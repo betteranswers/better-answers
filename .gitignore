@@ -1,0 +1,40 @@
+# dependencies and builds
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.turbo/
+coverage/
+reports/mutation/
+
+# local env — every secret lives in Coolify's env or the password manager (deploy/SECRETS.md)
+.env
+.env.*
+!.env.example
+
+# worker state is never committed and never backed up (ADR 0005 amendment)
+/data/
+
+# tooling
+.DS_Store
+.memdb/
+.lavish/*.session
+
+# wizard facts file (URLs, names, UUIDs — no secrets, but local)
+deploy/wizard-41.env
+
+# client material and the local planning map — never in the repository
+.planning/
+.scratch/
+.lavish/
+15-user-feedback.md
+old-suggested-schema.md
+AGENTS.md.bak
+
+# agent tooling installed from third parties — never ours to publish ([LIFT3], ADR 0027).
+# Skills are reinstalled from their sources; `tasks/AGENTS.md` from `ordna skill install`.
+.claude/skills/
+.agents/
+skills-lock.json
+tasks/AGENTS.md

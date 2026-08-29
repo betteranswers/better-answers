@@ -1,0 +1,47 @@
+---
+status: accepted
+date: 2026-08-29
+---
+
+# Better Answers is open core under Apache-2.0 — one licence over the whole tree, the hosted service is the product, copyleft is run-only
+
+The repository `github.com/betteranswers/better-answers` is public under the **Apache License 2.0**, one licence over the whole tree: the app, the worker, the share agent, **everything under `deploy/`** (compose files, Dockerfiles, the wizard, the runbook, the backup and restore scripts), the docs site, the ADRs, the constitution and the seed platform bundle. *("Deploy unit" is not the word for that list: it means what one release changes — the platform stack, by digest — and the stores and the database are not in it, `CONTEXT.md`. Corrected at the pre-build gate, A16.)* There is no `ee/` directory and no paid gate in the code. What a client pays for is the **hosted service**: the running estate (ADR 0022's two boxes, the tunnel, the model routes, the encrypted backups under governance lock, the restore drill, the escrow), support, the data-processor role and its DPIA, and any per-client purchase (a GPU, a local generation route). This is the model Better Auth ran — an MIT core with a paid hosted product — and the model Onyx and Dust run in this category.
+
+The flip from private to public happens **at the pre-build gate, before the first line of product code**, after a task in which a person reads every tracked file once for a client name, an address, a credential or a person's data, and `LICENSE`, `NOTICE`, `SECURITY.md` and `README.md` land in the same commit. Nothing ticket 41 laid down changes on the flip: secrets live in Actions and Coolify, never in files; client material (`.planning/`), the planning map (`.scratch/`) and review surfaces (`.lavish/`) are gitignored.
+
+**Copyleft is run-only.** Third-party code is lifted or depended on only under MIT, BSD, ISC, Apache-2.0 or the PostgreSQL licence. GPL/AGPL software (Garage, AGPL-3.0, the object store) runs as an unmodified separate process talked to over a network protocol — never linked, vendored or copied. Nothing under an `ee/` or enterprise-licensed directory is ever read from, not even for its shape. The label on copied code is a **`THIRD_PARTY_NOTICES.md`** at the root of each `<tier>/lifts/<name>/` snapshot (the file ADRs 0005, 0013 and 0021 call `LIFT.md`; the name changed here because it is the one other engineers recognise) carrying the upstream repository, commit, snapshot hash, licence and notice text, what was cut, who audited it and when. Ordinary pnpm and uv dependencies carry no such file; a `check` step fails on any dependency whose licence is off the list, and writes the root `THIRD_PARTY_NOTICES.md` aggregate.
+
+**The public face is read-only.** Issues are open; outside pull requests are closed with a fixed note; no CLA and no DCO; the platform bot and the maintainer are the only committers. `SECURITY.md` names one address for vulnerability reports. Revisited at v1.0 when a second maintainer exists.
+
+We decided this because the product's one claim no competitor makes — *open format you own* — is a claim about the bundle that is only whole when the client can leave with the bundle *and* run the thing that reads it; because the share agent (ADR 0013) is a program a client's IT installs on their own network and the customer-hosted worker (v1.0) is bought by the client who wants nothing to leave the site — both are sold to people who will read the source first; because a public repository gets 4-vCPU runners, unlimited Actions minutes, secret and code scanning and Dependabot for nothing; and because the tree is clean today, before any product code exists, which is the cheapest moment there will ever be for a one-way flip. Apache-2.0 over MIT for two clauses that matter to a product with no registered trade mark: §3's patent grant and §6's explicit reservation of the name *Better Answers*. The design — the ADRs — is public with the code; Onyx's and Dust's designs are public too, and the map still needed thirty sessions to reach ours.
+
+## Considered options
+
+- **Closed** — keeps the design private at the cost of the tagline's claim, the share agent's and customer-hosted worker's buyers, and the free CI and scanning; the design is the shape of a product, not the product.
+- **Source-available** (Business or Functional Source Licence, converting to Apache-2.0 after 2–4 years) — keeps a hosting competitor out for the conversion period; costs the word *open* (not OSI-recognised) and gives every client's legal team a bespoke licence to read. Reachable later from open core as a re-licence of future commits; not reachable the other way.
+- **Open later** — every commit until the flip must be publishable anyway; the cost of open without its benefits, and a date that drifts.
+- **MIT** — the Better Auth, Onyx and Dust choice; permissive alike; no patent grant, no trade-mark reservation. A coin toss whose one edge is Apache's.
+- **AGPL-3.0** — the strongest guard against a cloud vendor reselling the product; the licence that makes an IT manager refuse the share agent and turns a customer-hosted stack into a legal review; guards against a competitor that does not exist at one to ten clients.
+- **An `ee/` directory for paid features** (Onyx) — the pattern ticket 12 ruled a fork out for; doubles every seam; at this size there is no feature to gate that is not also what makes the product usable.
+- **Open only the share agent and the OKF tooling** — two repositories, two release trains; the customer-hosted worker becomes a negotiation.
+- **Accept outside contributions under a DCO or a CLA** — the review load, not the paperwork, is the problem for a solo maintainer with an agent-driven build; every merged outside line is a provenance question.
+
+## Consequences
+
+- **Files** (this PR): `LICENSE` (Apache-2.0), `NOTICE`, `SECURITY.md`, `README.md`; `[LIFT3]` in `CODING_RULES.md` and `THIRD_PARTY_NOTICES.md` as the per-lift file name in `[LIFT1]`/`[LIFT2]`; ADR 0005 amended. The `check` licence step lands with the first workspace `package.json` and `pyproject.toml` (its tools' versions from Context7, `[DEPS1]`).
+- **The flip** is task 77: the tree audit and the organisation setting, at the pre-build gate; the gate's list gains *the repository's public state matches ADR 0027*.
+- **Every lift ticket** checks its source's licence against `[LIFT3]` before a line is copied; a lift from a copyleft or enterprise-licensed source is refused, and the design is reimplemented clean-room (the neo4j-okf precedent, ADR 0021).
+- **The seed platform bundle** is open with the tree; a client's copy diverges and is theirs (ADR 0001 amendment, ticket 11).
+- **Trade mark**: the name relies on Apache-2.0 §6 until registration, which stays out of v0.1 (ticket 22 Q6); the Danish `betteranswers.ai` stays a watch item for the pre-build gate.
+- Amends ADRs 0005 (file name; posture) as recorded there; `LIFT.md` in ADRs 0013 and 0021 reads `THIRD_PARTY_NOTICES.md`.
+
+## Amendment — 2026-08-30, "the whole tree" excludes the estate's own configuration (ticket 79 Q10; applied by T-001)
+
+"One licence over the whole tree" is about the **licence**, and it stands. It is not a commitment to publish the **estate's own operational configuration**, and this ADR did not distinguish the two — so as the tree stood, the flip would have published which hostname carries which edge policy and why, where the single edge rate-limit rule sits, that the orchestrator writes plaintext env on the production box (making a snapshot of that box a secret), the host firewall rules with their source addresses, the backup bucket layout and which credential can delete from it, and the escrow model with its bus factor of one. **The flip is one-way through git history**, so this had to be settled before it, not after.
+
+**Three documents are split.** `deploy/SECRETS.md`, `deploy/coolify.md` and the estate-specific half of `deploy/RUNBOOK.md` keep **public halves** that name the credential *classes*, the *rotation contract*, the deployment *shape* and the recovery *order* — everything a reader needs to stand up their own deployment, and everything that makes the open-core claim real — while this estate's addresses, firewall rules, edge policy, bucket and vault names, host paths and recorded probe results live in the gitignored planning tree (`.planning/estate/`). The compose files, the Dockerfiles, the wizard, the workflows and the backup and restore scripts stay public in full: they are the product, and the wizard asks for every estate value rather than carrying one.
+
+**The rule, as a testable line** (ticket 77's new acceptance line): *no public file names a hostname's Access posture, a rate-limit placement, a firewall rule, a bucket name or an escrow holder.*
+
+**Enforced against operational files, not against the ADRs** (Liam, 30/08/2026). ADR 0022's edge paragraph and ADR 0008's amendment state which hostnames sit outside the access wall and why. Those are architectural facts anyone establishes with one request, and redacting them would gut the two ADRs a reader needs to understand the ingress at all. They stay. Settled — not to be re-asked at the flip.
+

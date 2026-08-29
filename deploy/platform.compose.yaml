@@ -1,0 +1,107 @@
+# Better Answers — the PLATFORM stack (ticket 41 Q2/Q3, ADR 0007 / 0022 / 0024): migrate → app → worker.
+# Redeployed on every release; the stores stack (stores.compose.yaml) and the Postgres resource
+# are untouched by it. See stores.compose.yaml for why there are two.
+#
+# Every image is deployed BY DIGEST: `${APP_IMAGE_DIGEST:?}` refuses to start without one, so
+# `:latest` cannot happen. The release workflow PATCHes the two digest env vars on this resource,
+# then calls Coolify's /deploy (research 68 §2b: the deploy call itself carries no variables).
+# VPC 1's Docker daemon pulls from ghcr.io with a read-only token (SECRETS.md) — packages are private.
+#
+# Order: `depends_on` conditions are a convenience; the safety is the runtime guard — migrate waits
+# for the DSN, the worker refuses to claim jobs when its schema stamp does not match
+# `__drizzle_migrations` (ADR 0007). Migrations are forward-only; a rollback is the previous digest,
+# and a migration that cannot run under the previous release says so in the release note.
+
+name: better-answers
+
+x-restart: &restart
+  restart: unless-stopped
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "10" }
+
+x-bootstrap: &bootstrap
+  # Bootstrap class only (CODING_RULES [SEC1]); every tenant credential is a row under the envelope.
+  DATABASE_URL: ${DATABASE_URL:?}
+  S3_ENDPOINT: http://objectstore:3900   # Garage, path-style, region "garage" (deploy/garage.toml)
+  S3_ACCESS_KEY: ${OBJECTSTORE_ROOT_KEY:?}
+  S3_SECRET_KEY: ${OBJECTSTORE_ROOT_SECRET:?}
+  # Unset in the first estate: no embedding host runs there (client one is on the hosted route —
+  # ADR 0020 amendment); set it when the service in stores.compose.yaml is uncommented.
+  EMBEDDINGS_URL: ${EMBEDDINGS_URL:-}
+  OTEL_TRACES_EXPORTER: none
+
+services:
+  # One-shot: the app's Drizzle migrations, including the DDL the app owns in `index` and the graph.
+  # `exclude_from_hc` stops Coolify reporting the stack as Exited after every deploy (research 68 §2a).
+  # Before `app` turns healthy after a RESTORE, the same image replays every erasure_request
+  # completed after the dump's timestamp (`pnpm ops replay-erasures`) — deploy/restore-drill.sh.
+  migrate:
+    image: ghcr.io/betteranswers/app@${APP_IMAGE_DIGEST:?set by the release workflow}
+    command: ["pnpm", "migrate"]
+    environment:
+      <<: *bootstrap
+    labels: { coolify.exclude_from_hc: "true" }
+    <<: *logging
+
+  app:
+    image: ghcr.io/betteranswers/app@${APP_IMAGE_DIGEST:?}
+    <<: [*restart, *logging]
+    environment:
+      <<: *bootstrap
+      NODE_ENV: production
+      PORT: "3000"
+      GIT_STORE_DIR: /data/git                # one bare repository per workspace, written through the git binary (ADR 0024)
+      KEK: ${KEK:?}
+      AUTH_SECRET: ${AUTH_SECRET:?}
+      SMTP_URL: ${SMTP_URL:?}
+      # Host-based routing: app. → everything; mcp. → /mcp, discovery and /oauth/*; agent. → /agent/v1/*
+      # only, refused before any body is read; the apex → /c/ (404). Anything else: 421.
+      # The four hostnames of the estate this file is deployed into — per-resource env, not a default
+      # in a public file (deploy/SECRETS.md § What the estate holds).
+      PUBLIC_HOSTS: ${PUBLIC_HOSTS:?}
+      AGENT_MAX_FILE_BYTES: "104857600"   # 100 MB — Cloudflare's edge limit on Free/Pro (research 68 §4); the 53 contract's cap
+      HEALTHCHECKS_PING_URL_SCHEDULER: ${HEALTHCHECKS_PING_URL_SCHEDULER:?}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+    volumes:
+      - /data/git:/data/git      # the bare repositories the app writes — one per workspace, under a per-repository lock (ADR 0024)
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  worker:
+    image: ghcr.io/betteranswers/worker@${WORKER_IMAGE_DIGEST:?set by the release workflow}
+    <<: [*restart, *logging]
+    environment:
+      <<: *bootstrap
+      DATABASE_URL: ${WORKER_DATABASE_URL:?}   # the workspace-scoped worker role, never the owner
+      HF_HOME: /data/worker/hf-cache
+      HF_HUB_OFFLINE: "1"                     # after first warm
+      MAX_CONCURRENT_RUNS: "1"                # one index at a time on a 4 GB box (ADR 0024); ticket 42 measures whether it can rise
+      LMDB_MAX_BYTES_PER_BINDING: "4294967296" # 4 GB cap; over it the binding's LMDB is wiped and reprocessed ([PIPE1])
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 15s
+      timeout: 3s
+      retries: 8
+      start_period: 40s
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      app: { condition: service_healthy }
+    volumes:
+      - /data/worker/lmdb:/data/worker/lmdb        # one LMDB per binding — personal data on disk; never backed up
+      - /data/worker/trees:/data/worker/trees      # git working trees per workspace — rebuilt
+      - /data/worker/hf-cache:/data/worker/hf-cache
+      - /data/git:/data/git:ro                     # read at the run's commit (`bundle_commit` on the run row); never written by the worker (ADR 0024)
+    deploy:
+      resources:
+        # 1.5 GB of a 4 GB box shared with Postgres, app, Garage and the tunnel (ADR 0024); an index
+        # that outgrows it spills to the host's swap file rather than failing — ticket 42 measures
+        # the swap-in rate and revises the cap.
+        limits: { memory: 1536m }

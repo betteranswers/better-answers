@@ -1,0 +1,23 @@
+# Garage — the platform's S3-compatible object store (ticket 41 Q12, research 70 §1).
+# One node, one image (dxflrs/garage:v2.3.0, read 28/08/2026): `garage server --single-node`.
+# Garage has no versioning or object lock: every immutability guarantee is off-host (BACKUPS.md).
+# Key names below are Garage v2's as documented at garagehq.deuxfleurs.fr — re-read on the day
+# before the first deploy ([DEPS1]); the first build task's spike confirms presigned URLs and
+# multipart streaming from the Node and Python SDKs.
+
+metadata_dir = "/data/meta"
+data_dir = "/data/data"
+db_engine = "sqlite"
+replication_factor = 1
+
+rpc_bind_addr = "127.0.0.1:3901"
+rpc_secret_file = "/run/secrets/garage_rpc_secret"   # any 32-byte hex; from Coolify env via the entrypoint
+
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "0.0.0.0:3900"
+root_domain = ".objectstore"
+
+[admin]
+api_bind_addr = "0.0.0.0:3903"        # /health for the compose healthcheck; internal network only
+admin_token_file = "/run/secrets/garage_admin_token"

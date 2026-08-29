@@ -1,0 +1,54 @@
+# Promote a pair of image digests to PRODUCTION. A person runs this; nothing else deploys production.
+# Default inputs are the digests staging is running. The `production` environment carries a required reviewer.
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_digest:
+        description: "ghcr.io/…/app digest (sha256:…) — blank = the digest staging runs"
+        required: false
+      worker_digest:
+        description: "ghcr.io/…/worker digest (sha256:…) — blank = the digest staging runs"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
+      # Coolify sits behind Cloudflare Access; CI presents a service token pair (deploy/coolify.md § Stage 7 state).
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      STAGING_UUID: ${{ vars.COOLIFY_STAGING_APP_UUID }}
+      PROD_UUID: ${{ vars.COOLIFY_PROD_APP_UUID }}
+    steps:
+      - name: resolve digests
+        id: d
+        env:
+          IN_APP: ${{ inputs.app_digest }}
+          IN_WORKER: ${{ inputs.worker_digest }}
+        run: |
+          set -euo pipefail
+          get() { curl -fsS "$COOLIFY_URL/api/v1/applications/$STAGING_UUID/envs" -H "Authorization: Bearer $COOLIFY_TOKEN" -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" | jq -r ".[] | select(.key==\"$1\") | .value"; }
+          app="$IN_APP"; worker="$IN_WORKER"
+          [ -n "$app" ] || app=$(get APP_IMAGE_DIGEST)
+          [ -n "$worker" ] || worker=$(get WORKER_IMAGE_DIGEST)
+          case "$app$worker" in *sha256:*sha256:*) ;; *) echo "digests missing" >&2; exit 1;; esac
+          echo "app=$app" >> "$GITHUB_OUTPUT"; echo "worker=$worker" >> "$GITHUB_OUTPUT"
+          echo "### Promoting\n- app \`$app\`\n- worker \`$worker\`" >> "$GITHUB_STEP_SUMMARY"
+      - name: set digests and redeploy production
+        run: |
+          set -euo pipefail
+          for kv in "APP_IMAGE_DIGEST=${{ steps.d.outputs.app }}" "WORKER_IMAGE_DIGEST=${{ steps.d.outputs.worker }}"; do
+            curl -fsS -X PATCH "$COOLIFY_URL/api/v1/applications/$PROD_UUID/envs" \
+              -H "Authorization: Bearer $COOLIFY_TOKEN" -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H "Content-Type: application/json" \
+              -d "{\"key\":\"${kv%%=*}\",\"value\":\"${kv#*=}\",\"is_preview\":false}"
+          done
+          curl -fsS "$COOLIFY_URL/api/v1/deploy?uuid=$PROD_UUID&force=false" -H "Authorization: Bearer $COOLIFY_TOKEN" -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"

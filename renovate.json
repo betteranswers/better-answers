@@ -1,0 +1,19 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":pinDigests", ":semanticCommitsDisabled", "schedule:weekends"],
+  "timezone": "Europe/London",
+  "labels": ["deps"],
+  "automerge": false,
+  "prConcurrentLimit": 6,
+  "ignorePaths": ["**/lifts/**", "**/node_modules/**", ".scratch/**", ".planning/**"],
+  "enabledManagers": ["npm", "pep621", "github-actions", "docker-compose", "dockerfile"],
+  "pep621": { "lockFileMaintenance": { "enabled": true } },
+  "packageRules": [
+    { "matchManagers": ["docker-compose", "dockerfile"], "groupName": "images", "pinDigests": true },
+    { "matchManagers": ["github-actions"], "groupName": "actions", "pinDigests": true },
+    { "matchManagers": ["npm"], "matchDepTypes": ["devDependencies"], "groupName": "npm dev" },
+    { "matchManagers": ["pep621"], "groupName": "python" },
+    { "matchPackageNames": ["apache/age", "postgres"], "matchUpdateTypes": ["major"], "enabled": false, "description": "A Postgres or AGE major is an upgrade drill, not a bump (ADR 0023): the platform image is built from AGE's release for one Postgres major, and the graph rides the dump. Neo4j and Forgejo are gone (ADRs 0023, 0024)" }
+  ],
+  "lockFileMaintenance": { "enabled": true, "schedule": ["before 6am on monday"] }
+}

@@ -1,0 +1,7 @@
+# .ordna/config.yaml
+storage: namespace
+
+namespace:
+  pollIntervalMs: 1000           # how often the watcher checks for ref changes
+  autoFetchIntervalMs: 60000     # background fetch from origin (0 disables)
+  autoRenumberOnConflict: true   # auto-renumber + cascade on push collision (false = surface a loud error instead)

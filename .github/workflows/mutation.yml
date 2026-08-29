@@ -1,0 +1,54 @@
+# Mutation testing on a schedule ([TEST6]): Stryker for app/ and web/, mutmut for worker/.
+# WEEKLY on hosted runners, not nightly: a nightly run is ~1,800 of the 2,000 free minutes on a 2-vCPU runner
+# (ticket 41 Q1, research 69). Nightly returns with a self-hosted runner on VPC 2 — a one-line runs-on change.
+# A falling score is an ordna task, not a failed build — the job posts the numbers, it does not gate.
+name: mutation
+
+on:
+  schedule:
+    - cron: "17 2 * * 0"   # Sundays 02:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stryker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      matrix:
+        workspace: [app, web]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.0.10
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter ./${{ matrix.workspace }} run mutation
+      - name: score to the job summary
+        run: |
+          f=${{ matrix.workspace }}/reports/mutation/mutation.json
+          [ -f "$f" ] && echo "### ${{ matrix.workspace }} mutation score: $(jq -r '.thresholds.break // "n/a"' "$f")" >> "$GITHUB_STEP_SUMMARY" || echo "no report" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@<read on the day — not in research 68>
+        if: always()
+        with:
+          name: stryker-${{ matrix.workspace }}
+          path: ${{ matrix.workspace }}/reports/mutation
+          retention-days: 14
+
+  mutmut:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults: { run: { working-directory: worker } }
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run mutmut run
+      - run: uv run mutmut results | tail -n 20 >> "$GITHUB_STEP_SUMMARY"
+        if: always()

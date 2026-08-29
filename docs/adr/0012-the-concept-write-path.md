@@ -1,0 +1,50 @@
+---
+status: accepted
+date: 2026-08-27
+---
+
+# The bundle is written only by the app, one commit per act; platform-prepared changes wait as suggestions; the concept index is written at commit time and checked by sync; the forge is internal and portability is an export
+
+Every change to a workspace's bundle is **one commit made by the app** through the governed write (an actor, a hash precondition, one commit, one audit entry — OnyxWriter's contract, research 26). Writes come in two kinds. A **human-actor write** — a UI edit, an en-masse verify, a promotion (ticket 37) — commits directly, the person as git author and the platform bot as committer. A **platform-prepared change** — candidate concepts from an extraction or enrichment run, an open-ontologies vocabulary `plan` diff, a platform-bundle or template update, an alias merge from entity resolution — is a **suggestion**: it waits in Control Centre until an Admin accepts or declines it, and *nothing platform-prepared reaches the bundle without that acceptance*. A run yields one suggestion set, accepted in bulk or per item; each acceptance act is one governed write and one commit; a declined suggestion is recorded with its reason. In the same operation as its commit the app writes the **concept index** — the derived row per concept (identity, frontmatter, body, content hash, commit SHA, projected trust fields, sensitivity) — in one database transaction with the `bundle_commit` row and ADR 0004's synchronous flagging of citing compositions; there is **no row without a commit**. The worker's derive-and-sync, woken by the `bundle_commit` row, checks out at that commit with a per-run read-only token, derives chunks and the graph, and **cross-checks its own parse hash-by-hash against the rows**, raising a `bundle_health` event on mismatch; a periodic head check is a reconciler for a crash between commit and rows, not a trigger. The workspace repository lives on a **self-hosted Forgejo that is internal**: private network only, no public hostname, no human accounts, the platform bot its only principal — nobody but the platform touches the forge (Liam, 26/08/2026; ADR 0001 amendment). A concept has two endings: **deprecate** (`status` only; the successor carries the lineage, ticket 23) for anything that has ever been `stable` or is cited or linked; **discard** (file removed, row kept as *removed*, IRI never reused) only for a never-stable, uncited concept. **Portability is an export** from Control Centre — a bundle snapshot (archive of `knowledge/` at a commit, readable by any OKF tool) or a repository export (`git bundle`) — and an existing OKF bundle is brought in through the same governed batch write, its trust events kept and marked *imported*.
+
+We decided this because the bundle is the company's asset and the platform's promise is trust per fact: a single committer makes every change attributable and revertible; acceptance before landing keeps a bad producer run out of a history that is permanent; the row written at commit time is what makes a changed atom flag its compositions *now* rather than after a Python job; and an internal forge with an export keeps portability real (any OKF tool reads the snapshot) without a second door onto the canonical store.
+
+## Considered options
+
+- **Land agent output on arrival as `status: draft`** (ticket 38 D4's literal reading) — cheaper first run; every wrong atom becomes a clean-up commit and the bundle's history records the mistake.
+- **Rows written only by the worker's sync** — one parser; every edit visible seconds later and "synchronous" flagging becomes "after the next sync". **No row at all** — no filters for sensitivity or status, no index (ticket 47 briefing §D2).
+- **Admins clone and push, checked on arrival** (round 1) — portability with a write path; reversed by Liam: a human on the forge means rules in two places and a history the platform did not make.
+- **A read-only clone URL** served by the app — `git clone` works; a second authenticated endpoint, token issuance and rate limits before any client has asked.
+- **Deprecate only**, never remove — mistakes filed as history forever. **Governed remove for any concept** with tombstones (round 1) — real knowledge can leave the tree.
+- **Home D, an in-app git library** on a shared volume — no pull-request primitive (now moot) and a customer-hosted worker cannot mount it (ticket 38).
+
+## Consequences
+
+- Forgejo is a container with no UI role: one bot service account, a repository-scoped token per workspace for the app (ingestion credential class), per-run read-only tokens for the worker; its pull-request screen and Actions are unused; tenant automation runs against the platform's API and MCP surface.
+- Two parsers exist by decision (TypeScript for writes, Python for the graph) and now police each other; `bundle_health`, sync lag, reconciler hits and the suggestion backlog are named signals (ticket 42).
+- Commit granularity: a UI edit, an acceptance act, a promotion = one commit each; an en-masse verify = one batch commit with per-document hash preconditions; trailers `Actor:` / `Audit:` / `Run:` / `Suggestion:` / `Projection: guides`.
+- A rename is the same IRI at a new path by a governed move that rewrites inbound links in the same commit; faults (unknown `type`, imported or hand-typed `verified`, missing `iri`) are signals on the row and in Control Centre, never marks in the file (`[OKF2]`).
+- Personal data that reaches the bundle is an incident procedure — history rewrite by the bot and a full resync — never a feature; ticket 24 keeps it out. Exports already issued cannot be recalled.
+- The word for a platform-prepared change is **suggestion** (accept / decline); "proposal" stays the bid document.
+- Reopens nothing in ADRs 0001–0011; refines ADR 0005's inbox (a `concept_write_request` is a suggestion's payload, committed on acceptance, not on validation) — amended there.
+
+## Amendment — 2026-08-27, a person may prepare a suggestion and the owner decides it (ticket 19, research 57)
+
+A **suggestion** may also be prepared by a person who may not commit the change: an edit to a concept's text made from a guide page by anyone but the concept's owner or an Admin, an edit to a Brief by a reader who may not edit compositions, or a missing fact offered as a new concept — the suggestion kind *edit*, with the proposer recorded and the payload carrying the content hash it was written against, so an acceptance over a body that moved fails loudly and returns to the proposer. It is decided by the **target's owner or an Admin** — in the guide page or the owner's inbox, since Control Centre is an Admin surface — and acceptance is the same governed write: one commit, the proposer as git author, the platform bot as committer, the accepter on the audit event. The owner's or an Admin's own edit from the page stays a human-actor write and commits directly, after the page has stated the consequence in words and, when the concept is used in more than one place, asked once. "Nothing platform-prepared reaches the bundle without acceptance" is unchanged; the sentence that now reads "an Admin accepts or declines" reads "the target's owner or an Admin" for the *edit* kind and "an Admin" for every other kind. Everything else in this ADR stands.
+
+## Amendment — 2026-08-27, the history rewrite is also a routine (ticket 24, ADR 0020)
+
+The history rewrite this ADR keeps for incidents is also run **on purpose**, as a routine with its report on the `erasure_request`, when a valid erasure request reaches personal data the bundle holds by design — a `Person` concept, `human:<email>` actor ids; git author lines are mailmapped to the member id in the same routine. Exports already issued are listed as not recalled. Everything else here stands: personal data reaching the bundle *unplanned* is still an incident.
+
+## Amendment — 2026-08-28, the forge is a bare repository the app writes (ticket 74, ADR 0024)
+
+The consequence "Forgejo is a container with no UI role …" is struck: each workspace's repository is a bare git repository under `/data/git` that the app writes through the git binary, with the commit contract above unchanged (one commit per act, hash precondition, author and committer, trailers). The worker reads at a commit over a read-only mount; the per-run token becomes the commit hash on the run row; a customer-hosted worker (v1.0) reads over git smart HTTP served by the app under the run's token — the answer to the objection that rejected an in-app library. Everything else stands.
+
+## Amendment — 2026-08-30, no vocabulary plan, and an unknown kind is not a fault (ticket 79, the pre-build gate; applied by T-001)
+
+Two sweeps from ADR 0026 (superseding ADR 0001), which removed the vocabulary file after this ADR was written.
+
+- The list of platform-prepared changes above names "an open-ontologies vocabulary `plan` diff" as a suggestion kind. **It is struck**: there is no vocabulary file, no plan record and no vocabulary suggestion kind. A new kind arrives with the concepts that carry it, and the suggestion set's summary names it ("introduces a new kind: *Course* (12)"); accepting the concepts accepts the kind. An Admin's **rename or merge of a kind** is one bulk commit through this same governed write, rewriting every affected `type` and re-keying `concept_identity` in the same transaction.
+- The consequence "faults (unknown `type`, imported or hand-typed `verified`, missing `iri`) are signals on the row" loses its first item. **An unknown kind is not a fault** — it is the ordinary case, folded at write for case and plural only. `imported or hand-typed `verified`` and `missing `iri`` stand as signals.
+
+Everything else in this ADR and its amendments stands.
