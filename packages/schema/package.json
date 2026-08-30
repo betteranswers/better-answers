@@ -13,9 +13,6 @@
     "check": "pnpm run lint && pnpm run typecheck && pnpm run test",
     "test": "vitest run"
   },
-  "dependencies": {
-    "drizzle-orm": "0.45.2"
-  },
   "devDependencies": {
     "@types/node": "24.13.3",
     "drizzle-kit": "0.31.10",

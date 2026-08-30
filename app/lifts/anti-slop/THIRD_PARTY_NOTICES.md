@@ -29,6 +29,13 @@ does **but one**: `no-module-mocking` stays an **error in test files**, because 
 the only place it can fire and `[TEST3]` is what it exists to enforce. That is the whole
 difference — the other fourteen behave exactly as they do upstream.
 
+**The severity split is upstream's, deliberately.** Eight rules are errors, five are
+warnings and two are off, so five of the fifteen cannot fail `check` — oxlint exits 0 on
+warnings. That is Onyx's own tuning of which rules are noisy, made against a far larger
+codebase than this one, and deviating from it without evidence would be guessing. A rule
+earns promotion to `error` when this repository has a case where the warning was right;
+`--deny-warnings` is the lever, and it is deliberately not pulled yet.
+
 ## The boundary contract a refresh must pass
 
 `app/test/anti-slop-lift.test.ts` — it runs oxlint over a fixture and asserts that
