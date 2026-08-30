@@ -13,8 +13,10 @@ row, and refuses to claim jobs when its schema stamp does not match `__drizzle_m
 
 `log.py` is the tier's only logger — structlog, JSON to stdout, `print` banned outside
 scripts (`[LOG1]`). `config.py` is the only module in the tier that reads the environment
-(`[SEC1]`), and it reads the bootstrap class alone; a run's tenant credentials are injected
-through the control plane, so the worker never holds the master key.
+(`[SEC1]`), and it reads the **bootstrap class alone** — what the deploy unit must give the
+process before it can reach anything. Every other credential class is a row under the
+envelope, injected per run through the control plane, so the worker never holds the master
+key. A variable no step in this tier reads yet does not belong in that module.
 
 ## [WRK3] `check` is one command that reports everything
 

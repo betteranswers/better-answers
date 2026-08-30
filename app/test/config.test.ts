@@ -7,7 +7,6 @@ describe("the app's bootstrap configuration", () => {
     const bootstrap = readBootstrap({
       DATABASE_URL: "postgresql://app@platform:5432/better_answers",
       PORT: "3000",
-      NODE_ENV: "production",
     });
 
     expect(bootstrap).toEqual({
@@ -15,7 +14,6 @@ describe("the app's bootstrap configuration", () => {
       value: {
         databaseUrl: "postgresql://app@platform:5432/better_answers",
         port: 3000,
-        nodeEnv: "production",
       },
     });
   });
@@ -26,6 +24,15 @@ describe("the app's bootstrap configuration", () => {
     });
 
     expect(bootstrap.ok && bootstrap.value.port).toBe(3000);
+  });
+
+  it("ignores an environment variable nothing in this tier reads yet", () => {
+    const bootstrap = readBootstrap({
+      DATABASE_URL: "postgresql://app@platform:5432/better_answers",
+      S3_SECRET_KEY: "not the bootstrap class",
+    });
+
+    expect(bootstrap.ok).toBe(true);
   });
 
   it("refuses to start rather than run without a database URL", () => {

@@ -23,10 +23,11 @@ plugin's own `package.json`, which is `private` and unused here because
 ## What is ours, not theirs
 
 The **rule severities** in the repository's `.oxlintrc.json`. Onyx runs eight of the
-fifteen rules as errors, five as warnings, two off, and turns *every* anti-slop rule
-off for test files. We keep the same split with one deliberate difference:
-`no-module-mocking` stays an **error in test files too**, because tests are the only
-place it can fire and `[TEST3]` is what it exists to enforce.
+fifteen rules as errors, five as warnings and two off, and turns *every* anti-slop rule
+off for test files. We keep that split, and the test override turns off every rule Onyx
+does **but one**: `no-module-mocking` stays an **error in test files**, because a test is
+the only place it can fire and `[TEST3]` is what it exists to enforce. That is the whole
+difference — the other fourteen behave exactly as they do upstream.
 
 ## The boundary contract a refresh must pass
 

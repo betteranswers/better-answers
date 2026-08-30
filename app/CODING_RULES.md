@@ -16,8 +16,11 @@ resolves. `tsc` runs for types only (`--noEmit`).
 `src/server.ts` builds the tier's only Hono app and takes what it needs as parameters —
 `createServer({ database })` is the shape every later mount follows. `src/logger.ts` is
 the tier's only logger (`[LOG1]`). `src/config.ts` is the only module in the tier that
-reads the environment (`[SEC1]`, § TYPES), and it reads the bootstrap class alone; every
-tenant credential is a row under the envelope.
+reads the environment (`[SEC1]`, § TYPES), and it reads the **bootstrap class alone** —
+what the deploy unit must give the process before it can reach anything. Every other
+credential class is a row under the envelope, so a key belongs in that module only once
+something in this tier reads it. Entry points call `requireBootstrap`, which says why on
+the way out rather than failing later against a store it was never told about.
 
 ## [APP3] Tests start a real Postgres and speak HTTP
 

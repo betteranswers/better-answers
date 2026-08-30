@@ -43,6 +43,8 @@
         "anti-slop/no-conditional-empty-object-spread": "off",
         "anti-slop/no-known-value-widening": "off",
         "anti-slop/no-object-parameters": "off",
+        "anti-slop/no-reflect-apply": "off",
+        "anti-slop/no-reflect-get": "off",
         "anti-slop/no-unknown-parameters": "off",
         "anti-slop/no-unknown-returns": "off",
         "anti-slop/no-unknown-type-aliases": "off",

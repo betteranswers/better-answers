@@ -1,15 +1,19 @@
 """The bootstrap credential class, and the only place in the tier that reads the
 environment (`[SEC1]`).
 
-Every tenant credential is a row under the envelope, decrypted by the app and handed
-to a run through the control plane; the worker never holds the master key (ADR 0005).
+The bootstrap class is what the deploy unit must give the process before it can reach
+anything. Every other credential class — ingestion, acting, agent, LLM provider,
+repository, object store — is a row under the envelope, decrypted by the app and
+injected per run through the control plane, and never mixed into this scope
+(`[SEC1]`, ADR 0005). The object store and the embedding host join this module the
+day a step in this tier reads them (B7).
 """
 
 from collections.abc import Mapping
 from dataclasses import dataclass
 from os import environ
 
-REQUIRED = ("DATABASE_URL", "S3_ENDPOINT", "S3_ACCESS_KEY", "S3_SECRET_KEY")
+REQUIRED = ("DATABASE_URL",)
 
 
 class BootstrapError(ValueError):
@@ -19,10 +23,6 @@ class BootstrapError(ValueError):
 @dataclass(frozen=True, slots=True)
 class Bootstrap:
     database_url: str
-    object_store_endpoint: str
-    object_store_access_key: str
-    object_store_secret_key: str
-    embeddings_url: str | None
 
 
 def read_bootstrap(environment: Mapping[str, str] | None = None) -> Bootstrap:
@@ -35,14 +35,4 @@ def read_bootstrap(environment: Mapping[str, str] | None = None) -> Bootstrap:
             "bootstrap configuration is incomplete: " + ", ".join(missing)
         )
 
-    # Unset in the first estate: no embedding host runs there, and the first client
-    # is on the hosted route (deploy/platform.compose.yaml, ADR 0024).
-    embeddings_url = source.get("EMBEDDINGS_URL") or None
-
-    return Bootstrap(
-        database_url=source["DATABASE_URL"],
-        object_store_endpoint=source["S3_ENDPOINT"],
-        object_store_access_key=source["S3_ACCESS_KEY"],
-        object_store_secret_key=source["S3_SECRET_KEY"],
-        embeddings_url=embeddings_url,
-    )
+    return Bootstrap(database_url=source["DATABASE_URL"])

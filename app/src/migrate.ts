@@ -4,7 +4,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { attempt } from "@better-answers/contracts";
 import { migrationsFolder } from "@better-answers/schema";
 
-import { readBootstrap } from "./config.ts";
+import { requireBootstrap } from "./config.ts";
 import { logger } from "./logger.ts";
 
 /**
@@ -12,13 +12,9 @@ import { logger } from "./logger.ts";
  * starts, and `app` before `worker` (ADR 0007's deploy order). Migrations are
  * forward-only — a rollback is the previous image digest (`[OPS1]`, ADR 0022).
  */
-const bootstrap = readBootstrap();
-if (!bootstrap.ok) {
-  logger.error({ reason: bootstrap.error.message }, "migrations cannot run");
-  process.exit(1);
-}
+const bootstrap = requireBootstrap("migrations");
+const database = drizzle(bootstrap.databaseUrl);
 
-const database = drizzle(bootstrap.value.databaseUrl);
 const applied = await attempt(async () => {
   await migrate(database, { migrationsFolder });
   await database.$client.end();
