@@ -4,6 +4,9 @@ dist/
 .venv/
 __pycache__/
 *.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 .turbo/
 coverage/
 reports/mutation/

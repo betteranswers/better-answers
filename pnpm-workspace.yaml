@@ -1,5 +1,19 @@
+# `worker/` is a uv workspace, not a pnpm one, and `docs-site/` joins this list the day
+# it is lifted in (AGENTS.md § Layout).
 packages:
   - app
   - web
   - packages/*
-  - docs-site
+
+# Postinstall scripts run for esbuild alone — vite and drizzle-kit need its platform
+# binary. The other three are optional native accelerations we do not take.
+allowBuilds:
+  cpu-features: false
+  esbuild: true
+  protobufjs: false
+  ssh2: false
+
+# pnpm 11 holds back releases younger than its minimum age; these were taken at their
+# current version deliberately, read from the registry on the day ([DEPS1]).
+minimumReleaseAgeExclude:
+  - zod@4.5.4

@@ -1,0 +1,48 @@
+[project]
+name = "better-answers-worker"
+version = "0.1.0"
+description = "Better Answers — the Python knowledge worker (ADR 0005)"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "structlog>=26.1.0",
+]
+
+[project.scripts]
+# The gate the root `check` runs: `uv run --frozen check` (AGENTS.md).
+check = "better_answers_worker.check:main"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+    "ruff>=0.16.5",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.4,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "better_answers_worker"
+module-root = "src"
+
+[tool.ruff]
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20"]
+
+[tool.ruff.lint.per-file-ignores]
+# The check runner is a script; it is the one place print-shaped output is allowed
+# (`[LOG1]` bans `print` outside scripts).
+"src/better_answers_worker/check.py" = ["T20"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

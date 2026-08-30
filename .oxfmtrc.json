@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": [
+    "**/*.md",
+    "**/*.yml",
+    "**/*.yaml",
+    "**/*.toml",
+    "deploy/**",
+    "renovate.json",
+    "app/lifts/**",
+    "packages/schema/migrations/**"
+  ]
+}

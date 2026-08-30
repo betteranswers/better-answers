@@ -1,0 +1,25 @@
+{
+  "name": "@better-answers/schema",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "lint": "oxlint --config ../../.oxlintrc.json .",
+    "typecheck": "tsc --noEmit",
+    "check": "pnpm run lint && pnpm run typecheck"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.2",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.10",
+    "typescript": "7.0.2"
+  }
+}

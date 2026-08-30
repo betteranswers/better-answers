@@ -2,11 +2,24 @@
   "name": "better-answers",
   "private": true,
   "description": "Better Answers — a living company knowledge map for UK SMBs on OKF v0.2 (see AGENTS.md)",
-  "engines": { "node": ">=24 <25", "pnpm": ">=10" },
-  "packageManager": "pnpm@11.24.0",
   "scripts": {
-    "check": "pnpm -r --if-present run check && (cd worker && uv run --frozen check)",
-    "migrate": "pnpm --filter @better-answers/schema run migrate",
+    "check": "pnpm run format:check && pnpm -r --if-present run check && (cd worker && uv run --frozen check)",
+    "lint": "oxlint",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "migrate": "pnpm --filter @better-answers/app run migrate",
     "mutation": "pnpm -r --if-present run mutation"
-  }
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "1.80.0",
+    "@types/node": "24.13.3",
+    "oxfmt": "0.65.0",
+    "oxlint": "1.80.0",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=10"
+  },
+  "packageManager": "pnpm@11.24.0"
 }
