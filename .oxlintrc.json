@@ -4,7 +4,7 @@
   "jsPlugins": [
     {
       "name": "anti-slop",
-      "specifier": "./app/lifts/anti-slop/index.ts"
+      "specifier": "./app/tools/anti-slop/index.ts"
     }
   ],
   "categories": {
