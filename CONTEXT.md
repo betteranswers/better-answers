@@ -404,6 +404,17 @@ to it by IRI and never restates it (ADR 0014).
   is the alert. Carries an outcome word and sizes, never a path or an error.
 - **escrow** — the two-holder vault outside every box that keeps the handful of secrets whose loss
   loses everything else.
+- **boundary schema** — the validation schema a caller is checked against for one table, in three
+  shapes (select, insert, update), generated from the table rather than written beside it, so a
+  column has one definition and a boundary cannot drift from it (ADR 0028). Narrowed by refinements
+  and composed at a boundary by picking, omitting and extending; a table's columns are described in
+  one place only. _Avoid_: shadow schema (a second, hand-written description of a table's columns —
+  the thing a boundary schema exists to make unnecessary).
+- **refinement** — a narrowing of one column's boundary schema, written beside that column: a brand,
+  a format, a trim, a value set smaller than the column's. A refinement only ever makes the accepted
+  set smaller, and the parity test proves it by offering what the refinement accepts to the column
+  itself (ADR 0028). Not a boundary's own shaping, which selects columns rather than redescribing
+  one.
 
 ## People
 
