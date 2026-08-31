@@ -489,6 +489,17 @@ to it by IRI and never restates it (ADR 0014).
   referenced read tool.
 - **open (an MCP entry)** — the verbatim step of two-step retrieval: a concept by IRI, or the
   passage a citation rests on by locator; `find` is the preview step.
+- **MCP App** — a view the platform serves for an assistant to render inside the conversation:
+  an HTML page addressed by a `ui://` URI, named in an entry's metadata, drawn in a sandbox the
+  host controls, able to call the same entries the assistant can. It shows a concept, an answer
+  or a set of hits; it is never a second way in (ADR 0030). _Avoid_: widget, panel, interactive
+  connector.
+- **view** — the rendering half of an MCP App: one `ui://` resource bound to one entry. Every
+  view has a **human rendering** behind it — the text form of the same result — and not every
+  human rendering has a view.
+- **`ui://`** — the wire URI scheme for a view. Beside `okf://` and meaning something different:
+  `okf://` identifies a **concept**, `ui://` identifies a **view**. On the wire only, never in a
+  file.
 - **token scope** — what a token may do on the MCP surface: `knowledge:read`, `feedback:write`;
   `act:*` later. Shown at consent in the person's words, never as an id. Not a binding's scope.
 - **personal token** — a person's own bearer credential for Claude Code and scripts (the
