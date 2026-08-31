@@ -1,0 +1,230 @@
+# yaml-language-server: $schema=https://cubic.dev/schema/cubic-repository-config.schema.json
+
+# cubic.yaml
+# This file configures AI review behavior, ignore patterns, PR descriptions, and custom rules.
+# Place this file in your repository root to version-control your AI review settings.
+# Settings defined here take precedence over UI-configured settings.
+# See https://docs.cubic.dev/configure/cubic-yaml for documentation.
+
+version: 1
+reviews:
+  enabled: true
+  sensitivity: high
+  incremental_commits: true
+  check_drafts: false
+  architecture_diagrams: false
+  external_contributors_require_manual_review: false
+  resolve_threads_when_addressed: true
+  merge_confidence_summary: false
+  auto_approve_behavior: disabled
+  auto_approve: disabled
+  auto_approve_rules:
+    exclude_external_contributors: false
+  ultrareview: manual
+  auto_ultrareview: disabled
+
+  # This repository is governed by written documents rather than by convention.
+  # A reviewer that has not read them reports generic findings and misses the
+  # rules that actually bind, so name them here — they cost no agent slot.
+  custom_instructions: |
+    Read these before reviewing. They are the standard this repository is held to,
+    and a finding that contradicts one of them is wrong.
+
+    - `AGENTS.md` — the map: layout, how a task is worked, which skill applies.
+    - `CONTEXT.md` — the glossary. Every domain word has one settled meaning.
+      A new domain word is settled here BEFORE it appears in code; a diff that
+      introduces a domain term absent from the glossary is a finding.
+    - `CODING_RULES.md` — the constitution. Rules are tagged (`[DESIGN]`,
+      `[TEST]`, `[SEC]`, `[LIFT]`, `[DEPS1]`, `[COMMENT]`, `[LOG1]`…). Cite the
+      tag when a finding rests on a rule.
+    - `app/CODING_RULES.md` and `worker/CODING_RULES.md` — tier rules. Apply the
+      tier's file to changes in that tier.
+    - `docs/adr/` — 28 architecture decision records. A change that contradicts
+      an ADR is a NEW ADR in the same pull request, never a quiet edit. Say which
+      ADR is contradicted.
+
+    Four things carry more weight here than in most repositories:
+
+    1. Deep modules. Much behaviour behind a small interface. A wide interface
+       over thin behaviour is a finding even when the code is correct.
+    2. Comments say WHY, never WHAT. History belongs in git and in ADRs.
+    3. Every version introduced is read from the vendor on the day (`[DEPS1]`).
+       A version that appears without evidence of being read is a finding.
+    4. Tests go through the module's interface against real infrastructure.
+       Module mocking is banned and lint-enforced.
+
+  ignore:
+    files:
+      # Verbatim install of github.com/dmmulroy/anti-slop, loaded as an oxlint
+      # jsPlugin. We do not edit it, so a finding here belongs upstream, not on
+      # a pull request of ours. Excluded from lint and format for the same reason.
+      - app/tools/anti-slop/**
+      - cubic.yaml
+      # Working material and generated artefacts, not reviewable source.
+      - .scratch/**
+      - .planning/**
+      - "**/reports/**"
+      - pnpm-lock.yaml
+      - worker/uv.lock
+
+  custom_rules:
+    - name: Enforce Pragmatic Test Coverage
+      description: |-
+        Be reasonable when evaluating tests. Flag changes when important behavior is untested, but do not require tests for every export, type, config, metadata file, or mechanical change.
+
+        Flag PRs that:
+        - Change core business logic without covering the main success and failure paths.
+        - Add UI behavior without testing the user-visible interaction or state change.
+        - Add tests that only assert rendering, existence, snapshots, or that a function returns any value.
+        - Skip, mute, or weaken existing tests without a clear reason.
+        - Mock so much of the system that the test no longer validates the behavior the PR claims to change.
+    - name: Enforce Strict Maintainability Standards
+      description: |-
+        Review changes for structural maintainability regressions. Behavior-correct code can still violate this rule if it makes the codebase harder to understand, extend, or decompose.
+
+        Be ambitious about structural simplification. Look for reframings that delete whole branches, helpers, modes, conditionals, or layers instead of adding more of them. Prefer solutions that remove complexity rather than rearrange it.
+
+        Flag PRs that:
+        - Push a file from under 1,000 lines to over 1,000 without a strong reason or clear organization. Prefer extracting helpers, subcomponents, modules, or local abstractions first.
+        - Add ad-hoc conditionals, scattered special cases, one-off booleans, nullable modes, or flags into already busy shared flows instead of a dedicated abstraction, helper, state machine, policy object, or separate module.
+        - Introduce thin wrappers, identity abstractions, or pass-through helpers that add indirection without reducing complexity.
+        - Use brittle, ad-hoc, or "magic" mechanisms that hide simple data-shape assumptions.
+        - Rely on unnecessary casts, any, unknown, or optional parameters when a clearer type boundary or explicit model would simplify control flow.
+        - Use silent fallbacks to paper over unclear invariants instead of making the boundary explicit.
+        - Duplicate existing helpers or put logic in the wrong layer when a canonical utility or module already owns the concept.
+        - Leak feature-specific logic into general-purpose or shared paths.
+        - Copy-paste logic instead of extracting a shared helper or pure function.
+        - Handle narrow edge cases in the middle of an already busy function.
+        - Refactor in ways that move complexity around without reducing the number of concepts a reader must hold in their head.
+        - Add "temporary" branching that is likely to become permanent debt.
+        - Serialize obviously independent work or leave related updates in a non-atomic shape when a cleaner structure is available.
+
+        Prioritize findings in this order:
+        1. Structural code-quality regressions
+        2. Missed opportunities for dramatic simplification
+        3. Spaghetti or branching complexity increases
+        4. Boundary, abstraction, or type-contract problems
+        5. File-size and decomposition concerns
+        6. Modularity and legibility concerns
+
+        Do not flag cosmetic nits when a larger structural issue is present. Prefer a smaller number of high-conviction findings over a long list of minor notes. Only report violations on changed lines with clear evidence from the diff.
+    - name: Flag AI Slop and Fabricated Changes
+      description: |-
+        Be conservative. Flag only obvious, evidence-backed low-quality AI output in the diff.
+
+        Flag changes that:
+        - Ship placeholder, mock, demo, fake-data, temporary debug, or filler text to production paths without a clear reason.
+        - Claim behavior in docs, comments, config, or PR text that the changed code does not implement.
+        - Reference files, commands, routes, functions, env vars, or config keys that do not exist.
+        - Add duplicated, patchwork, or overengineered code where a smaller cohesive solution would clearly work.
+        - Add narrating comments that restate obvious code instead of explaining intent or constraints.
+        - Change behavior without meaningful tests, or weaken existing tests to normalize a regression.
+
+        Do not flag:
+        - Generated files, fixtures, snapshots, migrations, vendored code, or mechanical renames unless one of the rules above clearly applies.
+        - Explicitly labeled scaffolding with concrete follow-up guidance.
+        - Well-scoped AI-assisted code that is cohesive and tested.
+    - name: Flag Security Vulnerabilities
+      description: "Scan for security flaws: hardcoded secrets, SQL injection, XSS, weak auth, exposed data, poor crypto, unsafe deserialization, insecure HTTP calls in production, and more. Ensure all network requests use HTTPS/TLS. Identify attack vectors and security violations to maintain robust defenses."
+    - name: Require API Auth, Validation, and Tenant Scoping
+      description: |-
+        Review API handlers and controller endpoints for missing authentication, authorization, tenant scoping, and request validation.
+
+        Flag new or modified endpoints that:
+        - Accept request bodies without runtime validation, such as Zod schemas, DTOs, or framework-native validators.
+        - Trust user-supplied identifiers for tenant, organization, or account access instead of deriving access from the authenticated session.
+        - Return sensitive internal errors or use inconsistent HTTP status codes for 400, 401, 403, 404, and 500 cases.
+        - Mix reads and writes in a way that makes side effects hard to reason about.
+        - Add public or high-volume endpoints without rate limiting or abuse controls.
+pr_descriptions:
+  generate: true
+  cubic_review_link: true
+  skip_if_author_description: false
+issues:
+  fix_with_cubic_buttons: true
+  pr_comment_fixes: true
+  fix_commits_to_pr: true
+  auto_fix_sign_commits: false
+  coding_agent_provider: cubic
+
+# -----------------------------------------------------------------------------
+# Sample configuration (commented out). Uncomment the sections you need.
+# -----------------------------------------------------------------------------
+# version: 1
+# reviews:
+#   enabled: true
+#   sensitivity: medium
+#   incremental_commits: true
+#   check_drafts: true
+#   architecture_diagrams: false
+#   external_contributors_require_manual_review: false
+#   resolve_threads_when_addressed: true
+#   merge_confidence_summary: false
+#   auto_approve_behavior: disabled # disabled | shadow | live
+#   auto_approve: disabled # disabled | always | low_risk_only | custom
+#   auto_approve_custom_prompt: |
+#     Only approve docs and tests.
+#   auto_approve_rules:
+#     exclude_external_contributors: false
+#     exclude: # changed-file globs that block auto-approval
+#       - "**/migrations/**"
+#     only_files: # every changed path must match at least one glob
+#       - docs/**
+#     # exclude_* blocks on any match; only_* is an allowlist the PR must match.
+#     exclude_authors:
+#       - "*[bot]"
+#     only_authors:
+#       - renovate[bot]
+#     exclude_labels: # labels match exactly, everything else is a glob
+#       - do-not-auto-approve
+#     only_labels: []
+#     exclude_head_branches: []
+#     only_head_branches: []
+#     exclude_base_branches: []
+#     only_base_branches:
+#       - main
+#     exclude_titles:
+#       - "WIP:*"
+#     only_titles: []
+#   ultrareview: manual # disabled | manual | automatic
+#   auto_ultrareview: disabled # disabled | high_risk_only | custom
+#   auto_ultrareview_custom_prompt: |
+#     Run an ultrareview when auth or payment flows change.
+#   auto_ultrareview_file_patterns:
+#     - "**/migrations/**"
+#   custom_instructions: "Add any reviewer guidance here."
+#   ignore:
+#     files:
+#       - docs/**
+#       - "**/*.md"
+#     head_branches:
+#       - feature/*
+#     base_branches:
+#       - release/*
+#     pr_labels:
+#       - WIP
+#     pr_titles:
+#       - "draft:*"
+#     max_changed_lines: 5000
+#   custom_rules:
+#     - name: Example rule name
+#       description: Explain what should be enforced.
+#       include:
+#         - "src/**/*.ts"
+#       exclude:
+#         - "**/*.spec.ts"
+#     - name: Enforce style guide
+#       description: Enforce the repository style guide.
+#       file_paths:
+#         - docs/style-guide.md
+#         - docs/review-rules.md
+# pr_descriptions:
+#   generate: true
+#   instructions: "Summaries should highlight risk and testing steps."
+#   skip_if_author_description: false # true skips generation when the author wrote a description
+# issues:
+#   fix_with_cubic_buttons: true
+#   pr_comment_fixes: true
+#   fix_commits_to_pr: false
+#   auto_fix_sign_commits: false
+#   coding_agent_provider: cubic # cubic | cursor_cloud_agent

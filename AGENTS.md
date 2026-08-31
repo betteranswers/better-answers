@@ -28,7 +28,8 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers �
 | `web/` | Vite React single-page app; talks to `app/` over tRPC only |
 | `worker/` | Python 3.13 knowledge worker (uv): connectors, conversion, indexing, graph derive-and-sync, enrichment, ontology tooling |
 | `packages/` | Shared TypeScript: `schema` (Drizzle — the only migration owner, ADR 0007), `contracts` |
-| `<tier>/lifts/<name>/` | Pinned third-party snapshots, each with a `THIRD_PARTY_NOTICES.md` — see `[LIFT]` in `CODING_RULES.md` (permissive licences only, ADR 0027) |
+| `<tier>/tools/<name>/` | Development tooling installed into a tier — not shipped, not a lift. `app/tools/anti-slop/` is the oxlint plugin (`github.com/dmmulroy/anti-slop`) that `.oxlintrc.json` loads as a `jsPlugin`; it is excluded from lint and format because it is not our source to style |
+| `<tier>/lifts/<name>/` | Pinned third-party snapshots the platform *runs*, each with a `THIRD_PARTY_NOTICES.md` — see `[LIFT]` in `CODING_RULES.md` (permissive licences only, ADR 0027). A lift is code we ship; a tool under `tools/` is not |
 | `docs/adr/` | Architecture decision records |
 | `docs-site/` | Astro + Starlight documentation site and its docs skills |
 | ordna | The work queue — tasks as git namespace refs (`refs/ordna/tasks/<id>`), not files; set up once the repository has a root `package.json` (ticket 41) |
@@ -48,6 +49,20 @@ Commands, versions and scripts are read from each workspace's `package.json` or 
 ## Skills
 
 `/grilling` and `/domain-modeling` for any design conversation; `/codebase-design` when shaping a module; `/tdd` for red–green work; `/writing-for-agents` when editing this file, a `CODING_RULES.md` or a skill; `/diagnosing-bugs` for anything broken or slow.
+
+## Agent skills
+
+### Issue tracker
+
+Build tasks live in **ordna** (`storage: namespace` — git blobs at `refs/ordna/tasks/<id>`, no files on disk; use the `ordna` CLI); wayfinding maps and their tickets live as markdown under `.scratch/<effort>/`; GitHub Issues is the public inbound surface, not the work queue. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical roles, unrenamed — `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix` — applied as ordna **tags**, since ordna has no label field. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one root `CONTEXT.md` and one `docs/adr/`; the workspaces are runtime tiers, not separate domains. See `docs/agents/domain.md`.
 
 ## Code Exploration Policy
 
