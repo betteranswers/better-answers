@@ -1,0 +1,13 @@
+/*
+ * Geist, self-hosted. One variable file carries every weight from 100 to 900,
+ * so weight is a CSS choice rather than another download.
+ */
+@import "@fontsource-variable/geist";
+
+:root {
+  font-family:
+    "Geist Variable",
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
+}

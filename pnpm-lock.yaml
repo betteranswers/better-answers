@@ -81,6 +81,9 @@ importers:
       '@better-answers/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@fontsource-variable/geist':
+        specifier: 5.3.0
+        version: 5.3.0
       react:
         specifier: 19.2.8
         version: 19.2.8
@@ -871,6 +874,9 @@ packages:
     peerDependenciesMeta:
       '@noble/hashes':
         optional: true
+
+  '@fontsource-variable/geist@5.3.0':
+    resolution: {integrity: sha512-j0m+vLQuG5XAYoHtGCVu0spvlGreR3EzpECUVzkFmI1mTVnAO38l/NEPDCFgZ177JxzYJCLSmTQibIiYPilGrA==}
 
   '@grpc/grpc-js@1.14.4':
     resolution: {integrity: sha512-k9Dj3DV/itK9D06Y8f190Qgop7/Ui+D0njFV3LHMPwPT75DpXLQohE9Wmz0QElrJnzsjB7KPWiKJbOl7IPDArQ==}
@@ -3866,6 +3872,8 @@ snapshots:
     optional: true
 
   '@exodus/bytes@1.15.1': {}
+
+  '@fontsource-variable/geist@5.3.0': {}
 
   '@grpc/grpc-js@1.14.4':
     dependencies:
