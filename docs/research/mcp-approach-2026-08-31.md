@@ -516,3 +516,23 @@ research.
 These are architecture words, not domain terms — the same judgement ADR 0029 made about *slice*,
 *kernel* and *access*, and `[GLOSSARY1]` keeps them out. They belong in the ADR and in
 `CODING_RULES.md` if anywhere.
+
+---
+
+## Correction — 2026-08-31, same day: the entry count is four
+
+§7 and §9 above treat ADR 0018's **five** entries as the decision of record and `T-004`'s **four** as
+an error. That is backwards. **A26** (ticket 79, the pre-build gate, 30/08/2026) dropped
+`describe_estate` on the owner's riders from prototype 61 — where all four remaining entries answered
+through Cowork with no orienting call before them, and where the entry's own budget was unmeasurable
+because no estate exists. A26 post-dates ADR 0018. `T-001` recorded the disagreement and routed it to
+`T-004`, which is why the task said four.
+
+ADR 0018 and `CONTEXT.md` now read four; ADR 0030 carries an amendment.
+
+**§7's judgement is unaffected.** The MCP App flow was drawn over `find`, `ask`, `open` and
+`give_feedback`; `describe_estate` never appeared in it. Views are over three entries either way, and
+`open` returning structured content is why the flow was drawn at all.
+
+The gap it exposes is where the gate's answers live: in a briefing under `.scratch/`, outside the ADR
+tree. Research that reads only `docs/adr/` reads true documents and reaches a stale conclusion.

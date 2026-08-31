@@ -65,9 +65,8 @@ untouched, and this sentence is here so that nobody has to reconstruct why.
 now render interfaces in the conversation — MCP Apps, supported by Claude, Claude Desktop and
 Claude Cowork, where a tool names a `ui://` resource that the host draws in a sandboxed iframe.
 Drawing the user flow — a manager asks a question, clicks a citation, reads the concept, presses
-*this is wrong* — confirms **ADR 0018's five entries hold**: `describe_estate`, `find`, `ask`,
-`open`, `give_feedback` are the right tool surface, and an App adds **views over three of them**,
-not a sixth entry. But it changes one thing about `open`: designed as "the verbatim fetch", it
+*this is wrong* — confirms **the entries hold**: `find`, `ask`, `open` and `give_feedback` are the
+right tool surface, and an App adds **views over three of them**, not a further entry. But it changes one thing about `open`: designed as "the verbatim fetch", it
 becomes the thing a person *looks at*, so **`open` returns structured content** — frontmatter,
 body, relations, trust state, evidence as fields — with the human rendering derived from it. That
 line goes into `T-004`, because without it the App layer is a rewrite of `open` rather than an
@@ -126,9 +125,7 @@ back — which is what ADR 0018 already describes.
 - **`T-004`'s acceptance criteria stand, with three amendments and one correction.** Add the seam
   line (`(Request, { authInfo }) => Response` mounted in Hono, no MCP library type in
   `packages/core`, lint-enforced); add structured output from `open`; add the tools-only
-  clarification below. **The correction:** `T-004` says "four-entry MCP surface" and "Four
-  entries" where ADR 0018 says **five**. The ADR is the decision of record, so the task reads
-  five — or dropping one is an amendment to ADR 0018, not an edit to a task.
+  clarification below. `T-004`'s **four** entries are correct as written — see the amendment.
 - **ADR 0008's tools-only rule is clarified, not amended.** No concept is served as an MCP
   resource in v0.1; that deferral stands. A `ui://` view resource, when the App is built, is not a
   concept and is not what that rule refuses. ADR 0018 already kept concept resources "as a later
@@ -159,3 +156,23 @@ back — which is what ADR 0018 already describes.
 - **This ADR is calibrated against no running MCP code.** Like ADR 0029, its first meeting with
   reality — `T-004` — is where it is expected to move. The seam is the part designed to survive
   being wrong.
+
+## Amendment — 2026-08-31, same day: the surface is four entries, not five
+
+This ADR was written against ADR 0018's **five** entries and treated `T-004`'s **four** as an error
+to correct. It is the other way round. **A26** — ticket 79, the pre-build gate, 30/08/2026 — dropped
+`describe_estate` on the owner's own riders from prototype 61, and A26 post-dates ADR 0018 by three
+days. `T-001` recorded the disagreement and routed it to `T-004`, which is why the task said four.
+ADR 0018 now carries the amendment; `CONTEXT.md` reads four.
+
+**Nothing else in this ADR moves.** The MCP App flow was drawn over `find`, `ask`, `open` and
+`give_feedback` — `describe_estate` never appeared in it, which is part of why the entry was
+droppable. The views are over three entries either way, `open` still returns structured content,
+and the library decision never depended on the count.
+
+The lesson is worth keeping, because it is the second time this shape has cost something: **an ADR
+is the decision of record only until a later decision is recorded somewhere else.** The gate's
+answers live in a briefing under `.scratch/`, not in the ADR tree, so an agent reading only
+`docs/adr/` reads a true document and reaches a stale conclusion. `T-001` swept the ADRs against
+each other and left this one to a build task; that deferral was reasonable and it is also how the
+gap survived.

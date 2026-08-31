@@ -479,8 +479,8 @@ to it by IRI and never restates it (ADR 0014).
   variant · different) — update the existing, add as new, or decline; client-specific wording
   stripped first. One governed write, the decider as author; a trim makes the decider the
   generator. _Avoid_: moderation.
-- **MCP surface** — the platform's one tools-only MCP server at `mcp.<domain>`: five entries in
-  v0.1 — `describe_estate`, `find`, `ask`, `open`, `give_feedback` — the principal from the
+- **MCP surface** — the platform's one tools-only MCP server at `mcp.<domain>`: four entries in
+  v0.1 — `find`, `ask`, `open`, `give_feedback` — the principal from the
   token, the same predicate and audit as the app, grown later by token scope, never by a
   second server (ADR 0018). Guides and the question set are not on it. Never named on a screen;
   the System card says *Connected clients*. _Avoid_: connector, endpoint, MCP (on a screen).
