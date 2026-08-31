@@ -37,6 +37,29 @@
   },
   "overrides": [
     {
+      // React correctness rules run over `web/` alone: this is the one root config for the
+      // server (`app/`), the SPA (`web/`) and shared TS (`packages/*`), and a react-doctor
+      // finding on server code would be noise. oxlint 1.80 scopes `jsPlugins` per override,
+      // so the plugin itself is loaded here rather than beside `anti-slop` at the top level.
+      "files": ["web/**"],
+      "jsPlugins": [
+        {
+          "name": "react-doctor",
+          "specifier": "oxlint-plugin-react-doctor"
+        }
+      ],
+      "rules": {
+        "react-doctor/rules-of-hooks": "error",
+        "react-doctor/no-unguarded-browser-global-in-render-or-hook-init": "error",
+        "react-doctor/effect-needs-cleanup": "error",
+        "react-doctor/no-effect-with-fresh-deps": "error",
+        "react-doctor/aria-role": "error",
+        "react-doctor/no-ref-current-in-render": "error",
+        "react-doctor/no-impure-state-updater": "error",
+        "react-doctor/no-layout-property-animation": "error"
+      }
+    },
+    {
       "files": ["**/*.test.ts", "**/*.test.tsx", "**/test/**"],
       "rules": {
         "anti-slop/no-chained-type-assertions": "off",
