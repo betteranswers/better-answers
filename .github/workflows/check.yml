@@ -31,6 +31,6 @@ jobs:
           enable-cache: true
       - run: pnpm install --frozen-lockfile
       - run: uv sync --frozen
-        working-directory: worker
+        working-directory: apps/worker
       # One command, every workspace — the root `check` runs them all.
       - run: pnpm check

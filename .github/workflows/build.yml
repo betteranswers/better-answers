@@ -24,10 +24,10 @@ jobs:
         include:
           - tier: app
             context: .
-            dockerfile: app/Dockerfile
+            dockerfile: apps/api/Dockerfile
           - tier: worker
-            context: worker
-            dockerfile: worker/Dockerfile
+            context: apps/worker
+            dockerfile: apps/worker/Dockerfile
     outputs:
       app_digest: ${{ steps.out.outputs.app_digest }}
       worker_digest: ${{ steps.out.outputs.worker_digest }}

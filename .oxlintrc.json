@@ -1,10 +1,10 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "vitest"],
+  "plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "vitest", "import"],
   "jsPlugins": [
     {
       "name": "anti-slop",
-      "specifier": "./app/tools/anti-slop/index.ts"
+      "specifier": "./apps/api/tools/anti-slop/index.ts"
     }
   ],
   "categories": {
@@ -15,6 +15,10 @@
   },
   "rules": {
     "no-console": "error",
+    // ADR 0029 rule 4 — the slice graph is acyclic. Repo-wide because a cycle is a
+    // design failure anywhere, and oxlint 1.80 has no `import/no-restricted-paths`
+    // to express the direction rules more precisely.
+    "import/no-cycle": "error",
     "typescript/no-explicit-any": "error",
     "typescript/consistent-type-imports": "error",
     "typescript/no-non-null-assertion": "error",
@@ -37,11 +41,45 @@
   },
   "overrides": [
     {
-      // React correctness rules run over `web/` alone: this is the one root config for the
-      // server (`app/`), the SPA (`web/`) and shared TS (`packages/*`), and a react-doctor
+      // ADR 0029 rule 5 — nothing in `packages/core` imports a transport or a transport's
+      // dependency. `core` is a library with five callers, four of which have no notion of an
+      // HTTP status code; a transport import here is how that boundary erodes. A package
+      // boundary cannot enforce this on its own, which is why it is a lint rule.
+      // Verified against oxlint 1.80.0: a per-glob override fires inside its glob and stays
+      // silent outside it.
+      "files": ["packages/core/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "hono",
+                  "hono/*",
+                  "@hono/*",
+                  "@trpc/*",
+                  "@modelcontextprotocol/*",
+                  "better-auth",
+                  "better-auth/*",
+                  "@better-auth/*",
+                  "node:http",
+                  "node:http2",
+                  "node:https"
+                ],
+                "message": "packages/core is transport-agnostic (ADR 0029 rule 5). A status code, a Request or a Response belongs in apps/api; export a function and a typed error instead."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // React correctness rules run over `apps/web/` alone: this is the one root config for
+      // the API (`apps/api/`), the SPA (`apps/web/`) and the shared packages, and a react-doctor
       // finding on server code would be noise. oxlint 1.80 scopes `jsPlugins` per override,
       // so the plugin itself is loaded here rather than beside `anti-slop` at the top level.
-      "files": ["web/**"],
+      "files": ["apps/web/**"],
       "jsPlugins": [
         {
           "name": "react-doctor",
@@ -83,7 +121,7 @@
     "coverage",
     "reports",
     ".venv",
-    "app/tools/anti-slop/**",
+    "apps/api/tools/anti-slop/**",
     ".claude/worktrees/**",
     "**/stryker-setup-*.js"
   ]

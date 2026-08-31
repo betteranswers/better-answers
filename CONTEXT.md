@@ -428,7 +428,7 @@ to it by IRI and never restates it (ADR 0014).
   about isolation rather than about a company: *tenanted by rule*, *multi-tenant-ready*. There is one
   boundary and it is the workspace; *tenant* never appears on a screen and is never a second concept.
 - **principal** — who a call is made as: `workspaceId`, `userId` and `role`, built by the transport
-  from a verified bearer and passed as the first parameter of every `app/lib` function that touches
+  from a verified bearer and passed as the first parameter of every `packages/core` function that touches
   tenant data (`[SEC2]`). It exists in **two kinds**, and both are real:
   - **deferred principal** — a named person's authority carried into work that outlives their
     session: a background job, a scheduled run, a replay. It records the person it borrowed from and

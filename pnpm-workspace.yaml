@@ -1,8 +1,8 @@
-# `worker/` is a uv workspace, not a pnpm one, and `docs-site/` joins this list the day
+# `apps/worker/` is a uv workspace, not a pnpm one, and `docs-site/` joins this list the day
 # it is lifted in (AGENTS.md § Layout).
 packages:
-  - app
-  - web
+  - apps/api
+  - apps/web
   - packages/*
 
 # Postinstall scripts run for esbuild alone — vite and drizzle-kit need its platform

@@ -27,14 +27,14 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
-  app:
+  apps/api:
     dependencies:
       '@better-answers/contracts':
         specifier: workspace:*
-        version: link:../packages/contracts
+        version: link:../../packages/contracts
       '@better-answers/schema':
         specifier: workspace:*
-        version: link:../packages/schema
+        version: link:../../packages/schema
       '@hono/node-server':
         specifier: 2.1.1
         version: 2.1.1(hono@4.13.5)
@@ -76,35 +76,11 @@ importers:
         specifier: 4.1.11
         version: 4.1.11(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(tsx@4.23.12)(yaml@2.9.0))
 
-  packages/contracts:
-    devDependencies:
-      typescript:
-        specifier: 7.0.2
-        version: 7.0.2
-      vitest:
-        specifier: 4.1.11
-        version: 4.1.11(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(tsx@4.23.12)(yaml@2.9.0))
-
-  packages/schema:
-    devDependencies:
-      '@types/node':
-        specifier: 24.13.3
-        version: 24.13.3
-      drizzle-kit:
-        specifier: 0.31.10
-        version: 0.31.10
-      typescript:
-        specifier: 7.0.2
-        version: 7.0.2
-      vitest:
-        specifier: 4.1.11
-        version: 4.1.11(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(tsx@4.23.12)(yaml@2.9.0))
-
-  web:
+  apps/web:
     dependencies:
       '@better-answers/contracts':
         specifier: workspace:*
-        version: link:../packages/contracts
+        version: link:../../packages/contracts
       react:
         specifier: 19.2.8
         version: 19.2.8
@@ -142,6 +118,42 @@ importers:
       vite:
         specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(tsx@4.23.12)(yaml@2.9.0)
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(tsx@4.23.12)(yaml@2.9.0))
+
+  packages/contracts:
+    devDependencies:
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(tsx@4.23.12)(yaml@2.9.0))
+
+  packages/core:
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(tsx@4.23.12)(yaml@2.9.0))
+
+  packages/schema:
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
+      drizzle-kit:
+        specifier: 0.31.10
+        version: 0.31.10
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
       vitest:
         specifier: 4.1.11
         version: 4.1.11(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(tsx@4.23.12)(yaml@2.9.0))

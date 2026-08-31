@@ -17,17 +17,20 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers �
 
 - `CONTEXT.md` — the glossary. Name things in code, tests, docs and commits with its words; a new domain word is settled there *before* it appears in code.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open and where each lands here; read before adding a key, convention or feature that relates to the knowledge layer.
-- `CODING_RULES.md` — the constitution: every rule that binds work in this repo. Tier rules live in `app/CODING_RULES.md` and `worker/CODING_RULES.md`.
+- `CODING_RULES.md` — the constitution: every rule that binds work in this repo. Tier rules live in `apps/api/CODING_RULES.md` and `apps/worker/CODING_RULES.md`.
 - `docs/adr/` — why the architecture is the way it is. Read the ADR a change touches before touching it; a change that contradicts one is a new ADR, never a quiet edit.
 
 ## Layout
 
+`apps/` is what deploys; `packages/` is what is imported (ADR 0029).
+
 | Path | What it is |
 | --- | --- |
-| `app/` | TypeScript server — Hono on Node 24: tRPC API, MCP server, OpenAPI, LLM routing, policy, worker control plane |
-| `web/` | Vite React single-page app; talks to `app/` over tRPC only |
-| `worker/` | Python 3.13 knowledge worker (uv): connectors, conversion, indexing, graph derive-and-sync, enrichment, ontology tooling |
-| `packages/` | Shared TypeScript: `schema`, `contracts` |
+| `apps/api/` | The one TypeScript deployable — Hono on Node 24. Transports only: tRPC, MCP, OpenAPI, `/agent/v1`, the worker control plane's HTTP face |
+| `apps/web/` | Vite React single-page app; talks to `apps/api/` over tRPC only |
+| `apps/worker/` | Python 3.13 knowledge worker (uv): connectors, conversion, indexing, graph derive-and-sync, enrichment, ontology tooling |
+| `packages/core/` | The business logic `apps/api` calls — capability slices over four store doors. Transport-agnostic, and lint-enforced as such |
+| `packages/` | The rest of the shared TypeScript: `schema`, `contracts` |
 | `docs/adr/` | Architecture decision records |
 | `docs-site/` | Astro + Starlight documentation site and its docs skills |
 | ordna | The work queue — tasks as git namespace refs (`refs/ordna/tasks/<id>`), not files |
