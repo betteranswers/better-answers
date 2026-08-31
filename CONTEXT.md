@@ -420,8 +420,8 @@ to it by IRI and never restates it (ADR 0014).
 
 - **workspace** — the tenancy boundary and the unit a company occupies: one company's people,
   bindings, bundle repository, index, graph and records. **Every row, every object-store prefix,
-  every graph node and edge carries its workspace id**, and every query is scoped through the
-  workspace-aware data layer (`[DESIGN4]`). One deployment holds many; a person may belong to more
+  every graph node and edge carries its workspace id**, and every query reaches its store through a
+  store door, over row-level security (`[DESIGN4]`). One deployment holds many; a person may belong to more
   than one and picks before consent. _Avoid_: organisation (Better Auth's word for the same thing —
   say *workspace* in our own code and on every screen), account, team, site.
 - **tenant** — the same boundary said from the platform's side, used only where the sentence is

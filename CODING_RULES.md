@@ -16,19 +16,15 @@ Tests cross the same seam callers do. Wanting to test past the interface means t
 
 Introduce a seam only where something already varies across it (a second store, a second provider). Accept dependencies as parameters; return results instead of producing side effects.
 
-### [DESIGN4] Workspace on every row
+### [DESIGN4] Workspace on every row, and RLS is the guarantee
 
-Every table carries the workspace id; every query is scoped through the workspace-aware data layer, which throws in every environment (the Dust `WorkspaceAwareModel` contract it follows only logs in production). Every document carries the `external_access` shape and its binding's sensitivity. The rule reaches the graph: every node and edge carries the workspace id, every query names the graph from the session principal and never from a tool argument, and no LLM-authored Cypher or SQL runs against a shared store.
+Every table carries the workspace id. Every query reaches its store through a **store door** in `packages/core/store/`. Every function that touches tenant data takes a `Principal` first (`[SEC2]`). Every document carries the `external_access` shape and its binding's sensitivity.
 
-In the graph — Apache AGE inside the platform Postgres, one graph per workspace, written as ordinary application data (ADR 0023 and its *the graph is application data* amendment):
+**RLS is the guarantee, and it is default-deny.** Every tenant table is created `withRLS()`, so a table with no policy returns no rows to anyone, under `FORCE ROW LEVEL SECURITY`, read by the non-owner `app_rt`, with `SET LOCAL app.workspace_id` set from the `Principal`. One zero-rows test per tenant table is the proof. The store door is ergonomics over that guarantee and never a substitute for it: drizzle-orm exposes no query lifecycle hook, so there is no interception layer to trust.
 
-- **One `Concept` label; `kind` is a property.** The bundle-and-record partition uses a closed label set the app's migrations own — `Concept`, `Section`, `Source`, `Actor`, `Composition`, `Evidence`, `CanonicalEntity` — and a concept's kind is an indexed **property**, never a label. Source-entity labels keep their own closed, prefixed set. No DDL enters the write path and no runtime role holds `CREATE` on a label.
-- **Uniqueness is a Postgres unique index on each label table**, in the app's migrations — `(gen, uid)` on the bundle-and-record partition, `(uid)` on source entities — with a `gen` range index per label; presence is the writer's guarantee, proved by its test and a nightly audit.
-- **`workspace_id` is a property on every node and edge** in both partitions, and a term of the builder's `WHERE` on every element of every path — beside the read predicate, never instead of it. A wrong graph name returns **zero rows**, not another tenant's knowledge.
-- **The three visibility terms are properties too** — `published_at`, `sensitivity` and `audience` on every node and edge — and the read predicate rides in `WHERE` on every node and edge of a **bounded variable-length pattern**, because AGE cannot carry it inside a path pattern. Depth is capped at 4 by the template, never by the caller, and the pattern is emitted only through the query module's builder.
-- **The graph name is derived from the Principal through one allowlisted function** that regex-checks `^ws_[0-9a-z]{26}$` — the only place string-building is permitted. A lint rule refuses `cypher(` outside the graph query module's builder.
-- **Writes are split `MERGE`s** (node, then edge — the AGE way); every statement is `cypher()`-in-SQL over `agtype`; the app reads through `pg` with an `agtype` parser, the worker through `psycopg` — one graph query module per tier. The bundle-and-record delta joins the app's commit transaction; generations survive for full rebuilds only.
-- **The app runs as the non-owner `app_rt`** under `FORCE ROW LEVEL SECURITY`; the owner DSN reaches `migrate` and the two runtime-DDL paths only. One worker **login** role holds no table privileges at all and `SET LOCAL ROLE`s into the workspace's role, so a forgotten `SET ROLE` fails with *permission denied*.
+**The rule reaches the graph**, which RLS does not: `workspace_id` and the three visibility terms are properties on every node and edge and terms of the `WHERE` on every element of every path; the graph name comes from the `Principal` through the one allowlisted function, never from a tool argument; no LLM-authored Cypher or SQL runs against a shared store; no `neo4j` driver, no Bolt, no APOC, no `neo4j_graphrag` import, with no exception.
+
+The shape behind these four lines is **ADR 0029** for the store doors and **ADR 0023**'s *the graph is application data* amendment for the write model. Read those before changing the data layer; a design specification wearing a rule identifier drifts from the code the day the code exists, which is why it lives there and the checkable statement lives here.
 
 ### [DESIGN5] The identity provider stays behind its seam
 
@@ -38,7 +34,9 @@ No Better Auth type crosses into `packages/core`. Transports verify a bearer and
 
 ### [TEST1] Functional tests through the interface
 
-Tests exercise a module through its interface — for `apps/api`, the endpoint (`app.request()`); for `apps/worker`, the job or module entry point. Unit tests of internals are neither required nor desired.
+Tests exercise a module through its interface — for `apps/api`, the endpoint (`app.request()`); for `apps/worker`, the job or module entry point; for `packages/core`, an entry point named in its `exports` map. Unit tests of internals are neither required nor desired.
+
+`packages/core` is where most behaviour lives (ADR 0029), so its `exports` map is the surface this rule points at. A slice's internals — its `*.store.ts`, its helpers — are reached through that entry point, never imported by a test.
 
 ### [TEST2] Real Postgres, always
 
