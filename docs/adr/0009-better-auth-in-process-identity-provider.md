@@ -19,7 +19,7 @@ Better Auth was acquired by Vercel on 7 July 2026. The library stays MIT, keeps 
 
 ## Consequences
 
-- The authorization server is part of the app: `app/` serves `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource` and the registration, authorize and token endpoints; `mcp.` stays a separate hostname with no Access policy (ticket 38).
+- The authorization server is part of the app: `apps/api/` serves `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource` and the registration, authorize and token endpoints; `mcp.` stays a separate hostname with no Access policy (ticket 38).
 - Auth tables are ordinary tables in the app's schema; workspace isolation applies to them like every other table (ADR 0005).
 - Two things are unverified and are proved by the prototype on the read-only MCP ticket before any build: that a Claude Teams connector completes DCR or CIMD against this server with its real registration body, and that the access token carries the active organisation as the workspace claim. If either fails, Keycloak replaces the authorization-server half behind the `requireBearerAuth` seam; the login half stays.
 - The library's version is read from Context7 in the PR that installs it (`[DEPS1]`), not from research 40.
@@ -47,6 +47,6 @@ Reviewed at the first client's renewal, or the moment a trigger fires. **Ticket 
 
 **The Keycloak fallback is real, and it is not a drop-in.** This ADR's consequence — "Keycloak replaces the authorization-server half behind the `requireBearerAuth` seam; the login half stays" — understated the work. Two things it did not account for. First, we are **CIMD-only** (research 80, fork F2) and Keycloak does DCR, not CIMD, so swapping providers reopens DCR and re-proves the whole claude.ai connector path prototype 61 measured. Second, Better Auth is not only the authorization server: it is also the app's email-code login **and its organisation model, which is where the `workspace` claim comes from**. Call it **two to three weeks, not two days.** That is still worth having — it means no trigger above is an existential event — but the true number is what belongs in an ADR.
 
-**The seam becomes a rule.** `requireBearerAuth` was named here as the seam; it is now `[DESIGN5]` in `CODING_RULES.md` and **lint-enforced**: no Better Auth type crosses into `app/lib`, and no `better-auth` or `@better-auth/*` import appears outside the auth module. The seam is what makes two to three weeks two to three weeks rather than a rewrite.
+**The seam becomes a rule.** `requireBearerAuth` was named here as the seam; it is now `[DESIGN5]` in `CODING_RULES.md` and **lint-enforced**: no Better Auth type crosses into `packages/core`, and no `better-auth` or `@better-auth/*` import appears outside the auth module. The seam is what makes two to three weeks two to three weeks rather than a rewrite.
 
 **An SSRF policy on the CIMD fetcher, applied here.** The fetcher retrieves a URL the caller supplies, so it resolves the address before connecting, refuses private and link-local ranges, caps redirects and body size, and re-checks after every redirect. The policy is owned by this ADR and carried with the `@better-auth/cimd/node` fix as a `lifts/` snapshot with its `THIRD_PARTY_NOTICES.md` and a removal condition — the upstream release that fixes it (`[LIFT1]`, ADR 0027).

@@ -3,7 +3,7 @@
 # Two Coolify compose resources on VPC 1, because a Coolify redeploy stops and restarts the WHOLE
 # resource (`stop_running_container(force: true)` then `docker compose up -d` — research 68 §2a):
 #   stores.compose.yaml   — this file: redeployed a few times a year (a store's upgrade drill)
-#   platform.compose.yaml — migrate → app → worker: redeployed on every release
+#   platform.compose.yaml — migrate → api → worker: redeployed on every release
 # Both join the Coolify-created network on the server; Postgres is a Coolify DATABASE RESOURCE
 # on that network (its own lifecycle, UI and a second backup writer), reached by DSN — running
 # deploy/postgres.Dockerfile (Postgres 18 + Apache AGE + pgvector). The graph lives inside it:
@@ -89,7 +89,7 @@ services:
   #     init: { condition: service_completed_successfully }
 
   # The only way in. Ingress (four hostnames + the catch-all http_status:404) is configured on
-  # the tunnel in Cloudflare (deploy/coolify.md § Ingress); every hostname → app:3000 on the
+  # the tunnel in Cloudflare (deploy/coolify.md § Ingress); every hostname → api:3000 on the
   # platform stack, which the tunnel reaches over the shared network. Lives in the stores stack
   # so a release never drops the tunnel.
   cloudflared:

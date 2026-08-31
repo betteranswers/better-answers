@@ -15,7 +15,7 @@
 set -euo pipefail
 
 : "${REPO_DIR:?checkout of the repository on VPC 2}"
-: "${STAGING_DATABASE_URL:?}" "${STAGING_APP_URL:?http://127.0.0.1:3000 or the staging hostname}"
+: "${STAGING_DATABASE_URL:?}" "${STAGING_API_URL:?http://127.0.0.1:3000 or the staging hostname}"
 : "${BACKUP_DUMPS_BUCKET:?}" "${BACKUP_MIRROR_BUCKET:?}"       # rclone remote `dumps:` configured on the host from the READ credential
 : "${BACKUP_AGE_IDENTITY_FILE:?the private half — on VPC 2 only for the drill, read from the escrow item}"
 : "${PROD_DATABASE_URL_RO:?read-only DSN to production, for the graph counts diff}"
@@ -69,33 +69,33 @@ for ws in $(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d /
   age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${WORK}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
   sudo -u '#1000' git clone --quiet --bare "${WORK}/${ws}.bundle" "/data/git/${ws}.git"
 done
-platform up -d app worker
-say "app and worker up — RTO so far $(( ( $(date +%s) - T0 ) / 60 )) min"
+platform up -d api worker
+say "api and worker up — RTO so far $(( ( $(date +%s) - T0 ) / 60 )) min"
 
 say "## 5 recovery order 2–5: watermark, graph rebuild, pipeline state (LMDBs empty → reprocess), orphans"
-platform exec -T app pnpm ops reconcile-watermark --workspace "${DRILL_WORKSPACE}"
-t0=$(date +%s); platform exec -T app pnpm ops graph-rebuild --workspace "${DRILL_WORKSPACE}" --wait
+platform exec -T api pnpm ops reconcile-watermark --workspace "${DRILL_WORKSPACE}"
+t0=$(date +%s); platform exec -T api pnpm ops graph-rebuild --workspace "${DRILL_WORKSPACE}" --wait
 say "graph rebuilt in $(( $(date +%s) - t0 )) s (promise: ≤ 120 s)"
-platform exec -T app pnpm ops graph-sweep --workspace "${DRILL_WORKSPACE}" --wait
-platform exec -T app pnpm ops object-store-orphans --workspace "${DRILL_WORKSPACE}" --list >> "${REPORT}"
+platform exec -T api pnpm ops graph-sweep --workspace "${DRILL_WORKSPACE}" --wait
+platform exec -T api pnpm ops object-store-orphans --workspace "${DRILL_WORKSPACE}" --list >> "${REPORT}"
 
 say "## 6 counts diff against production's stamped run (ADR 0023)"
-platform exec -T app pnpm ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts"
+platform exec -T api pnpm ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts"
 psql "${PROD_DATABASE_URL_RO}" -At -c "select counts_json from graph_sync_run where workspace_id = '${DRILL_WORKSPACE}' and outcome = 'ok' order by finished_at desc limit 1" > "${WORK}/prod.counts"
 if diff <(jq -S . "${WORK}/prod.counts") <(jq -S . "${WORK}/staging.counts") >> "${REPORT}"; then say "counts match"; else say "COUNTS DIFFER"; exit 1; fi
 
 say "## 7 smoke through the interface: find · a guide read · ask"
-platform exec -T app pnpm ops smoke --workspace "${DRILL_WORKSPACE}" --find --guide --ask >> "${REPORT}"
+platform exec -T api pnpm ops smoke --workspace "${DRILL_WORKSPACE}" --find --guide --ask >> "${REPORT}"
 
 say "## 8 bucket listing vs the matrix (tiers live in the bucket lifecycle, never in Coolify's schedule)"
 for tier in hourly daily weekly monthly; do printf '%s: %s copies\n' "${tier}" "$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/" | wc -l)" >> "${REPORT}"; done
 
 if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
   say "## 9 erasure rehearsal on a synthetic subject (ADR 0020, ticket 24)"
-  subject=$(platform exec -T app pnpm ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --report "${WORK}/erasure.md" | tail -n1)
+  subject=$(platform exec -T api pnpm ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --report "${WORK}/erasure.md" | tail -n1)
   cat "${WORK}/erasure.md" >> "${REPORT}"
   # the one check that proves "gone from every copy" rather than assumes it
-  platform exec -T app pnpm ops dump-grep --tokens "${subject}" < "${WORK}/pg.dump" >> "${REPORT}" && say "dump grep: subject present in the pre-erasure copy (expected; expiry dates recorded)"
+  platform exec -T api pnpm ops dump-grep --tokens "${subject}" < "${WORK}/pg.dump" >> "${REPORT}" && say "dump grep: subject present in the pre-erasure copy (expected; expiry dates recorded)"
 fi
 
 rto=$(( ( $(date +%s) - T0 ) / 60 ))
