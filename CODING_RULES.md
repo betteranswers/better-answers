@@ -1,6 +1,6 @@
 # Coding rules
 
-These rules apply to every workspace; tier rules live in `app/CODING_RULES.md` and `worker/CODING_RULES.md`.
+These rules apply to every workspace; tier rules live in `apps/api/CODING_RULES.md` and `apps/worker/CODING_RULES.md`.
 
 ## DESIGN
 
@@ -32,13 +32,13 @@ In the graph — Apache AGE inside the platform Postgres, one graph per workspac
 
 ### [DESIGN5] The identity provider stays behind its seam
 
-No Better Auth type crosses into `app/lib`. Transports verify a bearer and build a `Principal`; nothing behind that seam knows which library minted the token, and no `better-auth` or `@better-auth/*` import appears outside the auth module.
+No Better Auth type crosses into `packages/core`. Transports verify a bearer and build a `Principal`; nothing behind that seam knows which library minted the token, and no `better-auth` or `@better-auth/*` import appears outside the auth module.
 
 ## TEST
 
 ### [TEST1] Functional tests through the interface
 
-Tests exercise a module through its interface — for `app/`, the endpoint (`app.request()`); for `worker/`, the job or module entry point. Unit tests of internals are neither required nor desired.
+Tests exercise a module through its interface — for `apps/api`, the endpoint (`app.request()`); for `apps/worker`, the job or module entry point. Unit tests of internals are neither required nor desired.
 
 ### [TEST2] Real Postgres, always
 
@@ -58,7 +58,7 @@ A test title says what the system does for whom, not which function it calls.
 
 ### [TEST6] Mutation testing runs on a schedule
 
-Stryker (`app/`, `web/`) and mutmut (`worker/`) run on a schedule — weekly on hosted runners (a nightly run is most of the free minutes), nightly once a self-hosted runner exists; a falling mutation score is a task.
+Stryker (`apps/api`, `apps/web`) and mutmut (`apps/worker`) run on a schedule — weekly on hosted runners (a nightly run is most of the free minutes), nightly once a self-hosted runner exists; a falling mutation score is a task.
 
 ## COMMENT
 
@@ -98,7 +98,7 @@ Credentials are read through `CredentialsProviderInterface`; never from env at t
 
 ### [SEC2] A Principal on every call
 
-Every `app/lib` function that reads or writes tenant data takes a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter; transports build it, business logic checks the role, the role's action threshold and the **read predicate** (published · sensitivity · audience) beside the data access. The predicate is tested against **columns on the readable unit** — `concept_index`, `composition` and every `index.chunk` row carry `published_at`, `sensitivity` and `audience` whatever the unit's kind — never against three fields of a source binding, because a concept and a composition have no binding (ADR 0023).
+Every `packages/core` function that reads or writes tenant data takes a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter; transports build it, business logic checks the role, the role's action threshold and the **read predicate** (published · sensitivity · audience) beside the data access. The predicate is tested against **columns on the readable unit** — `concept_index`, `composition` and every `index.chunk` row carry `published_at`, `sensitivity` and `audience` whatever the unit's kind — never against three fields of a source binding, because a concept and a composition have no binding (ADR 0023).
 
 A `Principal` has **two kinds** and both are real (`CONTEXT.md`): a **deferred principal** carries a named person's authority into work that outlives their session — a background job, a scheduled run, a replay — and expires with the authority it borrowed; a **platform principal** is the platform acting as itself, with its own actor id and no person behind it. Work that outlives a session runs under one of the two, never under a live user session.
 

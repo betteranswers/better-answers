@@ -3,11 +3,11 @@
   "private": true,
   "description": "Better Answers — a living company knowledge map for UK SMBs on OKF v0.2 (see AGENTS.md)",
   "scripts": {
-    "check": "pnpm run format:check && pnpm -r --no-bail --if-present run check && (cd worker && uv run --frozen check)",
+    "check": "pnpm run format:check && pnpm -r --no-bail --if-present run check && (cd apps/worker && uv run --frozen check)",
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "migrate": "pnpm --filter @better-answers/app run migrate",
+    "migrate": "pnpm --filter @better-answers/api run migrate",
     "mutation": "pnpm -r --if-present run mutation"
   },
   "devDependencies": {

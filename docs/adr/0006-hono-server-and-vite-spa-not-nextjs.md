@@ -15,6 +15,6 @@ The TypeScript app tier (ADR 0005) is built as a plain long-running Node server 
 
 ## Consequences
 
-- `app/` is a server package; `web/` is a browser package; they share types through `packages/` and talk only over tRPC. Neither imports the other.
+- `apps/api/` is a server package; `apps/web/` is a browser package; they share types through `packages/` and talk only over tRPC. Neither imports the other.
 - A public surface, when one arrives, is a new site under its own workspace, never a mode of the app.
 - Node's LTS calendar sets the runtime upgrade cadence (24 until October 2026, then 26).

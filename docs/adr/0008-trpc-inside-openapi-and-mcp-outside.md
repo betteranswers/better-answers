@@ -15,7 +15,7 @@ The web app talks to the app server over tRPC 11 (`@hono/trpc-server`), so a fie
 
 ## Consequences
 
-- Handlers stay thin: business logic lives in `app/lib/*` and is called by the tRPC router, the OpenAPI adapter and the MCP tools alike (Dust BACK16).
+- Handlers stay thin: business logic lives in `packages/core/*` and is called by the tRPC router, the OpenAPI adapter and the MCP tools alike (Dust BACK16).
 - Every MCP tool is a named, described, zod-typed function; nothing in the MCP layer reaches the database directly.
 - The OpenAPI document is generated, never hand-edited; breaking an external route is a versioned change (Dust BACK12).
 
@@ -25,7 +25,7 @@ The web app talks to the app server over tRPC 11 (`@hono/trpc-server`), so a fie
 
 ## Amendment — 2026-08-27, a machine-client route family for the share agent (ticket 53)
 
-Pass 1 kept the generated OpenAPI surface unmounted in v0.1. The share agent needs a live, credentialled ingress, so the app gains a **dedicated `/agent/v1` route family** — hand-written Hono routes over the same `app/lib/*` logic, not the generated adapter — with its own credential class (an **agent token**, scoped to one binding and a path prefix, revocable in Control Centre), a per-file size cap, a per-agent rate limit, streaming to the object store without buffering, and a version-skew rule (the server supports agent versions N and N-1). A machine client cannot complete an interactive Access login, so its hostname or an Access service token is ticket 41's. The generated OpenAPI document stays unmounted.
+Pass 1 kept the generated OpenAPI surface unmounted in v0.1. The share agent needs a live, credentialled ingress, so the app gains a **dedicated `/agent/v1` route family** — hand-written Hono routes over the same `packages/core/*` logic, not the generated adapter — with its own credential class (an **agent token**, scoped to one binding and a path prefix, revocable in Control Centre), a per-file size cap, a per-agent rate limit, streaming to the object store without buffering, and a version-skew rule (the server supports agent versions N and N-1). A machine client cannot complete an interactive Access login, so its hostname or an Access service token is ticket 41's. The generated OpenAPI document stays unmounted.
 
 ## Amendment — 2026-08-28, the machine client's hostname and cap (ticket 41, ADR 0022)
 

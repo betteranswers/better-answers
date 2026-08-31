@@ -7,7 +7,7 @@ import { defineConfig } from "drizzle-kit";
  *
  * There are no `dbCredentials` here because this config exists for `generate` alone —
  * it reads `src/schema.ts` and writes SQL. Migrations are *applied* by the app
- * (`app/src/migrate.ts`), which reads the database URL through its typed config module
+ * (`apps/api/src/migrate.ts`), which reads the database URL through its typed config module
  * (§ TYPES); `drizzle-kit push` is never run against an estate, because migrations are
  * forward-only and a rollback is the previous image digest (`[OPS1]`).
  */

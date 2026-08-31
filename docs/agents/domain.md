@@ -2,14 +2,14 @@
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
-This repo is **single-context**: one root `CONTEXT.md` and one `docs/adr/`. The pnpm and uv workspaces (`app/`, `web/`, `worker/`, `packages/*`) are runtime tiers, not separate domains — they share one vocabulary by design.
+This repo is **single-context**: one root `CONTEXT.md` and one `docs/adr/`. The pnpm and uv workspaces (`apps/*`, `packages/*`) are runtime tiers, not separate domains — they share one vocabulary by design.
 
 ## Before exploring, read these
 
 - **`CONTEXT.md`** at the repo root — the glossary.
 - **`docs/adr/`** — read ADRs that touch the area you're about to work in.
 - **`AGENTS.md`** — the map: layout, how a task is worked, which skill to reach for.
-- **`CODING_RULES.md`** — the constitution. Tier rules live in `app/CODING_RULES.md` and `worker/CODING_RULES.md`; read the tier's file too when changing that tier.
+- **`CODING_RULES.md`** — the constitution. Tier rules live in `apps/api/CODING_RULES.md` and `apps/worker/CODING_RULES.md`; read the tier's file too when changing that tier.
 - **`docs/okf-v02.md`** — read before adding a key, convention or feature that touches a concept file.
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
@@ -25,10 +25,11 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 │   ├── okf-v02.md
 │   ├── vision.md
 │   └── adr/           ← 0001…0027
-├── app/               ← + app/CODING_RULES.md
-├── web/
-├── worker/            ← + worker/CODING_RULES.md
-└── packages/{schema,contracts}
+├── apps/
+│   ├── api/           ← + apps/api/CODING_RULES.md
+│   ├── web/
+│   └── worker/        ← + apps/worker/CODING_RULES.md
+└── packages/{core,schema,contracts}
 ```
 
 ## Use the glossary's vocabulary

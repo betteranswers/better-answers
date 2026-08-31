@@ -1,8 +1,8 @@
-# Better Answers — the PLATFORM stack (ticket 41 Q2/Q3, ADR 0007 / 0022 / 0024): migrate → app → worker.
+# Better Answers — the PLATFORM stack (ticket 41 Q2/Q3, ADR 0007 / 0022 / 0024): migrate → api → worker.
 # Redeployed on every release; the stores stack (stores.compose.yaml) and the Postgres resource
 # are untouched by it. See stores.compose.yaml for why there are two.
 #
-# Every image is deployed BY DIGEST: `${APP_IMAGE_DIGEST:?}` refuses to start without one, so
+# Every image is deployed BY DIGEST: `${API_IMAGE_DIGEST:?}` refuses to start without one, so
 # `:latest` cannot happen. The release workflow PATCHes the two digest env vars on this resource,
 # then calls Coolify's /deploy (research 68 §2b: the deploy call itself carries no variables).
 # VPC 1's Docker daemon pulls from ghcr.io with a read-only token (SECRETS.md) — packages are private.
@@ -34,20 +34,20 @@ x-bootstrap: &bootstrap
   OTEL_TRACES_EXPORTER: none
 
 services:
-  # One-shot: the app's Drizzle migrations, including the DDL the app owns in `index` and the graph.
+  # One-shot: the tier's Drizzle migrations, including the DDL it owns in `index` and the graph.
   # `exclude_from_hc` stops Coolify reporting the stack as Exited after every deploy (research 68 §2a).
-  # Before `app` turns healthy after a RESTORE, the same image replays every erasure_request
+  # Before `api` turns healthy after a RESTORE, the same image replays every erasure_request
   # completed after the dump's timestamp (`pnpm ops replay-erasures`) — deploy/restore-drill.sh.
   migrate:
-    image: ghcr.io/betteranswers/app@${APP_IMAGE_DIGEST:?set by the release workflow}
+    image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?set by the release workflow}
     command: ["pnpm", "migrate"]
     environment:
       <<: *bootstrap
     labels: { coolify.exclude_from_hc: "true" }
     <<: *logging
 
-  app:
-    image: ghcr.io/betteranswers/app@${APP_IMAGE_DIGEST:?}
+  api:
+    image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?}
     <<: [*restart, *logging]
     environment:
       <<: *bootstrap
@@ -71,7 +71,7 @@ services:
       retries: 12
       start_period: 20s
     volumes:
-      - /data/git:/data/git      # the bare repositories the app writes — one per workspace, under a per-repository lock (ADR 0024)
+      - /data/git:/data/git      # the bare repositories the tier writes — one per workspace, under a per-repository lock (ADR 0024)
     depends_on:
       migrate: { condition: service_completed_successfully }
 
@@ -93,7 +93,7 @@ services:
       start_period: 40s
     depends_on:
       migrate: { condition: service_completed_successfully }
-      app: { condition: service_healthy }
+      api: { condition: service_healthy }
     volumes:
       - /data/worker/lmdb:/data/worker/lmdb        # one LMDB per binding — personal data on disk; never backed up
       - /data/worker/trees:/data/worker/trees      # git working trees per workspace — rebuilt
@@ -101,7 +101,7 @@ services:
       - /data/git:/data/git:ro                     # read at the run's commit (`bundle_commit` on the run row); never written by the worker (ADR 0024)
     deploy:
       resources:
-        # 1.5 GB of a 4 GB box shared with Postgres, app, Garage and the tunnel (ADR 0024); an index
+        # 1.5 GB of a 4 GB box shared with Postgres, api, Garage and the tunnel (ADR 0024); an index
         # that outgrows it spills to the host's swap file rather than failing — ticket 42 measures
         # the swap-in rate and revises the cap.
         limits: { memory: 1536m }

@@ -1,4 +1,4 @@
-# Mutation testing on a schedule ([TEST6]): Stryker for app/ and web/, mutmut for worker/.
+# Mutation testing on a schedule ([TEST6]): Stryker for apps/api and apps/web, mutmut for apps/worker.
 # WEEKLY on hosted runners, not nightly: a nightly run is ~1,800 of the 2,000 free minutes on a 2-vCPU runner
 # (ticket 41 Q1, research 69). Nightly returns with a self-hosted runner on VPC 2 — a one-line runs-on change.
 # A falling score is an ordna task, not a failed build — the job posts the numbers, it does not gate.
@@ -22,7 +22,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        workspace: [app, web]
+        # `name` labels the job, the summary and the artifact; `path` is the workspace. They
+        # differ because an artifact name may not carry a slash (ADR 0029 moved the tiers
+        # under `apps/`).
+        include:
+          - name: api
+            path: apps/api
+          - name: web
+            path: apps/web
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: pnpm/action-setup@v6.0.10
@@ -31,15 +38,15 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter ./${{ matrix.workspace }} run mutation
+      - run: pnpm --filter ./${{ matrix.path }} run mutation
       - name: score to the job summary
         if: always()
         run: |
-          f=${{ matrix.workspace }}/reports/mutation/mutation.json
+          f=${{ matrix.path }}/reports/mutation/mutation.json
           if [ -f "$f" ]; then
             # The report holds one entry per mutant, not a score; the score is the share of
             # mutants a test caught, which is what a reader of the summary wants.
-            jq -r --arg w "${{ matrix.workspace }}" '
+            jq -r --arg w "${{ matrix.name }}" '
               [.files[].mutants[].status] as $s
               | ($s | map(select(. == "Killed" or . == "Timeout")) | length) as $killed
               | ($s | map(select(. == "Killed" or . == "Timeout" or . == "Survived" or . == "NoCoverage")) | length) as $total
@@ -48,19 +55,19 @@ jobs:
                 else "### \($w) mutation score: \(($killed * 1000 / $total | round) / 10)% (\($killed)/\($total) mutants killed)"
                 end' "$f" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "### ${{ matrix.workspace }} mutation score: no report" >> "$GITHUB_STEP_SUMMARY"
+            echo "### ${{ matrix.name }} mutation score: no report" >> "$GITHUB_STEP_SUMMARY"
           fi
       - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
-          name: stryker-${{ matrix.workspace }}
-          path: ${{ matrix.workspace }}/reports/mutation/mutation.json
+          name: stryker-${{ matrix.name }}
+          path: ${{ matrix.path }}/reports/mutation/mutation.json
           retention-days: 14
 
   mutmut:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    defaults: { run: { working-directory: worker } }
+    defaults: { run: { working-directory: apps/worker } }
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: astral-sh/setup-uv@v10.0.1

@@ -22,14 +22,14 @@ jobs:
     strategy:
       matrix:
         include:
-          - tier: app
+          - tier: api
             context: .
-            dockerfile: app/Dockerfile
+            dockerfile: apps/api/Dockerfile
           - tier: worker
-            context: worker
-            dockerfile: worker/Dockerfile
+            context: apps/worker
+            dockerfile: apps/worker/Dockerfile
     outputs:
-      app_digest: ${{ steps.out.outputs.app_digest }}
+      api_digest: ${{ steps.out.outputs.api_digest }}
       worker_digest: ${{ steps.out.outputs.worker_digest }}
     steps:
       - uses: actions/checkout@v7.0.1
@@ -74,11 +74,11 @@ jobs:
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           APP_UUID: ${{ vars.COOLIFY_STAGING_APP_UUID }}
-          APP_DIGEST: ${{ needs.image.outputs.app_digest }}
+          API_DIGEST: ${{ needs.image.outputs.api_digest }}
           WORKER_DIGEST: ${{ needs.image.outputs.worker_digest }}
         run: |
           set -euo pipefail
-          for kv in "APP_IMAGE_DIGEST=$APP_DIGEST" "WORKER_IMAGE_DIGEST=$WORKER_DIGEST"; do
+          for kv in "API_IMAGE_DIGEST=$API_DIGEST" "WORKER_IMAGE_DIGEST=$WORKER_DIGEST"; do
             curl -fsS -X PATCH "$COOLIFY_URL/api/v1/applications/$APP_UUID/envs" \
               -H "Authorization: Bearer $COOLIFY_TOKEN" -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H "Content-Type: application/json" \
               -d "{\"key\":\"${kv%%=*}\",\"value\":\"${kv#*=}\",\"is_preview\":false}"

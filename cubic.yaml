@@ -37,7 +37,7 @@ reviews:
     - `CODING_RULES.md` — the constitution. Rules are tagged (`[DESIGN]`,
       `[TEST]`, `[SEC]`, `[LIFT]`, `[DEPS1]`, `[COMMENT]`, `[LOG1]`…). Cite the
       tag when a finding rests on a rule.
-    - `app/CODING_RULES.md` and `worker/CODING_RULES.md` — tier rules. Apply the
+    - `apps/api/CODING_RULES.md` and `apps/worker/CODING_RULES.md` — tier rules. Apply the
       tier's file to changes in that tier.
     - `docs/adr/` — 28 architecture decision records. A change that contradicts
       an ADR is a NEW ADR in the same pull request, never a quiet edit. Say which
@@ -58,14 +58,14 @@ reviews:
       # Verbatim install of github.com/dmmulroy/anti-slop, loaded as an oxlint
       # jsPlugin. We do not edit it, so a finding here belongs upstream, not on
       # a pull request of ours. Excluded from lint and format for the same reason.
-      - app/tools/anti-slop/**
+      - apps/api/tools/anti-slop/**
       - cubic.yaml
       # Working material and generated artefacts, not reviewable source.
       - .scratch/**
       - .planning/**
       - "**/reports/**"
       - pnpm-lock.yaml
-      - worker/uv.lock
+      - apps/worker/uv.lock
 
   custom_rules:
     - name: Enforce Pragmatic Test Coverage

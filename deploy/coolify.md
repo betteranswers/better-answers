@@ -23,7 +23,7 @@ The estate's addresses, SSH users and key names, and its host firewall rules are
 | --- | --- | --- | --- |
 | the Postgres resource | orchestrator database on our own `ghcr.io/betteranswers/postgres` image (Postgres 18 + Apache AGE + pgvector, by digest — ADR 0023) | VPC 1 | volume bind-mounted under `/data/postgres`; the orchestrator's own scheduled dump is the second backup writer (ADR 0022) |
 | the `stores` stack | Docker Compose from `deploy/stores.compose.yaml` | VPC 1 | object store, `cloudflared`, `backup`; the embedding host is commented out until a workspace takes the local route (ADR 0024) |
-| the `platform` stack | Docker Compose from `deploy/platform.compose.yaml` | VPC 1 | `migrate` → `app` → `worker`; digests patched and deployed by `build.yml` / `release.yml`; a private-registry pull credential on the server's Docker config |
+| the `platform` stack | Docker Compose from `deploy/platform.compose.yaml` | VPC 1 | `migrate` → `api` → `worker`; digests patched and deployed by `build.yml` / `release.yml`; a private-registry pull credential on the server's Docker config |
 | the staging Postgres resource | orchestrator database | VPC 2 | created once and kept empty; the drill refills it |
 | the two staging stacks | the same two compose files, staging env | VPC 2 | **on demand** — brought up for a drill or rehearsal and wiped after (`RUNBOOK.md` § Bring staging up); synthetic fixture only; no machine hostname points at them |
 | the orchestrator itself | pinned version, `AUTOUPDATE=false` | VPC 2 | its upgrade is a drill item; its own instance backup is in `BACKUPS.md` |
@@ -33,7 +33,7 @@ The estate's addresses, SSH users and key names, and its host firewall rules are
 
 ## Ingress (Cloudflare)
 
-Every hostname resolves to the tunnel and the tunnel routes to `app:3000`; nothing else is exposed, and the tunnel's last ingress rule is a catch-all 404. Four kinds of hostname exist — the **web app**, the **MCP surface**, the **machine route** (`/agent/v1`, uploads), and the **apex**, which serves concept IRIs and nothing else (ADR 0002) — plus the docs site, built from `docs-site/` and served by its own static host.
+Every hostname resolves to the tunnel and the tunnel routes to `api:3000`; nothing else is exposed, and the tunnel's last ingress rule is a catch-all 404. Four kinds of hostname exist — the **web app**, the **MCP surface**, the **machine route** (`/agent/v1`, uploads), and the **apex**, which serves concept IRIs and nothing else (ADR 0002) — plus the docs site, built from `docs-site/` and served by its own static host.
 
 Which hostname carries which edge policy, and where the edge rate-limit rule is placed, is **estate configuration and is not published**. The rules those choices follow are public and are in ADR 0022's edge paragraph and ADR 0008's amendment: a hostname that must serve an unauthenticated OAuth flow cannot sit behind an interactive access wall, and a machine hostname authenticates in the app before any body is read. The per-file cap on the machine route matches the edge's own body limit.
 
@@ -49,7 +49,7 @@ Two more the reviews owe: whether AGE auto-creates a label table on first write,
 
 ## The `depends_on` probe
 
-Run once at the first deploy and recorded privately: the compose command the orchestrator actually ran; whether `migrate` completed before `app` started; whether `worker` waited for `app` healthy. Research 68 answered it on paper — plain `docker compose up -d` honours the conditions — and the box is the confirmation.
+Run once at the first deploy and recorded privately: the compose command the orchestrator actually ran; whether `migrate` completed before `api` started; whether `worker` waited for `api` healthy. Research 68 answered it on paper — plain `docker compose up -d` honours the conditions — and the box is the confirmation.
 
 ## Stage 7 state
 
