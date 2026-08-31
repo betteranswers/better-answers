@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":pinDigests", ":semanticCommitsDisabled", "schedule:weekends"],
+  "extends": ["config:recommended", ":semanticCommitsDisabled", "schedule:weekends"],
+  "description": "No digest-pinning preset is extended: `:pinDigests` never existed (its absence rejected this whole file, GitHub issue #1), and `docker:pinDigests` plus `helpers:pinGitHubActionDigests` would only restate the `pinDigests: true` the images and actions `packageRules` below already carry for every enabled manager that has a digest",
   "timezone": "Europe/London",
   "labels": ["deps"],
   "automerge": false,
