@@ -2,6 +2,9 @@
 # WEEKLY on hosted runners, not nightly: a nightly run is ~1,800 of the 2,000 free minutes on a 2-vCPU runner
 # (ticket 41 Q1, research 69). Nightly returns with a self-hosted runner on VPC 2 — a one-line runs-on change.
 # A falling score is an ordna task, not a failed build — the job posts the numbers, it does not gate.
+# Neither tool exits non-zero on a survivor here (Stryker's thresholds.break is null, mutmut's run always
+# exits 0), so a red job means the harness itself broke, which is worth seeing.
+# Action versions read from each action's GitHub releases page on 31/08/2026 ([DEPS1]).
 name: mutation
 
 on:
@@ -17,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
+      fail-fast: false
       matrix:
         workspace: [app, web]
     steps:
@@ -29,14 +33,28 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter ./${{ matrix.workspace }} run mutation
       - name: score to the job summary
+        if: always()
         run: |
           f=${{ matrix.workspace }}/reports/mutation/mutation.json
-          [ -f "$f" ] && echo "### ${{ matrix.workspace }} mutation score: $(jq -r '.thresholds.break // "n/a"' "$f")" >> "$GITHUB_STEP_SUMMARY" || echo "no report" >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@<read on the day — not in research 68>
+          if [ -f "$f" ]; then
+            # The report holds one entry per mutant, not a score; the score is the share of
+            # mutants a test caught, which is what a reader of the summary wants.
+            jq -r --arg w "${{ matrix.workspace }}" '
+              [.files[].mutants[].status] as $s
+              | ($s | map(select(. == "Killed" or . == "Timeout")) | length) as $killed
+              | ($s | map(select(. == "Killed" or . == "Timeout" or . == "Survived" or . == "NoCoverage")) | length) as $total
+              | if $total == 0
+                then "### \($w) mutation score: no mutants"
+                else "### \($w) mutation score: \(($killed * 1000 / $total | round) / 10)% (\($killed)/\($total) mutants killed)"
+                end' "$f" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### ${{ matrix.workspace }} mutation score: no report" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
           name: stryker-${{ matrix.workspace }}
-          path: ${{ matrix.workspace }}/reports/mutation
+          path: ${{ matrix.workspace }}/reports/mutation/mutation.json
           retention-days: 14
 
   mutmut:
@@ -49,6 +67,13 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --frozen
-      - run: uv run mutmut run
-      - run: uv run mutmut results | tail -n 20 >> "$GITHUB_STEP_SUMMARY"
+      - run: uv run --frozen mutmut run
+      - name: survivors to the job summary
         if: always()
+        run: |
+          {
+            echo "### worker mutation survivors"
+            echo '```'
+            uv run --frozen mutmut results | tail -n 20
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

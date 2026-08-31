@@ -54,5 +54,13 @@
       }
     }
   ],
-  "ignorePatterns": ["node_modules", "dist", "coverage", "reports", ".venv", "app/lifts/**"]
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "reports",
+    ".venv",
+    "app/lifts/**",
+    "**/stryker-setup-*.js"
+  ]
 }
