@@ -10,6 +10,7 @@
     "lint": "oxlint --config ../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "mutation": "stryker run",
     "check": "pnpm run lint && pnpm run typecheck && pnpm run test"
   },
   "dependencies": {
@@ -23,6 +24,8 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
     "@testcontainers/postgresql": "12.1.0",
     "@types/node": "24.13.3",
     "@types/pg": "8.23.1",

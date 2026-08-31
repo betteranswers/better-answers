@@ -84,6 +84,7 @@
     "reports",
     ".venv",
     "app/tools/anti-slop/**",
-    ".claude/worktrees/**"
+    ".claude/worktrees/**",
+    "**/stryker-setup-*.js"
   ]
 }

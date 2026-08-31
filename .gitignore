@@ -9,7 +9,15 @@ __pycache__/
 .ruff_cache/
 .turbo/
 coverage/
-reports/mutation/
+# `reports/mutation/` carries a slash, so git anchored it to the repository root and left
+# `app/reports/` and `web/reports/` tracked. Every workspace writes its mutation report
+# under its own `reports/` (`[TEST6]`), so the pattern has to match at any depth.
+reports/
+
+# Mutation testing leftovers ([TEST6]): mutmut copies the tier into `worker/mutants/`, and
+# Stryker's Vitest runner writes a per-worker setup file into the workspace it runs in.
+mutants/
+stryker-setup-*.js
 
 # local env — every secret lives in Coolify's env or the password manager (deploy/SECRETS.md)
 .env
