@@ -41,3 +41,6 @@ AGENTS.md.bak
 .agents/
 skills-lock.json
 tasks/AGENTS.md
+
+# Worktrees created by background agents (Claude Code `isolation: worktree`).
+.claude/worktrees/

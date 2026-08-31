@@ -41,7 +41,11 @@ select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20"]
 [tool.mypy]
 python_version = "3.13"
 strict = true
-files = ["src", "tests"]
+# `tests` rejoins this list with the first real test. mypy errors outright on a
+# directory holding no `.py` files, and `tests/` is deliberately empty — the
+# bootstrap tests were removed as trivial. Tests are checked as strictly as `src`
+# when they exist; this is a missing directory, not an exemption.
+files = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

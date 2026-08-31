@@ -24,7 +24,7 @@ the way out rather than failing later against a store it was never told about.
 
 ## [APP3] Tests start a real Postgres and speak HTTP
 
-`test/postgres.ts` is the factory every data-touching test builds its state through
+`tests/postgres.ts` is the factory every data-touching test builds its state through
 (`[TEST2]`, `[TEST4]`). A test reaches the app through `server.request(...)` — the seam a
 caller crosses — never through a function the transport happens to call (`[TEST1]`,
 `[DESIGN2]`).
@@ -33,4 +33,4 @@ caller crosses — never through a function the transport happens to call (`[TES
 
 Every directory under `lifts/` carries a `THIRD_PARTY_NOTICES.md` naming its upstream
 commit, its digest and the test a refresh must pass (`[LIFT1]`, `[LIFT2]`). The test lives
-in `test/` beside our own and fails the build, not a report.
+in `tests/` beside our own and fails the build, not a report.
