@@ -29,11 +29,10 @@ In the graph — Apache AGE inside the platform Postgres, one graph per workspac
 - **The graph name is derived from the Principal through one allowlisted function** that regex-checks `^ws_[0-9a-z]{26}$` — the only place string-building is permitted. A lint rule refuses `cypher(` outside the graph query module's builder.
 - **Writes are split `MERGE`s** (node, then edge — the AGE way); every statement is `cypher()`-in-SQL over `agtype`; the app reads through `pg` with an `agtype` parser, the worker through `psycopg` — one graph query module per tier. The bundle-and-record delta joins the app's commit transaction; generations survive for full rebuilds only.
 - **The app runs as the non-owner `app_rt`** under `FORCE ROW LEVEL SECURITY`; the owner DSN reaches `migrate` and the two runtime-DDL paths only. One worker **login** role holds no table privileges at all and `SET LOCAL ROLE`s into the workspace's role, so a forgotten `SET ROLE` fails with *permission denied*.
-- No graph-side vector or full-text index is a retrieval route; no `neo4j` driver, no Bolt, no APOC and no `neo4j_graphrag` import in either tier — the ban has no exception (ADR 0026 abolished typed-relation prediction, so the matcher lift has no consumer).
 
 ### [DESIGN5] The identity provider stays behind its seam
 
-No Better Auth type crosses into `app/lib`. Transports verify a bearer and build a `Principal`; nothing behind that seam knows which library minted the token, and no `better-auth` or `@better-auth/*` import appears outside the auth module — lint-enforced. Reason: Better Auth is a stay with three written leave-triggers (ADR 0009), and the seam is what makes the Keycloak fallback two to three weeks rather than a rewrite.
+No Better Auth type crosses into `app/lib`. Transports verify a bearer and build a `Principal`; nothing behind that seam knows which library minted the token, and no `better-auth` or `@better-auth/*` import appears outside the auth module.
 
 ## TEST
 
@@ -73,20 +72,6 @@ A comment carries the reason a reader cannot infer from the code: a constraint, 
 
 Domain terms, one definition each, no implementation detail. Code uses the glossary's word; a missing word is settled in `CONTEXT.md` first.
 
-## LIFT
-
-### [LIFT1] One directory, one `THIRD_PARTY_NOTICES.md`
-
-Third-party code taken by contract lives under `<tier>/lifts/<name>/` as a pinned snapshot with a `THIRD_PARTY_NOTICES.md` at its root (the label every engineer recognises; earlier ADRs call it `LIFT.md`): upstream repository, commit, `sha256` of the snapshot, licence and notice, what was cut, who audited it and when, and the boundary contract tests a refresh must pass. Never a fork branch or a submodule.
-
-### [LIFT2] Refresh is a deliberate act
-
-An upstream refresh is a task with its own PR: re-snapshot, re-apply cuts, run the owned tests, update `THIRD_PARTY_NOTICES.md`.
-
-### [LIFT3] Permissive only; copyleft runs, never links
-
-Code is lifted or depended on only under MIT, BSD, ISC, Apache-2.0 or the PostgreSQL licence. GPL/AGPL software runs as an unmodified separate process reached over a network protocol — never linked, vendored or copied. Nothing under an `ee/` or enterprise-licensed directory is ever read from, not even for its shape: the design is reimplemented clean-room. `check` fails on any dependency whose licence is off the list and writes the root `THIRD_PARTY_NOTICES.md` aggregate. Ordinary pnpm and uv dependencies carry no per-lift file; only copied code does (ADR 0027).
-
 ## TYPES (TypeScript)
 
 - `strict` and `noUncheckedIndexedAccess` on; zod v4 at every boundary (input, env, tool schemas).
@@ -113,7 +98,7 @@ Credentials are read through `CredentialsProviderInterface`; never from env at t
 
 ### [SEC2] A Principal on every call
 
-Every `app/lib` function that reads or writes tenant data takes a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter; transports build it, business logic checks the role, the role's action threshold and the **read predicate** (published · sensitivity · audience) beside the data access. The predicate is tested against **columns on the readable unit** — `concept_index`, `composition` and every `index.chunk` row carry `published_at`, `sensitivity` and `audience` whatever the unit's kind — never against three fields of a source binding, because a concept and a composition have no binding (ADR 0023). One functional test per capability runs **through every mounted transport**: tRPC, MCP and `/agent/v1` today, OpenAPI the day it mounts (ADR 0008's amendment leaves the generated document unmounted in v0.1).
+Every `app/lib` function that reads or writes tenant data takes a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter; transports build it, business logic checks the role, the role's action threshold and the **read predicate** (published · sensitivity · audience) beside the data access. The predicate is tested against **columns on the readable unit** — `concept_index`, `composition` and every `index.chunk` row carry `published_at`, `sensitivity` and `audience` whatever the unit's kind — never against three fields of a source binding, because a concept and a composition have no binding (ADR 0023).
 
 A `Principal` has **two kinds** and both are real (`CONTEXT.md`): a **deferred principal** carries a named person's authority into work that outlives their session — a background job, a scheduled run, a replay — and expires with the authority it borrowed; a **platform principal** is the platform acting as itself, with its own actor id and no person behind it. Work that outlives a session runs under one of the two, never under a live user session.
 
@@ -131,7 +116,7 @@ A concept file carries what OKF v0.2 defines plus exactly two platform keys — 
 
 ### [UX1] Show what is needed first, then more, then the action
 
-Every reader-facing surface follows the Linear/Spotify default (Liam, 26/08/2026): the first view shows only what the reader needs to judge — a claim with its trust words, a section with its coverage — one disclosure reveals more (verifier, date, evidence passage, history), and the action sits beside it with its consequence stated before the click. Two levels of disclosure for a Viewer; never a third pane, modal or tooltip where a second level would do. Trust and status are text tags, never colour alone; dates are UK long form.
+Every reader-facing surface follows the Linear/Spotify default: the first view shows only what the reader needs to judge — a claim with its trust words, a section with its coverage — one disclosure reveals more (verifier, date, evidence passage, history), and the action sits beside it with its consequence stated before the click. Two levels of disclosure for a Viewer; never a third pane, modal or tooltip where a second level would do. Trust and status are text tags, never colour alone; dates are UK long form.
 
 ### [UX2] Latency and keyboard budget
 
