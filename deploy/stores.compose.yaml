@@ -5,15 +5,15 @@
 #   stores.compose.yaml   — this file: redeployed a few times a year (a store's upgrade drill)
 #   platform.compose.yaml — migrate → api → worker: redeployed on every release
 # Both join the Coolify-created network on the server; Postgres is a Coolify DATABASE RESOURCE
-# on that network (its own lifecycle, UI and a second backup writer), reached by DSN — running
-# deploy/postgres.Dockerfile (Postgres 18 + Apache AGE + pgvector). The graph lives inside it:
-# there is no graph service here (ADR 0023). The git store is bare repositories under /data/git
-# that the app writes through the git binary; no forge service (ADR 0024) — `init` owns the
-# directory, `backup` bundles it nightly and pushes the mirror.
+# on that network (its own lifecycle, UI and a second backup writer), reached by DSN — the
+# official pgvector image on Postgres 18, pinned by digest in
+# packages/schema/src/postgres-image.ts (ADR 0032; no custom image). The graph is plain tables
+# inside it: there is no graph service here (ADR 0032). The git store is bare repositories under
+# /data/git that the app writes through the git binary; no forge service (ADR 0024) — `init`
+# owns the directory, `backup` bundles it nightly and pushes the mirror.
 #
 # Versions read on 28/08/2026 from Docker Hub / GitHub releases —
-# .scratch/v01-spec/research/41-deploy-facts.md §1 ([DEPS1]). Renovate pins these to digests;
-# the AGE line in deploy/postgres.Dockerfile is frozen there (a new line is an upgrade drill, not a bump).
+# .scratch/v01-spec/research/41-deploy-facts.md §1 ([DEPS1]). Renovate pins these to digests.
 #
 # State: bind mounts under /data/<service>, owned by each service's uid by `init` (idempotent;
 # runs on every redeploy). Never `user: "0:0"`. What is copied off-host and what is rebuilt:

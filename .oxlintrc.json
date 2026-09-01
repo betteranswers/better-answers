@@ -41,6 +41,35 @@
   },
   "overrides": [
     {
+      // ADR 0028 — drizzle-zod is imported through one module, so the drizzle-orm v1
+      // move to `drizzle-orm/zod` is one edit. Everything else imports the boundary
+      // schemas from @better-answers/schema. First in this list on purpose: a later
+      // override that sets `no-restricted-imports` (packages/core's transport ban)
+      // replaces this config for its files, so that override carries the drizzle-zod
+      // pattern too.
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["drizzle-zod"],
+                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // The one seam file the ban above exists to protect.
+      "files": ["packages/schema/src/drizzle-zod.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
       // ADR 0029 rule 5 — nothing in `packages/core` imports a transport or a transport's
       // dependency. `core` is a library with five callers, four of which have no notion of an
       // HTTP status code; a transport import here is how that boundary erodes. A package
@@ -68,6 +97,10 @@
                   "node:https"
                 ],
                 "message": "packages/core is transport-agnostic (ADR 0029 rule 5). A status code, a Request or a Response belongs in apps/api; export a function and a typed error instead."
+              },
+              {
+                "group": ["drizzle-zod"],
+                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema. Restated here because this override replaces the repo-wide no-restricted-imports config for packages/core."
               }
             ]
           }

@@ -1,6 +1,9 @@
 import { fileURLToPath } from "node:url";
 
 export * from "./schema.ts";
+export * from "./index-tables.ts";
+export * from "./postgres-image.ts";
+export * from "./boundary-schemas.ts";
 
 /**
  * Where the generated SQL lives. The schema is defined here and the migrations are

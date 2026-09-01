@@ -8,5 +8,5 @@
     "llm-routing": { "form": "sql-function" },
     "cost-ledger": { "form": "generated" }
   },
-  "fixtures": []
+  "fixtures": [{ "agreement": "llm-routing", "path": "llm-routing/cases.json" }]
 }

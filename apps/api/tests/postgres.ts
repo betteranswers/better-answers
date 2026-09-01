@@ -1,15 +1,12 @@
+import { POSTGRES_IMAGE } from "@better-answers/schema";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { Pool } from "pg";
 
 /**
  * The factory every data-touching test builds its state through (`[TEST4]`): a real
- * Postgres, never a mock (`[TEST2]`). B2 (`T-003`) swaps the image for the platform's
- * own — AGE plus pgvector on Postgres 18 (`deploy/postgres.Dockerfile`) — once there
- * is a schema to migrate into it.
- *
- * Image read from Docker Hub on 30/08/2026 (`[DEPS1]`).
+ * Postgres, never a mock (`[TEST2]`), on the one pinned platform image (ADR 0032 —
+ * `packages/schema/src/postgres-image.ts`).
  */
-const POSTGRES_IMAGE = "postgres:18.6-trixie";
 
 export type TestDatabase = {
   readonly pool: Pool;
