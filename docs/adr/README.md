@@ -28,7 +28,7 @@ The **live conclusion** of every ADR — the state after its amendments, not its
 | 0020 | Personal data is withheld at the seam before any store and erased from every copy by routine |
 | 0021 | ~~Graph on Neo4j Community~~ — **superseded by 0023** |
 | 0022 | Two stacks deployed by digest; every irreplaceable byte encrypted off-host; erasures replayed on restore |
-| 0023 | The graph is Apache AGE inside the platform Postgres, one graph per workspace; the read predicate lives once, in the app's graph query module; the incremental delta joins the app's commit transaction (2026-08-29 amendment) |
+| 0023 | ~~Apache AGE, one graph per workspace~~ — **engine superseded by 0032** (plain tables under RLS); its write model stands: the read predicate lives once, in the app's graph query module; the incremental delta joins the app's commit transaction (2026-08-29 amendment) |
 | 0024 | The forge is bare git repositories the app writes; the estate is two 4 GB boxes |
 | 0025 | A signal is a query over rows the platform already keeps; every model call writes one `llm_call` row |
 | 0026 | Kinds emerge from the concepts — no vocabulary file; a link is the relation |
@@ -37,3 +37,4 @@ The **live conclusion** of every ADR — the state after its amendments, not its
 | 0029 | The tree is `apps/` over `packages/`; business logic is `packages/core` — capability slices over four store doors; import direction is a lint rule (its contracts-rename and six-item-risk consequences are enacted and corrected by 0031) |
 | 0030 | The MCP surface stays MCP SDK v2 in the TypeScript tier behind one fetch-shaped seam |
 | 0031 | The tier contract is six agreements in three forms (SQL function / fixtured / generated) in top-level `contracts/`, conformance-tested by both tiers' suites; the read predicate's logic is app-only — the cross-tier piece is the visibility columns the worker writes |
+| 0032 | The graph is plain Postgres tables under RLS (no AGE, no per-workspace roles, no custom image); one migration journal, one `current_workspace_id()` policy seam, one SECURITY DEFINER lifecycle function, `vector(N)` fixed, the worker's schema view generated and drift-checked both ways |

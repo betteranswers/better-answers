@@ -22,9 +22,9 @@ Every table carries the workspace id. Every query reaches its store through a **
 
 **RLS is the guarantee, and it is default-deny.** Every tenant table is created `withRLS()`, so a table with no policy returns no rows to anyone, under `FORCE ROW LEVEL SECURITY`, read by the non-owner `app_rt`, with `SET LOCAL app.workspace_id` set from the `Principal`. One zero-rows test per tenant table is the proof. The store door is ergonomics over that guarantee and never a substitute for it: drizzle-orm exposes no query lifecycle hook, so there is no interception layer to trust.
 
-**The rule reaches the graph**, which RLS does not: `workspace_id` and the three visibility terms are properties on every node and edge and terms of the `WHERE` on every element of every path; the graph name comes from the `Principal` through the one allowlisted function, never from a tool argument; no LLM-authored Cypher or SQL runs against a shared store; no `neo4j` driver, no Bolt, no APOC, no `neo4j_graphrag` import, with no exception.
+**The graph tables are tenant tables like any other** (ADR 0032): `graph_node` and `graph_edge` carry `workspace_id` and the three visibility terms as columns under the same RLS; traversal is a prepared recursive-CTE template in the one graph query module per tier, depth capped at 4 by the template; no LLM-authored SQL runs against a shared store; no `neo4j` driver, no Bolt, no APOC, no `neo4j_graphrag` import, with no exception.
 
-The shape behind these four lines is **ADR 0029** for the store doors and **ADR 0023**'s *the graph is application data* amendment for the write model. Read those before changing the data layer; a design specification wearing a rule identifier drifts from the code the day the code exists, which is why it lives there and the checkable statement lives here.
+The shape behind these four lines is **ADR 0029** for the store doors and **ADR 0032** (restating ADR 0023's *the graph is application data* amendment as columns) for the write model. Read those before changing the data layer; a design specification wearing a rule identifier drifts from the code the day the code exists, which is why it lives there and the checkable statement lives here.
 
 ### [DESIGN5] The identity provider stays behind its seam
 

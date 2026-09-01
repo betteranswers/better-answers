@@ -46,7 +46,7 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   knowledge is one bundle in v0.1.
 - **graph** — the platform's derived, queryable map over the bundle and the records: concepts,
   their links and relations, sources, actors and citations; held inside the platform Postgres
-  (Apache AGE), one graph per workspace (ADR 0023). Derived again from the bundles on every
+  as ordinary workspace-scoped rows (ADR 0032). Derived again from the bundles on every
   commit and from the records as they change; never a source of truth.
 - **bundle manifest** — the bundle's self-description carried inside it: identity, origin,
   owner, content version.
