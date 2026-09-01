@@ -10,6 +10,7 @@ import type { PlatformPrincipal } from "../src/kernel/index.ts";
 import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
 import {
   provisionWorkspace,
+  revokeCredentials,
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
 } from "../src/workspaces/index.ts";
@@ -139,5 +140,69 @@ describe("provisioning a workspace", () => {
     });
 
     expect(provisioned).toEqual({ ok: false, error: "malformed" });
+  });
+});
+
+describe("revoking a person's credentials", () => {
+  it("writes the instant, ends the earlier sessions and revokes the earlier refresh tokens in one act", async () => {
+    const adminUserId = await seedUser();
+    const door = openPostgres(db.runtimePool);
+    const id = ulid();
+    await provisionWorkspace(bootstrap, door, {
+      id,
+      name: "Acme",
+      slug: `acme-${id.toLowerCase()}`,
+      adminUserId,
+    });
+    const at = new Date("2026-09-02T12:00:00Z");
+    // A session and a refresh token created before the instant, and one after.
+    const superuser = await db.pool.connect();
+    try {
+      await superuser.query(
+        "INSERT INTO session (id, expires_at, token, created_at, updated_at, user_id) VALUES ('s-old', now(), 'tok-old', $2, now(), $1)",
+        [adminUserId, new Date("2026-09-02T11:00:00Z")],
+      );
+      await superuser.query(
+        "INSERT INTO session (id, expires_at, token, created_at, updated_at, user_id) VALUES ('s-new', now(), 'tok-new', $2, now(), $1)",
+        [adminUserId, new Date("2026-09-02T13:00:00Z")],
+      );
+      await superuser.query(
+        "INSERT INTO oauth_client (id, client_id, redirect_uris) VALUES ('c', 'https://c.example/x', ARRAY['https://c.example/cb'])",
+      );
+      await superuser.query(
+        "INSERT INTO oauth_refresh_token (id, token, client_id, user_id, expires_at, created_at, scopes) VALUES ('r-old', 'r-old-t', 'https://c.example/x', $1, now(), $2, ARRAY['knowledge:read'])",
+        [adminUserId, new Date("2026-09-02T11:00:00Z")],
+      );
+    } finally {
+      superuser.release();
+    }
+
+    const revoked = await revokeCredentials(bootstrap, door, { userId: adminUserId, at });
+
+    expect(revoked).toEqual({
+      ok: true,
+      value: { userId: adminUserId, actorId: "process:better-answers-bootstrap" },
+    });
+    const after = await db.pool.query('SELECT credentials_revoked_at FROM "user" WHERE id = $1', [
+      adminUserId,
+    ]);
+    expect(after.rows[0]?.credentials_revoked_at).toEqual(at);
+    const sessions = await db.pool.query("SELECT id FROM session WHERE user_id = $1 ORDER BY id", [
+      adminUserId,
+    ]);
+    expect(sessions.rows).toEqual([{ id: "s-new" }]);
+    const token = await db.pool.query(
+      "SELECT revoked IS NOT NULL AS revoked FROM oauth_refresh_token WHERE id = 'r-old'",
+    );
+    expect(token.rows[0]?.revoked).toBe(true);
+  });
+
+  it("refuses a person who does not exist and leaves nothing behind", async () => {
+    const door = openPostgres(db.runtimePool);
+    const revoked = await revokeCredentials(bootstrap, door, {
+      userId: "user-missing",
+      at: new Date(),
+    });
+    expect(revoked).toEqual({ ok: false, error: "no-such-user" });
   });
 });

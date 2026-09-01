@@ -4,6 +4,7 @@ import type pg from "pg";
 import { err, ok, type Result } from "../../kernel/index.ts";
 import type {
   Claims,
+  PlatformPrincipal,
   PrincipalRefusal,
   Role,
   UserId,
@@ -45,20 +46,13 @@ const rollbackQuietly = async (client: pg.PoolClient): Promise<void> => {
   }
 };
 
-/**
- * Run `work` inside one transaction scoped to `workspaceId`. The setter every
- * tenant read goes through; `withPrincipal` is the door most callers use, this is
- * for the platform's own acts (provisioning), where no person is behind the call.
- */
-export const withScope = async <T>(
+const transaction = async <T>(
   door: PostgresDoor,
-  workspaceId: string,
-  work: (tx: Tx) => Promise<T>,
+  work: (client: pg.PoolClient) => Promise<T>,
 ): Promise<T> => {
   const client = await door.pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
     const result = await work(client);
     await client.query("COMMIT");
     return result;
@@ -69,6 +63,36 @@ export const withScope = async <T>(
     client.release();
   }
 };
+
+/**
+ * Run `work` inside one transaction scoped to `workspaceId`, as the platform. The
+ * setter every tenant read goes through; `withPrincipal` is the door a person's call
+ * uses, this is for the platform's own acts — provisioning, the identity provider's
+ * hooks — where a platform principal, not a person, is behind the call (`[SEC2]`:
+ * the actor is the first argument, and the act is audited under its id).
+ */
+export const withScope = async <T>(
+  actor: PlatformPrincipal,
+  door: PostgresDoor,
+  workspaceId: string,
+  work: (tx: Tx, actor: PlatformPrincipal) => Promise<T>,
+): Promise<T> =>
+  transaction(door, async (client) => {
+    await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
+    return work(client, actor);
+  });
+
+/**
+ * Run `work` inside one transaction with no scope, as the platform: a write to the
+ * identity set (ADR 0009), which no workspace scope reaches — revoking a person's
+ * credentials, for one. Never a tenant read: an unscoped transaction sees zero tenant
+ * rows by construction.
+ */
+export const withIdentityWrite = async <T>(
+  actor: PlatformPrincipal,
+  door: PostgresDoor,
+  work: (tx: Tx, actor: PlatformPrincipal) => Promise<T>,
+): Promise<T> => transaction(door, (client) => work(client, actor));
 
 /** The one resolve query (ADR 0018): the member row and the person's revocation instant. */
 const MEMBERSHIP_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS revoked_at
@@ -190,8 +214,13 @@ export const consumeIngress = async (
   now: Date = new Date(),
 ): Promise<CounterOutcome> => {
   const start = windowStart(rule, now);
+  // One statement: the key's expired windows go as its current one is counted, so the
+  // table holds at most one live row per key and never becomes the load it sheds.
   const counted = await door.pool.query<{ count: number }>(
-    `INSERT INTO ingress_counter (scope, key, window_start, count) VALUES ($1, $2, $3, 1)
+    `WITH swept AS (
+       DELETE FROM ingress_counter WHERE scope = $1 AND key = $2 AND window_start < $3
+     )
+     INSERT INTO ingress_counter (scope, key, window_start, count) VALUES ($1, $2, $3, 1)
      ON CONFLICT (scope, key, window_start) DO UPDATE SET count = ingress_counter.count + 1
      RETURNING count`,
     [scope, key, start],
@@ -212,8 +241,13 @@ export const consumeCall = async (
   now: Date = new Date(),
 ): Promise<CounterOutcome> => {
   const start = windowStart(rule, now);
+  // The token's expired windows go as its current one is counted, so a workspace holds
+  // at most one live row per token and the counter never becomes the load it sheds.
   const counted = await tx.query<{ count: number }>(
-    `INSERT INTO mcp_call_counter (workspace_id, token_id, window_start, count) VALUES ($1, $2, $3, 1)
+    `WITH swept AS (
+       DELETE FROM mcp_call_counter WHERE token_id = $2 AND window_start < $3
+     )
+     INSERT INTO mcp_call_counter (workspace_id, token_id, window_start, count) VALUES ($1, $2, $3, 1)
      ON CONFLICT (workspace_id, token_id, window_start) DO UPDATE SET count = mcp_call_counter.count + 1
      RETURNING count`,
     [principal.workspaceId, tokenId, start],

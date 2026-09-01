@@ -6,7 +6,7 @@ direction. The worker never migrates (`[WRK1]`); this module is its read-only
 knowledge of what the app's journal built, stamped with the migration id it was
 generated from."""
 
-MIGRATION_ID = "0005_identity-set-substrate"
+MIGRATION_ID = "0006_identity-role-checks"
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {

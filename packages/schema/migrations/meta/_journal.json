@@ -43,6 +43,13 @@
       "when": 1788298724733,
       "tag": "0005_identity-set-substrate",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788303950941,
+      "tag": "0006_identity-role-checks",
+      "breakpoints": true
     }
   ]
 }

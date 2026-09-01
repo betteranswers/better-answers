@@ -117,6 +117,17 @@ describe("every MCP entry carries its annotations", () => {
     expect(output).not.toContain("entries/with.ts");
     expect(output).not.toContain("registered-with.ts");
   });
+
+  it("refuses annotations that carry no readOnlyHint — the host splits read from write on it", () => {
+    const output = lint({
+      "apps/api/src/mcp/entries/no-hint.ts": `defineEntry({ name: "find", input: z.object({}), annotations: { idempotentHint: true } });\n`,
+      "apps/api/src/mcp/entries/hinted.ts": `defineEntry({ name: "find", input: z.object({}), annotations: { readOnlyHint: false } });\n`,
+    });
+
+    expect(output).toContain("entries/no-hint.ts");
+    expect(output).toContain("mcp-entry-annotations");
+    expect(output).not.toContain("entries/hinted.ts");
+  });
 });
 
 describe("no MCP entry takes a workspace argument", () => {
@@ -124,7 +135,7 @@ describe("no MCP entry takes a workspace argument", () => {
     "refuses an input named %s",
     (name) => {
       const output = lint({
-        "apps/api/src/mcp/entries/probe.ts": `defineEntry({ name: "find", annotations: {}, input: z.object({ ${name}: z.string() }) });\n`,
+        "apps/api/src/mcp/entries/probe.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: z.object({ ${name}: z.string() }) });\n`,
       });
 
       expect(output).toContain("mcp-entry-no-workspace-argument");
@@ -132,10 +143,30 @@ describe("no MCP entry takes a workspace argument", () => {
     },
   );
 
-  it("allows an input that names none of the three, in either declaration form", () => {
+  it("allows an input that names none of the three, in either declaration form, and unwraps a refine", () => {
     const output = lint({
-      "apps/api/src/mcp/entries/probe.ts": `defineEntry({ name: "find", annotations: {}, input: z.object({ query: z.string(), limit: z.number() }) });\n`,
-      "apps/api/src/mcp/raw.ts": `server.registerTool("find", { annotations: {}, inputSchema: { query: z.string() } }, async () => ({}));\n`,
+      "apps/api/src/mcp/entries/probe.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: z.object({ query: z.string(), limit: z.number() }) });\n`,
+      "apps/api/src/mcp/entries/refined.ts": `defineEntry({ name: "open", annotations: { readOnlyHint: true }, input: z.object({ iri: z.string() }).refine(() => true) });\n`,
+      "apps/api/src/mcp/raw.ts": `server.registerTool("find", { annotations: { readOnlyHint: true }, inputSchema: { query: z.string() } }, async () => ({}));\n`,
+    });
+
+    expect(output).not.toContain("mcp-entry-no-workspace-argument");
+  });
+
+  it("fails closed on a defineEntry whose input is an opaque variable, and on a spread key", () => {
+    const output = lint({
+      "apps/api/src/mcp/entries/opaque.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: sharedShape });\n`,
+      "apps/api/src/mcp/entries/spread.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: z.object({ ...base, query: z.string() }) });\n`,
+    });
+
+    expect(output).toContain("entries/opaque.ts");
+    expect(output).toContain("entries/spread.ts");
+    expect(output).toContain("mcp-entry-no-workspace-argument");
+  });
+
+  it("does not flag a registerTool whose inputSchema is a variable — the entries are checked at their defineEntry", () => {
+    const output = lint({
+      "apps/api/src/mcp/mount.ts": `server.registerTool(entry.name, { annotations: entry.annotations, inputSchema: entry.input }, entry.run);\n`,
     });
 
     expect(output).not.toContain("mcp-entry-no-workspace-argument");

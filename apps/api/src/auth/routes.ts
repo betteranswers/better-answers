@@ -171,6 +171,14 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   for (const page of ["/sign-in", "/choose-workspace", "/consent"]) {
     routes.use(page, limitByIp(door, PAGE_IP_RULE));
     routes.use(page, sameOriginOnly(publicUrl));
+    // No other site may frame these: a framed consent form still posts with this
+    // origin and would pass the same-origin check, so clickjacking is refused at the
+    // frame, not the post. `frame-ancestors 'none'` and the legacy header together.
+    routes.use(page, async (context, next) => {
+      await next();
+      context.res.headers.set("content-security-policy", "frame-ancestors 'none'");
+      context.res.headers.set("x-frame-options", "DENY");
+    });
   }
 
   routes.get("/sign-in", (context) => context.html(signInPage(carry(context.req.url))));
@@ -312,6 +320,23 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   routes.post("/consent", async (context) => {
     const form = await context.req.formData();
     const accept = String(form.get("accept")) === "true";
+    // The person's credentials may have been revoked since this session was created;
+    // consent mints a token, so the revocation check runs here too (`[SEC2]`, ADR 0018).
+    // A refused resolve stops the grant before Better Auth issues a code.
+    if (accept) {
+      const claims = await sessionClaims(
+        (headers) => auth.api.getSession({ headers }),
+        flowHeaders(context.req.raw, publicUrl),
+      );
+      const resolved =
+        claims === undefined ? undefined : await withPrincipal(door, claims, async () => true);
+      if (claims === undefined || resolved === undefined || !resolved.ok) {
+        return context.html(
+          refusedPage("Sign in again", "Your session is no longer valid. Sign in again."),
+          401,
+        );
+      }
+    }
     const decided = await attempt(() =>
       callFlow(auth, publicUrl, "/oauth2/consent", flowHeaders(context.req.raw, publicUrl), {
         accept,

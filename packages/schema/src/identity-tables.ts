@@ -1,6 +1,8 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -10,7 +12,11 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+import { ROLES } from "./roles.ts";
 import { workspace } from "./workspace-table.ts";
+
+/** The three roles as a SQL list, for the CHECK constraints below. */
+const roleList = ROLES.map((role) => `'${role}'`).join(", ");
 
 /**
  * The identity set (ADR 0009, 2026-09-01 amendment; ADR 0032): every table Better Auth
@@ -132,7 +138,10 @@ export const member = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    // Admin, Editor or Viewer (CONTEXT.md, *role (of a person)*); the boundary narrows it.
+    // Admin, Editor or Viewer (CONTEXT.md, *role (of a person)*); the boundary narrows it
+    // and the CHECK below holds it against Better Auth's own writes, which never cross
+    // the boundary — the organisation plugin merges its owner/admin/member defaults into
+    // any roles map, so the database is where those three are refused.
     role: text("role").notNull(),
     createdAt: stamp("created_at").notNull(),
   },
@@ -141,6 +150,7 @@ export const member = pgTable(
     index("member_user_id_idx").on(table.userId),
     // The resolver's one indexed read (ADR 0018): a person is a member of a workspace once.
     uniqueIndex("member_workspace_id_user_id_uidx").on(table.workspaceId, table.userId),
+    check("member_role_check", sql.raw(`role IN (${roleList})`)),
   ],
 );
 
@@ -163,6 +173,7 @@ export const invitation = pgTable(
   (table) => [
     index("invitation_workspace_id_idx").on(table.workspaceId),
     index("invitation_email_idx").on(table.email),
+    check("invitation_role_check", sql.raw(`role IS NULL OR role IN (${roleList})`)),
   ],
 );
 

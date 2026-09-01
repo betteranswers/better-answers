@@ -14,6 +14,7 @@ import type { Logger } from "pino";
 import type { Claims } from "@better-answers/core/kernel";
 import {
   consumeCall,
+  consumeIngress,
   readWorkspaceConfig,
   withPrincipal,
   type PostgresDoor,
@@ -31,7 +32,6 @@ import {
 } from "../auth/constants.ts";
 import { bearerOf } from "../auth/verify.ts";
 import { clientIpOf, tooManyRequests } from "../ingress/limits.ts";
-import { consumeIngress } from "@better-answers/core/store/postgres";
 import { ENTRIES } from "./entries/index.ts";
 
 /**
@@ -39,11 +39,13 @@ import { ENTRIES } from "./entries/index.ts";
  * mounted in Hono, authentication resolved before the handler and the Principal
  * passed in. No `@modelcontextprotocol/*` type crosses into `packages/core`.
  *
- * Per request: the bearer is verified (signature, issuer, audience, expiry, the
- * required scope); the Principal is resolved once in a short transaction that also
- * counts the call against the token and reads the workspace's `tools/list` TTL — a
- * refused resolve is a 401 the host answers by re-authorising, a passed ceiling a 429;
- * then `createMcpHandler` serves both protocol eras from one tool factory
+ * Per request: a request with no bearer at all pays the per-IP counter first (the 401
+ * flood never reaches a signature check); a bearer is verified (signature, issuer,
+ * audience, expiry, the required scope); the Principal is resolved once in a short
+ * transaction that also counts the call against the token and reads the workspace's
+ * `tools/list` TTL — a refused resolve is a 401 the host answers by re-authorising
+ * (the reason goes to the log, never to the wire), a passed ceiling a 429; then
+ * `createMcpHandler` serves both protocol eras from one tool factory
  * (`legacy: "stateless"`, the SDK's default and load-bearing: claude.ai's
  * unauthenticated pre-flight speaks 2025-11-25 only). The move to `legacy: "reject"`
  * is conditioned on `server/discover` having been observed from every host on the
@@ -63,6 +65,10 @@ export type McpSurfaceDependencies = {
 
 const CEILING_MESSAGE =
   "This connection has made too many calls this minute; an Admin can raise the ceiling in System.";
+
+/** The one wording every refused bearer gets; the reason is the log's. */
+const refused = (): OAuthError =>
+  new OAuthError(OAuthErrorCode.InvalidToken, "the bearer was refused");
 
 export const createMcpSurface = (
   deps: McpSurfaceDependencies,
@@ -90,7 +96,7 @@ export const createMcpSurface = (
     );
 
     for (const entry of ENTRIES) {
-      if (!scopes.has(entry.scope)) continue;
+      if (!entry.scopes.every((scope) => scopes.has(scope))) continue;
       server.registerTool(
         entry.name,
         {
@@ -130,34 +136,44 @@ export const createMcpSurface = (
       log.warn({ event: "mcp.handler_error", message: error.message }, "handler error"),
   });
 
+  /** The 401 flood is per IP, before any signature work. */
+  const flooded = async (request: Request): Promise<Response | undefined> => {
+    const flood = await consumeIngress(
+      deps.door,
+      "ip",
+      clientIpOf(request.headers),
+      MCP_UNAUTHENTICATED_IP_RULE,
+    );
+    return flood.allowed ? undefined : tooManyRequests(flood.retryAfterSeconds, CEILING_MESSAGE);
+  };
+
   return async (request: Request): Promise<Response> => {
+    const authorization = request.headers.get("authorization");
+    if (authorization === null || !/^Bearer\s+\S+$/i.test(authorization)) {
+      // No bearer to verify: the pre-flight that draws the challenge, or a flood.
+      return (
+        (await flooded(request)) ??
+        bearerAuthChallengeResponse(
+          new OAuthError(OAuthErrorCode.InvalidToken, "a bearer token is required"),
+          challengeOptions,
+        )
+      );
+    }
+
     let authInfo: AuthInfo;
     try {
-      authInfo = await verifyBearerToken(request.headers.get("authorization"), {
+      authInfo = await verifyBearerToken(authorization, {
         verifier: deps.verifier,
         requiredScopes: [MCP_REQUIRED_SCOPE],
       });
     } catch (cause) {
-      // The 401 flood is per IP, before any token is verified.
-      const flood = await consumeIngress(
-        deps.door,
-        "ip",
-        clientIpOf(request.headers),
-        MCP_UNAUTHENTICATED_IP_RULE,
-      );
-      if (!flood.allowed) return tooManyRequests(flood.retryAfterSeconds, CEILING_MESSAGE);
       // Trap 3 (prototype 61): the challenge advertises the whole surface's scopes;
       // the guard above enforces only the one every entry needs.
-      return bearerAuthChallengeResponse(cause, challengeOptions);
+      return (await flooded(request)) ?? bearerAuthChallengeResponse(cause, challengeOptions);
     }
 
     const bearer = bearerOf(authInfo);
-    if (bearer === undefined) {
-      return bearerAuthChallengeResponse(
-        new OAuthError(OAuthErrorCode.InvalidToken, "the bearer names no principal"),
-        challengeOptions,
-      );
-    }
+    if (bearer === undefined) return bearerAuthChallengeResponse(refused(), challengeOptions);
 
     const gate = await withPrincipal(deps.door, bearer.claims, async (principal, tx) => ({
       ceiling: await consumeCall(principal, tx, bearer.tokenId, MCP_TOKEN_RULE),
@@ -168,10 +184,7 @@ export const createMcpSurface = (
         { event: "mcp.refused", reason: gate.error, client_id: authInfo.clientId },
         "bearer refused",
       );
-      return bearerAuthChallengeResponse(
-        new OAuthError(OAuthErrorCode.InvalidToken, gate.error),
-        challengeOptions,
-      );
+      return bearerAuthChallengeResponse(refused(), challengeOptions);
     }
     if (!gate.value.ceiling.allowed) {
       return tooManyRequests(gate.value.ceiling.retryAfterSeconds, CEILING_MESSAGE);

@@ -6,7 +6,10 @@ import { pino } from "pino";
 
 import type { PlatformPrincipal } from "@better-answers/core/kernel";
 import { openPostgres } from "@better-answers/core/store/postgres";
-import { provisionWorkspace } from "@better-answers/core/workspaces";
+import {
+  provisionWorkspace,
+  revokeCredentials as revokeCredentials_,
+} from "@better-answers/core/workspaces";
 import { testData, ulid } from "@better-answers/schema/testing";
 
 import type { EmailMessage } from "../src/auth/index.ts";
@@ -181,10 +184,14 @@ export const startApp = async (): Promise<TestApp> => {
   };
 
   const revokeCredentials: TestApp["revokeCredentials"] = async (userId, at) => {
-    await database.superuser.query('UPDATE "user" SET credentials_revoked_at = $2 WHERE id = $1', [
-      userId,
-      at,
-    ]);
+    // Through the platform's one act, as the People screen will: writes the instant,
+    // ends the sessions and revokes the refresh tokens minted before it.
+    const revoked = await revokeCredentials_(
+      { kind: "platform", actorId: "process:better-answers-test" },
+      door,
+      { userId, at },
+    );
+    if (!revoked.ok) throw new Error(`revokeCredentials failed: ${revoked.error}`);
   };
 
   const removeMember: TestApp["removeMember"] = async (workspaceId, userId) => {

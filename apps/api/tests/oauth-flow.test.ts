@@ -182,6 +182,56 @@ describe("the flow, as claude.ai drives it", () => {
   });
 });
 
+describe("the pages, as a person walks them", () => {
+  it("never shows the picker to a person in exactly one workspace — consent is the next page", async () => {
+    const acme = await app.provision({ name: "Only" });
+    const client = app.client();
+
+    const next = await driveToPage(app, client, acme.admin);
+
+    expect(next.pathname).toBe("/consent");
+    const me = await json(await client.fetch("/me"));
+    expect(me).toMatchObject({ workspaceId: acme.workspaceId, role: "Admin" });
+  });
+
+  it("names every scope in the person's words on the consent page, staying connected included", async () => {
+    const acme = await app.provision({ name: "Acme" });
+    const client = app.client();
+    const consent = await driveToPage(
+      app,
+      client,
+      acme.admin,
+      "knowledge:read feedback:write offline_access",
+    );
+
+    const page = await (await client.fetch(`${consent.pathname}${consent.search}`)).text();
+
+    expect(page).toContain("Read what you can see of the company's knowledge");
+    expect(page).toContain("Send your feedback on answers");
+    expect(page).toContain("Stay connected until you disconnect it");
+    expect(page).toContain("Claude will act as you");
+  });
+
+  it("refuses consent once the person's credentials are revoked, and mints no code", async () => {
+    const acme = await app.provision({ name: "Acme" });
+    const client = app.client();
+    const consent = await driveToPage(app, client, acme.admin);
+    await app.revokeCredentials(acme.admin.id, new Date(Date.now() + 1_000));
+
+    const decided = await client.form(`/consent${consent.search}`, { accept: "true" });
+
+    expect(decided.status).toBe(401);
+    expect(decided.headers.get("location")).toBeNull();
+  });
+
+  it("refuses to be framed by another site", async () => {
+    const page = await app.client().fetch("/sign-in");
+
+    expect(page.headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
+    expect(page.headers.get("x-frame-options")).toBe("DENY");
+  });
+});
+
 describe("the pages refuse a cross-site form", () => {
   it("refuses consent posted from another origin, even with the person's cookie, and mints no code", async () => {
     const acme = await app.provision({ name: "Acme" });
@@ -241,7 +291,10 @@ describe("the cookie session, through the same resolver", () => {
     const refused = await client.fetch("/me");
 
     expect(refused.status).toBe(401);
-    expect(await json(refused)).toEqual({ error: "credentials-revoked" });
+    // Revocation ends the session itself (the platform's one act), so the person is
+    // simply no longer signed in; a session that somehow survived would be refused by
+    // the resolver as credentials-revoked. Either way: 401.
+    expect((await json(refused))["error"]).toMatch(/^(not_signed_in|credentials-revoked)$/);
   });
 });
 

@@ -134,7 +134,11 @@ describe("era-independent", () => {
     expect(names).toEqual(["find", "ask", "open"]);
 
     const refused = await rpc(
-      await callTool(client, token, "give_feedback", { iri: "x", reason: "wrong" }),
+      await callTool(client, token, "give_feedback", {
+        iri: "x",
+        verdict: "flag",
+        reason: "wrong",
+      }),
     );
     expect(refused["error"] ?? (refused["result"] as Rpc)["isError"]).toBeTruthy();
   });
@@ -199,36 +203,50 @@ describe("era-independent", () => {
       await callTool(client, token, "ask", { question: "What accreditations do we hold?" }),
     );
     expect((asked["structuredContent"] as Rpc)["verdict"]).toBe("refuse");
-    expect(String(((asked["content"] as Rpc[])[0] ?? {})["text"])).toMatch(/^\*\*Not answered/);
+    expect(String(((asked["content"] as Rpc[])[0] ?? {})["text"])).toMatch(
+      /^\*\*Not answered from the company/,
+    );
 
     const fed = await result(
       await callTool(client, token, "give_feedback", {
         iri: "https://better-answers.com/c/01X",
+        verdict: "flag",
         reason: "wrong",
       }),
     );
     expect((fed["structuredContent"] as Rpc)["outcome"]).toBe("received");
   });
 
-  it("refuses a token whose person was revoked after it was issued, on the next call (§9 6; ADR 0018)", async () => {
+  it("refuses a token whose person was revoked after it was issued, on the next call — the reason to the log, not the wire (§9 6; ADR 0018)", async () => {
     const { workspace, client, token } = await connect();
     expect((await modern(client, token, "tools/list")).status).toBe(200);
 
     await app.revokeCredentials(workspace.admin.id, new Date(Date.now() + 1_000));
+    const before = app.logs.length;
 
     const refused = await modern(client, token, "tools/list");
     expect(refused.status).toBe(401);
-    expect(refused.headers.get("www-authenticate")).toContain("credentials-revoked");
+    // The wire carries the one generic message; the reason is the server's alone.
+    const challenge = refused.headers.get("www-authenticate") ?? "";
+    expect(challenge).toContain('error="invalid_token"');
+    expect(challenge).not.toContain("credentials-revoked");
+    expect(app.logs.slice(before)).toContainEqual(
+      expect.objectContaining({ event: "mcp.refused", reason: "credentials-revoked" }),
+    );
   });
 
-  it("refuses a token whose person is no longer a member", async () => {
+  it("refuses a token whose person is no longer a member — the reason to the log, not the wire", async () => {
     const { workspace, client, token } = await connect();
     await app.removeMember(workspace.workspaceId, workspace.admin.id);
+    const before = app.logs.length;
 
     const refused = await modern(client, token, "tools/list");
 
     expect(refused.status).toBe(401);
-    expect(refused.headers.get("www-authenticate")).toContain("not-a-member");
+    expect(refused.headers.get("www-authenticate") ?? "").not.toContain("not-a-member");
+    expect(app.logs.slice(before)).toContainEqual(
+      expect.objectContaining({ event: "mcp.refused", reason: "not-a-member" }),
+    );
   });
 
   it("refuses a bearer that is not this issuer's (§9 5)", async () => {

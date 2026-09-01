@@ -171,6 +171,85 @@ describe("the identity set", () => {
       { relname: "mcp_call_counter", relpersistence: "u" },
     ]);
   });
+
+  it("refuses the worker role on every identity-set table and the counters (migration 0005, [SEC3])", async () => {
+    // The worker never touches identity rows — secrets, sessions, signing keys,
+    // memberships — nor the counters; migration 0000's default privileges would have
+    // granted it DML, which 0005 revokes. The refusal is asserted directly.
+    const refused = [
+      ...IDENTITY_SET.filter((name) => name !== "public.workspace"),
+      "public.ingress_counter",
+      "public.mcp_call_counter",
+    ];
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.user({ id: "user-worker-probe", email: "probe@example.invalid" });
+      await client.query("SET LOCAL ROLE worker_rt");
+      for (const qualified of refused) {
+        const [, table] = qualified.split(".");
+        await client.query("SAVEPOINT probe");
+        await expect(client.query(`SELECT 1 FROM "${table}" LIMIT 1`)).rejects.toThrow(
+          /permission denied/,
+        );
+        await client.query("ROLLBACK TO SAVEPOINT probe");
+      }
+    });
+  });
+
+  it("lets the worker read the workspace table and config, and never write them", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.workspaceConfig({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE worker_rt");
+
+      // `workspace` is the identity set (not RLS'd): the worker reads it globally, which
+      // is fine — it holds a tenant's name, not a secret. `workspace_config` is RLS'd, so
+      // a read needs a scope.
+      const workspaces = await client.query("SELECT id FROM workspace ORDER BY id");
+      expect(workspaces.rows).toEqual([{ id: WS_A }, { id: WS_B }]);
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const config = await client.query("SELECT workspace_id FROM workspace_config");
+      expect(config.rows).toEqual([{ workspace_id: WS_A }]);
+
+      // Writes to either: refused (0005 revokes DML from worker_rt).
+      await client.query("SAVEPOINT w");
+      await expect(
+        client.query("UPDATE workspace SET name = 'x' WHERE id = $1", [WS_A]),
+      ).rejects.toThrow(/permission denied/);
+      await client.query("ROLLBACK TO SAVEPOINT w");
+      await expect(
+        client.query("UPDATE workspace_config SET value = 'x' WHERE workspace_id = $1", [WS_A]),
+      ).rejects.toThrow(/permission denied/);
+    });
+  });
+});
+
+describe("the role CHECK on the identity set", () => {
+  it("refuses a member or invitation role outside Admin, Editor and Viewer", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const person = await seed.user();
+
+      // Better Auth's own owner/admin/member defaults, refused at the row.
+      await client.query("SAVEPOINT m");
+      await expect(
+        client.query(
+          "INSERT INTO member (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, 'owner', now())",
+          [`member-${WS_A}`, WS_A, person.id],
+        ),
+      ).rejects.toThrow(/member_role_check/);
+      await client.query("ROLLBACK TO SAVEPOINT m");
+
+      await client.query("SAVEPOINT i");
+      await expect(
+        client.query(
+          "INSERT INTO invitation (id, workspace_id, email, role, expires_at, inviter_id) VALUES ($1, $2, 'x@example.invalid', 'admin', now(), $3)",
+          [`invitation-${WS_A}`, WS_A, person.id],
+        ),
+      ).rejects.toThrow(/invitation_role_check/);
+      await client.query("ROLLBACK TO SAVEPOINT i");
+    });
+  });
 });
 
 describe("a tenant table under app_rt", () => {

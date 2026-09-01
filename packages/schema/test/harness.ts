@@ -37,14 +37,14 @@ export const startMigratedPostgres = async (): Promise<MigratedPostgres> => {
     await container.stop();
     throw error;
   }
-  const runtimePool = new pg.Pool({ connectionString: container.getConnectionUri(), max: 5 });
-  runtimePool.on("connect", (client) => {
-    // `app_rt` is NOLOGIN (migration 0000); the estate's provisioning gives it LOGIN,
-    // a test switches into it on every connection instead.
-    client.query("SET ROLE app_rt").catch(() => {
-      // A failure here surfaces on the first query as a permission error, which is
-      // louder than swallowing it silently would be — but the handler must not throw.
-    });
+  // `app_rt` is NOLOGIN (migration 0000); the estate's provisioning gives it LOGIN, a
+  // test connects as the superuser and takes the role at session start instead. As a
+  // startup option the switch fails closed: a connection that cannot take the role is
+  // refused by Postgres, never handed out as the superuser.
+  const runtimePool = new pg.Pool({
+    connectionString: container.getConnectionUri(),
+    max: 5,
+    options: "-c role=app_rt",
   });
   return {
     pool,

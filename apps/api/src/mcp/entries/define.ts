@@ -20,6 +20,7 @@ import type { McpScope } from "../../auth/constants.ts";
  * wraps every call in `withPrincipal`, so the role is read in the same transaction as
  * the read the entry does.
  */
+
 /** The slices' results are `readonly` throughout; a zod output type is not. This meets them. */
 export type Readonlyish<T> = T extends (infer Item)[]
   ? readonly Readonlyish<Item>[]
@@ -31,8 +32,12 @@ export type Entry<Input extends z.ZodObject, Output extends z.ZodType> = {
   readonly name: string;
   readonly title: string;
   readonly description: string;
-  /** The token scope that reaches this entry; `tools/list` shows only what the token's scopes reach. */
-  readonly scope: McpScope;
+  /**
+   * Every scope the token must hold to reach this entry; `tools/list` shows only what
+   * the token's scopes reach. `knowledge:read` is the surface's prerequisite and is on
+   * every entry; the one write needs `feedback:write` as well.
+   */
+  readonly scopes: readonly McpScope[];
   readonly input: Input;
   readonly output: Output;
   readonly annotations: ToolAnnotations;

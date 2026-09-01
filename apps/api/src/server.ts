@@ -54,20 +54,6 @@ export function createServer(dependencies: ServerDependencies): Hono {
   const door = openPostgres(dependencies.database);
   const mcpUrl = `${dependencies.publicUrl}/mcp`;
 
-  // Docker reads this every ten seconds and holds `worker` back until it passes, so an
-  // unreachable database has to read as unhealthy rather than as a running app.
-  server.get("/health", async (context) => {
-    const reached = await attempt(async () => {
-      await dependencies.database.query("select 1");
-    });
-
-    if (!reached.ok) {
-      return context.json({ status: "unhealthy", database: "unreachable" }, 503);
-    }
-
-    return context.json({ status: "healthy", database: "reachable" });
-  });
-
   const auth = createAuth({
     database: dependencies.database,
     door,
@@ -84,13 +70,38 @@ export function createServer(dependencies: ServerDependencies): Hono {
     logger,
   });
 
-  // Better Auth initialises eagerly (its JWKS and the resource row); with the database
-  // unreachable that rejects, and the rejection must land in the log, not the process.
-  auth.$context.catch((cause: unknown) => {
-    logger.error(
-      { reason: cause instanceof Error ? cause.message : String(cause) },
-      "identity provider failed to initialise",
-    );
+  // Better Auth initialises eagerly (its JWKS and the resource row). A failure while
+  // Postgres stays reachable would otherwise leave the app "healthy" and every OAuth
+  // and MCP request failing; the health check reads this and answers 503 instead.
+  let identity: "starting" | "ready" | "failed" = "starting";
+  auth.$context.then(
+    () => {
+      identity = "ready";
+    },
+    (cause: unknown) => {
+      identity = "failed";
+      logger.error(
+        { reason: cause instanceof Error ? cause.message : String(cause) },
+        "identity provider failed to initialise",
+      );
+    },
+  );
+
+  // Docker reads this every ten seconds and holds `worker` back until it passes, so an
+  // unreachable database has to read as unhealthy rather than as a running app.
+  server.get("/health", async (context) => {
+    const reached = await attempt(async () => {
+      await dependencies.database.query("select 1");
+    });
+
+    if (!reached.ok) {
+      return context.json({ status: "unhealthy", database: "unreachable", identity }, 503);
+    }
+    if (identity === "failed") {
+      return context.json({ status: "unhealthy", database: "reachable", identity }, 503);
+    }
+
+    return context.json({ status: "healthy", database: "reachable", identity });
   });
 
   server.route(
@@ -115,7 +126,8 @@ export function createServer(dependencies: ServerDependencies): Hono {
   server.all("/mcp", (context) => mcp(context.req.raw));
 
   // Better Auth's own endpoints — discovery, /oauth2/*, /jwks, the email-code and
-  // organisation endpoints — answer everything the routes above did not.
+  // organisation endpoints — answer everything the routes above did not. Host-based
+  // routing (`agent.` to `/agent/v1/*` alone, ADR 0022) is the deploy task's.
   server.all("/*", (context) => auth.handler(context.req.raw));
 
   return server;

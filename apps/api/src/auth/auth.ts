@@ -10,7 +10,14 @@ import type pg from "pg";
 import type { Logger } from "pino";
 import { z } from "zod";
 
+import type { PlatformPrincipal } from "@better-answers/core/kernel";
 import { withScope, type PostgresDoor } from "@better-answers/core/store/postgres";
+
+/** The identity provider's own acts (the partition on a self-serve create) are the platform's. */
+const PLATFORM_ACTOR: PlatformPrincipal = {
+  kind: "platform",
+  actorId: "process:better-answers-identity",
+};
 import {
   account,
   invitation,
@@ -29,6 +36,8 @@ import {
   verification,
   workspace,
 } from "@better-answers/schema";
+
+import { ROLES } from "@better-answers/schema";
 
 import {
   ACCESS_TOKEN_LIFETIME_SECONDS,
@@ -131,6 +140,18 @@ const mintedClaims = z.object({
   client_id: z.string().optional(),
   azp: z.string().optional(),
 });
+
+/** The three roles Better Auth's own endpoints may write; its owner/admin/member defaults are refused. */
+const isPlatformRole = (role: string | undefined): boolean =>
+  role === undefined || (ROLES as readonly string[]).includes(role);
+
+const refuseForeignRole = (role: string | undefined): void => {
+  if (isPlatformRole(role)) return;
+  throw new APIError("BAD_REQUEST", {
+    error: "invalid_role",
+    error_description: `role must be one of ${ROLES.join(", ")}`,
+  });
+};
 const bodyFields = z
   .object({
     client_id: z.string().optional(),
@@ -179,6 +200,27 @@ export const createAuth = (deps: AuthDependencies) => {
       // Per-IP limits key on the tunnel's header alone (grilling Q8).
       ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
     },
+    databaseHooks: {
+      session: {
+        create: {
+          // A person in exactly one workspace never sees the picker: the workspace is
+          // their active one from the moment the session exists, so `/me` and a fresh
+          // OAuth session both read it (ADR 0009's 2026-08-27 amendment). A person in
+          // none or several has none active, and the picker decides.
+          before: async (session) => {
+            const held = await deps.database.query<{ workspace_id: string }>(
+              "SELECT workspace_id FROM member WHERE user_id = $1",
+              [session.userId],
+            );
+            const [only] = held.rows;
+            if (held.rows.length !== 1 || only === undefined) return;
+            // The organisation plugin's session field is `activeOrganizationId` (mapped
+            // to the `active_workspace_id` column); set the field, not the column.
+            return { data: { ...session, activeOrganizationId: only.workspace_id } };
+          },
+        },
+      },
+    },
     hooks: {
       after: createAuthMiddleware(async (ctx) => {
         const event = auditedEvent(ctx.path);
@@ -197,6 +239,7 @@ export const createAuth = (deps: AuthDependencies) => {
 
         let principal = session?.user.id;
         let workspaceId: string | undefined = undefined;
+        let tokenId: string | undefined = undefined;
         let name: AuditEvent = event;
         let clientId = fields.client_id ?? clientIdOfQuery(fields.oauth_query);
 
@@ -209,6 +252,7 @@ export const createAuth = (deps: AuthDependencies) => {
           if (claims?.success) {
             principal = claims.data.user ?? claims.data.sub;
             workspaceId = claims.data.workspace ?? undefined;
+            tokenId = claims.data.jti;
             clientId = clientId ?? claims.data.azp ?? claims.data.client_id;
           }
           if (fields.grant_type === "refresh_token") name = "auth.token_refresh";
@@ -230,7 +274,9 @@ export const createAuth = (deps: AuthDependencies) => {
               : event === "auth.consent" && fields.accept === false
                 ? "declined"
                 : "ok",
-            token_id: undefined,
+            // The issued token's `jti` — never the token — so an issue and its later
+            // refresh and revocation are one thread in the audit slice's records.
+            token_id: tokenId ?? null,
           },
           name,
         );
@@ -258,9 +304,22 @@ export const createAuth = (deps: AuthDependencies) => {
           // hook runs after its own writes with no transaction handle (verified in
           // `plugins/organization/routes/crud-org.mjs`); the atomic act is the platform's.
           afterCreateOrganization: async ({ organization }) => {
-            await withScope(deps.door, organization.id, async (tx) => {
+            await withScope(PLATFORM_ACTOR, deps.door, organization.id, async (tx) => {
               await tx.query("SELECT create_workspace_partition($1)", [organization.id]);
             });
+          },
+          // Better Auth merges its owner/admin/member defaults into any roles map, so
+          // its own endpoints could otherwise assign or invite a role outside the three.
+          // The database CHECK on `member.role` is the fence; these give a clean 400
+          // instead of a constraint violation. `[GLOSSARY1]`.
+          beforeAddMember: async ({ member }) => {
+            refuseForeignRole(member.role);
+          },
+          beforeUpdateMemberRole: async ({ newRole }) => {
+            refuseForeignRole(newRole);
+          },
+          beforeCreateInvitation: async ({ invitation }) => {
+            refuseForeignRole(invitation.role);
           },
         },
       }),
@@ -313,26 +372,16 @@ export const createAuth = (deps: AuthDependencies) => {
           },
           // True sends the person to the picker: more than one membership and none
           // active, or an active one they no longer hold. A person in exactly one
-          // workspace never sees the picker — it becomes the session's active one here
-          // (ADR 0009's 2026-08-27 amendment: "a single-organisation user gets
-          // activeOrganizationId at session creation").
+          // workspace never gets here with none active — the session-create hook above
+          // set it before the session existed (ADR 0009's 2026-08-27 amendment).
           shouldRedirect: async ({ session, user: person }) => {
-            const memberships = await deps.database.query<{ workspace_id: string }>(
-              "SELECT workspace_id FROM member WHERE user_id = $1 ORDER BY workspace_id",
-              [person.id],
-            );
             const active = activeWorkspaceOf(session);
-            const held = memberships.rows.map((row) => row.workspace_id);
-            if (active !== undefined && held.includes(active)) return false;
-            const [only] = held;
-            if (held.length === 1 && only !== undefined) {
-              await deps.database.query(
-                "UPDATE session SET active_workspace_id = $1 WHERE id = $2",
-                [only, session.id],
-              );
-              return false;
-            }
-            return true;
+            if (active === undefined) return true;
+            const held = await deps.database.query(
+              "SELECT 1 FROM member WHERE user_id = $1 AND workspace_id = $2",
+              [person.id, active],
+            );
+            return held.rowCount !== 1;
           },
         },
         // The claims ADR 0018 asserts: `{workspace, user}`. `role` is deliberately

@@ -51,7 +51,8 @@ export type CimdRefusal =
   | "no-addresses"
   | "address-not-public"
   | "timeout"
-  | "response-too-large";
+  | "response-too-large"
+  | "bad-status";
 
 export class CimdTransportError extends TypeError {
   override readonly name = "CimdTransportError";
@@ -120,13 +121,41 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
   const maxBodyBytes = options.maxBodyBytes ?? 64 * 1024;
   const hostCacheMs = options.hostCacheMs ?? 60_000;
   const now = options.now ?? Date.now;
+  // Bounded: a flood of distinct client hostnames evicts the oldest entry, never grows.
   const hostCache = new Map<string, { readonly pinned: LookedUpAddress; readonly until: number }>();
+  const HOST_CACHE_ENTRIES = 1024;
 
-  const resolvePinned = async (hostname: string): Promise<LookedUpAddress> => {
+  const remember = (hostname: string, pinned: LookedUpAddress): void => {
+    if (hostCache.size >= HOST_CACHE_ENTRIES) {
+      const oldest = hostCache.keys().next().value;
+      if (oldest !== undefined) hostCache.delete(oldest);
+    }
+    hostCache.set(hostname, { pinned, until: now() + hostCacheMs });
+  };
+
+  /** The resolver under the same deadline as the connection: a stalled resolver is a timeout. */
+  const lookupWithin = (
+    hostname: string,
+    signal: AbortSignal,
+  ): Promise<readonly LookedUpAddress[]> =>
+    new Promise((resolve, reject) => {
+      const onAbort = () =>
+        reject(new CimdTransportError("timeout", `metadata fetch exceeded ${timeoutMs} ms`));
+      if (signal.aborted) {
+        onAbort();
+        return;
+      }
+      signal.addEventListener("abort", onAbort, { once: true });
+      lookup(hostname)
+        .then(resolve, reject)
+        .finally(() => signal.removeEventListener("abort", onAbort));
+    });
+
+  const resolvePinned = async (hostname: string, signal: AbortSignal): Promise<LookedUpAddress> => {
     const cached = hostCache.get(hostname);
     if (cached !== undefined && cached.until > now()) return cached.pinned;
 
-    const addresses = await lookup(hostname);
+    const addresses = await lookupWithin(hostname, signal);
     if (addresses.length === 0) {
       throw new CimdTransportError("no-addresses", "metadata hostname returned no DNS addresses");
     }
@@ -142,7 +171,7 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
     if (pinned === undefined) {
       throw new CimdTransportError("no-addresses", "metadata hostname returned no DNS addresses");
     }
-    hostCache.set(hostname, { pinned, until: now() + hostCacheMs });
+    remember(hostname, pinned);
     return pinned;
   };
 
@@ -162,13 +191,13 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
       );
     }
 
-    const pinned = await resolvePinned(url.hostname);
-
-    const headers = Object.fromEntries(webRequest.headers.entries());
-    headers["host"] = url.host;
     const callerSignal =
       init?.signal ?? (input instanceof Request ? input.signal : webRequest.signal);
     const signal = AbortSignal.any([callerSignal, AbortSignal.timeout(timeoutMs)]);
+    const pinned = await resolvePinned(url.hostname, signal);
+
+    const headers = Object.fromEntries(webRequest.headers.entries());
+    headers["host"] = url.host;
 
     return new Promise<Response>((resolve, reject) => {
       const outbound = request(
@@ -191,6 +220,15 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
         },
         (response) => {
           const status = response.statusCode ?? 500;
+          // `Response` refuses a status outside 200–599; a peer answering one is refused
+          // here rather than left as a rejected promise nobody holds.
+          if (status < 200 || status > 599) {
+            response.destroy();
+            reject(
+              new CimdTransportError("bad-status", `metadata server answered status ${status}`),
+            );
+            return;
+          }
           const body =
             webRequest.method === "HEAD" || BODY_FORBIDDEN_RESPONSE_STATUSES.has(status)
               ? null

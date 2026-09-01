@@ -1,0 +1,2 @@
+ALTER TABLE "invitation" ADD CONSTRAINT "invitation_role_check" CHECK (role IS NULL OR role IN ('Admin', 'Editor', 'Viewer'));--> statement-breakpoint
+ALTER TABLE "member" ADD CONSTRAINT "member_role_check" CHECK (role IN ('Admin', 'Editor', 'Viewer'));

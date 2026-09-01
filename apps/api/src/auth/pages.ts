@@ -88,6 +88,7 @@ export const consentPage = (
 <ul>
   ${params.scopes.includes("knowledge:read") ? "<li>Read what you can see of the company's knowledge</li>" : ""}
   ${params.scopes.includes("feedback:write") ? "<li>Send your feedback on answers</li>" : ""}
+  ${params.scopes.includes("offline_access") ? "<li>Stay connected until you disconnect it, without signing in each time</li>" : ""}
 </ul>
 <p>Every question you ask through ${escape(params.clientName)} is recorded as asked by you.</p>
 <form method="post" action="/consent${escape(query)}" class="inline">

@@ -19,7 +19,7 @@ describe("the app's health endpoint", () => {
     const response = await app.server.request("/health");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       status: "healthy",
       database: "reachable",
     });
@@ -37,10 +37,32 @@ describe("the app's health endpoint", () => {
     const response = await server.request("/health");
 
     expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       status: "unhealthy",
       database: "unreachable",
     });
     await unreachable.end();
+  });
+
+  it("tells the deploy unit the app is unhealthy when the database answers but the identity provider could not start", async () => {
+    // A reachable database with no journal applied: Better Auth's eager init (its
+    // resource row, its keys) fails while `select 1` still answers.
+    await app.database.superuser.query("CREATE DATABASE unmigrated");
+    const connection = new URL(String(app.database.superuser.options.connectionString));
+    connection.pathname = "/unmigrated";
+    const bare = new Pool({ connectionString: connection.href });
+    const server = serverFor(bare);
+    // Init is asynchronous; give it a moment to fail.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const response = await server.request("/health");
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      status: "unhealthy",
+      database: "reachable",
+      identity: "failed",
+    });
+    await bare.end();
   });
 });

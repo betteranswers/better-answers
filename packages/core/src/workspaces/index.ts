@@ -2,7 +2,7 @@ import { boundarySchemas, CREATOR_ROLE } from "@better-answers/schema";
 
 import { attempt, err, ok, type Result } from "../kernel/index.ts";
 import type { PlatformPrincipal, WorkspaceId } from "../kernel/index.ts";
-import { type PostgresDoor, withScope } from "../store/postgres/index.ts";
+import { type PostgresDoor, withIdentityWrite, withScope } from "../store/postgres/index.ts";
 
 /**
  * Slice: **workspaces** — the tenant's own lifecycle. Owns `workspace` as the platform
@@ -54,7 +54,7 @@ export const provisionWorkspace = async (
   if (!row.success || !admin.success) return err("malformed");
 
   const act = await attempt(() =>
-    withScope(door, row.data.id, async (tx) => {
+    withScope(actor, door, row.data.id, async (tx) => {
       await tx.query("INSERT INTO workspace (id, name, slug) VALUES ($1, $2, $3)", [
         row.data.id,
         row.data.name,
@@ -85,4 +85,49 @@ const classify = (error: Error): ProvisionRefusal => {
   if (detail.includes("workspace_pkey")) return "workspace-exists";
   if (detail.includes("member_user_id_user_id_fk")) return "no-such-user";
   throw error;
+};
+
+export type RevokeCredentialsInput = {
+  readonly userId: string;
+  /** The instant; every credential issued before it is refused from now on. */
+  readonly at: Date;
+};
+
+/**
+ * Revoke a person's credentials (ADR 0018): one act, one transaction. Writes the instant
+ * the resolver compares every credential's issue time against, ends every browser
+ * session created before it, and revokes every refresh token minted before it — so a
+ * stolen refresh token cannot mint an access token whose `iat` post-dates the
+ * revocation, and a live browser session cannot consent to a new grant. The People
+ * screen calls this; until then, the tests do.
+ */
+export const revokeCredentials = async (
+  actor: PlatformPrincipal,
+  door: PostgresDoor,
+  input: RevokeCredentialsInput,
+): Promise<Result<{ userId: string; actorId: PlatformPrincipal["actorId"] }, "no-such-user">> => {
+  const userId = boundarySchemas.user.select.shape.id.safeParse(input.userId);
+  if (!userId.success) return err("no-such-user");
+  const revoked = await withIdentityWrite(actor, door, async (tx) => {
+    const person = await tx.query(
+      'UPDATE "user" SET credentials_revoked_at = $2 WHERE id = $1 RETURNING id',
+      [userId.data, input.at],
+    );
+    if (person.rowCount !== 1) return false;
+    await tx.query("DELETE FROM session WHERE user_id = $1 AND created_at < $2", [
+      userId.data,
+      input.at,
+    ]);
+    await tx.query(
+      "UPDATE oauth_refresh_token SET revoked = now() WHERE user_id = $1 AND created_at < $2 AND revoked IS NULL",
+      [userId.data, input.at],
+    );
+    await tx.query(
+      "UPDATE oauth_access_token SET revoked = now() WHERE user_id = $1 AND created_at < $2 AND revoked IS NULL",
+      [userId.data, input.at],
+    );
+    return true;
+  });
+  if (!revoked) return err("no-such-user");
+  return ok({ userId: userId.data, actorId: actor.actorId });
 };

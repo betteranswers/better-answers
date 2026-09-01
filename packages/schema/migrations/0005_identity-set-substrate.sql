@@ -45,3 +45,16 @@ CREATE POLICY "mcp_call_counter_workspace_isolation" ON "mcp_call_counter" AS PE
   WITH CHECK ("workspace_id" = (select current_workspace_id()));
 --> statement-breakpoint
 ALTER TABLE "mcp_call_counter" FORCE ROW LEVEL SECURITY;
+--> statement-breakpoint
+-- The worker never touches the identity set or the counters, but migration 0000's
+-- default privileges grant worker_rt DML on every new public table — and these hold
+-- secrets, sessions, signing keys and memberships. Revoked here; `[SEC3]`'s refusal is
+-- the test "refuses the worker role on every identity-set table and the counters"
+-- (packages/schema/test/rls.test.ts). The worker keeps SELECT on `workspace` and
+-- `workspace_config` (the tenant's own row and thresholds) and nothing else.
+REVOKE ALL ON "user", "session", "account", "verification", "jwks", "member", "invitation",
+  "oauth_client", "oauth_resource", "oauth_client_resource", "oauth_refresh_token",
+  "oauth_access_token", "oauth_consent", "oauth_client_assertion", "rate_limit",
+  "ingress_counter", "mcp_call_counter" FROM worker_rt;
+--> statement-breakpoint
+REVOKE INSERT, UPDATE, DELETE ON "workspace", "workspace_config" FROM worker_rt;
