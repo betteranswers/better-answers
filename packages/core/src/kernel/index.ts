@@ -12,6 +12,8 @@
  *   where a source id belongs.
  * - the error vocabulary — the typed failures a transport maps to its own protocol.
  *   No status codes live here: four of `core`'s five callers have no notion of one.
- * - `Result` — folded in from `packages/contracts` when that package is renamed (T-020).
+ * - `Result` — folded in from `packages/contracts` when that package was retired
+ *   (T-020, ADR 0031).
  */
-export {};
+export { attempt, err, normalizeError, ok } from "./result.ts";
+export type { Result } from "./result.ts";

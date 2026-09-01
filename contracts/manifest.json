@@ -1,0 +1,12 @@
+{
+  "contract_version": 0,
+  "agreements": {
+    "queue": { "form": "sql-function" },
+    "concept-inbox": { "form": "sql-function" },
+    "credential-envelope": { "form": "fixtured" },
+    "visibility-columns": { "form": "fixtured" },
+    "llm-routing": { "form": "sql-function" },
+    "cost-ledger": { "form": "generated" }
+  },
+  "fixtures": []
+}

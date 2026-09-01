@@ -29,7 +29,8 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 │   ├── api/           ← + apps/api/CODING_RULES.md
 │   ├── web/
 │   └── worker/        ← + apps/worker/CODING_RULES.md
-└── packages/{core,schema,contracts}
+├── packages/{core,schema}
+└── contracts/         ← the tier contract's fixtures (ADR 0031)
 ```
 
 ## Use the glossary's vocabulary

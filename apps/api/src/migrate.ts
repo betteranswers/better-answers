@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 
-import { attempt } from "@better-answers/contracts";
+import { attempt } from "@better-answers/core/kernel";
 import { migrationsFolder } from "@better-answers/schema";
 
 import { requireBootstrap } from "./config.ts";
