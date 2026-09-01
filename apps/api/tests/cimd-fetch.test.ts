@@ -239,6 +239,48 @@ describe("the SSRF policy", () => {
     expect(await refusal(fetcher, "https://claude.ai/doc")).toBe("timeout");
   });
 
+  it("refuses a status outside the range a Response can carry", async () => {
+    const fetcher = createClientMetadataFetcher({
+      lookup: resolvesTo(publicAnswer),
+      request: answering(observe(), { status: 600 }),
+    });
+
+    expect(await refusal(fetcher, "https://claude.ai/doc")).toBe("bad-status");
+  });
+
+  it("refuses a resolver that never answers, under the same deadline, without a request", async () => {
+    let requested = 0;
+    const fetcher = createClientMetadataFetcher({
+      lookup: () => new Promise(() => {}),
+      request: (() => {
+        requested += 1;
+        throw new Error("never");
+      }) as unknown as typeof httpsRequest,
+      timeoutMs: 20,
+    });
+
+    expect(await refusal(fetcher, "https://claude.ai/doc")).toBe("timeout");
+    expect(requested).toBe(0);
+  });
+
+  it("bounds the host cache: past the cap the oldest host is resolved again", async () => {
+    const lookups = new Map<string, number>();
+    const fetcher = createClientMetadataFetcher({
+      lookup: async (hostname) => {
+        lookups.set(hostname, (lookups.get(hostname) ?? 0) + 1);
+        return [publicAnswer];
+      },
+      request: answering(observe(), { status: 200, body: "{}" }),
+      hostCacheMs: 60_000,
+    });
+
+    await fetcher("https://first.example/doc");
+    for (let n = 0; n < 1024; n += 1) await fetcher(`https://host-${n}.example/doc`);
+    await fetcher("https://first.example/doc");
+
+    expect(lookups.get("first.example")).toBe(2);
+  });
+
   it("reuses a host's pinned answer inside the cache window and resolves again after it", async () => {
     let lookups = 0;
     let clock = 0;

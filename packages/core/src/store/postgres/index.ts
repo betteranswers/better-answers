@@ -69,17 +69,17 @@ const transaction = async <T>(
  * setter every tenant read goes through; `withPrincipal` is the door a person's call
  * uses, this is for the platform's own acts — provisioning, the identity provider's
  * hooks — where a platform principal, not a person, is behind the call (`[SEC2]`:
- * the actor is the first argument, and the act is audited under its id).
+ * the platform principal is the first argument, and the act is audited under its id).
  */
 export const withScope = async <T>(
-  actor: PlatformPrincipal,
+  platform: PlatformPrincipal,
   door: PostgresDoor,
   workspaceId: string,
-  work: (tx: Tx, actor: PlatformPrincipal) => Promise<T>,
+  work: (tx: Tx, platform: PlatformPrincipal) => Promise<T>,
 ): Promise<T> =>
   transaction(door, async (client) => {
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
-    return work(client, actor);
+    return work(client, platform);
   });
 
 /**
@@ -89,10 +89,10 @@ export const withScope = async <T>(
  * rows by construction.
  */
 export const withIdentityWrite = async <T>(
-  actor: PlatformPrincipal,
+  platform: PlatformPrincipal,
   door: PostgresDoor,
-  work: (tx: Tx, actor: PlatformPrincipal) => Promise<T>,
-): Promise<T> => transaction(door, (client) => work(client, actor));
+  work: (tx: Tx, platform: PlatformPrincipal) => Promise<T>,
+): Promise<T> => transaction(door, (client) => work(client, platform));
 
 /** The one resolve query (ADR 0018): the member row and the person's revocation instant. */
 const MEMBERSHIP_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS revoked_at

@@ -57,7 +57,7 @@ services:
       KEK: ${KEK:?}
       AUTH_SECRET: ${AUTH_SECRET:?}
       # The https origin the authorization server issues from — the `mcp.` hostname; the MCP
-      # URL a person types is `${PUBLIC_URL}/mcp` and the PRM's `resource` equals it exactly (T-004).
+      # URL a person types is `${PUBLIC_URL}/mcp`, and the protected-resource metadata's `resource` equals it exactly (T-004).
       PUBLIC_URL: ${PUBLIC_URL:?}
       SMTP_URL: ${SMTP_URL:?}
       # Host-based routing: app. → everything; mcp. → /mcp, discovery and /oauth/*; agent. → /agent/v1/*

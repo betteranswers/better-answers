@@ -39,7 +39,7 @@ export type ProvisionRefusal = "slug-taken" | "workspace-exists" | "no-such-user
  * holds that.
  */
 export const provisionWorkspace = async (
-  actor: PlatformPrincipal,
+  platform: PlatformPrincipal,
   door: PostgresDoor,
   input: ProvisionWorkspaceInput,
 ): Promise<
@@ -54,7 +54,7 @@ export const provisionWorkspace = async (
   if (!row.success || !admin.success) return err("malformed");
 
   const act = await attempt(() =>
-    withScope(actor, door, row.data.id, async (tx) => {
+    withScope(platform, door, row.data.id, async (tx) => {
       await tx.query("INSERT INTO workspace (id, name, slug) VALUES ($1, $2, $3)", [
         row.data.id,
         row.data.name,
@@ -72,7 +72,7 @@ export const provisionWorkspace = async (
     }),
   );
   if (!act.ok) return err(classify(act.error));
-  return ok({ workspaceId: row.data.id, actorId: actor.actorId });
+  return ok({ workspaceId: row.data.id, actorId: platform.actorId });
 };
 
 /** Postgres's constraint names, read into the slice's own vocabulary. */
@@ -86,6 +86,9 @@ const classify = (error: Error): ProvisionRefusal => {
   if (detail.includes("member_user_id_user_id_fk")) return "no-such-user";
   throw error;
 };
+
+/** `failed` is the store refusing the act — a transaction that did not commit. */
+export type RevokeRefusal = "no-such-user" | "failed";
 
 export type RevokeCredentialsInput = {
   readonly userId: string;
@@ -102,32 +105,38 @@ export type RevokeCredentialsInput = {
  * screen calls this; until then, the tests do.
  */
 export const revokeCredentials = async (
-  actor: PlatformPrincipal,
+  platform: PlatformPrincipal,
   door: PostgresDoor,
   input: RevokeCredentialsInput,
-): Promise<Result<{ userId: string; actorId: PlatformPrincipal["actorId"] }, "no-such-user">> => {
+): Promise<Result<{ userId: string; actorId: PlatformPrincipal["actorId"] }, RevokeRefusal>> => {
   const userId = boundarySchemas.user.select.shape.id.safeParse(input.userId);
   if (!userId.success) return err("no-such-user");
-  const revoked = await withIdentityWrite(actor, door, async (tx) => {
-    const person = await tx.query(
-      'UPDATE "user" SET credentials_revoked_at = $2 WHERE id = $1 RETURNING id',
-      [userId.data, input.at],
-    );
-    if (person.rowCount !== 1) return false;
-    await tx.query("DELETE FROM session WHERE user_id = $1 AND created_at < $2", [
-      userId.data,
-      input.at,
-    ]);
-    await tx.query(
-      "UPDATE oauth_refresh_token SET revoked = now() WHERE user_id = $1 AND created_at < $2 AND revoked IS NULL",
-      [userId.data, input.at],
-    );
-    await tx.query(
-      "UPDATE oauth_access_token SET revoked = now() WHERE user_id = $1 AND created_at < $2 AND revoked IS NULL",
-      [userId.data, input.at],
-    );
-    return true;
-  });
-  if (!revoked) return err("no-such-user");
-  return ok({ userId: userId.data, actorId: actor.actorId });
+  const revoked = await attempt(() =>
+    withIdentityWrite(platform, door, async (tx) => {
+      // The instant never moves backwards: two revocations out of order keep the later
+      // one, and the sessions and tokens are ended against that effective instant.
+      const person = await tx.query<{ at: Date }>(
+        'UPDATE "user" SET credentials_revoked_at = GREATEST(COALESCE(credentials_revoked_at, $2), $2) WHERE id = $1 RETURNING credentials_revoked_at AS at',
+        [userId.data, input.at],
+      );
+      const at = person.rows[0]?.at;
+      if (at === undefined) return undefined;
+      await tx.query("DELETE FROM session WHERE user_id = $1 AND created_at < $2", [
+        userId.data,
+        at,
+      ]);
+      await tx.query(
+        "UPDATE oauth_refresh_token SET revoked = now() WHERE user_id = $1 AND created_at < $2 AND revoked IS NULL",
+        [userId.data, at],
+      );
+      await tx.query(
+        "UPDATE oauth_access_token SET revoked = now() WHERE user_id = $1 AND created_at < $2 AND revoked IS NULL",
+        [userId.data, at],
+      );
+      return at;
+    }),
+  );
+  if (!revoked.ok) return err("failed");
+  if (revoked.value === undefined) return err("no-such-user");
+  return ok({ userId: userId.data, actorId: platform.actorId });
 };

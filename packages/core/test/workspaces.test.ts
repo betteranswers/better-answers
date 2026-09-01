@@ -173,6 +173,10 @@ describe("revoking a person's credentials", () => {
         "INSERT INTO oauth_refresh_token (id, token, client_id, user_id, expires_at, created_at, scopes) VALUES ('r-old', 'r-old-t', 'https://c.example/x', $1, now(), $2, ARRAY['knowledge:read'])",
         [adminUserId, new Date("2026-09-02T11:00:00Z")],
       );
+      await superuser.query(
+        "INSERT INTO oauth_refresh_token (id, token, client_id, user_id, expires_at, created_at, scopes) VALUES ('r-new', 'r-new-t', 'https://c.example/x', $1, now(), $2, ARRAY['knowledge:read'])",
+        [adminUserId, new Date("2026-09-02T13:00:00Z")],
+      );
     } finally {
       superuser.release();
     }
@@ -191,10 +195,25 @@ describe("revoking a person's credentials", () => {
       adminUserId,
     ]);
     expect(sessions.rows).toEqual([{ id: "s-new" }]);
-    const token = await db.pool.query(
-      "SELECT revoked IS NOT NULL AS revoked FROM oauth_refresh_token WHERE id = 'r-old'",
+    const tokens = await db.pool.query(
+      "SELECT id, revoked IS NOT NULL AS revoked FROM oauth_refresh_token WHERE user_id = $1 ORDER BY id",
+      [adminUserId],
     );
-    expect(token.rows[0]?.revoked).toBe(true);
+    expect(tokens.rows).toEqual([
+      { id: "r-new", revoked: false },
+      { id: "r-old", revoked: true },
+    ]);
+
+    // A later revocation with an earlier instant never moves the instant backwards.
+    const earlier = await revokeCredentials(bootstrap, door, {
+      userId: adminUserId,
+      at: new Date("2026-09-02T10:00:00Z"),
+    });
+    expect(earlier.ok).toBe(true);
+    const kept = await db.pool.query('SELECT credentials_revoked_at FROM "user" WHERE id = $1', [
+      adminUserId,
+    ]);
+    expect(kept.rows[0]?.credentials_revoked_at).toEqual(at);
   });
 
   it("refuses a person who does not exist and leaves nothing behind", async () => {

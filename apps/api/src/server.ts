@@ -74,7 +74,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
   // Postgres stays reachable would otherwise leave the app "healthy" and every OAuth
   // and MCP request failing; the health check reads this and answers 503 instead.
   let identity: "starting" | "ready" | "failed" = "starting";
-  auth.$context.then(
+  const identityInit = auth.$context.then(
     () => {
       identity = "ready";
     },
@@ -82,7 +82,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
       identity = "failed";
       logger.error(
         { reason: cause instanceof Error ? cause.message : String(cause) },
-        "identity provider failed to initialise",
+        "the authorization server failed to initialise",
       );
     },
   );
@@ -97,7 +97,10 @@ export function createServer(dependencies: ServerDependencies): Hono {
     if (!reached.ok) {
       return context.json({ status: "unhealthy", database: "unreachable", identity }, 503);
     }
-    if (identity === "failed") {
+    // Healthy means ready to serve: the init is awaited (it settles once), so the
+    // deploy unit never starts `worker` while OAuth and MCP cannot answer.
+    await identityInit;
+    if (identity !== "ready") {
       return context.json({ status: "unhealthy", database: "reachable", identity }, 503);
     }
 
@@ -126,8 +129,9 @@ export function createServer(dependencies: ServerDependencies): Hono {
   server.all("/mcp", (context) => mcp(context.req.raw));
 
   // Better Auth's own endpoints — discovery, /oauth2/*, /jwks, the email-code and
-  // organisation endpoints — answer everything the routes above did not. Host-based
-  // routing (`agent.` to `/agent/v1/*` alone, ADR 0022) is the deploy task's.
+  // organisation endpoints — answer everything the routes above did not. Which
+  // hostname reaches which path is the tunnel's (ADR 0022: `agent.` reaches
+  // `/agent/v1/*` alone); the in-process refusal by hostname is the deploy task's.
   server.all("/*", (context) => auth.handler(context.req.raw));
 
   return server;

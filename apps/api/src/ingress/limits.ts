@@ -25,6 +25,10 @@ import { CLIENT_IP_HEADER, UNKNOWN_CLIENT_IP } from "../auth/constants.ts";
 export const clientKeyOf = (address: string): string => {
   const bare = address.replace(/^\[|\]$/g, "").split("%")[0] ?? "";
   if (!isIPv6(bare)) return address;
+  // An IPv4-mapped literal (`::ffff:203.0.113.9`) is that IPv4 client, keyed as itself,
+  // not as the one /64 every mapped client would otherwise share.
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(bare);
+  if (mapped?.[1] !== undefined) return mapped[1];
   // The URL parser canonicalises an IPv6 literal (lowercase, `::` compressed once, an
   // embedded IPv4 written as hex groups).
   const canonical = new URL(`http://[${bare}]`).hostname.replace(/^\[|\]$/g, "");

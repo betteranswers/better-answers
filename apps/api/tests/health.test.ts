@@ -52,8 +52,6 @@ describe("the app's health endpoint", () => {
     connection.pathname = "/unmigrated";
     const bare = new Pool({ connectionString: connection.href });
     const server = serverFor(bare);
-    // Init is asynchronous; give it a moment to fail.
-    await new Promise((resolve) => setTimeout(resolve, 500));
 
     const response = await server.request("/health");
 

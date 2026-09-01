@@ -69,11 +69,9 @@ export const mcpEntryNoWorkspaceArgumentRule = defineRule({
         if (input === undefined) return;
         const shape = shapeOf(input.value);
         if (shape === undefined) {
-          // A `defineEntry` declares its shape inline (this is where the shape is
-          // authored), so an opaque one is a real gap. A `registerTool` from a
-          // variable — the platform's generic mount over the `ENTRIES` array — carries
-          // a shape already checked at its `defineEntry`; the runtime test is its fence.
-          if (call.kind === "defineEntry") context.report({ node: input, messageId: "opaque" });
+          // Opaque either way. The one `registerTool` that mounts the `ENTRIES` array
+          // carries a disable comment naming the runtime test that fences it.
+          context.report({ node: input, messageId: "opaque" });
           return;
         }
         for (const property of shape.properties) {

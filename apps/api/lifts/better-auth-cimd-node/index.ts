@@ -52,7 +52,8 @@ export type CimdRefusal =
   | "address-not-public"
   | "timeout"
   | "response-too-large"
-  | "bad-status";
+  | "bad-status"
+  | "too-many-lookups";
 
 export class CimdTransportError extends TypeError {
   override readonly name = "CimdTransportError";
@@ -124,6 +125,10 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
   // Bounded: a flood of distinct client hostnames evicts the oldest entry, never grows.
   const hostCache = new Map<string, { readonly pinned: LookedUpAddress; readonly until: number }>();
   const HOST_CACHE_ENTRIES = 1024;
+  // Node's resolver cannot be cancelled: a lookup that outlives the deadline keeps
+  // running, so the number in flight is bounded and the excess is refused outright.
+  const MAX_INFLIGHT_LOOKUPS = 32;
+  let inFlight = 0;
 
   const remember = (hostname: string, pinned: LookedUpAddress): void => {
     if (hostCache.size >= HOST_CACHE_ENTRIES) {
@@ -155,7 +160,19 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
     const cached = hostCache.get(hostname);
     if (cached !== undefined && cached.until > now()) return cached.pinned;
 
-    const addresses = await lookupWithin(hostname, signal);
+    if (inFlight >= MAX_INFLIGHT_LOOKUPS) {
+      throw new CimdTransportError(
+        "too-many-lookups",
+        "too many metadata hostnames resolving at once",
+      );
+    }
+    inFlight += 1;
+    let addresses: readonly LookedUpAddress[];
+    try {
+      addresses = await lookupWithin(hostname, signal);
+    } finally {
+      inFlight -= 1;
+    }
     if (addresses.length === 0) {
       throw new CimdTransportError("no-addresses", "metadata hostname returned no DNS addresses");
     }

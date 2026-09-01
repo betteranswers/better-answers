@@ -24,6 +24,7 @@ describe("the client key an address becomes", () => {
   it("keeps two IPv6 /64s apart, and an IPv4 address as itself", () => {
     expect(clientKeyOf("2001:db8:85a3::1")).not.toBe(clientKeyOf("2001:db8:85a4::1"));
     expect(clientKeyOf("203.0.113.9")).toBe("203.0.113.9");
-    expect(clientKeyOf("::ffff:203.0.113.9")).toBe("0000:0000:0000:0000::/64");
+    // An IPv4-mapped literal is that IPv4 client, not the one /64 every mapped client would share.
+    expect(clientKeyOf("::ffff:203.0.113.9")).toBe("203.0.113.9");
   });
 });

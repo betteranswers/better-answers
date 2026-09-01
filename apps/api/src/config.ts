@@ -13,7 +13,7 @@ import { logger } from "./logger.ts";
  * provider, repository, object store — is a row under the envelope and never an
  * environment variable, so a key belongs here only once something in this tier reads
  * it. Two shapes, because two processes read it: `migrate` needs the database alone,
- * `app` also needs the identity provider's origin and secret.
+ * `app` also needs the authorization server's origin and secret (ADR 0009).
  */
 const bootstrapSchema = z.object({
   DATABASE_URL: z.url(),
@@ -25,8 +25,14 @@ const httpsOrigin = z
   .url({ protocol: /^https$/ })
   .refine((value) => {
     const url = new URL(value);
-    return url.pathname === "/" && url.search === "" && url.hash === "" && url.username === "";
-  }, "PUBLIC_URL must be an https origin with no path, query or fragment")
+    return (
+      url.pathname === "/" &&
+      url.search === "" &&
+      url.hash === "" &&
+      url.username === "" &&
+      url.password === ""
+    );
+  }, "PUBLIC_URL must be an https origin with no path, query, fragment or credentials")
   .transform((value) => new URL(value).origin);
 
 const identityBootstrapSchema = z.object({

@@ -224,11 +224,30 @@ describe("the pages, as a person walks them", () => {
     expect(decided.headers.get("location")).toBeNull();
   });
 
-  it("refuses to be framed by another site", async () => {
-    const page = await app.client().fetch("/sign-in");
+  it("refuses to be framed by another site — sign-in, the picker and consent alike", async () => {
+    const one = await app.provision({ name: "One" });
+    const two = await app.provision({ name: "Two" });
+    await app.addMember(two.workspaceId, one.admin.id, "Viewer");
+    const client = app.client();
+    const picker = await driveToPage(app, client, one.admin);
+    expect(picker.pathname).toBe("/choose-workspace");
+    const consentClient = app.client();
+    const consent = await driveToPage(
+      app,
+      consentClient,
+      (await app.provision({ name: "Lone" })).admin,
+    );
+    expect(consent.pathname).toBe("/consent");
 
-    expect(page.headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
-    expect(page.headers.get("x-frame-options")).toBe("DENY");
+    for (const [who, path] of [
+      [client, "/sign-in"],
+      [client, `${picker.pathname}${picker.search}`],
+      [consentClient, `${consent.pathname}${consent.search}`],
+    ] as const) {
+      const page = await who.fetch(path);
+      expect(page.headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
+      expect(page.headers.get("x-frame-options")).toBe("DENY");
+    }
   });
 });
 
@@ -457,6 +476,42 @@ describe("the limits", () => {
     expect(statuses).toContain(429);
     const stored = await app.database.superuser.query("SELECT count(*)::int AS n FROM rate_limit");
     expect(Number(stored.rows[0]?.n)).toBeGreaterThan(0);
+  });
+});
+
+describe("the three roles through Better Auth's own endpoints", () => {
+  const invite = (client: ReturnType<TestApp["client"]>, workspaceId: string, role: string) =>
+    client.fetch("/organization/invite-member", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: PUBLIC_URL },
+      body: JSON.stringify({
+        email: `invitee-${Date.now()}-${role}@example.invalid`,
+        role,
+        organizationId: workspaceId,
+      }),
+    });
+
+  it("lets an Admin invite at one of the three roles, and refuses the plugin's own owner role", async () => {
+    const acme = await app.provision({ name: "Acme" });
+    const client = app.client();
+    await connectAsHost(app, client, acme.admin);
+
+    expect((await invite(client, acme.workspaceId, "Viewer")).status).toBe(200);
+    const owner = await invite(client, acme.workspaceId, "owner");
+    expect(owner.status).toBe(400);
+    expect((await json(owner))["error"]).toBe("invalid_role");
+  });
+
+  it("refuses a Viewer who tries to invite", async () => {
+    const acme = await app.provision({ name: "Acme" });
+    const viewer = await app.person();
+    await app.addMember(acme.workspaceId, viewer.id, "Viewer");
+    const client = app.client();
+    await connectAsHost(app, client, viewer);
+
+    const response = await invite(client, acme.workspaceId, "Viewer");
+
+    expect(response.status).toBe(403);
   });
 });
 

@@ -164,11 +164,11 @@ describe("no MCP entry takes a workspace argument", () => {
     expect(output).toContain("mcp-entry-no-workspace-argument");
   });
 
-  it("does not flag a registerTool whose inputSchema is a variable — the entries are checked at their defineEntry", () => {
+  it("fails closed on a registerTool whose inputSchema is a variable — the one mount over ENTRIES carries the disable that names its runtime fence", () => {
     const output = lint({
       "apps/api/src/mcp/mount.ts": `server.registerTool(entry.name, { annotations: entry.annotations, inputSchema: entry.input }, entry.run);\n`,
     });
 
-    expect(output).not.toContain("mcp-entry-no-workspace-argument");
+    expect(output).toContain("mcp-entry-no-workspace-argument");
   });
 });

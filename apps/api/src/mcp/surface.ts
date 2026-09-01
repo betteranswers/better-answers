@@ -102,6 +102,7 @@ export const createMcpSurface = (
         {
           title: entry.title,
           description: entry.description,
+          // oxlint-disable-next-line better-answers/mcp-entry-no-workspace-argument -- the one mount over ENTRIES: each shape is checked inline at its defineEntry, and at runtime by "takes no workspace, bundle or tenant argument on any entry" (tests/mcp-surface.test.ts)
           inputSchema: entry.input,
           outputSchema: entry.output,
           annotations: entry.annotations,

@@ -24,6 +24,9 @@ export type TrustStatus =
   | "draft"
   | "deprecated";
 
+/** The two riders that may follow *Checked by* and never change the tier (CONTEXT.md). */
+export type TrustRider = "imported" | "source-moved-on";
+
 export type Trust = {
   readonly tier: TrustTier;
   readonly status: TrustStatus;
@@ -31,7 +34,14 @@ export type Trust = {
   readonly checkedBy: string | null;
   /** ISO date of the latest check; null when unchecked. */
   readonly checkedAt: string | null;
+  /** A check recorded before the platform, or one whose source moved on since; null otherwise. */
+  readonly rider: TrustRider | null;
 };
+
+const RIDER_WORDS = {
+  imported: " · imported",
+  "source-moved-on": " · source moved on",
+} satisfies Record<TrustRider, string>;
 
 /**
  * The reader's words for a trust state — these and no others (CONTEXT.md). A status
@@ -50,11 +60,12 @@ export const trustWords = (trust: Trust): string => {
     case "current":
       break;
   }
+  const rider = trust.rider === null ? "" : RIDER_WORDS[trust.rider];
   switch (trust.tier) {
     case "human-reviewed":
-      return `Checked by ${trust.checkedBy ?? "a person"}${trust.checkedAt === null ? "" : ` · ${ukLongDate(trust.checkedAt)}`}`;
+      return `Checked by ${trust.checkedBy ?? "a person"}${trust.checkedAt === null ? "" : ` · ${ukLongDate(trust.checkedAt)}`}${rider}`;
     case "machine-confirmed":
-      return "Checked by the platform";
+      return `Checked by the platform${rider}`;
     case "unverified":
       return "Unchecked";
   }
@@ -235,7 +246,19 @@ export const renderOpen = (result: OpenResult): string => {
   ].join("\n");
 };
 
-/** The human rendering of an answer — verdict first (ADR 0016). */
+/** The map's fixed phrases (CONTEXT.md, *map*): the context header line, never a verdict. */
+export const mapWords = (map: MapState): string => {
+  switch (map.state) {
+    case "live":
+      return "map as of now";
+    case "as_of":
+      return `map as of ${ukLongDate(map.at)}`;
+    case "unavailable_since":
+      return `map unavailable since ${ukLongDate(map.since)}`;
+  }
+};
+
+/** The human rendering of an answer — verdict first, then the map's context line (ADR 0016). */
 export const renderAnswer = (result: AnswerResult): string => {
   const verdict = {
     ok: "**Answered from the company's knowledge.**",
@@ -248,7 +271,7 @@ export const renderAnswer = (result: AnswerResult): string => {
       (p) => `Not company knowledge · ${p.sensitivity}\n> ${p.text}\n— ${p.source} (${p.locator})`,
     )
     .join("\n\n");
-  const lines = [verdict];
+  const lines = [verdict, `_${mapWords(result.map)}_`];
   if (result.verdict !== "refuse") lines.push("", result.text);
   if (citations !== "") lines.push("", citations);
   if (unmapped !== "") lines.push("", unmapped);

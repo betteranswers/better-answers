@@ -28,6 +28,7 @@ const trust = z.object({
   status: z.enum(["current", "changed-since-checked", "out-of-date", "draft", "deprecated"]),
   checkedBy: z.string().nullable(),
   checkedAt: z.string().nullable(),
+  rider: z.enum(["imported", "source-moved-on"]).nullable(),
 });
 
 const passage = z.object({
@@ -126,23 +127,29 @@ const openEntry = defineEntry({
       message: "give an iri or a locator, not both and not neither",
     }),
   output: z.discriminatedUnion("found", [
-    z.object({
-      found: z.literal(true),
-      concept: z
-        .object({
-          iri: z.string(),
-          frontmatter: z.record(
-            z.string(),
-            z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())]),
-          ),
-          body: z.string(),
-          relations: z.array(z.object({ kind: z.string(), target: z.string() })),
-          trust,
-          evidence: z.array(z.object({ locator: z.string(), source: z.string() })),
-        })
-        .optional(),
-      passage: passage.optional(),
-    }),
+    z
+      .object({
+        found: z.literal(true),
+        concept: z
+          .object({
+            iri: z.string(),
+            frontmatter: z.record(
+              z.string(),
+              z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())]),
+            ),
+            body: z.string(),
+            relations: z.array(z.object({ kind: z.string(), target: z.string() })),
+            trust,
+            evidence: z.array(z.object({ locator: z.string(), source: z.string() })),
+          })
+          .optional(),
+        passage: passage.optional(),
+      })
+      // Exactly one of the two: the type allows both keys so the wire and the slice
+      // agree; the refinement is what holds the invariant on the wire.
+      .refine((value) => (value.concept === undefined) !== (value.passage === undefined), {
+        message: "a found result carries a concept or a passage, never both or neither",
+      }),
     z.object({
       found: z.literal(false),
       iri: z.string().optional(),
@@ -183,15 +190,22 @@ const giveFeedbackEntry = defineEntry({
   description:
     "Record a reader's verdict on an answer or a concept: helpful, or a flag — wrong, out of date, incomplete, or should not have been shown — with what was wrong in their words. Called from a view's button or on the person's explicit ask; it is the surface's one write.",
   scopes: ["knowledge:read", "feedback:write"],
-  input: z.object({
-    iri: z.string().min(1).describe("The concept or answer the feedback is about."),
-    verdict: z.enum(["helpful", "flag"]).describe("Helpful, or a flag with a reason."),
-    reason: z
-      .enum(["wrong", "out-of-date", "incomplete", "should-not-have-shown"])
-      .optional()
-      .describe("Required with a flag."),
-    detail: z.string().max(2000).optional().describe("What was wrong, in the person's words."),
-  }),
+  input: z
+    .object({
+      iri: z.string().min(1).describe("The concept or answer the feedback is about."),
+      verdict: z.enum(["helpful", "flag"]).describe("Helpful, or a flag with a reason."),
+      reason: z
+        .enum(["wrong", "out-of-date", "incomplete", "should-not-have-shown"])
+        .optional()
+        .describe("Required with a flag."),
+      detail: z.string().max(2000).optional().describe("What was wrong, in the person's words."),
+    })
+    // The schema says what `run` requires, so a flag without a reason is a validation
+    // error at the door, never a failure inside the entry.
+    .refine((value) => value.verdict !== "flag" || value.reason !== undefined, {
+      message: "a flag needs a reason: wrong, out-of-date, incomplete or should-not-have-shown",
+      path: ["reason"],
+    }),
   output: z.object({
     outcome: z.literal("received"),
     feedback: feedbackInput,

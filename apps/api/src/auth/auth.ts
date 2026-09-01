@@ -14,7 +14,7 @@ import type { PlatformPrincipal } from "@better-answers/core/kernel";
 import { withScope, type PostgresDoor } from "@better-answers/core/store/postgres";
 
 /** The identity provider's own acts (the partition on a self-serve create) are the platform's. */
-const PLATFORM_ACTOR: PlatformPrincipal = {
+const PLATFORM_PRINCIPAL: PlatformPrincipal = {
   kind: "platform",
   actorId: "process:better-answers-identity",
 };
@@ -274,8 +274,10 @@ export const createAuth = (deps: AuthDependencies) => {
               : event === "auth.consent" && fields.accept === false
                 ? "declined"
                 : "ok",
-            // The issued token's `jti` — never the token — so an issue and its later
-            // refresh and revocation are one thread in the audit slice's records.
+            // The issued token's `jti` on an issue or a refresh — never the token. A
+            // revocation carries none: the revoked refresh token is opaque and stored
+            // hashed, so there is no `jti` to read; the audit slice threads it by
+            // `client_id` and principal.
             token_id: tokenId ?? null,
           },
           name,
@@ -292,6 +294,15 @@ export const createAuth = (deps: AuthDependencies) => {
         // `provisionWorkspace` (packages/core/workspaces) is the act; this flag is the
         // "self-serve later" switch.
         allowUserToCreateOrganization: false,
+        // An Admin's invitation reaches the person by email, through the same
+        // transport as the sign-in code; the accept page is T-022's.
+        sendInvitationEmail: async ({ email, organization, id }) => {
+          await deps.sendEmail({
+            to: email,
+            subject: `You are invited to ${organization.name} on Better Answers`,
+            text: `Sign in at ${deps.publicUrl}/sign-in to accept invitation ${id}.`,
+          });
+        },
         schema: {
           organization: { modelName: "workspace" },
           member: { fields: { organizationId: "workspaceId" } },
@@ -304,7 +315,7 @@ export const createAuth = (deps: AuthDependencies) => {
           // hook runs after its own writes with no transaction handle (verified in
           // `plugins/organization/routes/crud-org.mjs`); the atomic act is the platform's.
           afterCreateOrganization: async ({ organization }) => {
-            await withScope(PLATFORM_ACTOR, deps.door, organization.id, async (tx) => {
+            await withScope(PLATFORM_PRINCIPAL, deps.door, organization.id, async (tx) => {
               await tx.query("SELECT create_workspace_partition($1)", [organization.id]);
             });
           },
@@ -375,13 +386,24 @@ export const createAuth = (deps: AuthDependencies) => {
           // workspace never gets here with none active — the session-create hook above
           // set it before the session existed (ADR 0009's 2026-08-27 amendment).
           shouldRedirect: async ({ session, user: person }) => {
-            const active = activeWorkspaceOf(session);
-            if (active === undefined) return true;
-            const held = await deps.database.query(
-              "SELECT 1 FROM member WHERE user_id = $1 AND workspace_id = $2",
-              [person.id, active],
+            const memberships = await deps.database.query<{ workspace_id: string }>(
+              "SELECT workspace_id FROM member WHERE user_id = $1 ORDER BY workspace_id",
+              [person.id],
             );
-            return held.rowCount !== 1;
+            const held = memberships.rows.map((row) => row.workspace_id);
+            const active = activeWorkspaceOf(session);
+            if (active !== undefined && held.includes(active)) return false;
+            // A session made before the person's one membership existed: the
+            // session-create hook could not set it, so it is set here, once.
+            const [only] = held;
+            if (held.length === 1 && only !== undefined) {
+              await deps.database.query(
+                "UPDATE session SET active_workspace_id = $1 WHERE id = $2",
+                [only, session.id],
+              );
+              return false;
+            }
+            return true;
           },
         },
         // The claims ADR 0018 asserts: `{workspace, user}`. `role` is deliberately
