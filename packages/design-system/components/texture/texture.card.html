@@ -1,0 +1,202 @@
+<!-- @dsCard group="Components" viewport="960x420" name="Texture — grid, dots, noise" subtitle="@magicui ports: the grid is the page substrate, dots mean empty, noise sits on dark and accent only" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Texture</title>
+    <link rel="stylesheet" href="../../styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css"
+    />
+    <script
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+      integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+      integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+      integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+      crossorigin="anonymous"
+    ></script>
+    <script src="../../_ds_bundle.js"></script>
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-page);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+      }
+      a {
+        color: var(--text-link);
+      }
+      a:hover {
+        color: var(--text-link-hover);
+      }
+      .wrap {
+        padding: 20px;
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 18px;
+      }
+      .k {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        letter-spacing: var(--tracking-caps);
+        text-transform: uppercase;
+        color: var(--text-muted);
+        display: block;
+        margin-bottom: 8px;
+      }
+      .note {
+        margin: 8px 0 0;
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+      const { GridPattern, DotPattern, NoiseTexture, Frame, Button, EmptyState, Icon } =
+        window.BetterAnswersDesignSystem_22f3cc;
+      function Demo() {
+        return (
+          <div className="wrap">
+            <div>
+              <span className="k">GridPattern — the substrate</span>
+              <div
+                style={{
+                  position: "relative",
+                  height: 212,
+                  border: "1px solid var(--border-subtle)",
+                  background: "var(--surface-page)",
+                  overflow: "hidden",
+                }}
+              >
+                <GridPattern
+                  width={32}
+                  height={32}
+                  squares={[
+                    [2, 1],
+                    [5, 3],
+                    [3, 5],
+                  ]}
+                />
+                <div style={{ position: "relative", padding: 16 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.02em" }}>
+                    Every answer, cited.
+                  </div>
+                  <p
+                    style={{
+                      margin: "6px 0 0",
+                      fontSize: 13,
+                      color: "var(--text-muted)",
+                      maxWidth: "28ch",
+                    }}
+                  >
+                    The 32px module the layout is set on, made visible.
+                  </p>
+                </div>
+              </div>
+              <p className="note">
+                One per screen, behind everything, masked away from the content. Never inside a
+                card.
+              </p>
+            </div>
+            <div>
+              <span className="k">DotPattern — this area is empty</span>
+              <Frame
+                padding="0"
+                style={{
+                  height: 212,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "visible",
+                }}
+              >
+                <DotPattern fade />
+                <div style={{ position: "relative", textAlign: "center", padding: "0 20px" }}>
+                  <Icon
+                    name="tray"
+                    size={20}
+                    style={{ color: "var(--text-faint)", margin: "0 auto 10px" }}
+                  />
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>Nothing is waiting.</div>
+                  <p
+                    style={{
+                      margin: "5px 0 12px",
+                      fontSize: 12.5,
+                      color: "var(--text-muted)",
+                      maxWidth: "32ch",
+                    }}
+                  >
+                    Suggestions arrive from runs and from people who may not commit.
+                  </p>
+                  <Button size="sm" variant="accent">
+                    Connect a source
+                  </Button>
+                </div>
+              </Frame>
+              <p className="note">
+                Semantic, not decorative: dots mean nothing is here yet. Never behind content.
+              </p>
+            </div>
+            <div>
+              <span className="k">NoiseTexture — dark and accent only</span>
+              <div style={{ height: 212, display: "flex", flexDirection: "column" }}>
+                <div
+                  style={{
+                    position: "relative",
+                    flex: 1,
+                    background: "var(--grey-950)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <NoiseTexture />
+                  <div
+                    style={{
+                      position: "relative",
+                      padding: 14,
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 13,
+                      color: "#fff",
+                      letterSpacing: "-0.02em",
+                    }}
+                  >
+                    better-answers
+                  </div>
+                </div>
+                <div
+                  style={{
+                    position: "relative",
+                    flex: 1,
+                    background: "var(--accent-600)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <NoiseTexture />
+                  <div style={{ position: "relative", padding: 14, fontSize: 13, color: "#fff" }}>
+                    3.5% light · 5% dark · never above 5%
+                  </div>
+                </div>
+              </div>
+              <p className="note">
+                Grain, not a pattern. Never on a white card, never over reader prose. Off under
+                reduced transparency.
+              </p>
+            </div>
+          </div>
+        );
+      }
+      ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+    </script>
+  </body>
+</html>

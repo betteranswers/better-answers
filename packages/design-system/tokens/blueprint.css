@@ -1,0 +1,36 @@
+/* Blueprint: the modular grid, the registration mark, and the three textures.
+
+   The board is a 32px module. Objects sit on it square-cornered and hairline-drawn.
+   A "+" registers an object against the grid — it is a scarce mark, not a decoration
+   (see guidelines/blueprint-marks.card.html for where it is allowed). */
+:root {
+  /* Modular grid */
+  --grid-module: 32px;
+  --grid-module-lg: 64px;
+  --grid-line: rgba(11, 12, 14, 0.05);
+  --grid-line-strong: rgba(11, 12, 14, 0.085);
+
+  /* Registration mark */
+  --mark-arm: 7px;
+  --mark-weight: 1px;
+  --mark-color: var(--border-default);
+  --mark-color-quiet: var(--border-subtle);
+
+  /* Textures (@magicui). Bounded and rationed — see the Texture card. */
+  --dot-gap: 16px;
+  --dot-radius: 1px;
+  --dot-color: rgba(11, 12, 14, 0.13);
+  --noise-opacity: 0.035; /* @kind other */
+  --noise-frequency: 0.82; /* @kind other */
+}
+[data-theme="dark"] {
+  --grid-line: rgba(255, 255, 255, 0.055);
+  --grid-line-strong: rgba(255, 255, 255, 0.095);
+  --dot-color: rgba(255, 255, 255, 0.15);
+  --noise-opacity: 0.05; /* @kind other */
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --noise-opacity: 0; /* @kind other */
+  }
+}

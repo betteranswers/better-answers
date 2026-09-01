@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 1280px;
+        height: 854px;
+        overflow: hidden;
+      }
+      .t {
+        display: flex;
+        width: 1280px;
+        height: 854px;
+      }
+      .main {
+        flex: 1;
+        background: var(--accent-600);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .g {
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+        background-size: 64px 64px;
+      }
+      .mark {
+        position: relative;
+        font-family: var(--font-mono);
+        font-size: 108px;
+        font-weight: 500;
+        letter-spacing: -0.035em;
+        line-height: 1;
+        color: #fff;
+        white-space: nowrap;
+        padding: 44px 56px;
+        border: 2px solid rgba(255, 255, 255, 0.5);
+      }
+      .m {
+        position: absolute;
+        width: 34px;
+        height: 34px;
+        background-image: linear-gradient(#fff, #fff), linear-gradient(#fff, #fff);
+        background-repeat: no-repeat;
+        background-position: center, center;
+        background-size:
+          100% 3px,
+          3px 100%;
+      }
+      .strip {
+        width: 320px;
+        display: flex;
+        flex-direction: column;
+      }
+      .strip div {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="t">
+      <div class="main">
+        <div class="g"></div>
+        <div class="mark">
+          better-answers<span class="m" style="top: -17px; left: -17px"></span
+          ><span class="m" style="top: -17px; right: -17px"></span
+          ><span class="m" style="bottom: -17px; left: -17px"></span
+          ><span class="m" style="bottom: -17px; right: -17px"></span>
+        </div>
+      </div>
+      <div class="strip">
+        <div style="background: #a55d09"></div>
+        <div style="background: #137a52"></div>
+        <div style="background: #6741c4"></div>
+        <div style="background: #c0362c"></div>
+      </div>
+    </div>
+  </body>
+</html>

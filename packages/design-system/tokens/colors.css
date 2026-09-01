@@ -1,0 +1,51 @@
+/* Base palette. Neutral-led, one accent, four semantics.
+   Neutrals are cool-grey with a faint blue cast (Vercel/Linear register).
+   Trust is never carried by colour alone ([UX1]) — semantics tint tags that
+   already say the word. */
+:root {
+  /* Neutral ramp — light */
+  --grey-0: #ffffff;
+  --grey-25: #fcfcfd;
+  --grey-50: #f7f8f9;
+  --grey-100: #f0f1f3;
+  --grey-150: #e8eaed;
+  --grey-200: #dfe1e6;
+  --grey-300: #c6cad1;
+  --grey-400: #9aa0a9;
+  --grey-500: #727781;
+  --grey-600: #565b64;
+  --grey-700: #3d4148;
+  --grey-800: #26292e;
+  --grey-900: #17191c;
+  --grey-950: #0b0c0e;
+
+  /* Accent — "ink blue". Interactive only: links, focus, primary action. */
+  --accent-50: #eef2ff;
+  --accent-100: #dde5ff;
+  --accent-200: #bccbfe;
+  --accent-300: #93aafc;
+  --accent-400: #6685f7;
+  --accent-500: #3f62ea;
+  --accent-600: #2e4bd4; /* primary */
+  --accent-700: #2639aa;
+  --accent-800: #233285;
+  --accent-900: #1d2a68;
+
+  /* Semantics */
+  --green-50: #e8f6ef;
+  --green-200: #a9dcc4;
+  --green-600: #137a52;
+  --green-700: #0f6141;
+  --amber-50: #fdf3e3;
+  --amber-200: #f2d59b;
+  --amber-600: #a55d09;
+  --amber-700: #864a06;
+  --red-50: #fdeceb;
+  --red-200: #f4bdb8;
+  --red-600: #c0362c;
+  --red-700: #9d2a22;
+  --violet-50: #f2eefc;
+  --violet-200: #d6c8f5;
+  --violet-600: #6741c4;
+  --violet-700: #54329f;
+}

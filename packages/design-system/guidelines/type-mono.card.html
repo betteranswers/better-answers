@@ -1,0 +1,84 @@
+<!-- @dsCard group="Type" viewport="700x170" name="Mono and numerics" subtitle="Geist Mono for IRIs, commits, citation markers; tabular figures in every table" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mono</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 170px;
+        display: flex;
+      }
+      .p {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+      }
+      .mono {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .sw {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .chip {
+        height: 44px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(11, 12, 14, 0.06);
+      }
+      .ramp {
+        display: flex;
+        gap: 6px;
+      }
+      .k {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+      }
+      .v {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p" style="gap: 8px">
+      <span style="font-family: var(--font-mono); font-size: 13px; color: var(--text-body)"
+        >https://better-answers.com/c/01JZ9F4K2M8Q</span
+      >
+      <span style="font-family: var(--font-mono); font-size: 13px; color: var(--text-secondary)"
+        >commit 4f1c9ad · better-answers-extract/0.3.1</span
+      >
+      <div
+        style="
+          display: flex;
+          gap: 26px;
+          font-variant-numeric: tabular-nums;
+          font-size: 14px;
+          color: var(--text-body);
+        "
+      >
+        <span>1,284 concepts</span><span>96.4% coverage</span><span>£1,240.00</span
+        ><span>03:41</span>
+      </div>
+      <span class="k">Tabular figures are mandatory wherever numbers stack in a column.</span>
+    </div>
+  </body>
+</html>

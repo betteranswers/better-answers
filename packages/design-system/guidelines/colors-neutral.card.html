@@ -1,0 +1,103 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Neutrals" subtitle="Cool grey ramp — every surface, line and text colour derives from here" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Neutrals</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 150px;
+        display: flex;
+      }
+      .p {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+      }
+      .mono {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .sw {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .chip {
+        height: 44px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(11, 12, 14, 0.06);
+      }
+      .ramp {
+        display: flex;
+        gap: 6px;
+      }
+      .k {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+      }
+      .v {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p">
+      <div class="ramp">
+        <div class="sw">
+          <div class="chip" style="background: #ffffff"></div>
+          <span class="k">grey-0</span><span class="v">#ffffff</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #f7f8f9"></div>
+          <span class="k">grey-50</span><span class="v">#f7f8f9</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #f0f1f3"></div>
+          <span class="k">grey-100</span><span class="v">#f0f1f3</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #dfe1e6"></div>
+          <span class="k">grey-200</span><span class="v">#dfe1e6</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #c6cad1"></div>
+          <span class="k">grey-300</span><span class="v">#c6cad1</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #727781"></div>
+          <span class="k">grey-500</span><span class="v">#727781</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #3d4148"></div>
+          <span class="k">grey-700</span><span class="v">#3d4148</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #17191c"></div>
+          <span class="k">grey-900</span><span class="v">#17191c</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #0b0c0e"></div>
+          <span class="k">grey-950</span><span class="v">#0b0c0e</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,190 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Trust tints" subtitle="Tints exist only behind the fixed trust words — never as the signal itself" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Trust tints</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 150px;
+        display: flex;
+      }
+      .p {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+      }
+      .mono {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .sw {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .chip {
+        height: 44px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(11, 12, 14, 0.06);
+      }
+      .ramp {
+        display: flex;
+        gap: 6px;
+      }
+      .k {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+      }
+      .v {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p">
+      <div style="display: flex; flex-wrap: wrap; gap: 8px">
+        <span
+          style="
+            display: inline-flex;
+            align-items: center;
+            height: 22px;
+            padding: 0 8px;
+            border-radius: var(--radius-sm);
+            background: var(--trust-checked-bg);
+            color: var(--trust-checked-fg);
+            border: 1px solid var(--trust-checked-border);
+            font-size: var(--text-xs);
+            font-weight: 500;
+          "
+          >Checked by Priya Shah · 3 March 2026</span
+        >
+        <span
+          style="
+            display: inline-flex;
+            align-items: center;
+            height: 22px;
+            padding: 0 8px;
+            border-radius: var(--radius-sm);
+            background: var(--trust-unchecked-bg);
+            color: var(--trust-unchecked-fg);
+            border: 1px solid var(--trust-unchecked-border);
+            font-size: var(--text-xs);
+            font-weight: 500;
+          "
+          >Unchecked</span
+        >
+        <span
+          style="
+            display: inline-flex;
+            align-items: center;
+            height: 22px;
+            padding: 0 8px;
+            border-radius: var(--radius-sm);
+            background: var(--trust-stale-bg);
+            color: var(--trust-stale-fg);
+            border: 1px solid var(--trust-stale-border);
+            font-size: var(--text-xs);
+            font-weight: 500;
+          "
+          >Out of date</span
+        >
+        <span
+          style="
+            display: inline-flex;
+            align-items: center;
+            height: 22px;
+            padding: 0 8px;
+            border-radius: var(--radius-sm);
+            background: var(--trust-stale-bg);
+            color: var(--trust-stale-fg);
+            border: 1px solid var(--trust-stale-border);
+            font-size: var(--text-xs);
+            font-weight: 500;
+          "
+          >Changed since checked</span
+        >
+        <span
+          style="
+            display: inline-flex;
+            align-items: center;
+            height: 22px;
+            padding: 0 8px;
+            border-radius: var(--radius-sm);
+            background: var(--trust-restricted-bg);
+            color: var(--trust-restricted-fg);
+            border: 1px solid var(--trust-restricted-border);
+            font-size: var(--text-xs);
+            font-weight: 500;
+          "
+          >Restricted</span
+        >
+        <span
+          style="
+            display: inline-flex;
+            align-items: center;
+            height: 22px;
+            padding: 0 8px;
+            border-radius: var(--radius-sm);
+            background: var(--trust-draft-bg);
+            color: var(--trust-draft-fg);
+            border: 1px solid var(--trust-draft-border);
+            font-size: var(--text-xs);
+            font-weight: 500;
+          "
+          >Draft</span
+        >
+        <span
+          style="
+            display: inline-flex;
+            align-items: center;
+            height: 22px;
+            padding: 0 8px;
+            border-radius: var(--radius-sm);
+            background: var(--trust-unchecked-bg);
+            color: var(--trust-unchecked-fg);
+            border: 1px solid var(--trust-unchecked-border);
+            font-size: var(--text-xs);
+            font-weight: 500;
+          "
+          >Deprecated</span
+        >
+        <span
+          style="
+            display: inline-flex;
+            align-items: center;
+            height: 22px;
+            padding: 0 8px;
+            border-radius: var(--radius-sm);
+            background: var(--trust-unchecked-bg);
+            color: var(--trust-unchecked-fg);
+            border: 1px solid var(--trust-unchecked-border);
+            font-size: var(--text-xs);
+            font-weight: 500;
+          "
+          >Left</span
+        >
+      </div>
+      <p style="margin: 0; font-size: var(--text-xs); color: var(--text-muted)">
+        Remove the colour and every one of these still reads correctly. That is the test.
+      </p>
+    </div>
+  </body>
+</html>

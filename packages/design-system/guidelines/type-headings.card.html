@@ -1,0 +1,103 @@
+<!-- @dsCard group="Type" viewport="700x180" name="Interface headings" subtitle="21 / 18 / 16 / 15 px — the sizes the app actually uses" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Headings</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 180px;
+        display: flex;
+      }
+      .p {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+      }
+      .mono {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .sw {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .chip {
+        height: 44px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(11, 12, 14, 0.06);
+      }
+      .ramp {
+        display: flex;
+        gap: 6px;
+      }
+      .k {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+      }
+      .v {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p" style="gap: 8px">
+      <div class="row">
+        <span
+          style="
+            font-size: 21px;
+            font-weight: 600;
+            letter-spacing: -0.014em;
+            color: var(--text-primary);
+          "
+          >Suggestions</span
+        ><span class="v">21 / 600 · screen title</span>
+      </div>
+      <div class="row">
+        <span
+          style="
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: -0.014em;
+            color: var(--text-primary);
+          "
+          >Waiting for a decision</span
+        ><span class="v">18 / 600 · section</span>
+      </div>
+      <div class="row">
+        <span
+          style="
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: -0.006em;
+            color: var(--text-primary);
+          "
+          >ISO 27001 certification</span
+        ><span class="v">16 / 600 · card title</span>
+      </div>
+      <div class="row">
+        <span style="font-size: 15px; font-weight: 500; color: var(--text-primary)"
+          >Security section</span
+        ><span class="v">15 / 500 · sub-head</span>
+      </div>
+    </div>
+  </body>
+</html>

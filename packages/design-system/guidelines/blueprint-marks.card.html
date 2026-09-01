@@ -1,0 +1,196 @@
+<!-- @dsCard group="Brand" viewport="700x320" name="Registration marks — where a “+” is allowed" subtitle="A mark registers a board-level object against the grid. Three per screen, one level per stack." -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Registration marks</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-page);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 320px;
+      }
+      .p {
+        padding: 18px;
+        height: 100%;
+        box-sizing: border-box;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        position: relative;
+      }
+      .grid {
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(var(--grid-line) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: var(--grid-module) var(--grid-module);
+        pointer-events: none;
+      }
+      .col {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-width: 0;
+      }
+      .k {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        letter-spacing: var(--tracking-caps);
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .obj {
+        position: relative;
+        border: 1px solid var(--border-default);
+        background: var(--surface-card);
+        padding: 11px 13px;
+        font-size: 13px;
+      }
+      .m {
+        position: absolute;
+        width: 7px;
+        height: 7px;
+        background-image:
+          linear-gradient(var(--mark-color), var(--mark-color)),
+          linear-gradient(var(--mark-color), var(--mark-color));
+        background-repeat: no-repeat;
+        background-position: center, center;
+        background-size:
+          100% 1px,
+          1px 100%;
+      }
+      .tl {
+        top: -3.5px;
+        left: -3.5px;
+      }
+      .tr {
+        top: -3.5px;
+        right: -3.5px;
+      }
+      .bl {
+        bottom: -3.5px;
+        left: -3.5px;
+      }
+      .br {
+        bottom: -3.5px;
+        right: -3.5px;
+      }
+      .ma {
+        background-image:
+          linear-gradient(var(--accent-300), var(--accent-300)),
+          linear-gradient(var(--accent-300), var(--accent-300));
+      }
+      .no {
+        border: 1px solid var(--border-subtle);
+        background: var(--surface-card);
+        padding: 8px 10px;
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+      .li {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+      .li b {
+        color: var(--text-body);
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p">
+      <div class="grid"></div>
+      <div class="col">
+        <span class="k">Marked — board-level objects</span>
+        <div class="obj" style="padding: 14px 15px">
+          <span class="m tl"></span><span class="m tr"></span><span class="m bl"></span
+          ><span class="m br"></span>
+          <div style="font-weight: 500; margin-bottom: 3px">Coverage</div>
+          <div style="font-size: 12px; color: var(--text-muted)">18 of 24 concepts included</div>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center">
+          <span
+            style="
+              position: relative;
+              display: inline-flex;
+              align-items: center;
+              height: 32px;
+              padding: 0 14px;
+              background: var(--accent-600);
+              color: #fff;
+              font-size: 13px;
+              font-weight: 500;
+            "
+            ><span class="m tl ma"></span><span class="m tr ma"></span><span class="m bl ma"></span
+            ><span class="m br ma"></span>Accept 12 concepts</span
+          >
+          <span
+            style="
+              display: inline-flex;
+              align-items: center;
+              height: 32px;
+              padding: 0 14px;
+              border: 1px solid var(--border-default);
+              background: var(--surface-card);
+              font-size: 13px;
+            "
+            >Decline</span
+          >
+        </div>
+        <ul class="li">
+          <li><b>1.</b> a page region or module frame</li>
+          <li><b>2.</b> a figure, diagram or specimen</li>
+          <li><b>3.</b> a card that is a direct child of the grid</li>
+          <li><b>4.</b> the primary button — the one solid object</li>
+          <li><b>5.</b> an empty state or drop zone</li>
+        </ul>
+      </div>
+      <div class="col">
+        <span class="k">Never marked</span>
+        <div class="obj" style="padding: 12px 13px">
+          <span class="m tl"></span><span class="m tr"></span><span class="m bl"></span
+          ><span class="m br"></span>
+          <div class="k" style="margin-bottom: 8px">One marked level per stack</div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <div class="no">A nested card — inherits, never repeats</div>
+            <div style="display: flex; gap: 6px; align-items: center">
+              <span class="no" style="padding: 2px 7px; font-size: 11px">Restricted</span
+              ><span class="no" style="padding: 2px 7px; font-size: 11px"
+                >Checked by Priya Shah</span
+              >
+            </div>
+            <div
+              class="no"
+              style="height: 26px; display: flex; align-items: center; color: var(--text-faint)"
+            >
+              Filter concepts
+            </div>
+          </div>
+        </div>
+        <p style="margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5">
+          Inputs, selects, tags, trust tags, badges, table rows, nav items, menu items, tooltips,
+          toasts, anything under 32px tall, and anything inside a parent that already carries marks.
+          A committing action <i>repeated per row</i> takes the unmarked
+          <code style="font-family: var(--font-mono); font-size: 11px">accent</code> fill, not
+          <code style="font-family: var(--font-mono); font-size: 11px">primary</code>.
+          <b style="color: var(--text-body); font-weight: 500"
+            >At most three marked objects per screen</b
+          >
+          — if everything is registered, nothing is.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

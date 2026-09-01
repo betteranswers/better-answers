@@ -1,0 +1,167 @@
+<!-- @dsCard group="Motion" viewport="700x170" name="Durations and easing" subtitle="80–240ms, one standard curve, no bounce, no scale" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Motion</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 170px;
+        display: flex;
+      }
+      .p {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+      }
+      .mono {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .sw {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .chip {
+        height: 44px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(11, 12, 14, 0.06);
+      }
+      .ramp {
+        display: flex;
+        gap: 6px;
+      }
+      .k {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+      }
+      .v {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p" style="gap: 10px">
+      <style>
+        @keyframes demo {
+          0%,
+          100% {
+            transform: translateX(0);
+          }
+          50% {
+            transform: translateX(120px);
+          }
+        }
+      </style>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <span class="v" style="width: 96px">instant · 80ms</span>
+        <div
+          style="
+            width: 180px;
+            height: 6px;
+            background: var(--surface-inset);
+            border-radius: 3px;
+            position: relative;
+          "
+        >
+          <div
+            style="
+              width: 6px;
+              height: 6px;
+              border-radius: 3px;
+              background: var(--accent-600);
+              animation: demo 2.2s cubic-bezier(0.2, 0, 0.13, 1) infinite;
+            "
+          ></div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <span class="v" style="width: 96px">fast · 120ms</span>
+        <div
+          style="
+            width: 180px;
+            height: 6px;
+            background: var(--surface-inset);
+            border-radius: 3px;
+            position: relative;
+          "
+        >
+          <div
+            style="
+              width: 6px;
+              height: 6px;
+              border-radius: 3px;
+              background: var(--accent-600);
+              animation: demo 2.2s cubic-bezier(0.2, 0, 0.13, 1) infinite;
+            "
+          ></div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <span class="v" style="width: 96px">base · 160ms</span>
+        <div
+          style="
+            width: 180px;
+            height: 6px;
+            background: var(--surface-inset);
+            border-radius: 3px;
+            position: relative;
+          "
+        >
+          <div
+            style="
+              width: 6px;
+              height: 6px;
+              border-radius: 3px;
+              background: var(--accent-600);
+              animation: demo 2.2s cubic-bezier(0.2, 0, 0.13, 1) infinite;
+            "
+          ></div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <span class="v" style="width: 96px">slow · 240ms</span>
+        <div
+          style="
+            width: 180px;
+            height: 6px;
+            background: var(--surface-inset);
+            border-radius: 3px;
+            position: relative;
+          "
+        >
+          <div
+            style="
+              width: 6px;
+              height: 6px;
+              border-radius: 3px;
+              background: var(--accent-600);
+              animation: demo 2.2s cubic-bezier(0.2, 0, 0.13, 1) infinite;
+            "
+          ></div>
+        </div>
+      </div>
+      <span class="v"
+        >--ease-standard cubic-bezier(.2,0,.13,1) · reduced motion collapses everything to 1ms</span
+      >
+    </div>
+  </body>
+</html>

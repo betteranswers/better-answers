@@ -1,0 +1,18 @@
+/* Fast, flat, no bounce. Nothing decorative moves. */
+:root {
+  --duration-instant: 80ms; /* @kind other */
+  --duration-fast: 120ms; /* @kind other */
+  --duration-base: 160ms; /* @kind other */
+  --duration-slow: 240ms; /* @kind other */
+  --duration-stream: 1200ms; /* @kind other */
+
+  --ease-standard: cubic-bezier(0.2, 0, 0.13, 1); /* @kind other */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* @kind other */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1); /* @kind other */
+
+  --transition-control:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard); /* @kind other */
+}

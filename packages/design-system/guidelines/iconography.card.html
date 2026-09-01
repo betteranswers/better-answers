@@ -1,0 +1,70 @@
+<!-- @dsCard group="Brand" viewport="700x180" name="Iconography" subtitle="Phosphor — @phosphor-icons/react in the app, @phosphor-icons/web on a page. 16px, regular." -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Icons</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css"
+    />
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 180px;
+        display: flex;
+      }
+      .p {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 12px;
+      }
+      .k {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+      }
+      .row {
+        display: flex;
+        gap: 19px;
+        color: var(--text-secondary);
+        font-size: 19px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p">
+      <div class="row">
+        <i class="ph ph-magnifying-glass"></i><i class="ph ph-tray"></i
+        ><i class="ph ph-database"></i><i class="ph ph-graph"></i><i class="ph ph-question"></i
+        ><i class="ph ph-users"></i><i class="ph ph-pulse"></i><i class="ph ph-book-open"></i
+        ><i class="ph ph-chat-text"></i><i class="ph ph-copy"></i><i class="ph ph-flag"></i
+        ><i class="ph ph-check-circle"></i><i class="ph ph-warning"></i
+        ><i class="ph ph-sliders-horizontal"></i><i class="ph ph-funnel"></i
+        ><i class="ph ph-clock-counter-clockwise"></i>
+      </div>
+      <div class="row" style="font-size: 16px; color: var(--text-faint)">
+        <i class="ph-thin ph-database"></i><i class="ph-light ph-database"></i
+        ><i class="ph ph-database"></i><i class="ph-bold ph-database"></i
+        ><i class="ph-fill ph-database"></i
+        ><span class="k" style="align-self: center; margin-left: 6px"
+          >thin · light · <b style="color: var(--text-body)">regular</b> · bold · fill — regular
+          everywhere, bold for an active nav item, fill only inside a solid accent chip</span
+        >
+      </div>
+      <p style="margin: 0; font-size: var(--text-xs); color: var(--text-muted)">
+        16px in the interface, 18–20px in empty states.
+        <code style="font-family: var(--font-mono); font-size: var(--text-2xs)">currentColor</code>
+        always. Never duotone, never a second family, never emoji. An icon never carries meaning
+        alone.
+      </p>
+    </div>
+  </body>
+</html>

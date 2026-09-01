@@ -1,0 +1,84 @@
+<!-- @dsCard group="Spacing" viewport="700x160" name="Corners — square" subtitle="Every radius resolves to 0. The only circles left are the spinner ring and a radio." -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Corners</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 160px;
+        display: flex;
+      }
+      .p {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 14px;
+      }
+      .v {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .o {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 7px;
+      }
+      .b {
+        width: 66px;
+        height: 46px;
+        background: var(--surface-inset);
+        border: 1px solid var(--border-default);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p">
+      <div style="display: flex; gap: 14px; align-items: flex-end">
+        <div class="o">
+          <div class="b"></div>
+          <span class="v">tag</span>
+        </div>
+        <div class="o">
+          <div class="b"></div>
+          <span class="v">field</span>
+        </div>
+        <div class="o">
+          <div class="b"></div>
+          <span class="v">button</span>
+        </div>
+        <div class="o">
+          <div class="b"></div>
+          <span class="v">card</span>
+        </div>
+        <div class="o">
+          <div class="b"></div>
+          <span class="v">table</span>
+        </div>
+        <div class="o">
+          <div class="b"></div>
+          <span class="v">dialog</span>
+        </div>
+        <div class="o">
+          <div class="b" style="border-radius: 999px; width: 46px"></div>
+          <span class="v">spinner · radio</span>
+        </div>
+      </div>
+      <p style="margin: 0; font-size: var(--text-xs); color: var(--text-muted); max-width: 74ch">
+        The ramp <code class="v">--radius-xs … --radius-2xl</code> is kept so consumers can still
+        name a step, but every one resolves to <code class="v">0px</code>. A rounded corner softens
+        an object; this system draws objects. <code class="v">--radius-full</code> survives for the
+        two genuinely circular controls and nothing else.
+      </p>
+    </div>
+  </body>
+</html>

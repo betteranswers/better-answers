@@ -1,0 +1,90 @@
+<!-- @dsCard group="Brand" viewport="700x180" name="Voice" subtitle="Precise, confident, grounded — the platform states what is true, and what is not" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Voice</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 180px;
+        display: flex;
+      }
+      .p {
+        padding: 14px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 9px;
+      }
+      .k {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+        letter-spacing: var(--tracking-micro);
+        text-transform: uppercase;
+        font-family: var(--font-mono);
+      }
+      .g {
+        display: grid;
+        grid-template-columns: 26px 1fr;
+        align-items: baseline;
+        column-gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p">
+      <div style="display: flex; gap: 22px; margin-bottom: 2px">
+        <span style="font-size: 13px; font-weight: 600; color: var(--text-primary)">Precise</span
+        ><span style="font-size: 13px; font-weight: 600; color: var(--text-primary)">Confident</span
+        ><span style="font-size: 13px; font-weight: 600; color: var(--text-primary)">Grounded</span>
+        <span style="font-size: 13px; color: var(--text-faint)"
+          >— it names the number, it does not hedge, and it shows its evidence.</span
+        >
+      </div>
+      <div class="g">
+        <span class="k">Write</span>
+        <p style="margin: 0; font-size: 15px; color: var(--text-body)">
+          Nothing on the map answers this. Three passages mention it.
+        </p>
+      </div>
+      <div class="g">
+        <span class="k">Not</span>
+        <p
+          style="
+            margin: 0;
+            font-size: 15px;
+            color: var(--text-faint);
+            text-decoration: line-through;
+          "
+        >
+          We couldn’t find anything — try rephrasing your question.
+        </p>
+      </div>
+      <div class="g">
+        <span class="k">Write</span>
+        <p style="margin: 0; font-size: 15px; color: var(--text-body)">
+          One governed write. Audited under your name.
+        </p>
+      </div>
+      <div class="g">
+        <span class="k">Not</span>
+        <p
+          style="
+            margin: 0;
+            font-size: 15px;
+            color: var(--text-faint);
+            text-decoration: line-through;
+          "
+        >
+          Are you sure? This action cannot be undone.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,373 @@
+<!-- @dsCard group="Adoption" viewport="1180x820" name="Kit adoption map — what we take, skin, and skip" subtitle="shadcn · Kibo UI · AI Elements. Ours where the product rules are encoded; theirs where the behaviour is hard." -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Kit adoption map</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-page);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        width: 1180px;
+        height: 820px;
+        box-sizing: border-box;
+      }
+      .p {
+        padding: 24px 26px;
+        height: 100%;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        position: relative;
+      }
+      .grid {
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(var(--grid-line) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+        background-size: var(--grid-module) var(--grid-module);
+        pointer-events: none;
+      }
+      .k {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        letter-spacing: var(--tracking-caps);
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .hd {
+        position: relative;
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .hd h1 {
+        margin: 0;
+        font-size: 19px;
+        font-weight: 600;
+        letter-spacing: -0.014em;
+        color: var(--text-primary);
+      }
+      .hd p {
+        margin: 0;
+        font-size: 12.5px;
+        color: var(--text-muted);
+        max-width: 62ch;
+        line-height: 1.5;
+      }
+      .cols {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        flex: 1;
+        min-height: 0;
+      }
+      .col {
+        position: relative;
+        border: 1px solid var(--border-subtle);
+        background: var(--surface-card);
+        padding: 14px 14px 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .m {
+        position: absolute;
+        width: 7px;
+        height: 7px;
+        background-image:
+          linear-gradient(var(--mark-color), var(--mark-color)),
+          linear-gradient(var(--mark-color), var(--mark-color));
+        background-repeat: no-repeat;
+        background-position: center, center;
+        background-size:
+          100% 1px,
+          1px 100%;
+      }
+      .tl {
+        top: -3.5px;
+        left: -3.5px;
+      }
+      .tr {
+        top: -3.5px;
+        right: -3.5px;
+      }
+      .bl {
+        bottom: -3.5px;
+        left: -3.5px;
+      }
+      .br {
+        bottom: -3.5px;
+        right: -3.5px;
+      }
+      .ch {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        padding-bottom: 9px;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+      .ch strong {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+        letter-spacing: -0.006em;
+      }
+      .ch span {
+        font-size: 11.5px;
+        color: var(--text-muted);
+        line-height: 1.45;
+      }
+      .li {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        font-size: 12px;
+        line-height: 1.45;
+        overflow: hidden;
+      }
+      .li li {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+      }
+      .li b {
+        font-weight: 500;
+        color: var(--text-body);
+      }
+      .li i {
+        font-style: normal;
+        color: var(--text-muted);
+        font-size: 11px;
+      }
+      .src {
+        display: inline-block;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.02em;
+        color: var(--text-secondary);
+        background: var(--surface-sunken);
+        border: 1px solid var(--border-subtle);
+        padding: 1px 4px;
+        margin-right: 5px;
+        vertical-align: 1px;
+      }
+      .foot {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+      }
+      .note {
+        border: 1px solid var(--border-subtle);
+        background: var(--surface-sunken);
+        padding: 11px 13px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .note strong {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--text-primary);
+        line-height: 1.35;
+      }
+      .note p {
+        margin: 0;
+        font-size: 11px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+      }
+      code {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        background: var(--surface-inset);
+        padding: 1px 4px;
+        color: var(--text-body);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p">
+      <div class="grid"></div>
+      <div class="hd">
+        <h1>Kit adoption map</h1>
+        <p>
+          Three registries, one rule: they own
+          <b style="font-weight: 500; color: var(--text-body)">behaviour</b> — keyboard, focus,
+          ARIA, virtualisation, streaming. We own
+          <b style="font-weight: 500; color: var(--text-body)">meaning</b> — the trust words, the
+          citation unit, the register, the marks. Where the two meet, take theirs and skin it.
+        </p>
+      </div>
+      <div class="cols">
+        <div class="col">
+          <span class="m tl"></span><span class="m tr"></span><span class="m bl"></span
+          ><span class="m br"></span>
+          <div class="ch">
+            <strong>Take the behaviour, keep our skin</strong
+            ><span
+              >Radix does focus traps, roving tabindex and ARIA properly. Our hand-written versions
+              do not. Re-base ours as thin skins — this is how <code>[A11Y1]</code> gets met.</span
+            >
+          </div>
+          <ul class="li">
+            <li>
+              <b><span class="src">shadcn</span>Dialog</b><i>Focus trap, scrim, escape, restore</i>
+            </li>
+            <li>
+              <b><span class="src">shadcn</span>Select · Combobox</b
+              ><i>Typeahead, listbox semantics</i>
+            </li>
+            <li>
+              <b><span class="src">shadcn</span>Tooltip · Popover</b
+              ><i>Collision, delay group, dismiss</i>
+            </li>
+            <li>
+              <b><span class="src">shadcn</span>Tabs</b><i>Arrow-key roving, panel wiring</i>
+            </li>
+            <li>
+              <b><span class="src">shadcn</span>Checkbox · Radio · Switch</b
+              ><i>Indeterminate, label binding</i>
+            </li>
+            <li>
+              <b><span class="src">shadcn</span>Dropdown Menu</b
+              ><i>Row actions across Control Centre</i>
+            </li>
+            <li>
+              <b><span class="src">shadcn</span>Sonner</b><i>Replaces our Toast wholesale</i>
+            </li>
+          </ul>
+        </div>
+
+        <div class="col">
+          <span class="m tl"></span><span class="m tr"></span><span class="m bl"></span
+          ><span class="m br"></span>
+          <div class="ch">
+            <strong>Take outright — Kibo</strong
+            ><span
+              >Things we would spend weeks on and get worse. Install, set <code>--radius:0</code>,
+              done.</span
+            >
+          </div>
+          <ul class="li">
+            <li><b>Table</b><i>Sorting, resize, selection — Sources, Questions, People</i></li>
+            <li><b>Tree</b><i>The knowledge hierarchy; bundles and concepts</i></li>
+            <li><b>Dropzone</b><i>Source upload. Ours gets marks + DotPattern</i></li>
+            <li><b>Snippet · Code Block</b><i>IRIs, MCP client config, commit hashes</i></li>
+            <li>
+              <b>Kbd</b><i>Shortcut hints — the <code>[UX2]</code> keyboard budget</i>
+            </li>
+            <li><b>Spinner · Skeleton</b><i>Answers your loading-state question: yes</i></li>
+            <li><b>Editor</b><i>Only if Guides get an authoring surface</i></li>
+            <li><b>Contribution Graph</b><i>Candidate for usage over time</i></li>
+          </ul>
+        </div>
+
+        <div class="col">
+          <span class="m tl"></span><span class="m tr"></span><span class="m bl"></span
+          ><span class="m br"></span>
+          <div class="ch">
+            <strong>Take outright — AI Elements</strong
+            ><span
+              >The Ask surface, essentially complete. Streaming is genuinely hard to build well and
+              it is the product's one continuous motion.</span
+            >
+          </div>
+          <ul class="li">
+            <li><b>Conversation · Message</b><i>Stream-safe rendering, scroll anchoring</i></li>
+            <li><b>Prompt Input</b><i>The Ask box, with attachments</i></li>
+            <li><b>Sources · Inline Citation</b><i>Mechanics only — see note</i></li>
+            <li><b>Reasoning · Chain of Thought</b><i>“What it could not answer”</i></li>
+            <li><b>Task · Tool</b><i>Agent activity over MCP</i></li>
+            <li><b>Confirmation</b><i>The “one governed write” gate</i></li>
+            <li><b>Plan · Queue</b><i>Multi-step agent work</i></li>
+            <li><b>Suggestion</b><i>Follow-up questions</i></li>
+            <li><b>Shimmer</b><i>Pre-first-token only</i></li>
+          </ul>
+        </div>
+
+        <div class="col">
+          <span class="m tl"></span><span class="m tr"></span><span class="m bl"></span
+          ><span class="m br"></span>
+          <div class="ch">
+            <strong>Ours — never the kit version</strong
+            ><span
+              >Each encodes a rule from <code>CONTEXT.md</code> or an ADR. A kit equivalent exists
+              for most; taking it would quietly break the glossary.</span
+            >
+          </div>
+          <ul class="li">
+            <li>
+              <b>TrustTag</b
+              ><i
+                >Closed word set. Kibo <i style="opacity: 0.7">Status</i> and
+                <i style="opacity: 0.7">Pill</i> invent their own</i
+              >
+            </li>
+            <li><b>Citation</b><i>Concept · source · locator · passage (ADR 0015)</i></li>
+            <li><b>CoverageBar</b><i>Count first, bar second</i></li>
+            <li><b>Button · Frame · Card</b><i>Registration marks; the one solid object</i></li>
+            <li><b>SummaryList · Details</b><i>GOV.UK semantics, required</i></li>
+            <li><b>EmptyState</b><i>Two lines and an action. Never “Oops”</i></li>
+            <li><b>SideNav</b><i>Screens, not sections</i></li>
+            <li><b>Icon</b><i>The one place Phosphor lives</i></li>
+            <li><b>Grid · Dot · Noise</b><i>Already ported and tuned</i></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="foot">
+        <div class="note">
+          <strong>The app shell is shadcn Sidebar, not Kibo</strong>
+          <p>
+            Kibo has no shell. Build it from <code>sidebar</code>, <code>breadcrumb</code>,
+            <code>command</code> (⌘K), <code>separator</code> and <code>scroll-area</code>, then
+            dress it: 248px rail on <code>--surface-sunken</code>, 48px top bar, wordmark in Geist
+            Mono, marks on the page region only. Kibo <b>Blocks</b> — Hero, Pricing, Testimonial —
+            are for the marketing site, never the product.
+          </p>
+        </div>
+        <div class="note">
+          <strong>Icon collision: Lucide vs Phosphor</strong>
+          <p>
+            Every kit ships Lucide. Leave it for internal furniture a reader never reads as an icon
+            — chevrons, the ✕ on a dismiss. Swap to Phosphor via <code>Icon</code> for anything
+            carrying product meaning. One decision, taken once, or the two sets drift together on
+            screen.
+          </p>
+        </div>
+        <div class="note">
+          <strong>Sources is mechanics; Citation is meaning</strong>
+          <p>
+            AI Elements <code>Sources</code> and <code>Inline Citation</code> do the fiddly part —
+            anchoring a marker to a token mid-stream. Take that, discard the presentation. What
+            renders is our <code>Citation</code>: concept, source, locator, passage, on one
+            disclosure (ADR 0015).
+          </p>
+        </div>
+        <div class="note">
+          <strong>Two words that mean the opposite</strong>
+          <p>
+            shadcn <code>accent</code> is a hover tint, not a brand colour, and shadcn
+            <code>primary</code> is our near-black button, not ink blue.
+            <code>tokens/tailwind-bridge.css</code> maps both correctly. Ink blue is exposed as
+            <code>brand</code>, a name no kit overwrites.
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

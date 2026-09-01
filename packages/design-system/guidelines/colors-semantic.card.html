@@ -1,0 +1,99 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Semantic hues" subtitle="Green, amber, red, violet — used only behind a word that says the same thing" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Semantic</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 150px;
+        display: flex;
+      }
+      .p {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+      }
+      .mono {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .sw {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .chip {
+        height: 44px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(11, 12, 14, 0.06);
+      }
+      .ramp {
+        display: flex;
+        gap: 6px;
+      }
+      .k {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+      }
+      .v {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p">
+      <div class="ramp">
+        <div class="sw">
+          <div class="chip" style="background: #137a52"></div>
+          <span class="k">green-600</span><span class="v">#137a52</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #e8f6ef"></div>
+          <span class="k">green-50</span><span class="v">#e8f6ef</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #a55d09"></div>
+          <span class="k">amber-600</span><span class="v">#a55d09</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #fdf3e3"></div>
+          <span class="k">amber-50</span><span class="v">#fdf3e3</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #c0362c"></div>
+          <span class="k">red-600</span><span class="v">#c0362c</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #fdeceb"></div>
+          <span class="k">red-50</span><span class="v">#fdeceb</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #6741c4"></div>
+          <span class="k">violet-600</span><span class="v">#6741c4</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #f2eefc"></div>
+          <span class="k">violet-50</span><span class="v">#f2eefc</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

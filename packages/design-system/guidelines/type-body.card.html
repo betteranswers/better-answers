@@ -1,0 +1,94 @@
+<!-- @dsCard group="Type" viewport="700x200" name="Body and prose" subtitle="14px interface, 16px reading — 68ch measure on answers and guides" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Body</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 200px;
+        display: flex;
+      }
+      .p {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+      }
+      .mono {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .sw {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .chip {
+        height: 44px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(11, 12, 14, 0.06);
+      }
+      .ramp {
+        display: flex;
+        gap: 6px;
+      }
+      .k {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+      }
+      .v {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p" style="gap: 10px">
+      <p
+        style="
+          margin: 0;
+          font-size: 16px;
+          line-height: 1.65;
+          color: var(--text-body);
+          max-width: 60ch;
+        "
+      >
+        Northgate holds ISO 27001 certification for its managed service, audited annually by
+        BSI.<sup style="font-family: var(--font-mono); font-size: 10px; color: var(--text-link)"
+          >1</sup
+        >
+      </p>
+      <p
+        style="
+          margin: 0;
+          font-size: 14px;
+          line-height: 1.45;
+          color: var(--text-body);
+          max-width: 70ch;
+        "
+      >
+        14px is the interface size: table rows, field labels, side navigation, buttons. 13px and
+        12px carry metadata and hints; nothing reader-facing goes below 12px.
+      </p>
+      <p style="margin: 0; font-size: 12px; color: var(--text-muted)">
+        12px · Capability statement, p.4 · last modified 14 February 2026
+      </p>
+    </div>
+  </body>
+</html>

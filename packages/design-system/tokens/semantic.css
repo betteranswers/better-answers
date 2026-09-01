@@ -1,0 +1,137 @@
+/* Semantic aliases. Components reference only these, never the base ramp. */
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --surface-page: var(--grey-25);
+  --surface-card: var(--grey-0);
+  --surface-raised: var(--grey-0);
+  --surface-sunken: var(--grey-50);
+  --surface-inset: var(--grey-100);
+  --surface-hover: var(--grey-50);
+  --surface-active: var(--grey-100);
+  --surface-selected: var(--accent-50);
+  --surface-inverse: var(--grey-900);
+  --surface-scrim: rgba(11, 12, 14, 0.44);
+
+  /* Text */
+  --text-primary: var(--grey-900);
+  --text-body: var(--grey-800);
+  --text-secondary: var(--grey-600);
+  --text-muted: var(--grey-500);
+  --text-faint: var(--grey-400);
+  --text-inverse: var(--grey-0);
+  --text-link: var(--accent-600);
+  --text-link-hover: var(--accent-700);
+  --text-on-accent: #ffffff;
+
+  /* Lines */
+  --border-subtle: var(--grey-150);
+  --border-default: var(--grey-200);
+  --border-strong: var(--grey-300);
+  --border-inverse: rgba(255, 255, 255, 0.14);
+  --border-focus: var(--accent-600);
+
+  /* Controls */
+  --control-primary-bg: var(--grey-900);
+  --control-primary-bg-hover: var(--grey-800);
+  --control-primary-bg-active: var(--grey-950);
+  --control-primary-fg: var(--grey-0);
+  --control-secondary-bg: var(--grey-0);
+  --control-secondary-bg-hover: var(--grey-50);
+  --control-secondary-bg-active: var(--grey-100);
+  --control-accent-bg: var(--accent-600);
+  --control-accent-bg-hover: var(--accent-700);
+  --control-danger-fg: var(--red-600);
+  --control-disabled-bg: var(--grey-100);
+  --control-disabled-fg: var(--grey-400);
+  --focus-ring: 0 0 0 var(--focus-ring-width) var(--accent-200), 0 0 0 1px var(--accent-600);
+
+  /* Trust words — a tint behind a word that already says it ([UX1]) */
+  --trust-checked-bg: var(--green-50);
+  --trust-checked-fg: var(--green-700);
+  --trust-checked-border: var(--green-200);
+  --trust-unchecked-bg: var(--grey-100);
+  --trust-unchecked-fg: var(--grey-600);
+  --trust-unchecked-border: var(--grey-200);
+  --trust-stale-bg: var(--amber-50);
+  --trust-stale-fg: var(--amber-700);
+  --trust-stale-border: var(--amber-200);
+  --trust-restricted-bg: var(--red-50);
+  --trust-restricted-fg: var(--red-700);
+  --trust-restricted-border: var(--red-200);
+  --trust-draft-bg: var(--violet-50);
+  --trust-draft-fg: var(--violet-700);
+  --trust-draft-border: var(--violet-200);
+
+  /* Feedback */
+  --status-success-fg: var(--green-700);
+  --status-warning-fg: var(--amber-700);
+  --status-danger-fg: var(--red-700);
+  --status-info-fg: var(--accent-700);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-page: #0b0c0e;
+  --surface-card: #121417;
+  --surface-raised: #16181c;
+  --surface-sunken: #0e1012;
+  --surface-inset: #1b1e22;
+  --surface-hover: #1a1d21;
+  --surface-active: #212429;
+  --surface-selected: #16204a;
+  --surface-inverse: var(--grey-0);
+  --surface-scrim: rgba(0, 0, 0, 0.62);
+
+  --text-primary: #f4f5f6;
+  --text-body: #dfe1e4;
+  --text-secondary: #a3a8b0;
+  --text-muted: #82878f;
+  --text-faint: #61666e;
+  --text-inverse: var(--grey-950);
+  --text-link: var(--accent-300);
+  --text-link-hover: var(--accent-200);
+
+  --border-subtle: #212429;
+  --border-default: #2a2e34;
+  --border-strong: #3a3f47;
+  --border-inverse: rgba(0, 0, 0, 0.2);
+
+  --control-primary-bg: #f4f5f6;
+  --control-primary-bg-hover: #ffffff;
+  --control-primary-bg-active: #dfe1e4;
+  --control-primary-fg: #0b0c0e;
+  --control-secondary-bg: #16181c;
+  --control-secondary-bg-hover: #1c1f24;
+  --control-secondary-bg-active: #22262c;
+  --control-accent-bg: var(--accent-500);
+  --control-accent-bg-hover: var(--accent-400);
+  --control-danger-fg: #f08078;
+  --control-disabled-bg: #1b1e22;
+  --control-disabled-fg: #5b6068;
+  --focus-ring: 0 0 0 var(--focus-ring-width) rgba(63, 98, 234, 0.4), 0 0 0 1px var(--accent-400);
+
+  --trust-checked-bg: rgba(19, 122, 82, 0.16);
+  --trust-checked-fg: #5fc79b;
+  --trust-checked-border: rgba(19, 122, 82, 0.4);
+  --trust-unchecked-bg: #1b1e22;
+  --trust-unchecked-fg: #a3a8b0;
+  --trust-unchecked-border: #2a2e34;
+  --trust-stale-bg: rgba(165, 93, 9, 0.18);
+  --trust-stale-fg: #e0a860;
+  --trust-stale-border: rgba(165, 93, 9, 0.42);
+  --trust-restricted-bg: rgba(192, 54, 44, 0.16);
+  --trust-restricted-fg: #ef8b83;
+  --trust-restricted-border: rgba(192, 54, 44, 0.4);
+  --trust-draft-bg: rgba(103, 65, 196, 0.18);
+  --trust-draft-fg: #b49bf0;
+  --trust-draft-border: rgba(103, 65, 196, 0.42);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 1px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}

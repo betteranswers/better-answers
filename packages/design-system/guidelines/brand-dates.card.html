@@ -1,0 +1,89 @@
+<!-- @dsCard group="Brand" viewport="700x150" name="Dates, numbers and money" subtitle="UK long form everywhere a reader sees a date" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Dates</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 150px;
+        display: flex;
+      }
+      .p {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+      }
+      .mono {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .sw {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .chip {
+        height: 44px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(11, 12, 14, 0.06);
+      }
+      .ramp {
+        display: flex;
+        gap: 6px;
+      }
+      .k {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+      }
+      .v {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p" style="gap: 8px">
+      <div style="display: flex; gap: 30px">
+        <div>
+          <span class="k">Date</span>
+          <p style="margin: 2px 0 0; font-size: 15px; color: var(--text-body)">3 March 2026</p>
+        </div>
+        <div>
+          <span class="k">Date and time</span>
+          <p style="margin: 2px 0 0; font-size: 15px; color: var(--text-body)">
+            09:41 · 30 August 2026
+          </p>
+        </div>
+        <div>
+          <span class="k">Money</span>
+          <p style="margin: 2px 0 0; font-size: 15px; color: var(--text-body)">£1,240.00</p>
+        </div>
+        <div>
+          <span class="k">Relative</span>
+          <p style="margin: 2px 0 0; font-size: 15px; color: var(--text-body)">4 minutes ago</p>
+        </div>
+      </div>
+      <p style="margin: 0; font-size: var(--text-xs); color: var(--text-muted)">
+        Never 03/03/2026 — ambiguous to half the world. Relative time only under a minute old; a
+        stamp otherwise.
+      </p>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,33 @@
+/* Type scale. 14px is the app's body size (dense, Linear register);
+   16px is the reading size for prose surfaces (answers, guides, docs). */
+:root {
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 21px;
+  --text-3xl: 26px;
+  --text-4xl: 32px;
+  --text-5xl: 44px;
+  --text-6xl: 56px;
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-normal: 1.45;
+  --leading-relaxed: 1.6;
+  --leading-prose: 1.65;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* Optical tracking: tighten as size grows, open up the small caps-y bits. */
+  --tracking-display: -0.022em;
+  --tracking-heading: -0.014em;
+  --tracking-body: -0.006em;
+  --tracking-wide: 0.02em;
+  --tracking-caps: 0.06em;
+}

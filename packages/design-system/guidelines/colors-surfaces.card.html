@@ -1,0 +1,119 @@
+<!-- @dsCard group="Colors" viewport="700x170" name="Surfaces and text — light" subtitle="Semantic aliases components actually reference" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Surfaces</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 170px;
+        display: flex;
+      }
+      .p {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+      }
+      .mono {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .sw {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .chip {
+        height: 44px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(11, 12, 14, 0.06);
+      }
+      .ramp {
+        display: flex;
+        gap: 6px;
+      }
+      .k {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+      }
+      .v {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p" style="gap: 12px">
+      <div style="display: flex; gap: 8px">
+        <div class="sw">
+          <div
+            class="chip"
+            style="background: var(--surface-page); border: 1px solid var(--border-default)"
+          ></div>
+          <span class="k">page</span><span class="v">--surface-page</span>
+        </div>
+        <div class="sw">
+          <div
+            class="chip"
+            style="background: var(--surface-card); border: 1px solid var(--border-default)"
+          ></div>
+          <span class="k">card</span><span class="v">--surface-card</span>
+        </div>
+        <div class="sw">
+          <div
+            class="chip"
+            style="background: var(--surface-sunken); border: 1px solid var(--border-default)"
+          ></div>
+          <span class="k">sunken</span><span class="v">--surface-sunken</span>
+        </div>
+        <div class="sw">
+          <div
+            class="chip"
+            style="background: var(--surface-inset); border: 1px solid var(--border-default)"
+          ></div>
+          <span class="k">inset</span><span class="v">--surface-inset</span>
+        </div>
+        <div class="sw">
+          <div
+            class="chip"
+            style="background: var(--surface-hover); border: 1px solid var(--border-default)"
+          ></div>
+          <span class="k">hover</span><span class="v">--surface-hover</span>
+        </div>
+        <div class="sw">
+          <div
+            class="chip"
+            style="background: var(--surface-selected); border: 1px solid var(--border-default)"
+          ></div>
+          <span class="k">selected</span><span class="v">--surface-selected</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 20px; align-items: baseline">
+        <span style="color: var(--text-primary); font-size: var(--text-base); font-weight: 500"
+          >Primary</span
+        >
+        <span style="color: var(--text-body); font-size: var(--text-base)">Body</span>
+        <span style="color: var(--text-secondary); font-size: var(--text-base)">Secondary</span>
+        <span style="color: var(--text-muted); font-size: var(--text-base)">Muted</span>
+        <span style="color: var(--text-faint); font-size: var(--text-base)">Faint</span>
+        <span style="color: var(--text-link); font-size: var(--text-base)">Link</span>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,103 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Accent — ink blue" subtitle="Interactive only: links, focus rings, and the accent button at a gate" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Accent</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 150px;
+        display: flex;
+      }
+      .p {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+      }
+      .mono {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .sw {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .chip {
+        height: 44px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(11, 12, 14, 0.06);
+      }
+      .ramp {
+        display: flex;
+        gap: 6px;
+      }
+      .k {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+      }
+      .v {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p">
+      <div class="ramp">
+        <div class="sw">
+          <div class="chip" style="background: #eef2ff"></div>
+          <span class="k">accent-50</span><span class="v">#eef2ff</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #dde5ff"></div>
+          <span class="k">accent-100</span><span class="v">#dde5ff</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #bccbfe"></div>
+          <span class="k">accent-200</span><span class="v">#bccbfe</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #93aafc"></div>
+          <span class="k">accent-300</span><span class="v">#93aafc</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #6685f7"></div>
+          <span class="k">accent-400</span><span class="v">#6685f7</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #3f62ea"></div>
+          <span class="k">accent-500</span><span class="v">#3f62ea</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #2e4bd4"></div>
+          <span class="k">accent-600</span><span class="v">#2e4bd4</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #2639aa"></div>
+          <span class="k">accent-700</span><span class="v">#2639aa</span>
+        </div>
+        <div class="sw">
+          <div class="chip" style="background: #1d2a68"></div>
+          <span class="k">accent-900</span><span class="v">#1d2a68</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

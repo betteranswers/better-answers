@@ -1,0 +1,112 @@
+<!-- @dsCard group="Spacing" viewport="700x170" name="Layout constants" subtitle="248px rail, 48px top bar, 68ch prose measure" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Layout</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 170px;
+        display: flex;
+      }
+      .p {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+      }
+      .mono {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .sw {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .chip {
+        height: 44px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(11, 12, 14, 0.06);
+      }
+      .ramp {
+        display: flex;
+        gap: 6px;
+      }
+      .k {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+      }
+      .v {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p">
+      <div
+        style="
+          display: flex;
+          height: 110px;
+          border: 1px solid var(--border-default);
+          border-radius: var(--radius-md);
+          overflow: hidden;
+        "
+      >
+        <div
+          style="
+            width: 124px;
+            background: var(--surface-sunken);
+            border-right: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          "
+        >
+          <span class="v">248px rail</span>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column">
+          <div
+            style="
+              height: 34px;
+              border-bottom: 1px solid var(--border-subtle);
+              display: flex;
+              align-items: center;
+              padding: 0 12px;
+            "
+          >
+            <span class="v">48px top bar</span>
+          </div>
+          <div style="flex: 1; display: flex; align-items: center; padding: 0 12px; gap: 10px">
+            <div
+              style="
+                height: 8px;
+                flex: 1;
+                max-width: 300px;
+                background: var(--surface-inset);
+                border-radius: 4px;
+              "
+            ></div>
+            <span class="v">68ch measure</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

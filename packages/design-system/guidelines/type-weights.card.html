@@ -1,0 +1,84 @@
+<!-- @dsCard group="Type" viewport="700x150" name="Weights and tracking" subtitle="Only 400, 500 and 600 ship — tracking tightens as size grows" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Weights</title>
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-card);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+        height: 150px;
+        display: flex;
+      }
+      .p {
+        padding: 16px 18px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 10px;
+      }
+      .mono {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .sw {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .chip {
+        height: 44px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(11, 12, 14, 0.06);
+      }
+      .ramp {
+        display: flex;
+        gap: 6px;
+      }
+      .k {
+        font-size: var(--text-2xs);
+        color: var(--text-muted);
+      }
+      .v {
+        font-family: var(--font-mono);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
+      }
+      .row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="p" style="gap: 8px">
+      <div class="row">
+        <span style="font-size: 18px; font-weight: 400; color: var(--text-body)"
+          >Regular 400 — body and long prose</span
+        >
+      </div>
+      <div class="row">
+        <span style="font-size: 18px; font-weight: 500; color: var(--text-body)"
+          >Medium 500 — labels, buttons, selected nav</span
+        >
+      </div>
+      <div class="row">
+        <span style="font-size: 18px; font-weight: 600; color: var(--text-primary)"
+          >Semibold 600 — headings and card titles</span
+        >
+      </div>
+      <span class="v"
+        >--tracking-display −0.022em · --tracking-heading −0.014em · --tracking-body −0.006em ·
+        --tracking-caps 0.06em</span
+      >
+    </div>
+  </body>
+</html>

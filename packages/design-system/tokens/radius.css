@@ -1,0 +1,21 @@
+/* Corners: square. The blueprint register has no rounding — a card, a field, a
+   button and a dialog are all drawn objects on a modular grid, and a drawn object
+   has corners you can register a "+" against. The ramp is kept so consumers can
+   still name a scale, but every step resolves to 0.
+
+   --radius-full survives for the two things that are genuinely circular:
+   the loading spinner ring and a radio control. Nothing else may use it. */
+:root {
+  --radius-xs: 0px;
+  --radius-sm: 0px; /* tags, small inputs */
+  --radius-md: 0px; /* buttons, inputs */
+  --radius-lg: 0px; /* cards, panels */
+  --radius-xl: 0px; /* dialogs */
+  --radius-2xl: 0px;
+  --radius-full: 999px; /* spinner ring and radio only */
+
+  --border-width: 1px;
+  --border-width-thick: 1.5px;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+}

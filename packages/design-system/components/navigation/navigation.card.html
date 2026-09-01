@@ -1,0 +1,156 @@
+<!-- @dsCard group="Components" viewport="700x300" name="Navigation — side rail and tabs" subtitle="SideNav, Tabs" -->
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <title>Navigation components</title>
+    <link rel="stylesheet" href="../../styles.css" />
+    <script
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+      integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+      integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+      integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+      crossorigin="anonymous"
+    ></script>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css"
+    />
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css" />
+    <script src="../../_ds_bundle.js"></script>
+    <style>
+      body {
+        margin: 0;
+        background: var(--surface-page);
+        font-family: var(--font-sans);
+        color: var(--text-body);
+      }
+      .wrap {
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+      }
+      .lbl {
+        font-size: var(--text-2xs);
+        letter-spacing: var(--tracking-caps);
+        text-transform: uppercase;
+        color: var(--text-faint);
+        margin: 0 0 8px;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+      const { SideNav, Tabs, Badge, Icon } = window.BetterAnswersDesignSystem_22f3cc;
+      function Demo() {
+        const [screen, setScreen] = React.useState("suggestions");
+        const [tab, setTab] = React.useState("brief");
+        return (
+          <div style={{ display: "flex", height: "300px" }}>
+            <SideNav
+              value={screen}
+              onChange={setScreen}
+              width="216px"
+              header={
+                <span
+                  style={{
+                    fontSize: "var(--text-md)",
+                    fontWeight: "var(--weight-semibold)",
+                    fontFamily: "var(--font-mono)",
+                    letterSpacing: "-0.02em",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  better-answers
+                </span>
+              }
+              footer={
+                <span style={{ fontSize: "var(--text-2xs)", color: "var(--text-faint)" }}>
+                  Map as of 09:41
+                </span>
+              }
+              sections={[
+                {
+                  items: [
+                    { value: "ask", label: "Ask", icon: <Icon name="chat-text" /> },
+                    { value: "search", label: "Search", icon: <Icon name="magnifying-glass" /> },
+                    { value: "guides", label: "Guides", icon: <Icon name="book-open" /> },
+                  ],
+                },
+                {
+                  label: "Control Centre",
+                  items: [
+                    { value: "sources", label: "Sources", icon: <Icon name="database" /> },
+                    {
+                      value: "suggestions",
+                      label: "Suggestions",
+                      icon: <Icon name="tray" />,
+                      trailing: <Badge count={12} />,
+                    },
+                    { value: "knowledge", label: "Knowledge", icon: <Icon name="graph" /> },
+                    {
+                      value: "questions",
+                      label: "Questions",
+                      icon: <Icon name="question" />,
+                      trailing: <Badge count={3} tone="danger" />,
+                    },
+                    { value: "people", label: "People", icon: <Icon name="users" /> },
+                    { value: "system", label: "System", icon: <Icon name="pulse" /> },
+                  ],
+                },
+              ]}
+            />
+            <div style={{ flex: 1, padding: "16px 20px" }}>
+              <Tabs
+                value={tab}
+                onChange={setTab}
+                tabs={[
+                  { value: "brief", label: "Brief" },
+                  { value: "detail", label: "Detail" },
+                  { value: "coverage", label: "Coverage", count: 4 },
+                ]}
+              />
+              <Tabs
+                size="sm"
+                style={{ marginTop: "18px" }}
+                value={tab}
+                onChange={setTab}
+                tabs={[
+                  { value: "brief", label: "Waiting", count: 12 },
+                  { value: "detail", label: "Decided", count: 340 },
+                ]}
+              />
+            </div>
+          </div>
+        );
+      }
+      ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+    </script>
+  </body>
+</html>

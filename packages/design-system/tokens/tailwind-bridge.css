@@ -1,0 +1,241 @@
+/*
+ * Tailwind v4 / shadcn bridge
+ * ---------------------------------------------------------------------------
+ * shadcn, Kibo UI, AI Elements and Magic UI all read one fixed set of CSS
+ * variable names. This file points those names at Better Answers tokens, so a
+ * component installed from any of those registries comes out in our styling
+ * with no edits to the component file.
+ *
+ * It is NOT imported by styles.css — it only makes sense inside an app that
+ * has Tailwind v4. In apps/web/src/index.css, in this order:
+ *
+ *   @import "tailwindcss";
+ *   @import "@fontsource-variable/geist";
+ *   @import "@fontsource-variable/geist-mono";
+ *   @import "<design-system>/styles.css";           <- our tokens
+ *   @import "<design-system>/tokens/tailwind-bridge.css";
+ *
+ * Two things to know before reading the map below.
+ *
+ * 1. shadcn's word "accent" does not mean our accent. In shadcn, `accent` is
+ *    the faint tint a menu item takes on hover. Our ink blue is not that. So
+ *    ink blue maps to `ring` (focus) and to `brand`, and shadcn's `accent`
+ *    maps to our --surface-hover. Getting this backwards is the single most
+ *    common way a re-skin ends up looking wrong.
+ *
+ * 2. shadcn's `primary` is the solid default button. Ours is near-black, not
+ *    blue — the ink-blue button is a separate, rationed thing (see the
+ *    registration marks guidance). So `primary` maps to near-black, and the
+ *    accent button stays our own component.
+ */
+
+/* ---------------------------------------------------------------------------
+ * 1. The shadcn contract, filled with our tokens.
+ * Kept as raw values (not var() chains) where a kit may wrap them in
+ * colour-mix() or an opacity modifier, which needs a real colour.
+ * ------------------------------------------------------------------------ */
+:root {
+  --background: var(--surface-page);
+  --foreground: var(--text-primary);
+  --card: var(--surface-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--text-primary);
+
+  /* Solid default button — near-black, per our register */
+  --primary: var(--control-primary-bg);
+  --primary-foreground: var(--control-primary-fg);
+
+  /* Quiet button / chip surface */
+  --secondary: var(--surface-sunken);
+  --secondary-foreground: var(--text-body);
+
+  /* Muted = de-emphasised surface + its text */
+  --muted: var(--surface-sunken);
+  --muted-foreground: var(--text-secondary);
+
+  /* shadcn "accent" = hover tint, NOT our brand accent. See note 1. */
+  --accent: var(--surface-hover);
+  --accent-foreground: var(--text-primary);
+
+  --destructive: var(--red-600);
+  --destructive-foreground: #ffffff;
+
+  --border: var(--border-subtle);
+  --input: var(--border-default);
+  --ring: var(--accent-600);
+
+  /* Sidebar contract (shadcn sidebar block, Kibo layouts) */
+  --sidebar: var(--surface-sunken);
+  --sidebar-foreground: var(--text-body);
+  --sidebar-primary: var(--control-primary-bg);
+  --sidebar-primary-foreground: var(--control-primary-fg);
+  --sidebar-accent: var(--surface-hover);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border-subtle);
+  --sidebar-ring: var(--accent-600);
+
+  /* Charts. Our four semantic hues plus ink blue and one grey.
+     Ordered so the first two read clearly next to each other. */
+  --chart-1: var(--accent-600);
+  --chart-2: var(--green-600);
+  --chart-3: var(--amber-600);
+  --chart-4: var(--violet-600);
+  --chart-5: var(--grey-400);
+
+  /* Corners. Every kit derives its rounding from this one number. Setting it
+     to 0 squares shadcn, Kibo and AI Elements in a single line. */
+  --radius: 0px;
+
+  /* Our brand accent, exposed under a name no kit will overwrite.
+     Use as bg-brand / text-brand. */
+  --brand: var(--accent-600);
+  --brand-foreground: #ffffff;
+}
+
+/* ---------------------------------------------------------------------------
+ * 2. Dark theme.
+ * Our system switches on [data-theme="dark"]; shadcn and next-themes default
+ * to a .dark class. Both are honoured so either mechanism works, and the two
+ * can be mixed without a mismatch.
+ * Values come from our own dark aliases in tokens/semantic.css — this block
+ * only re-points the shadcn names that differ from their light mapping.
+ * ------------------------------------------------------------------------ */
+[data-theme="dark"],
+.dark {
+  --destructive: #e5645a;
+  --destructive-foreground: #0b0c0e;
+  --ring: var(--accent-400);
+  --sidebar-ring: var(--accent-400);
+  --brand: var(--accent-400);
+  --brand-foreground: #0b0c0e;
+  --chart-1: var(--accent-400);
+  --chart-2: #5fc79b;
+  --chart-3: #e0a860;
+  --chart-4: #b49bf0;
+  --chart-5: var(--grey-500);
+}
+
+/* ---------------------------------------------------------------------------
+ * 3. Reading mode — dyslexia-friendly.
+ * A separate axis from theme, so it combines with light or dark rather than
+ * replacing one. Set data-reading-mode="accessible" on <html> alongside
+ * whatever data-theme is already there.
+ * Font family is left for the reference repo's face to fill in; everything
+ * else — size, measure, leading, tracking — is set here.
+ * ------------------------------------------------------------------------ */
+[data-reading-mode="accessible"] {
+  --font-sans: var(--font-accessible, var(--font-sans-default));
+  --text-body-size: 16px;
+  --text-interface-size: 16px;
+  --prose-size: 18px;
+  --prose-leading: 1.8;
+  --prose-measure: 60ch;
+  --tracking-body: 0.01em;
+  --tracking-caps: 0.08em;
+}
+
+/* ---------------------------------------------------------------------------
+ * 4. Tell Tailwind about the names above, so utilities exist for them:
+ * bg-background, text-muted-foreground, border-border, bg-brand, rounded-md…
+ * `inline` means Tailwind resolves the var at use, which is what lets the
+ * theme flip at runtime.
+ * ------------------------------------------------------------------------ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Every step resolves to 0. The names survive so kit source still compiles. */
+  --radius-none: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  /* One curve, our durations — so kit transitions match ours. */
+  --ease-standard: cubic-bezier(0.2, 0, 0.13, 1);
+  --animate-duration-fast: 120ms;
+  --animate-duration-base: 160ms;
+  --animate-duration-slow: 240ms;
+}
+
+/* ---------------------------------------------------------------------------
+ * 5. Corrections the variables cannot reach.
+ * A handful of kit components hardcode a radius or a ring instead of reading
+ * the token. These three rules catch them. Keep this list SHORT — if it grows
+ * past a dozen rules, the component should be edited in place instead.
+ * ------------------------------------------------------------------------ */
+@layer base {
+  /* Any hardcoded rounded-* utility inside kit output. */
+  [class*="rounded-"]:not(.ba-allow-radius) {
+    border-radius: 0;
+  }
+
+  /* Circles we do keep: spinner ring, radio, avatar. */
+  .rounded-full.ba-allow-radius,
+  [role="radio"],
+  [data-slot="avatar"] {
+    border-radius: var(--radius-full);
+  }
+
+  /* Our focus treatment, not the kit's. */
+  :where(button, a, input, textarea, select, [tabindex]):focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 6. Reduced motion and reduced transparency, applied to kit output too.
+ * ------------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  [data-noise] {
+    display: none;
+  }
+}
