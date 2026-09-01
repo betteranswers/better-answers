@@ -29,9 +29,9 @@ importers:
 
   apps/api:
     dependencies:
-      '@better-answers/contracts':
+      '@better-answers/core':
         specifier: workspace:*
-        version: link:../../packages/contracts
+        version: link:../../packages/core
       '@better-answers/schema':
         specifier: workspace:*
         version: link:../../packages/schema
@@ -78,9 +78,6 @@ importers:
 
   apps/web:
     dependencies:
-      '@better-answers/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
       '@fontsource-variable/geist':
         specifier: 5.3.0
         version: 5.3.0
@@ -121,15 +118,6 @@ importers:
       vite:
         specifier: 8.2.2
         version: 8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(tsx@4.23.12)(yaml@2.9.0)
-      vitest:
-        specifier: 4.1.11
-        version: 4.1.11(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(tsx@4.23.12)(yaml@2.9.0))
-
-  packages/contracts:
-    devDependencies:
-      typescript:
-        specifier: 7.0.2
-        version: 7.0.2
       vitest:
         specifier: 4.1.11
         version: 4.1.11(@types/node@24.13.3)(jsdom@30.0.1)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(tsx@4.23.12)(yaml@2.9.0))

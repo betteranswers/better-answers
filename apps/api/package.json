@@ -14,7 +14,7 @@
     "check": "pnpm run lint && pnpm run typecheck && pnpm run test"
   },
   "dependencies": {
-    "@better-answers/contracts": "workspace:*",
+    "@better-answers/core": "workspace:*",
     "@better-answers/schema": "workspace:*",
     "@hono/node-server": "2.1.1",
     "drizzle-orm": "0.45.2",

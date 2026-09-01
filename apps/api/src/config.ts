@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { err, ok, type Result } from "@better-answers/contracts";
+import { err, ok, type Result } from "@better-answers/core/kernel";
 
 import { logger } from "./logger.ts";
 

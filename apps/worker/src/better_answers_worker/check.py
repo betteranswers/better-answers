@@ -14,13 +14,6 @@ STEPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("pytest", ("pytest",)),
 )
 
-# pytest exits 5 when it collects nothing. `apps/worker/tests/` is deliberately empty —
-# the bootstrap tests were removed as trivial and the first real one arrives with the
-# first connector — so an empty run is a pass, not a failure. Every other non-zero
-# exit still fails the gate. Delete this the day the directory has tests in it.
-NO_TESTS_COLLECTED = 5
-TOLERATED_EXIT_CODES: dict[str, int] = {"pytest": NO_TESTS_COLLECTED}
-
 
 def main() -> int:
     failed: list[str] = []
@@ -28,7 +21,7 @@ def main() -> int:
     for name, command in STEPS:
         print(f"\n== {name} ==", flush=True)
         returncode = subprocess.run(command, check=False).returncode
-        if returncode != 0 and returncode != TOLERATED_EXIT_CODES.get(name):
+        if returncode != 0:
             failed.append(name)
 
     if failed:

@@ -174,6 +174,8 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **connector run** — one execution of a binding by the scheduler (enumerate, index, extract, prune
   or reindex): claimed under a lease, keyed by its run key, checkpointed per batch, one per binding
   at a time, parked after repeated failure; its outcome rows record what changed per document.
+- **lease** — the scheduler's grip on a claimed run: renewed by heartbeat, expired by the reaper, so
+  a run whose worker died is handed back rather than lost. _Avoid_: lock (nothing waits on it).
 - **extraction plan** — the priced scope of extraction for one binding, accepted once by an Admin at
   review: the documents, the template per kind and the route, with hours and pounds from measured
   rates. Once accepted, every run extracts as it indexes; a run that would reprocess more than a set

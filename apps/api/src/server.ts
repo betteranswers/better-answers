@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Pool } from "pg";
 
-import { attempt } from "@better-answers/contracts";
+import { attempt } from "@better-answers/core/kernel";
 
 /**
  * Everything the HTTP surface needs, passed in rather than reached for, so a test
