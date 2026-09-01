@@ -33,7 +33,7 @@ export const signInPage = (query: string, notice?: string): string =>
     `<h1>Sign in</h1>
 <p>Enter your work email. We will send you a six-digit code.</p>
 ${notice === undefined ? "" : `<p class="error" role="alert">${escape(notice)}</p>`}
-<form method="post" action="/sign-in${query}">
+<form method="post" action="/sign-in${escape(query)}">
   <input type="hidden" name="step" value="email">
   <label for="email">Email</label><input id="email" name="email" type="email" required autocomplete="username">
   <button type="submit">Send code</button>
@@ -47,7 +47,7 @@ export const codePage = (query: string, email: string, notice?: string): string 
     `<h1>Enter your code</h1>
 <p>We sent a six-digit code to <strong>${escape(email)}</strong>. It is valid for five minutes.</p>
 ${notice === undefined ? "" : `<p class="error" role="alert">${escape(notice)}</p>`}
-<form method="post" action="/sign-in${query}">
+<form method="post" action="/sign-in${escape(query)}">
   <input type="hidden" name="step" value="code">
   <input type="hidden" name="email" value="${escape(email)}">
   <label for="code">Code</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" required>
@@ -65,7 +65,7 @@ export const chooseWorkspacePage = (
 <p>You belong to more than one. Claude will read only the one you pick.</p>
 ${workspaces
   .map(
-    (workspace) => `<form method="post" action="/choose-workspace${query}" class="inline">
+    (workspace) => `<form method="post" action="/choose-workspace${escape(query)}" class="inline">
   <input type="hidden" name="workspaceId" value="${escape(workspace.id)}">
   <button type="submit">${escape(workspace.name)}</button>
 </form> `,
@@ -90,10 +90,10 @@ export const consentPage = (
   ${params.scopes.includes("feedback:write") ? "<li>Send your feedback on answers</li>" : ""}
 </ul>
 <p>Every question you ask through ${escape(params.clientName)} is recorded as asked by you.</p>
-<form method="post" action="/consent${query}" class="inline">
+<form method="post" action="/consent${escape(query)}" class="inline">
   <input type="hidden" name="accept" value="true"><button type="submit">Connect</button>
 </form>
-<form method="post" action="/consent${query}" class="inline">
+<form method="post" action="/consent${escape(query)}" class="inline">
   <input type="hidden" name="accept" value="false"><button type="submit" class="secondary">Cancel</button>
 </form>`,
   );

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import type { Logger } from "pino";
 import { z } from "zod";
 
@@ -70,10 +70,41 @@ const flowHeaders = (request: Request, publicUrl: string): Headers => {
     const value = request.headers.get(name);
     if (value !== null) headers.set(name, value);
   }
-  // Better Auth's CSRF check compares Origin against baseURL; a server-side call has none of its own.
-  headers.set("origin", publicUrl);
+  // Better Auth's CSRF check compares Origin against baseURL: the browser's own Origin is
+  // carried through when it sent one; a same-origin navigation (a GET) sends none, and
+  // the in-process call then speaks as this origin.
+  headers.set("origin", request.headers.get("origin") ?? publicUrl);
   headers.set("accept", "application/json");
   return headers;
+};
+
+/**
+ * The three pages' forms are same-origin only. A cross-site form post — from a page an
+ * attacker controls, carrying the person's cookie — could otherwise accept consent for
+ * a client the attacker started the flow for (a signed query is not bound to the person
+ * who will answer it), pick a workspace, or sign the person into another account.
+ * Browsers send `Origin` on every cross-site POST and `Sec-Fetch-Site` on every fetch
+ * they make; a form posted from this origin carries this origin.
+ */
+const sameOriginOnly = (publicUrl: string): MiddlewareHandler => {
+  return async (context, next) => {
+    if (context.req.method !== "POST") {
+      await next();
+      return;
+    }
+    const origin = context.req.header("origin");
+    const site = context.req.header("sec-fetch-site");
+    const sameOrigin =
+      origin === publicUrl ||
+      (origin === undefined && (site === undefined || site === "same-origin" || site === "none"));
+    if (!sameOrigin) {
+      return context.html(
+        refusedPage("Refused", "This form can only be sent from Better Answers."),
+        403,
+      );
+    }
+    await next();
+  };
 };
 
 const emailKey = (email: string): string =>
@@ -137,9 +168,10 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   }
 
   // ------------------------------------------------------------------ pages
-  routes.use("/sign-in", limitByIp(door, PAGE_IP_RULE));
-  routes.use("/choose-workspace", limitByIp(door, PAGE_IP_RULE));
-  routes.use("/consent", limitByIp(door, PAGE_IP_RULE));
+  for (const page of ["/sign-in", "/choose-workspace", "/consent"]) {
+    routes.use(page, limitByIp(door, PAGE_IP_RULE));
+    routes.use(page, sameOriginOnly(publicUrl));
+  }
 
   routes.get("/sign-in", (context) => context.html(signInPage(carry(context.req.url))));
 

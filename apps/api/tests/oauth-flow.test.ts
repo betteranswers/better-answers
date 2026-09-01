@@ -203,6 +203,52 @@ describe("the flow, as claude.ai drives it", () => {
   });
 });
 
+describe("the pages refuse a cross-site form", () => {
+  it("refuses consent posted from another origin, even with the person's cookie, and mints no code", async () => {
+    const acme = await app.provision({ name: "Acme" });
+    const client = app.client();
+    const { challenge } = pkce();
+    const start = await client.fetch(authorizeUrl({ challenge, scope: "knowledge:read" }), {
+      redirect: "manual",
+    });
+    const signInQuery = new URL(start.headers.get("location") ?? "", PUBLIC_URL).search;
+    const signedIn = await signIn(app, client, acme.admin.email, signInQuery);
+    const resumeUrl = new URL(signedIn.headers.get("location") ?? "", PUBLIC_URL);
+    const resumed = await client.fetch(`${resumeUrl.pathname}${resumeUrl.search}`, {
+      redirect: "manual",
+    });
+    const consentUrl = new URL(resumed.headers.get("location") ?? "", PUBLIC_URL);
+    expect(consentUrl.pathname).toBe("/consent");
+
+    const crossSite = await client.fetch(`${consentUrl.pathname}${consentUrl.search}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        origin: "https://evil.example",
+        "sec-fetch-site": "cross-site",
+      },
+      body: new URLSearchParams({ accept: "true" }).toString(),
+    });
+
+    expect(crossSite.status).toBe(403);
+    expect(crossSite.headers.get("location")).toBeNull();
+  });
+
+  it("refuses a sign-in form posted from another origin", async () => {
+    const response = await app.client().fetch("/sign-in", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        origin: "https://evil.example",
+      },
+      body: new URLSearchParams({ step: "email", email: "victim@example.invalid" }).toString(),
+    });
+
+    expect(response.status).toBe(403);
+    expect(app.emails.some((message) => message.to === "victim@example.invalid")).toBe(false);
+  });
+});
+
 describe("the cookie session, through the same resolver", () => {
   it("answers /me with the workspace, the person and the role the member row holds", async () => {
     const acme = await app.provision({ name: "Acme" });

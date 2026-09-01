@@ -156,7 +156,9 @@ export const createAuth = (deps: AuthDependencies) => {
     basePath: "/",
     secret: deps.secret,
     database: drizzleAdapter(db, { provider: "pg", schema: identitySchema }),
-    trustedOrigins: [deps.publicUrl, "https://claude.ai"],
+    // This origin alone: a host never posts to these endpoints with a cookie, so it is
+    // not a trusted origin for Better Auth's CSRF check.
+    trustedOrigins: [deps.publicUrl],
     // The JWT plugin's `/token` and `set-auth-jwt` are for services without an OAuth
     // flow; under an OAuth provider both must be off (Better Auth, "OAuth Provider Mode").
     disabledPaths: ["/token"],
