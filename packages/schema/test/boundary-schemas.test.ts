@@ -192,9 +192,9 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
   }
 });
 
-describe("the customType exception, per variant", () => {
+describe("the customType exception, per shape", () => {
   // The plain schema replaces the generated field wholesale — the column's
-  // nullability and update's .optional() included — so each variant is constructed
+  // nullability and update's .optional() included — so each shape is constructed
   // on its own and each carries its own proof (ADR 0028, 2026-09-01 amendment).
   const tooShort = Array.from({ length: EMBEDDING_DIMENSIONS - 1 }, () => 0);
 

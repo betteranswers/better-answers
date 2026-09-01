@@ -152,7 +152,7 @@ Every dependency, image, extension or tool version is pinned from Context7 (`mcp
 
 ### [DEPS2] A pinned value is one exported constant
 
-Every value `[DEPS1]` reads — an image reference with its digest, a model's dimension, a version no package manifest holds — is one exported constant in the package that owns the decision, and every consumer imports it; a copy is a second pin that ages alone. `packages/schema/src/postgres-image.ts` holds the database image and `EMBEDDING_DIMENSIONS` the vector width; the Python tier reads the constant's source file and refuses more than one match. `T-003` (ADR 0032, PR 5) left `apps/api`'s test harness with its own image string and the vector width as a bare literal in three files.
+Every value `[DEPS1]` reads — an image reference with its digest, a model's dimension, a version no package manifest holds — is one exported constant in the package that owns the decision; every TypeScript consumer imports it, and a tier that cannot import reads the constant's source file and refuses more than one match (`apps/worker/tests/pg_harness.py` does this for `POSTGRES_IMAGE`); a copy is a second pin that ages alone. `packages/schema/src/postgres-image.ts` holds the database image and `packages/schema/src/index-tables.ts` exports `EMBEDDING_DIMENSIONS`, the vector width. `T-003` (ADR 0032, PR 5) left `apps/api`'s test harness with its own image string and the vector width as a bare literal in three files.
 
 ## OPS
 
