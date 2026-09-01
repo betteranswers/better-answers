@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
-import { chunk } from "./index-tables.ts";
+import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { llmRoute, workspace } from "./schema.ts";
 
 /**
@@ -39,9 +39,9 @@ export const llmRouteUpdate = createUpdateSchema(llmRoute, llmRouteRefinements);
 const chunkRefinements = {
   id: (schema: z.ZodString) => schema.trim().min(1),
   workspaceId: (schema: z.ZodString) => schema.regex(ULID).brand<"WorkspaceId">(),
-  // The customType exception: a plain schema, never a callback (ADR 0028). Length
-  // 1024 narrows to what the column's vector(1024) accepts.
-  embedding: z.array(z.number()).length(1024),
+  // The customType exception: a plain schema, never a callback (ADR 0028). The
+  // length narrows to what the column's vector(N) accepts.
+  embedding: z.array(z.number()).length(EMBEDDING_DIMENSIONS),
   embeddingRouteId: (schema: z.ZodString) => schema.trim().min(1),
   // The glossary's closed set (CONTEXT.md, *sensitivity*); the column stays text so
   // the set is the boundary's to narrow, exactly as ADR 0028 intends.

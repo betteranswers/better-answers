@@ -60,7 +60,7 @@ Stryker (`apps/api`, `apps/web`) and mutmut (`apps/worker`) run on a schedule �
 
 ### [TEST7] A pair is checked in both directions
 
-Where a manifest lists members (the migration journal and its directory), a generated artefact mirrors a source (the worker's schema view and the migrated tables), or a registry names them (the boundary-schema registry and the exported tables), the test asserts membership both ways: every entry has its member, and every member has its entry. One direction finds the missing; only the other finds the orphan. PR 5's journal check passed with an unlisted `.sql` file on disk, after the worker-view check in the same PR had already been written both ways.
+Where a list names members (the migration journal and its directory), a generated artefact mirrors a source (the worker's schema view and the migrated tables), or a registry names them (the boundary-schema registry and the exported tables), the test asserts membership both ways: every entry has its member, and every member has its entry. One direction finds the missing; only the other finds the orphan. `T-003` (ADR 0032, PR 5) wrote the journal check one way — an orphan `.sql` file would have passed — after the worker-view check in the same PR had been written both ways; the Cubic review flagged it.
 
 ## COMMENT
 
@@ -68,9 +68,9 @@ Where a manifest lists members (the migration journal and its directory), a gene
 
 A comment carries the reason a reader cannot infer from the code: a constraint, a trade-off, a gotcha. What the code does is said by the code; what happened to it is said by git and ADRs.
 
-### [COMMENT2] A stated invariant names its fence
+### [COMMENT2] A stated invariant names its check
 
-A comment or a test title that states an invariant — *FORCE on every tenant table*, *exactly one policy*, *created in the caller's transaction* — names the check that holds it: a test by title, a lint rule by name, a constraint by name. A claim with no named check is a memory, and PR 5 shipped those three as comments and titles before the review turned each into a catalogue assertion. A test title is a claim about its own body (`[TEST5]`): the body asserts every word the title says.
+A comment or a test title that states an invariant — *FORCE on every tenant table*, *created in the caller's transaction*, *`drizzle-zod` is imported nowhere else* — names the check that holds it: a test by title, a lint rule by name, a constraint by name. A claim with no named check is a memory. `T-003` (ADR 0032, PR 5) shipped those three as comments and a test title before review turned the first two into tests and the third into a lint rule.
 
 ## GLOSSARY
 
@@ -110,7 +110,7 @@ A `Principal` has **two kinds** and both are real (`CONTEXT.md`): a **deferred p
 
 ### [SEC3] A grant or a definer function ships with the test of what it refuses
 
-Every privilege a migration installs — a `GRANT`, a default privilege, a `SECURITY DEFINER` function — lands with a functional test of the path it must **refuse**, beside the test of the path it serves: the wrong role calling, a scope naming another tenant, the object reached by a road other than the policied one. A definer function meets four checks a reviewer reads off the SQL: its arguments are guarded against the transaction's scope before any DDL, its `search_path` is pinned, every object it names is schema-qualified, and `EXECUTE` is revoked from `PUBLIC` and granted to the one role that calls it. A partition child is a table of its own — parent policies do not reach a query aimed at the child, and default privileges do — so the child's denial is asserted directly (`packages/schema/test/rls.test.ts`, "denies a direct query against a partition, whatever the scope"), never inferred from the parent's. PR 5 shipped a direct-partition read that bypassed RLS; two document-driven reviews passed it and an attacking one found it.
+Every privilege a migration installs — a `GRANT`, a default privilege, a `SECURITY DEFINER` function — lands with a functional test of the path it must **refuse**, beside the test of the path it serves: the wrong role calling, a scope naming another tenant, a partition reached directly rather than through its parent. A definer function meets four checks a reviewer reads off the SQL: its arguments are guarded against the transaction's scope before any DDL, its `search_path` is pinned, every object it names is schema-qualified, and `EXECUTE` is revoked from `PUBLIC` and granted to the one role that calls it. A partition child is a table of its own — parent policies do not reach a query aimed at the child, and default privileges do — so the child's denial is asserted directly (`packages/schema/test/rls.test.ts`, "denies a direct query against a partition, whatever the scope"), never inferred from the parent's. A PR that touches `packages/schema/migrations` or any RLS policy gets an adversarial security pass before merge: the Standards and Spec axes review against documents; this one attacks the change. `T-003` (ADR 0032, PR 5) shipped a direct-partition read that bypassed RLS; two document-driven reviews passed it, and a review that read the code rather than the documents found it.
 
 ## OKF
 
@@ -152,7 +152,7 @@ Every dependency, image, extension or tool version is pinned from Context7 (`mcp
 
 ### [DEPS2] A pinned value is one exported constant
 
-Every value `[DEPS1]` reads — an image reference with its digest, a model's dimension, a version no package manifest holds — is one exported constant in the package that owns the decision, and every consumer imports it; a copy is a second pin that ages alone. `packages/schema/src/postgres-image.ts` is the database image's (`apps/api`'s test harness kept its own image string until PR 5 made it import the constant). The Python tier reads the constant's source file and refuses more than one match, which is how a pin crosses the tier without a copy.
+Every value `[DEPS1]` reads — an image reference with its digest, a model's dimension, a version no package manifest holds — is one exported constant in the package that owns the decision, and every consumer imports it; a copy is a second pin that ages alone. `packages/schema/src/postgres-image.ts` holds the database image and `EMBEDDING_DIMENSIONS` the vector width; the Python tier reads the constant's source file and refuses more than one match. `T-003` (ADR 0032, PR 5) left `apps/api`'s test harness with its own image string and the vector width as a bare literal in three files.
 
 ## OPS
 

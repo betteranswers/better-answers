@@ -33,7 +33,7 @@ The **live conclusion** of every ADR — the state after its amendments, not its
 | 0025 | A signal is a query over rows the platform already keeps; every model call writes one `llm_call` row |
 | 0026 | Kinds emerge from the concepts — no vocabulary file; a link is the relation |
 | 0027 | Open core under Apache-2.0; the hosted service is the product; copyleft is run-only |
-| 0028 | A boundary schema is generated from its table; a refinement only narrows; a parity test proves it; a `customType`'s plain schema is written and tested per variant (2026-09-01) |
+| 0028 | A boundary schema is generated from its table; a refinement only narrows; a parity test proves it; a `customType`'s plain schema is constructed and tested per variant (2026-09-01) |
 | 0029 | The tree is `apps/` over `packages/`; business logic is `packages/core` — capability slices over four store doors; import direction is a lint rule (its contracts-rename and six-item-risk consequences are enacted and corrected by 0031) |
 | 0030 | The MCP surface stays MCP SDK v2 in the TypeScript tier behind one fetch-shaped seam |
 | 0031 | The tier contract is six agreements in three forms (SQL function / fixtured / generated) in top-level `contracts/`, conformance-tested by both tiers' suites; the read predicate's logic is app-only — the cross-tier piece is the visibility columns the worker writes |

@@ -3,7 +3,7 @@ import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
 import type pg from "pg";
 import type { z } from "zod";
 
-import { boundarySchemas } from "../src/index.ts";
+import { boundarySchemas, EMBEDDING_DIMENSIONS } from "../src/index.ts";
 
 /**
  * The test-data factory (`[TEST4]`): tests state what their scenario needs and get
@@ -91,7 +91,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       provider: "mistral",
       model: "mistral-embed",
       // The dimensions CHECK: only the embedding purpose carries a count.
-      dimensions: purpose === "embedding" ? 1024 : null,
+      dimensions: purpose === "embedding" ? EMBEDDING_DIMENSIONS : null,
       ...overrides,
       purpose,
       workspaceId,
@@ -113,7 +113,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     return insertRow(client, "chunk", {
       id: `chunk-${ulid()}`,
       content: "test content",
-      embedding: Array.from({ length: 1024 }, () => 0),
+      embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0),
       embeddingRouteId: `route-${ulid()}`,
       sensitivity: "Internal",
       audience: "Everyone",
