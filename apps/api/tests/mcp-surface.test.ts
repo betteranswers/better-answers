@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import {
+  TOOLS_LIST_TTL_CONFIG_KEY,
+  TOOLS_LIST_TTL_MS_DEFAULT,
+} from "@better-answers/core/workspaces";
+
 import { connectAsHost } from "./flow.ts";
 import { startApp, type TestApp, type TestClient } from "./harness.ts";
 
@@ -218,10 +223,7 @@ describe("era-independent", () => {
 
   it("refuses a token whose person is no longer a member", async () => {
     const { workspace, client, token } = await connect();
-    await app.database.superuser.query(
-      "DELETE FROM member WHERE workspace_id = $1 AND user_id = $2",
-      [workspace.workspaceId, workspace.admin.id],
-    );
+    await app.removeMember(workspace.workspaceId, workspace.admin.id);
 
     const refused = await modern(client, token, "tools/list");
 
@@ -261,6 +263,8 @@ describe("the 2026-07-28 leg", () => {
 
     expect(discovered["supportedVersions"]).toContain(MODERN);
     expect((discovered["capabilities"] as Rpc)["tools"]).toBeDefined();
+    // Tools only (ADR 0008; ADR 0030's clarification): no concept is a resource in v0.1.
+    expect((discovered["capabilities"] as Rpc)["resources"]).toBeUndefined();
     expect(discovered["resultType"]).toBe("complete");
     expect(discovered["ttlMs"]).toBeDefined();
     expect(discovered["cacheScope"]).toBeDefined();
@@ -272,16 +276,13 @@ describe("the 2026-07-28 leg", () => {
     const listed = await result(await modern(client, token, "tools/list"));
 
     expect(listed["resultType"]).toBe("complete");
-    expect(listed["ttlMs"]).toBe(300_000);
+    expect(listed["ttlMs"]).toBe(TOOLS_LIST_TTL_MS_DEFAULT);
     expect(listed["cacheScope"]).toBe("private");
   });
 
   it("reads the TTL from the workspace's config row", async () => {
     const { workspace, client, token } = await connect();
-    await app.database.superuser.query(
-      "UPDATE workspace_config SET value = '42000' WHERE workspace_id = $1 AND key = 'mcp.tools_list_ttl_ms'",
-      [workspace.workspaceId],
-    );
+    await app.setWorkspaceConfig(workspace.workspaceId, TOOLS_LIST_TTL_CONFIG_KEY, "42000");
 
     const listed = await result(await modern(client, token, "tools/list"));
 

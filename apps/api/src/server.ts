@@ -5,8 +5,10 @@ import type { Logger } from "pino";
 import { attempt } from "@better-answers/core/kernel";
 import { openPostgres } from "@better-answers/core/store/postgres";
 
-import { fetchClientMetadataResource as liftedFetch } from "../lifts/better-auth-cimd-node/index.ts";
+import { createClientMetadataFetcher } from "../lifts/better-auth-cimd-node/index.ts";
 import {
+  CIMD_FETCH_TIMEOUT_MS,
+  CIMD_RESPONSE_CAP_BYTES,
   createAuth,
   createAuthRoutes,
   createTokenVerifier,
@@ -73,7 +75,12 @@ export function createServer(dependencies: ServerDependencies): Hono {
     mcpUrl,
     secret: dependencies.authSecret,
     sendEmail: dependencies.sendEmail,
-    fetchClientMetadataResource: dependencies.fetchClientMetadataResource ?? liftedFetch,
+    fetchClientMetadataResource:
+      dependencies.fetchClientMetadataResource ??
+      createClientMetadataFetcher({
+        timeoutMs: CIMD_FETCH_TIMEOUT_MS,
+        maxBodyBytes: CIMD_RESPONSE_CAP_BYTES,
+      }),
     logger,
   });
 

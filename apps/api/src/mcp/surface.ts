@@ -45,7 +45,9 @@ import { ENTRIES } from "./entries/index.ts";
  * refused resolve is a 401 the host answers by re-authorising, a passed ceiling a 429;
  * then `createMcpHandler` serves both protocol eras from one tool factory
  * (`legacy: "stateless"`, the SDK's default and load-bearing: claude.ai's
- * unauthenticated pre-flight speaks 2025-11-25 only). Every `tools/call` then runs
+ * unauthenticated pre-flight speaks 2025-11-25 only). The move to `legacy: "reject"`
+ * is conditioned on `server/discover` having been observed from every host on the
+ * conformance list (research 80 F1) — never on a date. Every `tools/call` then runs
  * under its own `withPrincipal`, so the role is read in the same transaction as the
  * read the entry does.
  */
@@ -158,8 +160,8 @@ export const createMcpSurface = (
     }
 
     const gate = await withPrincipal(deps.door, bearer.claims, async (principal, tx) => ({
-      ceiling: await consumeCall(tx, principal, bearer.tokenId, MCP_TOKEN_RULE),
-      ttl: await readWorkspaceConfig(tx, TOOLS_LIST_TTL_CONFIG_KEY),
+      ceiling: await consumeCall(principal, tx, bearer.tokenId, MCP_TOKEN_RULE),
+      ttl: await readWorkspaceConfig(principal, tx, TOOLS_LIST_TTL_CONFIG_KEY),
     }));
     if (!gate.ok) {
       log.info(

@@ -124,8 +124,8 @@ export const testData = (client: pg.PoolClient): TestData => {
   const workspaceConfig: TestData["workspaceConfig"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     return insertRow(client, "workspaceConfig", {
-      key: "mcp.tools_list_ttl_ms",
-      value: "300000",
+      key: "probe",
+      value: "probe",
       ...overrides,
       workspaceId,
     });

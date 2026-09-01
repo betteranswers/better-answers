@@ -8,6 +8,7 @@ import {
   CLAUDE_CLIENT_ID,
   CLAUDE_REDIRECT_URI,
   MCP_URL,
+  PUBLIC_URL,
   type TestApp,
   type TestClient,
 } from "./harness.ts";
@@ -77,6 +78,24 @@ export const signIn = async (
   expect(asked.status).toBe(200);
   const code = app.codeSentTo(email);
   return client.form(`/sign-in${query}`, { step: "code", email, code });
+};
+
+/**
+ * Start the flow and sign the person in; answers where the resumed authorize sent
+ * them next — the picker, or consent — as a URL on the public origin.
+ */
+export const driveToPage = async (
+  app: TestApp,
+  client: TestClient,
+  person: { readonly email: string },
+  scope = "knowledge:read",
+): Promise<URL> => {
+  const { challenge } = pkce();
+  const start = await client.fetch(authorizeUrl({ challenge, scope }), { redirect: "manual" });
+  const signInQuery = new URL(location(start), PUBLIC_URL).search;
+  const signedIn = await signIn(app, client, person.email, signInQuery);
+  const resumed = await client.fetch(relative(location(signedIn)), { redirect: "manual" });
+  return new URL(location(resumed), PUBLIC_URL);
 };
 
 /**

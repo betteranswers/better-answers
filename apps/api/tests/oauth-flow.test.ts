@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { REFRESH_TOKEN_LIFETIME_SECONDS } from "../src/auth/index.ts";
-import { authorizeUrl, connectAsHost, pkce, refresh, signIn } from "./flow.ts";
+import { authorizeUrl, connectAsHost, driveToPage, pkce, refresh } from "./flow.ts";
 import { CLAUDE_CLIENT_ID, MCP_URL, PUBLIC_URL, startApp, type TestApp } from "./harness.ts";
 
 /**
@@ -125,23 +125,12 @@ describe("the flow, as claude.ai drives it", () => {
     const mine = await app.provision({ name: "Mine" });
     const other = await app.provision({ name: "Other" });
     await app.addMember(other.workspaceId, mine.admin.id, "Editor");
-    const client = app.client();
     const stranger = await app.provision({ name: "Stranger" });
-    const { challenge } = pkce();
+    const client = app.client();
+    const picker = await driveToPage(app, client, mine.admin);
+    expect(picker.pathname).toBe("/choose-workspace");
 
-    const start = await client.fetch(authorizeUrl({ challenge, scope: "knowledge:read" }), {
-      redirect: "manual",
-    });
-    const signInQuery = new URL(start.headers.get("location") ?? "", PUBLIC_URL).search;
-    const signedIn = await signIn(app, client, mine.admin.email, signInQuery);
-    const resumed = await client.fetch(
-      new URL(signedIn.headers.get("location") ?? "", PUBLIC_URL).pathname +
-        new URL(signedIn.headers.get("location") ?? "", PUBLIC_URL).search,
-      { redirect: "manual" },
-    );
-    const pickerQuery = new URL(resumed.headers.get("location") ?? "", PUBLIC_URL).search;
-
-    const chosen = await client.form(`/choose-workspace${pickerQuery}`, {
+    const chosen = await client.form(`/choose-workspace${picker.search}`, {
       workspaceId: stranger.workspaceId,
     });
 
@@ -151,22 +140,12 @@ describe("the flow, as claude.ai drives it", () => {
   it("sends a person with no workspace nowhere: the picker refuses and no token is minted", async () => {
     const nobody = await app.person();
     const client = app.client();
-    const { challenge } = pkce();
 
-    const start = await client.fetch(authorizeUrl({ challenge, scope: "knowledge:read" }), {
-      redirect: "manual",
-    });
-    const signInQuery = new URL(start.headers.get("location") ?? "", PUBLIC_URL).search;
-    const signedIn = await signIn(app, client, nobody.email, signInQuery);
-    const resumeUrl = new URL(signedIn.headers.get("location") ?? "", PUBLIC_URL);
-    const resumed = await client.fetch(`${resumeUrl.pathname}${resumeUrl.search}`, {
-      redirect: "manual",
-    });
-    const pickerUrl = new URL(resumed.headers.get("location") ?? "", PUBLIC_URL);
+    const picker = await driveToPage(app, client, nobody);
 
-    expect(pickerUrl.pathname).toBe("/choose-workspace");
-    const picker = await client.fetch(`${pickerUrl.pathname}${pickerUrl.search}`);
-    expect(picker.status).toBe(403);
+    expect(picker.pathname).toBe("/choose-workspace");
+    const page = await client.fetch(`${picker.pathname}${picker.search}`);
+    expect(page.status).toBe(403);
   });
 
   it("redirects an authorize request for a scope the surface does not offer back to the host with iss (§9 23)", async () => {
@@ -207,20 +186,10 @@ describe("the pages refuse a cross-site form", () => {
   it("refuses consent posted from another origin, even with the person's cookie, and mints no code", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
-    const { challenge } = pkce();
-    const start = await client.fetch(authorizeUrl({ challenge, scope: "knowledge:read" }), {
-      redirect: "manual",
-    });
-    const signInQuery = new URL(start.headers.get("location") ?? "", PUBLIC_URL).search;
-    const signedIn = await signIn(app, client, acme.admin.email, signInQuery);
-    const resumeUrl = new URL(signedIn.headers.get("location") ?? "", PUBLIC_URL);
-    const resumed = await client.fetch(`${resumeUrl.pathname}${resumeUrl.search}`, {
-      redirect: "manual",
-    });
-    const consentUrl = new URL(resumed.headers.get("location") ?? "", PUBLIC_URL);
-    expect(consentUrl.pathname).toBe("/consent");
+    const consent = await driveToPage(app, client, acme.admin);
+    expect(consent.pathname).toBe("/consent");
 
-    const crossSite = await client.fetch(`${consentUrl.pathname}${consentUrl.search}`, {
+    const crossSite = await client.fetch(`${consent.pathname}${consent.search}`, {
       method: "POST",
       headers: {
         "content-type": "application/x-www-form-urlencoded",

@@ -186,8 +186,8 @@ describe("the Principal resolver", () => {
     }
     const door = openPostgres(db.runtimePool);
 
-    const resolved = await withPrincipal(door, claimsFor(seeded), (_principal, tx) =>
-      readWorkspaceConfig(tx, "probe"),
+    const resolved = await withPrincipal(door, claimsFor(seeded), (principal, tx) =>
+      readWorkspaceConfig(principal, tx, "probe"),
     );
 
     expect(resolved).toEqual({ ok: true, value: "mine" });
@@ -202,13 +202,13 @@ describe("the counters", () => {
     const at = new Date("2026-09-01T10:00:30Z");
 
     const outcomes = await withPrincipal(door, claimsFor(seeded), async (principal, tx) => [
-      await consumeCall(tx, principal, "jti-1", rule, at),
-      await consumeCall(tx, principal, "jti-1", rule, at),
-      await consumeCall(tx, principal, "jti-1", rule, at),
+      await consumeCall(principal, tx, "jti-1", rule, at),
+      await consumeCall(principal, tx, "jti-1", rule, at),
+      await consumeCall(principal, tx, "jti-1", rule, at),
       // Another token in the same window has its own count.
-      await consumeCall(tx, principal, "jti-2", rule, at),
+      await consumeCall(principal, tx, "jti-2", rule, at),
       // The next window starts fresh.
-      await consumeCall(tx, principal, "jti-1", rule, new Date("2026-09-01T10:01:00Z")),
+      await consumeCall(principal, tx, "jti-1", rule, new Date("2026-09-01T10:01:00Z")),
     ]);
 
     expect(outcomes.ok).toBe(true);

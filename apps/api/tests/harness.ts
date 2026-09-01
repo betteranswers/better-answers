@@ -67,6 +67,10 @@ export type TestApp = {
   ): Promise<void>;
   /** The superuser writes the revocation instant the People screen will one day write. */
   revokeCredentials(userId: string, at: Date): Promise<void>;
+  /** End a membership, as the People screen will one day. */
+  removeMember(workspaceId: string, userId: string): Promise<void>;
+  /** Set a workspace's config row, as the System screen will one day. */
+  setWorkspaceConfig(workspaceId: string, key: string, value: string): Promise<void>;
   client(ip?: string): TestClient;
   stop(): Promise<void>;
 };
@@ -183,6 +187,20 @@ export const startApp = async (): Promise<TestApp> => {
     ]);
   };
 
+  const removeMember: TestApp["removeMember"] = async (workspaceId, userId) => {
+    await database.superuser.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+      workspaceId,
+      userId,
+    ]);
+  };
+
+  const setWorkspaceConfig: TestApp["setWorkspaceConfig"] = async (workspaceId, key, value) => {
+    await database.superuser.query(
+      "UPDATE workspace_config SET value = $3 WHERE workspace_id = $1 AND key = $2",
+      [workspaceId, key, value],
+    );
+  };
+
   const codeSentTo: TestApp["codeSentTo"] = (email) => {
     const message = emails.findLast((candidate) => candidate.to === email);
     const code = message?.text.match(/\b(\d{6})\b/)?.[1];
@@ -234,6 +252,8 @@ export const startApp = async (): Promise<TestApp> => {
     person,
     addMember,
     revokeCredentials,
+    removeMember,
+    setWorkspaceConfig,
     client,
     stop: () => database.stop(),
   };

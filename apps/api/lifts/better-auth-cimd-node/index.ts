@@ -219,6 +219,3 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
 
   return fetchClientMetadataResource;
 };
-
-/** The production transport: Node's resolver and `https.request`, the ticket's limits. */
-export const fetchClientMetadataResource = createClientMetadataFetcher();

@@ -94,7 +94,7 @@ type MembershipRow = { readonly role: string; readonly revoked_at: Date | null }
  * Refusals: no member row for the pair; a credential issued before the person's
  * `credentials_revoked_at`; a credential carrying a role the member row disagrees
  * with; a member row whose role is not one of the three; claims that fail the
- * boundary's shape.
+ * boundary's shape. Each is its own test in `packages/core/test/principal.test.ts`.
  */
 export const withPrincipal = async <T>(
   door: PostgresDoor,
@@ -205,8 +205,8 @@ export const consumeIngress = async (
  * workspace id, so RLS keeps one workspace's tokens from ever reading another's.
  */
 export const consumeCall = async (
-  tx: Tx,
   principal: UserPrincipal,
+  tx: Tx,
   tokenId: string,
   rule: CounterRule,
   now: Date = new Date(),
@@ -221,11 +221,18 @@ export const consumeCall = async (
   return outcome(counted.rows[0]?.count ?? 1, rule, start, now);
 };
 
-/** A workspace's config row by key, under the transaction's scope; `undefined` when unset. */
-export const readWorkspaceConfig = async (tx: Tx, key: string): Promise<string | undefined> => {
+/**
+ * A workspace's config row by key; `undefined` when unset. RLS already scopes the read;
+ * the predicate says so in the statement (`[SEC2]`: the Principal, first).
+ */
+export const readWorkspaceConfig = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  key: string,
+): Promise<string | undefined> => {
   const found = await tx.query<{ value: string }>(
-    "SELECT value FROM workspace_config WHERE key = $1",
-    [key],
+    "SELECT value FROM workspace_config WHERE workspace_id = $1 AND key = $2",
+    [principal.workspaceId, key],
   );
   return found.rows[0]?.value;
 };

@@ -64,7 +64,6 @@ export const BETTER_AUTH_RATE_LIMIT = {
   },
 } as const;
 
-/** The client identity a CIMD document is fetched for, at most, before the plugin refuses. */
+/** The CIMD transport's limits (T-004): a metadata document is a few kilobytes and one round trip. */
 export const CIMD_FETCH_TIMEOUT_MS = 10_000;
 export const CIMD_RESPONSE_CAP_BYTES = 64 * 1024;
-export const CIMD_REDIRECT_CAP = 0;
