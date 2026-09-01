@@ -58,11 +58,19 @@ A test title says what the system does for whom, not which function it calls.
 
 Stryker (`apps/api`, `apps/web`) and mutmut (`apps/worker`) run on a schedule — weekly on hosted runners (a nightly run is most of the free minutes), nightly once a self-hosted runner exists; a falling mutation score is a task.
 
+### [TEST7] A pair is checked in both directions
+
+Where a manifest lists members (the migration journal and its directory), a generated artefact mirrors a source (the worker's schema view and the migrated tables), or a registry names them (the boundary-schema registry and the exported tables), the test asserts membership both ways: every entry has its member, and every member has its entry. One direction finds the missing; only the other finds the orphan. PR 5's journal check passed with an unlisted `.sql` file on disk, after the worker-view check in the same PR had already been written both ways.
+
 ## COMMENT
 
 ### [COMMENT1] Comments explain why
 
 A comment carries the reason a reader cannot infer from the code: a constraint, a trade-off, a gotcha. What the code does is said by the code; what happened to it is said by git and ADRs.
+
+### [COMMENT2] A stated invariant names its fence
+
+A comment or a test title that states an invariant — *FORCE on every tenant table*, *exactly one policy*, *created in the caller's transaction* — names the check that holds it: a test by title, a lint rule by name, a constraint by name. A claim with no named check is a memory, and PR 5 shipped those three as comments and titles before the review turned each into a catalogue assertion. A test title is a claim about its own body (`[TEST5]`): the body asserts every word the title says.
 
 ## GLOSSARY
 
@@ -99,6 +107,10 @@ Credentials are read through `CredentialsProviderInterface`; never from env at t
 Every `packages/core` function that reads or writes tenant data takes a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter; transports build it, business logic checks the role, the role's action threshold and the **read predicate** (published · sensitivity · audience) beside the data access. The predicate is tested against **columns on the readable unit** — `concept_index`, `composition` and every `index.chunk` row carry `published_at`, `sensitivity` and `audience` whatever the unit's kind — never against three fields of a source binding, because a concept and a composition have no binding (ADR 0023).
 
 A `Principal` has **two kinds** and both are real (`CONTEXT.md`): a **deferred principal** carries a named person's authority into work that outlives their session — a background job, a scheduled run, a replay — and expires with the authority it borrowed; a **platform principal** is the platform acting as itself, with its own actor id and no person behind it. Work that outlives a session runs under one of the two, never under a live user session.
+
+### [SEC3] A grant or a definer function ships with the test of what it refuses
+
+Every privilege a migration installs — a `GRANT`, a default privilege, a `SECURITY DEFINER` function — lands with a functional test of the path it must **refuse**, beside the test of the path it serves: the wrong role calling, a scope naming another tenant, the object reached by a road other than the policied one. A definer function meets four checks a reviewer reads off the SQL: its arguments are guarded against the transaction's scope before any DDL, its `search_path` is pinned, every object it names is schema-qualified, and `EXECUTE` is revoked from `PUBLIC` and granted to the one role that calls it. A partition child is a table of its own — parent policies do not reach a query aimed at the child, and default privileges do — so the child's denial is asserted directly (`packages/schema/test/rls.test.ts`, "denies a direct query against a partition, whatever the scope"), never inferred from the parent's. PR 5 shipped a direct-partition read that bypassed RLS; two document-driven reviews passed it and an attacking one found it.
 
 ## OKF
 
@@ -137,6 +149,10 @@ The worker composes cocoindex's documented building blocks — per-component com
 ### [DEPS1] Versions come from the source, never from memory
 
 Every dependency, image, extension or tool version is pinned from Context7 (`mcp__context7__*`) or the vendor's own release page at the time of the change, and the PR names where it was read. A Renovate PR is a source when it names the release page it read. Reason: the stack lock carried Postgres 17 from memory while 18 was current.
+
+### [DEPS2] A pinned value is one exported constant
+
+Every value `[DEPS1]` reads — an image reference with its digest, a model's dimension, a version no package manifest holds — is one exported constant in the package that owns the decision, and every consumer imports it; a copy is a second pin that ages alone. `packages/schema/src/postgres-image.ts` is the database image's (`apps/api`'s test harness kept its own image string until PR 5 made it import the constant). The Python tier reads the constant's source file and refuses more than one match, which is how a pin crosses the tier without a copy.
 
 ## OPS
 

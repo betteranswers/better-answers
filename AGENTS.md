@@ -46,6 +46,7 @@ Commands, versions and scripts are read from each workspace's `package.json` or 
 3. Every behaviour change lands with a functional test through the module's interface in the same PR (`[TEST]`).
 4. A decision that is hard to reverse, surprising later, and a real trade-off gets an ADR in the same PR (`[ADR]`).
 5. Every version you introduce is read from Context7 or the vendor's release page in that PR (`[DEPS1]`); a remembered version is a wrong version.
+6. A PR that touches `packages/schema/migrations` or any RLS policy gets an adversarial security pass (`/security-review`) before merge, beside the standards and spec reviews: those two check the change against documents; only an attacker's reading finds the path the change opens (`[SEC3]`).
 
 ## Skills
 
