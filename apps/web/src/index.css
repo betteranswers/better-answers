@@ -5,9 +5,5 @@
 @import "@fontsource-variable/geist";
 
 :root {
-  font-family:
-    "Geist Variable",
-    ui-sans-serif,
-    system-ui,
-    sans-serif;
+  font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
 }
