@@ -52,3 +52,6 @@ tasks/AGENTS.md
 
 # Worktrees created by background agents (Claude Code `isolation: worktree`).
 .claude/worktrees/
+
+# A person's own Claude Code overrides (permissions, skill toggles); the project's hooks live in .claude/settings.json.
+.claude/settings.local.json
