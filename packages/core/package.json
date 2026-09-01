@@ -14,7 +14,8 @@
     "./answering": "./src/answering/index.ts",
     "./guides": "./src/guides/index.ts",
     "./erasure": "./src/erasure/index.ts",
-    "./runs": "./src/runs/index.ts"
+    "./runs": "./src/runs/index.ts",
+    "./workspaces": "./src/workspaces/index.ts"
   },
   "scripts": {
     "lint": "oxlint --config ../../.oxlintrc.json .",
@@ -23,10 +24,14 @@
     "check": "pnpm run lint && pnpm run typecheck && pnpm run test"
   },
   "devDependencies": {
-    "@better-answers/schema": "workspace:*",
     "@types/node": "24.13.3",
     "typescript": "7.0.2",
     "vitest": "4.1.11",
-    "zod": "4.5.4"
+    "zod": "4.5.4",
+    "@types/pg": "8.23.1"
+  },
+  "dependencies": {
+    "@better-answers/schema": "workspace:*",
+    "pg": "8.23.0"
   }
 }
