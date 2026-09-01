@@ -2,6 +2,7 @@ import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { declaredTableNames } from "../scripts/worker-view.ts";
+import { GLOBAL_TABLE_NAMES_BEYOND_IDENTITY, IDENTITY_SET } from "../src/index.ts";
 import { testData } from "./factory.ts";
 import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
 
@@ -11,6 +12,12 @@ import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./ha
  * and the one SECURITY DEFINER lifecycle function is the only runtime-DDL path.
  * Seeding runs through the factory as the container's superuser (which bypasses RLS by
  * design); every assertion runs as `app_rt`.
+ *
+ * The identity set (ADR 0009, 2026-09-01 amendment) is the named exemption: Better
+ * Auth's tables and the pre-authentication counter carry no workspace column and no
+ * policy, because they are read by key before any workspace is known. The exemption
+ * is checked in both directions (`[TEST7]`) so a table can neither slip out of RLS
+ * unnamed nor stay named after it gains a policy.
  */
 
 let db: MigratedPostgres;
@@ -26,11 +33,24 @@ afterAll(async () => {
 const WS_A = "01J6AAAAAAAAAAAAAAAAAAAAAA";
 const WS_B = "01J6BBBBBBBBBBBBBBBBBBBBBB";
 
+const EXEMPT = new Set<string>([...IDENTITY_SET, ...GLOBAL_TABLE_NAMES_BEYOND_IDENTITY]);
+const tenantTableNames = (): string[] =>
+  [...declaredTableNames()].filter((name) => !EXEMPT.has(name));
+
 const seedTwoWorkspaces = async (client: pg.PoolClient) => {
   const seed = testData(client);
   await seed.workspace({ id: WS_A, name: "A" });
   await seed.workspace({ id: WS_B, name: "B" });
   return seed;
+};
+
+const rlsFlags = async (qualified: string) => {
+  const [schema, table] = qualified.split(".");
+  const flags = await db.pool.query(
+    "SELECT c.relrowsecurity AS rls, c.relforcerowsecurity AS forced FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1 AND c.relname = $2",
+    [schema, table],
+  );
+  return flags.rows[0];
 };
 
 describe("the seam function", () => {
@@ -56,16 +76,11 @@ describe("the seam function", () => {
 
 describe("every tenant table", () => {
   it("carries RLS and FORCE ROW LEVEL SECURITY in the catalogue", async () => {
-    // Every table src/ declares is a tenant table today; a table created without the
-    // hand-written FORCE line (which withRLS() cannot emit through drizzle-kit)
-    // fails here rather than shipping RLS-without-FORCE silently.
-    for (const qualified of declaredTableNames()) {
-      const [schema, table] = qualified.split(".");
-      const flags = await db.pool.query(
-        "SELECT c.relrowsecurity AS rls, c.relforcerowsecurity AS forced FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1 AND c.relname = $2",
-        [schema, table],
-      );
-      expect({ table: qualified, ...flags.rows[0] }).toEqual({
+    // Every declared table outside the exemption list is a tenant table; a table
+    // created without the hand-written FORCE line (which withRLS() cannot emit
+    // through drizzle-kit) fails here rather than shipping RLS-without-FORCE silently.
+    for (const qualified of tenantTableNames()) {
+      expect({ table: qualified, ...(await rlsFlags(qualified)) }).toEqual({
         table: qualified,
         rls: true,
         forced: true,
@@ -76,7 +91,7 @@ describe("every tenant table", () => {
   it("carries exactly one policy — the workspace-isolation one", async () => {
     // withRLS()'s extraConfig could smuggle in a second, wider policy (policies are
     // OR-combined); one policy per tenant table is the invariant, asserted here.
-    for (const qualified of declaredTableNames()) {
+    for (const qualified of tenantTableNames()) {
       const [schema, table] = qualified.split(".");
       const policies = await db.pool.query(
         "SELECT policyname FROM pg_policies WHERE schemaname = $1 AND tablename = $2",
@@ -88,27 +103,99 @@ describe("every tenant table", () => {
       });
     }
   });
+
+  it("calls the one seam function in its policy, never a literal or a second function", async () => {
+    // ADR 0032: every tenant policy is written `(SELECT current_workspace_id())`.
+    for (const qualified of tenantTableNames()) {
+      const [schema, table] = qualified.split(".");
+      const policy = await db.pool.query(
+        "SELECT qual, with_check FROM pg_policies WHERE schemaname = $1 AND tablename = $2",
+        [schema, table],
+      );
+      expect({ table: qualified, qual: policy.rows[0]?.qual }).toEqual({
+        table: qualified,
+        qual: expect.stringContaining("current_workspace_id()"),
+      });
+      expect(policy.rows[0]?.with_check).toContain("current_workspace_id()");
+    }
+  });
+});
+
+describe("the identity set", () => {
+  it("names every declared table that carries no policy, and nothing else", async () => {
+    // Both directions: a declared table with no policy must be in the exemption list
+    // (or it is a tenant table that lost its guarantee); a name in the list must be a
+    // declared table with no policy (or the list is stale and hides a real check).
+    const unpolicied: string[] = [];
+    for (const qualified of declaredTableNames()) {
+      const flags = await rlsFlags(qualified);
+      if (flags?.rls === false) unpolicied.push(qualified);
+    }
+    expect(unpolicied.toSorted()).toEqual([...EXEMPT].toSorted());
+  });
+
+  it("carries no workspace column on Better Auth's tables", async () => {
+    // The argument for the exemption is that these rows are isolated by key, not by
+    // scope; a workspace_id column appearing on one would mean the argument no longer
+    // holds and the table belongs under RLS.
+    for (const qualified of IDENTITY_SET) {
+      if (qualified === "public.workspace") continue;
+      const [schema, table] = qualified.split(".");
+      const column = await db.pool.query(
+        "SELECT 1 FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 AND column_name = 'workspace_id'",
+        [schema, table],
+      );
+      expect({ table: qualified, hasWorkspaceColumn: column.rowCount === 1 }).toEqual({
+        table: qualified,
+        hasWorkspaceColumn: qualified === "public.member" || qualified === "public.invitation",
+      });
+    }
+  });
+
+  it("is readable by app_rt with no scope set — the picker reads it before any workspace exists", async () => {
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      await client.query("SET LOCAL ROLE app_rt");
+
+      const unscoped = await client.query("SELECT id FROM workspace ORDER BY id");
+      expect(unscoped.rows).toEqual([{ id: WS_A }, { id: WS_B }]);
+    });
+  });
+
+  it("keeps the two counters UNLOGGED — the limiter cannot become the load it sheds", async () => {
+    const persistence = await db.pool.query(
+      "SELECT relname, relpersistence FROM pg_class WHERE relname IN ('ingress_counter', 'mcp_call_counter') ORDER BY relname",
+    );
+    expect(persistence.rows).toEqual([
+      { relname: "ingress_counter", relpersistence: "u" },
+      { relname: "mcp_call_counter", relpersistence: "u" },
+    ]);
+  });
 });
 
 describe("a tenant table under app_rt", () => {
   it("returns zero rows on a missing scope, never another tenant's", async () => {
     await withRollback(db.pool, async (client) => {
-      await seedTwoWorkspaces(client);
+      const seed = await seedTwoWorkspaces(client);
+      await seed.workspaceConfig({ workspaceId: WS_A });
+      await seed.workspaceConfig({ workspaceId: WS_B });
       await client.query("SET LOCAL ROLE app_rt");
 
-      const unscoped = await client.query("SELECT id FROM workspace");
+      const unscoped = await client.query("SELECT workspace_id FROM workspace_config");
       expect(unscoped.rows).toEqual([]);
     });
   });
 
   it("returns exactly the scoped tenant's rows", async () => {
     await withRollback(db.pool, async (client) => {
-      await seedTwoWorkspaces(client);
+      const seed = await seedTwoWorkspaces(client);
+      await seed.workspaceConfig({ workspaceId: WS_A });
+      await seed.workspaceConfig({ workspaceId: WS_B });
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      const scoped = await client.query("SELECT id FROM workspace");
-      expect(scoped.rows).toEqual([{ id: WS_A }]);
+      const scoped = await client.query("SELECT workspace_id FROM workspace_config");
+      expect(scoped.rows).toEqual([{ workspace_id: WS_A }]);
     });
   });
 
@@ -134,6 +221,26 @@ describe("a tenant table under app_rt", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       await expect(seed.llmRoute({ workspaceId: WS_B })).rejects.toThrow(/row-level security/);
+    });
+  });
+
+  it("scopes the per-token counter to its tenant, so one workspace's tokens never read another's counts", async () => {
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      await client.query(
+        "INSERT INTO mcp_call_counter (workspace_id, token_id, window_start, count) VALUES ($1, 'jti-1', now(), 1)",
+        [WS_A],
+      );
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
+      const otherTenant = await client.query("SELECT token_id FROM mcp_call_counter");
+      expect(otherTenant.rows).toEqual([]);
+
+      await client.query("SELECT set_config('app.workspace_id', '', true)");
+      const missingScope = await client.query("SELECT token_id FROM mcp_call_counter");
+      expect(missingScope.rows).toEqual([]);
     });
   });
 });

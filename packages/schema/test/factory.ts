@@ -3,7 +3,7 @@ import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
 import type pg from "pg";
 import type { z } from "zod";
 
-import { boundarySchemas, EMBEDDING_DIMENSIONS } from "../src/index.ts";
+import { boundarySchemas, CREATOR_ROLE, EMBEDDING_DIMENSIONS } from "../src/index.ts";
 
 /**
  * The test-data factory (`[TEST4]`): tests state what their scenario needs and get
@@ -20,8 +20,16 @@ type InsertInput<TName extends keyof Registry> = z.input<Registry[TName]["insert
 type Row<TName extends keyof Registry> = z.infer<Registry[TName]["select"]>;
 
 export type TestData = {
-  /** A workspace; id and name default. */
+  /** A workspace; id, name and slug default. */
   workspace(overrides?: Partial<InsertInput<"workspace">>): Promise<Row<"workspace">>;
+  /** A person in the identity set; id, name and email default. */
+  user(overrides?: Partial<InsertInput<"user">>): Promise<Row<"user">>;
+  /** A membership; creates its own workspace and user unless named; role defaults to the creator role. */
+  member(overrides?: Partial<InsertInput<"member">>): Promise<Row<"member">>;
+  /** A config row; creates its own workspace unless one is named. */
+  workspaceConfig(
+    overrides?: Partial<InsertInput<"workspaceConfig">>,
+  ): Promise<Row<"workspaceConfig">>;
   /** An llm route; creates its own workspace unless one is named. */
   llmRoute(overrides?: Partial<InsertInput<"llmRoute">>): Promise<Row<"llmRoute">>;
   /** A chunk; creates workspace and partition as needed; embedding defaults to zeros. */
@@ -29,7 +37,7 @@ export type TestData = {
 };
 
 const ULID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-const ulid = (): string =>
+export const ulid = (): string =>
   Array.from(
     { length: 26 },
     () => ULID_ALPHABET[Math.floor(Math.random() * ULID_ALPHABET.length)],
@@ -80,8 +88,48 @@ const partitionExists = async (client: pg.PoolClient, workspaceId: string): Prom
 };
 
 export const testData = (client: pg.PoolClient): TestData => {
-  const workspace: TestData["workspace"] = (overrides = {}) =>
-    insertRow(client, "workspace", { id: ulid(), name: "Test workspace", ...overrides });
+  const workspace: TestData["workspace"] = (overrides = {}) => {
+    const id = overrides.id ?? ulid();
+    return insertRow(client, "workspace", {
+      id,
+      name: "Test workspace",
+      slug: `ws-${id.toLowerCase()}`,
+      ...overrides,
+    });
+  };
+
+  const user: TestData["user"] = (overrides = {}) => {
+    const id = overrides.id ?? `user-${ulid()}`;
+    return insertRow(client, "user", {
+      id,
+      name: "Test person",
+      email: `${id.toLowerCase()}@example.invalid`,
+      ...overrides,
+    });
+  };
+
+  const member: TestData["member"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const userId = overrides.userId ?? (await user()).id;
+    return insertRow(client, "member", {
+      id: `member-${ulid()}`,
+      role: CREATOR_ROLE,
+      createdAt: new Date(),
+      ...overrides,
+      workspaceId,
+      userId,
+    });
+  };
+
+  const workspaceConfig: TestData["workspaceConfig"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "workspaceConfig", {
+      key: "mcp.tools_list_ttl_ms",
+      value: "300000",
+      ...overrides,
+      workspaceId,
+    });
+  };
 
   const llmRoute: TestData["llmRoute"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
@@ -123,5 +171,5 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
-  return { workspace, llmRoute, chunk };
+  return { workspace, user, member, workspaceConfig, llmRoute, chunk };
 };

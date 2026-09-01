@@ -4,7 +4,7 @@ import { PgTable } from "drizzle-orm/pg-core";
 import type { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { boundarySchemas, chunk, EMBEDDING_DIMENSIONS, llmRoute, workspace } from "../src/index.ts";
+import { boundarySchemas, EMBEDDING_DIMENSIONS } from "../src/index.ts";
 import * as publicEntry from "../src/index.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "../src/drizzle-zod.ts";
 import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
@@ -17,10 +17,13 @@ import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./ha
  */
 
 const WS_ID = "01J6AAAAAAAAAAAAAAAAAAAAAA";
+const USER_ID = "user-1";
+const NOW = new Date("2026-09-01T00:00:00Z");
 
 /** Rows each refined insert schema accepts — assertion 4's input. */
 const acceptedRows = {
-  workspace: [{ id: WS_ID, name: "Workspace A" }],
+  workspace: [{ id: WS_ID, name: "Workspace A", slug: "workspace-a" }],
+  user: [{ id: USER_ID, name: "A person", email: "person@example.invalid" }],
   llmRoute: [
     {
       id: "route-embed",
@@ -31,6 +34,81 @@ const acceptedRows = {
       dimensions: EMBEDDING_DIMENSIONS,
     },
   ],
+  workspaceConfig: [{ workspaceId: WS_ID, key: "mcp.tools_list_ttl_ms", value: "300000" }],
+  member: [{ id: "member-1", workspaceId: WS_ID, userId: USER_ID, role: "Admin", createdAt: NOW }],
+  session: [
+    { id: "session-1", expiresAt: NOW, token: "session-token", updatedAt: NOW, userId: USER_ID },
+  ],
+  account: [
+    {
+      id: "account-1",
+      issuer: "issuer",
+      accountId: USER_ID,
+      providerId: "credential",
+      userId: USER_ID,
+      updatedAt: NOW,
+    },
+  ],
+  verification: [{ id: "verification-1", identifier: "sign-in-otp-x", value: "v", expiresAt: NOW }],
+  jwks: [{ id: "jwk-1", publicKey: "pk", privateKey: "sk", createdAt: NOW }],
+  invitation: [
+    {
+      id: "invitation-1",
+      workspaceId: WS_ID,
+      email: "invitee@example.invalid",
+      expiresAt: NOW,
+      inviterId: USER_ID,
+    },
+  ],
+  oauthClient: [
+    {
+      id: "client-1",
+      clientId: "https://claude.ai/oauth/mcp-oauth-client-metadata",
+      redirectUris: ["https://claude.ai/api/mcp/auth_callback"],
+    },
+  ],
+  oauthResource: [{ id: "resource-1", identifier: "https://mcp.example.test/mcp", name: "mcp" }],
+  oauthClientResource: [
+    {
+      id: "client-resource-1",
+      clientId: "https://claude.ai/oauth/mcp-oauth-client-metadata",
+      resourceId: "https://mcp.example.test/mcp",
+    },
+  ],
+  oauthRefreshToken: [
+    {
+      id: "refresh-1",
+      token: "refresh-token-hash",
+      clientId: "https://claude.ai/oauth/mcp-oauth-client-metadata",
+      userId: USER_ID,
+      expiresAt: NOW,
+      createdAt: NOW,
+      scopes: ["knowledge:read"],
+    },
+  ],
+  oauthAccessToken: [
+    {
+      id: "access-1",
+      token: "access-token-hash",
+      clientId: "https://claude.ai/oauth/mcp-oauth-client-metadata",
+      expiresAt: NOW,
+      createdAt: NOW,
+      scopes: ["knowledge:read"],
+    },
+  ],
+  oauthConsent: [
+    {
+      id: "consent-1",
+      clientId: "https://claude.ai/oauth/mcp-oauth-client-metadata",
+      scopes: ["knowledge:read"],
+      createdAt: NOW,
+      updatedAt: NOW,
+    },
+  ],
+  oauthClientAssertion: [{ id: "assertion-1", expiresAt: NOW }],
+  rateLimit: [{ id: "limit-1", key: "ip:203.0.113.1", count: 1, lastRequest: 1 }],
+  mcpCallCounter: [{ workspaceId: WS_ID, tokenId: "jti-1", windowStart: NOW, count: 1 }],
+  ingressCounter: [{ scope: "ip", key: "203.0.113.1", windowStart: NOW, count: 1 }],
   chunk: [
     {
       id: "chunk-1",
@@ -45,32 +123,35 @@ const acceptedRows = {
   ],
 } as const;
 
-const unrefined = {
-  workspace: {
-    select: createSelectSchema(workspace),
-    insert: createInsertSchema(workspace),
-    update: createUpdateSchema(workspace),
-  },
-  llmRoute: {
-    select: createSelectSchema(llmRoute),
-    insert: createInsertSchema(llmRoute),
-    update: createUpdateSchema(llmRoute),
-  },
-  chunk: {
-    select: createSelectSchema(chunk),
-    insert: createInsertSchema(chunk),
-    update: createUpdateSchema(chunk),
-  },
-} as const;
-
 const registryNames = Object.keys(boundarySchemas) as (keyof typeof boundarySchemas)[];
 const forms = ["select", "insert", "update"] as const;
+
+/** The unrefined generation of a registered table — what assertions 2 and 3 compare against. */
+const unrefinedFor = (
+  name: keyof typeof boundarySchemas,
+): Record<(typeof forms)[number], z.ZodObject> => {
+  const table: PgTable = boundarySchemas[name].table;
+  return {
+    select: createSelectSchema(table),
+    insert: createInsertSchema(table),
+    update: createUpdateSchema(table),
+  };
+};
+const unrefined = Object.fromEntries(
+  registryNames.map((name) => [name, unrefinedFor(name)]),
+) as Readonly<Record<keyof typeof boundarySchemas, Record<(typeof forms)[number], z.ZodObject>>>;
 
 describe("1 — every table has a boundary", () => {
   it("registers exactly the PgTables the public entry point exports", () => {
     const exportedTables = Object.values(publicEntry).filter((value) => is(value, PgTable));
     const registeredTables = registryNames.map((name) => boundarySchemas[name].table);
     expect(new Set(registeredTables)).toEqual(new Set(exportedTables));
+  });
+
+  it("has an accepted row for every registered table, and no row for an unregistered one", () => {
+    // Both directions (`[TEST7]`): assertion 4 walks the fixture; a table with no
+    // fixture would never be proved, and a fixture with no table is a stale claim.
+    expect(Object.keys(acceptedRows).toSorted()).toEqual(registryNames.toSorted());
   });
 });
 
@@ -133,11 +214,33 @@ describe("4 — a refinement only narrows, proved against the column", () => {
     await withRollback(db.pool, async (client) => {
       const database = drizzle(client);
       let accepted = 0;
-      // Explicit insert order, never the registry's key order: workspace is every
-      // other row's FK target, and index.chunk is list-partitioned so its workspace
+      // Explicit insert order, never the registry's key order: every FK target comes
+      // before its referrer, and index.chunk is list-partitioned so its workspace
       // partition exists first (ADR 0028 assertion 4's note) — created through the
       // one lifecycle function, which requires the transaction scoped to it.
-      const insertOrder = ["workspace", "llmRoute", "chunk"] as const;
+      const insertOrder = [
+        "workspace",
+        "user",
+        "llmRoute",
+        "workspaceConfig",
+        "member",
+        "session",
+        "account",
+        "verification",
+        "jwks",
+        "invitation",
+        "oauthClient",
+        "oauthResource",
+        "oauthClientResource",
+        "oauthRefreshToken",
+        "oauthAccessToken",
+        "oauthConsent",
+        "oauthClientAssertion",
+        "rateLimit",
+        "mcpCallCounter",
+        "ingressCounter",
+        "chunk",
+      ] as const;
       expect(insertOrder.toSorted()).toEqual(registryNames.toSorted());
 
       for (const name of insertOrder) {
@@ -161,19 +264,14 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
   // client-side, before any INSERT exists to fail.
   const rejectedRows = {
     workspace: [
-      { id: "not-a-ulid", name: "Workspace A" },
-      { id: WS_ID, name: "   " },
+      { id: "not-a-ulid", name: "Workspace A", slug: "a" },
+      { id: WS_ID, name: "   ", slug: "a" },
     ],
-    llmRoute: [
-      {
-        id: "route-embed",
-        workspaceId: WS_ID,
-        purpose: "embedding",
-        provider: "mistral",
-        model: "mistral-embed",
-        dimensions: 0,
-      },
-    ],
+    llmRoute: [{ ...acceptedRows.llmRoute[0], dimensions: 0 }],
+    member: [{ ...acceptedRows.member[0], role: "owner" }],
+    workspaceConfig: [{ ...acceptedRows.workspaceConfig[0], key: "  " }],
+    ingressCounter: [{ ...acceptedRows.ingressCounter[0], scope: "user-agent" }],
+    mcpCallCounter: [{ ...acceptedRows.mcpCallCounter[0], count: -1 }],
     chunk: [
       {
         ...acceptedRows.chunk[0],
@@ -183,7 +281,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
     ],
   } as const;
 
-  for (const name of registryNames) {
+  for (const name of Object.keys(rejectedRows) as (keyof typeof rejectedRows)[]) {
     it(`${name} refuses every row that violates a refinement`, () => {
       for (const row of rejectedRows[name]) {
         expect(boundarySchemas[name].insert.safeParse(row).success).toBe(false);
@@ -227,11 +325,19 @@ describe("5 — the inferred type is pinned", () => {
     (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
   type WorkspaceId = string & z.core.$brand<"WorkspaceId">;
+  type UserId = string & z.core.$brand<"UserId">;
 
   type _workspaceSelect = Expect<
     Equal<
       z.infer<typeof boundarySchemas.workspace.select>,
-      { id: WorkspaceId; name: string; createdAt: Date }
+      {
+        id: WorkspaceId;
+        name: string;
+        slug: string;
+        logo: string | null;
+        createdAt: Date;
+        metadata: string | null;
+      }
     >
   >;
   type _llmRouteSelect = Expect<
@@ -245,6 +351,51 @@ describe("5 — the inferred type is pinned", () => {
         model: string;
         dimensions: number | null;
       }
+    >
+  >;
+  type _workspaceConfigSelect = Expect<
+    Equal<
+      z.infer<typeof boundarySchemas.workspaceConfig.select>,
+      { workspaceId: WorkspaceId; key: string; value: string; updatedAt: Date }
+    >
+  >;
+  type _memberSelect = Expect<
+    Equal<
+      z.infer<typeof boundarySchemas.member.select>,
+      {
+        id: string;
+        workspaceId: WorkspaceId;
+        userId: UserId;
+        role: "Admin" | "Editor" | "Viewer";
+        createdAt: Date;
+      }
+    >
+  >;
+  type _userSelect = Expect<
+    Equal<
+      z.infer<typeof boundarySchemas.user.select>,
+      {
+        id: UserId;
+        name: string;
+        email: string;
+        emailVerified: boolean;
+        image: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        credentialsRevokedAt: Date | null;
+      }
+    >
+  >;
+  type _mcpCallCounterSelect = Expect<
+    Equal<
+      z.infer<typeof boundarySchemas.mcpCallCounter.select>,
+      { workspaceId: WorkspaceId; tokenId: string; windowStart: Date; count: number }
+    >
+  >;
+  type _ingressCounterSelect = Expect<
+    Equal<
+      z.infer<typeof boundarySchemas.ingressCounter.select>,
+      { scope: "ip" | "email"; key: string; windowStart: Date; count: number }
     >
   >;
   type _chunkSelect = Expect<
