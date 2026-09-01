@@ -12,7 +12,7 @@ ADR 0029 named the app↔worker contract as the risk that outlives it: six cross
 | queue | SQL functions | claim, lease, heartbeat, reaper, attempt count, poison threshold (`[PIPE1]`); lease-expiry fixtures test the functions |
 | concept-inbox | SQL function | submitting a suggestion set is a function call; what acceptance promises is fixtured (ADRs 0005, 0012) |
 | credential-envelope | fixtured | golden sealed vectors both suites decrypt byte-identically (ADR 0005) |
-| visibility-columns | fixtured | the worker *writes* `published_at`, `sensitivity`, `audience`, `binding_id` on every chunk row and graph element; the predicate *logic* is app-only (below) |
+| visibility-columns | fixtured | the worker *writes* `published_at`, `sensitivity`, `audience` on every chunk row and graph element it lands, and `binding_id` on the source-derived ones (ADR 0023 — a canonical entity carries no binding); the predicate *logic* is app-only (below) |
 | llm-routing | SQL function | one route per workspace per purpose, resolved by the database, never twice in code |
 | cost-ledger | generated | the `llm_call` row type from the schema (ADR 0028); golden rows fixture its meaning (ADR 0025) |
 
@@ -20,7 +20,7 @@ ADR 0029 named the app↔worker contract as the risk that outlives it: six cross
 
 `T-020`'s goal text said the worker "must render \[the read predicate\] identically (`[SEC2]`)". Swept against every document (2026-09-01), that reading fails: **no described worker behaviour reads under the predicate.** `[SEC2]` scopes the predicate to `packages/core` functions; the glossary's own line — "every **consumer** reads through the same predicate" — is scoped to consumers, and the worker's runs are producers by the glossary's example list. The worker's reads are a whole-tree git checkout at a commit (ADR 0024), unfiltered platform-state rows under a workspace-scoped role, and the nightly parse cross-check — which compares hash-by-hash against *every* row and would report false mismatches under any filter. The predicate applied to that read is not merely unnecessary; it is wrong.
 
-What is genuinely cross-tier is the **column contract**: the worker writes the three visibility terms and `binding_id` onto everything it lands, "so the predicate has something to test everywhere it is applied" (ADR 0023). Absent or mis-carried columns make the app's predicate silently over- or under-filter — that is the failure the fixtures guard. The "one definition, N renderers, one corpus" problem stays entirely inside `packages/core/access/`, where ADR 0029 already placed it.
+What is genuinely cross-tier is the **column contract**: the worker writes the three visibility terms onto everything it lands — and `binding_id` on the source-derived rows and elements, which is where ADR 0023 puts it; a canonical entity carries no binding — "so the predicate has something to test everywhere it is applied" (ADR 0023). Absent or mis-carried columns make the app's predicate silently over- or under-filter — that is the failure the fixtures guard. The "one definition, N renderers, one corpus" problem stays entirely inside `packages/core/access/`, where ADR 0029 already placed it.
 
 ## SQL functions do not contradict stores-not-code
 

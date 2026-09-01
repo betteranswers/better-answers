@@ -24,7 +24,7 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 ├── docs/
 │   ├── okf-v02.md
 │   ├── vision.md
-│   └── adr/           ← 0001…0027
+│   └── adr/           ← the decision record, numbered from 0001
 ├── apps/
 │   ├── api/           ← + apps/api/CODING_RULES.md
 │   ├── web/

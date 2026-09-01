@@ -15,14 +15,14 @@ from typing import Any, cast
 
 SPOKEN_CONTRACT_VERSION = 0
 SPOKEN_AGREEMENTS = {
-    "concept-inbox",
-    "cost-ledger",
-    "credential-envelope",
-    "llm-routing",
-    "queue",
-    "visibility-columns",
+    "concept-inbox": "sql-function",
+    "cost-ledger": "generated",
+    "credential-envelope": "fixtured",
+    "llm-routing": "sql-function",
+    "queue": "sql-function",
+    "visibility-columns": "fixtured",
 }
-FORMS = {"sql-function", "fixtured", "generated"}
+NOT_FIXTURES = {"manifest.json", "README.md"}
 
 CONTRACTS_DIR = Path(__file__).resolve().parents[3] / "contracts"
 
@@ -36,12 +36,12 @@ def test_speaks_this_tiers_contract_version() -> None:
     assert read_manifest()["contract_version"] == SPOKEN_CONTRACT_VERSION
 
 
-def test_names_exactly_the_agreements_this_tier_speaks_each_in_a_known_form() -> None:
+def test_names_exactly_the_agreements_spoken_each_in_the_expected_form() -> None:
     manifest = read_manifest()
 
-    assert set(manifest["agreements"]) == SPOKEN_AGREEMENTS
-    forms = {agreement["form"] for agreement in manifest["agreements"].values()}
-    assert forms <= FORMS
+    assert set(manifest["agreements"]) == set(SPOKEN_AGREEMENTS)
+    for agreement_id, form in SPOKEN_AGREEMENTS.items():
+        assert manifest["agreements"][agreement_id]["form"] == form
 
 
 def test_lists_a_fixture_if_and_only_if_it_exists_under_an_agreement_it_names() -> None:
@@ -50,3 +50,11 @@ def test_lists_a_fixture_if_and_only_if_it_exists_under_an_agreement_it_names() 
     for fixture in manifest["fixtures"]:
         assert fixture["agreement"] in SPOKEN_AGREEMENTS
         assert (CONTRACTS_DIR / fixture["path"]).exists()
+
+    # The other direction: a file on disk the manifest does not list fails too.
+    on_disk = {
+        str(file.relative_to(CONTRACTS_DIR))
+        for file in CONTRACTS_DIR.rglob("*")
+        if file.is_file() and str(file.relative_to(CONTRACTS_DIR)) not in NOT_FIXTURES
+    }
+    assert on_disk == {fixture["path"] for fixture in manifest["fixtures"]}

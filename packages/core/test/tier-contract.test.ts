@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -14,15 +14,16 @@ import { describe, expect, it } from "vitest";
  */
 
 const SPOKEN_CONTRACT_VERSION = 0;
-const SPOKEN_AGREEMENTS = [
-  "concept-inbox",
-  "cost-ledger",
-  "credential-envelope",
-  "llm-routing",
-  "queue",
-  "visibility-columns",
-] as const;
-const FORMS = ["sql-function", "fixtured", "generated"] as const;
+const SPOKEN_AGREEMENTS = {
+  "concept-inbox": "sql-function",
+  "cost-ledger": "generated",
+  "credential-envelope": "fixtured",
+  "llm-routing": "sql-function",
+  queue: "sql-function",
+  "visibility-columns": "fixtured",
+} as const;
+/** Files the manifest does not have to list. */
+const NOT_FIXTURES = new Set(["manifest.json", "README.md"]);
 
 const contractsDir = path.resolve(import.meta.dirname, "../../../contracts");
 
@@ -40,12 +41,14 @@ describe("the tier contract", () => {
     expect(readManifest().contract_version).toBe(SPOKEN_CONTRACT_VERSION);
   });
 
-  it("names exactly the agreements this tier speaks, each in a known form", () => {
+  it("names exactly the agreements this tier speaks, each in the form this tier expects", () => {
     const manifest = readManifest();
 
-    expect(Object.keys(manifest.agreements).toSorted()).toEqual([...SPOKEN_AGREEMENTS]);
-    for (const agreement of Object.values(manifest.agreements)) {
-      expect(FORMS).toContain(agreement.form);
+    expect(Object.keys(manifest.agreements).toSorted()).toEqual(
+      Object.keys(SPOKEN_AGREEMENTS).toSorted(),
+    );
+    for (const [id, form] of Object.entries(SPOKEN_AGREEMENTS)) {
+      expect(manifest.agreements[id]?.form).toBe(form);
     }
   });
 
@@ -53,8 +56,15 @@ describe("the tier contract", () => {
     const manifest = readManifest();
 
     for (const fixture of manifest.fixtures) {
-      expect(SPOKEN_AGREEMENTS).toContain(fixture.agreement);
+      expect(Object.keys(SPOKEN_AGREEMENTS)).toContain(fixture.agreement);
       expect(existsSync(path.join(contractsDir, fixture.path))).toBe(true);
     }
+
+    // The other direction: a file on disk the manifest does not list fails too.
+    const onDisk = readdirSync(contractsDir, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => path.relative(contractsDir, path.join(entry.parentPath, entry.name)))
+      .filter((relative) => !NOT_FIXTURES.has(relative));
+    expect(onDisk.toSorted()).toEqual(manifest.fixtures.map((fixture) => fixture.path).toSorted());
   });
 });
