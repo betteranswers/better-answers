@@ -5,7 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./testing": "./test/harness.ts"
+    "./testing": "./test/testing.ts"
   },
   "scripts": {
     "generate": "drizzle-kit generate",

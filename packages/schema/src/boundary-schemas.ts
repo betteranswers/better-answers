@@ -43,6 +43,12 @@ const chunkRefinements = {
   // 1024 narrows to what the column's vector(1024) accepts.
   embedding: z.array(z.number()).length(1024),
   embeddingRouteId: (schema: z.ZodString) => schema.trim().min(1),
+  // The glossary's closed set (CONTEXT.md, *sensitivity*); the column stays text so
+  // the set is the boundary's to narrow, exactly as ADR 0028 intends.
+  sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(["Restricted", "Internal", "Public"])),
+  // *audience* is "everyone in the workspace, or named groups" — not a closed word
+  // set, so the boundary narrows to non-empty only.
+  audience: (schema: z.ZodString) => schema.trim().min(1),
   bindingId: (schema: z.ZodString) => schema.trim().min(1),
 };
 

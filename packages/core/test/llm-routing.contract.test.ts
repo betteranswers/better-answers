@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   type MigratedPostgres,
   startMigratedPostgres,
+  testData,
   withRollback,
 } from "@better-answers/schema/testing";
 
@@ -16,29 +18,36 @@ import {
  * runs the same cases in `apps/worker/tests/test_tier_contract.py`.
  */
 
-type Fixture = {
-  readonly workspaces: readonly { readonly id: string; readonly name: string }[];
-  readonly routes: readonly {
-    readonly id: string;
-    readonly workspace_id: string;
-    readonly purpose: string;
-    readonly provider: string;
-    readonly model: string;
-    readonly dimensions: number | null;
-  }[];
-  readonly calls: readonly {
-    readonly workspace_id: string;
-    readonly purpose: string;
-    readonly expect_route_id: string | null;
-  }[];
-};
-
-const fixture = JSON.parse(
-  readFileSync(
-    path.resolve(import.meta.dirname, "../../../contracts/llm-routing/cases.json"),
-    "utf8",
+const purpose = z.enum(["extraction", "enrichment", "answering", "judging", "embedding"]);
+const fixtureSchema = z.object({
+  workspaces: z.array(z.object({ id: z.string(), name: z.string() })),
+  routes: z.array(
+    z.object({
+      id: z.string(),
+      workspace_id: z.string(),
+      purpose,
+      provider: z.string(),
+      model: z.string(),
+      dimensions: z.number().int().positive().nullable(),
+    }),
   ),
-) as Fixture;
+  calls: z.array(
+    z.object({
+      workspace_id: z.string(),
+      purpose,
+      expect_route_id: z.string().nullable(),
+    }),
+  ),
+});
+
+const fixture = fixtureSchema.parse(
+  JSON.parse(
+    readFileSync(
+      path.resolve(import.meta.dirname, "../../../contracts/llm-routing/cases.json"),
+      "utf8",
+    ),
+  ),
+);
 
 let db: MigratedPostgres;
 
@@ -53,24 +62,19 @@ afterAll(async () => {
 describe("the llm-routing agreement", () => {
   it("resolves every fixtured call to exactly the route the fixture expects", async () => {
     await withRollback(db.pool, async (client) => {
+      const seed = testData(client);
       for (const workspace of fixture.workspaces) {
-        await client.query("INSERT INTO workspace (id, name) VALUES ($1, $2)", [
-          workspace.id,
-          workspace.name,
-        ]);
+        await seed.workspace(workspace);
       }
       for (const route of fixture.routes) {
-        await client.query(
-          "INSERT INTO llm_route (id, workspace_id, purpose, provider, model, dimensions) VALUES ($1, $2, $3, $4, $5, $6)",
-          [
-            route.id,
-            route.workspace_id,
-            route.purpose,
-            route.provider,
-            route.model,
-            route.dimensions,
-          ],
-        );
+        await seed.llmRoute({
+          id: route.id,
+          workspaceId: route.workspace_id,
+          purpose: route.purpose,
+          provider: route.provider,
+          model: route.model,
+          dimensions: route.dimensions,
+        });
       }
 
       await client.query("SET LOCAL ROLE app_rt");
@@ -90,32 +94,12 @@ describe("the llm-routing agreement", () => {
 
   it("refuses a second route for the same workspace and purpose", async () => {
     await withRollback(db.pool, async (client) => {
-      const [workspace] = fixture.workspaces;
-      const [route] = fixture.routes;
-      if (workspace === undefined || route === undefined) {
-        throw new Error("the fixture must seed at least one workspace and route");
-      }
-      await client.query("INSERT INTO workspace (id, name) VALUES ($1, $2)", [
-        workspace.id,
-        workspace.name,
-      ]);
-      await client.query(
-        "INSERT INTO llm_route (id, workspace_id, purpose, provider, model, dimensions) VALUES ($1, $2, $3, $4, $5, $6)",
-        [
-          route.id,
-          route.workspace_id,
-          route.purpose,
-          route.provider,
-          route.model,
-          route.dimensions,
-        ],
-      );
+      const seed = testData(client);
+      const workspace = await seed.workspace();
+      const route = await seed.llmRoute({ workspaceId: workspace.id });
 
       await expect(
-        client.query(
-          "INSERT INTO llm_route (id, workspace_id, purpose, provider, model) VALUES ('route-duplicate', $1, $2, 'other', 'other-model')",
-          [route.workspace_id, route.purpose],
-        ),
+        seed.llmRoute({ workspaceId: workspace.id, purpose: route.purpose }),
       ).rejects.toThrow(/duplicate key|unique/);
     });
   });

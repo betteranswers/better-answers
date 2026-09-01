@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { journalEntries, journalMigrationFiles } from "../src/journal.ts";
+
 /**
  * The one-journal rule's CI check (ADR 0032): Drizzle *generates* migrations for
  * `public` and *carries* hand-written ones for everything else, so a generated
@@ -11,28 +13,25 @@ import { describe, expect, it } from "vitest";
  */
 
 const CUSTOM_MARKER = "-- Custom migration (hand-written SQL; ADR 0032).";
-const FORBIDDEN_IN_GENERATED = [/"index"\./u, /\bgraph_node\b/u, /\bgraph_edge\b/u];
-
-const migrationsDir = path.resolve(import.meta.dirname, "../migrations");
-const journalPath = path.join(migrationsDir, "meta", "_journal.json");
-
-type Journal = { readonly entries: readonly { readonly tag: string }[] };
-const journal = JSON.parse(readFileSync(journalPath, "utf8")) as Journal;
+// Any mention of the quoted schema at all — `"index".chunk` and `CREATE SCHEMA
+// "index"` alike — and the graph tables by name.
+const FORBIDDEN_IN_GENERATED = [/"index"/u, /\bgraph_node\b/u, /\bgraph_edge\b/u];
 
 describe("the migration journal", () => {
   it("has a file for every entry", () => {
-    for (const entry of journal.entries) {
-      expect(() => readFileSync(path.join(migrationsDir, `${entry.tag}.sql`))).not.toThrow();
+    for (const file of journalMigrationFiles()) {
+      expect(() => readFileSync(file)).not.toThrow();
     }
   });
 
   it("never touches `index` or the graph tables from a generated migration", () => {
-    for (const entry of journal.entries) {
-      const sql = readFileSync(path.join(migrationsDir, `${entry.tag}.sql`), "utf8");
+    for (const [position, file] of journalMigrationFiles().entries()) {
+      const sql = readFileSync(file, "utf8");
       if (sql.startsWith(CUSTOM_MARKER)) continue;
+      const tag = journalEntries()[position]?.tag ?? path.basename(file);
       for (const forbidden of FORBIDDEN_IN_GENERATED) {
         expect
-          .soft(sql, `${entry.tag}.sql is generated and must not match ${String(forbidden)}`)
+          .soft(sql, `${tag}.sql is generated and must not match ${String(forbidden)}`)
           .not.toMatch(forbidden);
       }
     }

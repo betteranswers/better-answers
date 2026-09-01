@@ -1,7 +1,8 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { lastMigrationTag } from "../src/journal.ts";
 import { startMigratedPostgres } from "../test/harness.ts";
 import { assertNoUndeclaredTables, introspect, renderWorkerSchemaView } from "./worker-view.ts";
 
@@ -13,18 +14,12 @@ import { assertNoUndeclaredTables, introspect, renderWorkerSchemaView } from "./
  */
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const journalPath = path.resolve(here, "../migrations/meta/_journal.json");
 const viewPath = path.resolve(
   here,
   "../../../apps/worker/src/better_answers_worker/schema_view.py",
 );
 
-type Journal = { readonly entries: readonly { readonly tag: string }[] };
-// SAFETY: the journal is drizzle-kit's own artefact in this repository; a malformed
-// one fails on the very next line, which is the failure we want.
-const journal = JSON.parse(readFileSync(journalPath, "utf8")) as Journal;
-const migrationId = journal.entries.at(-1)?.tag;
-if (migrationId === undefined) throw new Error("the journal is empty");
+const migrationId = lastMigrationTag();
 
 const db = await startMigratedPostgres();
 try {

@@ -69,6 +69,7 @@ def test_lists_a_fixture_if_and_only_if_it_exists_under_an_agreement_it_names() 
 
 
 def test_llm_routing_resolves_every_fixtured_call() -> None:
+    from factories import seed_llm_route, seed_workspace
     from pg_harness import migrated_postgres
 
     fixture = json.loads(
@@ -77,22 +78,16 @@ def test_llm_routing_resolves_every_fixtured_call() -> None:
 
     with migrated_postgres() as connection, connection.cursor() as cursor:
         for workspace in fixture["workspaces"]:
-            cursor.execute(
-                "INSERT INTO workspace (id, name) VALUES (%s, %s)",
-                (workspace["id"], workspace["name"]),
-            )
+            seed_workspace(cursor, workspace_id=workspace["id"], name=workspace["name"])
         for route in fixture["routes"]:
-            cursor.execute(
-                "INSERT INTO llm_route (id, workspace_id, purpose, provider, model,"
-                " dimensions) VALUES (%s, %s, %s, %s, %s, %s)",
-                (
-                    route["id"],
-                    route["workspace_id"],
-                    route["purpose"],
-                    route["provider"],
-                    route["model"],
-                    route["dimensions"],
-                ),
+            seed_llm_route(
+                cursor,
+                route_id=route["id"],
+                workspace_id=route["workspace_id"],
+                purpose=route["purpose"],
+                provider=route["provider"],
+                model=route["model"],
+                dimensions=route["dimensions"],
             )
 
         cursor.execute("SET LOCAL ROLE app_rt")

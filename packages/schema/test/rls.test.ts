@@ -1,12 +1,16 @@
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { declaredTableNames } from "../scripts/worker-view.ts";
+import { testData } from "./factory.ts";
 import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
 
 /**
  * The isolation proofs ADR 0032 names: a missing scope (empty GUC) returns zero rows,
- * never another tenant's — once at the seam function, once through a tenant table —
+ * never another tenant's — once at the seam function, once through each tenant table —
  * and the one SECURITY DEFINER lifecycle function is the only runtime-DDL path.
+ * Seeding runs through the factory as the container's superuser (which bypasses RLS by
+ * design); every assertion runs as `app_rt`.
  */
 
 let db: MigratedPostgres;
@@ -23,9 +27,10 @@ const WS_A = "01J6AAAAAAAAAAAAAAAAAAAAAA";
 const WS_B = "01J6BBBBBBBBBBBBBBBBBBBBBB";
 
 const seedTwoWorkspaces = async (client: pg.PoolClient) => {
-  // Seeded as the container's superuser, which bypasses RLS — the assertions below
-  // run as app_rt, which cannot.
-  await client.query("INSERT INTO workspace (id, name) VALUES ($1, 'A'), ($2, 'B')", [WS_A, WS_B]);
+  const seed = testData(client);
+  await seed.workspace({ id: WS_A, name: "A" });
+  await seed.workspace({ id: WS_B, name: "B" });
+  return seed;
 };
 
 describe("the seam function", () => {
@@ -46,6 +51,26 @@ describe("the seam function", () => {
       const set = await client.query("SELECT current_workspace_id() AS ws");
       expect(set.rows[0]?.ws).toBe(WS_A);
     });
+  });
+});
+
+describe("every tenant table", () => {
+  it("carries RLS and FORCE ROW LEVEL SECURITY in the catalogue", async () => {
+    // Every table src/ declares is a tenant table today; a table created without the
+    // hand-written FORCE line (which withRLS() cannot emit through drizzle-kit)
+    // fails here rather than shipping RLS-without-FORCE silently.
+    for (const qualified of declaredTableNames()) {
+      const [schema, table] = qualified.split(".");
+      const flags = await db.pool.query(
+        "SELECT c.relrowsecurity AS rls, c.relforcerowsecurity AS forced FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1 AND c.relname = $2",
+        [schema, table],
+      );
+      expect({ table: qualified, ...flags.rows[0] }).toEqual({
+        table: qualified,
+        rls: true,
+        forced: true,
+      });
+    }
   });
 });
 
@@ -71,18 +96,28 @@ describe("a tenant table under app_rt", () => {
     });
   });
 
+  it("returns zero llm_route rows on a missing or empty scope", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.llmRoute({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      const unscoped = await client.query("SELECT id FROM llm_route");
+      expect(unscoped.rows).toEqual([]);
+
+      await client.query("SELECT set_config('app.workspace_id', '', true)");
+      const emptyScope = await client.query("SELECT id FROM llm_route");
+      expect(emptyScope.rows).toEqual([]);
+    });
+  });
+
   it("refuses a write into another tenant's scope", async () => {
     await withRollback(db.pool, async (client) => {
-      await seedTwoWorkspaces(client);
+      const seed = await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      await expect(
-        client.query(
-          "INSERT INTO llm_route (id, workspace_id, purpose, provider, model) VALUES ('r1', $1, 'answering', 'anthropic', 'claude-sonnet-5')",
-          [WS_B],
-        ),
-      ).rejects.toThrow(/row-level security/);
+      await expect(seed.llmRoute({ workspaceId: WS_B })).rejects.toThrow(/row-level security/);
     });
   });
 });
@@ -119,18 +154,13 @@ describe("the workspace-lifecycle function", () => {
 
   it("scopes chunk rows to their tenant through the parent table", async () => {
     await withRollback(db.pool, async (client) => {
-      await seedTwoWorkspaces(client);
+      const seed = await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT create_workspace_partition($1)", [WS_A]);
       await client.query("SELECT create_workspace_partition($1)", [WS_B]);
 
-      const embedding = JSON.stringify(Array.from({ length: 1024 }, () => 0));
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      await client.query(
-        `INSERT INTO "index".chunk (id, workspace_id, content, embedding, embedding_route_id, sensitivity, audience, binding_id)
-         VALUES ('c1', $1, 'hello', $2, 'route-embed', 'Internal', 'Everyone', 'binding-1')`,
-        [WS_A, embedding],
-      );
+      await seed.chunk({ workspaceId: WS_A, content: "hello" });
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
       const otherTenant = await client.query('SELECT id FROM "index".chunk');

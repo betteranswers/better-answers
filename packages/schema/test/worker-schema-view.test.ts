@@ -7,6 +7,7 @@ import {
   introspect,
   renderWorkerSchemaView,
 } from "../scripts/worker-view.ts";
+import { lastMigrationTag } from "../src/journal.ts";
 import { type MigratedPostgres, startMigratedPostgres } from "./harness.ts";
 
 /**
@@ -19,10 +20,6 @@ const viewPath = path.resolve(
   import.meta.dirname,
   "../../../apps/worker/src/better_answers_worker/schema_view.py",
 );
-const journalPath = path.resolve(import.meta.dirname, "../migrations/meta/_journal.json");
-
-type Journal = { readonly entries: readonly { readonly tag: string }[] };
-
 let db: MigratedPostgres;
 
 beforeAll(async () => {
@@ -51,9 +48,7 @@ describe("the worker's schema view", () => {
   });
 
   it("is byte-identical to a regeneration and carries the journal's last migration id", async () => {
-    const journal = JSON.parse(readFileSync(journalPath, "utf8")) as Journal;
-    const migrationId = journal.entries.at(-1)?.tag;
-    if (migrationId === undefined) throw new Error("the journal is empty");
+    const migrationId = lastMigrationTag();
 
     const regenerated = renderWorkerSchemaView(await introspect(db.pool), migrationId);
     expect(readFileSync(viewPath, "utf8")).toBe(regenerated);

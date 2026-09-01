@@ -149,6 +149,42 @@ describe("4 — a refinement only narrows, proved against the column", () => {
   });
 });
 
+describe("the rejection half: a violated refinement never reaches Postgres", () => {
+  // No database here on purpose — the whole point is that the parse refuses the row
+  // client-side, before any INSERT exists to fail.
+  const rejectedRows = {
+    workspace: [
+      { id: "not-a-ulid", name: "Workspace A" },
+      { id: WS_ID, name: "   " },
+    ],
+    llmRoute: [
+      {
+        id: "route-embed",
+        workspaceId: WS_ID,
+        purpose: "embedding",
+        provider: "mistral",
+        model: "mistral-embed",
+        dimensions: 0,
+      },
+    ],
+    chunk: [
+      {
+        ...acceptedRows.chunk[0],
+        embedding: Array.from({ length: 1023 }, () => 0.5),
+      },
+      { ...acceptedRows.chunk[0], sensitivity: "Secret" },
+    ],
+  } as const;
+
+  for (const name of registryNames) {
+    it(`${name} refuses every row that violates a refinement`, () => {
+      for (const row of rejectedRows[name]) {
+        expect(boundarySchemas[name].insert.safeParse(row).success).toBe(false);
+      }
+    });
+  }
+});
+
 describe("5 — the inferred type is pinned", () => {
   type Expect<T extends true> = T;
   type Equal<A, B> =
@@ -185,7 +221,7 @@ describe("5 — the inferred type is pinned", () => {
         embedding: number[];
         embeddingRouteId: string;
         publishedAt: Date | null;
-        sensitivity: string;
+        sensitivity: "Restricted" | "Internal" | "Public";
         audience: string;
         bindingId: string;
       }

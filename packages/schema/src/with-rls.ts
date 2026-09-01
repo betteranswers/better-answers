@@ -11,9 +11,11 @@ import {
  * enabled, one permissive policy for ALL commands whose predicate calls the one
  * migration-installed seam function. The call is written `(select
  * current_workspace_id())` — the InitPlan form — so a bulk statement pays the function
- * once, not once per row. `FORCE ROW LEVEL SECURITY` has no Drizzle API, so the
- * substrate migration applies it by hand and the migration-ownership test keeps the
- * two lists honest.
+ * once, not once per row. `FORCE ROW LEVEL SECURITY` has no Drizzle API, so a table
+ * created here also gets a hand-written `ALTER TABLE … FORCE ROW LEVEL SECURITY`
+ * line in a custom migration — and the catalogue assertion in `test/rls.test.ts`
+ * ("every tenant table") fails on any table whose FORCE line is missing, so the pair
+ * is enforced, not remembered.
  *
  * A missing scope is an empty GUC is zero rows: the seam function returns NULL and no
  * row's tenant column equals NULL.
