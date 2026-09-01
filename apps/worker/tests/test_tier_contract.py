@@ -58,3 +58,53 @@ def test_lists_a_fixture_if_and_only_if_it_exists_under_an_agreement_it_names() 
         if file.is_file() and str(file.relative_to(CONTRACTS_DIR)) not in NOT_FIXTURES
     }
     assert on_disk == {fixture["path"] for fixture in manifest["fixtures"]}
+
+
+# --- llm-routing: the first real fixture (ADR 0031) -----------------------------------
+#
+# The fixture is the contract: seed its workspaces and routes, run every call as
+# app_rt under the call's workspace GUC ('' = the missing scope), and expect exactly
+# expect_route_id (None = zero rows). The TypeScript half runs the same cases in
+# packages/core/test/llm-routing.contract.test.ts.
+
+
+def test_llm_routing_resolves_every_fixtured_call() -> None:
+    from pg_harness import migrated_postgres
+
+    fixture = json.loads(
+        (CONTRACTS_DIR / "llm-routing" / "cases.json").read_text("utf-8")
+    )
+
+    with migrated_postgres() as connection, connection.cursor() as cursor:
+        for workspace in fixture["workspaces"]:
+            cursor.execute(
+                "INSERT INTO workspace (id, name) VALUES (%s, %s)",
+                (workspace["id"], workspace["name"]),
+            )
+        for route in fixture["routes"]:
+            cursor.execute(
+                "INSERT INTO llm_route (id, workspace_id, purpose, provider, model,"
+                " dimensions) VALUES (%s, %s, %s, %s, %s, %s)",
+                (
+                    route["id"],
+                    route["workspace_id"],
+                    route["purpose"],
+                    route["provider"],
+                    route["model"],
+                    route["dimensions"],
+                ),
+            )
+
+        cursor.execute("SET LOCAL ROLE app_rt")
+        for call in fixture["calls"]:
+            cursor.execute(
+                "SELECT set_config('app.workspace_id', %s, true)",
+                (call["workspace_id"],),
+            )
+            cursor.execute(
+                "SELECT id FROM llm_route_for(%s::llm_purpose)", (call["purpose"],)
+            )
+            rows = cursor.fetchall()
+            resolved = rows[0][0] if rows else None
+            assert resolved == call["expect_route_id"], call
+        connection.rollback()

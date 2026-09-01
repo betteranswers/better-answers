@@ -1,0 +1,56 @@
+{
+  "description": "llm-routing (ADR 0031): one route per workspace per purpose, resolved by the database via llm_route_for(purpose), never twice in code. Each suite seeds `workspaces` and `routes`, then runs every `calls` entry as app_rt inside a transaction whose app.workspace_id GUC is the call's workspace_id ('' = the missing scope), and asserts llm_route_for returns exactly expect_route_id (null = zero rows).",
+  "workspaces": [
+    { "id": "01J6AAAAAAAAAAAAAAAAAAAAAA", "name": "Workspace A" },
+    { "id": "01J6BBBBBBBBBBBBBBBBBBBBBB", "name": "Workspace B" }
+  ],
+  "routes": [
+    {
+      "id": "route-a-embed",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "purpose": "embedding",
+      "provider": "mistral",
+      "model": "mistral-embed",
+      "dimensions": 1024
+    },
+    {
+      "id": "route-a-answer",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "purpose": "answering",
+      "provider": "anthropic",
+      "model": "claude-sonnet-5",
+      "dimensions": null
+    },
+    {
+      "id": "route-b-embed",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "purpose": "embedding",
+      "provider": "mistral",
+      "model": "mistral-embed",
+      "dimensions": 1024
+    }
+  ],
+  "calls": [
+    {
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "purpose": "embedding",
+      "expect_route_id": "route-a-embed"
+    },
+    {
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "purpose": "answering",
+      "expect_route_id": "route-a-answer"
+    },
+    {
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "purpose": "extraction",
+      "expect_route_id": null
+    },
+    {
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "purpose": "embedding",
+      "expect_route_id": "route-b-embed"
+    },
+    { "workspace_id": "", "purpose": "embedding", "expect_route_id": null }
+  ]
+}

@@ -288,7 +288,7 @@ step "Settings → Backup: escrow APP_KEY (from /data/coolify/source/.env) AND /
 step "Servers → add VPC 1 over SSH ($VPC1_PUBLIC_IP)."
 step "Storages → S3: '$BACKUP_S3_PROVIDER' with the WRITE-AND-LIST credential."
 step "Registries (or the resource's registry credential): ghcr.io with the pull PAT from stage 2 — on both servers."
-step "On VPC 1: Database → PostgreSQL, image ghcr.io/betteranswers/postgres by digest (deploy/postgres.Dockerfile), name 'better-answers-pg', shared_buffers 512 MB, data directory bind-mounted at /data/postgres if the UI allows (record the answer in deploy/coolify.md); Backups → S3 storage, daily — the tiers are the backup service's, not Coolify's."
+step "On VPC 1: Database → PostgreSQL, the official pgvector image by digest (packages/schema/src/postgres-image.ts — ADR 0032; no custom image), name 'better-answers-pg', shared_buffers 512 MB, data directory bind-mounted at /data/postgres if the UI allows (record the answer in deploy/coolify.md); Backups → S3 storage, daily — the tiers are the backup service's, not Coolify's."
 step "On VPC 1: Docker Compose 'better-answers-stores' from deploy/stores.compose.yaml, then 'better-answers' from deploy/platform.compose.yaml (git source = the GitHub repo). Paste every env in deploy/SECRETS.md that says 'Coolify env'."
 step "On VPC 2: only the staging Postgres resource is created (empty); the two staging stacks are brought up ON DEMAND by the drill or by hand (deploy/RUNBOOK.md § Bring staging up) and wiped after. The drill is HOST CRON on VPC 2, not a Coolify task: sudo crontab -e → 0 3 1 * * /opt/better-answers/deploy/restore-drill.sh (env from a root-only file)."
 step "Settings → Notifications → email: failed deployments, unhealthy containers, backup failures."
