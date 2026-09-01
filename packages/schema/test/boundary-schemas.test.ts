@@ -131,13 +131,20 @@ describe("4 — a refinement only narrows, proved against the column", () => {
 
   it("inserts every row the refined insert schemas accept", async () => {
     await withRollback(db.pool, async (client) => {
-      // index.chunk is list-partitioned, so the workspace partition exists first
-      // (ADR 0028 assertion 4's note) — created through the one lifecycle function.
-      await client.query("SELECT create_workspace_partition($1)", [WS_ID]);
-
       const database = drizzle(client);
       let accepted = 0;
-      for (const name of registryNames) {
+      // Explicit insert order, never the registry's key order: workspace is every
+      // other row's FK target, and index.chunk is list-partitioned so its workspace
+      // partition exists first (ADR 0028 assertion 4's note) — created through the
+      // one lifecycle function, which requires the transaction scoped to it.
+      const insertOrder = ["workspace", "llmRoute", "chunk"] as const;
+      expect(insertOrder.toSorted()).toEqual(registryNames.toSorted());
+
+      for (const name of insertOrder) {
+        if (name === "chunk") {
+          await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_ID]);
+          await client.query("SELECT create_workspace_partition($1)", [WS_ID]);
+        }
         for (const row of acceptedRows[name]) {
           const parsed = boundarySchemas[name].insert.parse(row);
           await database.insert(boundarySchemas[name].table).values(parsed);
@@ -183,6 +190,19 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       }
     });
   }
+});
+
+describe("the update forms stay partial", () => {
+  it("chunk.update accepts a row that touches no embedding, and still checks one it does", () => {
+    // The plain-schema exception replaces the generated field wholesale, update's
+    // .optional() included — this is the proof the hand-written optional copy holds.
+    expect(boundarySchemas.chunk.update.safeParse({ content: "edited" }).success).toBe(true);
+    expect(
+      boundarySchemas.chunk.update.safeParse({
+        embedding: Array.from({ length: 1023 }, () => 0),
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("5 — the inferred type is pinned", () => {

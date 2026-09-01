@@ -23,7 +23,13 @@ export const startMigratedPostgres = async (): Promise<MigratedPostgres> => {
     POSTGRES_IMAGE,
   ).start();
   const pool = new pg.Pool({ connectionString: container.getConnectionUri(), max: 3 });
-  await migrate(drizzle(pool), { migrationsFolder });
+  try {
+    await migrate(drizzle(pool), { migrationsFolder });
+  } catch (error) {
+    await pool.end();
+    await container.stop();
+    throw error;
+  }
   return {
     pool,
     stop: async () => {
@@ -43,7 +49,10 @@ export const withRollback = async <T>(
     await client.query("BEGIN");
     return await fn(client);
   } finally {
-    await client.query("ROLLBACK");
-    client.release();
+    try {
+      await client.query("ROLLBACK");
+    } finally {
+      client.release();
+    }
   }
 };

@@ -72,6 +72,22 @@ describe("every tenant table", () => {
       });
     }
   });
+
+  it("carries exactly one policy — the workspace-isolation one", async () => {
+    // withRLS()'s extraConfig could smuggle in a second, wider policy (policies are
+    // OR-combined); one policy per tenant table is the invariant, asserted here.
+    for (const qualified of declaredTableNames()) {
+      const [schema, table] = qualified.split(".");
+      const policies = await db.pool.query(
+        "SELECT policyname FROM pg_policies WHERE schemaname = $1 AND tablename = $2",
+        [schema, table],
+      );
+      expect({ table: qualified, policies: policies.rows }).toEqual({
+        table: qualified,
+        policies: [{ policyname: `${table}_workspace_isolation` }],
+      });
+    }
+  });
 });
 
 describe("a tenant table under app_rt", () => {
@@ -127,6 +143,7 @@ describe("the workspace-lifecycle function", () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       await client.query("SELECT create_workspace_partition($1)", [WS_A]);
 
       const partition = await client.query(
@@ -141,6 +158,14 @@ describe("the workspace-lifecycle function", () => {
       );
       expect(index.rows.map((row) => row.indexdef).join(" ")).toContain("hnsw");
     });
+
+    // "In one transaction" made checkable: the enclosing transaction rolled back, so
+    // the partition and its index went with it.
+    const afterRollback = await db.pool.query(
+      "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'index' AND c.relname = $1",
+      [`chunk_${WS_A}`],
+    );
+    expect(afterRollback.rowCount).toBe(0);
   });
 
   it("is refused to any role but app_rt", async () => {
@@ -152,11 +177,44 @@ describe("the workspace-lifecycle function", () => {
     });
   });
 
-  it("scopes chunk rows to their tenant through the parent table", async () => {
+  it("refuses a workspace the transaction is not scoped to, and an unknown one", async () => {
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      await client.query("SET LOCAL ROLE app_rt");
+
+      // No scope at all.
+      await expect(client.query("SELECT create_workspace_partition($1)", [WS_A])).rejects.toThrow(
+        /not scoped/,
+      );
+    });
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      // Scoped to A, asking for B's objects.
+      await expect(client.query("SELECT create_workspace_partition($1)", [WS_B])).rejects.toThrow(
+        /not scoped/,
+      );
+    });
+    await withRollback(db.pool, async (client) => {
+      const unknown = "01J6CCCCCCCCCCCCCCCCCCCCCC";
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [unknown]);
+
+      await expect(
+        client.query("SELECT create_workspace_partition($1)", [unknown]),
+      ).rejects.toThrow(/no such workspace/);
+    });
+  });
+
+  it("scopes chunk rows to their tenant through the parent, and denies the child table outright", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       await client.query("SELECT create_workspace_partition($1)", [WS_A]);
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
       await client.query("SELECT create_workspace_partition($1)", [WS_B]);
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
@@ -169,6 +227,35 @@ describe("the workspace-lifecycle function", () => {
       await client.query("SELECT set_config('app.workspace_id', '', true)");
       const missingScope = await client.query('SELECT id FROM "index".chunk');
       expect(missingScope.rows).toEqual([]);
+    });
+  });
+
+  it("denies a direct query against a partition, whatever the scope", async () => {
+    // The RLS-bypass Cubic caught: parent policies do not apply to a query aimed at
+    // a child table, and migration 0000's default privileges would have granted the
+    // runtime roles DML on it — the lifecycle function revokes them, so the only
+    // road to chunk rows is the policied parent.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      await client.query("SELECT create_workspace_partition($1)", [WS_A]);
+      await seed.chunk({ workspaceId: WS_A, content: "hello" });
+
+      // The other tenant's scope, aiming straight at A's partition. Each denial
+      // aborts the transaction, so a savepoint fences it from the next assertion.
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
+      await client.query("SAVEPOINT direct_query");
+      await expect(client.query(`SELECT id FROM "index"."chunk_${WS_A}"`)).rejects.toThrow(
+        /permission denied/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT direct_query");
+
+      // Even the owning tenant goes through the parent, never the child.
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      await expect(client.query(`SELECT id FROM "index"."chunk_${WS_A}"`)).rejects.toThrow(
+        /permission denied/,
+      );
     });
   });
 });

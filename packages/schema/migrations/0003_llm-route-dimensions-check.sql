@@ -1,0 +1,1 @@
+ALTER TABLE "llm_route" ADD CONSTRAINT "llm_route_dimensions_check" CHECK ((purpose = 'embedding') = (dimensions IS NOT NULL) AND (dimensions IS NULL OR dimensions > 0));

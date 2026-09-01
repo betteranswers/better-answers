@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -18,10 +18,14 @@ const CUSTOM_MARKER = "-- Custom migration (hand-written SQL; ADR 0032).";
 const FORBIDDEN_IN_GENERATED = [/"index"/u, /\bgraph_node\b/u, /\bgraph_edge\b/u];
 
 describe("the migration journal", () => {
-  it("has a file for every entry", () => {
-    for (const file of journalMigrationFiles()) {
-      expect(() => readFileSync(file)).not.toThrow();
-    }
+  it("has a file for every entry, and no .sql file the journal does not know", () => {
+    const journalFiles = journalMigrationFiles().map((file) => path.basename(file));
+    const migrationsDir = path.dirname(journalMigrationFiles()[0] ?? "");
+    const onDisk = readdirSync(migrationsDir).filter((name) => name.endsWith(".sql"));
+
+    // Both directions: a journal entry with no file will never apply; an orphan
+    // .sql file on disk will never apply either, and someone thinks it did.
+    expect(journalFiles.toSorted()).toEqual(onDisk.toSorted());
   });
 
   it("never touches `index` or the graph tables from a generated migration", () => {

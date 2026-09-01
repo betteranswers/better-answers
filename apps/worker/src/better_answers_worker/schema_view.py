@@ -6,7 +6,7 @@ direction. The worker never migrates (`[WRK1]`); this module is its read-only
 knowledge of what the app's journal built, stamped with the migration id it was
 generated from."""
 
-MIGRATION_ID = "0002_chunk-and-functions"
+MIGRATION_ID = "0003_llm-route-dimensions-check"
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {

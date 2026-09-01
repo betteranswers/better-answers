@@ -25,11 +25,12 @@ _IMAGE_SOURCE = REPO_ROOT / "packages" / "schema" / "src" / "postgres-image.ts"
 
 
 def pinned_postgres_image() -> str:
-    match = re.search(r'"(pgvector/pgvector:[^"]+)"', _IMAGE_SOURCE.read_text("utf-8"))
-    if match is None:
-        msg = f"no pinned image in {_IMAGE_SOURCE}"
+    source = _IMAGE_SOURCE.read_text("utf-8")
+    matches = re.findall(r'"(pgvector/pgvector:[^"]+)"', source)
+    if len(matches) != 1:
+        msg = f"expected one pinned image in {_IMAGE_SOURCE}, found {len(matches)}"
         raise RuntimeError(msg)
-    return match.group(1)
+    return str(matches[0])
 
 
 def journal_migrations() -> list[Path]:

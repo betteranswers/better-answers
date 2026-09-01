@@ -1,4 +1,5 @@
-import { integer, pgEnum, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { check, integer, pgEnum, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { withRLS } from "./with-rls.ts";
 
@@ -47,5 +48,11 @@ export const llmRoute = withRLS(
     // One route per workspace per purpose — what lets `llm_route_for` resolve to at
     // most one row (ADR 0031: "resolved by the database, never twice in code").
     uniqueIndex("llm_route_workspace_purpose_unique").on(table.workspaceId, table.purpose),
+    // The embedding route carries its dimension count and no other purpose does —
+    // the column comment's claim, made the database's.
+    check(
+      "llm_route_dimensions_check",
+      sql`(purpose = 'embedding') = (dimensions IS NOT NULL) AND (dimensions IS NULL OR dimensions > 0)`,
+    ),
   ],
 );

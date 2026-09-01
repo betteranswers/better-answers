@@ -85,13 +85,15 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const llmRoute: TestData["llmRoute"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const purpose = overrides.purpose ?? "embedding";
     return insertRow(client, "llmRoute", {
       id: `route-${ulid()}`,
-      purpose: "embedding",
       provider: "mistral",
       model: "mistral-embed",
-      dimensions: 1024,
+      // The dimensions CHECK: only the embedding purpose carries a count.
+      dimensions: purpose === "embedding" ? 1024 : null,
       ...overrides,
+      purpose,
       workspaceId,
     });
   };
@@ -99,7 +101,14 @@ export const testData = (client: pg.PoolClient): TestData => {
   const chunk: TestData["chunk"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     if (!(await partitionExists(client, workspaceId))) {
+      // The lifecycle function refuses a workspace the transaction is not scoped
+      // to, so scope to the target for the call and restore the caller's scope.
+      const previous = await client.query("SELECT current_workspace_id() AS ws");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
       await client.query("SELECT create_workspace_partition($1)", [workspaceId]);
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [
+        previous.rows[0]?.ws ?? "",
+      ]);
     }
     return insertRow(client, "chunk", {
       id: `chunk-${ulid()}`,

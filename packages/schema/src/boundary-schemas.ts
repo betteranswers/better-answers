@@ -54,7 +54,13 @@ const chunkRefinements = {
 
 export const chunkSelect = createSelectSchema(chunk, chunkRefinements);
 export const chunkInsert = createInsertSchema(chunk, chunkRefinements);
-export const chunkUpdate = createUpdateSchema(chunk, chunkRefinements);
+// A plain schema replaces the generated field wholesale — the update generation's
+// `.optional()` included — so the update form carries its own optional copy;
+// without it an update would demand an embedding.
+export const chunkUpdate = createUpdateSchema(chunk, {
+  ...chunkRefinements,
+  embedding: chunkRefinements.embedding.optional(),
+});
 
 /** One entry per table this package owns — the parity test's registry (ADR 0028). */
 export const boundarySchemas = {
