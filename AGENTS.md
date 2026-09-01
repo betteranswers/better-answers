@@ -36,6 +36,7 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers â
 | `docs-site/` | Astro + Starlight documentation site and its docs skills |
 | ordna | The work queue â€” tasks as git namespace refs (`refs/ordna/tasks/<id>`), not files |
 | `deploy/` | Compose files and deployment configuration |
+| `scripts/` | Repository tooling: the `WorktreeCreate` and `WorktreeRemove` hooks `.claude/settings.json` runs, so a Claude-created worktree arrives with its dependencies installed |
 
 Commands, versions and scripts are read from each workspace's `package.json` or `pyproject.toml`; this file does not repeat them. Every workspace exposes `check` (lint, types, tests); the root `check` runs them all.
 
