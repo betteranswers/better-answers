@@ -101,7 +101,8 @@ export const renderFind = (result: FindResult): string =>
 export const renderOpen = (result: OpenResult): string => {
   if (!result.found) return `No concept at ${result.iri}.`;
   const { concept } = result;
-  const title = typeof concept.frontmatter["title"] === "string" ? concept.frontmatter["title"] : concept.iri;
+  const title =
+    typeof concept.frontmatter["title"] === "string" ? concept.frontmatter["title"] : concept.iri;
   const evidence = concept.evidence.map((item) => `- ${item.source} (${item.locator})`).join("\n");
   return [
     `# ${title}`,

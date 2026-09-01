@@ -79,9 +79,18 @@ const workspaceConfigRefinements = {
   key: (schema: z.ZodString) => schema.trim().min(1),
 };
 
-export const workspaceConfigSelect = createSelectSchema(workspaceConfig, workspaceConfigRefinements);
-export const workspaceConfigInsert = createInsertSchema(workspaceConfig, workspaceConfigRefinements);
-export const workspaceConfigUpdate = createUpdateSchema(workspaceConfig, workspaceConfigRefinements);
+export const workspaceConfigSelect = createSelectSchema(
+  workspaceConfig,
+  workspaceConfigRefinements,
+);
+export const workspaceConfigInsert = createInsertSchema(
+  workspaceConfig,
+  workspaceConfigRefinements,
+);
+export const workspaceConfigUpdate = createUpdateSchema(
+  workspaceConfig,
+  workspaceConfigRefinements,
+);
 
 const chunkRefinements = {
   id: (schema: z.ZodString) => schema.trim().min(1),

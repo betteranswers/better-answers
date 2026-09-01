@@ -42,7 +42,9 @@ export const provisionWorkspace = async (
   actor: PlatformPrincipal,
   door: PostgresDoor,
   input: ProvisionWorkspaceInput,
-): Promise<Result<{ workspaceId: WorkspaceId; actorId: PlatformPrincipal["actorId"] }, ProvisionRefusal>> => {
+): Promise<
+  Result<{ workspaceId: WorkspaceId; actorId: PlatformPrincipal["actorId"] }, ProvisionRefusal>
+> => {
   const row = boundarySchemas.workspace.insert.safeParse({
     id: input.id,
     name: input.name,
@@ -63,11 +65,10 @@ export const provisionWorkspace = async (
         "INSERT INTO member (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, $4, now())",
         [`member-${row.data.id}-${admin.data}`, row.data.id, admin.data, CREATOR_ROLE],
       );
-      await tx.query("INSERT INTO workspace_config (workspace_id, key, value) VALUES ($1, $2, $3)", [
-        row.data.id,
-        TOOLS_LIST_TTL_CONFIG_KEY,
-        String(TOOLS_LIST_TTL_MS_DEFAULT),
-      ]);
+      await tx.query(
+        "INSERT INTO workspace_config (workspace_id, key, value) VALUES ($1, $2, $3)",
+        [row.data.id, TOOLS_LIST_TTL_CONFIG_KEY, String(TOOLS_LIST_TTL_MS_DEFAULT)],
+      );
     }),
   );
   if (!act.ok) return err(classify(act.error));

@@ -1,4 +1,9 @@
-import { type MigratedPostgres, startMigratedPostgres, testData, ulid } from "@better-answers/schema/testing";
+import {
+  type MigratedPostgres,
+  startMigratedPostgres,
+  testData,
+  ulid,
+} from "@better-answers/schema/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { Claims } from "../src/kernel/index.ts";
@@ -126,7 +131,11 @@ describe("the Principal resolver", () => {
     );
     expect(disagreeing).toEqual({ ok: false, error: "role-disagrees" });
 
-    const agreeing = await withPrincipal(door, claimsFor(seeded, { role: "Viewer" }), async () => "reached");
+    const agreeing = await withPrincipal(
+      door,
+      claimsFor(seeded, { role: "Viewer" }),
+      async () => "reached",
+    );
     expect(agreeing).toEqual({ ok: true, value: "reached" });
   });
 
@@ -149,10 +158,10 @@ describe("the Principal resolver", () => {
 
     await expect(
       withPrincipal(door, claimsFor(seeded), async (_principal, tx) => {
-        await tx.query("INSERT INTO workspace_config (workspace_id, key, value) VALUES ($1, $2, '1')", [
-          seeded.workspaceId,
-          key,
-        ]);
+        await tx.query(
+          "INSERT INTO workspace_config (workspace_id, key, value) VALUES ($1, $2, '1')",
+          [seeded.workspaceId, key],
+        );
         throw new Error("the work failed after writing");
       }),
     ).rejects.toThrow("the work failed after writing");
@@ -167,7 +176,11 @@ describe("the Principal resolver", () => {
     try {
       const seed = testData(superuser);
       await seed.workspaceConfig({ workspaceId: seeded.workspaceId, key: "probe", value: "mine" });
-      await seed.workspaceConfig({ workspaceId: seeded.otherWorkspaceId, key: "probe", value: "theirs" });
+      await seed.workspaceConfig({
+        workspaceId: seeded.otherWorkspaceId,
+        key: "probe",
+        value: "theirs",
+      });
     } finally {
       superuser.release();
     }

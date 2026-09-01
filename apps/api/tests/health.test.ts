@@ -1,24 +1,22 @@
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { createServer } from "../src/server.ts";
-import { startTestDatabase, type TestDatabase } from "./postgres.ts";
+import { startApp, type TestApp } from "./harness.ts";
+import { serverFor } from "./harness.ts";
 
 describe("the app's health endpoint", () => {
-  let database: TestDatabase;
+  let app: TestApp;
 
   beforeAll(async () => {
-    database = await startTestDatabase();
+    app = await startApp();
   });
 
   afterAll(async () => {
-    await database.stop();
+    await app.stop();
   });
 
   it("tells the deploy unit the app is healthy while the platform database answers", async () => {
-    const server = createServer({ database: database.pool });
-
-    const response = await server.request("/health");
+    const response = await app.server.request("/health");
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -34,7 +32,7 @@ describe("the app's health endpoint", () => {
       connectionString: "postgresql://nobody@127.0.0.1:1/nothing",
       connectionTimeoutMillis: 1_000,
     });
-    const server = createServer({ database: unreachable });
+    const server = serverFor(unreachable);
 
     const response = await server.request("/health");
 

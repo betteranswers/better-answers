@@ -1,7 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node"],
+    // Off in this workspace alone: `@better-auth/oauth-provider@1.7.2`'s plugin type
+    // carries endpoint metadata literals (`items?: undefined`) that fail to assign to
+    // `BetterAuthPlugin` under exact optionals, which makes the whole `plugins` array —
+    // and every `auth.api.*` name inferred from it — a type error (T-004, read
+    // 01/09/2026). Every other workspace keeps the base setting; revisit on the next
+    // Better Auth upgrade.
+    "exactOptionalPropertyTypes": false
   },
-  "include": ["src", "test", "vitest.config.ts"]
+  "include": ["src", "lifts", "tests", "tools/lint-rules", "vitest.config.ts"]
 }

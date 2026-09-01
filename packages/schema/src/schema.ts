@@ -72,9 +72,7 @@ export const workspaceConfig = withRLS(
       .references(() => workspace.id),
     key: text("key").notNull(),
     value: text("value").notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
-      .notNull()
-      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
   "workspaceId",
   (table) => [primaryKey({ columns: [table.workspaceId, table.key] })],

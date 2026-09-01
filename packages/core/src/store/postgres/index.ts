@@ -171,7 +171,10 @@ const windowStart = (rule: CounterRule, now: Date): Date =>
 
 const outcome = (count: number, rule: CounterRule, start: Date, now: Date): CounterOutcome => ({
   allowed: count <= rule.max,
-  retryAfterSeconds: Math.max(1, Math.ceil((start.getTime() + rule.windowMs - now.getTime()) / 1000)),
+  retryAfterSeconds: Math.max(
+    1,
+    Math.ceil((start.getTime() + rule.windowMs - now.getTime()) / 1000),
+  ),
 });
 
 /**

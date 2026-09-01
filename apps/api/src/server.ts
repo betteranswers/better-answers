@@ -1,7 +1,19 @@
 import { Hono } from "hono";
 import type { Pool } from "pg";
+import type { Logger } from "pino";
 
 import { attempt } from "@better-answers/core/kernel";
+import { openPostgres } from "@better-answers/core/store/postgres";
+
+import { fetchClientMetadataResource as liftedFetch } from "../lifts/better-auth-cimd-node/index.ts";
+import {
+  createAuth,
+  createAuthRoutes,
+  createTokenVerifier,
+  type EmailSender,
+} from "./auth/index.ts";
+import { logger as tierLogger } from "./logger.ts";
+import { createMcpSurface } from "./mcp/surface.ts";
 
 /**
  * Everything the HTTP surface needs, passed in rather than reached for, so a test
@@ -9,11 +21,22 @@ import { attempt } from "@better-answers/core/kernel";
  */
 export type ServerDependencies = {
   readonly database: Pool;
+  /** The https origin the authorization server issues from; the MCP URL is `${publicUrl}/mcp`. */
+  readonly publicUrl: string;
+  readonly authSecret: string;
+  readonly sendEmail: EmailSender;
+  readonly logger?: Logger;
+  /** The CIMD transport; the lift by default, an in-process document in a test. */
+  readonly fetchClientMetadataResource?: (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => Promise<Response>;
+  readonly serverVersion?: string;
 };
 
 /**
- * The app tier's single Hono server (ADR 0006). B3 mounts identity, B9 the tRPC router
- * and the MCP surface; today it answers one route.
+ * The app tier's single Hono server (ADR 0006). B3 mounts identity and the MCP
+ * surface here; B9 the tRPC router.
  *
  * Why this tier has an endpoint in B1 at all, when the worker has no HTTP server:
  * `[TEST1]` defines a functional test differently per tier — "for `apps/api`, the endpoint
@@ -25,6 +48,9 @@ export type ServerDependencies = {
  */
 export function createServer(dependencies: ServerDependencies): Hono {
   const server = new Hono();
+  const logger = dependencies.logger ?? tierLogger;
+  const door = openPostgres(dependencies.database);
+  const mcpUrl = `${dependencies.publicUrl}/mcp`;
 
   // Docker reads this every ten seconds and holds `worker` back until it passes, so an
   // unreachable database has to read as unhealthy rather than as a running app.
@@ -39,6 +65,51 @@ export function createServer(dependencies: ServerDependencies): Hono {
 
     return context.json({ status: "healthy", database: "reachable" });
   });
+
+  const auth = createAuth({
+    database: dependencies.database,
+    door,
+    publicUrl: dependencies.publicUrl,
+    mcpUrl,
+    secret: dependencies.authSecret,
+    sendEmail: dependencies.sendEmail,
+    fetchClientMetadataResource: dependencies.fetchClientMetadataResource ?? liftedFetch,
+    logger,
+  });
+
+  // Better Auth initialises eagerly (its JWKS and the resource row); with the database
+  // unreachable that rejects, and the rejection must land in the log, not the process.
+  auth.$context.catch((cause: unknown) => {
+    logger.error(
+      { reason: cause instanceof Error ? cause.message : String(cause) },
+      "identity provider failed to initialise",
+    );
+  });
+
+  server.route(
+    "/",
+    createAuthRoutes({ auth, door, publicUrl: dependencies.publicUrl, mcpUrl, logger }),
+  );
+
+  const mcp = createMcpSurface({
+    door,
+    verifier: createTokenVerifier({
+      issuer: dependencies.publicUrl,
+      audience: mcpUrl,
+      jwks: () => auth.api.getJwks(),
+    }),
+    publicUrl: dependencies.publicUrl,
+    mcpUrl,
+    logger,
+    serverVersion: dependencies.serverVersion ?? "0.1.0",
+  });
+  // The seam ADR 0030 names: `(Request, { authInfo }) => Response`, authentication
+  // resolved inside `mcp` before the handler sees the request.
+  server.all("/mcp", (context) => mcp(context.req.raw));
+
+  // Better Auth's own endpoints — discovery, /oauth2/*, /jwks, the email-code and
+  // organisation endpoints — answer everything the routes above did not.
+  server.all("/*", (context) => auth.handler(context.req.raw));
 
   return server;
 }

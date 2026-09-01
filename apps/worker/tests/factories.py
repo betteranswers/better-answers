@@ -55,9 +55,12 @@ def seed_workspace(
     workspace_id: str | None = None,
     name: str = "Test workspace",
 ) -> dict[str, Any]:
+    identifier = workspace_id or _ulid()
+    # `slug` is Better Auth's organisation column (ADR 0009, 2026-09-01): unique, never
+    # read by the worker, so the id itself is the slug here.
     cursor.execute(
-        "INSERT INTO workspace (id, name) VALUES (%s, %s) RETURNING *",
-        (workspace_id or _ulid(), name),
+        "INSERT INTO workspace (id, name, slug) VALUES (%s, %s, %s) RETURNING *",
+        (identifier, name, f"ws-{identifier.lower()}"),
     )
     return _returning_row(cursor)
 

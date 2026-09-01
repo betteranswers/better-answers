@@ -5,6 +5,12 @@
     {
       "name": "anti-slop",
       "specifier": "./apps/api/tools/anti-slop/index.ts"
+    },
+    {
+      // The repository's own rules — each holds a CODING_RULES or ADR line and is run
+      // by a functional test (apps/api/tests/lint-rules.test.ts).
+      "name": "better-answers",
+      "specifier": "./apps/api/tools/lint-rules/index.ts"
     }
   ],
   "categories": {
@@ -37,7 +43,11 @@
     "anti-slop/no-unsafe-dictionary-type": "warn",
     "anti-slop/require-safety-comment-for-type-assertion": "warn",
     "anti-slop/no-runtime-typeof": "off",
-    "anti-slop/no-shape-in-symbol-names": "off"
+    "anti-slop/no-shape-in-symbol-names": "off",
+    // T-004 (ADR 0018, [SEC2]): every MCP entry carries its annotations, and none takes
+    // a workspace, bundle or tenant argument.
+    "better-answers/mcp-entry-annotations": "error",
+    "better-answers/mcp-entry-no-workspace-argument": "error"
   },
   "overrides": [
     {
@@ -56,6 +66,13 @@
               {
                 "group": ["drizzle-zod"],
                 "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema."
+              },
+              {
+                // [DESIGN5] — the identity provider stays behind its seam: no better-auth
+                // import outside apps/api/src/auth/ and the CIMD lift (the override below
+                // lifts the ban for exactly those two directories).
+                "group": ["better-auth", "better-auth/*", "@better-auth/*"],
+                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009); the rest of the tier takes Claims and a Principal from that module."
               }
             ]
           }
@@ -63,10 +80,29 @@
       }
     },
     {
-      // The one seam file the ban above exists to protect.
+      // The one seam file the drizzle-zod ban exists to protect.
       "files": ["packages/schema/src/drizzle-zod.ts"],
       "rules": {
         "no-restricted-imports": "off"
+      }
+    },
+    {
+      // The identity module and the CIMD lift: the only places better-auth is configured
+      // ([DESIGN5]). The drizzle-zod ban is restated because this override replaces the
+      // repo-wide no-restricted-imports config for these files.
+      "files": ["apps/api/src/auth/**", "apps/api/lifts/better-auth-cimd-node/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["drizzle-zod"],
+                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema."
+              }
+            ]
+          }
+        ]
       }
     },
     {

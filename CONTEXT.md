@@ -422,11 +422,14 @@ to it by IRI and never restates it (ADR 0014).
 ## People
 
 - **workspace** — the tenancy boundary and the unit a company occupies: one company's people,
-  bindings, bundle repository, index, graph and records. **Every row, every object-store prefix,
-  every graph node and edge carries its workspace id**, and every query reaches its store through a
-  store door, over row-level security (`[DESIGN4]`). One deployment holds many; a person may belong to more
-  than one and picks before consent. _Avoid_: organisation (Better Auth's word for the same thing —
-  say *workspace* in our own code and on every screen), account, team, site.
+  bindings, bundle repository, index, graph and records. **Every tenant row, every object-store
+  prefix, every graph node and edge carries its workspace id**, and every query reaches its store
+  through a store door, over row-level security (`[DESIGN4]`). Better Auth's identity set is not
+  tenant data: read by key before a workspace is known, it is what a workspace id is resolved from
+  (ADR 0009). One deployment holds many; a person may belong to more than one and picks before
+  consent. Workspaces are provisioned by the platform, never created by a person. _Avoid_:
+  organisation (Better Auth's word for the same thing — say *workspace* in our own code and on every
+  screen), account, team, site.
 - **tenant** — the same boundary said from the platform's side, used only where the sentence is
   about isolation rather than about a company: *tenanted by rule*, *multi-tenant-ready*. There is one
   boundary and it is the workspace; *tenant* never appears on a screen and is never a second concept.
@@ -510,10 +513,12 @@ to it by IRI and never restates it (ADR 0014).
   shown once, minted on the Account page, listed to Admins in People. _Avoid_: api token,
   access token, agent token (the share agent's) for this meaning.
 - **client (connected)** — a host that has been granted access to the surface by OAuth and used it
-  (Claude on the web, Claude Code). Under client-ID-metadata documents there is **no registration and
-  no client row**, so the word *registered* is wrong: the System card lists the distinct `client_id`
-  URLs seen on issued grants, each named from its own metadata document, with who has connected
-  through it. _Avoid_: registered client, connector, integration.
+  (Claude on the web, Claude Code). Under client-ID-metadata documents there is **no registration**,
+  so the word *registered* is wrong — but the platform caches each client's metadata document as a
+  row, with the scopes it may request, refreshed from the document on a schedule (ADR 0009): the
+  System card lists the distinct `client_id` URLs seen on issued grants, each named from its own
+  metadata document, with who has connected through it. _Avoid_: registered client, connector,
+  integration.
 - **Account page** — a person's own small surface outside Control Centre: name, role,
   workspace, personal tokens.
 

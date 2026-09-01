@@ -1,4 +1,9 @@
-import { type MigratedPostgres, startMigratedPostgres, testData, ulid } from "@better-answers/schema/testing";
+import {
+  type MigratedPostgres,
+  startMigratedPostgres,
+  testData,
+  ulid,
+} from "@better-answers/schema/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { PlatformPrincipal } from "../src/kernel/index.ts";
@@ -25,7 +30,10 @@ afterAll(async () => {
   await db.stop();
 });
 
-const bootstrap: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-bootstrap" };
+const bootstrap: PlatformPrincipal = {
+  kind: "platform",
+  actorId: "process:better-answers-bootstrap",
+};
 
 const seedUser = async (): Promise<string> => {
   const client = await db.pool.connect();
@@ -103,8 +111,18 @@ describe("provisioning a workspace", () => {
     const door = openPostgres(db.runtimePool);
     const slug = `taken-${ulid().toLowerCase()}`;
 
-    const first = await provisionWorkspace(bootstrap, door, { id: ulid(), name: "One", slug, adminUserId });
-    const second = await provisionWorkspace(bootstrap, door, { id: ulid(), name: "Two", slug, adminUserId });
+    const first = await provisionWorkspace(bootstrap, door, {
+      id: ulid(),
+      name: "One",
+      slug,
+      adminUserId,
+    });
+    const second = await provisionWorkspace(bootstrap, door, {
+      id: ulid(),
+      name: "Two",
+      slug,
+      adminUserId,
+    });
 
     expect(first.ok).toBe(true);
     expect(second).toEqual({ ok: false, error: "slug-taken" });

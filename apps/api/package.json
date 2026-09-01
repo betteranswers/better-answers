@@ -17,6 +17,7 @@
     "@better-answers/core": "workspace:*",
     "@better-answers/schema": "workspace:*",
     "@better-auth/cimd": "1.7.2",
+    "@better-auth/core": "1.7.2",
     "@better-auth/drizzle-adapter": "1.7.2",
     "@better-auth/oauth-provider": "1.7.2",
     "@hono/node-server": "2.1.1",

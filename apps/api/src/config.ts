@@ -17,11 +17,20 @@ import { logger } from "./logger.ts";
 const bootstrapSchema = z.object({
   DATABASE_URL: z.url(),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  // The https origin the authorization server issues from and the MCP URL hangs off
+  // (`mcp.` in the estate, ADR 0022). Everything spec-exact — issuer, PRM `resource`,
+  // audience — is derived from it, so it is bootstrap, not a row.
+  PUBLIC_URL: z.url().transform((url) => url.replace(/\/$/, "")),
+  // Better Auth's secret: signs the OAuth flow's state and encrypts the JWKS private
+  // keys at rest (ADR 0009).
+  AUTH_SECRET: z.string().min(32),
 });
 
 export type Bootstrap = {
   readonly databaseUrl: string;
   readonly port: number;
+  readonly publicUrl: string;
+  readonly authSecret: string;
 };
 
 export function readBootstrap(
@@ -35,6 +44,8 @@ export function readBootstrap(
   return ok({
     databaseUrl: parsed.data.DATABASE_URL,
     port: parsed.data.PORT,
+    publicUrl: parsed.data.PUBLIC_URL,
+    authSecret: parsed.data.AUTH_SECRET,
   });
 }
 
