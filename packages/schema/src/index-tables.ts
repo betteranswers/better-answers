@@ -12,15 +12,22 @@ import { customType, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 export const indexSchema = pgSchema("index");
 
 /**
- * `vector(1024)`: N is the day-one embedding route's model — `mistral-embed`, whose
- * output is fixed at 1024 dimensions (Mistral platform docs, read 01/09/2026,
- * `[DEPS1]`; the hosted Mistral EU route is ADR 0020's amendment). A `customType`, and
- * therefore ADR 0028's one plain-schema exception: its boundary schema must never be
- * written as a callback, which throws `TypeError` at module evaluation on custom
- * columns.
+ * The vector width, `vector(N)`: N is the day-one embedding route's model —
+ * `mistral-embed`, whose output is fixed at 1024 dimensions (Mistral platform docs,
+ * read 01/09/2026, `[DEPS1]`; the hosted Mistral EU route is ADR 0020's amendment).
+ * The one place the number lives (`[DEPS2]`): the column type, the boundary
+ * refinement and the test factory import it. The migration's `vector(1024)` is the
+ * hand-written DDL this declaration mirrors; the worker-view drift test holds them equal.
  */
-const vector1024 = customType<{ data: number[]; driverData: string }>({
-  dataType: () => "vector(1024)",
+export const EMBEDDING_DIMENSIONS = 1024;
+
+/**
+ * A `customType`, and therefore ADR 0028's one plain-schema exception: its boundary
+ * schema must never be written as a callback, which throws `TypeError` at module
+ * evaluation on custom columns.
+ */
+const embeddingVector = customType<{ data: number[]; driverData: string }>({
+  dataType: () => `vector(${EMBEDDING_DIMENSIONS})`,
   toDriver: (value) => JSON.stringify(value),
   // SAFETY: pgvector's text output is a JSON-compatible number array ("[1,2,3]"),
   // so parsing the driver's string yields number[] by the column's own contract.
@@ -37,7 +44,7 @@ export const chunk = indexSchema.table("chunk", {
   id: text("id").notNull(),
   workspaceId: text("workspace_id").notNull(),
   content: text("content").notNull(),
-  embedding: vector1024("embedding").notNull(),
+  embedding: embeddingVector("embedding").notNull(),
   embeddingRouteId: text("embedding_route_id").notNull(),
   // The three visibility columns every readable unit carries (`[SEC2]`, ADR 0023).
   publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),

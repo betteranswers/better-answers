@@ -6,10 +6,33 @@ scope the cursor currently holds — seeding as the superuser and asserting as
 ``app_rt`` is the suites' pattern, not this module's concern.
 """
 
+import re
 import secrets
 from typing import Any
 
 from psycopg import Cursor
+
+from pg_harness import REPO_ROOT
+
+# The vector width (`[DEPS2]`) — the one packages/schema/src/index-tables.ts exports,
+# read from that file so the two tiers cannot drift; one match or refuse, as
+# pg_harness reads the image pin.
+_DIMENSIONS_SOURCE = REPO_ROOT / "packages" / "schema" / "src" / "index-tables.ts"
+
+
+def embedding_dimensions() -> int:
+    source = _DIMENSIONS_SOURCE.read_text("utf-8")
+    matches = re.findall(r"export const EMBEDDING_DIMENSIONS = (\d+);", source)
+    if len(matches) != 1:
+        msg = (
+            f"expected one EMBEDDING_DIMENSIONS in {_DIMENSIONS_SOURCE}, "
+            f"found {len(matches)}"
+        )
+        raise RuntimeError(msg)
+    return int(matches[0])
+
+
+EMBEDDING_DIMENSIONS = embedding_dimensions()
 
 _ULID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
@@ -47,7 +70,7 @@ def seed_llm_route(
     purpose: str = "embedding",
     provider: str = "mistral",
     model: str = "mistral-embed",
-    dimensions: int | None = 1024,
+    dimensions: int | None = EMBEDDING_DIMENSIONS,
 ) -> dict[str, Any]:
     cursor.execute(
         "INSERT INTO llm_route (id, workspace_id, purpose, provider, model, dimensions)"

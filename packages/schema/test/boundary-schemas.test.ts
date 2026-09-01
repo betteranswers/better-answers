@@ -4,7 +4,7 @@ import { PgTable } from "drizzle-orm/pg-core";
 import type { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { boundarySchemas, chunk, llmRoute, workspace } from "../src/index.ts";
+import { boundarySchemas, chunk, EMBEDDING_DIMENSIONS, llmRoute, workspace } from "../src/index.ts";
 import * as publicEntry from "../src/index.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "../src/drizzle-zod.ts";
 import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
@@ -28,7 +28,7 @@ const acceptedRows = {
       purpose: "embedding",
       provider: "mistral",
       model: "mistral-embed",
-      dimensions: 1024,
+      dimensions: EMBEDDING_DIMENSIONS,
     },
   ],
   chunk: [
@@ -36,7 +36,7 @@ const acceptedRows = {
       id: "chunk-1",
       workspaceId: WS_ID,
       content: "hello",
-      embedding: Array.from({ length: 1024 }, () => 0.5),
+      embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.5),
       embeddingRouteId: "route-embed",
       sensitivity: "Internal",
       audience: "Everyone",
@@ -177,7 +177,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
     chunk: [
       {
         ...acceptedRows.chunk[0],
-        embedding: Array.from({ length: 1023 }, () => 0.5),
+        embedding: Array.from({ length: EMBEDDING_DIMENSIONS - 1 }, () => 0.5),
       },
       { ...acceptedRows.chunk[0], sensitivity: "Secret" },
     ],
@@ -192,16 +192,32 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
   }
 });
 
-describe("the update forms stay partial", () => {
+describe("the customType exception, per shape", () => {
+  // The plain schema replaces the generated field wholesale — the column's
+  // nullability and update's .optional() included — so each shape is constructed
+  // on its own and each carries its own proof (ADR 0028, 2026-09-01 amendment).
+  const tooShort = Array.from({ length: EMBEDDING_DIMENSIONS - 1 }, () => 0);
+
+  it("chunk.select requires an embedding of the route's width", () => {
+    const row = { ...acceptedRows.chunk[0], publishedAt: null };
+    const select = boundarySchemas.chunk.select;
+    expect(select.safeParse(row).success).toBe(true);
+    expect(select.safeParse({ ...row, embedding: undefined }).success).toBe(false);
+    expect(select.safeParse({ ...row, embedding: tooShort }).success).toBe(false);
+  });
+
+  it("chunk.insert requires an embedding of the route's width", () => {
+    const row = acceptedRows.chunk[0];
+    const insert = boundarySchemas.chunk.insert;
+    expect(insert.safeParse(row).success).toBe(true);
+    expect(insert.safeParse({ ...row, embedding: undefined }).success).toBe(false);
+    expect(insert.safeParse({ ...row, embedding: tooShort }).success).toBe(false);
+  });
+
   it("chunk.update accepts a row that touches no embedding, and still checks one it does", () => {
-    // The plain-schema exception replaces the generated field wholesale, update's
-    // .optional() included — this is the proof the hand-written optional copy holds.
-    expect(boundarySchemas.chunk.update.safeParse({ content: "edited" }).success).toBe(true);
-    expect(
-      boundarySchemas.chunk.update.safeParse({
-        embedding: Array.from({ length: 1023 }, () => 0),
-      }).success,
-    ).toBe(false);
+    const update = boundarySchemas.chunk.update;
+    expect(update.safeParse({ content: "edited" }).success).toBe(true);
+    expect(update.safeParse({ embedding: tooShort }).success).toBe(false);
   });
 });
 
