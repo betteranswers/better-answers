@@ -1,0 +1,19 @@
+apps/api/src/ingress/hostnames.ts
+  s_d41063f43ada5b::t_a85a91abec984b 106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3b28fe26e4987d8d7cc0d3368d3a3157e4e78c0c",
+  "prompts": {},
+  "sessions": {
+    "s_d41063f43ada5b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e2e216cd-f777-484f-939a-18351ad361cb",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
