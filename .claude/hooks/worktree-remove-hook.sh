@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-# scripts/worktree-remove-hook.sh — Claude Code's `WorktreeRemove` hook (T-026).
+# .claude/hooks/worktree-remove-hook.sh — Claude Code's `WorktreeRemove` hook.
 #
-# The cleanup half of scripts/worktree-create-hook.sh. Fires when a worktree subagent
+# The cleanup half of .claude/hooks/worktree-create-hook.sh. Fires when a worktree subagent
 # finishes, a `--worktree` session exits and chooses removal, or a background session
 # is deleted. Claude Code passes the path the create hook returned as `.worktree_path`
 # and gives this hook no decision: it can tidy, never block, and a failure is logged

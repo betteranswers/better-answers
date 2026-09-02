@@ -40,15 +40,6 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers �
 
 Commands, versions and scripts are read from each workspace's `package.json` or `pyproject.toml`; this file does not repeat them. Every workspace exposes `check` (lint, types, tests); the root `check` runs them all.
 
-## Working a task
-
-1. Take one task from ordna; one branch and one pull request per task. The PR closes when `check` is green and the task's acceptance lines are each demonstrated by a test or a linked artefact.
-2. Design before code: state the module's **interface** (what a caller must know) and its **seam**; a deep module — much behaviour behind a small interface — is the target (`[DESIGN]`).
-3. Every behaviour change lands with a functional test through the module's interface in the same PR (`[TEST]`).
-4. A decision that is hard to reverse, surprising later, and a real trade-off gets an ADR in the same PR (`[ADR]`).
-5. Every version you introduce is read from Context7 or the vendor's release page in that PR (`[DEPS1]`); a remembered version is a wrong version.
-6. A PR touching `packages/schema/migrations` or any RLS policy gets an adversarial security pass before merge (`[SEC3]`).
-
 ## Skills
 
 `/grilling` and `/domain-modeling` for any design conversation; `/codebase-design` when shaping a module; `/tdd` for red–green work; `/writing-for-agents` when editing any file; `/diagnosing-bugs` for anything broken or slow.

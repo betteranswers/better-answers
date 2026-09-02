@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# scripts/worktree-create-hook.sh — Claude Code's `WorktreeCreate` hook (T-026).
+# .claude/hooks/worktree-create-hook.sh — Claude Code's `WorktreeCreate` hook.
 #
 # Replaces native worktree creation so every worktree Claude Code makes — an
 # `Agent(isolation: "worktree")` fork, `claude --worktree`, a desktop parallel
-# session — is provisioned before the agent's first turn (scripts/provision-worktree.sh).
+# session — is provisioned before the agent's first turn (.claude/hooks/provision-worktree.sh).
 #
 # Hook contract (https://code.claude.com/docs/en/worktrees, read 02/09/2026): JSON on
 # stdin carrying `.name`; stdout must be EXACTLY the created directory; a non-path on
@@ -16,7 +16,7 @@ set -euo pipefail
 # branch starts from the checkout's HEAD: in this repo `main` is pushed before any
 # fork, and a fork briefed to work from its worktree HEAD must see what the session
 # sees. A hook-created worktree carries no Claude Code marker, so the periodic sweep
-# leaves it alone; scripts/worktree-remove-hook.sh and `git worktree remove` are the
+# leaves it alone; .claude/hooks/worktree-remove-hook.sh and `git worktree remove` are the
 # two ways it goes.
 
 INPUT="$(cat)"
@@ -41,7 +41,7 @@ fi
 
 git -C "$ROOT" worktree add -b "$BRANCH" "$DIR" HEAD >&2
 
-bash "$ROOT/scripts/provision-worktree.sh" "$DIR" >&2 \
+bash "$ROOT/.claude/hooks/provision-worktree.sh" "$DIR" >&2 \
   || echo "worktree-create-hook: provisioning incomplete — the worktree is usable, install by hand" >&2
 
 echo "$DIR"

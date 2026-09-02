@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# scripts/provision-worktree.sh <worktree-path>
+# .claude/hooks/provision-worktree.sh <worktree-path>
 #
 # Installs a fresh checkout's dependencies so an agent's first act in a worktree is
-# its task, not `pnpm install`. Run by scripts/worktree-create-hook.sh for every
+# its task, not `pnpm install`. Run by .claude/hooks/worktree-create-hook.sh for every
 # worktree Claude Code creates; runnable by hand after `git worktree add`.
 #
 # Install, never symlink or clone from the main checkout. pnpm and uv both install by
