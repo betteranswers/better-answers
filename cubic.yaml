@@ -40,7 +40,7 @@ reviews:
       an ADR is a NEW ADR in the same pull request, never a quiet edit. Say which
       ADR is contradicted.
 
-    Four things carry more weight here than in most repositories:
+    Five things carry more weight here than in most repositories:
 
     1. Deep modules. Much behaviour behind a small interface. A wide interface
        over thin behaviour is a finding even when the code is correct.
@@ -49,11 +49,22 @@ reviews:
        A version that appears without evidence of being read is a finding.
     4. Tests go through the module's interface against real infrastructure.
        Module mocking is banned and lint-enforced.
+    5. Fabricated work. Placeholder, mock, demo or filler content on a
+       production path; documentation, comments or pull-request text claiming
+       behaviour the diff does not implement; a reference to a file, command,
+       route, function, environment variable or config key that does not exist.
+       Report these with the evidence from the diff, and leave alone generated
+       files, fixtures, snapshots, migrations and mechanical renames. A finding
+       that only restates an oxlint, anti-slop, ruff or mypy rule is not worth
+       writing: `check` already fails the branch on it before you see the diff.
 
   ignore:
     files:
       - apps/api/tools/anti-slop/**
       - cubic.yaml
+      # A verbatim third-party snapshot is taken by contract, so a finding in one
+      # belongs upstream and never on a pull request here (`[LIFT1]`, ADR 0027).
+      - "**/lifts/**"
       - .scratch/**
       - .planning/**
       - "**/reports/**"
@@ -101,34 +112,38 @@ reviews:
         6. Modularity and legibility concerns
 
         Do not flag cosmetic nits when a larger structural issue is present. Prefer a smaller number of high-conviction findings over a long list of minor notes. Only report violations on changed lines with clear evidence from the diff.
-    - name: Flag AI Slop and Fabricated Changes
-      description: |-
-        Be conservative. Flag only obvious, evidence-backed low-quality AI output in the diff.
-
-        Flag changes that:
-        - Ship placeholder, mock, demo, fake-data, temporary debug, or filler text to production paths without a clear reason.
-        - Claim behavior in docs, comments, config, or PR text that the changed code does not implement.
-        - Reference files, commands, routes, functions, env vars, or config keys that do not exist.
-        - Add duplicated, patchwork, or overengineered code where a smaller cohesive solution would clearly work.
-        - Add narrating comments that restate obvious code instead of explaining intent or constraints.
-        - Change behavior without meaningful tests, or weaken existing tests to normalize a regression.
-
-        Do not flag:
-        - Generated files, fixtures, snapshots, migrations, vendored code, or mechanical renames unless one of the rules above clearly applies.
-        - Explicitly labeled scaffolding with concrete follow-up guidance.
-        - Well-scoped AI-assisted code that is cohesive and tested.
     - name: Flag Security Vulnerabilities
       description: "Scan for security flaws: hardcoded secrets, SQL injection, XSS, weak auth, exposed data, poor crypto, unsafe deserialization, insecure HTTP calls in production, and more. Ensure all network requests use HTTPS/TLS. Identify attack vectors and security violations to maintain robust defenses."
-    - name: Require API Auth, Validation, and Tenant Scoping
+    # Cubic enables five agents per repository across every source, and a sixth
+    # is dropped with no error, so the two rules below cost the generic slots
+    # they replaced. The generic API-auth agent was absorbed here rather than
+    # deleted: tenant scoping and request validation are what `[SEC2]` is for.
+    - name: A Principal on every tenant-data call
       description: |-
-        Review API handlers and controller endpoints for missing authentication, authorization, tenant scoping, and request validation.
+        Rule `[SEC2]`, "A Principal on every call". Every `packages/core` function that reads or writes tenant data takes a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter; transports build it, business logic checks the role, the role's action threshold and the read predicate (published, sensitivity, audience) beside the data access.
 
-        Flag new or modified endpoints that:
-        - Accept request bodies without runtime validation, such as Zod schemas, DTOs, or framework-native validators.
-        - Trust user-supplied identifiers for tenant, organization, or account access instead of deriving access from the authenticated session.
-        - Return sensitive internal errors or use inconsistent HTTP status codes for 400, 401, 403, 404, and 500 cases.
-        - Mix reads and writes in a way that makes side effects hard to reason about.
-        - Add public or high-volume endpoints without rate limiting or abuse controls.
+        Flag a function that reaches a table, a store door or the graph and takes no `Principal` first, or takes one later in its parameter list, or takes a bare `workspaceId` string in place of one. Flag a transport that trusts a user-supplied workspace, organisation or account identifier instead of deriving it from the verified session or bearer token, and flag a request body accepted without runtime validation.
+
+        Flag a read that checks the workspace but skips the read predicate, and flag a read predicate tested against a source binding's fields rather than against the `published_at`, `sensitivity` and `audience` columns on the readable unit itself — a concept and a composition have no binding (ADR 0023).
+
+        A `Principal` has two kinds and both are real. A deferred principal carries a named person's authority into work that outlives their session and expires with the authority it borrowed; a platform principal is the platform acting as itself, with its own actor id and no person behind it. Flag a background job, scheduled run or replay carrying a live user session.
+
+        RLS is the guarantee and the store door is ergonomics over it, never a substitute: flag a new tenant table created without `withRLS()` or shipped without its zero-rows test, and flag a query aimed at a partition child that leans on the parent's policy.
+      include:
+        - apps/api/**
+        - packages/core/**
+        - packages/schema/**
+    - name: The identity provider stays behind its seam
+      description: |-
+        Rule `[DESIGN5]` and ADR 0009. Better Auth is a stay with written leave-triggers, and this seam is what keeps the Keycloak fallback a fortnight of work rather than a rewrite.
+
+        A transport verifies a bearer token and builds a `Principal`. Nothing behind that seam knows which library minted the token. Flag any `better-auth` or `@better-auth/*` import outside the auth module, and flag the subtler leak no lint rule sees: a Better Auth type, interface or object shape re-exported, aliased, structurally copied, or embedded in a `Principal`, a context object or a function signature that crosses into `packages/core` or into the web client. A session object passed onward where a `Principal` belongs is the same finding.
+
+        Rule `[DESIGN3]` governs seams generally. A seam is introduced only where something already varies across it — a second store, a second provider — so a seam built for one implementation with no second in sight is a finding. Dependencies arrive as parameters and results are returned rather than written as side effects.
+      include:
+        - apps/api/**
+        - apps/web/**
+        - packages/core/**
 pr_descriptions:
   generate: true
   cubic_review_link: true
