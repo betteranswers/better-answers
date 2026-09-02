@@ -1,0 +1,21 @@
+docs/adr/0022-two-stacks-deployed-by-digest-every-irreplaceable-byte-encrypted-off-host-erasures-replayed-on-restore.md
+  s_d41063f43ada5b::t_8b85122595f51f 62-65
+docs/adr/0008-trpc-inside-openapi-and-mcp-outside.md
+  s_d41063f43ada5b::t_0d10e165f616c5 33-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3b41e4ad12cdaadcf675ba82dc25aff456b8c0c3",
+  "prompts": {},
+  "sessions": {
+    "s_d41063f43ada5b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e2e216cd-f777-484f-939a-18351ad361cb",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
