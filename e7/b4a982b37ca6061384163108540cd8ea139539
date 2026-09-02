@@ -1,0 +1,53 @@
+apps/web/src/shared/ui/dialog.tsx
+  s_90ffdc067aac0d::t_6a9354b452af9c 32
+apps/api/package.json
+  s_90ffdc067aac0d::t_e37a2558b5265f 7
+apps/web/src/shared/ui/button.tsx
+  s_90ffdc067aac0d::t_6a9354b452af9c 14
+  s_90ffdc067aac0d::t_2d8aa6e897170c 22,26
+apps/web/src/shared/ui/badge.tsx
+  s_90ffdc067aac0d::t_6a9354b452af9c 15
+apps/api/src/trpc/router.ts
+  s_90ffdc067aac0d::t_90d8ce22fab5b3 50
+apps/web/tsconfig.json
+  s_90ffdc067aac0d::t_76113a57b2f4a6 9-15
+apps/api/src/trpc/app-router.ts
+  s_90ffdc067aac0d::t_e37a2558b5265f 1-13
+apps/web/src/app/providers.tsx
+  s_90ffdc067aac0d::t_a5230aa2f216fb 9-12
+apps/web/test/api-client.test.tsx
+  s_90ffdc067aac0d::t_f4791bcbf4ca7c 1-2
+  s_90ffdc067aac0d::t_6a03ad9ced3766 11
+  s_90ffdc067aac0d::t_d024aa175d883f 55
+  s_90ffdc067aac0d::t_8fb7264bcde853 72-83,85-86
+  s_90ffdc067aac0d::t_4ff27a3599693a 3,84,87-89
+apps/web/src/shared/api/query-client.ts
+  s_90ffdc067aac0d::t_fd56f95794049f 2,4-5,8-12,14-15,22-23,27-28
+  s_90ffdc067aac0d::t_968d6732cb094c 3,6-7,13
+  s_90ffdc067aac0d::t_998bb27f35eeb3 24-26
+apps/api/src/trpc/base.ts
+  s_90ffdc067aac0d::t_44d58fbe052f8e 57
+  s_90ffdc067aac0d::t_0a2d811204beac 6,17-23,27
+NOTICE
+  s_90ffdc067aac0d::t_5c7175d95ff44e 7-10
+apps/api/src/auth/index.ts
+  s_90ffdc067aac0d::t_998bb27f35eeb3 16
+apps/web/src/shared/ui/THIRD_PARTY_NOTICES.md
+  s_90ffdc067aac0d::t_41ee67710d4690 1-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e7b4a982b37ca6061384163108540cd8ea139539",
+  "prompts": {},
+  "sessions": {
+    "s_90ffdc067aac0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb92143-40a3-4162-962a-19793a875ce7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
