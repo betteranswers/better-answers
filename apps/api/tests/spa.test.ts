@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { TRPC_ENDPOINT } from "../src/trpc/index.ts";
 import { APP_HOSTNAME, MCP_HOSTNAME, startApp, type TestApp } from "./harness.ts";
 
 /**
@@ -78,6 +79,18 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     const response = await app.client(undefined, APP_HOSTNAME).fetch("/get-session");
 
     expect(response.headers.get("content-type")).not.toContain("text/html");
+  });
+
+  it("leaves the product's own transport answering on app., not the shell", async () => {
+    // The tRPC mount and the shell share `app.` and the same wildcard behind them
+    // (ADR 0008, ADR 0022). A navigation-shaped request to a procedure's path has to
+    // reach tRPC: the shell answering it would be a screen where a refusal should be.
+    const response = await app
+      .client(undefined, APP_HOSTNAME)
+      .fetch(`${TRPC_ENDPOINT}/routes.list`, asABrowserNavigates);
+
+    expect(response.headers.get("content-type")).not.toContain("text/html");
+    await expect(response.text()).resolves.not.toContain(`<div id="root">`);
   });
 
   it("serves the shell on app. and nowhere else, so mcp. is unchanged", async () => {
