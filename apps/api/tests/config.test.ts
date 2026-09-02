@@ -123,13 +123,16 @@ describe("the four hostnames of the estate", () => {
     expect(read.ok && read.value.hostnames.app).toBe("app.example.test");
   });
 
-  it("accepts a PUBLIC_URL carrying DNS's trailing dot beside the bare MCP_HOSTNAME", () => {
-    // `mcp.example.test.` is the same host; the comparison reads it the way the
-    // hostname fence reads an arriving request, so it does not stop the process.
+  it("strips DNS's trailing dot from PUBLIC_URL, so every string derived from it is on the host a browser sends", () => {
+    // `mcp.example.test.` is the same host to DNS and to nothing else: the issuer, the
+    // token audience, the protected-resource document and the three pages'
+    // same-origin check are all exact strings, and a browser's `Origin` never carries
+    // the dot. Accepting the value beside a bare `MCP_HOSTNAME` without normalising it
+    // would start the process and refuse every OAuth form at 403.
     const read = readIdentityBootstrap(
       identityEnvironment({ PUBLIC_URL: "https://mcp.example.test./" }),
     );
 
-    expect(read.ok).toBe(true);
+    expect(read.ok && read.value.publicUrl).toBe("https://mcp.example.test");
   });
 });

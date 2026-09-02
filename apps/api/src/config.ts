@@ -2,7 +2,12 @@ import { z } from "zod";
 
 import { err, ok, type Result } from "@better-answers/core/kernel";
 
-import { bareHostname, hostnameOfUrl, type PublicHostnames } from "./ingress/hostnames.ts";
+import {
+  bareHostname,
+  hostnameOfUrl,
+  originOfUrl,
+  type PublicHostnames,
+} from "./ingress/hostnames.ts";
 import { logger } from "./logger.ts";
 
 /**
@@ -34,7 +39,12 @@ const httpsOrigin = z
       url.password === ""
     );
   }, "PUBLIC_URL must be an https origin with no path, query, fragment or credentials")
-  .transform((value) => new URL(value).origin);
+  // Normalised to the bare host, not merely parsed: DNS's trailing root dot names the
+  // same host, but every string this origin becomes — the issuer, the token audience,
+  // the protected-resource document, Better Auth's trusted origins and the three
+  // pages' `origin === publicUrl` check — is compared character for character against
+  // an `Origin` a browser sends without it.
+  .transform((value) => originOfUrl(value));
 
 const identityBootstrapSchema = z
   .object({

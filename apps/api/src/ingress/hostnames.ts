@@ -107,12 +107,19 @@ export const HOSTNAME_REFUSAL = "This address does not serve that path.";
 const HOSTNAME_LABEL = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i;
 
 /**
- * One reading of a host string, for the configured value and the arriving request
- * alike: an IPv6 literal without its brackets, and without DNS's trailing root dot,
- * which names the same host and must not slip past a fence that knows only the bare
- * form. The URL parser has already lower-cased what it gives us.
+ * DNS's trailing root dot names the same host — and nothing that compares an origin as
+ * a string agrees: a browser sends `Origin` without it, and Better Auth's CSRF check,
+ * the token audience and the protected-resource document are all exact strings.
  */
-const bareForm = (hostname: string): string => hostname.replace(/^\[|\]$/g, "").replace(/\.$/, "");
+const withoutRootDot = (hostname: string): string => hostname.replace(/\.$/, "");
+
+/**
+ * One reading of a host string, for the configured value and the arriving request
+ * alike: an IPv6 literal without its brackets and without the root dot, so neither
+ * slips past a fence that knows only the bare form. The URL parser has already
+ * lower-cased what it gives us.
+ */
+const bareForm = (hostname: string): string => withoutRootDot(hostname.replace(/^\[|\]$/g, ""));
 
 /**
  * The host of a URL as the fence reads it. `@hono/node-server` builds the request URL
@@ -123,6 +130,18 @@ const bareForm = (hostname: string): string => hostname.replace(/^\[|\]$/g, "").
  * same host" means one thing on both sides of the fence.
  */
 export const hostnameOfUrl = (url: string): string => bareForm(new URL(url).hostname);
+
+/**
+ * A URL's origin on the host the fence reads. `config.ts` normalises `PUBLIC_URL`
+ * through this, so every string derived from it — the issuer, the token audience, the
+ * protected-resource document, Better Auth's trusted origins and its CSRF comparison —
+ * is on the bare host an arriving browser actually sends.
+ */
+export const originOfUrl = (url: string): string => {
+  const parsed = new URL(url);
+  parsed.hostname = withoutRootDot(parsed.hostname);
+  return parsed.origin;
+};
 
 /**
  * A bare hostname: DNS labels and nothing else. A value with a scheme, a port, a path
