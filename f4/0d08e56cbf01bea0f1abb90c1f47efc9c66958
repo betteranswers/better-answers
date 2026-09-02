@@ -1,0 +1,21 @@
+apps/api/src/auth/constants.ts
+  s_90ffdc067aac0d::t_c11a6ec5f57af4 54-58
+packages/core/test/llm-routes.test.ts
+  s_90ffdc067aac0d::t_acb219a8a29024 102-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f40d08e56cbf01bea0f1abb90c1f47efc9c66958",
+  "prompts": {},
+  "sessions": {
+    "s_90ffdc067aac0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb92143-40a3-4162-962a-19793a875ce7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
