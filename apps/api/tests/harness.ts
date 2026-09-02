@@ -191,7 +191,7 @@ export const startApp = async (): Promise<TestApp> => {
       door,
       { userId, at },
     );
-    if (!revoked.ok) throw new Error(`revokeCredentials failed: ${revoked.error}`);
+    if (!revoked.ok) throw new Error(`revokeCredentials failed: ${String(revoked.error)}`);
   };
 
   const removeMember: TestApp["removeMember"] = async (workspaceId, userId) => {

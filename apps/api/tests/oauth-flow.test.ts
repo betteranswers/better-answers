@@ -501,7 +501,7 @@ describe("the three roles through Better Auth's own endpoints", () => {
     return row.rows[0]?.role;
   };
 
-  it("lets an Admin move a member between the three roles, and refuses the plugin's own owner role", async () => {
+  it("lets an Admin change a Viewer to an Editor, and refuses the plugin's own owner role", async () => {
     const acme = await app.provision({ name: "Acme" });
     const viewer = await app.person();
     await app.addMember(acme.workspaceId, viewer.id, "Viewer");

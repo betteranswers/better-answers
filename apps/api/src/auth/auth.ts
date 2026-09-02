@@ -167,21 +167,32 @@ const bodyFields = z
   .partial();
 const signedInUser = z.object({ user: z.object({ id: z.string() }) });
 
+const invitationsNotYet = (): APIError =>
+  new APIError("NOT_IMPLEMENTED", {
+    error: "invitations_not_yet",
+    error_description: "invitations arrive with the People screen",
+  });
+
 const clientIdOfQuery = (query: string | undefined): string | undefined =>
   query === undefined ? undefined : (new URLSearchParams(query).get("client_id") ?? undefined);
 
 export const createAuth = (deps: AuthDependencies) => {
   const audit = deps.logger.child({ module: "auth" });
 
-  /** The one workspace a person holds, when it is exactly one. */
-  const soleMembershipOf = async (userId: string): Promise<string | undefined> => {
+  /** The workspaces a person holds — the one membership read the three identity paths share. */
+  const membershipsOf = async (userId: string): Promise<readonly string[]> => {
     const held = await deps.database.query<{ workspace_id: string }>(
-      "SELECT workspace_id FROM member WHERE user_id = $1",
+      "SELECT workspace_id FROM member WHERE user_id = $1 ORDER BY workspace_id",
       [userId],
     );
-    const [only] = held.rows;
-    return held.rows.length === 1 && only !== undefined ? only.workspace_id : undefined;
+    return held.rows.map((row) => row.workspace_id);
   };
+
+  /** The one workspace a person holds, when it is exactly one. */
+  const soleOf = (held: readonly string[]): string | undefined =>
+    held.length === 1 ? held[0] : undefined;
+  const soleMembershipOf = async (userId: string): Promise<string | undefined> =>
+    soleOf(await membershipsOf(userId));
   const db = drizzle(deps.database, { schema: identitySchema });
 
   return betterAuth({
@@ -222,15 +233,11 @@ export const createAuth = (deps: AuthDependencies) => {
           // OAuth session both read it (ADR 0009's 2026-08-27 amendment). A person in
           // none or several has none active, and the picker decides.
           before: async (session) => {
-            const held = await deps.database.query<{ workspace_id: string }>(
-              "SELECT workspace_id FROM member WHERE user_id = $1",
-              [session.userId],
-            );
-            const [only] = held.rows;
-            if (held.rows.length !== 1 || only === undefined) return;
+            const only = await soleMembershipOf(session.userId);
+            if (only === undefined) return;
             // The organisation plugin's session field is `activeOrganizationId` (mapped
             // to the `active_workspace_id` column); set the field, not the column.
-            return { data: { ...session, activeOrganizationId: only.workspace_id } };
+            return { data: { ...session, activeOrganizationId: only } };
           },
         },
       },
@@ -339,10 +346,11 @@ export const createAuth = (deps: AuthDependencies) => {
           // screen (T-022), so none is created: an emailed invitation with no way to
           // accept it would only sit pending. Membership today is the platform's act.
           beforeCreateInvitation: async () => {
-            throw new APIError("NOT_IMPLEMENTED", {
-              error: "invitations_not_yet",
-              error_description: "invitations arrive with the People screen",
-            });
+            throw invitationsNotYet();
+          },
+          // Nor accepted: a row created before this fence, or by hand, adds no membership.
+          beforeAcceptInvitation: async () => {
+            throw invitationsNotYet();
           },
         },
       }),
@@ -400,18 +408,14 @@ export const createAuth = (deps: AuthDependencies) => {
           // workspace never gets here with none active — the session-create hook above
           // set it before the session existed (ADR 0009's 2026-08-27 amendment).
           shouldRedirect: async ({ session, user: person }) => {
-            const memberships = await deps.database.query<{ workspace_id: string }>(
-              "SELECT workspace_id FROM member WHERE user_id = $1 ORDER BY workspace_id",
-              [person.id],
-            );
-            const held = memberships.rows.map((row) => row.workspace_id);
+            const held = await membershipsOf(person.id);
             const active = activeWorkspaceOf(session);
             if (active !== undefined && held.includes(active)) return false;
             // A session made before the person's one membership existed: the
             // session-create hook could not set it, so it is set here, once, as the
             // platform's own write to the identity set.
-            const [only] = held;
-            if (held.length === 1 && only !== undefined) {
+            const only = soleOf(held);
+            if (only !== undefined) {
               await withIdentityWrite(PLATFORM_PRINCIPAL, deps.door, (tx) =>
                 tx.query("UPDATE session SET active_workspace_id = $1 WHERE id = $2", [
                   only,

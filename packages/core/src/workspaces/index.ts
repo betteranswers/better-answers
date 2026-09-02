@@ -105,7 +105,9 @@ export const revokeCredentials = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: RevokeCredentialsInput,
-): Promise<Result<{ userId: string; actorId: PlatformPrincipal["actorId"] }, "no-such-user">> => {
+): Promise<
+  Result<{ userId: string; actorId: PlatformPrincipal["actorId"] }, "no-such-user" | Error>
+> => {
   const userId = boundarySchemas.user.select.shape.id.safeParse(input.userId);
   if (!userId.success) return err("no-such-user");
   const revoked = await attempt(() =>
@@ -133,10 +135,10 @@ export const revokeCredentials = async (
       return at;
     }),
   );
-  // No constraint of this act's is a refusal a caller can act on; a failure here is a
-  // programming or infrastructure error and surfaces as one (as `provisionWorkspace`'s
-  // `classify` does with what it does not recognise).
-  if (!revoked.ok) throw revoked.error;
+  // No constraint of this act's is a refusal a caller can act on, so a failure is the
+  // store's and comes back as the normalised Error itself — the cause kept, the
+  // convention (a Result, never a rejection) held.
+  if (!revoked.ok) return err(revoked.error);
   if (revoked.value === undefined) return err("no-such-user");
   return ok({ userId: userId.data, actorId: platform.actorId });
 };

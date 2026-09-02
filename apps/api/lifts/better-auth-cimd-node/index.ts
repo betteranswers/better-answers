@@ -164,10 +164,14 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
         "too many metadata hostnames resolving at once",
       );
     }
+    if (signal.aborted) {
+      throw new CimdTransportError("timeout", `metadata fetch exceeded ${timeoutMs} ms`);
+    }
     // The slot is held until the resolver itself settles — a lookup the caller stopped
-    // waiting for is still running, and still counts.
+    // waiting for is still running, and still counts. The resolver is started inside a
+    // settled promise so a synchronous throw releases the slot like a rejection.
     inFlight += 1;
-    const resolving = lookup(hostname);
+    const resolving = Promise.resolve().then(() => lookup(hostname));
     resolving.then(
       () => {
         inFlight -= 1;

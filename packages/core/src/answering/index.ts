@@ -75,7 +75,13 @@ export const trustWords = (trust: Trust): string => {
 const ukLongDate = (iso: string): string => {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  // A fixed zone, so the same instant reads the same on every machine (`[UX1]`).
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Europe/London",
+  });
 };
 
 export type FindHit = {
