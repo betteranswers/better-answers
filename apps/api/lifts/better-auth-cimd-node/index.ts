@@ -138,9 +138,9 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
     hostCache.set(hostname, { pinned, until: now() + hostCacheMs });
   };
 
-  /** The resolver under the same deadline as the connection: a stalled resolver is a timeout. */
-  const lookupWithin = (
-    hostname: string,
+  /** A resolve under the same deadline as the connection: a stalled resolver is a timeout. */
+  const within = (
+    resolving: Promise<readonly LookedUpAddress[]>,
     signal: AbortSignal,
   ): Promise<readonly LookedUpAddress[]> =>
     new Promise((resolve, reject) => {
@@ -151,9 +151,7 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
         return;
       }
       signal.addEventListener("abort", onAbort, { once: true });
-      lookup(hostname)
-        .then(resolve, reject)
-        .finally(() => signal.removeEventListener("abort", onAbort));
+      resolving.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
     });
 
   const resolvePinned = async (hostname: string, signal: AbortSignal): Promise<LookedUpAddress> => {
@@ -166,13 +164,19 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
         "too many metadata hostnames resolving at once",
       );
     }
+    // The slot is held until the resolver itself settles — a lookup the caller stopped
+    // waiting for is still running, and still counts.
     inFlight += 1;
-    let addresses: readonly LookedUpAddress[];
-    try {
-      addresses = await lookupWithin(hostname, signal);
-    } finally {
-      inFlight -= 1;
-    }
+    const resolving = lookup(hostname);
+    resolving.then(
+      () => {
+        inFlight -= 1;
+      },
+      () => {
+        inFlight -= 1;
+      },
+    );
+    const addresses = await within(resolving, signal);
     if (addresses.length === 0) {
       throw new CimdTransportError("no-addresses", "metadata hostname returned no DNS addresses");
     }

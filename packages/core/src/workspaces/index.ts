@@ -87,9 +87,6 @@ const classify = (error: Error): ProvisionRefusal => {
   throw error;
 };
 
-/** `failed` is the store refusing the act — a transaction that did not commit. */
-export type RevokeRefusal = "no-such-user" | "failed";
-
 export type RevokeCredentialsInput = {
   readonly userId: string;
   /** The instant; every credential issued before it is refused from now on. */
@@ -108,7 +105,7 @@ export const revokeCredentials = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: RevokeCredentialsInput,
-): Promise<Result<{ userId: string; actorId: PlatformPrincipal["actorId"] }, RevokeRefusal>> => {
+): Promise<Result<{ userId: string; actorId: PlatformPrincipal["actorId"] }, "no-such-user">> => {
   const userId = boundarySchemas.user.select.shape.id.safeParse(input.userId);
   if (!userId.success) return err("no-such-user");
   const revoked = await attempt(() =>
@@ -136,7 +133,10 @@ export const revokeCredentials = async (
       return at;
     }),
   );
-  if (!revoked.ok) return err("failed");
+  // No constraint of this act's is a refusal a caller can act on; a failure here is a
+  // programming or infrastructure error and surfaces as one (as `provisionWorkspace`'s
+  // `classify` does with what it does not recognise).
+  if (!revoked.ok) throw revoked.error;
   if (revoked.value === undefined) return err("no-such-user");
   return ok({ userId: userId.data, actorId: platform.actorId });
 };

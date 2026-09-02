@@ -480,38 +480,68 @@ describe("the limits", () => {
 });
 
 describe("the three roles through Better Auth's own endpoints", () => {
-  const invite = (client: ReturnType<TestApp["client"]>, workspaceId: string, role: string) =>
-    client.fetch("/organization/invite-member", {
+  const setRole = (client: ReturnType<TestApp["client"]>, memberId: string, role: string) =>
+    client.fetch("/organization/update-member-role", {
       method: "POST",
       headers: { "content-type": "application/json", origin: PUBLIC_URL },
-      body: JSON.stringify({
-        email: `invitee-${Date.now()}-${role}@example.invalid`,
-        role,
-        organizationId: workspaceId,
-      }),
+      body: JSON.stringify({ memberId, role }),
     });
+  const memberIdOf = async (workspaceId: string, userId: string): Promise<string> => {
+    const row = await app.database.superuser.query<{ id: string }>(
+      "SELECT id FROM member WHERE workspace_id = $1 AND user_id = $2",
+      [workspaceId, userId],
+    );
+    return row.rows[0]?.id ?? "";
+  };
+  const roleOf = async (workspaceId: string, userId: string): Promise<string | undefined> => {
+    const row = await app.database.superuser.query<{ role: string }>(
+      "SELECT role FROM member WHERE workspace_id = $1 AND user_id = $2",
+      [workspaceId, userId],
+    );
+    return row.rows[0]?.role;
+  };
 
-  it("lets an Admin invite at one of the three roles, and refuses the plugin's own owner role", async () => {
+  it("lets an Admin move a member between the three roles, and refuses the plugin's own owner role", async () => {
     const acme = await app.provision({ name: "Acme" });
+    const viewer = await app.person();
+    await app.addMember(acme.workspaceId, viewer.id, "Viewer");
     const client = app.client();
     await connectAsHost(app, client, acme.admin);
+    const memberId = await memberIdOf(acme.workspaceId, viewer.id);
 
-    expect((await invite(client, acme.workspaceId, "Viewer")).status).toBe(200);
-    const owner = await invite(client, acme.workspaceId, "owner");
+    expect((await setRole(client, memberId, "Editor")).status).toBe(200);
+    expect(await roleOf(acme.workspaceId, viewer.id)).toBe("Editor");
+
+    const owner = await setRole(client, memberId, "owner");
     expect(owner.status).toBe(400);
     expect((await json(owner))["error"]).toBe("invalid_role");
+    expect(await roleOf(acme.workspaceId, viewer.id)).toBe("Editor");
   });
 
-  it("refuses a Viewer who tries to invite", async () => {
+  it("refuses a Viewer who tries to change a role, and refuses every invitation until the People screen ships", async () => {
     const acme = await app.provision({ name: "Acme" });
     const viewer = await app.person();
     await app.addMember(acme.workspaceId, viewer.id, "Viewer");
     const client = app.client();
     await connectAsHost(app, client, viewer);
+    const adminMemberId = await memberIdOf(acme.workspaceId, acme.admin.id);
 
-    const response = await invite(client, acme.workspaceId, "Viewer");
+    expect((await setRole(client, adminMemberId, "Viewer")).status).toBe(403);
+    expect(await roleOf(acme.workspaceId, acme.admin.id)).toBe("Admin");
 
-    expect(response.status).toBe(403);
+    const adminClient = app.client();
+    await connectAsHost(app, adminClient, acme.admin);
+    const invited = await adminClient.fetch("/organization/invite-member", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: PUBLIC_URL },
+      body: JSON.stringify({
+        email: "invitee@example.invalid",
+        role: "Viewer",
+        organizationId: acme.workspaceId,
+      }),
+    });
+    expect(invited.status).toBe(501);
+    expect(app.emails.some((message) => message.to === "invitee@example.invalid")).toBe(false);
   });
 });
 

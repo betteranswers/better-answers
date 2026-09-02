@@ -11,7 +11,11 @@ import type { Logger } from "pino";
 import { z } from "zod";
 
 import type { PlatformPrincipal } from "@better-answers/core/kernel";
-import { withScope, type PostgresDoor } from "@better-answers/core/store/postgres";
+import {
+  withIdentityWrite,
+  withScope,
+  type PostgresDoor,
+} from "@better-answers/core/store/postgres";
 
 /** The identity provider's own acts (the partition on a self-serve create) are the platform's. */
 const PLATFORM_PRINCIPAL: PlatformPrincipal = {
@@ -168,6 +172,16 @@ const clientIdOfQuery = (query: string | undefined): string | undefined =>
 
 export const createAuth = (deps: AuthDependencies) => {
   const audit = deps.logger.child({ module: "auth" });
+
+  /** The one workspace a person holds, when it is exactly one. */
+  const soleMembershipOf = async (userId: string): Promise<string | undefined> => {
+    const held = await deps.database.query<{ workspace_id: string }>(
+      "SELECT workspace_id FROM member WHERE user_id = $1",
+      [userId],
+    );
+    const [only] = held.rows;
+    return held.rows.length === 1 && only !== undefined ? only.workspace_id : undefined;
+  };
   const db = drizzle(deps.database, { schema: identitySchema });
 
   return betterAuth({
@@ -294,15 +308,7 @@ export const createAuth = (deps: AuthDependencies) => {
         // `provisionWorkspace` (packages/core/workspaces) is the act; this flag is the
         // "self-serve later" switch.
         allowUserToCreateOrganization: false,
-        // An Admin's invitation reaches the person by email, through the same
-        // transport as the sign-in code; the accept page is T-022's.
-        sendInvitationEmail: async ({ email, organization, id }) => {
-          await deps.sendEmail({
-            to: email,
-            subject: `You are invited to ${organization.name} on Better Answers`,
-            text: `Sign in at ${deps.publicUrl}/sign-in to accept invitation ${id}.`,
-          });
-        },
+
         schema: {
           organization: { modelName: "workspace" },
           member: { fields: { organizationId: "workspaceId" } },
@@ -329,8 +335,14 @@ export const createAuth = (deps: AuthDependencies) => {
           beforeUpdateMemberRole: async ({ newRole }) => {
             refuseForeignRole(newRole);
           },
-          beforeCreateInvitation: async ({ invitation }) => {
-            refuseForeignRole(invitation.role);
+          // No invitation can be accepted until the accept page ships with the first
+          // screen (T-022), so none is created: an emailed invitation with no way to
+          // accept it would only sit pending. Membership today is the platform's act.
+          beforeCreateInvitation: async () => {
+            throw new APIError("NOT_IMPLEMENTED", {
+              error: "invitations_not_yet",
+              error_description: "invitations arrive with the People screen",
+            });
           },
         },
       }),
@@ -371,8 +383,10 @@ export const createAuth = (deps: AuthDependencies) => {
         postLogin: {
           page: "/choose-workspace",
           // ADR 0018's `workspace` claim: the active workspace, or no token at all.
-          consentReferenceId: async ({ session }) => {
-            const active = activeWorkspaceOf(session);
+          consentReferenceId: async ({ session, user: person }) => {
+            // The session object here may predate `shouldRedirect`'s write for a
+            // sole-membership session, so the fallback is read the same way here.
+            const active = activeWorkspaceOf(session) ?? (await soleMembershipOf(person.id));
             if (active === undefined) {
               throw new APIError("BAD_REQUEST", {
                 error: "set_workspace",
@@ -394,12 +408,15 @@ export const createAuth = (deps: AuthDependencies) => {
             const active = activeWorkspaceOf(session);
             if (active !== undefined && held.includes(active)) return false;
             // A session made before the person's one membership existed: the
-            // session-create hook could not set it, so it is set here, once.
+            // session-create hook could not set it, so it is set here, once, as the
+            // platform's own write to the identity set.
             const [only] = held;
             if (held.length === 1 && only !== undefined) {
-              await deps.database.query(
-                "UPDATE session SET active_workspace_id = $1 WHERE id = $2",
-                [only, session.id],
+              await withIdentityWrite(PLATFORM_PRINCIPAL, deps.door, (tx) =>
+                tx.query("UPDATE session SET active_workspace_id = $1 WHERE id = $2", [
+                  only,
+                  session.id,
+                ]),
               );
               return false;
             }

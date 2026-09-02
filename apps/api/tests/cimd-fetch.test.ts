@@ -263,6 +263,28 @@ describe("the SSRF policy", () => {
     expect(requested).toBe(0);
   });
 
+  it("bounds the resolves in flight: a lookup the caller stopped waiting for still holds its slot", async () => {
+    let requested = 0;
+    const fetcher = createClientMetadataFetcher({
+      lookup: () => new Promise(() => {}),
+      request: (() => {
+        requested += 1;
+        throw new Error("never");
+      }) as unknown as typeof httpsRequest,
+      timeoutMs: 10,
+    });
+
+    // Thirty-two distinct hosts time out but never settle; the thirty-third is refused
+    // at once, without waiting on the deadline.
+    for (let n = 0; n < 32; n += 1) {
+      expect(await refusal(fetcher, `https://host-${n}.example/doc`)).toBe("timeout");
+    }
+    const started = Date.now();
+    expect(await refusal(fetcher, "https://host-33.example/doc")).toBe("too-many-lookups");
+    expect(Date.now() - started).toBeLessThan(10);
+    expect(requested).toBe(0);
+  });
+
   it("bounds the host cache: past the cap the oldest host is resolved again", async () => {
     const lookups = new Map<string, number>();
     const fetcher = createClientMetadataFetcher({
