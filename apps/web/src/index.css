@@ -1,9 +1,45 @@
 /*
- * Geist, self-hosted. One variable file carries every weight from 100 to 900,
- * so weight is a CSS choice rather than another download.
+ * The one stylesheet the app has. Everything below comes from the design system:
+ * Tailwind reads its tokens through the bridge, so a colour, a size or a radius on a
+ * screen is a theme value and never a local invention (ADR 0033).
+ *
+ * The tokens come first, because `styles.css` reaches them through nested `@import`s and
+ * CSS lets an `@import` follow only another `@import`: behind Tailwind's own output those
+ * nested imports would sit after a rule, and a build drops them silently — a screen with
+ * every utility and no token values. Then Tailwind, then the bridge that hands the tokens
+ * to it, then the faces.
  */
-@import "@fontsource-variable/geist";
+@import "@better-answers/design-system/styles.css";
+@import "tailwindcss";
+@import "@better-answers/design-system/tokens/tailwind-bridge.css";
+@import "@better-answers/design-system/tokens/fonts-hosted.css";
 
-:root {
-  font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+/*
+ * The type scale is read from the tokens directly rather than through a Tailwind theme
+ * value, because Tailwind's font-size namespace and the design system's type steps are
+ * the same `--text-*` names (the bridge's §7 says why). Setting it once on the elements
+ * keeps every screen on the scale without a utility on every heading.
+ */
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    letter-spacing: var(--tracking-body);
+    color: var(--text-body);
+  }
+
+  h1 {
+    font-size: var(--text-xl);
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--tracking-heading);
+    color: var(--text-primary);
+  }
+
+  h2 {
+    font-size: var(--text-md);
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--tracking-heading);
+    color: var(--text-primary);
+  }
 }

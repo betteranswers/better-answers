@@ -9,24 +9,29 @@
     "preview": "vite preview",
     "lint": "oxlint --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
-    "check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
+    "check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run e2e",
     "test": "vitest run --passWithNoTests",
+    "e2e": "playwright test",
     "mutation": "stryker run"
   },
   "dependencies": {
-    "@fontsource-variable/geist": "5.3.0",
+    "@better-answers/design-system": "workspace:*",
+    "@tanstack/react-router": "1.170.32",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
+    "@tailwindcss/vite": "4.3.3",
     "@testing-library/dom": "10.4.1",
     "@testing-library/react": "16.3.3",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "@vitejs/plugin-react": "6.1.1",
     "jsdom": "30.0.1",
+    "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.2.2",
     "vitest": "4.1.11"

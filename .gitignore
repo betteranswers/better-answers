@@ -19,6 +19,10 @@ reports/
 mutants/
 stryker-setup-*.js
 
+# Playwright's per-run artefacts (traces, screenshots) and its last-run marker ([TEST1]).
+test-results/
+playwright-report/
+
 # local env — every secret lives in Coolify's env or the password manager (deploy/SECRETS.md)
 .env
 .env.*
