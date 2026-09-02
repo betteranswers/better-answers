@@ -1,0 +1,39 @@
+apps/api/src/trpc/index.ts
+  s_90ffdc067aac0d::t_42af474bb6c7b4 1-12
+packages/core/test/llm-routes.test.ts
+  s_90ffdc067aac0d::t_8f551624912ca6 2-137
+  s_90ffdc067aac0d::t_b59c26d8dede63 1
+apps/api/package.json
+  s_90ffdc067aac0d::t_6e9e5afe5814a2 24,26
+pnpm-lock.yaml
+  ai_agent 53-55,59-61,1047-1053,1799-1804,4252-4256,4775-4777
+apps/api/tests/routes-list.test.ts
+  s_90ffdc067aac0d::t_9d767343a2fac4 1-120,122-233
+  s_90ffdc067aac0d::t_5068bc46fad482 121
+apps/api/src/trpc/router.ts
+  s_90ffdc067aac0d::t_68198782d94332 1-51
+packages/core/src/llm/index.ts
+  s_90ffdc067aac0d::t_a4f8b068f2d2ef 1-5,11-70
+apps/api/src/trpc/base.ts
+  s_90ffdc067aac0d::t_aaece8c650cf03 1-64
+apps/api/src/server.ts
+  s_90ffdc067aac0d::t_7f841587c865f5 19
+  s_90ffdc067aac0d::t_16a96796fa4217 42
+  s_90ffdc067aac0d::t_e7b5960237916c 132-134
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0f25759a4f811ac5d8a8fa4c8ca327c17713bffa",
+  "prompts": {},
+  "sessions": {
+    "s_90ffdc067aac0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb92143-40a3-4162-962a-19793a875ce7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
