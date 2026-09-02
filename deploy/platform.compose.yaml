@@ -60,14 +60,24 @@ services:
       # URL a person types is `${PUBLIC_URL}/mcp`, and the protected-resource metadata's `resource` equals it exactly (T-004).
       PUBLIC_URL: ${PUBLIC_URL:?}
       SMTP_URL: ${SMTP_URL:?}
-      # Host-based routing: app. → everything; mcp. → /mcp, discovery and /oauth/*; agent. → /agent/v1/*
-      # only, refused before any body is read; the apex → /c/ (404). Anything else: 421.
-      # The four hostnames of the estate this file is deployed into — per-resource env, not a default
-      # in a public file (deploy/SECRETS.md § What the estate holds).
-      PUBLIC_HOSTS: ${PUBLIC_HOSTS:?}
+      # The four hostnames of the estate this file is deployed into (ADR 0022) — per-resource env,
+      # not a default in a public file (deploy/SECRETS.md § What the estate holds). Bare hostnames:
+      # no scheme, port or path, all four different, and MCP_HOSTNAME equal to PUBLIC_URL's host.
+      # The app routes on them itself: apps/api/src/ingress/hostnames.ts holds one list of
+      # surface → hostnames → why, and refuses a path outside its hostname's surface before any body
+      # is read (T-030). The tunnel's ingress rules stay the first fence (ADR 0022; deploy/coolify.md
+      # § Ingress records them when T-005 writes that file); this is the second, because Better Auth's
+      # handler answers the wildcard on every hostname the process is given.
+      APP_HOSTNAME: ${APP_HOSTNAME:?}      # the product: the SPA's build, /health, /me, the session endpoints
+      MCP_HOSTNAME: ${MCP_HOSTNAME:?}      # /mcp, discovery, /jwks, /oauth2/* and the OAuth flow's pages
+      AGENT_HOSTNAME: ${AGENT_HOSTNAME:?}  # /agent/v1/* alone
+      APEX_HOSTNAME: ${APEX_HOSTNAME:?}    # nothing: 404, as the edge answers it
       AGENT_MAX_FILE_BYTES: "104857600"   # 100 MB — Cloudflare's edge limit on Free/Pro (research 68 §4); the 53 contract's cap
       HEALTHCHECKS_PING_URL_SCHEDULER: ${HEALTHCHECKS_PING_URL_SCHEDULER:?}
     healthcheck:
+      # On the loopback, so it carries no public hostname: the loopback is a named entry in the
+      # hostname list above and carries /health alone (T-030). Do not point this at a hostname —
+      # a probe that has to know the estate's DNS is a probe that breaks when the DNS changes.
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 10s
       timeout: 3s

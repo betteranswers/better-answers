@@ -24,6 +24,7 @@ serve(
     fetch: createServer({
       database,
       publicUrl: identity.publicUrl,
+      hostnames: identity.hostnames,
       authSecret: identity.authSecret,
       sendEmail,
     }).fetch,

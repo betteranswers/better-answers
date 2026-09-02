@@ -14,6 +14,7 @@ import { testData, ulid } from "@better-answers/schema/testing";
 
 import type { EmailMessage } from "../src/auth/index.ts";
 import { CLIENT_IP_HEADER } from "../src/auth/index.ts";
+import type { PublicHostnames } from "../src/ingress/hostnames.ts";
 import { createServer } from "../src/server.ts";
 import { startTestDatabase, type TestDatabase } from "./postgres.ts";
 
@@ -29,6 +30,23 @@ import { startTestDatabase, type TestDatabase } from "./postgres.ts";
 export const PUBLIC_URL = "https://mcp.example.test";
 export const MCP_URL = `${PUBLIC_URL}/mcp`;
 export const AUTH_SECRET = "test-secret-that-is-at-least-thirty-two-characters-long";
+
+/**
+ * The estate's four hostnames as a test's deploy unit sets them (ADR 0022, T-030).
+ * `mcp.` is `PUBLIC_URL`'s host, which the bootstrap parser requires; a client speaks
+ * to `mcp.` unless a test names another, so every suite written before the hostname
+ * fence still reaches the surface it was written against.
+ */
+export const MCP_HOSTNAME = new URL(PUBLIC_URL).hostname;
+export const APP_HOSTNAME = "app.example.test";
+export const AGENT_HOSTNAME = "agent.example.test";
+export const APEX_HOSTNAME = "example.test";
+export const HOSTNAMES: PublicHostnames = {
+  app: APP_HOSTNAME,
+  mcp: MCP_HOSTNAME,
+  agent: AGENT_HOSTNAME,
+  apex: APEX_HOSTNAME,
+};
 
 /** Claude's CIMD document, fetched from https://claude.ai/oauth/mcp-oauth-client-metadata on 01/09/2026. */
 export const CLAUDE_CLIENT_ID = "https://claude.ai/oauth/mcp-oauth-client-metadata";
@@ -74,7 +92,8 @@ export type TestApp = {
   removeMember(workspaceId: string, userId: string): Promise<void>;
   /** Set a workspace's config row, as the System screen will one day. */
   setWorkspaceConfig(workspaceId: string, key: string, value: string): Promise<void>;
-  client(ip?: string): TestClient;
+  /** A client on one hostname — `mcp.` unless a test names another (T-030). */
+  client(ip?: string, hostname?: string): TestClient;
   stop(): Promise<void>;
 };
 
@@ -84,9 +103,11 @@ export type Provisioned = {
   readonly admin: { readonly id: string; readonly email: string };
 };
 
-/** A host-shaped client: full URLs on the public origin, a cookie jar, one client IP. */
+/** A host-shaped client: full URLs on one hostname's origin, a cookie jar, one client IP. */
 export type TestClient = {
   readonly ip: string;
+  /** The origin this client speaks to; the `Host` the server reads is its hostname. */
+  readonly origin: string;
   fetch(
     path: string,
     init?: RequestInit & { readonly followRedirects?: boolean },
@@ -116,6 +137,7 @@ export const serverFor = (pool: Pool): Hono =>
   createServer({
     database: pool,
     publicUrl: PUBLIC_URL,
+    hostnames: HOSTNAMES,
     authSecret: AUTH_SECRET,
     sendEmail: async () => {},
     fetchClientMetadataResource: cimdFixture,
@@ -141,6 +163,7 @@ export const startApp = async (): Promise<TestApp> => {
   const server = createServer({
     database: database.pool,
     publicUrl: PUBLIC_URL,
+    hostnames: HOSTNAMES,
     authSecret: AUTH_SECRET,
     sendEmail: async (message) => {
       emails.push(message);
@@ -215,7 +238,11 @@ export const startApp = async (): Promise<TestApp> => {
     return code;
   };
 
-  const client: TestApp["client"] = (ip = `203.0.113.${Math.floor(Math.random() * 250) + 1}`) => {
+  const client: TestApp["client"] = (
+    ip = `203.0.113.${Math.floor(Math.random() * 250) + 1}`,
+    hostname = MCP_HOSTNAME,
+  ) => {
+    const origin = `https://${hostname}`;
     const jar = new Map<string, string>();
     const remember = (response: Response) => {
       for (const cookie of response.headers.getSetCookie()) {
@@ -231,18 +258,21 @@ export const startApp = async (): Promise<TestApp> => {
       const headers = new Headers(init.headers);
       headers.set(CLIENT_IP_HEADER, ip);
       if (jar.size > 0) headers.set("cookie", cookies());
-      const url = path.startsWith("http") ? path : `${PUBLIC_URL}${path}`;
+      // A relative path becomes a URL on this client's own hostname, which is the
+      // `Host` the hostname fence reads (T-030).
+      const url = path.startsWith("http") ? path : `${origin}${path}`;
       const response = await server.request(new Request(url, { ...init, headers }));
       remember(response);
       return response;
     };
     return {
       ip,
+      origin,
       fetch: request,
       form: (path, fields) =>
         request(path, {
           method: "POST",
-          headers: { "content-type": "application/x-www-form-urlencoded", origin: PUBLIC_URL },
+          headers: { "content-type": "application/x-www-form-urlencoded", origin },
           body: new URLSearchParams(fields).toString(),
         }),
       cookies,
