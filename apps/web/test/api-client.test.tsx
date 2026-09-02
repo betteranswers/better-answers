@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -5,7 +8,7 @@ import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
 import { Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
-import { useTRPC } from "@/shared/api/trpc.ts";
+import { TRPC_ENDPOINT, useTRPC } from "@/shared/api/trpc.ts";
 
 /**
  * The SPA's one typed client, through the seam a screen crosses: the options proxy a
@@ -49,8 +52,7 @@ describe("the SPA's tRPC client", () => {
 
 describe("the query provider above the router", () => {
   it("wraps the router, so a screen the router renders reaches the same client", async () => {
-    const router = createAppRouter();
-    router.history = createMemoryHistory({ initialEntries: ["/system"] });
+    const router = createAppRouter(createMemoryHistory({ initialEntries: ["/system"] }));
     await router.load();
 
     // The composition `main.tsx` mounts: the provider outside, the router and every screen
@@ -64,6 +66,24 @@ describe("the query provider above the router", () => {
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("System");
     expect(screen.getByTestId("probe").textContent).toContain("routes");
+  });
+});
+
+describe("the path the client and the api agree on", () => {
+  it("is the path apps/api mounts its router at, and there is only one of it", () => {
+    // The SPA cannot import `TRPC_ENDPOINT`: a value import from the api is the runtime edge
+    // ADR 0006's amendment refuses. So the constant's source file is read instead, and more
+    // than one declaration is a failure — the shape `[DEPS2]` sets out and
+    // `apps/worker/tests/pg_harness.py` already uses for `POSTGRES_IMAGE`. A mount moved
+    // without moving the client fails here rather than in a browser.
+    const source = readFileSync(
+      path.join(import.meta.dirname, "../../api/src/trpc/router.ts"),
+      "utf8",
+    );
+    const declared = [...source.matchAll(/^export const TRPC_ENDPOINT = "(?<path>[^"]+)";$/gm)];
+
+    expect(declared).toHaveLength(1);
+    expect(declared[0]?.groups?.["path"]).toBe(TRPC_ENDPOINT);
   });
 });
 

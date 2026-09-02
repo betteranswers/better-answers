@@ -6,10 +6,13 @@
     "types": ["vite/client"],
     // Off here for the same reason it is off in `apps/api` — `@better-auth/oauth-provider@1.7.2`'s
     // plugin type carries `items?: undefined` metadata literals that fail to assign under exact
-    // optionals — and it has to be off *here* too because ADR 0006's one exception means this
-    // program contains `apps/api`'s source: `AppRouter` is inferred from the procedures, whose
-    // context names `Auth`. It costs the SPA's own files nothing else, and it goes when Better
-    // Auth is upgraded and `apps/api` drops the same line.
+    // optionals — and it has to be off *here* too because ADR 0006's one exception puts
+    // `apps/api`'s source in this program: `AppRouter` is inferred from the procedures, the
+    // procedures reach the auth module's interface for the session reader, and that interface
+    // re-exports `createAuth`. `AppRouter` itself names no Better Auth type (`[DESIGN5]`;
+    // `TrpcContext` carries a `SessionReader`) — this is the build graph, not the type. It costs
+    // the SPA's own files nothing else, and it goes when Better Auth is upgraded and `apps/api`
+    // drops the same line.
     "exactOptionalPropertyTypes": false,
     // `@/` is what makes the layering rules legible to a linter: an import that crosses a
     // directory is written `@/<zone>/…`, so the per-glob `no-restricted-imports` overrides in
