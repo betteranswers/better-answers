@@ -17,6 +17,7 @@ import {
 import { routeByHostname, type PublicHostnames } from "./ingress/hostnames.ts";
 import { logger as tierLogger } from "./logger.ts";
 import { createMcpSurface } from "./mcp/surface.ts";
+import { createTrpcRoutes } from "./trpc/index.ts";
 
 /**
  * Everything the HTTP surface needs, passed in rather than reached for, so a test
@@ -41,7 +42,7 @@ export type ServerDependencies = {
 
 /**
  * The app tier's single Hono server (ADR 0006). B3 mounts identity and the MCP
- * surface here; B9 the tRPC router.
+ * surface here.
  *
  * Why this tier has an endpoint in B1 at all, when the worker has no HTTP server:
  * `[TEST1]` defines a functional test differently per tier — "for `apps/api`, the endpoint
@@ -135,6 +136,9 @@ export function createServer(dependencies: ServerDependencies): Hono {
   // The seam ADR 0030 names: `(Request, { authInfo }) => Response`, authentication
   // resolved inside `mcp` before the handler sees the request.
   server.all("/mcp", (context) => mcp(context.req.raw));
+
+  // The product's own transport, on the origin the SPA is served from (ADR 0008).
+  server.route("/", createTrpcRoutes({ auth, door }));
 
   // Better Auth's own endpoints — discovery, /oauth2/*, /jwks, the email-code and
   // organisation endpoints — answer everything the routes above did not, on every
