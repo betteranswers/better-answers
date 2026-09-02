@@ -129,22 +129,22 @@ describe("each hostname reaches only its documented surface (ADR 0022)", () => {
     expect(refusals().at(-1)).toMatchObject({ path: "/mcp", role: "agent" });
   });
 
-  it("refuses a path that walks out of the share agent's surface", async () => {
+  it("refuses a path that walks out of the share agent's surface, in either spelling", async () => {
     const agent = app.client(undefined, AGENT_HOSTNAME);
 
-    // The URL parser resolves `..` before anything routes on the path, so the fence
-    // and the mounts behind it read the same string.
-    const walked = await agent.fetch("/agent/v1/../../mcp", { method: "POST" });
-    expect(walked.status).toBe(404);
-    expect(refusals().at(-1)).toMatchObject({ path: "/mcp", role: "agent" });
+    // The URL parser resolves every dot segment before anything routes on the path,
+    // and the URL standard reads `%2e` as `.`, so both spellings arrive as `/mcp` —
+    // the fence and the mounts behind it read one string, and no spelling means
+    // `/agent/v1/…` here and `/mcp` there.
+    for (const walk of ["/agent/v1/../../mcp", "/agent/v1/%2e%2e/%2e%2e/mcp"]) {
+      const response = await agent.fetch(walk, { method: "POST" });
 
-    // Percent-encoded, the segment is not a `..` to the parser — and it is not one to
-    // Hono or to Better Auth either, so the path the fence allowed is the path they
-    // both fail to match. The MCP endpoint's own answer (a 401 with a bearer
-    // challenge) is what would show it had been reached.
-    const encoded = await agent.fetch("/agent/v1/%2e%2e/mcp", { method: "POST" });
-    expect(encoded.status).toBe(404);
-    expect(encoded.headers.get("www-authenticate")).toBeNull();
+      expect(response.status).toBe(404);
+      // The MCP endpoint answers an unauthenticated call with a bearer challenge; its
+      // absence is what says the endpoint was never reached.
+      expect(response.headers.get("www-authenticate")).toBeNull();
+      expect(refusals().at(-1)).toMatchObject({ path: "/mcp", role: "agent" });
+    }
   });
 
   it("reads a hostname the way DNS does, so a resolver's trailing dot still reaches its surface", async () => {

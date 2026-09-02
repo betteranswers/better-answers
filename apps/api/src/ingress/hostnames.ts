@@ -103,13 +103,32 @@ export const HOSTNAME_SURFACES: readonly HostnameSurface[] = [
 /** The one sentence a refused caller reads; the reason is the log's (ADR 0018, `[SEC]`). */
 export const HOSTNAME_REFUSAL = "This address does not serve that path.";
 
+/** One DNS label: letters, digits and inner hyphens. */
+const HOSTNAME_LABEL = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i;
+
+/**
+ * One reading of a host string, for the configured value and the arriving request
+ * alike: an IPv6 literal without its brackets, and without DNS's trailing root dot,
+ * which names the same host and must not slip past a fence that knows only the bare
+ * form. The URL parser has already lower-cased what it gives us.
+ */
+const bareForm = (hostname: string): string => hostname.replace(/^\[|\]$/g, "").replace(/\.$/, "");
+
+/**
+ * The host of a URL as the fence reads it. `@hono/node-server` builds the request URL
+ * from the `Host` header, which is what the tunnel forwards, so a URL's host *is* the
+ * `Host`; `X-Forwarded-Host` is never read, in the shape of the per-IP counter's
+ * `CF-Connecting-IP`-only rule (T-004 grilling Q8) — a forwarding header is the
+ * caller's to write. `config.ts` reads `PUBLIC_URL`'s host through this too, so "the
+ * same host" means one thing on both sides of the fence.
+ */
+export const hostnameOfUrl = (url: string): string => bareForm(new URL(url).hostname);
+
 /**
  * A bare hostname: DNS labels and nothing else. A value with a scheme, a port, a path
  * or credentials is a configuration mistake that would silently match no request and
  * hand that hostname's surface to nobody, so it stops the process instead.
  */
-const HOSTNAME_LABEL = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i;
-
 export const bareHostname = z
   .string()
   .max(253)
@@ -119,8 +138,16 @@ export const bareHostname = z
       value.split(".").every((label) => label.length <= 63 && HOSTNAME_LABEL.test(label)),
     "must be a bare hostname — DNS labels only, with no scheme, port, path or credentials",
   )
-  // DNS is case-insensitive and a `Host` header may arrive in any case, so the fence
-  // compares one form.
+  .refine(
+    // The parser rewrites an address spelling — `127.000.000.001` and `0x7f.1` both
+    // read as `127.0.0.1` — so a value it does not return unchanged would name a
+    // hostname no arriving request can ever match. Refused rather than silently
+    // rewritten: a hostname an operator cannot find in their DNS is a mistake to stop for.
+    (value) => URL.parse(`https://${value}`)?.hostname === value.toLowerCase(),
+    "must already be written the way a URL parser reads a Host — an address spelling the parser rewrites (`127.000.000.001`, `0x7f.1`) would name a hostname no request can match",
+  )
+  // DNS is case-insensitive and a `Host` may arrive in any case, so the fence compares
+  // one form.
   .transform((value) => value.toLowerCase());
 
 /** `/prefix/*` matches the prefix and anything under it; anything else is exact. */
@@ -135,21 +162,6 @@ const carries = (role: HostnameRole, path: string): boolean => {
     candidate.paths.some((pattern) => matchesPath(pattern, path)),
   );
   return surface !== undefined && surface.hosts.includes(role);
-};
-
-/**
- * The hostname a request arrived on. `@hono/node-server` builds the request URL from
- * the `Host` header, which is what the tunnel forwards, so the URL's hostname *is* the
- * `Host`; `X-Forwarded-Host` is never read, in the shape of the per-IP counter's
- * `CF-Connecting-IP`-only rule (T-004 grilling Q8) — a forwarding header is the
- * caller's to write.
- */
-const hostnameOf = (url: string): string => {
-  // The URL parser lower-cases the hostname and keeps an IPv6 literal in brackets.
-  const hostname = new URL(url).hostname.replace(/^\[|\]$/g, "");
-  // A trailing dot is the DNS root: `mcp.example.test.` names the same host and must
-  // not slip past a fence that knows only `mcp.example.test`.
-  return hostname.endsWith(".") ? hostname.slice(0, -1) : hostname;
 };
 
 /**
@@ -169,11 +181,12 @@ export const routeByHostname = (hostnames: PublicHostnames, logger: Logger): Mid
   const log = logger.child({ module: "ingress" });
 
   return async (context, next) => {
-    const host = hostnameOf(context.req.url);
+    const host = hostnameOfUrl(context.req.url);
     const role = roles.get(host);
-    // The same string the mounts behind this match on: Hono and Better Auth both route
-    // on the undecoded path, so a percent-encoded traversal cannot mean one thing here
-    // and another there, and the URL parser has already resolved any `..` segment.
+    // The URL parser has already resolved every dot segment, in either spelling — the
+    // URL standard reads `%2e` as `.`, so `/agent/v1/%2e%2e/%2e%2e/mcp` arrives as
+    // `/mcp` — so this is the same string the mounts behind the fence route on and no
+    // spelling can mean one path here and another there.
     const path = context.req.path;
 
     if (role !== undefined && carries(role, path)) {

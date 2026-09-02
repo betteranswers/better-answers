@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { err, ok, type Result } from "@better-answers/core/kernel";
 
-import { bareHostname, type PublicHostnames } from "./ingress/hostnames.ts";
+import { bareHostname, hostnameOfUrl, type PublicHostnames } from "./ingress/hostnames.ts";
 import { logger } from "./logger.ts";
 
 /**
@@ -55,7 +55,10 @@ const identityBootstrapSchema = z
     APEX_HOSTNAME: bareHostname,
   })
   .refine(
-    (parsed) => parsed.MCP_HOSTNAME === new URL(parsed.PUBLIC_URL).hostname,
+    // Read through the fence's own reading of a URL's host, so "the same host" means
+    // one thing on both sides: a `PUBLIC_URL` carrying DNS's trailing root dot names
+    // the same host as the bare `MCP_HOSTNAME` and must not stop the process.
+    (parsed) => parsed.MCP_HOSTNAME === hostnameOfUrl(parsed.PUBLIC_URL),
     "MCP_HOSTNAME must be PUBLIC_URL's host: they are one origin (ADR 0022), and discovery, the token audience and the protected-resource document are all derived from PUBLIC_URL",
   )
   .refine((parsed) => {

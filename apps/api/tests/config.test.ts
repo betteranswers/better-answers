@@ -92,6 +92,10 @@ describe("the four hostnames of the estate", () => {
     ["a space", "app.example.test "],
     ["an empty label", "app..example.test"],
     ["a label opening with a hyphen", "-app.example.test"],
+    // The URL parser rewrites both of these to `127.0.0.1`, so the value would name a
+    // hostname no arriving request can ever match.
+    ["a padded IPv4 spelling", "127.000.000.001"],
+    ["a hexadecimal IPv4 spelling", "0x7f.1"],
   ])("refuses APP_HOSTNAME with %s", (_case, hostname) => {
     expect(readIdentityBootstrap(identityEnvironment({ APP_HOSTNAME: hostname })).ok).toBe(false);
   });
@@ -117,5 +121,15 @@ describe("the four hostnames of the estate", () => {
     const read = readIdentityBootstrap(identityEnvironment({ APP_HOSTNAME: "App.Example.Test" }));
 
     expect(read.ok && read.value.hostnames.app).toBe("app.example.test");
+  });
+
+  it("accepts a PUBLIC_URL carrying DNS's trailing dot beside the bare MCP_HOSTNAME", () => {
+    // `mcp.example.test.` is the same host; the comparison reads it the way the
+    // hostname fence reads an arriving request, so it does not stop the process.
+    const read = readIdentityBootstrap(
+      identityEnvironment({ PUBLIC_URL: "https://mcp.example.test./" }),
+    );
+
+    expect(read.ok).toBe(true);
   });
 });
