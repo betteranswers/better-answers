@@ -41,6 +41,9 @@ export type AuthRoutesDependencies = {
  */
 const carry = (url: string): string => new URL(url).search;
 const oauthQuery = (url: string): string => new URL(url).search.replace(/^\?/, "");
+// Better Auth has already refused a client_id or redirect_uri that is not an https URL by
+// the time consent renders; the fallback is the page's honest answer to a malformed carry.
+const hostnameOf = (url: string): string => URL.parse(url)?.hostname ?? "an unknown address";
 
 const redirectOf = z.object({ url: z.string().url().optional(), redirect: z.boolean().optional() });
 
@@ -305,12 +308,20 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
       ]);
       return row.rows[0]?.name ?? "your workspace";
     });
+    // A CIMD client names itself: `client_name` is whatever its metadata document says,
+    // and any public https document can register. The identity a person can verify is
+    // the two hostnames the document's author does not choose for them — where the
+    // client id lives and where the code will be sent (MCP 2026-07-28 authorization,
+    // "MUST clearly display the redirect URI hostname"; CIMD draft §6). Held by
+    // oauth-flow.test.ts "shows the client's real address beside its self-declared name".
     return context.html(
       consentPage(carry(context.req.url), {
         clientName:
           (clientName?.success
             ? (clientName.data.client_name ?? clientName.data.name)
             : undefined) ?? "This app",
+        hostedAt: hostnameOf(clientId),
+        sendsCodeTo: hostnameOf(query.get("redirect_uri") ?? ""),
         workspace: workspaceName.ok ? workspaceName.value : "your workspace",
         scopes,
       }),

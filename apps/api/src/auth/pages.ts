@@ -77,6 +77,10 @@ export const consentPage = (
   query: string,
   params: {
     readonly clientName: string;
+    /** The `client_id` URL's hostname — the one name its author cannot choose. */
+    readonly hostedAt: string;
+    /** The `redirect_uri` hostname the authorization code will be sent to. */
+    readonly sendsCodeTo: string;
     readonly workspace: string;
     readonly scopes: readonly string[];
   },
@@ -85,6 +89,7 @@ export const consentPage = (
     `Connect ${params.clientName}`,
     `<h1>Connect ${escape(params.clientName)}</h1>
 <p>${escape(params.clientName)} will act as you, at <strong>${escape(params.workspace)}</strong>.</p>
+<p>This app calls itself “${escape(params.clientName)}”. It is hosted at <strong>${escape(params.hostedAt)}</strong> and your connection will be sent to <strong>${escape(params.sendsCodeTo)}</strong>. If you did not expect those addresses, cancel.</p>
 <ul>
   ${params.scopes.includes("knowledge:read") ? "<li>Read what you can see of the company's knowledge</li>" : ""}
   ${params.scopes.includes("feedback:write") ? "<li>Send your feedback on answers</li>" : ""}

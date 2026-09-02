@@ -2,7 +2,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { REFRESH_TOKEN_LIFETIME_SECONDS } from "../src/auth/index.ts";
 import { authorizeUrl, connectAsHost, driveToPage, pkce, refresh } from "./flow.ts";
-import { CLAUDE_CLIENT_ID, MCP_URL, PUBLIC_URL, startApp, type TestApp } from "./harness.ts";
+import {
+  CLAUDE_CLIENT_ID,
+  CLAUDE_REDIRECT_URI,
+  MCP_URL,
+  PUBLIC_URL,
+  startApp,
+  type TestApp,
+} from "./harness.ts";
 
 /**
  * The OAuth half of research 80 §9's host-agnostic conformance test (assertions
@@ -210,6 +217,19 @@ describe("the pages, as a person walks them", () => {
     expect(page).toContain("Send your feedback on answers");
     expect(page).toContain("Stay connected until you disconnect it");
     expect(page).toContain("Claude will act as you");
+  });
+
+  it("shows the client's real address beside its self-declared name, so a look-alike cannot borrow Claude's", async () => {
+    const acme = await app.provision({ name: "Acme" });
+    const client = app.client();
+    const consent = await driveToPage(app, client, acme.admin);
+
+    const page = await (await client.fetch(`${consent.pathname}${consent.search}`)).text();
+
+    // The two hostnames a metadata document's author does not choose: where the client id
+    // lives and where the code goes (MCP 2026-07-28 authorization; CIMD draft §6).
+    expect(page).toContain(`hosted at <strong>${new URL(CLAUDE_CLIENT_ID).hostname}</strong>`);
+    expect(page).toContain(`sent to <strong>${new URL(CLAUDE_REDIRECT_URI).hostname}</strong>`);
   });
 
   it("refuses consent once the person's credentials are revoked, and mints no code", async () => {
