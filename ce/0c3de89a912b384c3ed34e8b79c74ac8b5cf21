@@ -1,0 +1,19 @@
+docs/research/t-022-better-auth-ui.md
+  s_90ffdc067aac0d::t_9202393385c0f1 1-391
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ce0c3de89a912b384c3ed34e8b79c74ac8b5cf21",
+  "prompts": {},
+  "sessions": {
+    "s_90ffdc067aac0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb92143-40a3-4162-962a-19793a875ce7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
