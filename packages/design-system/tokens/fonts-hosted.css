@@ -1,0 +1,5 @@
+/* The faces `tokens/fonts.css` names, self-hosted from the package's own dependencies, for
+   a consumer with a bundler. One variable file per family carries every weight from 100 to
+   900, so a weight is a CSS choice rather than another download. */
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";

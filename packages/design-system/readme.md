@@ -222,55 +222,49 @@ none was drawn. Wherever a mark would go, the name is set in type — **Geist Mo
 the handle and the domain (`better-answers.com`) are the same string. Never "Better
 Answers", never "BetterAnswers", never "BA". **Logo and icon files are being produced
 separately; when they land, drop the SVGs into `assets/` and replace the wordmark in
-`ui_kits/platform/AppShell.jsx` and `thumbnail.html`.**
+`apps/web`'s frame and in `thumbnail.html`.**
 
 ## 6. What is in this repository
 
 ```
+package.json            the workspace package apps/web imports; wires the two self-hosted faces
 styles.css              @import list only — the one file consumers link
-tokens/                 fonts · colors · typography · spacing · radius · blueprint · elevation · motion · semantic · keyframes
-components/             the reusable primitives (below)
+tokens/                 fonts · fonts-hosted · fonts-remote · colors · typography · spacing · radius · blueprint · elevation · motion · semantic · keyframes · tailwind-bridge
 guidelines/             foundation specimen cards
-ui_kits/platform/       click-through recreation of the product
 assets/                 (empty — logo and icon files are in production separately)
 SKILL.md                Agent Skills entry point
 ```
 
-### Components
+### Components — removed (T-035, ADR 0033)
 
-Grouped by concern. Every one is a single `.jsx` with a sibling `.d.ts` and `.prompt.md`,
-styled only through the CSS custom properties.
+This package shipped a full set of `.jsx` primitives and a `ui_kits/platform/`
+click-through, authored before any application existed. Both were **deleted when the
+application arrived**: the components the product uses come from the shadcn, Kibo UI and
+AI Elements registries, plus better-auth-ui for the auth screens, and a second set nothing
+imports is drift. What they proved — that the register can be built — the guidelines cards
+still record.
 
-**core/** — `Button`, `IconButton`, `Input`, `Textarea`, `Select`, `Checkbox`,
-`RadioGroup`, `Switch`
-**display/** — `Card`, `Frame`, `Tag`, `TrustTag`, `Badge`, `SummaryList`, `DataTable`,
-`EmptyState`, `Icon`
-**feedback/** — `Dialog`, `Toast`, `Tooltip`, `NotificationBanner`, `Details`
-**navigation/** — `SideNav`, `Tabs`
-**knowledge/** — `Citation`, `CoverageBar`
-**texture/** — `GridPattern`, `DotPattern`, `NoiseTexture`
-
-#### Intentional additions
-
-The source defines no component library, so the standard set was authored. Five additions
-are specific to this product rather than generic:
-
-- **`TrustTag`** — the closed set of reader-facing trust words (`CONTEXT.md`, ADR 0019). Without it, teams invent their own vocabulary, which the glossary forbids.
-- **`Citation`** — the unit a reader checks: concept, source, locator, passage on one disclosure (ADR 0015).
-- **`CoverageBar`** — a section's expectation minus what is included; count first, bar second.
-- **`SummaryList`** and **`Details`** — GOV.UK Design System *semantics* without the GOV.UK brand, required by `[A11Y1]`.
-- **`Icon`** — a wrapper so the Phosphor substitution lives in exactly one file.
-- **`Frame`** — the blueprint object: a transparent line drawing with "+" registration marks. Without it, marks get sprinkled by hand and the register collapses.
+What stays is the part an application consumes: the tokens, `styles.css`, and
+`tokens/tailwind-bridge.css`, which turns the tokens into Tailwind v4 theme values so a
+registry component comes out in this styling with no edit to the component file.
 
 ### UI kit
 
-`ui_kits/platform/` — Ask, Search, Guides, and Control Centre (Sources, Suggestions,
-Knowledge). Questions, People and System are deliberately left blank with a disclaimer:
-the source names them but specifies no interface. See its own `README.md`.
+shadcn · Kibo UI · AI Elements · better-auth-ui.
 
-shadcn · Kibo UI · AI Elements.
+Four registries, one rule: they own behaviour — keyboard, focus, ARIA, virtualisation,
+streaming. We own meaning — the trust words, the citation unit, the register, the marks,
+and every word on a screen. Where the two meet, take theirs and skin it. better-auth-ui
+says *organization* throughout and is taken with a `localization` override that says
+*workspace*; that override is not optional (`[GLOSSARY1]`).
 
-Three registries, one rule: they own behaviour — keyboard, focus, ARIA, virtualisation, streaming. We own meaning — the trust words, the citation unit, the register, the marks. Where the two meet, take theirs and skin it.
+The five product-specific components the set used to hold are the ones to rebuild first on
+top of a registry primitive, because nothing off the shelf carries their meaning:
+**`TrustTag`** (the closed set of trust words, `CONTEXT.md` and ADR 0019),
+**`Citation`** (concept, source, locator, passage on one disclosure, ADR 0015),
+**`CoverageBar`**, **`SummaryList`** and **`Details`** (GOV.UK *semantics* without the
+GOV.UK brand, `[A11Y1]`), **`Icon`** (the Phosphor substitution in one file) and
+**`Frame`** (the blueprint object with its registration marks).
 
 ### Foundation cards
 

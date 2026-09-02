@@ -1,11 +1,23 @@
-/* Geist + Geist Mono, served from Google Fonts.
-   SUBSTITUTION: the repository ships no brand webfont (no web/ tier exists yet).
-   Geist is the closest match to the Vercel/Linear reference styling. Replace the
-   @font-face src values here if real brand font binaries are provided. */
-@import url("https://fonts.googleapis.com/css2?family=Geist:wght@300;400;450;500;600;700&family=Geist+Mono:wght@400;500&display=swap");
+/* Geist and Geist Mono.
+   SUBSTITUTION: the repository ships no brand webfont. Geist is the closest match to the
+   Vercel/Linear reference styling (readme.md §7).
 
+   This file names the two families and nothing else, because the two consumers load the
+   faces differently and only one of them can resolve a package name: an application with a
+   bundler imports `tokens/fonts-hosted.css` (the self-hosted @fontsource packages, so a
+   screen makes no third-party request), and a page opened straight from disk — the
+   specimen cards and the thumbnail — links `tokens/fonts-remote.css` beside `styles.css`.
+
+   `--font-sans-default` is the face the product ships; `--font-sans` is what everything
+   reads, so an axis that replaces the family (the bridge's accessible reading mode) can
+   re-point it without losing what it is falling back to. */
 :root {
-  --font-sans:
-    "Geist", "Geist Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans-default:
+    "Geist Variable", "Geist", "Geist Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Helvetica, sans-serif;
+  --font-mono-default:
+    "Geist Mono Variable", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --font-sans: var(--font-sans-default);
+  --font-mono: var(--font-mono-default);
 }
