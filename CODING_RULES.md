@@ -36,6 +36,8 @@ No Better Auth type crosses into `packages/core`. Transports verify a bearer and
 
 Tests exercise a module through its interface — for `apps/api`, the endpoint (`app.request()`); for `apps/worker`, the job or module entry point; for `packages/core`, an entry point named in its `exports` map. Unit tests of internals are neither required nor desired.
 
+For `apps/web`, the interface is the **served build driven by a browser** (Playwright against the api serving the SPA on `app.`, over a Testcontainers Postgres) — or a **rendered component through Testing Library** where a component's own behaviour is the thing under test. A screen is never asserted against its source.
+
 `packages/core` is where most behaviour lives (ADR 0029), so its `exports` map is the surface this rule points at. A slice's internals — its `*.store.ts`, its helpers — are reached through that entry point, never imported by a test.
 
 ### [TEST2] Real Postgres, always

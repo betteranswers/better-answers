@@ -32,5 +32,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: uv sync --frozen
         working-directory: apps/worker
+      # The SPA's `check` ends in a browser suite over the served build ([TEST1]); the
+      # browser is not in the pnpm store, so it is installed here. Chromium alone: the
+      # suite runs one project.
+      - run: pnpm --filter @better-answers/web exec playwright install --with-deps chromium
       # One command, every workspace — the root `check` runs them all.
       - run: pnpm check

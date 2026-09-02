@@ -144,7 +144,20 @@ export const serverFor = (pool: Pool): Hono =>
     logger: pino({ level: "silent" }),
   });
 
-export const startApp = async (): Promise<TestApp> => {
+/**
+ * What a suite may vary about the app it starts. Both defaults are the ones every suite
+ * written before them expects: the estate's four test hostnames, and no SPA build (the
+ * server serves the shell only where a test has one to serve).
+ */
+export type TestAppOptions = {
+  /** The directory `apps/web`'s build was written to, for a test that reads the shell. */
+  readonly webRoot?: string | undefined;
+  /** The estate's four hostnames, for a test whose client is a real browser. */
+  readonly hostnames?: PublicHostnames | undefined;
+};
+
+export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> => {
+  const hostnames = options.hostnames ?? HOSTNAMES;
   const database = await startTestDatabase();
   const emails: EmailMessage[] = [];
   const logs: LogLine[] = [];
@@ -163,13 +176,14 @@ export const startApp = async (): Promise<TestApp> => {
   const server = createServer({
     database: database.pool,
     publicUrl: PUBLIC_URL,
-    hostnames: HOSTNAMES,
+    hostnames,
     authSecret: AUTH_SECRET,
     sendEmail: async (message) => {
       emails.push(message);
     },
     fetchClientMetadataResource: cimdFixture,
     logger,
+    webRoot: options.webRoot,
   });
   const door = openPostgres(database.pool);
 

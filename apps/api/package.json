@@ -7,6 +7,7 @@
     "dev": "node --watch src/main.ts",
     "start": "node src/main.ts",
     "migrate": "node src/migrate.ts",
+    "serve:e2e": "node tests/serve.ts",
     "lint": "oxlint --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

@@ -1,6 +1,6 @@
 ---
 name: better-answers-design
-description: Use this skill to generate well-branded interfaces and assets for Better Answers, either for production or throwaway prototypes/mocks/etc. Contains essential design guidelines, colors, type, fonts, assets, and UI kit components for protoyping.
+description: Use this skill to generate well-branded interfaces and assets for Better Answers, either for production or throwaway prototypes/mocks/etc. Contains essential design guidelines, colors, type, fonts and assets; the components come from the shadcn, Kibo UI and Vercel AI Elements registries plus better-auth-ui (ADR 0033).
 user-invocable: true
 ---
 

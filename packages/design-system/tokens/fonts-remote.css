@@ -1,0 +1,5 @@
+/* The faces `tokens/fonts.css` names, for a page with no bundler: the specimen cards under
+   `guidelines/` and `thumbnail.html` are opened straight from disk, where a package name
+   resolves to nothing. The product never links this — it self-hosts the same two families
+   through `tokens/fonts-hosted.css`, so no screen reaches a third party. */
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@300;400;450;500;600;700&family=Geist+Mono:wght@400;500&display=swap");

@@ -1,10 +1,13 @@
-@import url("tokens/fonts.css");
-@import url("tokens/colors.css");
-@import url("tokens/typography.css");
-@import url("tokens/spacing.css");
-@import url("tokens/radius.css");
-@import url("tokens/blueprint.css");
-@import url("tokens/elevation.css");
-@import url("tokens/motion.css");
-@import url("tokens/semantic.css");
-@import url("tokens/keyframes.css");
+/* The one file a consumer links. Every path is explicitly relative, because a bundler
+   reads `tokens/colors.css` as a package name and looks for it beside the file that
+   imported this one. */
+@import "./tokens/fonts.css";
+@import "./tokens/colors.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./tokens/radius.css";
+@import "./tokens/blueprint.css";
+@import "./tokens/elevation.css";
+@import "./tokens/motion.css";
+@import "./tokens/semantic.css";
+@import "./tokens/keyframes.css";

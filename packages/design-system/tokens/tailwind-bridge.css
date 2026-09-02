@@ -186,14 +186,25 @@
   --radius-2xl: 0px;
   --radius-3xl: 0px;
 
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
-
   /* One curve, our durations — so kit transitions match ours. */
   --ease-standard: cubic-bezier(0.2, 0, 0.13, 1);
   --animate-duration-fast: 120ms;
   --animate-duration-base: 160ms;
   --animate-duration-slow: 240ms;
+}
+
+/* ---------------------------------------------------------------------------
+ * 4b. The two families, in a NON-inline @theme.
+ * Not inline, because inline bakes the value into the utility and `font-sans`
+ * would then miss the accessible reading mode above, which re-points
+ * --font-sans at runtime. Non-inline emits `font-family: var(--font-sans)`,
+ * which follows it. The value is the `-default` name rather than --font-sans
+ * itself: Tailwind writes every theme variable into :root, and
+ * `--font-sans: var(--font-sans)` would be a reference to itself.
+ * ------------------------------------------------------------------------ */
+@theme {
+  --font-sans: var(--font-sans-default);
+  --font-mono: var(--font-mono-default);
 }
 
 /* ---------------------------------------------------------------------------
@@ -238,4 +249,30 @@
   [data-noise] {
     display: none;
   }
+}
+
+/* ---------------------------------------------------------------------------
+ * 7. Layout — the spacing scale and the layout constants, so a screen sizes
+ * itself from the tokens rather than from Tailwind's own defaults.
+ *
+ * The type scale is deliberately absent. Tailwind's font-size namespace is
+ * `--text-*` and tokens/typography.css already owns those names, so a theme
+ * variable here would point at itself and resolve to nothing, and a copied
+ * literal would be a second scale that ages alone. A screen reads a type step
+ * as var(--text-lg).
+ * ------------------------------------------------------------------------ */
+@theme inline {
+  /* Tailwind's numeric scale becomes multiples of the 4px base, so `p-4` is
+     --space-4 and there is one scale rather than two that nearly agree. */
+  --spacing: var(--space-1);
+
+  /* The layout constants, named: w-sidebar, h-topbar, max-w-measure, max-w-page. */
+  --spacing-sidebar: var(--sidebar-w);
+  --spacing-rail: var(--rail-w);
+  --spacing-topbar: var(--topbar-h);
+  /* `measure`, not `prose`: Tailwind ships its own `max-w-prose` at 65ch and a theme
+     value of that name does not displace it, so the token would silently lose. */
+  --container-measure: var(--measure-prose);
+  --container-measure-narrow: var(--measure-narrow);
+  --container-page: var(--page-max);
 }
