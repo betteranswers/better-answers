@@ -68,10 +68,6 @@ Where a list names members (the migration journal and its directory), a generate
 
 A comment carries the reason a reader cannot infer from the code: a constraint, a trade-off, a gotcha. What the code does is said by the code; what happened to it is said by git and ADRs.
 
-### [COMMENT2] A stated invariant names its check
-
-A comment or a test title that states an invariant — *FORCE on every tenant table*, *created in the caller's transaction*, *`drizzle-zod` is imported nowhere else* — names the check that holds it: a test by title, a lint rule by name, a constraint by name. A claim with no named check is a memory. `T-003` (ADR 0032, PR 5) shipped those three as comments and a test title before review turned the first two into tests and the third into a lint rule.
-
 ## GLOSSARY
 
 ### [GLOSSARY1] `CONTEXT.md` is a glossary and nothing else
