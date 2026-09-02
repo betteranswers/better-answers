@@ -14,7 +14,7 @@ The **live conclusion** of every ADR — the state after its amendments, not its
 | 0006 | Hono long-running Node server + Vite SPA, not Next.js |
 | 0007 | Plain Postgres; the app owns every migration and all DDL; deploy order `migrate` → `app` → `worker` |
 | 0008 | tRPC inside; generated OpenAPI, MCP and `/agent/v1` outside |
-| 0009 | Better Auth in-process — the app is its own authorization server |
+| 0009 | Better Auth in-process — the app is its own authorization server; its tables are the identity set, isolated by key not by scope, and its organisation model is the `workspace` table (2026-09-01) |
 | 0010 | ~~Typed relations on concepts~~ — **rejected**; a link is the relation (0026) |
 | 0011 | Three knowledge layers (sources → bundles → graph) and the minting rule decide where a unit lives |
 | 0012 | The bundle is written only by the app, one commit per act; platform-prepared changes wait as suggestions; enrichment jobs read committed concepts, a run may enrich its own candidates before submitting (2026-09-01); the forge consequence is superseded — bare repositories (0024) |

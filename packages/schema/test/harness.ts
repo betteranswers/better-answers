@@ -12,9 +12,16 @@ import { POSTGRES_IMAGE } from "../src/postgres-image.ts";
  * proofs, the parity test, the worker-view drift test — reuses this; none starts its
  * own container its own way. RLS assertions run `SET LOCAL ROLE app_rt` inside a
  * transaction, because the container's superuser bypasses RLS by design.
+ *
+ * `runtimePool` is the app's footing: every connection it hands out has already
+ * `SET ROLE app_rt`, so a test that drives the app through it meets the same RLS a
+ * deployed estate does (where the DSN itself is the runtime role, ADR 0032).
  */
 export type MigratedPostgres = {
+  /** The container's superuser — bypasses RLS; for seeding and catalogue reads. */
   readonly pool: pg.Pool;
+  /** The runtime role — what the app connects as; RLS applies. */
+  readonly runtimePool: pg.Pool;
   readonly stop: () => Promise<void>;
 };
 
@@ -30,9 +37,20 @@ export const startMigratedPostgres = async (): Promise<MigratedPostgres> => {
     await container.stop();
     throw error;
   }
+  // `app_rt` is NOLOGIN (migration 0000); the estate's provisioning gives it LOGIN, a
+  // test connects as the superuser and takes the role at session start instead. As a
+  // startup option the switch fails closed: a connection that cannot take the role is
+  // refused by Postgres, never handed out as the superuser.
+  const runtimePool = new pg.Pool({
+    connectionString: container.getConnectionUri(),
+    max: 5,
+    options: "-c role=app_rt",
+  });
   return {
     pool,
+    runtimePool,
     stop: async () => {
+      await runtimePool.end();
       await pool.end();
       await container.stop();
     },

@@ -1,25 +1,28 @@
 import { sql } from "drizzle-orm";
-import { check, integer, pgEnum, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  check,
+  integer,
+  pgEnum,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 import { withRLS } from "./with-rls.ts";
+import { workspace } from "./workspace-table.ts";
 
 /**
  * The `public` schema Drizzle owns (ADR 0007, ADR 0032). Only what this file reaches
- * is *generated*: the `index` schema's declarations live in `index-tables.ts`, outside
- * the drizzle config's `schema` path, because their DDL is hand-written SQL in the
- * same journal.
+ * is *generated*: the `index` schema's declarations live in `index-tables.ts` and the
+ * two UNLOGGED counters in `counter-tables.ts`, both outside the drizzle config's
+ * `schema` path, because their DDL is hand-written SQL in the same journal. The
+ * identity set (`identity-tables.ts`) and `workspace` are re-exported here so
+ * drizzle-kit generates them.
  */
 
-export const workspace = withRLS(
-  "workspace",
-  {
-    // The tenant itself, so its tenant column is its own id (a ULID).
-    id: text("id").primaryKey(),
-    name: text("name").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
-  },
-  "id",
-);
+export { workspace } from "./workspace-table.ts";
+export * from "./identity-tables.ts";
 
 /** The five route purposes (briefing 16's record family; ADR 0031's llm-routing). */
 export const llmPurpose = pgEnum("llm_purpose", [
@@ -55,4 +58,22 @@ export const llmRoute = withRLS(
       sql`(purpose = 'embedding') = (dimensions IS NOT NULL) AND (dimensions IS NULL OR dimensions > 0)`,
     ),
   ],
+);
+
+/**
+ * A workspace's thresholds as rows (ADR 0025, `[OPS1]`): today `mcp.tools_list_ttl_ms`,
+ * seeded by workspace provisioning. A tenant table like any other.
+ */
+export const workspaceConfig = withRLS(
+  "workspace_config",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  "workspaceId",
+  (table) => [primaryKey({ columns: [table.workspaceId, table.key] })],
 );

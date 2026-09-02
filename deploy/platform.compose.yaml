@@ -56,6 +56,9 @@ services:
       GIT_STORE_DIR: /data/git                # one bare repository per workspace, written through the git binary (ADR 0024)
       KEK: ${KEK:?}
       AUTH_SECRET: ${AUTH_SECRET:?}
+      # The https origin the authorization server issues from — the `mcp.` hostname; the MCP
+      # URL a person types is `${PUBLIC_URL}/mcp`, and the protected-resource metadata's `resource` equals it exactly (T-004).
+      PUBLIC_URL: ${PUBLIC_URL:?}
       SMTP_URL: ${SMTP_URL:?}
       # Host-based routing: app. → everything; mcp. → /mcp, discovery and /oauth/*; agent. → /agent/v1/*
       # only, refused before any body is read; the apex → /c/ (404). Anything else: 421.

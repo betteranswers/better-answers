@@ -3,4 +3,4 @@
  * (`[TEST4]`) every data test in the TypeScript tier reuses.
  */
 export { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
-export { type TestData, testData } from "./factory.ts";
+export { type TestData, testData, ulid } from "./factory.ts";
