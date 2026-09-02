@@ -1,0 +1,88 @@
+packages/design-system/guidelines/colors-accent.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/guidelines/colors-dark.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 6
+packages/design-system/guidelines/colors-trust.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/guidelines/colors-neutral.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/guidelines/colors-semantic.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/tokens/tailwind-bridge.css
+  s_90ffdc067aac0d::t_0a7ab05cde876f 263
+  s_90ffdc067aac0d::t_b98119e4a7bbbf 267-270
+  s_90ffdc067aac0d::t_81d28f26a610f0 189-195
+  s_90ffdc067aac0d::t_4745455ceee86b 247-262,264-266,271-272
+packages/design-system/styles.css
+  s_90ffdc067aac0d::t_3ffc7bf2f8a360 4-13
+  s_90ffdc067aac0d::t_5807f33400e076 1-3
+packages/design-system/tokens/fonts-hosted.css
+  s_90ffdc067aac0d::t_9e1a73e950074a 1-5
+packages/design-system/guidelines/iconography.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/guidelines/brand-wordmark.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/guidelines/kits-adoption.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/guidelines/blueprint-marks.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/thumbnail.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 5
+packages/design-system/readme.md
+  s_90ffdc067aac0d::t_e17b9f78c89a8f 230,232,238,240-245,247-249,253-267
+  s_90ffdc067aac0d::t_0436bc79845370 225
+packages/design-system/guidelines/brand-dates.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/guidelines/spacing-scale.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/guidelines/type-headings.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/package.json
+  s_90ffdc067aac0d::t_ac8f5096f02f0d 7-10
+  s_90ffdc067aac0d::t_3ab257789d16a7 6
+  s_90ffdc067aac0d::t_52fc408e4902b3 1-5,11-15
+packages/design-system/guidelines/type-mono.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/assets/README.md
+  s_90ffdc067aac0d::t_11927403641efc 11
+packages/design-system/tokens/fonts.css
+  s_90ffdc067aac0d::t_f39b93f584d2f8 1-3,5-13,15-22
+packages/design-system/guidelines/motion.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/guidelines/type-weights.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/SKILL.md
+  s_90ffdc067aac0d::t_65a580606b64ad 3
+packages/design-system/guidelines/colors-surfaces.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/guidelines/elevation.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/guidelines/brand-voice.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/tokens/fonts-remote.css
+  s_90ffdc067aac0d::t_99a5d4119dc2a8 1-5
+packages/design-system/guidelines/type-body.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/guidelines/radius.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/guidelines/spacing-layout.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+packages/design-system/guidelines/type-display.card.html
+  s_90ffdc067aac0d::t_d858841cce2ab4 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "5b22dfdf27a529c248fb68e0845524e2ae9f10da",
+  "prompts": {},
+  "sessions": {
+    "s_90ffdc067aac0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb92143-40a3-4162-962a-19793a875ce7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
