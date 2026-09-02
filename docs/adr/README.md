@@ -11,10 +11,10 @@ The **live conclusion** of every ADR — the state after its amendments, not its
 | 0003 | One tenant bundle of atom concepts in v0.1; domains are future bundle boundaries |
 | 0004 | Guides and compositions are platform records citing concepts, never restating them |
 | 0005 | Own app, two runtime tiers (TS app, Python worker) sharing **four stores and never code**; no app↔worker HTTP — the control plane is rows; third-party parts lifted as pinned snapshots under `THIRD_PARTY_NOTICES.md` |
-| 0006 | Hono long-running Node server + Vite SPA, not Next.js |
+| 0006 | Hono long-running Node server + Vite SPA, not Next.js; the api serves the SPA's static build on `app.`; `apps/web` imports `apps/api` as a type only, for `AppRouter` (2026-09-02) |
 | 0007 | Plain Postgres; the app owns every migration and all DDL; deploy order `migrate` → `app` → `worker` |
 | 0008 | tRPC inside; generated OpenAPI, MCP and `/agent/v1` outside |
-| 0009 | Better Auth in-process — the app is its own authorization server; its tables are the identity set, isolated by key not by scope, and its organisation model is the `workspace` table (2026-09-01) |
+| 0009 | Better Auth in-process — the app is its own authorization server; its tables are the identity set, isolated by key not by scope, and its organisation model is the `workspace` table (2026-09-01); one session across `app.` and `mcp.`, sign-in and the picker are the SPA's, CIMD allow-listed to `claude.ai`, the `admin()` plugin refused as shipped (2026-09-02) |
 | 0010 | ~~Typed relations on concepts~~ — **rejected**; a link is the relation (0026) |
 | 0011 | Three knowledge layers (sources → bundles → graph) and the minting rule decide where a unit lives |
 | 0012 | The bundle is written only by the app, one commit per act; platform-prepared changes wait as suggestions; enrichment jobs read committed concepts, a run may enrich its own candidates before submitting (2026-09-01); the forge consequence is superseded — bare repositories (0024) |
@@ -27,7 +27,7 @@ The **live conclusion** of every ADR — the state after its amendments, not its
 | 0019 | Trust is derived from the file, told in fixed words, moved only by a check; verifier ≠ generator |
 | 0020 | Personal data is withheld at the seam before any store and erased from every copy by routine |
 | 0021 | ~~Graph on Neo4j Community~~ — **superseded by 0023** |
-| 0022 | Two stacks deployed by digest; every irreplaceable byte encrypted off-host; erasures replayed on restore |
+| 0022 | Two stacks deployed by digest; every irreplaceable byte encrypted off-host; erasures replayed on restore; `app.` is open at the edge — Better Auth is its sign-in (2026-09-02) |
 | 0023 | ~~Apache AGE, one graph per workspace~~ — **engine superseded by 0032** (plain tables under RLS); its write model stands: the read predicate lives once, in the app's graph query module; the incremental delta joins the app's commit transaction (2026-08-29 amendment) |
 | 0024 | The forge is bare git repositories the app writes; the estate is two 4 GB boxes |
 | 0025 | A signal is a query over rows the platform already keeps; every model call writes one `llm_call` row |

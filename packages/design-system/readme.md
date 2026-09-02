@@ -268,6 +268,10 @@ are specific to this product rather than generic:
 Knowledge). Questions, People and System are deliberately left blank with a disclaimer:
 the source names them but specifies no interface. See its own `README.md`.
 
+shadcn · Kibo UI · AI Elements.
+
+Three registries, one rule: they own behaviour — keyboard, focus, ARIA, virtualisation, streaming. We own meaning — the trust words, the citation unit, the register, the marks. Where the two meet, take theirs and skin it.
+
 ### Foundation cards
 
 `guidelines/` — Colors (6), Type (5), Spacing (4), Motion (1), Brand (5, including

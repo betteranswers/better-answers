@@ -170,7 +170,7 @@ const signedInUser = z.object({ user: z.object({ id: z.string() }) });
 const invitationsNotYet = (): APIError =>
   new APIError("NOT_IMPLEMENTED", {
     error: "invitations_not_yet",
-    error_description: "invitations arrive with the People screen",
+    error_description: "invitations arrive with the People screen (T-027)",
   });
 
 const clientIdOfQuery = (query: string | undefined): string | undefined =>
@@ -342,9 +342,10 @@ export const createAuth = (deps: AuthDependencies) => {
           beforeUpdateMemberRole: async ({ newRole }) => {
             refuseForeignRole(newRole);
           },
-          // No invitation can be accepted until the accept page ships with the first
-          // screen (T-022), so none is created: an emailed invitation with no way to
-          // accept it would only sit pending. Membership today is the platform's act.
+          // No invitation can be accepted until the People screen ships its accept page
+          // (T-027, after T-005 wires email), so none is created: an emailed invitation
+          // with no way to accept it would only sit pending. Membership today is the
+          // platform's act.
           beforeCreateInvitation: async () => {
             throw invitationsNotYet();
           },

@@ -33,10 +33,11 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers �
 | `packages/` | The rest of the shared TypeScript: `schema` |
 | `contracts/` | The tier contract's language-neutral fixtures — both tiers' suites read it, nothing imports it (ADR 0031) |
 | `docs/adr/` | Architecture decision records |
-| `docs-site/` | Astro + Starlight documentation site and its docs skills |
+| `apps/docs-site/` | Astro + Starlight documentation site and its docs skills; `apps/docs-site/specs/<ticket>.md` is where a ticket's spec lives |
 | ordna | The work queue — tasks as git namespace refs (`refs/ordna/tasks/<id>`), not files |
 | `deploy/` | Compose files and deployment configuration |
-| `scripts/` | Repository tooling: the `WorktreeCreate` and `WorktreeRemove` hooks `.claude/settings.json` runs, so a Claude-created worktree arrives with its dependencies installed |
+| `.claude/hooks/` | The `WorktreeCreate` and `WorktreeRemove` hooks `.claude/settings.json` runs, so a Claude-created worktree arrives with its dependencies installed |
+| `.cubic/wiki/` | Cubic's generated wiki: orientation only, never authority (`docs/agents/code-review.md`) |
 
 Commands, versions and scripts are read from each workspace's `package.json` or `pyproject.toml`; this file does not repeat them. Every workspace exposes `check` (lint, types, tests); the root `check` runs them all.
 
@@ -57,6 +58,10 @@ The five canonical roles, unrenamed — `needs-triage`, `needs-info`, `ready-for
 ### Domain docs
 
 Single-context: one root `CONTEXT.md` and one `docs/adr/`. See `docs/agents/domain.md`.
+
+### Code review
+
+Cubic reviews every PR and its findings are triaged through the `cubic` MCP on the PR threads, one commit per round, three rounds at most; GitNexus gates every edit and commit; the wiki orients and never decides. The loop is `docs/agents/code-review.md` — read it before opening a PR.
 
 ## Code Exploration Policy
 
