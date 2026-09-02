@@ -1,0 +1,35 @@
+apps/api/src/auth/constants.ts
+  s_90ffdc067aac0d::t_24208af21baa5c 50-55
+packages/core/src/llm/index.ts
+  s_90ffdc067aac0d::t_74fceee4bd7d19 30,32-33
+  s_90ffdc067aac0d::t_bf13d799a2d19d 68
+apps/api/src/trpc/base.ts
+  s_90ffdc067aac0d::t_095ee4acb369a0 51-61,69-76
+apps/api/tests/routes-list.test.ts
+  s_90ffdc067aac0d::t_1157e0ab211863 6
+  s_90ffdc067aac0d::t_76458969e713e5 81-94
+  s_90ffdc067aac0d::t_ab53f57359f9d4 239-248
+  s_90ffdc067aac0d::t_ce602911b6a87c 218-221,223,233,236
+apps/api/src/trpc/router.ts
+  s_90ffdc067aac0d::t_89c08ebdd67f6b 40-42
+  s_90ffdc067aac0d::t_93f4f980a8748b 8-9
+packages/core/test/llm-routes.test.ts
+  s_90ffdc067aac0d::t_6aa8545f2fa304 96-104
+  s_90ffdc067aac0d::t_65b6cba1f3bedf 10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "bacf7672512dd44f9d1df81ec65713321d0326ed",
+  "prompts": {},
+  "sessions": {
+    "s_90ffdc067aac0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb92143-40a3-4162-962a-19793a875ce7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
