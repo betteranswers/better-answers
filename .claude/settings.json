@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/worktree-create-hook.sh\""
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/worktree-create-hook.sh\""
           }
         ]
       }
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/worktree-remove-hook.sh\""
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/worktree-remove-hook.sh\""
           }
         ]
       }

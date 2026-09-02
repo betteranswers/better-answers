@@ -12,7 +12,7 @@ reviews:
   sensitivity: high
   incremental_commits: true
   check_drafts: false
-  architecture_diagrams: false
+  architecture_diagrams: true
   external_contributors_require_manual_review: false
   resolve_threads_when_addressed: true
   merge_confidence_summary: false
@@ -21,11 +21,8 @@ reviews:
   auto_approve_rules:
     exclude_external_contributors: false
   ultrareview: manual
-  auto_ultrareview: disabled
+  auto_ultrareview: high_risk_only
 
-  # This repository is governed by written documents rather than by convention.
-  # A reviewer that has not read them reports generic findings and misses the
-  # rules that actually bind, so name them here — they cost no agent slot.
   custom_instructions: |
     Read these before reviewing. They are the standard this repository is held to,
     and a finding that contradicts one of them is wrong.
@@ -55,12 +52,8 @@ reviews:
 
   ignore:
     files:
-      # Verbatim install of github.com/dmmulroy/anti-slop, loaded as an oxlint
-      # jsPlugin. We do not edit it, so a finding here belongs upstream, not on
-      # a pull request of ours. Excluded from lint and format for the same reason.
       - apps/api/tools/anti-slop/**
       - cubic.yaml
-      # Working material and generated artefacts, not reviewable source.
       - .scratch/**
       - .planning/**
       - "**/reports/**"
