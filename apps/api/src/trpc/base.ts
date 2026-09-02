@@ -49,8 +49,7 @@ export const router = trpc.router;
 export const workspaceProcedure = trpc.procedure.use(async ({ ctx, next }) => {
   const read = await attempt(() => ctx.auth.api.getSession({ headers: ctx.headers }));
   // A session store that could not be reached is the platform's failure, not the
-  // person's: only a session the identity provider answered *with nothing* is
-  // "not signed in".
+  // person's: only a lookup that succeeded and found nothing is "not signed in".
   if (!read.ok) {
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",

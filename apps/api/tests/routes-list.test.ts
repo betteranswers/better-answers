@@ -239,8 +239,12 @@ describe("what the routes list refuses", () => {
   it("refuses a flood from one address before it can spend a session lookup each", async () => {
     const client = app.client("198.51.100.60");
     const statuses: number[] = [];
-    for (let attempt = 0; attempt <= TRPC_IP_RULE.max; attempt += 1) {
-      statuses.push((await listRoutes(client)).status);
+    // The window is wall-clock aligned, so a burst that straddles a boundary starts
+    // its count again: ask until refused rather than a fixed number of times.
+    for (let attempt = 0; attempt <= TRPC_IP_RULE.max * 2 + 1; attempt += 1) {
+      const status = (await listRoutes(client)).status;
+      statuses.push(status);
+      if (status === 429) break;
     }
 
     expect(statuses).toContain(429);
