@@ -1,0 +1,49 @@
+apps/api/tests/harness.ts
+  s_90ffdc067aac0d::t_568fcd419f4a17 179,186
+  s_90ffdc067aac0d::t_1f81aa6dcd835e 147-160
+apps/api/src/ingress/spa.ts
+  s_90ffdc067aac0d::t_b9332b569ab99e 1-13,17-59
+  s_90ffdc067aac0d::t_21e830f470ea12 14-16
+apps/api/tests/spa.test.ts
+  s_90ffdc067aac0d::t_abec54c4c43e7c 1-100
+apps/api/tests/fixtures/web-build/index.html
+  s_90ffdc067aac0d::t_3cd0504d340054 1-16
+apps/api/src/config.ts
+  s_90ffdc067aac0d::t_0e5ee0fa06a7d3 1-2
+  s_90ffdc067aac0d::t_72c66c068afe9c 24-28
+  s_90ffdc067aac0d::t_e24bc09d130080 98-102
+  s_90ffdc067aac0d::t_3737fcd87b9831 81
+.env.example
+  s_90ffdc067aac0d::t_84c3f477e19d07 12-17
+apps/api/package.json
+  s_90ffdc067aac0d::t_e58e3bedff2861 10
+apps/api/tests/fixtures/web-build/assets/screen.js
+  s_90ffdc067aac0d::t_6f0d81e9143640 1-2
+apps/api/src/main.ts
+  s_90ffdc067aac0d::t_9fe75c83e2d351 30
+apps/api/tests/serve.ts
+  s_90ffdc067aac0d::t_1a4747aa7db78d 1-53
+apps/api/tests/config.test.ts
+  s_90ffdc067aac0d::t_ee57950f2219d5 27-32,34-45
+apps/api/src/server.ts
+  s_90ffdc067aac0d::t_6b271e34106cca 142-146
+  s_90ffdc067aac0d::t_6a0b11bc723bfd 41
+  s_90ffdc067aac0d::t_20cbe351490681 42
+  s_90ffdc067aac0d::t_f3646dd90a057f 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3081869ffee177c03df07ee77e0f971bd8c10f6f",
+  "prompts": {},
+  "sessions": {
+    "s_90ffdc067aac0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb92143-40a3-4162-962a-19793a875ce7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
