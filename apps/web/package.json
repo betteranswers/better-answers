@@ -16,11 +16,23 @@
   },
   "dependencies": {
     "@better-answers/design-system": "workspace:*",
+    "@radix-ui/react-use-controllable-state": "1.2.6",
+    "@tanstack/react-query": "5.102.8",
     "@tanstack/react-router": "1.170.32",
+    "@trpc/client": "11.18.0",
+    "@trpc/tanstack-react-query": "11.18.0",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "cmdk": "1.1.1",
+    "embla-carousel-react": "8.6.0",
+    "lucide-react": "1.39.0",
+    "radix-ui": "1.6.7",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "tailwind-merge": "3.6.0"
   },
   "devDependencies": {
+    "@better-answers/api": "workspace:*",
     "@playwright/test": "1.62.1",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",

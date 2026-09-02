@@ -8,9 +8,9 @@ import {
 } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
-import { SystemScreen } from "../screens/system-screen.tsx";
-import { UnbuiltScreen } from "../screens/unbuilt-screen.tsx";
-import { SCREENS, type Screen, type ScreenId } from "../shared/screens.ts";
+import { SystemScreen } from "./screens/system-screen.tsx";
+import { UnbuiltScreen } from "./screens/unbuilt-screen.tsx";
+import { SCREENS, type Screen, type ScreenId } from "@/shared/screens.ts";
 import { Frame } from "./frame.tsx";
 import { UnknownScreen } from "./unknown-screen.tsx";
 

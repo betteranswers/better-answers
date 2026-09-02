@@ -167,6 +167,184 @@
       }
     },
     {
+      // T-036 — the SPA's rules. Two things every file in `apps/web` obeys, before the zones
+      // below narrow them further.
+      //
+      // Filenames are kebab-case, so a component's file reads the same on a case-insensitive
+      // and a case-sensitive filesystem and a rename is never a no-op commit.
+      //
+      // `no-restricted-imports` carries the SPA's import shape. oxlint 1.80 has no
+      // `import/no-restricted-paths`, so a layering zone cannot be expressed as "this directory
+      // may not reach that one"; it is expressed instead as a convention a glob *can* read — a
+      // relative import stays inside its own directory, and anything that crosses one is written
+      // `@/<zone>/…` (the path alias in `apps/web/tsconfig.json` and `vite.config.ts`). The
+      // overrides after this one then name zones rather than counting `../`.
+      //
+      // Testing-library and jest-dom rules: not enabled, because oxlint 1.80 ships neither
+      // plugin (checked against `node_modules/oxlint/configuration_schema.json`, 03/09/2026);
+      // the component suites are held by review and by `[TEST1]` instead.
+      "files": ["apps/web/**"],
+      "rules": {
+        "unicorn/filename-case": ["error", { "case": "kebabCase" }],
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["../*/**", "../../**"],
+                "message": "A relative import in apps/web stays inside its own directory; an import that crosses one is written `@/<zone>/…` (T-036), because that is what the layering overrides in this file can read."
+              },
+              {
+                "group": ["@better-answers/api", "@better-answers/api/*"],
+                "message": "apps/web imports nothing from apps/api (ADR 0006). The one exception is `AppRouter` as an `import type`, in `apps/web/src/shared/api/trpc.ts` and no second file; runtime coupling stays zero."
+              },
+              {
+                "group": ["drizzle-zod"],
+                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema. Restated here because this override replaces the repo-wide no-restricted-imports config for apps/web."
+              },
+              {
+                "group": ["better-auth", "better-auth/*", "@better-auth/*"],
+                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009). Restated here because this override replaces the repo-wide no-restricted-imports config for apps/web."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // A feature owns one concern of the product and the requests it issues (ADR 0006's
+      // amendment; the bulletproof-react api-layer pattern). It reaches down to `shared/` and
+      // never sideways or up: a feature that needs another feature's ground is two features
+      // sharing something that belongs in `shared/`, and a feature that reaches into `app/`
+      // has inverted the direction the app composes in.
+      "files": ["apps/web/src/features/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/**"],
+                "message": "No feature imports another feature (T-036). Within a feature, imports are relative; ground two features share belongs in `apps/web/src/shared/`."
+              },
+              {
+                "group": ["@/app/**"],
+                "message": "The direction is app → features → shared and never back (T-036): `app/` composes features, so a feature importing `app/` is a cycle waiting to be written."
+              },
+              {
+                "group": ["../*/**", "../../**"],
+                "message": "A relative import in apps/web stays inside its own directory; an import that crosses one is written `@/<zone>/…` (T-036), because that is what the layering overrides in this file can read."
+              },
+              {
+                "group": ["@better-answers/api", "@better-answers/api/*"],
+                "message": "apps/web imports nothing from apps/api (ADR 0006). The one exception is `AppRouter` as an `import type`, in `apps/web/src/shared/api/trpc.ts` and no second file; runtime coupling stays zero."
+              },
+              {
+                "group": ["drizzle-zod"],
+                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema. Restated here because this override replaces the config above."
+              },
+              {
+                "group": ["better-auth", "better-auth/*", "@better-auth/*"],
+                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009). Restated here because this override replaces the config above."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // `shared/` is the bottom of the SPA: the tRPC client, the design-system bridge, the
+      // registry primitives and the screen list. It imports nothing above it, which is what
+      // makes it safe for every feature and the app layer to import.
+      "files": ["apps/web/src/shared/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/**", "@/app/**"],
+                "message": "shared/ imports nothing above it (T-036): it is the layer every feature and the app layer stand on, and an import upwards makes it one of them."
+              },
+              {
+                "group": ["../*/**", "../../**"],
+                "message": "A relative import in apps/web stays inside its own directory; an import that crosses one is written `@/<zone>/…` (T-036), because that is what the layering overrides in this file can read."
+              },
+              {
+                "group": ["@better-answers/api", "@better-answers/api/*"],
+                "message": "apps/web imports nothing from apps/api (ADR 0006). The one exception is `AppRouter` as an `import type`, in `apps/web/src/shared/api/trpc.ts` and no second file; runtime coupling stays zero."
+              },
+              {
+                "group": ["drizzle-zod"],
+                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema. Restated here because this override replaces the config above."
+              },
+              {
+                "group": ["better-auth", "better-auth/*", "@better-auth/*"],
+                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009). Restated here because this override replaces the config above."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // ADR 0006's one exception, as one line of configuration: this file, `AppRouter`, and
+      // `import type`. Everything else the shared override bans stays banned, so a value import
+      // of `AppRouter` fails here and an `import type` of it fails in every other file.
+      "files": ["apps/web/src/shared/api/trpc.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@better-answers/api", "@better-answers/api/*"],
+                "allowTypeImports": true,
+                "message": "This file is the api's type seam: an `import type` is allowed here and a value import is not (ADR 0006, amended 2026-09-02), so runtime coupling stays zero. The guarantee is `import type`-only rather than `AppRouter`-only — oxlint 1.80 ignores `allowImportNames` beside `allowTypeImports`, and `import type`-only is what the amendment asks for."
+              },
+              {
+                "group": ["@/features/**", "@/app/**"],
+                "message": "shared/ imports nothing above it (T-036): it is the layer every feature and the app layer stand on, and an import upwards makes it one of them."
+              },
+              {
+                "group": ["../*/**", "../../**"],
+                "message": "A relative import in apps/web stays inside its own directory; an import that crosses one is written `@/<zone>/…` (T-036), because that is what the layering overrides in this file can read."
+              },
+              {
+                "group": ["drizzle-zod"],
+                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema. Restated here because this override replaces the config above."
+              },
+              {
+                "group": ["better-auth", "better-auth/*", "@better-auth/*"],
+                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009). Restated here because this override replaces the config above."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // Registry source (ADR 0033): shadcn's primitives, Kibo UI's composed pieces and
+      // Vercel AI Elements, installed here as source. The rule the ADR states is that they
+      // own behaviour — keyboard handling, focus, ARIA wiring, subscriptions — and the
+      // platform owns meaning. These four rules judge how a component is written, which is
+      // the part that is theirs; leaving them on would mean rewriting an upstream carousel's
+      // effects on every registry update and calling the result reviewed.
+      //
+      // What is *not* relaxed: every import rule above, `no-console`, the anti-slop rules
+      // that catch a widened type, and `[A11Y1]` itself — a screen carries the WCAG 2.2 AA
+      // line and is tested with a keyboard and a screen reader whatever a primitive does.
+      // Meaning stays ours: a trust word, a citation unit or a register decision never comes
+      // out of this directory.
+      "files": ["apps/web/src/shared/ui/**"],
+      "rules": {
+        "react/set-state-in-effect": "off",
+        "react-doctor/effect-needs-cleanup": "off",
+        "jsx-a11y/prefer-tag-over-role": "off",
+        "anti-slop/require-safety-comment-for-type-assertion": "off"
+      }
+    },
+    {
       "files": ["**/*.test.ts", "**/*.test.tsx", "**/test/**"],
       "rules": {
         "anti-slop/no-chained-type-assertions": "off",

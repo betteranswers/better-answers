@@ -3,7 +3,19 @@
   "compilerOptions": {
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    // Off here for the same reason it is off in `apps/api` — `@better-auth/oauth-provider@1.7.2`'s
+    // plugin type carries `items?: undefined` metadata literals that fail to assign under exact
+    // optionals — and it has to be off *here* too because ADR 0006's one exception means this
+    // program contains `apps/api`'s source: `AppRouter` is inferred from the procedures, whose
+    // context names `Auth`. It costs the SPA's own files nothing else, and it goes when Better
+    // Auth is upgraded and `apps/api` drops the same line.
+    "exactOptionalPropertyTypes": false,
+    // `@/` is what makes the layering rules legible to a linter: an import that crosses a
+    // directory is written `@/<zone>/…`, so the per-glob `no-restricted-imports` overrides in
+    // `.oxlintrc.json` can name a zone instead of guessing how many `../` a file climbed.
+    // TypeScript 7 removed `baseUrl`; the mapping is relative to this file instead.
+    "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src", "test", "e2e", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
 }
