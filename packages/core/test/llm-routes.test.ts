@@ -7,7 +7,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { Claims } from "../src/kernel/index.ts";
-import { listRoutes } from "../src/llm/index.ts";
+import { listRoutes, LLM_PURPOSES } from "../src/llm/index.ts";
 import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
 
 /**
@@ -91,6 +91,15 @@ describe("a workspace's model routes", () => {
         fixed: true,
       },
     ]);
+  });
+
+  it("says a workspace that has chosen nothing has chosen nothing, the embedding route included", async () => {
+    const seeded = await seedWorkspace([]);
+
+    const listed = await listAs(seeded);
+
+    expect(listed).toHaveLength(LLM_PURPOSES.length);
+    expect(listed.every((route) => route.provider === null && !route.fixed)).toBe(true);
   });
 
   it("shows a member of one workspace their own routes and never another workspace's", async () => {

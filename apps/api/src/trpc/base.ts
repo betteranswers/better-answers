@@ -48,7 +48,17 @@ export const router = trpc.router;
  */
 export const workspaceProcedure = trpc.procedure.use(async ({ ctx, next }) => {
   const read = await attempt(() => ctx.auth.api.getSession({ headers: ctx.headers }));
-  const session = read.ok ? read.value : null;
+  // A session store that could not be reached is the platform's failure, not the
+  // person's: only a session the identity provider answered *with nothing* is
+  // "not signed in".
+  if (!read.ok) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "the session could not be read",
+      cause: read.error,
+    });
+  }
+  const session = read.value;
   if (session === null || session === undefined) throw unauthorized("no-session");
 
   // The session is read once and handed to the same reader `/me` passes, so the
@@ -56,9 +66,14 @@ export const workspaceProcedure = trpc.procedure.use(async ({ ctx, next }) => {
   const claims = await sessionClaims(async () => session, ctx.headers);
   if (claims === undefined) throw unauthorized("no-active-workspace");
 
-  const resolved = await withPrincipal(ctx.door, claims, (principal, tx) =>
-    next({ ctx: { principal, tx } }),
-  );
+  const resolved = await withPrincipal(ctx.door, claims, async (principal, tx) => {
+    // tRPC hands a failed resolver back as a value rather than throwing it, so a
+    // failure would otherwise commit the transaction it failed inside. Throwing it
+    // here rolls the transaction back and `withPrincipal` re-raises it unchanged.
+    const ran = await next({ ctx: { principal, tx } });
+    if (!ran.ok) throw ran.error;
+    return ran;
+  });
   if (!resolved.ok) throw unauthorized(resolved.error);
   return resolved.value;
 });

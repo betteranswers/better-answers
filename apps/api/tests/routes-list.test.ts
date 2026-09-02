@@ -3,6 +3,7 @@ import { testData } from "@better-answers/schema/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { TRPC_IP_RULE } from "../src/auth/index.ts";
 import { signIn } from "./flow.ts";
 import { startApp, type TestApp, type TestClient } from "./harness.ts";
 
@@ -76,6 +77,20 @@ const listRoutes = (client: TestClient): Promise<Response> => client.fetch(TRPC_
 
 const refusalOf = async (response: Response): Promise<string> =>
   refused.parse(await response.json()).error.message;
+
+/** The role fence the migration installed, named once so nothing restates its SQL. */
+const MEMBER_ROLE_CHECK = "member_role_check";
+
+/** A constraint exactly as the database holds it, so it can be put back as it was. */
+const constraintDefinition = async (name: string): Promise<string> => {
+  const found = await app.database.superuser.query<{ definition: string }>(
+    "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = $1",
+    [name],
+  );
+  const definition = found.rows[0]?.definition;
+  if (definition === undefined) throw new Error(`no constraint named ${name}`);
+  return definition;
+};
 
 describe("the routes list over the wire", () => {
   it("answers a workspace member one route per purpose, with the embedding route fixed at its dimensions", async () => {
@@ -200,9 +215,12 @@ describe("what the routes list refuses", () => {
     const where = "workspace_id = $1 AND user_id = $2";
     const member = [workspace.workspaceId, workspace.admin.id];
     // The database's CHECK is what keeps this row out of an estate; the resolver
-    // refuses it anyway, and the only way to ask it is to stand the fence down.
-    await superuser.query('ALTER TABLE "member" DROP CONSTRAINT "member_role_check"');
+    // refuses it anyway, and the only way to ask it is to stand the fence down. The
+    // fence is read from the catalogue and put back verbatim, so this test can never
+    // leave the migration's constraint behind as a paraphrase of itself.
+    const definition = await constraintDefinition(MEMBER_ROLE_CHECK);
     try {
+      await superuser.query(`ALTER TABLE "member" DROP CONSTRAINT "${MEMBER_ROLE_CHECK}"`);
       await superuser.query(`UPDATE "member" SET role = 'Owner' WHERE ${where}`, member);
 
       const response = await listRoutes(client);
@@ -212,9 +230,22 @@ describe("what the routes list refuses", () => {
     } finally {
       await superuser.query(`UPDATE "member" SET role = 'Admin' WHERE ${where}`, member);
       await superuser.query(
-        `ALTER TABLE "member" ADD CONSTRAINT "member_role_check" CHECK (role IN ('Admin', 'Editor', 'Viewer'))`,
+        `ALTER TABLE "member" ADD CONSTRAINT "${MEMBER_ROLE_CHECK}" ${definition}`,
       );
     }
+    expect(await constraintDefinition(MEMBER_ROLE_CHECK)).toBe(definition);
+  });
+
+  it("refuses a flood from one address before it can spend a session lookup each", async () => {
+    const client = app.client("198.51.100.60");
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt <= TRPC_IP_RULE.max; attempt += 1) {
+      statuses.push((await listRoutes(client)).status);
+    }
+
+    expect(statuses).toContain(429);
+    // Another address is unaffected: the ceiling is per client, not global.
+    expect((await listRoutes(app.client("198.51.100.61"))).status).toBe(401);
   });
 
   it("refuses a session whose active workspace is not a workspace id", async () => {

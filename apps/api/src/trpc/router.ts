@@ -5,6 +5,8 @@ import { listRoutes } from "@better-answers/core/llm";
 import type { PostgresDoor } from "@better-answers/core/store/postgres";
 
 import type { Auth } from "../auth/index.ts";
+import { TRPC_IP_RULE } from "../auth/index.ts";
+import { limitByIp } from "../ingress/limits.ts";
 import { router, workspaceProcedure } from "./base.ts";
 
 /**
@@ -35,6 +37,9 @@ export type TrpcRoutesDependencies = {
 
 export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
   const routes = new Hono();
+  // The ceiling stands in front of the session lookup: an unauthenticated flood is
+  // refused before it can spend a database round trip per request.
+  routes.use(`${TRPC_ENDPOINT}/*`, limitByIp(deps.door, TRPC_IP_RULE));
   routes.use(
     `${TRPC_ENDPOINT}/*`,
     trpcServer({

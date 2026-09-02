@@ -47,6 +47,12 @@ export const PAGE_IP_RULE: CounterRule = { windowMs: 60_000, max: 30 };
 export const EMAIL_CODE_EMAIL_RULE: CounterRule = { windowMs: 10 * 60_000, max: 5 };
 /** Per-IP, on `/mcp` before any token is verified — the 401 flood. */
 export const MCP_UNAUTHENTICATED_IP_RULE: CounterRule = { windowMs: 60_000, max: 60 };
+/**
+ * Per-IP, in front of the tRPC endpoint. Every call there costs a session lookup
+ * before it can be refused, so the ceiling sits before the lookup. Twice the MCP
+ * flood rule, because a screen is many small queries and an office is one address.
+ */
+export const TRPC_IP_RULE: CounterRule = { windowMs: 60_000, max: 120 };
 /** Per-token, on every MCP request (ADR 0018's counter per `(token, window)`). */
 export const MCP_TOKEN_RULE: CounterRule = { windowMs: 60_000, max: 120 };
 

@@ -27,9 +27,10 @@ export type WorkspaceRoute = {
   /** The embedding route's vector width; every other purpose carries none. */
   readonly dimensions: number | null;
   /**
-   * The embedding route is fixed: changing it invalidates every vector already
+   * A chosen embedding route is fixed: changing it invalidates every vector already
    * written (ADR 0020's hosted-embedding amendment). The database refusing the
-   * change is T-029's; this is the word a screen shows.
+   * change is T-029's; this is the word a screen shows. An embedding purpose with no
+   * route yet is not fixed — there is nothing chosen for a vector to depend on.
    */
   readonly fixed: boolean;
 };
@@ -64,7 +65,7 @@ export const listRoutes = async (
       provider: row?.provider ?? null,
       model: row?.model ?? null,
       dimensions: row?.dimensions ?? null,
-      fixed: purpose === FIXED_PURPOSE,
+      fixed: row !== undefined && purpose === FIXED_PURPOSE,
     };
   });
 };
