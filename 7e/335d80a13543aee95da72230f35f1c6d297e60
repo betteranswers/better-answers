@@ -1,0 +1,59 @@
+apps/web/src/screens/system-screen.tsx
+  s_90ffdc067aac0d::t_815d63a3de604a 7
+  s_90ffdc067aac0d::t_5e0a80b579f7cf 29-30
+  s_90ffdc067aac0d::t_efb29d7a665332 9-13,27-28,31
+apps/web/e2e/frame.spec.ts
+  ai_agent 41-56
+apps/web/src/app/frame.tsx
+  s_90ffdc067aac0d::t_5ecd537381db85 6-7,20,23,28-33,62
+packages/design-system/tokens/tailwind-bridge.css
+  s_90ffdc067aac0d::t_5e0a80b579f7cf 196-207
+packages/design-system/SKILL.md
+  s_90ffdc067aac0d::t_d85fbe2e991241 3
+apps/web/test/frame.test.tsx
+  s_90ffdc067aac0d::t_7bedb6ac92325c 19,59-65
+apps/web/src/shared/screens.ts
+  s_90ffdc067aac0d::t_214e715f6994b7 11,50-59
+apps/api/tests/serve.ts
+  s_90ffdc067aac0d::t_05429394ac0580 45-51
+docs/adr/0033-the-ui-kit-is-tailwind-v4-through-the-design-system-bridge-with-three-registries-that-own-behaviour.md
+  s_90ffdc067aac0d::t_f4b400c3a799c9 19-25,33-35,37-38,58-61
+apps/api/tests/config.test.ts
+  s_90ffdc067aac0d::t_5e0a80b579f7cf 40-47
+apps/api/tests/spa.test.ts
+  s_90ffdc067aac0d::t_5e0a80b579f7cf 96-107
+apps/web/stryker.config.mjs
+  ai_agent 12-15
+packages/design-system/assets/README.md
+  s_90ffdc067aac0d::t_d85fbe2e991241 11
+apps/api/src/server.ts
+  s_90ffdc067aac0d::t_357497843d3939 146-150,158-166
+apps/api/src/config.ts
+  s_90ffdc067aac0d::t_05429394ac0580 33-39
+packages/design-system/readme.md
+  s_90ffdc067aac0d::t_d85fbe2e991241 261,276
+apps/api/src/ingress/spa.ts
+  s_90ffdc067aac0d::t_047f2384897856 2-4,11-25,35-41,48-64,68-70,73,75-78,80-84,86-91,93-94
+apps/web/package.json
+  ai_agent 12,14
+apps/web/src/app/unknown-screen.tsx
+  s_90ffdc067aac0d::t_5ecd537381db85 4-6
+apps/web/src/app/router.tsx
+  s_90ffdc067aac0d::t_815d63a3de604a 7,59-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7e335d80a13543aee95da72230f35f1c6d297e60",
+  "prompts": {},
+  "sessions": {
+    "s_90ffdc067aac0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb92143-40a3-4162-962a-19793a875ce7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
