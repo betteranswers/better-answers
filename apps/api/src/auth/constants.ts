@@ -53,8 +53,9 @@ export const MCP_UNAUTHENTICATED_IP_RULE: CounterRule = { windowMs: 60_000, max:
  *
  * The three `ip` rules above — the OAuth endpoints, the pages, the MCP flood — and
  * this one read **one counter per client key per window** (`consumeIngress` keys on
- * scope, key and window, and a key is an IPv4 address or an IPv6 `/64`; the rule is
- * the threshold it is read against, not a budget of its own). The email rule is a
+ * scope, key and window, and a key is an IPv4 address, an IPv6 `/64`, or the one
+ * `UNKNOWN_CLIENT_IP` bucket a request off the tunnel falls into; the rule is the
+ * threshold it is read against, not a budget of its own). The email rule is a
  * counter of its own. So each surface names the count at which
  * *it* stops answering, and this is the highest of them because a screen is many
  * small queries where a page is one navigation — a person browsing the product is
