@@ -9,9 +9,10 @@ export default {
   vitest: { configFile: "vitest.config.ts" },
 
   // `main.tsx` mounts the app into the document; there is no seam under it to test.
-  // `e2e/` is named as excluded rather than merely left out: the browser suite is driven by
-  // Playwright against a served build over a Testcontainers Postgres, and the vitest runner
-  // below cannot run it, so a mutant there would be reported as survived for ever.
+  // `e2e/` is named rather than merely left out. The positive glob already excludes it, so
+  // the negation changes nothing a run does — it records the decision where the next person
+  // to widen the globs will read it: the browser suite is Playwright against a served build
+  // over a Testcontainers Postgres, and the vitest runner below cannot run it.
   mutate: ["src/**/*.tsx", "!src/main.tsx", "!e2e/**"],
   coverageAnalysis: "perTest",
 

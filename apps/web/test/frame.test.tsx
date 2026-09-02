@@ -16,8 +16,7 @@ import { SCREENS } from "../src/shared/screens.ts";
 afterEach(cleanup);
 
 const openAt = async (path: string) => {
-  const router = createAppRouter();
-  router.history = createMemoryHistory({ initialEntries: [path] });
+  const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }));
   await router.load();
   return render(<RouterProvider router={router} />);
 };
@@ -55,6 +54,15 @@ describe("Control Centre's frame", () => {
     }
 
     expect(unbuilt).toEqual(["Sources", "Suggestions", "Knowledge", "Questions", "People"]);
+  });
+
+  it("says the routes are not listed, rather than showing an empty table", async () => {
+    await openAt("/system");
+
+    expect(screen.getByRole("heading", { level: 2, name: "Routes" })).toBeDefined();
+    expect(screen.getByText("A workspace's routes are not listed here yet.")).toBeDefined();
+    // ADR 0025 gives System eight cards; none is built, and the screen says so.
+    expect(screen.getByText(/The rest of System/)).toBeDefined();
   });
 
   it("says nothing about who is signed in, because no session has been read", async () => {

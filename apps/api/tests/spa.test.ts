@@ -93,6 +93,18 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     await expect(response.text()).resolves.not.toContain(`<div id="root">`);
   });
 
+  it("answers a screen's address on a hostname the fence spells with a trailing dot", async () => {
+    // The fence admits `app.example.test.` — a trailing dot is the DNS root and names the
+    // same host — so the shell has to normalise the same way or that address reaches the
+    // authorization server's 404 instead of the product.
+    const response = await app.server.request(
+      new Request(`https://${APP_HOSTNAME}./system`, asABrowserNavigates),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toContain(`<div id="root">`);
+  });
+
   it("serves the shell on app. and nowhere else, so mcp. is unchanged", async () => {
     const response = await app
       .client(undefined, MCP_HOSTNAME)

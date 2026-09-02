@@ -258,7 +258,7 @@ and every word on a screen. Where the two meet, take theirs and skin it. better-
 says *organization* throughout and is taken with a `localization` override that says
 *workspace*; that override is not optional (`[GLOSSARY1]`).
 
-The five product-specific components the set used to hold are the ones to rebuild first on
+The seven product-specific components the set used to hold are the ones to rebuild first on
 top of a registry primitive, because nothing off the shelf carries their meaning:
 **`TrustTag`** (the closed set of trust words, `CONTEXT.md` and ADR 0019),
 **`Citation`** (concept, source, locator, passage on one disclosure, ADR 0015),
@@ -273,7 +273,7 @@ GOV.UK brand, `[A11Y1]`), **`Icon`** (the Phosphor substitution in one file) and
 
 ## 7. Flagged substitutions and open questions
 
-1. **Fonts.** No font binaries exist in the source. **Geist and Geist Mono** are loaded from Google Fonts as the closest match to the stated reference styling. Replace `tokens/fonts.css` if a licensed brand font exists.
+1. **Fonts.** No brand font binaries exist in the source. **Geist and Geist Mono** were chosen as the closest match to the stated reference styling, and the substitution stands. Since T-035 the product **self-hosts** them from this package's own `@fontsource-variable/geist` and `-geist-mono` dependencies (`tokens/fonts-hosted.css`), so no screen makes a third-party request; the specimen cards under `guidelines/`, which are opened straight from disk and cannot resolve a package name, still link Google Fonts through `tokens/fonts-remote.css`. Replace the two `tokens/fonts-*.css` files if a licensed brand font exists; `tokens/fonts.css` names the families and stays.
 2. **Icons.** No icon set exists in the source. **Phosphor** — `@phosphor-icons/react` in the app, `@phosphor-icons/web` on a page — flagged above.
 3. **Logo.** None exists yet; none was drawn. The wordmark is `better-answers` set in Geist Mono. Logo and icon files are in production separately.
 4. **Accent colour.** Ink blue `#2e4bd4` was chosen, not found. The source specifies no palette — only that colour never carries a signal alone.

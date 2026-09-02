@@ -16,9 +16,13 @@ stylesheet.** `packages/design-system` already held the tokens, the stylesheet a
 Better Answers tokens. The SPA imports that bridge, so `bg-card` is `--surface-card`,
 `text-brand` is the ink blue, `p-4` is `--space-4` and every step of the radius ramp is 0.
 There is no `tailwind.config.js` to drift from the tokens, because v4 has no configuration
-file: the theme *is* CSS, and the CSS is the design system's. **A colour, a size or a radius
-that is not a theme value from the tokens is a defect**, not a preference — the one
-deliberate exception is the type scale, because Tailwind's font-size namespace is `--text-*`
+file: the theme *is* CSS, and the CSS is the design system's. **In a screen, a colour, a size or a radius that is not a
+theme value from the tokens is a defect**, not a preference. The bridge itself is the one
+place literals are allowed, and only where a token cannot reach: it fills a few kit contract
+names — a destructive foreground, the dark theme's handful of overrides — with raw values,
+because a kit may wrap them in `color-mix()` or an opacity modifier, which needs a real
+colour rather than a `var()` chain. The file says so where it does it. The second exception
+is the type scale, because Tailwind's font-size namespace is `--text-*`
 and the design system already owns those names, so a screen reads a type step as
 `var(--text-lg)` and the bridge says why in the file.
 
@@ -26,10 +30,12 @@ and the design system already owns those names, so a screen reads a type step as
 vendored blindly.** `shadcn` for the primitives (dialog, select, table, tabs), **Kibo UI**
 for the composed pieces built on them, **Vercel AI Elements** for the answer surface —
 streaming, reasoning, citations-in-flight — and **better-auth-ui** for the sign-in and
-workspace-picker screens, which is the same library that mints the session. All four are
-installed as *source into this repository*, which is what a shadcn registry is: there is no
+workspace-picker screens, over the Better Auth instance in `apps/api` that mints the
+session — the library draws those screens, it does not issue anything. All four arrive as
+*source into this repository*, which is what a shadcn registry is: there will be no
 runtime dependency to be broken by an upstream release, and a component that has to be
-re-skinned is edited in place.
+re-skinned is edited in place. **None of them is installed by this ADR's own PR** — that is
+the next ticket's; what is settled here is which registries, and under which rule.
 
 **One rule governs all four: they own behaviour, the platform owns meaning.** Keyboard
 handling, focus management, ARIA wiring, virtualisation, streaming and the fiddly parts of
@@ -49,8 +55,10 @@ It is taken with a `localization` override that replaces every one of those stri
 that override is not optional — a screen that says "organization" is a defect against
 `[GLOSSARY1]`, not a cosmetic issue.
 
-Versions are read from the registry on the day (`[DEPS1]`), never from memory. The pins
-taken on 2 September 2026 are `tailwindcss` and `@tailwindcss/vite` 4.3.3,
+Versions are read from the source on the day (`[DEPS1]`), never from memory. The source for
+each of these is the **npm registry**, read with `npm view <package> version` on **2
+September 2026**, and each pin lives in the manifest of the workspace that owns it. The pins
+taken that day are `tailwindcss` and `@tailwindcss/vite` 4.3.3,
 `@tanstack/react-router` 1.170.32, `@playwright/test` 1.62.1 and
 `@fontsource-variable/geist` / `-geist-mono` 5.3.0; the registry components themselves are
 installed by a later ticket and pinned when they are.

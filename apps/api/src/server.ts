@@ -143,11 +143,11 @@ export function createServer(dependencies: ServerDependencies): Hono {
   // The product's own transport, on the origin the SPA is served from (ADR 0008).
   server.route("/", createTrpcRoutes({ auth, door }));
 
-  // The SPA's static build on `app.` (ADR 0006, amended 2026-09-02), after every route
-  // this process owns — the tRPC mount above included — and ahead of the authorization
-  // server's wildcard, so `/system` is answered by the shell rather than by a 404 while
-  // `/health` and `/trpc` still answer themselves.
-  server.use("*", serveSpa({ root: dependencies.webRoot, hostname: dependencies.hostnames.app }));
+  // The files the SPA's build holds, on `app.` (ADR 0006, amended 2026-09-02) — the
+  // hashed bundles and the shell at `/`. A file lookup claims nothing it does not hold, so
+  // it is safe here, after every route this process owns and before the wildcard.
+  const spa = serveSpa({ root: dependencies.webRoot, hostname: dependencies.hostnames.app });
+  server.use("*", spa.assets);
 
   // Better Auth's own endpoints — discovery, /oauth2/*, /jwks, the email-code and
   // organisation endpoints — answer everything the routes above did not, on every
@@ -155,7 +155,15 @@ export function createServer(dependencies: ServerDependencies): Hono {
   // before this mount, by the hostname fence at the top of this function and the one
   // list in `ingress/hostnames.ts` (T-030); the tunnel's ingress rules are the first
   // fence and stay so (ADR 0022).
-  server.all("/*", (context) => auth.handler(context.req.raw));
+  server.all("/*", async (context) => {
+    const answered = await auth.handler(context.req.raw);
+    // A screen's address is a path nothing on disk holds and the authorization server does
+    // not know. It is answered here, after that server has declined, so no endpoint of it
+    // can be shadowed by the shell — its set grows with the library, and a shell that
+    // guessed which paths were its own would be wrong on the next upgrade.
+    if (answered.status !== 404) return answered;
+    return (await spa.shell(context)) ?? answered;
+  });
 
   return server;
 }

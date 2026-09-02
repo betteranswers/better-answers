@@ -30,7 +30,13 @@ const bootstrapSchema = z.object({
   // (ADR 0006, amended 2026-09-02). The default is the build directory in this repository,
   // which is what `pnpm --filter @better-answers/web build` writes and what the dev loop
   // and the browser suite use; an image that lays the build down elsewhere names it.
-  WEB_ROOT: z.string().default(fileURLToPath(new URL("../../web/dist", import.meta.url))),
+  // `.min(1)` because an empty value is not "unset": it would reach the static handler as
+  // a root of "", which resolves against the working directory and would serve the app
+  // image's own files on `app.`.
+  WEB_ROOT: z
+    .string()
+    .min(1)
+    .default(fileURLToPath(new URL("../../web/dist", import.meta.url))),
 });
 
 /** An https origin and nothing else: no path, query or fragment, so every URL derived from it agrees with the root-mounted routes. */

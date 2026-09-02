@@ -1,9 +1,9 @@
 import { Link } from "@tanstack/react-router";
 
 /**
- * The address is on `app.` but is not one of Control Centre's screens. The api serves the
- * shell for any address it does not answer itself, so this is where such an address lands,
- * and saying so is better than a blank frame.
+ * The address is on `app.` but is not one of Control Centre's screens. The api answers any
+ * such address with this page rather than with a 404, so that a screen's own address
+ * survives a refresh; saying so is better than showing a page with nothing on it.
  *
  * WCAG 2.2 AA, tested with a keyboard and a screen reader (`[A11Y1]`).
  */

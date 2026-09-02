@@ -37,6 +37,14 @@ describe("the bootstrap configuration", () => {
     });
   });
 
+  it("refuses an empty build directory, which would serve the image's own files", () => {
+    // An empty value is not "unset": it reaches the static handler as a root of "", which
+    // resolves against the working directory.
+    const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x", WEB_ROOT: "" });
+
+    expect(read.ok).toBe(false);
+  });
+
   it("defaults the SPA's build to this repository's own, so the dev loop needs no setting", () => {
     // The app serves the build on `app.` (ADR 0006, amended 2026-09-02); an image that
     // lays it down elsewhere sets WEB_ROOT, and everything else is already right.

@@ -4,6 +4,7 @@ import {
   createRouter,
   redirect,
   type AnyRoute,
+  type RouterHistory,
 } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
@@ -55,8 +56,15 @@ const screenRoutes: AnyRoute[] = SCREENS.map((screen) =>
   }),
 );
 
-export const createAppRouter = () =>
-  createRouter({ routeTree: rootRoute.addChildren([indexRoute, ...screenRoutes]) });
+/**
+ * The history is a parameter because a test drives the router without a browser: assigning
+ * one after construction relies on the router re-reading a property it never promised to.
+ */
+export const createAppRouter = (history?: RouterHistory) =>
+  createRouter({
+    routeTree: rootRoute.addChildren([indexRoute, ...screenRoutes]),
+    ...(history === undefined ? {} : { history }),
+  });
 
 export const router = createAppRouter();
 

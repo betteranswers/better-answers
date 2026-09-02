@@ -186,19 +186,25 @@
   --radius-2xl: 0px;
   --radius-3xl: 0px;
 
-  /* The `-default` names, not `--font-sans` itself: Tailwind emits every theme variable
-     into `:root`, so `--font-sans: var(--font-sans)` would overwrite the token with a
-     reference to itself and the family would resolve to nothing. `tokens/fonts.css`
-     defines the pair, and the accessible reading mode above re-points `--font-sans`
-     alone. */
-  --font-sans: var(--font-sans-default);
-  --font-mono: var(--font-mono-default);
-
   /* One curve, our durations — so kit transitions match ours. */
   --ease-standard: cubic-bezier(0.2, 0, 0.13, 1);
   --animate-duration-fast: 120ms;
   --animate-duration-base: 160ms;
   --animate-duration-slow: 240ms;
+}
+
+/* ---------------------------------------------------------------------------
+ * 4b. The two families, in a NON-inline @theme.
+ * Not inline, because inline bakes the value into the utility and `font-sans`
+ * would then miss the accessible reading mode above, which re-points
+ * --font-sans at runtime. Non-inline emits `font-family: var(--font-sans)`,
+ * which follows it. The value is the `-default` name rather than --font-sans
+ * itself: Tailwind writes every theme variable into :root, and
+ * `--font-sans: var(--font-sans)` would be a reference to itself.
+ * ------------------------------------------------------------------------ */
+@theme {
+  --font-sans: var(--font-sans-default);
+  --font-mono: var(--font-mono-default);
 }
 
 /* ---------------------------------------------------------------------------

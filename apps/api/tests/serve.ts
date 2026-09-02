@@ -42,6 +42,13 @@ const listening = serve({ fetch: app.server.fetch, port, hostname: "127.0.0.1" }
   logger.info({ port: address.port }, "the browser suite's app is listening");
 });
 
+// Without this, a port already in use is an unhandled `error` event and a stack trace with
+// the port nowhere in it; Playwright then reports only that its server never came up.
+listening.on("error", (cause: Error) => {
+  logger.error({ port, reason: cause.message }, "the browser suite's app could not listen");
+  process.exit(1);
+});
+
 // Playwright ends the run by signalling this process; the database it started goes with it
 // rather than waiting for the container reaper.
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

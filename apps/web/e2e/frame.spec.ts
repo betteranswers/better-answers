@@ -38,10 +38,20 @@ test("a browser reaches the frame the api serves on app.", async ({ page }) => {
   await expect(page.getByText("This screen is not built yet.")).toBeVisible();
   await expect(page.getByText("the workspace's map")).toBeVisible();
 
-  // The frame is styled by the design system's tokens, so the page is on the token surface
-  // rather than the browser's default white.
-  const background = await page
-    .locator("body")
-    .evaluate((body) => getComputedStyle(body).getPropertyValue("--surface-page").trim());
-  expect(background).not.toBe("");
+  // The frame is painted with the token, not merely near a stylesheet that defines it: read
+  // the colour actually resolved on the element that carries `bg-background`, and compare it
+  // with what `--surface-page` resolves to on the same page. A build that lost the tokens
+  // fails here, because the two would not agree.
+  const painted = await page.locator("main").evaluate((main) => {
+    const frame = main.parentElement;
+    if (frame === null) throw new Error("the screen has no frame around it");
+    const probe = document.createElement("div");
+    probe.style.backgroundColor = "var(--surface-page)";
+    document.body.append(probe);
+    const token = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return { frame: getComputedStyle(frame).backgroundColor, token };
+  });
+  expect(painted.token).not.toBe("rgba(0, 0, 0, 0)");
+  expect(painted.frame).toBe(painted.token);
 });
