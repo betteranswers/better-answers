@@ -14,6 +14,7 @@ import {
   createTokenVerifier,
   type EmailSender,
 } from "./auth/index.ts";
+import { routeByHostname, type PublicHostnames } from "./ingress/hostnames.ts";
 import { logger as tierLogger } from "./logger.ts";
 import { createMcpSurface } from "./mcp/surface.ts";
 
@@ -25,6 +26,8 @@ export type ServerDependencies = {
   readonly database: Pool;
   /** The https origin the authorization server issues from; the MCP URL is `${publicUrl}/mcp`. */
   readonly publicUrl: string;
+  /** The estate's four hostnames (ADR 0022); the fence in `ingress/hostnames.ts` is built from them. */
+  readonly hostnames: PublicHostnames;
   readonly authSecret: string;
   readonly sendEmail: EmailSender;
   readonly logger?: Logger;
@@ -53,6 +56,11 @@ export function createServer(dependencies: ServerDependencies): Hono {
   const logger = dependencies.logger ?? tierLogger;
   const door = openPostgres(dependencies.database);
   const mcpUrl = `${dependencies.publicUrl}/mcp`;
+
+  // Ahead of every mount below, so a path outside its hostname's surface is refused
+  // before a counter, a session read or a body (T-030; the list is
+  // `ingress/hostnames.ts`).
+  server.use("*", routeByHostname(dependencies.hostnames, logger));
 
   const auth = createAuth({
     database: dependencies.database,
@@ -129,9 +137,11 @@ export function createServer(dependencies: ServerDependencies): Hono {
   server.all("/mcp", (context) => mcp(context.req.raw));
 
   // Better Auth's own endpoints — discovery, /oauth2/*, /jwks, the email-code and
-  // organisation endpoints — answer everything the routes above did not. Which
-  // hostname reaches which path is the tunnel's (ADR 0022: `agent.` reaches
-  // `/agent/v1/*` alone); the in-process refusal by hostname is the deploy task's.
+  // organisation endpoints — answer everything the routes above did not, on every
+  // hostname this process is given. Which hostname reaches which path is decided
+  // before this mount, by the hostname fence at the top of this function and the one
+  // list in `ingress/hostnames.ts` (T-030); the tunnel's ingress rules are the first
+  // fence and stay so (ADR 0022).
   server.all("/*", (context) => auth.handler(context.req.raw));
 
   return server;
