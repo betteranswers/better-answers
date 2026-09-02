@@ -27,6 +27,7 @@ serve(
       hostnames: identity.hostnames,
       authSecret: identity.authSecret,
       sendEmail,
+      webRoot: bootstrap.webRoot,
     }).fetch,
     port: bootstrap.port,
   },

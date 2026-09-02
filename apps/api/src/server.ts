@@ -15,6 +15,7 @@ import {
   type EmailSender,
 } from "./auth/index.ts";
 import { routeByHostname, type PublicHostnames } from "./ingress/hostnames.ts";
+import { serveSpa } from "./ingress/spa.ts";
 import { logger as tierLogger } from "./logger.ts";
 import { createMcpSurface } from "./mcp/surface.ts";
 import { createTrpcRoutes } from "./trpc/index.ts";
@@ -38,6 +39,8 @@ export type ServerDependencies = {
     init?: RequestInit,
   ) => Promise<Response>;
   readonly serverVersion?: string;
+  /** Where `apps/web`'s static build was written; absent means this process serves no SPA. */
+  readonly webRoot?: string | undefined;
 };
 
 /**
@@ -139,6 +142,12 @@ export function createServer(dependencies: ServerDependencies): Hono {
 
   // The product's own transport, on the origin the SPA is served from (ADR 0008).
   server.route("/", createTrpcRoutes({ auth, door }));
+
+  // The SPA's static build on `app.` (ADR 0006, amended 2026-09-02), after every route
+  // this process owns — the tRPC mount above included — and ahead of the authorization
+  // server's wildcard, so `/system` is answered by the shell rather than by a 404 while
+  // `/health` and `/trpc` still answer themselves.
+  server.use("*", serveSpa({ root: dependencies.webRoot, hostname: dependencies.hostnames.app }));
 
   // Better Auth's own endpoints — discovery, /oauth2/*, /jwks, the email-code and
   // organisation endpoints — answer everything the routes above did not, on every

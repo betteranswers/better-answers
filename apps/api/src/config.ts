@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { z } from "zod";
 
 import { err, ok, type Result } from "@better-answers/core/kernel";
@@ -24,6 +26,11 @@ import { logger } from "./logger.ts";
 const bootstrapSchema = z.object({
   DATABASE_URL: z.url(),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  // Where `apps/web`'s static build is on disk, because the app serves it on `app.`
+  // (ADR 0006, amended 2026-09-02). The default is the build directory in this repository,
+  // which is what `pnpm --filter @better-answers/web build` writes and what the dev loop
+  // and the browser suite use; an image that lays the build down elsewhere names it.
+  WEB_ROOT: z.string().default(fileURLToPath(new URL("../../web/dist", import.meta.url))),
 });
 
 /** An https origin and nothing else: no path, query or fragment, so every URL derived from it agrees with the root-mounted routes. */
@@ -84,6 +91,7 @@ const identityBootstrapSchema = z
 export type Bootstrap = {
   readonly databaseUrl: string;
   readonly port: number;
+  readonly webRoot: string;
 };
 
 export type IdentityBootstrap = {
@@ -100,7 +108,11 @@ export function readBootstrap(
 ): Result<Bootstrap> {
   const parsed = bootstrapSchema.safeParse(environment);
   if (!parsed.success) return err(invalid(parsed.error));
-  return ok({ databaseUrl: parsed.data.DATABASE_URL, port: parsed.data.PORT });
+  return ok({
+    databaseUrl: parsed.data.DATABASE_URL,
+    port: parsed.data.PORT,
+    webRoot: parsed.data.WEB_ROOT,
+  });
 }
 
 export function readIdentityBootstrap(

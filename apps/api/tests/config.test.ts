@@ -24,10 +24,25 @@ const identityEnvironment = (
  * the authorization server's origin — an https origin and nothing else — and secret.
  */
 describe("the bootstrap configuration", () => {
-  it("gives migrate the database and port, and nothing more", () => {
-    const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x", PORT: "4000" });
+  it("gives the database, the port and where the SPA's build is, and nothing more", () => {
+    const read = readBootstrap({
+      DATABASE_URL: "postgresql://x@db/x",
+      PORT: "4000",
+      WEB_ROOT: "/srv/web",
+    });
 
-    expect(read).toEqual({ ok: true, value: { databaseUrl: "postgresql://x@db/x", port: 4000 } });
+    expect(read).toEqual({
+      ok: true,
+      value: { databaseUrl: "postgresql://x@db/x", port: 4000, webRoot: "/srv/web" },
+    });
+  });
+
+  it("defaults the SPA's build to this repository's own, so the dev loop needs no setting", () => {
+    // The app serves the build on `app.` (ADR 0006, amended 2026-09-02); an image that
+    // lays it down elsewhere sets WEB_ROOT, and everything else is already right.
+    const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x" });
+
+    expect(read.ok && read.value.webRoot.endsWith("/apps/web/dist")).toBe(true);
   });
 
   it("gives the app the authorization server's origin, normalised, its secret and the four hostnames", () => {
