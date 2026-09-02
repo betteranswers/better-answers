@@ -59,3 +59,7 @@ The estate is two boxes of 4 vCPU · 4 GB · 120 GB, not 16 + 8 GB: VPC 1 runs a
 ## Amendment — 2026-09-02, `app.` is open at the edge (T-022 grilling, ADR 0009 amended)
 
 "`app.` behind Access (email OTP)" is struck. Better Auth is the product's sign-in (ADR 0009), the SPA signs in on `app.` and shares one session with `mcp.`, and Cloudflare Access in front of it was a second email-OTP the person had to pass to reach the first. `app.` joins `mcp.` as an open hostname behind the tunnel; the app's own per-IP counters and Better Auth's limiter are the abuse controls, as they already are for `mcp.`. Access stays available as the day-two kill switch it already is for `agent.`. Everything else stands.
+
+## Amendment — 2026-09-03, `/oauth2/*` and the second fence (T-030, PR #10)
+
+Two corrections of wording, no change of decision. The edge section's "`/oauth/*`" reads **`/oauth2/*`**: that is the path `@better-auth/oauth-provider` mounts and the one T-004 shipped and tested; the shorthand predates the library choice. And the sentence "refused before any body is read" is now enacted in the app as well as at the edge: `apps/api/src/ingress/hostnames.ts` holds one list of surface → hostnames → reason and refuses, before any counter, session read or body, a path outside its hostname's surface. The tunnel's ingress rules remain the first fence; the app's list is the second, because Better Auth's handler answers the wildcard on every hostname the process is given. The four hostnames are bootstrap env the app refuses to start without.

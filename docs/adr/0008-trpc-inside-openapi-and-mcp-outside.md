@@ -30,3 +30,7 @@ Pass 1 kept the generated OpenAPI surface unmounted in v0.1. The share agent nee
 ## Amendment — 2026-08-28, the machine client's hostname and cap (ticket 41, ADR 0022)
 
 The `/agent/v1` route family is served on its own hostname, **`agent.better-answers.com`**, open on the tunnel with no Access policy — a machine client cannot complete an interactive login — and the app's host router routes that hostname to `/agent/v1/*` only, refusing any other path or host before reading a body. The per-file cap is **100 MB**, Cloudflare's edge body limit on the Free and Pro plans, enforced before the origin regardless of streaming. The OAuth 2.1 pages of the MCP surface (`/oauth/*`) are served on `mcp.`, outside Access, or a connector's redirect would meet the OTP wall.
+
+## Amendment — 2026-09-03, the path is `/oauth2/*` and the host router exists (T-030, PR #10)
+
+"`/oauth/*`" above reads **`/oauth2/*`**, the path `@better-auth/oauth-provider` mounts (T-004). "The app's host router" is now built: `apps/api/src/ingress/hostnames.ts`, one list of surface → hostnames → reason, mounted ahead of every other route, refusing `agent.` anything but `/agent/v1/*` before a body is read (ADR 0022 amended the same day). Nothing else changes.
