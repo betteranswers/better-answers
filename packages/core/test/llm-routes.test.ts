@@ -99,7 +99,15 @@ describe("a workspace's model routes", () => {
     const listed = await listAs(seeded);
 
     expect(listed).toHaveLength(LLM_PURPOSES.length);
-    expect(listed.every((route) => route.provider === null && !route.fixed)).toBe(true);
+    expect(
+      listed.every(
+        (route) =>
+          route.provider === null &&
+          route.model === null &&
+          route.dimensions === null &&
+          !route.fixed,
+      ),
+    ).toBe(true);
   });
 
   it("shows a member of one workspace their own routes and never another workspace's", async () => {

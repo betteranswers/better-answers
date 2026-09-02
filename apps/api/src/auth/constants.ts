@@ -51,9 +51,11 @@ export const MCP_UNAUTHENTICATED_IP_RULE: CounterRule = { windowMs: 60_000, max:
  * In front of the tRPC endpoint, where every call costs a session lookup before it
  * can be refused, so the ceiling sits before the lookup.
  *
- * The four `ip` rules above and this one read **one counter per address per window**
- * (`consumeIngress` keys on scope, key and window; the rule is the threshold it is
- * read against, not a budget of its own). So each surface names the count at which
+ * The three `ip` rules above — the OAuth endpoints, the pages, the MCP flood — and
+ * this one read **one counter per client key per window** (`consumeIngress` keys on
+ * scope, key and window, and a key is an IPv4 address or an IPv6 `/64`; the rule is
+ * the threshold it is read against, not a budget of its own). The email rule is a
+ * counter of its own. So each surface names the count at which
  * *it* stops answering, and this is the highest of them because a screen is many
  * small queries where a page is one navigation — a person browsing the product is
  * never refused by the pages' lower ceiling, because they are not fetching pages.
