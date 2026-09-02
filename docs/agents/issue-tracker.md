@@ -31,11 +31,25 @@ Statuses are exactly `todo` · `doing` · `done`. Moving to `done` while any `de
 
 Full CLI and schema reference: `tasks/AGENTS.md`.
 
+### Editing a body: origin first
+
+The CLI has no edit command, and `ordna web` / `ordna board` auto-fetch `refs/ordna/*` from origin every minute, **overwriting any local ref origin disagrees with**. A body edit that only touches the local ref is silently reverted within a minute while a board is open. So the order is: write the blob, push it to origin, then set the local ref, then re-read.
+
+```bash
+git cat-file -p refs/ordna/tasks/T-004 > /tmp/T-004.md      # edit this; bump updated_at
+oid=$(git hash-object -w /tmp/T-004.md)
+git push --force origin "$oid:refs/ordna/tasks/T-004"        # origin FIRST
+git update-ref refs/ordna/tasks/T-004 "$oid"
+ordna show T-004                                             # confirm the edit is what the CLI reads
+```
+
+`ordna create` and `ordna move` write the local ref only; push it by hand the same way (`git push origin refs/ordna/tasks/T-030`) or the next fetch will not delete it but no other clone will see it. Two sessions editing the same task race on origin; re-read before writing.
+
 ### When a skill says "publish to the issue tracker"
 
 `ordna create` a task. Give it a `## Goal`, an `## Acceptance Criteria` checklist and `## Notes` naming the ADRs it touches — match the shape of `T-001`–`T-008`, which are the house style. Set `-d` for every task it genuinely depends on; the CLI enforces it later.
 
-Acceptance criteria checkboxes are parsed structurally and are the source of truth for progress. Write them so each line is demonstrable by a test or a linked artefact (`AGENTS.md` § Working a task).
+Acceptance criteria checkboxes are parsed structurally and are the source of truth for progress. Write them so each line is demonstrable by a test or a linked artefact.
 
 ### When a skill says "fetch the relevant ticket"
 
@@ -43,7 +57,7 @@ Acceptance criteria checkboxes are parsed structurally and are the source of tru
 
 ### One task, one branch, one PR
 
-`AGENTS.md` § Working a task is binding: take one task from ordna, one branch and one pull request per task; the PR closes when `check` is green and every acceptance line is demonstrated.
+Take one task from ordna, one branch and one pull request per task; the PR closes when `check` is green and every acceptance line is demonstrated. The rule is per task, not per session: parallel work is several tasks on several branches, never several tasks on one.
 
 ---
 
