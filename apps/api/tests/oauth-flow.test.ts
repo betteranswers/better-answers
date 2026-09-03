@@ -386,17 +386,27 @@ describe("one session across app. and mcp. (ADR 0009, 2026-09-02)", () => {
   });
 
   it("refuses a cross-origin post that carries the person's cookie", async () => {
+    // The two posts the product makes from `app.` with a session behind them: the pick,
+    // and the resume of a host's authorization. `/oauth2/continue` is the one endpoint of
+    // the authorization server `app.` carries at all (`ingress/hostnames.ts`), so the
+    // origin check is the whole of what stands between a page an attacker controls and a
+    // grant made in the person's name.
     const acme = await app.provision({ name: "Cross" });
     const client = app.client(undefined, APP_HOSTNAME);
     await signIn(app, client, acme.admin.email);
 
-    const refused = await client.fetch("/organization/set-active", {
-      method: "POST",
-      headers: { "content-type": "application/json", origin: "https://evil.example" },
-      body: JSON.stringify({ organizationId: acme.workspaceId }),
-    });
+    for (const [path, body] of [
+      ["/organization/set-active", { organizationId: acme.workspaceId }],
+      ["/oauth2/continue", { postLogin: true, oauth_query: "sig=whatever" }],
+    ] as const) {
+      const refused = await client.fetch(path, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://evil.example" },
+        body: JSON.stringify(body),
+      });
 
-    expect(refused.status).toBe(403);
+      expect(refused.status, `${path} answered ${refused.status}`).toBe(403);
+    }
   });
 });
 

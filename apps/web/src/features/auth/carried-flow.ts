@@ -16,9 +16,6 @@ const SIGNATURE = "sig";
 export const carriedFlow = (search: string): string =>
   new URLSearchParams(search).has(SIGNATURE) ? search : "";
 
-/** The same string as `/oauth2/continue` takes it: the query, without its `?`. */
-export const asOauthQuery = (carried: string): string => carried.replace(/^\?/, "");
-
 /**
  * Where an ended session sends a person back to. It is a path on this origin and nothing
  * else: an absolute URL here would be an open redirect with a person's session behind it.

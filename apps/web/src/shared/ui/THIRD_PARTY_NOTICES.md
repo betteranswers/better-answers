@@ -15,6 +15,13 @@ better-auth-ui's `auth-provider` — and the npm packages that provider stands o
 registry on **3 September 2026**, pinned exactly in `apps/web/package.json`. That line
 releases daily; the version read the day before was the same one.
 
+Two more pins arrived with them and are **not** a version choice of this workspace's:
+`better-auth` and `@better-auth/oauth-provider`, both **1.7.2**, are the client halves of
+what `apps/api` runs as the server, read on the same day from the same registry and stated
+in `apps/web/package.json` at exactly the versions `apps/api/package.json` holds. They move
+when the api's move and never on their own: a client and a server of one protocol at two
+versions is a bug that shows up as a 404 on a path one of them renamed.
+
 ## Provenance, item by item
 
 Two digests per component, sha256 truncated to 16 hex characters, both taken 3 September 2026.

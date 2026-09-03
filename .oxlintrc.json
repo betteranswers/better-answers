@@ -356,24 +356,19 @@
       }
     },
     {
-      // T-037 — the SPA's identity feature, and the registry's auth files it stands on, are
-      // the one place in `apps/web` that may name `better-auth`. It is the same shape
-      // `apps/api/src/auth/` has on the other side (`[DESIGN5]`, ADR 0009): one directory
-      // owns the library, and everything above it speaks screens, workspaces and roles
-      // rather than endpoints. The product signs a person in by posting to Better Auth,
-      // so *somewhere* has to know its client; what the rule buys is that the somewhere is
-      // one directory a reviewer can read in a sitting.
-      //
-      // `@better-auth-ui/*` is not in the banned group and needs no exception: it is a
-      // different package, and its hooks are TanStack Query over that client.
+      // T-037 — the SPA's identity feature is the one directory in `apps/web` that may name
+      // `better-auth`, which is the same shape `apps/api/src/auth/` has on the other side
+      // (`[DESIGN5]`, ADR 0009): one directory owns the library, and everything above it
+      // speaks screens, workspaces and roles rather than endpoints. The product signs a
+      // person in by posting to Better Auth, so *somewhere* has to know its client; what
+      // the rule buys is that the somewhere is one directory a reviewer can read in a
+      // sitting. So it is exactly one glob, and the registry's auth files under
+      // `shared/` are not in it — they import `@better-auth-ui/*`, which is a different
+      // package and was never banned.
       //
       // Everything the zone overrides above ban stays banned here — no feature reaches
       // another, none reaches `app/`, none imports the api at runtime.
-      "files": [
-        "apps/web/src/features/auth/**",
-        "apps/web/src/shared/ui/auth/**",
-        "apps/web/src/shared/lib/auth/**"
-      ],
+      "files": ["apps/web/src/features/auth/**"],
       "rules": {
         "no-restricted-imports": [
           "error",

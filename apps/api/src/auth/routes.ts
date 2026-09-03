@@ -52,6 +52,15 @@ const oauthQuery = (url: string): string => new URL(url).search.replace(/^\?/, "
 // the time consent renders; the fallback is the page's honest answer to a malformed carry.
 const hostnameOf = (url: string): string => URL.parse(url)?.hostname ?? "an unknown address";
 
+/**
+ * Where a flow endpoint says the person goes next. `url` is a string rather than a URL
+ * because Better Auth writes whichever it was configured with, verbatim: `consentPage` is
+ * absolute since T-037, so today's answer is a URL — but the same endpoint answers a
+ * relative path the moment a page of the flow is configured relatively, and this reader
+ * would then silently see nothing and fall back. The source is this process's own
+ * authorization server, not a caller, so what is wanted here is "whatever it said", and
+ * the string is passed to `context.redirect` unexamined either way.
+ */
 const redirectOf = z.object({
   url: z.string().min(1).optional(),
   redirect: z.boolean().optional(),

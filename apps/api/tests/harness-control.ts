@@ -30,6 +30,7 @@ const membership = z.object({
   role: z.enum(["Admin", "Editor", "Viewer"]),
 });
 const revocation = z.object({ userId: z.string().min(1) });
+const ending = z.object({ workspaceId: z.string().min(1), userId: z.string().min(1) });
 
 /** A body a test got wrong is the test's mistake, and it says which field in one line. */
 const readBody = async <T>(request: Request, schema: z.ZodType<T>): Promise<T> => {
@@ -63,6 +64,12 @@ export const harnessControl = (app: TestApp): Hono => {
     // the credential being refused, and a browser's clock is not this process's.
     await app.revokeCredentials(asked.userId, new Date(Date.now() + 1_000));
     return context.json({ revoked: true });
+  });
+
+  control.delete(`${HARNESS_PREFIX}/members`, async (context) => {
+    const asked = await readBody(context.req.raw, ending);
+    await app.removeMember(asked.workspaceId, asked.userId);
+    return context.json({ removed: true });
   });
 
   /**

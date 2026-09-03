@@ -71,6 +71,13 @@ const redirectOf = z.object({
  * Where a Better Auth endpoint says the person goes next: a 3xx's `Location`, or the
  * `url` in the JSON it answers a caller that asked for JSON — which is what the SPA's
  * client is and so what these helpers are.
+ *
+ * `auth/routes.ts` reads the same two places for consent, and this is deliberately a
+ * second copy rather than an import of it. This file is the *caller's* side of the
+ * protocol — what a host and a browser do — and a caller that read the answer with the
+ * server's own helper would agree with the server by construction: the day the server
+ * stopped setting one of the two, the test would stop looking for it in the same commit.
+ * Sixteen lines is the price of the two being able to disagree.
  */
 const nextLocation = async (response: Response): Promise<string | undefined> => {
   const header = response.headers.get("location");

@@ -43,6 +43,15 @@ export const addMember = (
   input: { workspaceId: string; userId: string; role: "Admin" | "Editor" | "Viewer" },
 ) => ask<{ added: boolean }>(api, "/members", input);
 
+/** End a membership, as the People screen will one day (T-027). */
+export const removeMember = async (
+  api: APIRequestContext,
+  input: { workspaceId: string; userId: string },
+): Promise<void> => {
+  const answered = await api.delete(`${HARNESS}/members`, { data: input });
+  expect(answered.ok(), `removing a member answered ${answered.status()}`).toBe(true);
+};
+
 export const revokeCredentials = (api: APIRequestContext, userId: string) =>
   ask<{ revoked: boolean }>(api, "/revocations", { userId });
 

@@ -19,10 +19,17 @@ export const useMembership = () => {
 
 /**
  * Why the platform refused, in its own word. Every refusal arrives as `UNAUTHORIZED`
- * carrying its name — `no-session`, `no-active-workspace`, `not-a-member`,
- * `credentials-revoked`, `role-disagrees`, `role-unknown`, `malformed-claims`
- * (`apps/api/src/trpc/base.ts`) — and the shell reads the name rather than the code,
- * because two of them mean "ask a different question" and the rest mean "sign in again".
+ * carrying its name, and this procedure can answer nine of them:
+ *
+ * - the transport's two, before the resolver — `no-session`, `no-active-workspace`;
+ * - the resolver's five — `not-a-member`, `credentials-revoked`, `role-disagrees`,
+ *   `role-unknown`, `malformed-claims`;
+ * - and this read's own two — `no-such-workspace`, `no-such-person`, a session pointing
+ *   at rows that no longer exist, which to a reader is a session that has ended.
+ *
+ * The shell reads the name rather than the code, because exactly one of the nine —
+ * `no-active-workspace` — means "answer a question", and the other eight mean "sign in
+ * again". A name it does not know is treated as the eight, which is the safe way round.
  */
 type Refused = {
   readonly data?: { readonly code?: string } | null | undefined;
