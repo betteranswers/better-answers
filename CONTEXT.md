@@ -486,7 +486,8 @@ to it by IRI and never restates it (ADR 0014).
   variant · different) — update the existing, add as new, or decline; client-specific wording
   stripped first. One governed write, the decider as author; a trim makes the decider the
   generator. _Avoid_: moderation.
-- **MCP surface** — the platform's one tools-only MCP server at `mcp.<domain>`: four entries in
+- **MCP surface** — the platform's one tools-only MCP server at `app.<domain>/mcp`, on the product's
+  own origin (T-045, 2026-09-03; `mcp.<domain>` before it): four entries in
   v0.1 — `find`, `ask`, `open`, `give_feedback` — the principal from the
   token, the same predicate and audit as the app, grown later by token scope, never by a
   second server (ADR 0018). Guides and the question set are not on it. Never named on a screen;
@@ -522,6 +523,10 @@ to it by IRI and never restates it (ADR 0014).
   integration.
 - **Account page** — a person's own small surface outside Control Centre: name, role,
   workspace, personal tokens.
+- **sign-in** — how a person proves who they are to the platform: an email code, or Microsoft
+  for a company on Microsoft 365 (T-045 grilling Q10, 2026-09-03); never a password. A person is
+  invited by email first, and a Microsoft account signs in only on an exact match with that
+  email. _Avoid_: login, social login; SSO only for the per-client shape, a client's own tenant.
 
 - **map** — the reader's word for the graph, and the only one that reaches a surface (*graph*,
   *sync*, *traversal* and *generation* never do). **Two** fixed phrases tell its state: **map as of
