@@ -27,7 +27,7 @@ x-logging: &logging
 # sum of every limit is what BACKUPS.md § Signals measures the page-cache floor against.
 # `migrate` runs Drizzle over a journal and exits; `api` is one Node process serving the SPA,
 # the authorization server and the MCP surface. The worker's is below, with its swap allowance.
-x-medium: &medium
+x-mem-512: &mem512
   deploy: { resources: { limits: { memory: 512m } } }
 
 x-bootstrap: &bootstrap
@@ -52,11 +52,11 @@ services:
     environment:
       <<: *bootstrap
     labels: { coolify.exclude_from_hc: "true" }
-    <<: [*logging, *medium]
+    <<: [*logging, *mem512]
 
   api:
     image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?}
-    <<: [*restart, *logging, *medium]
+    <<: [*restart, *logging, *mem512]
     environment:
       <<: *bootstrap
       NODE_ENV: production

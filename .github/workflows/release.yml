@@ -16,9 +16,11 @@
 # forcing function: the switch is a check in this file, not a sentence in a runbook.
 #
 # THE RECORD. Every promotion is appended to `deploy/RELEASES.md` — date, who, both digests, what
-# it rode on — and pushed to main, so the previous digest is findable during an outage without
-# GitHub's UI (ticket 79 op F3; RUNBOOK.md page 6 reads it). The `main` ruleset must let the
-# github-actions app bypass "require a pull request" for that one push (wizard stage 2).
+# it rode on — and pushed to main BEFORE the smoke runs, so a release the smoke fails still has
+# its row and page 6's "the row above" exists (ticket 79 op F3; RUNBOOK.md page 6 reads it). The
+# `main` ruleset must let the GitHub Actions app bypass "require a pull request" for that one
+# push (wizard stage 2); whether the ruleset honours GITHUB_TOKEN as that app is proved at the
+# first release and recorded in the private coolify.md — if not, a GitHub App token replaces it.
 #
 # Action versions read from each repository's latest release and pinned by commit SHA
 # (`[DEPS1]`, `T-040`); one pin per action across the directory (tests/workflow-pins.test.ts).
@@ -119,13 +121,6 @@ jobs:
           patch WORKER_IMAGE_DIGEST "${WORKER_DIGEST}"
           curl -fsS "${COOLIFY_URL}/api/v1/deploy?uuid=${PROD_UUID}&force=false" \
             -H "Authorization: Bearer ${COOLIFY_TOKEN}" -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}"
-      - name: post-deploy smoke against production (the release's last step)
-        run: |
-          set -euo pipefail
-          # The two paths the uptime check watches (coolify.md § Ingress): the app is healthy and the
-          # protected-resource document names the MCP surface. Retried while the stack comes up.
-          curl -fsS --retry 20 --retry-delay 6 --retry-all-errors -o /dev/null "${PUBLIC_URL}/health"
-          curl -fsS --retry 5 --retry-delay 6 --retry-all-errors "${PUBLIC_URL}/.well-known/oauth-protected-resource/mcp" | jq -e --arg mcp "${PUBLIC_URL}/mcp" '.resource == $mcp' >/dev/null
       - name: record the promotion in deploy/RELEASES.md
         env:
           API_DIGEST: ${{ steps.d.outputs.api }}
@@ -139,6 +134,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add deploy/RELEASES.md
           git commit -m "release: api ${API_DIGEST:7:12} · worker ${WORKER_DIGEST:7:12}"
+          # main may have moved while the reviewer approved: rebase the one commit, then push.
+          git pull --rebase --quiet origin main
           git push origin HEAD:main
           {
             echo "### Promoted to production"
@@ -149,3 +146,10 @@ jobs:
             echo ""
             echo "The app refuses to start unless PUBLIC_URL, AGENT_HOSTNAME and APEX_HOSTNAME are set on the api resource and all three hostnames differ (ADR 0034)."
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: post-deploy smoke against production (the release's last step)
+        run: |
+          set -euo pipefail
+          # The two paths the uptime check watches (coolify.md § Ingress): the app is healthy and the
+          # protected-resource document names the MCP surface. Retried while the stack comes up.
+          curl -fsS --retry 20 --retry-delay 6 --retry-all-errors -o /dev/null "${PUBLIC_URL}/health"
+          curl -fsS --retry 5 --retry-delay 6 --retry-all-errors "${PUBLIC_URL}/.well-known/oauth-protected-resource/mcp" | jq -e --arg mcp "${PUBLIC_URL}/mcp" '.resource == $mcp' >/dev/null

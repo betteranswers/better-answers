@@ -1,12 +1,15 @@
 import { fileURLToPath } from "node:url";
 
+import { serve } from "@hono/node-server";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { fetchHonouringHost } from "../src/ops/http-fetch.ts";
 import { NOT_BUILT, parseSince, runOps, type OpsIo } from "../src/ops/index.ts";
 import { APP_HOSTNAME, PUBLIC_URL, startApp, type TestApp } from "./harness.ts";
 
 /**
- * The `pnpm ops` commands the deploy unit's scripts call (ADR 0022, T-005), run against a
+ * The `pnpm ops` commands the estate's restore scripts call (ADR 0022, T-005), run against a
  * real, migrated Postgres and the app itself. What is held is the contract the scripts
  * rely on — `0` did it, `1` stop, `3` not built — on the schema as it stands today, and on
  * the schema as the slices will leave it (tables created here by the superuser, the way
@@ -37,7 +40,7 @@ const ops = async (app: TestApp, argv: readonly string[], stdin = ""): Promise<R
   return { exitCode, lines: io.lines };
 };
 
-describe("pnpm ops — the deploy unit's commands", () => {
+describe("pnpm ops — the restore scripts' commands", () => {
   let app: TestApp;
 
   beforeAll(async () => {
@@ -71,6 +74,9 @@ describe("pnpm ops — the deploy unit's commands", () => {
     });
 
     it("refuses — stopping the restore before api starts — once erasures can exist and it cannot replay them", async () => {
+      // Not a fixture: the erasure slice's table does not exist yet, and what is under test is
+      // the command's reading of the catalogue — "a table by this name exists" — not any row.
+      // The one column is the name; the moment the slice lands, its journal replaces this.
       await app.database.superuser.query(
         "CREATE TABLE erasure_request (id text primary key, completed_at timestamptz)",
       );
@@ -99,39 +105,6 @@ describe("pnpm ops — the deploy unit's commands", () => {
       expect(run.exitCode).toBe(NOT_BUILT);
       expect(run.lines.join("\n")).toContain("not built");
     });
-
-    it("graph-counts counts nodes per label and edges inside the workspace's scope once the graph tables exist", async () => {
-      // The shape ADR 0032 names: tenant tables under RLS with `workspace_id` and a closed
-      // `label` column. Created here as the graph slice's migration will, under the same seam.
-      const superuser = app.database.superuser;
-      await superuser.query(`
-        CREATE TABLE graph_node (id text primary key, workspace_id text not null, label text not null);
-        CREATE TABLE graph_edge (id text primary key, workspace_id text not null);
-        ALTER TABLE graph_node ENABLE ROW LEVEL SECURITY; ALTER TABLE graph_node FORCE ROW LEVEL SECURITY;
-        ALTER TABLE graph_edge ENABLE ROW LEVEL SECURITY; ALTER TABLE graph_edge FORCE ROW LEVEL SECURITY;
-        CREATE POLICY tenant ON graph_node USING (workspace_id = (SELECT current_workspace_id()));
-        CREATE POLICY tenant ON graph_edge USING (workspace_id = (SELECT current_workspace_id()));
-        INSERT INTO graph_node VALUES ('n1','ws_a','Concept'),('n2','ws_a','Concept'),('n3','ws_a','Source'),('n4','ws_b','Concept');
-        INSERT INTO graph_edge VALUES ('e1','ws_a'),('e2','ws_b');
-      `);
-      try {
-        const io = ioFor(app);
-        // The runtime pool, so the policy above is what scopes the count — not the superuser.
-        const exitCode = await runOps(
-          ["graph-counts", "--workspace", "ws_a"],
-          app.database.pool,
-          io,
-        );
-
-        expect(exitCode).toBe(0);
-        expect(JSON.parse(io.lines[0] ?? "")).toEqual({
-          nodes: { Concept: 2, Source: 1 },
-          edges: 1,
-        });
-      } finally {
-        await superuser.query("DROP TABLE graph_node; DROP TABLE graph_edge");
-      }
-    });
   });
 
   describe("smoke — the platform answers through its interface", () => {
@@ -143,6 +116,32 @@ describe("pnpm ops — the deploy unit's commands", () => {
       expect(run.lines.filter((line) => line.startsWith("ok  "))).toHaveLength(4);
       // The three entries are named and honestly deferred, never reported as passed.
       expect(run.lines.filter((line) => line.startsWith("note "))).toHaveLength(3);
+    });
+
+    it("passes on the loopback the way the drill reaches it, by sending the app hostname as Host through node:http", async () => {
+      // The drill and the production restore call `smoke --url http://127.0.0.1:3000` from
+      // inside the stack. The fence carries /health alone on the loopback, and Node's fetch
+      // drops a `host` header, so this is the one path a harness `server.request` cannot prove.
+      let listener: ReturnType<typeof serve> | undefined;
+      const port = await new Promise<number>((resolve) => {
+        listener = serve({ fetch: app.server.fetch, port: 0, hostname: "127.0.0.1" }, (info) =>
+          resolve(info.port),
+        );
+      });
+      const url = `http://127.0.0.1:${port}`;
+      try {
+        const io = ioFor(app);
+        const withHost: OpsIo = { ...io, fetch: fetchHonouringHost };
+        expect(await runOps(["smoke", "--url", url], app.database.pool, withHost)).toBe(0);
+        expect(io.lines.filter((line) => line.startsWith("FAIL"))).toEqual([]);
+
+        // And without the hostname the fence refuses everything but /health — the failure
+        // the header exists to prevent, shown rather than assumed.
+        const bare: OpsIo = { ...ioFor(app), fetch: fetchHonouringHost, appHostname: undefined };
+        expect(await runOps(["smoke", "--url", url], app.database.pool, bare)).toBe(1);
+      } finally {
+        await new Promise<void>((resolve) => listener?.close(() => resolve()));
+      }
     });
 
     it("fails when the surface does not answer", async () => {

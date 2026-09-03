@@ -86,7 +86,7 @@ job_git_mirror() { # the second copy: every bare repository force-mirrored to VP
   local started rc=0; started=$(date -u +%FT%TZ)
   while read -r repo; do
     ws=$(basename "${repo}" .git)
-    # the mirror key is restricted to git-shell; `init-repo` is the one extra command it may run (creates the bare target if absent)
+    # the mirror key's forced command is deploy/mirror-shell.sh: `init-repo <ws>` (creates the bare target if absent) and git-receive-pack, nothing else
     ssh -o BatchMode=yes "${GIT_MIRROR_SSH_TARGET%%:*}" init-repo "${ws}" >/dev/null || { rc=1; continue; }
     git -C "${repo}" push --mirror --quiet "${GIT_MIRROR_SSH_TARGET}/${ws}.git" || rc=1
   done < <(find "${GIT_STORE}" -mindepth 1 -maxdepth 1 -type d -name '*.git')

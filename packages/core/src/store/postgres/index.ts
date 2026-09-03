@@ -270,3 +270,20 @@ export const readWorkspaceConfig = async (
   );
   return found.rows[0]?.value;
 };
+
+/**
+ * Which of `names` exist as tables in `public` — a catalogue read, not a tenant read, so
+ * it runs outside any scope. The estate's restore commands ask this before acting: a
+ * slice whose tables are absent has not landed, and "not built" is an answer the drill
+ * records rather than a silence (T-005; `apps/api/src/ops/index.ts`).
+ */
+export const tablesPresent = async (
+  door: PostgresDoor,
+  names: readonly string[],
+): Promise<readonly string[]> => {
+  const result = await door.pool.query<{ table_name: string }>(
+    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY($1::text[])",
+    [names],
+  );
+  return result.rows.map((row) => row.table_name);
+};

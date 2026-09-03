@@ -46,13 +46,15 @@ NOT_BUILT=3   # apps/api/src/ops.ts: the slice this command needs has no tables 
 STAMP=$(date -u +%Y%m%dT%H%M%SZ); WORK=$(mktemp -d); REPORT="${WORK}/drill-${STAMP}.md"
 started=$(date -u +%FT%TZ); T0=$(date +%s)
 say() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}"; }
+# aside — the same line, to the report and stderr only: for helpers whose stdout a caller captures
+aside() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}" >&2; }
 compose() { docker compose --project-directory "${REPO_DIR}/deploy" --env-file "${STAGING_ENV_FILE}" "$@"; }
 stores()   { compose -f stores.compose.yaml -f staging.override.yaml -p better-answers-stores-staging "$@"; }
 platform() { compose -f platform.compose.yaml -p better-answers-staging "$@"; }
 # ops <args…> — a `pnpm ops` command inside the staging api; "not built" is reported, not fatal
 ops() {
   local rc=0; platform exec -T api pnpm ops "$@" || rc=$?
-  if [ "${rc}" -eq "${NOT_BUILT}" ]; then say "  -> not built yet: 'pnpm ops $1' found no tables for its slice (recorded, not failed)"; return 0; fi
+  if [ "${rc}" -eq "${NOT_BUILT}" ]; then aside "  -> not built yet: 'pnpm ops $1' found no tables for its slice (recorded, not failed)"; return 0; fi
   return "${rc}"
 }
 wipe_staging() {
@@ -83,7 +85,9 @@ rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/${globals}" "${WORK}/global
 rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/${latest}" "${WORK}/pg.dump.age"
 age -d -i "${BACKUP_AGE_IDENTITY_FILE}" "${WORK}/globals.sql.age" | psql "${STAGING_DATABASE_URL}" -q || true   # roles may already exist
 age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${WORK}/pg.dump" "${WORK}/pg.dump.age"
-pg_restore --no-owner --no-privileges --dbname="${STAGING_DATABASE_URL}" "${WORK}/pg.dump"
+# --no-owner: the restoring role owns everything, as migrate's does. Privileges ARE restored: the
+# grants to app_rt and worker_rt ride the dump, and without them the api answers permission denied.
+pg_restore --no-owner --dbname="${STAGING_DATABASE_URL}" "${WORK}/pg.dump"
 say "restored ${latest} (taken ${dump_at}) — RPO $(( ( $(date +%s) - $(date -d "${dump_at:0:8} ${dump_at:9:2}:${dump_at:11:2}" +%s) ) / 60 )) min"
 
 say "## 2 stores up, migrate, REPLAY ERASURES completed after the dump (ADR 0020 — beyond use, made honest)"
@@ -117,7 +121,9 @@ ops object-store-orphans --workspace "${DRILL_WORKSPACE}" --list >> "${REPORT}"
 
 say "## 6 counts diff against production's stamped run (ADR 0023) — production read over SSH, no open port (ticket 79 A12)"
 if ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts"; then
-  ${PROD_PSQL} -At -c "select counts_json from graph_sync_run where workspace_id = '${DRILL_WORKSPACE}' and outcome = 'ok' order by finished_at desc limit 1" > "${WORK}/prod.counts" 2>/dev/null || echo '{}' > "${WORK}/prod.counts"
+  # The SQL travels on stdin: an argument would be re-split by the shell on the far side of the SSH hop.
+  printf '%s' "select counts_json from graph_sync_run where workspace_id = '${DRILL_WORKSPACE}' and outcome = 'ok' order by finished_at desc limit 1" \
+    | ${PROD_PSQL} -At > "${WORK}/prod.counts" 2>/dev/null || echo '{}' > "${WORK}/prod.counts"
   if [ -s "${WORK}/staging.counts" ] && diff <(jq -S . "${WORK}/prod.counts") <(jq -S . "${WORK}/staging.counts") >> "${REPORT}"; then say "counts match"; elif [ -s "${WORK}/staging.counts" ]; then say "COUNTS DIFFER"; exit 1; fi
 fi
 
@@ -145,6 +151,6 @@ say "## done — RTO ${rto} min"
 rclone copyto "${REPORT}" "dumps:${BACKUP_DUMPS_BUCKET}/drills/$(basename "${REPORT}")"
 # The drill's own row goes to PRODUCTION (ticket 79 A13): staging is wiped minutes from now, and
 # ADR 0025's "last drill" signal has no other source. The one write the drill makes there.
-${PROD_PSQL} -qc "insert into backup_run (kind, store, started_at, finished_at, outcome, bytes, location, report_url, contains_personal_data, rto_minutes) values ('drill', 'all', '${started}', now(), 'ok', 0, 'drills/', 'drills/$(basename "${REPORT}")', false, ${rto})" \
-  || say "backup_run row not written to production (no backup_run table yet — it lands with the signals task)"
+printf '%s' "insert into backup_run (kind, store, started_at, finished_at, outcome, bytes, location, report_url, contains_personal_data, rto_minutes) values ('drill', 'all', '${started}', now(), 'ok', 0, 'drills/', 'drills/$(basename "${REPORT}")', false, ${rto})" \
+  | ${PROD_PSQL} -q -v ON_ERROR_STOP=1 || say "backup_run row not written to production (no backup_run table yet — it lands with the signals task)"
 curl -fsS -m 10 -o /dev/null --data-raw "ok took=${rto}m" "${HEALTHCHECKS_PING_URL_DRILL}"

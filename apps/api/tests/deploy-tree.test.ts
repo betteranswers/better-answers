@@ -105,9 +105,7 @@ describe("the deploy tree (T-005)", () => {
       const unlimited = services
         .filter(
           (service) =>
-            !(
-              /\*(small|medium)\b/.test(service.body) || /limits:\s*\{\s*memory:/.test(service.body)
-            ),
+            !(/\*mem\d+\b/.test(service.body) || /limits:\s*\{\s*memory:/.test(service.body)),
         )
         .map((service) => `${file}: ${service.name}`);
       expect(unlimited).toEqual([]);

@@ -18,22 +18,22 @@
 set -euo pipefail
 
 root=${1:?the mirror root, e.g. /data/mirror}
-command=${SSH_ORIGINAL_COMMAND:-}
+requested=${SSH_ORIGINAL_COMMAND:-}
 refuse() { printf 'mirror-shell: refused: %s\n' "$1" >&2; exit 255; }
 
 # A workspace id is one path segment of DNS-safe characters; a `/`, a `..` or a space is not
 # a workspace, it is an attempt to leave the root.
 is_workspace() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$ ]]; }
 
-case "${command}" in
+case "${requested}" in
   "init-repo "*)
-    ws=${command#init-repo }
+    ws=${requested#init-repo }
     is_workspace "${ws}" || refuse "init-repo: not a workspace id"
     target="${root}/${ws}.git"
     [ -d "${target}" ] || git init --quiet --bare "${target}"
     ;;
   "git-receive-pack "*)
-    arg=${command#git-receive-pack }
+    arg=${requested#git-receive-pack }
     arg=${arg#\'}; arg=${arg%\'}                       # the client quotes the path
     case "${arg}" in "${root}/"*.git) ;; *) refuse "git-receive-pack: path outside ${root}";; esac
     ws=${arg#"${root}/"}; ws=${ws%.git}

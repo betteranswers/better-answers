@@ -1,10 +1,9 @@
 import type { Pool } from "pg";
 
-import type { PlatformPrincipal } from "@better-answers/core/kernel";
-import { openPostgres, withScope } from "@better-answers/core/store/postgres";
+import { openPostgres, tablesPresent } from "@better-answers/core/store/postgres";
 
 /**
- * The `pnpm ops` commands the deploy unit's scripts call (ADR 0022; `restore-drill.sh`,
+ * The `pnpm ops` commands the estate's restore scripts call (ADR 0022; `restore-drill.sh`,
  * `restore-production.sh`): one dispatcher, one contract, held by `tests/ops.test.ts`.
  *
  * **The contract.** A command answers over the schema it finds, and it says which of
@@ -26,6 +25,10 @@ import { openPostgres, withScope } from "@better-answers/core/store/postgres";
  * (`[SEC1]`, `[APP2]`).
  */
 
+/** The contract's exit codes, by name: the scripts read them, so they are stated once. */
+export const DONE = 0;
+export const REFUSED = 1;
+export const USAGE = 2;
 export const NOT_BUILT = 3;
 
 export type OpsIo = {
@@ -37,8 +40,6 @@ export type OpsIo = {
   /** The app hostname the smoke test sends as `Host` when it is reached on the loopback. */
   readonly appHostname?: string | undefined;
 };
-
-const platform: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-ops" };
 
 /** `pg-20260903T020500Z` (a dump stamp) or any ISO 8601 instant, as a Date. */
 export const parseSince = (value: string): Date | undefined => {
@@ -75,14 +76,6 @@ const flagValue = (flags: Flags, name: string): string | undefined => {
   return typeof value === "string" ? value : undefined;
 };
 
-const existingTables = async (pool: Pool, names: readonly string[]): Promise<readonly string[]> => {
-  const result = await pool.query<{ table_name: string }>(
-    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY($1::text[])",
-    [names],
-  );
-  return result.rows.map((row) => row.table_name);
-};
-
 /** The tables each slice-owned command needs before it can mean anything. */
 const NEEDS = {
   "graph-rebuild": ["graph_node", "graph_edge"],
@@ -95,49 +88,32 @@ const NEEDS = {
 
 type SliceCommand = keyof typeof NEEDS;
 
-const USAGE = `usage: pnpm ops <command> [options]
+const USAGE_TEXT = `usage: pnpm ops <command> [options]
   replay-erasures --since <dump stamp | ISO instant>      re-apply every erasure completed after a dump (mandatory in every restore)
   graph-rebuild | graph-sweep --workspace <id> [--wait]    the graph as a repair path (ADR 0023, 0032)
-  graph-counts --workspace <id>                             nodes per label and edges, as JSON, for the drill's diff
+  graph-counts --workspace <id>                             nodes per label and edges, as JSON, for the drill's diff (the graph slice's)
   reconcile-watermark --workspace <id>                      recovery order step 2
   object-store-orphans --workspace <id> [--list]            recovery order step 5
   smoke --url <origin> [--workspace <id>] [--find] [--guide] [--ask]
   erasure-rehearsal --workspace <id> --synthetic --report <file>
   dump-grep --tokens <a,b,…>                                stdin: a plain-SQL dump; reports present/absent per token, never a line
-exit codes: 0 done · 1 refused, stop · 2 usage · ${NOT_BUILT} the slice this needs has no tables yet`;
-
-const graphCounts = async (pool: Pool, workspaceId: string, io: OpsIo): Promise<number> => {
-  const counts = await withScope(platform, openPostgres(pool), workspaceId, async (tx) => {
-    const nodes = await tx.query<{ label: string; count: string }>(
-      "SELECT label, count(*)::text AS count FROM graph_node GROUP BY label ORDER BY label",
-    );
-    const edges = await tx.query<{ count: string }>(
-      "SELECT count(*)::text AS count FROM graph_edge",
-    );
-    return {
-      nodes: Object.fromEntries(nodes.rows.map((row) => [row.label, Number(row.count)])),
-      edges: Number(edges.rows[0]?.count ?? "0"),
-    };
-  });
-  io.say(JSON.stringify(counts));
-  return 0;
-};
+exit codes: ${DONE} done · ${REFUSED} refused, stop · ${USAGE} usage · ${NOT_BUILT} the slice this needs has no tables yet`;
 
 const replayErasures = async (pool: Pool, flags: Flags, io: OpsIo): Promise<number> => {
   const sinceArgument = flagValue(flags, "since");
   const since = sinceArgument === undefined ? undefined : parseSince(sinceArgument);
   if (since === undefined) {
     io.say("replay-erasures: --since <dump stamp or ISO instant> is required");
-    return 2;
+    return USAGE;
   }
-  const present = await existingTables(pool, ["erasure_request"]);
+  const present = await tablesPresent(openPostgres(pool), ["erasure_request"]);
   if (present.length === 0) {
     // Absence is proof, not silence: no erasure_request table means no erasure has ever
     // been recorded in this database, so there is nothing a restore could have undone.
     io.say(
       `replayed 0 erasures since ${since.toISOString()}: no erasure_request table exists in this schema, so no erasure has ever been recorded here`,
     );
-    return 0;
+    return DONE;
   }
   // The table exists and the replay is the erasure slice's to write (ADR 0020). Until it
   // is, a restore over a schema that may hold erasures completed after the dump must
@@ -145,14 +121,14 @@ const replayErasures = async (pool: Pool, flags: Flags, io: OpsIo): Promise<numb
   io.say(
     `REFUSED: erasure_request exists in this schema and the replay is not implemented in this image — do not start api; the erasure slice's task (ADR 0020) fills this command in`,
   );
-  return 1;
+  return REFUSED;
 };
 
 const smoke = async (flags: Flags, io: OpsIo): Promise<number> => {
   const url = flagValue(flags, "url");
   if (url === undefined) {
     io.say("smoke: --url <origin> is required (http://127.0.0.1:3000 inside the stack)");
-    return 2;
+    return USAGE;
   }
   const origin = url.replace(/\/$/, "");
   // On the loopback the fence carries /health alone (T-030): everything else is asked for
@@ -215,7 +191,7 @@ const smoke = async (flags: Flags, io: OpsIo): Promise<number> => {
     // procedure) until a service principal exists (ticket 79 SEC4).
     io.say(`note ${entry}: needs a minted token — proved by hand through the connector, not here`);
   }
-  return failed === 0 ? 0 : 1;
+  return failed === 0 ? DONE : REFUSED;
 };
 
 const dumpGrep = async (flags: Flags, io: OpsIo): Promise<number> => {
@@ -225,7 +201,7 @@ const dumpGrep = async (flags: Flags, io: OpsIo): Promise<number> => {
     .filter((token) => token.length > 0);
   if (tokens.length === 0) {
     io.say("dump-grep: --tokens <a,b,…> is required");
-    return 2;
+    return USAGE;
   }
   const text = await io.stdin();
   const lines = text.split("\n");
@@ -248,21 +224,23 @@ const sliceCommand = async (
   const workspaceId = flagValue(flags, "workspace");
   if (workspaceId === undefined) {
     io.say(`${command}: --workspace <id> is required`);
-    return 2;
+    return USAGE;
   }
   const needed = NEEDS[command];
-  const present = await existingTables(pool, needed);
+  const present = await tablesPresent(openPostgres(pool), needed);
   if (present.length < needed.length) {
     io.say(
       `${command}: not built — ${needed.filter((name) => !present.includes(name)).join(", ")} absent from this schema; the slice that owns them has not landed`,
     );
     return NOT_BUILT;
   }
-  if (command === "graph-counts") return graphCounts(pool, workspaceId, io);
+  // The tables exist, so the slice has landed and its own query module answers this —
+  // never SQL written here: the api tier is transports, and a tenant read belongs to
+  // `packages/core` (ADR 0029). Until that module is wired in, refusing is the honest answer.
   io.say(
     `${command}: REFUSED — its tables exist but this image carries no implementation; the slice's task fills it in`,
   );
-  return 1;
+  return REFUSED;
 };
 
 const isSliceCommand = (command: string): command is SliceCommand => command in NEEDS;
@@ -271,13 +249,13 @@ export const runOps = async (argv: readonly string[], pool: Pool, io: OpsIo): Pr
   const [command, ...rest] = argv;
   const flags = parseFlags(rest);
   if (command === undefined || command === "--help" || command === "help") {
-    io.say(USAGE);
-    return command === undefined ? 2 : 0;
+    io.say(USAGE_TEXT);
+    return command === undefined ? USAGE : DONE;
   }
   if (command === "replay-erasures") return replayErasures(pool, flags, io);
   if (command === "smoke") return smoke(flags, io);
   if (command === "dump-grep") return dumpGrep(flags, io);
   if (isSliceCommand(command)) return sliceCommand(command, pool, flags, io);
-  io.say(`unknown command: ${command}\n${USAGE}`);
-  return 2;
+  io.say(`unknown command: ${command}\n${USAGE_TEXT}`);
+  return USAGE;
 };
