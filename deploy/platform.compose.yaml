@@ -89,13 +89,21 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
 
+  # NOT STARTED BY DEFAULT — it is behind the `pipeline` profile, so `docker compose up`
+  # brings up migrate and api and leaves this service declared and stopped. It joins the
+  # stack when `T-006`'s work loop exists: `docker compose --profile pipeline up`.
+  #
   # No `command:` here on purpose: the image's own is the deploy contract, and today it is a
   # refusal. Nothing in this tier claims a job yet — the claim/lease/heartbeat functions are
   # the app's to migrate (`T-006`) — so `apps/worker/Dockerfile` ships a default command that
-  # says so and exits rather than idling and reporting health it does not have. This service
-  # therefore restarts until that loop lands; the image, its dependencies and its non-root
-  # user are what `T-018` delivers.
+  # says so and exits rather than idling and reporting health it does not have. Started by
+  # default, that refusal plus `restart: unless-stopped` is a restart storm the deploy unit
+  # would report as an unhealthy stack and `T-005`'s alerting would page on; a service that
+  # exists only to fail is not one to start. The image, its dependencies, its non-root user
+  # and its healthcheck are what `T-018` delivers, and the profile is the one line `T-006`
+  # deletes.
   worker:
+    profiles: ["pipeline"]
     image: ghcr.io/betteranswers/worker@${WORKER_IMAGE_DIGEST:?set by the release workflow}
     <<: [*restart, *logging]
     environment:
