@@ -52,7 +52,10 @@ const oauthQuery = (url: string): string => new URL(url).search.replace(/^\?/, "
 // the time consent renders; the fallback is the page's honest answer to a malformed carry.
 const hostnameOf = (url: string): string => URL.parse(url)?.hostname ?? "an unknown address";
 
-const redirectOf = z.object({ url: z.string().min(1).optional(), redirect: z.boolean().optional() });
+const redirectOf = z.object({
+  url: z.string().min(1).optional(),
+  redirect: z.boolean().optional(),
+});
 
 /** Where a Better Auth flow endpoint sends the person next: a 3xx's Location, or the JSON's `url`. */
 const nextLocation = async (response: Response): Promise<string | undefined> => {

@@ -52,10 +52,10 @@ const webOverrides = () =>
         override.rules?.["unicorn/filename-case"] !== undefined),
   );
 
-// The four the SPA owns. A fifth added without a case below would be run by this suite and
+// The five the SPA owns. A sixth added without a case below would be run by this suite and
 // asserted by nothing, which is the failure a rule test exists to prevent.
-if (webOverrides().length !== 4) {
-  throw new Error(`expected four apps/web overrides, found ${webOverrides().length}`);
+if (webOverrides().length !== 5) {
+  throw new Error(`expected five apps/web overrides, found ${webOverrides().length}`);
 }
 
 type Fixture = Readonly<Record<string, string>>;
@@ -184,6 +184,39 @@ describe("the direction is app \u2192 features \u2192 shared and never back", ()
       "apps/web/src/shared/api/reaches-a-feature-relatively.ts",
       "apps/web/src/shared/reaches-a-feature.ts",
       "apps/web/src/shared/reaches-the-app.ts",
+    ]);
+  });
+});
+
+describe("better-auth is named in the identity feature and nowhere else", () => {
+  it("allows the client where the feature that owns identity lives, and refuses it outside", () => {
+    const refused = flagged({
+      "apps/web/src/features/auth/auth-client.ts": probe("better-auth/client"),
+      "apps/web/src/shared/ui/auth/provider.tsx": probe("better-auth/react"),
+      "apps/web/src/features/routes/reaches-the-library.ts": probe("better-auth/client"),
+      "apps/web/src/shared/api/reaches-the-library.ts": probe("better-auth/client"),
+      "apps/web/src/app/reaches-the-library.ts": probe("@better-auth/oauth-provider/client"),
+    });
+
+    expect(refused).toEqual([
+      "apps/web/src/app/reaches-the-library.ts",
+      "apps/web/src/features/routes/reaches-the-library.ts",
+      "apps/web/src/shared/api/reaches-the-library.ts",
+    ]);
+  });
+
+  it("keeps every other rule over the identity feature: it may not reach sideways, or up", () => {
+    const refused = flagged({
+      "apps/web/src/features/auth/reaches-sideways.ts": probe("@/features/routes/api.ts"),
+      "apps/web/src/features/auth/reaches-up.ts": probe("@/app/router.tsx"),
+      "apps/web/src/features/auth/reaches-the-api.ts": typeProbe("@better-answers/api/trpc"),
+      "apps/web/src/features/auth/reaches-down.ts": probe("@/shared/ui/button.tsx"),
+    });
+
+    expect(refused).toEqual([
+      "apps/web/src/features/auth/reaches-sideways.ts",
+      "apps/web/src/features/auth/reaches-the-api.ts",
+      "apps/web/src/features/auth/reaches-up.ts",
     ]);
   });
 });

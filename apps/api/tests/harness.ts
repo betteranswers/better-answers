@@ -81,7 +81,7 @@ export type TestApp = {
   /** A workspace with its first Admin, provisioned through the platform's one act. */
   provision(input?: { name?: string; adminEmail?: string }): Promise<Provisioned>;
   /** A person in the identity set with no membership anywhere. */
-  person(email?: string): Promise<{ id: string; email: string }>;
+  person(email?: string): Promise<Person>;
   /** Add a person to a workspace at a role (seeded directly: Better Auth's invitation flow is not under test). */
   addMember(
     workspaceId: string,
@@ -102,7 +102,14 @@ export type TestApp = {
 export type Provisioned = {
   readonly workspaceId: string;
   readonly name: string;
-  readonly admin: { readonly id: string; readonly email: string };
+  readonly admin: Person;
+};
+
+/** A person as the identity set holds them; the name is what the shell shows (T-037). */
+export type Person = {
+  readonly id: string;
+  readonly email: string;
+  readonly name: string;
 };
 
 /** A host-shaped client: full URLs on one hostname's origin, a cookie jar, one client IP. */
@@ -208,7 +215,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     const client = await database.superuser.connect();
     try {
       const created = await testData(client).user(email === undefined ? {} : { email });
-      return { id: created.id, email: created.email };
+      return { id: created.id, email: created.email, name: created.name };
     } finally {
       client.release();
     }

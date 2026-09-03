@@ -1,8 +1,19 @@
 import { boundarySchemas, CREATOR_ROLE } from "@better-answers/schema";
 
 import { attempt, err, ok, type Result } from "../kernel/index.ts";
-import type { PlatformPrincipal, Role, UserId, UserPrincipal, WorkspaceId } from "../kernel/index.ts";
-import { type PostgresDoor, type Tx, withIdentityWrite, withScope } from "../store/postgres/index.ts";
+import type {
+  PlatformPrincipal,
+  Role,
+  UserId,
+  UserPrincipal,
+  WorkspaceId,
+} from "../kernel/index.ts";
+import {
+  type PostgresDoor,
+  type Tx,
+  withIdentityWrite,
+  withScope,
+} from "../store/postgres/index.ts";
 
 /**
  * Slice: **workspaces** — the tenant's own lifecycle. Owns `workspace` as the platform
@@ -167,10 +178,9 @@ export const readMembership = async (
   principal: UserPrincipal,
   tx: Tx,
 ): Promise<Result<Membership, "no-such-workspace" | "no-such-person">> => {
-  const workspace = await tx.query<{ name: string }>(
-    "SELECT name FROM workspace WHERE id = $1",
-    [principal.workspaceId],
-  );
+  const workspace = await tx.query<{ name: string }>("SELECT name FROM workspace WHERE id = $1", [
+    principal.workspaceId,
+  ]);
   const name = workspace.rows[0]?.name;
   if (name === undefined) return err("no-such-workspace");
 

@@ -62,7 +62,10 @@ const location = (response: Response): string => {
   return header ?? "";
 };
 
-const redirectOf = z.object({ url: z.string().min(1).optional(), redirect: z.boolean().optional() });
+const redirectOf = z.object({
+  url: z.string().min(1).optional(),
+  redirect: z.boolean().optional(),
+});
 
 /**
  * Where a Better Auth endpoint says the person goes next: a 3xx's `Location`, or the
@@ -126,10 +129,7 @@ export const setActiveWorkspace = async (
  * `app.` with the signed query it was carried here with. Answers where the person goes
  * next — consent, on `mcp.`.
  */
-export const continueAfterPostLogin = async (
-  client: TestClient,
-  query: string,
-): Promise<URL> => {
+export const continueAfterPostLogin = async (client: TestClient, query: string): Promise<URL> => {
   // Relative: the resume is posted from the origin the picker is served on, which is what
   // makes `app.` a trusted origin and `/oauth2/continue` a path `app.` carries.
   const continued = await client.json("/oauth2/continue", {
@@ -137,7 +137,10 @@ export const continueAfterPostLogin = async (
     oauth_query: query.replace(/^\?/, ""),
   });
   const next = await nextLocation(continued);
-  expect(next, `the continue endpoint answered ${continued.status} with no next step`).toBeDefined();
+  expect(
+    next,
+    `the continue endpoint answered ${continued.status} with no next step`,
+  ).toBeDefined();
   return new URL(next ?? "", PUBLIC_URL);
 };
 

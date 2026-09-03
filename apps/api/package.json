@@ -11,6 +11,7 @@
     "start": "node src/main.ts",
     "migrate": "node src/migrate.ts",
     "serve:e2e": "node tests/serve.ts",
+    "serve:local": "node tests/local.ts",
     "lint": "oxlint --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
