@@ -1,0 +1,30 @@
+apps/docs-site/specs/T-045.md
+  s_dc003d4ec5f1ea::t_3b50d04f65e5aa 1-159
+CONTEXT.md
+  s_a6dab1385c2575::t_00bfcb2f27cad6 489-490
+  s_a6dab1385c2575::t_d49c8a13247fa1 526-529
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "167d99924c6a1b40f3a1e731dd9d55eea92a07aa",
+  "prompts": {},
+  "sessions": {
+    "s_a6dab1385c2575": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3d1b4af0-eadf-4a04-a82c-273a9fd003ee",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    },
+    "s_dc003d4ec5f1ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e46dcd4c-9eee-49e1-b660-eace5fa8a036",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
