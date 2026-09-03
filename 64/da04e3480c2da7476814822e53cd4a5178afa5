@@ -1,0 +1,27 @@
+apps/web/test/lint-rules.test.ts
+  s_90ffdc067aac0d::t_edd1b005fcadc2 27-28
+  s_90ffdc067aac0d::t_beba52ba6fb95c 63-72,92,94-99
+  s_90ffdc067aac0d::t_381994746e4644 20-26,29-31
+  s_90ffdc067aac0d::t_0098da669d5b0b 84-89
+  s_90ffdc067aac0d::t_7be9a7387015ef 2-3,109-111,113,119-132
+apps/web/src/shared/api/query-client.ts
+  s_90ffdc067aac0d::t_26583634aa3886 14
+ci.sh
+  s_90ffdc067aac0d::t_98649f3fafc722 1-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "64da04e3480c2da7476814822e53cd4a5178afa5",
+  "prompts": {},
+  "sessions": {
+    "s_90ffdc067aac0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb92143-40a3-4162-962a-19793a875ce7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
