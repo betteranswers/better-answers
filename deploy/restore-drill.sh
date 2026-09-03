@@ -69,8 +69,10 @@ for ws in $(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d /
   age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${WORK}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
   sudo -u '#1000' git clone --quiet --bare "${WORK}/${ws}.bundle" "/data/git/${ws}.git"
 done
-platform up -d api worker
-say "api and worker up — RTO so far $(( ( $(date +%s) - T0 ) / 60 )) min"
+# `api` alone: naming a service on the command line auto-enables its profile, and `worker` is
+# behind the `pipeline` profile until T-006's work loop exists (platform.compose.yaml).
+platform up -d api
+say "api up — RTO so far $(( ( $(date +%s) - T0 ) / 60 )) min"
 
 say "## 5 recovery order 2–5: watermark, graph rebuild, pipeline state (LMDBs empty → reprocess), orphans"
 platform exec -T api pnpm ops reconcile-watermark --workspace "${DRILL_WORKSPACE}"

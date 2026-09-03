@@ -79,10 +79,9 @@ services:
       AGENT_MAX_FILE_BYTES: "104857600"   # 100 MB — Cloudflare's edge limit on Free/Pro (research 68 §4); the 53 contract's cap
       HEALTHCHECKS_PING_URL_SCHEDULER: ${HEALTHCHECKS_PING_URL_SCHEDULER:?}
     healthcheck:
-      # On the loopback, so it carries no public hostname. There is no fifth variable to set: the
-      # app's fence holds the loopback (localhost, 127.0.0.1, ::1) as a fixed role carrying /health
-      # alone (T-030). Do not point this at a hostname — a probe that has to know the estate's DNS
-      # is a probe that breaks when the DNS changes.
+      # Why the loopback and not one of the four hostnames: `apps/api/Dockerfile` § HEALTHCHECK.
+      # The command is the same one the image carries; the settings are repeated here because
+      # a healthcheck declared in compose replaces the image's outright.
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 10s
       timeout: 3s
@@ -93,7 +92,21 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
 
+  # NOT STARTED BY DEFAULT — it is behind the `pipeline` profile, so `docker compose up`
+  # brings up migrate and api and leaves this service declared and stopped. It joins the
+  # stack when `T-006`'s work loop exists: `docker compose --profile pipeline up`.
+  #
+  # No `command:` here on purpose: the image's own is the deploy contract, and today it is a
+  # refusal. Nothing in this tier claims a job yet — the claim/lease/heartbeat functions are
+  # the app's to migrate (`T-006`) — so `apps/worker/Dockerfile` ships a default command that
+  # says so and exits rather than idling and reporting health it does not have. Started by
+  # default, that refusal plus `restart: unless-stopped` is a restart storm the deploy unit
+  # would report as an unhealthy stack and `T-005`'s alerting would page on; a service that
+  # exists only to fail is not one to start. The image, its dependencies, its non-root user
+  # and its healthcheck are what `T-018` delivers, and the profile is the one line `T-006`
+  # deletes.
   worker:
+    profiles: ["pipeline"]
     image: ghcr.io/betteranswers/worker@${WORKER_IMAGE_DIGEST:?set by the release workflow}
     <<: [*restart, *logging]
     environment:
@@ -104,7 +117,10 @@ services:
       MAX_CONCURRENT_RUNS: "1"                # one index at a time on a 4 GB box (ADR 0024); ticket 42 measures whether it can rise
       LMDB_MAX_BYTES_PER_BINDING: "4294967296" # 4 GB cap; over it the binding's LMDB is wiped and reprocessed ([PIPE1])
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      # Why a process-level probe and not an HTTP one: `apps/worker/Dockerfile` § HEALTHCHECK.
+      # The command is the same one the image carries; the settings are repeated here because
+      # a healthcheck declared in compose replaces the image's outright.
+      test: ["CMD", "python", "-c", "import better_answers_worker"]
       interval: 15s
       timeout: 3s
       retries: 8
