@@ -1,0 +1,46 @@
+deploy/platform.compose.yaml
+  s_d41063f43ada5b::t_e7ef037ef9c43e 109-117
+  s_d41063f43ada5b::t_360915c790cc7f 92-97
+.dockerignore
+  s_d41063f43ada5b::t_37e3b175dbe352 1-52
+.github/workflows/build.yml
+  s_d41063f43ada5b::t_e831d610fd1e26 1-14,31-37,39,43,54-58,81-83,85-89
+apps/worker/Dockerfile
+  s_d41063f43ada5b::t_3a3e6f85ff6306 1-69
+apps/api/Dockerfile
+  s_d41063f43ada5b::t_c7aa1ca5a2446e 1-20,24-38,43-66,75-88,94,97-103,107-132
+  s_d41063f43ada5b::t_c45297dbe72cc0 21-23
+  s_d41063f43ada5b::t_44ef0bfaba93eb 67-74
+  s_d41063f43ada5b::t_2acd45532491f6 104-106
+  s_d41063f43ada5b::t_e5405ac636f3bf 39-42
+  s_d41063f43ada5b::t_5f6d11a65f4887 89-93,95-96
+.github/workflows/check.yml
+  s_d41063f43ada5b::t_ca060a2549d17e 1-2
+  s_d41063f43ada5b::t_e329b139ee107d 9-12
+apps/api/tests/image.test.ts
+  s_d41063f43ada5b::t_e2a2e2496910b2 8
+  s_d41063f43ada5b::t_9364656a321d2e 133
+  s_d41063f43ada5b::t_f2e4691258888c 70-77
+  s_d41063f43ada5b::t_c86c3ad6523afa 1-7,9-40,50-69,78-102,108-126,130-132,134-156
+  s_d41063f43ada5b::t_678b7e05752886 127-129
+  s_d41063f43ada5b::t_685833cd5081ef 103-107
+  s_d41063f43ada5b::t_2d13ad5a3fd611 41-49
+apps/worker/.dockerignore
+  s_d41063f43ada5b::t_82577cd8e31e5a 1-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b552be840bb09125704fee510e42d3d94c4475d1",
+  "prompts": {},
+  "sessions": {
+    "s_d41063f43ada5b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e2e216cd-f777-484f-939a-18351ad361cb",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
