@@ -1,0 +1,54 @@
+deploy/backup.sh
+  s_e2e47fc1e56be9::t_fe179c0c53c632 89
+deploy/stores.compose.yaml
+  s_e2e47fc1e56be9::t_b070434ef802f2 43,45,55,70,114,131
+apps/api/src/ops.ts
+  s_e2e47fc1e56be9::t_9ccf32b8aff07e 8
+  s_e2e47fc1e56be9::t_a06ce0358f4576 4,25
+apps/api/src/ops/http-fetch.ts
+  s_e2e47fc1e56be9::t_a06ce0358f4576 1-48
+apps/api/tests/ops.test.ts
+  s_e2e47fc1e56be9::t_9ccf32b8aff07e 12,43,77-79
+  s_e2e47fc1e56be9::t_c1b32a62ad01b2 125-131,143
+  s_e2e47fc1e56be9::t_a06ce0358f4576 3-4,7,121-124,132-142,144
+deploy/wizard-41.sh
+  s_e2e47fc1e56be9::t_1619fbda22500e 287-288
+deploy/mirror-shell.sh
+  s_e2e47fc1e56be9::t_b070434ef802f2 21,28,30,36
+packages/core/src/store/postgres/index.ts
+  s_e2e47fc1e56be9::t_9ccf32b8aff07e 273-289
+deploy/host-setup.sh
+  s_e2e47fc1e56be9::t_b070434ef802f2 5-10,34-37,45-46,49,63-66,102,117-119,127
+deploy/restore-production.sh
+  s_e2e47fc1e56be9::t_46d677a34017c0 24-28,30,33-34,41,55,60-63,81-84,89-90,105-109,114
+  s_e2e47fc1e56be9::t_fe179c0c53c632 85-88
+apps/api/src/ops/index.ts
+  s_e2e47fc1e56be9::t_9ccf32b8aff07e 3,6,28-31,91,94,100,107,109,116,124,131,194,204,227,230,237-239,243,252-253,259-260
+apps/docs-site/operations/coolify.md
+  s_e2e47fc1e56be9::t_1619fbda22500e 36,47
+deploy/platform.compose.yaml
+  s_e2e47fc1e56be9::t_b070434ef802f2 30,55,59
+apps/api/tests/deploy-tree.test.ts
+  s_e2e47fc1e56be9::t_4214bbb6075b67 108
+deploy/restore-drill.sh
+  s_e2e47fc1e56be9::t_fe179c0c53c632 49-50,57,88-90
+  s_e2e47fc1e56be9::t_b070434ef802f2 124-126,154-155
+.github/workflows/release.yml
+  s_e2e47fc1e56be9::t_fe179c0c53c632 19-23,137-138,149-155
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a0e87da22d16801e5e92830037a0a5e045bbec10",
+  "prompts": {},
+  "sessions": {
+    "s_e2e47fc1e56be9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0c1dc75-cb84-4c52-911c-da01a85a7647",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
