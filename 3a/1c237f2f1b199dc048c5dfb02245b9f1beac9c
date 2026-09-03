@@ -1,0 +1,20 @@
+.github/workflows/check.yml
+  s_09ad417bc22bdb::t_3511f1de189d34 19-20
+  s_09ad417bc22bdb::t_0d029677d4fdbf 23-37,40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3a1c237f2f1b199dc048c5dfb02245b9f1beac9c",
+  "prompts": {},
+  "sessions": {
+    "s_09ad417bc22bdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd84fef3-35ab-41ef-a9ee-2b92664fe274",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
