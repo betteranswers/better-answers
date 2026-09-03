@@ -14,7 +14,7 @@ import { testData, ulid } from "@better-answers/schema/testing";
 
 import type { EmailMessage } from "../src/auth/index.ts";
 import { CLIENT_IP_HEADER } from "../src/auth/index.ts";
-import type { PublicHostnames } from "../src/ingress/hostnames.ts";
+import { hostnameOfUrl, type PublicHostnames } from "../src/ingress/hostnames.ts";
 import { createServer } from "../src/server.ts";
 import { startTestDatabase, type TestDatabase } from "./postgres.ts";
 
@@ -32,12 +32,13 @@ export const MCP_URL = `${PUBLIC_URL}/mcp`;
 export const AUTH_SECRET = "test-secret-that-is-at-least-thirty-two-characters-long";
 
 /**
- * The estate's four hostnames as a test's deploy unit sets them (ADR 0022, T-030).
- * `mcp.` is `PUBLIC_URL`'s host, which the bootstrap parser requires; a client speaks
+ * The estate's four hostnames as a test's deploy unit sets them (ADR 0022, T-030). The
+ * deploy unit sets three; `mcp.` is `PUBLIC_URL`'s host, read the way `config.ts`
+ * derives it and the way the fence reads an arriving `Host` (T-039). A client speaks
  * to `mcp.` unless a test names another, so every suite written before the hostname
  * fence still reaches the surface it was written against.
  */
-export const MCP_HOSTNAME = new URL(PUBLIC_URL).hostname;
+export const MCP_HOSTNAME = hostnameOfUrl(PUBLIC_URL);
 export const APP_HOSTNAME = "app.example.test";
 /** Where the product is served, and so where sign-in and the picker are (ADR 0006, amended). */
 export const APP_URL = `https://${APP_HOSTNAME}`;

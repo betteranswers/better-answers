@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { readBootstrap, readIdentityBootstrap } from "../src/config.ts";
 
-/** The four hostnames of an estate, as the deploy unit sets them (ADR 0022). */
+/**
+ * The three hostnames of an estate the deploy unit sets (ADR 0022). The fourth, `mcp.`,
+ * is `PUBLIC_URL`'s host and is set by setting that (T-039).
+ */
 const HOSTNAMES = {
   APP_HOSTNAME: "app.example.test",
-  MCP_HOSTNAME: "mcp.example.test",
   AGENT_HOSTNAME: "agent.example.test",
   APEX_HOSTNAME: "example.test",
 };
@@ -96,13 +98,18 @@ describe("the bootstrap configuration", () => {
 });
 
 /**
- * The four hostnames of ADR 0022, read beside `PUBLIC_URL` because the router that
- * consumes them (`apps/api/src/ingress/hostnames.ts`) is a fence: a hostname the
- * deploy unit did not give the process is a hostname that reaches nothing, so a
- * missing or malformed one has to stop the process rather than open it.
+ * The four hostnames of ADR 0022. Three are read beside `PUBLIC_URL` because the
+ * router that consumes them (`apps/api/src/ingress/hostnames.ts`) is a fence: a
+ * hostname the deploy unit did not give the process is a hostname that reaches
+ * nothing, so a missing or malformed one has to stop the process rather than open it.
+ * The fourth is `PUBLIC_URL`'s host, derived rather than declared (T-039), so the
+ * cases below that would have been `MCP_HOSTNAME`'s are `PUBLIC_URL`'s.
  */
 describe("the four hostnames of the estate", () => {
-  it.each(["APP_HOSTNAME", "MCP_HOSTNAME", "AGENT_HOSTNAME", "APEX_HOSTNAME"])(
+  // `PUBLIC_URL` is in this matrix as a hostname, not only as an origin: it is where
+  // `mcp.` comes from, so a deploy unit that omits it leaves a hostname unset as surely
+  // as omitting one of the three would (Cubic round 1).
+  it.each(["PUBLIC_URL", "APP_HOSTNAME", "AGENT_HOSTNAME", "APEX_HOSTNAME"])(
     "refuses a missing %s",
     (name) => {
       expect(readIdentityBootstrap(identityEnvironment({ [name]: undefined })).ok).toBe(false);
@@ -127,21 +134,49 @@ describe("the four hostnames of the estate", () => {
     expect(readIdentityBootstrap(identityEnvironment({ APP_HOSTNAME: hostname })).ok).toBe(false);
   });
 
-  it("refuses an MCP_HOSTNAME that is not the origin the authorization server issues from", () => {
+  it("gives mcp. the host the authorization server issues from, without being told it twice", () => {
     // ADR 0022: `mcp.` carries `/mcp`, discovery and `/oauth2/*`, and `PUBLIC_URL` is
     // that origin exactly — the protected-resource document's `resource` is derived
-    // from it. Two different values would serve discovery on a hostname no document names.
+    // from it. Declaring the hostname beside the origin was one truth in two places;
+    // it is read off the origin instead (T-039), so the two cannot disagree.
     const read = readIdentityBootstrap(
-      identityEnvironment({ MCP_HOSTNAME: "not-the-issuer.example.test" }),
+      identityEnvironment({ PUBLIC_URL: "https://issuer.example.test" }),
     );
+
+    expect(read.ok && read.value.hostnames.mcp).toBe("issuer.example.test");
+  });
+
+  it("refuses two hostnames that are the same, which would hand one surface to the other", () => {
+    const read = readIdentityBootstrap(identityEnvironment({ AGENT_HOSTNAME: "app.example.test" }));
 
     expect(read.ok).toBe(false);
   });
 
-  it("refuses two hostnames that are the same, which would hand one surface to the other", () => {
-    const read = readIdentityBootstrap(identityEnvironment({ AGENT_HOSTNAME: "mcp.example.test" }));
+  it.each(Object.entries(HOSTNAMES))("refuses a derived mcp. that equals %s", (_name, hostname) => {
+    // The derived hostname is in the distinctness check with the three declared
+    // ones. `PUBLIC_URL` naming a host the deploy unit also gave another role would
+    // hand the authorization server to that role — or take `app.`'s surface away.
+    const read = readIdentityBootstrap(identityEnvironment({ PUBLIC_URL: `https://${hostname}` }));
 
     expect(read.ok).toBe(false);
+  });
+
+  it.each([
+    // Each of these derives an `mcp.` hostname the operator never wrote and cannot
+    // find in their DNS — the class `bareHostname` already refuses for the three
+    // declared hostnames (T-030), now applied to the one that is derived
+    // (`[SEC3]`, T-039).
+    ["a padded IPv4 spelling", "https://127.000.000.001"],
+    ["a hexadecimal IPv4 spelling", "https://0x7f.1"],
+    ["a percent-encoded label", "https://%6dcp.example.test"],
+    // Not a DNS name at all: an IPv6 literal reaches the fence as `::1`, which is no
+    // bare hostname.
+    ["an IPv6 literal", "https://[::1]"],
+    // The root dot is the one rewriting that names the same host, so one is stripped
+    // and accepted; two leave an empty label, which is not a hostname.
+    ["an empty final label", "https://mcp.example.test.."],
+  ])("refuses a PUBLIC_URL whose host the parser rewrites — %s", (_case, url) => {
+    expect(readIdentityBootstrap(identityEnvironment({ PUBLIC_URL: url })).ok).toBe(false);
   });
 
   it("reads a hostname in any case, because DNS does", () => {
@@ -154,12 +189,29 @@ describe("the four hostnames of the estate", () => {
     // `mcp.example.test.` is the same host to DNS and to nothing else: the issuer, the
     // token audience, the protected-resource document and the three pages'
     // same-origin check are all exact strings, and a browser's `Origin` never carries
-    // the dot. Accepting the value beside a bare `MCP_HOSTNAME` without normalising it
-    // would start the process and refuse every OAuth form at 403.
+    // the dot. Accepting the value without normalising it would start the process and
+    // refuse every OAuth form at 403. It is the one host rewriting that is allowed,
+    // and the derived `mcp.` hostname carries the same normalisation.
     const read = readIdentityBootstrap(
       identityEnvironment({ PUBLIC_URL: "https://mcp.example.test./" }),
     );
 
     expect(read.ok && read.value.publicUrl).toBe("https://mcp.example.test");
+    expect(read.ok && read.value.hostnames.mcp).toBe("mcp.example.test");
+  });
+
+  it("accepts a port beside DNS's trailing dot, which names the same host on a port of its own", () => {
+    // Cubic round 1: the first version of the as-written check compared the whole
+    // origin as a prefix of the value, so normalising the root dot moved it *past* the
+    // port — `https://mcp.example.test.:8443` became `https://mcp.example.test:8443`,
+    // which the raw value does not start with, and a legitimate origin stopped the
+    // process. The check reads the host alone now (`hostIsAsWritten`), so the port is
+    // no part of the comparison and the dot is read the same way on both sides.
+    const read = readIdentityBootstrap(
+      identityEnvironment({ PUBLIC_URL: "https://mcp.example.test.:8443" }),
+    );
+
+    expect(read.ok && read.value.publicUrl).toBe("https://mcp.example.test:8443");
+    expect(read.ok && read.value.hostnames.mcp).toBe("mcp.example.test");
   });
 });

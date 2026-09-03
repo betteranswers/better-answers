@@ -108,7 +108,7 @@ export const HOSTNAME_SURFACES: readonly HostnameSurface[] = [
     paths: ["/*"],
     hosts: ["app", "mcp"],
     reason:
-      "Everything else this process answers is Better Auth's own handler at the wildcard with `basePath: '/'` — the session, sign-out, email-code and organisation endpoints — plus `/me`, the tier's cookie-session probe, and, with T-022, the SPA's static build and the tRPC mount on `app.`. The set cannot be enumerated here: it is the plugin list's, and a Better Auth upgrade adds to it, so an enumerated entry would refuse a path the flow needs the day the library grows one. Both hostnames carry it because there is one session across `app.` and `mcp.` (ADR 0009, 2026-09-02): the SPA signs in on `app.` and the OAuth flow resumes on `mcp.` under the same cookie. That `agent.` and the apex are absent from it is the whole point of the entry.",
+      "Everything else this process answers is Better Auth's own handler at the wildcard with `basePath: '/'` — the session, sign-out, email-code and organisation endpoints — plus `/me`, the tier's cookie-session probe, and, with T-022, the SPA's static build and the tRPC mount on `app.`. The set cannot be enumerated here: it is the plugin list's, and a Better Auth upgrade adds to it, so an enumerated entry would refuse a path the flow needs the day the library grows one. It is reviewed instead of enumerated: `apps/api/tests/better-auth-endpoints.txt` is what this entry admitted when a human last looked, read from the instance's own endpoint table, and `better-auth-endpoints.test.ts` fails with the added and removed paths named when an upgrade moves it (T-039). Both hostnames carry it because there is one session across `app.` and `mcp.` (ADR 0009, 2026-09-02): the SPA signs in on `app.` and the OAuth flow resumes on `mcp.` under the same cookie. That `agent.` and the apex are absent from it is the whole point of the entry.",
   },
 ];
 
@@ -153,6 +153,30 @@ export const originOfUrl = (url: string): string => {
   const parsed = new URL(url);
   parsed.hostname = withoutRootDot(parsed.hostname);
   return parsed.origin;
+};
+
+/**
+ * Whether a URL's host is already written the way a URL parser reads it — the reading
+ * `bareHostname` makes of a declared hostname, made of the one that is derived from a
+ * URL (`PUBLIC_URL`'s, which is `mcp.`; T-039).
+ *
+ * The parser canonicalises an address spelling — `127.000.000.001` and `0x7f.1` both
+ * come back as `127.0.0.1`, `%6dcp.example.test` as `mcp.example.test` — so a value
+ * written that way names a host no arriving request can match and no operator can find
+ * in their DNS. Case and DNS's trailing root dot are the two rewritings that name the
+ * *same* host, so both sides are read through `bareForm` and neither stops a process.
+ * A port is not part of a hostname, and the parser drops it when it is the scheme's
+ * default, so it is taken off the written side rather than compared.
+ */
+export const hostIsAsWritten = (url: string): boolean => {
+  // The authority exactly as the operator typed it: after the scheme, before the path.
+  const authority = url.slice(url.indexOf("://") + 3).split(/[/?#]/)[0] ?? "";
+  // An IPv6 literal keeps its brackets and carries its own colons; for a name, the
+  // first colon after the host starts the port.
+  const written = authority.startsWith("[")
+    ? authority.slice(0, authority.indexOf("]") + 1)
+    : (authority.split(":")[0] ?? "");
+  return bareForm(written.toLowerCase()) === hostnameOfUrl(url);
 };
 
 /**

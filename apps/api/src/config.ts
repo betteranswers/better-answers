@@ -6,6 +6,7 @@ import { err, ok, type Result } from "@better-answers/core/kernel";
 
 import {
   bareHostname,
+  hostIsAsWritten,
   hostnameOfUrl,
   originOfUrl,
   type PublicHostnames,
@@ -52,6 +53,20 @@ const httpsOrigin = z
       url.password === ""
     );
   }, "PUBLIC_URL must be an https origin with no path, query, fragment or credentials")
+  .refine(
+    // The `mcp.` hostname is this URL's host, so a host the parser rewrites is a
+    // hostname the operator never wrote and cannot find in their DNS. `bareHostname`
+    // refuses that class for the three declared hostnames (T-030); the fence makes the
+    // same reading of the one that is now derived.
+    hostIsAsWritten,
+    "PUBLIC_URL must already be written the way a URL parser reads a host: a spelling the parser rewrites (`127.000.000.001`, `0x7f.1`, a percent-encoded label) would derive an `mcp.` hostname no arriving request can match",
+  )
+  .refine(
+    // The derived hostname is validated exactly as the three declared ones are, so the
+    // four are one class of value and not three plus an exception.
+    (value) => bareHostname.safeParse(hostnameOfUrl(value)).success,
+    "PUBLIC_URL's host must be a bare hostname — DNS labels only — because it is the `mcp.` hostname the fence matches an arriving `Host` against",
+  )
   // Normalised to the bare host, not merely parsed: DNS's trailing root dot names the
   // same host, but every string this origin becomes — the issuer, the token audience,
   // the protected-resource document, Better Auth's trusted origins and the three
@@ -68,31 +83,27 @@ const identityBootstrapSchema = z
     // Better Auth's secret: signs the OAuth flow's state and encrypts the JWKS private
     // keys at rest (ADR 0009).
     AUTH_SECRET: z.string().min(32),
-    // The estate's four hostnames (ADR 0022), read here because the hostname fence
-    // (`ingress/hostnames.ts`) has to know them before the first request: a hostname
-    // the deploy unit did not give the process is a hostname that reaches nothing, so
-    // a missing or malformed one stops the process rather than opening it.
+    // Three of the estate's four hostnames (ADR 0022), read here because the hostname
+    // fence (`ingress/hostnames.ts`) has to know them before the first request: a
+    // hostname the deploy unit did not give the process is a hostname that reaches
+    // nothing, so a missing or malformed one stops the process rather than opening it.
+    // The fourth is not declared — `mcp.` *is* `PUBLIC_URL`'s host, and one truth in
+    // two places is one more thing to get wrong on deploy day (T-039), so it is
+    // derived through the fence's own reading of a host and the two sides still agree
+    // by construction rather than by a refine.
     APP_HOSTNAME: bareHostname,
-    MCP_HOSTNAME: bareHostname,
     AGENT_HOSTNAME: bareHostname,
     APEX_HOSTNAME: bareHostname,
   })
-  .refine(
-    // Read through the fence's own reading of a URL's host, so "the same host" means
-    // one thing on both sides: a `PUBLIC_URL` carrying DNS's trailing root dot names
-    // the same host as the bare `MCP_HOSTNAME` and must not stop the process.
-    (parsed) => parsed.MCP_HOSTNAME === hostnameOfUrl(parsed.PUBLIC_URL),
-    "MCP_HOSTNAME must be PUBLIC_URL's host: they are one origin (ADR 0022), and discovery, the token audience and the protected-resource document are all derived from PUBLIC_URL",
-  )
   .refine((parsed) => {
     const hostnames = [
       parsed.APP_HOSTNAME,
-      parsed.MCP_HOSTNAME,
+      hostnameOfUrl(parsed.PUBLIC_URL),
       parsed.AGENT_HOSTNAME,
       parsed.APEX_HOSTNAME,
     ];
     return new Set(hostnames).size === hostnames.length;
-  }, "the four hostnames must differ: two the same hands one hostname's surface to the other, which is the fence this configuration exists to raise");
+  }, "the four hostnames must differ, the derived `mcp.` one included: two the same hands one hostname's surface to the other, which is the fence this configuration exists to raise");
 
 export type Bootstrap = {
   readonly databaseUrl: string;
@@ -139,7 +150,10 @@ export function readIdentityBootstrap(
     authSecret: parsed.data.AUTH_SECRET,
     hostnames: {
       app: parsed.data.APP_HOSTNAME,
-      mcp: parsed.data.MCP_HOSTNAME,
+      // Read the way the fence reads an arriving request's host, so the hostname the
+      // router matches on and the origin every spec-exact string is derived from are
+      // one value from one place (ADR 0022, T-039).
+      mcp: hostnameOfUrl(parsed.data.PUBLIC_URL),
       agent: parsed.data.AGENT_HOSTNAME,
       apex: parsed.data.APEX_HOSTNAME,
     },

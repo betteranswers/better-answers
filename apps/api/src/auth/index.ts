@@ -12,6 +12,7 @@ export {
   type EmailMessage,
   type EmailSender,
 } from "./auth.ts";
+export { mountedPaths } from "./endpoints.ts";
 export { createAuthRoutes } from "./routes.ts";
 export { bearerOf, createTokenVerifier, sessionClaims, type SessionReader } from "./verify.ts";
 export * from "./constants.ts";

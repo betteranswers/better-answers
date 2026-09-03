@@ -56,20 +56,24 @@ services:
       GIT_STORE_DIR: /data/git                # one bare repository per workspace, written through the git binary (ADR 0024)
       KEK: ${KEK:?}
       AUTH_SECRET: ${AUTH_SECRET:?}
-      # The https origin the authorization server issues from — the `mcp.` hostname; the MCP
-      # URL a person types is `${PUBLIC_URL}/mcp`, and the protected-resource metadata's `resource` equals it exactly (T-004).
-      PUBLIC_URL: ${PUBLIC_URL:?}
+      # The https origin the authorization server issues from. Its host *is* the `mcp.` hostname —
+      # the app derives it from here rather than being told it twice (T-039) — and the MCP
+      # URL a person types is `${PUBLIC_URL}/mcp`, whose `resource` the protected-resource metadata
+      # equals exactly (T-004). Write the host the way a URL parser reads it: a spelling it rewrites
+      # is refused at bootstrap rather than deriving a hostname no request can match.
+      PUBLIC_URL: ${PUBLIC_URL:?}          # its host is `mcp.`: /mcp, discovery, /jwks, /oauth2/* and the OAuth flow's pages
       SMTP_URL: ${SMTP_URL:?}
-      # The four hostnames of the estate this file is deployed into (ADR 0022) — per-resource env,
-      # not a default in a public file (deploy/SECRETS.md § What the estate holds). Bare hostnames:
-      # no scheme, port or path, all four different, and MCP_HOSTNAME equal to PUBLIC_URL's host.
+      # Three of the estate's four hostnames (ADR 0022) — per-resource env, not a default in a public
+      # file (deploy/SECRETS.md § What the estate holds). Bare hostnames: no scheme, port or path.
+      # The fourth, `mcp.`, is PUBLIC_URL's host and has no variable of its own: it is one origin, so
+      # setting it twice was one more thing to get wrong on deploy day (T-039). All four must differ,
+      # the derived one included, or the app refuses to start.
       # The app routes on them itself: apps/api/src/ingress/hostnames.ts holds one list of
       # surface → hostnames → why, and refuses a path outside its hostname's surface before any body
       # is read (T-030). The tunnel's ingress rules stay the first fence (ADR 0022; deploy/coolify.md
       # § Ingress records them when T-005 writes that file); this is the second, because Better Auth's
       # handler answers the wildcard on every hostname the process is given.
       APP_HOSTNAME: ${APP_HOSTNAME:?}      # the product: the SPA's build, /health, /me, the session endpoints
-      MCP_HOSTNAME: ${MCP_HOSTNAME:?}      # /mcp, discovery, /jwks, /oauth2/* and the OAuth flow's pages
       AGENT_HOSTNAME: ${AGENT_HOSTNAME:?}  # /agent/v1/* alone
       APEX_HOSTNAME: ${APEX_HOSTNAME:?}    # nothing: 404, as the edge answers it
       AGENT_MAX_FILE_BYTES: "104857600"   # 100 MB — Cloudflare's edge limit on Free/Pro (research 68 §4); the 53 contract's cap
