@@ -121,11 +121,13 @@ USER node
 
 EXPOSE 3000
 
-# The same probe, the same thresholds and the same loopback URL as the `api` service's
-# healthcheck. It carries no hostname on purpose: the app's fence holds the loopback as a
-# fixed role carrying /health alone (T-030), and a probe that has to know the estate's DNS
-# is a probe that breaks when the DNS changes. /health answers 503 until the authorization
-# server is ready, which is what makes `worker`'s wait on `api` mean something (ADR 0007).
+# The loopback, so the probe carries no public hostname. There is no fifth hostname variable
+# to set: the app's fence holds the loopback (localhost, 127.0.0.1, ::1) as a fixed role
+# carrying /health alone (T-030). Do not point this at a hostname — a probe that has to know
+# the estate's DNS is a probe that breaks when the DNS changes. /health answers 503 until the
+# authorization server is ready, which is what makes `worker`'s wait on `api` mean something
+# (ADR 0007). This is the rationale for both copies of the probe: the `api` service in
+# `deploy/platform.compose.yaml` runs the same command with the same thresholds, and points here.
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=12 \
   CMD wget -qO- http://127.0.0.1:3000/health || exit 1
 

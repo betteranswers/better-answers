@@ -1,10 +1,10 @@
 import { execFile } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 const run = promisify(execFile);
@@ -23,9 +23,10 @@ const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
  * suites and imported by nothing; it is test material, and a runtime that carries it has a
  * `COPY` nobody meant.
  *
- * The list of what must not be there is read off the workspace manifests rather than
- * written down here, so a dependency moved between `dependencies` and `devDependencies`
- * changes what this test demands without anyone remembering to edit it.
+ * The list of what must not be there is derived — the workspace list from
+ * `pnpm-workspace.yaml`, the dependency lists from each manifest — so a project added to
+ * the workspace or a dependency moved between `dependencies` and `devDependencies` changes
+ * what this test demands without anyone remembering to edit it.
  */
 
 const dockerIsAvailable = async (): Promise<boolean> => {
@@ -47,7 +48,42 @@ const manifest = (workspace: string): z.infer<typeof manifestSchema> =>
     JSON.parse(readFileSync(path.join(repositoryRoot, workspace, "package.json"), "utf8")),
   );
 
-const WORKSPACES = [".", "apps/api", "apps/web", "packages/core", "packages/schema"];
+/**
+ * Every project pnpm installs, read from `pnpm-workspace.yaml` rather than listed here: a
+ * second list would age alone, and the one it missed — `packages/design-system` — is
+ * exactly the kind of omission that makes this test quietly weaker than it reads.
+ *
+ * The root is not in that file and is an importer all the same, so it is added; a `packages/*`
+ * entry is expanded against the directory, which is what pnpm's own glob means here. Read
+ * with a reader rather than a YAML parser because `apps/api` has no YAML dependency and the
+ * shape being read is one list of plain strings — the moment it is not, this throws.
+ */
+const workspaceProjects = (): readonly string[] => {
+  const file = readFileSync(path.join(repositoryRoot, "pnpm-workspace.yaml"), "utf8");
+  const block = /^packages:\n((?:[ \t]*-[ \t]+\S+[ \t]*\n)+)/m.exec(file)?.[1];
+  if (block === undefined) throw new Error("pnpm-workspace.yaml has no `packages:` list");
+
+  const patterns = block
+    .split("\n")
+    .map((line) =>
+      line
+        .replace(/^[ \t]*-[ \t]+/, "")
+        .trim()
+        .replace(/^["']|["']$/g, ""),
+    )
+    .filter((entry) => entry.length > 0);
+
+  const expand = (pattern: string): readonly string[] => {
+    if (!pattern.endsWith("/*")) return [pattern];
+    const parent = pattern.slice(0, -2);
+    return readdirSync(path.join(repositoryRoot, parent), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => `${parent}/${entry.name}`)
+      .filter((project) => existsSync(path.join(repositoryRoot, project, "package.json")));
+  };
+
+  return [".", ...patterns.flatMap(expand)];
+};
 
 /**
  * A name is a development dependency of this repository when some workspace has it under
@@ -58,8 +94,8 @@ const WORKSPACES = [".", "apps/api", "apps/web", "packages/core", "packages/sche
 const developmentOnlyPackages = (): readonly string[] => {
   const development = new Set<string>();
   const production = new Set<string>();
-  for (const workspace of WORKSPACES) {
-    const read = manifest(workspace);
+  for (const project of workspaceProjects()) {
+    const read = manifest(project);
     for (const name of Object.keys(read.devDependencies ?? {})) development.add(name);
     for (const name of Object.keys(read.dependencies ?? {})) production.add(name);
   }
@@ -70,7 +106,7 @@ const contentsSchema = z.object({
   resolvable: z.array(z.string()),
   missing: z.array(z.string()),
   hasContracts: z.boolean(),
-  hasShell: z.boolean(),
+  hasSpaBuild: z.boolean(),
 });
 
 type ImageContents = z.infer<typeof contentsSchema>;
@@ -88,17 +124,28 @@ process.stdout.write(JSON.stringify({
   resolvable,
   missing,
   hasContracts: existsSync("/app/contracts"),
-  hasShell: existsSync("/app/apps/web/dist/index.html"),
+  hasSpaBuild: existsSync("/app/apps/web/dist/index.html"),
 }));
 `;
 
-describe.skipIf(!(await dockerIsAvailable()))("the app tier's runtime image", () => {
-  // Skipped whole when no Docker daemon answers, so a machine or a CI job without one stays
-  // green: the image is built and pushed by .github/workflows/build.yml, which has one.
+const dockerAnswers = await dockerIsAvailable();
+// A laptop without Docker still runs `check`; CI does not get that latitude. `build.yml`
+// gates the push on this workflow, so a CI job that quietly skipped these four tests would
+// leave the image ungoverned while reporting green — the one outcome the gate exists to
+// prevent. Skipped off CI, failed on it, and never silent on either.
+const daemonIsRequired = (process.env["CI"] ?? "") !== "";
+
+describe.skipIf(!dockerAnswers && !daemonIsRequired)("the app tier's runtime image", () => {
   let contents: ImageContents;
+  let image: string | undefined;
   const developmentOnly = developmentOnlyPackages();
 
   beforeAll(async () => {
+    if (!dockerAnswers) {
+      throw new Error(
+        "no Docker daemon answered, so the runtime image cannot be read: on CI these tests fail rather than skip, because build.yml gates the image push on this workflow",
+      );
+    }
     // The image is run by the id the build prints, and is never tagged. A tag is a name on
     // the daemon, and the daemon is shared: two worktrees running `check` at once would
     // overwrite each other's tag and one would read the other's image. The id cannot be
@@ -108,7 +155,7 @@ describe.skipIf(!(await dockerIsAvailable()))("the app tier's runtime image", ()
       timeout: 900_000,
       maxBuffer: 64 * 1024 * 1024,
     });
-    const image = built.stdout.trim();
+    image = built.stdout.trim();
     const { stdout } = await run(
       "docker",
       [
@@ -137,6 +184,14 @@ describe.skipIf(!(await dockerIsAvailable()))("the app tier's runtime image", ()
     contents = contentsSchema.parse(JSON.parse(stdout));
   }, 1_020_000);
 
+  afterAll(async () => {
+    // The image is untagged, so leaving it behind leaves a dangling half-gigabyte on the
+    // machine for every run whose source differed from the last. Failure to remove it is not
+    // a failure of the suite: another run may hold the same id.
+    if (image === undefined) return;
+    await run("docker", ["rmi", "--force", image], { timeout: 120_000 }).catch(() => undefined);
+  }, 130_000);
+
   it("gives the app no development dependency it could load", () => {
     expect(developmentOnly.length).toBeGreaterThan(0);
     expect(contents.resolvable).toEqual([]);
@@ -155,6 +210,6 @@ describe.skipIf(!(await dockerIsAvailable()))("the app tier's runtime image", ()
   });
 
   it("carries the single-page app's build where the app reads it", () => {
-    expect(contents.hasShell).toBe(true);
+    expect(contents.hasSpaBuild).toBe(true);
   });
 });

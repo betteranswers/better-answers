@@ -75,10 +75,9 @@ services:
       AGENT_MAX_FILE_BYTES: "104857600"   # 100 MB — Cloudflare's edge limit on Free/Pro (research 68 §4); the 53 contract's cap
       HEALTHCHECKS_PING_URL_SCHEDULER: ${HEALTHCHECKS_PING_URL_SCHEDULER:?}
     healthcheck:
-      # On the loopback, so it carries no public hostname. There is no fifth variable to set: the
-      # app's fence holds the loopback (localhost, 127.0.0.1, ::1) as a fixed role carrying /health
-      # alone (T-030). Do not point this at a hostname — a probe that has to know the estate's DNS
-      # is a probe that breaks when the DNS changes.
+      # Why the loopback and not one of the four hostnames: `apps/api/Dockerfile` § HEALTHCHECK.
+      # The command is the same one the image carries; the settings are repeated here because
+      # a healthcheck declared in compose replaces the image's outright.
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 10s
       timeout: 3s
@@ -114,14 +113,9 @@ services:
       MAX_CONCURRENT_RUNS: "1"                # one index at a time on a 4 GB box (ADR 0024); ticket 42 measures whether it can rise
       LMDB_MAX_BYTES_PER_BINDING: "4294967296" # 4 GB cap; over it the binding's LMDB is wiped and reprocessed ([PIPE1])
     healthcheck:
-      # A process-level check, because this tier exposes no HTTP surface: no server, no port,
-      # no `/health`. The app↔worker control plane is rows in Postgres and never HTTP (ADR
-      # 0005), so the GET of http://127.0.0.1:8000/health that stood here could never have
-      # answered — it named a port nothing binds. What is checkable without inventing a
-      # surface is that the interpreter is alive and the tier's package imports in it, and
-      # `apps/worker/Dockerfile` carries the same command as its own HEALTHCHECK (T-018).
-      # When a run claimant exists, its liveness is a claimed lease with a fresh heartbeat
-      # (`[PIPE1]`) and this becomes a query for one.
+      # Why a process-level probe and not an HTTP one: `apps/worker/Dockerfile` § HEALTHCHECK.
+      # The command is the same one the image carries; the settings are repeated here because
+      # a healthcheck declared in compose replaces the image's outright.
       test: ["CMD", "python", "-c", "import better_answers_worker"]
       interval: 15s
       timeout: 3s

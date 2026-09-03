@@ -52,12 +52,12 @@ USER worker
 
 # A process-level check, not an HTTP one, and deliberately: this tier exposes no HTTP
 # surface at all. It has no server, no port and no `/health` — the app↔worker control plane
-# is rows in Postgres, never HTTP (ADR 0005) — so the probe that `deploy/platform.compose.yaml`
-# carried, a GET of http://127.0.0.1:8000/health, could never have answered. What can be
+# is rows in Postgres, never HTTP (ADR 0005) — so there is nothing to GET. What can be
 # checked without inventing a surface is that this container's interpreter is alive and the
-# tier's package imports in it; the compose file's `worker` healthcheck now runs the same
-# command. When a run claimant exists it will have a liveness signal of its own — a claimed
-# lease with a fresh heartbeat (`[PIPE1]`) — and this line becomes a query for it.
+# tier's package imports in it. This is the rationale for both copies of the probe: the
+# `worker` service in `deploy/platform.compose.yaml` runs the same command, and points here.
+# When a run claimant exists it will have a liveness signal of its own — a claimed lease with
+# a fresh heartbeat (`[PIPE1]`) — and this line becomes a query for it.
 HEALTHCHECK --interval=15s --timeout=3s --start-period=40s --retries=8 \
   CMD ["python", "-c", "import better_answers_worker"]
 
