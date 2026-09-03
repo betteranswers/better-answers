@@ -1,0 +1,23 @@
+docs/adr/README.md
+  s_09ad417bc22bdb::t_24815bdb381403 30
+  s_09ad417bc22bdb::t_570d89dc7e6050 16
+apps/api/tests/adr-index.test.ts
+  s_09ad417bc22bdb::t_396bebf10e3870 100
+  s_09ad417bc22bdb::t_c4baa28939c180 1-99,101-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7d7e9d37b6e876cc3c510fd7f82dd173e50b2464",
+  "prompts": {},
+  "sessions": {
+    "s_09ad417bc22bdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd84fef3-35ab-41ef-a9ee-2b92664fe274",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
