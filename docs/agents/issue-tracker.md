@@ -55,10 +55,6 @@ Acceptance criteria checkboxes are parsed structurally and are the source of tru
 
 `ordna show <id>`. The user normally passes the id. Do not grep `tasks/`.
 
-### One task, one branch, one PR
-
-Take one task from ordna, one branch and one pull request per task; the PR closes when `check` is green and every acceptance line is demonstrated. The rule is per task, not per session: parallel work is several tasks on several branches, never several tasks on one.
-
 ---
 
 ## The discovery lane — `.scratch/`
