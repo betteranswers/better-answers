@@ -36,7 +36,9 @@
     "tailwind-merge": "3.6.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@better-answers/api": "workspace:*",
+    "@better-answers/schema": "workspace:*",
     "@playwright/test": "1.62.1",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
