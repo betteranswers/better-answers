@@ -1,0 +1,81 @@
+apps/api/src/main.ts
+  s_90ffdc067aac0d::t_6eddf69b0608b6 27
+apps/api/src/ingress/hostnames.ts
+  s_90ffdc067aac0d::t_56d762a6140003 72-76,84,87-93
+  s_90ffdc067aac0d::t_f42a3ab2477d57 184-201
+apps/api/src/auth/pages.ts
+  s_90ffdc067aac0d::t_a1e16dcb466cf7 26
+  s_90ffdc067aac0d::t_e3dbe730e2d720 2-8
+apps/api/tests/hostnames.test.ts
+  s_90ffdc067aac0d::t_66ddf2503c42d1 68-80,83,85-106,198,200,206
+apps/api/src/auth/constants.ts
+  s_90ffdc067aac0d::t_b0bb7d2be6682e 44,46,48-53
+packages/core/src/workspaces/index.ts
+  s_90ffdc067aac0d::t_2c77dc0738abd9 145-189
+  s_90ffdc067aac0d::t_b2b75ebce4093a 4-5
+apps/api/src/trpc/router.ts
+  s_90ffdc067aac0d::t_c53a62d63fb038 2
+  s_90ffdc067aac0d::t_981a35afc0acc1 6
+  s_90ffdc067aac0d::t_4987d083451016 27-41
+apps/api/tests/flow.ts
+  s_90ffdc067aac0d::t_8b10cf4be15bec 170-175,186-190,192-194,196-203,206-211,213,220
+  s_90ffdc067aac0d::t_dc127c3bd64e23 8,21,24-29,84-89,97-101,107-110,113-132,136-141,155-166
+  s_90ffdc067aac0d::t_b56927c511c78c 65
+  s_90ffdc067aac0d::t_ede2451f6e8eaf 66-81,133-135,229,246
+apps/api/src/server.ts
+  s_90ffdc067aac0d::t_4b779b40dc1342 17
+  s_90ffdc067aac0d::t_94de92907314c3 31-37
+  s_90ffdc067aac0d::t_d947076ca3bfa7 80,82
+apps/api/src/config.ts
+  s_90ffdc067aac0d::t_b907582af4d844 138
+  s_90ffdc067aac0d::t_a6518029b90919 105-111
+apps/api/src/auth/auth.ts
+  s_90ffdc067aac0d::t_e8274e8ff63a11 426-427
+  s_90ffdc067aac0d::t_78204947018bcc 235-240
+  s_90ffdc067aac0d::t_36996c29ff0c7b 241-249
+  s_90ffdc067aac0d::t_c1336dc1073e95 209-215
+  s_90ffdc067aac0d::t_0adb8a67340616 396-401
+  s_90ffdc067aac0d::t_1012f01ec2f1bc 88-89,91-92
+  s_90ffdc067aac0d::t_f180c0cce4603b 402-407
+apps/api/tests/harness.ts
+  s_90ffdc067aac0d::t_7352633ba12d53 291-296
+  s_90ffdc067aac0d::t_dc8d09decb5344 42-43
+  s_90ffdc067aac0d::t_49abfa7e40dcdc 144,162-171,194,199
+  s_90ffdc067aac0d::t_8d8ac06fc380bc 315-323
+  s_90ffdc067aac0d::t_33eb6577a7479c 119-120
+apps/api/tests/routes-list.test.ts
+  s_90ffdc067aac0d::t_e9a783c70b6794 74,76-77
+  s_90ffdc067aac0d::t_cb335b4235f421 9
+apps/api/src/auth/routes.ts
+  s_90ffdc067aac0d::t_82ca046c41d044 23
+  s_90ffdc067aac0d::t_b56927c511c78c 55
+  s_90ffdc067aac0d::t_9253970cd46722 218-219
+  s_90ffdc067aac0d::t_8f1638a9534208 92-98
+  s_90ffdc067aac0d::t_e0f5e441891b86 221-230
+  s_90ffdc067aac0d::t_7b0c917baa0b1c 124-161
+  s_90ffdc067aac0d::t_b148771dadef7c 16-22
+  s_90ffdc067aac0d::t_08df63604983ff 27-28
+apps/api/tests/config.test.ts
+  s_90ffdc067aac0d::t_108c28d4e5b0d2 56,65-68
+apps/api/tests/oauth-flow.test.ts
+  s_90ffdc067aac0d::t_f2264a6ddc6177 3,547,552-553,556-557,564-565,567-570
+  s_90ffdc067aac0d::t_d5a30608f8583b 12,14,16,19,327-399
+  s_90ffdc067aac0d::t_ce8c25fc4800a6 7,161-164,174-175,178-179,317
+  s_90ffdc067aac0d::t_3b691fdff94530 5-6,8-11,13,15,17-18,30-33,147,152,154-156,158,160,167,169,173,176-177,271,280-283,308-312,315,319,322
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d574978532c56856e0633859d23968d12376e42b",
+  "prompts": {},
+  "sessions": {
+    "s_90ffdc067aac0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb92143-40a3-4162-962a-19793a875ce7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
