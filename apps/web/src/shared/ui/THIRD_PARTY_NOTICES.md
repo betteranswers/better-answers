@@ -9,13 +9,50 @@ Installed **3 September 2026** with `shadcn@4.20.1` and `ai-elements@1.9.0`. A s
 item carries no version of its own, so the pin is the CLI, the registry URL and the date
 (`[DEPS1]`); `apps/web/components.json` holds the URLs so a refresh lands in the same places.
 
-## What came from where
+## Provenance, item by item
 
-| Files | Upstream | Registry | Licence |
+Two digests per component, sha256 truncated to 16 hex characters, both taken 3 September 2026.
+The **item** digest is the registry's JSON as it served it that day: a refresh whose item digest
+is unchanged has nothing to bring. The **file** digest is the source as it sits here, *after*
+the arrival edits below: it is what tells a reader whether a file has drifted since, and it is
+the one to recompute before a refresh so the edits can be reapplied deliberately rather than
+discovered missing. `shasum -a 256 <file> | cut -c1-16` reproduces the second column.
+
+Upstream repositories: [shadcn-ui/ui](https://github.com/shadcn-ui/ui) (MIT),
+[haydenbleasel/kibo](https://github.com/haydenbleasel/kibo) (MIT),
+[vercel/ai-elements](https://github.com/vercel/ai-elements) (Apache-2.0). A shadcn registry item
+carries no commit or version of its own — this is the whole reason the item digest stands in for
+one — so there is no upstream commit to record, and the CLI version and the date are the rest of
+the pin (`[DEPS1]`).
+
+| File | Registry item | Item digest | File digest |
 | --- | --- | --- | --- |
-| `badge.tsx`, `button.tsx`, `carousel.tsx`, `collapsible.tsx`, `command.tsx`, `dialog.tsx`, `dropdown-menu.tsx`, `hover-card.tsx`, `popover.tsx`, `select.tsx`, `table.tsx`, `tabs.tsx` | [shadcn-ui/ui](https://github.com/shadcn-ui/ui) | `https://ui.shadcn.com/r/{name}.json` | MIT |
-| `kibo-ui/combobox.tsx`, `kibo-ui/snippet.tsx` | [haydenbleasel/kibo](https://github.com/haydenbleasel/kibo) | `https://www.kibo-ui.com/r/{name}.json` | MIT |
-| `ai-elements/sources.tsx`, `ai-elements/inline-citation.tsx` | [vercel/ai-elements](https://github.com/vercel/ai-elements) | `https://registry.ai-sdk.dev/{name}.json` | Apache-2.0 |
+| `badge.tsx` | https://ui.shadcn.com/r/styles/new-york/badge.json | `ce3f01e6d6785477` | `051518194cec3127` |
+| `button.tsx` | https://ui.shadcn.com/r/styles/new-york/button.json | `4d8f39c3bd25e630` | `76bfc0a14e9c395d` |
+| `carousel.tsx` | https://ui.shadcn.com/r/styles/new-york/carousel.json | `07c286e6b8c6a125` | `8db57d96badd03aa` |
+| `collapsible.tsx` | https://ui.shadcn.com/r/styles/new-york/collapsible.json | `9e935a82f4d846cc` | `f3ce568d1ede383d` |
+| `command.tsx` | https://ui.shadcn.com/r/styles/new-york/command.json | `b2800b32e6dbfb40` | `aa5236bf5e2680fd` |
+| `dialog.tsx` | https://ui.shadcn.com/r/styles/new-york/dialog.json | `e240f8eaa9e9e626` | `cdb85fcea315ed0d` |
+| `dropdown-menu.tsx` | https://ui.shadcn.com/r/styles/new-york/dropdown-menu.json | `dbd4c0a23be34f27` | `52dc57ac9f0961f0` |
+| `hover-card.tsx` | https://ui.shadcn.com/r/styles/new-york/hover-card.json | `cd66337682527d0f` | `e4af8adfc11ca89e` |
+| `popover.tsx` | https://ui.shadcn.com/r/styles/new-york/popover.json | `112f3cc3836f6b37` | `cce1178282657cd3` |
+| `select.tsx` | https://ui.shadcn.com/r/styles/new-york/select.json | `574c730b6dc8b37e` | `57dc01beab6126fd` |
+| `table.tsx` | https://ui.shadcn.com/r/styles/new-york/table.json | `0cf28e873dde65e0` | `0b594ca1376c7e6f` |
+| `tabs.tsx` | https://ui.shadcn.com/r/styles/new-york/tabs.json | `b608b427c8d64016` | `7729090ff447f666` |
+| `kibo-ui/combobox.tsx` | https://www.kibo-ui.com/r/combobox.json | `3d4a0d9e74228a9f` | `5be6c4a7abd468d9` |
+| `kibo-ui/snippet.tsx` | https://www.kibo-ui.com/r/snippet.json | `eb643de82639a64e` | `fbf35ce84afabbf0` |
+| `ai-elements/sources.tsx` | https://registry.ai-sdk.dev/sources.json | `a698c945798c6e79` | `e7117ede42aa02ed` |
+| `ai-elements/inline-citation.tsx` | https://registry.ai-sdk.dev/inline-citation.json | `7ee8f5238d63b78f` | `618d35f1d1147d77` |
+
+`components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
+the CLI's own default form; the table records the style-qualified URL the CLI resolves it to,
+which is the one that answers with JSON when fetched by hand.
+
+**Audited by** the T-036 builder on 3 September 2026: every file above was read before it landed,
+which is what ADR 0033 means by "a registry component is reviewed before it lands". The reading
+is what produced the arrival edits below, the four token corrections, the rejection of Kibo UI's
+`table` (written against `@tanstack/react-table` v8 while v9 is current), and the four
+how-it-is-written lint rules relaxed over this directory in `.oxlintrc.json`.
 
 ## What was changed on arrival
 
@@ -32,6 +69,21 @@ item carries no version of its own, so the pin is the CLI, the registry URL and 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA
 line (`[A11Y1]`) and are tested with a keyboard and a screen reader.
+
+## Refreshing this directory
+
+1. Recompute the file digests and reconcile them with the table: any that has moved is an edit
+   made since the snapshot, and it has to be carried forward deliberately.
+2. Re-run the CLI (`components.json` holds the registry URLs), then reapply the arrival edits —
+   the extensions, the directives, and the four token corrections. They are listed above
+   precisely so a refresh can reapply them without rereading this PR.
+3. Recompute both digest columns and this file's install date.
+4. **The test a refresh must pass** is `apps/web`'s `check`: `oxlint` under the four relaxations
+   in `.oxlintrc.json` and no others, `tsc --noEmit` (which is what catches the extensionless
+   imports coming back), the component and lint-rule suites, the production build, and the
+   Playwright browser suite against the api-served build. A screen that renders any of these
+   components also carries its own WCAG 2.2 AA check with a keyboard and a screen reader
+   (`[A11Y1]`); that check is the screen's, not this file's.
 
 ## Notice text
 
