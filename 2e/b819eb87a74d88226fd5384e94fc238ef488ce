@@ -1,0 +1,21 @@
+apps/api/tests/local.ts
+  s_ca08c10fe73d76::t_8be3e528bb1dc0 20,22-24,26,29-31,35,42-43,46-51,54-55,71,86
+  s_ca08c10fe73d76::t_139276280dc00c 4,25,27-28,44-45,52,87-89
+  s_ca08c10fe73d76::t_90779cc385fb20 56-67,72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "2eb819eb87a74d88226fd5384e94fc238ef488ce",
+  "prompts": {},
+  "sessions": {
+    "s_ca08c10fe73d76": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "64c95a9d-4a62-4f28-a582-604527f55ed6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
