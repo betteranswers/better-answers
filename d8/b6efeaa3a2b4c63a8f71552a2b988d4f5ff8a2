@@ -1,0 +1,55 @@
+apps/api/src/ingress/hostnames.ts
+  s_dd789516bdd60c::t_bd5365c13b822b 100
+docs/adr/0009-better-auth-in-process-identity-provider.md
+  s_dd789516bdd60c::t_b189ad64a5acdd 74
+apps/api/tests/oauth-flow.test.ts
+  s_dd789516bdd60c::t_5c99efd8e84b3b 18
+  s_dd789516bdd60c::t_558402d413f0d7 195-217
+apps/web/e2e/consent.spec.ts
+  s_dd789516bdd60c::t_bd5365c13b822b 25-30,41
+apps/api/tests/hostnames.test.ts
+  s_dd789516bdd60c::t_bd5365c13b822b 275
+deploy/stores.compose.yaml
+  s_dd789516bdd60c::t_bd5365c13b822b 91
+docs/adr/README.md
+  s_dd789516bdd60c::t_bd5365c13b822b 26
+apps/api/src/auth/endpoints.ts
+  s_dd789516bdd60c::t_bd5365c13b822b 8-9
+docs/adr/0018-one-mcp-surface-of-five-entries-the-principal-from-the-token-grown-by-scope.md
+  s_dd789516bdd60c::t_bd5365c13b822b 45-48
+apps/api/tests/harness.ts
+  s_dd789516bdd60c::t_d1e1a085219078 206
+  s_dd789516bdd60c::t_9c4958473bf1cd 146-153
+  s_dd789516bdd60c::t_1283a17a159cce 83-84
+  s_dd789516bdd60c::t_723d9c063ced21 68-75
+  s_dd789516bdd60c::t_7abe2cfef6e349 230,232
+  s_dd789516bdd60c::t_6ec5fb7032a95d 229,231
+  s_dd789516bdd60c::t_9fcffc934ce85d 222
+  s_dd789516bdd60c::t_d7db2c4878b0b9 195-203
+  s_dd789516bdd60c::t_235c31f60f7837 372
+docs/adr/0034-one-origin-for-the-product-and-the-authorization-server.md
+  s_dd789516bdd60c::t_b189ad64a5acdd 67-71
+apps/api/src/auth/constants.ts
+  s_dd789516bdd60c::t_521fcae4baa9d2 91-99
+apps/api/tests/flow.ts
+  s_dd789516bdd60c::t_c4d1525edc3a1c 44-45,48
+apps/api/src/auth/auth.ts
+  s_dd789516bdd60c::t_9f014c029cdfcb 474-482
+  s_dd789516bdd60c::t_c5a3fbb6bb2193 49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d8b6efeaa3a2b4c63a8f71552a2b988d4f5ff8a2",
+  "prompts": {},
+  "sessions": {
+    "s_dd789516bdd60c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d2a9311-4393-439c-b09a-1961e0be6302",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
