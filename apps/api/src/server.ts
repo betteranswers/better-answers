@@ -14,7 +14,7 @@ import {
   createTokenVerifier,
   type EmailSender,
 } from "./auth/index.ts";
-import { apexCookieDomain, routeByHostname, type PublicHostnames } from "./ingress/hostnames.ts";
+import { routeByHostname, type PublicHostnames } from "./ingress/hostnames.ts";
 import { serveSpa } from "./ingress/spa.ts";
 import { logger as tierLogger } from "./logger.ts";
 import { createMcpSurface } from "./mcp/surface.ts";
@@ -26,16 +26,15 @@ import { createTrpcRoutes } from "./trpc/index.ts";
  */
 export type ServerDependencies = {
   readonly database: Pool;
-  /** The https origin the authorization server issues from; the MCP URL is `${publicUrl}/mcp`. */
-  readonly publicUrl: string;
   /**
-   * The origin the SPA is served from. `https://<app hostname>` in the estate; a caller
-   * that serves the build somewhere else — the browser suite on a loopback port — says so,
-   * because Better Auth sends the person to this origin's `/sign-in` and `/choose-workspace`
-   * and a wrong scheme or port is a redirect into nothing.
+   * The one origin (ADR 0034): where the SPA is served, where the authorization server
+   * issues from, and what the MCP URL hangs off as `${publicUrl}/mcp`. `https://<app
+   * hostname>` in the estate; the browser suite, on a loopback port, says its own, because
+   * Better Auth sends the person to this origin's `/sign-in` and `/choose-workspace` and a
+   * wrong scheme or port is a redirect into nothing.
    */
-  readonly appUrl: string;
-  /** The estate's four hostnames (ADR 0022); the fence in `ingress/hostnames.ts` is built from them. */
+  readonly publicUrl: string;
+  /** The estate's three hostnames (ADR 0022, ADR 0034); the fence in `ingress/hostnames.ts` is built from them. */
   readonly hostnames: PublicHostnames;
   readonly authSecret: string;
   readonly sendEmail: EmailSender;
@@ -77,9 +76,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
     database: dependencies.database,
     door,
     publicUrl: dependencies.publicUrl,
-    appUrl: dependencies.appUrl,
     mcpUrl,
-    cookieDomain: apexCookieDomain(dependencies.hostnames),
     secret: dependencies.authSecret,
     sendEmail: dependencies.sendEmail,
     fetchClientMetadataResource:

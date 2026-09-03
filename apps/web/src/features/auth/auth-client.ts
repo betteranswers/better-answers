@@ -10,9 +10,9 @@ import { createAuthClient } from "better-auth/client";
  *
  * No `baseURL`, so every call goes to the origin this build was served from — `app.`,
  * which the api answers with Better Auth's own handler (ADR 0006, amended 2026-09-02).
- * The session cookie the answers set is scoped to the estate's apex, so the same session
- * answers the OAuth flow on `mcp.` (ADR 0009, amended 2026-09-02); the api's
- * `trustedOrigins` is what lets a POST from here through its CSRF check.
+ * That origin is also the authorization server's and the MCP surface's (ADR 0034), so the
+ * host-only session cookie the answers set is the one the OAuth flow reads, and the
+ * api's one trusted origin is this one.
  *
  * Three plugins, and no fourth: the email code a person signs in with, the workspaces
  * they are a member of, and the resume the picker performs when the person arrived here

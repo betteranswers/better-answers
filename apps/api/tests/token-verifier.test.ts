@@ -10,7 +10,7 @@ import { createTokenVerifier } from "../src/auth/index.ts";
  * read once more before a token is turned away.
  */
 
-const ISSUER = "https://mcp.example.test";
+const ISSUER = "https://app.example.test";
 const AUDIENCE = `${ISSUER}/mcp`;
 
 const keyed = async () => {

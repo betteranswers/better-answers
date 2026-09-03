@@ -5,16 +5,21 @@ import { z } from "zod";
 /**
  * The in-process hostname fence (T-030; PR #7's deferral D1, Cubic `987e5743`).
  *
- * ADR 0022 gives the estate four hostnames behind one Cloudflare tunnel and says what
- * each carries — `agent.` "open and routed only to `/agent/v1/*`, refused before any
- * body is read", `mcp.` carrying `/mcp`, discovery and `/oauth2/*`, `app.` the product
- * (open at the edge since the 2026-09-02 amendment), the apex answering 404. The
- * tunnel's ingress rules are the first fence and stay so (ADR 0022; recorded in
- * `deploy/coolify.md` § Ingress when T-005 writes that file). This is the second, and
- * it is in the app because Better Auth's handler is mounted at the wildcard: every one
- * of its endpoints answers on every hostname the process is given, so a tunnel rule
- * that is one console edit from being wrong is otherwise the only thing between
- * `agent.` and the authorization server.
+ * ADR 0022 as amended by ADR 0034 gives the estate three hostnames behind one Cloudflare
+ * tunnel and says what each carries — `agent.` "open and routed only to `/agent/v1/*`,
+ * refused before any body is read", `app.` the product *and* the authorization server
+ * (`/mcp`, discovery, `/jwks`, `/oauth2/*`, consent; open at the edge since the
+ * 2026-09-02 amendment), the apex answering 404. The tunnel's ingress rules are the
+ * first fence and stay so (ADR 0022; recorded in `deploy/coolify.md` § Ingress when
+ * T-005 writes that file). This is the second, and it is in the app because Better
+ * Auth's handler is mounted at the wildcard: every one of its endpoints answers on every
+ * hostname the process is given, so a tunnel rule that is one console edit from being
+ * wrong is otherwise the only thing between `agent.` and the authorization server.
+ *
+ * Since T-045 the fence is mostly a fence *between* hostnames rather than one that
+ * splits the product's paths across them: everything a browser or a host reaches is on
+ * `app.`, and the list below says which paths are `app.`'s by name so that a builder
+ * reads where the issuer's surface is rather than inferring it from the catch-all.
  *
  * The whole fence is the one list below — a surface per entry, the hostnames that
  * carry it, and why — in the shape of `IDENTITY_SET` in
@@ -22,14 +27,16 @@ import { z } from "zod";
  * that checks the pair both ways (`[TEST7]`).
  */
 
-/** The four hostnames the deploy unit names, plus the loopback the container probes itself on. */
-export const HOSTNAME_ROLES = ["app", "mcp", "agent", "apex", "loopback"] as const;
+/** The three hostnames the deploy unit names, plus the loopback the container probes itself on. */
+export const HOSTNAME_ROLES = ["app", "agent", "apex", "loopback"] as const;
 export type HostnameRole = (typeof HOSTNAME_ROLES)[number];
 
-/** The four of ADR 0022, as bare hostnames — bootstrap env, read beside `PUBLIC_URL`. */
+/**
+ * The three of ADR 0022 (ADR 0034), as bare hostnames. `agent` and `apex` are bootstrap
+ * env; `app` is `PUBLIC_URL`'s host, derived (T-039, T-045).
+ */
 export type PublicHostnames = {
   readonly app: string;
-  readonly mcp: string;
   readonly agent: string;
   readonly apex: string;
 };
@@ -63,40 +70,22 @@ export const HOSTNAME_SURFACES: readonly HostnameSurface[] = [
       "The share agent's surface and nothing else. ADR 0022 says it exactly — `agent.` is 'open and routed only to /agent/v1/*, refused before any body is read' — and CONTEXT.md's *agent token* puts that check in the app rather than only at the edge. Nothing is mounted under it yet (ADR 0008's share agent is a later task): the fence is written before the mount so it is never a thing to remember to add.",
   },
   {
-    paths: ["/mcp"],
-    hosts: ["mcp"],
+    paths: ["/mcp", "/.well-known/*", "/jwks", "/oauth2/*"],
+    hosts: ["app"],
     reason:
-      "The MCP endpoint. The protected-resource document's `resource` is `${PUBLIC_URL}/mcp` exactly and every access token's audience equals that string, so the endpoint answers on the origin the authorization server issues from and nowhere else (ADR 0022, ADR 0018, T-004).",
-  },
-  {
-    paths: ["/oauth2/continue"],
-    hosts: ["app", "mcp"],
-    reason:
-      "The one endpoint of the authorization server an application-owned screen calls. Better Auth's own words for `/oauth2/continue` are 'call this after a redirect screen finishes its own job … an application-owned post-login screen' (`@better-auth-ui/core`'s `oauthContinueOptions`), and since T-037 that screen is the SPA's picker on `app.`: it posts the pick and the carried signed query from the origin it was served on, same-origin, and Better Auth resumes the authorization and answers with where the person goes next. Listed before the entry below so it is the first match, and paired with `mcp.` because the flow's own resume still arrives there. Nothing else of `/oauth2/*` moves: `authorize`, `token`, `revoke` and consent stay on the issuer's origin alone, which is the separation the entry below exists to make.",
-  },
-  {
-    paths: ["/.well-known/*", "/jwks", "/oauth2/*"],
-    hosts: ["mcp"],
-    reason:
-      "Discovery, the signing keys and the authorization server itself. ADR 0022 gives `mcp.` '/mcp, discovery and /oauth2/*'. PR #7 refused splitting the authorization server onto a hostname of its own (Cubic `a1179be0`, rejected with this ADR as the citation); the separation that matters is from `app.`, and this entry is where it is made.",
+      "The MCP endpoint, discovery, the signing keys and the authorization server itself, on the product's own origin (ADR 0034). The protected-resource document's `resource` is `${PUBLIC_URL}/mcp` exactly and every access token's audience equals that string, so the endpoint answers on the origin the authorization server issues from and nowhere else (ADR 0018, T-004) — and since T-045 that origin is `app.`, because the split onto `mcp.` cost an apex-scoped session cookie sent to every subdomain of the estate for the sake of a separation Cloudflare Access no longer needed. These paths are the catch-all's already; they are named here so a builder reads where the issuer's surface is, and so the day a second hostname carries any of them the change is a diff on this line rather than a silence.",
   },
   {
     paths: ["/consent"],
-    hosts: ["mcp"],
-    reason:
-      "Consent, the one page of the OAuth flow this tier still renders itself (T-004 grilling Q5). It sits on the authorization server's own origin because a decision to grant an outside client access to a workspace must never sit behind the product's own shell (ADR 0009, 2026-09-02), and because Better Auth's CSRF check compares the browser's `Origin` against its base URL, which is `PUBLIC_URL`.",
-  },
-  {
-    paths: ["/sign-in", "/choose-workspace"],
     hosts: ["app"],
     reason:
-      "Sign-in and the workspace picker, which T-037 moved out of this tier and into the SPA (ADR 0009, 2026-09-02; ADR 0006, 2026-09-02). They are screens' addresses now, not endpoints: nothing on disk holds them, the authorization server does not know them, and the shell answers them after it declines (`ingress/spa.ts`). They are named here rather than left to the catch-all because the catch-all also carries `mcp.`, and a sign-in screen served on the issuer's origin would be the second sign-in this move exists to remove.",
+      "Consent, the one page of the OAuth flow this tier still renders itself (T-004 grilling Q5), on the product's origin but outside its shell. It keeps a name in this list rather than falling to the catch-all because it is the one path here with a fence of its own beside the hostname fence: its POST answers a redirect, so it can be reached only by a document navigation, and `auth/routes.ts` refuses a POST whose `Sec-Fetch-Dest` is not `document` on top of the same-origin check. What makes consent acceptable on the same origin as the product is the closed client list plus PKCE (ADR 0034): the CIMD allow-list admits only `claude.ai`, so a code any script in the shell could obtain lands only at Claude's own redirect, bound to a verifier only the host holds.",
   },
   {
     paths: ["/health"],
     hosts: ["app", "loopback"],
     reason:
-      "`app.` because the uptime check T-005 sets up reaches the estate from outside on `app.`'s health and on `mcp.`'s protected-resource document — one check per open hostname, each on a path that hostname owns. The loopback because the container's own healthcheck is `wget http://127.0.0.1:3000/health` from inside the container, and a fence that refused it would hold `worker` back for ever. Not on `mcp.`, which the same check reaches through a document it must serve anyway, and never on `agent.`, whose one line in ADR 0022 admits no second path.",
+      "`app.` because the uptime check T-005 sets up reaches the estate from outside on `app.`'s health and on its protected-resource document — two paths on the one open hostname that serves people and hosts. The loopback because the container's own healthcheck is `wget http://127.0.0.1:3000/health` from inside the container, and a fence that refused it would hold `worker` back for ever. Never on `agent.`, whose one line in ADR 0022 admits no second path.",
   },
   {
     paths: [],
@@ -106,9 +95,9 @@ export const HOSTNAME_SURFACES: readonly HostnameSurface[] = [
   },
   {
     paths: ["/*"],
-    hosts: ["app", "mcp"],
+    hosts: ["app"],
     reason:
-      "Everything else this process answers is Better Auth's own handler at the wildcard with `basePath: '/'` — the session, sign-out, email-code and organisation endpoints — plus `/me`, the tier's cookie-session probe, and, with T-022, the SPA's static build and the tRPC mount on `app.`. The set cannot be enumerated here: it is the plugin list's, and a Better Auth upgrade adds to it, so an enumerated entry would refuse a path the flow needs the day the library grows one. It is reviewed instead of enumerated: `apps/api/tests/better-auth-endpoints.txt` is what this entry admitted when a human last looked, read from the instance's own endpoint table, and `better-auth-endpoints.test.ts` fails with the added and removed paths named when an upgrade moves it (T-039). Both hostnames carry it because there is one session across `app.` and `mcp.` (ADR 0009, 2026-09-02): the SPA signs in on `app.` and the OAuth flow resumes on `mcp.` under the same cookie. That `agent.` and the apex are absent from it is the whole point of the entry.",
+      "Everything else this process answers is Better Auth's own handler at the wildcard with `basePath: '/'` — the session, sign-out, email-code and organisation endpoints — plus `/me`, the tier's cookie-session probe, the SPA's static build and its screens' addresses (`/sign-in`, `/choose-workspace`, everything the shell answers after the authorization server declines; T-037, T-022), and the tRPC mount. The set cannot be enumerated here: it is the plugin list's, and a Better Auth upgrade adds to it, so an enumerated entry would refuse a path the flow needs the day the library grows one. It is reviewed instead of enumerated: `apps/api/tests/better-auth-endpoints.txt` is what this entry admitted when a human last looked, read from the instance's own endpoint table, and `better-auth-endpoints.test.ts` fails with the added and removed paths named when an upgrade moves it (T-039). One hostname carries it because there is one origin and one session (ADR 0034): the SPA signs in, picks and resumes the OAuth flow on the origin it was served from. That `agent.` and the apex are absent from it is the whole point of the entry.",
   },
 ];
 
@@ -146,7 +135,7 @@ export const hostnameOfUrl = (url: string): string => bareForm(new URL(url).host
 /**
  * A URL's origin on the host the fence reads. `config.ts` normalises `PUBLIC_URL`
  * through this, so every string derived from it — the issuer, the token audience, the
- * protected-resource document, Better Auth's trusted origins and its CSRF comparison —
+ * protected-resource document, Better Auth's trusted origin and its CSRF comparison —
  * is on the bare host an arriving browser actually sends.
  */
 export const originOfUrl = (url: string): string => {
@@ -158,10 +147,10 @@ export const originOfUrl = (url: string): string => {
 /**
  * Whether a URL's host is already written the way a URL parser reads it — the reading
  * `bareHostname` makes of a declared hostname, made of the one that is derived from a
- * URL (`PUBLIC_URL`'s, which is `mcp.`; T-039).
+ * URL (`PUBLIC_URL`'s, which is `app.`; T-039, T-045).
  *
  * The parser canonicalises an address spelling — `127.000.000.001` and `0x7f.1` both
- * come back as `127.0.0.1`, `%6dcp.example.test` as `mcp.example.test` — so a value
+ * come back as `127.0.0.1`, `%61pp.example.test` as `app.example.test` — so a value
  * written that way names a host no arriving request can match and no operator can find
  * in their DNS. Case and DNS's trailing root dot are the two rewritings that name the
  * *same* host, so both sides are read through `bareForm` and neither stops a process.
@@ -205,24 +194,6 @@ export const bareHostname = z
   // one form.
   .transform((value) => value.toLowerCase());
 
-/**
- * The domain one session's cookie is scoped to, so a session made on `app.` answers the
- * OAuth flow on `mcp.` (ADR 0009, 2026-09-02).
- *
- * Better Auth derives this domain as `new URL(baseURL).hostname` verbatim when it is not
- * given one — `mcp.…`, not the apex — and a `Set-Cookie` for another host's domain is
- * rejected by the browser outright, so the value is stated rather than defaulted.
- *
- * It is `undefined` when the estate's own hostnames are not under its apex, which is the
- * shape of a loopback estate (`app.` is `127.0.0.1`, the apex is `localhost`): a cookie
- * scoped to a domain the browser does not see itself under is refused, and one host means
- * there is nothing to share the session across. Host-only is then the correct answer.
- */
-export const apexCookieDomain = (hostnames: PublicHostnames): string | undefined => {
-  const under = (hostname: string): boolean => hostname.endsWith(`.${hostnames.apex}`);
-  return under(hostnames.app) && under(hostnames.mcp) ? hostnames.apex : undefined;
-};
-
 /** `/prefix/*` matches the prefix and anything under it; anything else is exact. */
 const matchesPath = (pattern: string, path: string): boolean => {
   if (!pattern.endsWith("/*")) return path === pattern;
@@ -242,12 +213,11 @@ const carries = (role: HostnameRole, path: string): boolean => {
  * `next()`, so a refused request never reaches a counter, a session read or a body.
  */
 export const routeByHostname = (hostnames: PublicHostnames, logger: Logger): MiddlewareHandler => {
-  // The loopback first, so an estate that names one of its four `localhost` still gets
+  // The loopback first, so an estate that names one of its three `localhost` still gets
   // that hostname's full surface rather than the probe's one path.
   const roles = new Map<string, HostnameRole>([
     ...LOOPBACK_HOSTNAMES.map((hostname): [string, HostnameRole] => [hostname, "loopback"]),
     [hostnames.app, "app"],
-    [hostnames.mcp, "mcp"],
     [hostnames.agent, "agent"],
     [hostnames.apex, "apex"],
   ]);

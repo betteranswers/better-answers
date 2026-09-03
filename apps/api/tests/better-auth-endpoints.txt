@@ -3,10 +3,16 @@
 # out by hand.
 #
 # This file is the review point for the hostname fence's catch-all entry
-# (apps/api/src/ingress/hostnames.ts). That entry gives `/*` to `app.` and `mcp.`
+# (apps/api/src/ingress/hostnames.ts). That entry gives `/*` to `app.` — the one
+# origin the product, the authorization server and the MCP surface share (ADR 0034) —
 # without listing what it admits, because the list is the plugin list's; this is what
 # it admitted when a human last looked. A path added here is a path the fence hands to
-# both of those hostnames — read it before you commit it, and check it against ADR 0022.
+# that hostname — read it before you commit it, and check it against ADR 0022 and
+# ADR 0034. Two classes are refused by configuration rather than by the fence and are
+# reviewed here for that reason: the password and sign-up paths (no password or sign-up
+# plugin is enabled, and the product never posts to them — sign-in is an email code or
+# Microsoft, never a password), and the social paths, which open for Microsoft in its
+# own task (ADR 0034).
 #
 # Refresh:
 #   UPDATE_BETTER_AUTH_ENDPOINTS=1 pnpm --filter @better-answers/api exec vitest run tests/better-auth-endpoints.test.ts
@@ -20,10 +26,10 @@
 # Already checked, so nobody need raise it twice: the five `/admin/oauth2/*` paths —
 # @better-auth/oauth-provider's surface for minting OAuth clients and managing resource
 # registrations — are `SERVER_ONLY`, so better-call leaves them off its router. They
-# answer 404 on `app.` and on `mcp.`, GET and POST, and that is held by a test rather
-# than a claim: hostnames.test.ts, "refuses the identity provider's admin endpoints on
-# every hostname that answers". They are listed here because the flag is the library's,
-# not because they are reachable.
+# answer 404 on `app.`, GET and POST, and that is held by a test rather than a claim:
+# hostnames.test.ts, "refuses the identity provider's admin endpoints on the one
+# hostname that answers". They are listed here because the flag is the library's, not
+# because they are reachable.
 /.well-known/oauth-authorization-server
 /.well-known/openid-configuration
 /account-info

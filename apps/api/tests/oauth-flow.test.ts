@@ -11,12 +11,8 @@ import {
   setActiveWorkspace,
   signIn,
 } from "./flow.ts";
-import { apexCookieDomain } from "../src/ingress/hostnames.ts";
 import {
   APEX_HOSTNAME,
-  APP_HOSTNAME,
-  APP_URL,
-  HOSTNAMES,
   CLAUDE_CLIENT_ID,
   CLAUDE_REDIRECT_URI,
   MCP_URL,
@@ -29,11 +25,11 @@ import {
  * The OAuth half of research 80 §9's host-agnostic conformance test (assertions
  * 19–24), prototype 61's three silent configuration traps as regressions, the flow
  * driven as a host drives it — sign-in and the pick through the endpoints the SPA posts
- * to, consent through the page this tier still renders (grilling Q5; T-037) — the
- * cookie-session path through
- * the one resolver, refresh rotation and lifetime (Q10), revocation, the audit logs
- * (Q12), the per-IP and per-email limits (Q8), and the closed workspace-creation
- * endpoint (Q11). Every request crosses `server.request` (`[APP3]`).
+ * to, consent through the page this tier still renders (grilling Q5; T-037), all on the
+ * one origin (T-045, ADR 0034) — the cookie-session path through the one resolver,
+ * refresh rotation and lifetime (Q10), revocation, the audit logs (Q12), the per-IP and
+ * per-email limits (Q8), and the closed workspace-creation endpoint (Q11). Every request
+ * crosses `server.request` (`[APP3]`).
  */
 
 let app: TestApp;
@@ -149,11 +145,11 @@ describe("the flow, as claude.ai drives it", () => {
     const other = await app.provision({ name: "Other" });
     await app.addMember(other.workspaceId, mine.admin.id, "Editor");
     const stranger = await app.provision({ name: "Stranger" });
-    const client = app.client(undefined, APP_HOSTNAME);
+    const client = app.client();
     const picker = await driveToPage(app, client, mine.admin);
-    // A person with a choice to make is sent to the product's picker, on the product's
-    // own origin, carrying the signed query.
-    expect(`${picker.origin}${picker.pathname}`).toBe(`${APP_URL}/choose-workspace`);
+    // A person with a choice to make is sent to the product's picker, on the one
+    // origin, carrying the signed query.
+    expect(`${picker.origin}${picker.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
 
     const chosen = await setActiveWorkspace(client, stranger.workspaceId);
 
@@ -161,22 +157,22 @@ describe("the flow, as claude.ai drives it", () => {
     // And the flow does not move on the back of it: nothing was made active, so the
     // resume sends the person back to the picker rather than on to consent.
     const resumed = await continueAfterPostLogin(client, picker.search);
-    expect(`${resumed.origin}${resumed.pathname}`).toBe(`${APP_URL}/choose-workspace`);
+    expect(`${resumed.origin}${resumed.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
   });
 
   it("sends a person with no workspace nowhere: nothing to pick, and no token is minted", async () => {
     const nobody = await app.person();
-    const client = app.client(undefined, APP_HOSTNAME);
+    const client = app.client();
 
     const picker = await driveToPage(app, client, nobody);
 
-    expect(`${picker.origin}${picker.pathname}`).toBe(`${APP_URL}/choose-workspace`);
+    expect(`${picker.origin}${picker.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
     // What the refused screen reads to decide it has nothing to offer, and where the
     // resume sends a person who asks anyway: back to the picker, never to consent.
     const listed = await client.fetch("/organization/list");
     await expect(listed.json()).resolves.toEqual([]);
     const resumed = await continueAfterPostLogin(client, picker.search);
-    expect(`${resumed.origin}${resumed.pathname}`).toBe(`${APP_URL}/choose-workspace`);
+    expect(`${resumed.origin}${resumed.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
   });
 
   it("redirects an authorize request for a scope the surface does not offer back to the host with iss (§9 23)", async () => {
@@ -305,9 +301,61 @@ describe("the pages refuse a cross-site form", () => {
     expect(crossSite.headers.get("location")).toBeNull();
   });
 
+  it("refuses consent posted as a fetch from this origin, even with the person's cookie, and mints no code", async () => {
+    // Since T-045 consent shares the product's origin, so a script in the shell can
+    // reach it with a `fetch` that carries this origin and the person's cookie — which
+    // the same-origin fence above admits. What refuses it is the shape: a fetch is
+    // `Sec-Fetch-Dest: empty`, and only a document navigation can follow the redirect
+    // the form answers with (ADR 0034; `auth/routes.ts`).
+    const acme = await app.provision({ name: "Acme" });
+    const client = app.client();
+    const consent = await driveToPage(app, client, acme.admin);
+    expect(consent.pathname).toBe("/consent");
+    const before = await app.database.superuser.query("SELECT count(*)::int AS n FROM oauth_consent");
+
+    const fetched = await client.fetch(`${consent.pathname}${consent.search}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        origin: PUBLIC_URL,
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+      },
+      body: new URLSearchParams({ accept: "true" }).toString(),
+    });
+
+    expect(fetched.status).toBe(403);
+    expect(fetched.headers.get("location")).toBeNull();
+    const after = await app.database.superuser.query("SELECT count(*)::int AS n FROM oauth_consent");
+    expect(after.rows[0]).toEqual(before.rows[0]);
+    // And the same form, as a document navigation from this origin, is the one that
+    // works: what the fence reads is the shape of the request and nothing else.
+    const navigated = await client.form(`${consent.pathname}${consent.search}`, {
+      accept: "true",
+    });
+    expect(navigated.status).toBe(302);
+    expect(new URL(navigated.headers.get("location") ?? "").searchParams.get("code")).not.toBeNull();
+  });
+
+  it("refuses consent posted with no Fetch Metadata at all, which no browser navigation is", async () => {
+    const acme = await app.provision({ name: "Acme" });
+    const client = app.client();
+    const consent = await driveToPage(app, client, acme.admin);
+
+    const bare = await client.fetch(`${consent.pathname}${consent.search}`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", origin: PUBLIC_URL },
+      body: new URLSearchParams({ accept: "true" }).toString(),
+    });
+
+    expect(bare.status).toBe(403);
+    expect(bare.headers.get("location")).toBeNull();
+  });
+
   it("refuses a code request from another origin, so no site can start a sign-in for someone", async () => {
     // The screen moved to the SPA, so this fence moved with it: Better Auth's own origin
-    // check against the two trusted origins is what refuses it now (`auth.ts`). The check
+    // check against the one trusted origin is what refuses it now (`auth.ts`). The check
     // runs on a request that carries a cookie, which is the request that could do harm.
     const response = await app.client().fetch("/email-otp/send-verification-otp", {
       method: "POST",
@@ -324,35 +372,30 @@ describe("the pages refuse a cross-site form", () => {
   });
 });
 
-describe("one session across app. and mcp. (ADR 0009, 2026-09-02)", () => {
-  it("scopes the session cookie to the apex, so the session made on the product answers the flow", async () => {
-    const acme = await app.provision({ name: "Apex" });
-    const client = app.client(undefined, APP_HOSTNAME);
+describe("one origin, one session (ADR 0034)", () => {
+  it("sets a host-only, Secure-prefixed session cookie, and never one scoped to the apex", async () => {
+    // Before T-045 the cookie was scoped to the apex so a session made on `app.`
+    // answered the flow on `mcp.` — and so was sent to every subdomain of the estate,
+    // present and future. On one origin the library's own `__Secure-` host-only cookie
+    // is the session, and nothing the response sets names a domain at all.
+    const acme = await app.provision({ name: "Host-only" });
+    const client = app.client();
 
     const signedIn = await signIn(app, client, acme.admin.email);
 
-    const cookie = signedIn.headers.getSetCookie().join("; ");
-    expect(cookie).toContain(`Domain=${APEX_HOSTNAME}`);
-    expect(cookie).toContain("HttpOnly");
-    expect(cookie).toContain("Secure");
+    const cookies = signedIn.headers.getSetCookie();
+    const session = cookies.find((cookie) => cookie.startsWith("__Secure-"));
+    expect(session).toBeDefined();
+    expect(session).toContain("session_token=");
+    expect(session).toContain("HttpOnly");
+    expect(session).toContain("Secure");
+    for (const cookie of cookies) {
+      expect(cookie).not.toMatch(/;\s*Domain=/i);
+      expect(cookie).not.toContain(APEX_HOSTNAME);
+    }
     // The cookie made on the product is the one the authorization server reads.
     const me = await client.fetch(`${PUBLIC_URL}/me`);
     expect(me.status).toBe(200);
-  });
-
-  it("leaves the cookie host-only where the estate's hostnames are not under its apex", () => {
-    // A loopback estate: the browser suite serves the product on 127.0.0.1 and nothing
-    // shares a session with it. A cookie scoped to `localhost` from a 127.0.0.1 response
-    // is rejected outright, so host-only is the right answer and the option is left off.
-    expect(apexCookieDomain(HOSTNAMES)).toBe(APEX_HOSTNAME);
-    expect(
-      apexCookieDomain({
-        app: "127.0.0.1",
-        mcp: "mcp.localhost",
-        agent: "agent.localhost",
-        apex: "localhost",
-      }),
-    ).toBeUndefined();
   });
 
   it("sends a person with no session to the product's sign-in, carrying the signed query", async () => {
@@ -363,20 +406,21 @@ describe("one session across app. and mcp. (ADR 0009, 2026-09-02)", () => {
       .fetch(authorizeUrl({ challenge, scope: "knowledge:read" }), { redirect: "manual" });
 
     const sent = new URL(start.headers.get("location") ?? "", PUBLIC_URL);
-    expect(`${sent.origin}${sent.pathname}`).toBe(`${APP_URL}/sign-in`);
+    expect(`${sent.origin}${sent.pathname}`).toBe(`${PUBLIC_URL}/sign-in`);
     // The signed query is carried whole: the resume is verified against it, and a page
     // that dropped a parameter would break the signature (prototype 61, bug 2).
     expect(sent.searchParams.get("sig")).not.toBeNull();
     expect(sent.searchParams.get("client_id")).toBe(CLAUDE_CLIENT_ID);
   });
 
-  it("answers the resume with an address the product can send the person to", async () => {
-    // The picker is on `app.`; a relative answer would resolve against the product's own
-    // origin, where consent deliberately does not live.
+  it("answers the resume with an absolute address on the one origin", async () => {
+    // The picker reads the answer as a URL and sends the person there; absolute rather
+    // than relative because that is what Better Auth was configured with, and the day
+    // the two differ again this is the line that says so.
     const two = await app.provision({ name: "Second" });
     const one = await app.provision({ name: "First" });
     await app.addMember(two.workspaceId, one.admin.id, "Viewer");
-    const client = app.client(undefined, APP_HOSTNAME);
+    const client = app.client();
     const picker = await driveToPage(app, client, one.admin);
     await setActiveWorkspace(client, two.workspaceId);
 
@@ -386,13 +430,11 @@ describe("one session across app. and mcp. (ADR 0009, 2026-09-02)", () => {
   });
 
   it("refuses a cross-origin post that carries the person's cookie", async () => {
-    // The two posts the product makes from `app.` with a session behind them: the pick,
-    // and the resume of a host's authorization. `/oauth2/continue` is the one endpoint of
-    // the authorization server `app.` carries at all (`ingress/hostnames.ts`), so the
-    // origin check is the whole of what stands between a page an attacker controls and a
-    // grant made in the person's name.
+    // The two posts the product makes with a session behind them: the pick, and the
+    // resume of a host's authorization. The origin check is the whole of what stands
+    // between a page an attacker controls and a grant made in the person's name.
     const acme = await app.provision({ name: "Cross" });
-    const client = app.client(undefined, APP_HOSTNAME);
+    const client = app.client();
     await signIn(app, client, acme.admin.email);
 
     for (const [path, body] of [
@@ -576,7 +618,7 @@ describe("the limits", () => {
     const statuses = await untilRefused(
       () =>
         app
-          .client(`198.51.100.${(address += 1)}`, APP_HOSTNAME)
+          .client(`198.51.100.${(address += 1)}`)
           .json(SEND_EMAIL_CODE_PATH, { email, type: "sign-in" }),
       5,
     );

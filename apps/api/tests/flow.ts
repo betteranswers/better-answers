@@ -5,7 +5,6 @@ import { expect } from "vitest";
 import { z } from "zod";
 
 import {
-  APP_URL,
   CLAUDE_CLIENT_ID,
   CLAUDE_REDIRECT_URI,
   MCP_URL,
@@ -24,9 +23,10 @@ import {
  *
  * Since T-037 the middle of that walk is the SPA's, so this file drives what the SPA
  * drives: the two email-code endpoints, `/organization/set-active` and `/oauth2/continue`,
- * posted as JSON from the `app.` origin with one cookie jar across both hostnames — which
- * is what a browser has. Only consent is still a form on a page this tier renders. The
- * screens themselves are held by `apps/web/e2e`; what is held here is the protocol.
+ * posted as JSON from the one origin with one cookie jar — which is what a browser has.
+ * Only consent is still a form on a page this tier renders, on that same origin since
+ * T-045 (ADR 0034). The screens themselves are held by `apps/web/e2e`; what is held here
+ * is the protocol.
  */
 
 export type Pkce = { readonly verifier: string; readonly challenge: string };
@@ -91,7 +91,7 @@ const nextLocation = async (response: Response): Promise<string | undefined> => 
   return parsed.success ? parsed.data.url : undefined;
 };
 
-/** Where a step sent the person, as an absolute URL: the two hostnames are both in play. */
+/** Where a step sent the person, as an absolute URL on the one origin. */
 const sentTo = (response: Response): URL => new URL(location(response), PUBLIC_URL);
 
 /** The signed query a flow step carries forward, `?` and all. */
@@ -133,12 +133,10 @@ export const setActiveWorkspace = async (
 
 /**
  * The resume, as the SPA's picker makes it: Better Auth's continue endpoint, posted from
- * `app.` with the signed query it was carried here with. Answers where the person goes
- * next — consent, on `mcp.`.
+ * the origin the picker is served on with the signed query it was carried here with.
+ * Answers where the person goes next — consent, on the same origin.
  */
 export const continueAfterPostLogin = async (client: TestClient, query: string): Promise<URL> => {
-  // Relative: the resume is posted from the origin the picker is served on, which is what
-  // makes `app.` a trusted origin and `/oauth2/continue` a path `app.` carries.
   const continued = await client.json("/oauth2/continue", {
     postLogin: true,
     oauth_query: query.replace(/^\?/, ""),
@@ -179,8 +177,8 @@ export const driveToPage = async (
 /**
  * The whole dance, from the authorize request to the tokens, walked the way the product
  * walks it: the host sends the person to authorize, Better Auth sends them to the SPA's
- * sign-in on `app.`, the SPA signs them in and — carrying the signed query the whole way,
- * never stripping it — picks a workspace where there is a choice and resumes through the
+ * sign-in, the SPA signs them in and — carrying the signed query the whole way, never
+ * stripping it — picks a workspace where there is a choice and resumes through the
  * continue endpoint. `pick` names the workspace; a person in exactly one has it already,
  * set when the session was created.
  */
@@ -194,13 +192,13 @@ export const connectAsHost = async (
   const scope = options.scope ?? "knowledge:read feedback:write offline_access";
 
   // 1. The host sends the person to authorize; with no session that is the product's own
-  //    sign-in screen, on the product's own origin.
+  //    sign-in screen, on the same origin.
   let step = await client.fetch(`${PUBLIC_URL}${authorizeUrl({ challenge, scope })}`, {
     redirect: "manual",
   });
   expect(step.status).toBe(302);
   let next = sentTo(step);
-  expect(`${next.origin}${next.pathname}`).toBe(`${APP_URL}/sign-in`);
+  expect(`${next.origin}${next.pathname}`).toBe(`${PUBLIC_URL}/sign-in`);
   const query = carried(next);
 
   // 2. The SPA signs the person in with the captured code.
@@ -217,7 +215,8 @@ export const connectAsHost = async (
   next = await continueAfterPostLogin(client, query);
   expect(`${next.origin}${next.pathname}`).toBe(`${PUBLIC_URL}/consent`);
 
-  // 5. Consent, in the person's words, still rendered by this tier on the issuer's origin.
+  // 5. Consent, in the person's words, still rendered by this tier — a page outside the
+  //    shell on the one origin, answered as a form navigation.
   const consent = await client.fetch(next.href);
   expect(consent.status).toBe(200);
   step = await client.form(`${PUBLIC_URL}/consent${next.search}`, { accept: "true" });

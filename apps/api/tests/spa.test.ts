@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { TRPC_ENDPOINT } from "../src/trpc/index.ts";
-import { APP_HOSTNAME, MCP_HOSTNAME, startApp, type TestApp } from "./harness.ts";
+import { AGENT_HOSTNAME, APEX_HOSTNAME, APP_HOSTNAME, startApp, type TestApp } from "./harness.ts";
 
 /**
  * The api serves the SPA's static build on `app.` (ADR 0006, amended 2026-09-02; ADR 0022
@@ -50,7 +50,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     // these two headers there (T-004). They are the shell's addresses now, so the shell
     // carries them: a framed sign-in is a person typing a code into someone else's page,
     // and a framed picker is a pick made for them. Consent keeps its own pair in
-    // `auth/routes.ts`, on the origin it is still rendered from.
+    // `auth/routes.ts`, the page it is still rendered as.
     for (const screen of ["/sign-in", "/choose-workspace", "/system", "/"]) {
       const response = await app.client(undefined, APP_HOSTNAME).fetch(screen, asABrowserNavigates);
 
@@ -120,18 +120,21 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     await expect(response.text()).resolves.toContain(`<div id="root">`);
   });
 
-  it("serves the shell on app. and nowhere else, so mcp. is unchanged", async () => {
-    const response = await app
-      .client(undefined, MCP_HOSTNAME)
-      .fetch("/system", asABrowserNavigates);
+  it("serves the shell on app. and nowhere else, so agent. and the apex are unchanged", async () => {
+    for (const hostname of [AGENT_HOSTNAME, APEX_HOSTNAME]) {
+      const response = await app.client(undefined, hostname).fetch("/system", asABrowserNavigates);
 
-    expect(response.status).toBe(404);
-    await expect(response.text()).resolves.not.toContain(`<div id="root">`);
+      expect(response.status).toBe(404);
+      await expect(response.text()).resolves.not.toContain(`<div id="root">`);
+    }
   });
 
-  it("leaves the protected-resource document on mcp. as it was", async () => {
+  it("leaves the protected-resource document answering as itself on app., not as the shell", async () => {
+    // The issuer's documents share `app.` with the product since T-045 (ADR 0034). A
+    // navigation to one has to reach the document: the shell answering it would be a
+    // host reading HTML where it looked for the resource.
     const response = await app
-      .client(undefined, MCP_HOSTNAME)
+      .client(undefined, APP_HOSTNAME)
       .fetch("/.well-known/oauth-protected-resource", asABrowserNavigates);
 
     expect(response.status).toBe(200);

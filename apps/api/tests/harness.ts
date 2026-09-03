@@ -27,26 +27,23 @@ import { startTestDatabase, type TestDatabase } from "./postgres.ts";
  * origin, a cookie jar, the tunnel's client-IP header.
  */
 
-export const PUBLIC_URL = "https://mcp.example.test";
+/** The one origin (ADR 0034): the product, the authorization server and the MCP surface. */
+export const PUBLIC_URL = "https://app.example.test";
 export const MCP_URL = `${PUBLIC_URL}/mcp`;
 export const AUTH_SECRET = "test-secret-that-is-at-least-thirty-two-characters-long";
 
 /**
- * The estate's four hostnames as a test's deploy unit sets them (ADR 0022, T-030). The
- * deploy unit sets three; `mcp.` is `PUBLIC_URL`'s host, read the way `config.ts`
- * derives it and the way the fence reads an arriving `Host` (T-039). A client speaks
- * to `mcp.` unless a test names another, so every suite written before the hostname
- * fence still reaches the surface it was written against.
+ * The estate's three hostnames as a test's deploy unit sets them (ADR 0022, ADR 0034).
+ * The deploy unit sets two; `app.` is `PUBLIC_URL`'s host, read the way `config.ts`
+ * derives it and the way the fence reads an arriving `Host` (T-039, T-045). A client
+ * speaks to `app.` unless a test names another, so every suite reaches the one surface a
+ * browser or a host reaches.
  */
-export const MCP_HOSTNAME = hostnameOfUrl(PUBLIC_URL);
-export const APP_HOSTNAME = "app.example.test";
-/** Where the product is served, and so where sign-in and the picker are (ADR 0006, amended). */
-export const APP_URL = `https://${APP_HOSTNAME}`;
+export const APP_HOSTNAME = hostnameOfUrl(PUBLIC_URL);
 export const AGENT_HOSTNAME = "agent.example.test";
 export const APEX_HOSTNAME = "example.test";
 export const HOSTNAMES: PublicHostnames = {
   app: APP_HOSTNAME,
-  mcp: MCP_HOSTNAME,
   agent: AGENT_HOSTNAME,
   apex: APEX_HOSTNAME,
 };
@@ -95,7 +92,7 @@ export type TestApp = {
   removeMember(workspaceId: string, userId: string): Promise<void>;
   /** Set a workspace's config row, as the System screen will one day. */
   setWorkspaceConfig(workspaceId: string, key: string, value: string): Promise<void>;
-  /** A client on one hostname — `mcp.` unless a test names another (T-030). */
+  /** A client on one hostname — `app.` unless a test names another (T-030, T-045). */
   client(ip?: string, hostname?: string): TestClient;
   stop(): Promise<void>;
 };
@@ -122,7 +119,7 @@ export type TestClient = {
     path: string,
     init?: RequestInit & { readonly followRedirects?: boolean },
   ): Promise<Response>;
-  /** POST a form the way a browser does. */
+  /** POST a form the way a browser does: a document navigation from this origin. */
   form(path: string, fields: Readonly<Record<string, string>>): Promise<Response>;
   /** POST JSON the way the SPA does: this origin's `Origin` header, and JSON wanted back. */
   json(path: string, body: unknown): Promise<Response>;
@@ -149,7 +146,6 @@ export const serverFor = (pool: Pool): Hono =>
   createServer({
     database: pool,
     publicUrl: PUBLIC_URL,
-    appUrl: APP_URL,
     hostnames: HOSTNAMES,
     authSecret: AUTH_SECRET,
     sendEmail: async () => {},
@@ -158,20 +154,21 @@ export const serverFor = (pool: Pool): Hono =>
   });
 
 /**
- * What a suite may vary about the app it starts. Both defaults are the ones every suite
- * written before them expects: the estate's four test hostnames, and no SPA build (the
- * server serves the shell only where a test has one to serve).
+ * What a suite may vary about the app it starts. The defaults are the ones every suite
+ * written before them expects: the estate's three test hostnames on the one test origin,
+ * and no SPA build (the server serves the shell only where a test has one to serve).
  */
 export type TestAppOptions = {
   /** The directory `apps/web`'s build was written to, for a test that reads the shell. */
   readonly webRoot?: string | undefined;
-  /** The estate's four hostnames, for a test whose client is a real browser. */
+  /** The estate's three hostnames, for a test whose client is a real browser. */
   readonly hostnames?: PublicHostnames | undefined;
   /**
-   * The origin the product is served from, for a caller that serves it somewhere the
-   * hostnames do not say — the browser suite, on a loopback port.
+   * The one origin, for a caller that serves the product somewhere the test hostnames do
+   * not say — the browser suite, on a loopback http port. Its host must be `hostnames.app`,
+   * as `config.ts` derives it in the estate.
    */
-  readonly appUrl?: string | undefined;
+  readonly publicUrl?: string | undefined;
   /**
    * Called with every captured email as it is sent, for the local loop: it prints the
    * code from here, never from the app's logger, which `[LOG1]` forbids from holding one.
@@ -198,8 +195,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
 
   const server = createServer({
     database: database.pool,
-    publicUrl: PUBLIC_URL,
-    appUrl: options.appUrl ?? APP_URL,
+    publicUrl: options.publicUrl ?? PUBLIC_URL,
     hostnames,
     authSecret: AUTH_SECRET,
     sendEmail: async (message) => {
@@ -279,7 +275,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
 
   const client: TestApp["client"] = (
     ip = `203.0.113.${Math.floor(Math.random() * 250) + 1}`,
-    hostname = MCP_HOSTNAME,
+    hostname = APP_HOSTNAME,
   ) => {
     const origin = `https://${hostname}`;
     const jar = new Map<string, string>();
@@ -317,7 +313,16 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
       form: (path, fields) =>
         request(path, {
           method: "POST",
-          headers: { "content-type": "application/x-www-form-urlencoded", origin },
+          // What a browser sends when a person submits a form: the origin the form was
+          // served on, and the Fetch Metadata of a document navigation — which is what
+          // the consent form's navigation-only fence reads (`auth/routes.ts`, ADR 0034).
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            origin,
+            "sec-fetch-dest": "document",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-site": "same-origin",
+          },
           body: new URLSearchParams(fields).toString(),
         }),
       json: (path, body) =>

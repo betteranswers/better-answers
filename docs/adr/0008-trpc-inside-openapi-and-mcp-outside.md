@@ -34,3 +34,7 @@ The `/agent/v1` route family is served on its own hostname, **`agent.better-answ
 ## Amendment — 2026-09-03, the path is `/oauth2/*` and the host router exists (T-030, PR #10)
 
 "`/oauth/*`" above reads **`/oauth2/*`**, the path `@better-auth/oauth-provider` mounts (T-004). "The app's host router" is now built: `apps/api/src/ingress/hostnames.ts`, one list of surface → hostnames → reason, mounted ahead of every other route, refusing `agent.` anything but `/agent/v1/*` before a body is read (ADR 0022 amended the same day). Nothing else changes.
+
+## Amendment — 2026-09-03 (later, T-045), the MCP surface and `/oauth2/*` are on the app origin
+
+The 2026-08-28 amendment's "the OAuth 2.1 pages of the MCP surface … are served on `mcp.`" is struck. The MCP surface answers at `app.<domain>/mcp` and `/oauth2/*`, `/.well-known/*` and `/jwks` answer beside it on the same origin as the product, so one session serves the flow without a cookie scoped to the apex (ADR 0034). The host router now holds paths per hostname across **three** hostnames — `app.`, `agent.` and the apex — and `agent.` is unchanged. Everything else stands.

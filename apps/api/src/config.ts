@@ -22,7 +22,8 @@ import { logger } from "./logger.ts";
  * provider, repository, object store — is a row under the envelope and never an
  * environment variable, so a key belongs here only once something in this tier reads
  * it. Two shapes, because two processes read it: `migrate` needs the database alone,
- * `app` also needs the authorization server's origin and secret (ADR 0009).
+ * `app` also needs the one public origin and the authorization server's secret
+ * (ADR 0009, ADR 0034).
  */
 const bootstrapSchema = z.object({
   DATABASE_URL: z.url(),
@@ -54,56 +55,55 @@ const httpsOrigin = z
     );
   }, "PUBLIC_URL must be an https origin with no path, query, fragment or credentials")
   .refine(
-    // The `mcp.` hostname is this URL's host, so a host the parser rewrites is a
+    // The `app.` hostname is this URL's host, so a host the parser rewrites is a
     // hostname the operator never wrote and cannot find in their DNS. `bareHostname`
-    // refuses that class for the three declared hostnames (T-030); the fence makes the
-    // same reading of the one that is now derived.
+    // refuses that class for the two declared hostnames (T-030); the fence makes the
+    // same reading of the one that is derived (T-039, T-045).
     hostIsAsWritten,
-    "PUBLIC_URL must already be written the way a URL parser reads a host: a spelling the parser rewrites (`127.000.000.001`, `0x7f.1`, a percent-encoded label) would derive an `mcp.` hostname no arriving request can match",
+    "PUBLIC_URL must already be written the way a URL parser reads a host: a spelling the parser rewrites (`127.000.000.001`, `0x7f.1`, a percent-encoded label) would derive an `app.` hostname no arriving request can match",
   )
   .refine(
-    // The derived hostname is validated exactly as the three declared ones are, so the
-    // four are one class of value and not three plus an exception.
+    // The derived hostname is validated exactly as the two declared ones are, so the
+    // three are one class of value and not two plus an exception.
     (value) => bareHostname.safeParse(hostnameOfUrl(value)).success,
-    "PUBLIC_URL's host must be a bare hostname — DNS labels only — because it is the `mcp.` hostname the fence matches an arriving `Host` against",
+    "PUBLIC_URL's host must be a bare hostname — DNS labels only — because it is the `app.` hostname the fence matches an arriving `Host` against",
   )
   // Normalised to the bare host, not merely parsed: DNS's trailing root dot names the
   // same host, but every string this origin becomes — the issuer, the token audience,
-  // the protected-resource document, Better Auth's trusted origins and the three
-  // pages' `origin === publicUrl` check — is compared character for character against
+  // the protected-resource document, Better Auth's trusted origin and the consent
+  // form's `origin === publicUrl` check — is compared character for character against
   // an `Origin` a browser sends without it.
   .transform((value) => originOfUrl(value));
 
 const identityBootstrapSchema = z
   .object({
-    // The https origin the authorization server issues from and the MCP URL hangs off
-    // (`mcp.` in the estate, ADR 0022). Everything spec-exact — issuer, PRM `resource`,
-    // audience — is derived from it, so it is bootstrap, not a row.
+    // The one https origin the product is served from, the authorization server issues
+    // from and the MCP URL hangs off (`app.` in the estate; ADR 0034). Everything
+    // spec-exact — issuer, PRM `resource`, audience — and every page of the flow is
+    // derived from it, so it is bootstrap, not a row.
     PUBLIC_URL: httpsOrigin,
     // Better Auth's secret: signs the OAuth flow's state and encrypts the JWKS private
     // keys at rest (ADR 0009).
     AUTH_SECRET: z.string().min(32),
-    // Three of the estate's four hostnames (ADR 0022), read here because the hostname
-    // fence (`ingress/hostnames.ts`) has to know them before the first request: a
-    // hostname the deploy unit did not give the process is a hostname that reaches
+    // Two of the estate's three hostnames (ADR 0022, ADR 0034), read here because the
+    // hostname fence (`ingress/hostnames.ts`) has to know them before the first request:
+    // a hostname the deploy unit did not give the process is a hostname that reaches
     // nothing, so a missing or malformed one stops the process rather than opening it.
-    // The fourth is not declared — `mcp.` *is* `PUBLIC_URL`'s host, and one truth in
-    // two places is one more thing to get wrong on deploy day (T-039), so it is
-    // derived through the fence's own reading of a host and the two sides still agree
-    // by construction rather than by a refine.
-    APP_HOSTNAME: bareHostname,
+    // The third is not declared — `app.` *is* `PUBLIC_URL`'s host, and one truth in two
+    // places is one more thing to get wrong on deploy day (T-039), so it is derived
+    // through the fence's own reading of a host and the two sides still agree by
+    // construction rather than by a refine.
     AGENT_HOSTNAME: bareHostname,
     APEX_HOSTNAME: bareHostname,
   })
   .refine((parsed) => {
     const hostnames = [
-      parsed.APP_HOSTNAME,
       hostnameOfUrl(parsed.PUBLIC_URL),
       parsed.AGENT_HOSTNAME,
       parsed.APEX_HOSTNAME,
     ];
     return new Set(hostnames).size === hostnames.length;
-  }, "the four hostnames must differ, the derived `mcp.` one included: two the same hands one hostname's surface to the other, which is the fence this configuration exists to raise");
+  }, "the three hostnames must differ, the derived `app.` one included: two the same hands one hostname's surface to the other, which is the fence this configuration exists to raise");
 
 export type Bootstrap = {
   readonly databaseUrl: string;
@@ -112,14 +112,8 @@ export type Bootstrap = {
 };
 
 export type IdentityBootstrap = {
+  /** The one origin: the product, the authorization server and the MCP surface (ADR 0034). */
   readonly publicUrl: string;
-  /**
-   * The origin the product is served from. Derived from `APP_HOSTNAME` rather than read as
-   * a variable of its own: the deploy unit already names that hostname, the fence already
-   * routes on it, and a second value able to disagree with it would send a person signing
-   * in to a host this process refuses.
-   */
-  readonly appUrl: string;
   readonly authSecret: string;
   readonly hostnames: PublicHostnames;
 };
@@ -146,14 +140,12 @@ export function readIdentityBootstrap(
   if (!parsed.success) return err(invalid(parsed.error));
   return ok({
     publicUrl: parsed.data.PUBLIC_URL,
-    appUrl: `https://${parsed.data.APP_HOSTNAME}`,
     authSecret: parsed.data.AUTH_SECRET,
     hostnames: {
-      app: parsed.data.APP_HOSTNAME,
       // Read the way the fence reads an arriving request's host, so the hostname the
       // router matches on and the origin every spec-exact string is derived from are
-      // one value from one place (ADR 0022, T-039).
-      mcp: hostnameOfUrl(parsed.data.PUBLIC_URL),
+      // one value from one place (ADR 0022, T-039; ADR 0034).
+      app: hostnameOfUrl(parsed.data.PUBLIC_URL),
       agent: parsed.data.AGENT_HOSTNAME,
       apex: parsed.data.APEX_HOSTNAME,
     },

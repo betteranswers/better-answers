@@ -24,8 +24,9 @@ import { consentPage, refusedPage } from "./pages.ts";
 import { sessionClaims } from "./verify.ts";
 
 /**
- * The identity routes this tier serves itself: the consent page (grilling Q5; sign-in and
- * the workspace picker are the SPA's screens since T-037), the
+ * The identity routes this tier serves itself, all on the one origin (ADR 0034): the
+ * consent page (grilling Q5; sign-in and the workspace picker are the SPA's screens
+ * since T-037), the
  * protected-resource metadata (research 80 F6: hand-written, `resource` exactly the
  * URL a person types), `/me` (the cookie-session path through the one resolver), and
  * the per-IP counter in front of `/oauth2/*` and the discovery documents. Better
@@ -107,7 +108,7 @@ const flowHeaders = (request: Request, publicUrl: string): Headers => {
  * answer it. Browsers send `Origin` on every cross-site POST and `Sec-Fetch-Site` on
  * every fetch they make; a form posted from this origin carries this origin. The SPA's
  * own screens are fenced the same way one layer down, by Better Auth's origin check
- * against the two trusted origins (`auth.ts`).
+ * against the one trusted origin (`auth.ts`).
  */
 const sameOriginOnly = (publicUrl: string): MiddlewareHandler => {
   return async (context, next) => {
@@ -128,6 +129,31 @@ const sameOriginOnly = (publicUrl: string): MiddlewareHandler => {
     }
     await next();
   };
+};
+
+/**
+ * The consent form is answered by a navigation only. Since T-045 consent sits on the
+ * same origin as the product (ADR 0034), so the same-origin fence above no longer
+ * separates it from a script running in the shell: a `fetch` from the SPA's own origin
+ * carries this origin and would pass. What separates them is the shape of the request.
+ * The form answers with a redirect to the client, which only a document navigation can
+ * follow, and a browser marks a navigation `Sec-Fetch-Dest: document` and a script's
+ * `fetch` or `XMLHttpRequest` `empty`. So a POST that is not a document is refused and
+ * mints nothing. Every browser that sends the header is trusted on it; one that sends
+ * none is refused too, because the header is the whole of what is being asked.
+ *
+ * Together the two fences say: a browser navigated a form here from this origin; no
+ * fetch did. What bounds the residue — a script that submits the form itself — is the
+ * closed client list plus PKCE (ADR 0034).
+ */
+const navigationOnly: MiddlewareHandler = async (context, next) => {
+  if (context.req.method === "POST" && context.req.header("sec-fetch-dest") !== "document") {
+    return context.html(
+      refusedPage("Refused", "This form can only be sent by opening it in your browser."),
+      403,
+    );
+  }
+  await next();
 };
 
 const emailKey = (email: string): string =>
@@ -233,6 +259,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   // ---------------------------------------------------------------- consent
   routes.use("/consent", limitByIp(door, PAGE_IP_RULE));
   routes.use("/consent", sameOriginOnly(publicUrl));
+  routes.use("/consent", navigationOnly);
   // No other site may frame it: a framed consent form still posts with this origin and
   // would pass the same-origin check, so clickjacking is refused at the frame, not the
   // post. `frame-ancestors 'none'` and the legacy header together.

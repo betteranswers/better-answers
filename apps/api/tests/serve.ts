@@ -29,20 +29,20 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
  * `app.` is the loopback here, because that is the hostname a browser on this machine can
  * actually reach and the fence in `ingress/hostnames.ts` matches on the `Host` it arrives
  * with. Which hostname carries which path is proven in `tests/hostnames.test.ts`; this
- * suite is about what a browser does with the screens `app.` serves.
+ * suite is about what a browser does with the screens and the flow `app.` serves.
  *
- * The product's own origin has to be told to the app rather than derived, because Better
- * Auth sends a person signing in to `${appUrl}/sign-in` and this estate's product is on a
- * loopback port, not on an https hostname. Its four hostnames are not under its apex, so
- * the session cookie stays host-only here — nothing shares a session with 127.0.0.1, and
- * the cookie the estate does scope to its apex is proven at the endpoint seam instead.
+ * The one origin is told to the app rather than left to the harness's default, because
+ * Better Auth sends a person signing in to `${publicUrl}/sign-in`, issues from it and
+ * renders consent on it, and this estate's product is on a loopback http port rather than
+ * an https hostname (ADR 0034). One product host is what makes the consent flow provable
+ * here at all: sign-in, authorize, consent and the code's redirect all happen on the
+ * origin the browser is already on.
  */
 const app = await startApp({
   webRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
-  appUrl: `http://127.0.0.1:${port}`,
+  publicUrl: `http://127.0.0.1:${port}`,
   hostnames: {
     app: "127.0.0.1",
-    mcp: "mcp.localhost",
     agent: "agent.localhost",
     apex: "localhost",
   },

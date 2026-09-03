@@ -67,12 +67,12 @@ const acceptedRows = {
       redirectUris: ["https://claude.ai/api/mcp/auth_callback"],
     },
   ],
-  oauthResource: [{ id: "resource-1", identifier: "https://mcp.example.test/mcp", name: "mcp" }],
+  oauthResource: [{ id: "resource-1", identifier: "https://app.example.test/mcp", name: "mcp" }],
   oauthClientResource: [
     {
       id: "client-resource-1",
       clientId: "https://claude.ai/oauth/mcp-oauth-client-metadata",
-      resourceId: "https://mcp.example.test/mcp",
+      resourceId: "https://app.example.test/mcp",
     },
   ],
   oauthRefreshToken: [

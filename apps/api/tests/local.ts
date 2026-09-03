@@ -30,10 +30,9 @@ const say = (line: string): void => {
 
 const app = await startApp({
   webRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
-  appUrl: APP_URL,
+  publicUrl: APP_URL,
   hostnames: {
     app: "127.0.0.1",
-    mcp: "mcp.localhost",
     agent: "agent.localhost",
     apex: "localhost",
   },
