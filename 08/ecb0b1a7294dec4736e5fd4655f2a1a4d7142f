@@ -1,0 +1,19 @@
+deploy/platform.compose.yaml
+  s_d41063f43ada5b::t_7729dfd4c8fa16 92-95,99-104,106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "08ecb0b1a7294dec4736e5fd4655f2a1a4d7142f",
+  "prompts": {},
+  "sessions": {
+    "s_d41063f43ada5b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e2e216cd-f777-484f-939a-18351ad361cb",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
