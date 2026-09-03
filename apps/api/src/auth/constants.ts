@@ -88,3 +88,12 @@ export const BETTER_AUTH_RATE_LIMIT = {
 /** The CIMD transport's limits (T-004): a metadata document is a few kilobytes and one round trip. */
 export const CIMD_FETCH_TIMEOUT_MS = 10_000;
 export const CIMD_RESPONSE_CAP_BYTES = 64 * 1024;
+
+/**
+ * The hosts a client-ID metadata document may live on — the closed client list (ADR 0009,
+ * 2026-09-02; ADR 0034). One entry for v0.1: any public https document can otherwise
+ * register itself as a client, and since T-045 consent sits on the product's own origin
+ * on the strength of this list, so that a code any script in the shell could obtain lands
+ * only at Claude's own redirect. Matched on the exact hostname, never a suffix.
+ */
+export const CIMD_ALLOWED_CLIENT_HOSTS = ["claude.ai"] as const;

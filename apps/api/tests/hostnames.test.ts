@@ -272,7 +272,7 @@ describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)
     for (const surface of HOSTNAME_SURFACES) expect(surface.reason.length).toBeGreaterThan(0);
   });
 
-  it("names the issuer's paths and consent on app. by name, ahead of the catch-all", () => {
+  it("tells a builder where the issuer's surface is: its paths and consent named on app. ahead of the catch-all", () => {
     // ADR 0034: the paths are the catch-all's already; they are listed so a builder reads
     // where the issuer's surface is, and consent keeps an entry because it carries a
     // fence of its own. A list that folded them away would pass every request test above

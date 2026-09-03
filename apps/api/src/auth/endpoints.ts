@@ -5,7 +5,8 @@ import type { Auth } from "./auth.ts";
  * endpoint table rather than typed out here — sorted, and each path once.
  *
  * This exists for the hostname fence's catch-all (`ingress/hostnames.ts`, T-030). That
- * entry hands `/*` to `app.` and `mcp.` without enumerating it, because the set is the
+ * entry hands `/*` to `app.` — the one origin since T-045 (ADR 0034) — without
+ * enumerating it, because the set is the
  * plugin list's and a Better Auth upgrade adds to it — so the fence cannot say what it
  * is admitting. `apps/api/tests/better-auth-endpoints.txt` is that set as last
  * reviewed and `better-auth-endpoints.test.ts` fails when the two differ, which turns

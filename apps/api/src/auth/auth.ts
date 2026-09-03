@@ -46,6 +46,7 @@ import { ROLES } from "@better-answers/schema";
 import {
   ACCESS_TOKEN_LIFETIME_SECONDS,
   BETTER_AUTH_RATE_LIMIT,
+  CIMD_ALLOWED_CLIENT_HOSTS,
   CLIENT_IP_HEADER,
   EMAIL_CODE_ATTEMPTS,
   EMAIL_CODE_LENGTH,
@@ -470,6 +471,15 @@ export const createAuth = (deps: AuthDependencies) => {
         fetchClientMetadataResource: deps.fetchClientMetadataResource,
         metadataProfile: "mcp-2026-07-28",
         metadataRevalidationInterval: "60m",
+        // The closed client list. Refused before the document is fetched, so a client
+        // the list does not name costs no round trip and leaves no row. Consent's place
+        // on the product's origin rests on this line (ADR 0034): with only `claude.ai`
+        // admitted, a code obtained by any script in the shell can land only at Claude's
+        // own redirect, bound to a PKCE verifier no script holds.
+        isMetadataDocumentUrlAllowed: (clientIdUrl) =>
+          (CIMD_ALLOWED_CLIENT_HOSTS as readonly string[]).includes(
+            URL.parse(clientIdUrl)?.hostname ?? "",
+          ),
       }),
     ],
   });

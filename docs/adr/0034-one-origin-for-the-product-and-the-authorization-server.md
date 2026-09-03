@@ -64,8 +64,11 @@ decision to grant a client access is never dressed as an ordinary screen. What c
 reason it is safe there. ADR 0009 said consent sat outside the shell *because it was on the
 other host*, and that reason has been spent.
 
-**The reason now is the closed client list plus PKCE.** The CIMD allow-list admits only
-`claude.ai`, so a code obtained by any script running in the product's shell lands only at
+**The reason now is the closed client list plus PKCE.** The CIMD allow-list
+(`isMetadataDocumentUrlAllowed`, `CIMD_ALLOWED_CLIENT_HOSTS` in `apps/api/src/auth/constants.ts`)
+admits only `claude.ai`. ADR 0009 took that decision on 2 September 2026 and left it to land
+with T-005; consent's move onto the product's origin rests on it, so it lands here, before
+the move and not after (Cubic's branch review of T-045). The list admits only `claude.ai`, so a code obtained by any script running in the product's shell lands only at
 Claude's own redirect URI, and PKCE binds that code to the verifier the host holds and no script
 has. A same-origin script therefore gains nothing by reading the consent page.
 

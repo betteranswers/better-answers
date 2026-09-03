@@ -42,3 +42,7 @@ What replaces it is nothing. An agent orients by calling `find`, which is the pr
 Two things this does not touch. **The read/write split still lands in the host's own permission UI**: claude.ai divided the four into "Write/delete tools 1" and "Other tools 3" from `readOnlyHint` alone, which is what `[SEC2]`'s annotation requirement buys. And the surface still **grows by token scope, never by a second server** — that argument was about accretion, and dropping an entry is its opposite.
 
 One correction rides with this. This ADR's principal is `{workspace, user, role}`; the token claim set observed from claude.ai carries **no `role`**, so it is `{workspace, user}` with the role read per call, in the same transaction as the read it authorises (`T-004`). Everything else stands.
+
+## Amendment — 2026-09-03, the surface's address (T-045, ADR 0034)
+
+"`mcp.<domain>/mcp`" reads **`app.<domain>/mcp`**: the MCP surface answers on the product's own origin, and every access token's audience is that URL (ADR 0034). Nothing else changes — the four entries, the principal from the token, the per-call revocation check and the growth by token scope all stand.

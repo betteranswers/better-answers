@@ -22,10 +22,12 @@ import { anAddress, provision, revokeCredentials, signIn } from "./harness.ts";
 const CLIENT_ID = "https://claude.ai/oauth/mcp-oauth-client-metadata";
 const REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback";
 
-const pkce = () => {
-  const verifier = randomBytes(64).toString("base64url");
-  return { verifier, challenge: createHash("sha256").update(verifier).digest("base64url") };
-};
+/**
+ * A PKCE challenge with no verifier kept: no code is exchanged in this suite, so what is
+ * needed is only a challenge Better Auth accepts, not a pair.
+ */
+const aChallenge = (): string =>
+  createHash("sha256").update(randomBytes(64).toString("base64url")).digest("base64url");
 
 /** Claude's authorize request, as prototype 61 captured it: CIMD, S256, `resource`, `prompt=consent`. */
 const authorizeUrl = (
@@ -36,7 +38,7 @@ const authorizeUrl = (
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI,
     response_type: "code",
-    code_challenge: pkce().challenge,
+    code_challenge: aChallenge(),
     code_challenge_method: "S256",
     resource: `${baseURL}/mcp`,
     scope: "knowledge:read feedback:write offline_access",

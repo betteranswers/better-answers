@@ -15,6 +15,7 @@ import {
   APEX_HOSTNAME,
   CLAUDE_CLIENT_ID,
   CLAUDE_REDIRECT_URI,
+  LOOKALIKE_CLIENT_ID,
   MCP_URL,
   PUBLIC_URL,
   startApp,
@@ -189,6 +190,29 @@ describe("the flow, as claude.ai drives it", () => {
     expect(target.origin + target.pathname).toBe("https://claude.ai/api/mcp/auth_callback");
     expect(target.searchParams.get("error")).toBe("invalid_scope");
     expect(target.searchParams.get("iss")).toBe(PUBLIC_URL);
+  });
+
+  it("refuses a client whose metadata document lives anywhere but claude.ai, without ever fetching it", async () => {
+    // The closed client list (ADR 0009, 2026-09-02; ADR 0034). The harness serves a
+    // look-alike document word for word, so the refusal below is the list's and not a
+    // missing document's — and the transport is never asked, so the list is read before
+    // the fetch and a refused client leaves no row.
+    const { challenge } = pkce();
+    const asked = app.metadataFetches.length;
+
+    const response = await app.client().fetch(
+      authorizeUrl({ challenge, scope: "knowledge:read", clientId: LOOKALIKE_CLIENT_ID }),
+      { redirect: "manual" },
+    );
+
+    expect(response.ok).toBe(false);
+    expect(response.headers.get("location") ?? "").not.toContain("code=");
+    expect(app.metadataFetches.slice(asked)).toEqual([]);
+    const registered = await app.database.superuser.query(
+      "SELECT 1 FROM oauth_client WHERE client_id = $1",
+      [LOOKALIKE_CLIENT_ID],
+    );
+    expect(registered.rowCount).toBe(0);
   });
 
   it("refuses an authorize request for a resource that is not the MCP URL (trap 2, RFC 8707)", async () => {

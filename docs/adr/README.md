@@ -23,7 +23,7 @@ The **live conclusion** of every ADR — the state after its amendments, not its
 | 0015 | A composition cites its concept by a footnote labelled by the include (roles are levels, 2026-08-30) |
 | 0016 | An answer asserts concepts only, found by traversal, served as one contract — verdict first; at depth 0 when the map is unavailable, said in the header line (2026-08-30) |
 | 0017 | Every answer is a retained, correctable record; an `Answer` is minted only at a gate a person runs (2026-08-30) |
-| 0018 | One MCP surface, the Principal from the token grown by scope — **four entries, not the title's five** (A26, ticket 79; `describe_estate` dropped, 2026-08-31) |
+| 0018 | One MCP surface at `app.<domain>/mcp` (0034, 2026-09-03), the Principal from the token grown by scope — **four entries, not the title's five** (A26, ticket 79; `describe_estate` dropped, 2026-08-31) |
 | 0019 | Trust is derived from the file, told in fixed words, moved only by a check; verifier ≠ generator; `human:<email>` is rewritten to `human:<member-id>` only on erasure (2026-08-27) |
 | 0020 | Personal data is withheld at the seam before any store; the erasure routine rewrites every actor id the platform wrote, and a person edits what the company wrote — the title's *every copy* is narrowed to that (2026-08-30) |
 | 0021 | ~~Graph on Neo4j Community~~ — **superseded by 0023** |

@@ -65,6 +65,14 @@ export const CLAUDE_METADATA_DOCUMENT = {
   token_endpoint_auth_method: "none",
 } as const;
 
+/**
+ * A look-alike: Claude's document, word for word, served from a host the closed client
+ * list does not name (ADR 0034). What it proves is that the refusal is the list's and not
+ * a missing document's — the harness serves it, and the app must still never ask.
+ */
+export const LOOKALIKE_CLIENT_ID = "https://claude-ai.example/oauth/mcp-oauth-client-metadata";
+export const LOOKALIKE_REDIRECT_URI = "https://claude-ai.example/api/mcp/auth_callback";
+
 export type LogLine = Readonly<Record<string, unknown>>;
 
 export type TestApp = {
@@ -72,6 +80,8 @@ export type TestApp = {
   readonly database: TestDatabase;
   /** Every email the app tried to send, in order. */
   readonly emails: EmailMessage[];
+  /** Every client-ID URL the app asked the CIMD transport for, in order. */
+  readonly metadataFetches: string[];
   /** Every structured log line the app wrote, parsed. */
   readonly logs: LogLine[];
   /** The last six-digit code sent to an address. */
@@ -133,10 +143,14 @@ const bootstrap: PlatformPrincipal = {
 
 const cimdFixture = async (input: string | URL | Request): Promise<Response> => {
   const url = new URL(input instanceof Request ? input.url : String(input));
-  if (url.href === CLAUDE_CLIENT_ID) {
-    return Response.json(CLAUDE_METADATA_DOCUMENT, {
-      headers: { "content-type": "application/json", "cache-control": "max-age=3600" },
-    });
+  const document = (clientId: string, redirectUri: string) =>
+    Response.json(
+      { ...CLAUDE_METADATA_DOCUMENT, client_id: clientId, redirect_uris: [redirectUri] },
+      { headers: { "content-type": "application/json", "cache-control": "max-age=3600" } },
+    );
+  if (url.href === CLAUDE_CLIENT_ID) return document(CLAUDE_CLIENT_ID, CLAUDE_REDIRECT_URI);
+  if (url.href === LOOKALIKE_CLIENT_ID) {
+    return document(LOOKALIKE_CLIENT_ID, LOOKALIKE_REDIRECT_URI);
   }
   return new Response("no such document", { status: 404 });
 };
@@ -178,8 +192,18 @@ export type TestAppOptions = {
 
 export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> => {
   const hostnames = options.hostnames ?? HOSTNAMES;
+  const publicUrl = options.publicUrl ?? PUBLIC_URL;
+  // The invariant `config.ts` holds by construction — the app hostname *is* the public
+  // URL's host — checked here because this harness takes the two separately. A mismatch
+  // would otherwise surface as a fence 404 on the first request, far from its cause.
+  if (hostnameOfUrl(publicUrl) !== hostnames.app) {
+    throw new Error(
+      `the harness was started with publicUrl ${publicUrl} but hostnames.app ${hostnames.app}; the estate has one origin and its host is the app hostname (ADR 0034)`,
+    );
+  }
   const database = await startTestDatabase();
   const emails: EmailMessage[] = [];
+  const metadataFetches: string[] = [];
   const logs: LogLine[] = [];
   const sink = new Writable({
     write(chunk: Buffer, _encoding, callback) {
@@ -195,14 +219,17 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
 
   const server = createServer({
     database: database.pool,
-    publicUrl: options.publicUrl ?? PUBLIC_URL,
+    publicUrl,
     hostnames,
     authSecret: AUTH_SECRET,
     sendEmail: async (message) => {
       emails.push(message);
       options.onEmail?.(message);
     },
-    fetchClientMetadataResource: cimdFixture,
+    fetchClientMetadataResource: (input) => {
+      metadataFetches.push(input instanceof Request ? input.url : String(input));
+      return cimdFixture(input);
+    },
     logger,
     webRoot: options.webRoot,
   });
@@ -342,6 +369,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     server,
     database,
     emails,
+    metadataFetches,
     logs,
     codeSentTo,
     provision,

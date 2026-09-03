@@ -41,9 +41,11 @@ export const authorizeUrl = (params: {
   readonly scope: string;
   readonly state?: string;
   readonly resource?: string;
+  /** Claude's, unless a test is about a client that is not Claude. */
+  readonly clientId?: string;
 }): string => {
   const query = new URLSearchParams({
-    client_id: CLAUDE_CLIENT_ID,
+    client_id: params.clientId ?? CLAUDE_CLIENT_ID,
     redirect_uri: CLAUDE_REDIRECT_URI,
     response_type: "code",
     code_challenge: params.challenge,
