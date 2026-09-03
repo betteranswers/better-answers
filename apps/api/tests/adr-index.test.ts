@@ -15,17 +15,23 @@ import { describe, expect, it } from "vitest";
  * commit") was a promise, and it was broken twice on 2026-09-03 alone — ADR 0008 and
  * ADR 0022 were amended and their rows were not. This is the promise as a check.
  *
- * **What it can and cannot see.** The membership check is exact and runs both ways
- * (`[TEST7]`): an ADR with no row and a row with no ADR are different mistakes and only
- * one direction finds each. The staleness check is a heuristic, and honest about it — a
- * row carries no field saying which amendment it accounts for, only prose that sometimes
- * names a date. So it compares the newest date the row mentions against the newest date
- * an `## Amendment` heading in that ADR mentions, and it only speaks where the row
- * mentions one at all. A row that names no date is not checked for staleness; that is
- * the README's style, not an oversight, and tightening it would mean dating twenty-odd
- * rows whose conclusions have not moved since they were written. What this buys is the
- * case that actually bit: a row that was dated, an amendment written after it, and
- * nobody noticing.
+ * **What it can and cannot see.** Membership is exact and runs both ways (`[TEST7]`): an
+ * ADR with no row and a row with no ADR are different mistakes, and only one direction
+ * finds each. Staleness is read off dates, because a row carries no field saying which
+ * amendment it accounts for — the newest date the row mentions against the newest date an
+ * `## Amendment` heading in that ADR mentions.
+ *
+ * **A row that names no date is behind, not exempt.** That was this test's first shape and
+ * it would have missed the case that motivated it: ADR 0008's row was undated *and* stale,
+ * so a rule that only spoke where a row named a date passed it. Replayed against the
+ * README as it stood on `origin/main` at `1e468de`, the rule as written now names both
+ * 0008 and 0022 — and eighteen more, which is why this ticket dated every row whose ADR
+ * carries a dated amendment. Every one of those is now checked on every run.
+ *
+ * What is still outside it: an ADR with **no** dated amendment (nothing to be behind), and
+ * an amendment that changes a conclusion *without* changing the newest date — an
+ * amendment written on a day the row already claims. The date is a claim about currency,
+ * not a diff; a reviewer still reads the amendment.
  */
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
@@ -40,9 +46,9 @@ const INDEX_ROW = /^\|\s*(?<number>\d{4})\s*\|(?<conclusion>.*)\|\s*$/;
 const AMENDMENT_HEADING = /^##\s+Amendment\b.*$/gm;
 
 /**
- * Both date forms the repository actually writes: ISO in most amendment headings and
- * most rows, UK in a few of each (`## Amendment (27/08/2026, …)`, ADR 0033's row).
- * Normalised to ISO so a plain string sort is a chronological one.
+ * Both date forms the repository actually writes: ISO in most amendment headings and most
+ * rows, UK in a few of each (`## Amendment (27/08/2026, …)`, ADR 0033's row). Normalised to
+ * ISO so a plain string sort is a chronological one.
  */
 const datesIn = (text: string): readonly string[] => [
   ...[...text.matchAll(/\d{4}-\d{2}-\d{2}/g)].map((match) => match[0]),
@@ -56,82 +62,96 @@ const datesIn = (text: string): readonly string[] => [
 
 const latestDateIn = (text: string): string | undefined => [...datesIn(text)].sort().at(-1);
 
-const adrNumbers = (): readonly string[] =>
+/** One decision record on disk. `ADR_FILE` is the only thing that decides what is one. */
+type Adr = { readonly number: string; readonly file: string };
+/** One row of the index. `conclusion` is the cell after the number, pipes stripped. */
+type Row = { readonly number: string; readonly conclusion: string };
+
+const adrs = (): readonly Adr[] =>
   readdirSync(adrDirectory)
     .flatMap((file) => {
       const number = ADR_FILE.exec(file)?.groups?.["number"];
-      return number === undefined ? [] : [number];
+      return number === undefined ? [] : [{ number, file }];
     })
-    .sort();
+    .sort((left, right) => left.number.localeCompare(right.number));
 
-const adrBody = (number: string): string => {
-  const file = readdirSync(adrDirectory).find((name) => name.startsWith(`${number}-`));
-  if (file === undefined) throw new Error(`no ADR file for ${number}`);
-  return readFileSync(path.join(adrDirectory, file), "utf8");
-};
+const rows = (): readonly Row[] =>
+  readFileSync(indexPath, "utf8")
+    .split("\n")
+    .flatMap((line) => {
+      const groups = INDEX_ROW.exec(line)?.groups;
+      const number = groups?.["number"];
+      const conclusion = groups?.["conclusion"];
+      return number === undefined || conclusion === undefined ? [] : [{ number, conclusion }];
+    });
 
-/** number → the row's conclusion text, in the order the index lists them. */
-const indexRows = (): ReadonlyMap<string, string> => {
-  const rows = new Map<string, string>();
-  for (const line of readFileSync(indexPath, "utf8").split("\n")) {
-    const groups = INDEX_ROW.exec(line)?.groups;
-    const number = groups?.["number"];
-    const conclusion = groups?.["conclusion"];
-    if (number !== undefined && conclusion !== undefined) rows.set(number, conclusion);
-  }
-  return rows;
-};
+const bodyOf = (adr: Adr): string => readFileSync(path.join(adrDirectory, adr.file), "utf8");
+
+/** The newest date any `## Amendment` heading in this ADR carries; `undefined` if none does. */
+const amendedOn = (adr: Adr): string | undefined =>
+  latestDateIn((bodyOf(adr).match(AMENDMENT_HEADING) ?? []).join("\n"));
+
+/** Every value that appears more than once. */
+const duplicates = (values: readonly string[]): readonly string[] => [
+  ...new Set(values.filter((value, index) => values.indexOf(value) !== index)),
+];
 
 describe("the ADR index against the ADRs it indexes (T-040)", () => {
-  it("names every decision record, and records every decision it names", () => {
+  it("names every decision record once, and records every decision it names", () => {
     // [TEST7] both ways: the first direction finds the ADR nobody indexed, the second the
-    // row left behind by a file that was renamed or removed.
-    const numbers = adrNumbers();
-    const rows = indexRows();
+    // row left behind by a file that was renamed or removed. The two duplicate checks are
+    // the same rule again — a second row for one number would satisfy both directions
+    // while making the index ambiguous about which line is the live one, and the staleness
+    // check below would read whichever came last.
+    const numbers = adrs().map((adr) => adr.number);
+    const indexed = rows().map((row) => row.number);
 
-    expect(numbers.filter((number) => !rows.has(number))).toEqual([]);
-    expect([...rows.keys()].filter((number) => !numbers.includes(number))).toEqual([]);
+    expect(numbers.filter((number) => !indexed.includes(number))).toEqual([]);
+    expect(indexed.filter((number) => !numbers.includes(number))).toEqual([]);
+    expect(duplicates(indexed)).toEqual([]);
+    expect(duplicates(numbers)).toEqual([]);
   });
 
-  it("carries no row whose newest date is older than its ADR's newest amendment", () => {
-    const stale = [...indexRows()]
-      .flatMap(([number, conclusion]) => {
-        const claimed = latestDateIn(conclusion);
-        const amended = latestDateIn((adrBody(number).match(AMENDMENT_HEADING) ?? []).join("\n"));
-        // A row that names no date makes no claim to check; an ADR with no dated
-        // amendment has nothing to be behind.
-        return claimed === undefined || amended === undefined || amended <= claimed
+  it("dates every row at or after the newest amendment of the ADR it summarises", () => {
+    const byNumber = new Map(adrs().map((adr) => [adr.number, adr]));
+
+    const behind = rows()
+      .flatMap((row) => {
+        const adr = byNumber.get(row.number);
+        const amended = adr === undefined ? undefined : amendedOn(adr);
+        // An ADR with no dated amendment has nothing to be behind. An undated row IS
+        // behind: ADR 0008's row was undated and stale on the same day, and a rule that
+        // only spoke where a row named a date is the rule that let it through.
+        if (amended === undefined) return [];
+        const claimed = latestDateIn(row.conclusion);
+        return claimed !== undefined && amended <= claimed
           ? []
-          : [{ adr: number, rowSaysAsOf: claimed, amendedOn: amended }];
+          : [{ adr: row.number, rowSaysAsOf: claimed ?? "undated", amendedOn: amended }];
       })
       .sort((left, right) => left.adr.localeCompare(right.adr));
 
     expect(
-      stale,
-      "docs/adr/README.md has a row older than the ADR it summarises. Read the amendment, then write the live conclusion into the row and date it — the index is what a session is told to trust instead of the body.",
+      behind,
+      "docs/adr/README.md has a row behind the ADR it summarises. Read the amendment, then write the live conclusion into the row and date it — the index is what a session is told to trust instead of the body, and an undated row is one nobody can tell has been read since.",
     ).toEqual([]);
   });
 
-  it("reads a dated amendment out of every amendment heading, so none goes unchecked", () => {
-    // Both assertions above are silent when a regex stops matching: no rows found is no
-    // rows missing, and no amendment headings found is nothing stale. This is the guard
-    // T-039 wrote for its endpoint snapshot, in the same shape — a heading written in a
-    // date form `datesIn` cannot read would take that ADR out of the check above without
-    // anybody being told.
-    const undated = adrNumbers().flatMap((number) =>
-      (adrBody(number).match(AMENDMENT_HEADING) ?? [])
+  it("carries a readable date on every amendment, and rows for the check to bite on", () => {
+    // Both assertions above go quiet when a regex stops matching: no rows found is no rows
+    // missing, and no amendment headings found is nothing behind. This is the guard T-039
+    // wrote for its endpoint snapshot, in the same shape — a heading in a date form
+    // `datesIn` cannot read would take that ADR out of the check above with nobody told.
+    const undated = adrs().flatMap((adr) =>
+      (bodyOf(adr).match(AMENDMENT_HEADING) ?? [])
         .filter((heading) => latestDateIn(heading) === undefined)
-        .map((heading) => `${number}: ${heading}`),
+        .map((heading) => `${adr.number}: ${heading}`),
     );
 
     expect(
       undated,
-      "an ADR amendment heading carries no date this test can read. Date it as `2026-09-03` (or `03/09/2026`), or the ADR silently drops out of the staleness check.",
+      "an ADR amendment heading carries no date this test can read. Date it as `2026-09-03` (or `03/09/2026`), or the ADR silently drops out of the check above.",
     ).toEqual([]);
-    expect(indexRows().size).toBeGreaterThan(0);
-    expect(
-      adrNumbers().filter((number) => (adrBody(number).match(AMENDMENT_HEADING) ?? []).length > 0)
-        .length,
-    ).toBeGreaterThan(0);
+    expect(rows().length).toBeGreaterThan(0);
+    expect(adrs().filter((adr) => amendedOn(adr) !== undefined).length).toBeGreaterThan(0);
   });
 });
