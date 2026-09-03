@@ -3,6 +3,15 @@
   "compilerOptions": {
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
+    // The SPA is resolved the way the thing that builds it resolves — Vite's, not Node's.
+    // The root config is `nodenext` because `apps/api` runs on Node and its own imports
+    // carry explicit extensions; this workspace is bundled and never run by Node, and
+    // `@better-auth-ui/react@1.7.19` ships declaration files whose re-exports are
+    // extensionless, which `nodenext` refuses to resolve — every export of the package
+    // then reads as missing (T-037). `preserve` keeps `verbatimModuleSyntax` and the
+    // explicit `.ts` extensions this repository writes; nothing here is emitted.
+    "module": "preserve",
+    "moduleResolution": "bundler",
     "types": ["vite/client"],
     // Off here for the same reason it is off in `apps/api` — `@better-auth/oauth-provider@1.7.2`'s
     // plugin type carries `items?: undefined` metadata literals that fail to assign under exact

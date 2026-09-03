@@ -71,7 +71,13 @@
                 // [DESIGN5] — the identity provider stays behind its seam: no better-auth
                 // import outside apps/api/src/auth/ and the CIMD lift (the override below
                 // lifts the ban for exactly those two directories).
-                "group": ["better-auth", "better-auth/*", "@better-auth/*"],
+                "group": [
+                  "better-auth",
+                  "better-auth/*",
+                  "better-auth/*/*",
+                  "@better-auth/*",
+                  "@better-auth/*/*"
+                ],
                 "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009); the rest of the tier takes Claims and a Principal from that module."
               }
             ]
@@ -127,7 +133,9 @@
                   "@modelcontextprotocol/*",
                   "better-auth",
                   "better-auth/*",
+                  "better-auth/*/*",
                   "@better-auth/*",
+                  "@better-auth/*/*",
                   "node:http",
                   "node:http2",
                   "node:https"
@@ -203,7 +211,13 @@
                 "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema. Restated here because this override replaces the repo-wide no-restricted-imports config for apps/web."
               },
               {
-                "group": ["better-auth", "better-auth/*", "@better-auth/*"],
+                "group": [
+                  "better-auth",
+                  "better-auth/*",
+                  "better-auth/*/*",
+                  "@better-auth/*",
+                  "@better-auth/*/*"
+                ],
                 "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009). Restated here because this override replaces the repo-wide no-restricted-imports config for apps/web."
               }
             ]
@@ -244,7 +258,13 @@
                 "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema. Restated here because this override replaces the config above."
               },
               {
-                "group": ["better-auth", "better-auth/*", "@better-auth/*"],
+                "group": [
+                  "better-auth",
+                  "better-auth/*",
+                  "better-auth/*/*",
+                  "@better-auth/*",
+                  "@better-auth/*/*"
+                ],
                 "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009). Restated here because this override replaces the config above."
               }
             ]
@@ -279,7 +299,13 @@
                 "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema. Restated here because this override replaces the config above."
               },
               {
-                "group": ["better-auth", "better-auth/*", "@better-auth/*"],
+                "group": [
+                  "better-auth",
+                  "better-auth/*",
+                  "better-auth/*/*",
+                  "@better-auth/*",
+                  "@better-auth/*/*"
+                ],
                 "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009). Restated here because this override replaces the config above."
               }
             ]
@@ -315,8 +341,58 @@
                 "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema. Restated here because this override replaces the config above."
               },
               {
-                "group": ["better-auth", "better-auth/*", "@better-auth/*"],
+                "group": [
+                  "better-auth",
+                  "better-auth/*",
+                  "better-auth/*/*",
+                  "@better-auth/*",
+                  "@better-auth/*/*"
+                ],
                 "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009). Restated here because this override replaces the config above."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // T-037 — the SPA's identity feature is the one directory in `apps/web` that may name
+      // `better-auth`, which is the same shape `apps/api/src/auth/` has on the other side
+      // (`[DESIGN5]`, ADR 0009): one directory owns the library, and everything above it
+      // speaks screens, workspaces and roles rather than endpoints. The product signs a
+      // person in by posting to Better Auth, so *somewhere* has to know its client; what
+      // the rule buys is that the somewhere is one directory a reviewer can read in a
+      // sitting. So it is exactly one glob, and the registry's auth files under
+      // `shared/` are not in it — they import `@better-auth-ui/*`, which is a different
+      // package and was never banned.
+      //
+      // Everything the zone overrides above ban stays banned here — no feature reaches
+      // another, none reaches `app/`, none imports the api at runtime.
+      "files": ["apps/web/src/features/auth/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@/features/**"],
+                "message": "No feature imports another feature (T-036). Within a feature, imports are relative; ground two features share belongs in `apps/web/src/shared/`."
+              },
+              {
+                "group": ["@/app/**"],
+                "message": "The direction is app → features → shared and never back (T-036): `app/` composes features, so a feature importing `app/` is a cycle waiting to be written."
+              },
+              {
+                "group": ["../*/**", "../../**"],
+                "message": "A relative import in apps/web stays inside its own directory; an import that crosses one is written `@/<zone>/…` (T-036), because that is what the layering overrides in this file can read."
+              },
+              {
+                "group": ["@better-answers/api", "@better-answers/api/*"],
+                "message": "apps/web imports nothing from apps/api (ADR 0006). The one exception is `AppRouter` as an `import type`, in `apps/web/src/shared/api/trpc.ts` and no second file; runtime coupling stays zero."
+              },
+              {
+                "group": ["drizzle-zod"],
+                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema. Restated here because this override replaces the config above."
               }
             ]
           }

@@ -1,14 +1,21 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./browser.ts";
+
+import { anAddress, provision, signIn } from "./harness.ts";
 
 /**
  * The acceptance seam for T-035: the api serves the built SPA on `app.`, and a real browser
  * reaches Control Centre's frame.
  *
- * No session is made here. Signing in is a later ticket, and the frame renders without one
- * — which is the other thing this test holds: nothing on the screen claims to know who is
- * looking at it.
+ * A session is made first, which is T-037's change to this test: the shell is a signed-in
+ * person's, and an address inside it now sends anyone else to sign in. What the shell says
+ * about who is reading is `sign-in.spec.ts`'s; what is held here is the frame itself.
  */
-test("a browser reaches the frame the api serves on app.", async ({ page }) => {
+test("a browser reaches the frame the api serves on app.", async ({ page, request }) => {
+  const email = anAddress("frame");
+  await provision(request, { name: "Frame", adminEmail: email });
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+
   // A screen's own address, not the root: this is the history fallback, so a bookmark and a
   // refresh both have to reach the shell rather than a 404.
   await page.goto("/system");
@@ -26,7 +33,9 @@ test("a browser reaches the frame the api serves on app.", async ({ page }) => {
   ]);
 
   // Keyboard order is DOM order and the first stop is the skip link (`[A11Y1]`). Asserted
-  // before anything is clicked, because a click is what moves focus off the document.
+  // before anything is clicked, because a click is what moves focus off the document — and
+  // after the shell knows who is reading, because that answer is what draws the last of it.
+  await expect(page.getByRole("region", { name: "You" })).toBeVisible();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();
   await page.keyboard.press("Tab");

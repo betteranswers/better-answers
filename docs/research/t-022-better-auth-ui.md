@@ -320,6 +320,26 @@ to be named somewhere no manifest holds it.
 
 ---
 
+## Amendment — 2026-09-03, two rows corrected by the build (T-037)
+
+**`consentPage` is absolute, not relative.** §3's table says it "stays `/consent`" and that
+the relative resolution is correct on `mcp.` That was read against a flow whose every page
+was on `mcp.`; it is wrong once the picker is on `app.`. `/oauth2/continue` answers with
+the configured string **verbatim** — the same construction the table records for `loginPage`
+— and the screen that reads that answer is the SPA's picker, which resolves it against
+`app.`, where consent deliberately does not live. So `consentPage` is
+`${publicUrl}/consent`. The five-line checklist gains it; `baseURL` still does not move.
+
+**The protocol-relative `trustedOrigins` item is moot.** The unverified list wonders whether
+a `//host` pattern would ever match. Nothing in this configuration writes one: both trusted
+origins are exact origins with a scheme, as the table's own row prescribes, so the branch is
+never reached. It stays untested and stays unreachable.
+
+**One thing the note did not name, found in the build.** `advanced.disableOriginCheck`
+defaults to `NODE_ENV === "test"`, so §3's whole origin-check row is off under every test
+runner unless the option is stated. It is now stated as `false`, and the suite drives the
+check for real.
+
 ## What is unverified
 
 - Whether `@better-auth-ui/core@1.7.19` still ships a client-side map of Better Auth's

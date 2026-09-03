@@ -2,6 +2,7 @@ import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
 import { SCREENS } from "@/shared/screens.ts";
 
@@ -15,10 +16,21 @@ import { SCREENS } from "@/shared/screens.ts";
 // registers itself and a second render would find the first one still in the document.
 afterEach(cleanup);
 
+/**
+ * The providers the app mounts, because the frame reads who is signed in through them
+ * (T-037). Nothing answers here — there is no server behind a jsdom render — so the shell
+ * renders without an identity, which is the state a real browser is in for the first paint
+ * and the one this suite is about. What the shell says once it knows is the browser
+ * suite's, where a real session exists.
+ */
 const openAt = async (path: string) => {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }));
   await router.load();
-  return render(<RouterProvider router={router} />);
+  return render(
+    <Providers>
+      <RouterProvider router={router} />
+    </Providers>,
+  );
 };
 
 describe("Control Centre's frame", () => {
@@ -65,11 +77,14 @@ describe("Control Centre's frame", () => {
     expect(screen.getByText(/The rest of System/)).toBeDefined();
   });
 
-  it("says nothing about who is signed in, because no session has been read", async () => {
+  it("names nobody until it knows, rather than guessing", async () => {
     const { container } = await openAt("/system");
 
-    // The words a shell that guessed would reach for. Sign-in is a later ticket.
-    expect(container.textContent).not.toMatch(/signed in|sign out|your workspace/i);
+    // Nothing has answered, so the shell says nothing about who is reading — no name, no
+    // workspace, and not the sign-out that belongs beside them (T-037). A shell that
+    // guessed would be saying something it cannot know.
+    expect(screen.queryByRole("region", { name: "You" })).toBeNull();
+    expect(container.textContent).not.toMatch(/sign out/i);
   });
 
   it("marks the screen being read, so it is announced and not only shaded", async () => {
