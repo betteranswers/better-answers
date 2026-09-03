@@ -22,6 +22,14 @@ x-logging: &logging
     driver: json-file
     options: { max-size: "20m", max-file: "10" }
 
+# Every service carries an explicit memory limit (ticket 79 scale F2; T-003 → T-005): the box
+# is 4 GB shared with the Postgres resource (1 GB, set in Coolify) and the stores stack, and the
+# sum of every limit is what BACKUPS.md § Signals measures the page-cache floor against.
+# `migrate` runs Drizzle over a journal and exits; `api` is one Node process serving the SPA,
+# the authorization server and the MCP surface. The worker's is below, with its swap allowance.
+x-medium: &medium
+  deploy: { resources: { limits: { memory: 512m } } }
+
 x-bootstrap: &bootstrap
   # Bootstrap class only (CODING_RULES [SEC1]); every tenant credential is a row under the envelope.
   DATABASE_URL: ${DATABASE_URL:?}
@@ -44,11 +52,11 @@ services:
     environment:
       <<: *bootstrap
     labels: { coolify.exclude_from_hc: "true" }
-    <<: *logging
+    <<: [*logging, *medium]
 
   api:
     image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?}
-    <<: [*restart, *logging]
+    <<: [*restart, *logging, *medium]
     environment:
       <<: *bootstrap
       NODE_ENV: production
@@ -71,8 +79,8 @@ services:
       # must differ, the derived one included, or the app refuses to start.
       # The app routes on them itself: apps/api/src/ingress/hostnames.ts holds one list of
       # surface → hostnames → why, and refuses a path outside its hostname's surface before any body
-      # is read (T-030). The tunnel's ingress rules stay the first fence (ADR 0022; deploy/coolify.md
-      # § Ingress records them when T-005 writes that file); this is the second, because Better Auth's
+      # is read (T-030). The tunnel's ingress rules stay the first fence (ADR 0022; coolify.md § Ingress
+      # under apps/docs-site/operations/ records them); this is the second, because Better Auth's
       # handler answers the wildcard on every hostname the process is given.
       AGENT_HOSTNAME: ${AGENT_HOSTNAME:?}  # /agent/v1/* alone
       APEX_HOSTNAME: ${APEX_HOSTNAME:?}    # nothing: 404, as the edge answers it
@@ -139,3 +147,8 @@ services:
         # that outgrows it spills to the host's swap file rather than failing — ticket 42 measures
         # the swap-in rate and revises the cap.
         limits: { memory: 1536m }
+    # The spill is explicit, not implied: memory + swap = 3 GB, so an index may take up to
+    # 1.5 GB of the host's 4 GB swap file (RUNBOOK.md § Swap) before it fails (ticket 79 A9).
+    # Without this line the kernel's default is "as much swap as memory", which happens to be
+    # the same number today and would silently move with the cap above.
+    memswap_limit: 3072m

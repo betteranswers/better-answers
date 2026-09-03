@@ -1,0 +1,11 @@
+# Staging only (ADR 0024: staging is on demand, on VPC 2, for a drill or a rehearsal). Layered
+# over stores.compose.yaml by `restore-drill.sh` and RUNBOOK.md § Bring staging up — never by
+# Coolify on VPC 1, where nothing listens on a public interface (coolify.md § Boxes).
+#
+# It publishes the object store's S3 port on the loopback so the drill, which runs on the
+# host and not inside the stack, can mirror the off-host copy back into it through the
+# `stagingstore:` rclone remote the drill defines from the staging env.
+services:
+  objectstore:
+    ports:
+      - "127.0.0.1:3900:3900"

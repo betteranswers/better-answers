@@ -1,54 +1,151 @@
-# Promote a pair of image digests to PRODUCTION. A person runs this; nothing else deploys production.
-# Default inputs are the digests staging is running. The `production` environment carries a required reviewer.
+# Promote a pair of image digests to PRODUCTION. A person runs this; nothing else deploys production
+# (ADR 0022, `[OPS1]`). The `production` environment carries a required reviewer.
+#
+# THE DIGESTS. Blank inputs mean "the last build": the digests `build.yml` pushed under the `main`
+# tag, read back from ghcr.io — staging is on demand and never stands (ADR 0024), so there is no
+# "digest staging runs" to default to (ticket 79 A1, Q7). Every digest is passed between steps
+# through `env:` and matched against `^sha256:[0-9a-f]{64}$` on its own before anything is
+# PATCHed — never interpolated into a shell line (ticket 79 SEC10).
+#
+# THE RHYTHM (ticket 79 Q7, a condition and not a date). While no client's data is on the box a
+# release is minutes to undo, so any green build may be promoted and the post-deploy smoke is the
+# release's last step. THE DAY THE FIRST CLIENT'S DATA IS ON THE BOX the owner sets the repository
+# variable `CLIENT_DATA_ON_BOX` (`gh variable set CLIENT_DATA_ON_BOX --body <date>`; RUNBOOK.md
+# page 6 says so), and from then on this workflow REFUSES to run unless `rehearsed_by` names the
+# drill report that just proved a restore (a drill-day release) or a hotfix reason. That is the
+# forcing function: the switch is a check in this file, not a sentence in a runbook.
+#
+# THE RECORD. Every promotion is appended to `deploy/RELEASES.md` — date, who, both digests, what
+# it rode on — and pushed to main, so the previous digest is findable during an outage without
+# GitHub's UI (ticket 79 op F3; RUNBOOK.md page 6 reads it). The `main` ruleset must let the
+# github-actions app bypass "require a pull request" for that one push (wizard stage 2).
+#
+# Action versions read from each repository's latest release and pinned by commit SHA
+# (`[DEPS1]`, `T-040`); one pin per action across the directory (tests/workflow-pins.test.ts).
 name: release
 
 on:
   workflow_dispatch:
     inputs:
       api_digest:
-        description: "ghcr.io/…/api digest (sha256:…) — blank = the digest staging runs"
+        description: "ghcr.io/…/api digest (sha256:…) — blank = what the last build pushed as :main"
         required: false
       worker_digest:
-        description: "ghcr.io/…/worker digest (sha256:…) — blank = the digest staging runs"
+        description: "ghcr.io/…/worker digest (sha256:…) — blank = what the last build pushed as :main"
+        required: false
+      rehearsed_by:
+        description: "Once CLIENT_DATA_ON_BOX is set: the drill report this release rides on (drills/drill-<stamp>.md), or `hotfix: <reason>`"
         required: false
 
 permissions:
-  contents: read
+  contents: write
+  packages: read
+
+concurrency:
+  group: release-production
+  cancel-in-progress: false
 
 jobs:
   promote:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     environment: production
     env:
       COOLIFY_URL: ${{ vars.COOLIFY_URL }}
       COOLIFY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
-      # Coolify sits behind Cloudflare Access; CI presents a service token pair (deploy/coolify.md § Stage 7 state).
+      # Coolify sits behind Cloudflare Access; CI presents a service token pair (coolify.md § Stage 7 state).
       CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-      STAGING_UUID: ${{ vars.COOLIFY_STAGING_APP_UUID }}
       PROD_UUID: ${{ vars.COOLIFY_PROD_APP_UUID }}
+      # The one origin (ADR 0034), for the post-deploy smoke: https://app.<apex>
+      PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+      CLIENT_DATA_ON_BOX: ${{ vars.CLIENT_DATA_ON_BOX }}
+      REHEARSED_BY: ${{ inputs.rehearsed_by }}
     steps:
+      - name: drill-day releases once client data is on the box (Q7)
+        run: |
+          set -euo pipefail
+          if [ -n "${CLIENT_DATA_ON_BOX}" ] && [ -z "${REHEARSED_BY}" ]; then
+            echo "::error::CLIENT_DATA_ON_BOX is set (${CLIENT_DATA_ON_BOX}): a release must ride a drill that just proved a restore, or state a hotfix reason — fill \`rehearsed_by\` (RUNBOOK.md page 6)"
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: resolve digests
         id: d
         env:
           IN_API: ${{ inputs.api_digest }}
           IN_WORKER: ${{ inputs.worker_digest }}
+          OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
-          get() { curl -fsS "$COOLIFY_URL/api/v1/applications/$STAGING_UUID/envs" -H "Authorization: Bearer $COOLIFY_TOKEN" -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" | jq -r ".[] | select(.key==\"$1\") | .value"; }
-          api="$IN_API"; worker="$IN_WORKER"
-          [ -n "$api" ] || api=$(get API_IMAGE_DIGEST)
-          [ -n "$worker" ] || worker=$(get WORKER_IMAGE_DIGEST)
-          case "$api$worker" in *sha256:*sha256:*) ;; *) echo "digests missing" >&2; exit 1;; esac
-          echo "api=$api" >> "$GITHUB_OUTPUT"; echo "worker=$worker" >> "$GITHUB_OUTPUT"
-          echo "### Promoting\n- api \`$api\`\n- worker \`$worker\`" >> "$GITHUB_STEP_SUMMARY"
-      - name: set digests and redeploy production
+          last_build() { docker buildx imagetools inspect "ghcr.io/${OWNER}/$1:main" --format '{{.Manifest.Digest}}'; }
+          api="${IN_API:-$(last_build api)}"
+          worker="${IN_WORKER:-$(last_build worker)}"
+          echo "api=${api}" >> "$GITHUB_OUTPUT"
+          echo "worker=${worker}" >> "$GITHUB_OUTPUT"
+      - name: each digest is a digest, on its own
+        env:
+          API_DIGEST: ${{ steps.d.outputs.api }}
+          WORKER_DIGEST: ${{ steps.d.outputs.worker }}
         run: |
           set -euo pipefail
-          for kv in "API_IMAGE_DIGEST=${{ steps.d.outputs.api }}" "WORKER_IMAGE_DIGEST=${{ steps.d.outputs.worker }}"; do
-            curl -fsS -X PATCH "$COOLIFY_URL/api/v1/applications/$PROD_UUID/envs" \
-              -H "Authorization: Bearer $COOLIFY_TOKEN" -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H "Content-Type: application/json" \
-              -d "{\"key\":\"${kv%%=*}\",\"value\":\"${kv#*=}\",\"is_preview\":false}"
+          for name in API_DIGEST WORKER_DIGEST; do
+            value="${!name}"
+            if ! [[ "${value}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error::${name} is not a digest (sha256: followed by 64 hex characters)"
+              exit 1
+            fi
           done
-          curl -fsS "$COOLIFY_URL/api/v1/deploy?uuid=$PROD_UUID&force=false" -H "Authorization: Bearer $COOLIFY_TOKEN" -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"
+      - name: set digests and redeploy production
+        env:
+          API_DIGEST: ${{ steps.d.outputs.api }}
+          WORKER_DIGEST: ${{ steps.d.outputs.worker }}
+        run: |
+          set -euo pipefail
+          patch() {
+            jq -cn --arg key "$1" --arg value "$2" '{key: $key, value: $value, is_preview: false}' \
+              | curl -fsS -X PATCH "${COOLIFY_URL}/api/v1/applications/${PROD_UUID}/envs" \
+                  -H "Authorization: Bearer ${COOLIFY_TOKEN}" -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
+                  -H "Content-Type: application/json" --data-binary @-
+          }
+          patch API_IMAGE_DIGEST "${API_DIGEST}"
+          patch WORKER_IMAGE_DIGEST "${WORKER_DIGEST}"
+          curl -fsS "${COOLIFY_URL}/api/v1/deploy?uuid=${PROD_UUID}&force=false" \
+            -H "Authorization: Bearer ${COOLIFY_TOKEN}" -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}"
+      - name: post-deploy smoke against production (the release's last step)
+        run: |
+          set -euo pipefail
+          # The two paths the uptime check watches (coolify.md § Ingress): the app is healthy and the
+          # protected-resource document names the MCP surface. Retried while the stack comes up.
+          curl -fsS --retry 20 --retry-delay 6 --retry-all-errors -o /dev/null "${PUBLIC_URL}/health"
+          curl -fsS --retry 5 --retry-delay 6 --retry-all-errors "${PUBLIC_URL}/.well-known/oauth-protected-resource/mcp" | jq -e --arg mcp "${PUBLIC_URL}/mcp" '.resource == $mcp' >/dev/null
+      - name: record the promotion in deploy/RELEASES.md
+        env:
+          API_DIGEST: ${{ steps.d.outputs.api }}
+          WORKER_DIGEST: ${{ steps.d.outputs.worker }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          rode="${REHEARSED_BY:-pre-client: any green build}"
+          printf '| %s | %s | `%s` | `%s` | %s |\n' "$(date -u +%FT%TZ)" "${ACTOR}" "${API_DIGEST}" "${WORKER_DIGEST}" "${rode}" >> deploy/RELEASES.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/RELEASES.md
+          git commit -m "release: api ${API_DIGEST:7:12} · worker ${WORKER_DIGEST:7:12}"
+          git push origin HEAD:main
+          {
+            echo "### Promoted to production"
+            echo ""
+            echo "- api \`${API_DIGEST}\`"
+            echo "- worker \`${WORKER_DIGEST}\`"
+            echo "- rode on: ${rode}"
+            echo ""
+            echo "The app refuses to start unless PUBLIC_URL, AGENT_HOSTNAME and APEX_HOSTNAME are set on the api resource and all three hostnames differ (ADR 0034)."
+          } >> "$GITHUB_STEP_SUMMARY"

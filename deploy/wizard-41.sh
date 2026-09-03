@@ -180,13 +180,19 @@ finish() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────
-# STAGES — ticket 41: the eight steps only Liam can take (briefing §5, deploy/SECRETS.md).
-# Secrets are NEVER written by this wizard: it tells you where each one goes (Coolify env,
-# the escrow vault) and captures only facts — URLs, names, UUIDs — into deploy/wizard-41.env,
-# plus the three GitHub variables and the one GitHub secret the workflows read.
+# STAGES — ticket 41 (re-cut by T-005, 03/09/2026): the steps only the owner can take (briefing §5,
+# SECRETS.md, coolify.md). Secrets are NEVER written by this wizard: it tells you where each one goes
+# (Coolify env, the escrow vault, a root-only file on VPC 2) and captures only facts — URLs, names,
+# UUIDs — into deploy/wizard-41.env, plus the GitHub variables and the one GitHub secret the
+# workflows read. The shell work on the two boxes is deploy/host-setup.sh, run once per box.
+#
+# Estate shape it walks (ADR 0022, ADR 0034): three hostnames — app., agent., the apex — one tunnel,
+# NO Cloudflare Access on any of them, Cloudflare Pro before the first client credential exists,
+# the database on the official pgvector image by digest (ADR 0032), and the first restore drill run
+# by hand BEFORE any client's data is on the box.
 
-TOTAL_STAGES=9
-banner "Better Answers — ticket 41: accounts, boxes, edge, control plane (stages 1, 4, 7, 8 and one drill before the first client's data; the rest may follow go-live)"
+TOTAL_STAGES=10
+banner "Better Answers — ticket 41 / T-005: accounts, boxes, edge, control plane, the first drill (stages 1, 4, 7, 8 and the drill precede the first client's data; the rest may follow go-live)"
 
 # ────────────────────────────────────────────────────────────────────────
 stage "Escrow vault"
@@ -196,25 +202,28 @@ step "In your password manager create a vault for this deployment's escrow."
 step "Share it with one other named person before the first client goes live (SECRETS.md)."
 ask ESCROW_VAULT "Name of the vault as created:"
 say "Six items will land here: APP_KEY · Coolify SSH keys · KEK · the backup age identity · the bucket ADMIN credential · the tunnel token (plus the ghcr pull token, the git-mirror deploy key and every account's recovery codes)."
-step "Name the SECOND holder (co-director, solicitor) and write the instruction under which they open it. One holder is the outage the backups exist for."
+step "Name the SECOND holder (co-director, solicitor) and write the instruction under which they open it. One holder is the outage the backups exist for — RUNBOOK.md page 9 is the page they act on."
 ask ESCROW_SECOND_HOLDER "Second holder (name or role):"
+step "Name the TECHNICAL CONTACT every runbook page escalates to, with a number, in the private file's § Contacts (.planning/estate/RUNBOOK.md). Never here, never in the repository."
 write_env ESCROW_VAULT "$ESCROW_VAULT"; write_env ESCROW_SECOND_HOLDER "$ESCROW_SECOND_HOLDER"
 
 # ────────────────────────────────────────────────────────────────────────
-stage "GitHub — organisation, repository, protection, Renovate"
+stage "GitHub — organisation, repository, protection, packages, Renovate"
 open_url "https://github.com/organizations/plan"
 step "Create the organisation 'betteranswers' (ticket 63) — or the name you settled on."
 ask GH_ORG "Organisation name:"
 open_url "https://github.com/organizations/$GH_ORG/repositories/new"
-step "Create a PRIVATE repository 'better-answers' (62 decides public; the flip is free)."
+step "Create the repository 'better-answers' (62 decides public; the flip is free)."
 ask GH_REPO "Repository name:"
 say "Push this repository:"
 note "  git remote add origin git@github.com:$GH_ORG/$GH_REPO.git && git push -u origin main"
 pause "Pushed?"
-open_url "https://github.com/$GH_ORG/$GH_REPO/settings/branches"
-step "Add a ruleset for 'main': require a pull request, require the 'check' status check."
+open_url "https://github.com/$GH_ORG/$GH_REPO/settings/rules"
+step "Add a ruleset for 'main': require a pull request, require the 'check' status check. BYPASS LIST: the 'GitHub Actions' app — release.yml appends one row to deploy/RELEASES.md and pushes it to main on every promotion (RUNBOOK.md page 6 reads that file during an outage)."
 open_url "https://github.com/$GH_ORG/$GH_REPO/settings/environments"
-step "Create environments 'staging' (no reviewers) and 'production' (required reviewer: you)."
+step "Create the environment 'production' (required reviewer: you). No 'staging' environment: staging is on demand and no workflow deploys it (ADR 0024)."
+open_url "https://github.com/organizations/$GH_ORG/settings/packages"
+step "Packages: allow members to create packages, and the repository to publish — build.yml's first push of the three images (api, worker, backup) to ghcr.io fails without it; after the first push, set each package's visibility to private and link it to the repository."
 open_url "https://github.com/apps/renovate"
 step "Install the Renovate app on the organisation, scoped to this repository (renovate.json is at the root)."
 open_url "https://github.com/settings/personal-access-tokens/new"
@@ -224,105 +233,131 @@ write_env GH_ORG "$GH_ORG"; write_env GH_REPO "$GH_REPO"
 pause
 
 # ────────────────────────────────────────────────────────────────────────
-stage "IONOS — the two VPS (4 vCPU · 4 GB · 120 GB NVMe each)"
+stage "IONOS — the two VPS (4 vCPU · 4 GB · 120 GB NVMe each), and host-setup.sh on each"
 open_url "https://cloud.ionos.co.uk/"
 say "The two existing contracts, 4 vCPU / 4 GB / 120 GB NVMe each; they cannot be resized (ADR 0024). No private network joins them."
-step "VPC 1 — production: Ubuntu LTS; your SSH key. Create the 4 GB swap file (deploy/RUNBOOK.md § Swap) before the first deploy."
+step "VPC 1 — production: Ubuntu LTS; your SSH key."
 step "VPC 2 — Coolify + git mirror + restore target (staging on demand)."
-step "Firewall: inbound SSH only — from your IP to both, from VPC 2 to VPC 1, AND from VPC 1 to VPC 2 (the git push mirror travels to VPC 2's public IP). Nothing else inbound."
-step "On both: unattended security upgrades on, fail2ban, password SSH off, NTP running (object-lock dates and token iat checks trust the clock)."
+step "Provider firewall: inbound SSH only — from your IP to both, from VPC 2 to VPC 1, AND from VPC 1 to VPC 2 (the git push mirror travels to VPC 2's public IP). Nothing else inbound; 80 and 443 closed on both."
 ask VPC1_PUBLIC_IP  "VPC 1 public IP (SSH from VPC 2 and you only):"
 ask VPC2_PUBLIC_IP  "VPC 2 public IP:"
-step "On VPC 1: sudo mkdir -p /data && sudo chmod 755 /data  (bind mounts live here — compose.yaml). Generate the git-mirror deploy keypair: ssh-keygen -t ed25519 -f /data/backup/mirror-ssh/id_ed25519 -N ''  (root-only directory; the backup service mounts it read-only); escrow the private half."
-step "On VPC 2: create a 'mirror' user with sudo mkdir -p /data/mirror owned by it; add the deploy key's PUBLIC half to its authorized_keys restricted to git-receive-pack; git clone the repository to /opt/better-answers (the drill runs from there by host cron). GIT_MIRROR_SSH_TARGET in Coolify env = mirror@$VPC2_PUBLIC_IP:/data/mirror."
-step "The drill restores the whole estate beside Coolify on VPC 2 with production's caps — there is no bigger plan; the swap-in probe (deploy/coolify.md) decides the WireGuard split."
+say "Now the shell work, as root, from this repository's deploy/ copied to each box (scp -r deploy root@<ip>:/root/):"
+step "On VPC 1:  /root/deploy/host-setup.sh vpc1 --mirror-host $VPC2_PUBLIC_IP"
+say "  — creates /data and the 4 GB swap file, the mirror deploy keypair (root-only), known_hosts for VPC 2, and hardens the host. It PRINTS the key's public half: save it to a file on your laptop. Escrow the private half (/data/backup/mirror-ssh/id_ed25519)."
+step "On VPC 2:  /root/deploy/host-setup.sh vpc2 --mirror-pubkey <that file> --repo git@github.com:$GH_ORG/$GH_REPO.git --prod-host $VPC1_PUBLIC_IP"
+say "  — the 'mirror' user and /data/mirror, the key restricted to deploy/mirror-shell.sh (init-repo + git-receive-pack — NOT git-receive-pack alone, which broke the first push to a new workspace), the checkout at /opt/better-answers, the root-only files under /etc/better-answers/ and the drill's cron line."
+step "GIT_MIRROR_SSH_TARGET in Coolify env (stage 7) = mirror@$VPC2_PUBLIC_IP:/data/mirror."
+step "The drill restores the whole estate beside Coolify on VPC 2 with production's caps — there is no bigger plan; the swap-in probe and the page-cache floor (coolify.md § Memory) decide the WireGuard split."
 write_env VPC1_PUBLIC_IP "$VPC1_PUBLIC_IP"
 write_env VPC2_PUBLIC_IP "$VPC2_PUBLIC_IP"
-pause
+pause "Both host-setup runs finished?"
 
 # ────────────────────────────────────────────────────────────────────────
-stage "Backup bucket — versioning + object lock, two credentials"
+stage "Backup bucket — versioning + object lock, two credentials, the age identity"
 say "Provider: the one research 70 ranked first (.scratch/v01-spec/research/41-object-store-and-bucket.md) — UK preferred, EU fine; object lock; a UK-addendum DPA."
 ask BACKUP_S3_PROVIDER "Provider chosen:"
 ask BACKUP_S3_ENDPOINT "S3 endpoint URL:"
 ask BACKUP_DUMPS_BUCKET "DUMPS bucket name (versioning ON, object lock ON in GOVERNANCE mode):"
 step "Lifecycle on the dumps bucket: pg/hourly 48 h · pg/daily 30 d · pg/weekly 8 w · pg/monthly 6 m · git/ 30 d (+ first-of-month 6 m) · drills/ 12 m (BACKUPS.md)."
 ask BACKUP_MIRROR_BUCKET "MIRROR bucket name (versioning ON, NO lock, non-current versions expire after 30 days):"
-step "Credential 1 — WRITE-AND-LIST (PutObject, ListBucket, GetObject; no Delete*, no lifecycle, no bypass-governance) → Coolify env BACKUP_S3_ACCESS_KEY / _SECRET_KEY and Coolify's S3 storage."
-step "Credential 2 — READ (list + get on both buckets) → VPC 2 host env for the drill, root-only file."
+step "Credential 1 — WRITE-AND-LIST (PutObject, ListBucket, GetObject; no Delete*, no lifecycle, no bypass-governance) → Coolify env BACKUP_S3_ACCESS_KEY / _SECRET_KEY on the stores resource, and Coolify's S3 storage."
+step "Credential 2 — READ (list + get on both buckets) → /etc/better-answers/drill.env on VPC 2 (the RCLONE_CONFIG_DUMPS_* lines), root-only."
 step "Credential 3 — ADMIN (delete, lifecycle, bypass governance). Escrow only."
-step "Generate the backup age keypair on your laptop: age-keygen -o backup.key  → the public 'age1…' line goes to Coolify env as BACKUP_AGE_RECIPIENT; the file goes to escrow and is deleted from the laptop."
+step "The backup age identity: age-keygen -o backup.key on your laptop. The public 'age1…' line → Coolify env BACKUP_AGE_RECIPIENT on the stores resource. The file → escrow AND, pasted by hand, /etc/better-answers/backup-age.key on VPC 2 (mode 0600 — host-setup created it empty). Then delete it from the laptop."
+warn "That resident copy is a stated risk, not an accident: a VPC 2 compromise exposes every dump's plaintext (SECRETS.md § The backup identity; RUNBOOK.md page 2). Rotation is written there."
 warn "Do not paste any credential or key here."
 write_env BACKUP_S3_PROVIDER "$BACKUP_S3_PROVIDER"; write_env BACKUP_S3_ENDPOINT "$BACKUP_S3_ENDPOINT"; write_env BACKUP_DUMPS_BUCKET "$BACKUP_DUMPS_BUCKET"; write_env BACKUP_MIRROR_BUCKET "$BACKUP_MIRROR_BUCKET"
 pause
 
 # ────────────────────────────────────────────────────────────────────────
-stage "Cloudflare — zone, tunnel, Access, rate limits, Pages"
+stage "Cloudflare — zone, Pro, tunnel (three hostnames, no Access), four rate-limit rules, two health checks"
 ask APEX "Apex domain for this deployment (e.g. example.com):"
 write_env APEX "$APEX"
 open_url "https://dash.cloudflare.com/"
 step "Add the zone $APEX (nameservers at the registrar)."
+step "Plan → PRO. Four rate-limit rules and the external health checks below need it; Free allows one rule (ticket 79 Q9). This is the forcing function: the wizard does not pass this stage on Free."
+if ! confirm "Is the zone $APEX on the Pro plan (or higher) now"; then
+  warn "Stopping here: Pro must exist BEFORE the first client credential does (coolify.md § Ingress). Re-run this stage when it is."
+  SKIPPED+=("Cloudflare Pro on $APEX — required before the first client credential; re-run stage 5")
+  finish; exit 1
+fi
 open_url "https://one.dash.cloudflare.com/"
-step "Zero Trust → Networks → Tunnels → create tunnel 'better-answers' (remotely managed). Copy the TUNNEL TOKEN into Coolify env later (TUNNEL_TOKEN) and escrow it."
-step "Public hostnames on the tunnel, all → http://app:3000 : app. · mcp. · agent. · the apex ($APEX); the last ingress rule is the catch-all http_status:404."
-step "Access → Applications: 'app' for app.$APEX — policy Allow, emails: yours + the first client's; login method One-time PIN. The machine hostnames authenticate in the app (OAuth 2.1 on mcp., an agent token on agent.), so an interactive Access policy on them would break the client that must reach them (ADRs 0008, 0018)."
-step "Security → WAF → Rate limiting: the Free plan allows ONE rule — put it on the agent hostname, the one route that streams uploads (the MCP surface is limited per token inside the app, ADR 0018). On Pro, add a second rule. Record where each rule sits in the estate file, never here. Tighten after the first week."
-step "Docs site: keep the existing Vercel project (Astro); point it at this repo's docs-site/ and add the custom domain docs.$APEX (CNAME in Cloudflare DNS, DNS-only). No Cloudflare Pages project (28/08/2026)."
+step "Zero Trust → Networks → Tunnels → create tunnel 'better-answers' (remotely managed). Copy the TUNNEL TOKEN into Coolify env later (TUNNEL_TOKEN, stores resource) and escrow it."
+step "Public hostnames on the tunnel, in this order, all → http://app:3000 : app.$APEX · agent.$APEX · $APEX ; the last ingress rule is the catch-all http_status:404. THREE hostnames — there is no mcp. and no docs. (ADR 0034). Read them against apps/api/src/ingress/hostnames.ts: app · agent · apex, one rule each."
+step "NO Access application on any hostname (ADR 0022 amended 02/09/2026): the product signs in with Better Auth on app., the OAuth flow on app./oauth2/* cannot sit behind a wall, and agent. authenticates in the app. Access stays available as the day-two kill switch only."
+step "Security → WAF → Rate limiting rules, four, each per client IP, block 10 minutes (coolify.md § Ingress has the table): /oauth2/* 20/min · /.well-known/* 60/min · /mcp with no Authorization header 30/min · the sign-in endpoints /email-otp/send-verification-otp and /sign-in/email-otp 5/min. Rehearse a rule against the real flow first: serve:local behind a quick tunnel (coolify.md)."
+step "Traffic → Health Checks: two, from outside, on app.$APEX every minute, expect 200, three failures to red — /health and /.well-known/oauth-protected-resource/mcp. Notifications → a webhook or SMS to the SECOND channel (stage 8 says which)."
+step "No docs site, no Pages project: the ops documents' public halves are in the repository, unrendered (ADR 0034)."
 ask CF_TUNNEL_ID "Tunnel ID (not the token):"
-write_env CF_TUNNEL_ID "$CF_TUNNEL_ID"
+write_env CF_TUNNEL_ID "$CF_TUNNEL_ID"; write_env CF_PRO_CONFIRMED "$(date -u +%F)"
 pause
 
 # ────────────────────────────────────────────────────────────────────────
 stage "Transactional email — sign-in codes, invitations, Coolify notifications"
 say "Better Auth's email-code login, invitations and Coolify's alerts all need SMTP. A UK/EU-hosted provider preferred; any with a DPA."
 step "Create the account; verify the sending domain $APEX (SPF, DKIM, DMARC records in Cloudflare DNS)."
-step "Create one API key → (a) Coolify env SMTP_URL on the production stack: smtps://resend:<API key>@smtp.resend.com:465 ; (b) Coolify Settings → Notifications → Resend (the same key) for Coolify's own alerts. Two places, one key."
+step "Create one API key → (a) Coolify env SMTP_URL on the platform resource: smtps://resend:<API key>@smtp.resend.com:465 ; (b) Coolify Settings → Notifications → Resend (the same key) for Coolify's own alerts. Two places, one key."
 ask SMTP_PROVIDER "Provider chosen:"
 write_env SMTP_PROVIDER "$SMTP_PROVIDER"
 pause
 
 # ────────────────────────────────────────────────────────────────────────
-stage "Coolify on VPC 2 — control plane, resources, backups, notifications"
+stage "Coolify on VPC 2 — control plane, resources, the runtime roles, backups, notifications"
 say "Install on VPC 2 at the PINNED version v4.3.13 (28/08/2026); Settings → Update: auto-update OFF. Reach the UI over SSH forwarding, or behind Access if exposed."
-step "Settings → Backup: escrow APP_KEY (from /data/coolify/source/.env) AND /data/coolify/ssh/keys/ in '$ESCROW_VAULT'; enable the instance backup to S3 storage '$BACKUP_DUMPS_BUCKET/coolify/', daily."
+step "Settings → Backup: escrow APP_KEY (from /data/coolify/source/.env) AND /data/coolify/ssh/keys/ in '$ESCROW_VAULT'; enable the instance backup to S3 storage '$BACKUP_DUMPS_BUCKET/coolify/', daily. (/etc/better-answers/ is outside it by design — SECRETS.md.)"
 step "Servers → add VPC 1 over SSH ($VPC1_PUBLIC_IP)."
 step "Storages → S3: '$BACKUP_S3_PROVIDER' with the WRITE-AND-LIST credential."
 step "Registries (or the resource's registry credential): ghcr.io with the pull PAT from stage 2 — on both servers."
-step "On VPC 1: Database → PostgreSQL, the official pgvector image by digest (packages/schema/src/postgres-image.ts — ADR 0032; no custom image), name 'better-answers-pg', shared_buffers 512 MB, data directory bind-mounted at /data/postgres if the UI allows (record the answer in deploy/coolify.md); Backups → S3 storage, daily — the tiers are the backup service's, not Coolify's."
-step "On VPC 1: Docker Compose 'better-answers-stores' from deploy/stores.compose.yaml, then 'better-answers' from deploy/platform.compose.yaml (git source = the GitHub repo). Paste every env in deploy/SECRETS.md that says 'Coolify env'."
-step "On VPC 2: only the staging Postgres resource is created (empty); the two staging stacks are brought up ON DEMAND by the drill or by hand (deploy/RUNBOOK.md § Bring staging up) and wiped after. The drill is HOST CRON on VPC 2, not a Coolify task: sudo crontab -e → 0 3 1 * * /opt/better-answers/deploy/restore-drill.sh (env from a root-only file)."
+step "On VPC 1: Database → PostgreSQL, the OFFICIAL pgvector image BY DIGEST — the exact reference in packages/schema/src/postgres-image.ts (ADR 0032; no custom image). Name 'better-answers-pg', shared_buffers 512 MB, memory limit 1 GB, data directory bind-mounted at /data/postgres if the UI allows; Backups → S3 storage, daily. Record in the private coolify.md § Probes: the image accepted by digest? the bind mount? and the answer to \\du — is the resource's owner the superuser?"
+step "Runtime roles (T-003 created them NOLOGIN): as the resource's owner run  ALTER ROLE app_rt LOGIN PASSWORD '<new>';  ALTER ROLE worker_rt LOGIN PASSWORD '<new>';  → the two DSNs become DATABASE_URL and WORKER_DATABASE_URL on the PLATFORM resource; the owner DSN is migrate's alone (it is the same DATABASE_URL today: the platform stack runs migrate and api from one env — record in the private inventory how each password is held). The box is not reachable by the app until this act."
+step "On VPC 1: Docker Compose 'better-answers-stores' from deploy/stores.compose.yaml — its env includes BACKUP_IMAGE_DIGEST from build.yml's run summary (the backup image), GARAGE_RPC_SECRET and GARAGE_ADMIN_TOKEN (openssl rand -hex 32 each) — then 'better-answers' from deploy/platform.compose.yaml (git source = the GitHub repo) with PUBLIC_URL=https://app.$APEX, AGENT_HOSTNAME=agent.$APEX, APEX_HOSTNAME=$APEX (all three must differ or the app refuses to start — ADR 0034) and every other env SECRETS.md says is 'Coolify env'."
+step "On VPC 2: only the staging Postgres resource is created (empty). The staging stacks are brought up ON DEMAND by the drill or by hand (RUNBOOK.md § Bring staging up) and wiped after. The drill is HOST CRON on VPC 2, already written by host-setup.sh (/etc/cron.d/better-answers-drill); fill /etc/better-answers/drill.env and staging.env now, root-only."
 step "Settings → Notifications → email: failed deployments, unhealthy containers, backup failures."
 step "Keys & Tokens → API tokens: create 'github-actions-deploy' (deploy scope)."
 say "CI (GitHub-hosted runners) cannot reach Coolify while the firewall allows only your own address. COOLIFY_URL waits until Coolify is reachable by CI — a second tunnel on VPC 2 (coolify.\$APEX → localhost:8000) behind Access with a service token for CI is the recommended shape; leave '-' until then."
 ask COOLIFY_URL "Coolify URL (as CI will reach it; '-' if not yet):"
-ask COOLIFY_STAGING_APP_UUID "UUID of the STAGING compose resource:"
-ask COOLIFY_PROD_APP_UUID "UUID of the PRODUCTION compose resource:"
+ask COOLIFY_PROD_APP_UUID "UUID of the PRODUCTION platform compose resource:"
 ask_secret COOLIFY_DEPLOY_TOKEN "Paste the API token (hidden; goes to GitHub only):"
 set_var COOLIFY_URL "$COOLIFY_URL"
-set_var COOLIFY_STAGING_APP_UUID "$COOLIFY_STAGING_APP_UUID"
 set_var COOLIFY_PROD_APP_UUID "$COOLIFY_PROD_APP_UUID"
+set_var PUBLIC_URL "https://app.$APEX"
 set_secret COOLIFY_DEPLOY_TOKEN "$COOLIFY_DEPLOY_TOKEN"
-write_env COOLIFY_URL "$COOLIFY_URL"; write_env COOLIFY_STAGING_APP_UUID "$COOLIFY_STAGING_APP_UUID"; write_env COOLIFY_PROD_APP_UUID "$COOLIFY_PROD_APP_UUID"
+write_env COOLIFY_URL "$COOLIFY_URL"; write_env COOLIFY_PROD_APP_UUID "$COOLIFY_PROD_APP_UUID"
 pause
 
 # ────────────────────────────────────────────────────────────────────────
-stage "healthchecks.io — the dead-man's switch"
+stage "healthchecks.io — the dead-man's switch, the second channel, the weekly digest"
 open_url "https://healthchecks.io/"
 step "Create a project 'Better Answers'. Checks (period · grace): scheduler 1 min · 3 min; pg-hourly 1 h · 15 min; nightly 24 h · 2 h; coolify-backup 24 h · 4 h; drill 35 d · 2 d; staging-wiped 35 d · 2 d."
-step "Ping URLs → Coolify env: HEALTHCHECKS_PING_URL_SCHEDULER, _PG_HOURLY, _NIGHTLY (production stacks); _DRILL and _STAGING_WIPED → the VPC 2 host env file. Ping bodies carry an outcome word and sizes only."
-step "Integrations: email to you; add a second channel (SMS or a chat app) for 'scheduler' — silence there is an outage."
-pause "Ping URLs in Coolify env?"
+step "Ping URLs → Coolify env: HEALTHCHECKS_PING_URL_SCHEDULER (platform resource), _PG_HOURLY and _NIGHTLY (stores resource); _DRILL and _STAGING_WIPED → /etc/better-answers/drill.env on VPC 2. Ping bodies carry an outcome word and sizes only."
+step "Integrations: email to you, AND a SECOND channel (SMS or a chat app) assigned to scheduler, pg-hourly, nightly AND drill — a missed backup is not an email to read on Monday. The same channel takes the Cloudflare health-check notifications (stage 5)."
+step "Account → Reports: the WEEKLY report ON, to you — an all-green digest every week, so silence is distinguishable from health."
+ask SECOND_CHANNEL "Second channel (kind only, e.g. SMS / Signal / Slack — no number here):"
+write_env SECOND_CHANNEL "$SECOND_CHANNEL"
+pause "Ping URLs in Coolify env and the drill env?"
 
 # ────────────────────────────────────────────────────────────────────────
-stage "First deploy, the depends_on probe, the first drill"
-say "In GitHub → Actions run 'build' (main): the images are pushed; staging deploys only when brought up. Then run 'release' to promote to production."
-step "Watch the production deploy log in Coolify. Record in deploy/coolify.md § Probes: the compose command Coolify ran; whether 'migrate' finished before 'app' started; whether 'worker' waited for 'app' healthy; whether redeploying 'better-answers' left 'better-answers-stores' running."
-step "Open https://app.$APEX (Access OTP), https://mcp.$APEX/.well-known/oauth-protected-resource, https://agent.$APEX/ (expect 404), https://$APEX/c/test (expect 404)."
-step "Run the first drill by hand on VPC 2: sudo /opt/better-answers/deploy/restore-drill.sh. Read the report in the bucket under drills/. Then rehearse 'Coolify lost' once (deploy/RUNBOOK.md page 5) and test that the second holder can open the vault."
-if confirm "All four hostnames answered as expected and the drill report exists"; then
+stage "First deploy and the probes"
+say "In GitHub → Actions run 'build' (main): three images are pushed and the run summary shows three digests. Put the backup one in the stores resource's env; then run 'release' with blank inputs to promote the api and worker digests to production (the worker is declared, not started — the pipeline profile)."
+step "Watch the production deploy log in Coolify. Record in the private coolify.md § Probes: the compose command Coolify ran; whether 'migrate' finished before 'api' started; whether redeploying 'better-answers' left 'better-answers-stores' running; the \\du answer."
+step "Open https://app.$APEX (the shell and sign-in), https://app.$APEX/.well-known/oauth-protected-resource/mcp (resource = https://app.$APEX/mcp), https://agent.$APEX/ (expect 404), https://$APEX/c/test (expect 404). Both Cloudflare health checks green; one row in deploy/RELEASES.md."
+if confirm "All three hostnames answered as expected and RELEASES.md has its first row"; then
   write_env FIRST_DEPLOY_DONE "$(date -u +%F)"
 else
-  SKIPPED+=("first deploy / probe / drill — re-run this stage")
+  SKIPPED+=("first deploy / probes — re-run this stage")
+fi
+
+# ────────────────────────────────────────────────────────────────────────
+stage "The first restore drill — by hand, before any client's data exists (ADR 0022)"
+say "This is the task's finish line. Nothing of a client's goes on the box until this has run green once."
+step "On VPC 2, as root:  set -a; . /etc/better-answers/drill.env; set +a; /opt/better-answers/deploy/restore-drill.sh"
+step "Read the report in the bucket under drills/. A step marked 'not built yet' is a slice that has not landed and is expected today; a FAIL is not. The 'drill' and 'staging-wiped' checks both pinged."
+step "Then rehearse 'Coolify lost' once (RUNBOOK.md page 5), and have the second holder open the vault once."
+step "Record the drill's date and RTO in the private RUNBOOK.md. The day the first client's data lands: gh variable set CLIENT_DATA_ON_BOX --body <date> — from then on 'release' insists on a drill-day or a hotfix reason (page 6)."
+if confirm "Did the first drill run green, with its report in drills/ and both pings received"; then
+  write_env FIRST_DRILL_DONE "$(date -u +%F)"
+else
+  SKIPPED+=("the first restore drill — must precede any client data; re-run this stage")
 fi
 
 finish

@@ -5,7 +5,7 @@ The matrix ADR 0007 asked for, decided by ticket 41 (ADR 0022) and resized by ti
 - **dumps** — versioned, **object lock in governance mode**, lifecycle tiers below. The production host's credential can write and list, never delete, never bypass retention; the escrowed admin credential can. A compromised host cannot erase its history; a human can correct a mistake.
 - **mirror** — versioned, **no lock**, 30-day expiry of non-current versions: deletions must propagate, because the object store holds personal data that erasure removes (ADR 0020).
 
-Everything in `dumps/` is **client-side encrypted with `age`** before upload; the private half lives only in escrow and, for the drill, on VPC 2. Every job: verify the upload against the bucket, write a `backup_run` row (the System screen reads it — ticket 42), then ping the dead-man check with the outcome word and sizes only.
+Everything in `dumps/` is **client-side encrypted with `age`** before upload; the private half lives in escrow and, for the unattended drill, in a root-only file on VPC 2 — with the consequence `SECRETS.md` § The backup identity states. Every job: verify the upload against the bucket, write a `backup_run` row (the System screen reads it — ticket 42), then ping the dead-man check with the outcome word and sizes only.
 
 ## Copied
 
@@ -23,7 +23,7 @@ Everything in `dumps/` is **client-side encrypted with `age`** before upload; th
 
 | Store | Kind | Why not | Rebuilt by | Budget |
 | --- | --- | --- | --- | --- |
-| The graph (AGE, inside Postgres) | copied | rides the Postgres dump above — no separate job (ADR 0023) | `dumps/pg/` | with every dump | as Postgres | yes — source entities from redacted text | `pg_restore`; the rebuild is a repair path, drilled monthly on one workspace |
+| The graph (plain tables inside Postgres, ADR 0032) | copied | rides the Postgres dump above — no separate job | `dumps/pg/` | with every dump | as Postgres | yes — source entities from redacted text | `pg_restore`; the rebuild is a repair path, drilled monthly on one workspace |
 | Worker LMDBs (`/data/worker/lmdb/<binding>`) | **personal data on disk** | memoised extraction output; disposable by design (`[PIPE1]`, ADR 0005); capped at 4 GB per binding, wiped and reprocessed over it | reprocessing the binding | priced by the extraction plan |
 | Worker trees (`/data/worker/trees`) | personal data on disk | checkouts of the bare repositories at a commit | `git clone` from `/data/git` (mounted read-only) | minutes |
 | `/data/backup/staging` | personal data on disk | the local copy before upload — deleted on verified upload; anything older than 24 h is deleted by the next job | — | — |
@@ -42,7 +42,7 @@ The three dates are computed **from the timestamp of the last dump before the re
 4. Reconcile pipeline state: every LMDB is wiped; bindings reprocess from the object store.
 5. Object-store orphans: blobs with no catalogue row are listed, then swept after the grace.
 
-`restore-drill.sh` replays exactly this into staging on VPC 2 on the first of every month, records RTO and RPO, and ends by wiping staging. A restore anywhere is an `audit_event` (*restore*: by whom, from which copy) on the System screen.
+`restore-drill.sh` replays exactly this into staging on VPC 2 on the first of every month, records RTO and RPO, and ends by wiping staging. **`restore-production.sh` replays it into production** (`RUNBOOK.md` page 1): the same order, step 1's replay mandatory, no wipe and no trap. Every step that needs a slice not yet built says so through its `pnpm ops` command's exit code (`apps/api/src/ops.ts`), so a drill before the graph exists records "not built" and never a false green. A restore anywhere is an `audit_event` (*restore*: by whom, from which copy) on the System screen.
 
 ## Boxes (ADR 0024)
 
@@ -64,4 +64,4 @@ Two boxes of 4 vCPU · 4 GB · 120 GB NVMe. VPC 1 runs all of production — the
 
 ## Signals (for ticket 42)
 
-`backup_run(id, kind ∈ backup · drill, store, started_at, finished_at, outcome, bytes, location, report_url, contains_personal_data, expires_at, rto_minutes)`. Alerts: a missed or failed ping per job (scheduler, pg-hourly, nightly, drill, Coolify instance backup, staging-wiped); disk under `/data` above 80 %; last backup per store older than its period; last drill older than 35 days; worker `image_digest` ≠ the released one.
+`backup_run(id, kind ∈ backup · drill, store, started_at, finished_at, outcome, bytes, location, report_url, contains_personal_data, expires_at, rto_minutes)` — the table lands with ticket 42's signals task; until then `backup.sh` and the drill say "row not written" and carry on, and the pings are the record. Alerts: a missed or failed ping per job (scheduler, pg-hourly, nightly, drill, Coolify instance backup, staging-wiped) — `pg-hourly`, `nightly` and `drill` on the **second channel**, with a weekly all-green digest so silence is distinguishable from health; the uptime check's two paths (`coolify.md` § Ingress); disk under `/data` above 80 %; last backup per store older than its period; last drill older than 35 days; worker `image_digest` ≠ the released one. **Growth step A has two triggers** (ADR 0024): the swap-in rate (`pswpin` above 4 MB/s for five minutes) and the **page-cache floor** — `MemAvailable` on VPC 1 below 512 MB for five minutes, with every service's limit summed in `coolify.md` § Memory.

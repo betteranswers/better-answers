@@ -10,6 +10,7 @@
     "dev": "node --watch src/main.ts",
     "start": "node src/main.ts",
     "migrate": "node src/migrate.ts",
+    "ops": "node src/ops.ts",
     "serve:e2e": "node tests/serve.ts",
     "serve:local": "node tests/local.ts",
     "lint": "oxlint --config ../../.oxlintrc.json .",

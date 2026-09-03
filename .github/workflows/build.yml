@@ -6,10 +6,12 @@
 # THE IMAGE LIST, and it is stated once:
 #   api     — apps/api/Dockerfile, built from the repository root (it carries apps/web's build)
 #   worker  — apps/worker/Dockerfile, built from apps/worker
-# These are the two `deploy/platform.compose.yaml` names by digest. The `backup` image
-# (deploy/backup.Dockerfile) is the third and joins this matrix under `T-005`, with the deploy
-# unit that runs it. Postgres is never built here and never will be: it is the official
-# pgvector image, pinned by digest in `packages/schema/src/postgres-image.ts` (ADR 0032).
+#   backup  — deploy/backup.Dockerfile, built from deploy/ (T-005; ticket 79 A11)
+# The first two are `deploy/platform.compose.yaml`'s names by digest, promoted by release.yml;
+# the third is `deploy/stores.compose.yaml`'s, set in that resource's env by hand at the first
+# deploy and whenever the backup image changes — the stores stack is not the deploy unit.
+# Postgres is never built here and never will be: it is the official pgvector image, pinned by
+# digest in `packages/schema/src/postgres-image.ts` (ADR 0032).
 #
 # Action versions read from each repository's latest release on 03/09/2026, and every `uses:`
 # names the commit SHA that tag resolved to on the same day (`[DEPS1]`, `T-040`) — the reason
@@ -52,6 +54,9 @@ jobs:
           - tier: worker
             context: apps/worker
             dockerfile: apps/worker/Dockerfile
+          - tier: backup
+            context: deploy
+            dockerfile: deploy/backup.Dockerfile
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Before build-push-action, always: the default `docker` driver cannot export a build

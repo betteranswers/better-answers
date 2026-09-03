@@ -13,11 +13,18 @@
 # owns the directory, `backup` bundles it nightly and pushes the mirror.
 #
 # Versions read on 28/08/2026 from Docker Hub / GitHub releases —
-# .scratch/v01-spec/research/41-deploy-facts.md §1 ([DEPS1]). Renovate pins these to digests.
+# .scratch/v01-spec/research/41-deploy-facts.md §1 ([DEPS1]); the digests beside each tag were
+# read from Docker Hub's tag API on 03/09/2026 (T-005). Renovate keeps them pinned.
 #
 # State: bind mounts under /data/<service>, owned by each service's uid by `init` (idempotent;
 # runs on every redeploy). Never `user: "0:0"`. What is copied off-host and what is rebuilt:
-# deploy/BACKUPS.md.
+# BACKUPS.md.
+#
+# MEMORY: every service on VPC 1 carries an explicit limit (ticket 79 scale F2, T-003 → T-005),
+# because a 4 GB box shared by Postgres, the platform stack and this one has no room for a
+# service that grows unannounced. The sum of every limit — this file, platform.compose.yaml
+# and the Postgres resource's own (1 GB, set in Coolify) — leaves the page-cache floor
+# BACKUPS.md § Signals states; a box under that floor for five minutes is growth step A.
 
 name: better-answers-stores
 
@@ -31,11 +38,21 @@ x-logging: &logging
     driver: json-file
     options: { max-size: "20m", max-file: "10" }
 
+# `deploy.resources.limits.memory` is what `docker compose up` honours outside swarm, and it is
+# the form platform.compose.yaml already uses for the worker; one form in both files.
+x-small: &small
+  deploy: { resources: { limits: { memory: 128m } } }
+x-medium: &medium
+  deploy: { resources: { limits: { memory: 384m } } }
+
 services:
   # `embeddings:1000` is absent from the list because the service below is commented out; it
   # returns with the service.
   init:
-    image: alpine:<read on the day — not in research 68>
+    # alpine 3.23.5, read from Docker Hub's tag API on 03/09/2026 ([DEPS1]) — `latest` on that
+    # day resolved to 3.22.5, so the current release line is named rather than the alias.
+    image: alpine:3.23.5@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40
+    <<: *small
     command: >
       sh -ec '
         for d in objectstore:1000 git:1000 worker/lmdb:1000 worker/trees:1000 worker/hf-cache:1000 backup/staging:1000 mirror:1000; do
@@ -49,8 +66,8 @@ services:
   # Internal only; the app and worker speak S3 to it on :3900 (deploy/garage.toml). Access keys
   # are created once with `garage key create` and stored as OBJECTSTORE_ROOT_KEY/SECRET.
   objectstore:
-    image: dxflrs/garage:v2.3.0
-    <<: [*restart, *logging]
+    image: dxflrs/garage:v2.3.0@sha256:866bd13ed2038ba7e7190e840482bc27234c4afaf77be8cfa439ae088c1e4690
+    <<: [*restart, *logging, *medium]
     command: ["/garage", "server", "--single-node"]
     environment:
       GARAGE_CONFIG_FILE: /etc/garage.toml
@@ -74,7 +91,7 @@ services:
   # immutable per workspace (29).
   #
   # embeddings:
-  #   image: <read on the day — the OpenAI-shaped embedding server the first build task picks>
+  #   image: # the OpenAI-shaped embedding server, chosen and pinned the day a workspace takes the local route ([DEPS1])
   #   <<: [*restart, *logging]
   #   environment:
   #     MODEL_ID: BAAI/bge-m3
@@ -89,26 +106,29 @@ services:
   #     init: { condition: service_completed_successfully }
 
   # The only way in. Ingress (three hostnames, ADR 0034, + the catch-all http_status:404) is configured on
-  # the tunnel in Cloudflare (deploy/coolify.md § Ingress); every hostname → api:3000 on the
+  # the tunnel in Cloudflare (coolify.md § Ingress, under apps/docs-site/operations/); every hostname → api:3000 on the
   # platform stack, which the tunnel reaches over the shared network. Lives in the stores stack
   # so a release never drops the tunnel.
   cloudflared:
-    image: cloudflare/cloudflared:2026.8.2
-    <<: [*restart, *logging]
+    image: cloudflare/cloudflared:2026.8.2@sha256:0aa26e284f05e6c77ae375b8c9c11d9eb6a448fb7bcd8d40f31cb6176189eb38
+    <<: [*restart, *logging, *small]
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:?}
 
-  # Backup jobs (deploy/backup.sh, deploy/BACKUPS.md): hourly/daily/weekly/monthly Postgres dumps
+  # Backup jobs (deploy/backup.sh, BACKUPS.md): hourly/daily/weekly/monthly Postgres dumps
   # (age-encrypted), the nightly object-store mirror, one git bundle per bare repository and the
   # push mirror of the git store to VPC 2 → the off-host buckets with rclone, the mirror over SSH.
   # Cron inside; nothing listens. Every job: verify the upload, write a backup_run row, then ping
   # with the outcome word and sizes only.
+  #
+  # The third image build.yml pushes by digest (deploy/backup.Dockerfile). `backup.sh` is inside
+  # it. The digest is this resource's env, set at the first deploy from build.yml's run summary
+  # and moved by hand when the backup image changes — never by release.yml, whose deploy unit
+  # is the platform stack alone (CONTEXT.md, *deploy unit*).
   backup:
-    build:
-      context: .
-      dockerfile: backup.Dockerfile
-    <<: [*restart, *logging]
+    image: ghcr.io/betteranswers/backup@${BACKUP_IMAGE_DIGEST:?set from build.yml's run summary}
+    <<: [*restart, *logging, *medium]
     environment:
       DATABASE_URL: ${DATABASE_URL:?}
       BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:?}          # public half; the private key is escrow-only
@@ -137,7 +157,6 @@ services:
       timeout: 5s
       retries: 3
     volumes:
-      - ./backup.sh:/usr/local/bin/backup.sh:ro
       - /data/git:/data/git:ro
       - /data/backup/mirror-ssh:/root/.ssh:ro    # the mirror deploy key (private half) and known_hosts — root-only on the host, SECRETS.md
       - /data/backup/staging:/staging
