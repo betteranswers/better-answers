@@ -144,6 +144,30 @@ export const originOfUrl = (url: string): string => {
 };
 
 /**
+ * Whether a URL's host is already written the way a URL parser reads it — the reading
+ * `bareHostname` makes of a declared hostname, made of the one that is derived from a
+ * URL (`PUBLIC_URL`'s, which is `mcp.`; T-039).
+ *
+ * The parser canonicalises an address spelling — `127.000.000.001` and `0x7f.1` both
+ * come back as `127.0.0.1`, `%6dcp.example.test` as `mcp.example.test` — so a value
+ * written that way names a host no arriving request can match and no operator can find
+ * in their DNS. Case and DNS's trailing root dot are the two rewritings that name the
+ * *same* host, so both sides are read through `bareForm` and neither stops a process.
+ * A port is not part of a hostname, and the parser drops it when it is the scheme's
+ * default, so it is taken off the written side rather than compared.
+ */
+export const hostIsAsWritten = (url: string): boolean => {
+  // The authority exactly as the operator typed it: after the scheme, before the path.
+  const authority = url.slice(url.indexOf("://") + 3).split(/[/?#]/)[0] ?? "";
+  // An IPv6 literal keeps its brackets and carries its own colons; for a name, the
+  // first colon after the host starts the port.
+  const written = authority.startsWith("[")
+    ? authority.slice(0, authority.indexOf("]") + 1)
+    : (authority.split(":")[0] ?? "");
+  return bareForm(written.toLowerCase()) === hostnameOfUrl(url);
+};
+
+/**
  * A bare hostname: DNS labels and nothing else. A value with a scheme, a port, a path
  * or credentials is a configuration mistake that would silently match no request and
  * hand that hostname's surface to nobody, so it stops the process instead.

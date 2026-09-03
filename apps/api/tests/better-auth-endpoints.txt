@@ -19,9 +19,11 @@
 #
 # Already checked, so nobody need raise it twice: the five `/admin/oauth2/*` paths —
 # @better-auth/oauth-provider's surface for minting OAuth clients and managing resource
-# registrations — are `SERVER_ONLY` and answer 404 on `app.` and on `mcp.`, GET and
-# POST (T-039's [SEC3] pass, verified through the harness). They are listed because that
-# flag is the library's, not because they are reachable.
+# registrations — are `SERVER_ONLY`, so better-call leaves them off its router. They
+# answer 404 on `app.` and on `mcp.`, GET and POST, and that is held by a test rather
+# than a claim: hostnames.test.ts, "refuses the identity provider's admin endpoints on
+# every hostname that answers". They are listed here because the flag is the library's,
+# not because they are reachable.
 /.well-known/oauth-authorization-server
 /.well-known/openid-configuration
 /account-info

@@ -6,6 +6,7 @@ import { err, ok, type Result } from "@better-answers/core/kernel";
 
 import {
   bareHostname,
+  hostIsAsWritten,
   hostnameOfUrl,
   originOfUrl,
   type PublicHostnames,
@@ -54,14 +55,10 @@ const httpsOrigin = z
   }, "PUBLIC_URL must be an https origin with no path, query, fragment or credentials")
   .refine(
     // The `mcp.` hostname is this URL's host, so a host the parser rewrites is a
-    // hostname the operator never wrote and cannot find in their DNS —
-    // `https://127.000.000.001` and `https://0x7f.1` both read as `127.0.0.1`, and
-    // `https://%6dcp.example.test` as `mcp.example.test`. `bareHostname` refuses the
-    // same class for the three named hostnames (T-030); this is the same rule on the
-    // one that is now derived rather than declared. The comparison is against the
-    // origin this becomes, so DNS's trailing root dot — the one rewriting that *is*
-    // the same host — still passes and is still normalised away below.
-    (value) => value.toLowerCase().startsWith(originOfUrl(value).toLowerCase()),
+    // hostname the operator never wrote and cannot find in their DNS. `bareHostname`
+    // refuses that class for the three declared hostnames (T-030); the fence makes the
+    // same reading of the one that is now derived.
+    hostIsAsWritten,
     "PUBLIC_URL must already be written the way a URL parser reads a host: a spelling the parser rewrites (`127.000.000.001`, `0x7f.1`, a percent-encoded label) would derive an `mcp.` hostname no arriving request can match",
   )
   .refine(

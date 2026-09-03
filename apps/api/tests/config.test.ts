@@ -102,9 +102,15 @@ describe("the bootstrap configuration", () => {
  * cases below that would have been `MCP_HOSTNAME`'s are `PUBLIC_URL`'s.
  */
 describe("the four hostnames of the estate", () => {
-  it.each(["APP_HOSTNAME", "AGENT_HOSTNAME", "APEX_HOSTNAME"])("refuses a missing %s", (name) => {
-    expect(readIdentityBootstrap(identityEnvironment({ [name]: undefined })).ok).toBe(false);
-  });
+  // `PUBLIC_URL` is in this matrix as a hostname, not only as an origin: it is where
+  // `mcp.` comes from, so a deploy unit that omits it leaves a hostname unset as surely
+  // as omitting one of the three would (Cubic round 1).
+  it.each(["PUBLIC_URL", "APP_HOSTNAME", "AGENT_HOSTNAME", "APEX_HOSTNAME"])(
+    "refuses a missing %s",
+    (name) => {
+      expect(readIdentityBootstrap(identityEnvironment({ [name]: undefined })).ok).toBe(false);
+    },
+  );
 
   it.each([
     ["a scheme", "https://app.example.test"],
@@ -187,6 +193,21 @@ describe("the four hostnames of the estate", () => {
     );
 
     expect(read.ok && read.value.publicUrl).toBe("https://mcp.example.test");
+    expect(read.ok && read.value.hostnames.mcp).toBe("mcp.example.test");
+  });
+
+  it("accepts a port beside DNS's trailing dot, which names the same host on a port of its own", () => {
+    // Cubic round 1: the first version of the as-written check compared the whole
+    // origin as a prefix of the value, so normalising the root dot moved it *past* the
+    // port — `https://mcp.example.test.:8443` became `https://mcp.example.test:8443`,
+    // which the raw value does not start with, and a legitimate origin stopped the
+    // process. The check reads the host alone now (`hostIsAsWritten`), so the port is
+    // no part of the comparison and the dot is read the same way on both sides.
+    const read = readIdentityBootstrap(
+      identityEnvironment({ PUBLIC_URL: "https://mcp.example.test.:8443" }),
+    );
+
+    expect(read.ok && read.value.publicUrl).toBe("https://mcp.example.test:8443");
     expect(read.ok && read.value.hostnames.mcp).toBe("mcp.example.test");
   });
 });

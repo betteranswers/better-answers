@@ -47,9 +47,11 @@ const HEADER = `\
 #
 # Already checked, so nobody need raise it twice: the five \`/admin/oauth2/*\` paths —
 # @better-auth/oauth-provider's surface for minting OAuth clients and managing resource
-# registrations — are \`SERVER_ONLY\` and answer 404 on \`app.\` and on \`mcp.\`, GET and
-# POST (T-039's [SEC3] pass, verified through the harness). They are listed because that
-# flag is the library's, not because they are reachable.
+# registrations — are \`SERVER_ONLY\`, so better-call leaves them off its router. They
+# answer 404 on \`app.\` and on \`mcp.\`, GET and POST, and that is held by a test rather
+# than a claim: hostnames.test.ts, "refuses the identity provider's admin endpoints on
+# every hostname that answers". They are listed here because the flag is the library's,
+# not because they are reachable.
 `;
 
 /** A comment line and a blank line are the header; every other line is one path. */
@@ -64,10 +66,16 @@ const readSnapshot = (): readonly string[] =>
  * the same options — because which endpoints exist is decided by the plugin list and
  * `basePath`, both of which live in `auth.ts`.
  *
- * The pool is never connected: no endpoint is registered by a query, so the table is
- * the same one a running app carries. Better Auth initialises eagerly against the
- * database it was given and this one reaches nothing, so that rejection is swallowed
- * here exactly as `createServer` reads it through the health check.
+ * The pool is never connected, and the table does not depend on it. `getEndpoints`
+ * builds `auth.api` **synchronously** from `options.plugins` at construction
+ * (`better-auth/dist/api/index.mjs`; `router()` registers from that same call), and
+ * nothing can add to it later — so the set here is the set a running app carries,
+ * whatever the database is doing. Better Auth's eager initialisation does reach for the
+ * database and this pool reaches nothing, so that rejection is swallowed here exactly
+ * as `createServer` reads it through the health check. Starting a real Postgres would
+ * buy this suite a container and no assertion; the guard against a build that carries
+ * *no* table is the second test below, not a live connection. (`[TEST2]` binds a test
+ * that touches data; this one touches none.)
  */
 const database = new Pool({ connectionString: "postgresql://unused@127.0.0.1:1/unused" });
 const auth = createAuth({
@@ -116,6 +124,15 @@ describe("what Better Auth mounts behind the fence's catch-all (ADR 0022, T-039)
     }
 
     const reviewed = readSnapshot();
+    // Sorted and each path once, before membership is compared at all: the comparison
+    // below is set-shaped, so a hand-edited file with a duplicate or an out-of-order
+    // line would pass while breaking the invariant the header states — and the next
+    // refresh would produce a diff nobody could read (Cubic round 1).
+    expect(
+      reviewed,
+      "tests/better-auth-endpoints.txt is not sorted, or names a path twice. Refresh it rather than editing it by hand.",
+    ).toEqual([...new Set(reviewed)].sort());
+
     const added = mounted.filter((mount) => !reviewed.includes(mount));
     const removed = reviewed.filter((mount) => !mounted.includes(mount));
 

@@ -78,6 +78,27 @@ describe("each hostname reaches only its documented surface (ADR 0022)", () => {
     expect(response.status).toBe(200);
   });
 
+  it("refuses the identity provider's admin endpoints on every hostname that answers", async () => {
+    // `@better-auth/oauth-provider` ships a surface that mints OAuth clients and
+    // manages resource registrations. It is in the endpoint table, so the snapshot
+    // (`better-auth-endpoints.txt`) puts it in front of a reader — and the answer to
+    // the question that raises is here rather than in a PR comment (T-039, `[SEC3]`).
+    // Better Auth marks each `metadata.SERVER_ONLY`, so better-call leaves it off its
+    // router; the fence's catch-all admits the path on `app.` and `mcp.` and there is
+    // nothing behind it. That is the library's flag, not ours, so it is asserted.
+    for (const hostname of [MCP_HOSTNAME, APP_HOSTNAME]) {
+      const client = app.client(undefined, hostname);
+      for (const path of [
+        "/admin/oauth2/create-client",
+        "/admin/oauth2/update-client",
+        "/admin/oauth2/resources",
+      ]) {
+        expect((await client.fetch(path, { method: "POST" })).status).toBe(404);
+        expect((await client.fetch(path)).status).toBe(404);
+      }
+    }
+  });
+
   it("refuses the share agent's surface on mcp.", async () => {
     const response = await app.client().fetch("/agent/v1/files");
 
