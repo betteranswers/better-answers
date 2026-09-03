@@ -6,13 +6,7 @@ import {
   HOSTNAME_SURFACES,
   LOOPBACK_HOSTNAMES,
 } from "../src/ingress/hostnames.ts";
-import {
-  AGENT_HOSTNAME,
-  APEX_HOSTNAME,
-  APP_HOSTNAME,
-  startApp,
-  type TestApp,
-} from "./harness.ts";
+import { AGENT_HOSTNAME, APEX_HOSTNAME, APP_HOSTNAME, startApp, type TestApp } from "./harness.ts";
 
 /**
  * The in-process hostname fence (T-030, PR #7's deferral D1), re-cut to one origin by
@@ -82,9 +76,7 @@ describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)
     }
     // What `authorize` and `token` answer a bare request is Better Auth's to say — a
     // redirect with an error, a 400 — but never the fence's 404.
-    expect((await product.fetch("/oauth2/authorize", { redirect: "manual" })).status).not.toBe(
-      404,
-    );
+    expect((await product.fetch("/oauth2/authorize", { redirect: "manual" })).status).not.toBe(404);
     expect((await product.fetch("/oauth2/token", { method: "POST" })).status).not.toBe(404);
     expect(refusals().some((line) => String(line["path"]).startsWith("/oauth2/"))).toBe(false);
   });

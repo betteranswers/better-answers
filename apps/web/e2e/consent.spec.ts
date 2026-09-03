@@ -60,7 +60,8 @@ const catchClaudesRedirect = (page: Page) =>
 
 const landedAt = (page: Page): URL => new URL(page.url());
 
-const consentHeading = (page: Page) => page.getByRole("heading", { level: 1, name: "Connect Claude" });
+const consentHeading = (page: Page) =>
+  page.getByRole("heading", { level: 1, name: "Connect Claude" });
 
 test("sign-in, authorize, consent and the code at Claude's redirect, all on one origin", async ({
   page,

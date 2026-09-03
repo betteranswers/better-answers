@@ -200,10 +200,11 @@ describe("the flow, as claude.ai drives it", () => {
     const { challenge } = pkce();
     const asked = app.metadataFetches.length;
 
-    const response = await app.client().fetch(
-      authorizeUrl({ challenge, scope: "knowledge:read", clientId: LOOKALIKE_CLIENT_ID }),
-      { redirect: "manual" },
-    );
+    const response = await app
+      .client()
+      .fetch(authorizeUrl({ challenge, scope: "knowledge:read", clientId: LOOKALIKE_CLIENT_ID }), {
+        redirect: "manual",
+      });
 
     expect(response.ok).toBe(false);
     expect(response.headers.get("location") ?? "").not.toContain("code=");
@@ -335,7 +336,9 @@ describe("the pages refuse a cross-site form", () => {
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
     expect(consent.pathname).toBe("/consent");
-    const before = await app.database.superuser.query("SELECT count(*)::int AS n FROM oauth_consent");
+    const before = await app.database.superuser.query(
+      "SELECT count(*)::int AS n FROM oauth_consent",
+    );
 
     const fetched = await client.fetch(`${consent.pathname}${consent.search}`, {
       method: "POST",
@@ -351,7 +354,9 @@ describe("the pages refuse a cross-site form", () => {
 
     expect(fetched.status).toBe(403);
     expect(fetched.headers.get("location")).toBeNull();
-    const after = await app.database.superuser.query("SELECT count(*)::int AS n FROM oauth_consent");
+    const after = await app.database.superuser.query(
+      "SELECT count(*)::int AS n FROM oauth_consent",
+    );
     expect(after.rows[0]).toEqual(before.rows[0]);
     // And the same form, as a document navigation from this origin, is the one that
     // works: what the fence reads is the shape of the request and nothing else.
@@ -359,7 +364,9 @@ describe("the pages refuse a cross-site form", () => {
       accept: "true",
     });
     expect(navigated.status).toBe(302);
-    expect(new URL(navigated.headers.get("location") ?? "").searchParams.get("code")).not.toBeNull();
+    expect(
+      new URL(navigated.headers.get("location") ?? "").searchParams.get("code"),
+    ).not.toBeNull();
   });
 
   it("refuses consent posted with no Fetch Metadata at all, which no browser navigation is", async () => {

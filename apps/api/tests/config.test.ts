@@ -131,9 +131,7 @@ describe("the three hostnames of the estate", () => {
     ["a padded IPv4 spelling", "127.000.000.001"],
     ["a hexadecimal IPv4 spelling", "0x7f.1"],
   ])("refuses AGENT_HOSTNAME with %s", (_case, hostname) => {
-    expect(readIdentityBootstrap(identityEnvironment({ AGENT_HOSTNAME: hostname })).ok).toBe(
-      false,
-    );
+    expect(readIdentityBootstrap(identityEnvironment({ AGENT_HOSTNAME: hostname })).ok).toBe(false);
   });
 
   it("gives app. the host the product is served from and the authorization server issues from, without being told it twice", () => {
