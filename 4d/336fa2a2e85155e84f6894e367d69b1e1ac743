@@ -1,0 +1,49 @@
+.oxlintrc.json
+  s_90ffdc067aac0d::t_df0bb336f189ae 359-367,371
+apps/api/tests/oauth-flow.test.ts
+  s_90ffdc067aac0d::t_9c630d8991ed9b 389-393,398-406,408-409
+apps/web/src/features/auth/choose-workspace-screen.tsx
+  s_90ffdc067aac0d::t_dffd26b562abbf 148-149
+  s_90ffdc067aac0d::t_26df8b24ff404b 9,24-28,40-42,44-45,51-55,69-70,74,91,96-103,109-125,136-138,140-147,150-163,175-176,179-185,214,218
+docs/research/t-022-better-auth-ui.md
+  s_90ffdc067aac0d::t_aa43e0ebbe36e6 323-342
+apps/api/tests/flow.ts
+  s_90ffdc067aac0d::t_232f8dd6ad0029 74-80
+apps/api/tests/harness-control.ts
+  s_90ffdc067aac0d::t_6ef844133eff38 33,69-72
+CODING_RULES.md
+  s_90ffdc067aac0d::t_1bb670d81598f5 31-33
+apps/web/e2e/sign-in.spec.ts
+  s_90ffdc067aac0d::t_dffd26b562abbf 3
+  s_90ffdc067aac0d::t_3b0b7cd357f4c2 30-33,54-56,129-196
+apps/web/src/features/auth/membership.ts
+  s_90ffdc067aac0d::t_232f8dd6ad0029 22-32
+apps/api/tests/spa.test.ts
+  s_90ffdc067aac0d::t_3206ecadce453a 48-62
+apps/api/src/auth/routes.ts
+  s_90ffdc067aac0d::t_232f8dd6ad0029 55-63
+apps/web/test/lint-rules.test.ts
+  s_90ffdc067aac0d::t_db9f1fd794fdd3 192,195-197,203-205,210
+apps/web/e2e/harness.ts
+  s_90ffdc067aac0d::t_b97894d19d03e6 46-54
+apps/web/src/shared/ui/THIRD_PARTY_NOTICES.md
+  s_90ffdc067aac0d::t_aa43e0ebbe36e6 18-24
+apps/api/src/ingress/spa.ts
+  s_90ffdc067aac0d::t_b839c3de22e016 51-65,67,70-71,97,105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "4d336fa2a2e85155e84f6894e367d69b1e1ac743",
+  "prompts": {},
+  "sessions": {
+    "s_90ffdc067aac0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb92143-40a3-4162-962a-19793a875ce7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
