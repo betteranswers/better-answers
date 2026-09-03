@@ -11,7 +11,7 @@ const RETRY_ATTEMPTS = 2;
  * (`[UX2]`). Everything else, including the `INTERNAL_SERVER_ERROR` raised when the session
  * store could not be reached, may well succeed on the next attempt.
  */
-const isRefusal = (error: unknown) =>
+const isRefusal = (error: Error) =>
   error instanceof TRPCClientError && error.data?.code === "UNAUTHORIZED";
 
 /**
