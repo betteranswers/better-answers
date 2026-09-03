@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { fileURLToPath } from "node:url";
 
+import { hostnameOfUrl, originOfUrl } from "../src/ingress/hostnames.ts";
 import { startApp } from "./harness.ts";
 
 /**
@@ -16,26 +17,59 @@ import { startApp } from "./harness.ts";
  * loop unable to sign in at all. The captured transport hands each message to this file
  * instead, and this file prints it. Nothing in `apps/api/src` is involved.
  *
- * `pnpm --filter @better-answers/api run serve:local` — build the SPA first
+ * `pnpm --filter @better-answers/api run serve:local [origin]` — build the SPA first
  * (`pnpm --filter @better-answers/web run build`), because the app serves that build.
+ *
+ * The one optional argument is the origin the app is reached on when it is not the
+ * loopback: a Cloudflare quick tunnel (`cloudflared tunnel --url http://127.0.0.1:3200`)
+ * in front of this port, so a real MCP host — claude.ai — can connect as a client
+ * against this issuer (T-045's re-prove; prototype 61). The issuer Better Auth
+ * advertises *is* `publicUrl`, read through the same `originOfUrl` as `PUBLIC_URL` is in
+ * `config.ts`, and the fence's `app` hostname is its host, derived the same way; the listener stays on the loopback port either way, because
+ * that is where the tunnel forwards to. An argument rather than an environment variable,
+ * in the shape of `tests/serve.ts`: `[SEC1]` keeps `src/config.ts` the tier's only reader
+ * of the environment.
  */
 
 const PORT = 3200;
-const APP_URL = `http://127.0.0.1:${PORT}`;
+const LOOPBACK_URL = `http://127.0.0.1:${PORT}`;
 
 /** Not a logger: the logger must never hold a code, and this is the point of the file. */
 const say = (line: string): void => {
   process.stdout.write(`${line}\n`);
 };
 
+const originArgument = (argument: string | undefined): string => {
+  if (argument === undefined) return LOOPBACK_URL;
+  // The URL standard spells an opaque origin — a scheme with no host, such as a bare
+  // `mailto:` — as the literal string "null", so that is the second way to have no origin.
+  const parsed = URL.parse(argument);
+  if (parsed === null || parsed.origin === "null") {
+    throw new Error(
+      `the local loop's one argument is the origin the app is reached on, e.g. https://<name>.trycloudflare.com; got ${argument}`,
+    );
+  }
+  return originOfUrl(argument);
+};
+
+const publicUrl = originArgument(process.argv[2]);
+const hostnames = {
+  app: hostnameOfUrl(publicUrl),
+  agent: "agent.localhost",
+  apex: "localhost",
+};
+// The three must differ, as `config.ts` insists: an origin on one of the other two names
+// would hand that hostname's surface to the product and fail on the first request instead.
+if (hostnames.app === hostnames.agent || hostnames.app === hostnames.apex) {
+  throw new Error(
+    `the origin's host ${hostnames.app} is already the agent or apex hostname; use a different one`,
+  );
+}
+
 const app = await startApp({
   webRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
-  publicUrl: APP_URL,
-  hostnames: {
-    app: "127.0.0.1",
-    agent: "agent.localhost",
-    apex: "localhost",
-  },
+  publicUrl,
+  hostnames,
   onEmail: (message) => {
     const code = /\b(\d{6})\b/.exec(message.text)?.[1];
     say("");
@@ -49,7 +83,10 @@ const workspace = await app.provision({ name: "Dogfood", adminEmail: "admin@exam
 
 serve({ fetch: app.server.fetch, port: PORT, hostname: "127.0.0.1" }, () => {
   say("");
-  say(`  Better Answers is at ${APP_URL}/sign-in`);
+  say(`  Better Answers is at ${publicUrl}/sign-in`);
+  if (publicUrl !== LOOPBACK_URL) {
+    say(`  Listening on ${LOOPBACK_URL} for the tunnel in front of it`);
+  }
   say(`  Workspace: ${workspace.name}`);
   say(`  Admin:     ${workspace.admin.email}`);
   say("");
