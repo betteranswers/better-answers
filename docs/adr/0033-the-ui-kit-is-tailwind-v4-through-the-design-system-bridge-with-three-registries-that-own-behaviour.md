@@ -108,3 +108,43 @@ installed by a later ticket and pinned when they are.
 - **This ADR is calibrated against one screen.** The frame exists; the answer surface, where
   AI Elements earns its place, does not. If the streaming components turn out to fight the
   register, that is an amendment here rather than a quiet substitution.
+
+## Amendment — 2026-09-03, the registry components land, and what they cost (T-036)
+
+The ADR left the registry components to "a later ticket… pinned when they are". This is that
+pin. Everything below was read from the registry on **3 September 2026**; nothing came from
+memory (`[DEPS1]`).
+
+**Where they live.** `apps/web/src/shared/ui/` holds the shadcn primitives — `badge`,
+`button`, `carousel`, `collapsible`, `command`, `dialog`, `dropdown-menu`, `hover-card`,
+`popover`, `select`, `table`, `tabs` — with `kibo-ui/` and `ai-elements/` beside them so a
+reader can tell at a glance which registry a component came from. `shared/lib/utils.ts` holds
+the `cn` helper all three expect. `apps/web/components.json` records the two registry URLs
+(`https://www.kibo-ui.com/r/{name}.json`, `https://registry.ai-sdk.dev/{name}.json`) and the
+aliases, so the next install lands in the same places.
+
+**What was taken.** shadcn's primitives above; Kibo UI's `combobox` and `snippet`; AI
+Elements' `sources` and `inline-citation`. The CLIs are `shadcn@4.20.1` and
+`ai-elements@1.9.0`; a shadcn registry item carries no version of its own, so the pin is the
+CLI version, the registry URL and the date, and the source itself is in this repository.
+
+**Kibo UI's `table` was read and rejected**, which is what "reviewed before it lands" is for:
+its source is written against `@tanstack/react-table` v8, and v9 — current on the day — is a
+breaking rewrite (`useReactTable` and `getCoreRowModel` no longer exist). Taking it would have
+meant pinning a knowingly-superseded major on the day the repository first depends on it. The
+review table it was wanted for uses the shadcn `table` primitive until Kibo catches up.
+
+**Three costs the ADR did not name, now visible.**
+
+1. **Registry source does not pass rules written for our own code.** Four rules are turned off
+   over `apps/web/src/shared/ui/**` in `.oxlintrc.json` — `react/set-state-in-effect`,
+   `react-doctor/effect-needs-cleanup`, `jsx-a11y/prefer-tag-over-role` and the type-assertion
+   safety comment — each of which judges *how* a component is written, which is the half this
+   ADR gives the registries. Every import rule, `no-console`, `[A11Y1]` at the screen and the
+   anti-slop rules that catch a widened type stay on.
+2. **The registries write extensionless imports**, which do not resolve under this repository's
+   `nodenext` setting. They are rewritten to explicit `.ts`/`.tsx` on arrival, along with the
+   `"use client"` directives, which mean nothing in a Vite SPA.
+3. **The icons are lucide-react**, because that is what the primitives import. The design
+   system's Phosphor choice stands for the platform's own components; a chevron inside a
+   `Select` is behaviour, not meaning.

@@ -2,8 +2,8 @@ import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createAppRouter } from "../src/app/router.tsx";
-import { SCREENS } from "../src/shared/screens.ts";
+import { createAppRouter } from "@/app/router.tsx";
+import { SCREENS } from "@/shared/screens.ts";
 
 /**
  * The frame's own behaviour, through the router a browser drives (`[TEST1]`: a rendered

@@ -1,6 +1,6 @@
 import { Link, Outlet } from "@tanstack/react-router";
 
-import { SCREENS } from "../shared/screens.ts";
+import { SCREENS } from "@/shared/screens.ts";
 
 /**
  * Control Centre's frame: the `better-answers` handle, the navigation over the six

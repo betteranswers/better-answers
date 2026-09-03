@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { TRPC_IP_RULE } from "../src/auth/index.ts";
+import { TRPC_ENDPOINT } from "../src/trpc/index.ts";
 import { signIn } from "./flow.ts";
 import { startApp, type TestApp, type TestClient } from "./harness.ts";
 
@@ -21,7 +22,12 @@ import { startApp, type TestApp, type TestClient } from "./harness.ts";
  * wire through the same single mapping every refusal below takes.
  */
 
-const TRPC_ROUTES_LIST = "/trpc/routes.list";
+// Built from the mount's own constant rather than written out, so this suite drives the path
+// the server actually serves. `apps/web` cannot import that constant — a value import from the
+// api is the runtime edge ADR 0006's amendment refuses — so it asserts the same declaration by
+// reading this file's source (`[DEPS2]`, `apps/web/test/api-client.test.tsx`). Between the two,
+// a mount moved without its client fails a test rather than a browser.
+const TRPC_ROUTES_LIST = `${TRPC_ENDPOINT}/routes.list`;
 
 const routeShape = z.object({
   purpose: z.string(),

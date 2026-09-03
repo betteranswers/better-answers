@@ -13,7 +13,9 @@ export default {
   // the negation changes nothing a run does — it records the decision where the next person
   // to widen the globs will read it: the browser suite is Playwright against a served build
   // over a Testcontainers Postgres, and the vitest runner below cannot run it.
-  mutate: ["src/**/*.tsx", "!src/main.tsx", "!e2e/**"],
+  // `src/shared/ui/**` is registry source (ADR 0033, 2026-09-03 amendment): it belongs to the
+  // registries that wrote it, so a mutant there measures their tests, not ours.
+  mutate: ["src/**/*.tsx", "!src/main.tsx", "!src/shared/ui/**", "!e2e/**"],
   coverageAnalysis: "perTest",
 
   // Stryker's sandbox copies the workspace to a temp directory and rewrites `extends` in the

@@ -47,7 +47,7 @@ export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
       endpoint: TRPC_ENDPOINT,
       createContext: (_options, context) => ({
         door: deps.door,
-        auth: deps.auth,
+        readSession: (headers: Headers) => deps.auth.api.getSession({ headers }),
         headers: context.req.raw.headers,
       }),
     }),

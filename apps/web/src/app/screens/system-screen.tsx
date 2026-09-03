@@ -1,4 +1,4 @@
-import { screenById } from "../shared/screens.ts";
+import { screenById } from "@/shared/screens.ts";
 
 const system = screenById("system");
 
