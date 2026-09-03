@@ -219,7 +219,8 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   run. _Avoid_: idempotency key (cocoindex's word for its stable data ids).
 - **route** — a workspace's choice of model and provider for one purpose (extraction,
   enrichment, answering, judging, embedding), local or hosted; one route per purpose. The
-  embedding route never changes once vectors exist.
+  embedding route is **fixed** — the word a reader sees on it — and never changes once vectors
+  exist (ADR 0020).
 
 ## Trust words the reader sees
 

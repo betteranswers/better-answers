@@ -9,7 +9,9 @@ import {
 } from "@playwright/test";
 import { z } from "zod";
 
-import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
+import { EMBEDDING_DIMENSIONS, type llmPurpose } from "@better-answers/schema";
+
+import { SCREENS } from "@/shared/screens.ts";
 
 /**
  * T-022's acceptance seam, and the test T-038 exists for: browser to row-level policy. A real
@@ -36,7 +38,12 @@ const sessionAnswer = z.object({
 
 type Workspace = z.infer<typeof workspaceAnswer>;
 type Member = z.infer<typeof memberAnswer>;
-type Route = { readonly purpose: string; readonly provider: string; readonly model: string };
+/** A route to seed. The purpose is the column's own enum, so a typo is a type error here. */
+type Route = {
+  readonly purpose: (typeof llmPurpose.enumValues)[number];
+  readonly provider: string;
+  readonly model: string;
+};
 
 const parsed = async <TShape extends z.ZodType>(
   response: APIResponse,
@@ -94,8 +101,20 @@ const signInAs = async (
 
 const routesCard = (page: Page) => page.getByRole("region", { name: "Routes" });
 
+const embeddingRow = (page: Page) =>
+  routesCard(page)
+    .getByRole("listitem")
+    .filter({ has: page.getByRole("heading", { level: 3, name: "Embedding" }) });
+
 /** The five rows, in the order the purpose enum declares and a reader reads them. */
 const PURPOSES = ["Extraction", "Enrichment", "Answering", "Judging", "Embedding"];
+
+/**
+ * The substance of the card's why-line, in the words `CONTEXT.md`'s *route* entry settles: the
+ * embedding route is *fixed* and never changes once vectors exist (ADR 0020). Asserted as a
+ * phrase rather than the whole sentence, so rewording the rest of it is not a test change.
+ */
+const FIXED_REASON_PHRASE = "never changes once vectors exist";
 
 test.describe("the System screen's routes card", () => {
   test("shows a member of one workspace their five routes and never another workspace's", async ({
@@ -147,6 +166,16 @@ test.describe("the System screen's routes card", () => {
     await expect(card.getByRole("listitem")).toHaveCount(5);
     await expect(card.getByRole("heading", { level: 3 })).toHaveText(PURPOSES);
     await expect(card.getByText("No route is set.")).toHaveCount(4);
+
+    // The embedding row still reads as fixed with nothing chosen: *fixed* is what the platform
+    // has decided about the purpose, not something a particular choice acquires, and a reader
+    // looking at an unconfigured embedding purpose must learn there will never be a control.
+    const embedding = embeddingRow(page);
+    await expect(embedding).toContainText("No route is set.");
+    await expect(embedding.getByText("Fixed", { exact: true })).toHaveCount(1);
+    await expect(embedding).toContainText(FIXED_REASON_PHRASE);
+    // The count is the chosen model's vector width, so with nothing chosen there is none to show.
+    await expect(embedding).not.toContainText("dimensions");
   });
 
   test("says the embedding route is fixed, in words, with its dimension count and why", async ({
@@ -160,18 +189,17 @@ test.describe("the System screen's routes card", () => {
     await signInAs(context, request, { email: workspace.adminEmail });
 
     await page.goto("/system");
-    const embedding = routesCard(page)
-      .getByRole("listitem")
-      .filter({ has: page.getByRole("heading", { level: 3, name: "Embedding" }) });
+    const embedding = embeddingRow(page);
 
     await expect(embedding).toContainText("mistral");
     await expect(embedding).toContainText("mistral-embed");
-    // The word, not a colour: a reader who cannot see the border still learns the route is fixed.
+    // The word, not a colour: a reader who cannot see the outline still learns the route is fixed.
     await expect(embedding).toContainText("Fixed");
-    // The count as the platform pins it, never a literal (`[DEPS2]`).
+    // The count as the platform pins it, never a literal (`[DEPS2]`). The screen reads it off the
+    // wire; this equality is what holds the two ends of that number together.
     await expect(embedding).toContainText(`${EMBEDDING_DIMENSIONS} dimensions`);
-    // The why-line: one sentence saying it never changes once vectors exist (ADR 0020's amendment).
-    await expect(embedding).toContainText("vectors already written");
+    // The why-line, in the words `CONTEXT.md`'s *route* entry settles (ADR 0020's amendment).
+    await expect(embedding).toContainText(FIXED_REASON_PHRASE);
 
     // One state tag on the card, on the one row it is about: the four other purposes are not
     // fixed and say nothing that could be read as if they were.
@@ -271,24 +299,54 @@ test.describe("the System screen's routes card", () => {
     await page.keyboard.press("Enter");
     await expect(page.getByRole("main")).toBeFocused();
 
-    // The card is a labelled region with a heading and a list: the structure a screen reader
-    // navigates by. Asserted here rather than left to axe, which does not require it.
-    await expect(routesCard(page).getByRole("heading", { level: 2, name: "Routes" })).toBeVisible();
-    await expect(routesCard(page).getByRole("list")).toHaveCount(1);
+    // The announced structure itself, not a claim about it: the accessibility tree a screen
+    // reader reads, written out. A row that lost its heading, a list that stopped being a list
+    // or a state tag that turned into an image fails here even though the pixels are unchanged.
+    // This is the record of what the card sounds like; no live screen reader is driven by CI.
+    await expect(routesCard(page)).toMatchAriaSnapshot(`
+      - region "Routes":
+        - heading "Routes" [level=2]
+        - paragraph: /Which model does which job in this workspace/
+        - list:
+          - listitem:
+            - heading "Extraction" [level=3]
+            - paragraph: No route is set.
+          - listitem:
+            - heading "Enrichment" [level=3]
+            - paragraph: No route is set.
+          - listitem:
+            - heading "Answering" [level=3]
+            - term: Provider
+            - definition: anthropic
+            - term: Model
+            - definition: claude-sonnet-5
+          - listitem:
+            - heading "Judging" [level=3]
+            - paragraph: No route is set.
+          - listitem:
+            - heading "Embedding" [level=3]
+            - term: Provider
+            - definition: mistral
+            - term: Model
+            - definition: mistral-embed
+            - paragraph: /Fixed ${EMBEDDING_DIMENSIONS} dimensions/
+            - paragraph: /${FIXED_REASON_PHRASE}/
+    `);
 
-    // `@axe-core/playwright` 4.13.0, read from npm 03/09/2026 (`[DEPS1]`). A pass is evidence,
-    // not proof: the keyboard traversal above and the screen-reader review are the rest of it.
+    // `@axe-core/playwright` 4.13.0, read from npm 03/09/2026 (`[DEPS1]`). Automated rules are
+    // evidence, not proof: the keyboard traversal and the aria snapshot above are the rest of it.
     const audit = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
       .analyze();
     expect(audit.violations).toEqual([]);
 
-    // The rest of System, and the other five screens, still say they are unbuilt.
+    // The rest of System, and every one of the other five screens, still say they are unbuilt.
     await expect(page.getByText(/The rest of System/)).toBeVisible();
-    await page
-      .getByRole("navigation", { name: "Control Centre" })
-      .getByRole("link", { name: "Knowledge" })
-      .click();
-    await expect(page.getByText("This screen is not built yet.")).toBeVisible();
+    const navigation = page.getByRole("navigation", { name: "Control Centre" });
+    for (const screen of SCREENS.filter((candidate) => candidate.id !== "system")) {
+      await navigation.getByRole("link", { name: screen.name }).click();
+      await expect(page.getByRole("heading", { level: 1, name: screen.name })).toBeVisible();
+      await expect(page.getByText("This screen is not built yet.")).toBeVisible();
+    }
   });
 });

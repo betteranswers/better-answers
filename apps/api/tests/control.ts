@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 
+import { llmPurpose } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import { MCP_HOSTNAME, type TestApp } from "./harness.ts";
@@ -23,7 +24,9 @@ import { MCP_HOSTNAME, type TestApp } from "./harness.ts";
 export const CONTROL_PREFIX = "/__test__";
 
 const routeSeed = z.object({
-  purpose: z.enum(["extraction", "enrichment", "answering", "judging", "embedding"]),
+  // The enum the column is declared from, never a restatement of it (`[DEPS2]`): a purpose
+  // added to the platform is accepted here the day it is added.
+  purpose: z.enum(llmPurpose.enumValues),
   provider: z.string().min(1),
   model: z.string().min(1),
 });
