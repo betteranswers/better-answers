@@ -11,7 +11,10 @@
 # unit that runs it. Postgres is never built here and never will be: it is the official
 # pgvector image, pinned by digest in `packages/schema/src/postgres-image.ts` (ADR 0032).
 #
-# Action versions read from each repository's latest release on 03/09/2026 (`[DEPS1]`).
+# Action versions read from each repository's latest release on 03/09/2026, and every `uses:`
+# names the commit SHA that tag resolved to on the same day (`[DEPS1]`, `T-040`) — the reason
+# is in check.yml's header, and this is the job that would pay for a moving tag: it holds a
+# `packages: write` token.
 name: build
 
 on:
@@ -50,25 +53,25 @@ jobs:
             context: apps/worker
             dockerfile: apps/worker/Dockerfile
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Before build-push-action, always: the default `docker` driver cannot export a build
       # cache, so `cache-to: type=gha` fails the build outright with "Cache export is not
       # supported for the docker driver". This step is what gives the job a buildkit driver
       # that can.
-      - uses: docker/setup-buildx-action@v4.3.0
-      - uses: docker/login-action@v4.6.0
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/metadata-action@v6.2.0
+      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         id: meta
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}
           tags: |
             type=sha,prefix=sha-
             type=raw,value=main
-      - uses: docker/build-push-action@v7.3.0
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         id: build
         with:
           context: ${{ matrix.context }}

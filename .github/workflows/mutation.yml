@@ -4,7 +4,8 @@
 # A falling score is an ordna task, not a failed build — the job posts the numbers, it does not gate.
 # Neither tool exits non-zero on a survivor here (Stryker's thresholds.break is null, mutmut's run always
 # exits 0), so a red job means the harness itself broke, which is worth seeing.
-# Action versions read from each action's GitHub releases page on 31/08/2026 ([DEPS1]).
+# Action versions read from each action's GitHub releases page on 31/08/2026, resolved to the
+# commit SHA each tag names on 03/09/2026 ([DEPS1], `T-040`; the reason is in check.yml's header).
 name: mutation
 
 on:
@@ -31,9 +32,9 @@ jobs:
           - name: web
             path: apps/web
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: pnpm/action-setup@v6.0.10
-      - uses: actions/setup-node@v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
           cache: pnpm
@@ -57,7 +58,7 @@ jobs:
           else
             echo "### ${{ matrix.name }} mutation score: no report" >> "$GITHUB_STEP_SUMMARY"
           fi
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: stryker-${{ matrix.name }}
@@ -69,8 +70,8 @@ jobs:
     timeout-minutes: 120
     defaults: { run: { working-directory: apps/worker } }
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: astral-sh/setup-uv@v10.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
       - run: uv sync --frozen

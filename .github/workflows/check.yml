@@ -1,7 +1,16 @@
 # `check` on every PR, and on main as build.yml's first job — lint, types, tests per
 # workspace (AGENTS.md). One definition of `check`, called from both places.
 # Hosted Ubuntu runners ship Docker, so Testcontainers ([TEST2]) runs unchanged.
-# Action versions read from each repository's latest release on 28/08/2026 — research/41-deploy-facts.md §1 ([DEPS1]); Renovate pins them to digests.
+# Action versions read from each repository's latest release on 28/08/2026 — research/41-deploy-facts.md §1 ([DEPS1]).
+#
+# EVERY `uses:` IN THIS DIRECTORY NAMES A COMMIT SHA, with its tag beside it as a comment: the
+# tag is what a person reads and what Renovate rewrites, the SHA is what runs. A tag is a
+# moving reference into somebody else's repository, and these workflows hold a token that can
+# push our images. "Renovate pins them to digests" stood in this header from 28/08/2026 as a
+# plan, and every file went on using tags until `T-040` resolved them (GitHub API,
+# `git/ref/tags/<tag>`, annotated tags dereferenced, 03/09/2026). `renovate.json` keeps them
+# pinned — `pinDigests` on the `github-actions` manager, which is what the
+# `helpers:pinGitHubActionDigests` preset sets.
 name: check
 
 on:
@@ -23,13 +32,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: pnpm/action-setup@v6.0.10
-      - uses: actions/setup-node@v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
           cache: pnpm
-      - uses: astral-sh/setup-uv@v10.0.1
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
       - run: pnpm install --frozen-lockfile
