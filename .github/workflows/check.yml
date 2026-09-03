@@ -16,13 +16,28 @@ name: check
 on:
   pull_request:
   # On main this workflow is CALLED by build.yml as its first job, so a push runs `check`
-  # once — before the images are built, never beside them (`T-018`). Two triggers would also
-  # have the two runs cancel each other on the concurrency group below.
+  # once — before the images are built, never beside them (`T-018`). A `push` trigger here as
+  # well would put both runs in the one group below and have them queue behind each other.
   workflow_call:
 
+# A pull request cancels the run it supersedes; a run CALLED by build.yml never does.
+#
+# This block is evaluated in the caller's context, so `check-refs/heads/main` was one group
+# holding every push to main with `cancel-in-progress: true` — and build.yml asks for the
+# opposite in its own group (`build-main`, `cancel-in-progress: false`) because an image is
+# worth building for every commit that lands. Two fast pushes and the second run cancelled the
+# first run's `check` job, taking the images it gates with it (`T-040`).
+#
+# The condition holds whichever value a called run reads: GitHub documents `github.event_name`
+# as "the name of the event that triggered the workflow run" without saying, for a reusable
+# workflow, whether that is the caller's event or `workflow_call` — and neither of those is
+# `pull_request`. Only a run triggered directly by a pull request cancels, either way.
+#
+# The group must also stay different from build.yml's: a called workflow that waits on its
+# caller's group waits on itself.
 concurrency:
   group: check-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
