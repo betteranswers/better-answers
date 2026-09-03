@@ -6,7 +6,7 @@ import { z } from "zod";
 import { TRPC_IP_RULE } from "../src/auth/index.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/index.ts";
 import { signIn } from "./flow.ts";
-import { startApp, type TestApp, type TestClient } from "./harness.ts";
+import { APP_HOSTNAME, startApp, type TestApp, type TestClient } from "./harness.ts";
 
 /**
  * `routes.list` from the outside (`[TEST1]`, `[APP3]`): a person signs in with a code
@@ -71,11 +71,10 @@ const seedRoutes = async (workspaceId: string): Promise<void> => {
   }
 };
 
-/** A signed-in browser: the email step, the code from the captured email, no OAuth flow. */
+/** A signed-in browser: the code request, the code from the captured email, no OAuth flow. */
 const signedInClient = async (email: string): Promise<TestClient> => {
-  const client = app.client();
-  const signedIn = await signIn(app, client, email, "");
-  expect(signedIn.status).toBe(302);
+  const client = app.client(undefined, APP_HOSTNAME);
+  await signIn(app, client, email);
   return client;
 };
 

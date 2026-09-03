@@ -85,7 +85,11 @@ export type AuthDependencies = {
   readonly database: pg.Pool;
   readonly door: PostgresDoor;
   readonly publicUrl: string;
+  /** The origin the SPA is served from (`app.`): where sign-in and the picker are screens. */
+  readonly appUrl: string;
   readonly mcpUrl: string;
+  /** The domain one session's cookie is scoped to; `undefined` leaves the cookie host-only. */
+  readonly cookieDomain: string | undefined;
   readonly secret: string;
   readonly sendEmail: EmailSender;
   readonly fetchClientMetadataResource: ClientMetadataFetch;
@@ -202,9 +206,13 @@ export const createAuth = (deps: AuthDependencies) => {
     basePath: "/",
     secret: deps.secret,
     database: drizzleAdapter(db, { provider: "pg", schema: identitySchema }),
-    // This origin alone: a host never posts to these endpoints with a cookie, so it is
-    // not a trusted origin for Better Auth's CSRF check.
-    trustedOrigins: [deps.publicUrl],
+    // Two exact origins, no wildcard. Better Auth pushes `baseURL`'s own origin before it
+    // reads this option; `app.` is here because every POST the SPA makes carries the
+    // session cookie and `Origin: https://app.…`, which is not `baseURL`'s origin — sign-in,
+    // the pick and the OAuth resume would each be refused for a missing or untrusted origin
+    // without it (ADR 0009, 2026-09-02). A host still posts to `/oauth2/token` with no
+    // cookie at all, and the check does not run on a cookie-less request.
+    trustedOrigins: [deps.publicUrl, deps.appUrl],
     // The JWT plugin's `/token` and `set-auth-jwt` are for services without an OAuth
     // flow; under an OAuth provider both must be off (Better Auth, "OAuth Provider Mode").
     disabledPaths: ["/token"],
@@ -224,6 +232,21 @@ export const createAuth = (deps: AuthDependencies) => {
     advanced: {
       // Per-IP limits key on the tunnel's header alone (grilling Q8).
       ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
+      // Stated, because the library's default for this option is `NODE_ENV === "test"`:
+      // left unset, the origin check — the whole of the CSRF fence in front of sign-in,
+      // the pick and the resume — is off under every test runner, and the suite that
+      // believed it was proving the fence would be proving nothing. `false` is the same
+      // answer in every environment, which is what a fence has to be.
+      disableOriginCheck: false,
+      // One session for the browser across `app.` and `mcp.` (ADR 0009, 2026-09-02). The
+      // domain is stated because the library derives it from `baseURL`'s hostname verbatim
+      // when it is not — `mcp.…`, the one host that would make the cookie useless to the
+      // product, and a `Set-Cookie` for a domain the browser does not see itself under is
+      // rejected outright. An estate whose hostnames are not under its apex gets no
+      // cross-subdomain cookie rather than one no browser will keep.
+      ...(deps.cookieDomain === undefined
+        ? {}
+        : { crossSubDomainCookies: { enabled: true, domain: deps.cookieDomain } }),
     },
     databaseHooks: {
       session: {
@@ -370,8 +393,18 @@ export const createAuth = (deps: AuthDependencies) => {
         },
       }),
       oauthProvider({
-        loginPage: "/sign-in",
-        consentPage: "/consent",
+        // Absolute, because the redirect's `Location` is the configured string verbatim and
+        // a browser would otherwise resolve a relative path against `mcp.` — the origin the
+        // person is being sent away from. It carries no query of its own: the signed query
+        // is appended with an unconditional `?`, and a second one would corrupt the
+        // signature.
+        loginPage: `${deps.appUrl}/sign-in`,
+        // Consent is this tier's own page on this origin, outside the product's shell
+        // (ADR 0009, 2026-09-02) — and named absolutely, because the picker that resumes
+        // the flow is a screen on `app.` and the continue endpoint answers it with this
+        // string verbatim. Relative, it would resolve against the product's origin, where
+        // consent deliberately does not live.
+        consentPage: `${deps.publicUrl}/consent`,
         scopes: [...OAUTH_SCOPES],
         accessTokenExpiresIn: ACCESS_TOKEN_LIFETIME_SECONDS,
         refreshTokenExpiresIn: REFRESH_TOKEN_LIFETIME_SECONDS,
@@ -390,7 +423,8 @@ export const createAuth = (deps: AuthDependencies) => {
         clientRegistrationDefaultResources: [deps.mcpUrl],
         clientRegistrationAllowedResources: [deps.mcpUrl],
         postLogin: {
-          page: "/choose-workspace",
+          // The SPA's picker, absolute for the same reason as `loginPage` above.
+          page: `${deps.appUrl}/choose-workspace`,
           // ADR 0018's `workspace` claim: the active workspace, or no token at all.
           consentReferenceId: async ({ session, user: person }) => {
             // The session object here may predate `shouldRedirect`'s write for a

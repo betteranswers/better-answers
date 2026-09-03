@@ -1,8 +1,8 @@
 import { boundarySchemas, CREATOR_ROLE } from "@better-answers/schema";
 
 import { attempt, err, ok, type Result } from "../kernel/index.ts";
-import type { PlatformPrincipal, WorkspaceId } from "../kernel/index.ts";
-import { type PostgresDoor, withIdentityWrite, withScope } from "../store/postgres/index.ts";
+import type { PlatformPrincipal, Role, UserId, UserPrincipal, WorkspaceId } from "../kernel/index.ts";
+import { type PostgresDoor, type Tx, withIdentityWrite, withScope } from "../store/postgres/index.ts";
 
 /**
  * Slice: **workspaces** — the tenant's own lifecycle. Owns `workspace` as the platform
@@ -141,4 +141,49 @@ export const revokeCredentials = async (
   if (!revoked.ok) return err(revoked.error);
   if (revoked.value === undefined) return err("no-such-user");
   return ok({ userId: userId.data, actorId: platform.actorId });
+};
+
+/**
+ * Who the person is, where they are and at what role — the three the shell names
+ * (T-037, user stories 9 and 10). The role is the Principal's, resolved in this same
+ * transaction against the member row; the two names are looked up beside it.
+ */
+export type Membership = {
+  readonly workspace: { readonly id: WorkspaceId; readonly name: string };
+  /** `name` is null until a person has told us one; the shell falls back to the address. */
+  readonly person: { readonly id: UserId; readonly name: string | null; readonly email: string };
+  readonly role: Role;
+};
+
+/**
+ * Read the current membership as the Principal. `workspace` and `user` are identity-set
+ * tables and carry no policy (ADR 0009, 2026-09-01), so both statements name their row's
+ * id — the Principal's own, never one from a caller — and neither lists across
+ * principals. The role is not read again: it is the one the resolver already refused a
+ * disagreeing member row over (`withPrincipal`), and reading it twice would be two
+ * answers where the platform has one.
+ */
+export const readMembership = async (
+  principal: UserPrincipal,
+  tx: Tx,
+): Promise<Result<Membership, "no-such-workspace" | "no-such-person">> => {
+  const workspace = await tx.query<{ name: string }>(
+    "SELECT name FROM workspace WHERE id = $1",
+    [principal.workspaceId],
+  );
+  const name = workspace.rows[0]?.name;
+  if (name === undefined) return err("no-such-workspace");
+
+  const person = await tx.query<{ name: string | null; email: string }>(
+    'SELECT name, email FROM "user" WHERE id = $1',
+    [principal.userId],
+  );
+  const row = person.rows[0];
+  if (row === undefined) return err("no-such-person");
+
+  return ok({
+    workspace: { id: principal.workspaceId, name },
+    person: { id: principal.userId, name: row.name, email: row.email },
+    role: principal.role,
+  });
 };
