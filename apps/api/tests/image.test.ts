@@ -10,7 +10,6 @@ import { z } from "zod";
 const run = promisify(execFile);
 
 const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
-const image = "better-answers-api:check";
 
 /**
  * The runtime image's contents, asserted through the one interface a deploy unit has on
@@ -100,11 +99,16 @@ describe.skipIf(!(await dockerIsAvailable()))("the app tier's runtime image", ()
   const developmentOnly = developmentOnlyPackages();
 
   beforeAll(async () => {
-    await run("docker", ["build", "--file", "apps/api/Dockerfile", "--tag", image, "."], {
+    // The image is run by the id the build prints, and is never tagged. A tag is a name on
+    // the daemon, and the daemon is shared: two worktrees running `check` at once would
+    // overwrite each other's tag and one would read the other's image. The id cannot be
+    // taken from under this test.
+    const built = await run("docker", ["build", "--quiet", "--file", "apps/api/Dockerfile", "."], {
       cwd: repositoryRoot,
       timeout: 900_000,
       maxBuffer: 64 * 1024 * 1024,
     });
+    const image = built.stdout.trim();
     const { stdout } = await run(
       "docker",
       [
