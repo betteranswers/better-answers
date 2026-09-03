@@ -6,36 +6,36 @@ The **live conclusion** of every ADR — the state after its amendments, not its
 
 | ADR | Live conclusion |
 | --- | --- |
-| 0001 | ~~Type vocabulary authoritative in the bundle~~ — **superseded by 0026**: no vocabulary file; kinds are read off the concepts |
-| 0002 | Concept identity is a platform-minted opaque IRI; bundle identity lives in the manifest |
-| 0003 | One tenant bundle of atom concepts in v0.1; domains are future bundle boundaries |
-| 0004 | Guides and compositions are platform records citing concepts, never restating them |
-| 0005 | Own app, two runtime tiers (TS app, Python worker) sharing **four stores and never code**; no app↔worker HTTP — the control plane is rows; third-party parts lifted as pinned snapshots under `THIRD_PARTY_NOTICES.md` |
+| 0001 | ~~Type vocabulary authoritative in the bundle~~ — **superseded by 0026**: no vocabulary file; kinds are read off the concepts (superseded 2026-08-29) |
+| 0002 | Concept identity is a platform-minted opaque IRI on the bare apex `better-answers.com`; bundle identity lives in the manifest at the bundle's root, `knowledge/manifest.yaml`; `okf://` is an MCP wire URI and never a file reference (2026-08-30) |
+| 0003 | One tenant bundle of atom concepts in v0.1; domains are future bundle boundaries; merge-by-identity is keyed `(workspace, bundle, type, normalised label)` in `concept_identity` (2026-08-25) |
+| 0004 | Guides and compositions are platform records citing concepts, never restating them; a Q&A pair is an `Answer` concept and a context wording lives on its concept (0011, 0014); a guide's readers are levels Admin · Editor · Viewer; no publish state; the map degrades visibly in fixed words (2026-08-28) |
+| 0005 | Own app, two runtime tiers (TS app, Python worker) sharing **four stores and never code**; no app↔worker HTTP — the control plane is rows; third-party parts lifted as pinned snapshots under `THIRD_PARTY_NOTICES.md`; the tier contract's fixtures live in top-level `contracts/` (0031) (2026-09-01) |
 | 0006 | Hono long-running Node server + Vite SPA, not Next.js; the api serves the SPA's static build on `app.`; `apps/web` imports `apps/api` as a type only, for `AppRouter` (2026-09-02) |
-| 0007 | Plain Postgres; the app owns every migration and all DDL; deploy order `migrate` → `app` → `worker` |
-| 0008 | tRPC inside; generated OpenAPI, MCP and `/agent/v1` outside |
+| 0007 | Plain Postgres; the app owns every migration and all DDL — in `index` and the graph too; deploy order `migrate` → `api` → `worker`; the graph engine and custom image are superseded by 0032 (2026-09-01) |
+| 0008 | tRPC inside; generated OpenAPI, MCP and `/agent/v1` outside; the identity provider's pages are `/oauth2/*`, not `/oauth/*`, and the host router that holds each hostname to its own paths is built — `apps/api/src/ingress/hostnames.ts` (2026-09-03) |
 | 0009 | Better Auth in-process — the app is its own authorization server; its tables are the identity set, isolated by key not by scope, and its organisation model is the `workspace` table (2026-09-01); one session across `app.` and `mcp.`, sign-in and the picker are the SPA's, CIMD allow-listed to `claude.ai`, the `admin()` plugin refused as shipped (2026-09-02) |
 | 0010 | ~~Typed relations on concepts~~ — **rejected**; a link is the relation (0026) |
-| 0011 | Three knowledge layers (sources → bundles → graph) and the minting rule decide where a unit lives |
+| 0011 | Three knowledge layers (sources → bundles → graph) and the minting rule decide where a unit lives; the graph derives from sources too, as source entities that are never concepts; a relation is a `LINKS_TO` edge, never a typed derivation (0026) (2026-08-30) |
 | 0012 | The bundle is written only by the app, one commit per act; platform-prepared changes wait as suggestions; enrichment jobs read committed concepts, a run may enrich its own candidates before submitting (2026-09-01); the forge consequence is superseded — bare repositories (0024) |
-| 0013 | Sources bound by origin, reach and destination; publish · sensitivity · audience are the three permission fields, applied as one server-side predicate on every read |
-| 0014 | Records attach by IRI, versioned where edited, audited in one ledger |
-| 0015 | A composition cites its concept by a footnote labelled by the include |
-| 0016 | An answer asserts concepts only, found by traversal, served as one contract — verdict first |
-| 0017 | Every answer is a retained, correctable record; an `Answer` is minted only at a gate a person runs |
-| 0018 | One MCP surface, the Principal from the token grown by scope — **four entries, not the title's five** (A26, ticket 79; `describe_estate` dropped) |
-| 0019 | Trust is derived from the file, told in fixed words, moved only by a check; verifier ≠ generator |
-| 0020 | Personal data is withheld at the seam before any store and erased from every copy by routine |
+| 0013 | Sources bound by origin, reach and destination; publish · sensitivity · audience are the three permission fields, applied as one server-side predicate on every read (2026-08-30) |
+| 0014 | Records attach by IRI, versioned where edited, audited in one ledger; findings, subject requests and entity merges are record families in that ledger (2026-08-29) |
+| 0015 | A composition cites its concept by a footnote labelled by the include (roles are levels, 2026-08-30) |
+| 0016 | An answer asserts concepts only, found by traversal, served as one contract — verdict first; at depth 0 when the map is unavailable, said in the header line (2026-08-30) |
+| 0017 | Every answer is a retained, correctable record; an `Answer` is minted only at a gate a person runs (2026-08-30) |
+| 0018 | One MCP surface, the Principal from the token grown by scope — **four entries, not the title's five** (A26, ticket 79; `describe_estate` dropped, 2026-08-31) |
+| 0019 | Trust is derived from the file, told in fixed words, moved only by a check; verifier ≠ generator; `human:<email>` is rewritten to `human:<member-id>` only on erasure (2026-08-27) |
+| 0020 | Personal data is withheld at the seam before any store; the erasure routine rewrites every actor id the platform wrote, and a person edits what the company wrote — the title's *every copy* is narrowed to that (2026-08-30) |
 | 0021 | ~~Graph on Neo4j Community~~ — **superseded by 0023** |
-| 0022 | Two stacks deployed by digest; every irreplaceable byte encrypted off-host; erasures replayed on restore; `app.` is open at the edge — Better Auth is its sign-in (2026-09-02) |
+| 0022 | Two stacks deployed by digest; every irreplaceable byte encrypted off-host; erasures replayed on restore; `app.` is open at the edge — Better Auth is its sign-in (2026-09-02); the tunnel's ingress rules are the first fence and the app's own hostname list the second; three hostnames are bootstrap env and the fourth, `mcp.`, is derived from `PUBLIC_URL` (2026-09-03) |
 | 0023 | ~~Apache AGE, one graph per workspace~~ — **engine superseded by 0032** (plain tables under RLS); its write model stands: the read predicate lives once, in the app's graph query module; the incremental delta joins the app's commit transaction (2026-08-29 amendment) |
-| 0024 | The forge is bare git repositories the app writes; the estate is two 4 GB boxes |
+| 0024 | The forge is bare git repositories the app writes; the estate is two 4 GB boxes; a model-host box is a precondition of local embedding, triggered by the first workspace that asks (2026-08-30) |
 | 0025 | A signal is a query over rows the platform already keeps; every model call writes one `llm_call` row |
-| 0026 | Kinds emerge from the concepts — no vocabulary file; a link is the relation |
-| 0027 | Open core under Apache-2.0; the hosted service is the product; copyleft is run-only |
+| 0026 | Kinds emerge from the concepts — no vocabulary file; a link is the relation, never named; the five named edges are the platform's own bookkeeping (2026-08-30) |
+| 0027 | Open core under Apache-2.0; the hosted service is the product; copyleft is run-only; the estate's own configuration is not published — the ops documents' public halves name classes, contracts and shape, the private file holds addresses and edge-policy placement (2026-08-30) |
 | 0028 | A boundary schema is generated from its table; a refinement only narrows; a parity test proves it; a `customType`'s plain schema is constructed and tested per shape (2026-09-01) |
 | 0029 | The tree is `apps/` over `packages/`; business logic is `packages/core` — capability slices over four store doors; import direction is a lint rule (its contracts-rename and six-item-risk consequences are enacted and corrected by 0031) |
-| 0030 | The MCP surface stays MCP SDK v2 in the TypeScript tier behind one fetch-shaped seam |
+| 0030 | The MCP surface stays MCP SDK v2 in the TypeScript tier behind one fetch-shaped seam (four entries, 2026-08-31) |
 | 0031 | The tier contract is six agreements in three forms (SQL function / fixtured / generated) in top-level `contracts/`, conformance-tested by both tiers' suites; the read predicate's logic is app-only — the cross-tier piece is the visibility columns the worker writes |
 | 0032 | The graph is plain Postgres tables under RLS (no AGE, no per-workspace roles, no custom image); one migration journal, one `current_workspace_id()` policy seam, one SECURITY DEFINER lifecycle function, `vector(N)` fixed, the worker's schema view generated and drift-checked both ways |
 | 0033 | The interface is Tailwind v4 with the design system's tokens as its theme through one bridge; shadcn, Kibo UI, AI Elements and better-auth-ui own behaviour, the platform owns meaning; the design system's own components are deleted; the components landed in `apps/web/src/shared/ui/` on 03/09/2026 with four how-it-is-written rules relaxed over that directory alone, and Kibo's `table` rejected as v8-bound; better-auth-ui is taken as its provider, its localization and its headless hooks, and its 28 rendered sign-in files are refused as product this platform does not have |
