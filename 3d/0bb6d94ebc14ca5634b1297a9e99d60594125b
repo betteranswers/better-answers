@@ -1,0 +1,112 @@
+apps/api/tests/flow.ts
+  s_dd789516bdd60c::t_dbe9b06a69a643 94
+  s_dd789516bdd60c::t_cbc6aeecb29b35 136-137
+  s_dd789516bdd60c::t_425056bc1e1bcc 180-181
+  s_dd789516bdd60c::t_701d8485a6421f 26-29
+  s_dd789516bdd60c::t_24bcd73eec93ad 195,201
+  s_dd789516bdd60c::t_2762d31fcaea6b 218-219
+docs/adr/0008-trpc-inside-openapi-and-mcp-outside.md
+  s_dd789516bdd60c::t_7596a1f40f5832 37-40
+apps/api/src/auth/auth.ts
+  s_dd789516bdd60c::t_5814749f530849 424
+  s_dd789516bdd60c::t_1635ad0bde83cb 209-215
+  s_dd789516bdd60c::t_4360592ab70625 241-246
+  s_dd789516bdd60c::t_7cc89a80f2465e 87-90
+  s_dd789516bdd60c::t_245e313b131802 393-403
+apps/api/tests/local.ts
+  s_dd789516bdd60c::t_bc141567208540 33
+apps/api/tests/hostnames.test.ts
+  s_dd789516bdd60c::t_4c64ea67656642 81,148,284
+  s_dd789516bdd60c::t_b68104a66f08ee 18-22,24-28,30,45,63-66,68-70,73-74,76-80,83-89,92,94-103,105-107,110,116-125,129,133,146-147,149-150,171-181,187,212,215,252,265-266,274-283,285-289
+apps/web/e2e/consent.spec.ts
+  s_dd789516bdd60c::t_0cfb764e2b669e 1-187
+docs/adr/0034-one-origin-for-the-product-and-the-authorization-server.md
+  s_dd789516bdd60c::t_20278651cd63c3 1-46,48-151
+  s_dd789516bdd60c::t_2be6aeb0c33e15 47
+apps/api/tests/config.test.ts
+  s_dd789516bdd60c::t_6b98524fc49f4f 6-7,17,25-26,58,60,66,78-83,96-101,103,105-117,120-123,126-128,133-136,139-144,146,149,153,158-161,168-170,173,179,185-187,189,193-198,200,203-204,208-212,214,217-218
+apps/web/src/features/auth/auth-client.ts
+  s_dd789516bdd60c::t_b21ad63bd5de47 13-15
+apps/api/src/ingress/hostnames.ts
+  s_dd789516bdd60c::t_3da686a4121073 73-74,76,82,88,98
+  s_dd789516bdd60c::t_d5529fec713710 8-22,30-31,34-37
+  s_dd789516bdd60c::t_345a3c232e5973 100
+  s_dd789516bdd60c::t_41012d749eda59 150,153
+  s_dd789516bdd60c::t_710202356d4ea0 138
+  s_dd789516bdd60c::t_b6eaabf513fda4 216
+docs/adr/README.md
+  s_dd789516bdd60c::t_cce113a360a3ca 17
+  s_dd789516bdd60c::t_bb9964a9a38de1 30
+  s_dd789516bdd60c::t_2dbb490279aee3 16
+  s_dd789516bdd60c::t_8e99861cd4664a 42
+apps/api/tests/better-auth-endpoints.txt
+  s_dd789516bdd60c::t_4c64ea67656642 6-7,10-15,29-32
+apps/api/src/auth/routes.ts
+  s_dd789516bdd60c::t_df0cdf63ee1bf3 262
+  s_dd789516bdd60c::t_1d3cf06334beaf 27-29
+  s_dd789516bdd60c::t_e8fb4f19c70ef4 111,134-156
+apps/api/tests/token-verifier.test.ts
+  s_dd789516bdd60c::t_48631d888313b6 13
+deploy/platform.compose.yaml
+  s_dd789516bdd60c::t_be2cad704f2447 59-65,67-71
+  s_dd789516bdd60c::t_ec49e117411e97 82
+apps/api/tests/oauth-flow.test.ts
+  s_dd789516bdd60c::t_58670c49e22207 621
+  s_dd789516bdd60c::t_fc4f9e15aac9aa 304-355,358
+  s_dd789516bdd60c::t_e1e0ae14807269 148,150-152,160,165,169,175
+  s_dd789516bdd60c::t_5a57b4a480a27a 28-32
+  s_dd789516bdd60c::t_c20e81b47b193c 375-382,386-387,389-395,409,416-419,423,433-435,437
+  s_dd789516bdd60c::t_4c64ea67656642 388
+apps/api/tests/better-auth-endpoints.test.ts
+  s_dd789516bdd60c::t_e06f60b92f76b0 11-12,18
+  s_dd789516bdd60c::t_cfa65a6ab444ae 57-60
+  s_dd789516bdd60c::t_8d87734158238d 34-35,38-43
+  s_dd789516bdd60c::t_758617b2c3f150 78-79
+  s_dd789516bdd60c::t_e9d28f36ddccda 154
+  s_dd789516bdd60c::t_8ecc65a00fa89c 171
+apps/api/src/server.ts
+  s_dd789516bdd60c::t_b2110e05311984 30-34,36-37
+  s_dd789516bdd60c::t_85b68907c1ee13 17
+apps/api/tests/serve.ts
+  s_dd789516bdd60c::t_62b26cf446b1a9 32,34-39,43
+docs/adr/0022-two-stacks-deployed-by-digest-every-irreplaceable-byte-encrypted-off-host-erasures-replayed-on-restore.md
+  s_dd789516bdd60c::t_2be6aeb0c33e15 73
+  s_dd789516bdd60c::t_7416df8fd60f6a 70-72
+apps/api/tests/harness.ts
+  s_dd789516bdd60c::t_a275ede35df704 95
+  s_dd789516bdd60c::t_6d1c92bba62ac1 157-159,164,167-169,171
+  s_dd789516bdd60c::t_df5c70fa3cfdb9 30-31,36-40,42
+  s_dd789516bdd60c::t_51a713577de436 122
+  s_dd789516bdd60c::t_aab271b2b13ddc 198
+  s_dd789516bdd60c::t_5c8825bdad2925 278
+  s_dd789516bdd60c::t_ac6aed5ddf8c45 316-325
+apps/api/src/config.ts
+  s_dd789516bdd60c::t_14780eb0bc4f58 58,60-61,63,66-67,69,73-74,80-83,88-90,92-95,106,115
+  s_dd789516bdd60c::t_97a8c7cda766dc 147-148
+  s_dd789516bdd60c::t_7a1f5e29db6683 25-26
+apps/api/tests/spa.test.ts
+  s_dd789516bdd60c::t_722ac0fa66e9e2 123-125,128-129,132-135,137
+  s_dd789516bdd60c::t_de903d4a6bbeb9 6
+  s_dd789516bdd60c::t_620ce2d6f50291 53
+  s_dd789516bdd60c::t_059411e7683591 127
+packages/schema/test/boundary-schemas.test.ts
+  s_dd789516bdd60c::t_426a28f8b18d24 70,75
+docs/adr/0009-better-auth-in-process-identity-provider.md
+  s_dd789516bdd60c::t_6f986b601ae43f 71-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3d0bb6d94ebc14ca5634b1297a9e99d60594125b",
+  "prompts": {},
+  "sessions": {
+    "s_dd789516bdd60c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d2a9311-4393-439c-b09a-1961e0be6302",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
