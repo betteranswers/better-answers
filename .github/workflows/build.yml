@@ -1,5 +1,17 @@
-# Build the two tier images on main, push to ghcr.io, and redeploy STAGING by digest.
-# Production is promoted by a person — release.yml. Tags are labels for people; the digest is the deploy variable.
+# Build the tier images on main and push them to ghcr.io. Nothing here deploys.
+# Tags are labels for people; the DIGEST is the deploy variable (ADR 0022, `[OPS1]`) — the
+# platform compose file refuses to start without one. Staging is brought up by the drill
+# procedure (`T-005`); production is promoted by a person (release.yml).
+#
+# THE IMAGE LIST, and it is stated once:
+#   api     — apps/api/Dockerfile, built from the repository root (it carries apps/web's build)
+#   worker  — apps/worker/Dockerfile, built from apps/worker
+# These are the two `deploy/platform.compose.yaml` names by digest. The `backup` image
+# (deploy/backup.Dockerfile) is the third and joins this matrix under `T-005`, with the deploy
+# unit that runs it. Postgres is never built here and never will be: it is the official
+# pgvector image, pinned by digest in `packages/schema/src/postgres-image.ts` (ADR 0032).
+#
+# Action versions read from each repository's latest release on 03/09/2026 (`[DEPS1]`).
 name: build
 
 on:
@@ -16,10 +28,19 @@ permissions:
   packages: write
 
 jobs:
+  # An image is never pushed from a red tree. This is the same `check` every pull request
+  # runs, CALLED and not copied, so there is exactly one definition of what `check` is
+  # (AGENTS.md: one command, every workspace). `check.yml` has no push trigger of its own for
+  # main precisely so a push runs it once — here — rather than twice in two workflows.
+  check:
+    uses: ./.github/workflows/check.yml
+
   image:
+    needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
+      fail-fast: false
       matrix:
         include:
           - tier: api
@@ -28,11 +49,13 @@ jobs:
           - tier: worker
             context: apps/worker
             dockerfile: apps/worker/Dockerfile
-    outputs:
-      api_digest: ${{ steps.out.outputs.api_digest }}
-      worker_digest: ${{ steps.out.outputs.worker_digest }}
     steps:
       - uses: actions/checkout@v7.0.1
+      # Before build-push-action, always: the default `docker` driver cannot export a build
+      # cache, so `cache-to: type=gha` fails the build outright with "Cache export is not
+      # supported for the docker driver". This step is what gives the job a buildkit driver
+      # that can. Its absence is why this workflow had never passed.
+      - uses: docker/setup-buildx-action@v4.3.0
       - uses: docker/login-action@v4.6.0
         with:
           registry: ghcr.io
@@ -55,32 +78,12 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - id: out
-        run: echo "${{ matrix.tier }}_digest=${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
-
-  staging:
-    needs: image
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment: staging
-    steps:
-      # Coolify deploy API: set the two digest env vars on the staging stack, then trigger a redeploy.
-      # Endpoint shapes: research/41-deploy-facts.md §2(b); COOLIFY_URL is the VPC 2 Coolify (behind Access — an Access service token pair for CI is the wizard's step 6).
-      - name: set digests and redeploy staging
-        env:
-          COOLIFY_URL: ${{ vars.COOLIFY_URL }}
-          COOLIFY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
-          # Coolify sits behind Cloudflare Access; CI presents a service token pair (deploy/coolify.md § Stage 7 state).
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-          APP_UUID: ${{ vars.COOLIFY_STAGING_APP_UUID }}
-          API_DIGEST: ${{ needs.image.outputs.api_digest }}
-          WORKER_DIGEST: ${{ needs.image.outputs.worker_digest }}
+      # The digest, in the run's summary, in the form the deploy unit's env var takes — so a
+      # person promoting a build copies it from here rather than reading it out of a log.
+      - name: digest to the job summary
         run: |
-          set -euo pipefail
-          for kv in "API_IMAGE_DIGEST=$API_DIGEST" "WORKER_IMAGE_DIGEST=$WORKER_DIGEST"; do
-            curl -fsS -X PATCH "$COOLIFY_URL/api/v1/applications/$APP_UUID/envs" \
-              -H "Authorization: Bearer $COOLIFY_TOKEN" -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H "Content-Type: application/json" \
-              -d "{\"key\":\"${kv%%=*}\",\"value\":\"${kv#*=}\",\"is_preview\":false}"
-          done
-          curl -fsS "$COOLIFY_URL/api/v1/deploy?uuid=$APP_UUID&force=false" -H "Authorization: Bearer $COOLIFY_TOKEN" -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"
+          {
+            echo "### ${{ matrix.tier }}"
+            echo ""
+            echo "\`ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}@${{ steps.build.outputs.digest }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

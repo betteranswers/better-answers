@@ -1,0 +1,52 @@
+# What never reaches a Docker build context.
+#
+# The api image is built from the repository root (`.github/workflows/build.yml` passes
+# `context: .`), so this file is the first fence of the image's supply chain: anything
+# listed here cannot be copied into a layer by a `COPY` that is wider than its author
+# meant, and cannot be read by a build step at all. `apps/worker/` has its own, because
+# the worker image is built from its own directory.
+#
+# Three kinds of entry:
+#   - secrets and local state, which must never be in an image (`[SEC1]`);
+#   - the host's build products, so a stale `dist/` or `node_modules/` on a laptop can
+#     never become the thing that ships — the image builds its own;
+#   - everything the runtime does not need, which is most of the repository.
+#
+# `contracts/` is here for a reason ADR 0031 states: it is a top-level fixture directory,
+# read by both tiers' test suites and imported by nothing. Excluding it from the context
+# makes "no `contracts/` in the image" structural rather than a promise.
+
+# Secrets and local state
+.env
+.env.*
+.git
+.gitignore
+.claude
+.cubic
+.ordna
+.scratch
+
+# The host's build products — the image builds its own
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.vite
+**/coverage
+**/test-results
+**/playwright-report
+**/blob-report
+**/reports
+**/.stryker-tmp
+*.log
+
+# Not runtime, not build input
+.github
+apps/docs-site
+apps/worker
+contracts
+deploy
+docs
+cubic.yaml
+renovate.json

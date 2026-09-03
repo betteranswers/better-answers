@@ -89,6 +89,12 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
 
+  # No `command:` here on purpose: the image's own is the deploy contract, and today it is a
+  # refusal. Nothing in this tier claims a job yet — the claim/lease/heartbeat functions are
+  # the app's to migrate (`T-006`) — so `apps/worker/Dockerfile` ships a default command that
+  # says so and exits rather than idling and reporting health it does not have. This service
+  # therefore restarts until that loop lands; the image, its dependencies and its non-root
+  # user are what `T-018` delivers.
   worker:
     image: ghcr.io/betteranswers/worker@${WORKER_IMAGE_DIGEST:?set by the release workflow}
     <<: [*restart, *logging]
@@ -100,7 +106,15 @@ services:
       MAX_CONCURRENT_RUNS: "1"                # one index at a time on a 4 GB box (ADR 0024); ticket 42 measures whether it can rise
       LMDB_MAX_BYTES_PER_BINDING: "4294967296" # 4 GB cap; over it the binding's LMDB is wiped and reprocessed ([PIPE1])
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      # A process-level check, because this tier exposes no HTTP surface: no server, no port,
+      # no `/health`. The app↔worker control plane is rows in Postgres and never HTTP (ADR
+      # 0005), so the GET of http://127.0.0.1:8000/health that stood here could never have
+      # answered — it named a port nothing binds. What is checkable without inventing a
+      # surface is that the interpreter is alive and the tier's package imports in it, and
+      # `apps/worker/Dockerfile` carries the same command as its own HEALTHCHECK (T-018).
+      # When a run claimant exists, its liveness is a claimed lease with a fresh heartbeat
+      # (`[PIPE1]`) and this becomes a query for one.
+      test: ["CMD", "python", "-c", "import better_answers_worker"]
       interval: 15s
       timeout: 3s
       retries: 8

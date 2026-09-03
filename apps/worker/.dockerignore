@@ -1,0 +1,24 @@
+# What never reaches the worker image's build context.
+#
+# The worker image is built from this directory (`.github/workflows/build.yml` passes
+# `context: apps/worker`), so the repository root's `.dockerignore` does not apply here.
+# Same three kinds of entry: secrets and local state, the host's build products, and
+# everything the runtime does not need.
+
+# Secrets and local state
+.env
+.env.*
+
+# The host's build products — the image builds its own
+.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.mutmut-cache
+htmlcov
+
+# Not runtime, not build input
+tests
+CODING_RULES.md
