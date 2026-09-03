@@ -48,13 +48,27 @@ const asksForADocument = (accept: string | undefined): boolean =>
 const isReadOnly = (method: string): boolean => method === "GET" || method === "HEAD";
 
 /**
- * The shell is one file behind hashed asset names, so a browser holding yesterday's copy
- * would load yesterday's build until it happened to revalidate. Set on the response rather
- * than on the context, so it reaches the shell however the shell was found.
+ * What every document this build serves carries, set on the response rather than on the
+ * context so it reaches the shell however the shell was found.
+ *
+ * **Revalidation**: the shell is one file behind hashed asset names, so a browser holding
+ * yesterday's copy would load yesterday's build until it happened to revalidate.
+ *
+ * **No frame, ever**: the shell answers every screen's address, and two of those addresses
+ * are sign-in and the workspace picker (T-037). Those two were server-rendered pages until
+ * this ticket and carried these headers there (T-004); the protection moves with them
+ * rather than being dropped, because a framed sign-in is a person typing a code into
+ * someone else's page, and a framed picker is a pick made for them. It is set on the whole
+ * shell rather than on those two routes because the api cannot tell which screen a shell
+ * request will render — the address is the router's to read — and no screen of this product
+ * is ever framed by another site. `frame-ancestors 'none'` and the legacy header together,
+ * as `auth/routes.ts` still does for consent.
  */
-const revalidateHtml = (response: Response): Response => {
+const documentHeaders = (response: Response): Response => {
   if (response.headers.get("content-type")?.includes("text/html") === true) {
     response.headers.set("cache-control", "no-cache");
+    response.headers.set("content-security-policy", "frame-ancestors 'none'");
+    response.headers.set("x-frame-options", "DENY");
   }
   return response;
 };
@@ -80,7 +94,7 @@ export const serveSpa = (build: SpaBuild): SpaServing => {
   const assets: MiddlewareHandler = async (context, next) => {
     if (!isReadOnly(context.req.method) || !isTheProduct(context)) return next();
     const served = await file(context, passed);
-    return served === undefined ? next() : revalidateHtml(served);
+    return served === undefined ? next() : documentHeaders(served);
   };
 
   const shell: SpaServing["shell"] = async (context) => {
@@ -88,7 +102,7 @@ export const serveSpa = (build: SpaBuild): SpaServing => {
     if (asksForAFile(context.req.path)) return undefined;
     if (!asksForADocument(context.req.header("accept"))) return undefined;
     const served = await index(context, passed);
-    return served === undefined ? undefined : revalidateHtml(served);
+    return served === undefined ? undefined : documentHeaders(served);
   };
 
   return { assets, shell };

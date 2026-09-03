@@ -2,8 +2,9 @@ import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createAppRouter } from "../src/app/router.tsx";
-import { SCREENS } from "../src/shared/screens.ts";
+import { Providers } from "@/app/providers.tsx";
+import { createAppRouter } from "@/app/router.tsx";
+import { SCREENS } from "@/shared/screens.ts";
 
 /**
  * The frame's own behaviour, through the router a browser drives (`[TEST1]`: a rendered
@@ -15,10 +16,25 @@ import { SCREENS } from "../src/shared/screens.ts";
 // registers itself and a second render would find the first one still in the document.
 afterEach(cleanup);
 
+/**
+ * The tree `main.tsx` mounts, minus the browser: the providers outside, the router inside.
+ * The frame reads who is signed in through them (T-037), and System's routes card reads the
+ * tRPC client out of the same context (T-038); a render without them would be testing a
+ * composition the app never mounts.
+ *
+ * Nothing answers here — there is no server behind a jsdom render — so the shell renders
+ * without an identity and the card without routes, which is the state a real browser is in
+ * for the first paint and the one this suite is about. What either says once it knows is the
+ * browser suite's, where a real session exists.
+ */
 const openAt = async (path: string) => {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }));
   await router.load();
-  return render(<RouterProvider router={router} />);
+  return render(
+    <Providers>
+      <RouterProvider router={router} />
+    </Providers>,
+  );
 };
 
 describe("Control Centre's frame", () => {
@@ -56,20 +72,24 @@ describe("Control Centre's frame", () => {
     expect(unbuilt).toEqual(["Sources", "Suggestions", "Knowledge", "Questions", "People"]);
   });
 
-  it("says the routes are not listed, rather than showing an empty table", async () => {
+  it("gives System the routes card, and says the rest of the screen is unbuilt", async () => {
     await openAt("/system");
 
     expect(screen.getByRole("heading", { level: 2, name: "Routes" })).toBeDefined();
-    expect(screen.getByText("A workspace's routes are not listed here yet.")).toBeDefined();
-    // ADR 0025 gives System eight cards; none is built, and the screen says so.
+    // The card's own behaviour — what it lists, and for whom — is the browser suite's
+    // (`e2e/routes.spec.ts`), because it needs a session and a workspace to be about.
+    // ADR 0025 gives System eight cards; routes is the only one built, and the screen says so.
     expect(screen.getByText(/The rest of System/)).toBeDefined();
   });
 
-  it("says nothing about who is signed in, because no session has been read", async () => {
+  it("names nobody until it knows, rather than guessing", async () => {
     const { container } = await openAt("/system");
 
-    // The words a shell that guessed would reach for. Sign-in is a later ticket.
-    expect(container.textContent).not.toMatch(/signed in|sign out|your workspace/i);
+    // Nothing has answered, so the shell says nothing about who is reading — no name, no
+    // workspace, and not the sign-out that belongs beside them (T-037). A shell that
+    // guessed would be saying something it cannot know.
+    expect(screen.queryByRole("region", { name: "You" })).toBeNull();
+    expect(container.textContent).not.toMatch(/sign out/i);
   });
 
   it("marks the screen being read, so it is announced and not only shaded", async () => {

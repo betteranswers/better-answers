@@ -4,8 +4,10 @@ Copyright 2026 Better Answers (Liam Jons)
 This product includes software developed by third parties under permissive
 licences. Each lifted snapshot under <tier>/lifts/<name>/ carries its own
 THIRD_PARTY_NOTICES.md with the upstream repository, commit, licence and
-notice text; the root THIRD_PARTY_NOTICES.md is the aggregate the `check`
-script writes for every dependency (CODING_RULES.md, [LIFT3]; ADR 0027).
+notice text, as does apps/web/src/shared/ui/, where the shadcn, Kibo UI and
+AI Elements registries are taken as source (ADR 0033); the root
+THIRD_PARTY_NOTICES.md is the aggregate the `check` script writes for every
+dependency (CODING_RULES.md, [LIFT3]; ADR 0027).
 
 "Better Answers" is a name of Better Answers. This licence grants no
 permission to use it (Apache License 2.0, section 6).

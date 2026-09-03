@@ -45,6 +45,21 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     await expect(response.text()).resolves.toContain(`<div id="root">`);
   });
 
+  it("refuses to be framed by another site — sign-in and the picker as much as any screen", async () => {
+    // Sign-in and the workspace picker were server-rendered pages until T-037 and carried
+    // these two headers there (T-004). They are the shell's addresses now, so the shell
+    // carries them: a framed sign-in is a person typing a code into someone else's page,
+    // and a framed picker is a pick made for them. Consent keeps its own pair in
+    // `auth/routes.ts`, on the origin it is still rendered from.
+    for (const screen of ["/sign-in", "/choose-workspace", "/system", "/"]) {
+      const response = await app.client(undefined, APP_HOSTNAME).fetch(screen, asABrowserNavigates);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
+      expect(response.headers.get("x-frame-options")).toBe("DENY");
+    }
+  });
+
   it("serves a built asset as itself", async () => {
     const response = await app.client(undefined, APP_HOSTNAME).fetch("/assets/screen.js");
 

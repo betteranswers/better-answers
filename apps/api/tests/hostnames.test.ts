@@ -65,11 +65,45 @@ describe("each hostname reaches only its documented surface (ADR 0022)", () => {
   });
 
   it("refuses the authorization server on app.", async () => {
+    const product = app.client(undefined, APP_HOSTNAME);
+
+    for (const path of ["/.well-known/oauth-authorization-server", "/oauth2/authorize", "/jwks"]) {
+      expect((await product.fetch(path)).status).toBe(404);
+    }
+    expect((await product.fetch("/oauth2/token", { method: "POST" })).status).toBe(404);
+  });
+
+  it("carries the resume on app., because the screen that posts it is served there", async () => {
+    // `/oauth2/continue` is the one endpoint of the authorization server an
+    // application-owned screen calls (T-037): the picker posts the pick and the carried
+    // signed query from the origin it was served on. It reaches the endpoint here — what
+    // it answers a request with no session is Better Auth's to say, not the fence's.
     const response = await app
       .client(undefined, APP_HOSTNAME)
-      .fetch("/.well-known/oauth-authorization-server");
+      .fetch("/oauth2/continue", { method: "POST" });
 
-    expect(response.status).toBe(404);
+    expect(response.status).not.toBe(404);
+    expect(refusals().some((line) => line["path"] === "/oauth2/continue")).toBe(false);
+  });
+
+  it("carries the product's own screens on app. and refuses them on mcp.", async () => {
+    // Sign-in and the picker are screens now, not endpoints (T-037). On `app.` the fence
+    // lets them through to the shell; on `mcp.` they are refused, because a sign-in
+    // screen on the issuer's origin is the second sign-in the move exists to remove.
+    for (const screen of ["/sign-in", "/choose-workspace"]) {
+      await app.client(undefined, APP_HOSTNAME).fetch(screen);
+      expect(refusals().some((line) => line["path"] === screen)).toBe(false);
+
+      const onIssuer = await app.client().fetch(screen);
+      expect(onIssuer.status).toBe(404);
+      expect(refusals().at(-1)).toMatchObject({ path: screen, role: "mcp" });
+    }
+
+    // Consent is the other way round: it stays on the issuer's origin, outside the
+    // product's shell (ADR 0009, 2026-09-02).
+    const consentOnProduct = await app.client(undefined, APP_HOSTNAME).fetch("/consent");
+    expect(consentOnProduct.status).toBe(404);
+    expect(refusals().at(-1)).toMatchObject({ path: "/consent", role: "app" });
   });
 
   it("answers the protected-resource document on mcp.", async () => {
@@ -182,15 +216,15 @@ describe("each hostname reaches only its documented surface (ADR 0022)", () => {
     const before = app.emails.length;
     const client = app.client("203.0.113.240", AGENT_HOSTNAME);
 
-    const response = await client.form("/sign-in", {
-      step: "email",
+    const response = await client.json("/email-otp/send-verification-otp", {
       email: "nobody@example.invalid",
+      type: "sign-in",
     });
 
     expect(response.status).toBe(404);
     expect(response.headers.getSetCookie()).toEqual([]);
     expect(app.emails.length).toBe(before);
-    // The per-IP counter is the first work the sign-in page does; a refusal that
+    // The per-email throttle reads the body before Better Auth sees it; a refusal that
     // reached it would have written its row.
     const counted = await app.database.superuser.query<{ n: number }>(
       "SELECT count(*)::int AS n FROM ingress_counter WHERE key = $1",

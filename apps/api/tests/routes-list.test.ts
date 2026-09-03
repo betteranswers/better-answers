@@ -4,8 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { TRPC_IP_RULE } from "../src/auth/index.ts";
+import { TRPC_ENDPOINT } from "../src/trpc/index.ts";
 import { signIn } from "./flow.ts";
-import { startApp, type TestApp, type TestClient } from "./harness.ts";
+import { APP_HOSTNAME, startApp, type TestApp, type TestClient } from "./harness.ts";
 
 /**
  * `routes.list` from the outside (`[TEST1]`, `[APP3]`): a person signs in with a code
@@ -21,7 +22,12 @@ import { startApp, type TestApp, type TestClient } from "./harness.ts";
  * wire through the same single mapping every refusal below takes.
  */
 
-const TRPC_ROUTES_LIST = "/trpc/routes.list";
+// Built from the mount's own constant rather than written out, so this suite drives the path
+// the server actually serves. `apps/web` cannot import that constant — a value import from the
+// api is the runtime edge ADR 0006's amendment refuses — so it asserts the same declaration by
+// reading this file's source (`[DEPS2]`, `apps/web/test/api-client.test.tsx`). Between the two,
+// a mount moved without its client fails a test rather than a browser.
+const TRPC_ROUTES_LIST = `${TRPC_ENDPOINT}/routes.list`;
 
 const routeShape = z.object({
   purpose: z.string(),
@@ -65,11 +71,10 @@ const seedRoutes = async (workspaceId: string): Promise<void> => {
   }
 };
 
-/** A signed-in browser: the email step, the code from the captured email, no OAuth flow. */
+/** A signed-in browser: the code request, the code from the captured email, no OAuth flow. */
 const signedInClient = async (email: string): Promise<TestClient> => {
-  const client = app.client();
-  const signedIn = await signIn(app, client, email, "");
-  expect(signedIn.status).toBe(302);
+  const client = app.client(undefined, APP_HOSTNAME);
+  await signIn(app, client, email);
   return client;
 };
 

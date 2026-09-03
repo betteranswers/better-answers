@@ -41,10 +41,16 @@ export const EMAIL_CODE_ATTEMPTS = 3;
 
 /** Per-IP, in front of `/oauth2/*` and the discovery documents. */
 export const OAUTH_IP_RULE: CounterRule = { windowMs: 60_000, max: 60 };
-/** Per-IP, in front of the three pages. */
+/** Per-IP, in front of the consent page. */
 export const PAGE_IP_RULE: CounterRule = { windowMs: 60_000, max: 30 };
-/** Per-email, on the sign-in page's code request: five codes in ten minutes. */
+/** Per-email, on the code request: five codes in ten minutes. */
 export const EMAIL_CODE_EMAIL_RULE: CounterRule = { windowMs: 10 * 60_000, max: 5 };
+/**
+ * Where a person asks for a sign-in code. Better Auth's own path, named here because
+ * two things stand in front of it — the per-email throttle (`auth/routes.ts`) and the
+ * screen that posts to it — and a path spelled twice is a path that can disagree.
+ */
+export const SEND_EMAIL_CODE_PATH = "/email-otp/send-verification-otp";
 /** Per-IP, on `/mcp` before any token is verified — the 401 flood. */
 export const MCP_UNAUTHENTICATED_IP_RULE: CounterRule = { windowMs: 60_000, max: 60 };
 /**

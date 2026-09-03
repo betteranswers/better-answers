@@ -3,7 +3,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { attempt, type PrincipalRefusal } from "@better-answers/core/kernel";
 import { withPrincipal, type PostgresDoor } from "@better-answers/core/store/postgres";
 
-import type { Auth } from "../auth/index.ts";
+import type { SessionReader } from "../auth/index.ts";
 import { sessionClaims } from "../auth/index.ts";
 
 /**
@@ -14,10 +14,17 @@ import { sessionClaims } from "../auth/index.ts";
  * The context carries the doors and the request's headers and **never a Principal**: a
  * Principal exists only inside the transaction that resolved it, and nothing caches
  * one beyond a request (`[SEC2]`).
+ *
+ * It carries a `SessionReader` rather than the `Auth` instance, because `AppRouter` is
+ * inferred from the procedures and the procedures are typed by this context: an `Auth`
+ * here would put Better Auth's inferred instance type into the one type `apps/web`
+ * imports, which is exactly what `[DESIGN5]` says never crosses the seam. The seam's own
+ * function type — headers in, a session record or nothing out — says everything this
+ * transport needs and names no library.
  */
 export type TrpcContext = {
   readonly door: PostgresDoor;
-  readonly auth: Auth;
+  readonly readSession: SessionReader;
   readonly headers: Headers;
 };
 
@@ -47,7 +54,7 @@ export const router = trpc.router;
  * resolver. No procedure takes a workspace argument: the workspace is the session's.
  */
 export const workspaceProcedure = trpc.procedure.use(async ({ ctx, next }) => {
-  const read = await attempt(() => ctx.auth.api.getSession({ headers: ctx.headers }));
+  const read = await attempt(() => ctx.readSession(ctx.headers));
   // A session store that could not be reached is the platform's failure, not the
   // person's: only a lookup that succeeded and found nothing is "not signed in".
   if (!read.ok) {

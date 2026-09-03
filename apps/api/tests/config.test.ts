@@ -55,7 +55,7 @@ describe("the bootstrap configuration", () => {
     expect(read.ok && read.value.webRoot.endsWith("/apps/web/dist")).toBe(true);
   });
 
-  it("gives the app the authorization server's origin, normalised, its secret and the four hostnames — three read, mcp. derived", () => {
+  it("gives the app both origins, normalised, its secret and the four hostnames", () => {
     const read = readIdentityBootstrap(
       identityEnvironment({ PUBLIC_URL: "https://mcp.example.test/" }),
     );
@@ -64,6 +64,10 @@ describe("the bootstrap configuration", () => {
       ok: true,
       value: {
         publicUrl: "https://mcp.example.test",
+        // Derived from `APP_HOSTNAME` rather than read as a variable of its own: two
+        // values able to disagree would send a person signing in to a host the fence
+        // refuses (T-037).
+        appUrl: "https://app.example.test",
         authSecret: "a-secret-that-is-at-least-thirty-two-characters",
         hostnames: {
           app: "app.example.test",

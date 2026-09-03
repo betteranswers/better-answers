@@ -1,4 +1,4 @@
-import type { Screen } from "../shared/screens.ts";
+import type { Screen } from "@/shared/screens.ts";
 
 /**
  * A screen the product names but has not built. It says so, rather than showing an empty

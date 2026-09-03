@@ -40,6 +40,8 @@ export const AUTH_SECRET = "test-secret-that-is-at-least-thirty-two-characters-l
  */
 export const MCP_HOSTNAME = hostnameOfUrl(PUBLIC_URL);
 export const APP_HOSTNAME = "app.example.test";
+/** Where the product is served, and so where sign-in and the picker are (ADR 0006, amended). */
+export const APP_URL = `https://${APP_HOSTNAME}`;
 export const AGENT_HOSTNAME = "agent.example.test";
 export const APEX_HOSTNAME = "example.test";
 export const HOSTNAMES: PublicHostnames = {
@@ -80,7 +82,7 @@ export type TestApp = {
   /** A workspace with its first Admin, provisioned through the platform's one act. */
   provision(input?: { name?: string; adminEmail?: string }): Promise<Provisioned>;
   /** A person in the identity set with no membership anywhere. */
-  person(email?: string): Promise<{ id: string; email: string }>;
+  person(email?: string): Promise<Person>;
   /** Add a person to a workspace at a role (seeded directly: Better Auth's invitation flow is not under test). */
   addMember(
     workspaceId: string,
@@ -101,7 +103,14 @@ export type TestApp = {
 export type Provisioned = {
   readonly workspaceId: string;
   readonly name: string;
-  readonly admin: { readonly id: string; readonly email: string };
+  readonly admin: Person;
+};
+
+/** A person as the identity set holds them; the name is what the shell shows (T-037). */
+export type Person = {
+  readonly id: string;
+  readonly email: string;
+  readonly name: string;
 };
 
 /** A host-shaped client: full URLs on one hostname's origin, a cookie jar, one client IP. */
@@ -115,6 +124,8 @@ export type TestClient = {
   ): Promise<Response>;
   /** POST a form the way a browser does. */
   form(path: string, fields: Readonly<Record<string, string>>): Promise<Response>;
+  /** POST JSON the way the SPA does: this origin's `Origin` header, and JSON wanted back. */
+  json(path: string, body: unknown): Promise<Response>;
   cookies(): string;
 };
 
@@ -138,6 +149,7 @@ export const serverFor = (pool: Pool): Hono =>
   createServer({
     database: pool,
     publicUrl: PUBLIC_URL,
+    appUrl: APP_URL,
     hostnames: HOSTNAMES,
     authSecret: AUTH_SECRET,
     sendEmail: async () => {},
@@ -155,6 +167,16 @@ export type TestAppOptions = {
   readonly webRoot?: string | undefined;
   /** The estate's four hostnames, for a test whose client is a real browser. */
   readonly hostnames?: PublicHostnames | undefined;
+  /**
+   * The origin the product is served from, for a caller that serves it somewhere the
+   * hostnames do not say — the browser suite, on a loopback port.
+   */
+  readonly appUrl?: string | undefined;
+  /**
+   * Called with every captured email as it is sent, for the local loop: it prints the
+   * code from here, never from the app's logger, which `[LOG1]` forbids from holding one.
+   */
+  readonly onEmail?: ((message: EmailMessage) => void) | undefined;
 };
 
 export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> => {
@@ -177,10 +199,12 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
   const server = createServer({
     database: database.pool,
     publicUrl: PUBLIC_URL,
+    appUrl: options.appUrl ?? APP_URL,
     hostnames,
     authSecret: AUTH_SECRET,
     sendEmail: async (message) => {
       emails.push(message);
+      options.onEmail?.(message);
     },
     fetchClientMetadataResource: cimdFixture,
     logger,
@@ -192,7 +216,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     const client = await database.superuser.connect();
     try {
       const created = await testData(client).user(email === undefined ? {} : { email });
-      return { id: created.id, email: created.email };
+      return { id: created.id, email: created.email, name: created.name };
     } finally {
       client.release();
     }
@@ -272,6 +296,12 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     const request = async (path: string, init: RequestInit = {}): Promise<Response> => {
       const headers = new Headers(init.headers);
       headers.set(CLIENT_IP_HEADER, ip);
+      // A browser sends `Origin` on every request that is not a plain navigation, and
+      // Better Auth's CSRF fence reads it. A test that omitted it would be a caller no
+      // browser can be, and the fence would be proved against the wrong request.
+      if (init.method !== undefined && init.method !== "GET" && !headers.has("origin")) {
+        headers.set("origin", origin);
+      }
       if (jar.size > 0) headers.set("cookie", cookies());
       // A relative path becomes a URL on this client's own hostname, which is the
       // `Host` the hostname fence reads (T-030).
@@ -289,6 +319,15 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
           method: "POST",
           headers: { "content-type": "application/x-www-form-urlencoded", origin },
           body: new URLSearchParams(fields).toString(),
+        }),
+      json: (path, body) =>
+        request(path, {
+          method: "POST",
+          // The three headers the SPA's client sends: what it is posting, where it is
+          // posting from — the origin Better Auth's CSRF check reads — and that it wants
+          // an answer it can act on rather than a redirect it cannot follow.
+          headers: { "content-type": "application/json", origin, accept: "application/json" },
+          body: JSON.stringify(body),
         }),
       cookies,
     };

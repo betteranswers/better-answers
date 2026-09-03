@@ -108,3 +108,91 @@ installed by a later ticket and pinned when they are.
 - **This ADR is calibrated against one screen.** The frame exists; the answer surface, where
   AI Elements earns its place, does not. If the streaming components turn out to fight the
   register, that is an amendment here rather than a quiet substitution.
+
+## Amendment — 2026-09-03, the registry components land, and what they cost (T-036)
+
+The ADR left the registry components to "a later ticket… pinned when they are". This is that
+pin. Everything below was read from the registry on **3 September 2026**; nothing came from
+memory (`[DEPS1]`).
+
+**Where they live.** `apps/web/src/shared/ui/` holds the shadcn primitives — `badge`,
+`button`, `carousel`, `collapsible`, `command`, `dialog`, `dropdown-menu`, `hover-card`,
+`popover`, `select`, `table`, `tabs` — with `kibo-ui/` and `ai-elements/` beside them so a
+reader can tell at a glance which registry a component came from. `shared/lib/utils.ts` holds
+the `cn` helper all three expect. `apps/web/components.json` records the two registry URLs
+(`https://www.kibo-ui.com/r/{name}.json`, `https://registry.ai-sdk.dev/{name}.json`) and the
+aliases, so the next install lands in the same places.
+
+**What was taken.** shadcn's primitives above; Kibo UI's `combobox` and `snippet`; AI
+Elements' `sources` and `inline-citation`. The CLIs are `shadcn@4.20.1` and
+`ai-elements@1.9.0`; a shadcn registry item carries no version of its own, so the pin is the
+CLI version, the registry URL and the date, and the source itself is in this repository.
+
+**Kibo UI's `table` was read and rejected**, which is what "reviewed before it lands" is for:
+its source is written against `@tanstack/react-table` v8, and v9 — current on the day — is a
+breaking rewrite (`useReactTable` and `getCoreRowModel` no longer exist). Taking it would have
+meant pinning a knowingly-superseded major on the day the repository first depends on it. The
+review table it was wanted for uses the shadcn `table` primitive until Kibo catches up.
+
+**Three costs the ADR did not name, now visible.**
+
+1. **Registry source does not pass rules written for our own code.** Four rules are turned off
+   over `apps/web/src/shared/ui/**` in `.oxlintrc.json` — `react/set-state-in-effect`,
+   `react-doctor/effect-needs-cleanup`, `jsx-a11y/prefer-tag-over-role` and the type-assertion
+   safety comment — each of which judges *how* a component is written, which is the half this
+   ADR gives the registries. Every import rule, `no-console`, `[A11Y1]` at the screen and the
+   anti-slop rules that catch a widened type stay on.
+2. **The registries write extensionless imports**, which do not resolve under this repository's
+   `nodenext` setting. They are rewritten to explicit `.ts`/`.tsx` on arrival, along with the
+   `"use client"` directives, which mean nothing in a Vite SPA.
+3. **The icons are lucide-react**, because that is what the primitives import. The design
+   system's Phosphor choice stands for the platform's own components; a chevron inside a
+   `Select` is behaviour, not meaning.
+
+## Amendment — 2026-09-03, what better-auth-ui gives this product, and what it does not (T-037)
+
+This ADR names better-auth-ui "for the sign-in and workspace screens" and takes it as one of
+the four registries. The sign-in ticket has now read the registry, and the decision is
+sharpened rather than reversed: **what is taken is the provider, the localization and the
+headless hooks. The rendered screens are not taken.**
+
+**What is taken.** The `auth-provider` item through the shadcn registry — the wrapper over the
+npm primitive, the `Link` slot that lets a library component render an internal link without
+knowing the router, and the plugin type beside it — pinned as every registry item is, by the
+CLI, the URL and the date (`apps/web/src/shared/ui/THIRD_PARTY_NOTICES.md`). Under it, the npm
+packages `@better-auth-ui/core` and `@better-auth-ui/react` at **1.7.19**, read from the
+registry on the day and pinned exactly: TanStack Query option factories and the React hooks
+over them — the email code, the workspaces a person holds, the pick, and the resume of an
+authorization the product interrupted. And the `localization`, which is the whole reason this
+library is named in this ADR at all: `organization` becomes *Workspace*, and the four keys a
+screen in v0.1 renders are stated in one file the screens read through `useAuth()`, so a
+screen cannot quietly say a fifth.
+
+**What is not taken, and why.** The registry's `auth` and `email-otp` items copy **28 files**
+into the tree, among them sign-up, forgot-password, reset-password, verify-email, a password
+strength meter, social provider buttons and change-email. This product has no password, no
+sign-up and no social provider: a person exists because an Admin added them to a workspace
+(ADR 0009). Those files would sit in the tree, be linted, be reviewed, and imply a product
+that does not exist — which is exactly the argument `docs/research/t-022-better-auth-ui.md`
+made against the `organization` item's 53 files, applied to the same library's other end. They
+also bring `@tanstack/react-form`, `date-fns`, `input-otp` and about sixteen further shadcn
+primitives for one screen.
+
+So the three screens outside the shell — sign-in, the picker and the refused screen — are
+written by the platform on the library's hooks, with `input` and `label` from shadcn under
+them. The rule this ADR states is unchanged and is what makes the split legible: **the library
+owns behaviour, the platform owns meaning.** For a sign-in whose every visible sentence is a
+platform decision — what a sent code says, what a refused code says, what too many codes says —
+there is very little behaviour left to own, and the hooks are exactly that little. The
+`error-toaster.tsx` of the provider item is not taken either, for the same reason at a smaller
+scale: this product's screens say what happened inline, in a live region beside the control
+that caused it, and a toast would be a second announcement of the same sentence — with two
+dependencies behind it.
+
+**One consequence for the whole workspace.** `@better-auth-ui/react@1.7.19` ships declaration
+files whose re-exports are extensionless, which `nodenext` will not resolve — every export of
+the package then reads as missing. `apps/web` therefore resolves as what builds it does:
+`module: "preserve"`, `moduleResolution: "bundler"`. This is cost 2 of the 2026-09-03
+amendment above, arriving at a size a rewrite-on-arrival cannot fix, because these files are a
+dependency rather than source. `apps/api` is unchanged and stays on `nodenext`; nothing in
+`apps/web` is emitted by `tsc`.

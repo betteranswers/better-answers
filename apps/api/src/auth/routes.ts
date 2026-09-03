@@ -13,12 +13,19 @@ import {
 
 import { limitByIp, tooManyRequests } from "../ingress/limits.ts";
 import type { Auth } from "./auth.ts";
-import { EMAIL_CODE_EMAIL_RULE, MCP_SCOPES, OAUTH_IP_RULE, PAGE_IP_RULE } from "./constants.ts";
-import { chooseWorkspacePage, codePage, consentPage, refusedPage, signInPage } from "./pages.ts";
+import {
+  EMAIL_CODE_EMAIL_RULE,
+  MCP_SCOPES,
+  OAUTH_IP_RULE,
+  PAGE_IP_RULE,
+  SEND_EMAIL_CODE_PATH,
+} from "./constants.ts";
+import { consentPage, refusedPage } from "./pages.ts";
 import { sessionClaims } from "./verify.ts";
 
 /**
- * The identity routes this tier serves itself: the three pages (grilling Q5), the
+ * The identity routes this tier serves itself: the consent page (grilling Q5; sign-in and
+ * the workspace picker are the SPA's screens since T-037), the
  * protected-resource metadata (research 80 F6: hand-written, `resource` exactly the
  * URL a person types), `/me` (the cookie-session path through the one resolver), and
  * the per-IP counter in front of `/oauth2/*` and the discovery documents. Better
@@ -45,7 +52,19 @@ const oauthQuery = (url: string): string => new URL(url).search.replace(/^\?/, "
 // the time consent renders; the fallback is the page's honest answer to a malformed carry.
 const hostnameOf = (url: string): string => URL.parse(url)?.hostname ?? "an unknown address";
 
-const redirectOf = z.object({ url: z.string().url().optional(), redirect: z.boolean().optional() });
+/**
+ * Where a flow endpoint says the person goes next. `url` is a string rather than a URL
+ * because Better Auth writes whichever it was configured with, verbatim: `consentPage` is
+ * absolute since T-037, so today's answer is a URL — but the same endpoint answers a
+ * relative path the moment a page of the flow is configured relatively, and this reader
+ * would then silently see nothing and fall back. The source is this process's own
+ * authorization server, not a caller, so what is wanted here is "whatever it said", and
+ * the string is passed to `context.redirect` unexamined either way.
+ */
+const redirectOf = z.object({
+  url: z.string().min(1).optional(),
+  redirect: z.boolean().optional(),
+});
 
 /** Where a Better Auth flow endpoint sends the person next: a 3xx's Location, or the JSON's `url`. */
 const nextLocation = async (response: Response): Promise<string | undefined> => {
@@ -82,12 +101,13 @@ const flowHeaders = (request: Request, publicUrl: string): Headers => {
 };
 
 /**
- * The three pages' forms are same-origin only. A cross-site form post — from a page an
- * attacker controls, carrying the person's cookie — could otherwise accept consent for
- * a client the attacker started the flow for (a signed query is not bound to the person
- * who will answer it), pick a workspace, or sign the person into another account.
- * Browsers send `Origin` on every cross-site POST and `Sec-Fetch-Site` on every fetch
- * they make; a form posted from this origin carries this origin.
+ * The consent form is same-origin only. A cross-site form post — from a page an attacker
+ * controls, carrying the person's cookie — could otherwise accept consent for a client
+ * the attacker started the flow for; a signed query is not bound to the person who will
+ * answer it. Browsers send `Origin` on every cross-site POST and `Sec-Fetch-Site` on
+ * every fetch they make; a form posted from this origin carries this origin. The SPA's
+ * own screens are fenced the same way one layer down, by Better Auth's origin check
+ * against the two trusted origins (`auth.ts`).
  */
 const sameOriginOnly = (publicUrl: string): MiddlewareHandler => {
   return async (context, next) => {
@@ -112,6 +132,44 @@ const sameOriginOnly = (publicUrl: string): MiddlewareHandler => {
 
 const emailKey = (email: string): string =>
   createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
+
+const codeRequest = z.object({ email: z.string().trim().min(1) });
+
+/**
+ * The per-email throttle, in front of Better Auth's own code-sending endpoint (grilling
+ * rounds 2–3: Better Auth's limiter is per address per path, so a sender who moves
+ * addresses can post codes at one person's inbox all day). It stands here rather than in
+ * a page because the page moved to the SPA (T-037) and the endpoint is what the screen
+ * posts to.
+ *
+ * The body is read from a clone, so the request Better Auth's handler receives further
+ * down is still unread.
+ */
+const limitCodesByEmail = (door: PostgresDoor): MiddlewareHandler => {
+  return async (context, next) => {
+    const read = await attempt(() => context.req.raw.clone().json());
+    const asked = read.ok ? codeRequest.safeParse(read.value) : undefined;
+    // A request with no address in it asks for no code; what to do with it is Better
+    // Auth's to say, and this counter is only about how often one address may be asked for.
+    if (asked === undefined || !asked.success) {
+      await next();
+      return;
+    }
+    const throttle = await consumeIngress(
+      door,
+      "email",
+      emailKey(asked.data.email),
+      EMAIL_CODE_EMAIL_RULE,
+    );
+    if (!throttle.allowed) {
+      return tooManyRequests(
+        throttle.retryAfterSeconds,
+        "Too many codes requested for this address; try again later.",
+      );
+    }
+    await next();
+  };
+};
 
 /**
  * The two flow endpoints — consent and continue — resume the authorization by
@@ -142,7 +200,6 @@ const callFlow = (
   );
 };
 
-const memberships = z.array(z.object({ id: z.string(), name: z.string() }));
 const clientShape = z.object({ client_name: z.string().nullish(), name: z.string().nullish() });
 
 export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
@@ -170,120 +227,19 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     routes.get(path, (context) => context.json(prm));
   }
 
-  // ------------------------------------------------------------------ pages
-  for (const page of ["/sign-in", "/choose-workspace", "/consent"]) {
-    routes.use(page, limitByIp(door, PAGE_IP_RULE));
-    routes.use(page, sameOriginOnly(publicUrl));
-    // No other site may frame these: a framed consent form still posts with this
-    // origin and would pass the same-origin check, so clickjacking is refused at the
-    // frame, not the post. `frame-ancestors 'none'` and the legacy header together.
-    routes.use(page, async (context, next) => {
-      await next();
-      context.res.headers.set("content-security-policy", "frame-ancestors 'none'");
-      context.res.headers.set("x-frame-options", "DENY");
-    });
-  }
+  // ------------------------------------------------------------- sign-in code
+  routes.use(SEND_EMAIL_CODE_PATH, limitCodesByEmail(door));
 
-  routes.get("/sign-in", (context) => context.html(signInPage(carry(context.req.url))));
-
-  routes.post("/sign-in", async (context) => {
-    const query = carry(context.req.url);
-    const form = await context.req.formData();
-    const step = String(form.get("step") ?? "email");
-    const email = String(form.get("email") ?? "").trim();
-    if (email === "") return context.html(signInPage(query, "Enter your email address."), 400);
-
-    if (step === "email") {
-      // Per-email throttle (grilling round 2–3: Better Auth's limiter is per IP only).
-      const throttle = await consumeIngress(door, "email", emailKey(email), EMAIL_CODE_EMAIL_RULE);
-      if (!throttle.allowed) {
-        return tooManyRequests(
-          throttle.retryAfterSeconds,
-          "Too many codes requested for this address; try again later.",
-        );
-      }
-      const sent = await attempt(() =>
-        auth.api.sendVerificationOTP({
-          body: { email, type: "sign-in" },
-          headers: flowHeaders(context.req.raw, publicUrl),
-        }),
-      );
-      if (!sent.ok)
-        return context.html(signInPage(query, "We could not send a code. Try again."), 502);
-      return context.html(codePage(query, email));
-    }
-
-    const code = String(form.get("code") ?? "").trim();
-    const signedIn = await attempt(() =>
-      auth.api.signInEmailOTP({
-        body: { email, otp: code },
-        headers: flowHeaders(context.req.raw, publicUrl),
-        asResponse: true,
-      }),
-    );
-    if (!signedIn.ok || !signedIn.value.ok) {
-      return context.html(
-        codePage(query, email, "That code did not work. Check it and try again."),
-        401,
-      );
-    }
-    forwardCookies(signedIn.value, context.res.headers);
-    // A session now exists; the authorization flow resumes at /oauth2/authorize.
-    if (query === "") return context.redirect("/me", 302);
-    return context.redirect(`/oauth2/authorize${query}`, 302);
-  });
-
-  routes.get("/choose-workspace", async (context) => {
-    const headers = flowHeaders(context.req.raw, publicUrl);
-    const listed = await attempt(() => auth.api.listOrganizations({ headers }));
-    const parsed = listed.ok ? memberships.safeParse(listed.value) : undefined;
-    if (parsed === undefined || !parsed.success) {
-      return context.html(
-        refusedPage("Sign in first", "Your session has ended. Sign in again."),
-        401,
-      );
-    }
-    if (parsed.data.length === 0) {
-      // A person in no workspace has nothing to pick and no token to be minted
-      // (workspaces are platform-provisioned, grilling Q11).
-      return context.html(
-        refusedPage(
-          "No workspace",
-          "You are not a member of any workspace yet. Ask your Admin to add you.",
-        ),
-        403,
-      );
-    }
-    return context.html(chooseWorkspacePage(carry(context.req.url), parsed.data));
-  });
-
-  routes.post("/choose-workspace", async (context) => {
-    const form = await context.req.formData();
-    const workspaceId = String(form.get("workspaceId") ?? "");
-    const headers = flowHeaders(context.req.raw, publicUrl);
-    const chosen = await attempt(() =>
-      auth.api.setActiveOrganization({
-        body: { organizationId: workspaceId },
-        headers,
-        asResponse: true,
-      }),
-    );
-    if (!chosen.ok || !chosen.value.ok) {
-      return context.html(
-        refusedPage("Not your workspace", "You are not a member of that workspace."),
-        403,
-      );
-    }
-    forwardCookies(chosen.value, context.res.headers);
-    const continued = await attempt(() =>
-      callFlow(auth, publicUrl, "/oauth2/continue", withForwardedCookies(headers, chosen.value), {
-        postLogin: true,
-        oauth_query: oauthQuery(context.req.url),
-      }),
-    );
-    if (continued.ok) forwardCookies(continued.value, context.res.headers);
-    const next = continued.ok ? await nextLocation(continued.value) : undefined;
-    return context.redirect(next ?? `/oauth2/authorize${carry(context.req.url)}`, 302);
+  // ---------------------------------------------------------------- consent
+  routes.use("/consent", limitByIp(door, PAGE_IP_RULE));
+  routes.use("/consent", sameOriginOnly(publicUrl));
+  // No other site may frame it: a framed consent form still posts with this origin and
+  // would pass the same-origin check, so clickjacking is refused at the frame, not the
+  // post. `frame-ancestors 'none'` and the legacy header together.
+  routes.use("/consent", async (context, next) => {
+    await next();
+    context.res.headers.set("content-security-policy", "frame-ancestors 'none'");
+    context.res.headers.set("x-frame-options", "DENY");
   });
 
   routes.get("/consent", async (context) => {
@@ -389,18 +345,4 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   });
 
   return routes;
-};
-
-/** The cookies a flow step just set, carried into the next in-process call. */
-const withForwardedCookies = (headers: Headers, from: Response): Headers => {
-  const next = new Headers(headers);
-  const fresh = from.headers
-    .getSetCookie()
-    .map((cookie) => cookie.split(";")[0] ?? "")
-    .filter((pair) => pair !== "");
-  if (fresh.length > 0) {
-    const existing = headers.get("cookie");
-    next.set("cookie", [existing, ...fresh].filter((c) => c !== null && c !== "").join("; "));
-  }
-  return next;
 };

@@ -113,6 +113,13 @@ export type Bootstrap = {
 
 export type IdentityBootstrap = {
   readonly publicUrl: string;
+  /**
+   * The origin the product is served from. Derived from `APP_HOSTNAME` rather than read as
+   * a variable of its own: the deploy unit already names that hostname, the fence already
+   * routes on it, and a second value able to disagree with it would send a person signing
+   * in to a host this process refuses.
+   */
+  readonly appUrl: string;
   readonly authSecret: string;
   readonly hostnames: PublicHostnames;
 };
@@ -139,6 +146,7 @@ export function readIdentityBootstrap(
   if (!parsed.success) return err(invalid(parsed.error));
   return ok({
     publicUrl: parsed.data.PUBLIC_URL,
+    appUrl: `https://${parsed.data.APP_HOSTNAME}`,
     authSecret: parsed.data.AUTH_SECRET,
     hostnames: {
       app: parsed.data.APP_HOSTNAME,

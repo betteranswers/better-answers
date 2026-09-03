@@ -69,16 +69,28 @@ export const HOSTNAME_SURFACES: readonly HostnameSurface[] = [
       "The MCP endpoint. The protected-resource document's `resource` is `${PUBLIC_URL}/mcp` exactly and every access token's audience equals that string, so the endpoint answers on the origin the authorization server issues from and nowhere else (ADR 0022, ADR 0018, T-004).",
   },
   {
+    paths: ["/oauth2/continue"],
+    hosts: ["app", "mcp"],
+    reason:
+      "The one endpoint of the authorization server an application-owned screen calls. Better Auth's own words for `/oauth2/continue` are 'call this after a redirect screen finishes its own job … an application-owned post-login screen' (`@better-auth-ui/core`'s `oauthContinueOptions`), and since T-037 that screen is the SPA's picker on `app.`: it posts the pick and the carried signed query from the origin it was served on, same-origin, and Better Auth resumes the authorization and answers with where the person goes next. Listed before the entry below so it is the first match, and paired with `mcp.` because the flow's own resume still arrives there. Nothing else of `/oauth2/*` moves: `authorize`, `token`, `revoke` and consent stay on the issuer's origin alone, which is the separation the entry below exists to make.",
+  },
+  {
     paths: ["/.well-known/*", "/jwks", "/oauth2/*"],
     hosts: ["mcp"],
     reason:
       "Discovery, the signing keys and the authorization server itself. ADR 0022 gives `mcp.` '/mcp, discovery and /oauth2/*'. PR #7 refused splitting the authorization server onto a hostname of its own (Cubic `a1179be0`, rejected with this ADR as the citation); the separation that matters is from `app.`, and this entry is where it is made.",
   },
   {
-    paths: ["/sign-in", "/choose-workspace", "/consent"],
+    paths: ["/consent"],
     hosts: ["mcp"],
     reason:
-      "The three server-rendered pages of the OAuth flow (T-004 grilling Q5). They sit on the authorization server's own origin because Better Auth's CSRF check compares the browser's `Origin` against its base URL, which is `PUBLIC_URL`. T-022 moves sign-in and the workspace picker into the SPA on `app.` and keeps consent server-rendered here, because consent must never sit behind the product's own shell (ADR 0009, 2026-09-02): that ticket splits this entry, adding `app.` to the first two paths and leaving `/consent` as it is.",
+      "Consent, the one page of the OAuth flow this tier still renders itself (T-004 grilling Q5). It sits on the authorization server's own origin because a decision to grant an outside client access to a workspace must never sit behind the product's own shell (ADR 0009, 2026-09-02), and because Better Auth's CSRF check compares the browser's `Origin` against its base URL, which is `PUBLIC_URL`.",
+  },
+  {
+    paths: ["/sign-in", "/choose-workspace"],
+    hosts: ["app"],
+    reason:
+      "Sign-in and the workspace picker, which T-037 moved out of this tier and into the SPA (ADR 0009, 2026-09-02; ADR 0006, 2026-09-02). They are screens' addresses now, not endpoints: nothing on disk holds them, the authorization server does not know them, and the shell answers them after it declines (`ingress/spa.ts`). They are named here rather than left to the catch-all because the catch-all also carries `mcp.`, and a sign-in screen served on the issuer's origin would be the second sign-in this move exists to remove.",
   },
   {
     paths: ["/health"],
@@ -192,6 +204,24 @@ export const bareHostname = z
   // DNS is case-insensitive and a `Host` may arrive in any case, so the fence compares
   // one form.
   .transform((value) => value.toLowerCase());
+
+/**
+ * The domain one session's cookie is scoped to, so a session made on `app.` answers the
+ * OAuth flow on `mcp.` (ADR 0009, 2026-09-02).
+ *
+ * Better Auth derives this domain as `new URL(baseURL).hostname` verbatim when it is not
+ * given one — `mcp.…`, not the apex — and a `Set-Cookie` for another host's domain is
+ * rejected by the browser outright, so the value is stated rather than defaulted.
+ *
+ * It is `undefined` when the estate's own hostnames are not under its apex, which is the
+ * shape of a loopback estate (`app.` is `127.0.0.1`, the apex is `localhost`): a cookie
+ * scoped to a domain the browser does not see itself under is refused, and one host means
+ * there is nothing to share the session across. Host-only is then the correct answer.
+ */
+export const apexCookieDomain = (hostnames: PublicHostnames): string | undefined => {
+  const under = (hostname: string): boolean => hostname.endsWith(`.${hostnames.apex}`);
+  return under(hostnames.app) && under(hostnames.mcp) ? hostnames.apex : undefined;
+};
 
 /** `/prefix/*` matches the prefix and anything under it; anything else is exact. */
 const matchesPath = (pattern: string, path: string): boolean => {
