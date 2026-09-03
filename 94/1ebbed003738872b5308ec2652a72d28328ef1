@@ -1,0 +1,22 @@
+apps/api/tests/workflow-pins.test.ts
+  s_09ad417bc22bdb::t_6dcc19fa1a34a0 98-113,125
+  s_09ad417bc22bdb::t_4f001c9daa3dab 1-97,114-124,126-127
+apps/api/tests/adr-index.test.ts
+  s_09ad417bc22bdb::t_651924f07cec1f 18-34,49-51,65-70,74,76-97,100,102-107,109-112,115-127,129,134-135,139-145,147,152,154-155
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "941ebbed003738872b5308ec2652a72d28328ef1",
+  "prompts": {},
+  "sessions": {
+    "s_09ad417bc22bdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd84fef3-35ab-41ef-a9ee-2b92664fe274",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
