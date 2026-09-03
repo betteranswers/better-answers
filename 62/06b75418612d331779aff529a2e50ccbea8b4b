@@ -1,0 +1,120 @@
+apps/api/tests/local.ts
+  s_90ffdc067aac0d::t_5944ce61469a2b 1-65
+docs/adr/0033-the-ui-kit-is-tailwind-v4-through-the-design-system-bridge-with-three-registries-that-own-behaviour.md
+  s_90ffdc067aac0d::t_6e2dcb8c0a1a60 151-198
+pnpm-lock.yaml
+  ai_agent 111-119,135-137,490-565,636-645,666-668,1217-1219,1393-1399,1796-1846,2682-2688,3161-3164,3304-3311,3937-3939,4392-4398,4482-4484,4505-4507,4735-4737,4746-4749,4793-4795,5244-5288,5342-5353,5365-5366,5683-5684,5849-5852,6045-6144,6972-6984,7436-7441,7523-7531,8121-8122,8542-8547,8685-8686,8716-8717,8980-8981,8990-8993,9047
+apps/web/src/shared/ui/label.tsx
+  s_90ffdc067aac0d::t_7ecbb62b8a10c4 1-2,4,6,12,16,19
+  s_90ffdc067aac0d::t_fd23245c133128 3,5,7-11,13-15,17-18
+apps/web/tsconfig.json
+  s_90ffdc067aac0d::t_75ddbc9fe6f499 6-14
+apps/api/tests/harness.ts
+  s_90ffdc067aac0d::t_e816a2bcf97864 84,105-112,218
+apps/web/src/shared/ui/THIRD_PARTY_NOTICES.md
+  s_90ffdc067aac0d::t_75a22ff26bb821 12-17,52-61,85-102,124,141
+apps/web/e2e/sign-in.spec.ts
+  s_90ffdc067aac0d::t_8b043585887967 27
+  s_90ffdc067aac0d::t_fc06a5eaa356c2 2-26,28-38,44-102,108,113,119-129,131-158
+  s_90ffdc067aac0d::t_436d03722d74a2 103-107,109-112,114-118
+  s_90ffdc067aac0d::t_861bd7e11ae9d7 1,39-43,130
+apps/web/e2e/browser.ts
+  s_90ffdc067aac0d::t_5b25e1ddff4f57 14-15,20-21,24-26
+  s_90ffdc067aac0d::t_940ed1889a4559 1-13,16-19,22-23,27-36
+docs/adr/README.md
+  s_90ffdc067aac0d::t_6e2dcb8c0a1a60 41
+apps/web/src/features/auth/carried-flow.ts
+  s_90ffdc067aac0d::t_c087de5854cea8 1-30
+apps/web/e2e/sign-out.spec.ts
+  s_90ffdc067aac0d::t_9ab148b83818ee 2-68
+  s_90ffdc067aac0d::t_861bd7e11ae9d7 1
+apps/web/e2e/harness.ts
+  s_90ffdc067aac0d::t_493ba8ff4d5ac9 1-18,20-21,28-68,72
+  s_90ffdc067aac0d::t_8b043585887967 19,22-27
+  s_90ffdc067aac0d::t_c388a13f9ddfc0 69-71
+apps/api/tests/flow.ts
+  s_90ffdc067aac0d::t_7ecbb62b8a10c4 65-68,132,140-143
+apps/web/src/shared/ui/auth/auth-provider.tsx
+  s_90ffdc067aac0d::t_ed27e8661c9dd4 1-2,6-19,21-24,26-29,32,37-38,40
+  s_90ffdc067aac0d::t_7ecbb62b8a10c4 3-5,20,25,39
+  s_90ffdc067aac0d::t_a9f30272991c1b 30-31,33-36
+apps/web/src/features/auth/auth-screen.tsx
+  s_90ffdc067aac0d::t_7ecbb62b8a10c4 13
+  s_90ffdc067aac0d::t_afc2b535454798 1-12,14-52
+apps/api/tests/serve.ts
+  s_90ffdc067aac0d::t_ba3c5647212993 4-5,7,33-38,42,51-68
+apps/web/src/shared/ui/input.tsx
+  s_90ffdc067aac0d::t_7ecbb62b8a10c4 1,3,14,18,21
+  s_90ffdc067aac0d::t_fd23245c133128 2,4-13,15-17,19-20
+apps/web/src/features/auth/sign-in-screen.tsx
+  s_90ffdc067aac0d::t_b73ddd3165026f 1,4-31,34-37,40,43-47,49-62,67-168
+  s_90ffdc067aac0d::t_436d03722d74a2 3,48,63-66
+  s_90ffdc067aac0d::t_40051d9583d98e 2,32-33,38-39,41-42
+apps/web/src/features/auth/sign-out-button.tsx
+  s_90ffdc067aac0d::t_577081994f5dc4 1-38
+apps/web/src/app/frame.tsx
+  s_90ffdc067aac0d::t_dcbdb576870a8e 1-2,4-5,9-10,12-17,25-31,36-48,85-101
+  s_90ffdc067aac0d::t_9cbe7d07d51f3c 32-35
+apps/web/e2e/frame.spec.ts
+  s_90ffdc067aac0d::t_1aa0df4b2b6477 3,9-11,13-18
+  s_90ffdc067aac0d::t_9cbe7d07d51f3c 36-38
+  s_90ffdc067aac0d::t_861bd7e11ae9d7 1
+apps/web/test/frame.test.tsx
+  s_90ffdc067aac0d::t_8e6480e5eb5fe5 5,19-25,29-33,80,83-87
+pnpm-workspace.yaml
+  s_90ffdc067aac0d::t_281057e99bf81f 20-23
+apps/web/src/features/auth/auth-client.ts
+  s_90ffdc067aac0d::t_4572cf85b0dae0 1-21,27-30
+  s_90ffdc067aac0d::t_005c5336eed596 22-26
+packages/core/src/workspaces/index.ts
+  s_90ffdc067aac0d::t_7ecbb62b8a10c4 4-16,181-183
+apps/web/src/app/router.tsx
+  s_90ffdc067aac0d::t_285a4ed9485b08 5,12-15,18-19,30-35,44-48,50-79,87,99,111-116
+apps/web/src/features/auth/no-workspace-screen.tsx
+  s_90ffdc067aac0d::t_7ecbb62b8a10c4 17-18
+  s_90ffdc067aac0d::t_08b2222cbe10df 1-16,19-26
+.oxlintrc.json
+  s_90ffdc067aac0d::t_21be7bfac33191 359-406
+  s_90ffdc067aac0d::t_4f64a1dc30c3b8 136,138
+  s_90ffdc067aac0d::t_98819e34a14374 74-80,214-220,261-267,302-308,344-350
+apps/web/src/shared/lib/auth/auth-plugin.ts
+  s_90ffdc067aac0d::t_7ecbb62b8a10c4 3-4,9,15-18,22-23,30
+  s_90ffdc067aac0d::t_ed27e8661c9dd4 1-2,5-8,10-14,19-21,24-29
+apps/api/tests/harness-control.ts
+  s_90ffdc067aac0d::t_8820d2150a268c 1-79
+apps/api/package.json
+  s_90ffdc067aac0d::t_e7335175858faf 14
+apps/web/src/features/auth/workspace-words.ts
+  s_90ffdc067aac0d::t_39fdcc4c17d29a 1-22
+apps/web/src/features/auth/membership.ts
+  s_90ffdc067aac0d::t_b3cb3b124172fd 1-26,34-36
+  s_90ffdc067aac0d::t_d4a2f869606a0c 27-33
+apps/web/test/lint-rules.test.ts
+  s_90ffdc067aac0d::t_dc4c808d7cfba7 55,57-58,191-219
+apps/web/src/features/auth/choose-workspace-screen.tsx
+  s_90ffdc067aac0d::t_c690f586518894 15,74-79,81
+  s_90ffdc067aac0d::t_40051d9583d98e 18-24,83-84
+  s_90ffdc067aac0d::t_a179a46fb0cc04 1-14,16-17,25-73,80,82,85-160
+apps/api/src/auth/routes.ts
+  s_90ffdc067aac0d::t_7ecbb62b8a10c4 55-58
+apps/web/src/features/auth/auth-configuration.tsx
+  s_90ffdc067aac0d::t_1005d1b4f253dc 1-53
+apps/web/package.json
+  s_90ffdc067aac0d::t_9e7cefd3def710 19-21,27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "6206b75418612d331779aff529a2e50ccbea8b4b",
+  "prompts": {},
+  "sessions": {
+    "s_90ffdc067aac0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb92143-40a3-4162-962a-19793a875ce7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
