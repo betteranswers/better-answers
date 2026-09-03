@@ -1,103 +1,34 @@
 import { AxeBuilder } from "@axe-core/playwright";
-import {
-  expect,
-  test,
-  type APIRequestContext,
-  type APIResponse,
-  type BrowserContext,
-  type Page,
-} from "@playwright/test";
-import { z } from "zod";
+import type { APIRequestContext, Page } from "@playwright/test";
 
-import { EMBEDDING_DIMENSIONS, type llmPurpose } from "@better-answers/schema";
+import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
 
 import { SCREENS } from "@/shared/screens.ts";
+
+import { expect, test } from "./browser.ts";
+import {
+  addMember,
+  anAddress,
+  person,
+  provision,
+  seedRoutes,
+  signIn,
+  type SeedRoute,
+} from "./harness.ts";
 
 /**
  * T-022's acceptance seam, and the test T-038 exists for: browser to row-level policy. A real
  * browser, the real server over a real Postgres, and the System screen's routes card.
  *
- * Two workspaces are provisioned through the app tier's own harness, reached over its control
- * face (`apps/api/tests/control.ts`) because this suite runs in another process. Nothing here
- * writes a row itself: a workspace arrives through the platform's provisioning act and a
- * session through the sign-in flow, so what the browser sees is what a person would see.
+ * Two workspaces are provisioned through the api's own harness, reached over its control face
+ * (`apps/api/tests/harness-control.ts`) because this suite runs in another process. Nothing
+ * here writes a row itself and nothing sets a cookie from outside: a workspace arrives through
+ * the platform's provisioning act, and a session through the product's own sign-in screen
+ * (T-037), so what the browser sees is what a person would see.
  */
 
 /** `[UX2]`: "Lists and search hits render under one second." A screen that misses it is a bug. */
 const LIST_BUDGET_MS = 1000;
-
-/** The prefix `apps/api/tests/serve.ts` mounts the harness's control face under. */
-const CONTROL = "/__test__";
-
-/** What the control face answers, parsed rather than asserted, so a change to it fails here. */
-const workspaceAnswer = z.object({ workspaceId: z.string().min(1), adminEmail: z.email() });
-const memberAnswer = z.object({ email: z.email() });
-const sessionAnswer = z.object({
-  cookies: z.array(z.object({ name: z.string().min(1), value: z.string().min(1) })).min(1),
-});
-
-type Workspace = z.infer<typeof workspaceAnswer>;
-type Member = z.infer<typeof memberAnswer>;
-/** A route to seed. The purpose is the column's own enum, so a typo is a type error here. */
-type Route = {
-  readonly purpose: (typeof llmPurpose.enumValues)[number];
-  readonly provider: string;
-  readonly model: string;
-};
-
-const parsed = async <TShape extends z.ZodType>(
-  response: APIResponse,
-  shape: TShape,
-): Promise<z.infer<TShape>> => {
-  if (!response.ok()) throw new Error(`the control face answered ${response.status()}`);
-  return shape.parse(await response.json());
-};
-
-const provision = async (
-  request: APIRequestContext,
-  routes: readonly Route[],
-): Promise<Workspace> =>
-  parsed(await request.post(`${CONTROL}/workspace`, { data: { routes } }), workspaceAnswer);
-
-const addMember = async (
-  request: APIRequestContext,
-  workspaceId: string,
-  role: "Admin" | "Editor" | "Viewer",
-): Promise<Member> =>
-  parsed(await request.post(`${CONTROL}/member`, { data: { workspaceId, role } }), memberAnswer);
-
-/**
- * Sign a person in and leave the browser holding their session.
- *
- * **Harness-driven, pending T-037.** The SPA's sign-in screen is that ticket's; until it lands
- * there is no screen to drive, so the flow is run through the harness — the same email step and
- * the same six-digit code the product's sign-in uses — and the cookie it produces is put into
- * the browser. When T-037 merges, this function's body becomes "go to the sign-in screen, type
- * the address, read the code, type it", and every test below is unchanged: that is why it is
- * one helper and not four lines repeated.
- */
-const signInAs = async (
-  context: BrowserContext,
-  request: APIRequestContext,
-  member: Member,
-): Promise<void> => {
-  const { cookies } = await parsed(
-    await request.post(`${CONTROL}/session`, { data: { email: member.email } }),
-    sessionAnswer,
-  );
-  await context.addCookies(
-    cookies.map((cookie) => ({
-      ...cookie,
-      domain: "127.0.0.1",
-      path: "/",
-      httpOnly: true,
-      // The session cookie is issued `Secure`; a browser treats the loopback as a trustworthy
-      // origin, so it is sent over the plain-HTTP loopback the suite serves on.
-      secure: true,
-      sameSite: "Lax" as const,
-    })),
-  );
-};
 
 const routesCard = (page: Page) => page.getByRole("region", { name: "Routes" });
 
@@ -116,28 +47,50 @@ const PURPOSES = ["Extraction", "Enrichment", "Answering", "Judging", "Embedding
  */
 const FIXED_REASON_PHRASE = "never changes once vectors exist";
 
+/**
+ * A workspace with its routes, and its Admin signed in on the product's own sign-in screen —
+ * the two steps a person takes, not a cookie set from outside. `signIn` and `provision` are
+ * T-037's helpers; this composes them for a suite whose subject is what the screen then shows.
+ */
+const signedInWith = async (
+  page: Page,
+  api: APIRequestContext,
+  input: { readonly name: string; readonly routes: readonly SeedRoute[] },
+) => {
+  const email = anAddress("member");
+  const workspace = await provision(api, { name: input.name, adminEmail: email });
+  await seedRoutes(api, { workspaceId: workspace.workspaceId, routes: input.routes });
+  await page.goto("/sign-in");
+  await signIn(page, api, email);
+  return workspace;
+};
+
 test.describe("the System screen's routes card", () => {
   test("shows a member of one workspace their five routes and never another workspace's", async ({
     page,
-    context,
     request,
   }) => {
-    const mine = await provision(request, [
-      { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
-      { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
-    ]);
     // The other workspace's routes name a provider and a model nothing of mine does, so the
     // absence below is an absence of *their* rows and not of a string we happen to share.
-    await provision(request, [
-      { purpose: "answering", provider: "openai", model: "gpt-5-not-mine" },
-      { purpose: "extraction", provider: "google", model: "gemini-not-mine" },
-    ]);
-    await signInAs(context, request, { email: mine.adminEmail });
+    const theirs = await provision(request, { name: "Southern Castings" });
+    await seedRoutes(request, {
+      workspaceId: theirs.workspaceId,
+      routes: [
+        { purpose: "answering", provider: "openai", model: "gpt-5-not-mine" },
+        { purpose: "extraction", provider: "google", model: "gemini-not-mine" },
+      ],
+    });
 
-    await page.goto("/system");
+    await signedInWith(page, request, {
+      name: "Northern Tooling",
+      routes: [
+        { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
+        { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
+      ],
+    });
+
     const card = routesCard(page);
     await expect(card.getByRole("heading", { level: 3 })).toHaveText(PURPOSES);
-
     await expect(card).toContainText("anthropic");
     await expect(card).toContainText("claude-sonnet-5");
 
@@ -148,21 +101,19 @@ test.describe("the System screen's routes card", () => {
     await expect(everything).not.toContainText("gpt-5-not-mine");
     await expect(everything).not.toContainText("google");
     await expect(everything).not.toContainText("gemini-not-mine");
+    await expect(everything).not.toContainText(theirs.name);
   });
 
   test("says which purposes have no route, so the list is always five rows", async ({
     page,
-    context,
     request,
   }) => {
-    const workspace = await provision(request, [
-      { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
-    ]);
-    await signInAs(context, request, { email: workspace.adminEmail });
+    await signedInWith(page, request, {
+      name: "Acme Joinery",
+      routes: [{ purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" }],
+    });
 
-    await page.goto("/system");
     const card = routesCard(page);
-
     await expect(card.getByRole("listitem")).toHaveCount(5);
     await expect(card.getByRole("heading", { level: 3 })).toHaveText(PURPOSES);
     await expect(card.getByText("No route is set.")).toHaveCount(4);
@@ -180,17 +131,14 @@ test.describe("the System screen's routes card", () => {
 
   test("says the embedding route is fixed, in words, with its dimension count and why", async ({
     page,
-    context,
     request,
   }) => {
-    const workspace = await provision(request, [
-      { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
-    ]);
-    await signInAs(context, request, { email: workspace.adminEmail });
+    await signedInWith(page, request, {
+      name: "Halifax Fabrication",
+      routes: [{ purpose: "embedding", provider: "mistral", model: "mistral-embed" }],
+    });
 
-    await page.goto("/system");
     const embedding = embeddingRow(page);
-
     await expect(embedding).toContainText("mistral");
     await expect(embedding).toContainText("mistral-embed");
     // The word, not a colour: a reader who cannot see the outline still learns the route is fixed.
@@ -206,20 +154,16 @@ test.describe("the System screen's routes card", () => {
     await expect(routesCard(page).getByText("Fixed", { exact: true })).toHaveCount(1);
   });
 
-  test("carries no control that edits, adds or deletes a route", async ({
-    page,
-    context,
-    request,
-  }) => {
-    const workspace = await provision(request, [
-      { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
-      { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
-    ]);
-    await signInAs(context, request, { email: workspace.adminEmail });
+  test("carries no control that edits, adds or deletes a route", async ({ page, request }) => {
+    await signedInWith(page, request, {
+      name: "Pennine Metalwork",
+      routes: [
+        { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
+        { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
+      ],
+    });
 
-    await page.goto("/system");
     const card = routesCard(page);
-
     // Nothing operable at all: editing is a later ticket with its own gating, and a disabled
     // control that hints at it would be the half-gated write this ticket refuses to ship.
     await expect(card.getByRole("button")).toHaveCount(0);
@@ -230,20 +174,21 @@ test.describe("the System screen's routes card", () => {
     await expect(card).not.toContainText(/edit|add|delete|remove/i);
   });
 
-  test("renders the list within the constitution's latency budget", async ({
-    page,
-    context,
-    request,
-  }) => {
-    const workspace = await provision(request, [
-      { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
-      { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
-    ]);
-    await signInAs(context, request, { email: workspace.adminEmail });
+  test("renders the list within the constitution's latency budget", async ({ page, request }) => {
+    await signedInWith(page, request, {
+      name: "Dales Engineering",
+      routes: [
+        { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
+        { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
+      ],
+    });
 
     // Measured from a screen the person is already on, so what is timed is the list arriving —
     // the query, the answer and the render — and not the first load of the bundle behind it.
-    await page.goto("/people");
+    await page
+      .getByRole("navigation", { name: "Control Centre" })
+      .getByRole("link", { name: "People" })
+      .click();
     await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 
     const started = Date.now();
@@ -262,16 +207,19 @@ test.describe("the System screen's routes card", () => {
   for (const role of ["Admin", "Editor", "Viewer"] as const) {
     test(`shows the list to a member at ${role}, because the list is read-only`, async ({
       page,
-      context,
       request,
     }) => {
-      const workspace = await provision(request, [
-        { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
-      ]);
-      const member = await addMember(request, workspace.workspaceId, role);
-      await signInAs(context, request, member);
+      const workspace = await provision(request, { name: `Workspace for a ${role}` });
+      await seedRoutes(request, {
+        workspaceId: workspace.workspaceId,
+        routes: [{ purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" }],
+      });
+      const email = anAddress(role.toLowerCase());
+      const member = await person(request, email);
+      await addMember(request, { workspaceId: workspace.workspaceId, userId: member.id, role });
 
-      await page.goto("/system");
+      await page.goto("/sign-in");
+      await signIn(page, request, email);
 
       await expect(routesCard(page).getByRole("listitem")).toHaveCount(5);
       await expect(routesCard(page)).toContainText("claude-sonnet-5");
@@ -280,16 +228,15 @@ test.describe("the System screen's routes card", () => {
 
   test("is reachable by keyboard and clean under axe, and leaves the rest of System unbuilt", async ({
     page,
-    context,
     request,
   }) => {
-    const workspace = await provision(request, [
-      { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
-      { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
-    ]);
-    await signInAs(context, request, { email: workspace.adminEmail });
-
-    await page.goto("/system");
+    await signedInWith(page, request, {
+      name: "Wharfedale Castings",
+      routes: [
+        { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
+        { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
+      ],
+    });
     await expect(routesCard(page).getByRole("listitem")).toHaveCount(5);
 
     // The card adds nothing to the tab order — it has no controls — so the traversal past the
@@ -306,7 +253,7 @@ test.describe("the System screen's routes card", () => {
     await expect(routesCard(page)).toMatchAriaSnapshot(`
       - region "Routes":
         - heading "Routes" [level=2]
-        - paragraph: /Which model does which job in this workspace/
+        - paragraph: "Which model does which job in this workspace. Listed only: choosing a route is not part of this screen."
         - list:
           - listitem:
             - heading "Extraction" [level=3]

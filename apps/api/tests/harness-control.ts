@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { z } from "zod";
 
+import { llmPurpose } from "@better-answers/schema";
+import { testData } from "@better-answers/schema/testing";
+
 import type { TestApp } from "./harness.ts";
 
 /**
@@ -30,6 +33,18 @@ const membership = z.object({
   role: z.enum(["Admin", "Editor", "Viewer"]),
 });
 const revocation = z.object({ userId: z.string().min(1) });
+const seeding = z.object({
+  workspaceId: z.string().min(1),
+  // The enum the column is declared from, never a restatement of it (`[DEPS2]`): a purpose
+  // added to the platform is accepted here the day it is added.
+  routes: z.array(
+    z.object({
+      purpose: z.enum(llmPurpose.enumValues),
+      provider: z.string().min(1),
+      model: z.string().min(1),
+    }),
+  ),
+});
 const ending = z.object({ workspaceId: z.string().min(1), userId: z.string().min(1) });
 
 /** A body a test got wrong is the test's mistake, and it says which field in one line. */
@@ -70,6 +85,25 @@ export const harnessControl = (app: TestApp): Hono => {
     const asked = await readBody(context.req.raw, ending);
     await app.removeMember(asked.workspaceId, asked.userId);
     return context.json({ removed: true });
+  });
+
+  /**
+   * The routes a workspace has chosen, seeded as the System screen will one day write them
+   * (T-038). It is a surface of its own rather than a field on `/workspaces`, because a test
+   * that wants a workspace with no routes at all wants exactly what provisioning already does.
+   */
+  control.post(`${HARNESS_PREFIX}/routes`, async (context) => {
+    const asked = await readBody(context.req.raw, seeding);
+    const client = await app.database.superuser.connect();
+    try {
+      const seed = testData(client);
+      for (const route of asked.routes) {
+        await seed.llmRoute({ workspaceId: asked.workspaceId, ...route });
+      }
+    } finally {
+      client.release();
+    }
+    return context.json({ seeded: asked.routes.length });
   });
 
   /**

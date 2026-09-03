@@ -55,6 +55,23 @@ export const removeMember = async (
 export const revokeCredentials = (api: APIRequestContext, userId: string) =>
   ask<{ revoked: boolean }>(api, "/revocations", { userId });
 
+/** One purpose's choice, as a test seeds it and the System screen will one day write it. */
+export type SeedRoute = {
+  readonly purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
+  readonly provider: string;
+  readonly model: string;
+};
+
+/**
+ * The routes a workspace has chosen (T-038). A purpose left out of the list is a purpose with
+ * no route, which the screen has to show rather than omit — so this seeds what it is given and
+ * nothing else.
+ */
+export const seedRoutes = (
+  api: APIRequestContext,
+  input: { workspaceId: string; routes: readonly SeedRoute[] },
+) => ask<{ seeded: number }>(api, "/routes", input);
+
 /** An address nobody else in the run will use, so a code read back is this test's. */
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
