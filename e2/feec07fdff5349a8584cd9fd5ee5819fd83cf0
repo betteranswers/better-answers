@@ -1,0 +1,32 @@
+apps/api/Dockerfile
+  s_d41063f43ada5b::t_a9b8ffdb3adc2a 124-130
+deploy/restore-drill.sh
+  s_d41063f43ada5b::t_a588410d467929 72-75
+apps/api/tests/image.test.ts
+  s_d41063f43ada5b::t_2e285028bb9dbe 68-73
+  s_d41063f43ada5b::t_dbd130157bfd4c 136
+  s_d41063f43ada5b::t_8e56b1ca94c6fd 2,7,26-29,51-67,74-86,97-98,109,127,131-135,137-138,140,144-148,158,187-194,213
+apps/worker/Dockerfile
+  s_d41063f43ada5b::t_599e1b111efda0 55,57-60
+.github/workflows/build.yml
+  s_d41063f43ada5b::t_52328e9497d89f 57
+deploy/platform.compose.yaml
+  s_d41063f43ada5b::t_e8c6078a9a27ca 78-80
+  s_d41063f43ada5b::t_9f9683552910a7 116-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e2feec07fdff5349a8584cd9fd5ee5819fd83cf0",
+  "prompts": {},
+  "sessions": {
+    "s_d41063f43ada5b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e2e216cd-f777-484f-939a-18351ad361cb",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
