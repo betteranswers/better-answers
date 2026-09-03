@@ -1,0 +1,26 @@
+.github/workflows/check.yml
+  s_09ad417bc22bdb::t_e28479cf234773 4-13
+  s_09ad417bc22bdb::t_736820b824d3d2 35-37,41
+.github/workflows/build.yml
+  s_09ad417bc22bdb::t_736820b824d3d2 56,61-62,67,74
+  s_09ad417bc22bdb::t_4898ffd54b1d23 14-17
+.github/workflows/mutation.yml
+  s_09ad417bc22bdb::t_736820b824d3d2 35-37,61,73-74
+  s_09ad417bc22bdb::t_bf50b35252f08c 7-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1fe5734f1b41b8eab8fbd6a27cb6bd33c7980755",
+  "prompts": {},
+  "sessions": {
+    "s_09ad417bc22bdb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd84fef3-35ab-41ef-a9ee-2b92664fe274",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
