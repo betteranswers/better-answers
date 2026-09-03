@@ -1,0 +1,47 @@
+apps/api/tests/control.ts
+  s_90ffdc067aac0d::t_2594dcd9c90e55 1-108
+apps/web/src/features/routes/routes-card.tsx
+  s_90ffdc067aac0d::t_fd54529cafb098 86-87
+  s_90ffdc067aac0d::t_f465876a77f3fc 1-23,25-29,31-85,88-110
+  s_90ffdc067aac0d::t_02fbccb522020d 24,30
+apps/web/src/features/routes/list-routes.ts
+  s_90ffdc067aac0d::t_a5252765bd932b 1-27
+apps/web/src/app/screens/system-screen.tsx
+  s_90ffdc067aac0d::t_ec7a4acfd59034 1,8,10-15,25
+apps/api/tests/serve.ts
+  s_90ffdc067aac0d::t_8bd818a274e191 2,6-7
+  s_90ffdc067aac0d::t_3526d3890cf7bd 32-36,42-44,48-56
+pnpm-lock.yaml
+  ai_agent 154-156,160-162,205-207,287-291,3020-3023,4819-4823,7082
+apps/web/test/frame.test.tsx
+  s_90ffdc067aac0d::t_91ba054303041c 19-23,27-31
+  s_90ffdc067aac0d::t_5be7450eb4285d 5
+  s_90ffdc067aac0d::t_a010fb99489147 69,73-75
+apps/web/e2e/routes.spec.ts
+  s_90ffdc067aac0d::t_b652c7c135188c 11-29,39-40,45,47-48,54-59,61-76,78,80-126,132-175,179-201,203-221,226-294
+  s_90ffdc067aac0d::t_c9717be2ce901a 77,79
+  s_90ffdc067aac0d::t_d92c106244a7e6 176-178
+  s_90ffdc067aac0d::t_fd54529cafb098 222-225
+  s_90ffdc067aac0d::t_5ab689b57cffdf 1-10
+  s_90ffdc067aac0d::t_a089ff55fb2d0b 30-38,41-44,46,49-53,60
+  s_90ffdc067aac0d::t_067e9b7432f7f7 127-131,202
+apps/web/package.json
+  s_90ffdc067aac0d::t_55fe91e063ebda 35,37
+  s_90ffdc067aac0d::t_f7bc0f0e4327ac 51-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "acf42e0e17199b6322cbf418ea1b694828afb6b6",
+  "prompts": {},
+  "sessions": {
+    "s_90ffdc067aac0d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb92143-40a3-4162-962a-19793a875ce7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
