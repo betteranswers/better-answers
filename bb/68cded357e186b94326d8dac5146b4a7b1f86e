@@ -1,0 +1,32 @@
+apps/api/tests/ops.test.ts
+  s_151a8937515035::t_d6d39b7809f84f 67-72
+deploy/wizard-41.sh
+  s_151a8937515035::t_e5dce0a168076e 325
+  s_151a8937515035::t_146428e0080f88 321
+deploy/RELEASES.md
+  s_151a8937515035::t_d011b16177bb31 3
+deploy/restore-drill.sh
+  s_151a8937515035::t_606e54369ed45e 54-57,93-100
+apps/api/src/ops.ts
+  s_151a8937515035::t_f05fb359cc643a 24
+apps/api/src/ops/index.ts
+  s_151a8937515035::t_2d826c40eb4c10 249-252
+deploy/host-setup.sh
+  s_151a8937515035::t_34365ff7b97c0b 80-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "bb68cded357e186b94326d8dac5146b4a7b1f86e",
+  "prompts": {},
+  "sessions": {
+    "s_151a8937515035": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c01ae4cf-0bc0-4d2f-97b9-fd14f03fd353",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
