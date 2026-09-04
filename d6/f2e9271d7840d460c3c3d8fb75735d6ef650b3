@@ -1,0 +1,19 @@
+apps/api/tests/config.test.ts
+  s_aeae77468c20c4::t_766b7cb289811d 113-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d6f2e9271d7840d460c3c3d8fb75735d6ef650b3",
+  "prompts": {},
+  "sessions": {
+    "s_aeae77468c20c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "77eafac5-4ffb-41ab-b8f7-4ff90398deea",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
