@@ -153,5 +153,7 @@ jobs:
           set -euo pipefail
           # The two paths the uptime check watches (coolify.md § Ingress): the app is healthy and the
           # protected-resource document names the MCP surface. Retried while the stack comes up.
-          curl -fsS --retry 20 --retry-delay 6 --retry-all-errors -o /dev/null "${PUBLIC_URL}/health"
+          # 40 × 6 s ≈ 4 min: /deploy is asynchronous and a release that pulls a fresh image
+          # takes ~3 min end to end — 2 min of retries lost the race (first CI release, 04/09/2026).
+          curl -fsS --retry 40 --retry-delay 6 --retry-all-errors -o /dev/null "${PUBLIC_URL}/health"
           curl -fsS --retry 5 --retry-delay 6 --retry-all-errors "${PUBLIC_URL}/.well-known/oauth-protected-resource/mcp" | jq -e --arg mcp "${PUBLIC_URL}/mcp" '.resource == $mcp' >/dev/null
