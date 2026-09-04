@@ -10,8 +10,9 @@ import { z } from "zod";
  * refused before any body is read", `app.` the product *and* the authorization server
  * (`/mcp`, discovery, `/jwks`, `/oauth2/*`, consent; open at the edge since the
  * 2026-09-02 amendment), the apex answering 404. The tunnel's ingress rules are the
- * first fence and stay so (ADR 0022; recorded in `deploy/coolify.md` § Ingress when
- * T-005 writes that file). This is the second, and it is in the app because Better
+ * first fence and stay so (ADR 0022; recorded in
+ * `apps/docs-site/operations/coolify.md` § Ingress). This is the second, and it is in
+ * the app because Better
  * Auth's handler is mounted at the wildcard: every one of its endpoints answers on every
  * hostname the process is given, so a tunnel rule that is one console edit from being
  * wrong is otherwise the only thing between `agent.` and the authorization server.

@@ -1,5 +1,7 @@
 # Runbook — nine pages and two procedures
 
+**Operational reference, not a page of the docs site.** This file lives in `apps/docs-site/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
+
 Each entry: the check that fires, what to do, the rows to attach, who to escalate to, the drill that rehearses it.
 
 **This is the public half.** The pages below state *what happens* and *in what order* — the shape one non-technical owner follows. The estate's own half — the provider console to open, the exact host paths, the named credential list to rotate, the addresses, the **names behind each escalation contact** and the recorded results — is **not published**: it is `.planning/estate/RUNBOOK.md`, outside the repository, beside `.planning/estate/SECRETS.md` and `.planning/estate/coolify.md` (ADR 0027, ticket 79 Q10; ticket 77's acceptance line). An operator runs from the private copy; a reader learns the design from this one. Detail on the classes and the rotation contract is in `SECRETS.md`; on the copies, in `BACKUPS.md`; on the shape of the deployment, in `coolify.md`.

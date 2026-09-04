@@ -10,17 +10,11 @@ item carries no version of its own, so the pin is the CLI, the registry URL and 
 (`[DEPS1]`); `apps/web/components.json` holds the URLs so a refresh lands in the same places.
 
 T-037 added three more items on the same day with the same CLI — `input`, `label` and
-better-auth-ui's `auth-provider` — and the npm packages that provider stands on:
-`@better-auth-ui/core` and `@better-auth-ui/react`, both **1.7.19**, read from the npm
-registry on **3 September 2026**, pinned exactly in `apps/web/package.json`. That line
-releases daily; the version read the day before was the same one.
+better-auth-ui's `auth-provider`.
 
-Two more pins arrived with them and are **not** a version choice of this workspace's:
-`better-auth` and `@better-auth/oauth-provider`, both **1.7.2**, are the client halves of
-what `apps/api` runs as the server, read on the same day from the same registry and stated
-in `apps/web/package.json` at exactly the versions `apps/api/package.json` holds. They move
-when the api's move and never on their own: a client and a server of one protocol at two
-versions is a bug that shows up as a 404 on a path one of them renamed.
+This file records vendored source only. The npm packages those items stand on are ordinary
+dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
+lockfile, which is where a reader reads them and where Renovate moves them.
 
 ## Provenance, item by item
 

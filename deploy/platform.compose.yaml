@@ -82,7 +82,7 @@ services:
       PUBLIC_URL: ${PUBLIC_URL:?}          # its host is `app.`: the SPA, /health, /me, the session endpoints, /mcp, discovery, /jwks, /oauth2/* and consent
       SMTP_URL: ${SMTP_URL:?}
       # Two of the estate's three hostnames (ADR 0022, ADR 0034) — per-resource env, not a default in
-      # a public file (deploy/SECRETS.md § What the estate holds). Bare hostnames: no scheme, port or
+      # a public file (apps/docs-site/operations/SECRETS.md § What the estate holds). Bare hostnames: no scheme, port or
       # path. The third, `app.`, is PUBLIC_URL's host and has no variable of its own: it is one
       # origin, so setting it twice was one more thing to get wrong on deploy day (T-039). All three
       # must differ, the derived one included, or the app refuses to start.

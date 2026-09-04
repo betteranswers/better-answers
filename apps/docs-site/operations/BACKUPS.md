@@ -1,5 +1,9 @@
 # Backups — one line per store
 
+**Operational reference, not a page of the docs site.** This file lives in `apps/docs-site/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
+
+**This is the public half.** It states *which copies exist*, *on what schedule*, *how long each is kept* and *what restores each one*. The estate's own half — the provider account, the buckets and the vault as they are actually named, who holds the escrowed identity, and the recorded drill results — is **not published**: it is `.planning/estate/BACKUPS.md`, outside the repository, because a public operational map of a running estate helps only an attacker (ADR 0027, ticket 79 Q10; ticket 77's acceptance line). Everything a reader needs to back up *their own* deployment is here and in `deploy/backup.sh`, `deploy/restore-drill.sh` and `deploy/restore-production.sh`.
+
 The matrix ADR 0007 asked for, decided by ticket 41 (ADR 0022) and resized by ticket 74 (ADR 0024). Two off-host buckets outside both IONOS boxes, UK or EU region under a UK-addendum DPA (ticket 41 Q5; provider: `research/41-object-store-and-bucket.md`):
 
 - **dumps** — versioned, **object lock in governance mode**, lifecycle tiers below. The production host's credential can write and list, never delete, never bypass retention; the escrowed admin credential can. A compromised host cannot erase its history; a human can correct a mistake.

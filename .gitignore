@@ -23,7 +23,7 @@ stryker-setup-*.js
 test-results/
 playwright-report/
 
-# local env — every secret lives in Coolify's env or the password manager (deploy/SECRETS.md)
+# local env — every secret lives in Coolify's env or the password manager (apps/docs-site/operations/SECRETS.md)
 .env
 .env.*
 !.env.example

@@ -24,7 +24,7 @@ amends: 0005, 0007, 0012, 0020, 0022
 
 ## Consequences
 
-- `deploy/stores.compose.yaml`: `forgejo` and `embeddings` gone (the embedding service stays in the file commented out, for the workspace that chooses the local route); `init` owns `/data/git`; `backup` mounts `/data/git` read-only and pushes the mirror. `deploy/platform.compose.yaml`: `app` mounts `/data/git`; `worker` mounts it read-only, `MAX_CONCURRENT_RUNS=1`, memory limit 1.5 GB. `deploy/coolify.md` § Boxes: the two boxes and the swap file. `deploy/BACKUPS.md`, `RUNBOOK.md`, `SECRETS.md`, `restore-drill.sh`, `backup.sh`: Forgejo rows and steps become the git store's; the Forgejo database credential and bot token leave `SECRETS.md`.
+- `deploy/stores.compose.yaml`: `forgejo` and `embeddings` gone (the embedding service stays in the file commented out, for the workspace that chooses the local route); `init` owns `/data/git`; `backup` mounts `/data/git` read-only and pushes the mirror. `deploy/platform.compose.yaml`: `app` mounts `/data/git`; `worker` mounts it read-only, `MAX_CONCURRENT_RUNS=1`, memory limit 1.5 GB. `apps/docs-site/operations/coolify.md` § Boxes: the two boxes and the swap file. `apps/docs-site/operations/BACKUPS.md`, `RUNBOOK.md` and `SECRETS.md`, and `deploy/restore-drill.sh` and `deploy/backup.sh`: Forgejo rows and steps become the git store's; the Forgejo database credential and bot token leave `SECRETS.md`.
 - Records: `backup_run` unchanged; the run row carries `bundle_commit` (the hash the worker checked out).
 - Signals to ticket 42: **swap-in rate during a first index** (decides A), free memory on VPC 1 at 85 %, the git store's size per workspace.
 - `CONTEXT.md`: *forge* — the bare repositories under `/data/git` the app writes; *staging* — on demand.

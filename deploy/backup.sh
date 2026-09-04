@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Better Answers — backup jobs (deploy/BACKUPS.md). Runs inside the `backup` service.
+# Better Answers — backup jobs (apps/docs-site/operations/BACKUPS.md). Runs inside the `backup` service.
 #   backup.sh hourly   — Postgres dump, age-encrypted, filed into the tier the clock says
 #                        (hourly; 02:05 → daily; Sunday 02:05 → weekly; 1st 02:05 → monthly)
 #   backup.sh nightly  — object-store mirror (rclone sync — deletions propagate) + one git bundle per bare

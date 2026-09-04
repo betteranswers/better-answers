@@ -210,7 +210,7 @@ Research 55 left eight questions it could not answer, and pass 1 left one. **Non
 | 6 · Neo4j online backup | **Void.** ADR 0023 put the graph inside Postgres; it rides every `pg_dump`. |
 | 7 · Where does a machine client authenticate on the tunnel? | **Closed by ticket 41.** `agent.` is the machine client's hostname — no Access, the agent token checked in the app before any body is read, the one Free-plan rate-limit rule on it. |
 | 8 · Does the memo cache grow without bound? | **Capped, not probed.** `LMDB_MAX_BYTES_PER_BINDING` is already 4 GB in the compose file; over it the binding's LMDB is wiped and reprocessed. Add the LMDB size per binding as an ADR 0025 signal and the question answers itself in production. |
-| 9 · Coolify honours `depends_on` conditions | **Answered on paper** (research 68: Compose's plain `up -d` honours them) and already listed in `deploy/coolify.md` as a probe to record at the first deploy. |
+| 9 · Coolify honours `depends_on` conditions | **Answered on paper** (research 68: Compose's plain `up -d` honours them) and already listed in `apps/docs-site/operations/coolify.md` as a probe to record at the first deploy. |
 
 **Recommendation: close all nine.** Four are void or already answered, four are conservative-by-design and become build-task tests, and one — the first client's estate size — is an onboarding step you take before pricing a plan, not a thing that blocks writing code.
 
@@ -269,7 +269,7 @@ Call it **two to three weeks, not two days**. That is still worth having — it 
 
 - Private, on `github.com/betteranswers/better-answers`, 52 tracked files.
 - No client material tracked: `.planning/`, `.scratch/`, `.lavish/`, `old-suggested-schema.md` and `15-user-feedback.md` are all gitignored, and nothing matching a client, credential, key or env pattern is tracked.
-- `deploy/SECRETS.md` is tracked and holds **no secret values** — it is the inventory of what exists and where it lives, which is what it should be.
+- `apps/docs-site/operations/SECRETS.md` is tracked and holds **no secret values** — it is the inventory of what exists and where it lives, which is what it should be.
 - `LICENSE` (Apache-2.0), `NOTICE`, `SECURITY.md` and `README.md` are all present, per ADR 0027 and ticket 62.
 
 Nothing here blocks the gate. Ticket 77 still owns the flip itself, the organisation setting, and the `security@` mailbox `SECURITY.md` promises.
