@@ -1,0 +1,21 @@
+apps/docs-site/operations/coolify.md
+  s_de04f897fd5c8d::t_8f23d66b1713e5 47
+docs/adr/0034-one-origin-for-the-product-and-the-authorization-server.md
+  s_de04f897fd5c8d::t_66a05d23e0b803 161-165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0b4990c64839cda4466f87917c3705d54f18920e",
+  "prompts": {},
+  "sessions": {
+    "s_de04f897fd5c8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d64240bd-0964-49f7-bd3e-fb53860e910a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
