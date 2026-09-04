@@ -49,6 +49,10 @@ services:
   migrate:
     image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?set by the release workflow}
     command: ["pnpm", "migrate"]
+    # Explicit and quoted: Coolify fills a MISSING `restart` with unless-stopped, which
+    # restarts a one-shot forever and api's `service_completed_successfully` never fires
+    # (stores.compose.yaml § init carries the reference). Unquoted `no` is YAML false.
+    restart: "no"
     environment:
       <<: *bootstrap
     labels: { coolify.exclude_from_hc: "true" }

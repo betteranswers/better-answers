@@ -52,6 +52,11 @@ services:
     # alpine 3.23.5, read from Docker Hub's tag API on 03/09/2026 ([DEPS1]) — `latest` on that
     # day resolved to 3.22.5, so the current release line is named rather than the alias.
     image: alpine:3.23.5@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40
+    # Explicit and quoted: Coolify fills a MISSING `restart` with unless-stopped
+    # (parsers.php `data_get_str($service, 'restart', RESTART_MODE)`), which restarts a
+    # one-shot forever and `service_completed_successfully` below never fires (first deploy,
+    # 04/09/2026). Unquoted `no` is YAML false and reads as missing.
+    restart: "no"
     <<: *mem128
     command: >
       sh -ec '
