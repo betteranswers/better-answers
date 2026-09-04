@@ -1,0 +1,28 @@
+apps/docs-site/operations/coolify.md
+  s_de04f897fd5c8d::t_f634cae8a3b17a 47
+  s_de04f897fd5c8d::t_edd352f99741d3 51
+deploy/uptime-probe.sh
+  s_de04f897fd5c8d::t_920d05e5f2ebab 1-34
+deploy/wizard-41.sh
+  s_de04f897fd5c8d::t_a5cc041607f3df 296-297
+  s_de04f897fd5c8d::t_286efd38fc4d58 273,278-290
+  s_de04f897fd5c8d::t_d5c1d87bdc25ad 339-340
+  s_de04f897fd5c8d::t_0ff2f6f984c7a4 351
+  s_de04f897fd5c8d::t_5cf127e6c499ec 300
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "53aa4bbdf89c0f5aa8b61eafa4533054aaf11706",
+  "prompts": {},
+  "sessions": {
+    "s_de04f897fd5c8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d64240bd-0964-49f7-bd3e-fb53860e910a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
