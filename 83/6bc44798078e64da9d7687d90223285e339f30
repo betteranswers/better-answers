@@ -1,0 +1,19 @@
+.github/workflows/debug-access.yml
+  s_151a8937515035::t_a077d8daec1096 32-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "836bc44798078e64da9d7687d90223285e339f30",
+  "prompts": {},
+  "sessions": {
+    "s_151a8937515035": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c01ae4cf-0bc0-4d2f-97b9-fd14f03fd353",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
