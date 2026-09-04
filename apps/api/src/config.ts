@@ -95,6 +95,14 @@ const identityBootstrapSchema = z
     // construction rather than by a refine.
     AGENT_HOSTNAME: bareHostname,
     APEX_HOSTNAME: bareHostname,
+    // The sign-in email's transport, as a connection URL (`smtps://resend:<key>@...` in
+    // the estate). Bootstrap rather than a row under the envelope because the first email
+    // the tier sends precedes the first signed-in user — no principal exists yet to
+    // install a row. Optional so the dev loop and the test harness run without a mail
+    // account; the deploy unit marks it required (`${SMTP_URL:?}` in
+    // `deploy/platform.compose.yaml`), and the scheme check stops the process when
+    // Coolify hands the `:?` message through as the value instead of failing the parse.
+    SMTP_URL: z.url({ protocol: /^smtps?$/ }).optional(),
   })
   .refine((parsed) => {
     const hostnames = [
@@ -116,6 +124,8 @@ export type IdentityBootstrap = {
   readonly publicUrl: string;
   readonly authSecret: string;
   readonly hostnames: PublicHostnames;
+  /** The sign-in email's SMTP connection URL; absent, the app starts and a code request fails loudly instead of sending. */
+  readonly smtpUrl: string | undefined;
 };
 
 const invalid = (parsed: z.ZodError): Error =>
@@ -141,6 +151,7 @@ export function readIdentityBootstrap(
   return ok({
     publicUrl: parsed.data.PUBLIC_URL,
     authSecret: parsed.data.AUTH_SECRET,
+    smtpUrl: parsed.data.SMTP_URL,
     hostnames: {
       // Read the way the fence reads an arriving request's host, so the hostname the
       // router matches on and the origin every spec-exact string is derived from are

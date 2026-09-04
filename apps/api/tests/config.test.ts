@@ -90,6 +90,31 @@ describe("the bootstrap configuration", () => {
   it("refuses a short secret", () => {
     expect(readIdentityBootstrap(identityEnvironment({ AUTH_SECRET: "short" })).ok).toBe(false);
   });
+
+  it("gives the app its SMTP connection URL, so the sign-in code has a transport", () => {
+    const read = readIdentityBootstrap(
+      identityEnvironment({ SMTP_URL: "smtps://resend:key@smtp.example.test:465" }),
+    );
+
+    expect(read.ok && read.value.smtpUrl).toBe("smtps://resend:key@smtp.example.test:465");
+  });
+
+  it("starts without SMTP, because the dev loop and the harness send no email", () => {
+    const read = readIdentityBootstrap(identityEnvironment());
+
+    expect(read.ok && read.value.smtpUrl).toBe(undefined);
+  });
+
+  it.each([
+    ["another scheme", "https://smtp.example.test"],
+    // Coolify hands a compose `:?` message through as the value when the variable is
+    // unset on the resource (probe record, `.planning/estate/coolify.md`); the scheme
+    // check stops the process on deploy day instead of failing at the first sign-in.
+    ["compose's own error message", 'The "SMTP_URL" variable is not set. Defaulting to a blank string.'],
+    ["an empty value", ""],
+  ])("refuses SMTP_URL with %s", (_case, url) => {
+    expect(readIdentityBootstrap(identityEnvironment({ SMTP_URL: url })).ok).toBe(false);
+  });
 });
 
 /**
