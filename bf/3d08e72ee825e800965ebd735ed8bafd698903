@@ -1,0 +1,23 @@
+deploy/wizard-41.sh
+  s_151a8937515035::t_93f9406d9ae3fc 264
+deploy/restore-drill.sh
+  s_151a8937515035::t_7c5a27d4b55b51 36,59,114,147,154,158,167-170
+deploy/host-setup.sh
+  s_151a8937515035::t_3e92be9a11fa3a 112-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "bf3d08e72ee825e800965ebd735ed8bafd698903",
+  "prompts": {},
+  "sessions": {
+    "s_151a8937515035": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c01ae4cf-0bc0-4d2f-97b9-fd14f03fd353",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
