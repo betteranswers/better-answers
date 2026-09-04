@@ -38,5 +38,16 @@ jobs:
             | curl -s -o /tmp/patch.out -D /tmp/patch.hdr -w "no-op PATCH -> %{http_code}\n" -X PATCH "${auth[@]}" -H "Content-Type: application/json" --data-binary @- "${COOLIFY_URL}/api/v1/applications/${PROD_UUID}/envs"
           grep -i -e "^server:" -e "^cf-ray:" -e "^allow:" /tmp/patch.hdr || true
           head -c 300 /tmp/patch.out; echo
+          # The release's patch() VERBATIM (flags, header order, URL position) with the same
+          # no-op value — whatever answers differently here is the discriminant.
+          patch_verbatim() {
+            jq -cn --arg key "$1" --arg value "$2" '{key: $key, value: $value, is_preview: false}' \
+              | curl -sS -o /tmp/v.out -D /tmp/v.hdr -w "verbatim PATCH -> %{http_code}\n" -X PATCH "${COOLIFY_URL}/api/v1/applications/${PROD_UUID}/envs" \
+                  -H "Authorization: Bearer ${COOLIFY_TOKEN}" -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
+                  -H "Content-Type: application/json" --data-binary @-
+          }
+          patch_verbatim API_IMAGE_DIGEST "${digest}"
+          grep -i -e "^server:" -e "^cf-ray:" -e "^allow:" /tmp/v.hdr || true
+          head -c 300 /tmp/v.out; echo
         env:
           PROD_UUID: ${{ vars.COOLIFY_PROD_APP_UUID }}
