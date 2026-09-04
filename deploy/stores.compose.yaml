@@ -160,7 +160,9 @@ services:
       HEALTHCHECKS_PING_URL_PG_HOURLY: ${HEALTHCHECKS_PING_URL_PG_HOURLY:?}
       HEALTHCHECKS_PING_URL_NIGHTLY: ${HEALTHCHECKS_PING_URL_NIGHTLY:?}
     healthcheck:
-      test: ["CMD-SHELL", "pgrep crond >/dev/null && [ $(find /staging -type f -mmin +1440 | wc -l) -eq 0 ]"]
+      # `-x cron`, not `crond`: the image is Debian-based and its daemon is `cron -f`
+      # (first deploy, 04/09/2026 — `pgrep crond` matched nothing and the service sat unhealthy).
+      test: ["CMD-SHELL", "pgrep -x cron >/dev/null && [ $(find /staging -type f -mmin +1440 | wc -l) -eq 0 ]"]
       interval: 60s
       timeout: 5s
       retries: 3
