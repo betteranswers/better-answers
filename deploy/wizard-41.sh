@@ -270,26 +270,34 @@ write_env BACKUP_S3_PROVIDER "$BACKUP_S3_PROVIDER"; write_env BACKUP_S3_ENDPOINT
 pause
 
 # ────────────────────────────────────────────────────────────────────────
-stage "Cloudflare — zone, Pro, tunnel (three hostnames, no Access), four rate-limit rules, two health checks"
+stage "Cloudflare — zone, plan, tunnel (three hostnames, no Access), rate limiting within the plan's allowance, uptime"
 ask APEX "Apex domain for this deployment (e.g. example.com):"
 write_env APEX "$APEX"
 open_url "https://dash.cloudflare.com/"
 step "Add the zone $APEX (nameservers at the registrar)."
-step "Plan → PRO. Four rate-limit rules and the external health checks below need it; Free allows one rule (ticket 79 Q9). This is the forcing function: the wizard does not pass this stage on Free."
-if ! confirm "Is the zone $APEX on the Pro plan (or higher) now"; then
-  warn "Stopping here: Pro must exist BEFORE the first client credential does (coolify.md § Ingress). Re-run this stage when it is."
-  SKIPPED+=("Cloudflare Pro on $APEX — required before the first client credential; re-run stage 5")
-  finish; exit 1
+say "Plans meter rate-limit RULES, not paths: Free 1 · Pro (~\$25/mo) 2 · Business (\$250/mo) 5. The four metered path groups below are combined with OR expressions to fit the plan's allowance."
+say "The Pro trigger (ticket 79 Q9) is a condition, not this stage: BEFORE the first client credential exists, the zone is on Pro. Until that day, Free's one combined rule ahead of the app's own counters is the accepted posture (Q9 b)."
+if confirm "Is the zone $APEX on the Pro plan (or higher)"; then
+  write_env CF_PLAN "pro"; write_env CF_PRO_CONFIRMED "$(date -u +%F)"
+else
+  if ! confirm "Confirm: NO client credential exists yet, and none will be issued before this stage is re-run on Pro"; then
+    warn "Stopping here: a client credential may not precede Pro (coolify.md § Ingress, Q9). Upgrade the zone, then re-run this stage."
+    SKIPPED+=("Cloudflare Pro on $APEX — must precede the first client credential (Q9); re-run stage 5")
+    finish; exit 1
+  fi
+  write_env CF_PLAN "free"
+  warn "Free posture recorded: ONE combined rate-limit rule, and the VPC 2 uptime probe below instead of Cloudflare Health Checks."
+  SKIPPED+=("Cloudflare Pro on $APEX — before the first client credential exists (Q9); re-run stage 5 to upgrade")
 fi
 open_url "https://one.dash.cloudflare.com/"
 step "Zero Trust → Networks → Tunnels → create tunnel 'better-answers' (remotely managed). Copy the TUNNEL TOKEN into Coolify env later (TUNNEL_TOKEN, stores resource) and escrow it."
 step "Public hostnames on the tunnel, in this order, all → http://app:3000 : app.$APEX · agent.$APEX · $APEX ; the last ingress rule is the catch-all http_status:404. THREE hostnames — there is no mcp. and no docs. (ADR 0034). Read them against apps/api/src/ingress/hostnames.ts: app · agent · apex, one rule each."
 step "Access: follow ADR 0022's edge paragraph — a hostname serving sign-in or the OAuth flow cannot sit behind an interactive wall, and agent. authenticates in the app. Record each hostname's posture in the PRIVATE coolify.md, never here."
-step "Security → WAF → Rate limiting rules, four, each per client IP, by PATH on app.: /oauth2/* · /.well-known/* · /mcp with no Authorization header · the sign-in endpoints /email-otp/send-verification-otp and /sign-in/email-otp. Thresholds and the block time: the PRIVATE coolify.md § Ingress (starting values are there; tighten after the first week). Rehearse a rule against the real flow first: serve:local behind a quick tunnel (coolify.md)."
-step "Traffic → Health Checks: two, from outside, on app.$APEX every minute, expect 200, three failures to red — /health and /.well-known/oauth-protected-resource/mcp. Notifications → a webhook or SMS to the SECOND channel (stage 8 says which)."
+step "Security → WAF → Rate limiting rules, per client IP, by PATH on app. — the four metered path groups are /oauth2/* · /.well-known/* · /mcp with no Authorization header · the sign-in endpoints /email-otp/send-verification-otp and /sign-in/email-otp. On FREE: one rule, the four groups OR-ed into one expression, one shared threshold. On PRO: two rules — the credential writes (/oauth2/*, the sign-in endpoints, /mcp without a bearer) and discovery (/.well-known/*). Thresholds and the block time: the PRIVATE coolify.md § Ingress (starting values are there; tighten after the first week). Rehearse a rule against the real flow first: serve:local behind a quick tunnel (coolify.md)."
+step "Uptime — two paths on app.$APEX, each expecting 200, alerting the SECOND channel: /health and /.well-known/oauth-protected-resource/mcp. On PRO: Traffic → Health Checks, two, from outside, every minute, three failures to red; Notifications → a webhook or SMS to the second channel (stage 8 says which). On FREE: the VPC 2 probe — scp deploy/uptime-probe.sh root@$VPC2_PUBLIC_IP:/opt/better-answers/deploy/ if the checkout predates it, create the healthchecks.io check 'uptime' (stage 8), write APEX and the check's ping URL into root-only /etc/better-answers/uptime.env, and add the cron line:  */5 * * * * root . /etc/better-answers/uptime.env && /opt/better-answers/deploy/uptime-probe.sh  — a silent probe (VPC 2 down included) trips the dead-man alarm on the same channel."
 step "No docs site, no Pages project: the ops documents' public halves are in the repository, unrendered (ADR 0034)."
 ask CF_TUNNEL_ID "Tunnel ID (not the token):"
-write_env CF_TUNNEL_ID "$CF_TUNNEL_ID"; write_env CF_PRO_CONFIRMED "$(date -u +%F)"
+write_env CF_TUNNEL_ID "$CF_TUNNEL_ID"
 pause
 
 # ────────────────────────────────────────────────────────────────────────
@@ -328,8 +336,8 @@ pause
 # ────────────────────────────────────────────────────────────────────────
 stage "healthchecks.io — the dead-man's switch, the second channel, the weekly digest"
 open_url "https://healthchecks.io/"
-step "Create a project 'Better Answers'. Checks (period · grace): scheduler 1 min · 3 min; pg-hourly 1 h · 15 min; nightly 24 h · 2 h; coolify-backup 24 h · 4 h; drill 35 d · 2 d; staging-wiped 35 d · 2 d."
-step "Ping URLs → Coolify env: HEALTHCHECKS_PING_URL_SCHEDULER (platform resource), _PG_HOURLY and _NIGHTLY (stores resource); _DRILL and _STAGING_WIPED → /etc/better-answers/drill.env on VPC 2. Ping bodies carry an outcome word and sizes only."
+step "Create a project 'Better Answers'. Checks (period · grace): scheduler 1 min · 3 min; pg-hourly 1 h · 15 min; nightly 24 h · 2 h; coolify-backup 24 h · 4 h; drill 35 d · 2 d; staging-wiped 35 d · 2 d; and — only while stage 5 took the Free path — uptime 5 min · 5 min."
+step "Ping URLs → Coolify env: HEALTHCHECKS_PING_URL_SCHEDULER (platform resource), _PG_HOURLY and _NIGHTLY (stores resource); _DRILL and _STAGING_WIPED → /etc/better-answers/drill.env on VPC 2; the uptime check's URL → /etc/better-answers/uptime.env (stage 5, Free path). Ping bodies carry an outcome word and sizes only."
 step "Integrations: email to you, AND a SECOND channel (SMS or a chat app) assigned to scheduler, pg-hourly, nightly AND drill — a missed backup is not an email to read on Monday. The same channel takes the Cloudflare health-check notifications (stage 5)."
 step "Account → Reports: the WEEKLY report ON, to you — an all-green digest every week, so silence is distinguishable from health."
 ask SECOND_CHANNEL "Second channel (kind only, e.g. SMS / Signal / Slack — no number here):"
@@ -340,7 +348,7 @@ pause "Ping URLs in Coolify env and the drill env?"
 stage "First deploy and the probes"
 say "In GitHub → Actions run 'build' (main): three images are pushed and the run summary shows three digests. Put the backup one in the stores resource's env; then run 'release' with blank inputs to promote the api and worker digests to production (the worker is declared, not started — the pipeline profile)."
 step "Watch the production deploy log in Coolify. Record in the private coolify.md § Probes: the compose command Coolify ran; whether 'migrate' finished before 'api' started; whether redeploying 'better-answers' left 'better-answers-stores' running; the \\du answer."
-step "Open https://app.$APEX (the shell and sign-in), https://app.$APEX/.well-known/oauth-protected-resource/mcp (resource = https://app.$APEX/mcp), https://agent.$APEX/ (expect 404), https://$APEX/c/test (expect 404). Both Cloudflare health checks green; one row in deploy/RELEASES.md."
+step "Open https://app.$APEX (the shell and sign-in), https://app.$APEX/.well-known/oauth-protected-resource/mcp (resource = https://app.$APEX/mcp), https://agent.$APEX/ (expect 404), https://$APEX/c/test (expect 404). Both uptime paths green (Cloudflare Health Checks on Pro; the healthchecks.io 'uptime' check on Free); one row in deploy/RELEASES.md."
 if confirm "All three hostnames answered as expected and RELEASES.md has its first row"; then
   write_env FIRST_DEPLOY_DONE "$(date -u +%F)"
 else
