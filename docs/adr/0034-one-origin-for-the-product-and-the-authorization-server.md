@@ -158,8 +158,11 @@ platform runs one registration it owns.
 "The Pro trigger is unchanged, since the plan is the same either way" carried a wrong premise:
 it read Pro as fitting four rate-limit rules. Cloudflare meters **rules**, not paths — Free
 allows one, Pro two, Business five ($250/month; developers.cloudflare.com/waf/rate-limiting-rules,
-read 2026-09-04) — so the four path groups combine by OR expression into one rule on Free and
-two on Pro (the credential writes; discovery). The trigger itself is unchanged and is Q9 (b)'s
+read 2026-09-04) — so the path groups combine by OR expression: two rules on Pro (the
+credential writes; discovery), and one rule on Free over three groups, since a Free
+rate-limiting expression matches URI paths only and the `/mcp`-without-a-bearer group needs a
+header clause — on Free that group is the app's counters' alone (found in the rule builder,
+2026-09-04). The trigger itself is unchanged and is Q9 (b)'s
 own condition: **before the first client credential exists, the zone is on Pro**. Until that day
 the wizard's Cloudflare stage passes on Free against the operator's confirmation that no client
 credential exists or is imminent, and the two uptime paths are probed from VPC 2
