@@ -29,3 +29,14 @@ jobs:
           probe "pair + bogus bearer" -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" -H "Authorization: Bearer 1|bogus"
           probe "pair + real bearer" -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" -H "Authorization: Bearer ${COOLIFY_TOKEN}"
           probe "no headers"
+          # The release's failing shape: a no-op PATCH of the current digest. Body head and
+          # cf-ray identify WHO answers the 405 (a digest is not a secret; envs are never echoed).
+          auth=(-H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" -H "Authorization: Bearer ${COOLIFY_TOKEN}")
+          digest=$(curl -s "${auth[@]}" "${COOLIFY_URL}/api/v1/applications/${PROD_UUID}/envs" | jq -r '[.[] | select(.key=="API_IMAGE_DIGEST" and (.is_preview|not))][0].value')
+          echo "digest read ok: $(echo "${digest}" | grep -cE '^sha256:[0-9a-f]{64}$')"
+          jq -cn --arg v "${digest}" '{key:"API_IMAGE_DIGEST", value:$v, is_preview:false}' \
+            | curl -s -o /tmp/patch.out -D /tmp/patch.hdr -w "no-op PATCH -> %{http_code}\n" -X PATCH "${auth[@]}" -H "Content-Type: application/json" --data-binary @- "${COOLIFY_URL}/api/v1/applications/${PROD_UUID}/envs"
+          grep -i -e "^server:" -e "^cf-ray:" -e "^allow:" /tmp/patch.hdr || true
+          head -c 300 /tmp/patch.out; echo
+        env:
+          PROD_UUID: ${{ vars.COOLIFY_PROD_APP_UUID }}
