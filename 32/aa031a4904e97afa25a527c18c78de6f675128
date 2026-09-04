@@ -1,0 +1,45 @@
+apps/api/tsconfig.json
+  s_623ab2f4f462c9::t_51234f98daa4a7 5,8-14
+  s_623ab2f4f462c9::t_083e279f6fc402 6-7
+apps/web/src/shared/ui/kibo-ui/combobox.tsx
+  s_623ab2f4f462c9::t_f695c30185b499 77-79,83,88
+apps/web/src/shared/ui/dropdown-menu.tsx
+  s_623ab2f4f462c9::t_e43fcfe0312411 73-75
+apps/web/tsconfig.json
+  s_623ab2f4f462c9::t_ea87bfa43c8008 6-14
+apps/api/src/trpc/index.ts
+  s_623ab2f4f462c9::t_0b64e668a87189 6-7
+apps/web/test/api-client.test.tsx
+  s_623ab2f4f462c9::t_7cf84fb6f6cfe5 80
+apps/api/src/trpc/mount.ts
+  s_623ab2f4f462c9::t_6e64cc9196dbd9 1-47
+apps/api/src/trpc/router.ts
+  s_623ab2f4f462c9::t_f8c94b25a43b6f 9-12
+apps/api/src/trpc/base.ts
+  s_623ab2f4f462c9::t_17a931d1e9a4be 6-9
+apps/web/test/api-seam.test.ts
+  s_623ab2f4f462c9::t_a8c8c3f64aaab5 1-44,46,55-56
+  s_623ab2f4f462c9::t_4fb06ffae3da0a 45,47-54
+apps/web/src/shared/ui/THIRD_PARTY_NOTICES.md
+  s_623ab2f4f462c9::t_42745b29d1225e 134-136
+  s_623ab2f4f462c9::t_6d0b22367e5c1d 113-124
+  s_623ab2f4f462c9::t_a07ce4a41ba962 43
+  s_623ab2f4f462c9::t_564308475ac406 49
+  s_623ab2f4f462c9::t_6462ed678bd3b9 64-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "32aa031a4904e97afa25a527c18c78de6f675128",
+  "prompts": {},
+  "sessions": {
+    "s_623ab2f4f462c9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6bfffeaf-2fc2-4234-a8f0-ce6cc634774d",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
