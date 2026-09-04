@@ -88,7 +88,11 @@ globals=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/" | grep '^globals-'
 dump_at=$(echo "${latest}" | sed -E 's/^pg-([0-9T]+Z)\..*/\1/')
 rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/${globals}" "${WORK}/globals.sql.age"
 rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/${latest}" "${WORK}/pg.dump.age"
-age -d -i "${BACKUP_AGE_IDENTITY_FILE}" "${WORK}/globals.sql.age" | psql "${STAGING_DATABASE_URL}" -q || true   # roles may already exist
+# The postgres role's own lines are dropped: production's globals carry `ALTER ROLE postgres
+# … PASSWORD`, which replaced the STAGING superuser's password mid-drill and every later
+# connection failed (first drill, 04/09/2026). The roles the restore needs are app_rt,
+# worker_rt and their grants; the staging superuser stays staging's.
+age -d -i "${BACKUP_AGE_IDENTITY_FILE}" "${WORK}/globals.sql.age" | grep -v -E '^(CREATE|ALTER) ROLE postgres[ ;]' | psql "${STAGING_DATABASE_URL}" -q || true   # roles may already exist
 age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${WORK}/pg.dump" "${WORK}/pg.dump.age"
 # --no-owner: the restoring role owns everything, as migrate's does. Privileges ARE restored: the
 # grants to app_rt and worker_rt ride the dump, and without them the api answers permission denied.
