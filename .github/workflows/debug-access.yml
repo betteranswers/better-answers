@@ -1,0 +1,31 @@
+# TEMPORARY — T-005 release-403 diagnosis, deleted the day it answers.
+# Prints status codes and value SHAPES (lengths, prefixes) only; never a value.
+name: debug-access
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    env:
+      COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: shapes and probes
+        run: |
+          set -uo pipefail
+          echo "id_len=${#CF_ACCESS_CLIENT_ID} secret_len=${#CF_ACCESS_CLIENT_SECRET} token_len=${#COOLIFY_TOKEN}"
+          case "${COOLIFY_TOKEN}" in Bearer*) echo "token starts with 'Bearer '";; esac
+          case "${CF_ACCESS_CLIENT_ID}" in *.access) echo "id ends with .access";; *) echo "id does NOT end with .access";; esac
+          probe() { echo "$1 -> $(curl -s -o /dev/null -w '%{http_code}' -m 15 "${@:2}" "${COOLIFY_URL}/api/v1/version")"; }
+          probe "pair only" -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}"
+          probe "pair + bogus bearer" -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" -H "Authorization: Bearer 1|bogus"
+          probe "pair + real bearer" -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" -H "Authorization: Bearer ${COOLIFY_TOKEN}"
+          probe "no headers"
