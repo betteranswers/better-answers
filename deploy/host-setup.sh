@@ -75,7 +75,11 @@ vpc2() {
     --mirror-pubkey) pubkey=$2; shift 2 ;; --repo) repo=$2; shift 2 ;; --prod-host) prod_host=$2; shift 2 ;; *) usage ;; esac; done
   [ -n "${pubkey}" ] && [ -n "${repo}" ] || usage
   need_root
-  apt-get install -y --no-install-recommends git rclone age postgresql-client jq >/dev/null
+  apt-get install -y --no-install-recommends git rclone age postgresql-common jq >/dev/null
+  # The client must match the DUMP's major, not Ubuntu's default: pg_restore 16 refuses a
+  # pg18 custom-format archive (first drill prep, 04/09/2026). PGDG carries 18 on noble.
+  YES=yes /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+  apt-get install -y --no-install-recommends postgresql-client-18 >/dev/null
   # The mirror user: a home, /data/mirror, and one key that can run two commands.
   id mirror >/dev/null 2>&1 || useradd --system --create-home --shell /bin/bash mirror
   install -d -m 750 -o mirror -g mirror /data/mirror
