@@ -79,7 +79,10 @@ services:
       GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?}
       GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:?}
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3903/health"]
+      # Exec form against the garage binary: the image carries no shell and no wget (first
+      # deploy, 04/09/2026), so an HTTP probe of :3903/health cannot run from inside it.
+      # `status` answers over the local RPC port and exits non-zero when the node is not up.
+      test: ["CMD", "/garage", "status"]
       interval: 10s
       timeout: 3s
       retries: 12
