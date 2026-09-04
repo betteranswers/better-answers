@@ -52,6 +52,7 @@ describe("the deploy tree (T-005)", () => {
         "restore-drill.sh",
         "restore-production.sh",
         "seed-synthetic.sh",
+        "uptime-probe.sh",
         "wizard-41.sh",
       ]),
     );

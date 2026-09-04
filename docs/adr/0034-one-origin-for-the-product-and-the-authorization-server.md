@@ -152,3 +152,15 @@ platform runs one registration it owns.
 - **The re-prove is an acceptance artefact, not a test**: the claude.ai path over a quick tunnel
   on the new issuer, with the issuer, the date and the outcome in the PR body beside the `[SEC3]`
   adversarial pass.
+
+## Amendment — 2026-09-04, the Pro trigger's rationale corrected (T-005 stage 5)
+
+"The Pro trigger is unchanged, since the plan is the same either way" carried a wrong premise:
+it read Pro as fitting four rate-limit rules. Cloudflare meters **rules**, not paths — Free
+allows one, Pro two, Business five ($250/month; developers.cloudflare.com/waf/rate-limiting-rules,
+read 2026-09-04) — so the four path groups combine by OR expression into one rule on Free and
+two on Pro (the credential writes; discovery). The trigger itself is unchanged and is Q9 (b)'s
+own condition: **before the first client credential exists, the zone is on Pro**. Until that day
+the wizard's Cloudflare stage passes on Free against the operator's confirmation that no client
+credential exists or is imminent, and the two uptime paths are probed from VPC 2
+(`deploy/uptime-probe.sh`) instead of Pro's Health Checks. Everything else stands.
