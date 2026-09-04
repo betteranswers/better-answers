@@ -261,7 +261,7 @@ ask BACKUP_DUMPS_BUCKET "DUMPS bucket name (versioning ON, object lock ON in GOV
 step "Lifecycle on the dumps bucket: pg/hourly 48 h · pg/daily 30 d · pg/weekly 8 w · pg/monthly 6 m · git/ 30 d (+ first-of-month 6 m) · drills/ 12 m (BACKUPS.md)."
 ask BACKUP_MIRROR_BUCKET "MIRROR bucket name (versioning ON, NO lock, non-current versions expire after 30 days):"
 step "Credential 1 — WRITE-AND-LIST (PutObject, ListBucket, GetObject; no Delete*, no lifecycle, no bypass-governance) → Coolify env BACKUP_S3_ACCESS_KEY / _SECRET_KEY on the stores resource, and Coolify's S3 storage."
-step "Credential 2 — READ (list + get on both buckets) → /etc/better-answers/drill.env on VPC 2 (the RCLONE_CONFIG_DUMPS_* lines), root-only."
+step "Credential 2 — READ (list + get on both buckets) → /etc/better-answers/drill.env on VPC 2 (the RCLONE_CONFIG_DUMPS_* lines), root-only. Credential 1 ALSO lands there, as the RCLONE_CONFIG_DRILLSINK_* lines: the drill's report upload to drills/ is a write the READ credential is refused."
 step "Credential 3 — ADMIN (delete, lifecycle, bypass governance). Escrow only."
 step "The backup age identity: age-keygen -o backup.key on your laptop. The public 'age1…' line → Coolify env BACKUP_AGE_RECIPIENT on the stores resource. The file → escrow AND, pasted by hand, /etc/better-answers/backup-age.key on VPC 2 (mode 0600 — host-setup created it empty). Then delete it from the laptop."
 warn "That resident copy is a stated risk, not an accident: a VPC 2 compromise exposes every dump's plaintext (SECRETS.md § The backup identity; RUNBOOK.md page 2). Rotation is written there."

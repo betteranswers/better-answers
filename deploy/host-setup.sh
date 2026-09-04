@@ -109,6 +109,13 @@ PROD_PSQL="ssh -o BatchMode=yes root@${prod_host:-<VPC1 IP>} docker exec -i <pg-
 DRILL_WORKSPACE=
 HEALTHCHECKS_PING_URL_DRILL=
 HEALTHCHECKS_PING_URL_STAGING_WIPED=
+# the `drillsink:` remote, from the WRITE-AND-LIST credential — the drill's report upload
+# is the one write it makes to the bucket; the READ credential is refused there (04/09/2026)
+RCLONE_CONFIG_DRILLSINK_TYPE=s3
+RCLONE_CONFIG_DRILLSINK_PROVIDER=
+RCLONE_CONFIG_DRILLSINK_ENDPOINT=
+RCLONE_CONFIG_DRILLSINK_ACCESS_KEY_ID=
+RCLONE_CONFIG_DRILLSINK_SECRET_ACCESS_KEY=
 # the `dumps:` remote, from the READ credential (SECRETS.md class object store)
 RCLONE_CONFIG_DUMPS_TYPE=s3
 RCLONE_CONFIG_DUMPS_PROVIDER=

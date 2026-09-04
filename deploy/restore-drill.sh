@@ -33,6 +33,7 @@ set -euo pipefail
 : "${PROD_PSQL:?a command that runs psql against production over SSH — see the drill.env template host-setup.sh writes}"
 : "${DRILL_WORKSPACE:?the workspace whose graph is rebuilt and diffed}"
 : "${HEALTHCHECKS_PING_URL_DRILL:?}" "${HEALTHCHECKS_PING_URL_STAGING_WIPED:?}"
+: "${RCLONE_CONFIG_DRILLSINK_ACCESS_KEY_ID:?the WRITE-AND-LIST credential — the report upload alone}"
 
 # The `stagingstore:` remote — the staging object store, reached on the loopback port
 # staging.override.yaml publishes; defined here from env rather than in a config file on disk.
@@ -55,7 +56,7 @@ stores()   { compose -f "${REPO_DIR}/deploy/stores.compose.yaml" -f "${REPO_DIR}
 platform() { compose -f "${REPO_DIR}/deploy/platform.compose.yaml" -p better-answers-staging "$@"; }
 # ops <args…> — a `pnpm ops` command inside the staging api; "not built" is reported, not fatal
 ops() {
-  local rc=0; platform exec -T api pnpm ops "$@" || rc=$?
+  local rc=0; platform exec -T api pnpm --silent ops "$@" || rc=$?
   if [ "${rc}" -eq "${NOT_BUILT}" ]; then aside "  -> not built yet: 'pnpm ops $1' found no tables for its slice (recorded, not failed)"; return 0; fi
   return "${rc}"
 }
@@ -110,7 +111,7 @@ stores exec -T objectstore /garage key allow --create-bucket "${STAGING_OBJECTST
 platform run --rm migrate
 # Mandatory and never "not built": an erasure the dump predates must be re-applied before the app
 # turns healthy, and a schema that cannot say whether any exists stops the restore (ops.ts).
-platform run --rm migrate pnpm ops replay-erasures --since "${dump_at}" | tee -a "${REPORT}"
+platform run --rm migrate pnpm --silent ops replay-erasures --since "${dump_at}" | tee -a "${REPORT}"
 
 say "## 3 object store — mirror back"
 rclone sync "dumps:${BACKUP_MIRROR_BUCKET}/objectstore/" stagingstore:/
@@ -143,18 +144,18 @@ if ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts";
 fi
 
 say "## 7 smoke through the interface: health, discovery, the shell; find · a guide read · ask as the slices land"
-platform exec -T api pnpm ops smoke --workspace "${DRILL_WORKSPACE}" --url "${STAGING_API_URL}" --find --guide --ask >> "${REPORT}"
+platform exec -T api pnpm --silent ops smoke --workspace "${DRILL_WORKSPACE}" --url "${STAGING_API_URL}" --find --guide --ask >> "${REPORT}"
 
 say "## 8 bucket listing vs the matrix (tiers live in the bucket lifecycle, never in Coolify's schedule)"
 for tier in hourly daily weekly monthly; do printf '%s: %s copies\n' "${tier}" "$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/" | wc -l)" >> "${REPORT}"; done
 
 if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
   say "## 9 erasure rehearsal on a synthetic subject (ADR 0020, ticket 24)"
-  if subject=$(platform exec -T api pnpm ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --report /tmp/erasure.md | tail -n1); then
+  if subject=$(platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --report /tmp/erasure.md | tail -n1); then
     platform exec -T api cat /tmp/erasure.md >> "${REPORT}"
     # the one check that proves "gone from every copy" rather than assumes it: the pre-erasure dump,
     # restored to plain SQL by pg_restore on the host, grepped for the subject's tokens inside the api
-    pg_restore -f - "${WORK}/pg.dump" | platform exec -T api pnpm ops dump-grep --tokens "${subject}" >> "${REPORT}" \
+    pg_restore -f - "${WORK}/pg.dump" | platform exec -T api pnpm --silent ops dump-grep --tokens "${subject}" >> "${REPORT}" \
       && say "dump grep: subject present in the pre-erasure copy (expected; expiry dates recorded)"
   else
     say "  -> not built yet: the erasure slice has no tables in this schema (recorded, not failed)"
@@ -163,7 +164,10 @@ fi
 
 rto=$(( ( $(date +%s) - T0 ) / 60 ))
 say "## done — RTO ${rto} min"
-rclone copyto "${REPORT}" "dumps:${BACKUP_DUMPS_BUCKET}/drills/$(basename "${REPORT}")"
+# `drillsink:` — the WRITE-AND-LIST credential, defined in drill.env alongside the READ
+# `dumps:` remote: the report is the ONE write the drill makes to the bucket, and the READ
+# credential was refused here with 403 (first drill, 04/09/2026).
+rclone copyto "${REPORT}" "drillsink:${BACKUP_DUMPS_BUCKET}/drills/$(basename "${REPORT}")"
 # The drill's own row goes to PRODUCTION (ticket 79 A13): staging is wiped minutes from now, and
 # ADR 0025's "last drill" signal has no other source. The one write the drill makes there.
 printf '%s' "insert into backup_run (kind, store, started_at, finished_at, outcome, bytes, location, report_url, contains_personal_data, rto_minutes) values ('drill', 'all', '${started}', now(), 'ok', 0, 'drills/', 'drills/$(basename "${REPORT}")', false, ${rto})" \
