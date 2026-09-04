@@ -2,12 +2,16 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "types": ["node"],
-    // Off in this workspace alone: `@better-auth/oauth-provider@1.7.2`'s plugin type
-    // carries endpoint metadata literals (`items?: undefined`) that fail to assign to
-    // `BetterAuthPlugin` under exact optionals, which makes the whole `plugins` array —
-    // and every `auth.api.*` name inferred from it — a type error (T-004, read
-    // 01/09/2026). Every other workspace keeps the base setting; revisit on the next
-    // Better Auth upgrade.
+    // Off in this workspace alone, and a Better Auth upgrade alone will not turn it back
+    // on: of the 7 errors the flag surfaces (measured 04/09/2026 — T-042 counted 8, one
+    // since fixed by T-040), only 3 trace to
+    // `@better-auth/oauth-provider@1.7.2` — its plugin type's `items?: undefined` metadata
+    // literals fail to assign to `BetterAuthPlugin` (`src/auth/auth.ts`), which collapses
+    // the inferred `auth.api.*` surface and takes `src/auth/routes.ts` and `src/server.ts`
+    // down with it (T-004, read 01/09/2026). The other 4 are this tier's own: 3 in
+    // `src/mcp/entries/index.ts` (optional properties assigned `T | undefined`), 1 in
+    // `tests/harness-control.ts`. The flag returns when both halves are fixed (T-042's
+    // notes); every other workspace keeps the base setting.
     "exactOptionalPropertyTypes": false
   },
   "include": ["src", "lifts", "tests", "tools/lint-rules", "vitest.config.ts"]

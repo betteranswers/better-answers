@@ -3,8 +3,10 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { attempt, type PrincipalRefusal } from "@better-answers/core/kernel";
 import { withPrincipal, type PostgresDoor } from "@better-answers/core/store/postgres";
 
-import type { SessionReader } from "../auth/index.ts";
-import { sessionClaims } from "../auth/index.ts";
+// From `verify.ts` itself, never the auth barrel: the barrel re-exports `createAuth`,
+// and this file rides into `apps/web`'s program behind `AppRouter`
+// (`apps/web/test/api-seam.test.ts`).
+import { sessionClaims, type SessionReader } from "../auth/verify.ts";
 
 /**
  * tRPC's footing for this tier (ADR 0008: tRPC inside, the generated surfaces

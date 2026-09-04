@@ -77,7 +77,7 @@ describe("the path the client and the api agree on", () => {
     // `apps/worker/tests/pg_harness.py` already uses for `POSTGRES_IMAGE`. A mount moved
     // without moving the client fails here rather than in a browser.
     const source = readFileSync(
-      path.join(import.meta.dirname, "../../api/src/trpc/router.ts"),
+      path.join(import.meta.dirname, "../../api/src/trpc/mount.ts"),
       "utf8",
     );
     const declared = [...source.matchAll(/^export const TRPC_ENDPOINT = "(?<path>[^"]+)";$/gm)];

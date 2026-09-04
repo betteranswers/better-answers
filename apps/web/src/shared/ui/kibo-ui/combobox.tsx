@@ -74,15 +74,18 @@ export const Combobox = ({
   onOpenChange: controlledOnOpenChange,
   ...props
 }: ComboboxProps) => {
+  // `onChange` enters by conditional spread (arrival edit, `THIRD_PARTY_NOTICES.md`): the
+  // hook's `onChange?:` slot does not admit an explicit `undefined` under
+  // `exactOptionalPropertyTypes`, while `prop?:` does.
   const [value, onValueChange] = useControllableState({
     defaultProp: defaultValue ?? "",
     prop: controlledValue,
-    onChange: controlledOnValueChange,
+    ...(controlledOnValueChange && { onChange: controlledOnValueChange }),
   });
   const [open, onOpenChange] = useControllableState({
     defaultProp: defaultOpen,
     prop: controlledOpen,
-    onChange: controlledOnOpenChange,
+    ...(controlledOnOpenChange && { onChange: controlledOnOpenChange }),
   });
   const [width, setWidth] = useState(200);
   const [inputValue, setInputValue] = useState("");
