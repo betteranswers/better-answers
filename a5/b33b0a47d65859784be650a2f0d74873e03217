@@ -1,0 +1,19 @@
+deploy/RELEASES.md
+  s_151a8937515035::t_cd9488dc9ce320 10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a5b33b0a47d65859784be650a2f0d74873e03217",
+  "prompts": {},
+  "sessions": {
+    "s_151a8937515035": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c01ae4cf-0bc0-4d2f-97b9-fd14f03fd353",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
