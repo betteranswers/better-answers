@@ -7,3 +7,4 @@ Standing release note, true of every row: the app refuses to start unless `PUBLI
 | When (UTC) | By | api | worker | Rode on |
 | --- | --- | --- | --- | --- |
 | 2026-09-04T14:27:00Z | liam-jons | `sha256:918292a396a56c71b6ffd658b4c6de40b6c29856e60e0d3da5bd0edbac249aa9` | `sha256:81d3083aa5effc493a3dddf438711efb6dfff650201db2dd83987aa83590f19c` | pre-client: any green build |
+| 2026-09-04T15:00:00Z | liam-jons | `sha256:828e78f9681fd1be2c8788995eb42fdbad45fed7757578d1aaa37453e6f0b07c` | `sha256:19b4fd4a8d301178136cfe2c88597eff2ad7c703b7e31f29c6b8bbf44fc88efc` | pre-client: any green build |
