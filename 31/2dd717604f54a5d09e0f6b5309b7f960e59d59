@@ -1,0 +1,30 @@
+apps/api/src/main.ts
+  s_aeae77468c20c4::t_03a9a257c821f8 2,13-14,16-17,19,24-44
+apps/api/package.json
+  s_aeae77468c20c4::t_90e9c66665c04d 37
+  s_aeae77468c20c4::t_8065128b24e150 47
+apps/api/tests/config.test.ts
+  s_aeae77468c20c4::t_11d080aa8f039f 93-117
+pnpm-lock.yaml
+  ai_agent 74-76,99-101,2940-2942,4213-4216,7273-7276,8331
+apps/api/src/config.ts
+  s_aeae77468c20c4::t_11f89217d2646b 127-128
+  s_aeae77468c20c4::t_99e4e433073f12 154
+  s_aeae77468c20c4::t_2c7ef49471eaed 98-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "312dd717604f54a5d09e0f6b5309b7f960e59d59",
+  "prompts": {},
+  "sessions": {
+    "s_aeae77468c20c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "77eafac5-4ffb-41ab-b8f7-4ff90398deea",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
