@@ -1,0 +1,9 @@
+apps/api/tests/ops.test.ts
+  ai_agent 69-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "89c811a5f705120246f8d96cb003e6d9ef3cd89a",
+  "prompts": {}
+}
