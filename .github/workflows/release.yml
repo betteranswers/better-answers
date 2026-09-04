@@ -119,7 +119,9 @@ jobs:
           }
           patch API_IMAGE_DIGEST "${API_DIGEST}"
           patch WORKER_IMAGE_DIGEST "${WORKER_DIGEST}"
-          curl -fsS "${COOLIFY_URL}/api/v1/deploy?uuid=${PROD_UUID}&force=false" \
+          # -X POST: Coolify v4.3.13 answers GET /deploy with 405 "changed to a POST request"
+          # (first CI release, 04/09/2026 — the 403s in front of it hid this until auth passed).
+          curl -fsS -X POST "${COOLIFY_URL}/api/v1/deploy?uuid=${PROD_UUID}&force=false" \
             -H "Authorization: Bearer ${COOLIFY_TOKEN}" -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}"
       - name: record the promotion in deploy/RELEASES.md
         env:
