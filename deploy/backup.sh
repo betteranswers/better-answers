@@ -44,7 +44,10 @@ job_pg() {
   if erasure_running; then echo "erasure routine running — hourly dump skipped"; return 0; fi
   read -r tier life <<<"$(tier_for_now)"
   local file="${STAGING}/pg-${NOW}.dump.age" remote="dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/pg-${NOW}.dump.age"
-  if { pg_dumpall --globals-only "${DATABASE_URL}" | age -r "${BACKUP_AGE_RECIPIENT}" > "${STAGING}/globals-${NOW}.sql.age"; } \
+  # `--dbname=`: pg_dumpall takes no positional DSN — passed bare it errors "too many
+  # command-line arguments" AND echoes the full DSN, password included, into the log
+  # (first backup run, 04/09/2026).
+  if { pg_dumpall --globals-only --dbname="${DATABASE_URL}" | age -r "${BACKUP_AGE_RECIPIENT}" > "${STAGING}/globals-${NOW}.sql.age"; } \
      && { pg_dump --format=custom --no-owner "${DATABASE_URL}" | age -r "${BACKUP_AGE_RECIPIENT}" > "${file}"; } \
      && rclone copyto --s3-no-check-bucket "${file}" "${remote}" \
      && rclone copyto --s3-no-check-bucket "${STAGING}/globals-${NOW}.sql.age" "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/globals-${NOW}.sql.age" \

@@ -92,6 +92,12 @@ say "restored ${latest} (taken ${dump_at}) — RPO $(( ( $(date +%s) - $(date -d
 
 say "## 2 stores up, migrate, REPLAY ERASURES completed after the dump (ADR 0020 — beyond use, made honest)"
 stores up -d
+# A wiped staging Garage holds no keys (step 0 cleared /data/objectstore): import the drill's
+# pair from the env so `stagingstore:` can write, and let it create the buckets the mirror
+# sync brings back. Idempotent: a re-import of an existing key id fails harmlessly.
+stores exec -T objectstore /garage key import --yes -n drill-root \
+  "${STAGING_OBJECTSTORE_ROOT_KEY}" "${STAGING_OBJECTSTORE_ROOT_SECRET}" || true
+stores exec -T objectstore /garage key allow --create-bucket "${STAGING_OBJECTSTORE_ROOT_KEY}"
 platform run --rm migrate
 # Mandatory and never "not built": an erasure the dump predates must be re-applied before the app
 # turns healthy, and a schema that cannot say whether any exists stops the restore (ops.ts).

@@ -98,8 +98,10 @@ BACKUP_MIRROR_BUCKET=
 BACKUP_AGE_IDENTITY_FILE=/etc/better-answers/backup-age.key
 STAGING_OBJECTSTORE_ROOT_KEY=
 STAGING_OBJECTSTORE_ROOT_SECRET=
-# psql against PRODUCTION over the SSH connection this box already holds — no Postgres port is open (ticket 79 A12)
-PROD_PSQL="ssh -o BatchMode=yes root@${prod_host:-<VPC1 IP>} docker exec -i better-answers-pg psql -U postgres -d better_answers"
+# psql against PRODUCTION over the SSH connection this box already holds — no Postgres port is open (ticket 79 A12).
+# The container is named by the Coolify DATABASE RESOURCE'S UUID, not the resource's display
+# name (first deploy, 04/09/2026): read it with `docker ps` on VPC 1 and replace the placeholder.
+PROD_PSQL="ssh -o BatchMode=yes root@${prod_host:-<VPC1 IP>} docker exec -i <pg-resource-uuid> psql -U postgres -d better_answers"
 DRILL_WORKSPACE=
 HEALTHCHECKS_PING_URL_DRILL=
 HEALTHCHECKS_PING_URL_STAGING_WIPED=
