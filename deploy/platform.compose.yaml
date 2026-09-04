@@ -55,6 +55,11 @@ services:
     restart: "no"
     environment:
       <<: *bootstrap
+      # The owner DSN, migrate's alone (wizard stage 7): the runtime role `app_rt` that api
+      # connects as cannot run DDL — the first redeploy after the LOGIN act failed on
+      # `CREATE SCHEMA IF NOT EXISTS "drizzle"` (04/09/2026). Same per-service override
+      # idiom as the worker's WORKER_DATABASE_URL below.
+      DATABASE_URL: ${MIGRATE_DATABASE_URL:?the owner DSN — migrate's alone}
     labels: { coolify.exclude_from_hc: "true" }
     <<: [*logging, *mem512]
 
