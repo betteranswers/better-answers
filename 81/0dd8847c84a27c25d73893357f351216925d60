@@ -1,0 +1,21 @@
+deploy/wizard-41.sh
+  s_151a8937515035::t_0ad4e5f53fc007 320
+deploy/platform.compose.yaml
+  s_151a8937515035::t_e45db7d871bdc0 58-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "810dd8847c84a27c25d73893357f351216925d60",
+  "prompts": {},
+  "sessions": {
+    "s_151a8937515035": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c01ae4cf-0bc0-4d2f-97b9-fd14f03fd353",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
