@@ -1,0 +1,59 @@
+apps/web/src/shared/ui/THIRD_PARTY_NOTICES.md
+  s_aeae77468c20c4::t_4278dfc87f262e 13,15-17
+apps/docs-site/operations/coolify.md
+  s_aeae77468c20c4::t_18275ba555abbf 3-4
+docs/adr/0027-better-answers-is-open-core-under-apache-2-0-the-hosted-service-is-the-product-copyleft-is-run-only.md
+  s_aeae77468c20c4::t_624043cfa9e0cf 42
+.gitignore
+  s_aeae77468c20c4::t_f0375792080187 26
+deploy/platform.compose.yaml
+  s_aeae77468c20c4::t_a08e4a41783d21 85
+deploy/backup.sh
+  s_aeae77468c20c4::t_271c3fd3a0ca07 2
+apps/docs-site/operations/RUNBOOK.md
+  s_aeae77468c20c4::t_0e1327995f5ce4 3-4
+apps/api/tests/hostnames.test.ts
+  s_aeae77468c20c4::t_f510540b703d82 14-15
+apps/docs-site/operations/SECRETS.md
+  s_aeae77468c20c4::t_a4ab90bab40c62 3-4
+docs/adr/0009-better-auth-in-process-identity-provider.md
+  s_aeae77468c20c4::t_f13fb1ad299f6f 75-84
+apps/api/src/ingress/hostnames.ts
+  s_aeae77468c20c4::t_74fbb8e1e3d5fa 13-15
+apps/docs-site/pre-build-gate-2026-08-30.md
+  s_aeae77468c20c4::t_6c632cc350b8b5 213
+  s_aeae77468c20c4::t_24616f08ce20ff 272
+docs/adr/0024-the-forge-is-bare-git-repositories-the-app-writes-and-two-4gb-boxes-run-v01.md
+  s_aeae77468c20c4::t_9565e8ac84a8e4 27
+docs/adr/0022-two-stacks-deployed-by-digest-every-irreplaceable-byte-encrypted-off-host-erasures-replayed-on-restore.md
+  s_aeae77468c20c4::t_b30e87be64e86f 14
+  s_aeae77468c20c4::t_8a1bb42e4d7a83 40
+  s_aeae77468c20c4::t_0dea0b6231f99a 20
+  s_aeae77468c20c4::t_a723255e9da3c9 44
+docs/adr/README.md
+  s_aeae77468c20c4::t_62334a383c1304 17
+apps/docs-site/operations/BACKUPS.md
+  s_aeae77468c20c4::t_c8231cd0c1f3af 3-6
+.env.example
+  s_aeae77468c20c4::t_db2d70b0ce93d3 2
+docs/adr/0023-the-graph-is-apache-age-inside-the-platform-postgres.md
+  s_aeae77468c20c4::t_55890789a38ba6 33
+  s_aeae77468c20c4::t_a8e84fe28a43bd 11
+  s_aeae77468c20c4::t_33f6b9813e6a5e 48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d9140aea7a95ff2cda3fec58394b5a2e9154f1bf",
+  "prompts": {},
+  "sessions": {
+    "s_aeae77468c20c4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "77eafac5-4ffb-41ab-b8f7-4ff90398deea",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
