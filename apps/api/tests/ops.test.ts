@@ -64,6 +64,12 @@ describe("pnpm ops — the restore scripts' commands", () => {
     expect((await ops(app, ["replay-erasures"])).exitCode).toBe(2); // no --since
   });
 
+  it("reads through the -- separator pnpm forwards, and does not read it as a command", async () => {
+    // `pnpm ops replay-erasures …` arrives as `-- replay-erasures …` (first drill, 04/09/2026)
+    expect((await ops(app, ["--", "replay-erasures", "--since", "20260904T000000Z"])).exitCode).toBe(0);
+    expect((await ops(app, ["--"])).exitCode).toBe(2); // a bare separator is still no command
+  });
+
   describe("replay-erasures — mandatory in every restore, never quietly a no-op", () => {
     it("proves there is nothing to replay while no erasure has ever been recorded", async () => {
       const run = await ops(app, ["replay-erasures", "--since", "20260901T020500Z"]);

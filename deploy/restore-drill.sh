@@ -51,9 +51,10 @@ say() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}"; }
 aside() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}" >&2; }
 # -f paths are absolute: docker compose resolves them against the CALLER'S cwd, not
 # --project-directory (first drill, 04/09/2026 — "open /root/stores.compose.yaml").
-compose() { docker compose --project-directory "${REPO_DIR}/deploy" --env-file "${STAGING_ENV_FILE}" "$@"; }
-stores()   { compose -f "${REPO_DIR}/deploy/stores.compose.yaml" -f "${REPO_DIR}/deploy/staging.override.yaml" -p better-answers-stores-staging "$@"; }
-platform() { compose -f "${REPO_DIR}/deploy/platform.compose.yaml" -p better-answers-staging "$@"; }
+DEPLOY_DIR="${REPO_DIR}/deploy"
+compose() { docker compose --project-directory "${DEPLOY_DIR}" --env-file "${STAGING_ENV_FILE}" "$@"; }
+stores()   { compose -f "${DEPLOY_DIR}/stores.compose.yaml" -f "${DEPLOY_DIR}/staging.override.yaml" -p better-answers-stores-staging "$@"; }
+platform() { compose -f "${DEPLOY_DIR}/platform.compose.yaml" -p better-answers-staging "$@"; }
 # ops <args…> — a `pnpm ops` command inside the staging api; "not built" is reported, not fatal
 ops() {
   local rc=0; platform exec -T api pnpm --silent ops "$@" || rc=$?
@@ -89,11 +90,14 @@ globals=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/" | grep '^globals-'
 dump_at=$(echo "${latest}" | sed -E 's/^pg-([0-9T]+Z)\..*/\1/')
 rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/${globals}" "${WORK}/globals.sql.age"
 rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/${latest}" "${WORK}/pg.dump.age"
-# The postgres role's own lines are dropped: production's globals carry `ALTER ROLE postgres
-# … PASSWORD`, which replaced the STAGING superuser's password mid-drill and every later
-# connection failed (first drill, 04/09/2026). The roles the restore needs are app_rt,
-# worker_rt and their grants; the staging superuser stays staging's.
-age -d -i "${BACKUP_AGE_IDENTITY_FILE}" "${WORK}/globals.sql.age" | grep -v -E '^(CREATE|ALTER) ROLE postgres[ ;]' | psql "${STAGING_DATABASE_URL}" -q || true   # roles may already exist
+# The staging owner's own lines are dropped: production's globals carry `ALTER ROLE
+# … PASSWORD` for its owner, which replaced the STAGING superuser's password mid-drill and
+# every later connection failed (first drill, 04/09/2026). The owner's name comes from the
+# staging DSN — the `\du` probe says a Coolify owner need not be called `postgres` — and
+# the filter tolerates pg_dumpall's optional quoting. The roles the restore needs are
+# app_rt, worker_rt and their grants; the staging superuser stays staging's.
+staging_owner=$(printf '%s' "${STAGING_DATABASE_URL}" | sed -E 's|^[a-z]+://([^:/@]+).*|\1|')
+age -d -i "${BACKUP_AGE_IDENTITY_FILE}" "${WORK}/globals.sql.age" | grep -v -E "^(CREATE|ALTER) ROLE \"?${staging_owner}\"?[ ;]" | psql "${STAGING_DATABASE_URL}" -q || true   # roles may already exist
 age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${WORK}/pg.dump" "${WORK}/pg.dump.age"
 # --no-owner: the restoring role owns everything, as migrate's does. Privileges ARE restored: the
 # grants to app_rt and worker_rt ride the dump, and without them the api answers permission denied.

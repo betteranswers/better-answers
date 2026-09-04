@@ -246,7 +246,10 @@ const sliceCommand = async (
 const isSliceCommand = (command: string): command is SliceCommand => command in NEEDS;
 
 export const runOps = async (argv: readonly string[], pool: Pool, io: OpsIo): Promise<number> => {
-  const [command, ...rest] = argv;
+  // pnpm inserts a literal `--` when it forwards arguments through the workspace `ops`
+  // script (`pnpm ops replay-erasures` arrives as `-- replay-erasures`; first drill,
+  // 04/09/2026) — a separator, never a command. Stripped here, inside the tested seam.
+  const [command, ...rest] = argv[0] === "--" ? argv.slice(1) : argv;
   const flags = parseFlags(rest);
   if (command === undefined || command === "--help" || command === "help") {
     io.say(USAGE_TEXT);

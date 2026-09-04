@@ -21,13 +21,7 @@ const stdin = async (): Promise<string> => {
   return Buffer.concat(chunks).toString("utf8");
 };
 
-// pnpm inserts a literal `--` when it forwards arguments through the workspace `ops`
-// script (`pnpm ops replay-erasures` arrives as `node src/ops.ts -- replay-erasures`;
-// first drill, 04/09/2026) — it is a separator, never a command.
-const argv = process.argv.slice(2);
-if (argv[0] === "--") argv.shift();
-
-const exitCode = await runOps(argv, pool, {
+const exitCode = await runOps(process.argv.slice(2), pool, {
   fetch: fetchHonouringHost,
   stdin,
   say: (line) => {

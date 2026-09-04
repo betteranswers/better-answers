@@ -77,7 +77,9 @@ vpc2() {
   need_root
   apt-get install -y --no-install-recommends git rclone age postgresql-common jq >/dev/null
   # The client must match the DUMP's major, not Ubuntu's default: pg_restore 16 refuses a
-  # pg18 custom-format archive (first drill prep, 04/09/2026). PGDG carries 18 on noble.
+  # pg18 custom-format archive (first drill prep, 04/09/2026). The major is pinned once, in
+  # packages/schema/src/postgres-image.ts (ADR 0032) — when that image moves major, this
+  # line moves with it. PGDG (apt.postgresql.org) carries 18 on noble.
   YES=yes /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
   apt-get install -y --no-install-recommends postgresql-client-18 >/dev/null
   # The mirror user: a home, /data/mirror, and one key that can run two commands.
