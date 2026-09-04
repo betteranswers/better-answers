@@ -48,9 +48,11 @@ started=$(date -u +%FT%TZ); T0=$(date +%s)
 say() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}"; }
 # aside — the same line, to the report and stderr only: for helpers whose stdout a caller captures
 aside() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}" >&2; }
+# -f paths are absolute: docker compose resolves them against the CALLER'S cwd, not
+# --project-directory (first drill, 04/09/2026 — "open /root/stores.compose.yaml").
 compose() { docker compose --project-directory "${REPO_DIR}/deploy" --env-file "${STAGING_ENV_FILE}" "$@"; }
-stores()   { compose -f stores.compose.yaml -f staging.override.yaml -p better-answers-stores-staging "$@"; }
-platform() { compose -f platform.compose.yaml -p better-answers-staging "$@"; }
+stores()   { compose -f "${REPO_DIR}/deploy/stores.compose.yaml" -f "${REPO_DIR}/deploy/staging.override.yaml" -p better-answers-stores-staging "$@"; }
+platform() { compose -f "${REPO_DIR}/deploy/platform.compose.yaml" -p better-answers-staging "$@"; }
 # ops <args…> — a `pnpm ops` command inside the staging api; "not built" is reported, not fatal
 ops() {
   local rc=0; platform exec -T api pnpm ops "$@" || rc=$?
@@ -59,7 +61,9 @@ ops() {
 }
 wipe_staging() {
   platform down --remove-orphans || true; stores down --remove-orphans || true
-  sudo rm -rf /data/objectstore/* /data/git/* /data/worker/lmdb/* /data/worker/trees/* /data/backup/staging/* "${WORK}"
+  # NOT "${WORK}": step 0 wipes too, and the report being written lives there — the work
+  # directory (restored plaintext included) is removed by on_exit alone (first drill, 04/09/2026).
+  sudo rm -rf /data/objectstore/* /data/git/* /data/worker/lmdb/* /data/worker/trees/* /data/backup/staging/*
   # The graph is plain tenant tables in `public` (ADR 0032): dropping the three schemas the journal
   # writes — public, index and drizzle's own — is the whole wipe. There is no per-workspace schema.
   psql "${STAGING_DATABASE_URL}" -qc "drop schema if exists public cascade; create schema public; drop schema if exists index cascade; drop schema if exists drizzle cascade;" || true
@@ -70,6 +74,7 @@ on_exit() { rc=$?
   wipe_staging && stores up -d init && platform run --rm migrate \
     && STAGING_DATABASE_URL="${STAGING_DATABASE_URL}" "${REPO_DIR}/deploy/seed-synthetic.sh" \
     && curl -fsS -m 10 -o /dev/null --data-raw "ok" "${HEALTHCHECKS_PING_URL_STAGING_WIPED}" || true
+  sudo rm -rf "${WORK}"   # the restored plaintext leaves with the drill, whatever happened
   exit "${rc}"
 }
 trap on_exit EXIT
