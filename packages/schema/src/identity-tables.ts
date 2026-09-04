@@ -365,7 +365,8 @@ export const rateLimit = pgTable("rate_limit", {
 });
 
 /**
- * The identity set by name — the RLS coverage test's exemption list. Sixteen tables:
+ * The identity set by name — the larger half of `RLS_EXEMPTIONS` (`rls-exemptions.ts`),
+ * where each of these names carries its reason. Sixteen tables:
  * Better Auth's core four, the JWT plugin's one, the organisation plugin's three
  * (`workspace` is its organisation model), the OAuth provider's seven and the limiter's.
  */

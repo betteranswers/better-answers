@@ -47,7 +47,8 @@ export const mcpCallCounter = pgTable(
 );
 
 /**
- * Every table without a workspace column and without a policy: the identity set plus
- * the pre-authentication counter. The RLS coverage test's exemption list.
+ * The global tables beyond the identity set: the pre-authentication counter. Joined with
+ * `IDENTITY_SET` in `RLS_EXEMPTIONS` (`rls-exemptions.ts`), the one exemption list, where
+ * this name carries its reason.
  */
 export const GLOBAL_TABLE_NAMES_BEYOND_IDENTITY = ["public.ingress_counter"] as const;

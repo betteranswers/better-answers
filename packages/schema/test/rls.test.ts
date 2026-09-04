@@ -2,7 +2,7 @@ import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { declaredTableNames } from "../scripts/worker-view.ts";
-import { GLOBAL_TABLE_NAMES_BEYOND_IDENTITY, IDENTITY_SET } from "../src/index.ts";
+import { EXEMPT_TABLE_NAMES, IDENTITY_SET, RLS_EXEMPTIONS } from "../src/index.ts";
 import { testData } from "./factory.ts";
 import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
 
@@ -13,11 +13,11 @@ import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./ha
  * Seeding runs through the factory as the container's superuser (which bypasses RLS by
  * design); every assertion runs as `app_rt`.
  *
- * The identity set (ADR 0009, 2026-09-01 amendment) is the named exemption: Better
- * Auth's tables and the pre-authentication counter carry no workspace column and no
- * policy, because they are read by key before any workspace is known. The exemption
- * is checked in both directions (`[TEST7]`) so a table can neither slip out of RLS
- * unnamed nor stay named after it gains a policy.
+ * A tenant table is every table `src/` declares minus `RLS_EXEMPTIONS`, the one list,
+ * which carries a reason per entry: Better Auth's identity set (ADR 0009, 2026-09-01
+ * amendment) and the pre-authentication counter, read by key before any workspace is
+ * known. The exemption is checked in both directions (`[TEST7]`) so a table can neither
+ * slip out of RLS unnamed nor stay named after it gains a policy.
  */
 
 let db: MigratedPostgres;
@@ -33,7 +33,7 @@ afterAll(async () => {
 const WS_A = "01J6AAAAAAAAAAAAAAAAAAAAAA";
 const WS_B = "01J6BBBBBBBBBBBBBBBBBBBBBB";
 
-const EXEMPT = new Set<string>([...IDENTITY_SET, ...GLOBAL_TABLE_NAMES_BEYOND_IDENTITY]);
+const EXEMPT = new Set<string>(Object.keys(RLS_EXEMPTIONS));
 const tenantTableNames = (): string[] =>
   [...declaredTableNames()].filter((name) => !EXEMPT.has(name));
 
@@ -71,6 +71,18 @@ describe("the seam function", () => {
       const set = await client.query("SELECT current_workspace_id() AS ws");
       expect(set.rows[0]?.ws).toBe(WS_A);
     });
+  });
+});
+
+describe("the exemption list", () => {
+  it("names the same tables the two source arrays do, and carries a reason for each", () => {
+    // The one list a reviewer reads is `RLS_EXEMPTIONS`; the arrays stay beside the
+    // declarations they belong to. Held equal here, in both directions, so an entry
+    // cannot be added to one and forgotten in the other.
+    expect(Object.keys(RLS_EXEMPTIONS).toSorted()).toEqual([...EXEMPT_TABLE_NAMES].toSorted());
+    for (const [table, reason] of Object.entries(RLS_EXEMPTIONS)) {
+      expect({ table, reasoned: reason.trim().length > 0 }).toEqual({ table, reasoned: true });
+    }
   });
 });
 
