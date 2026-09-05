@@ -1,0 +1,20 @@
+apps/docs-site/specs/T-048.md
+  s_61d51d90becc60::t_633398c74f436f 1-122,124-127
+  s_61d51d90becc60::t_377f419c90b939 123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c32b240658def3673efbfe396260b58d2d87d9b8",
+  "prompts": {},
+  "sessions": {
+    "s_61d51d90becc60": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "936e4b59-d726-4b6d-af7a-ba9b6202b5e6",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
