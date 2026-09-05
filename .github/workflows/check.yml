@@ -57,6 +57,14 @@ jobs:
         with:
           enable-cache: true
       - run: pnpm install --frozen-lockfile
+      # This checkout is the only fresh clone we ever get, so it is the only place the
+      # promise "install and the hook is there" can actually be tested. The config test
+      # reads the hook file; nothing but a clone can prove the install wrote it.
+      - name: the pre-commit hook is installed by install alone
+        run: |
+          hook="$(git rev-parse --git-path hooks)/pre-commit"
+          test -x "$hook" || { echo "no executable pre-commit hook at $hook"; exit 1; }
+          grep -q lefthook "$hook" || { echo "$hook is not lefthook's"; exit 1; }
       - run: uv sync --frozen
         working-directory: apps/worker
       # The SPA's `check` ends in a browser suite over the served build; the
