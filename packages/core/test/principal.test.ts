@@ -1,8 +1,8 @@
+import { ulid } from "@better-answers/schema";
 import {
   type MigratedPostgres,
   startMigratedPostgres,
   testData,
-  ulid,
 } from "@better-answers/schema/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

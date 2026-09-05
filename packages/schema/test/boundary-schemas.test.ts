@@ -397,6 +397,37 @@ describe("5 — the inferred type is pinned", () => {
       }
     >
   >;
+  type _sessionSelect = Expect<
+    Equal<
+      z.infer<typeof boundarySchemas.session.select>,
+      {
+        id: string;
+        expiresAt: Date;
+        token: string;
+        createdAt: Date;
+        updatedAt: Date;
+        ipAddress: string | null;
+        userAgent: string | null;
+        userId: string;
+        activeWorkspaceId: string | null;
+      }
+    >
+  >;
+  type _invitationSelect = Expect<
+    Equal<
+      z.infer<typeof boundarySchemas.invitation.select>,
+      {
+        id: string;
+        workspaceId: string;
+        email: string;
+        role: string | null;
+        status: string;
+        expiresAt: Date;
+        createdAt: Date;
+        inviterId: string;
+      }
+    >
+  >;
   type _mcpCallCounterSelect = Expect<
     Equal<
       z.infer<typeof boundarySchemas.mcpCallCounter.select>,

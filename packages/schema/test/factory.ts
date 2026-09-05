@@ -26,6 +26,12 @@ export type TestData = {
   user(overrides?: Partial<InsertInput<"user">>): Promise<Row<"user">>;
   /** A membership; creates its own workspace and user unless named; role defaults to the creator role. */
   member(overrides?: Partial<InsertInput<"member">>): Promise<Row<"member">>;
+  /**
+   * A pending invitation; creates its own workspace and inviter unless named. The role
+   * defaults to the creator role and the invitation expires a week out, which is what a
+   * People screen would write.
+   */
+  invitation(overrides?: Partial<InsertInput<"invitation">>): Promise<Row<"invitation">>;
   /** A config row; creates its own workspace unless one is named. */
   workspaceConfig(
     overrides?: Partial<InsertInput<"workspaceConfig">>,
@@ -114,6 +120,23 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const invitation: TestData["invitation"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const inviterId = overrides.inviterId ?? (await user()).id;
+    const week = 7 * 24 * 60 * 60 * 1000;
+    return insertRow(client, "invitation", {
+      id: ulid(),
+      email: `invitee-${ulid().toLowerCase()}@example.invalid`,
+      role: CREATOR_ROLE,
+      status: "pending",
+      expiresAt: new Date(Date.now() + week),
+      createdAt: new Date(),
+      ...overrides,
+      workspaceId,
+      inviterId,
+    });
+  };
+
   const workspaceConfig: TestData["workspaceConfig"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     return insertRow(client, "workspaceConfig", {
@@ -164,5 +187,5 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
-  return { workspace, user, member, workspaceConfig, llmRoute, chunk };
+  return { workspace, user, member, invitation, workspaceConfig, llmRoute, chunk };
 };

@@ -2,12 +2,11 @@ import {
   type MigratedPostgres,
   startMigratedPostgres,
   testData,
-  ulid,
 } from "@better-answers/schema/testing";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { boundarySchemas } from "@better-answers/schema";
+import { boundarySchemas, ulid } from "@better-answers/schema";
 
 import { attempt, type Claims, type PlatformPrincipal } from "../src/kernel/index.ts";
 import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";

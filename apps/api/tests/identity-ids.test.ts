@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ULID_PATTERN, ulid } from "@better-answers/schema";
+import { ULID, ulid } from "@better-answers/schema";
 
 import { signIn } from "./flow.ts";
 import { startApp, type TestApp } from "./harness.ts";
@@ -23,7 +23,7 @@ afterAll(async () => {
 });
 
 const isPlatformId = (value: string | undefined): boolean =>
-  value !== undefined && new RegExp(ULID_PATTERN).test(value);
+  value !== undefined && ULID.test(value);
 
 const anAddress = () => `${ulid().toLowerCase()}@example.invalid`;
 
@@ -64,36 +64,25 @@ describe("the id a person gets", () => {
 });
 
 describe("an invitation read by its id", () => {
-  /** A pending invitation as the People screen will one day write one (T-027). */
-  const seedInvitation = async (workspaceId: string, email: string, inviterId: string) => {
-    const id = ulid();
-    await app.database.superuser.query(
-      "INSERT INTO invitation (id, workspace_id, email, role, status, expires_at, inviter_id) VALUES ($1, $2, $3, 'Viewer', 'pending', now() + interval '7 days', $4)",
-      [id, workspaceId, email, inviterId],
-    );
-    return id;
-  };
-
   it("is refused to the invited person until their email is verified, and read once it is", async () => {
     const acme = await app.provision({ name: "Acme" });
     const email = anAddress();
     const client = app.client();
     await signIn(app, client, email);
-    const invitationId = await seedInvitation(acme.workspaceId, email, acme.admin.id);
+    const invited = await app.invite({
+      workspaceId: acme.workspaceId,
+      email,
+      inviterId: acme.admin.id,
+    });
 
-    // The same person, their address no longer verified: the sign-in code proved the
-    // address once, and this is what the platform does when that proof is withdrawn.
-    await app.database.superuser.query(
-      'UPDATE "user" SET email_verified = false WHERE email = $1',
-      [email],
-    );
-    const refused = await client.fetch(`/organization/get-invitation?id=${invitationId}`);
+    // The same person, their address no longer proved: the sign-in code proved it once,
+    // and this is the state a person is in before they have answered any code at all.
+    await app.setEmailVerified(email, false);
+    const refused = await client.fetch(`/organization/get-invitation?id=${invited.id}`);
     expect(refused.status).toBe(403);
 
-    await app.database.superuser.query('UPDATE "user" SET email_verified = true WHERE email = $1', [
-      email,
-    ]);
-    const read = await client.fetch(`/organization/get-invitation?id=${invitationId}`);
+    await app.setEmailVerified(email, true);
+    const read = await client.fetch(`/organization/get-invitation?id=${invited.id}`);
     expect(read.status).toBe(200);
   });
 });

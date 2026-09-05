@@ -10,7 +10,8 @@ import {
   provisionWorkspace,
   revokeCredentials as revokeCredentials_,
 } from "@better-answers/core/workspaces";
-import { testData, ulid } from "@better-answers/schema/testing";
+import { ulid } from "@better-answers/schema";
+import { testData } from "@better-answers/schema/testing";
 
 import type { EmailMessage } from "../src/auth/index.ts";
 import { CLIENT_IP_HEADER } from "../src/auth/index.ts";
@@ -96,6 +97,10 @@ export type TestApp = {
     userId: string,
     role: "Admin" | "Editor" | "Viewer",
   ): Promise<void>;
+  /** A pending invitation, as the People screen will one day write one (T-027). */
+  invite(input: { workspaceId: string; email: string; inviterId: string }): Promise<{ id: string }>;
+  /** Say whether a person's address counts as proved, as sign-in and erasure will. */
+  setEmailVerified(email: string, verified: boolean): Promise<void>;
   /** The superuser writes the revocation instant the People screen will one day write. */
   revokeCredentials(userId: string, at: Date): Promise<void>;
   /** End a membership, as the People screen will one day. */
@@ -268,6 +273,27 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     }
   };
 
+  const invite: TestApp["invite"] = async (input) => {
+    const client = await database.superuser.connect();
+    try {
+      const created = await testData(client).invitation({
+        workspaceId: input.workspaceId,
+        email: input.email,
+        inviterId: input.inviterId,
+      });
+      return { id: created.id };
+    } finally {
+      client.release();
+    }
+  };
+
+  const setEmailVerified: TestApp["setEmailVerified"] = async (email, verified) => {
+    await database.superuser.query('UPDATE "user" SET email_verified = $2 WHERE email = $1', [
+      email,
+      verified,
+    ]);
+  };
+
   const revokeCredentials: TestApp["revokeCredentials"] = async (userId, at) => {
     // Through the platform's one act, as the People screen will: writes the instant,
     // ends the sessions and revokes the refresh tokens minted before it.
@@ -375,6 +401,8 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     provision,
     person,
     addMember,
+    invite,
+    setEmailVerified,
     revokeCredentials,
     removeMember,
     setWorkspaceConfig,

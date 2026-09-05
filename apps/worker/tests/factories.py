@@ -8,6 +8,7 @@ scope the cursor currently holds — seeding as the superuser and asserting as
 
 import re
 import secrets
+import time
 from typing import Any
 
 from psycopg import Cursor
@@ -34,11 +35,24 @@ def embedding_dimensions() -> int:
 
 EMBEDDING_DIMENSIONS = embedding_dimensions()
 
-ULID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+_ULID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
 
 def ulid() -> str:
-    return "".join(secrets.choice(ULID_ALPHABET) for _ in range(26))
+    """One id in the shape both tiers agreed (``contracts/id-shape``, ADR 0035).
+
+    Ten characters of milliseconds then sixteen of randomness, so an id seeded here
+    sorts by when it was made and parses at the other tier's boundary — the same
+    promise ``packages/schema/src/ulid.ts`` makes. This tier mints no id in
+    production; the helper exists so a seeded row is indistinguishable from one the
+    app wrote, and so the conformance suite has something of its own to hold to the
+    fixture.
+    """
+    milliseconds = time.time_ns() // 1_000_000
+    stamp = "".join(
+        _ULID_ALPHABET[(milliseconds >> shift) & 0b11111] for shift in range(45, -1, -5)
+    )
+    return stamp + "".join(secrets.choice(_ULID_ALPHABET) for _ in range(16))
 
 
 def _returning_row(cursor: Cursor[Any]) -> dict[str, Any]:

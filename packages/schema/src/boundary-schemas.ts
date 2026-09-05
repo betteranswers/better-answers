@@ -23,7 +23,7 @@ import {
 import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { ROLES } from "./roles.ts";
 import { llmRoute, workspaceConfig } from "./schema.ts";
-import { ULID_PATTERN } from "./ulid.ts";
+import { ULID } from "./ulid.ts";
 import { workspace } from "./workspace-table.ts";
 
 /**
@@ -43,7 +43,6 @@ import { workspace } from "./workspace-table.ts";
  * row stands for, so their ids are not the platform's to narrow.
  */
 
-const ULID = new RegExp(ULID_PATTERN);
 const workspaceId = (schema: z.ZodString) => schema.regex(ULID).brand<"WorkspaceId">();
 const userId = (schema: z.ZodString) => schema.regex(ULID).brand<"UserId">();
 /**

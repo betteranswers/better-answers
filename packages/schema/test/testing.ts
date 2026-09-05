@@ -4,5 +4,5 @@
  */
 export { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
 export { type TestData, testData } from "./factory.ts";
-// The production minter, so a test seeds ids in exactly the shape the platform mints.
-export { ulid } from "../src/index.ts";
+// The minter is not re-exported here: it is production code, and a test that needs one
+// takes it from `@better-answers/schema` beside everything else the package exports.

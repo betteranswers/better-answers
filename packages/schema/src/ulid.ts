@@ -26,6 +26,13 @@ const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
  */
 export const ULID_PATTERN = "^[0-9A-HJKMNP-TV-Z]{26}$";
 
+/**
+ * The compiled pattern, so a caller asking "is this the shape the platform mints?" reads
+ * one object rather than each building its own from the string. No `g` flag, so it holds
+ * no cursor between calls and is safe to share.
+ */
+export const ULID = new RegExp(ULID_PATTERN);
+
 const TIME_CHARS = 10;
 const RANDOM_CHARS = 16;
 /** 48 bits of milliseconds is the last instant a ULID's time half can hold. */
@@ -39,7 +46,11 @@ const MAX_TIME_MS = 2 ** 48 - 1;
  * unordered between them, which is what a ULID promises and all it promises.
  */
 let lastTimeMs = -1;
-/** The random half as sixteen five-bit digits, most significant first. */
+/**
+ * The random half is kept as sixteen five-bit digits rather than ten bytes so that
+ * adding one to it is a carry over the characters it will be written as; packing and
+ * unpacking eighty bits on every mint would buy nothing.
+ */
 const lastRandom = new Uint8Array(RANDOM_CHARS);
 
 const drawRandom = (): void => {
@@ -51,7 +62,15 @@ const drawRandom = (): void => {
   }
 };
 
-/** Add one to the random half, carrying left. Returns false when all 80 bits were set. */
+/**
+ * Add one to the random half, carrying left — the increment that keeps two ids minted in
+ * the same millisecond in the order they were minted. Returns false when all 80 bits were
+ * already set and there is nothing left to carry into.
+ *
+ * The `?? 0` reads a digit the array certainly has: the loop's index is bounded by the
+ * array's own length. It is there because the compiler cannot see that, and a thrown
+ * error would be a worse answer than a digit.
+ */
 const incrementRandom = (): boolean => {
   for (let index = RANDOM_CHARS - 1; index >= 0; index -= 1) {
     const digit = lastRandom[index] ?? 0;
@@ -64,6 +83,11 @@ const incrementRandom = (): boolean => {
   return false;
 };
 
+/**
+ * The milliseconds as ten base32 digits, most significant first — the half that makes an
+ * id sortable and readable back as a time. The `?? "0"` is the same bounded-index
+ * appeasement as above: `remaining % 32` is always an index the alphabet has.
+ */
 const encodeTime = (milliseconds: number): string => {
   let remaining = milliseconds;
   let encoded = "";

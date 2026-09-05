@@ -90,8 +90,13 @@ def test_an_id_minted_in_this_tier_matches_the_shape_the_other_tier_parses() -> 
 
     pattern = re.compile(read_id_shape()["pattern"])
 
-    for _ in range(100):
-        assert pattern.fullmatch(ulid())
+    minted = [ulid() for _ in range(100)]
+    for identifier in minted:
+        assert pattern.fullmatch(identifier), identifier
+    # The time half is the half the shape promises: ids made in order read in order.
+    assert [identifier[:10] for identifier in minted] == sorted(
+        identifier[:10] for identifier in minted
+    )
 
 
 # --- llm-routing: the first real fixture (ADR 0031) -----------------------------------
