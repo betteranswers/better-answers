@@ -1,0 +1,21 @@
+CONTEXT.md
+  s_68ebbb9f6e7da4::t_37795b478c701a 199-200
+  s_68ebbb9f6e7da4::t_9fd5fd0e012f53 254-260
+  s_68ebbb9f6e7da4::t_0945fdc8fa27ae 198,201-208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "de633a8381686da18d27d77a8b6ec6be8173fb3a",
+  "prompts": {},
+  "sessions": {
+    "s_68ebbb9f6e7da4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "010b5445-82f5-4012-8898-67203a565202",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
