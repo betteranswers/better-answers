@@ -1,0 +1,34 @@
+apps/api/package.json
+  s_2c3fc9d16bd52c::t_a4407890b5e736 50-51
+package.json
+  s_2c3fc9d16bd52c::t_f9cbfc03b913e7 6
+  s_2c3fc9d16bd52c::t_a4407890b5e736 18
+pnpm-workspace.yaml
+  s_2c3fc9d16bd52c::t_a6c1f78ed13bdd 17
+  s_2c3fc9d16bd52c::t_3ef5e7ab7eaf0b 10-13
+  s_2c3fc9d16bd52c::t_3b8b141fa80a9b 9
+apps/api/tests/lefthook-config.test.ts
+  s_2c3fc9d16bd52c::t_aea342dde093ae 163-169,171,173,175
+  s_2c3fc9d16bd52c::t_1a3267119305e9 1-154,159-162,170,172,174,176-177
+  s_2c3fc9d16bd52c::t_cc7eb194d45282 155-158
+lefthook.yml
+  s_2c3fc9d16bd52c::t_8dd060b6b42bf6 22-28
+  s_2c3fc9d16bd52c::t_c7e32e419202f0 1-20,29-77
+  s_2c3fc9d16bd52c::t_afeb58274ffc7e 21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7c7b81a54a51ea6dedbb3fc160e1659c97ed4be6",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
