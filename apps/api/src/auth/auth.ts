@@ -10,7 +10,7 @@ import type pg from "pg";
 import type { Logger } from "pino";
 import { z } from "zod";
 
-import type { PlatformPrincipal } from "@better-answers/core/kernel";
+import { ulid, type PlatformPrincipal } from "@better-answers/core/kernel";
 import {
   withIdentityWrite,
   withScope,
@@ -233,6 +233,30 @@ export const createAuth = (deps: AuthDependencies) => {
     advanced: {
       // Per-IP limits key on the tunnel's header alone (grilling Q8).
       ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
+      database: {
+        /**
+         * The platform's one minter, handed to the library, so a person's user id, their
+         * session id and the rows the organisation plugin writes all carry the shape the
+         * workspace id already has (ADR 0035). Three facts about this library, verified
+         * against the installed version by the staff review T-063 records — written here
+         * so nobody re-derives them:
+         *
+         * 1. Nothing secret comes from here. Session tokens, authorisation codes, client
+         *    secrets and a token's `jti` are produced by the library's own random-string
+         *    paths, which this option does not reach — and a ULID, whose first ten
+         *    characters are the minting time, would be a poor secret.
+         * 2. The organisation plugin creates members and invitations through the adapter,
+         *    so both get a minted id.
+         * 3. The adapter drops a caller-supplied id unless it is forced, so an id minted
+         *    ahead of time is never sent through Better Auth's API. The platform's own
+         *    direct SQL writes are a different path and mint their own.
+         *
+         * The `size` hint the library passes for its variable-length ids is ignored by
+         * design: a ULID is 26 characters or it is not one, and nothing that asks for a
+         * size here is an id the platform reads.
+         */
+        generateId: () => ulid(),
+      },
       // Stated, because the library's default for this option is `NODE_ENV === "test"`:
       // left unset, the origin check — the whole of the CSRF fence in front of sign-in,
       // the pick and the resume — is off under every test runner, and the suite that
@@ -336,6 +360,15 @@ export const createAuth = (deps: AuthDependencies) => {
         // `provisionWorkspace` (packages/core/workspaces) is the act; this flag is the
         // "self-serve later" switch.
         allowUserToCreateOrganization: false,
+        // Stated, not left to the library's default. Unset, the plugin decides whether an
+        // invitation id is opaque by looking at which id generator is installed, and a
+        // custom one switches that heuristic off — so accepting, rejecting or reading an
+        // invitation by id would quietly stop asking for a verified address the moment the
+        // minter above was handed over. A ULID sorts and carries its minting time, so an
+        // invitation id is a poor proof of who the invitation is for; the verified address
+        // is the proof, and T-027's accept page rests on this line rather than on a guess
+        // about the shape of an id.
+        requireEmailVerificationOnInvitation: true,
 
         schema: {
           organization: { modelName: "workspace" },
