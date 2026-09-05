@@ -1,0 +1,45 @@
+docs/adr/0021-the-graph-is-neo4j-community-on-one-instance-tenanted-by-rule-written-in-generations-and-never-a-hard-dependency.md
+  s_ef049562f376fa::t_11e6417a3f3ef3 8,12,41
+docs/adr/0032-the-graph-is-plain-tables-under-rls-the-substrate-is-one-journal-one-role-seam-one-definer-function.md
+  s_ef049562f376fa::t_11e6417a3f3ef3 45,56
+docs/adr/0033-the-ui-kit-is-tailwind-v4-through-the-design-system-bridge-with-three-registries-that-own-behaviour.md
+  s_ef049562f376fa::t_11e6417a3f3ef3 219
+docs/adr/0005-own-app-two-tiers-parts-lifted-by-contract.md
+  s_ef049562f376fa::t_11e6417a3f3ef3 65,72,83
+docs/adr/0009-better-auth-in-process-identity-provider.md
+  s_ef049562f376fa::t_11e6417a3f3ef3 50,52,80,92
+apps/api/tests/coding-rules-tags.test.ts
+  s_ef049562f376fa::t_11e6417a3f3ef3 30-32,125-127,131
+apps/web/src/features/routes/routes-card.tsx
+  s_ef049562f376fa::t_11e6417a3f3ef3 114
+docs/adr/0028-a-boundary-schema-is-generated-from-its-table-a-refinement-only-narrows-and-a-parity-test-proves-it.md
+  s_ef049562f376fa::t_11e6417a3f3ef3 22
+docs/adr/0013-sources-bound-by-origin-reach-and-destination.md
+  s_ef049562f376fa::t_11e6417a3f3ef3 53
+docs/adr/0027-better-answers-is-open-core-under-apache-2-0-the-hosted-service-is-the-product-copyleft-is-run-only.md
+  s_ef049562f376fa::t_11e6417a3f3ef3 31,33,51
+CODING_RULES.md
+  s_ef049562f376fa::t_11e6417a3f3ef3 61
+docs/adr/0023-the-graph-is-apache-age-inside-the-platform-postgres.md
+  s_ef049562f376fa::t_11e6417a3f3ef3 53,69,75
+docs/adr/0029-the-tier-is-apps-over-packages-business-logic-is-a-library-of-capability-slices-over-four-store-doors.md
+  s_ef049562f376fa::t_11e6417a3f3ef3 14,104,122,131
+docs/adr/0030-the-mcp-surface-stays-mcp-sdk-v2-in-the-typescript-tier-behind-one-fetch-shaped-seam.md
+  s_ef049562f376fa::t_11e6417a3f3ef3 55,142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "bb989f0444d774646a03b9ad1bc2aa279435f6d7",
+  "prompts": {},
+  "sessions": {
+    "s_ef049562f376fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5694ad5b-a38e-4e87-b27e-ab045c653208",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
