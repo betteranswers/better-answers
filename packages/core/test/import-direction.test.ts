@@ -1,6 +1,4 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-
+import { oxlintOverrideFor } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
@@ -19,21 +17,6 @@ import { describe, expect, it } from "vitest";
  * every assertion below, so an empty output has to be impossible unless the rule was silent.
  */
 
-const repoRoot = path.resolve(import.meta.dirname, "../../..");
-
-/** JSONC: the repo's config carries the comments explaining each rule. */
-const readConfig = (): Record<string, unknown> =>
-  JSON.parse(
-    readFileSync(path.join(repoRoot, ".oxlintrc.json"), "utf8").replaceAll(/^\s*\/\/.*$/gm, ""),
-  ) as Record<string, unknown>;
-
-const coreOverride = (): unknown => {
-  const overrides = readConfig()["overrides"] as { files?: string[] }[];
-  const found = overrides.find((o) => o.files?.length === 1 && o.files[0] === "packages/core/**");
-  if (found === undefined) throw new Error("no `packages/core/**` override in .oxlintrc.json");
-  return found;
-};
-
 const bothWorkspaces = (importSpecifier: string): Readonly<Record<string, string>> =>
   Object.fromEntries(
     ["packages/core", "apps/api"].map((workspace) => [
@@ -45,7 +28,7 @@ const bothWorkspaces = (importSpecifier: string): Readonly<Record<string, string
 // The smoke case: the rule's own subject, under both globs, with the one path that must come
 // back. Until oxlint answers this the way the config says it will, no silence below means
 // anything.
-const lint = oxlintOver(JSON.stringify({ overrides: [coreOverride()] }), {
+const lint = oxlintOver(JSON.stringify({ overrides: [oxlintOverrideFor("packages/core/**")] }), {
   tree: bothWorkspaces("hono"),
   flagged: ["packages/core/probe.ts"],
 });

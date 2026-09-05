@@ -1,6 +1,10 @@
-import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import {
+  oxlintOverrideFor,
+  readOxlintConfig,
+  repositoryRoot,
+} from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
@@ -18,28 +22,10 @@ import { describe, expect, it } from "vitest";
  * below.
  */
 
-const repoRoot = path.resolve(import.meta.dirname, "../../..");
-
-/** JSONC: the repo's config carries the comments explaining each rule. */
-const readConfig = (): {
-  overrides: { files?: string[]; rules?: Record<string, unknown> }[];
-  rules: Record<string, unknown>;
-  jsPlugins: { name: string; specifier: string }[];
-} =>
-  JSON.parse(
-    readFileSync(path.join(repoRoot, ".oxlintrc.json"), "utf8").replaceAll(/^\s*\/\/.*$/gm, ""),
-  ) as ReturnType<typeof readConfig>;
-
-const overrideFor = (glob: string) => {
-  const found = readConfig().overrides.find((override) => override.files?.includes(glob));
-  if (found === undefined) throw new Error(`no override for ${glob} in .oxlintrc.json`);
-  return found;
-};
-
 const probe = (specifier: string): string =>
   `import * as probe from "${specifier}";\nexport const keep = probe;\n`;
 
-const config = readConfig();
+const config = readOxlintConfig();
 
 /** Lint `files` (path → source) under the repo's real config, returning oxlint's output. */
 const { output: lint } = oxlintOver(
@@ -47,15 +33,15 @@ const { output: lint } = oxlintOver(
     // The plugin is resolved from the repo, not copied.
     jsPlugins: config.jsPlugins.map((plugin) => ({
       ...plugin,
-      specifier: path.join(repoRoot, plugin.specifier),
+      specifier: path.join(repositoryRoot, plugin.specifier),
     })),
     rules: Object.fromEntries(
       Object.entries(config.rules).filter(([name]) => name.startsWith("better-answers/")),
     ),
     overrides: [
-      overrideFor("**/*.ts"),
-      overrideFor("apps/api/src/auth/**"),
-      overrideFor("packages/core/**"),
+      oxlintOverrideFor("**/*.ts"),
+      oxlintOverrideFor("apps/api/src/auth/**"),
+      oxlintOverrideFor("packages/core/**"),
     ],
   }),
   {

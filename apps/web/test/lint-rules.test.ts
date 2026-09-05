@@ -1,6 +1,4 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-
+import { readOxlintConfig } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
@@ -17,16 +15,6 @@ import { describe, expect, it } from "vitest";
  * 1.80 has no `import/no-restricted-paths`.
  */
 
-const repoRoot = path.resolve(import.meta.dirname, "../../..");
-
-/** JSONC: the repo's config carries the comments explaining each rule. */
-const readConfig = (): {
-  overrides: { files?: string[]; rules?: Record<string, unknown> }[];
-} =>
-  JSON.parse(
-    readFileSync(path.join(repoRoot, ".oxlintrc.json"), "utf8").replaceAll(/^\s*\/\/.*$/gm, ""),
-  ) as ReturnType<typeof readConfig>;
-
 /**
  * The SPA's overrides, in the order the real config declares them — which matters, because a
  * later override replaces an earlier one's configuration of the same rule and the zones are
@@ -34,7 +22,7 @@ const readConfig = (): {
  * filter: it sets neither of the two rules under test.
  */
 const webOverrides = () =>
-  readConfig().overrides.filter(
+  readOxlintConfig().overrides.filter(
     (override) =>
       override.files?.[0]?.startsWith("apps/web") === true &&
       (override.rules?.["no-restricted-imports"] !== undefined ||
