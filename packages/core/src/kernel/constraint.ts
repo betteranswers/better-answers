@@ -12,19 +12,24 @@
 
 /**
  * @param error the normalised Error `attempt` returned
- * @param named the constraints this act refuses over, each mapped to its refusal word
+ * @param byConstraint the constraints this act refuses over, each with its refusal word
  */
 export const refusalFor = <Refusal extends string>(
   error: Error,
-  named: Readonly<Record<string, Refusal>>,
+  byConstraint: Readonly<Record<string, Refusal>>,
 ): Refusal | Error => {
-  // node-postgres puts the violated constraint's name on the error it throws; older
-  // messages carry it only in the text, so both are read.
+  // node-postgres puts the violated constraint's name on the error it throws. Read as a
+  // whole name first: a substring search over a map with `member_pkey` and
+  // `member_pkey_v2` in it would answer whichever was declared first.
   const constraint =
     "constraint" in error && typeof error.constraint === "string" ? error.constraint : "";
-  const detail = `${error.message} ${constraint}`;
-  for (const [name, refusal] of Object.entries(named)) {
-    if (detail.includes(name)) return refusal;
+  const named = byConstraint[constraint];
+  if (named !== undefined) return named;
+  // Not every failure carries the field — some drivers and some errors put the name only
+  // in the text — so the message is read second, and by containment because that is all
+  // the sentence allows.
+  for (const [name, refusal] of Object.entries(byConstraint)) {
+    if (error.message.includes(name)) return refusal;
   }
   return error;
 };

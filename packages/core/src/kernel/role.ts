@@ -15,17 +15,19 @@ import { err, ok, type Result } from "./result.ts";
 export type RoleRefusal = "role-forbids";
 
 /**
- * A Principal at the highest role a workspace has (`CONTEXT.md`, *role (of a person)*:
- * Admin, Editor, Viewer — a level, never a job title). An act that requires one takes
- * this type, so the check is in the signature rather than repeated in the body.
+ * A user principal at the highest role a workspace has (`CONTEXT.md`, *role (of a
+ * person)*: Admin, Editor, Viewer — a level, never a job title). An act that requires
+ * one takes this type, so the check is in the signature rather than repeated in the
+ * body. Not a fourth kind of *principal* — the glossary closes that list at three, and
+ * this is a `UserPrincipal` narrowed, which is why the name says so.
  */
-export type AdminPrincipal = UserPrincipal & { readonly role: "Admin" };
+export type AdminUserPrincipal = UserPrincipal & { readonly role: "Admin" };
 
 /**
  * The guard: an Admin comes back narrowed and every other role comes back as the one
  * refusal word. Pure, so a verb can be guarded before it opens a transaction.
  */
-export const requireAdmin = (principal: UserPrincipal): Result<AdminPrincipal, RoleRefusal> => {
+export const requireAdmin = (principal: UserPrincipal): Result<AdminUserPrincipal, RoleRefusal> => {
   const { role } = principal;
   return role === "Admin" ? ok({ ...principal, role }) : err("role-forbids");
 };

@@ -15,13 +15,14 @@ import type { Principal } from "./principal.ts";
  * keep `human:<email>` (ADR 0019, which stands). The two forms differ by decision, and
  * that is why the erasure routine rewrites files and never the ledger.
  *
- * The type is a template-literal union rather than a brand so that a hand-composed
- * string cannot pass for one and the three forms are readable at the call site.
+ * A template-literal union rather than a brand, so the three forms are readable at the
+ * call site and a bare `string` cannot pass for one. It is a shape, not a promise about
+ * what fills it: `actorIdOf` is what makes the person's part a *person id* rather than
+ * an email, and it is the only thing that should ever produce one.
  */
-export type ActorId =
-  | `human:${string}`
-  | `process:better-answers-${string}`
-  | `better-answers-${string}/${string}`;
+export type ProcessActorId = `process:better-answers-${string}`;
+
+export type ActorId = `human:${string}` | ProcessActorId | `better-answers-${string}/${string}`;
 
 /**
  * The one derivation, so no slice composes the string by hand. A user

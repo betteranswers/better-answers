@@ -1,6 +1,9 @@
 import type { boundarySchemas } from "@better-answers/schema";
 import type { z } from "zod";
 
+// Type-only, so the pair `actor.ts` ↔ `principal.ts` forms no import cycle at runtime.
+import type { ProcessActorId } from "./actor.ts";
+
 /**
  * The Principal (`CONTEXT.md`, *principal*): who a call is made as. Built by
  * a transport from a verified credential, first parameter of every function in `core`
@@ -35,7 +38,8 @@ export type UserPrincipal = {
  */
 export type PlatformPrincipal = {
   readonly kind: "platform";
-  readonly actorId: `process:better-answers-${string}`;
+  /** The process arm of `ActorId` itself, so the two forms cannot drift apart. */
+  readonly actorId: ProcessActorId;
 };
 
 export type Principal = UserPrincipal | PlatformPrincipal;

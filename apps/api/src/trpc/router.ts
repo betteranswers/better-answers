@@ -12,6 +12,15 @@ import { router, workspaceProcedure } from "./base.ts";
  * `Auth` or touch the auth barrel; the runtime coupling stays zero.
  */
 
+/**
+ * A slice answers a store failure rather than throwing it (the kernel's result
+ * convention); a transport is where it becomes a status a client understands. The cause
+ * is kept so the tier's logger has the driver's own error, and the message says what
+ * could not be done rather than why, which is the client's business and not the store's.
+ */
+const storeFailed = (what: string, cause: Error): TRPCError =>
+  new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `${what} could not be read`, cause });
+
 export const appRouter = router({
   session: router({
     /**
@@ -27,12 +36,7 @@ export const appRouter = router({
       // that, and is never told to a client as a signed-out session.
       if (!read.ok) {
         const { error } = read;
-        if (error instanceof Error)
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "the membership could not be read",
-            cause: error,
-          });
+        if (error instanceof Error) throw storeFailed("the membership", error);
         throw new TRPCError({ code: "UNAUTHORIZED", message: error });
       }
       return read.value;
@@ -42,14 +46,7 @@ export const appRouter = router({
     /** A workspace's model routes, one row per purpose. Read-only: editing is a later ticket. */
     list: workspaceProcedure.query(async ({ ctx }) => {
       const listed = await listRoutes(ctx.principal, ctx.tx);
-      // The slice answers a store failure rather than throwing it (the kernel's result
-      // convention); a transport is where it becomes a status a client understands.
-      if (!listed.ok)
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "the workspace's routes could not be read",
-          cause: listed.error,
-        });
+      if (!listed.ok) throw storeFailed("the workspace's routes", listed.error);
       return listed.value;
     }),
   }),

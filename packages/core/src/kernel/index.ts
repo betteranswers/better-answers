@@ -30,9 +30,9 @@ export { refusalFor } from "./constraint.ts";
 export { attempt, err, normalizeError, ok } from "./result.ts";
 export type { Result } from "./result.ts";
 export { actorIdOf } from "./actor.ts";
-export type { ActorId } from "./actor.ts";
+export type { ActorId, ProcessActorId } from "./actor.ts";
 export { requireAdmin } from "./role.ts";
-export type { AdminPrincipal, RoleRefusal } from "./role.ts";
+export type { AdminUserPrincipal, RoleRefusal } from "./role.ts";
 export type {
   Claims,
   GroupId,

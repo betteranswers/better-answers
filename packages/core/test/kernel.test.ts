@@ -95,4 +95,16 @@ describe("reading a store's constraint names into a slice's words", () => {
 
     expect(refusalFor(failure, named)).toBe(failure);
   });
+
+  it("answers for the constraint that was violated, not one whose name it contains", () => {
+    // `member_pkey` is a substring of `member_pkey_v2`, so a search over the text alone
+    // would answer the wrong word for whichever the map happened to list first.
+    const overlapping = { member_pkey: "one", member_pkey_v2: "the other" } as const;
+    const violation = Object.assign(
+      new Error('duplicate key value violates unique constraint "member_pkey_v2"'),
+      { constraint: "member_pkey_v2" },
+    );
+
+    expect(refusalFor(violation, overlapping)).toBe("the other");
+  });
 });

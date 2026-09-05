@@ -27,10 +27,11 @@ import { defineEntry, type Entry } from "./define.ts";
 /**
  * A slice act answers a `Result` and never throws across its seam (the kernel's result
  * convention). The surface is a transport, and a transport is where a failure becomes a
- * throw again — the MCP runtime turns it into an error result for the host. Today's
- * four acts cannot fail, so this branch is unreachable and typed so.
+ * throw again — the MCP runtime turns it into an error result for the host. Today's four
+ * acts declare `never` for their error, so the throwing arm is unreachable through them;
+ * the parameter is written wider so it stays right when their bodies arrive.
  */
-const answered = <Value>(result: Result<Value, Error>): Value => {
+const valueOrThrow = <Value>(result: Result<Value, Error>): Value => {
   if (!result.ok) throw result.error;
   return result.value;
 };
@@ -79,7 +80,7 @@ const findEntry = defineEntry({
     idempotentHint: true,
     openWorldHint: false,
   },
-  run: async (principal, tx, args) => answered(await find(principal, tx, args)),
+  run: async (principal, tx, args) => valueOrThrow(await find(principal, tx, args)),
   render: renderFind,
 });
 
@@ -116,7 +117,7 @@ const askEntry = defineEntry({
     idempotentHint: false,
     openWorldHint: false,
   },
-  run: async (principal, tx, args) => answered(await ask(principal, tx, args)),
+  run: async (principal, tx, args) => valueOrThrow(await ask(principal, tx, args)),
   render: renderAnswer,
 });
 
@@ -175,7 +176,7 @@ const openEntry = defineEntry({
     openWorldHint: false,
   },
   run: async (principal, tx, args) =>
-    answered(
+    valueOrThrow(
       await open(
         principal,
         tx,
@@ -236,7 +237,7 @@ const giveFeedbackEntry = defineEntry({
       throw new Error(
         "a flag needs a reason: wrong, out-of-date, incomplete or should-not-have-shown",
       );
-    return answered(await giveFeedback(principal, tx, parsed.data));
+    return valueOrThrow(await giveFeedback(principal, tx, parsed.data));
   },
   render: renderFeedback,
 });
