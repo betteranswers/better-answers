@@ -43,7 +43,7 @@ Commands, versions and scripts are read from each workspace's `package.json` or 
 
 ## Skills
 
-`/grilling` and `/domain-modeling` for any design conversation; `/codebase-design` when shaping a module; `/tdd` for red–green work; `/writing-for-agents` when editing any file; `/diagnosing-bugs` for anything broken or slow.
+`/grilling` and `/domain-modeling` for any design conversation; `/codebase-design` when shaping a module; `/tdd` for red–green work; `/writing-for-agents` when editing any file; `/diagnosing-bugs` for anything broken or slow; `/browser-suite` — this repository's own, tracked at `.claude/skills/browser-suite/` — for any Playwright spec under `apps/web/e2e/`.
 
 ## Agent skills
 
