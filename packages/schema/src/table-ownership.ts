@@ -6,17 +6,19 @@
  * database. The mitigation it names first is **a checked-in table-ownership map,
  * reviewed like the export list** — this file. It is shaped like `RLS_EXEMPTIONS`
  * beside it (T-015) for the same reason: one record a reviewer reads, every entry
- * carrying a reason, and a test asserting the pair in both
- * directions, so no name can be added in one place and forgotten in another
+ * carrying a reason, and a test asserting each pair in both directions, so no name can
+ * be added in one place and forgotten in another
  * (`packages/schema/test/table-ownership.test.ts`).
  *
- * **A slice owns a table**: the capability whose invariants the table holds, which is
- * the write path and never a screen (ADR 0029). An owner is written as its directory
- * name under `packages/core/src/` and the test checks that directory exists, so a map
- * entry always reaches a module a reader can open.
- *
- * **Two owners are not slices**, and each is written as the repository path of the
- * module it is, so it cannot be read as a slice name that has gone missing:
+ * **An owner is a module, written as the name a reader can open it by.** Most owners are
+ * slices — the capability whose invariants a table holds, which is the write path and
+ * never a screen (ADR 0029) — and a slice is written as its directory name under
+ * `packages/core/src/`: `workspaces`, `sources`. `llm` is written the same way without
+ * being a slice (ADR 0029 rule 3: `llm` and `audit` import `kernel`, `access` and
+ * `store`, never a slice and never each other), because the name still opens a
+ * directory. Two owners are not under `packages/core/src/` at all, and each is written
+ * as the repository path of the module it is — a form no directory name there can take,
+ * so the two kinds can never be confused:
  *
  * - `apps/api/src/auth` — the **identity provider**. The sixteen tables of
  *   `IDENTITY_SET` are Better Auth's own: the library declares their shapes, writes
@@ -53,16 +55,22 @@
  * own rows and are not a slice's table, so they are not the breach.
  */
 
-/**
- * The owner of every table `src/` declares. A slice by its directory name under
- * `packages/core/src/`; the two owners that are not slices by their path (above).
- */
 export const IDENTITY_PROVIDER = "apps/api/src/auth";
 export const POSTGRES_DOOR = "packages/core/src/store/postgres";
 
-/** The owners that are not slices, so the owner test can admit exactly these two. */
-export const NON_SLICE_OWNERS = [IDENTITY_PROVIDER, POSTGRES_DOOR] as const;
+/**
+ * The two owners that live outside `packages/core/src/` and so are written as paths. The
+ * owner test admits exactly these two and holds each to a directory that exists; every
+ * other owner it holds to a directory under `packages/core/src/`.
+ */
+export const OWNERS_OUTSIDE_CORE = [IDENTITY_PROVIDER, POSTGRES_DOOR] as const;
 
+/**
+ * The owner of every table `src/` declares — written out rather than derived, so a
+ * reviewer reads the whole map in one place, exactly as `RLS_EXEMPTIONS` is. The identity
+ * set's sixteen rows are the one place that copies another list, and the ownership test
+ * holds them equal to `IDENTITY_SET` in both directions so the copy cannot drift.
+ */
 export const TABLE_OWNERS = {
   // Better Auth's identity set (ADR 0009). Declared here, written by the library.
   "public.user": IDENTITY_PROVIDER,
@@ -86,17 +94,28 @@ export const TABLE_OWNERS = {
   "public.ingress_counter": POSTGRES_DOOR,
   "public.mcp_call_counter": POSTGRES_DOOR,
 
-  // The slices.
+  // The modules under `packages/core/src/`: two slices, and `llm`, which owns its route
+  // table without being one (ADR 0029 rule 3).
   "public.workspace_config": "workspaces",
   "public.llm_route": "llm",
   "index.chunk": "sources",
 } satisfies Record<string, string>;
 
+/** A table the schema package declares: every key of the map, and nothing else. */
+export type OwnedTable = keyof typeof TABLE_OWNERS;
+
+/** Every owner the map names, as a union — so a typo in an owner is a type error. */
+export type TableOwner = (typeof TABLE_OWNERS)[OwnedTable];
+
 /** A read or a write of a table by anyone but its owner. */
 export type CrossOwnerAccess = {
   /** The schema-qualified table, as `TABLE_OWNERS` and `RLS_EXEMPTIONS` name it. */
-  readonly table: string;
-  /** The slice or non-slice module doing the reading or writing. */
+  readonly table: OwnedTable;
+  /**
+   * The module doing the reading or writing. Not narrowed to `TableOwner`: a module may
+   * read a table without owning one of its own, which is precisely the fact this list
+   * exists to record. The ownership test holds the name to a directory either way.
+   */
   readonly by: string;
   readonly access: "read" | "write" | "read and write";
   /** Why it is allowed to, in the words a reviewer would want at the diff. */

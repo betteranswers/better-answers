@@ -187,17 +187,27 @@ export const createAuth = (deps: AuthDependencies) => {
 
   /**
    * The workspaces a person holds — the one membership read the three identity paths
-   * below share, and since T-077 the workspaces slice's function rather than SQL
-   * written here: `member` is a table this module does not own, and the ownership map
-   * (`packages/schema`, ADR 0029) is where the fact is recorded. A store failure is
-   * rethrown, which is what the raw query did and what the identity provider's own
-   * error handling expects; a `malformed` id holds no workspace, which is the answer
-   * the query gave for one.
+   * below share, and the workspaces slice's function rather than SQL written here:
+   * `member` is a table this module does not own, and the ownership map
+   * (`packages/schema`, ADR 0029) is where the fact is recorded.
+   *
+   * The two failures answer differently. A store failure is rethrown, because a read
+   * that did not happen is not an answer and the identity provider's own endpoints turn
+   * a throw into a 500. A `malformed` id — Better Auth handing back an id the boundary
+   * does not accept as a person id — fails closed to no workspace, which is what the raw
+   * query answered for one and what every caller here treats safely: the picker, a
+   * refusal to consent, no active workspace set. It is logged rather than swallowed,
+   * because the slice's refusal is a fact about the identity set that an operator wants
+   * to see, and "holds none" alone would hide it.
    */
   const membershipsOf = async (userId: string): Promise<readonly string[]> => {
     const held = await workspacesHeldBy(PLATFORM_PRINCIPAL, deps.door, userId);
     if (held.ok) return held.value;
     if (held.error instanceof Error) throw held.error;
+    audit.warn(
+      { event: "auth.membership_read", principal: userId, outcome: held.error },
+      "auth.membership_read",
+    );
     return [];
   };
 
@@ -492,9 +502,23 @@ export const createAuth = (deps: AuthDependencies) => {
           page: `${deps.publicUrl}/choose-workspace`,
           // ADR 0018's `workspace` claim: the active workspace, or no token at all.
           consentReferenceId: async ({ session, user: person }) => {
-            // The session object here may predate `shouldRedirect`'s write for a
-            // sole-membership session, so the fallback is read the same way here.
-            const active = activeWorkspaceOf(session) ?? (await soleMembershipOf(person.id));
+            // One read, and the claim is checked against it. The session object here may
+            // predate `shouldRedirect`'s write for a sole-membership session, so the
+            // sole-membership fallback is read the same way; and the active workspace is
+            // taken only if the person still holds it, because a `workspace` claim is a
+            // statement the platform makes about them at the moment of minting.
+            //
+            // The inner of two fences, and never the load-bearing one. A consent posted
+            // to the product's own page resolves the Principal first and answers 401 to
+            // a person whose membership has ended (`auth/routes.ts`; the flow test
+            // "mints no code for a person whose membership ended…"), and the resolver
+            // refuses a lost claim on every later call. What this line covers is Better
+            // Auth's own `/oauth2/consent`, which that page's fence does not sit in
+            // front of (adversarial pass, T-077).
+            const held = await membershipsOf(person.id);
+            const stillActive = activeWorkspaceOf(session);
+            const active =
+              stillActive !== undefined && held.includes(stillActive) ? stillActive : soleOf(held);
             if (active === undefined) {
               throw new APIError("BAD_REQUEST", {
                 error: "set_workspace",

@@ -95,6 +95,24 @@ export const withIdentityWrite = async <T>(
 ): Promise<T> => transaction(door, (client) => work(client, platform));
 
 /**
+ * The read twin: one unscoped transaction, as the platform, over the identity set — the
+ * reads that happen *before* a workspace is known and so cannot be scoped, the picker's
+ * "which workspaces does this person hold" among them (ADR 0035). Its own name rather
+ * than `withIdentityWrite`'s, because a caller reading this file should be able to tell
+ * which of the two a statement is; and its own door rather than the raw pool, so that
+ * every statement in a slice still reaches Postgres through a door with the principal it
+ * is made under in its hand (ADR 0029's amendment).
+ *
+ * Never a tenant read: an unscoped transaction sees zero tenant rows by construction,
+ * which is the guarantee, not an omission.
+ */
+export const withIdentityRead = async <T>(
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  work: (tx: Tx, platform: PlatformPrincipal) => Promise<T>,
+): Promise<T> => transaction(door, (client) => work(client, platform));
+
+/**
  * The one resolve query (ADR 0018, ADR 0035): the member row, the person's revocation
  * instant and this membership's. Both instants come back in the one statement — a
  * revocation costs no second round trip on the path every call takes.

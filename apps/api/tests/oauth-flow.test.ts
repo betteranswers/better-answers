@@ -289,6 +289,27 @@ describe("the pages, as a person walks them", () => {
     expect(decided.headers.get("location")).toBeNull();
   });
 
+  it("mints no code for a person whose membership ended between the redirect decision and their consent", async () => {
+    // The window T-077's adversarial pass asked about: the session still names the
+    // workspace as active and nothing re-runs `shouldRedirect`, so without a check the
+    // grant would carry a `workspace` claim its holder no longer holds. Two fences stand
+    // in it and this is the outer one — the consent post resolves the Principal through
+    // the same resolver every call uses, which has no member row to find and answers
+    // 401 (`auth/routes.ts`). The inner one is `consentReferenceId`, which now takes the
+    // active workspace only if the person still holds it; it is unreachable through this
+    // page and is there for Better Auth's own `/oauth2/consent`, which this fence does
+    // not sit in front of.
+    const acme = await app.provision({ name: "Acme" });
+    const client = app.client();
+    const consent = await driveToPage(app, client, acme.admin);
+    await app.removeMember(acme.workspaceId, acme.admin.id);
+
+    const decided = await client.form(`/consent${consent.search}`, { accept: "true" });
+
+    expect(decided.status).toBe(401);
+    expect(decided.headers.get("location")).toBeNull();
+  });
+
   it("refuses to be framed by another site", async () => {
     const consentClient = app.client();
     const consent = await driveToPage(
