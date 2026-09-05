@@ -38,10 +38,12 @@ Import `test` and `expect` from `apps/web/e2e/browser.ts`, which is the suite's 
 
 It gives every browser context a `cf-connecting-ip` header of its own, from RFC 2544's reserved
 benchmarking block, keyed by worker index and a per-run count. It exists because every counter in
-front of sign-in is per client address — the platform's per-IP ceiling
-(`apps/api/src/ingress/limits.ts`) and Better Auth's own limiter both key on the one header
-`apps/api/src/auth/constants.ts` names. Without the fixture the whole run shares one bucket, the
-sixth sign-in is refused, and every spec after it fails for a reason unrelated to what it tested.
+front of sign-in is per client address — the platform's per-IP ceilings
+(`apps/api/src/ingress/limits.ts`, the rules in `apps/api/src/auth/constants.ts`) and Better
+Auth's own limiter all key on the one header that file names. Without the fixture every browser
+in the run arrives from the same address and shares one bucket, so a long run trips a ceiling
+partway through and every spec after it fails for a reason that has nothing to do with what it
+was testing.
 
 ## The harness's acts
 
@@ -76,14 +78,19 @@ holding one.
 
 ## The accessibility gate
 
-`[A11Y1]` is WCAG 2.2 AA tested with a keyboard and a screen reader, and a spec carries that as
-three things together: a keyboard traversal reaching the screen and its acts without a pointer, an
-aria snapshot writing out the announced structure, and an `AxeBuilder` pass
-(`@axe-core/playwright`) over `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa` and `wcag22aa` asserted
-to have no violations. Automated rules are evidence, not proof — the traversal and the snapshot
-are the rest of it. A screen with a card of its own carries all three
-(`apps/web/e2e/routes.spec.ts`); a screen without one carries the traversal
-(`apps/web/e2e/sign-in.spec.ts`). A new screen brings its own gate; every screen's spec has one.
+`[A11Y1]` is WCAG 2.2 AA tested with a keyboard and a screen reader, and the suite carries that as
+three things, of which automated rules are only one:
+
+- **A keyboard traversal** reaching the screen and each of its acts without a pointer. Every
+  screen's spec has one; it is the floor, not the extra.
+- **An `AxeBuilder` pass** (`@axe-core/playwright`) over `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`
+  and `wcag22aa`, asserted to have no violations. It runs where a screen has rendered substance to
+  audit, so a screen bringing real content brings one.
+- **An aria snapshot** writing out the announced structure, where what a screen *sounds like* is
+  the thing under test — a row that lost its heading or a list that stopped being a list fails it
+  though the pixels are unchanged.
+
+`apps/web/e2e/routes.spec.ts` carries all three and is the model to copy.
 
 ## Running it
 
