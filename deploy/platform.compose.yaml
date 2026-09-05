@@ -31,7 +31,7 @@ x-mem-512: &mem512
   deploy: { resources: { limits: { memory: 512m } } }
 
 x-bootstrap: &bootstrap
-  # Bootstrap class only (CODING_RULES [SEC1]); every tenant credential is a row under the envelope.
+  # Bootstrap class only; every tenant credential is a row under the envelope, never a variable here.
   DATABASE_URL: ${DATABASE_URL:?}
   S3_ENDPOINT: http://objectstore:3900   # Garage, path-style, region "garage" (deploy/garage.toml)
   S3_ACCESS_KEY: ${OBJECTSTORE_ROOT_KEY:?}
@@ -132,7 +132,7 @@ services:
       HF_HOME: /data/worker/hf-cache
       HF_HUB_OFFLINE: "1"                     # after first warm
       MAX_CONCURRENT_RUNS: "1"                # one index at a time on a 4 GB box (ADR 0024); ticket 42 measures whether it can rise
-      LMDB_MAX_BYTES_PER_BINDING: "4294967296" # 4 GB cap; over it the binding's LMDB is wiped and reprocessed ([PIPE1])
+      LMDB_MAX_BYTES_PER_BINDING: "4294967296" # 4 GB cap; over it the binding's LMDB is wiped and reprocessed — it is disposable (ADR 0036)
     healthcheck:
       # Why a process-level probe and not an HTTP one: `apps/worker/Dockerfile` § HEALTHCHECK.
       # The command is the same one the image carries; the settings are repeated here because

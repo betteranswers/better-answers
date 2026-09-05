@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Better Answers — the synthetic fixture staging holds outside a drill (`[OPS1]`, ADR 0022, ADR 0024).
+# Better Answers — the synthetic fixture staging holds outside a drill (ADR 0022, ADR 0024).
 #
 # Called by `restore-drill.sh` after the wipe, and by hand after a rehearsal, so staging never
 # holds a client's data between drills and never stands empty either: the synthetic workspace is

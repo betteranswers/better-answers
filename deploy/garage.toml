@@ -6,7 +6,7 @@
 # the admin token arrive as `GARAGE_RPC_SECRET` and `GARAGE_ADMIN_TOKEN` in the service's
 # environment (stores.compose.yaml), from Coolify's per-resource env like every other
 # bootstrap secret. Garage's configuration reference (garagehq.deuxfleurs.fr, read
-# 03/09/2026, `[DEPS1]`) documents both variables as the environment form of `rpc_secret`
+# 03/09/2026) documents both variables as the environment form of `rpc_secret`
 # and `admin_token`; the earlier `*_file` keys pointed at `/run/secrets/*` that nothing
 # wrote (ticket 79 A10).
 

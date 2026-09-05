@@ -2,7 +2,7 @@
 # workspace, not a pnpm one, and it shares four stores with the app tier and never code, so
 # its image needs nothing from the rest of the repository.
 #
-# Versions read on 03/09/2026 (`[DEPS1]`): `python:3.13.15-slim-bookworm` from Docker Hub's
+# Versions read on 03/09/2026: `python:3.13.15-slim-bookworm` from Docker Hub's
 # tag API — 3.13 is what `pyproject.toml` requires (`>=3.13,<3.14`) and `.python-version`
 # names — and uv 0.12.9 from astral-sh/uv's releases. Both are pinned by digest as well as
 # by tag: the tag is the label a person reads, the digest is what actually ships.
@@ -10,7 +10,7 @@
 # uv arrives by `COPY --from` off Astral's own image, which is their documented way to add
 # uv to a Python base. It puts the exact uv version in this file, where a reader looking for
 # the pin finds it, rather than behind an installer script that resolves "latest" at build
-# time — which is the thing `[DEPS1]` exists to stop.
+# time — a version nobody read on the day, which is what pinning exists to stop.
 FROM ghcr.io/astral-sh/uv:0.12.9@sha256:8b940d3a9d65bed080436972241af2e21c84b5e8c9193f7014ed71479ee795ff AS uv
 
 FROM python:3.13.15-slim-bookworm@sha256:ed86c82274b3c69b52fb5820f358f0bd7df0b603332063cb5c6e32bd220c3e6e AS build
@@ -24,7 +24,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=never
 WORKDIR /app
 # The lockfile's dependencies first, so a source edit does not re-resolve them. `--frozen`
-# fails rather than updating `uv.lock`: the committed lockfile is the pin (`[DEPS1]`).
+# fails rather than updating `uv.lock`: the committed lockfile is the pin.
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY src src
@@ -33,7 +33,7 @@ RUN uv sync --frozen --no-dev
 FROM python:3.13.15-slim-bookworm@sha256:ed86c82274b3c69b52fb5820f358f0bd7df0b603332063cb5c6e32bd220c3e6e AS runtime
 
 # uid 1000, the uid `init` in `deploy/stores.compose.yaml` chowns /data/worker/{lmdb,trees,hf-cache}
-# to; nothing runs as root to own a volume (`[OPS1]`). The Python base ships no non-root
+# to; nothing runs as root to own a volume. The Python base ships no non-root
 # user, so this is where the worker's gets made.
 RUN groupadd --system --gid 1000 worker \
  && useradd --system --uid 1000 --gid worker --home-dir /home/worker --create-home worker
@@ -45,7 +45,7 @@ ENV PATH=/app/.venv/bin:$PATH \
 COPY --from=build /app/.venv /app/.venv
 # The project is installed into the venv editable, so the tier's source is read from here —
 # including `schema_view.py`, the committed, generated view of the app's schema the worker
-# reads and never migrates (ADR 0032, `[WRK1]`).
+# reads and never migrates (ADR 0032).
 COPY src src
 
 USER worker
@@ -57,7 +57,7 @@ USER worker
 # tier's package imports in it. This is the rationale for both copies of the probe: the
 # `worker` service in `deploy/platform.compose.yaml` runs the same command, and points here.
 # When a run claimant exists it will have a liveness signal of its own — a claimed lease with
-# a fresh heartbeat (`[PIPE1]`) — and this line becomes a query for it.
+# a fresh heartbeat (ADR 0036) — and this line becomes a query for it.
 HEALTHCHECK --interval=15s --timeout=3s --start-period=40s --retries=8 \
   CMD ["python", "-c", "import better_answers_worker"]
 

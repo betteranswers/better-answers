@@ -6,7 +6,7 @@
 # and origin all on the probed path — then pings the healthchecks.io 'uptime'
 # check with the outcome, so a silent probe (VPC 2 down included) trips the
 # dead-man alarm on the second channel. The ping body is an outcome word and
-# counts, never a path or an error string ([OPS1]).
+# counts, never a path or an error string.
 #
 # Env (root-only /etc/better-answers/uptime.env, sourced with set -a by cron):
 #   APEX                          the apex domain, e.g. example.com

@@ -13,7 +13,7 @@
 # owns the directory, `backup` bundles it nightly and pushes the mirror.
 #
 # Versions read on 28/08/2026 from Docker Hub / GitHub releases —
-# .scratch/v01-spec/research/41-deploy-facts.md §1 ([DEPS1]); the digests beside each tag were
+# .scratch/v01-spec/research/41-deploy-facts.md §1; the digests beside each tag were
 # read from Docker Hub's tag API on 03/09/2026 (T-005). Renovate keeps them pinned.
 #
 # State: bind mounts under /data/<service>, owned by each service's uid by `init` (idempotent;
@@ -32,7 +32,7 @@ x-restart: &restart
   restart: unless-stopped
 
 # stdout is the log store; 30 days is the retention the DPIA states (rotation by size here,
-# the 42 signal watches it). Never a query string or an upload filename at info level ([LOG1]).
+# the 42 signal watches it). Never a query string or an upload filename at info level.
 x-logging: &logging
   logging:
     driver: json-file
@@ -49,7 +49,7 @@ services:
   # `embeddings:1000` is absent from the list because the service below is commented out; it
   # returns with the service.
   init:
-    # alpine 3.23.5, read from Docker Hub's tag API on 03/09/2026 ([DEPS1]) — `latest` on that
+    # alpine 3.23.5, read from Docker Hub's tag API on 03/09/2026 — `latest` on that
     # day resolved to 3.22.5, so the current release line is named rather than the alias.
     image: alpine:3.23.5@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40
     # Explicit and quoted: Coolify fills a MISSING `restart` with unless-stopped
@@ -99,7 +99,7 @@ services:
   # immutable per workspace (29).
   #
   # embeddings:
-  #   image: # the OpenAI-shaped embedding server, chosen and pinned the day a workspace takes the local route ([DEPS1])
+  #   image: # the OpenAI-shaped embedding server, chosen and pinned the day a workspace takes the local route
   #   <<: [*restart, *logging]
   #   environment:
   #     MODEL_ID: BAAI/bge-m3

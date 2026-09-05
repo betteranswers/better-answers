@@ -4,7 +4,7 @@
 # `pnpm migrate` and runs to completion, then `api` runs this file's `CMD`. That is why pnpm
 # is in the runtime stage and why the root manifest and `pnpm-workspace.yaml` ship with it:
 # `pnpm migrate` is a root script that filters to this workspace, and a rollback is the
-# previous digest of *this* image (`[OPS1]`, ADR 0022), so the two must never skew.
+# previous digest of *this* image (ADR 0022), so the two must never skew.
 #
 # The image also carries `apps/web`'s build. The app serves the SPA on the `app.` hostname
 # (ADR 0006, amended 2026-09-02), and `apps/api/src/config.ts` reads it from `WEB_ROOT`,
@@ -16,14 +16,14 @@
 # `tsconfig.base.json` is what keeps that true. The build stages exist for `apps/web` and for
 # the production dependency tree, not for `apps/api`.
 #
-# Base image read from Docker Hub on 03/09/2026 (`[DEPS1]`): `node:24.20.0-bookworm-slim`,
+# Base image read from Docker Hub on 03/09/2026: `node:24.20.0-bookworm-slim`,
 # the current Node 24 line, pinned by the tag's manifest digest as well as its tag — the tag
 # is the label a person reads, the digest is what actually ships. Debian rather than Alpine,
 # because the lockfile's platform binaries and every test this tier has are resolved against
 # glibc today; an image is the wrong place to change a libc.
 FROM node:24.20.0-bookworm-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e AS base
 
-# pnpm's version is the root manifest's `packageManager` field and nowhere else (`[DEPS2]`):
+# pnpm's version is the root manifest's `packageManager` field and nowhere else:
 # `corepack install` with no argument reads it, so this image cannot carry a second pin that
 # ages alone. The cache is world-readable because the runtime stage runs as `node`, not root.
 ENV COREPACK_HOME=/opt/corepack \
@@ -87,7 +87,7 @@ ENV NODE_ENV=production \
     PORT=3000
 
 # The repository's own project list — one source for it, not a second copy that ages
-# alone (`[DEPS2]`) — plus the one setting that is true of an image and false of a
+# alone — plus the one setting that is true of an image and false of a
 # checkout. pnpm 11 verifies the dependency tree before `pnpm run` and repairs it by
 # installing; this image has no lockfile, no registry credential and no writable /app, so
 # that repair can only fail. The tree was built at image build time and is the artefact.
@@ -114,7 +114,7 @@ COPY packages/schema/migrations packages/schema/migrations
 COPY --from=web /app/apps/web/dist apps/web/dist
 
 # uid 1000, which is the uid `init` in `deploy/stores.compose.yaml` chowns `/data/git` to;
-# nothing here runs as root to own a volume (`[OPS1]`). `node` is that user in this base
+# nothing here runs as root to own a volume. `node` is that user in this base
 # image, and `HOME` is set so pnpm's cache lands somewhere the process can write.
 ENV HOME=/home/node
 USER node
