@@ -1,0 +1,17 @@
+docs/adr/README.md
+  ai_agent 31
+CODING_RULES.md
+  ai_agent 91,93
+cubic.yaml
+  ai_agent 129
+CONTEXT.md
+  ai_agent 470-471,475,477-481
+docs/adr/0023-the-graph-is-apache-age-inside-the-platform-postgres.md
+  ai_agent 78-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "45f444843dd9cad772c7fa996b125ce89b926ef7",
+  "prompts": {}
+}
