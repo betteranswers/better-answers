@@ -1,11 +1,13 @@
-import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
 import {
+  CONFIGURED_LLM_ROUTES,
+  LISTED_LLM_ROUTES,
   type MigratedPostgres,
   startMigratedPostgres,
   testData,
 } from "@better-answers/schema/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { answered } from "./aborted-transaction.ts";
 import { attempt, type Claims } from "../src/kernel/index.ts";
 import { listRoutes, LLM_PURPOSES } from "../src/llm/index.ts";
 import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
@@ -69,30 +71,9 @@ const listAs = async (seeded: Seeded) => {
 
 describe("a workspace's model routes", () => {
   it("answers one row per purpose in the purpose order, whatever the workspace has configured", async () => {
-    const seeded = await seedWorkspace([
-      { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
-      { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
-    ]);
+    const seeded = await seedWorkspace(CONFIGURED_LLM_ROUTES);
 
-    expect(await listAs(seeded)).toEqual([
-      { purpose: "extraction", provider: null, model: null, dimensions: null, fixed: false },
-      { purpose: "enrichment", provider: null, model: null, dimensions: null, fixed: false },
-      {
-        purpose: "answering",
-        provider: "anthropic",
-        model: "claude-sonnet-5",
-        dimensions: null,
-        fixed: false,
-      },
-      { purpose: "judging", provider: null, model: null, dimensions: null, fixed: false },
-      {
-        purpose: "embedding",
-        provider: "mistral",
-        model: "mistral-embed",
-        dimensions: EMBEDDING_DIMENSIONS,
-        fixed: true,
-      },
-    ]);
+    expect(await listAs(seeded)).toEqual(LISTED_LLM_ROUTES);
   });
 
   it("says a workspace that has chosen nothing has chosen nothing, the embedding route included", async () => {
@@ -168,10 +149,6 @@ describe("a workspace's model routes", () => {
       },
     );
 
-    expect(read.ok).toBe(true);
-    if (!read.ok) return;
-    expect(read.value.ok).toBe(false);
-    if (read.value.ok) return;
-    expect(read.value.error).toBeInstanceOf(Error);
+    expect(answered(read)).toBeInstanceOf(Error);
   });
 });

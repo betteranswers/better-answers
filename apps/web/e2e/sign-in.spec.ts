@@ -1,3 +1,5 @@
+import type { APIRequestContext } from "@playwright/test";
+
 import { expect, test } from "./browser.ts";
 
 import { addMember, anAddress, person, provision, removeMember, signIn } from "./harness.ts";
@@ -8,6 +10,26 @@ import { addMember, anAddress, person, provision, removeMember, signIn } from ".
  * screen. Every fact here is read from a real browser against the real server over a real
  * Postgres, and every workspace and code comes from the api's own harness.
  */
+
+/**
+ * A person who is an Admin of one workspace and a Viewer of a second — the two memberships
+ * that put the picker on the screen. Three scenarios below start here and differ only in
+ * what happens next, so the arrange is one act with the two names as its arguments.
+ */
+const memberOfTwoWorkspaces = async (
+  request: APIRequestContext,
+  email: string,
+  names: { readonly first: string; readonly second: string },
+) => {
+  const first = await provision(request, { name: names.first, adminEmail: email });
+  const second = await provision(request, { name: names.second });
+  await addMember(request, {
+    workspaceId: second.workspaceId,
+    userId: first.admin.id,
+    role: "Viewer",
+  });
+  return { first, second };
+};
 
 test("a member of one workspace lands in the shell, which names the workspace, the person and the role", async ({
   page,
@@ -38,12 +60,9 @@ test("a member of two workspaces picks one, and everything after is scoped to th
   request,
 }) => {
   const email = anAddress("both");
-  const first = await provision(request, { name: "Northern Tooling", adminEmail: email });
-  const second = await provision(request, { name: "Southern Castings" });
-  await addMember(request, {
-    workspaceId: second.workspaceId,
-    userId: first.admin.id,
-    role: "Viewer",
+  const { first, second } = await memberOfTwoWorkspaces(request, email, {
+    first: "Northern Tooling",
+    second: "Southern Castings",
   });
 
   await page.goto("/sign-in");
@@ -134,11 +153,15 @@ test("a member of one workspace whose session predates the membership is still n
   // exists. A person added to their first workspace *after* they signed in has a session
   // that names none — and still has nothing to choose between, so the picker chooses for
   // them rather than showing a list of one (user story 3).
+  // Six lines the refused-person test also has, carried rather than folded: this test is
+  // about what happens *after* that screen, so a reader has to see it was reached first.
+  /* jscpd:ignore-start */
   const email = anAddress("later");
   const who = await person(request, email);
   await page.goto("/sign-in");
   await signIn(page, request, email);
   await expect(page.getByRole("heading", { level: 1, name: "No workspace yet" })).toBeVisible();
+  /* jscpd:ignore-end */
 
   const workspace = await provision(request, { name: "Arrived Late" });
   await addMember(request, { workspaceId: workspace.workspaceId, userId: who.id, role: "Editor" });
@@ -160,12 +183,9 @@ test("a pick of a workspace the person no longer belongs to is refused in words"
   // someone mid-session does (T-027 will give them the screen for it). The refusal is the
   // platform's: Better Auth checks the member row on every set-active.
   const email = anAddress("removed");
-  const first = await provision(request, { name: "Still Mine", adminEmail: email });
-  const second = await provision(request, { name: "Taken Away" });
-  await addMember(request, {
-    workspaceId: second.workspaceId,
-    userId: first.admin.id,
-    role: "Viewer",
+  const { first, second } = await memberOfTwoWorkspaces(request, email, {
+    first: "Still Mine",
+    second: "Taken Away",
   });
   await page.goto("/sign-in");
   await signIn(page, request, email);
@@ -201,12 +221,9 @@ test("the picker says when the workspace list could not be read, distinct from n
   request,
 }) => {
   const email = anAddress("listfails");
-  const first = await provision(request, { name: "First List Failure", adminEmail: email });
-  const second = await provision(request, { name: "Second List Failure" });
-  await addMember(request, {
-    workspaceId: second.workspaceId,
-    userId: first.admin.id,
-    role: "Viewer",
+  const { first, second } = await memberOfTwoWorkspaces(request, email, {
+    first: "First List Failure",
+    second: "Second List Failure",
   });
 
   // Failed at the network, scoped to the organization list alone: the code sent and
@@ -229,10 +246,14 @@ test("the picker says when the workspace list could not be read, distinct from n
   await page.getByRole("button", { name: "Try again" }).click();
 
   // A successful retry carries the person on through the existing shapes unchanged — two
-  // memberships here, so the picker.
+  // memberships here, so the picker. Six lines the picker's own test also asserts, carried
+  // rather than folded: what this test claims is that the retry reaches that same screen,
+  // and a helper would leave the claim somewhere a reader of this test cannot see it.
+  /* jscpd:ignore-start */
   await expect(page.getByRole("heading", { level: 1, name: "Choose a workspace" })).toBeVisible();
   await expect(page.getByRole("button", { name: first.name })).toBeVisible();
   await expect(page.getByRole("button", { name: second.name })).toBeVisible();
+  /* jscpd:ignore-end */
 });
 
 test("the three screens outside the shell are keyboard-operable, landmarked and labelled", async ({

@@ -14,6 +14,7 @@ import {
   type PlatformPrincipal,
   type UserPrincipal,
 } from "../src/kernel/index.ts";
+import { answered } from "./aborted-transaction.ts";
 import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
 import {
   provisionWorkspace,
@@ -339,11 +340,7 @@ describe("reading the current membership", () => {
       return readMembership(principal, tx);
     });
 
-    expect(read.ok).toBe(true);
-    if (!read.ok) return;
-    expect(read.value.ok).toBe(false);
-    if (read.value.ok) return;
-    expect(read.value.error).toBeInstanceOf(Error);
+    expect(answered(read)).toBeInstanceOf(Error);
   });
 });
 
