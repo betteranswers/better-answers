@@ -1,15 +1,11 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { Pool } from "pg";
-import { pino } from "pino";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { openPostgres } from "@better-answers/core/store/postgres";
-
-import { createAuth, mountedPaths } from "../src/auth/index.ts";
+import { mountedPaths } from "../src/auth/index.ts";
 import { HOSTNAME_SURFACES } from "../src/ingress/hostnames.ts";
-import { AUTH_SECRET, MCP_URL, PUBLIC_URL } from "./harness.ts";
+import { authAsServerBuildsIt } from "./auth-instance.ts";
 
 /**
  * The hostname fence's catch-all under review (T-039).
@@ -68,40 +64,13 @@ const readSnapshot = (): readonly string[] =>
     .filter((line) => line !== "" && !line.startsWith("#"));
 
 /**
- * The instance `createServer` builds, built the same way — the same `createAuth` with
- * the same options — because which endpoints exist is decided by the plugin list and
- * `basePath`, both of which live in `auth.ts`.
- *
- * Every option is written out again here rather than shared with `server.ts`, so a field
- * added to `AuthDependencies` lands as a type error on this line. It did: `T-037` added
- * `appUrl` and `cookieDomain` while this file was on another branch, and the merge of two
- * green branches was red (`T-040`); `T-045` then removed both. Build them the way
- * `server.ts` does — the one origin, the MCP URL hung off it — or the instance under
- * snapshot is not the instance that deploys.
- *
- * The pool is never connected, and the table does not depend on it. `getEndpoints`
- * builds `auth.api` **synchronously** from `options.plugins` at construction
- * (`better-auth/dist/api/index.mjs`; `router()` registers from that same call), and
- * nothing can add to it later — so the set here is the set a running app carries,
- * whatever the database is doing. Better Auth's eager initialisation does reach for the
- * database and this pool reaches nothing, so that rejection is swallowed here exactly
- * as `createServer` reads it through the health check. Starting a real Postgres would
- * buy this suite a container and no assertion; the guard against a build that carries
- * *no* table is the second test below, not a live connection. (`[TEST2]` binds a test
- * that touches data; this one touches none.)
+ * The instance `createServer` builds, built the same way — the same `createAuth` with the
+ * same options — because which endpoints exist is decided by the plugin list and
+ * `basePath`, both of which live in `auth.ts`. `auth-instance.ts` builds it and says why
+ * the options are written out rather than reached for; the guard against a build that
+ * carries *no* table is the second test below, not a live connection.
  */
-const database = new Pool({ connectionString: "postgresql://unused@127.0.0.1:1/unused" });
-const auth = createAuth({
-  database,
-  door: openPostgres(database),
-  publicUrl: PUBLIC_URL,
-  mcpUrl: MCP_URL,
-  secret: AUTH_SECRET,
-  sendEmail: async () => {},
-  fetchClientMetadataResource: async () => new Response("", { status: 404 }),
-  logger: pino({ level: "silent" }),
-});
-auth.$context.catch(() => {});
+const { auth, database } = authAsServerBuildsIt();
 
 /**
  * The paths the OAuth flow and the session actually drive (`oauth-flow.test.ts`). A

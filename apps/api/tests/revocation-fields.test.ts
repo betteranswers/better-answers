@@ -1,11 +1,6 @@
-import { Pool } from "pg";
-import { pino } from "pino";
 import { describe, expect, it } from "vitest";
 
-import { openPostgres } from "@better-answers/core/store/postgres";
-
-import { createAuth } from "../src/auth/index.ts";
-import { AUTH_SECRET, MCP_URL, PUBLIC_URL } from "./harness.ts";
+import { authAsServerBuildsIt } from "./auth-instance.ts";
 
 /**
  * The two revocation instants the identity provider is told about (ADR 0035): the
@@ -17,22 +12,11 @@ import { AUTH_SECRET, MCP_URL, PUBLIC_URL } from "./harness.ts";
  * neither instant is taken from a person's input, since a field a person could set
  * would let the revoked revoke their own revocation.
  *
- * The pool is never connected: the options are the plugin list's, not the database's
- * (the endpoint-snapshot suite explains the same trick at greater length).
+ * Building that instance is `auth-instance.ts`'s, shared with the endpoint snapshot, which
+ * asks the same instance a different question.
  */
 
-const database = new Pool({ connectionString: "postgresql://unused@127.0.0.1:1/unused" });
-const auth = createAuth({
-  database,
-  door: openPostgres(database),
-  publicUrl: PUBLIC_URL,
-  mcpUrl: MCP_URL,
-  secret: AUTH_SECRET,
-  sendEmail: async () => {},
-  fetchClientMetadataResource: async () => new Response("", { status: 404 }),
-  logger: pino({ level: "silent" }),
-});
-auth.$context.catch(() => {});
+const { auth } = authAsServerBuildsIt();
 
 /** A field as the library holds it: a type, and who may set it or see it. */
 type Declared = { type?: unknown; required?: unknown; input?: unknown; returned?: unknown };
