@@ -18,6 +18,10 @@ const baseURL = `http://127.0.0.1:${PORT}`;
 export default defineConfig({
   testDir: "e2e",
   fullyParallel: true,
+  // The specs import `test` from `e2e/browser.ts`, so oxlint's vitest rules never see them
+  // and this is the only thing that refuses a `test.only` a debugging session left behind —
+  // which in CI would run one spec and report the suite green. Locally it is allowed.
+  forbidOnly: Boolean(process.env["CI"]),
   reporter: "list",
   use: { baseURL, trace: "on-first-retry" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
