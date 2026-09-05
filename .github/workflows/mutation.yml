@@ -1,11 +1,11 @@
-# Mutation testing on a schedule ([TEST6]): Stryker for apps/api and apps/web, mutmut for apps/worker.
+# Mutation testing on a schedule: Stryker for apps/api and apps/web, mutmut for apps/worker.
 # WEEKLY on hosted runners, not nightly: a nightly run is ~1,800 of the 2,000 free minutes on a 2-vCPU runner
 # (ticket 41 Q1, research 69). Nightly returns with a self-hosted runner on VPC 2 — a one-line runs-on change.
 # A falling score is an ordna task, not a failed build — the job posts the numbers, it does not gate.
 # Neither tool exits non-zero on a survivor here (Stryker's thresholds.break is null, mutmut's run always
 # exits 0), so a red job means the harness itself broke, which is worth seeing.
 # Action versions read from each action's GitHub releases page on 31/08/2026, resolved to the
-# commit SHA each tag names on 03/09/2026 ([DEPS1], `T-040`; the reason is in check.yml's header).
+# commit SHA each tag names on 03/09/2026 (`T-040`; the reason is in check.yml's header).
 name: mutation
 
 on:

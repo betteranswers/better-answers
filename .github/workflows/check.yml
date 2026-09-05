@@ -1,7 +1,7 @@
 # `check` on every PR, and on main as build.yml's first job — lint, types, tests per
 # workspace (AGENTS.md). One definition of `check`, called from both places.
-# Hosted Ubuntu runners ship Docker, so Testcontainers ([TEST2]) runs unchanged.
-# Action versions read from each repository's latest release on 28/08/2026 — research/41-deploy-facts.md §1 ([DEPS1]).
+# Hosted Ubuntu runners ship Docker, so Testcontainers runs unchanged.
+# Action versions read from each repository's latest release on 28/08/2026 — research/41-deploy-facts.md §1.
 #
 # EVERY `uses:` IN THIS DIRECTORY NAMES A COMMIT SHA, with its tag beside it as a comment: the
 # tag is what a person reads and what Renovate rewrites, the SHA is what runs. A tag is a
@@ -59,7 +59,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: uv sync --frozen
         working-directory: apps/worker
-      # The SPA's `check` ends in a browser suite over the served build ([TEST1]); the
+      # The SPA's `check` ends in a browser suite over the served build; the
       # browser is not in the pnpm store, so it is installed here. Chromium alone: the
       # suite runs one project.
       - run: pnpm --filter @better-answers/web exec playwright install --with-deps chromium

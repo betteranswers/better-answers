@@ -1,5 +1,5 @@
 # Build the tier images on main and push them to ghcr.io. Nothing here deploys.
-# Tags are labels for people; the DIGEST is the deploy variable (ADR 0022, `[OPS1]`) — the
+# Tags are labels for people; the DIGEST is the deploy variable (ADR 0022) — the
 # platform compose file refuses to start without one. Staging is brought up by the drill
 # procedure (`T-005`); production is promoted by a person (release.yml).
 #
@@ -14,7 +14,7 @@
 # digest in `packages/schema/src/postgres-image.ts` (ADR 0032).
 #
 # Action versions read from each repository's latest release on 03/09/2026, and every `uses:`
-# names the commit SHA that tag resolved to on the same day (`[DEPS1]`, `T-040`) — the reason
+# names the commit SHA that tag resolved to on the same day (`T-040`) — the reason
 # is in check.yml's header, and this is the job that would pay for a moving tag: it holds a
 # `packages: write` token.
 name: build

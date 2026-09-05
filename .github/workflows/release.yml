@@ -1,5 +1,5 @@
 # Promote a pair of image digests to PRODUCTION. A person runs this; nothing else deploys production
-# (ADR 0022, `[OPS1]`). The `production` environment carries a required reviewer.
+# (ADR 0022). The `production` environment carries a required reviewer.
 #
 # THE DIGESTS. Blank inputs mean "the last build": the digests `build.yml` pushed under the `main`
 # tag, read back from ghcr.io — staging is on demand and never stands (ADR 0024), so there is no
@@ -23,7 +23,7 @@
 # first release and recorded in the private coolify.md — if not, a GitHub App token replaces it.
 #
 # Action versions read from each repository's latest release and pinned by commit SHA
-# (`[DEPS1]`, `T-040`); one pin per action across the directory (tests/workflow-pins.test.ts).
+# (`T-040`); one pin per action across the directory (tests/workflow-pins.test.ts).
 name: release
 
 on:
