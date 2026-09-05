@@ -1,0 +1,46 @@
+apps/api/tests/served-app.ts
+  s_2c3fc9d16bd52c::t_3001a3ddc60bfd 1-40
+apps/api/tests/token-verifier.test.ts
+  s_2c3fc9d16bd52c::t_627fa8b7782a3f 47-57,64,66-67,73,77
+  s_2c3fc9d16bd52c::t_619eaf80905d0a 58-63,65,68-72
+  s_2c3fc9d16bd52c::t_a246e0e85ef416 96-101,110-115,123-128
+apps/api/tests/revocation-fields.test.ts
+  s_2c3fc9d16bd52c::t_e7846c61ffc632 3
+  s_2c3fc9d16bd52c::t_52b6002428cf6c 15-16
+  s_2c3fc9d16bd52c::t_df82b4cd66bd66 19
+apps/api/tests/ops.test.ts
+  s_2c3fc9d16bd52c::t_639870493dc0c0 49-52,58,60,65,76,80,85,99,108,123,129,131,136-137,144,155
+  s_2c3fc9d16bd52c::t_bad1749c617061 3,7-8,40
+apps/api/tests/auth-instance.ts
+  s_2c3fc9d16bd52c::t_fca7b46f3d3d56 31-33
+  s_2c3fc9d16bd52c::t_f4fce3bc228483 34
+  s_2c3fc9d16bd52c::t_c320a86c82c002 47
+  s_2c3fc9d16bd52c::t_52ff5c1b6838aa 1-30,35-46,48
+apps/api/tests/better-auth-endpoints.test.ts
+  s_2c3fc9d16bd52c::t_e512974c3e3751 67-71
+  s_2c3fc9d16bd52c::t_72c50f94b95d42 6,8
+  s_2c3fc9d16bd52c::t_df82b4cd66bd66 73
+apps/api/tests/spa.test.ts
+  s_2c3fc9d16bd52c::t_0c697edb482113 1,4-5,19,22,32,56,64,75,86,95,107,130
+  s_2c3fc9d16bd52c::t_f8d0779085b370 45-47,117-119
+apps/api/tests/cimd-fetch.test.ts
+  s_2c3fc9d16bd52c::t_f1356fae3bc815 297
+  s_2c3fc9d16bd52c::t_749baf4d2dea5a 280,283,287
+  s_2c3fc9d16bd52c::t_2ed750a8b67382 97-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "44b72278ed675992faf0a0e066b90cd2d15f5ed0",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
