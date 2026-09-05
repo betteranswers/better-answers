@@ -1,0 +1,31 @@
+apps/web/test/lint-rules.test.ts
+  s_2c3fc9d16bd52c::t_2f3b5541b9ae3b 25
+  s_2c3fc9d16bd52c::t_70e2f06e7f146b 1
+apps/api/tests/lint-rules.test.ts
+  s_2c3fc9d16bd52c::t_29c5c710e3c674 36,42-44
+  s_2c3fc9d16bd52c::t_35872a4c22bc6a 3-7
+  s_2c3fc9d16bd52c::t_0fc5fe2997ac20 28
+packages/core/test/import-direction.test.ts
+  s_2c3fc9d16bd52c::t_fbb1bc38abb03b 31
+  s_2c3fc9d16bd52c::t_4779567b8a61ac 1
+packages/devtools/src/oxlint-config.ts
+  s_2c3fc9d16bd52c::t_e0e3fdb5119880 43-45
+  s_2c3fc9d16bd52c::t_d799afa6589714 1-17,24-25,27-28,30-42,46-63
+  s_2c3fc9d16bd52c::t_dd1ef709d17c99 18-23,26,29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "400a5a72c51734de7e86283ec1752c6b741d1c9d",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
