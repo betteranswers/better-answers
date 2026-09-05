@@ -69,7 +69,7 @@ export type Clone = { readonly left: string; readonly right: string };
  * statistics table, because the table's "Clones found" column is a number and a caller that
  * asserted on it could not say *which* files a gate stopped being blind to.
  */
-export const clonesIn = (output: string): readonly Clone[] => {
+const clonesIn = (output: string): readonly Clone[] => {
   const fragment = /^\s*(?:- )?(?<file>\S+) \[\d+:\d+ - \d+:\d+]/;
   const files = output
     .split("\n")

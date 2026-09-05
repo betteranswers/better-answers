@@ -18,7 +18,7 @@ import { startApp, type TestApp } from "./harness.ts";
  */
 
 /** The fixture build: enough of a shell for a suite to find it. */
-export const WEB_ROOT = fileURLToPath(new URL("fixtures/web-build", import.meta.url));
+const WEB_ROOT = fileURLToPath(new URL("fixtures/web-build", import.meta.url));
 
 export const servedApp = (): (() => TestApp) => {
   let started: TestApp | undefined;

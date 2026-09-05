@@ -31,6 +31,7 @@ import { AUTH_SECRET, MCP_URL, PUBLIC_URL } from "./harness.ts";
 
 /** The instance, and the pool it was built over so a suite can end it in `afterAll`. */
 type BuiltAuth = { readonly auth: ReturnType<typeof createAuth>; readonly database: Pool };
+
 export const authAsServerBuildsIt = (): BuiltAuth => {
   const database = new Pool({ connectionString: "postgresql://unused@127.0.0.1:1/unused" });
   const auth = createAuth({

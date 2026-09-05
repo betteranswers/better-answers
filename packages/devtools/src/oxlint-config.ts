@@ -19,7 +19,7 @@ export const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
  * How oxlint writes a rule's setting: a severity on its own, or a severity followed by the
  * rule's own options, whose shape is that rule's and not this module's to know.
  */
-export type RuleSetting = string | readonly [string, ...unknown[]];
+type RuleSetting = string | readonly [string, ...unknown[]];
 
 /** The shape the suites read out of the config. Every field is one they assert on. */
 export type OxlintConfig = {
