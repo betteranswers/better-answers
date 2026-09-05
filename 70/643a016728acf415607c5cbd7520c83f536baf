@@ -1,0 +1,21 @@
+apps/api/tests/check-scripts.test.ts
+  s_2c3fc9d16bd52c::t_9c1a4383938b85 112-134,138,142
+  s_2c3fc9d16bd52c::t_de8995089f03e0 74-83
+  s_2c3fc9d16bd52c::t_a1e1332cabc769 135-137,139-141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "70643a016728acf415607c5cbd7520c83f536baf",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
