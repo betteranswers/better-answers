@@ -1,0 +1,70 @@
+apps/api/src/auth/index.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 7-12,14,17
+apps/api/package.json
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 44
+cubic.yaml
+  ai_agent 75
+apps/web/src/shared/api/trpc.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 28
+packages/devtools/test/knip.test.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 1-126
+apps/api/src/trpc/app-router.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 7-9
+pnpm-lock.yaml
+  ai_agent 17-19,99-101,196-198,290-292,697-705,1383-1389,1408-1413,1420-1425,1432-1437,1444-1449,1456-1461,1468-1473,1480-1485,1493-1499,1507-1513,1521-1527,1535-1541,1549-1555,1563-1569,1577-1583,1591-1597,1604-1609,1616-1621,1628-1633,1640-1645,1652-1754,3069-3071,3920-3922,3940-3944,4163-4167,4510-4516,4554-4556,4881-4884,4952-4955,5066-5069,5209-5212,5654-5669,6119-6125,6135-6137,6141-6143,6147-6149,6153-6155,6159-6161,6165-6167,6171-6173,6177-6179,6183-6185,6189-6191,6195-6197,6201-6203,6207-6209,6213-6215,6219-6221,6225-6227,6231-6233,6237-6239,6243-6245,6250-6310,7491-7495,8233-8236,8250-8254,8442-8457,8719-8764,8832-8833,9222-9223,9299-9300,9463-9464,9549
+apps/api/src/auth/auth.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 81,83
+packages/devtools/src/throwaway-tree.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 55-70,72,74-87,244-341
+knip.config.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 1-72,77-81
+  s_2c3fc9d16bd52c::t_f41e635d93f9b4 73-76
+apps/api/src/ingress/hostnames.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 33
+apps/api/tests/routes-list.test.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 6
+apps/web/package.json
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 42
+packages/devtools/package.json
+  ai_agent 23
+apps/api/tests/spa.test.ts
+  ai_agent 3
+apps/api/src/ops/index.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 27-34
+apps/web/src/features/auth/auth-hooks.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 40,55,64,73,81,89,97,133
+package.json
+  ai_agent 7,12,22
+apps/api/src/mcp/entries/define.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 26
+apps/api/src/trpc/mount.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 24
+apps/api/src/auth/verify.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 143
+apps/api/src/trpc/base.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 27,37
+apps/api/tests/flow.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 241,279
+apps/api/tests/harness-control.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 23
+apps/api/tests/harness.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 46,55,75,77,115,122
+apps/api/src/server.ts
+  s_2c3fc9d16bd52c::t_3c2b70c2ff733a 21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "df45167a516bcab709b0a31abe12b6dd801773ea",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
