@@ -48,7 +48,11 @@ files = ["src", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+# `--strict-markers`: a mistyped marker marks nothing and skips nothing, so it must be an
+# error rather than a warning nobody reads.
+addopts = "-q --strict-markers"
+# An expected failure that passes is a bug that was fixed and an `xfail` that outlived it.
+xfail_strict = true
 
 # Mutation testing, weekly on a schedule (.github/workflows/mutation.yml).
 # `check.py` is the check runner script, not tier behaviour — the same reason `apps/api`
