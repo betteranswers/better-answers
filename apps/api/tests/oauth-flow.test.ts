@@ -353,10 +353,14 @@ describe("the pages refuse a cross-site form", () => {
     // the same-origin fence above admits. What refuses it is the shape: a fetch is
     // `Sec-Fetch-Dest: empty`, and only a document navigation can follow the redirect
     // the form answers with (ADR 0034; `auth/routes.ts`).
+    // Seven lines of the arrange above, carried rather than folded: a helper over it would
+    // hide which of the two fences each of these two tests is actually about.
+    /* jscpd:ignore-start */
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
     expect(consent.pathname).toBe("/consent");
+    /* jscpd:ignore-end */
     const before = await app.database.superuser.query(
       "SELECT count(*)::int AS n FROM oauth_consent",
     );
@@ -742,12 +746,16 @@ describe("the three roles through Better Auth's own endpoints", () => {
   });
 
   it("refuses a Viewer who tries to change a role, and refuses every invitation until the People screen ships", async () => {
+    // Six lines of the arrange above, carried rather than folded: the two differ in who
+    // connects and whose membership is looked up, which is the whole subject of both.
+    /* jscpd:ignore-start */
     const acme = await app.provision({ name: "Acme" });
     const viewer = await app.person();
     await app.addMember(acme.workspaceId, viewer.id, "Viewer");
     const client = app.client();
     await connectAsHost(app, client, viewer);
     const adminMemberId = await memberIdOf(acme.workspaceId, acme.admin.id);
+    /* jscpd:ignore-end */
 
     expect((await setRole(client, adminMemberId, "Viewer")).status).toBe(403);
     expect(await roleOf(acme.workspaceId, acme.admin.id)).toBe("Admin");

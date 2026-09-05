@@ -1,5 +1,4 @@
-import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
-import { testData } from "@better-answers/schema/testing";
+import { CONFIGURED_LLM_ROUTES, LISTED_LLM_ROUTES, testData } from "@better-answers/schema/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -54,18 +53,7 @@ const seedRoutes = async (workspaceId: string): Promise<void> => {
   const client = await app.database.superuser.connect();
   try {
     const seed = testData(client);
-    await seed.llmRoute({
-      workspaceId,
-      purpose: "answering",
-      provider: "anthropic",
-      model: "claude-sonnet-5",
-    });
-    await seed.llmRoute({
-      workspaceId,
-      purpose: "embedding",
-      provider: "mistral",
-      model: "mistral-embed",
-    });
+    for (const route of CONFIGURED_LLM_ROUTES) await seed.llmRoute({ workspaceId, ...route });
   } finally {
     client.release();
   }
@@ -105,25 +93,7 @@ describe("the routes list over the wire", () => {
     const response = await listRoutes(await signedInClient(workspace.admin.email));
 
     expect(response.status).toBe(200);
-    expect(answered.parse(await response.json()).result.data).toEqual([
-      { purpose: "extraction", provider: null, model: null, dimensions: null, fixed: false },
-      { purpose: "enrichment", provider: null, model: null, dimensions: null, fixed: false },
-      {
-        purpose: "answering",
-        provider: "anthropic",
-        model: "claude-sonnet-5",
-        dimensions: null,
-        fixed: false,
-      },
-      { purpose: "judging", provider: null, model: null, dimensions: null, fixed: false },
-      {
-        purpose: "embedding",
-        provider: "mistral",
-        model: "mistral-embed",
-        dimensions: EMBEDDING_DIMENSIONS,
-        fixed: true,
-      },
-    ]);
+    expect(answered.parse(await response.json()).result.data).toEqual(LISTED_LLM_ROUTES);
   });
 
   it.each(["Admin", "Editor", "Viewer"] as const)(

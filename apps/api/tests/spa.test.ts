@@ -1,9 +1,8 @@
-import { fileURLToPath } from "node:url";
-
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { TRPC_ENDPOINT } from "../src/trpc/index.ts";
-import { AGENT_HOSTNAME, APEX_HOSTNAME, APP_HOSTNAME, startApp, type TestApp } from "./harness.ts";
+import { AGENT_HOSTNAME, APEX_HOSTNAME, APP_HOSTNAME } from "./harness.ts";
+import { servedApp } from "./served-app.ts";
 
 /**
  * The api serves the SPA's static build on `app.` (ADR 0006, amended 2026-09-02; ADR 0022
@@ -14,22 +13,13 @@ import { AGENT_HOSTNAME, APEX_HOSTNAME, APP_HOSTNAME, startApp, type TestApp } f
  * a navigation asks for `text/html`, a script tag does not.
  */
 
-const WEB_ROOT = fileURLToPath(new URL("fixtures/web-build", import.meta.url));
 const asABrowserNavigates = { headers: { accept: "text/html,application/xhtml+xml" } };
 
 describe("the api serves the shell on app. (ADR 0006)", () => {
-  let app: TestApp;
-
-  beforeAll(async () => {
-    app = await startApp({ webRoot: WEB_ROOT });
-  });
-
-  afterAll(async () => {
-    await app.stop();
-  });
+  const app = servedApp();
 
   it("answers a screen's address with the shell, so a bookmark opens the product", async () => {
-    const response = await app
+    const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/system", asABrowserNavigates);
 
@@ -39,7 +29,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
   });
 
   it("answers the root with the shell", async () => {
-    const response = await app.client(undefined, APP_HOSTNAME).fetch("/", asABrowserNavigates);
+    const response = await app().client(undefined, APP_HOSTNAME).fetch("/", asABrowserNavigates);
 
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toContain(`<div id="root">`);
@@ -52,7 +42,9 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     // and a framed picker is a pick made for them. Consent keeps its own pair in
     // `auth/routes.ts`, the page it is still rendered as.
     for (const screen of ["/sign-in", "/choose-workspace", "/system", "/"]) {
-      const response = await app.client(undefined, APP_HOSTNAME).fetch(screen, asABrowserNavigates);
+      const response = await app()
+        .client(undefined, APP_HOSTNAME)
+        .fetch(screen, asABrowserNavigates);
 
       expect(response.status).toBe(200);
       expect(response.headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
@@ -61,7 +53,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
   });
 
   it("serves a built asset as itself", async () => {
-    const response = await app.client(undefined, APP_HOSTNAME).fetch("/assets/screen.js");
+    const response = await app().client(undefined, APP_HOSTNAME).fetch("/assets/screen.js");
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("javascript");
@@ -69,7 +61,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
   });
 
   it("does not answer a missing asset with the shell, which would be an unreadable script error", async () => {
-    const response = await app
+    const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/assets/gone.js", asABrowserNavigates);
 
@@ -80,7 +72,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
   it("leaves the health check answering the health check, not the shell", async () => {
     // The uptime check T-005 sets up reaches `app.`'s health; a shell with status 200 would
     // read as healthy for ever.
-    const response = await app
+    const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/health", asABrowserNavigates);
 
@@ -91,7 +83,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
   it("does not shadow an endpoint a client reaches with fetch", async () => {
     // Better Auth's own endpoints answer the same wildcard. A `fetch` sends no `text/html`,
     // which is what keeps the shell off them.
-    const response = await app.client(undefined, APP_HOSTNAME).fetch("/get-session");
+    const response = await app().client(undefined, APP_HOSTNAME).fetch("/get-session");
 
     expect(response.headers.get("content-type")).not.toContain("text/html");
   });
@@ -100,7 +92,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     // The tRPC mount and the shell share `app.` and the same wildcard behind them
     // (ADR 0008, ADR 0022). A navigation-shaped request to a procedure's path has to
     // reach tRPC: the shell answering it would be a screen where a refusal should be.
-    const response = await app
+    const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch(`${TRPC_ENDPOINT}/routes.list`, asABrowserNavigates);
 
@@ -112,7 +104,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     // The fence admits `app.example.test.` — a trailing dot is the DNS root and names the
     // same host — so the shell has to normalise the same way or that address reaches the
     // authorization server's 404 instead of the product.
-    const response = await app.server.request(
+    const response = await app().server.request(
       new Request(`https://${APP_HOSTNAME}./system`, asABrowserNavigates),
     );
 
@@ -122,7 +114,9 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
 
   it("serves the shell on app. and nowhere else, so agent. and the apex are unchanged", async () => {
     for (const hostname of [AGENT_HOSTNAME, APEX_HOSTNAME]) {
-      const response = await app.client(undefined, hostname).fetch("/system", asABrowserNavigates);
+      const response = await app()
+        .client(undefined, hostname)
+        .fetch("/system", asABrowserNavigates);
 
       expect(response.status).toBe(404);
       await expect(response.text()).resolves.not.toContain(`<div id="root">`);
@@ -133,7 +127,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     // The issuer's documents share `app.` with the product since T-045 (ADR 0034). A
     // navigation to one has to reach the document: the shell answering it would be a
     // host reading HTML where it looked for the resource.
-    const response = await app
+    const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/.well-known/oauth-protected-resource", asABrowserNavigates);
 

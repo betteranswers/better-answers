@@ -304,6 +304,11 @@ export const oauthRefreshToken = pgTable(
   ],
 );
 
+// The access token's columns are the refresh token's, less a few and plus `refresh_id`, and
+// the overlap is Better Auth's rather than ours: both tables are declared column-for-column
+// against the library's own schema so a reader can compare them to it, and the parity suite
+// names every column of each. A shared column object would read as a decision we had made.
+/* jscpd:ignore-start */
 export const oauthAccessToken = pgTable(
   "oauth_access_token",
   {
@@ -335,6 +340,7 @@ export const oauthAccessToken = pgTable(
     index("oauth_access_token_refresh_id_idx").on(table.refreshId),
   ],
 );
+/* jscpd:ignore-end */
 
 export const oauthConsent = pgTable(
   "oauth_consent",

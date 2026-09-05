@@ -279,11 +279,15 @@ describe("a tenant table under app_rt", () => {
 
   it("returns exactly the scoped tenant's rows", async () => {
     await withRollback(db.pool, async (client) => {
+      // Six lines of arrange the test above also has, carried rather than folded: which
+      // scope is set, and when, is the whole subject of each of these tests.
+      /* jscpd:ignore-start */
       const seed = await seedTwoWorkspaces(client);
       await seed.workspaceConfig({ workspaceId: WS_A });
       await seed.workspaceConfig({ workspaceId: WS_B });
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      /* jscpd:ignore-end */
 
       const scoped = await client.query("SELECT workspace_id FROM workspace_config");
       expect(scoped.rows).toEqual([{ workspace_id: WS_A }]);
@@ -339,10 +343,14 @@ describe("a tenant table under app_rt", () => {
 describe("the workspace-lifecycle function", () => {
   it("creates the chunk partition and its HNSW index for app_rt, in one transaction", async () => {
     await withRollback(db.pool, async (client) => {
+      // Six lines of arrange the test above also has, carried rather than folded: which
+      // scope is set, and when, is the whole subject of each of these tests.
+      /* jscpd:ignore-start */
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       await client.query("SELECT create_workspace_partition($1)", [WS_A]);
+      /* jscpd:ignore-end */
 
       const partition = await client.query(
         "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'index' AND c.relname = $1",
@@ -434,11 +442,15 @@ describe("the workspace-lifecycle function", () => {
     // runtime roles DML on it — the lifecycle function revokes them, so the only
     // road to chunk rows is the policied parent.
     await withRollback(db.pool, async (client) => {
+      // Seven lines of arrange the chunk-scoping test above also has, carried rather than
+      // folded: which scope is set, and when, is the whole subject of each of these tests.
+      /* jscpd:ignore-start */
       const seed = await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       await client.query("SELECT create_workspace_partition($1)", [WS_A]);
       await seed.chunk({ workspaceId: WS_A, content: "hello" });
+      /* jscpd:ignore-end */
 
       // The other tenant's scope, aiming straight at A's partition. Each denial
       // aborts the transaction, so a savepoint fences it from the next assertion.

@@ -32,6 +32,16 @@ const LIST_BUDGET_MS = 1000;
 
 const routesCard = (page: Page) => page.getByRole("region", { name: "Routes" });
 
+/**
+ * The two routes a workspace has chosen in most of the scenarios below: one purpose whose
+ * provider and model the card shows, and the embedding route, whose dimensions are fixed.
+ * A scenario that turns on having chosen only one names that one itself.
+ */
+const ANSWERING_AND_EMBEDDING: readonly SeedRoute[] = [
+  { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
+  { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
+];
+
 const embeddingRow = (page: Page) =>
   routesCard(page)
     .getByRole("listitem")
@@ -83,10 +93,7 @@ test.describe("the System screen's routes card", () => {
 
     await signedInWith(page, request, {
       name: "Northern Tooling",
-      routes: [
-        { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
-        { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
-      ],
+      routes: ANSWERING_AND_EMBEDDING,
     });
 
     const card = routesCard(page);
@@ -157,10 +164,7 @@ test.describe("the System screen's routes card", () => {
   test("carries no control that edits, adds or deletes a route", async ({ page, request }) => {
     await signedInWith(page, request, {
       name: "Pennine Metalwork",
-      routes: [
-        { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
-        { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
-      ],
+      routes: ANSWERING_AND_EMBEDDING,
     });
 
     const card = routesCard(page);
@@ -177,10 +181,7 @@ test.describe("the System screen's routes card", () => {
   test("renders the list within the constitution's latency budget", async ({ page, request }) => {
     await signedInWith(page, request, {
       name: "Dales Engineering",
-      routes: [
-        { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
-        { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
-      ],
+      routes: ANSWERING_AND_EMBEDDING,
     });
 
     // Measured from a screen the person is already on, so what is timed is the list arriving —
@@ -232,10 +233,7 @@ test.describe("the System screen's routes card", () => {
   }) => {
     await signedInWith(page, request, {
       name: "Wharfedale Castings",
-      routes: [
-        { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
-        { purpose: "embedding", provider: "mistral", model: "mistral-embed" },
-      ],
+      routes: ANSWERING_AND_EMBEDDING,
     });
     await expect(routesCard(page).getByRole("listitem")).toHaveCount(5);
 

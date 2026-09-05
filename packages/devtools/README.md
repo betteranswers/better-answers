@@ -4,7 +4,7 @@ The repository's own gate tooling. **It is imported and never deployed** — `pa
 is imported, `apps/` is what deploys (ADR 0029) — so nothing under `apps/` copies this
 directory into an image, and every dependency here is a development dependency.
 
-Three things live here.
+Four things live here.
 
 ## `src/throwaway-tree.ts` — the runner
 
@@ -27,6 +27,23 @@ throwaway tree lives where there is no `node_modules` to walk up to — so witho
 type-aware rule would read as silent, which is the failure this whole helper exists to make
 impossible. A tree that a type-aware rule is asserted over carries a `tsconfig.json`, because
 the type-aware linter needs a program to type the files it lints.
+
+Two modules sit beside it, for the two tools whose gates read a file this repository owns.
+
+`src/jscpd.ts` turns a set of copy-paste settings into jscpd's command line, in one place, so
+the gate (`scripts/jscpd.mjs`, driven by the root `jscpd.config.mjs`) and the suite that
+proves the gate fires run the tool the same way. The values live in a JavaScript module and
+not in jscpd's own `.jscpd.json` because every exclusion has to carry the reason it is there,
+and jscpd 5 parses that file strictly, reports a parse it refused, and then scans on its
+defaults and exits zero — a config nobody could read reading exactly like a tree with nothing
+in it. `jscpdOver` is the built form for a throwaway tree. Imported through
+`@better-answers/devtools/jscpd`.
+
+`src/oxlint-config.ts` reads the repository's own `.oxlintrc.json` as a value, comments and
+all, for the three suites that run oxlint over a throwaway tree under the *real* config
+rather than a restatement of it. It is one reader rather than three because the
+comment-stripping is the part that would have gone wrong quietly. Imported through
+`@better-answers/devtools/oxlint-config`.
 
 ## `lint-rules/` — the `better-answers` oxlint plugin
 

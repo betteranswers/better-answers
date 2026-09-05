@@ -5,6 +5,8 @@
   "description": "The repository's own gate tooling — the throwaway-tree runner and the two oxlint plugins. Imported by suites and by the lint config; never deployed (ADR 0029).",
   "type": "module",
   "exports": {
+    "./jscpd": "./src/jscpd.ts",
+    "./oxlint-config": "./src/oxlint-config.ts",
     "./throwaway-tree": "./src/throwaway-tree.ts"
   },
   "scripts": {
@@ -17,6 +19,7 @@
     "@better-answers/devtools": "workspace:*",
     "@oxlint/plugins": "1.80.0",
     "@types/node": "24.13.3",
+    "jscpd": "5.1.2",
     "oxlint": "1.80.0",
     "oxlint-tsgolint": "7.0.2001",
     "typescript": "7.0.2",

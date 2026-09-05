@@ -94,6 +94,34 @@ const answering = (
 
 const observe = (): Observed => ({ lookupAnswers: [], headers: {}, servername: undefined });
 
+/**
+ * A fetcher whose resolver never answers, and a count of the requests it made anyway.
+ *
+ * Both the deadline and the in-flight cap are about what happens while a lookup hangs, and
+ * the assertion that matters for each is the same one: the request was never made. The
+ * request here throws as well as counting, so a fetcher that reached it fails loudly rather
+ * than hanging on a socket the suite never opened.
+ */
+const neverResolving = (
+  timeoutMs: number,
+): {
+  readonly fetcher: ReturnType<typeof createClientMetadataFetcher>;
+  readonly requests: () => number;
+} => {
+  let requested = 0;
+  return {
+    fetcher: createClientMetadataFetcher({
+      lookup: () => new Promise(() => {}),
+      request: (() => {
+        requested += 1;
+        throw new Error("never");
+      }) as unknown as typeof httpsRequest,
+      timeoutMs,
+    }),
+    requests: () => requested,
+  };
+};
+
 describe("the CIMD transport's fix", () => {
   it("answers the socket's all-addresses lookup with an array and the single form with an address", async () => {
     const observed = observe();
@@ -249,30 +277,14 @@ describe("the SSRF policy", () => {
   });
 
   it("refuses a resolver that never answers, under the same deadline, without a request", async () => {
-    let requested = 0;
-    const fetcher = createClientMetadataFetcher({
-      lookup: () => new Promise(() => {}),
-      request: (() => {
-        requested += 1;
-        throw new Error("never");
-      }) as unknown as typeof httpsRequest,
-      timeoutMs: 20,
-    });
+    const { fetcher, requests } = neverResolving(20);
 
     expect(await refusal(fetcher, "https://claude.ai/doc")).toBe("timeout");
-    expect(requested).toBe(0);
+    expect(requests()).toBe(0);
   });
 
   it("bounds the resolves in flight: a lookup the caller stopped waiting for still holds its slot", async () => {
-    let requested = 0;
-    const fetcher = createClientMetadataFetcher({
-      lookup: () => new Promise(() => {}),
-      request: (() => {
-        requested += 1;
-        throw new Error("never");
-      }) as unknown as typeof httpsRequest,
-      timeoutMs: 10,
-    });
+    const { fetcher, requests } = neverResolving(10);
 
     // Thirty-two distinct hosts time out but never settle; the thirty-third is refused
     // at once, without waiting on the deadline.
@@ -282,7 +294,7 @@ describe("the SSRF policy", () => {
     const started = Date.now();
     expect(await refusal(fetcher, "https://host-33.example/doc")).toBe("too-many-lookups");
     expect(Date.now() - started).toBeLessThan(10);
-    expect(requested).toBe(0);
+    expect(requests()).toBe(0);
   });
 
   it("bounds the host cache: past the cap the oldest host is resolved again", async () => {
