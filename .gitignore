@@ -49,7 +49,11 @@ AGENTS.md.bak
 
 # agent tooling installed from third parties — never ours to publish (ADR 0027).
 # Skills are reinstalled from their sources; `tasks/AGENTS.md` from `ordna skill install`.
-.claude/skills/
+# Wildcarded rather than the directory, because git will not descend into an excluded
+# directory to re-include anything inside it — and one skill below is ours, written in this
+# repository and tracked with it, so a fresh clone or worktree has it with no install step.
+.claude/skills/*
+!.claude/skills/browser-suite/
 .agents/
 skills-lock.json
 tasks/AGENTS.md
