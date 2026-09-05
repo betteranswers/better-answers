@@ -1,0 +1,23 @@
+.oxlintrc.json
+  s_2c3fc9d16bd52c::t_a8664cde48f379 30-33
+apps/api/tests/lint-rules.test.ts
+  s_2c3fc9d16bd52c::t_1fdc3d95bce9fc 138-174
+CODING_RULES.md
+  s_2c3fc9d16bd52c::t_10d7c8de25fcf5 81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3eebb13cbde64bf34a2c7de80bf898b888ef1f15",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
