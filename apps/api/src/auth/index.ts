@@ -1,5 +1,5 @@
 /**
- * The identity module's interface (`[DESIGN5]`): everything the rest of the tier may
+ * The identity module's interface (ADR 0009): everything the rest of the tier may
  * know about how a credential becomes `Claims`. `better-auth` and `@better-auth/*`
  * are imported under `apps/api/src/auth/` and the CIMD lift alone; the lint override
  * in `.oxlintrc.json` refuses them anywhere else, and

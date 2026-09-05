@@ -14,7 +14,7 @@ const system = screenById("system");
  * their requests (T-036's rule), so this screen names the card and knows nothing about how it
  * is filled.
  *
- * WCAG 2.2 AA, tested with a keyboard and a screen reader (`[A11Y1]`).
+ * WCAG 2.2 AA, tested with a keyboard and a screen reader.
  */
 export function SystemScreen() {
   return (

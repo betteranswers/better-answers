@@ -61,7 +61,7 @@ export const llmRoute = withRLS(
 );
 
 /**
- * A workspace's thresholds as rows (ADR 0025, `[OPS1]`): today `mcp.tools_list_ttl_ms`,
+ * A workspace's thresholds as rows (ADR 0025): today `mcp.tools_list_ttl_ms`,
  * seeded by workspace provisioning. A tenant table like any other.
  */
 export const workspaceConfig = withRLS(

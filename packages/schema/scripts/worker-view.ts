@@ -8,7 +8,7 @@ import * as publicEntry from "../src/index.ts";
 /**
  * The worker's view of the schema, generated and committed (ADR 0032): these
  * functions run the journal's result through `pg_catalog` and render the Python
- * module the worker imports, carrying the migration id (`[WRK1]`'s stamp). The drift
+ * module the worker imports, carrying the migration id (the worker's schema stamp). The drift
  * test regenerates and fails in both directions — a stale committed view, and any
  * table in the migrated database the declarations do not know (a hand-written
  * migration that added a table `src/` never declared).
@@ -82,7 +82,7 @@ export const renderWorkerSchemaView = (rows: readonly ColumnRow[], migrationId: 
     "",
     "Regenerate with `pnpm --filter @better-answers/schema run generate:worker-view`;",
     "the drift test fails CI when this file and the journal disagree in either",
-    "direction. The worker never migrates (`[WRK1]`); this module is its read-only",
+    "direction. The worker never migrates; this module is its read-only",
     "knowledge of what the app's journal built, stamped with the migration id it was",
     'generated from."""',
     "",

@@ -1,6 +1,6 @@
 /* Base palette. Neutral-led, one accent, four semantics.
    Neutrals are cool-grey with a faint blue cast (Vercel/Linear register).
-   Trust is never carried by colour alone ([UX1]) — semantics tint tags that
+   Trust is never carried by colour alone — semantics tint tags that
    already say the word. */
 :root {
   /* Neutral ramp — light */

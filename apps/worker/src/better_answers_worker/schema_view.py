@@ -2,7 +2,7 @@
 
 Regenerate with `pnpm --filter @better-answers/schema run generate:worker-view`;
 the drift test fails CI when this file and the journal disagree in either
-direction. The worker never migrates (`[WRK1]`); this module is its read-only
+direction. The worker never migrates; this module is its read-only
 knowledge of what the app's journal built, stamped with the migration id it was
 generated from."""
 

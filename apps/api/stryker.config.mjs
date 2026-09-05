@@ -1,5 +1,5 @@
 /**
- * Mutation testing for this tier ([TEST6]), run weekly by .github/workflows/mutation.yml.
+ * Mutation testing for this tier, run weekly by .github/workflows/mutation.yml.
  *
  * @type {import("@stryker-mutator/api/core").PartialStrykerOptions}
  */
@@ -9,7 +9,7 @@ export default {
   vitest: { configFile: "vitest.config.ts" },
 
   // `main.ts` and `migrate.ts` are the tier's entry points, not its behaviour: they read the
-  // bootstrap and hand off, and nothing crosses a seam a test could reach ([APP1], [TEST1]).
+  // bootstrap and hand off, and nothing crosses a seam a test could reach.
   mutate: ["src/**/*.ts", "!src/main.ts", "!src/migrate.ts"],
   coverageAnalysis: "perTest",
 
@@ -24,12 +24,12 @@ export default {
   reporters: ["progress", "clear-text", "json"],
   jsonReporter: { fileName: "reports/mutation/mutation.json" },
 
-  // No `break`: a falling score is an ordna task, not a failed build ([TEST6]). `high` and `low`
+  // No `break`: a falling score is an ordna task, not a failed build. `high` and `low`
   // colour the report alone.
   thresholds: { high: 80, low: 60, break: null },
 
   // A mutant here can leave a Testcontainers Postgres waiting on a query that will never answer;
-  // the timeout has to clear the container start the suite's `beforeAll` pays for ([TEST2]).
+  // the timeout has to clear the container start the suite's `beforeAll` pays for.
   timeoutMS: 300_000,
 
   // Each test runner process owns a Postgres container. Two is what a 2-vCPU hosted runner can

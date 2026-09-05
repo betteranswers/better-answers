@@ -2,7 +2,7 @@ import type { boundarySchemas } from "@better-answers/schema";
 import type { z } from "zod";
 
 /**
- * The Principal (`CONTEXT.md`, *principal*; `[SEC2]`): who a call is made as. Built by
+ * The Principal (`CONTEXT.md`, *principal*): who a call is made as. Built by
  * a transport from a verified credential, first parameter of every function in `core`
  * that touches tenant data, and alive only inside the transaction that resolved it
  * (`store/postgres`'s `withPrincipal`) — nothing caches one beyond a request.

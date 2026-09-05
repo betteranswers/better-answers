@@ -47,10 +47,9 @@ const addressIn = (answer: ResumeAnswer): string | undefined => {
  *
  * Every outcome is said in words, including the two that are nobody's fault: a pick the
  * platform refused, and a resume that answered with nowhere to go. A screen that went
- * quiet would leave a person looking at a list of buttons that had stopped working
- * (`[UX2]`).
+ * quiet would leave a person looking at a list of buttons that had stopped working.
  *
- * WCAG 2.2 AA (`[A11Y1]`): the choices are buttons in a list, in DOM order, each naming
+ * WCAG 2.2 AA: the choices are buttons in a list, in DOM order, each naming
  * its workspace; the outcome of a pick is announced in a live region.
  */
 export function ChooseWorkspaceScreen() {

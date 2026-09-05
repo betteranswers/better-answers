@@ -2,7 +2,7 @@ import type { CounterRule } from "@better-answers/core/store/postgres";
 
 /**
  * Every pinned number and name the identity module carries, one exported constant
- * each (`[DEPS2]`). A copy anywhere else is a second pin that ages alone.
+ * each. A copy anywhere else is a second pin that ages alone.
  */
 
 /**

@@ -8,7 +8,7 @@ const RETRY_ATTEMPTS = 2;
  * A refusal is a decision, not a blip. Every refusal this api returns arrives as
  * `UNAUTHORIZED` carrying its own name — no session, no active workspace, not a member
  * (`apps/api/src/trpc/base.ts`) — and retrying one only delays the screen that has to say so
- * (`[UX2]`). Everything else, including the `INTERNAL_SERVER_ERROR` raised when the session
+ * (ADR 0037). Everything else, including the `INTERNAL_SERVER_ERROR` raised when the session
  * store could not be reached, may well succeed on the next attempt.
  */
 const isRefusal = (error: Error) =>

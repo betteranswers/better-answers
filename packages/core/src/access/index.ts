@@ -10,6 +10,6 @@
  * Tested against columns on the readable unit — `concept_index`, `composition` and every
  * `index.chunk` row carry `published_at`, `sensitivity` and `audience` — never against
  * three fields of a source binding, because a concept and a composition have no binding
- * (ADR 0023, `[SEC2]`).
+ * (ADR 0023).
  */
 export {};

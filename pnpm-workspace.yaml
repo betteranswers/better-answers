@@ -14,6 +14,6 @@ allowBuilds:
   ssh2: false
 
 # pnpm 11 holds back releases younger than its minimum age; these were taken at their
-# current version deliberately, read from the registry on the day ([DEPS1]).
+# current version deliberately, read from the registry on the day.
 minimumReleaseAgeExclude:
   - zod@4.5.4

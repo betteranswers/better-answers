@@ -15,12 +15,12 @@ import { sessionClaims, type SessionReader } from "../auth/verify.ts";
  *
  * The context carries the doors and the request's headers and **never a Principal**: a
  * Principal exists only inside the transaction that resolved it, and nothing caches
- * one beyond a request (`[SEC2]`).
+ * one beyond a request.
  *
  * It carries a `SessionReader` rather than the `Auth` instance, because `AppRouter` is
  * inferred from the procedures and the procedures are typed by this context: an `Auth`
  * here would put Better Auth's inferred instance type into the one type `apps/web`
- * imports, which is exactly what `[DESIGN5]` says never crosses the seam. The seam's own
+ * imports, which is exactly what the identity seam (ADR 0009) says never crosses it. The seam's own
  * function type — headers in, a session record or nothing out — says everything this
  * transport needs and names no library.
  */

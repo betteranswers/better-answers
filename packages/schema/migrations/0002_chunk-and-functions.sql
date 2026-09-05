@@ -4,7 +4,7 @@
 -- DEFINER workspace-lifecycle function, and the llm-routing SQL function (ADR 0031).
 
 -- Mirrors src/index-tables.ts column for column — the worker-view drift test fails if
--- the two part. vector(1024): mistral-embed's fixed output dimension ([DEPS1],
+-- the two part. vector(1024): mistral-embed's fixed output dimension (read
 -- 01/09/2026); the per-partition HNSW index is the lifecycle function's, for the
 -- recall-isolation reason ADR 0007 gives.
 CREATE TABLE "index".chunk (
@@ -27,7 +27,7 @@ CREATE POLICY "chunk_workspace_isolation" ON "index".chunk AS PERMISSIVE FOR ALL
   WITH CHECK ("workspace_id" = (select current_workspace_id()));
 --> statement-breakpoint
 -- FORCE applies RLS to the table's owner too, so not even a mis-wired owner
--- connection reads across tenants (`[DESIGN4]`).
+-- connection reads across tenants (ADR 0032).
 ALTER TABLE "workspace" FORCE ROW LEVEL SECURITY;
 --> statement-breakpoint
 ALTER TABLE "llm_route" FORCE ROW LEVEL SECURITY;

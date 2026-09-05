@@ -11,15 +11,15 @@ __pycache__/
 coverage/
 # `reports/mutation/` carries a slash, so git anchored it to the repository root and left
 # `apps/api/reports/` and `apps/web/reports/` tracked. Every workspace writes its mutation report
-# under its own `reports/` (`[TEST6]`), so the pattern has to match at any depth.
+# under its own `reports/`, so the pattern has to match at any depth.
 reports/
 
-# Mutation testing leftovers ([TEST6]): mutmut copies the tier into `apps/worker/mutants/`, and
+# Mutation testing leftovers: mutmut copies the tier into `apps/worker/mutants/`, and
 # Stryker's Vitest runner writes a per-worker setup file into the workspace it runs in.
 mutants/
 stryker-setup-*.js
 
-# Playwright's per-run artefacts (traces, screenshots) and its last-run marker ([TEST1]).
+# Playwright's per-run artefacts (traces, screenshots) and its last-run marker.
 test-results/
 playwright-report/
 

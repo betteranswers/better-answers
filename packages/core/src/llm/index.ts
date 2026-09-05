@@ -46,8 +46,8 @@ type RouteRow = {
 
 /**
  * The workspace's routes, one row per purpose in purpose order, read as the Principal
- * inside the transaction that resolved it — so RLS is the guarantee (`[DESIGN4]`) and
- * the statement names the workspace anyway (`[SEC2]`).
+ * inside the transaction that resolved it — so RLS is the guarantee (ADR 0032) and
+ * the statement names the workspace anyway.
  */
 export const listRoutes = async (
   principal: UserPrincipal,

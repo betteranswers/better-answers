@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * The browser-to-product seam (`[TEST1]`): the served build, driven by a real browser.
+ * The browser-to-product seam: the served build, driven by a real browser.
  *
  * The server is the app tier's own harness (`apps/api/tests/serve.ts`) — the server factory
  * over a Testcontainers Postgres, the email sender capturing codes, the CIMD transport in

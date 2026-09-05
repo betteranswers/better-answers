@@ -9,7 +9,7 @@ import { defineConfig } from "drizzle-kit";
  * it reads `src/schema.ts` and writes SQL. Migrations are *applied* by the app
  * (`apps/api/src/migrate.ts`), which reads the database URL through its typed config module
  * (§ TYPES); `drizzle-kit push` is never run against an estate, because migrations are
- * forward-only and a rollback is the previous image digest (`[OPS1]`).
+ * forward-only and a rollback is the previous image digest (ADR 0022).
  */
 export default defineConfig({
   dialect: "postgresql",

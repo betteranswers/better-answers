@@ -315,7 +315,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     const form = await context.req.formData();
     const accept = String(form.get("accept")) === "true";
     // The person's credentials may have been revoked since this session was created;
-    // consent mints a token, so the revocation check runs here too (`[SEC2]`, ADR 0018).
+    // consent mints a token, so the revocation check runs here too (ADR 0018).
     // A refused resolve stops the grant before Better Auth issues a code.
     if (accept) {
       const claims = await sessionClaims(

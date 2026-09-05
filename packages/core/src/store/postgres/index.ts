@@ -68,8 +68,8 @@ const transaction = async <T>(
  * Run `work` inside one transaction scoped to `workspaceId`, as the platform. The
  * setter every tenant read goes through; `withPrincipal` is the door a person's call
  * uses, this is for the platform's own acts — provisioning, the identity provider's
- * hooks — where a platform principal, not a person, is behind the call (`[SEC2]`:
- * the platform principal is the first argument, and the act is audited under its id).
+ * hooks — where a platform principal, not a person, is behind the call: the platform
+ * principal is the first argument, and the act is audited under its id.
  */
 export const withScope = async <T>(
   platform: PlatformPrincipal,
@@ -257,7 +257,7 @@ export const consumeCall = async (
 
 /**
  * A workspace's config row by key; `undefined` when unset. RLS already scopes the read;
- * the predicate says so in the statement (`[SEC2]`: the Principal, first).
+ * the predicate says so in the statement: the Principal, first.
  */
 export const readWorkspaceConfig = async (
   principal: UserPrincipal,

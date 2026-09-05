@@ -1,5 +1,5 @@
 /**
- * Mutation testing for this workspace ([TEST6]), run weekly by .github/workflows/mutation.yml.
+ * Mutation testing for this workspace, run weekly by .github/workflows/mutation.yml.
  *
  * @type {import("@stryker-mutator/api/core").PartialStrykerOptions}
  */
@@ -29,7 +29,7 @@ export default {
   reporters: ["progress", "clear-text", "json"],
   jsonReporter: { fileName: "reports/mutation/mutation.json" },
 
-  // No `break`: a falling score is an ordna task, not a failed build ([TEST6]). `high` and `low`
+  // No `break`: a falling score is an ordna task, not a failed build. `high` and `low`
   // colour the report alone.
   thresholds: { high: 80, low: 60, break: null },
 };

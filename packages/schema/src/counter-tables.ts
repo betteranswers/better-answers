@@ -38,7 +38,7 @@ export const mcpCallCounter = pgTable(
   "mcp_call_counter",
   {
     workspaceId: text("workspace_id").notNull(),
-    // The access token's `jti`; never the token itself (`[SEC1]`, `[LOG1]`).
+    // The access token's `jti`; never the token itself, which no row or log may hold.
     tokenId: text("token_id").notNull(),
     windowStart: timestamp("window_start", { withTimezone: true, mode: "date" }).notNull(),
     count: integer("count").notNull(),

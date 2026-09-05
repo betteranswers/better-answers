@@ -47,7 +47,7 @@
   --control-disabled-fg: var(--grey-400);
   --focus-ring: 0 0 0 var(--focus-ring-width) var(--accent-200), 0 0 0 1px var(--accent-600);
 
-  /* Trust words — a tint behind a word that already says it ([UX1]) */
+  /* Trust words — a tint behind a word that already says it */
   --trust-checked-bg: var(--green-50);
   --trust-checked-fg: var(--green-700);
   --trust-checked-border: var(--green-200);

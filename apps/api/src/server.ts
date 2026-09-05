@@ -22,7 +22,7 @@ import { createTrpcRoutes } from "./trpc/index.ts";
 
 /**
  * Everything the HTTP surface needs, passed in rather than reached for, so a test
- * crosses the same seam a caller does (`[DESIGN2]`, `[DESIGN3]`).
+ * crosses the same seam a caller does.
  */
 export type ServerDependencies = {
   readonly database: Pool;
@@ -54,8 +54,8 @@ export type ServerDependencies = {
  * surface here.
  *
  * Why this tier has an endpoint in B1 at all, when the worker has no HTTP server:
- * `[TEST1]` defines a functional test differently per tier — "for `apps/api`, the endpoint
- * (`app.request()`); for `apps/worker`, the job or module entry point". So the tier cannot
+ * a functional test crosses a different seam per tier — for `apps/api` the endpoint
+ * (`app.request()`), for `apps/worker` the job or module entry point. So the tier cannot
  * have a functional test until it has a route, and the worker can. `/health` is the
  * route chosen because it is one the deploy unit will need
  * (`deploy/platform.compose.yaml`) rather than one invented for the test; the worker's

@@ -16,7 +16,7 @@ import { SCREENS } from "@/shared/screens.ts";
  * not guess: it sends the person where the refusal says, keeping the address they were
  * reading so they come back to it.
  *
- * WCAG 2.2 AA, tested with a keyboard and a screen reader (`[A11Y1]`): three landmarks
+ * WCAG 2.2 AA, tested with a keyboard and a screen reader: three landmarks
  * (banner, navigation, main), a skip link as the first thing in the tab order, the DOM
  * order as the keyboard order, the current screen marked with `aria-current`, and the
  * focus ring the design system's bridge draws on every focusable element.
@@ -58,7 +58,7 @@ export function Frame() {
       {/*
         Stacked below the medium breakpoint, beside the screen above it. A 248px rail and a
         320px viewport cannot both be honoured, and WCAG 2.2 AA's reflow criterion says
-        which one gives (`[A11Y1]`).
+        which one gives.
       */}
       <header className="flex shrink-0 flex-col gap-6 border-b border-border bg-sidebar px-4 py-5 md:w-sidebar md:border-r md:border-b-0">
         <p className="font-mono font-medium tracking-tight text-foreground">better-answers</p>

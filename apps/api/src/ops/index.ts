@@ -21,8 +21,7 @@ import { openPostgres, tablesPresent } from "@better-answers/core/store/postgres
  * What each command does today is exactly what the schema allows today, and no more.
  * The tables named per command are the ones its slice's ADR names; when a slice lands,
  * its command is filled in here and the drill exercises it with no script change.
- * Nothing here reads the environment: the pool and every value come in as arguments
- * (`[SEC1]`, `[APP2]`).
+ * Nothing here reads the environment: the pool and every value come in as arguments.
  */
 
 /** The contract's exit codes, by name: the scripts read them, so they are stated once. */

@@ -53,7 +53,7 @@ export const SCREENS = [
  * A screen's id is read off the list rather than declared beside it. A second declaration
  * would let an id exist with no screen behind it — a name that is valid everywhere and
  * reaches nothing — which is the failure a two-way membership check would otherwise have to
- * catch (`[TEST7]`).
+ * catch.
  */
 export type Screen = (typeof SCREENS)[number];
 export type ScreenId = Screen["id"];

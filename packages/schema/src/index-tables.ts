@@ -14,8 +14,8 @@ export const indexSchema = pgSchema("index");
 /**
  * The vector width, `vector(N)`: N is the day-one embedding route's model —
  * `mistral-embed`, whose output is fixed at 1024 dimensions (Mistral platform docs,
- * read 01/09/2026, `[DEPS1]`; the hosted Mistral EU route is ADR 0020's amendment).
- * The one place the number lives (`[DEPS2]`): the column type, the boundary
+ * read 01/09/2026; the hosted Mistral EU route is ADR 0020's amendment).
+ * The one place the number lives: the column type, the boundary
  * refinement and the test factory import it. The migration's `vector(1024)` is the
  * hand-written DDL this declaration mirrors; the worker-view drift test holds them equal.
  */
@@ -46,7 +46,7 @@ export const chunk = indexSchema.table("chunk", {
   content: text("content").notNull(),
   embedding: embeddingVector("embedding").notNull(),
   embeddingRouteId: text("embedding_route_id").notNull(),
-  // The three visibility columns every readable unit carries (`[SEC2]`, ADR 0023).
+  // The three visibility columns every readable unit carries (ADR 0023).
   publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
   sensitivity: text("sensitivity").notNull(),
   audience: text("audience").notNull(),

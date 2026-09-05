@@ -7,7 +7,7 @@
 # the worker image is built from its own directory.
 #
 # Three kinds of entry:
-#   - secrets and local state, which must never be in an image (`[SEC1]`);
+#   - secrets and local state, which must never be in an image;
 #   - the host's build products, so a stale `dist/` or `node_modules/` on a laptop can
 #     never become the thing that ships — the image builds its own;
 #   - everything the runtime does not need, which is most of the repository.

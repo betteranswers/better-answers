@@ -12,7 +12,7 @@ import type { Tx } from "../store/postgres/index.ts";
  * contract, verdict first). The bodies are B9's: today there is no concept index to
  * read, so `find` answers no hits, `open` not found, `ask` a refuse verdict, and
  * `giveFeedback` a receipt. Every function takes the Principal first and runs on the
- * transaction that resolved it (`[SEC2]`).
+ * transaction that resolved it.
  */
 
 /** The trust tiers and states a unit carries (CONTEXT.md, *trust words the reader sees*). */
@@ -71,11 +71,11 @@ export const trustWords = (trust: Trust): string => {
   }
 };
 
-/** UK long form (`[UX1]`): "3 March 2026". */
+/** UK long form: "3 March 2026". */
 const ukLongDate = (iso: string): string => {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  // A fixed zone, so the same instant reads the same on every machine (`[UX1]`).
+  // A fixed zone, so the same instant reads the same on every machine.
   return date.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",

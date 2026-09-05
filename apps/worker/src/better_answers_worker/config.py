@@ -1,11 +1,11 @@
 """The bootstrap credential class, and the only place in the tier that reads the
-environment (`[SEC1]`).
+environment.
 
 The bootstrap class is what the deploy unit must give the process before it can reach
 anything. Every other credential class — ingestion, acting, agent, LLM provider,
 repository, object store — is a row under the envelope, decrypted by the app and
 injected per run through the control plane, and never mixed into this scope
-(`[SEC1]`, ADR 0005). The object store and the embedding host join this module the
+(ADR 0005). The object store and the embedding host join this module the
 day a step in this tier reads them (B7).
 """
 

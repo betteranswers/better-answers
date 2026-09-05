@@ -20,7 +20,7 @@ import { carriedFlow, safeReturnPath } from "./carried-flow.ts";
  * The two acts are the module's own mutations (`auth-hooks.ts`) over Better Auth's
  * endpoints; the words are the platform's. Every outcome the person could not predict is said in a sentence —
  * that a code was sent, that it did not work, that too many have been asked for — and
- * each sits in a live region so a screen reader hears it (`[A11Y1]`, `[UX2]`).
+ * each sits in a live region so a screen reader hears it.
  *
  * WCAG 2.2 AA, checked with a keyboard and a screen reader.
  */

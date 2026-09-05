@@ -1,4 +1,4 @@
-"""The tier's one structured logger (`[LOG1]`): JSON to stdout, `print` banned."""
+"""The tier's one structured logger: JSON to stdout, `print` banned."""
 
 import structlog
 

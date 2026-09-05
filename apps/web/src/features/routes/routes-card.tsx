@@ -5,7 +5,7 @@ import { useWorkspaceRoutes, type WorkspaceRoute } from "./list-routes.ts";
 /**
  * The System screen's first card: the workspace's routes, one row per purpose, read-only.
  *
- * `[UX1]`, the disclosure rule: a row leads with what a reader needs to judge it — the purpose,
+ * The disclosure rule: a row leads with what a reader needs to judge it — the purpose,
  * the provider and the model — and the embedding row's fixed tag, its why-line and its dimension
  * count come after them, on the one row they are about. Nothing here is a second pane, a modal
  * or a tooltip. Trust and state are words: *Fixed* is a text tag on the registry's `Badge`, and
@@ -15,9 +15,9 @@ import { useWorkspaceRoutes, type WorkspaceRoute } from "./list-routes.ts";
  * a thing a reader must be able to see. Omitting it would say "there are three purposes".
  *
  * No control edits, adds or deletes a route: editing is a later ticket with its own gating, and
- * a disabled control here would be an action the platform cannot yet honour (`[UX1]`).
+ * a disabled control here would be an action the platform cannot yet honour.
  *
- * WCAG 2.2 AA (`[A11Y1]`): a labelled region, a heading per row and a list a screen reader can
+ * WCAG 2.2 AA: a labelled region, a heading per row and a list a screen reader can
  * count, and no focusable element at all — the card adds nothing to the tab order because it
  * holds nothing to operate. The evidence is in `apps/web/e2e/routes.spec.ts`: an `axe` pass, a
  * keyboard traversal, and an aria snapshot of the announced structure.
@@ -112,7 +112,7 @@ export function RoutesCard() {
       {/*
         A pending or failed read says so in words rather than showing an empty list: a reader
         must never mistake "the platform has not answered" for "this workspace has none"
-        (`[UX1]`). `aria-live` because the list replaces this line without moving focus.
+        `aria-live` because the list replaces this line without moving focus.
 
         The failure says what happened and who can act, in the platform's own voice — the
         design system's voice card: precise, and never a hedge asking the reader to try

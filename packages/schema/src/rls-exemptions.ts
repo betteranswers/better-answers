@@ -3,14 +3,14 @@ import { IDENTITY_SET } from "./identity-tables.ts";
 
 /**
  * The one place a reviewer looks to see which tables are outside the tenant guarantee,
- * and why each one is (`[SEC3]`; T-015's spec, `apps/docs-site/specs/T-015.md`). A tenant
+ * and why each one is (T-015's spec, `apps/docs-site/specs/T-015.md`). A tenant
  * table is every table `src/` declares minus these; adding an entry is a visible diff
  * carrying a reason, and no pattern ever matches a new table quietly.
  *
  * The two arrays this is built from stay where their owners need them — `IDENTITY_SET`
  * beside Better Auth's declarations, `GLOBAL_TABLE_NAMES_BEYOND_IDENTITY` beside the
  * counters — and the RLS coverage test asserts the union both ways against this record
- * (`[TEST7]`), so a name can neither gain an exemption without a reason nor keep one
+ * so a name can neither gain an exemption without a reason nor keep one
  * after its array drops it.
  */
 export const RLS_EXEMPTIONS = {

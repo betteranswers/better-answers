@@ -62,13 +62,13 @@ import { accessControl, creatorRole, roles } from "./roles.ts";
  * onto `workspace`, `@better-auth/oauth-provider` with CIMD client discovery and the
  * lifted Node transport, the JWT plugin's keys, its own limiter database-backed. This
  * file is the one place `better-auth` and `@better-auth/*` are configured; nothing
- * outside `apps/api/src/auth/` imports them (`[DESIGN5]`, lint-enforced).
+ * outside `apps/api/src/auth/` imports them (ADR 0009, lint-enforced).
  *
  * Prototype 61's three silent traps are each a line here with the trap named beside
  * it, and `apps/api/tests/oauth-flow.test.ts` holds each as a regression.
  */
 
-/** One email, as the sign-in page needs to send it. The transport is injected (`[SEC1]`: SMTP is a row later). */
+/** One email, as the sign-in page needs to send it. The transport is injected: SMTP becomes a credential row later, and nothing here reads it. */
 export type EmailMessage = {
   readonly to: string;
   readonly subject: string;
@@ -356,7 +356,7 @@ export const createAuth = (deps: AuthDependencies) => {
           // Better Auth merges its owner/admin/member defaults into any roles map, so
           // its own endpoints could otherwise assign or invite a role outside the three.
           // The database CHECK on `member.role` is the fence; these give a clean 400
-          // instead of a constraint violation. `[GLOSSARY1]`.
+          // instead of a constraint violation.
           beforeAddMember: async ({ member }) => {
             refuseForeignRole(member.role);
           },

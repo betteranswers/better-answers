@@ -7,7 +7,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 /**
- * Every tenant table is created through this helper (`[DESIGN4]`, ADR 0032): RLS
+ * Every tenant table is created through this helper (ADR 0032): RLS
  * enabled, one permissive policy for ALL commands whose predicate calls the one
  * migration-installed seam function. The call is written `(select
  * current_workspace_id())` — the InitPlan form — so a bulk statement pays the function

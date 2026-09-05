@@ -8,7 +8,7 @@
  * - `Principal` — `workspaceId`, `userId`, `role`, and its two kinds, user and
  *   platform (`CONTEXT.md`; the deferred kind arrives with the first background job).
  *   Built by a transport, first parameter of every function in `core` that touches
- *   tenant data (`[SEC2]`). T-004.
+ *   tenant data. T-004.
  * - branded ids — one per entity the glossary names, so a concept id cannot be passed
  *   where a source id belongs. `WorkspaceId` and `UserId` today, from the boundary.
  * - the error vocabulary — the typed failures a transport maps to its own protocol.

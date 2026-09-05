@@ -14,7 +14,7 @@ type EmailMessage = { readonly to: string; readonly subject: string; readonly te
 
 /**
  * Without `SMTP_URL` — the dev loop, the test harness — a code request fails loudly
- * here rather than writing a code anywhere a log could hold it (`[LOG1]`).
+ * here rather than writing a code anywhere a log could hold it.
  */
 const failWithoutTransport = async (message: EmailMessage): Promise<void> => {
   logger.error({ to_domain: message.to.split("@")[1] ?? null }, "no email transport is configured");

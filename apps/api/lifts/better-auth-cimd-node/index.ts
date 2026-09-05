@@ -25,7 +25,7 @@ import { isPublicRoutableHost } from "@better-auth/core/utils/host";
  * response cap; a per-host answer cache so a rebinding resolver cannot swap the address
  * between two fetches of the same host inside a window.
  *
- * Dependencies are parameters (`[DESIGN3]`, `[TEST3]`): the test injects a resolver and
+ * Dependencies are parameters: the test injects a resolver and
  * a request function; production takes Node's.
  */
 

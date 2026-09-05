@@ -37,8 +37,8 @@ src = ["src", "tests"]
 select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20"]
 
 [tool.ruff.lint.per-file-ignores]
-# The check runner is a script; it is the one place print-shaped output is allowed
-# (`[LOG1]` bans `print` outside scripts).
+# The check runner is a script; it is the one place print-shaped output is allowed,
+# `print` being banned everywhere else in the tier.
 "src/better_answers_worker/check.py" = ["T20"]
 
 [tool.mypy]
@@ -50,7 +50,7 @@ files = ["src", "tests"]
 testpaths = ["tests"]
 addopts = "-q"
 
-# Mutation testing, weekly on a schedule (`[TEST6]`, .github/workflows/mutation.yml).
+# Mutation testing, weekly on a schedule (.github/workflows/mutation.yml).
 # `check.py` is the check runner script, not tier behaviour — the same reason `apps/api`
 # leaves `main.ts` and `migrate.ts` out of Stryker's `mutate`.
 [tool.mutmut]

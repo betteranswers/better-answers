@@ -3,9 +3,9 @@ import type { Screen } from "@/shared/screens.ts";
 /**
  * A screen the product names but has not built. It says so, rather than showing an empty
  * table a reader would read as "this workspace has none" — the platform states what is
- * true and what is not (`[UX1]`, the design system's tone rules).
+ * true and what is not (the design system's tone rules).
  *
- * WCAG 2.2 AA, tested with a keyboard and a screen reader (`[A11Y1]`).
+ * WCAG 2.2 AA, tested with a keyboard and a screen reader.
  */
 export function UnbuiltScreen(properties: { readonly screen: Screen }) {
   return (

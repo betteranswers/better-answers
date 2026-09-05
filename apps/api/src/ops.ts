@@ -7,7 +7,7 @@ import { runOps } from "./ops/index.ts";
 /**
  * `pnpm ops <command>` — the entry point the estate's restore scripts run inside the `api`
  * image (`restore-drill.sh`, `restore-production.sh`; ADR 0022). Bootstrap is read once
- * here, as `main.ts` and `migrate.ts` read it (`[APP2]`), and everything else is an
+ * here, as `main.ts` and `migrate.ts` read it, and everything else is an
  * argument. The identity bootstrap is optional: `migrate`'s environment has the
  * database alone, and only `smoke` wants the app hostname.
  */

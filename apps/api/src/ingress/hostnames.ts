@@ -25,7 +25,7 @@ import { z } from "zod";
  * The whole fence is the one list below — a surface per entry, the hostnames that
  * carry it, and why — in the shape of `IDENTITY_SET` in
  * `packages/schema/src/identity-tables.ts`: one place to read what is true, and a test
- * that checks the pair both ways (`[TEST7]`).
+ * that checks the pair both ways.
  */
 
 /** The three hostnames the deploy unit names, plus the loopback the container probes itself on. */

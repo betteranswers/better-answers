@@ -15,7 +15,7 @@ import { logger } from "./logger.ts";
 
 /**
  * The bootstrap credential class, and the only place in the tier that reads the
- * environment (`[SEC1]`, `CODING_RULES.md` § TYPES).
+ * environment.
  *
  * The bootstrap class is what the deploy unit must give the process before it can
  * reach anything. Every other credential class — ingestion, acting, agent, LLM

@@ -7,7 +7,7 @@ import { useTRPC } from "@/shared/api/trpc.ts";
  * by `session.membership` through the same resolver every other procedure crosses. The
  * shell asks this rather than reading the session object, because the role is the member
  * row's and is read in the transaction that authorises the read — never guessed from a
- * claim, and never defaulted (`[SEC2]`, ADR 0018).
+ * claim, and never defaulted (ADR 0018).
  *
  * The declaration lives here, in the feature that owns identity, and the client it is
  * issued through lives in `shared/` (bulletproof-react's api layer; ADR 0006's amendment).

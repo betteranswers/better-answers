@@ -5,7 +5,7 @@
  * (ADR 0009, 2026-09-02), and consent stays here because a decision to grant an outside
  * client access to a workspace must never sit behind the product's own shell. The
  * wording is ADR 0018's, in the person's words. Native controls, labels and a `main`
- * landmark: what `[A11Y1]` asks of every screen.
+ * landmark: what WCAG 2.2 AA asks of every screen.
  */
 
 const escape = (value: string): string =>

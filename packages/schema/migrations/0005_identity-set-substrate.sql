@@ -10,7 +10,7 @@
 -- never touches. The RLS coverage test names this table in its exemption list.
 ALTER TABLE "workspace" NO FORCE ROW LEVEL SECURITY;
 --> statement-breakpoint
--- FORCE applies RLS to the table's owner too (`[DESIGN4]`); the coverage test fails on
+-- FORCE applies RLS to the table's owner too (ADR 0032); the coverage test fails on
 -- any tenant table whose FORCE line is missing.
 ALTER TABLE "workspace_config" FORCE ROW LEVEL SECURITY;
 --> statement-breakpoint
@@ -48,7 +48,7 @@ ALTER TABLE "mcp_call_counter" FORCE ROW LEVEL SECURITY;
 --> statement-breakpoint
 -- The worker never touches the identity set or the counters, but migration 0000's
 -- default privileges grant worker_rt DML on every new public table — and these hold
--- secrets, sessions, signing keys and memberships. Revoked here; `[SEC3]`'s refusal is
+-- secrets, sessions, signing keys and memberships. Revoked here; the refusal is proved by
 -- the test "refuses the worker role on every identity-set table and the counters"
 -- (packages/schema/test/rls.test.ts). The worker keeps SELECT on `workspace` and
 -- `workspace_config` (the tenant's own row and thresholds) and nothing else.

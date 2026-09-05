@@ -5,7 +5,7 @@ import { createAuthClient } from "better-auth/client";
 /**
  * The product's one identity client. This feature is the only place in `apps/web` that
  * names `better-auth` at all — the shape `apps/api/src/auth/` has on the other side
- * (`[DESIGN5]`), and the reason `.oxlintrc.json` opens the ban for this directory and no
+ * (ADR 0009), and the reason `.oxlintrc.json` opens the ban for this directory and no
  * other. Everything above it speaks screens and memberships, never endpoints.
  *
  * No `baseURL`, so every call goes to the origin this build was served from — `app.`,

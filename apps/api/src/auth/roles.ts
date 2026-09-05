@@ -5,10 +5,11 @@ import { CREATOR_ROLE, type ROLES } from "@better-answers/schema";
 /**
  * The three roles through the organisation plugin's access control (grilling rounds
  * 2–3, 2026-09-01): Admin, Editor, Viewer, with Admin as the creator role, and Better
- * Auth's owner/admin/member defaults not registered (`[GLOSSARY1]`). The statements
+ * Auth's owner/admin/member defaults not registered, so the glossary's three words are
+ * the only roles the database or the plugin can name. The statements
  * are Better Auth's organisation resources — what the plugin's own endpoints consult
  * when a member invites, removes or updates another. The platform's own action
- * thresholds are the slices' (`[SEC2]`); this is only what Better Auth needs.
+ * thresholds are the slices'; this is only what Better Auth needs.
  */
 const statement = {
   organization: ["update", "delete"],

@@ -18,7 +18,7 @@ import type { Claims } from "@better-answers/core/kernel";
 /**
  * The two credential paths reduced to `Claims` (the resolver's input): an OAuth bearer
  * verified in process against Better Auth's own JWKS, and a Better Auth cookie session.
- * Nothing past this file knows which library minted either (`[DESIGN5]`).
+ * Nothing past this file knows which library minted either (ADR 0009).
  */
 
 /** The claim set prototype 61 observed on the wire: `{workspace, user}` and no role. */

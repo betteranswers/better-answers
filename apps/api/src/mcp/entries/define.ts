@@ -14,7 +14,8 @@ import type { McpScope } from "../../auth/constants.ts";
  * `tools/list` — prototype 61 saw claude.ai split the surface into read and write
  * tools from `readOnlyHint` alone. The input's keys are refused by
  * `better-answers/mcp-entry-no-workspace-argument` and by the same test if any is
- * `workspace`, `bundle` or `tenant` (`[SEC2]`).
+ * `workspace`, `bundle` or `tenant` — the principal comes from the token, never an
+ * argument (ADR 0018).
  *
  * `run` takes the Principal first and the transaction that resolved it; the surface
  * wraps every call in `withPrincipal`, so the role is read in the same transaction as
