@@ -1,0 +1,21 @@
+apps/worker/tests/test_tier_contract.py
+  s_529f881ca25f4e::t_4b87ca4011abb6 78
+packages/core/test/tier-contract.test.ts
+  s_529f881ca25f4e::t_508a52e7a727d7 101-102,104,106-107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9007b9ccb3aca7fd715a6cfb1a05fcaabd1e4e2d",
+  "prompts": {},
+  "sessions": {
+    "s_529f881ca25f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688411cf-a489-4e1b-b43c-905b1ccfe9f6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
