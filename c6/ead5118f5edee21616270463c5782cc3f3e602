@@ -1,0 +1,57 @@
+apps/api/src/mcp/entries/define.ts
+  s_2c3fc9d16bd52c::t_99c246d95d1e14 26
+apps/api/tests/harness.ts
+  s_2c3fc9d16bd52c::t_99c246d95d1e14 46,55,75,77,115,122
+apps/api/package.json
+  s_2c3fc9d16bd52c::t_ffd4f9bf8ad85d 44
+apps/web/package.json
+  s_2c3fc9d16bd52c::t_ffd4f9bf8ad85d 42
+apps/web/src/shared/api/trpc.ts
+  s_2c3fc9d16bd52c::t_b42351af89e980 28
+apps/api/src/auth/verify.ts
+  s_2c3fc9d16bd52c::t_99c246d95d1e14 143
+apps/api/tests/harness-control.ts
+  s_2c3fc9d16bd52c::t_99c246d95d1e14 23
+apps/api/tests/spa.test.ts
+  s_2c3fc9d16bd52c::t_97228129e2ca5e 5
+apps/api/src/auth/index.ts
+  s_2c3fc9d16bd52c::t_dba2c5f932e3ea 14,17
+  s_2c3fc9d16bd52c::t_2e32ae7afc77be 7-12
+apps/api/tests/routes-list.test.ts
+  s_2c3fc9d16bd52c::t_97228129e2ca5e 7
+apps/api/tests/flow.ts
+  s_2c3fc9d16bd52c::t_99c246d95d1e14 236,274
+apps/api/src/trpc/app-router.ts
+  s_2c3fc9d16bd52c::t_5fb1ee57e615c8 7-9
+apps/api/src/ops/index.ts
+  s_2c3fc9d16bd52c::t_99c246d95d1e14 28-30
+apps/api/src/server.ts
+  s_2c3fc9d16bd52c::t_97228129e2ca5e 21
+apps/api/src/ingress/hostnames.ts
+  s_2c3fc9d16bd52c::t_99c246d95d1e14 33
+apps/api/src/trpc/base.ts
+  s_2c3fc9d16bd52c::t_99c246d95d1e14 27,37
+apps/web/src/features/auth/auth-hooks.ts
+  s_2c3fc9d16bd52c::t_4f3374612069e0 40,55,64,73,81,89,97,133
+apps/api/src/trpc/mount.ts
+  s_2c3fc9d16bd52c::t_99c246d95d1e14 24
+apps/api/src/auth/auth.ts
+  s_2c3fc9d16bd52c::t_99c246d95d1e14 82
+  s_2c3fc9d16bd52c::t_e9a8af5fe73fae 80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c6ead5118f5edee21616270463c5782cc3f3e602",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
