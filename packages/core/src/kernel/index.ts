@@ -16,9 +16,23 @@
  *   `PrincipalRefusal` today.
  * - `Result` — folded in from `packages/contracts` when that package was retired
  *   (T-020, ADR 0031).
+ * - `ActorId` and `actorIdOf` — the three forms a record the platform keeps names an
+ *   actor in, and the one derivation from a Principal, so none is composed by hand
+ *   (`[AUDIT3]`, ADRs 0019 and 0035). T-076.
+ * - `RoleRefusal` and `requireAdmin` — the one word for an act a role may not perform
+ *   and the guard that narrows a `UserPrincipal` to Admin or returns it. T-076.
+ * - the result convention — what a slice act returns and that it never throws across
+ *   its seam, stated once in `result.ts`'s docblock. T-076.
+ * - `refusalFor` — Postgres's constraint names read into a slice's own refusal words,
+ *   the store's Error back for every violation the slice does not name. T-076.
  */
+export { refusalFor } from "./constraint.ts";
 export { attempt, err, normalizeError, ok } from "./result.ts";
 export type { Result } from "./result.ts";
+export { actorIdOf } from "./actor.ts";
+export type { ActorId } from "./actor.ts";
+export { requireAdmin } from "./role.ts";
+export type { AdminPrincipal, RoleRefusal } from "./role.ts";
 export type {
   Claims,
   GroupId,
