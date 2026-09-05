@@ -1,25 +1,18 @@
-import { organizationPlugin } from "@better-auth-ui/core/plugins/organization";
-import { useAuthPlugin, useSession } from "@better-auth-ui/react";
-import { useOAuthContinue } from "@better-auth-ui/react/plugins/oauth-provider";
-import {
-  useListOrganizations,
-  useSetActiveOrganization,
-} from "@better-auth-ui/react/plugins/organization";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/shared/ui/button.tsx";
 
-import { authClient } from "./auth-client.ts";
+import {
+  useListOrganizations,
+  useOAuthContinue,
+  useSession,
+  useSetActiveOrganization,
+  type ResumeAnswer,
+} from "./auth-hooks.ts";
 import { AuthScreen, Outcome } from "./auth-screen.tsx";
 import { carriedFlow } from "./carried-flow.ts";
-
-/**
- * What Better Auth answers a resumed authorization with: where the person goes next. The
- * shape is stated here because the client's own type for it is `any`, and a screen that
- * navigates somewhere should say what it read to decide.
- */
-type ResumeAnswer = { readonly redirect?: boolean; readonly url?: string };
+import { WORKSPACE_WORDS } from "./workspace-words.ts";
 
 const addressIn = (answer: ResumeAnswer): string | undefined => {
   const next = answer.url;
@@ -27,12 +20,9 @@ const addressIn = (answer: ResumeAnswer): string | undefined => {
 };
 
 /**
- * The workspace picker — a screen this platform writes, on better-auth-ui's headless
- * hooks rather than its organisation switcher. The switcher is a dropdown for a shell and
- * cannot be had on its own: it arrives inside a registry item implementing create, delete,
- * leave, invite, teams and roles, every one of them an act this product refuses
- * (`docs/research/t-022-better-auth-ui.md` § 1). The hooks are what a picker needs, and
- * the resume is by the library's own account "application-owned".
+ * The workspace picker — a screen this platform writes, on the module's own hooks
+ * (`auth-hooks.ts`, T-046 slice 2). Its heading is the platform's word, read straight
+ * from `workspace-words.ts`.
  *
  * It answers three shapes of visit:
  *
@@ -61,11 +51,10 @@ export function ChooseWorkspaceScreen() {
   const search = useRouterState({ select: (state) => state.location.searchStr });
   const carried = carriedFlow(search);
 
-  const { localization } = useAuthPlugin(organizationPlugin);
-  const session = useSession(authClient);
-  const workspaces = useListOrganizations(authClient);
-  const pick = useSetActiveOrganization(authClient);
-  const resume = useOAuthContinue(authClient);
+  const session = useSession();
+  const workspaces = useListOrganizations();
+  const pick = useSetActiveOrganization();
+  const resume = useOAuthContinue();
   /** The resume answered, and named nowhere to go. Held so the screen can say so. */
   const [wentNowhere, setWentNowhere] = useState(false);
 
@@ -92,7 +81,7 @@ export function ChooseWorkspaceScreen() {
     resume.mutate(
       { postLogin: true },
       {
-        onSuccess: (answer: ResumeAnswer) => {
+        onSuccess: (answer) => {
           const next = addressIn(answer);
           if (next === undefined) {
             // The flow cannot be resumed and the person is not told to wait for something
@@ -164,7 +153,7 @@ export function ChooseWorkspaceScreen() {
 
   if (!settled) {
     return (
-      <AuthScreen title={localization.organizations}>
+      <AuthScreen title={WORKSPACE_WORDS.organizations}>
         <Outcome tone="said">Reading your workspaces.</Outcome>
       </AuthScreen>
     );
@@ -175,7 +164,7 @@ export function ChooseWorkspaceScreen() {
     // this is what they read while it does — unless the pick that carries them was
     // refused, which is said rather than left as a screen that never moves.
     return (
-      <AuthScreen title={localization.organizations}>
+      <AuthScreen title={WORKSPACE_WORDS.organizations}>
         {refused ? (
           <Outcome tone="refused">
             Your workspace could not be opened. Sign out and sign in again.

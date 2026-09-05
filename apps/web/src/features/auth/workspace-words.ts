@@ -1,17 +1,15 @@
 /**
- * The library says *organization*; this platform says *workspace* (`CONTEXT.md`), and the
+ * The client says *organization*; this platform says *workspace* (`CONTEXT.md`), and the
  * word a person reads is the platform's everywhere.
  *
- * better-auth-ui's organisation strings are a per-plugin `localization`, spread shallowly
- * over its defaults, so naming four keys keeps the rest. These four are the ones a screen
- * in this ticket renders; the rest of the set belongs to acts this platform does not have
- * — create, delete, leave, invite, teams, roles — and is left alone until the screen that
- * needs it exists (T-027). The full table is in
- * `docs/research/t-022-better-auth-ui.md` § 2.
+ * The module's own plain word map, read directly by the screens that render its words
+ * (T-046 slice 2) — no longer a library `localization` parameter. The keys keep the
+ * client's nouns so a reader can trace a word to the call it faces; T-027 adds the
+ * People screens' eight keys beside these four.
  *
- * `organizationsDescription` loses its verb as well as its noun: upstream reads "Create an
- * organization to collaborate with others", and there is no create-workspace control
- * anywhere in this product — workspaces are platform-provisioned (T-004 judgement call 1).
+ * `organizationsDescription` loses its verb as well as its noun: there is no
+ * create-workspace control anywhere in this product — workspaces are
+ * platform-provisioned (T-004 judgement call 1).
  */
 export const WORKSPACE_WORDS = {
   organization: "Workspace",
