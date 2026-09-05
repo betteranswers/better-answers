@@ -7,6 +7,8 @@ import {
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { boundarySchemas } from "@better-answers/schema";
+
 import { attempt, type Claims, type PlatformPrincipal } from "../src/kernel/index.ts";
 import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
 import {
@@ -92,6 +94,29 @@ describe("provisioning a workspace", () => {
     });
   });
 
+  it("gives the first Admin's membership an id in the one shape the platform mints, composed from nothing", async () => {
+    const adminUserId = await seedUser();
+    const door = openPostgres(db.runtimePool);
+    const id = ulid();
+
+    await provisionWorkspace(bootstrap, door, {
+      id,
+      name: "Minted",
+      slug: `minted-${id.toLowerCase()}`,
+      adminUserId,
+    });
+
+    const row = await db.pool.query<{ id: string }>(
+      "SELECT id FROM member WHERE workspace_id = $1 AND user_id = $2",
+      [id, adminUserId],
+    );
+    const memberId = row.rows[0]?.id;
+    expect(boundarySchemas.member.select.shape.id.safeParse(memberId).success).toBe(true);
+    // Composed from neither of the ids it sits between: T-063 retired the composed form.
+    expect(memberId).not.toContain(id);
+    expect(memberId).not.toContain(adminUserId);
+  });
+
   it("leaves nothing behind when the admin does not exist — no workspace without its partition", async () => {
     const door = openPostgres(db.runtimePool);
     const id = ulid();
@@ -100,7 +125,8 @@ describe("provisioning a workspace", () => {
       id,
       name: "Ghost",
       slug: `ghost-${id.toLowerCase()}`,
-      adminUserId: "user-who-does-not-exist",
+      // Minted, so it is a person id in shape; it is simply nobody's.
+      adminUserId: ulid(),
     });
 
     expect(provisioned).toEqual({ ok: false, error: "no-such-user" });

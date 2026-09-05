@@ -1,6 +1,6 @@
 import { boundarySchemas, CREATOR_ROLE } from "@better-answers/schema";
 
-import { attempt, err, ok, refusalFor, type Result } from "../kernel/index.ts";
+import { attempt, err, ok, refusalFor, type Result, ulid } from "../kernel/index.ts";
 import type {
   PlatformPrincipal,
   Role,
@@ -82,9 +82,12 @@ export const provisionWorkspace = async (
         row.data.slug,
       ]);
       await tx.query("SELECT create_workspace_partition($1)", [row.data.id]);
+      // The membership's key is minted, never composed from the workspace and person
+      // ids it sits between: nothing of ours references it, and a composed key would
+      // read as a fact about the two — People acts key by (workspace, person).
       await tx.query(
         "INSERT INTO member (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, $4, now())",
-        [`member-${row.data.id}-${admin.data}`, row.data.id, admin.data, CREATOR_ROLE],
+        [ulid(), row.data.id, admin.data, CREATOR_ROLE],
       );
       await tx.query(
         "INSERT INTO workspace_config (workspace_id, key, value) VALUES ($1, $2, $3)",
