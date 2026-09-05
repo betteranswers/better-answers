@@ -1,0 +1,41 @@
+packages/schema/test/testing.ts
+  s_2c3fc9d16bd52c::t_4f17d8bdd70ff7 7
+packages/core/test/llm-routes.test.ts
+  s_2c3fc9d16bd52c::t_610e1f7ba69496 2-3,74
+  s_2c3fc9d16bd52c::t_1bf0ea09565313 10,152
+  s_2c3fc9d16bd52c::t_d053a6851f14b2 76
+packages/core/test/workspaces.test.ts
+  s_2c3fc9d16bd52c::t_1bf0ea09565313 17,343
+packages/core/test/aborted-transaction.ts
+  s_2c3fc9d16bd52c::t_04ae2d3653405e 1-3,5,10,16,22
+  s_2c3fc9d16bd52c::t_2b829f4e8ec033 4,6-9,11-15,20-21
+  s_2c3fc9d16bd52c::t_a246e0e85ef416 17-19
+apps/web/e2e/routes.spec.ts
+  s_2c3fc9d16bd52c::t_1c8a81de79080c 35-44,96,167,184,236
+packages/schema/test/llm-route-scenario.ts
+  s_2c3fc9d16bd52c::t_aacff287c0f9dd 1-46
+apps/web/e2e/sign-in.spec.ts
+  s_2c3fc9d16bd52c::t_a83ba83c22b380 1-2,14-33,63-65,186-188,224-226
+  s_2c3fc9d16bd52c::t_74b2b30515ab30 156-158,164
+  s_2c3fc9d16bd52c::t_eabf148254cbea 249-252,256
+apps/api/tests/routes-list.test.ts
+  s_2c3fc9d16bd52c::t_f8d0779085b370 1
+  s_2c3fc9d16bd52c::t_610e1f7ba69496 56
+  s_2c3fc9d16bd52c::t_d053a6851f14b2 96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "156b30913ccc951a7aef9cbd2343ecfb9150b382",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
