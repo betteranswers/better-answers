@@ -77,11 +77,16 @@ const isTest = (file: string): boolean =>
  * A document a reader follows to the rule, as `[COMMENT2]` lists them: the glossary, a note
  * under `docs/` or `apps/docs-site/` (research, operations, the gate record), a package's
  * readme, a notices file. Not every markdown file — a `.md` beside source is source's.
+ *
+ * A tracked `SKILL.md` is one of them, added by T-071: a skill this repository writes and
+ * carries is read by the next session exactly the way a note under `docs/` is, and a tag in
+ * it is the pointer that sends that session to the rule. Only a tracked one — the installed
+ * third-party skills under `.claude/skills/` are `.gitignore`d and never reach this walk.
  */
 const isDocument = (file: string): boolean =>
   file === "CONTEXT.md" ||
   (file.endsWith(".md") && (file.startsWith("docs/") || file.startsWith("apps/docs-site/"))) ||
-  /(^|\/)(readme\.md|THIRD_PARTY_NOTICES\.md)$/i.test(file);
+  /(^|\/)(readme\.md|SKILL\.md|THIRD_PARTY_NOTICES\.md)$/i.test(file);
 
 /**
  * Where `[COMMENT2]` lets a tag be written. The rules files, ADRs, specs and `cubic.yaml`
