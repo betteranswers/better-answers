@@ -32,7 +32,7 @@ Every test that touches data runs against a real Postgres (Testcontainers or the
 
 ### [TEST3] Our own code is never mocked
 
-Module mocking (`vi.mock`, `jest.mock`, `monkeypatch` of our modules) is banned and lint-enforced (`anti-slop/no-module-mocking`). External services — LLMs, SaaS APIs — are replaced behind their adapter with an in-memory implementation.
+Module mocking (`vi.mock`, `jest.mock`, `monkeypatch` of our modules) is banned, and enforced in both tiers: in TypeScript by lint (`anti-slop/no-module-mocking`), in Python by a conftest guard that refuses a `monkeypatch` whose target is a module under `better_answers_worker`. External services — LLMs, SaaS APIs — are replaced behind their adapter with an in-memory implementation, and a third-party attribute stays patchable.
 
 ### [TEST4] Setup through factories
 
@@ -49,6 +49,16 @@ Stryker (`apps/api`, `apps/web`) and mutmut (`apps/worker`) run on a schedule �
 ### [TEST7] A pair is checked in both directions
 
 Where a list names members (the migration journal and its directory), a generated artefact mirrors a source (the worker's schema view and the migrated tables), or a registry names them (the boundary-schema registry and the exported tables), the test asserts membership both ways: every entry has its member, and every member has its entry. One direction finds the missing; only the other finds the orphan.
+
+## CHECK
+
+### [CHECK2] A suite that can run nothing fails
+
+A test script never passes for having found no tests, and a browser spec left focused fails under CI (Playwright's `forbidOnly`). pytest refuses a marker it does not know and an expected failure that passed. Every pnpm workspace carries a `check` script or is named, with the reason it has nothing to run, in `apps/api/tests/check-scripts.test.ts`, which holds the pair both ways (`[TEST7]`): a named workspace that gains `check`, and a workspace off the list that lacks one, each fail.
+
+### [CHECK3] One run of `check` names every failure
+
+A workspace's `check` runs every step it has — lint, types, tests, and the browser suite where there is one — even when an earlier step fails, and reports the failures together. `&&` between steps is banned: it names the first problem and hides the rest, so a session fixes one thing per run. Each tier has one runner and one list of steps; the root `check` is the same shape over its own steps, and `apps/api/tests/check-scripts.test.ts` reads each manifest for it.
 
 ## COMMENT
 
