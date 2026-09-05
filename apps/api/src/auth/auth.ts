@@ -372,7 +372,16 @@ export const createAuth = (deps: AuthDependencies) => {
 
         schema: {
           organization: { modelName: "workspace" },
-          member: { fields: { organizationId: "workspaceId" } },
+          member: {
+            fields: { organizationId: "workspaceId" },
+            additionalFields: {
+              // Revocation's workspace scope (ADR 0035), declared here so the library and
+              // the platform agree the column exists: an Admin's revocation in one
+              // workspace is refused there and nowhere else. Written by the platform,
+              // never by the person — the twin of the user row's instant above.
+              credentialsRevokedAt: { type: "date", required: false, input: false },
+            },
+          },
           invitation: { fields: { organizationId: "workspaceId" } },
           session: { fields: { activeOrganizationId: "activeWorkspaceId" } },
         },

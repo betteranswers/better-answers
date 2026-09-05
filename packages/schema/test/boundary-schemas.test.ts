@@ -38,7 +38,18 @@ const acceptedRows = {
     },
   ],
   workspaceConfig: [{ workspaceId: WS_ID, key: "mcp.tools_list_ttl_ms", value: "300000" }],
-  member: [{ id: MEMBER_ID, workspaceId: WS_ID, userId: USER_ID, role: "Admin", createdAt: NOW }],
+  // The membership carries the workspace-scoped revocation instant (ADR 0035); one row
+  // only, because `member_workspace_id_user_id_uidx` allows a person one membership here.
+  member: [
+    {
+      id: MEMBER_ID,
+      workspaceId: WS_ID,
+      userId: USER_ID,
+      role: "Admin",
+      createdAt: NOW,
+      credentialsRevokedAt: NOW,
+    },
+  ],
   session: [
     { id: SESSION_ID, expiresAt: NOW, token: "session-token", updatedAt: NOW, userId: USER_ID },
   ],
@@ -379,6 +390,7 @@ describe("5 — the inferred type is pinned", () => {
         userId: UserId;
         role: "Admin" | "Editor" | "Viewer";
         createdAt: Date;
+        credentialsRevokedAt: Date | null;
       }
     >
   >;

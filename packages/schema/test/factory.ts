@@ -40,6 +40,19 @@ export type TestData = {
   llmRoute(overrides?: Partial<InsertInput<"llmRoute">>): Promise<Row<"llmRoute">>;
   /** A chunk; creates workspace and partition as needed; embedding defaults to zeros. */
   chunk(overrides?: Partial<InsertInput<"chunk">>): Promise<Row<"chunk">>;
+  /** An OAuth client; id, client id and redirect uris default. */
+  oauthClient(overrides?: Partial<InsertInput<"oauthClient">>): Promise<Row<"oauthClient">>;
+  /**
+   * A refresh token; creates its own client and person unless named. `referenceId` is
+   * the workspace the grant was consented to — null means a grant that named none.
+   */
+  oauthRefreshToken(
+    overrides?: Partial<InsertInput<"oauthRefreshToken">>,
+  ): Promise<Row<"oauthRefreshToken">>;
+  /** An access token; creates its own client and person unless named; `referenceId` as above. */
+  oauthAccessToken(
+    overrides?: Partial<InsertInput<"oauthAccessToken">>,
+  ): Promise<Row<"oauthAccessToken">>;
 };
 
 /** INSERT the boundary-parsed row and read it back through the select schema. */
@@ -50,7 +63,8 @@ const insertRow = async <TName extends keyof Registry>(
 ): Promise<Row<TName>> => {
   const { table, insert, select } = boundarySchemas[name];
   const parsed: Readonly<Record<string, unknown>> = insert.parse(values);
-  const columns: Readonly<Record<string, { name: string }>> = getTableColumns(table);
+  const columns: Readonly<Record<string, { name: string; getSQLType: () => string }>> =
+    getTableColumns(table);
   const config = getTableConfig(table as PgTable);
   const qualified = `${config.schema === undefined ? "" : `"${config.schema}".`}"${config.name}"`;
 
@@ -61,7 +75,11 @@ const insertRow = async <TName extends keyof Registry>(
     `INSERT INTO ${qualified} (${names}) VALUES (${placeholders}) RETURNING *`,
     keys.map((key) => {
       const value = parsed[key];
-      return Array.isArray(value) ? JSON.stringify(value) : value;
+      // node-postgres renders a JS array as a Postgres array literal, which is right for
+      // every `text[]` column; pgvector wants the bracketed text form instead, so only
+      // the vector column is stringified.
+      const isVector = columns[key]?.getSQLType().startsWith("vector") ?? false;
+      return Array.isArray(value) && isVector ? JSON.stringify(value) : value;
     }),
   );
 
@@ -187,5 +205,59 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
-  return { workspace, user, member, invitation, workspaceConfig, llmRoute, chunk };
+  const oauthClient: TestData["oauthClient"] = (overrides = {}) => {
+    const id = overrides.id ?? `client-${ulid()}`;
+    return insertRow(client, "oauthClient", {
+      id,
+      // Better Auth keys the token tables on the client id, not the row's id.
+      clientId: `https://${id.toLowerCase()}.example.invalid/metadata`,
+      redirectUris: ["https://claude.ai/api/mcp/auth_callback"],
+      ...overrides,
+    });
+  };
+
+  const oauthRefreshToken: TestData["oauthRefreshToken"] = async (overrides = {}) => {
+    const clientId = overrides.clientId ?? (await oauthClient()).clientId;
+    const userId = overrides.userId ?? (await user()).id;
+    const id = overrides.id ?? `refresh-${ulid()}`;
+    return insertRow(client, "oauthRefreshToken", {
+      id,
+      token: `refresh-token-${id}`,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      createdAt: new Date(),
+      scopes: ["knowledge:read"],
+      ...overrides,
+      clientId,
+      userId,
+    });
+  };
+
+  const oauthAccessToken: TestData["oauthAccessToken"] = async (overrides = {}) => {
+    const clientId = overrides.clientId ?? (await oauthClient()).clientId;
+    const userId = overrides.userId ?? (await user()).id;
+    const id = overrides.id ?? `access-${ulid()}`;
+    return insertRow(client, "oauthAccessToken", {
+      id,
+      token: `access-token-${id}`,
+      expiresAt: new Date(Date.now() + 3_600_000),
+      createdAt: new Date(),
+      scopes: ["knowledge:read"],
+      ...overrides,
+      clientId,
+      userId,
+    });
+  };
+
+  return {
+    workspace,
+    user,
+    member,
+    invitation,
+    workspaceConfig,
+    llmRoute,
+    chunk,
+    oauthClient,
+    oauthRefreshToken,
+    oauthAccessToken,
+  };
 };

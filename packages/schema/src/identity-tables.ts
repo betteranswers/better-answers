@@ -144,6 +144,12 @@ export const member = pgTable(
     // any roles map, so the database is where those three are refused.
     role: text("role").notNull(),
     createdAt: stamp("created_at").notNull(),
+    // Revocation's workspace scope (ADR 0035): a credential issued before this instant is
+    // refused *in this workspace* and nowhere else, so an Admin of one company never ends
+    // a person's access at another. The person-level twin is `user.credentials_revoked_at`,
+    // and the resolver reads both in the one membership query. Written by the platform,
+    // never by the person — the organisation plugin's member schema declares it `input: false`.
+    credentialsRevokedAt: stamp("credentials_revoked_at"),
   },
   (table) => [
     index("member_workspace_id_idx").on(table.workspaceId),

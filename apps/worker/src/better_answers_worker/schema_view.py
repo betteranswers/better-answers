@@ -6,7 +6,7 @@ direction. The worker never migrates; this module is its read-only
 knowledge of what the app's journal built, stamped with the migration id it was
 generated from."""
 
-MIGRATION_ID = "0006_identity-role-checks"
+MIGRATION_ID = "0007_member-revocation-instant"
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -81,6 +81,7 @@ TABLES: dict[str, dict[str, str]] = {
         "user_id": "text NOT NULL",
         "role": "text NOT NULL",
         "created_at": "timestamp with time zone NOT NULL",
+        "credentials_revoked_at": "timestamp with time zone",
     },
     "public.oauth_access_token": {
         "id": "text NOT NULL",
