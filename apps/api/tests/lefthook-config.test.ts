@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -65,36 +66,65 @@ const declaredBinary = (packageName: string): string => {
   return path.join(path.dirname(manifestPath), relative);
 };
 
-/** A binary on PATH, for the tools npm does not own. */
-const onPath = (binary: string): string | undefined =>
-  (process.env["PATH"] ?? "")
-    .split(path.delimiter)
-    .map((directory) => path.join(directory, binary))
-    .find((candidate) => existsSync(candidate));
+/**
+ * How a command's tool is proved to exist:
+ *
+ * - `npm` — a package this repository declares, resolved through the module graph;
+ * - `uv` — reached through the worker's runner, which the shell must be able to find;
+ * - `guarded` — not ours to install, so what is proved is the skip, not the binary;
+ * - `shell` — no tool at all, just git and the shell.
+ */
+type Proof =
+  | { readonly kind: "npm"; readonly package: string }
+  | { readonly kind: "uv" }
+  | { readonly kind: "guarded"; readonly binary: string }
+  | { readonly kind: "shell" };
 
 /**
- * Every command the hook runs, with how its binary is proved. A command added to the hook and
- * not named here fails the first test below, so a new command cannot arrive unasserted —
- * `[TEST7]`'s both-ways shape, in the small.
+ * Every command the hook runs, its glob and how its tool is proved — one fact in one place.
+ * The keys are checked against the file both ways, so a seventh command cannot arrive
+ * without a line here, and a line here cannot outlive the command it describes
+ * (`[TEST7]`, in the small). `glob: undefined` is a claim like any other: oxfmt takes the
+ * whole staged set on purpose, and refuse-main is about the branch, not the files.
  */
-const EXPECTED_COMMANDS = [
-  "refuse-main",
-  "oxfmt",
-  "oxlint",
-  "ruff-format",
-  "ruff-check",
-  "actionlint",
-] as const;
+const HOOK: Readonly<Record<string, { readonly glob: string | undefined; readonly proof: Proof }>> =
+  {
+    "refuse-main": { glob: undefined, proof: { kind: "shell" } },
+    oxfmt: { glob: undefined, proof: { kind: "npm", package: "oxfmt" } },
+    oxlint: { glob: "*.{ts,tsx}", proof: { kind: "npm", package: "oxlint" } },
+    "ruff-format": { glob: "*.py", proof: { kind: "uv" } },
+    "ruff-check": { glob: "*.py", proof: { kind: "uv" } },
+    actionlint: {
+      glob: ".github/workflows/*.{yml,yaml}",
+      proof: { kind: "guarded", binary: "actionlint" },
+    },
+  };
 
-/** Commands whose tool is an npm package this repository declares. */
-const NPM_TOOLS: Readonly<Record<string, string>> = { oxfmt: "oxfmt", oxlint: "oxlint" };
+/**
+ * The map, read one proof kind at a time. Each case gets its own test rather than a branch
+ * inside one, because an `expect` reached through a condition is an `expect` that can be
+ * skipped without anyone noticing — which is the rule `vitest/no-conditional-expect` holds
+ * and exactly the silence this suite exists to avoid.
+ */
+const npmCommands = (): readonly (readonly [string, string])[] =>
+  Object.entries(HOOK).flatMap(([name, { proof }]) =>
+    proof.kind === "npm" ? [[name, proof.package] as const] : [],
+  );
 
-/** Commands whose tool is reached through `uv`, the worker's runner. */
-const UV_TOOLS = ["ruff-format", "ruff-check"] as const;
+const uvCommands = (): readonly string[] =>
+  Object.entries(HOOK).flatMap(([name, { proof }]) => (proof.kind === "uv" ? [name] : []));
+
+const guardedCommands = (): readonly (readonly [string, string])[] =>
+  Object.entries(HOOK).flatMap(([name, { proof }]) =>
+    proof.kind === "guarded" ? [[name, proof.binary] as const] : [],
+  );
+
+const shellCommands = (): readonly string[] =>
+  Object.entries(HOOK).flatMap(([name, { proof }]) => (proof.kind === "shell" ? [name] : []));
 
 describe("the pre-commit hook (T-070)", () => {
-  it("runs exactly the commands this test knows about", () => {
-    expect(Object.keys(commands()).sort()).toEqual([...EXPECTED_COMMANDS].sort());
+  it("runs exactly the commands this test knows how to prove", () => {
+    expect(Object.keys(commands()).sort()).toEqual(Object.keys(HOOK).sort());
   });
 
   it("runs its commands in parallel, so the slowest one sets the wait", () => {
@@ -108,7 +138,41 @@ describe("the pre-commit hook (T-070)", () => {
     expect(run).toContain("exit 1");
   });
 
-  it.each(Object.entries(NPM_TOOLS))(
+  it.each(Object.keys(HOOK))("runs `%s` over the files it says it does", (command) => {
+    expect(commands()[command]?.glob).toBe(HOOK[command]?.glob);
+  });
+
+  /**
+   * oxfmt's absent glob is the one worth a word: `.oxfmtrc.json` is where this repository
+   * decides which files the formatter touches, and a glob here would be a second answer to
+   * that question — the reason sits in `lefthook.yml`, beside the command.
+   *
+   * The flag is what makes that safe, and is asserted because losing it is silent until the
+   * day someone commits only markdown: oxfmt exits 2 when every file it was handed was
+   * excluded by an ignore rule, and the whole commit is refused for having nothing to format.
+   */
+  it("lets oxfmt take the whole staged set, and pass when none of it is its to format", () => {
+    expect(existsSync(path.join(repositoryRoot, ".oxfmtrc.json"))).toBe(true);
+    expect(runOf("oxfmt")).toContain("--no-error-on-unmatched-pattern");
+  });
+
+  /**
+   * The branch guard has to hold on a machine where nothing else is installed yet — a clone
+   * whose `pnpm install` has not finished is exactly when someone commits to main by mistake.
+   */
+  it.each(shellCommands())("needs nothing but git and the shell to run `%s`", (command) => {
+    const run = runOf(command);
+    expect(run).toContain("git ");
+    for (const tool of ["pnpm", "uv", "node", "npx"]) {
+      expect({ command, tool, named: run.includes(tool) }).toEqual({
+        command,
+        tool,
+        named: false,
+      });
+    }
+  });
+
+  it.each(npmCommands())(
     "runs `%s` from a binary this repository's own packages declare",
     (command, packageName) => {
       expect(runOf(command)).toContain(packageName);
@@ -116,18 +180,26 @@ describe("the pre-commit hook (T-070)", () => {
     },
   );
 
-  it.each(UV_TOOLS)("runs `%s` through uv inside the worker", (command) => {
+  it.each(uvCommands())("runs `%s` through uv inside the worker", (command) => {
     expect(runOf(command)).toContain("uv run --frozen ruff");
     expect(commands()[command]?.root).toBe("apps/worker/");
-    expect(onPath("uv")).toBeDefined();
+    // The shell's own lookup, so the test fails exactly where the hook would.
+    expect(() => execFileSync("uv", ["--version"], { stdio: "pipe" })).not.toThrow();
   });
 
-  it("skips actionlint with a warning when it is not installed, rather than failing", () => {
-    const run = runOf("actionlint");
-    expect(run).toContain("command -v actionlint");
-    expect(run).toContain("warning");
-    expect(run).toContain("exit 0");
-  });
+  /**
+   * Not ours to install, so what is proved is the skip: a warning and a pass, never a failed
+   * commit on a machine that never had the tool.
+   */
+  it.each(guardedCommands())(
+    "skips `%s` with a warning where it is not installed, rather than failing",
+    (command, binary) => {
+      const run = runOf(command);
+      expect(run).toContain(`command -v ${binary}`);
+      expect(run).toContain("warning");
+      expect(run).toContain("exit 0");
+    },
+  );
 
   it("runs no tests and no typecheck, so it stays a seconds-long hook", () => {
     for (const [name, command] of Object.entries(commands())) {
@@ -159,15 +231,7 @@ describe("the pre-commit hook (T-070)", () => {
     expect(manifest.devDependencies["lefthook"]).toBeDefined();
   });
 
-  /**
-   * pnpm 11's build allow-list governs a dependency's own lifecycle scripts. lefthook's
-   * postinstall is refused there and `prepare` installs the hook in the open instead.
-   *
-   * The entry is `false` rather than absent because pnpm 11 treats an undecided build script
-   * as a hard error — `ERR_PNPM_IGNORED_BUILDS`, exit 1 — and rewrites the workspace file
-   * with a placeholder, so no entry at all would fail every fresh install including CI's.
-   * Read empirically on 05/09/2026 against pnpm 11.24.0.
-   */
+  /** Why the entry is `false` rather than absent is written in `pnpm-workspace.yaml`. */
   it("refuses lefthook's own postinstall in the allow-list, because `prepare` is the wiring", () => {
     const workspace = parse(read("pnpm-workspace.yaml")) as {
       allowBuilds?: Record<string, unknown>;

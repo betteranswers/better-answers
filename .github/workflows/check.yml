@@ -59,7 +59,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # This checkout is the only fresh clone we ever get, so it is the only place the
       # promise "install and the hook is there" can actually be tested. The config test
-      # reads the hook file; nothing but a clone can prove the install wrote it.
+      # reads the hook's configuration; nothing but a clone can prove the install wrote the
+      # hook script itself.
       - name: the pre-commit hook is installed by install alone
         run: |
           hook="$(git rev-parse --git-path hooks)/pre-commit"
