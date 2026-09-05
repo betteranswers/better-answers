@@ -1,0 +1,35 @@
+CODING_RULES.md
+  s_2c3fc9d16bd52c::t_1ba4b4767e797c 61
+  s_2c3fc9d16bd52c::t_da80f017a16e1d 62
+apps/api/tests/flow.ts
+  s_2c3fc9d16bd52c::t_c100614f9b798e 99
+  s_2c3fc9d16bd52c::t_588f855bf65df0 83-86
+  s_2c3fc9d16bd52c::t_2a1ce1810288d8 67
+packages/schema/test/rls.test.ts
+  s_2c3fc9d16bd52c::t_4ebea318e15e99 282-284,290,346-348,353
+  s_2c3fc9d16bd52c::t_d138607b01f9e8 445-447,453
+apps/web/e2e/consent.spec.ts
+  s_2c3fc9d16bd52c::t_7d416197440bb5 174-177,186
+packages/schema/src/identity-tables.ts
+  s_2c3fc9d16bd52c::t_47de74d2a15410 307-311,343
+apps/api/tests/oauth-flow.test.ts
+  s_2c3fc9d16bd52c::t_73f7404e92541a 342
+  s_2c3fc9d16bd52c::t_aa9a6ec121ba66 728-730,737
+  s_2c3fc9d16bd52c::t_c1a92ca71f61c3 335-337
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "cb4e27158b0dee588cfdda3f14b857146c4e85be",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
