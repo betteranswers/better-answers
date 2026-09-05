@@ -1,21 +1,17 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "vitest", "import"],
-  // Both plugins live in packages/devtools, which is imported and never deployed
-  // (ADR 0029). A rule in the `better-answers` plugin names the rule it holds — a
-  // CODING_RULES.md rule or an ADR — in the message it prints, so a reader who hits it
-  // reaches the rule without asking; and it lands with a functional test that runs it over
-  // a throwaway tree and asserts where it stays silent as well as where it fires. The rule
-  // that requires both is in CODING_RULES.md under CHECK; the test is
-  // apps/api/tests/lint-rules.test.ts.
+  // Both plugins live in packages/devtools, which is imported and never deployed (ADR 0029).
+  // A `better-answers` rule names the rule it holds in the message it prints, so a reader who
+  // hits it reaches the rule without asking, and lands with a functional test over a throwaway
+  // tree. CODING_RULES.md § CHECK is where that is required; apps/api/tests/lint-rules.test.ts
+  // is the test.
   "jsPlugins": [
     {
       "name": "anti-slop",
       "specifier": "./packages/devtools/lifts/anti-slop/index.ts"
     },
     {
-      // The repository's own rules — each holds a CODING_RULES or ADR line and is run
-      // by a functional test (apps/api/tests/lint-rules.test.ts).
       "name": "better-answers",
       "specifier": "./packages/devtools/lint-rules/index.ts"
     }

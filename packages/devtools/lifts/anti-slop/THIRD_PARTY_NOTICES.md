@@ -5,13 +5,20 @@ low-evidence TypeScript and JavaScript patterns".
 Upstream commit this snapshot was taken at: `6376385614d6c5d69b7460a11a86b656cdd88a7b`
 (recorded by `docs/research/t-012-cubic.md`; the sha no longer resolves against the upstream
 repository, so a refresh compares source rather than history — see *Refreshing* below).
-Snapshot digest (sha256 over the sorted per-file sha256 list of this directory, taken
-2026-09-05, before this file was added): `58a028870935703e13ecbd947104f111d4a43cec522613e8803088ebf7f56879`.
+Snapshot digest, taken 2026-09-05 and covering the lifted files alone — this file is not one
+of them: `58a028870935703e13ecbd947104f111d4a43cec522613e8803088ebf7f56879`. Reproduced from
+this directory by
+`find . -type f ! -name THIRD_PARTY_NOTICES.md | LC_ALL=C sort | xargs shasum -a 256 | shasum -a 256`.
 Licence: MIT (`[APP4]`, ADR 0027; read from the upstream `LICENSE` on 2026-09-05, `[DEPS1]`;
 the notice text is below).
 Lifted: 2026-08 at repository set-up, as `app/tools/anti-slop/`. Moved unchanged to
 `apps/api/tools/anti-slop/` by T-021 and here by T-065 — a lift is imported and never
 deployed, so ADR 0029 puts it under `packages/`. No rule source has ever been edited.
+Audited by the T-065 builder on 2026-09-05: the upstream `LICENSE` and `src/` file list were
+read on the day and reconciled against this directory, which is what produced the licence
+above, the cut list below and the finding that the recorded sha no longer resolves. The
+snapshot's arrival was not audited — it landed at set-up without this file — so the digest
+below is a baseline taken now, not a check against what was copied then.
 
 This file is the notice the lift has been owed since it landed: the snapshot arrived without
 one, and T-065 wrote it where the lift now lives rather than leaving the obligation behind in

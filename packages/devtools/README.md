@@ -12,13 +12,14 @@ The one helper that writes a map of paths to sources into a temporary directory,
 tool's command line over it, and returns what the tool wrote. It exists for one failure: a
 tool that could not run at all reports nothing, and a suite that reads nothing as "the rule
 stayed silent" then passes while enforcing nothing. So only the tool's own "I found
-something" exit is tolerated, every other exit is re-thrown with what the tool wrote to
-`stderr`, and a smoke case proves the reporter's shape before any caller is allowed to read a
-silence.
+something" exit is tolerated, every other exit is re-thrown with both of the tool's streams,
+and a smoke case proves the reporter's shape before any caller is allowed to read a silence.
 
 The tool is a parameter — which package holds the binary, the command line, the exits that
-mean a finding, and the smoke case — so oxlint, knip and jscpd each run through the same
-helper. Imported through `@better-answers/devtools/throwaway-tree`.
+mean a finding, and the smoke case — so a second and a third tool run through this helper
+rather than each writing its own. oxlint runs through it today, with `oxlintOver` as the
+built form the lint-rule suites take. Imported through
+`@better-answers/devtools/throwaway-tree`.
 
 ## `lint-rules/` — the `better-answers` oxlint plugin
 

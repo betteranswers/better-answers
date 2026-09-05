@@ -25,8 +25,6 @@ export type Tree = Readonly<Record<string, string>>;
 
 /** What a caller must know to run one tool over a throwaway tree. */
 export type Tool = {
-  /** Written into a failure, so a tool that could not run says which tool it was. */
-  readonly name: string;
   /**
    * The package that declares the executable, and the path to it inside that package.
    * Resolved through the module graph rather than assembled from the repository root,
@@ -55,13 +53,13 @@ const resolveExecutable = (tool: Tool): string => {
     root = path.dirname(from.resolve(`${tool.executable.package}/package.json`));
   } catch {
     throw new Error(
-      `${tool.name}: the package \`${tool.executable.package}\` is not in @better-answers/devtools's dependency tree, so its binary cannot be resolved. Declare it as a devDependency of packages/devtools.`,
+      `\`${tool.executable.package}\` is not in @better-answers/devtools's dependency tree, so its binary cannot be resolved. Declare it as a devDependency of packages/devtools.`,
     );
   }
   const binary = path.join(root, ...tool.executable.path);
   if (!existsSync(binary)) {
     throw new Error(
-      `${tool.name}: \`${tool.executable.package}\` is installed but carries no executable at ${tool.executable.path.join("/")} (looked at ${binary}).`,
+      `${tool.executable.package}: the package is installed but carries no executable at ${tool.executable.path.join("/")} (looked at ${binary}).`,
     );
   }
   return binary;
@@ -84,7 +82,7 @@ export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
   const binary = resolveExecutable(tool);
 
   const run: RunOverTree = (tree) => {
-    const directory = mkdtempSync(path.join(tmpdir(), `${tool.name}-`));
+    const directory = mkdtempSync(path.join(tmpdir(), "throwaway-tree-"));
     writeTree(directory, tool.scaffold ?? {});
     writeTree(directory, tree);
     try {
@@ -109,7 +107,7 @@ export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
       // Both streams: a tool that refuses its configuration does not reliably say so on
       // stderr, and the whole point of this branch is that the reader learns why.
       throw new Error(
-        `${tool.name} (${binary}) did not run: exit ${String(status)}\n${String(failure.stdout ?? "")}\n${String(failure.stderr ?? cause)}`,
+        `${tool.executable.package} (${binary}) did not run: exit ${String(status)}\n${String(failure.stdout ?? "")}\n${String(failure.stderr ?? cause)}`,
       );
     }
   };
@@ -117,7 +115,7 @@ export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
   const smoked = run(tool.smoke.tree);
   if (!tool.smoke.reports(smoked)) {
     throw new Error(
-      `${tool.name} (${binary}) failed its smoke case: it ran over a tree that must produce a report, and what it wrote is not something the caller's reading can find. Until this passes, a silence from this tool means nothing.\nRaw output was:\n${smoked}`,
+      `${tool.executable.package} (${binary}) failed its smoke case: it ran over a tree that must produce a report, and what it wrote is not something the caller's reading can find. Until this passes, a silence from this tool means nothing.\nRaw output was:\n${smoked}`,
     );
   }
 
@@ -164,7 +162,6 @@ export const oxlintOver = (
 ): OxlintRunner => {
   const expected = [...smoke.flagged].sort();
   const run = runsOverThrowawayTree({
-    name: "oxlint",
     executable: { package: "oxlint", path: ["bin", "oxlint"] },
     argv: ["--config", ".oxlintrc.json", "--format=unix", "."],
     scaffold: { ".oxlintrc.json": configJson },

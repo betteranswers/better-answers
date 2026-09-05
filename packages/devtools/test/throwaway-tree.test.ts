@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { oxlintOver, runsOverThrowawayTree } from "../src/throwaway-tree.ts";
-import type { Tool, Tree } from "../src/throwaway-tree.ts";
+import { oxlintOver, runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
+import type { Tool, Tree } from "@better-answers/devtools/throwaway-tree";
 
 /**
  * The runner every gate's functional test runs its tool through (`[CHECK1]`).
  *
- * It is what stands between "the rule stayed silent" and "the tool never ran", so
- * this suite is mostly about the second reading being impossible. Three lint-rule suites
- * used to swallow a non-zero exit into an empty string; under that shape a missing binary, a
- * config the tool refused, or a plugin that failed to load turned every "it fires here"
- * assertion into a tautology that passed.
+ * It is what stands between "the rule stayed silent" and "the tool never ran", so this suite
+ * is mostly about the second reading being impossible. A suite that swallows a non-zero exit
+ * into an empty string cannot tell them apart, and under that shape a missing binary, a
+ * config the tool refused or a plugin that failed to load turns every "it fires here"
+ * assertion into a tautology that passes.
  *
  * oxlint is the tool under test because it is in this package's dependency tree and it
  * exercises the awkward case honestly: it exits 1 both for a diagnostic and for a
@@ -39,7 +39,6 @@ const FOUND_SOMETHING = [1];
 const reportsAFileAndPosition = (output: string): boolean => /^[^\s:]+:\d+:\d+:/m.test(output);
 
 const oxlintTool = (over: Partial<Tool> = {}): Tool => ({
-  name: "oxlint",
   executable: oxlint,
   argv: ["--config", ".oxlintrc.json", "--format=unix", "."],
   scaffold: { ".oxlintrc.json": kebabCaseConfig },

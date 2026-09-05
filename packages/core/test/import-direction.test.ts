@@ -15,8 +15,8 @@ import { describe, expect, it } from "vitest";
  * as much about where the rule stays *silent* as about where it fires.
  *
  * The tree and the oxlint run are the devtools runner's, which is what stops this suite
- * reading a linter that could not run as a rule that stayed quiet: it used to swallow every
- * non-zero exit into an empty string, and an empty string satisfies every assertion below.
+ * reading a linter that could not run as a rule that stayed quiet: an empty output satisfies
+ * every assertion below, so an empty output has to be impossible unless the rule was silent.
  */
 
 const repoRoot = path.resolve(import.meta.dirname, "../../..");

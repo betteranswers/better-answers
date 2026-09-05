@@ -12,10 +12,10 @@ import { describe, expect, it } from "vitest";
  * workspace argument. Each is applied to a throwaway tree so the assertion is as much
  * about where the rule stays silent as where it fires.
  *
- * The tree and the oxlint run are the devtools runner's. This suite used to swallow every
- * non-zero exit into an empty string, which meant a linter that could not run — a moved
- * binary, a plugin that failed to load, a config oxlint refused — read as a rule that had
- * stayed quiet, and satisfied every assertion below.
+ * The tree and the oxlint run are the devtools runner's, which is what makes a silence here
+ * mean something: a linter that could not run — a moved binary, a plugin that failed to
+ * load, a config oxlint refused — reports nothing, and nothing satisfies every assertion
+ * below.
  */
 
 const repoRoot = path.resolve(import.meta.dirname, "../../..");

@@ -260,6 +260,9 @@ importers:
 
   packages/devtools:
     devDependencies:
+      '@better-answers/devtools':
+        specifier: workspace:*
+        version: 'link:'
       '@oxlint/plugins':
         specifier: 1.80.0
         version: 1.80.0

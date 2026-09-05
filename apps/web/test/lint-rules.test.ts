@@ -12,9 +12,9 @@ import { describe, expect, it } from "vitest";
  *
  * Each rule is applied to a throwaway tree, so the assertion is as much about where the rule
  * stays silent as where it fires. The tree, the run and the reading of the report are the
- * devtools runner's — this suite is where that runner's hardening was written, and it now
- * imports it rather than owning a copy. The zones themselves are per-glob
- * `no-restricted-imports` overrides because oxlint 1.80 has no `import/no-restricted-paths`.
+ * devtools runner's, so a linter that could not run cannot read here as a rule that stayed
+ * quiet. The zones themselves are per-glob `no-restricted-imports` overrides because oxlint
+ * 1.80 has no `import/no-restricted-paths`.
  */
 
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
