@@ -1,0 +1,42 @@
+apps/worker/src/better_answers_worker/schema_view.py
+  s_529f881ca25f4e::t_0ed949ba2e74cb 9,84
+apps/api/tests/revocation-fields.test.ts
+  s_529f881ca25f4e::t_75bd5f9f176c55 1-54
+apps/api/src/auth/auth.ts
+  s_529f881ca25f4e::t_5859590c02d434 342-351
+packages/schema/test/boundary-schemas.test.ts
+  s_529f881ca25f4e::t_dba11062d3aeff 382
+  s_529f881ca25f4e::t_feeeac14e74988 38-39,42,45
+  s_529f881ca25f4e::t_bc3b2a366563d9 40-41,43-44,46-49
+packages/schema/migrations/meta/0007_snapshot.json
+  s_529f881ca25f4e::t_c1a8f83caaa1ce 1-2141
+packages/schema/src/identity-tables.ts
+  s_529f881ca25f4e::t_a10b90db70c7ef 147-152
+packages/schema/test/factory.ts
+  s_529f881ca25f4e::t_7ed3ba4345a3d4 83
+  s_529f881ca25f4e::t_4f8a4415cc7474 37-49
+  s_529f881ca25f4e::t_b86aba6892accf 67-68
+  s_529f881ca25f4e::t_22da4ebd70840d 82
+  s_529f881ca25f4e::t_931ceff2da76ec 79-81
+  s_529f881ca25f4e::t_651fe7987862e6 192-245
+packages/schema/migrations/0007_member-revocation-instant.sql
+  s_529f881ca25f4e::t_c1a8f83caaa1ce 1
+packages/schema/migrations/meta/_journal.json
+  s_529f881ca25f4e::t_c1a8f83caaa1ce 53-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1df44dcb3eb7414adacaa855d51534d7a80c7dc2",
+  "prompts": {},
+  "sessions": {
+    "s_529f881ca25f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688411cf-a489-4e1b-b43c-905b1ccfe9f6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
