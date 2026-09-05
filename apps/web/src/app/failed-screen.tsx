@@ -3,9 +3,12 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/shared/ui/button.tsx";
 
 /**
- * A screen that threw while it was being drawn. The router mounts this inside the shell's
- * outlet, so the frame, its landmarks and its navigation are still there and the reader has
- * lost one screen rather than the product.
+ * A screen that threw while it was being drawn. The router mounts it in place of the route
+ * that threw and no higher, so a screen under the shell is replaced inside the frame's
+ * outlet and the reader loses one screen rather than the product. The three screens outside
+ * the frame — sign-in, the picker, the refused screen — carry their own landmark, so a throw
+ * in one of them leaves this standing alone; that is the same page the no-such-screen
+ * component has always been, and better than the blank the router's own default drew.
  *
  * The router hands an error component the error, its component stack and a reset. This one
  * takes the reset alone: a message, a name or a stack is the platform's own internals, and
