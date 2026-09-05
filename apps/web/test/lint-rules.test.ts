@@ -1,34 +1,23 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import path from "node:path";
+
+import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
 /**
- * The SPA's rules, run rather than remembered: the layering zones (app → features → shared,
- * never back, and no feature reaching another), kebab-case filenames, and ADR 0006's one
- * exception — `AppRouter` as an `import type` in the client-instance file and nowhere else.
+ * The SPA's rules, run rather than remembered (`[CHECK1]`): the layering zones (app →
+ * features → shared, never back, and no feature reaching another), kebab-case filenames, and
+ * ADR 0006's one exception — `AppRouter` as an `import type` in the client-instance file and
+ * nowhere else.
  *
  * Each rule is applied to a throwaway tree, so the assertion is as much about where the rule
- * stays silent as where it fires. This is the shape `apps/api/tests/lint-rules.test.ts` uses;
- * the zones themselves are per-glob `no-restricted-imports` overrides because oxlint 1.80 has
- * no `import/no-restricted-paths`.
+ * stays silent as where it fires. The tree, the run and the reading of the report are the
+ * devtools runner's — this suite is where that runner's hardening was written, and it now
+ * imports it rather than owning a copy. The zones themselves are per-glob
+ * `no-restricted-imports` overrides because oxlint 1.80 has no `import/no-restricted-paths`.
  */
 
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
-
-/**
- * Resolved through the module graph rather than assembled from a path, because pnpm's layout
- * puts a binary where the package that declares it can reach it and not necessarily at the
- * root — and a wrong path here does not fail loudly, it makes every rule look silent.
- */
-const oxlint = (() => {
-  const manifest = createRequire(import.meta.url).resolve("oxlint/package.json");
-  const binary = path.join(path.dirname(manifest), "bin", "oxlint");
-  if (!existsSync(binary)) throw new Error(`oxlint's binary is not at ${binary}`);
-  return binary;
-})();
 
 /** JSONC: the repo's config carries the comments explaining each rule. */
 const readConfig = (): {
@@ -58,78 +47,23 @@ if (webOverrides().length !== 5) {
   throw new Error(`expected five apps/web overrides, found ${webOverrides().length}`);
 }
 
-type Fixture = Readonly<Record<string, string>>;
-
 /**
- * Lint `files` (path → source) under the SPA's real overrides, returning oxlint's output.
+ * Lint a tree (path → source) under the SPA's real overrides, and name the paths oxlint
+ * reported a diagnostic against.
  *
- * The failure this shape has to avoid is the silent one: if oxlint cannot be run at all, or
- * refuses the config, the natural `catch` returns an empty string, every "it fires here"
- * assertion sees no diagnostics, and the whole suite passes while enforcing nothing. So the
- * only tolerated non-zero exit is oxlint's own "I found something" (1); anything else is
- * re-thrown with what it wrote to stderr, and the smoke check below proves the command works
- * before any case trusts a silence.
+ * The smoke case is a file whose name `unicorn/filename-case` must refuse, and the one path
+ * that must come back for it. Nothing below is allowed to read a silence as "the rule stayed
+ * quiet" until oxlint has answered it: an oxlint that cannot run, one whose config it
+ * refused, or one whose reporter changed would otherwise turn every assertion in this file
+ * into a tautology that passes.
  */
-const lint = (files: Fixture): string => {
-  const dir = mkdtempSync(path.join(tmpdir(), "t036-lint-"));
-  writeFileSync(
-    path.join(dir, ".oxlintrc.json"),
-    JSON.stringify({ plugins: ["typescript", "unicorn", "import"], overrides: webOverrides() }),
-  );
-  for (const [file, source] of Object.entries(files)) {
-    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
-    writeFileSync(path.join(dir, file), source);
-  }
-  try {
-    // The format is pinned rather than left to oxlint: it picks GitHub's annotation reporter
-    // when it detects Actions, which buries the path inside a `::error file=…::` line where
-    // the `path:line:column:` reader below cannot see it — every rule then reads as silent,
-    // which is exactly what CI found while this suite passed locally. `unix` is the one
-    // format that is a stable `path:line:column: message` line and never a drawn box.
-    return execFileSync(oxlint, ["--config", ".oxlintrc.json", "--format=unix", "."], {
-      cwd: dir,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  } catch (cause) {
-    const failure = cause as { status?: number | null; stdout?: string; stderr?: string };
-    if (failure.status === 1) return String(failure.stdout ?? "");
-    throw new Error(
-      `oxlint (${oxlint}) did not run: exit ${String(failure.status)}\n${String(failure.stderr ?? cause)}`,
-    );
-  }
-};
-
-/**
- * The paths oxlint reported a diagnostic against, read off the `path:line:column:` column of
- * each line. Asserted on rather than on the raw output, because a rule's help text names the
- * file it points the reader at — `Rename the file to 'route-table.ts'` — and a substring
- * search over the whole output would read that as a second diagnostic.
- */
-const flagged = (files: Fixture): readonly string[] => {
-  const output = lint(files);
-  return [
-    ...new Set(
-      output
-        .split("\n")
-        .map((line) => /^(?<file>[^\s:]+):\d+:\d+:/.exec(line)?.groups?.["file"])
-        .filter((file): file is string => file !== undefined),
-    ),
-  ].sort();
-};
-
-// The command works and its output is in the shape `flagged` reads, proved before any case
-// below is allowed to read a silence as "the rule stayed quiet". Without this, an oxlint that
-// cannot run, or one whose reporter changed, turns every assertion in this file into a
-// tautology that passes.
-const smoke = flagged({ "apps/web/src/shared/routeTable.ts": "export const keep = 1;\n" });
-if (smoke.length !== 1) {
-  throw new Error(
-    `oxlint reported nothing for a file that must fail unicorn/filename-case; raw output was:\n${lint(
-      { "apps/web/src/shared/routeTable.ts": "export const keep = 1;\n" },
-    )}`,
-  );
-}
+const { flagged } = oxlintOver(
+  JSON.stringify({ plugins: ["typescript", "unicorn", "import"], overrides: webOverrides() }),
+  {
+    tree: { "apps/web/src/shared/routeTable.ts": "export const keep = 1;\n" },
+    flagged: ["apps/web/src/shared/routeTable.ts"],
+  },
+);
 
 const probe = (specifier: string): string =>
   `import * as probe from "${specifier}";\nexport const keep = probe;\n`;

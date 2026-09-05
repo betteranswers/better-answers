@@ -84,6 +84,9 @@ importers:
         specifier: 4.5.4
         version: 4.5.4
     devDependencies:
+      '@better-answers/devtools':
+        specifier: workspace:*
+        version: link:../../packages/devtools
       '@stryker-mutator/core':
         specifier: 10.0.0
         version: 10.0.0(@types/node@24.13.3)
@@ -169,6 +172,9 @@ importers:
       '@better-answers/api':
         specifier: workspace:*
         version: link:../api
+      '@better-answers/devtools':
+        specifier: workspace:*
+        version: link:../../packages/devtools
       '@better-answers/schema':
         specifier: workspace:*
         version: link:../../packages/schema
@@ -224,6 +230,9 @@ importers:
         specifier: 8.23.0
         version: 8.23.0
     devDependencies:
+      '@better-answers/devtools':
+        specifier: workspace:*
+        version: link:../devtools
       '@types/node':
         specifier: 24.13.3
         version: 24.13.3

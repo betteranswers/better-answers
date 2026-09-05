@@ -36,6 +36,7 @@
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
     "@better-answers/api": "workspace:*",
+    "@better-answers/devtools": "workspace:*",
     "@better-answers/schema": "workspace:*",
     "@playwright/test": "1.62.1",
     "@stryker-mutator/core": "10.0.0",

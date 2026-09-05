@@ -29,6 +29,7 @@
     "pg": "8.23.0"
   },
   "devDependencies": {
+    "@better-answers/devtools": "workspace:*",
     "@types/node": "24.13.3",
     "@types/pg": "8.23.1",
     "typescript": "7.0.2",

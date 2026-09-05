@@ -4,7 +4,9 @@ import { oxlintOver, runsOverThrowawayTree } from "../src/throwaway-tree.ts";
 import type { Tool, Tree } from "../src/throwaway-tree.ts";
 
 /**
- * The runner is what stands between "the rule stayed silent" and "the tool never ran", so
+ * The runner every gate's functional test runs its tool through (`[CHECK1]`).
+ *
+ * It is what stands between "the rule stayed silent" and "the tool never ran", so
  * this suite is mostly about the second reading being impossible. Three lint-rule suites
  * used to swallow a non-zero exit into an empty string; under that shape a missing binary, a
  * config the tool refused, or a plugin that failed to load turned every "it fires here"

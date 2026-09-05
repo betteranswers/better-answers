@@ -1,22 +1,25 @@
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import path from "node:path";
+
+import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
 /**
  * ADR 0029 rule 5 — nothing in `packages/core` imports a transport or a transport's
  * dependency — is held by a per-glob `no-restricted-imports` override in the root oxlint
- * config. A rule nobody has run is a convention, so this test runs it.
+ * config. A rule nobody has run is a convention, so this test runs it (`[CHECK1]`).
  *
  * The override is read out of the real `.oxlintrc.json` rather than restated here: a
  * restatement would pass while the repository's own config was broken. It is then applied
  * to a throwaway tree holding the same import under both globs, because the assertion is
  * as much about where the rule stays *silent* as about where it fires.
+ *
+ * The tree and the oxlint run are the devtools runner's, which is what stops this suite
+ * reading a linter that could not run as a rule that stayed quiet: it used to swallow every
+ * non-zero exit into an empty string, and an empty string satisfies every assertion below.
  */
 
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
-const oxlint = path.join(repoRoot, "node_modules", ".bin", "oxlint");
 
 /** JSONC: the repo's config carries the comments explaining each rule. */
 const readConfig = (): Record<string, unknown> =>
@@ -31,26 +34,24 @@ const coreOverride = (): unknown => {
   return found;
 };
 
-const lintFixture = (importSpecifier: string): string => {
-  const dir = mkdtempSync(path.join(tmpdir(), "import-direction-"));
-  writeFileSync(path.join(dir, ".oxlintrc.json"), JSON.stringify({ overrides: [coreOverride()] }));
-  for (const workspace of ["packages/core", "apps/api"]) {
-    mkdirSync(path.join(dir, workspace), { recursive: true });
-    writeFileSync(
-      path.join(dir, workspace, "probe.ts"),
+const bothWorkspaces = (importSpecifier: string): Readonly<Record<string, string>> =>
+  Object.fromEntries(
+    ["packages/core", "apps/api"].map((workspace) => [
+      `${workspace}/probe.ts`,
       `import * as transport from "${importSpecifier}";\nexport const probe = transport;\n`,
-    );
-  }
-  try {
-    return execFileSync(oxlint, ["--config", ".oxlintrc.json", "."], {
-      cwd: dir,
-      encoding: "utf8",
-    });
-  } catch (error) {
-    // oxlint exits non-zero when it finds a diagnostic, which is the case under test.
-    return String((error as { stdout?: string }).stdout ?? "");
-  }
-};
+    ]),
+  );
+
+// The smoke case: the rule's own subject, under both globs, with the one path that must come
+// back. Until oxlint answers this the way the config says it will, no silence below means
+// anything.
+const lint = oxlintOver(JSON.stringify({ overrides: [coreOverride()] }), {
+  tree: bothWorkspaces("hono"),
+  flagged: ["packages/core/probe.ts"],
+});
+
+const lintFixture = (importSpecifier: string): string =>
+  lint.output(bothWorkspaces(importSpecifier));
 
 describe("the transport ban over packages/core", () => {
   it("fires on a transport import inside packages/core and stays silent in apps/api", () => {

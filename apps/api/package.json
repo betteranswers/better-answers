@@ -40,6 +40,7 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@better-answers/devtools": "workspace:*",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@testcontainers/postgresql": "12.1.0",

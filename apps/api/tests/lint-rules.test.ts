@@ -1,20 +1,24 @@
-import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import path from "node:path";
+
+import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
 /**
- * The lint rules T-004 adds, run rather than remembered: ADR 0009's better-auth ban
- * (an override in `.oxlintrc.json`), ADR 0030's MCP-type ban over `packages/core` (the
+ * The lint rules T-004 adds, run rather than remembered (`[CHECK1]`): ADR 0009's better-auth
+ * ban (an override in `.oxlintrc.json`), ADR 0030's MCP-type ban over `packages/core` (the
  * existing core override, extended here to the v2 package name), and the two
  * `better-answers` plugin rules — every entry carries `annotations`, no entry takes a
  * workspace argument. Each is applied to a throwaway tree so the assertion is as much
  * about where the rule stays silent as where it fires.
+ *
+ * The tree and the oxlint run are the devtools runner's. This suite used to swallow every
+ * non-zero exit into an empty string, which meant a linter that could not run — a moved
+ * binary, a plugin that failed to load, a config oxlint refused — read as a rule that had
+ * stayed quiet, and satisfied every assertion below.
  */
 
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
-const oxlint = path.join(repoRoot, "node_modules", ".bin", "oxlint");
 
 /** JSONC: the repo's config carries the comments explaining each rule. */
 const readConfig = (): {
@@ -32,47 +36,39 @@ const overrideFor = (glob: string) => {
   return found;
 };
 
-type Fixture = Readonly<Record<string, string>>;
-
-/** Lint `files` (path → source) under the repo's real config, returning oxlint's output. */
-const lint = (files: Fixture): string => {
-  const dir = mkdtempSync(path.join(tmpdir(), "t004-lint-"));
-  const config = readConfig();
-  writeFileSync(
-    path.join(dir, ".oxlintrc.json"),
-    JSON.stringify({
-      // The plugin is resolved from the repo, not copied.
-      jsPlugins: config.jsPlugins.map((plugin) => ({
-        ...plugin,
-        specifier: path.join(repoRoot, plugin.specifier),
-      })),
-      rules: Object.fromEntries(
-        Object.entries(config.rules).filter(([name]) => name.startsWith("better-answers/")),
-      ),
-      overrides: [
-        overrideFor("**/*.ts"),
-        overrideFor("apps/api/src/auth/**"),
-        overrideFor("packages/core/**"),
-      ],
-    }),
-  );
-  for (const [file, source] of Object.entries(files)) {
-    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
-    writeFileSync(path.join(dir, file), source);
-  }
-  try {
-    return execFileSync(oxlint, ["--config", ".oxlintrc.json", "."], {
-      cwd: dir,
-      encoding: "utf8",
-    });
-  } catch (error) {
-    // oxlint exits non-zero when it finds a diagnostic, which is the case under test.
-    return String((error as { stdout?: string }).stdout ?? "");
-  }
-};
-
 const probe = (specifier: string): string =>
   `import * as probe from "${specifier}";\nexport const keep = probe;\n`;
+
+const config = readConfig();
+
+/** Lint `files` (path → source) under the repo's real config, returning oxlint's output. */
+const { output: lint } = oxlintOver(
+  JSON.stringify({
+    // The plugin is resolved from the repo, not copied.
+    jsPlugins: config.jsPlugins.map((plugin) => ({
+      ...plugin,
+      specifier: path.join(repoRoot, plugin.specifier),
+    })),
+    rules: Object.fromEntries(
+      Object.entries(config.rules).filter(([name]) => name.startsWith("better-answers/")),
+    ),
+    overrides: [
+      overrideFor("**/*.ts"),
+      overrideFor("apps/api/src/auth/**"),
+      overrideFor("packages/core/**"),
+    ],
+  }),
+  {
+    // The identity ban's own subject, under the glob it fires in and the one it does not.
+    // Until oxlint answers this the way the config says it will, no silence below means
+    // anything — and the plugin specifiers above are proved to load by the same case.
+    tree: {
+      "apps/api/src/mcp/probe.ts": probe("better-auth"),
+      "apps/api/src/auth/probe.ts": probe("better-auth"),
+    },
+    flagged: ["apps/api/src/mcp/probe.ts"],
+  },
+);
 
 describe("ADR 0009 — the identity provider stays behind its seam", () => {
   it("refuses a better-auth import outside the auth module, and allows it inside", () => {

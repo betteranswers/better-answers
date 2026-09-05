@@ -25,7 +25,7 @@ helper. Imported through `@better-answers/devtools/throwaway-tree`.
 The repository's own rules: the ones that hold a rule in `CODING_RULES.md` or an ADR rather
 than a generic hygiene pattern. Loaded by `.oxlintrc.json` as a `jsPlugins` specifier. Each
 rule carries its rule line in the message it prints and lands with a functional test through
-the runner.
+the runner (`[CHECK1]`).
 
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted
 
