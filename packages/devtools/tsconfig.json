@@ -1,9 +1,12 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node"],
+    // The gate's configuration is a JavaScript module — `.jscpd.json` cannot carry the
+    // reason for an exclusion — and the suite that reads it as a value is here.
+    "allowJs": true
   },
   // `lifts/anti-slop` is left out: a verbatim third-party snapshot is not held to this
   // repository's compiler settings, and the api workspace never typechecked it either.
-  "include": ["src", "test", "lint-rules", "vitest.config.ts"]
+  "include": ["src", "test", "lint-rules", "vitest.config.ts", "../../jscpd.config.mjs"]
 }
