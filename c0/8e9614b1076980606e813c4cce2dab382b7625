@@ -1,0 +1,34 @@
+.github/workflows/check.yml
+  s_2c3fc9d16bd52c::t_4b7453e0b478f3 62-63
+lefthook.yml
+  s_2c3fc9d16bd52c::t_93cf23ba68682c 49-55,57
+  s_2c3fc9d16bd52c::t_a7cf106265d1d5 45-48
+apps/api/tests/lefthook-config.test.ts
+  s_2c3fc9d16bd52c::t_c06e54e4cce786 1
+  s_2c3fc9d16bd52c::t_d79c106273cb8e 141-143,146-147
+  s_2c3fc9d16bd52c::t_7f6d7156c650c2 70-89,91-101
+  s_2c3fc9d16bd52c::t_bffb3ef51c3111 175,183,186-187,190-202
+  s_2c3fc9d16bd52c::t_1d707c70095672 234
+  s_2c3fc9d16bd52c::t_bed31596a7e07b 104-107,109-115,117-120
+  s_2c3fc9d16bd52c::t_f1de86df1ebd81 126-127
+  s_2c3fc9d16bd52c::t_02e208479a7bd0 145,153,155
+  s_2c3fc9d16bd52c::t_12a221212af86c 148-152,154,156
+  s_2c3fc9d16bd52c::t_d3abd3fe65d7ee 159-174
+  s_2c3fc9d16bd52c::t_69af06b7c9588f 122-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c08e9614b1076980606e813c4cce2dab382b7625",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
