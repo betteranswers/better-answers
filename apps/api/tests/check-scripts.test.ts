@@ -141,3 +141,58 @@ describe("the workspaces' scripts (T-068)", () => {
     expect(recursive[0]).toContain("--no-bail");
   });
 });
+
+/**
+ * A step named on the runner's command line, in the order a `check` runs them: what a
+ * workspace's gates are, and the order the failures are reported in.
+ */
+const GATE_STEPS = ["lint", "typecheck", "test", "e2e"] as const;
+
+/** `node ../../scripts/check.mjs lint typecheck test` → the steps, or nothing. */
+const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<steps>.+)$/;
+
+const stepsOf = (check: string): readonly string[] =>
+  (RUNNER.exec(check)?.groups?.["steps"] ?? "").split(/\s+/).filter((step) => step.length > 0);
+
+describe("one run of check names every failure (T-068)", () => {
+  it("runs a workspace's every gate through the runner rather than chaining them", () => {
+    const chained = workspaceDirectories().flatMap((directory) => {
+      const check = scriptsOf(directory)["check"];
+      // `&&` stops at the first failure: a session is told about lint, fixes it, runs
+      // check again and is only then told about types.
+      return check !== undefined && (check.includes("&&") || stepsOf(check).length === 0)
+        ? [`${directory}: ${check}`]
+        : [];
+    });
+
+    expect(
+      chained,
+      "a workspace's check chains its steps. Call scripts/check.mjs with the steps instead: it runs every one and names all that failed.",
+    ).toEqual([]);
+  });
+
+  it("names each of a workspace's gates as a step, and nothing that is not a script", () => {
+    for (const directory of workspaceDirectories()) {
+      const scripts = scriptsOf(directory);
+      const check = scripts["check"];
+      if (check === undefined) continue;
+
+      // Both directions (`[TEST7]`): a gate the workspace has and `check` does not run is
+      // a gate CI never reaches, and a step naming no script is a `check` that cannot run.
+      expect(stepsOf(check), `${directory} runs a step it does not have, or misses a gate`).toEqual(
+        GATE_STEPS.filter((step) => scripts[step] !== undefined),
+      );
+    }
+  });
+
+  it("runs the root's own steps the same way, so a step is added by naming it", () => {
+    const scripts = scriptsOf(".");
+    const steps = stepsOf(scripts["check"] ?? "");
+
+    expect(steps.length, "the root check does not call the runner").toBeGreaterThan(0);
+    expect(steps.filter((step) => scripts[step] === undefined)).toEqual([]);
+    // The two halves of the tree, each a step of the root's own list.
+    expect(steps).toContain("check:workspaces");
+    expect(steps).toContain("check:worker");
+  });
+});

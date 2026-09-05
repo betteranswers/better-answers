@@ -22,7 +22,7 @@
     "lint": "oxlint --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "pnpm run lint && pnpm run typecheck && pnpm run test"
+    "check": "node ../../scripts/check.mjs lint typecheck test"
   },
   "dependencies": {
     "@better-answers/schema": "workspace:*",
