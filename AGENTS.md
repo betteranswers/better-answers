@@ -30,7 +30,8 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers �
 | `apps/web/` | Vite React single-page app; talks to `apps/api/` over tRPC only |
 | `apps/worker/` | Python 3.13 knowledge worker (uv): connectors, conversion, indexing, graph derive-and-sync, enrichment, ontology tooling |
 | `packages/core/` | The business logic `apps/api` calls — capability slices over four store doors. Transport-agnostic, and lint-enforced as such |
-| `packages/` | The rest of the shared TypeScript: `schema` |
+| `packages/devtools/` | The repository's own gate tooling — the throwaway-tree runner every gate's test runs its tool through, the `better-answers` oxlint plugin and the anti-slop lift. Imported, never deployed |
+| `packages/` | The rest of the shared TypeScript: `schema`, `design-system` |
 | `contracts/` | The tier contract's language-neutral fixtures — both tiers' suites read it, nothing imports it (ADR 0031) |
 | `docs/adr/` | Architecture decision records |
 | `apps/docs-site/` | Astro + Starlight documentation site and its docs skills; `apps/docs-site/specs/<ticket>.md` is where a ticket's spec lives |

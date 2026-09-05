@@ -50,6 +50,14 @@ Stryker (`apps/api`, `apps/web`) and mutmut (`apps/worker`) run on a schedule �
 
 Where a list names members (the migration journal and its directory), a generated artefact mirrors a source (the worker's schema view and the migrated tables), or a registry names them (the boundary-schema registry and the exported tables), the test asserts membership both ways: every entry has its member, and every member has its entry. One direction finds the missing; only the other finds the orphan.
 
+## CHECK
+
+### [CHECK1] Every gate is run, not remembered
+
+A lint rule, a tool in `check` and a hook command each land with a functional test that runs the tool over a throwaway tree and asserts both where it fires and where it stays silent. The tree, the run and the reading of the report are `@better-answers/devtools/throwaway-tree`'s: only the tool's own "found something" exit is tolerated, any other exit is re-thrown with what the tool wrote, and a smoke case proves the reporter before a silence may be read as a rule staying quiet.
+
+A repository lint rule carries its rule line — a tag or an ADR — in the message it prints, so a reader who hits it reaches the rule without asking, and it lands with a functional test through that runner.
+
 ## COMMENT
 
 ### [COMMENT1] Comments explain why

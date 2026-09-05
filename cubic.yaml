@@ -35,8 +35,10 @@ reviews:
       `[TEST]`, `[SEC]`, `[AUDIT]`, `[DEPS1]`, `[COMMENT1]`, `[LOG1]`…). Cite the
       tag when a finding rests on a rule; `[TEST5]` (a test title says what the system does
       for whom), `[COMMENT1]` (a comment says why, never what or what happened) and
-      `[COMMENT2]` (a rule tag never appears in source, deploy, a Dockerfile or CI) are
-      cited by review alone, so cite them when they are the finding.
+      `[COMMENT2]` (a rule tag never appears in source, deploy, a Dockerfile or CI) and
+      `[CHECK1]` (a lint rule, a tool in `check` or a hook command lands with a functional
+      test of where it fires and where it stays silent) are cited by review alone, so cite
+      them when they are the finding.
     - `apps/api/CODING_RULES.md` and `apps/worker/CODING_RULES.md` — tier rules. Apply the
       tier's file to changes in that tier.
     - `docs/adr/` — the architecture decision records; `docs/adr/README.md` is the
