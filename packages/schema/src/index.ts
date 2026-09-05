@@ -7,6 +7,7 @@ export * from "./rls-exemptions.ts";
 export * from "./postgres-image.ts";
 export * from "./boundary-schemas.ts";
 export * from "./roles.ts";
+export * from "./ulid.ts";
 
 /**
  * Where the generated SQL lives. The schema is defined here and the migrations are

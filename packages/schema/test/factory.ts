@@ -3,7 +3,7 @@ import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
 import type pg from "pg";
 import type { z } from "zod";
 
-import { boundarySchemas, CREATOR_ROLE, EMBEDDING_DIMENSIONS } from "../src/index.ts";
+import { boundarySchemas, CREATOR_ROLE, EMBEDDING_DIMENSIONS, ulid } from "../src/index.ts";
 
 /**
  * The test-data factory (`[TEST4]`): tests state what their scenario needs and get
@@ -35,13 +35,6 @@ export type TestData = {
   /** A chunk; creates workspace and partition as needed; embedding defaults to zeros. */
   chunk(overrides?: Partial<InsertInput<"chunk">>): Promise<Row<"chunk">>;
 };
-
-const ULID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-export const ulid = (): string =>
-  Array.from(
-    { length: 26 },
-    () => ULID_ALPHABET[Math.floor(Math.random() * ULID_ALPHABET.length)],
-  ).join("");
 
 /** INSERT the boundary-parsed row and read it back through the select schema. */
 const insertRow = async <TName extends keyof Registry>(
@@ -99,7 +92,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   };
 
   const user: TestData["user"] = (overrides = {}) => {
-    const id = overrides.id ?? `user-${ulid()}`;
+    const id = overrides.id ?? ulid();
     return insertRow(client, "user", {
       id,
       name: "Test person",
@@ -112,7 +105,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const userId = overrides.userId ?? (await user()).id;
     return insertRow(client, "member", {
-      id: `member-${ulid()}`,
+      id: ulid(),
       role: CREATOR_ROLE,
       createdAt: new Date(),
       ...overrides,

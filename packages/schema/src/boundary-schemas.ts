@@ -23,6 +23,7 @@ import {
 import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { ROLES } from "./roles.ts";
 import { llmRoute, workspaceConfig } from "./schema.ts";
+import { ULID_PATTERN } from "./ulid.ts";
 import { workspace } from "./workspace-table.ts";
 
 /**
@@ -39,7 +40,7 @@ import { workspace } from "./workspace-table.ts";
  * the user and workspace ids to the platform's brands.
  */
 
-const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+const ULID = new RegExp(ULID_PATTERN);
 const workspaceId = (schema: z.ZodString) => schema.regex(ULID).brand<"WorkspaceId">();
 const userId = (schema: z.ZodString) => schema.trim().min(1).brand<"UserId">();
 

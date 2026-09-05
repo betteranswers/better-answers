@@ -25,7 +25,11 @@
  *   its seam, stated once in `result.ts`'s docblock. T-076.
  * - `refusalFor` — Postgres's constraint names read into a slice's own refusal words,
  *   the store's Error back for every violation the slice does not name. T-076.
+ * - `ulid` — the platform's one minter, re-exported from the boundary package where its
+ *   body sits beside the pattern it mints to. Every id the platform writes for itself
+ *   comes from here, and Better Auth is handed the same function. T-074, ADR 0035.
  */
+export { ulid } from "@better-answers/schema";
 export { refusalFor } from "./constraint.ts";
 export { attempt, err, normalizeError, ok } from "./result.ts";
 export type { Result } from "./result.ts";

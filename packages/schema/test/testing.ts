@@ -3,4 +3,6 @@
  * (`[TEST4]`) every data test in the TypeScript tier reuses.
  */
 export { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
-export { type TestData, testData, ulid } from "./factory.ts";
+export { type TestData, testData } from "./factory.ts";
+// The production minter, so a test seeds ids in exactly the shape the platform mints.
+export { ulid } from "../src/index.ts";
