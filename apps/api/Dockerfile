@@ -33,8 +33,10 @@ COPY package.json ./
 RUN corepack enable && corepack install && chmod -R a+rX "$COREPACK_HOME"
 
 # Every workspace manifest, and nothing else, so a source edit does not invalidate the
-# install layer. `pnpm-workspace.yaml` lists five projects; the lockfile is checked against
-# all of them, so all five are copied even though the runtime needs three.
+# install layer. `pnpm-workspace.yaml` lists six projects; the lockfile is checked against
+# all of them, so all six are copied even though the runtime needs three. `packages/devtools`
+# is here for its manifest alone — it is imported by suites and by the lint config and never
+# deployed, so no stage below copies a line of it.
 FROM base AS manifests
 # `tsconfig.base.json` joins them because every workspace's tsconfig extends it and vite
 # reads the chain at build time. Node needs none of it: type stripping reads no tsconfig,
@@ -44,6 +46,7 @@ COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY packages/core/package.json packages/core/
 COPY packages/design-system/package.json packages/design-system/
+COPY packages/devtools/package.json packages/devtools/
 COPY packages/schema/package.json packages/schema/
 
 # The SPA's build. It needs the dev dependency tree (vite, tailwind, esbuild's platform

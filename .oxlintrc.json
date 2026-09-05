@@ -4,13 +4,13 @@
   "jsPlugins": [
     {
       "name": "anti-slop",
-      "specifier": "./apps/api/tools/anti-slop/index.ts"
+      "specifier": "./packages/devtools/lifts/anti-slop/index.ts"
     },
     {
       // The repository's own rules — each holds a CODING_RULES or ADR line and is run
       // by a functional test (apps/api/tests/lint-rules.test.ts).
       "name": "better-answers",
-      "specifier": "./apps/api/tools/lint-rules/index.ts"
+      "specifier": "./packages/devtools/lint-rules/index.ts"
     }
   ],
   "categories": {
@@ -444,7 +444,7 @@
     "coverage",
     "reports",
     ".venv",
-    "apps/api/tools/anti-slop/**",
+    "packages/devtools/lifts/anti-slop/**",
     ".claude/worktrees/**",
     "**/stryker-setup-*.js"
   ]

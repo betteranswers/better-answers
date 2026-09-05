@@ -97,7 +97,7 @@ const isAllowedLocation = (file: string): boolean =>
   file.startsWith("apps/docs-site/specs/") ||
   file === "cubic.yaml" ||
   file === ".oxlintrc.json" ||
-  file.startsWith("apps/api/tools/lint-rules/") ||
+  file.startsWith("packages/devtools/lint-rules/") ||
   isTest(file) ||
   isDocument(file);
 

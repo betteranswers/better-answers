@@ -7,7 +7,7 @@
     "**/*.toml",
     "deploy/**",
     "renovate.json",
-    "apps/api/tools/anti-slop/**",
+    "packages/devtools/lifts/anti-slop/**",
     ".claude/worktrees/**",
     "packages/schema/migrations/**"
   ]

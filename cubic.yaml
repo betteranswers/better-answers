@@ -64,7 +64,6 @@ reviews:
 
   ignore:
     files:
-      - apps/api/tools/anti-slop/**
       - cubic.yaml
       # A verbatim third-party snapshot is taken by contract, so a finding in one
       # belongs upstream and never on a pull request here (ADR 0027).

@@ -14,5 +14,5 @@
     // notes); every other workspace keeps the base setting.
     "exactOptionalPropertyTypes": false
   },
-  "include": ["src", "lifts", "tests", "tools/lint-rules", "vitest.config.ts"]
+  "include": ["src", "lifts", "tests", "vitest.config.ts"]
 }
