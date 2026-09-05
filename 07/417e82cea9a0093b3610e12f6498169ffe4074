@@ -1,0 +1,25 @@
+CODING_RULES.md
+  s_fcbd378fb8388d::t_b08c08d2954070 145
+  s_fcbd378fb8388d::t_04315baa2cd730 125,133,137,141,149
+  s_fcbd378fb8388d::t_6224aeeb6a3c84 115-116,118-124,126-128,130-132,134-136,138-140,142-144,146-148,150
+CONTEXT.md
+  s_fcbd378fb8388d::t_00ef8c6988f431 387-389,478-480
+cubic.yaml
+  s_fcbd378fb8388d::t_bb923322b11757 35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "07417e82cea9a0093b3610e12f6498169ffe4074",
+  "prompts": {},
+  "sessions": {
+    "s_fcbd378fb8388d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "13d84d6a-7dce-40e9-9e99-881e55475ca1",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
