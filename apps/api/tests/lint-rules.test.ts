@@ -5,12 +5,19 @@ import { oxlintOver, type Tree } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
 /**
- * The lint rules T-004 adds, run rather than remembered (`[CHECK1]`): ADR 0009's better-auth
- * ban (an override in `.oxlintrc.json`), ADR 0030's MCP-type ban over `packages/core` (the
- * existing core override, extended here to the v2 package name), and the two
- * `better-answers` plugin rules — every entry carries `annotations`, no entry takes a
- * workspace argument. Each is applied to a throwaway tree so the assertion is as much
- * about where the rule stays silent as where it fires.
+ * The repository's lint rules, run rather than remembered (`[CHECK1]`). Two families, two
+ * runners.
+ *
+ * The rules T-004 adds, each an override or a plugin rule: ADR 0009's better-auth ban, ADR
+ * 0030's MCP-type ban over `packages/core` (the existing core override, extended here to the
+ * v2 package name), and the two `better-answers` plugin rules — every entry carries
+ * `annotations`, no entry takes a workspace argument.
+ *
+ * The three rules T-069 adds, each a line in the base `rules` block: no two tests in one
+ * describe block carry the same title, no block is empty, and no promise floats.
+ *
+ * Each is applied to a throwaway tree so the assertion is as much about where the rule stays
+ * silent as where it fires.
  *
  * The tree and the oxlint run are the devtools runner's, which is what makes a silence here
  * mean something: a linter that could not run — a moved binary, a plugin that failed to
@@ -78,6 +85,10 @@ const { output: lint } = oxlintOver(
  * config carried the rule as a warning, or not at all. The plugin list and the options
  * block travel with it, because a rule from a plugin oxlint was not told to load is a rule
  * that stays silent, and the type-aware rules need the options block to run at all.
+ *
+ * The overrides do not travel with it — the react plugin one names a specifier that cannot
+ * resolve from a temporary directory — so the runner refuses instead to build over a rule any
+ * override switches off, which is the only way an override could make these cases lie.
  */
 const ruleRunner = (
   name: string,
@@ -85,6 +96,11 @@ const ruleRunner = (
 ): ((tree: Tree) => string) => {
   const setting = config.rules[name];
   if (setting === undefined) throw new Error(`no \`${name}\` rule in .oxlintrc.json`);
+  const relaxed = config.overrides.filter((override) => override.rules?.[name] !== undefined);
+  if (relaxed.length > 0)
+    throw new Error(
+      `\`${name}\` is re-set by an override over ${relaxed.map((o) => o.files?.join(", ")).join("; ")}, which this runner does not carry — so these cases would prove the rule somewhere it no longer holds.`,
+    );
   return oxlintOver(
     JSON.stringify({
       plugins: config.plugins,
@@ -102,15 +118,16 @@ const suiteOf = (...titles: readonly string[]): string =>
     .join("\n")}\n});\n`;
 
 describe("no two tests in one describe block carry the same title", () => {
+  const copied: Tree = {
+    "test/copied.test.ts": suiteOf("refuses a stranger", "refuses a stranger"),
+  };
   const lintTitles = ruleRunner("vitest/no-identical-title", {
-    tree: { "test/copied.test.ts": suiteOf("refuses a stranger", "refuses a stranger") },
+    tree: copied,
     flagged: ["test/copied.test.ts"],
   });
 
   it("fires when a copied test keeps the title of the one it was copied from", () => {
-    const output = lintTitles({
-      "test/copied.test.ts": suiteOf("refuses a stranger", "refuses a stranger"),
-    });
+    const output = lintTitles(copied);
 
     expect(output).toContain("test/copied.test.ts");
     expect(output).toContain("no-identical-title");
@@ -140,13 +157,11 @@ const swallow = (body: string): string =>
   `export const rollbackQuietly = async (client: Client): Promise<void> => {\n  try {\n    await client.query("ROLLBACK");\n  } catch {${body}}\n};\n`;
 
 describe("no block is empty, and a swallowed error is a commented decision", () => {
-  const lintBlocks = ruleRunner("no-empty", {
-    tree: { "src/silent.ts": swallow("") },
-    flagged: ["src/silent.ts"],
-  });
+  const silent: Tree = { "src/silent.ts": swallow("") };
+  const lintBlocks = ruleRunner("no-empty", { tree: silent, flagged: ["src/silent.ts"] });
 
   it("fires on an empty catch — `allowEmptyCatch` is off, so a swallow says nothing by accident", () => {
-    const output = lintBlocks({ "src/silent.ts": swallow("") });
+    const output = lintBlocks(silent);
 
     expect(output).toContain("src/silent.ts");
     expect(output).toContain("no-empty");
@@ -190,13 +205,14 @@ const callsRevoke = (call: string): string =>
   `const revoke = async (): Promise<void> => {};\n\nexport const act = async (): Promise<void> => {\n  ${call}\n};\n`;
 
 describe("no promise floats — an unawaited call is awaited or `void`", () => {
+  const forgotten = typedTree({ "src/forgotten.ts": callsRevoke("revoke();") });
   const lintPromises = ruleRunner("typescript/no-floating-promises", {
-    tree: typedTree({ "src/forgotten.ts": callsRevoke("revoke();") }),
+    tree: forgotten,
     flagged: ["src/forgotten.ts"],
   });
 
   it("fires on a call whose promise nobody takes", () => {
-    const output = lintPromises(typedTree({ "src/forgotten.ts": callsRevoke("revoke();") }));
+    const output = lintPromises(forgotten);
 
     expect(output).toContain("src/forgotten.ts");
     expect(output).toContain("no-floating-promises");

@@ -101,6 +101,26 @@ describe("a tool that ran hands back what it reported", () => {
     expect(lint({ [KEBAB_CASE_FILE]: SOURCE })).toBe("");
   });
 
+  it("runs the tool in the environment the caller named, which is how a child finds a binary the tree has no node_modules for", () => {
+    // oxlint spawns `tsgolint` for its type-aware rules and reads `OXLINT_TSGOLINT_PATH` to
+    // find it. Pointed at nothing, it says so and names the path — so the path coming back
+    // is proof the caller's environment reached the child rather than being dropped.
+    expect(() =>
+      runsOverThrowawayTree(
+        oxlintTool({
+          scaffold: {
+            ".oxlintrc.json": JSON.stringify({
+              plugins: ["typescript"],
+              options: { typeAware: true },
+              rules: { "typescript/no-floating-promises": "error" },
+            }),
+          },
+          env: { OXLINT_TSGOLINT_PATH: "/nowhere/tsgolint" },
+        }),
+      ),
+    ).toThrow(/\/nowhere\/tsgolint/);
+  });
+
   it("writes a file into a directory the tree names but does not create", () => {
     const lint = runsOverThrowawayTree(oxlintTool());
 

@@ -22,8 +22,13 @@
   // documentation marks neither the flag nor this option as preview or experimental (only the
   // separate `--type-check` is), tsgolint's readme calls itself stable and recommends the mode
   // in CI, and it needs TypeScript 7, which every workspace here already pins. It costs a
-  // second process per lint run and the `oxlint-tsgolint` dev dependency; what it buys is the
-  // one rule below, which no syntax-only linter can decide.
+  // second process per lint run and the `oxlint-tsgolint` dev dependency, taken at 7.0.2001 —
+  // the version the npm registry answered with on the same day.
+  //
+  // The mode is on for one rule, the floating-promise rule below. Turning it on also reaches
+  // thirteen other type-aware rules oxlint files under `correctness`, and those are switched
+  // off by name further down: adopting them is a wider decision than the ticket that brought
+  // the mode in, and a rule nobody chose is not a rule this repository holds.
   "options": {
     "typeAware": true
   },
@@ -49,6 +54,25 @@
     // so the deliberate case is a word a reader can see rather than an absence they cannot.
     // Type-aware: it needs the checker to know a call returns a promise (see `options` above).
     "typescript/no-floating-promises": ["error", { "ignoreVoid": true }],
+    // The other thirteen type-aware rules oxlint files under `correctness`, off by name.
+    // Not a judgement that they are wrong — the one finding they raised on the tree was real
+    // and is fixed — but the ticket that brought the type-aware mode in was scoped to the
+    // floating-promise rule, and thirteen rules every branch inherits is a decision the owner
+    // takes rather than one a lint config acquires. Deleting a line here is how each is
+    // adopted, one at a time and each with its own pass over the tree.
+    "typescript/await-thenable": "off",
+    "typescript/no-array-delete": "off",
+    "typescript/no-base-to-string": "off",
+    "typescript/no-duplicate-type-constituents": "off",
+    "typescript/no-for-in-array": "off",
+    "typescript/no-implied-eval": "off",
+    "typescript/no-meaningless-void-operator": "off",
+    "typescript/no-misused-spread": "off",
+    "typescript/no-redundant-type-constituents": "off",
+    "typescript/no-unsafe-unary-minus": "off",
+    "typescript/require-array-sort-compare": "off",
+    "typescript/restrict-template-expressions": "off",
+    "typescript/unbound-method": "off",
     "typescript/no-explicit-any": "error",
     "typescript/consistent-type-imports": "error",
     "typescript/no-non-null-assertion": "error",

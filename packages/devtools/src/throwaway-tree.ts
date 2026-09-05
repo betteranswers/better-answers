@@ -96,6 +96,9 @@ export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
         cwd: directory,
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
+        // The parent's environment, not this repository's configuration: a tool spawned with
+        // an empty environment loses PATH, HOME and the platform's temporary directory and
+        // fails for reasons that have nothing to do with the rule under test.
         env: { ...process.env, ...tool.env },
       });
     } catch (cause) {
@@ -163,7 +166,7 @@ const tsgolintPath = (): string => {
     return from.resolve(`@oxlint-tsgolint/${process.platform}-${process.arch}/tsgolint${suffix}`);
   } catch {
     throw new Error(
-      "`oxlint-tsgolint` is not in @better-answers/devtools's dependency tree, so oxlint's type-aware rules cannot run over a throwaway tree and would every one of them read as silent. Declare it as a devDependency of packages/devtools.",
+      `oxlint's type-aware linter has no binary for ${process.platform}-${process.arch}, so a type-aware rule over a throwaway tree would read as silent — the one thing this runner exists to make impossible. Either \`oxlint-tsgolint\` is not a devDependency of packages/devtools, or it ships no build for this platform.`,
     );
   }
 };
