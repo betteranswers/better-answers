@@ -171,6 +171,10 @@ test("consent is refused once the person's credentials are revoked, and no code 
   request,
   baseURL,
 }) => {
+  // Eight lines of the arrange the declining test also has, carried rather than folded: the
+  // whole subject of each test is what the person does at the consent page, and a reader has
+  // to see the page was reached the way a browser reaches it.
+  /* jscpd:ignore-start */
   const origin = baseURL ?? "";
   const email = anAddress("revoked");
   const workspace = await provision(request, { name: "Revoked Ltd", adminEmail: email });
@@ -179,6 +183,7 @@ test("consent is refused once the person's credentials are revoked, and no code 
   await signIn(page, request, email);
   await page.goto(authorizeUrl(origin, { prompt: "consent" }));
   await expect(consentHeading(page)).toBeVisible();
+  /* jscpd:ignore-end */
 
   // The act the People screen will one day perform, between the page and the click.
   await revokeCredentials(request, workspace.admin.id);

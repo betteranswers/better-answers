@@ -64,6 +64,7 @@ const location = (response: Response): string => {
   return header ?? "";
 };
 
+/* jscpd:ignore-start */
 const redirectOf = z.object({
   url: z.string().min(1).optional(),
   redirect: z.boolean().optional(),
@@ -79,7 +80,10 @@ const redirectOf = z.object({
  * protocol — what a host and a browser do — and a caller that read the answer with the
  * server's own helper would agree with the server by construction: the day the server
  * stopped setting one of the two, the test would stop looking for it in the same commit.
- * Sixteen lines is the price of the two being able to disagree.
+ * Sixteen lines is the price of the two being able to disagree, and the `jscpd:ignore`
+ * fence around them is that decision said again where the copy-paste gate can read it: the
+ * one copy in this repository jscpd is told to walk past, named here rather than in the
+ * configuration so it travels with the reason.
  */
 const nextLocation = async (response: Response): Promise<string | undefined> => {
   const header = response.headers.get("location");
@@ -92,6 +96,7 @@ const nextLocation = async (response: Response): Promise<string | undefined> => 
   );
   return parsed.success ? parsed.data.url : undefined;
 };
+/* jscpd:ignore-end */
 
 /** Where a step sent the person, as an absolute URL on the one origin. */
 const sentTo = (response: Response): URL => new URL(location(response), PUBLIC_URL);
