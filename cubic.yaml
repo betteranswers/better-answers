@@ -135,7 +135,7 @@ reviews:
         - packages/schema/**
     - name: The identity provider stays behind its seam
       description: |-
-        Rule `[DESIGN5]` and ADR 0009. Better Auth is a stay with written leave-triggers, and this seam is what keeps the Keycloak fallback a fortnight of work rather than a rewrite.
+        ADR 0009's identity seam. Better Auth is a stay with written leave-triggers, and this seam is what keeps the Keycloak fallback a fortnight of work rather than a rewrite.
 
         A transport verifies a bearer token and builds a `Principal`. Nothing behind that seam knows which library minted the token. Flag any `better-auth` or `@better-auth/*` import outside the auth module, and flag the subtler leak no lint rule sees: a Better Auth type, interface or object shape re-exported, aliased, structurally copied, or embedded in a `Principal`, a context object or a function signature that crosses into `packages/core` or into the web client. A session object passed onward where a `Principal` belongs is the same finding.
 

@@ -52,7 +52,7 @@ move.** Better Auth has no ID-JAG page; SEP-990 is an open implementation issue 
 official TypeScript, Python and Kotlin SDKs alike. When a customer's IT department asks for
 enterprise-managed authorization, the work is to accept the RFC 7523 `jwt-bearer` grant at Better
 Auth's token endpoint and validate signature, issuer, audience, `typ`, `sub` and `jti` replay,
-behind `[DESIGN5]`'s existing seam. Buying that today by moving a transport into the Python
+behind the identity seam ADR 0009 keeps. Buying that today by moving a transport into the Python
 worker would trade one week of future work for a permanent second identity boundary.
 
 **This ADR is therefore not an ADR against ADR 0005's two tiers, and not against ADR 0029's one
@@ -139,7 +139,7 @@ back — which is what ADR 0018 already describes.
 - **Proposing a concept stays a web link in v0.1.** An App could offer a form; a governed write
   path (ADR 0012) wants its first version where an Admin sees the whole queue.
 - **SEP-990 becomes a named, sized future task rather than an unknown** — the RFC 7523
-  `jwt-bearer` grant on Better Auth's token endpoint, behind `[DESIGN5]`'s seam, roughly a week.
+  `jwt-bearer` grant on Better Auth's token endpoint, behind ADR 0009's seam, roughly a week.
   It is also a fourth thing to watch alongside ADR 0009's three leave-triggers: if the self-hosted
   OAuth path never gains it while hosted alternatives do, that is evidence about the trigger-2
   question, not a separate decision.

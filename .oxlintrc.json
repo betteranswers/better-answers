@@ -68,7 +68,7 @@
                 "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema."
               },
               {
-                // [DESIGN5] — the identity provider stays behind its seam: no better-auth
+                // The identity provider stays behind its seam (ADR 0009): no better-auth
                 // import outside apps/api/src/auth/ and the CIMD lift (the override below
                 // lifts the ban for exactly those two directories).
                 "group": [
@@ -78,7 +78,7 @@
                   "@better-auth/*",
                   "@better-auth/*/*"
                 ],
-                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009); the rest of the tier takes Claims and a Principal from that module."
+                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ (ADR 0009); the rest of the tier takes Claims and a Principal from that module."
               }
             ]
           }
@@ -94,7 +94,7 @@
     },
     {
       // The identity module and the CIMD lift: the only places better-auth is configured
-      // ([DESIGN5]). The drizzle-zod ban is restated because this override replaces the
+      // (ADR 0009). The drizzle-zod ban is restated because this override replaces the
       // repo-wide no-restricted-imports config for these files.
       "files": ["apps/api/src/auth/**", "apps/api/lifts/better-auth-cimd-node/**"],
       "rules": {
@@ -218,7 +218,7 @@
                   "@better-auth/*",
                   "@better-auth/*/*"
                 ],
-                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009). Restated here because this override replaces the repo-wide no-restricted-imports config for apps/web."
+                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ (ADR 0009). Restated here because this override replaces the repo-wide no-restricted-imports config for apps/web."
               }
             ]
           }
@@ -265,7 +265,7 @@
                   "@better-auth/*",
                   "@better-auth/*/*"
                 ],
-                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009). Restated here because this override replaces the config above."
+                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ (ADR 0009). Restated here because this override replaces the config above."
               }
             ]
           }
@@ -306,7 +306,7 @@
                   "@better-auth/*",
                   "@better-auth/*/*"
                 ],
-                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009). Restated here because this override replaces the config above."
+                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ (ADR 0009). Restated here because this override replaces the config above."
               }
             ]
           }
@@ -348,7 +348,7 @@
                   "@better-auth/*",
                   "@better-auth/*/*"
                 ],
-                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ ([DESIGN5], ADR 0009). Restated here because this override replaces the config above."
+                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/ (ADR 0009). Restated here because this override replaces the config above."
               }
             ]
           }
@@ -358,7 +358,7 @@
     {
       // T-037 — the SPA's identity feature is the one directory in `apps/web` that may name
       // `better-auth`, which is the same shape `apps/api/src/auth/` has on the other side
-      // (`[DESIGN5]`, ADR 0009): one directory owns the library, and everything above it
+      // (ADR 0009): one directory owns the library, and everything above it
       // speaks screens, workspaces and roles rather than endpoints. The product signs a
       // person in by posting to Better Auth, so *somewhere* has to know its client; what
       // the rule buys is that the somewhere is one directory a reviewer can read in a

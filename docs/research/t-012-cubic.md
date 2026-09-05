@@ -472,7 +472,7 @@ reviews:
 
     - name: The identity provider stays behind its seam
       description: >
-        Rule [DESIGN5] and ADR 0009. Better Auth is a stay with three written
+        ADR 0009's identity seam. Better Auth is a stay with three written
         leave-triggers, and this seam is what makes the Keycloak fallback two to
         three weeks of work rather than a rewrite.
 
@@ -600,7 +600,7 @@ agents, hitting the cap precisely, which is why nothing below could be added.
 Five agents is the whole budget. Nothing was silently trimmed; these are the
 rules that lost the contest for a slot, in order of how soon they should take one.
 
-- **`[DESIGN4]` workspace on every row, and the Apache AGE graph rules.** The
+- **The tenancy rule — workspace on every row — and the Apache AGE graph rules.** The
   strongest omission by a distance: one graph per workspace; `workspace_id` a
   term of the builder's `WHERE` on every node *and* edge; the three visibility
   terms as properties on every element of a bounded variable-length pattern;

@@ -184,7 +184,7 @@ So SEP-990 is **a genuine future capability gap, and one nobody on our side of t
 closed.** When a customer's IT department asks for it, the work is: accept the RFC 7523
 `jwt-bearer` grant at Better Auth's token endpoint, validate the assertion's signature, issuer,
 audience, `typ`, `sub` and `jti` replay, and mint a short-lived token. That is a well-specified
-piece of work of maybe a week, against a plugin we already own the seam for (`[DESIGN5]`). It is
+piece of work of maybe a week, against a plugin we already own the seam for (ADR 0009). It is
 not a reason to move a tier.
 
 ---

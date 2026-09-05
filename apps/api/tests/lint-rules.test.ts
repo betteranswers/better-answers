@@ -5,7 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * The lint rules T-004 adds, run rather than remembered: `[DESIGN5]`'s better-auth ban
+ * The lint rules T-004 adds, run rather than remembered: ADR 0009's better-auth ban
  * (an override in `.oxlintrc.json`), ADR 0030's MCP-type ban over `packages/core` (the
  * existing core override, extended here to the v2 package name), and the two
  * `better-answers` plugin rules — every entry carries `annotations`, no entry takes a
@@ -74,7 +74,7 @@ const lint = (files: Fixture): string => {
 const probe = (specifier: string): string =>
   `import * as probe from "${specifier}";\nexport const keep = probe;\n`;
 
-describe("[DESIGN5] — the identity provider stays behind its seam", () => {
+describe("ADR 0009 — the identity provider stays behind its seam", () => {
   it("refuses a better-auth import outside the auth module, and allows it inside", () => {
     const output = lint({
       "apps/api/src/mcp/probe.ts": probe("better-auth"),

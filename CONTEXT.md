@@ -456,7 +456,7 @@ to it by IRI and never restates it (ADR 0014).
 - **workspace** — the tenancy boundary and the unit a company occupies: one company's people,
   bindings, bundle repository, index, graph and records. **Every tenant row, every object-store
   prefix, every graph node and edge carries its workspace id**, and every query reaches its store
-  through a store door, over row-level security (`[DESIGN4]`). Better Auth's identity set is not
+  through a store door, over row-level security (ADR 0032). Better Auth's identity set is not
   tenant data: read by key before a workspace is known, it is what a workspace id is resolved from
   (ADR 0009). One deployment holds many; a person may belong to more than one and picks before
   consent. Workspaces are provisioned by the platform, never created by a person. _Avoid_:
