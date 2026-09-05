@@ -6,9 +6,11 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * The SPA's rules, run rather than remembered: the layering zones (app → features → shared,
- * never back, and no feature reaching another), kebab-case filenames, and ADR 0006's one
- * exception — `AppRouter` as an `import type` in the client-instance file and nowhere else.
+ * The SPA's rules, run rather than remembered: the layering zones (`[WEB1]` — app → features
+ * → shared, never back, and no feature reaching another), the one directory that names
+ * Better Auth (`[WEB2]`), kebab-case filenames (`[WEB3]`'s file half), and ADR 0006's one
+ * exception — `AppRouter` as an `import type` in the client-instance file and nowhere else
+ * (`[WEB4]`).
  *
  * Each rule is applied to a throwaway tree, so the assertion is as much about where the rule
  * stays silent as where it fires. This is the shape `apps/api/tests/lint-rules.test.ts` uses;

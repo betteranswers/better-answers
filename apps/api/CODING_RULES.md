@@ -1,8 +1,8 @@
 # Coding rules — `apps/api/`
 
 The whole of `CODING_RULES.md` binds this workspace. What follows is true of this tier
-alone. `apps/web/` is a browser package and follows the same TypeScript rules; it talks to
-this tier over tRPC and neither imports the other (ADR 0006).
+alone. The browser package on the other side of tRPC has its own rules in
+`apps/web/CODING_RULES.md`.
 
 ## [APP1] The tier runs from source
 

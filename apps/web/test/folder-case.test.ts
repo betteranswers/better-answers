@@ -6,9 +6,9 @@ import { describe, expect, it } from "vitest";
 /**
  * Folder names under the SPA's source, run rather than remembered.
  *
- * `unicorn/filename-case` holds the file half of the convention, and oxlint 1.80 has no rule
- * over a directory's own name — so the half that would otherwise live in review is a walk of
- * the tree. A folder named `SharedUi` reads the same as `shared-ui` on a
+ * `unicorn/filename-case` holds the file half of `[WEB3]`, and oxlint 1.80 has no rule over
+ * a directory's own name — so the half that would otherwise live in review is a walk of the
+ * tree. A folder named `SharedUi` reads the same as `shared-ui` on a
  * case-insensitive filesystem, which is what makes a rename a commit that changes nothing
  * on the machine that made it and everything on the machine that builds it.
  *

@@ -12,8 +12,8 @@ import { Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
 
 /**
- * What a reader is left with when a screen throws, through the router a browser drives
- * (`[TEST1]`: a rendered component through Testing Library where a component's own
+ * `[WEB5]`: what a reader is left with when a screen throws, through the router a browser
+ * drives (`[TEST1]`: a rendered component through Testing Library where a component's own
  * behaviour is the thing under test). The same failure over the served build, with axe,
  * is `e2e/failed-screen.spec.ts`.
  */
