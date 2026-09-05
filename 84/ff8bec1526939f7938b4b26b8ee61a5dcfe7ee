@@ -1,0 +1,32 @@
+packages/schema/src/index.ts
+  s_529f881ca25f4e::t_2415855dfb0fed 10
+packages/schema/src/ulid.ts
+  s_529f881ca25f4e::t_3021b39ac49ba4 49-51
+  s_529f881ca25f4e::t_96a8f63e416ce7 1-48,52-102
+packages/core/src/kernel/index.ts
+  s_529f881ca25f4e::t_0409e5728b22c8 19-21,23
+packages/schema/test/factory.ts
+  s_529f881ca25f4e::t_ec70debd525394 6,95,108
+packages/schema/test/testing.ts
+  s_529f881ca25f4e::t_ec70debd525394 6-8
+packages/schema/test/ulid.test.ts
+  s_529f881ca25f4e::t_c5cd7df6f0dd28 1-61
+packages/schema/src/boundary-schemas.ts
+  s_529f881ca25f4e::t_fa801d771ce92b 26,43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "84ff8bec1526939f7938b4b26b8ee61a5dcfe7ee",
+  "prompts": {},
+  "sessions": {
+    "s_529f881ca25f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688411cf-a489-4e1b-b43c-905b1ccfe9f6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
