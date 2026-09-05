@@ -32,7 +32,7 @@ reviews:
       A new domain word is settled here BEFORE it appears in code; a diff that
       introduces a domain term absent from the glossary is a finding.
     - `CODING_RULES.md` — the constitution. Rules are tagged (`[DESIGN]`,
-      `[TEST]`, `[SEC]`, `[LIFT]`, `[DEPS1]`, `[COMMENT]`, `[LOG1]`…). Cite the
+      `[TEST]`, `[SEC]`, `[AUDIT]`, `[LIFT]`, `[DEPS1]`, `[COMMENT]`, `[LOG1]`…). Cite the
       tag when a finding rests on a rule.
     - `apps/api/CODING_RULES.md` and `apps/worker/CODING_RULES.md` — tier rules. Apply the
       tier's file to changes in that tier.

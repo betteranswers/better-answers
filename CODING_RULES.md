@@ -112,6 +112,42 @@ A `Principal` has **two kinds** and both are real (`CONTEXT.md`): a **deferred p
 
 Every privilege a migration installs — a `GRANT`, a default privilege, a `SECURITY DEFINER` function — lands with a functional test of the path it must **refuse**, beside the test of the path it serves: the wrong role calling, a scope naming another tenant, a partition reached directly rather than through its parent. A definer function meets four checks a reviewer reads off the SQL: its arguments are guarded against the transaction's scope before any DDL, its `search_path` is pinned, every object it names is schema-qualified, and `EXECUTE` is revoked from `PUBLIC` and granted to the one role that calls it. A partition child is a table of its own — parent policies do not reach a query aimed at the child, and default privileges do — so the child's denial is asserted directly (`packages/schema/test/rls.test.ts`, "denies a direct query against a partition, whatever the scope"), never inferred from the parent's. A PR that touches `packages/schema/migrations` or any RLS policy gets an adversarial security pass before merge: the Standards and Spec axes review against documents; this one attacks the change. `T-003` (ADR 0032, PR 5) shipped a direct-partition read that bypassed RLS; two document-driven reviews passed it, and a review that read the code rather than the documents found it.
 
+## AUDIT
+
+The one append-only *ledger* (`audit_event`) and the audit slice that writes it. These are the checkable sentences; the shape — the columns, the two doors, the typed vocabulary — stays in ADR 0014, ADR 0035 and the T-048 and T-063 specs (`apps/docs-site/specs/`), and is not restated here.
+
+### [AUDIT1] An act and its audit event land in one transaction
+
+Every Admin act, every governed write and every platform act writes its *audit event* through the audit slice inside the same database transaction as the rows it describes, so the two land or fail together — an act whose event cannot be written does not happen (ADR 0014 rule 4; T-048 spec). A slice that declares an act (`[AUDIT2]`) writes the event on every path that performs it. One row per act and target: a bulk act is N rows sharing one batch id, never one row hiding N. The transaction is the test: an act's test asserts its rows and its event together, and one test per slice proves they fail together.
+
+### [AUDIT2] An act is named `family.subject.verb`, declared, never a free string
+
+The four families — **people**, **knowledge**, **sources**, **platform** — are the only closed list; each slice declares its own acts against the template type the audit slice exports, and the doors accept a declared act and nothing else (T-063 spec). The subject is what was acted on and the verb what happened, spelled as the spec's four examples are — `people.member.role_changed`, `knowledge.suggestion.accepted`, `sources.binding.published`, `platform.reconciler.replayed`. Held by the type at compile time and by one test that walks every slice's declared acts and checks the family prefix both ways (`[TEST7]`).
+
+### [AUDIT3] The actor is an `ActorId`
+
+The row's actor is the kernel's `ActorId` — `human:<person id>`, `process:better-answers-<purpose>`, or an agent's id as ADR 0019 shapes it — derived from the Principal by the kernel's one function, never composed by hand, and never an email, a display name or a session (ADR 0035; T-063 spec). Concept files keep `human:<email>` in `generated.by` and `verified[].by` (ADR 0019): the file's form and the ledger's form differ by decision, which is why the erasure routine rewrites files and never the ledger (T-048 spec; T-063 spec). Held by the type and its test — a bare string is not an `ActorId`.
+
+### [AUDIT4] A platform or deferred act is audited under its own actor
+
+Work that outlives a session runs under a deferred or a platform principal (`[SEC2]`), and its row names the actor the kernel derives from that principal (`[AUDIT3]`) — for the platform, its own *actor id* — never a live person's session. The audit slice has two doors and no third: one derives the actor from the caller's Principal; the other takes the platform principal and an explicit actor, typed so a user principal cannot reach it, and the *access request* — made by a signed-in person who holds no membership — is its one caller (T-048 spec; T-063 spec). Held by the second door's type, which refuses a user principal at compile time, and by the access-request test that the row's actor is the requester.
+
+### [AUDIT5] The detail carries ids and role words
+
+The structured detail names records by id and roles by their word — Admin, Editor, Viewer — and carries an act's confirmations as typed fields (the publish act's LIA, privacy-notice and DPIA confirmations — ADR 0014, ADR 0020). It never carries an email, a display name, a prompt or a completion (`[LOG1]`): a ledger that held one would need rewriting on erasure, and the ledger is never rewritten (T-048 spec). Held by each declared act's detail type, which names every field it carries; a field that could hold a person's name or contact is a finding under this tag.
+
+### [AUDIT6] The ledger is append-only by the database
+
+The migration that creates `audit_event` revokes `UPDATE` and `DELETE` from the app's role and grants the worker's role nothing on the table, and each refusal is tested beside the served path per `[SEC3]` (ADR 0014; T-048 spec) — so nothing in the worker writes the ledger, and nothing in the app edits a row.
+
+### [AUDIT7] The id is caller-minted
+
+The writer mints the row's id through the kernel minter — a ULID (T-063 spec) — before it writes, and the column has no database default, so a governed write mints its id before its git commit and the commit carries it: a ledger row and a commit join on one id (ADR 0014 rule 4; T-048 spec). Held by the slice test that a supplied id is stored verbatim and by the id column's boundary refinement to the ULID shape.
+
+### [AUDIT8] What stays out of the ledger is named
+
+A read writes no row; the one view an ADR names as an act — an Admin opening a document's withheld original bytes (ADR 0020) — is audited as one. An event with no workspace — a sign-in, a token issued or refused — is a log line, because the ledger is a tenant table and no ledger over the identity set exists. Runs, the *answer audit* (ADR 0017), signals, alerts and spend (ADR 0025), backup runs and health checks (`[OPS1]`) are their own records and never audit events (T-063 spec). Held by the declared-acts walk (`[AUDIT2]`), which refuses an act whose subject names one of these records.
+
 ## OKF
 
 ### [OKF1] The bundle-alone test

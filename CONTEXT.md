@@ -384,7 +384,9 @@ to it by IRI and never restates it (ADR 0014).
   the workspace's tests are replayed retrieval-only when the answer path changes and weekly;
   *stale* when a concept it names is deprecated. _Avoid_: eval (on any screen).
 - **audit event** — the record of one act by an Admin or the platform — what was done, to what, by
-  whom, when, with what confirmations — in the one append-only ledger. _Avoid_: log.
+  whom, when, with what confirmations — in the one append-only *ledger*. _Avoid_: log.
+- **ledger** — the one append-only record of every *audit event* a workspace keeps, written in
+  the same act it records. _Avoid_: audit log, event log.
 - **erasure request** — a person's request that their personal data leave the platform: what was
   done in every store, when, and when the backups are beyond use. A valid one reaching the bundle
   runs the history-rewrite routine (ADR 0020).
@@ -473,6 +475,9 @@ to it by IRI and never restates it (ADR 0014).
   writer, Sales (as role names). A guide definition sets, per role, the default layer
   and the action threshold; a binding's *audience* is who may see, never a role. Not a section's
   role label.
+- **access request** — a signed-in person's recorded ask to join one workspace, with a reason;
+  decided by an Admin — approved (which mints the invitation) or declined — each decision on the
+  *ledger*. Not a *subject request*.
 
 ## Platform surfaces
 
