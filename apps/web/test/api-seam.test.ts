@@ -52,5 +52,9 @@ describe("the AppRouter seam", () => {
     // Anything else — `createAuth`'s module above all — is the regression, named here.
     const intruders = authFiles.filter((file) => file !== "verify.ts" && file !== "constants.ts");
     expect(intruders).toEqual([]);
-  });
+    // A whole compile of ~1,600 files, run beside the rest of this workspace's suite: the
+    // default five seconds is a stopwatch on the machine, not on the seam, and the fence
+    // reads as broken whenever the box is busy. Same reason `packages/core` raises its
+    // timeout for the suite that shells out to oxlint.
+  }, 60_000);
 });
