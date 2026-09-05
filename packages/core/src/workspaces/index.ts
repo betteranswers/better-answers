@@ -173,22 +173,30 @@ export type Membership = {
  * principals. The role is not read again: it is the one the resolver already refused a
  * disagreeing member row over (`withPrincipal`), and reading it twice would be two
  * answers where the platform has one.
+ *
+ * Two refusals a caller can act on — a session pointing at rows that are gone — and the
+ * store's Error for anything else, so the seam answers a value however the read ends
+ * (the kernel's result convention, `kernel/result.ts`).
  */
 export const readMembership = async (
   principal: UserPrincipal,
   tx: Tx,
-): Promise<Result<Membership, "no-such-workspace" | "no-such-person">> => {
-  const workspace = await tx.query<{ name: string }>("SELECT name FROM workspace WHERE id = $1", [
-    principal.workspaceId,
-  ]);
-  const name = workspace.rows[0]?.name;
+): Promise<Result<Membership, "no-such-workspace" | "no-such-person" | Error>> => {
+  const workspace = await attempt(() =>
+    tx.query<{ name: string }>("SELECT name FROM workspace WHERE id = $1", [principal.workspaceId]),
+  );
+  if (!workspace.ok) return err(workspace.error);
+  const name = workspace.value.rows[0]?.name;
   if (name === undefined) return err("no-such-workspace");
 
-  const person = await tx.query<{ name: string | null; email: string }>(
-    'SELECT name, email FROM "user" WHERE id = $1',
-    [principal.userId],
+  const person = await attempt(() =>
+    tx.query<{ name: string | null; email: string }>(
+      'SELECT name, email FROM "user" WHERE id = $1',
+      [principal.userId],
+    ),
   );
-  const row = person.rows[0];
+  if (!person.ok) return err(person.error);
+  const row = person.value.rows[0];
   if (row === undefined) return err("no-such-person");
 
   return ok({

@@ -23,8 +23,18 @@ export const appRouter = router({
     membership: workspaceProcedure.query(async ({ ctx }) => {
       const read = await readMembership(ctx.principal, ctx.tx);
       // The two refusals are a session pointing at rows that no longer exist, which is
-      // the same thing to a reader as a session that has ended.
-      if (!read.ok) throw new TRPCError({ code: "UNAUTHORIZED", message: read.error });
+      // the same thing to a reader as a session that has ended. A store failure is not
+      // that, and is never told to a client as a signed-out session.
+      if (!read.ok) {
+        const { error } = read;
+        if (error instanceof Error)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "the membership could not be read",
+            cause: error,
+          });
+        throw new TRPCError({ code: "UNAUTHORIZED", message: error });
+      }
       return read.value;
     }),
   }),

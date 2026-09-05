@@ -7,10 +7,11 @@ import {
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { PlatformPrincipal } from "../src/kernel/index.ts";
+import { attempt, type Claims, type PlatformPrincipal } from "../src/kernel/index.ts";
 import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
 import {
   provisionWorkspace,
+  readMembership,
   revokeCredentials,
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
@@ -265,5 +266,34 @@ describe("revoking a person's credentials", () => {
       at: new Date(),
     });
     expect(revoked).toEqual({ ok: false, error: "no-such-user" });
+  });
+});
+
+describe("reading the current membership", () => {
+  it("hands a caller a store failure to read rather than one to catch", async () => {
+    const adminUserId = await seedUser();
+    const door = openPostgres(db.runtimePool);
+    const id = ulid();
+    const provisioned = await provisionWorkspace(bootstrap, door, {
+      id,
+      name: "Shell",
+      slug: `shell-${id.toLowerCase()}`,
+      adminUserId,
+    });
+    expect(provisioned.ok).toBe(true);
+
+    const claims: Claims = { workspaceId: id, userId: adminUserId, issuedAt: new Date() };
+    const read = await withPrincipal(door, claims, async (principal, tx) => {
+      // A statement Postgres refuses aborts the transaction, so the read cannot run.
+      // `attempt` is the one place a rejection is caught (`CODING_RULES.md` § TYPES).
+      await attempt(() => tx.query("SELECT no_such_function()"));
+      return readMembership(principal, tx);
+    });
+
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    expect(read.value.ok).toBe(false);
+    if (read.value.ok) return;
+    expect(read.value.error).toBeInstanceOf(Error);
   });
 });
