@@ -1,0 +1,23 @@
+apps/api/tests/coding-rules-tags.test.ts
+  s_2c3fc9d16bd52c::t_4f662c83c7ff99 80-84,89
+.claude/skills/browser-suite/SKILL.md
+  s_2c3fc9d16bd52c::t_e65965d656ff24 1-126
+.gitignore
+  s_2c3fc9d16bd52c::t_6226c0e090d6b2 52-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ba68df9dc5e20e18aa2bc3ddaa462a9f4562208e",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
