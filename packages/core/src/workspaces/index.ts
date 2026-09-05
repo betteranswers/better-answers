@@ -1,6 +1,6 @@
 import { boundarySchemas, CREATOR_ROLE } from "@better-answers/schema";
 
-import { attempt, err, ok, type Result } from "../kernel/index.ts";
+import { attempt, err, ok, refusalFor, type Result } from "../kernel/index.ts";
 import type {
   PlatformPrincipal,
   Role,
@@ -42,6 +42,13 @@ export type ProvisionWorkspaceInput = {
 
 export type ProvisionRefusal = "slug-taken" | "workspace-exists" | "no-such-user" | "malformed";
 
+/** The three violations provisioning has a word for; every other failure is the store's. */
+const PROVISION_CONSTRAINTS = {
+  workspace_slug_unique: "slug-taken",
+  workspace_pkey: "workspace-exists",
+  member_user_id_user_id_fk: "no-such-user",
+} as const satisfies Record<string, ProvisionRefusal>;
+
 /**
  * One transaction: the workspace row, its chunk partition (through the one
  * SECURITY DEFINER lifecycle function, ADR 0032), the Admin membership and the
@@ -54,7 +61,10 @@ export const provisionWorkspace = async (
   door: PostgresDoor,
   input: ProvisionWorkspaceInput,
 ): Promise<
-  Result<{ workspaceId: WorkspaceId; actorId: PlatformPrincipal["actorId"] }, ProvisionRefusal>
+  Result<
+    { workspaceId: WorkspaceId; actorId: PlatformPrincipal["actorId"] },
+    ProvisionRefusal | Error
+  >
 > => {
   const row = boundarySchemas.workspace.insert.safeParse({
     id: input.id,
@@ -82,20 +92,10 @@ export const provisionWorkspace = async (
       );
     }),
   );
-  if (!act.ok) return err(classify(act.error));
+  // A named constraint becomes the word a caller can act on; anything else comes back
+  // as the store's own Error, so the seam answers a value either way.
+  if (!act.ok) return err(refusalFor(act.error, PROVISION_CONSTRAINTS));
   return ok({ workspaceId: row.data.id, actorId: platform.actorId });
-};
-
-/** Postgres's constraint names, read into the slice's own vocabulary. */
-const classify = (error: Error): ProvisionRefusal => {
-  // node-postgres puts the violated constraint's name on the error it throws.
-  const constraint =
-    "constraint" in error && typeof error.constraint === "string" ? error.constraint : "";
-  const detail = `${error.message} ${constraint}`;
-  if (detail.includes("workspace_slug_unique")) return "slug-taken";
-  if (detail.includes("workspace_pkey")) return "workspace-exists";
-  if (detail.includes("member_user_id_user_id_fk")) return "no-such-user";
-  throw error;
 };
 
 export type RevokeCredentialsInput = {

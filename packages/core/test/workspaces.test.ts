@@ -4,6 +4,7 @@ import {
   testData,
   ulid,
 } from "@better-answers/schema/testing";
+import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { PlatformPrincipal } from "../src/kernel/index.ts";
@@ -129,6 +130,28 @@ describe("provisioning a workspace", () => {
     expect(second).toEqual({ ok: false, error: "slug-taken" });
   });
 
+  it("refuses an id a workspace already holds", async () => {
+    const adminUserId = await seedUser();
+    const door = openPostgres(db.runtimePool);
+    const id = ulid();
+
+    const first = await provisionWorkspace(bootstrap, door, {
+      id,
+      name: "One",
+      slug: `first-${id.toLowerCase()}`,
+      adminUserId,
+    });
+    const second = await provisionWorkspace(bootstrap, door, {
+      id,
+      name: "Again",
+      slug: `again-${ulid().toLowerCase()}`,
+      adminUserId,
+    });
+
+    expect(first.ok).toBe(true);
+    expect(second).toEqual({ ok: false, error: "workspace-exists" });
+  });
+
   it("refuses an id that is not a workspace id", async () => {
     const door = openPostgres(db.runtimePool);
 
@@ -140,6 +163,25 @@ describe("provisioning a workspace", () => {
     });
 
     expect(provisioned).toEqual({ ok: false, error: "malformed" });
+  });
+
+  it("hands a caller the store's own failure rather than a refusal it could act on", async () => {
+    // A failure the act names no word for: the pool is gone, so nothing about it is a
+    // refusal a caller can do anything with. The seam still answers a value — the
+    // kernel's result convention — and the value carries the store's Error.
+    const gone = new pg.Pool(db.runtimePool.options);
+    await gone.end();
+
+    const provisioned = await provisionWorkspace(bootstrap, openPostgres(gone), {
+      id: ulid(),
+      name: "Unreachable",
+      slug: `unreachable-${ulid().toLowerCase()}`,
+      adminUserId: await seedUser(),
+    });
+
+    expect(provisioned.ok).toBe(false);
+    if (provisioned.ok) return;
+    expect(provisioned.error).toBeInstanceOf(Error);
   });
 });
 
