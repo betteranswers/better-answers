@@ -36,4 +36,8 @@ We decided this because the file is the substrate any OKF consumer reads (`[OKF1
 
 ## Amendment — 2026-08-27, the erasure line answered (ticket 24, ADR 0020)
 
-`human:<email>` is retained under a documented basis while a person's checks stand and rewritten to `human:<member-id>` across history only on a valid erasure request; `verification.origin` gains **erasure-rewrite** so a hash the routine moved never reads *Changed since checked*. A `Person`'s ending word is **Left**, never *Deprecated*.
+`human:<email>` is retained under a documented basis while a person's checks stand and rewritten to ~~`human:<member-id>`~~ `human:<erasure pseudonym>` (2026-09-05 amendment below) across history only on a valid erasure request; `verification.origin` gains **erasure-rewrite** so a hash the routine moved never reads *Changed since checked*. A `Person`'s ending word is **Left**, never *Deprecated*.
+
+## Amendment — 2026-09-05, the erasure rewrite target is the erasure pseudonym (T-073, ADR 0035)
+
+The 2026-08-27 amendment's `human:<member-id>` is struck: on a valid erasure request `human:<email>` is rewritten across history to **`human:<erasure pseudonym>`** — a per-workspace opaque id minted at erasure and kept on the erasure request, never the person id, so two workspaces' rewritten histories cannot be joined on one person (ADR 0020 amended). The `human:` prefix survives the rewrite, so the tier this ADR derives from it does too, and `verification.origin`'s *erasure-rewrite* stands. The file's forms are unchanged — a person is `human:<email>` while their checks stand, and the *opaque per-member ULIDs* option above stays rejected for the file; on a record the platform keeps a person is `human:<person id>`, which no routine ever rewrites. Everything else stands.

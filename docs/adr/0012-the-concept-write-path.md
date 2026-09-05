@@ -34,7 +34,7 @@ A **suggestion** may also be prepared by a person who may not commit the change:
 
 ## Amendment — 2026-08-27, the history rewrite is also a routine (ticket 24, ADR 0020)
 
-The history rewrite this ADR keeps for incidents is also run **on purpose**, as a routine with its report on the `erasure_request`, when a valid erasure request reaches personal data the bundle holds by design — a `Person` concept, `human:<email>` actor ids; git author lines are mailmapped to the member id in the same routine. Exports already issued are listed as not recalled. Everything else here stands: personal data reaching the bundle *unplanned* is still an incident.
+The history rewrite this ADR keeps for incidents is also run **on purpose**, as a routine with its report on the `erasure_request`, when a valid erasure request reaches personal data the bundle holds by design — a `Person` concept, `human:<email>` actor ids; git author lines are mailmapped to ~~the member id~~ the erasure pseudonym (2026-09-05 amendment below) in the same routine. Exports already issued are listed as not recalled. Everything else here stands: personal data reaching the bundle *unplanned* is still an incident.
 
 ## Amendment — 2026-08-28, the forge is a bare repository the app writes (ticket 74, ADR 0024)
 
@@ -52,3 +52,7 @@ Everything else in this ADR and its amendments stands.
 ## Amendment — 2026-09-01, enrichment reads committed concepts, and a run may enrich its own candidates before submitting (T-020 grilling, ADR 0031)
 
 Two enrichment shapes exist, and until now the boundary between them was true by inference only. **An enrichment *job* reads committed concepts** — the shapes described anywhere (enriching from a referenced source, ADR 0013; deriving edge labels, ADR 0023/0026) cite into concept files and read the graph, which is derived from commits and structurally cannot contain a candidate. It proposes its output as fresh suggestions through this ADR's gate, like any producer. **A *run* may enrich its own candidates before submitting its suggestion set** — "a run yields one suggestion set" says nothing about the passes inside the run, and an extraction-then-enrichment run submits one set of candidates worth an Admin's review rather than bare stubs. This is the design's answer to review quality: the principle already recorded is the Admin holding the writer's clock (ADR 0016), and fewer, richer candidates serve it. What no enrichment does is read another run's candidates out of the inbox: a `concept_write_request` payload is platform state, in no knowledge layer (ADR 0011), and nothing reads it but the acceptance path. Everything else stands.
+
+## Amendment — 2026-09-05, the mailmap target is the erasure pseudonym (T-073, ADR 0035)
+
+The 2026-08-27 amendment's "mailmapped to the member id" is corrected: the routine mailmaps a person's git author lines to the workspace's **erasure pseudonym** — an opaque id minted at erasure and kept on the erasure request, one per workspace and never the person id, so two workspaces' rewritten histories cannot be joined on one person (ADR 0020 amended, ADR 0035). Everything else stands.

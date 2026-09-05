@@ -348,11 +348,19 @@ to it by IRI and never restates it (ADR 0014).
   date*; absent means none. _Avoid_: expiry, expired.
 - **actor id** — who a `generated.by` or `verified[].by` names: a person as `human:<email>` (as
   Google's samples), the platform's agents as `better-answers-<purpose>/<version>`, a process as
-  `process:better-answers-<name>`. Verifier and generator must differ on the producer part.
+  `process:better-answers-<purpose>`. Verifier and generator must differ on the producer part. On
+  a record the platform keeps — the *ledger*, a commit trailer, a suggestion's proposer — a person
+  is `human:<person id>`; the file forms stand.
 - **actor alias** — an Admin's mapping of an imported actor id to a member, so *Checked by* can
   name them; the file is never rewritten.
-- **member id** — the platform's per-member ULID, minted at member creation; what `human:<email>`
-  becomes across history on a valid erasure request.
+- **person id** — the platform's one stable id for a person: minted by the platform at their first
+  sign-in, carried on the identity set's user row, `userId` on every Principal, and what every
+  record names a person by as `human:<person id>`. Never written into a concept file, which keeps
+  `human:<email>` (ADR 0019). _Avoid_: member id (retired 05/09/2026 — the member row's key names
+  nothing), user id (on a screen).
+- **minter** — the kernel's one function that mints every id the platform writes, a time-ordered
+  ULID; Better Auth is handed it too, so every identity id has the same shape (ADR 0035). Not the
+  *minting* rule, which decides where a unit of knowledge lives (ADR 0011). _Avoid_: id generator.
 - **owner (of a concept)** — the person answerable for keeping a concept checked and current: the
   domain's owner unless the concept names its own. May edit it directly and decides *edit*
   suggestions on it. Distinct from a binding's owner and from the bundle manifest's owner.
@@ -384,12 +392,19 @@ to it by IRI and never restates it (ADR 0014).
   the workspace's tests are replayed retrieval-only when the answer path changes and weekly;
   *stale* when a concept it names is deprecated. _Avoid_: eval (on any screen).
 - **audit event** — the record of one act by an Admin or the platform — what was done, to what, by
-  whom, when, with what confirmations — in the one append-only *ledger*. _Avoid_: log.
+  whom, when, with what confirmations — in the one append-only *ledger*. Every event belongs to
+  one of four families — **people**, **knowledge**, **sources**, **platform** — named as the first
+  word of its act, `family.subject.verb`; runs, the *answer audit*, *signals* and spend are their
+  own records and never audit events. _Avoid_: log.
 - **ledger** — the one append-only record of every *audit event* a workspace keeps, written in
   the same act it records. _Avoid_: audit log, event log.
 - **erasure request** — a person's request that their personal data leave the platform: what was
   done in every store, when, and when the backups are beyond use. A valid one reaching the bundle
-  runs the history-rewrite routine (ADR 0020).
+  runs the history-rewrite routine (ADR 0020) and carries the *erasure pseudonym* it minted.
+- **erasure pseudonym** — the per-workspace opaque id, minted at erasure and kept on the erasure
+  request, that `human:<email>` becomes across that workspace's files and history on a valid
+  erasure request. Never the person id, so two workspaces' rewritten histories cannot be joined
+  on one person.
 - **subject request** — a person's access or erasure request: the same per-store finder, the
   one-month clock; access answers from the normalised text.
 - **suppression** — the entry that keeps a person's data out of every derived store when a
@@ -462,6 +477,16 @@ to it by IRI and never restates it (ADR 0014).
 
   Work that outlives a session runs under one of the two, never under a live user session.
   _Avoid_: user (in code), session, caller, actor (which is the *id* on a file, not the principal).
+- **operator** — the platform's own administrator over every workspace: a real person on the
+  identity set with the platform-level role, a third principal kind beside a user and the
+  platform, audited under their own id. Never a workspace *role*; *Admin* is the highest role a
+  workspace has.
+- **revoke credentials** — the one revocation act, in two scopes. *In a workspace*: a workspace
+  Admin ends every session and token a person holds there, by an instant on the membership row
+  the resolver refuses against; nothing outside that workspace changes, and the Admin never
+  learns whether others exist. *Everywhere*: the operator ends every session and token the
+  person holds, by an instant on the person. Both end what was issued; a fresh sign-in mints
+  anew. _Avoid_: suspend, ban, deactivate.
 - **agent token** — a **share agent's** credential: binding-scoped, minted and revoked by an Admin,
   checked in the app before any request body is read, and good only for the `/agent/v1` routes a
   share agent uses to push documents in from a company's own network (ADR 0008 amendment, `[SEC1]`'s

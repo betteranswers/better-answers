@@ -40,7 +40,7 @@ We decided this because the records are where the platform's promise — trust p
 
 ## Amendment — 2026-08-27, findings, subject requests, the member id (ticket 24, ADR 0020)
 
-Two families join: `finding` (attached to `source_document`: category, offsets into the normalised text, rule version, detector pin; the *keep in text* act with its reason) and `subject_request` (access · erasure; the erasure map's per-store finder on the one-month clock). The member row carries a **member id** (ULID minted at member creation) beside the email; on a valid erasure request the member row is **pseudonymised** — the one exception to "retired, never deleted".
+Two families join: `finding` (attached to `source_document`: category, offsets into the normalised text, rule version, detector pin; the *keep in text* act with its reason) and `subject_request` (access · erasure; the erasure map's per-store finder on the one-month clock). ~~The member row carries a **member id** (ULID minted at member creation) beside the email; on a valid erasure request the member row is **pseudonymised** — the one exception to "retired, never deleted".~~ (Struck 2026-09-05 — the amendment below, ADR 0035: the member row carries no id of ours, and the user row is the one pseudonymised.)
 
 ## Amendment — 2026-08-28, the entity-merge family and the record watermark (ticket 39, ADR 0021)
 
@@ -49,3 +49,7 @@ An **`entity_merge`** record (pending · confirmed) is the rule a confirmed alia
 ## Amendment — 2026-08-29, aliases, kinds, the section hash and the Answer's domain (ticket 50, ADR 0026)
 
 `concept_identity` derives its merge-key names from the concept's `title` and its *Also known as* body line — a confirmed concept alias is a kind-*edit* suggestion that adds the line, never an alias store; an Admin's *No* to "Are these the same thing?" is remembered per pair as an audit event. A kind rename or merge is one bulk commit that re-keys `concept_identity` in the same transaction. An include's section hash covers the section's subtree with the heading line excluded, normalised as the 2026-08-27 amendment normalises a body; a body with two headings that fold to the same text is refused at commit, an imported bundle's duplicates flagged. An `Answer` minted at the promotion gate lands in the domain of the concept it chiefly cites, else `company/answers/`, shown for override. No `vocabulary_term`, no plan record, no vocabulary suggestion kind exist. Everything else stands.
+
+## Amendment — 2026-09-05, the member row carries no id of ours (T-073, ADR 0035)
+
+The 2026-08-27 amendment's member id is struck. The member row's key is one the organisation plugin requires and nothing of ours references, joins on or shows; a person has **one id**, the `user` row's, and every record this ADR keeps names a person by it as `human:<person id>` — the ledger's actor, a version's actor, a suggestion's proposer and decider (ADR 0035). The file's `human:<email>` (the 2026-08-27 hash-normaliser amendment) stands as the file's form. On a valid erasure request the rewrite target is the per-workspace *erasure pseudonym* and the **user** row is the one pseudonymised — email to a unique tombstone, name cleared, id kept — so "retired, never deleted" holds for it and the member row is not touched (ADR 0020 amended). The ledger is never rewritten. Everything else stands.
