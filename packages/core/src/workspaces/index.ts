@@ -157,6 +157,81 @@ export const revokeCredentials = async (
   return ok({ userId: userId.data, actorId: platform.actorId });
 };
 
+export type RevokeWorkspaceTokensInput = {
+  readonly workspaceId: string;
+  readonly userId: string;
+  /** The instant; every token minted for this workspace before it is ended. */
+  readonly at: Date;
+};
+
+/**
+ * Revocation's workspace scope, the token half (ADR 0035): end the refresh and access
+ * tokens this person holds **for this workspace** and minted before the instant. The
+ * act around it — writing the instant on the membership row and its ledger row — is
+ * T-027's; this is the predicate that act calls, landed and tested first.
+ *
+ * A token's consented workspace is the reference id the grant carried, which Better
+ * Auth writes onto the token row at mint and reads back as the `workspace` claim
+ * (`apps/api/src/auth/auth.ts`, `customAccessTokenClaims`). The predicate matches that
+ * column and never joins, so it cannot reach a row of another workspace's however the
+ * arguments are chosen; a grant that named no workspace matches nothing and stays.
+ *
+ * Sessions are not ended here, and that is the point of the two scopes: a browser
+ * session belongs to the person, not to one workspace, so ending it would reach the
+ * other company's tenant. What refuses a session in this workspace is the membership
+ * instant the resolver reads (`withPrincipal`); *revoke everywhere* is the act that
+ * ends sessions.
+ */
+export const revokeWorkspaceTokens = async (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  input: RevokeWorkspaceTokensInput,
+): Promise<
+  Result<
+    {
+      workspaceId: WorkspaceId;
+      userId: string;
+      actorId: PlatformPrincipal["actorId"];
+      refreshTokensEnded: number;
+      accessTokensEnded: number;
+    },
+    "malformed" | Error
+  >
+> => {
+  const workspaceId = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
+  const userId = boundarySchemas.user.select.shape.id.safeParse(input.userId);
+  if (!workspaceId.success || !userId.success) return err("malformed");
+
+  const ended = await attempt(() =>
+    // The token tables are the identity set's, which no workspace scope reaches; the
+    // workspace is the predicate's own argument, not the transaction's.
+    withIdentityWrite(platform, door, async (tx) => {
+      const end = async (table: "oauth_refresh_token" | "oauth_access_token"): Promise<number> => {
+        const updated = await tx.query(
+          `UPDATE ${table} SET revoked = now()
+            WHERE user_id = $1 AND reference_id = $2 AND created_at < $3 AND revoked IS NULL`,
+          [userId.data, workspaceId.data, input.at],
+        );
+        return updated.rowCount ?? 0;
+      };
+      // The refresh row first: an access token outliving its parent is the window a
+      // rotation would mint through.
+      const refreshTokensEnded = await end("oauth_refresh_token");
+      const accessTokensEnded = await end("oauth_access_token");
+      return { refreshTokensEnded, accessTokensEnded };
+    }),
+  );
+  // No constraint of this act's is a refusal a caller can act on; a store failure comes
+  // back as the normalised Error, the convention (a Result, never a rejection) held.
+  if (!ended.ok) return err(ended.error);
+  return ok({
+    workspaceId: workspaceId.data,
+    userId: userId.data,
+    actorId: platform.actorId,
+    ...ended.value,
+  });
+};
+
 /**
  * Who the person is, where they are and at what role — the three the shell names
  * (T-037, user stories 9 and 10). The role is the Principal's, resolved in this same

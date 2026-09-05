@@ -14,6 +14,7 @@ import {
   provisionWorkspace,
   readMembership,
   revokeCredentials,
+  revokeWorkspaceTokens,
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
 } from "../src/workspaces/index.ts";
@@ -320,5 +321,145 @@ describe("reading the current membership", () => {
     expect(read.value.ok).toBe(false);
     if (read.value.ok) return;
     expect(read.value.error).toBeInstanceOf(Error);
+  });
+});
+
+/**
+ * Revocation's workspace scope (ADR 0035): the same person holds tokens in two
+ * workspaces, and one workspace's revocation reaches its own and no others. The
+ * seam is the slice's entry point against real Postgres, because "leaves the other
+ * workspace's token alone" is only a claim until a second tenant's row is there to
+ * be left alone.
+ */
+describe("revoking a person's tokens in one workspace", () => {
+  const at = new Date("2026-09-04T12:00:00Z");
+  const before = new Date("2026-09-04T11:00:00Z");
+  const after = new Date("2026-09-04T13:00:00Z");
+
+  type Seeded = {
+    here: string;
+    there: string;
+    userId: string;
+    clientId: string;
+    /** Every token seeded, by the id it was minted with, so a refusal reads as a grant. */
+    grants: ReadonlyMap<string, string>;
+  };
+
+  const seedTwoWorkspaces = async (): Promise<Seeded> => {
+    const client = await db.pool.connect();
+    try {
+      const seed = testData(client);
+      const here = await seed.workspace();
+      const there = await seed.workspace();
+      const person = await seed.user();
+      const other = await seed.user();
+      const oauthClient = await seed.oauthClient();
+      const grants = new Map<string, string>();
+      const mint = async (
+        grant: string,
+        userId: string,
+        referenceId: string | null,
+        createdAt: Date,
+      ): Promise<void> => {
+        const refresh = await seed.oauthRefreshToken({
+          clientId: oauthClient.clientId,
+          userId,
+          referenceId,
+          createdAt,
+        });
+        const access = await seed.oauthAccessToken({
+          clientId: oauthClient.clientId,
+          userId,
+          referenceId,
+          createdAt,
+        });
+        grants.set(refresh.id, `refresh ${grant}`);
+        grants.set(access.id, `access ${grant}`);
+      };
+      await mint("here-old", person.id, here.id, before);
+      await mint("here-new", person.id, here.id, after);
+      await mint("there-old", person.id, there.id, before);
+      // A grant that named no workspace, and another person's grant in this workspace.
+      await mint("nowhere-old", person.id, null, before);
+      await mint("someone-else-here-old", other.id, here.id, before);
+      return {
+        here: here.id,
+        there: there.id,
+        userId: person.id,
+        clientId: oauthClient.clientId,
+        grants,
+      };
+    } finally {
+      client.release();
+    }
+  };
+
+  /** The grants this seeding's tokens now count as ended, in their words. */
+  const endedGrants = async (seeded: Seeded): Promise<readonly string[]> => {
+    const rows = await db.pool.query<{ id: string }>(
+      `SELECT id FROM oauth_refresh_token WHERE client_id = $1 AND revoked IS NOT NULL
+       UNION ALL
+       SELECT id FROM oauth_access_token WHERE client_id = $1 AND revoked IS NOT NULL`,
+      [seeded.clientId],
+    );
+    return rows.rows.map((row) => seeded.grants.get(row.id) ?? row.id).toSorted();
+  };
+
+  it("ends the refresh and access tokens consented to this workspace before the instant, and no others", async () => {
+    const seeded = await seedTwoWorkspaces();
+    const door = openPostgres(db.runtimePool);
+
+    const ended = await revokeWorkspaceTokens(bootstrap, door, {
+      workspaceId: seeded.here,
+      userId: seeded.userId,
+      at,
+    });
+
+    expect(ended).toEqual({
+      ok: true,
+      value: {
+        workspaceId: seeded.here,
+        userId: seeded.userId,
+        actorId: "process:better-answers-bootstrap",
+        refreshTokensEnded: 1,
+        accessTokensEnded: 1,
+      },
+    });
+    expect(await endedGrants(seeded)).toEqual(["access here-old", "refresh here-old"]);
+  });
+
+  it("cannot reach the other workspace's tokens even when the instant is now", async () => {
+    const seeded = await seedTwoWorkspaces();
+    const door = openPostgres(db.runtimePool);
+
+    const ended = await revokeWorkspaceTokens(bootstrap, door, {
+      workspaceId: seeded.here,
+      userId: seeded.userId,
+      at: new Date("2036-01-01T00:00:00Z"),
+    });
+
+    expect(ended.ok).toBe(true);
+    // Everything of this person's in this workspace goes; the other workspace's grant,
+    // the workspace-less grant and the other person's grant all stay.
+    expect(await endedGrants(seeded)).toEqual([
+      "access here-new",
+      "access here-old",
+      "refresh here-new",
+      "refresh here-old",
+    ]);
+  });
+
+  it("refuses a workspace id or a person id that is not one, and ends nothing", async () => {
+    const seeded = await seedTwoWorkspaces();
+    const door = openPostgres(db.runtimePool);
+
+    const malformed = await revokeWorkspaceTokens(bootstrap, door, {
+      workspaceId: "not-a-ulid",
+      userId: seeded.userId,
+      at,
+    });
+
+    expect(malformed).toEqual({ ok: false, error: "malformed" });
+    expect(await endedGrants(seeded)).toEqual([]);
   });
 });
