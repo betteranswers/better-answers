@@ -28,9 +28,9 @@ We decided this because the product's one claim no competitor makes — *open fo
 
 ## Consequences
 
-- **Files** (this PR): `LICENSE` (Apache-2.0), `NOTICE`, `SECURITY.md`, `README.md`; `[LIFT3]` in `CODING_RULES.md` and `THIRD_PARTY_NOTICES.md` as the per-lift file name in `[LIFT1]`/`[LIFT2]`; ADR 0005 amended. The `check` licence step lands with the first workspace `package.json` and `pyproject.toml` (its tools' versions from Context7, `[DEPS1]`).
+- **Files** (this PR): `LICENSE` (Apache-2.0), `NOTICE`, `SECURITY.md`, `README.md`; the licence rule and `THIRD_PARTY_NOTICES.md` as the per-lift file name as three rules in `CODING_RULES.md` (retired 2026-08-31; the 2026-09-05 amendment below records it); ADR 0005 amended. The `check` licence step lands with the first workspace `package.json` and `pyproject.toml` (its tools' versions from Context7, `[DEPS1]`).
 - **The flip** is task 77: the tree audit and the organisation setting, at the pre-build gate; the gate's list gains *the repository's public state matches ADR 0027*.
-- **Every lift ticket** checks its source's licence against `[LIFT3]` before a line is copied; a lift from a copyleft or enterprise-licensed source is refused, and the design is reimplemented clean-room (the neo4j-okf precedent, ADR 0021).
+- **Every lift ticket** checks its source's licence against this ADR's list before a line is copied; a lift from a copyleft or enterprise-licensed source is refused, and the design is reimplemented clean-room (the neo4j-okf precedent, ADR 0021).
 - **The seed platform bundle** is open with the tree; a client's copy diverges and is theirs (ADR 0001 amendment, ticket 11).
 - **Trade mark**: the name relies on Apache-2.0 §6 until registration, which stays out of v0.1 (ticket 22 Q6); the Danish `betteranswers.ai` stays a watch item for the pre-build gate.
 - Amends ADRs 0005 (file name; posture) as recorded there; `LIFT.md` in ADRs 0013 and 0021 reads `THIRD_PARTY_NOTICES.md`.
@@ -45,3 +45,7 @@ We decided this because the product's one claim no competitor makes — *open fo
 
 **Enforced against operational files, not against the ADRs** (Liam, 30/08/2026). ADR 0022's edge paragraph and ADR 0008's amendment state which hostnames sit outside the access wall and why. Those are architectural facts anyone establishes with one request, and redacting them would gut the two ADRs a reader needs to understand the ingress at all. They stay. Settled — not to be re-asked at the flip.
 
+
+## Amendment — 2026-09-05, the constitution's LIFT family is retired; the posture is this ADR's own text (T-078)
+
+The consequences above put three rules into `CODING_RULES.md` — the per-lift file, refresh as a deliberate act, permissive licences only. The owner retired the family from the constitution on 31 August 2026 (`64c1e78`), together with the root `THIRD_PARTY_NOTICES.md` it had promised, and the retirement is deliberate: the posture is this ADR's decision and binds as an ADR does; what is checkable at a lift — the file's contents and the contract test that fails the build — is `[APP4]` in `apps/api/CODING_RULES.md`, which the two notices files in the tree (`apps/api/lifts/better-auth-cimd-node/`, `apps/web/src/shared/ui/`) cite beside this ADR. The `check` licence step and the root aggregate are struck: no task builds them, and `NOTICE` no longer promises them. Where the consequences above cite the retired tags, the citation now reads as words; nothing else changes.

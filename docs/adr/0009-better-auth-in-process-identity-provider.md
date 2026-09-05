@@ -49,7 +49,7 @@ Reviewed at the first client's renewal, or the moment a trigger fires. **Ticket 
 
 **The seam becomes a rule.** `requireBearerAuth` was named here as the seam; it is now a rule of the constitution (retired to this ADR on 2026-09-05; amendment below) and **lint-enforced**: no Better Auth type crosses into `packages/core`, and no `better-auth` or `@better-auth/*` import appears outside the auth module. The seam is what makes two to three weeks two to three weeks rather than a rewrite.
 
-**An SSRF policy on the CIMD fetcher, applied here.** The fetcher retrieves a URL the caller supplies, so it resolves the address before connecting, refuses private and link-local ranges, caps redirects and body size, and re-checks after every redirect. The policy is owned by this ADR and carried with the `@better-auth/cimd/node` fix as a `lifts/` snapshot with its `THIRD_PARTY_NOTICES.md` and a removal condition — the upstream release that fixes it (`[LIFT1]`, ADR 0027).
+**An SSRF policy on the CIMD fetcher, applied here.** The fetcher retrieves a URL the caller supplies, so it resolves the address before connecting, refuses private and link-local ranges, caps redirects and body size, and re-checks after every redirect. The policy is owned by this ADR and carried with the `@better-auth/cimd/node` fix as a `lifts/` snapshot with its `THIRD_PARTY_NOTICES.md` and a removal condition — the upstream release that fixes it (ADR 0027, `[APP4]`).
 
 ## Amendment — 2026-09-01, the identity set is isolated by key, not by scope (T-004; research `docs/research/better-auth-tenancy-and-agent-auth-2026-09-01.md`)
 

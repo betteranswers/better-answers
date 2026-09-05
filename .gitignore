@@ -47,7 +47,7 @@ deploy/wizard-41.env
 old-suggested-schema.md
 AGENTS.md.bak
 
-# agent tooling installed from third parties — never ours to publish ([LIFT3], ADR 0027).
+# agent tooling installed from third parties — never ours to publish (ADR 0027).
 # Skills are reinstalled from their sources; `tasks/AGENTS.md` from `ordna skill install`.
 .claude/skills/
 .agents/

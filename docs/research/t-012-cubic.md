@@ -361,7 +361,7 @@ anti-slop plugin currently sits at `app/tools/anti-slop/` — a lift in substanc
 (the root `THIRD_PARTY_NOTICES.md` documents it as a snapshot of
 `github.com/dmmulroy/anti-slop` at commit `6376385614d6c5d69b7460a11a86b656cdd88a7b`,
 boundary-tested by `app/test/anti-slop-lift.test.ts`) but misplaced relative to
-`[LIFT1]`'s `<tier>/lifts/<name>/`. T-016 moves it. The config is written against
+ADR 0027's `<tier>/lifts/<name>/`. T-016 moves it. The config is written against
 where it is going, with a comment saying so, so that no edit is needed when T-016
 lands — at the cost of the ignore not covering it in the window between T-012 and
 T-016.
@@ -425,7 +425,7 @@ reviews:
       # This file. A review of the review config is circular.
       - cubic.yaml
 
-      # Verbatim third-party snapshots taken by contract ([LIFT1], ADR 0027).
+      # Verbatim third-party snapshots taken by contract (ADR 0027).
       # A finding in one belongs upstream, not on a pull request here.
       # Depends on T-016, which moves the vendored anti-slop plugin from
       # `app/tools/anti-slop/` to `app/lifts/anti-slop/`.
@@ -566,8 +566,7 @@ reviews:
         start without one (ADR 0022).
 
         Licences are pinned the same way: code is lifted or depended on only
-        under MIT, BSD, ISC, Apache-2.0 or the PostgreSQL licence ([LIFT3],
-        ADR 0027). Flag a new dependency outside that list.
+        under MIT, BSD, ISC, Apache-2.0 or the PostgreSQL licence (ADR 0027). Flag a new dependency outside that list.
       include:
         - "**/package.json"
         - pnpm-workspace.yaml

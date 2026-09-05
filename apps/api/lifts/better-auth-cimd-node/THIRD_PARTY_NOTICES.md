@@ -3,7 +3,7 @@
 Upstream: https://github.com/better-auth/better-auth, package `@better-auth/cimd` 1.7.2, file `packages/cimd/src/node.ts` (published as `dist/node.mjs`).
 Upstream commit (tag `v1.7.2`): `ba12fcdfa774ca27d417079dbac0b1b5894ccaf2`.
 Snapshot digest (sha256 of the published `dist/node.mjs` this lift was written against): `905c3227fd0d3509a1ff2acf905a43f4bf5865c689c20770224d25c554e819b1`.
-Licence: MIT (`[LIFT3]`; the notice text is below).
+Licence: MIT (`[APP4]`, ADR 0027; the notice text is below).
 Lifted: 2026-09-01, T-004. Audited by the T-004 builder against prototype 61's fix (`.scratch/v01-spec/prototypes/61-claude-connector/src/cimd-fetch.ts`) and research 80 F7.
 
 ## Why it is lifted

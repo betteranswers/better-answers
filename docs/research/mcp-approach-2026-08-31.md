@@ -269,7 +269,7 @@ Given that, the maintainability judgement:
 - **It is the only TypeScript option with an MCP **Apps** layer that is not a whole other
   framework** — `FastMCPApp`, a server-side component library, and ready-made Approval, Choice,
   FileUpload and FormInput providers.
-- **Apache-2.0**, which sits inside `[LIFT3]`'s allowed set.
+- **Apache-2.0**, which sits inside ADR 0027's allowed set.
 
 **Against it, decisively for now:** it is **eight weeks old in its 1.x line and released again the
 day this was written**; its authentication story is labelled interim by its own authors; and the

@@ -50,4 +50,8 @@ An extraction template names whatever kinds the document kind evidences; there i
 
 ## Amendment — 2026-08-30, the lift label (ticket 79, the pre-build gate; applied by T-001)
 
-Where the consequence above says "`LIFT.md` records the cut of `extract_text_and_images`, the pinned defaults and their code-vs-docs discrepancies", the file at the root of each `<tier>/lifts/<name>/` snapshot is **`THIRD_PARTY_NOTICES.md`** — same contents, the name other engineers recognise (ADR 0027, `[LIFT1]`). Its licence rule is `[LIFT3]`: MIT, BSD, ISC, Apache-2.0 or PostgreSQL only. Nothing else in this ADR changes.
+Where the consequence above says "`LIFT.md` records the cut of `extract_text_and_images`, the pinned defaults and their code-vs-docs discrepancies", the file at the root of each `<tier>/lifts/<name>/` snapshot is **`THIRD_PARTY_NOTICES.md`** — same contents, the name other engineers recognise (ADR 0027). Its licence rule is ADR 0027's: MIT, BSD, ISC, Apache-2.0 or PostgreSQL only (the constitution's two rules once cited here were retired on 2026-08-31; the 2026-09-05 amendment below records it). Nothing else in this ADR changes.
+
+## Amendment — 2026-09-05, the lift tags are retired (T-078)
+
+The 2026-08-30 amendment above cited two rules of the constitution for the per-lift file and the licence list. Both were retired by the owner on 31 August 2026 (recorded today in ADRs 0005 and 0027); the file's contents are `[APP4]`'s and the licence list is ADR 0027's own text. Nothing else in this ADR changes.

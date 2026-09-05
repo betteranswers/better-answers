@@ -32,5 +32,6 @@ caller crosses — never through a function the transport happens to call (`[TES
 ## [APP4] The lift is contract-tested, not trusted
 
 Every directory under `lifts/` carries a `THIRD_PARTY_NOTICES.md` naming its upstream
-commit, its digest and the test a refresh must pass (`[LIFT1]`, `[LIFT2]`). The test lives
-in `tests/` beside our own and fails the build, not a report.
+repository and commit, the snapshot's digest, its licence and notice text, what was cut, who
+audited it and when, and the test a refresh must pass (ADR 0027 names the file, ADR 0005 the
+practice). The test lives in `tests/` beside our own and fails the build, not a report.

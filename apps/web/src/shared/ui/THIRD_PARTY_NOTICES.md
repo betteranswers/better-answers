@@ -1,7 +1,7 @@
 # Registry components in `apps/web/src/shared/ui/`
 
 ADR 0033 takes shadcn, Kibo UI and Vercel AI Elements as **source into this repository**, and
-says a registry component carries the same notice obligation as any lift (`[LIFT3]`, ADR 0027).
+says a registry component carries the same notice obligation as any lift (`[APP4]`, ADR 0027).
 This file is that notice. It covers every file under this directory; the tokens, the stylesheet
 and the Tailwind bridge these components read are `packages/design-system`'s and are ours.
 
