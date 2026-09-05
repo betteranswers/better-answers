@@ -71,6 +71,16 @@ const manifestOf = (directory: string): Manifest => {
 const scriptsOf = (directory: string): Readonly<Record<string, string>> =>
   manifestOf(directory).scripts ?? {};
 
+/**
+ * The workspaces with no `check` script, each with the reason it has nothing to run. The
+ * root `check` skips a missing script (`--if-present`), which is what makes this list
+ * necessary: without it a new package joins the workspace and is gated by nothing.
+ */
+const NO_CHECK: Readonly<Record<string, string>> = {
+  "packages/design-system":
+    "CSS tokens, a stylesheet and guideline cards as HTML — nothing executable to lint, type or test; the workspace exists so apps/web can import the stylesheet by name (ADR 0029)",
+};
+
 describe("the workspaces' scripts (T-068)", () => {
   it("reads a workspace for every glob the pnpm workspace file declares", () => {
     // The assertions below go quiet if this list is empty, so it is asserted first: a
@@ -98,5 +108,36 @@ describe("the workspaces' scripts (T-068)", () => {
       passing,
       "a workspace's test script passes with no tests. Delete the flag and write a test for what the workspace holds.",
     ).toEqual([]);
+  });
+
+  it("gates every workspace, or names the one it does not and why", () => {
+    const withoutCheck = workspaceDirectories()
+      .filter((directory) => scriptsOf(directory)["check"] === undefined)
+      .sort();
+    const named = Object.keys(NO_CHECK).sort();
+
+    // Both directions (`[TEST7]`): one finds the workspace that never joined the gate, the
+    // other the entry whose reason has stopped being true — a listed workspace that has
+    // grown something to run and whose exemption should leave with the script that ends it.
+    expect(
+      withoutCheck.filter((directory) => !named.includes(directory)),
+      "a pnpm workspace carries no check script and is not named in NO_CHECK. Give it a check script, or list it with the reason it has nothing to run.",
+    ).toEqual([]);
+    expect(
+      named.filter((directory) => !withoutCheck.includes(directory)),
+      "a workspace named in NO_CHECK now has a check script. Remove the entry: the reason it carried has stopped being true.",
+    ).toEqual([]);
+  });
+
+  it("keeps the root check running a workspace that has a check and skipping one that has none", () => {
+    // The skip is what NO_CHECK stands over: `--if-present` is what lets a workspace with
+    // nothing to run stay silent instead of failing the root command.
+    const recursive = Object.values(scriptsOf(".")).filter(
+      (script) => script.includes("-r ") && script.includes("run check"),
+    );
+
+    expect(recursive.length, "the root runs no workspace's check").toBe(1);
+    expect(recursive[0]).toContain("--if-present");
+    expect(recursive[0]).toContain("--no-bail");
   });
 });
