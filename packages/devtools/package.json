@@ -17,6 +17,7 @@
     "@better-answers/devtools": "workspace:*",
     "@oxlint/plugins": "1.80.0",
     "@types/node": "24.13.3",
+    "knip": "6.34.0",
     "oxlint": "1.80.0",
     "typescript": "7.0.2",
     "vitest": "4.1.11"

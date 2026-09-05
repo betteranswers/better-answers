@@ -4,10 +4,11 @@
   "description": "Better Answers — a living company knowledge map for UK SMBs on OKF v0.2 (see AGENTS.md)",
   "scripts": {
     "prepare": "lefthook install || echo 'lefthook is absent — no git hooks installed (see lefthook.yml)'",
-    "check": "node scripts/check.mjs format:check lint check:workspaces check:worker",
+    "check": "node scripts/check.mjs format:check lint knip check:workspaces check:worker",
     "check:workspaces": "pnpm -r --no-bail --if-present run check",
     "check:worker": "cd apps/worker && uv run --frozen check",
     "lint": "oxlint",
+    "knip": "knip",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "migrate": "pnpm --filter @better-answers/api run migrate",
@@ -15,8 +16,8 @@
     "mutation": "pnpm -r --if-present run mutation"
   },
   "devDependencies": {
-    "@oxlint/plugins": "1.80.0",
     "@types/node": "24.13.3",
+    "knip": "6.34.0",
     "lefthook": "2.1.12",
     "oxfmt": "0.65.0",
     "oxlint": "1.80.0",

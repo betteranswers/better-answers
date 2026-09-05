@@ -58,6 +58,8 @@ A lint rule, a tool in `check` and a hook command each land with a functional te
 
 A repository lint rule carries its rule line — a tag or an ADR — in the message it prints, so a reader who hits it reaches the rule without asking, and it lands with a functional test through that runner.
 
+Every tool named in `check` is a gate and never a report, so a finding from one is a rule citation and not a matter of taste: oxlint refuses the patterns its plugins name, and knip refuses a file no code reaches, an export nothing imports, and a dependency either declared and unused or used and undeclared.
+
 ### [CHECK2] A suite that can run nothing fails
 
 A test script never passes for having found no tests, and a browser spec left focused fails under CI (Playwright's `forbidOnly`). pytest refuses a marker it does not know and an expected failure that passed. Every pnpm workspace carries a `check` script or is named, with the reason it has nothing to run, in `apps/api/tests/check-scripts.test.ts`, which holds the pair both ways (`[TEST7]`): a named workspace that gains `check`, and a workspace off the list that lacks one, each fail.
