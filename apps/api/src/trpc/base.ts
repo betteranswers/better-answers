@@ -24,7 +24,7 @@ import { sessionClaims, type SessionReader } from "../auth/verify.ts";
  * function type — headers in, a session record or nothing out — says everything this
  * transport needs and names no library.
  */
-export type TrpcContext = {
+type TrpcContext = {
   readonly door: PostgresDoor;
   readonly readSession: SessionReader;
   readonly headers: Headers;
@@ -34,7 +34,7 @@ export type TrpcContext = {
  * What this transport refuses on top of the resolver's own refusals: no session at
  * all, and a session that has not passed the workspace picker.
  */
-export type TransportRefusal = PrincipalRefusal | "no-session" | "no-active-workspace";
+type TransportRefusal = PrincipalRefusal | "no-session" | "no-active-workspace";
 
 /**
  * Every refusal is `UNAUTHORIZED` carrying its own name, and there is no branch here

@@ -77,12 +77,9 @@ export type EmailMessage = {
 export type EmailSender = (message: EmailMessage) => Promise<void>;
 
 /** The seam the CIMD plugin fetches metadata documents through; production takes the lift. */
-export type ClientMetadataFetch = (
-  input: string | URL | Request,
-  init?: RequestInit,
-) => Promise<Response>;
+type ClientMetadataFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
-export type AuthDependencies = {
+type AuthDependencies = {
   readonly database: pg.Pool;
   readonly door: PostgresDoor;
   /**

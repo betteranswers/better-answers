@@ -233,7 +233,7 @@ export const connectAsHost = async (
   return { ...tokens, code, callback };
 };
 
-export const exchange = async (
+const exchange = async (
   client: TestClient,
   params: { readonly code: string; readonly verifier: string },
 ): Promise<Tokens> => {
@@ -271,7 +271,7 @@ const tokenResponse = z.object({
   expires_in: z.coerce.number(),
 });
 
-export const tokensOf = (body: unknown): Tokens => {
+const tokensOf = (body: unknown): Tokens => {
   const parsed = tokenResponse.parse(body);
   return {
     accessToken: parsed.access_token,

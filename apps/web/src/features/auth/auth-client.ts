@@ -26,5 +26,3 @@ export const authClient = createAuthClient({
   basePath: "/",
   plugins: [emailOTPClient(), organizationClient(), oauthProviderClient()],
 });
-
-export type AuthClient = typeof authClient;

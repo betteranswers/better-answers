@@ -25,9 +25,9 @@ import { openPostgres, tablesPresent } from "@better-answers/core/store/postgres
  */
 
 /** The contract's exit codes, by name: the scripts read them, so they are stated once. */
-export const DONE = 0;
-export const REFUSED = 1;
-export const USAGE = 2;
+const DONE = 0;
+const REFUSED = 1;
+const USAGE = 2;
 export const NOT_BUILT = 3;
 
 export type OpsIo = {

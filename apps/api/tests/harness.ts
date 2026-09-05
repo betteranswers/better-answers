@@ -43,7 +43,7 @@ export const AUTH_SECRET = "test-secret-that-is-at-least-thirty-two-characters-l
 export const APP_HOSTNAME = hostnameOfUrl(PUBLIC_URL);
 export const AGENT_HOSTNAME = "agent.example.test";
 export const APEX_HOSTNAME = "example.test";
-export const HOSTNAMES: PublicHostnames = {
+const HOSTNAMES: PublicHostnames = {
   app: APP_HOSTNAME,
   agent: AGENT_HOSTNAME,
   apex: APEX_HOSTNAME,
@@ -52,7 +52,7 @@ export const HOSTNAMES: PublicHostnames = {
 /** Claude's CIMD document, fetched from https://claude.ai/oauth/mcp-oauth-client-metadata on 01/09/2026. */
 export const CLAUDE_CLIENT_ID = "https://claude.ai/oauth/mcp-oauth-client-metadata";
 export const CLAUDE_REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback";
-export const CLAUDE_METADATA_DOCUMENT = {
+const CLAUDE_METADATA_DOCUMENT = {
   client_id: CLAUDE_CLIENT_ID,
   client_name: "Claude",
   client_uri: "https://claude.ai",
@@ -72,9 +72,9 @@ export const CLAUDE_METADATA_DOCUMENT = {
  * a missing document's — the harness serves it, and the app must still never ask.
  */
 export const LOOKALIKE_CLIENT_ID = "https://claude-ai.example/oauth/mcp-oauth-client-metadata";
-export const LOOKALIKE_REDIRECT_URI = "https://claude-ai.example/api/mcp/auth_callback";
+const LOOKALIKE_REDIRECT_URI = "https://claude-ai.example/api/mcp/auth_callback";
 
-export type LogLine = Readonly<Record<string, unknown>>;
+type LogLine = Readonly<Record<string, unknown>>;
 
 export type TestApp = {
   readonly server: Hono;
@@ -112,14 +112,14 @@ export type TestApp = {
   stop(): Promise<void>;
 };
 
-export type Provisioned = {
+type Provisioned = {
   readonly workspaceId: string;
   readonly name: string;
   readonly admin: Person;
 };
 
 /** A person as the identity set holds them; the name is what the shell shows (T-037). */
-export type Person = {
+type Person = {
   readonly id: string;
   readonly email: string;
   readonly name: string;

@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { TRPC_ENDPOINT } from "../src/trpc/index.ts";
+import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { AGENT_HOSTNAME, APEX_HOSTNAME, APP_HOSTNAME, startApp, type TestApp } from "./harness.ts";
 
 /**
