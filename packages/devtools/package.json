@@ -11,7 +11,7 @@
     "lint": "oxlint --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "pnpm run lint && pnpm run typecheck && pnpm run test"
+    "check": "node ../../scripts/check.mjs lint typecheck test"
   },
   "devDependencies": {
     "@better-answers/devtools": "workspace:*",
