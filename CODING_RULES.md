@@ -56,6 +56,10 @@ Where a list names members (the migration journal and its directory), a generate
 
 A comment carries the reason a reader cannot infer from the code: a constraint, a trade-off, a gotcha. What the code does is said by the code; what happened to it is said by git and ADRs.
 
+### [COMMENT2] A rule tag is cited where rules are made, kept, reviewed or proved
+
+A tag such as `[SEC2]` appears in the rules files, an ADR, a spec or a ticket, `cubic.yaml`, a lint rule's line or message, a test — and in a document a reader follows to the rule: the glossary, a note under `docs/` or `apps/docs-site/`, a package readme, a notices file. It never appears in source, a deploy file, a Dockerfile, a CI workflow or a workspace's config: a comment there carries the constraint, the trade-off or the gotcha in words (`[COMMENT1]`) or is deleted, and is never replaced tag-for-sentence. `apps/api/tests/coding-rules-tags.test.ts` holds this both ways (`[TEST7]`): every tag cited in the tree is defined in a rules file and sits in one of those places, and every defined tag is cited outside its own file or is named in the test with the reason it is not.
+
 ## GLOSSARY
 
 ### [GLOSSARY1] `CONTEXT.md` is a glossary and nothing else

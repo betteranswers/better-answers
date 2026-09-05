@@ -34,7 +34,8 @@ reviews:
     - `CODING_RULES.md` — the constitution. Rules are tagged (`[DESIGN]`,
       `[TEST]`, `[SEC]`, `[AUDIT]`, `[DEPS1]`, `[COMMENT1]`, `[LOG1]`…). Cite the
       tag when a finding rests on a rule; `[TEST5]` (a test title says what the system does
-      for whom) and `[COMMENT1]` (a comment says why, never what or what happened) are
+      for whom), `[COMMENT1]` (a comment says why, never what or what happened) and
+      `[COMMENT2]` (a rule tag never appears in source, deploy, a Dockerfile or CI) are
       cited by review alone, so cite them when they are the finding.
     - `apps/api/CODING_RULES.md` and `apps/worker/CODING_RULES.md` — tier rules. Apply the
       tier's file to changes in that tier.
