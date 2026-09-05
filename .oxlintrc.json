@@ -4,8 +4,7 @@
   // Both plugins live in packages/devtools, which is imported and never deployed (ADR 0029).
   // A `better-answers` rule names the rule it holds in the message it prints, so a reader who
   // hits it reaches the rule without asking, and lands with a functional test over a throwaway
-  // tree. CODING_RULES.md § CHECK is where that is required; apps/api/tests/lint-rules.test.ts
-  // is the test.
+  // tree ([CHECK1]; apps/api/tests/lint-rules.test.ts is the test).
   "jsPlugins": [
     {
       "name": "anti-slop",
