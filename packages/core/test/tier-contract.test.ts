@@ -2,6 +2,10 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { boundarySchemas, ULID_PATTERN } from "@better-answers/schema";
+
+import { ulid } from "../src/kernel/index.ts";
+
 /**
  * The TypeScript half of the tier-contract conformance suite (ADR 0031). The Python
  * half is `apps/worker/tests/test_tier_contract.py`, and the two assert the same
@@ -13,10 +17,11 @@ import { describe, expect, it } from "vitest";
  * is the mechanism; deduplicating it away would delete the test.
  */
 
-const SPOKEN_CONTRACT_VERSION = 0;
+const SPOKEN_CONTRACT_VERSION = 1;
 const SPOKEN_AGREEMENTS = {
   "concept-inbox": "sql-function",
   "cost-ledger": "generated",
+  "id-shape": "fixtured",
   "credential-envelope": "fixtured",
   "llm-routing": "sql-function",
   queue: "sql-function",
@@ -66,5 +71,44 @@ describe("the tier contract", () => {
       .map((entry) => path.relative(contractsDir, path.join(entry.parentPath, entry.name)))
       .filter((relative) => !NOT_FIXTURES.has(relative));
     expect(onDisk.toSorted()).toEqual(manifest.fixtures.map((fixture) => fixture.path).toSorted());
+  });
+});
+
+/**
+ * id-shape: the one shape an id has, whichever tier minted it (ADR 0035). The fixture is
+ * the contract — the pattern, the ids that must parse and the ids that must not — and
+ * this half holds it against the tier's own minter and its own boundary, never against a
+ * copy of the pattern written out here, which would agree with itself.
+ */
+type IdShape = {
+  readonly pattern: string;
+  readonly must_parse: readonly string[];
+  readonly must_not_parse: readonly { readonly id: string; readonly why: string }[];
+};
+
+const readIdShape = (): IdShape =>
+  JSON.parse(readFileSync(path.join(contractsDir, "id-shape", "cases.json"), "utf8")) as IdShape;
+
+describe("id-shape, the agreement about what an id looks like", () => {
+  it("pins the very pattern this tier narrows an identity id to at its boundary", () => {
+    expect(readIdShape().pattern).toBe(ULID_PATTERN);
+  });
+
+  it("parses at this tier's boundary every id the other tier may mint, and refuses every id it may not", () => {
+    const fixture = readIdShape();
+    const atTheBoundary = boundarySchemas.workspace.select.shape.id;
+
+    for (const id of fixture.must_parse) {
+      expect(atTheBoundary.safeParse(id).success, id).toBe(true);
+    }
+    for (const rejected of fixture.must_not_parse) {
+      expect(atTheBoundary.safeParse(rejected.id).success, rejected.why).toBe(false);
+    }
+  });
+
+  it("mints ids the fixture's pattern accepts, so an id minted here parses over there", () => {
+    const pattern = new RegExp(readIdShape().pattern);
+
+    for (let minted = 0; minted < 100; minted += 1) expect(pattern.test(ulid())).toBe(true);
   });
 });

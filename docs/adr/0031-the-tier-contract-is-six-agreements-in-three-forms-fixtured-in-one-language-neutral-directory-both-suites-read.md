@@ -15,6 +15,11 @@ ADR 0029 named the app↔worker contract as the risk that outlives it: six cross
 | visibility-columns | fixtured | the worker *writes* `published_at`, `sensitivity`, `audience` on every chunk row and graph element it lands, and `binding_id` on the source-derived ones (ADR 0023 — a canonical entity carries no binding); the predicate *logic* is app-only (below) |
 | llm-routing | SQL function | one route per workspace per purpose, resolved by the database, never twice in code |
 | cost-ledger | generated | the `llm_call` row type from the schema (ADR 0028); golden rows fixture its meaning (ADR 0025) |
+| id-shape | fixtured | the one shape every id either tier mints has (ADR 0035); added 05/09/2026, see below |
+
+## Amendment, 05/09/2026 — the set is seven: id-shape joins it
+
+ADR 0035 gives the platform one minter and one id shape, and the shape is cross-tier by construction: the worker seeds and reads ids the app minted, and the app parses ids the worker wrote at a boundary that now narrows to the pattern (ADR 0028). That is exactly an agreement in this ADR's sense, and its form is *fixtured* — the pattern, the ids that must parse and the ids that must not, in `contracts/id-shape/cases.json`, with each tier holding it against its own minter and its own boundary rather than against a written-out copy. **The six of the title become seven**; nothing about the three forms, the two thin runners or the directory's place changes, and `contract_version` bumps to 1 for the first time, which is the mechanism this ADR built working as designed (T-074).
 
 ## The read predicate leaves the contract
 

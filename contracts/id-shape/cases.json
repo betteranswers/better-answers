@@ -1,0 +1,32 @@
+{
+  "description": "id-shape (ADR 0031, ADR 0035): every id either tier mints for the platform is a ULID — 48 bits of milliseconds, 80 bits of randomness, Crockford base32, 26 characters, so ids sort in the order they were minted and no letter is misread aloud. `pattern` is the whole of the agreement; `must_parse` are ids either tier may hand the other, and `must_not_parse` are the shapes this replaced, each with the reason it is refused. The TypeScript half runs these through its own boundary schema and mints a hundred ids the pattern must accept (packages/core/test/tier-contract.test.ts); the Python half compiles the pattern and does the same with its own (apps/worker/tests/test_tier_contract.py). Neither writes the pattern out itself.",
+  "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+  "must_parse": [
+    "01J6AAAAAAAAAAAAAAAAAAAAAA",
+    "01M1SH9VHPVNXBB65A38DMX34D",
+    "00000000000000000000000000",
+    "7ZZZZZZZZZZZZZZZZZZZZZZZZZ"
+  ],
+  "must_not_parse": [
+    { "id": "01j6aaaaaaaaaaaaaaaaaaaaaa", "why": "lower case; Crockford base32 is written upper" },
+    { "id": "01J6AAAAAAAAAAAAAAAAAAAAA", "why": "25 characters; a ULID is exactly 26" },
+    { "id": "01J6AAAAAAAAAAAAAAAAAAAAAAA", "why": "27 characters; a ULID is exactly 26" },
+    { "id": "01J6IAAAAAAAAAAAAAAAAAAAAA", "why": "I is excluded, so it is never confused with 1" },
+    { "id": "01J6LAAAAAAAAAAAAAAAAAAAAA", "why": "L is excluded, so it is never confused with 1" },
+    { "id": "01J6OAAAAAAAAAAAAAAAAAAAAA", "why": "O is excluded, so it is never confused with 0" },
+    { "id": "01J6UAAAAAAAAAAAAAAAAAAAAA", "why": "U is excluded, so no id spells an accident" },
+    {
+      "id": "member-01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "why": "a key composed from the ids it joins; the platform mints, never composes"
+    },
+    {
+      "id": "kEyIkQBmQ1EnBJnUvKMR6nSFXlQKUcuJ",
+      "why": "the identity library's own default id: mixed case, 32 characters, no time"
+    },
+    {
+      "id": "b3f5c4d2-9a1e-4c77-8f2b-1d6a0e5c3b7a",
+      "why": "a UUID: hyphens, lower case, and no order that matches its timestamps"
+    },
+    { "id": "", "why": "empty" }
+  ]
+}

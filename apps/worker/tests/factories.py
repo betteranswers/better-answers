@@ -34,11 +34,11 @@ def embedding_dimensions() -> int:
 
 EMBEDDING_DIMENSIONS = embedding_dimensions()
 
-_ULID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+ULID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
 
-def _ulid() -> str:
-    return "".join(secrets.choice(_ULID_ALPHABET) for _ in range(26))
+def ulid() -> str:
+    return "".join(secrets.choice(ULID_ALPHABET) for _ in range(26))
 
 
 def _returning_row(cursor: Cursor[Any]) -> dict[str, Any]:
@@ -55,7 +55,7 @@ def seed_workspace(
     workspace_id: str | None = None,
     name: str = "Test workspace",
 ) -> dict[str, Any]:
-    identifier = workspace_id or _ulid()
+    identifier = workspace_id or ulid()
     # `slug` is Better Auth's organisation column (ADR 0009, 2026-09-01): unique, never
     # read by the worker, so the id itself is the slug here.
     cursor.execute(
@@ -79,7 +79,7 @@ def seed_llm_route(
         "INSERT INTO llm_route (id, workspace_id, purpose, provider, model, dimensions)"
         " VALUES (%s, %s, %s, %s, %s, %s) RETURNING *",
         (
-            route_id or f"route-{_ulid()}",
+            route_id or f"route-{ulid()}",
             workspace_id,
             purpose,
             provider,

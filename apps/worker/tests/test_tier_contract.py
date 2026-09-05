@@ -10,13 +10,15 @@ is the mechanism; deduplicating it away would delete the test.
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Any, cast
 
-SPOKEN_CONTRACT_VERSION = 0
+SPOKEN_CONTRACT_VERSION = 1
 SPOKEN_AGREEMENTS = {
     "concept-inbox": "sql-function",
     "cost-ledger": "generated",
+    "id-shape": "fixtured",
     "credential-envelope": "fixtured",
     "llm-routing": "sql-function",
     "queue": "sql-function",
@@ -58,6 +60,38 @@ def test_lists_a_fixture_if_and_only_if_it_exists_under_an_agreement_it_names() 
         if file.is_file() and str(file.relative_to(CONTRACTS_DIR)) not in NOT_FIXTURES
     }
     assert on_disk == {fixture["path"] for fixture in manifest["fixtures"]}
+
+
+# --- id-shape: one id shape, whichever tier minted it (ADR 0035) ----------------------
+#
+# The fixture is the contract: the pattern an id matches, the ids that must match it and
+# the ids that must not. This tier reads an id the other tier minted on every row it
+# touches, so the pattern is what it holds them to; and every id this tier seeds is held
+# to the same one, so an id minted here parses at the other tier's boundary.
+
+
+def read_id_shape() -> dict[str, Any]:
+    raw = (CONTRACTS_DIR / "id-shape" / "cases.json").read_text(encoding="utf-8")
+    return cast("dict[str, Any]", json.loads(raw))
+
+
+def test_the_id_shape_pattern_accepts_and_refuses_exactly_what_the_fixture_says() -> None:
+    fixture = read_id_shape()
+    pattern = re.compile(fixture["pattern"])
+
+    for identifier in fixture["must_parse"]:
+        assert pattern.fullmatch(identifier), identifier
+    for rejected in fixture["must_not_parse"]:
+        assert not pattern.fullmatch(rejected["id"]), rejected["why"]
+
+
+def test_an_id_minted_in_this_tier_matches_the_shape_the_other_tier_parses() -> None:
+    from factories import ulid
+
+    pattern = re.compile(read_id_shape()["pattern"])
+
+    for _ in range(100):
+        assert pattern.fullmatch(ulid())
 
 
 # --- llm-routing: the first real fixture (ADR 0031) -----------------------------------

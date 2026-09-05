@@ -1,12 +1,16 @@
 {
-  "contract_version": 0,
+  "contract_version": 1,
   "agreements": {
     "queue": { "form": "sql-function" },
     "concept-inbox": { "form": "sql-function" },
     "credential-envelope": { "form": "fixtured" },
     "visibility-columns": { "form": "fixtured" },
     "llm-routing": { "form": "sql-function" },
-    "cost-ledger": { "form": "generated" }
+    "cost-ledger": { "form": "generated" },
+    "id-shape": { "form": "fixtured" }
   },
-  "fixtures": [{ "agreement": "llm-routing", "path": "llm-routing/cases.json" }]
+  "fixtures": [
+    { "agreement": "llm-routing", "path": "llm-routing/cases.json" },
+    { "agreement": "id-shape", "path": "id-shape/cases.json" }
+  ]
 }
