@@ -13,6 +13,7 @@ import { ChooseWorkspaceScreen } from "@/features/auth/choose-workspace-screen.t
 import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
 import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
 import { SCREENS, type Screen, type ScreenId } from "@/shared/screens.ts";
+import { FailedScreen } from "./failed-screen.tsx";
 import { Frame } from "./frame.tsx";
 import { SystemScreen } from "./screens/system-screen.tsx";
 import { UnbuiltScreen } from "./screens/unbuilt-screen.tsx";
@@ -107,6 +108,13 @@ export const createAppRouter = (history?: RouterHistory) =>
       shellRoute.addChildren([indexRoute, ...screenRoutes]),
     ]),
     ...(history === undefined ? {} : { history }),
+    // One boundary for every route, rather than one per screen: a screen that throws is a
+    // bug, and a bug is not a thing a screen knows something extra about. The router's own
+    // default puts the error's message and a "Show Error" toggle on the page, which is a
+    // reader-facing stack trace; this one replaces it (`apps/web/src/app/failed-screen.tsx`).
+    // It sits on the router rather than on the shell so the three screens outside the frame
+    // are covered too. No `defaultOnCatch`: there is nowhere in the browser to send the error.
+    defaultErrorComponent: FailedScreen,
   });
 
 export const router = createAppRouter();
