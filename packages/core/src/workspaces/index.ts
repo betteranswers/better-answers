@@ -244,6 +244,57 @@ export const revokeWorkspaceTokens = async (
 };
 
 /**
+ * Which workspaces does this person hold? The picker's read (ADR 0035), and the one the
+ * identity provider's three pre-workspace paths share: the session-create hook that
+ * makes a sole membership active before the session exists, the consent reference that
+ * puts a `workspace` claim on a credential, and the redirect decision that sends a
+ * person to the picker or past it (`apps/api/src/auth/auth.ts`). It lived there as a raw
+ * pool query until T-077; `member` is a table the workspaces slice does not own, so the
+ * read is a slice function and the fact is an entry on the table-ownership map, where a
+ * second copy of it would be a visible diff (ADR 0029; `packages/schema`'s map).
+ *
+ * **On the unscoped pool, and no transaction.** It runs before a workspace is known, so
+ * there is no scope to set and a scoped read would see nothing; `member` carries no
+ * policy for exactly this reason, which is the sentence its RLS exemption now makes
+ * (ADR 0009). One statement needs no transaction either — there is nothing for a second
+ * statement to be consistent with.
+ *
+ * **It reads by person id and by nothing else**, and answers ids and nothing else: no
+ * name, no role, no row count, no other person's membership. A caller that could ask
+ * "who is in workspace X" would be a cross-tenant oracle on a table with no policy, and
+ * the argument list is where that is refused — there is no argument to ask it with.
+ *
+ * The platform principal is the first argument for the reason `revokeCredentials`'s is:
+ * this is the identity set, which no workspace scope reaches, so the act is the
+ * platform's own and is audited under its id when the ledger lands (T-059). An id that
+ * is not a person id is `malformed` rather than an empty list, so a caller cannot read
+ * "holds nothing" from an argument the boundary never accepted.
+ */
+export const workspacesHeldBy = async (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  userId: string,
+): Promise<Result<readonly WorkspaceId[], "malformed" | Error>> => {
+  const person = boundarySchemas.user.select.shape.id.safeParse(userId);
+  if (!person.success) return err("malformed");
+
+  const held = await attempt(async () => {
+    const rows = await door.pool.query<{ workspace_id: string }>(
+      "SELECT workspace_id FROM member WHERE user_id = $1 ORDER BY workspace_id",
+      [person.data],
+    );
+    // The column is a foreign key to `workspace.id`, so it is parsed at the boundary
+    // rather than asserted (ADR 0028): a value that is not a workspace id comes back as
+    // the store's Error and never as an id the picker would act on.
+    return rows.rows.map((row) =>
+      boundarySchemas.workspace.select.shape.id.parse(row.workspace_id),
+    );
+  });
+  if (!held.ok) return err(held.error);
+  return ok(held.value);
+};
+
+/**
  * Who the person is, where they are and at what role — the three the shell names
  * (T-037, user stories 9 and 10). The role is the Principal's, resolved in this same
  * transaction against the member row; the two names are looked up beside it.

@@ -16,6 +16,7 @@ import {
   withScope,
   type PostgresDoor,
 } from "@better-answers/core/store/postgres";
+import { workspacesHeldBy } from "@better-answers/core/workspaces";
 
 /** The identity provider's own acts (the partition on a self-serve create) are the platform's. */
 const PLATFORM_PRINCIPAL: PlatformPrincipal = {
@@ -184,13 +185,20 @@ const clientIdOfQuery = (query: string | undefined): string | undefined =>
 export const createAuth = (deps: AuthDependencies) => {
   const audit = deps.logger.child({ module: "auth" });
 
-  /** The workspaces a person holds — the one membership read the three identity paths share. */
+  /**
+   * The workspaces a person holds — the one membership read the three identity paths
+   * below share, and since T-077 the workspaces slice's function rather than SQL
+   * written here: `member` is a table this module does not own, and the ownership map
+   * (`packages/schema`, ADR 0029) is where the fact is recorded. A store failure is
+   * rethrown, which is what the raw query did and what the identity provider's own
+   * error handling expects; a `malformed` id holds no workspace, which is the answer
+   * the query gave for one.
+   */
   const membershipsOf = async (userId: string): Promise<readonly string[]> => {
-    const held = await deps.database.query<{ workspace_id: string }>(
-      "SELECT workspace_id FROM member WHERE user_id = $1 ORDER BY workspace_id",
-      [userId],
-    );
-    return held.rows.map((row) => row.workspace_id);
+    const held = await workspacesHeldBy(PLATFORM_PRINCIPAL, deps.door, userId);
+    if (held.ok) return held.value;
+    if (held.error instanceof Error) throw held.error;
+    return [];
   };
 
   /** The one workspace a person holds, when it is exactly one. */

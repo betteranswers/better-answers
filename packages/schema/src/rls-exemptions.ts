@@ -22,7 +22,7 @@ export const RLS_EXEMPTIONS = {
   "public.workspace":
     "The picker lists a person's workspaces before one is chosen, so a scope cannot gate it; it holds a tenant's name, not a secret.",
   "public.member":
-    "Carries workspace_id on purpose: the membership read that validates a claim runs in the same transaction that sets the scope, so it cannot depend on it.",
+    "Carries workspace_id on purpose, and is read across workspaces by person id: the picker asks which workspaces a person holds before any workspace is known, and the membership read that validates a claim runs in the same transaction that sets the scope — so neither read can depend on a scope.",
   "public.invitation":
     "Carries workspace_id on purpose: read by invitation id by a person who is not yet a member of the workspace it names.",
   "public.oauth_client": "Read by client_id URL during registration and authorize, pre-session.",

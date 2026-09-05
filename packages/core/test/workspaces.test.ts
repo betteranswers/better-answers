@@ -22,6 +22,7 @@ import {
   revokeWorkspaceTokens,
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
+  workspacesHeldBy,
 } from "../src/workspaces/index.ts";
 
 /**
@@ -484,5 +485,68 @@ describe("revoking a person's tokens in one workspace", () => {
 
     expect(malformed).toEqual({ ok: false, error: "malformed" });
     expect(await endedGrants(seeded)).toEqual([]);
+  });
+});
+
+/**
+ * The picker's read (ADR 0035): which workspaces does this person hold? It runs before
+ * a workspace is known — at sign-in, at consent and at the redirect decision — so it
+ * cannot be a scoped read, and the thing it must never become is a list across people.
+ * The seam is the slice's entry point against real Postgres, because "never another
+ * person's" is only a claim until a second person's membership is there to be missed.
+ */
+describe("the workspaces a person holds", () => {
+  it("answers that person's workspace ids in id order, and nothing about anybody else", async () => {
+    const door = openPostgres(db.runtimePool);
+    const person = await seedUser();
+    const colleague = await seedUser();
+    const held: string[] = [];
+    for (const name of ["Acme", "Beta"]) {
+      const id = ulid();
+      const provisioned = await provisionWorkspace(bootstrap, door, {
+        id,
+        name,
+        slug: `${name.toLowerCase()}-${id.toLowerCase()}`,
+        adminUserId: person,
+      });
+      expect(provisioned.ok).toBe(true);
+      held.push(id);
+    }
+    const theirs = ulid();
+    expect(
+      (
+        await provisionWorkspace(bootstrap, door, {
+          id: theirs,
+          name: "Gamma",
+          slug: `gamma-${theirs.toLowerCase()}`,
+          adminUserId: colleague,
+        })
+      ).ok,
+    ).toBe(true);
+
+    expect(await workspacesHeldBy(bootstrap, door, person)).toEqual({
+      ok: true,
+      value: held.toSorted(),
+    });
+  });
+
+  it("answers an empty list for a person who holds none, rather than a refusal to handle", async () => {
+    // The picker's own case: a person signs in before anybody has put them in a
+    // workspace. Holding none is an answer, not a failure.
+    const door = openPostgres(db.runtimePool);
+
+    expect(await workspacesHeldBy(bootstrap, door, await seedUser())).toEqual({
+      ok: true,
+      value: [],
+    });
+  });
+
+  it("refuses an id that is not a person id, so no argument of another shape reaches the statement", async () => {
+    const door = openPostgres(db.runtimePool);
+
+    expect(await workspacesHeldBy(bootstrap, door, "' OR true --")).toEqual({
+      ok: false,
+      error: "malformed",
+    });
   });
 });
