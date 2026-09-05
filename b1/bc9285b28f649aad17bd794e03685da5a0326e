@@ -1,0 +1,37 @@
+pnpm-lock.yaml
+  ai_agent 87-89,175-177,233-235
+apps/api/package.json
+  s_2c3fc9d16bd52c::t_8e370e930dbcdb 43
+packages/core/package.json
+  s_2c3fc9d16bd52c::t_8e370e930dbcdb 32
+apps/web/package.json
+  s_2c3fc9d16bd52c::t_8e370e930dbcdb 39
+packages/devtools/README.md
+  s_2c3fc9d16bd52c::t_1236eba07ffb9b 28
+apps/web/test/lint-rules.test.ts
+  s_2c3fc9d16bd52c::t_f420c75a8b06a5 1,3-4,8-11,14-17
+  s_2c3fc9d16bd52c::t_0668aa08bfbfd6 51-52,54-58,60-66
+packages/core/test/import-direction.test.ts
+  s_2c3fc9d16bd52c::t_eecf771d2c4b49 1,3-4,10,16-19,37-40,42-54
+apps/api/tests/lint-rules.test.ts
+  s_2c3fc9d16bd52c::t_0cd43816541bbe 42-72
+  s_2c3fc9d16bd52c::t_3de90b2a841317 1,3-4,8-9,14-18
+packages/devtools/test/throwaway-tree.test.ts
+  s_2c3fc9d16bd52c::t_6f731b2a46dde2 7-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b1bc9285b28f649aad17bd794e03685da5a0326e",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
