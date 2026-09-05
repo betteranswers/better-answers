@@ -1,0 +1,24 @@
+packages/core/src/workspaces/index.ts
+  s_529f881ca25f4e::t_d44ec04725d582 157-231
+packages/core/test/workspaces.test.ts
+  s_529f881ca25f4e::t_247f1e9cc5b6c9 301,331,347-351,366
+  s_529f881ca25f4e::t_c987a24652d16e 229-241,243-246,252-259,261,263-266,268-272,274-278,281-286,288-292,294-299,302-304,307,309-330,332-346,352-365,367-368
+  s_529f881ca25f4e::t_5e22e5327a5712 242,247-251,260,262,267,273,279-280,287,293,300,305-306,308
+  s_529f881ca25f4e::t_b504ce81361cec 14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "04f026dc88777f80bb9b669c2c7f76c20b9b4619",
+  "prompts": {},
+  "sessions": {
+    "s_529f881ca25f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688411cf-a489-4e1b-b43c-905b1ccfe9f6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
