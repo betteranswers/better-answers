@@ -1,0 +1,25 @@
+.oxlintrc.json
+  s_2c3fc9d16bd52c::t_513e9b128fac85 4-10
+cubic.yaml
+  s_2c3fc9d16bd52c::t_513e9b128fac85 38-41
+AGENTS.md
+  s_2c3fc9d16bd52c::t_513e9b128fac85 33-34
+CODING_RULES.md
+  s_2c3fc9d16bd52c::t_a895ec1d4c5bfe 53-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "74965e8074b03cb5691b5d9b0cebcc065503f204",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
