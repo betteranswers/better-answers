@@ -1,0 +1,76 @@
+packages/schema/src/ulid.ts
+  s_529f881ca25f4e::t_96a8f63e416ce7 1-28,36-48,54-59,63-64,74-85,91-126,33,35,49,53,65,73,86,90
+  s_529f881ca25f4e::t_3021b39ac49ba4 60-62
+  s_529f881ca25f4e::t_af38541af832f0 30-32,34
+  s_529f881ca25f4e::t_ce942535031591 50-52
+  s_529f881ca25f4e::t_b6c6fc59c6a5da 66-72
+  s_529f881ca25f4e::t_e5f1480412e8b0 87-89
+packages/schema/test/boundary-schemas.test.ts
+  s_529f881ca25f4e::t_69909d4d17bc7a 20-23,41,43,59,274-282
+  s_529f881ca25f4e::t_8f30b883e46a2f 400-430
+packages/schema/test/factory.ts
+  s_529f881ca25f4e::t_ec70debd525394 6,101,114
+  s_529f881ca25f4e::t_2bd5b3dfbe9ec3 29-34
+  s_529f881ca25f4e::t_55c9777432758d 123-139
+  s_529f881ca25f4e::t_3af29fdfc66088 190
+packages/core/test/workspaces.test.ts
+  s_529f881ca25f4e::t_a5e85f045643bc 10,96-118,127-128
+  s_529f881ca25f4e::t_6f750096cab6f5 9
+apps/worker/tests/test_tier_contract.py
+  s_529f881ca25f4e::t_a16591b1cd321b 13,17,21
+  s_529f881ca25f4e::t_77df0ac430c280 65-77,79-88,90-92,100-101
+  s_529f881ca25f4e::t_ef7fbebc7a453f 89
+  s_529f881ca25f4e::t_4b87ca4011abb6 78
+  s_529f881ca25f4e::t_16413d2dcfe9ea 93-99
+packages/schema/test/testing.ts
+  s_529f881ca25f4e::t_ec70debd525394 6
+  s_529f881ca25f4e::t_95260624806755 7-8
+apps/api/tests/harness.ts
+  s_529f881ca25f4e::t_4a61fd55c60199 13-14
+  s_529f881ca25f4e::t_60fe948214a942 100,102-103
+  s_529f881ca25f4e::t_3975549fe45758 101
+  s_529f881ca25f4e::t_33be1522d6a914 276-296
+  s_529f881ca25f4e::t_6472f47e77377b 404-405
+packages/core/test/principal.test.ts
+  s_529f881ca25f4e::t_289ef08ef7c67d 1
+apps/worker/tests/factories.py
+  s_529f881ca25f4e::t_657bc22563e8bf 41,72,96
+  s_529f881ca25f4e::t_61d2fe2ac82a68 11
+  s_529f881ca25f4e::t_6488a0afa0f162 38,42-52,54-55
+  s_529f881ca25f4e::t_f3791fb8d92863 53
+packages/schema/test/ulid.test.ts
+  s_529f881ca25f4e::t_c5cd7df6f0dd28 1-9,16-21,29-34,37-43,45-53,55-58,73,72
+  s_529f881ca25f4e::t_b88a41d900cf57 10-15,22-28,44,54,60-71
+packages/schema/src/boundary-schemas.ts
+  s_529f881ca25f4e::t_338fa64362fdfc 150,151-162
+  s_529f881ca25f4e::t_6fd3de85254cd6 40-43
+  s_529f881ca25f4e::t_0abdcc6481041b 47-53
+  s_529f881ca25f4e::t_baafd4a0a2fb52 140
+  s_529f881ca25f4e::t_403a122944bc75 218-222
+  s_529f881ca25f4e::t_437c16ece1d2b8 223,227-232
+  s_529f881ca25f4e::t_dc42d346115d49 26
+apps/api/tests/identity-ids.test.ts
+  s_529f881ca25f4e::t_ce62cc1d356f91 1-2,4-25,27-71,82-83,86-88
+  s_529f881ca25f4e::t_4657d47b39a46a 3
+  s_529f881ca25f4e::t_d3dff7a869b18d 26
+  s_529f881ca25f4e::t_415309af8558b1 72-76,78-81,84-85
+contracts/id-shape/cases.json
+  s_529f881ca25f4e::t_866a3c46197339 1,3-32
+  s_529f881ca25f4e::t_2dfca088758003 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "abb590ee9fe2411f23a9a6c4ad4d81adf68f9b13",
+  "prompts": {},
+  "sessions": {
+    "s_529f881ca25f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688411cf-a489-4e1b-b43c-905b1ccfe9f6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}

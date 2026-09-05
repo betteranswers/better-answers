@@ -1,0 +1,29 @@
+packages/schema/test/rls.test.ts
+  s_529f881ca25f4e::t_57b8e3f280649c 5
+  s_529f881ca25f4e::t_d5cbd4f74a716a 198,250,259
+packages/schema/src/boundary-schemas.ts
+  s_529f881ca25f4e::t_338fa64362fdfc 151,152-163
+  s_529f881ca25f4e::t_6fd3de85254cd6 40-43
+  s_529f881ca25f4e::t_0abdcc6481041b 48-54
+  s_529f881ca25f4e::t_baafd4a0a2fb52 141
+  s_529f881ca25f4e::t_403a122944bc75 219-223
+  s_529f881ca25f4e::t_437c16ece1d2b8 224,228-233
+packages/schema/test/boundary-schemas.test.ts
+  s_529f881ca25f4e::t_69909d4d17bc7a 20-23,41,43,59,274-282
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "909907d50be5b661bbb9c7abe21952242120f51a",
+  "prompts": {},
+  "sessions": {
+    "s_529f881ca25f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688411cf-a489-4e1b-b43c-905b1ccfe9f6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
