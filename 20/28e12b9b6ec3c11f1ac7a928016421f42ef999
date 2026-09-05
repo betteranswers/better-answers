@@ -1,0 +1,22 @@
+apps/docs-site/specs/T-006.md
+  s_97877e1c0f1443::t_4b9fec3e6ac2ac 154
+  s_97877e1c0f1443::t_cd484823da7a91 94-96
+  s_97877e1c0f1443::t_c9c8ada806ad73 77
+  s_97877e1c0f1443::t_e1222f75777e6d 1-76,78-93,97-153,155-158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "2028e12b9b6ec3c11f1ac7a928016421f42ef999",
+  "prompts": {},
+  "sessions": {
+    "s_97877e1c0f1443": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "21d406e6-71ce-48ff-b703-129fc278a169",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
