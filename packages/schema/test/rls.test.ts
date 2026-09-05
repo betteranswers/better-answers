@@ -2,7 +2,7 @@ import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { declaredTableNames } from "../scripts/worker-view.ts";
-import { EXEMPT_TABLE_NAMES, IDENTITY_SET, RLS_EXEMPTIONS } from "../src/index.ts";
+import { EXEMPT_TABLE_NAMES, IDENTITY_SET, RLS_EXEMPTIONS, ulid } from "../src/index.ts";
 import { testData } from "./factory.ts";
 import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
 
@@ -195,7 +195,7 @@ describe("the identity set", () => {
     ];
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
-      await seed.user({ id: "user-worker-probe", email: "probe@example.invalid" });
+      await seed.user({ email: "probe@example.invalid" });
       await client.query("SET LOCAL ROLE worker_rt");
       for (const qualified of refused) {
         const [, table] = qualified.split(".");
@@ -247,7 +247,7 @@ describe("the role CHECK on the identity set", () => {
       await expect(
         client.query(
           "INSERT INTO member (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, 'owner', now())",
-          [`member-${WS_A}`, WS_A, person.id],
+          [ulid(), WS_A, person.id],
         ),
       ).rejects.toThrow(/member_role_check/);
       await client.query("ROLLBACK TO SAVEPOINT m");
@@ -256,7 +256,7 @@ describe("the role CHECK on the identity set", () => {
       await expect(
         client.query(
           "INSERT INTO invitation (id, workspace_id, email, role, expires_at, inviter_id) VALUES ($1, $2, 'x@example.invalid', 'admin', now(), $3)",
-          [`invitation-${WS_A}`, WS_A, person.id],
+          [ulid(), WS_A, person.id],
         ),
       ).rejects.toThrow(/invitation_role_check/);
       await client.query("ROLLBACK TO SAVEPOINT i");

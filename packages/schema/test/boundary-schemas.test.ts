@@ -17,7 +17,10 @@ import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./ha
  */
 
 const WS_ID = "01J6AAAAAAAAAAAAAAAAAAAAAA";
-const USER_ID = "user-1";
+const USER_ID = "01J6CCCCCCCCCCCCCCCCCCCCCC";
+const MEMBER_ID = "01J6DDDDDDDDDDDDDDDDDDDDDD";
+const SESSION_ID = "01J6EEEEEEEEEEEEEEEEEEEEEE";
+const INVITATION_ID = "01J6FFFFFFFFFFFFFFFFFFFFFF";
 const NOW = new Date("2026-09-01T00:00:00Z");
 
 /** Rows each refined insert schema accepts — assertion 4's input. */
@@ -35,9 +38,9 @@ const acceptedRows = {
     },
   ],
   workspaceConfig: [{ workspaceId: WS_ID, key: "mcp.tools_list_ttl_ms", value: "300000" }],
-  member: [{ id: "member-1", workspaceId: WS_ID, userId: USER_ID, role: "Admin", createdAt: NOW }],
+  member: [{ id: MEMBER_ID, workspaceId: WS_ID, userId: USER_ID, role: "Admin", createdAt: NOW }],
   session: [
-    { id: "session-1", expiresAt: NOW, token: "session-token", updatedAt: NOW, userId: USER_ID },
+    { id: SESSION_ID, expiresAt: NOW, token: "session-token", updatedAt: NOW, userId: USER_ID },
   ],
   account: [
     {
@@ -53,7 +56,7 @@ const acceptedRows = {
   jwks: [{ id: "jwk-1", publicKey: "pk", privateKey: "sk", createdAt: NOW }],
   invitation: [
     {
-      id: "invitation-1",
+      id: INVITATION_ID,
       workspaceId: WS_ID,
       email: "invitee@example.invalid",
       expiresAt: NOW,
@@ -268,7 +271,15 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { id: WS_ID, name: "   ", slug: "a" },
     ],
     llmRoute: [{ ...acceptedRows.llmRoute[0], dimensions: 0 }],
-    member: [{ ...acceptedRows.member[0], role: "owner" }],
+    // The identity ids the platform reads: one shape, the minter's (ADR 0035). Better
+    // Auth's own default id and a hand-composed key are both refused at the boundary.
+    user: [{ ...acceptedRows.user[0], id: "kEyIkQBmQ1EnBJnUvKMR6nSFXlQKUcuJ" }],
+    member: [
+      { ...acceptedRows.member[0], role: "owner" },
+      { ...acceptedRows.member[0], id: `member-${WS_ID}-${USER_ID}` },
+    ],
+    session: [{ ...acceptedRows.session[0], id: "kEyIkQBmQ1EnBJnUvKMR6nSFXlQKUcuJ" }],
+    invitation: [{ ...acceptedRows.invitation[0], id: "invitation-1" }],
     workspaceConfig: [{ ...acceptedRows.workspaceConfig[0], key: "  " }],
     ingressCounter: [{ ...acceptedRows.ingressCounter[0], scope: "user-agent" }],
     mcpCallCounter: [{ ...acceptedRows.mcpCallCounter[0], count: -1 }],

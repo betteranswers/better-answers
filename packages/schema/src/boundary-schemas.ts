@@ -37,12 +37,21 @@ import { workspace } from "./workspace-table.ts";
  * The identity set's tables (ADR 0009, 2026-09-01) are written by Better Auth alone,
  * so their boundaries are the unrefined generation — the table's own shape — except
  * where the platform reads a column and narrows it: `member.role` to the three roles,
- * the user and workspace ids to the platform's brands.
+ * the user and workspace ids to the platform's brands, and the ids of `user`, `session`,
+ * `member` and `invitation` to the one shape the minter mints (ADR 0035, T-074). The
+ * OAuth tables stay unrefined: the library keys one of them by a hash of the token the
+ * row stands for, so their ids are not the platform's to narrow.
  */
 
 const ULID = new RegExp(ULID_PATTERN);
 const workspaceId = (schema: z.ZodString) => schema.regex(ULID).brand<"WorkspaceId">();
-const userId = (schema: z.ZodString) => schema.trim().min(1).brand<"UserId">();
+const userId = (schema: z.ZodString) => schema.regex(ULID).brand<"UserId">();
+/**
+ * An id of the identity set the platform reads or writes: one shape, the minter's
+ * (`ulid.ts`, ADR 0035). The OAuth tables are deliberately left unnarrowed — the library
+ * keys one of them by a hash of the token it stands for, which is not a minted id.
+ */
+const identityId = (schema: z.ZodString) => schema.regex(ULID);
 
 /** The unrefined generation, for a table whose shape is its boundary. */
 const plain = <TTable extends PgTable>(table: TTable) =>
@@ -129,7 +138,7 @@ export const userInsert = createInsertSchema(user, userRefinements);
 export const userUpdate = createUpdateSchema(user, userRefinements);
 
 const memberRefinements = {
-  id: (schema: z.ZodString) => schema.trim().min(1),
+  id: identityId,
   workspaceId,
   userId,
   // The platform's three roles and no other (CONTEXT.md, *role (of a person)*).
@@ -139,6 +148,18 @@ const memberRefinements = {
 export const memberSelect = createSelectSchema(member, memberRefinements);
 export const memberInsert = createInsertSchema(member, memberRefinements);
 export const memberUpdate = createUpdateSchema(member, memberRefinements);
+
+const sessionRefinements = { id: identityId };
+
+export const sessionSelect = createSelectSchema(session, sessionRefinements);
+export const sessionInsert = createInsertSchema(session, sessionRefinements);
+export const sessionUpdate = createUpdateSchema(session, sessionRefinements);
+
+const invitationRefinements = { id: identityId };
+
+export const invitationSelect = createSelectSchema(invitation, invitationRefinements);
+export const invitationInsert = createInsertSchema(invitation, invitationRefinements);
+export const invitationUpdate = createUpdateSchema(invitation, invitationRefinements);
 
 const mcpCallCounterRefinements = {
   workspaceId,
@@ -195,11 +216,21 @@ export const boundarySchemas = {
     insert: ingressCounterInsert,
     update: ingressCounterUpdate,
   },
-  session: plain(session),
+  session: {
+    table: session,
+    select: sessionSelect,
+    insert: sessionInsert,
+    update: sessionUpdate,
+  },
   account: plain(account),
   verification: plain(verification),
   jwks: plain(jwks),
-  invitation: plain(invitation),
+  invitation: {
+    table: invitation,
+    select: invitationSelect,
+    insert: invitationInsert,
+    update: invitationUpdate,
+  },
   oauthClient: plain(oauthClient),
   oauthResource: plain(oauthResource),
   oauthClientResource: plain(oauthClientResource),
