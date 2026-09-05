@@ -467,15 +467,18 @@ to it by IRI and never restates it (ADR 0014).
   boundary and it is the workspace; *tenant* never appears on a screen and is never a second concept.
 - **principal** — who a call is made as: `workspaceId`, `userId` and `role`, built by the transport
   from a verified bearer and passed as the first parameter of every `packages/core` function that touches
-  tenant data (`[SEC2]`). It exists in **two kinds**, and both are real:
-  - **deferred principal** — a named person's authority carried into work that outlives their
-    session: a background job, a scheduled run, a replay. It records the person it borrowed from and
-    **expires with the authority it borrowed**, so a job cannot outlive the access that started it.
+  tenant data (`[SEC2]`). It has **three kinds** (ADR 0009, 2026-09-04):
+  - **user principal** — a signed-in person in one workspace, with the role their membership gives them.
   - **platform principal** — the platform acting as itself, with its own actor id
     (`process:better-answers-<purpose>`) and no person behind it: the erasure routine, the nightly
     audit, the reconciler. Its acts are audited under that identity and never under a person's.
+  - **operator** — the platform's administrator over every workspace; its own entry below.
 
-  Work that outlives a session runs under one of the two, never under a live user session.
+  One more word has no type yet — **deferred principal**: a named person's authority carried into
+  work that outlives their session (a background job, a scheduled run, a replay). It records the
+  person it borrowed from and **expires with the authority it borrowed**, so a job cannot outlive
+  the access that started it. Work that outlives a session runs under a deferred or a platform
+  principal, never under a live user session.
   _Avoid_: user (in code), session, caller, actor (which is the *id* on a file, not the principal).
 - **operator** — the platform's own administrator over every workspace: a real person on the
   identity set with the platform-level role, a third principal kind beside a user and the

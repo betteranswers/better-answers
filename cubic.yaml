@@ -126,7 +126,7 @@ reviews:
 
         Flag a read that checks the workspace but skips the read predicate, and flag a read predicate tested against a source binding's fields rather than against the `published_at`, `sensitivity` and `audience` columns on the readable unit itself — a concept and a composition have no binding (ADR 0023).
 
-        A `Principal` has two kinds and both are real. A deferred principal carries a named person's authority into work that outlives their session and expires with the authority it borrowed; a platform principal is the platform acting as itself, with its own actor id and no person behind it. Flag a background job, scheduled run or replay carrying a live user session.
+        A `Principal` has three kinds — a user principal, the platform principal and the operator (ADR 0009, 2026-09-04) — and a deferred principal (a named person's authority carried into work that outlives their session, expiring with the authority it borrowed) is a glossary word with no type yet. Flag a background job, scheduled run or replay carrying a live user session, and flag a cross-workspace caller threaded through a user principal's role field.
 
         RLS is the guarantee and the store door is ergonomics over it, never a substitute: flag a new tenant table created without `withRLS()` or shipped without its zero-rows test, and flag a query aimed at a partition child that leans on the parent's policy.
       include:
