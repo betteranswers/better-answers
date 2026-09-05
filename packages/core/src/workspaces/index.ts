@@ -181,6 +181,17 @@ export type RevokeWorkspaceTokensInput = {
  * other company's tenant. What refuses a session in this workspace is the membership
  * instant the resolver reads (`withPrincipal`); *revoke everywhere* is the act that
  * ends sessions.
+ *
+ * The first argument is the platform principal because this is a write to the identity
+ * set, which no workspace scope reaches — not because the caller is the platform. The
+ * Admin's authority is checked by T-027's act, which narrows its own user principal to
+ * Admin and then makes this write as the platform; the workspace it may write is the
+ * one it passes here, and it is the act's business that the two agree.
+ *
+ * A revoked token stops a *refresh*: the bearer path verifies an access token's JWT
+ * statelessly, so what refuses an already-minted access token in this workspace is the
+ * membership instant, not this row. Ending the rows and writing the instant belong to
+ * the one act (T-027).
  */
 export const revokeWorkspaceTokens = async (
   platform: PlatformPrincipal,

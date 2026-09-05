@@ -8,7 +8,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { boundarySchemas, ulid } from "@better-answers/schema";
 
-import { attempt, type Claims, type PlatformPrincipal } from "../src/kernel/index.ts";
+import {
+  attempt,
+  type Claims,
+  type PlatformPrincipal,
+  type UserPrincipal,
+} from "../src/kernel/index.ts";
 import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
 import {
   provisionWorkspace,
@@ -292,6 +297,24 @@ describe("revoking a person's credentials", () => {
       at: new Date(),
     });
     expect(revoked).toEqual({ ok: false, error: "no-such-user" });
+  });
+
+  it("is not reachable from a workspace Admin's own principal", () => {
+    const door = openPostgres(db.runtimePool);
+    const admin: UserPrincipal = {
+      kind: "user",
+      workspaceId: ulid() as UserPrincipal["workspaceId"],
+      userId: "user-admin" as UserPrincipal["userId"],
+      role: "Admin",
+      groups: [],
+    };
+
+    // *Revoke everywhere* is the operator's act (the platform principal until T-028),
+    // and the type is what keeps a workspace Admin's procedure out of it: no runtime
+    // check refuses this, because the call never compiles.
+    // @ts-expect-error a user principal is not a platform principal
+    void (() => revokeCredentials(admin, door, { userId: admin.userId, at: new Date() }));
+    expect(admin.role).toBe("Admin");
   });
 });
 

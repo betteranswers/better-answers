@@ -378,8 +378,17 @@ export const createAuth = (deps: AuthDependencies) => {
               // Revocation's workspace scope (ADR 0035), declared here so the library and
               // the platform agree the column exists: an Admin's revocation in one
               // workspace is refused there and nowhere else. Written by the platform,
-              // never by the person — the twin of the user row's instant above.
-              credentialsRevokedAt: { type: "date", required: false, input: false },
+              // never by the person — the twin of the user row's instant above. It is
+              // also kept out of response bodies, which the user row's twin need not be:
+              // a member list is other people's rows, and when a colleague was revoked
+              // is nobody else's business. Nothing of ours reads it through the library
+              // — the resolver reads the column in its own SQL.
+              credentialsRevokedAt: {
+                type: "date",
+                required: false,
+                input: false,
+                returned: false,
+              },
             },
           },
           invitation: { fields: { organizationId: "workspaceId" } },
