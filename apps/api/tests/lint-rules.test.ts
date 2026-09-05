@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
+import { oxlintOver, type Tree } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -25,6 +25,8 @@ const readConfig = (): {
   overrides: { files?: string[]; rules?: Record<string, unknown> }[];
   rules: Record<string, unknown>;
   jsPlugins: { name: string; specifier: string }[];
+  plugins: string[];
+  options?: Record<string, unknown>;
 } =>
   JSON.parse(
     readFileSync(path.join(repoRoot, ".oxlintrc.json"), "utf8").replaceAll(/^\s*\/\/.*$/gm, ""),
@@ -69,6 +71,69 @@ const { output: lint } = oxlintOver(
     flagged: ["apps/api/src/mcp/probe.ts"],
   },
 );
+
+/**
+ * A runner over exactly one of the repository's base rules, its setting read out of
+ * `.oxlintrc.json` rather than restated here — a restatement would pass while the real
+ * config carried the rule as a warning, or not at all. The plugin list and the options
+ * block travel with it, because a rule from a plugin oxlint was not told to load is a rule
+ * that stays silent, and the type-aware rules need the options block to run at all.
+ */
+const ruleRunner = (
+  name: string,
+  smoke: { readonly tree: Tree; readonly flagged: readonly string[] },
+): ((tree: Tree) => string) => {
+  const setting = config.rules[name];
+  if (setting === undefined) throw new Error(`no \`${name}\` rule in .oxlintrc.json`);
+  return oxlintOver(
+    JSON.stringify({
+      plugins: config.plugins,
+      options: config.options,
+      rules: { [name]: setting },
+    }),
+    smoke,
+  ).output;
+};
+
+/** A vitest file whose one describe block holds `titles`, each test carrying an assertion. */
+const suiteOf = (...titles: readonly string[]): string =>
+  `describe("the workspace door", () => {\n${titles
+    .map((title) => `  it("${title}", () => {\n    expect(door).toBeDefined();\n  });`)
+    .join("\n")}\n});\n`;
+
+describe("no two tests in one describe block carry the same title", () => {
+  const lintTitles = ruleRunner("vitest/no-identical-title", {
+    tree: { "test/copied.test.ts": suiteOf("refuses a stranger", "refuses a stranger") },
+    flagged: ["test/copied.test.ts"],
+  });
+
+  it("fires when a copied test keeps the title of the one it was copied from", () => {
+    const output = lintTitles({
+      "test/copied.test.ts": suiteOf("refuses a stranger", "refuses a stranger"),
+    });
+
+    expect(output).toContain("test/copied.test.ts");
+    expect(output).toContain("no-identical-title");
+  });
+
+  it("stays silent when the two titles differ, which is the whole ask of the rule", () => {
+    const output = lintTitles({
+      "test/distinct.test.ts": suiteOf("refuses a stranger", "admits a member"),
+    });
+
+    expect(output).not.toContain("test/distinct.test.ts");
+  });
+
+  it("stays silent when two files share a title — a title is unique inside its block, not the tree", () => {
+    const output = lintTitles({
+      "test/one.test.ts": suiteOf("refuses a stranger"),
+      "test/two.test.ts": suiteOf("refuses a stranger"),
+    });
+
+    expect(output).not.toContain("test/one.test.ts");
+    expect(output).not.toContain("test/two.test.ts");
+  });
+});
 
 describe("ADR 0009 — the identity provider stays behind its seam", () => {
   it("refuses a better-auth import outside the auth module, and allows it inside", () => {
