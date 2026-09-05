@@ -3,6 +3,7 @@
   "private": true,
   "description": "Better Answers — a living company knowledge map for UK SMBs on OKF v0.2 (see AGENTS.md)",
   "scripts": {
+    "prepare": "lefthook install || echo 'lefthook is absent — no git hooks installed (see lefthook.yml)'",
     "check": "pnpm run format:check && pnpm -r --no-bail --if-present run check && (cd apps/worker && uv run --frozen check)",
     "lint": "oxlint",
     "format": "oxfmt",
@@ -14,6 +15,7 @@
   "devDependencies": {
     "@oxlint/plugins": "1.80.0",
     "@types/node": "24.13.3",
+    "lefthook": "2.1.12",
     "oxfmt": "0.65.0",
     "oxlint": "1.80.0",
     "oxlint-plugin-react-doctor": "0.9.12",

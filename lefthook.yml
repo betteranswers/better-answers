@@ -1,0 +1,77 @@
+# The pre-commit hook: the first word on a mistake, local and in seconds.
+#
+# One hook, its commands in parallel over staged files only. No tests and no typecheck live
+# here — `pnpm check` owns those, and a hook that takes minutes is a hook people delete.
+#
+# HOW TO SKIP, when you mean to:
+#
+#   LEFTHOOK=0 git commit …                     the whole hook, once
+#   LEFTHOOK_EXCLUDE=oxlint git commit …        one command
+#   LEFTHOOK_EXCLUDE=oxfmt,oxlint git commit …  several, comma-separated
+#
+# The command names below are the names those variables take. A deliberate skip is one of
+# these; it is never a deleted hook file, because the next `pnpm install` writes it back and
+# the reason for the skip goes with it.
+#
+# HOW IT IS INSTALLED. The root `prepare` script runs `lefthook install`, and pnpm runs
+# `prepare` after every install — so a fresh clone gets the hook with no step to remember.
+# lefthook ships its own postinstall that would do the same, but pnpm 11 only runs a
+# dependency's lifecycle scripts when the workspace file's `allowBuilds` says so, and that
+# list is for native builds we have inspected, not for a tool wiring itself into `.git`.
+# So `allowBuilds` refuses lefthook's postinstall (`lefthook: false`) and `prepare` does the
+# installing in the open, in a script anyone reading that manifest can see.
+#
+# `prepare` falls back to a message rather than failing, because pnpm runs it in two places
+# that have no business holding a hook: the api's runtime image, where `--prod` leaves
+# lefthook out of the tree entirely, and any install outside a git working tree. A fresh
+# developer clone is the case that must work, and `.github/workflows/check.yml` asserts it
+# on the only genuinely fresh clone we get — so the fallback cannot hide a real failure.
+
+pre-commit:
+  parallel: true
+
+  commands:
+    # One branch per task. The hook holds the rule so memory does not have to.
+    refuse-main:
+      run: |
+        if [ "$(git symbolic-ref --short HEAD)" = "main" ]; then
+          echo "refusing: commit on main. Branch for the task, then commit."
+          echo "If you truly mean it: LEFTHOOK_EXCLUDE=refuse-main git commit …"
+          exit 1
+        fi
+
+    # The formatter writes, and `stage_fixed` puts what it wrote into the commit — so a
+    # formatting-only CI failure cannot happen and no second commit is needed to fix it.
+    oxfmt:
+      glob: "*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"
+      run: pnpm exec oxfmt {staged_files}
+      stage_fixed: true
+
+    oxlint:
+      glob: "*.{ts,tsx}"
+      run: pnpm exec oxlint {staged_files}
+
+    # Both tiers get the same first word. `root:` makes the staged paths relative to the
+    # worker, which is where `uv` finds the locked environment ruff lives in.
+    ruff-format:
+      glob: "*.py"
+      root: apps/worker/
+      run: uv run --frozen ruff format {staged_files}
+      stage_fixed: true
+
+    ruff-check:
+      glob: "*.py"
+      root: apps/worker/
+      run: uv run --frozen ruff check {staged_files}
+
+    # actionlint is a Homebrew binary, not an npm package, so a clone may not have it. A
+    # warning and a pass, never a failure: a tool nobody installed must not block a commit.
+    actionlint:
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: |
+        if command -v actionlint >/dev/null 2>&1; then
+          actionlint {staged_files}
+        else
+          echo "warning: actionlint is not installed, skipping. Install it with: brew install actionlint"
+          exit 0
+        fi

@@ -6,10 +6,15 @@ packages:
   - packages/*
 
 # Postinstall scripts run for esbuild alone — vite and drizzle-kit need its platform
-# binary. The other three are optional native accelerations we do not take.
+# binary. The other three are optional native accelerations we do not take. lefthook is
+# `false` for a different reason: its postinstall would wire a hook into `.git`, and that is
+# the root `prepare` script's job, where it is visible — `lefthook.yml`'s header says so.
+# `false` rather than no entry at all: pnpm 11 makes an undecided build script a hard error
+# (`ERR_PNPM_IGNORED_BUILDS`, exit 1), so silence here would fail every fresh install.
 allowBuilds:
   cpu-features: false
   esbuild: true
+  lefthook: false
   protobufjs: false
   ssh2: false
 
