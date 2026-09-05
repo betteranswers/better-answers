@@ -16,10 +16,17 @@ something" exit is tolerated, every other exit is re-thrown with both of the too
 and a smoke case proves the reporter's shape before any caller is allowed to read a silence.
 
 The tool is a parameter — which package holds the binary, the command line, the exits that
-mean a finding, and the smoke case — so a second and a third tool run through this helper
-rather than each writing its own. oxlint runs through it today, with `oxlintOver` as the
-built form the lint-rule suites take. Imported through
+mean a finding, the environment it runs in, and the smoke case — so a second and a third tool
+run through this helper rather than each writing its own. oxlint runs through it today, with
+`oxlintOver` as the built form the lint-rule suites take. Imported through
 `@better-answers/devtools/throwaway-tree`.
+
+`oxlintOver` also hands the child the path to `tsgolint`, the binary oxlint spawns for its
+type-aware rules. oxlint finds that binary by walking up from its working directory, and a
+throwaway tree lives where there is no `node_modules` to walk up to — so without this every
+type-aware rule would read as silent, which is the failure this whole helper exists to make
+impossible. A tree that a type-aware rule is asserted over carries a `tsconfig.json`, because
+the type-aware linter needs a program to type the files it lints.
 
 ## `lint-rules/` — the `better-answers` oxlint plugin
 

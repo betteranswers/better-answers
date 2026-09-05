@@ -54,7 +54,13 @@ export const SnippetCopyButton = ({
       return;
     }
 
-    navigator.clipboard.writeText(value).then(() => {
+    // `onError` is optional, so the rejection handler may be nothing at all and a refused
+    // clipboard write would go unhandled. The `void` says the promise is deliberately not
+    // taken further here: what a caller wants on failure is what it passed as `onError`.
+    // The floating-promise rule stays on over registry source — ADR 0033 relaxes the four
+    // rules that judge how a component is written, and a lost rejection is not one of those —
+    // so the next update from upstream that drops this word will be told to put it back.
+    void navigator.clipboard.writeText(value).then(() => {
       setIsCopied(true);
       onCopy?.();
 

@@ -313,7 +313,10 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
 
   routes.post("/consent", async (context) => {
     const form = await context.req.formData();
-    const accept = String(form.get("accept")) === "true";
+    // Compared rather than stringified: a multipart part is a File, whose default
+    // stringification is `[object File]`, and a form field the browser did not send is null.
+    // Neither equals the word, so an entry that is not the string "true" is a refusal.
+    const accept = form.get("accept") === "true";
     // The person's credentials may have been revoked since this session was created;
     // consent mints a token, so the revocation check runs here too (ADR 0018).
     // A refused resolve stops the grant before Better Auth issues a code.
