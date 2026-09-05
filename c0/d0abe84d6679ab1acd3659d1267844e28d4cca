@@ -1,0 +1,36 @@
+apps/api/src/auth/auth.ts
+  s_529f881ca25f4e::t_11735e7d9da27c 509-517
+  s_529f881ca25f4e::t_95e559c20543fc 505-508,518-520
+  s_529f881ca25f4e::t_be74a473837ed3 192-201
+  s_529f881ca25f4e::t_79fd61fde73253 207-210,521
+  s_529f881ca25f4e::t_bd47dad19730b3 190-191
+packages/core/src/workspaces/index.ts
+  s_529f881ca25f4e::t_bd47dad19730b3 14
+  s_529f881ca25f4e::t_094b4e282976a0 252-255,257,259-264,269-271,281-294
+packages/schema/src/table-ownership.ts
+  s_529f881ca25f4e::t_8375da1ea0ae80 9-10,107,114-118
+  s_529f881ca25f4e::t_f1576ecd656333 13-21,61-66,68-73,97-98,104-106,108-109,113
+packages/core/src/store/postgres/index.ts
+  s_529f881ca25f4e::t_94619198bb6cce 98-114
+packages/schema/test/table-ownership.test.ts
+  s_529f881ca25f4e::t_fde7986580765a 7-13,21-24,29-34,36,38-39,62-72,89,96-102,104-107,111-113,115
+apps/api/tests/oauth-flow.test.ts
+  s_529f881ca25f4e::t_8c5019b6283055 302-308,310-312
+  s_529f881ca25f4e::t_bc4477d4a05d96 292-301,309
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c0d0abe84d6679ab1acd3659d1267844e28d4cca",
+  "prompts": {},
+  "sessions": {
+    "s_529f881ca25f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688411cf-a489-4e1b-b43c-905b1ccfe9f6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
