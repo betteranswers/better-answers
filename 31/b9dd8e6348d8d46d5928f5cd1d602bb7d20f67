@@ -1,0 +1,27 @@
+apps/web/src/app/router.tsx
+  s_2c3fc9d16bd52c::t_800a8e909faa76 111-117
+  s_2c3fc9d16bd52c::t_d77276b756736d 16
+apps/web/test/failed-screen.test.tsx
+  s_2c3fc9d16bd52c::t_ebde760a273e06 52-61
+  s_2c3fc9d16bd52c::t_238be0a04917f5 1-51,62-140,149-155,157-163,170-189
+  s_2c3fc9d16bd52c::t_48dfa047f1b917 141-148,156,164-169
+apps/web/src/app/failed-screen.tsx
+  s_2c3fc9d16bd52c::t_ebde760a273e06 30-31
+  s_2c3fc9d16bd52c::t_895bbbd5e1c8ce 1-29,32-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "31b9dd8e6348d8d46d5928f5cd1d602bb7d20f67",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
