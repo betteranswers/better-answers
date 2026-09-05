@@ -1,0 +1,23 @@
+packages/schema/package.json
+  s_2c3fc9d16bd52c::t_5eb2ab1db5484a 16
+apps/web/package.json
+  s_2c3fc9d16bd52c::t_5eb2ab1db5484a 13
+apps/api/tests/check-scripts.test.ts
+  s_2c3fc9d16bd52c::t_a3bb5fd8bcb47b 1-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "4787befec5b932d45cc24e7d5dd0f50940d8f571",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
