@@ -32,13 +32,16 @@ reviews:
       A new domain word is settled here BEFORE it appears in code; a diff that
       introduces a domain term absent from the glossary is a finding.
     - `CODING_RULES.md` — the constitution. Rules are tagged (`[DESIGN]`,
-      `[TEST]`, `[SEC]`, `[AUDIT]`, `[DEPS1]`, `[COMMENT]`, `[LOG1]`…). Cite the
-      tag when a finding rests on a rule.
+      `[TEST]`, `[SEC]`, `[AUDIT]`, `[DEPS1]`, `[COMMENT1]`, `[LOG1]`…). Cite the
+      tag when a finding rests on a rule; `[TEST5]` (a test title says what the system does
+      for whom) and `[COMMENT1]` (a comment says why, never what or what happened) are
+      cited by review alone, so cite them when they are the finding.
     - `apps/api/CODING_RULES.md` and `apps/worker/CODING_RULES.md` — tier rules. Apply the
       tier's file to changes in that tier.
-    - `docs/adr/` — 28 architecture decision records. A change that contradicts
-      an ADR is a NEW ADR in the same pull request, never a quiet edit. Say which
-      ADR is contradicted.
+    - `docs/adr/` — the architecture decision records; `docs/adr/README.md` is the
+      one-line live conclusion of each and the list to read first. A change that
+      contradicts an ADR is a NEW ADR in the same pull request, never a quiet edit.
+      Say which ADR is contradicted.
 
     Five things carry more weight here than in most repositories:
 
