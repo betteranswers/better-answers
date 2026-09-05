@@ -1,0 +1,23 @@
+apps/web/e2e/sign-in.spec.ts
+  s_0ca629127ef52f::t_7e7ab9d2071312 199-237
+apps/web/src/features/auth/choose-workspace-screen.tsx
+  s_0ca629127ef52f::t_620e7d20d9a6d9 37-43
+  s_0ca629127ef52f::t_3d3f85db3086cb 128-131,139
+  s_0ca629127ef52f::t_0580482abe9114 172-191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "6b29de99535649f33b14b591afb4d35b61a8b50a",
+  "prompts": {},
+  "sessions": {
+    "s_0ca629127ef52f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2a3efb03-5925-4985-bd9d-c260c4ec8e39",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
