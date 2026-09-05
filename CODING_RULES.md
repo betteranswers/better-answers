@@ -82,9 +82,9 @@ pino in TypeScript, structlog in Python, JSON to stdout; the OpenTelemetry expor
 
 ## SEC
 
-### [SEC1] Secrets only through the credentials provider
+### [SEC1] Secrets reach code through one seam per tier
 
-Credentials are read through `CredentialsProviderInterface`; never from env at the call site, never logged. Credential classes: ingestion, acting, agent (a share agent's binding-scoped token), LLM provider, repository, object store, and bootstrap (read once by the typed config module) — never mixed in one scope. Tokens are stored hashed with a lookup prefix, expire, and are revocable; every class has a rotation path; access decisions are audit-logged.
+The **bootstrap class** — what the deploy unit must give the process before it can reach anything — is read once by the typed config module (`apps/api/src/config.ts`, `apps/worker/src/better_answers_worker/config.py`) and nowhere else: never from env at the call site, never logged. The other six classes — ingestion, acting, agent (a share agent's binding-scoped token), LLM provider, repository, object store — are rows under the envelope, read through a **credentials provider** that no task has built yet; until it exists no code reads one, and the first slice that needs one builds it — tokens stored hashed behind a lookup prefix, expiring and revocable, one rotation path per class, every access decision audited. Classes are never mixed in one scope.
 
 ### [SEC2] A Principal on every call
 
