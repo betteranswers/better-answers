@@ -6,7 +6,7 @@ import {
 } from "@better-answers/schema/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { Claims } from "../src/kernel/index.ts";
+import { attempt, type Claims } from "../src/kernel/index.ts";
 import { listRoutes, LLM_PURPOSES } from "../src/llm/index.ts";
 import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
 
@@ -60,8 +60,10 @@ const claimsFor = (seeded: Seeded): Claims => ({
 });
 
 const listAs = async (seeded: Seeded) => {
-  const listed = await withPrincipal(openPostgres(db.runtimePool), claimsFor(seeded), listRoutes);
-  if (!listed.ok) throw new Error(`the Principal was refused: ${listed.error}`);
+  const resolved = await withPrincipal(openPostgres(db.runtimePool), claimsFor(seeded), listRoutes);
+  if (!resolved.ok) throw new Error(`the Principal was refused: ${resolved.error}`);
+  const listed = resolved.value;
+  if (!listed.ok) throw listed.error;
   return listed.value;
 };
 
@@ -150,5 +152,26 @@ describe("a workspace's model routes", () => {
     );
 
     expect(visible).toEqual({ ok: true, value: [mine.workspaceId] });
+  });
+
+  it("hands a caller a store failure to read rather than one to catch", async () => {
+    const seeded = await seedWorkspace([]);
+
+    const read = await withPrincipal(
+      openPostgres(db.runtimePool),
+      claimsFor(seeded),
+      async (principal, tx) => {
+        // A statement Postgres refuses aborts the transaction, so the capability's own
+        // read cannot run. `attempt` is the one place a rejection is caught (§ TYPES).
+        await attempt(() => tx.query("SELECT no_such_function()"));
+        return listRoutes(principal, tx);
+      },
+    );
+
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    expect(read.value.ok).toBe(false);
+    if (read.value.ok) return;
+    expect(read.value.error).toBeInstanceOf(Error);
   });
 });

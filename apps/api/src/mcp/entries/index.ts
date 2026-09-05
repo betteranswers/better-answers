@@ -10,6 +10,7 @@ import {
   renderFind,
   renderOpen,
 } from "@better-answers/core/answering";
+import type { Result } from "@better-answers/core/kernel";
 
 import { defineEntry, type Entry } from "./define.ts";
 
@@ -22,6 +23,17 @@ import { defineEntry, type Entry } from "./define.ts";
  * Every schema is JSON Schema 2020-12 through zod v4's `toJSONSchema`; no key carries
  * `x-mcp-header` (research 80 row 13: a question is the person's own words).
  */
+
+/**
+ * A slice act answers a `Result` and never throws across its seam (the kernel's result
+ * convention). The surface is a transport, and a transport is where a failure becomes a
+ * throw again — the MCP runtime turns it into an error result for the host. Today's
+ * four acts cannot fail, so this branch is unreachable and typed so.
+ */
+const answered = <Value>(result: Result<Value, Error>): Value => {
+  if (!result.ok) throw result.error;
+  return result.value;
+};
 
 const trust = z.object({
   tier: z.enum(["unverified", "machine-confirmed", "human-reviewed"]),
@@ -67,7 +79,7 @@ const findEntry = defineEntry({
     idempotentHint: true,
     openWorldHint: false,
   },
-  run: (principal, tx, args) => find(principal, tx, args),
+  run: async (principal, tx, args) => answered(await find(principal, tx, args)),
   render: renderFind,
 });
 
@@ -104,7 +116,7 @@ const askEntry = defineEntry({
     idempotentHint: false,
     openWorldHint: false,
   },
-  run: (principal, tx, args) => ask(principal, tx, args),
+  run: async (principal, tx, args) => answered(await ask(principal, tx, args)),
   render: renderAnswer,
 });
 
@@ -162,11 +174,13 @@ const openEntry = defineEntry({
     idempotentHint: true,
     openWorldHint: false,
   },
-  run: (principal, tx, args) =>
-    open(
-      principal,
-      tx,
-      args.iri === undefined ? { locator: args.locator ?? "" } : { iri: args.iri },
+  run: async (principal, tx, args) =>
+    answered(
+      await open(
+        principal,
+        tx,
+        args.iri === undefined ? { locator: args.locator ?? "" } : { iri: args.iri },
+      ),
     ),
   render: renderOpen,
 });
@@ -222,7 +236,7 @@ const giveFeedbackEntry = defineEntry({
       throw new Error(
         "a flag needs a reason: wrong, out-of-date, incomplete or should-not-have-shown",
       );
-    return giveFeedback(principal, tx, parsed.data);
+    return answered(await giveFeedback(principal, tx, parsed.data));
   },
   render: renderFeedback,
 });

@@ -1,4 +1,4 @@
-import type { UserPrincipal } from "../kernel/index.ts";
+import { ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
 /**
@@ -179,40 +179,49 @@ export type FeedbackReceipt = {
   readonly feedback: FeedbackInput;
 };
 
+/**
+ * The four acts answer a `Result` (the kernel's result convention, `kernel/result.ts`)
+ * with `never` for its error: B9's bodies read no store yet, so there is nothing that
+ * can fail and no refusal word to name. The shape is the one the bodies will keep —
+ * when the concept index arrives the union widens and no caller is reshaped.
+ */
 export const find = async (
   _principal: UserPrincipal,
   _tx: Tx,
   input: { readonly query: string; readonly limit: number },
-): Promise<FindResult> => ({ query: input.query, hits: [] });
+): Promise<Result<FindResult, never>> => ok({ query: input.query, hits: [] });
 
 export const open = async (
   _principal: UserPrincipal,
   _tx: Tx,
   input: OpenInput,
-): Promise<OpenResult> =>
-  input.iri === undefined
-    ? { found: false, locator: input.locator ?? "" }
-    : { found: false, iri: input.iri };
+): Promise<Result<OpenResult, never>> =>
+  ok(
+    input.iri === undefined
+      ? { found: false, locator: input.locator ?? "" }
+      : { found: false, iri: input.iri },
+  );
 
 export const ask = async (
   _principal: UserPrincipal,
   _tx: Tx,
   _input: { readonly question: string },
-): Promise<AnswerResult> => ({
-  verdict: "refuse",
-  text: NOT_ANSWERED,
-  citations: [],
-  conflicts: [],
-  coverage: { asked: 1, answered: 0 },
-  unmappedPassages: [],
-  map: { state: "live" },
-});
+): Promise<Result<AnswerResult, never>> =>
+  ok({
+    verdict: "refuse",
+    text: NOT_ANSWERED,
+    citations: [],
+    conflicts: [],
+    coverage: { asked: 1, answered: 0 },
+    unmappedPassages: [],
+    map: { state: "live" },
+  });
 
 export const giveFeedback = async (
   _principal: UserPrincipal,
   _tx: Tx,
   input: FeedbackInput,
-): Promise<FeedbackReceipt> => ({ outcome: "received", feedback: input });
+): Promise<Result<FeedbackReceipt, never>> => ok({ outcome: "received", feedback: input });
 
 /** The human rendering of a preview — one line per hit, never the JSON. */
 export const renderFind = (result: FindResult): string =>

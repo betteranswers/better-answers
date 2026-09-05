@@ -1,14 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
+  ask,
+  find,
+  giveFeedback,
   mapWords,
   NOT_ANSWERED,
+  open,
   renderAnswer,
   renderFeedback,
   renderOpen,
   trustWords,
   type AnswerResult,
+  type FeedbackReceipt,
+  type FindResult,
+  type OpenResult,
 } from "../src/answering/index.ts";
+import type { Result } from "../src/kernel/index.ts";
 
 /**
  * The human renderings through the slice's interface: the reader's words and no others
@@ -147,5 +155,14 @@ describe("open's and feedback's renderings", () => {
         feedback: { iri: "x", verdict: "flag", reason: "out-of-date", detail: "renewed in May" },
       }),
     ).toContain('flagged as out of date — "renewed in May"');
+  });
+});
+
+describe("what the slice's four acts answer", () => {
+  it("hands every caller an outcome to read, never one to catch", () => {
+    expectTypeOf(find).returns.resolves.toEqualTypeOf<Result<FindResult, never>>();
+    expectTypeOf(open).returns.resolves.toEqualTypeOf<Result<OpenResult, never>>();
+    expectTypeOf(ask).returns.resolves.toEqualTypeOf<Result<AnswerResult, never>>();
+    expectTypeOf(giveFeedback).returns.resolves.toEqualTypeOf<Result<FeedbackReceipt, never>>();
   });
 });

@@ -1,6 +1,6 @@
 import { llmPurpose } from "@better-answers/schema";
 
-import type { UserPrincipal } from "../kernel/index.ts";
+import { attempt, err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
 /**
@@ -48,24 +48,33 @@ type RouteRow = {
  * The workspace's routes, one row per purpose in purpose order, read as the Principal
  * inside the transaction that resolved it — so RLS is the guarantee (ADR 0032) and
  * the statement names the workspace anyway.
+ *
+ * No refusal word: a workspace that has configured nothing is five routes with nothing
+ * chosen, not a failure. So the error arm is the store's alone (the kernel's result
+ * convention, `kernel/result.ts`) and a caller reads a failure rather than catching one.
  */
 export const listRoutes = async (
   principal: UserPrincipal,
   tx: Tx,
-): Promise<readonly WorkspaceRoute[]> => {
-  const configured = await tx.query<RouteRow>(
-    "SELECT purpose, provider, model, dimensions FROM llm_route WHERE workspace_id = $1",
-    [principal.workspaceId],
+): Promise<Result<readonly WorkspaceRoute[], Error>> => {
+  const configured = await attempt(() =>
+    tx.query<RouteRow>(
+      "SELECT purpose, provider, model, dimensions FROM llm_route WHERE workspace_id = $1",
+      [principal.workspaceId],
+    ),
   );
-  const byPurpose = new Map(configured.rows.map((row) => [row.purpose, row]));
-  return LLM_PURPOSES.map((purpose) => {
-    const row = byPurpose.get(purpose);
-    return {
-      purpose,
-      provider: row?.provider ?? null,
-      model: row?.model ?? null,
-      dimensions: row?.dimensions ?? null,
-      fixed: row !== undefined && purpose === FIXED_PURPOSE,
-    };
-  });
+  if (!configured.ok) return err(configured.error);
+  const byPurpose = new Map(configured.value.rows.map((row) => [row.purpose, row]));
+  return ok(
+    LLM_PURPOSES.map((purpose) => {
+      const row = byPurpose.get(purpose);
+      return {
+        purpose,
+        provider: row?.provider ?? null,
+        model: row?.model ?? null,
+        dimensions: row?.dimensions ?? null,
+        fixed: row !== undefined && purpose === FIXED_PURPOSE,
+      };
+    }),
+  );
 };

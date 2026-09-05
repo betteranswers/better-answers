@@ -30,7 +30,18 @@ export const appRouter = router({
   }),
   routes: router({
     /** A workspace's model routes, one row per purpose. Read-only: editing is a later ticket. */
-    list: workspaceProcedure.query(({ ctx }) => listRoutes(ctx.principal, ctx.tx)),
+    list: workspaceProcedure.query(async ({ ctx }) => {
+      const listed = await listRoutes(ctx.principal, ctx.tx);
+      // The slice answers a store failure rather than throwing it (the kernel's result
+      // convention); a transport is where it becomes a status a client understands.
+      if (!listed.ok)
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "the workspace's routes could not be read",
+          cause: listed.error,
+        });
+      return listed.value;
+    }),
   }),
 });
 
