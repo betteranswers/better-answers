@@ -1,6 +1,6 @@
 # Coding rules
 
-These rules apply to every workspace; tier rules live in `apps/api/CODING_RULES.md` and `apps/worker/CODING_RULES.md`.
+These rules apply to every workspace; a workspace's own rules live in `apps/api/CODING_RULES.md`, `apps/web/CODING_RULES.md` and `apps/worker/CODING_RULES.md`.
 
 ## DESIGN
 

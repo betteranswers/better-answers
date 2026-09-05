@@ -197,12 +197,13 @@ describe("rule tags against the rules files that define them (T-078)", () => {
 
   it("reads tags from every rules file, and the tags it reads look like tags", () => {
     // The assertions above go quiet when nothing matches: no rules files found is no tags
-    // defined is nothing to check. Three rules files exist today and each defines a tag.
+    // defined is nothing to check. Four rules files exist today and each defines a tag.
     const defined = definedTags();
     const files = new Set(defined.values());
 
     expect(files).toContain("CODING_RULES.md");
     expect(files).toContain("apps/api/CODING_RULES.md");
+    expect(files).toContain("apps/web/CODING_RULES.md");
     expect(files).toContain("apps/worker/CODING_RULES.md");
     expect([...defined.keys()].every((tag) => /^[A-Z][A-Z0-9]*[A-Z][0-9]+$/.test(tag))).toBe(true);
   });

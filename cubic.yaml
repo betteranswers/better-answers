@@ -42,8 +42,9 @@ reviews:
       `[CHECK3]` (one run of `check` names every failure, so a manifest never chains its
       steps with `&&`) bind any diff that touches a lint rule, a workspace's scripts or its
       test configuration.
-    - `apps/api/CODING_RULES.md` and `apps/worker/CODING_RULES.md` — tier rules. Apply the
-      tier's file to changes in that tier.
+    - `apps/api/CODING_RULES.md`, `apps/web/CODING_RULES.md` and
+      `apps/worker/CODING_RULES.md` — workspace rules. Apply a workspace's own file to
+      changes in it; `[WEB]` is the browser package's family.
     - `docs/adr/` — the architecture decision records; `docs/adr/README.md` is the
       one-line live conclusion of each and the list to read first. A change that
       contradicts an ADR is a NEW ADR in the same pull request, never a quiet edit.
