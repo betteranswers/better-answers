@@ -1,0 +1,26 @@
+packages/schema/test/table-ownership.test.ts
+  s_529f881ca25f4e::t_ef644f565661e1 1-84,91-99,106-108
+  s_529f881ca25f4e::t_611d5005484d4c 85-90,100-105
+packages/schema/src/table-ownership.ts
+  s_529f881ca25f4e::t_bb6cb53c3b5c5c 1-8,12-91,93-123,125-167
+  s_529f881ca25f4e::t_263f79c44cf9eb 9-11,92
+  s_529f881ca25f4e::t_e2322973de43ef 124
+packages/schema/src/index.ts
+  s_529f881ca25f4e::t_12097ac8d18202 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b26aba920f32a995de9ce092a0e13a1e93b92c8c",
+  "prompts": {},
+  "sessions": {
+    "s_529f881ca25f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688411cf-a489-4e1b-b43c-905b1ccfe9f6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
