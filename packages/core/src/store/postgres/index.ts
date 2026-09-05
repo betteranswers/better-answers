@@ -105,12 +105,19 @@ export const withIdentityWrite = async <T>(
  *
  * Never a tenant read: an unscoped transaction sees zero tenant rows by construction,
  * which is the guarantee, not an omission.
+ *
+ * The body is its twin's, deliberately, and the `jscpd:ignore` fence around it is that
+ * decision said again where the copy-paste gate can read it: the two are one implementation
+ * under two names on purpose, so that a statement says which of them it is, and they have to
+ * be able to part — the day a read takes a read-only transaction, only this one changes.
  */
+/* jscpd:ignore-start */
 export const withIdentityRead = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
   work: (tx: Tx, platform: PlatformPrincipal) => Promise<T>,
 ): Promise<T> => transaction(door, (client) => work(client, platform));
+/* jscpd:ignore-end */
 
 /**
  * The one resolve query (ADR 0018, ADR 0035): the member row, the person's revocation

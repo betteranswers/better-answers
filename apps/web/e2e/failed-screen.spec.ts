@@ -1,7 +1,12 @@
-import { AxeBuilder } from "@axe-core/playwright";
-
 import { expect, test } from "./browser.ts";
-import { anAddress, provision, seedRoutes, signIn } from "./harness.ts";
+import {
+  anAddress,
+  passesTheAccessibilityGate,
+  provision,
+  seedRoutes,
+  signIn,
+  skipLinkReachesTheScreen,
+} from "./harness.ts";
 
 /**
  * A screen that throws over the served build: the frame stands, the navigation still works,
@@ -77,24 +82,22 @@ test("a screen that throws leaves the frame, the navigation and an accessible wa
 
   // The way out is reachable by keyboard: the skip link, then the screen region, then the
   // first control in it. Nothing between the reader and the retry needs a mouse.
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("main")).toBeFocused();
+  await skipLinkReachesTheScreen(page);
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Try this screen again" })).toBeFocused();
 
-  // `@axe-core/playwright` 4.13.0, the tags `routes.spec.ts` runs. Automated rules are
-  // evidence, not proof: the keyboard traversal above is the rest of it.
-  const audit = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-    .analyze();
-  expect(audit.violations).toEqual([]);
+  // The rest of what a reader is left with: the keyboard traversal above is the other half.
+  await passesTheAccessibilityGate(page);
 
   // The navigation still navigates, which is the whole point of the boundary sitting inside
-  // the outlet: one screen is lost and the other five are read as usual.
+  // the outlet: one screen is lost and the other five are read as usual. Eight lines the
+  // frame's own spec also walks, carried rather than folded: there it is the claim, here it
+  // is what has to still be true after a screen threw, and a helper would leave neither
+  // reader able to see what the other test meant.
+  /* jscpd:ignore-start */
   await navigation.getByRole("link", { name: "Knowledge" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Knowledge" })).toBeVisible();
   await expect(page.getByText("This screen is not built yet.")).toBeVisible();
+  /* jscpd:ignore-end */
   await expect(page.getByRole("alert")).toHaveCount(0);
 });

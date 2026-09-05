@@ -1,4 +1,3 @@
-import { AxeBuilder } from "@axe-core/playwright";
 import type { APIRequestContext, Page } from "@playwright/test";
 
 import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
@@ -9,10 +8,12 @@ import { expect, test } from "./browser.ts";
 import {
   addMember,
   anAddress,
+  passesTheAccessibilityGate,
   person,
   provision,
   seedRoutes,
   signIn,
+  skipLinkReachesTheScreen,
   type SeedRoute,
 } from "./harness.ts";
 
@@ -239,10 +240,7 @@ test.describe("the System screen's routes card", () => {
 
     // The card adds nothing to the tab order — it has no controls — so the traversal past the
     // navigation still lands on the screen itself, which the skip link is what reaches.
-    await page.keyboard.press("Tab");
-    await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(page.getByRole("main")).toBeFocused();
+    await skipLinkReachesTheScreen(page);
 
     // The announced structure itself, not a claim about it: the accessibility tree a screen
     // reader reads, written out. A row that lost its heading, a list that stopped being a list
@@ -278,12 +276,8 @@ test.describe("the System screen's routes card", () => {
             - paragraph: /${FIXED_REASON_PHRASE}/
     `);
 
-    // `@axe-core/playwright` 4.13.0, read from npm 03/09/2026 (`[DEPS1]`). Automated rules are
-    // evidence, not proof: the keyboard traversal and the aria snapshot above are the rest of it.
-    const audit = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-      .analyze();
-    expect(audit.violations).toEqual([]);
+    // The keyboard traversal and the aria snapshot above are the rest of this claim.
+    await passesTheAccessibilityGate(page);
 
     // The rest of System, and every one of the other five screens, still say they are unbuilt.
     await expect(page.getByText(/The rest of System/)).toBeVisible();

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { TRPC_ENDPOINT } from "../src/trpc/index.ts";
 import { AGENT_HOSTNAME, APEX_HOSTNAME, APP_HOSTNAME } from "./harness.ts";
-import { servedApp } from "./served-app.ts";
+import { servedApp } from "./suite-app.ts";
 
 /**
  * The api serves the SPA's static build on `app.` (ADR 0006, amended 2026-09-02; ADR 0022

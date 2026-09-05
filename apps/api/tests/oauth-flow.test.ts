@@ -235,6 +235,23 @@ describe("the flow, as claude.ai drives it", () => {
 });
 
 describe("the pages, as a person walks them", () => {
+  /**
+   * A person driven to the consent page, something that ends their standing, then the
+   * consent post. Two tests turn on that order — credentials revoked, and the membership
+   * removed between the redirect decision and the click — and what both are about is that
+   * the standing is checked at the post and not only at the redirect, so the thing that
+   * ends it is the argument and everything around it is one act.
+   */
+  const consentPostedAfter = async (
+    endTheirStanding: (workspace: Awaited<ReturnType<typeof app.provision>>) => Promise<void>,
+  ): Promise<Response> => {
+    const acme = await app.provision({ name: "Acme" });
+    const client = app.client();
+    const consent = await driveToPage(app, client, acme.admin);
+    await endTheirStanding(acme);
+    return client.form(`/consent${consent.search}`, { accept: "true" });
+  };
+
   it("never shows the picker to a person in exactly one workspace — consent is the next page", async () => {
     const acme = await app.provision({ name: "Only" });
     const client = app.client();
@@ -278,12 +295,9 @@ describe("the pages, as a person walks them", () => {
   });
 
   it("refuses consent once the person's credentials are revoked, and mints no code", async () => {
-    const acme = await app.provision({ name: "Acme" });
-    const client = app.client();
-    const consent = await driveToPage(app, client, acme.admin);
-    await app.revokeCredentials(acme.admin.id, new Date(Date.now() + 1_000));
-
-    const decided = await client.form(`/consent${consent.search}`, { accept: "true" });
+    const decided = await consentPostedAfter((acme) =>
+      app.revokeCredentials(acme.admin.id, new Date(Date.now() + 1_000)),
+    );
 
     expect(decided.status).toBe(401);
     expect(decided.headers.get("location")).toBeNull();
@@ -299,12 +313,9 @@ describe("the pages, as a person walks them", () => {
     // active workspace only if the person still holds it; it is unreachable through this
     // page and is there for Better Auth's own `/oauth2/consent`, which this fence does
     // not sit in front of.
-    const acme = await app.provision({ name: "Acme" });
-    const client = app.client();
-    const consent = await driveToPage(app, client, acme.admin);
-    await app.removeMember(acme.workspaceId, acme.admin.id);
-
-    const decided = await client.form(`/consent${consent.search}`, { accept: "true" });
+    const decided = await consentPostedAfter((acme) =>
+      app.removeMember(acme.workspaceId, acme.admin.id),
+    );
 
     expect(decided.status).toBe(401);
     expect(decided.headers.get("location")).toBeNull();

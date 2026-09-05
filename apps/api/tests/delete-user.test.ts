@@ -1,7 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { signIn } from "./flow.ts";
-import { startApp, type TestApp } from "./harness.ts";
+import { appForSuite } from "./suite-app.ts";
 
 /**
  * The guard `[SEC3]` asks for beside a privilege the platform does not grant: Better
@@ -26,21 +26,13 @@ import { startApp, type TestApp } from "./harness.ts";
  * the code is not a test; what closes that road is this option staying off.
  */
 
-let app: TestApp;
-
-beforeAll(async () => {
-  app = await startApp();
-}, 180_000);
-
-afterAll(async () => {
-  await app.stop();
-});
+const app = appForSuite();
 
 describe("the delete-user endpoint, to a person who is signed in", () => {
   it("refuses them, and leaves their user row and their membership where they are", async () => {
-    const acme = await app.provision({ name: "Acme" });
-    const client = app.client();
-    await signIn(app, client, acme.admin.email);
+    const acme = await app().provision({ name: "Acme" });
+    const client = app().client();
+    await signIn(app(), client, acme.admin.email);
 
     // The same client, on the same cookie: a session Better Auth answers for. So the
     // refusal below cannot be read as "not signed in".
@@ -50,11 +42,11 @@ describe("the delete-user endpoint, to a person who is signed in", () => {
     const deleted = await client.json("/delete-user", {});
     expect(deleted.status).toBe(404);
 
-    const person = await app.database.superuser.query<{ id: string }>(
+    const person = await app().database.superuser.query<{ id: string }>(
       'SELECT id FROM "user" WHERE id = $1',
       [acme.admin.id],
     );
-    const membership = await app.database.superuser.query<{ user_id: string }>(
+    const membership = await app().database.superuser.query<{ user_id: string }>(
       "SELECT user_id FROM member WHERE workspace_id = $1 AND user_id = $2",
       [acme.workspaceId, acme.admin.id],
     );

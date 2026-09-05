@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { fetchHonouringHost } from "../src/ops/http-fetch.ts";
 import { NOT_BUILT, parseSince, runOps, type OpsIo } from "../src/ops/index.ts";
 import { APP_HOSTNAME, PUBLIC_URL, type TestApp } from "./harness.ts";
-import { servedApp } from "./served-app.ts";
+import { servedApp } from "./suite-app.ts";
 
 /**
  * The `pnpm ops` commands the estate's restore scripts call (ADR 0022, T-005), run against a
