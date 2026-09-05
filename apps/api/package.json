@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "mutation": "stryker run",
-    "check": "pnpm run lint && pnpm run typecheck && pnpm run test"
+    "check": "node ../../scripts/check.mjs lint typecheck test"
   },
   "dependencies": {
     "@better-answers/core": "workspace:*",

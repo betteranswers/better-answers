@@ -9,8 +9,8 @@
     "preview": "vite preview",
     "lint": "oxlint --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
-    "check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run e2e",
-    "test": "vitest run --passWithNoTests",
+    "check": "node ../../scripts/check.mjs lint typecheck test e2e",
+    "test": "vitest run",
     "e2e": "pnpm run build && playwright test",
     "mutation": "stryker run"
   },

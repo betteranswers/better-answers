@@ -20,9 +20,9 @@ key. A variable no step in this tier reads yet does not belong in that module.
 
 ## [WRK3] `check` is one command that reports everything
 
-`uv run --frozen check` runs ruff, ruff format, mypy and pytest, and runs every step even
-when an earlier one fails, so one run names every problem rather than the first. It is what
-the root `check` calls and what CI calls; there is no second list of steps anywhere.
+`uv run --frozen check` runs ruff, ruff format, mypy and pytest — this tier's whole gate,
+under `[CHECK3]`, whose runner here is `check.py`. It is what the root `check` calls and
+what CI calls; there is no second list of steps anywhere.
 
 ## [WRK4] Typed at every public boundary
 

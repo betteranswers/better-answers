@@ -12,8 +12,8 @@
     "generate:worker-view": "node scripts/generate-worker-schema.ts",
     "lint": "oxlint --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
-    "check": "pnpm run lint && pnpm run typecheck && pnpm run test",
-    "test": "vitest run --passWithNoTests"
+    "check": "node ../../scripts/check.mjs lint typecheck test",
+    "test": "vitest run"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

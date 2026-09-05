@@ -1,11 +1,13 @@
 import { execFile } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
+
+import { workspacePackages } from "./workspaces.ts";
 
 const run = promisify(execFile);
 
@@ -49,41 +51,10 @@ const manifest = (workspace: string): z.infer<typeof manifestSchema> =>
   );
 
 /**
- * Every project pnpm installs, read from `pnpm-workspace.yaml` rather than listed here: a
- * second list would age alone, and the one it missed — `packages/design-system` — is
- * exactly the kind of omission that makes this test quietly weaker than it reads.
- *
- * The root is not in that file and is an importer all the same, so it is added; a `packages/*`
- * entry is expanded against the directory, which is what pnpm's own glob means here. Read
- * with a reader rather than a YAML parser because `apps/api` has no YAML dependency and the
- * shape being read is one list of plain strings — the moment it is not, this throws.
+ * Every project pnpm installs: the workspaces, plus the root, which is not in
+ * `pnpm-workspace.yaml` and is an importer all the same.
  */
-const workspaceProjects = (): readonly string[] => {
-  const file = readFileSync(path.join(repositoryRoot, "pnpm-workspace.yaml"), "utf8");
-  const block = /^packages:\n((?:[ \t]*-[ \t]+\S+[ \t]*\n)+)/m.exec(file)?.[1];
-  if (block === undefined) throw new Error("pnpm-workspace.yaml has no `packages:` list");
-
-  const patterns = block
-    .split("\n")
-    .map((line) =>
-      line
-        .replace(/^[ \t]*-[ \t]+/, "")
-        .trim()
-        .replace(/^["']|["']$/g, ""),
-    )
-    .filter((entry) => entry.length > 0);
-
-  const expand = (pattern: string): readonly string[] => {
-    if (!pattern.endsWith("/*")) return [pattern];
-    const parent = pattern.slice(0, -2);
-    return readdirSync(path.join(repositoryRoot, parent), { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => `${parent}/${entry.name}`)
-      .filter((project) => existsSync(path.join(repositoryRoot, project, "package.json")));
-  };
-
-  return [".", ...patterns.flatMap(expand)];
-};
+const workspaceProjects = (): readonly string[] => [".", ...workspacePackages()];
 
 /**
  * A name is a development dependency of this repository when some workspace has it under

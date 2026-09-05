@@ -32,7 +32,7 @@ Every test that touches data runs against a real Postgres (Testcontainers or the
 
 ### [TEST3] Our own code is never mocked
 
-Module mocking (`vi.mock`, `jest.mock`, `monkeypatch` of our modules) is banned and lint-enforced (`anti-slop/no-module-mocking`). External services — LLMs, SaaS APIs — are replaced behind their adapter with an in-memory implementation.
+Module mocking (`vi.mock`, `jest.mock`, `monkeypatch` of our modules) is banned, and enforced in both tiers: in TypeScript by lint (`anti-slop/no-module-mocking`), in Python by a conftest guard that refuses a `monkeypatch` whose target is a module under `better_answers_worker`, and by a lint ban on `unittest.mock`, which is the way round it. External services — LLMs, SaaS APIs — are replaced behind their adapter with an in-memory implementation, and a third-party attribute stays patchable.
 
 ### [TEST4] Setup through factories
 
@@ -57,6 +57,14 @@ Where a list names members (the migration journal and its directory), a generate
 A lint rule, a tool in `check` and a hook command each land with a functional test that runs the tool over a throwaway tree and asserts both where it fires and where it stays silent. The tree, the run and the reading of the report are `@better-answers/devtools/throwaway-tree`'s: only the tool's own "found something" exit is tolerated, any other exit is re-thrown with what the tool wrote, and a smoke case proves the reporter before a silence may be read as a rule staying quiet.
 
 A repository lint rule carries its rule line — a tag or an ADR — in the message it prints, so a reader who hits it reaches the rule without asking, and it lands with a functional test through that runner.
+
+### [CHECK2] A suite that can run nothing fails
+
+A test script never passes for having found no tests, and a browser spec left focused fails under CI (Playwright's `forbidOnly`). pytest refuses a marker it does not know and an expected failure that passed. Every pnpm workspace carries a `check` script or is named, with the reason it has nothing to run, in `apps/api/tests/check-scripts.test.ts`, which holds the pair both ways (`[TEST7]`): a named workspace that gains `check`, and a workspace off the list that lacks one, each fail.
+
+### [CHECK3] One run of `check` names every failure
+
+A workspace's `check` runs every step it has — lint, types, tests, and the browser suite where there is one — even when an earlier step fails, and reports the failures together. `&&` between steps is banned: it names the first problem and hides the rest, so a session fixes one thing per run. Each tier has one runner, and a manifest's steps are named in that manifest and nowhere else; the root `check` is the same shape over its own steps, so a gate is added by naming it. `apps/api/tests/check-scripts.test.ts` reads each manifest for this, and the runner is proved by a test that runs it over a throwaway manifest.
 
 ## COMMENT
 

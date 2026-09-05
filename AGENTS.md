@@ -39,7 +39,7 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers â
 | `deploy/` | Compose files and deployment configuration |
 | `.cubic/wiki/` | Cubic's generated wiki: orientation only, never authority (`docs/agents/code-review.md`) |
 
-Commands, versions and scripts are read from each workspace's `package.json` or `pyproject.toml`; this file does not repeat them. Every workspace exposes `check` (lint, types, tests); the root `check` runs them all.
+Commands, versions and scripts are read from each workspace's `package.json` or `pyproject.toml`; this file does not repeat them. Every workspace exposes `check` (lint, types, tests) unless a test names it as having nothing to run; one `check` runs every step it has and names all that failed, and the root `check` runs them all.
 
 ## Skills
 
