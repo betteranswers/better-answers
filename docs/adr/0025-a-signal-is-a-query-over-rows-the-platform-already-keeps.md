@@ -39,3 +39,7 @@ amends: 0017, 0022, 0024
 - `CONTEXT.md`: *signal*, *alert*, *System* (card order).
 - The first build task's first index on the box is the measurement for every threshold in the catalogue and for ADR 0024's step A.
 - Fog kept: SLOs, tracing, a status page, per-client reports, alert routing beyond email.
+
+## Amendment — 2026-09-05, the ledger columns and the alert rule are this ADR's alone (T-078)
+
+The consequence above had `[LOG1]` name the `llm_call` row's columns and `[OPS1]` carry the alert-once rule; both were specification wearing a rule tag (the coding-rules audit of 5 September 2026). The rules keep their checkable sentences — no prompt or completion in any logger, exporter or row; no metrics store, no scrape — and the shape is here and only here. **`llm_call`** carries `workspace_id`, purpose, route, model, tokens in and out, seconds, priced cost, outcome and the run or answer served, one row per model call, never the prompt or the completion. The **answer audit** is its own table with a workspace id and a retention period (ADR 0017). A **signal** is a query over existing rows with a threshold held as a config row; an **alert** is recorded once as a `platform_event(kind=alert)` and closed by a *cleared* event. `llm_call`, `platform_event` and the threshold rows have no migration yet; this is the shape the task that migrates them builds to.

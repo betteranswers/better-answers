@@ -78,7 +78,7 @@ Domain terms, one definition each, no implementation detail. Code uses the gloss
 
 ### [LOG1] One structured logger per tier
 
-pino in TypeScript, structlog in Python, JSON to stdout; the OpenTelemetry exporter is one config key (`OTEL_EXPORTER_OTLP_ENDPOINT`), empty until something receives it (ADR 0025). `console.*` and `print` are banned outside scripts. Prompt and completion content never enter the logger, the exporter or the `llm_call` row — every model call writes one (`workspace_id`, purpose, route, model, tokens, seconds, priced cost, outcome, the run or answer served); the answer audit is its own table with a workspace id and a retention period.
+pino in TypeScript, structlog in Python, JSON to stdout; the OpenTelemetry exporter is one config key (`OTEL_EXPORTER_OTLP_ENDPOINT`), empty until something receives it (ADR 0025). `console.*` and `print` are banned outside scripts. Prompt and completion content never enter the logger, the exporter or any row — the `llm_call` row every model call writes and the answer audit's own table are ADR 0025's shape, not restated here.
 
 ## SEC
 
@@ -148,9 +148,9 @@ A concept file carries what OKF v0.2 defines plus exactly two platform keys — 
 
 Every reader-facing surface follows the Linear/Spotify default: the first view shows only what the reader needs to judge — a claim with its trust words, a section with its coverage — one disclosure reveals more (verifier, date, evidence passage, history), and the action sits beside it with its consequence stated before the click. Two levels of disclosure for a Viewer; never a third pane, modal or tooltip where a second level would do. Trust and status are text tags, never colour alone; dates are UK long form.
 
-### [UX2] Latency and keyboard budget
+### [UX2] Every common action has a keystroke
 
-Lists and search hits render under one second; actions apply under 100 ms optimistically and reconcile after; answers stream. Every common action has a keystroke, `?` lists them, and bulk work is select-then-command. A screen that misses the budget is a bug, not a backlog item.
+Every common action has a keystroke, `?` lists them, and bulk work is select-then-command. The latency budget — lists under a second, actions under 100 ms optimistically, answers streamed — is ADR 0037's; a screen that misses it is a bug, not a backlog item.
 
 ## A11Y
 
@@ -162,7 +162,7 @@ Every UI ticket carries the acceptance line "WCAG 2.2 AA, tested with keyboard a
 
 ### [PIPE1] Never rebuild what cocoindex provides; never rely on what it does not
 
-The worker composes cocoindex's documented building blocks — per-component commit, memoisation with keys and states, stable ids, target sync with deletes, `mount_each` isolation, cooperative timeouts, exception handlers, `stats_group`/`watch()`, one `Environment` per binding — and writes only what the engine has no block for: the run key, claim/lease/heartbeat/reaper, attempt count and poison threshold, the source-document catalogue, retention membership, priced-vs-actual, outcome rows, the object-store landing, one run per binding, supervision (the ours/shared/theirs table on ticket 53). Undocumented API (`use_state`) is never relied on; `use_mount` never fans documents onto the critical path. The exit stays cheap: cocoindex types never cross a module seam, the catalogue and run rows are the durable truth, and every LMDB is disposable. Every cocoindex target is `managed_by="user"`; the app owns all DDL (ADR 0007).
+cocoindex types never cross a module seam. Every cocoindex target is `managed_by="user"` and the app owns all DDL (ADR 0007); the line between what the worker composes and what it writes itself is ADR 0036.
 
 ## DEPS
 
@@ -178,4 +178,4 @@ Every value `[DEPS1]` reads — an image reference with its digest, a model's di
 
 ### [OPS1] State on disk, jobs that prove themselves, staging that holds nothing
 
-Nothing runs as root to own a volume; every stateful service is a bind mount under `/data/<service>` owned by its uid. Every scheduled job verifies its upload against the bucket, writes a `backup_run` row, and only then pings the dead-man check — with an outcome word and sizes, never a path, key, workspace or error string. Staging holds synthetic data outside a restore drill and is wiped when the drill ends. Migrations are forward-only; a rollback is the previous image digest. Images are deployed by digest; a compose file refuses to start without one (ADR 0022). A signal is a query over existing rows with a threshold held as a config row; an alert is recorded once as a `platform_event` and closed by a *cleared* event — no metrics store, no scrape (ADR 0025).
+Nothing runs as root to own a volume; every stateful service is a bind mount under `/data/<service>` owned by its uid. Every scheduled job verifies its upload against the bucket, writes a `backup_run` row, and only then pings the dead-man check — with an outcome word and sizes, never a path, key, workspace or error string. Staging holds synthetic data outside a restore drill and is wiped when the drill ends. Migrations are forward-only; a rollback is the previous image digest. Images are deployed by digest; a compose file refuses to start without one (ADR 0022). No metrics store and no scrape: a signal and an alert are rows, in the shape ADR 0025 sets.
