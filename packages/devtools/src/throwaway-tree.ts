@@ -231,9 +231,13 @@ export type KnipFinding = {
   readonly name: string;
 };
 
-/** knip over a throwaway tree: the raw report, or the findings read out of it. */
+/**
+ * knip over a throwaway tree: the findings, and nothing wider. The raw report is not on the
+ * interface, because knip's JSON is one object per file with an array per kind of finding —
+ * a caller reading it would rewrite `findingsIn` badly, and the smoke case proves that
+ * reading and no other.
+ */
 export type KnipRunner = {
-  readonly output: (tree: Tree) => string;
   readonly findings: (tree: Tree) => readonly KnipFinding[];
 };
 
@@ -300,5 +304,5 @@ export const knipOver = (
     },
   });
 
-  return { output: run, findings: (tree) => findingsIn(run(tree)) };
+  return { findings: (tree) => findingsIn(run(tree)) };
 };

@@ -16,8 +16,8 @@ import type { KnipConfig } from "knip";
  * They are left to be inferred, which also keeps the gate honest — the day a manifest stops
  * naming one, knip reports the file as unreached rather than an entry nobody starts.
  *
- * What is left is the four things knip cannot know, each with its reason beside it. This is
- * TypeScript rather than JSON so those reasons can be sentences.
+ * What is left is what knip cannot know, each with its reason beside it. This is TypeScript
+ * rather than JSON so those reasons can be sentences.
  */
 const config: KnipConfig = {
   // `uv` is the Python tier's package manager, named by the root `check:worker` step and by
@@ -32,8 +32,11 @@ const config: KnipConfig = {
         // is why it also sits outside this repository's linter, formatter and compiler.
         "lifts/**",
         // A stand-in for the SPA's build, reached over HTTP by the endpoint suite rather
-        // than imported by it — a path a request asks for is not an edge in a module graph.
-        "tests/fixtures/**",
+        // than imported by it — a path a request asks for is not an edge in a module graph,
+        // so `index.html` naming `/assets/screen.js` is invisible to knip. Named to this
+        // one tree rather than to `tests/fixtures/`, so a fixture that really is orphaned
+        // still fails.
+        "tests/fixtures/web-build/**",
       ],
     },
 

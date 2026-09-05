@@ -24,7 +24,11 @@ import { openPostgres, tablesPresent } from "@better-answers/core/store/postgres
  * Nothing here reads the environment: the pool and every value come in as arguments.
  */
 
-/** The contract's exit codes, by name: the scripts read them, so they are stated once. */
+/**
+ * The contract's exit codes, by name: the scripts read them, so they are stated once. Only
+ * `NOT_BUILT` is named outside this module — the drill's test asserts a command answers with
+ * it — and the other three are exported the day something outside asks for them by name.
+ */
 const DONE = 0;
 const REFUSED = 1;
 const USAGE = 2;
