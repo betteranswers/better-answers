@@ -54,7 +54,10 @@ export const SnippetCopyButton = ({
       return;
     }
 
-    navigator.clipboard.writeText(value).then(() => {
+    // `onError` is optional, so the rejection handler may be nothing at all and a refused
+    // clipboard write would go unhandled. The `void` says the promise is deliberately not
+    // taken further here: what a caller wants on failure is what it passed as `onError`.
+    void navigator.clipboard.writeText(value).then(() => {
       setIsCopied(true);
       onCopy?.();
 

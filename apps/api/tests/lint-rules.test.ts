@@ -172,6 +172,49 @@ describe("no block is empty, and a swallowed error is a commented decision", () 
   });
 });
 
+/**
+ * A tree the type-aware linter can build a program from. `tsgolint` reads a `tsconfig.json`
+ * to type the files it lints, so a type-aware rule over a tree without one has nothing to
+ * say — which would read as the rule staying silent.
+ */
+const typedTree = (files: Tree): Tree => ({
+  "tsconfig.json": JSON.stringify({
+    compilerOptions: { target: "esnext", module: "esnext", strict: true, noEmit: true },
+    include: ["src"],
+  }),
+  ...files,
+});
+
+/** A module calling `revoke`, which returns a promise, in the way `call` writes it. */
+const callsRevoke = (call: string): string =>
+  `const revoke = async (): Promise<void> => {};\n\nexport const act = async (): Promise<void> => {\n  ${call}\n};\n`;
+
+describe("no promise floats — an unawaited call is awaited or `void`", () => {
+  const lintPromises = ruleRunner("typescript/no-floating-promises", {
+    tree: typedTree({ "src/forgotten.ts": callsRevoke("revoke();") }),
+    flagged: ["src/forgotten.ts"],
+  });
+
+  it("fires on a call whose promise nobody takes", () => {
+    const output = lintPromises(typedTree({ "src/forgotten.ts": callsRevoke("revoke();") }));
+
+    expect(output).toContain("src/forgotten.ts");
+    expect(output).toContain("no-floating-promises");
+  });
+
+  it("stays silent on a `void`-prefixed call — the sanctioned way to say fire and forget", () => {
+    const output = lintPromises(typedTree({ "src/sanctioned.ts": callsRevoke("void revoke();") }));
+
+    expect(output).not.toContain("src/sanctioned.ts");
+  });
+
+  it("stays silent on an awaited call", () => {
+    const output = lintPromises(typedTree({ "src/awaited.ts": callsRevoke("await revoke();") }));
+
+    expect(output).not.toContain("src/awaited.ts");
+  });
+});
+
 describe("ADR 0009 — the identity provider stays behind its seam", () => {
   it("refuses a better-auth import outside the auth module, and allows it inside", () => {
     const output = lint({

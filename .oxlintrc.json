@@ -18,6 +18,15 @@
   "categories": {
     "correctness": "error"
   },
+  // Type-aware linting, read on 5 September 2026 and taken as production-ready: oxlint's own
+  // documentation marks neither the flag nor this option as preview or experimental (only the
+  // separate `--type-check` is), tsgolint's readme calls itself stable and recommends the mode
+  // in CI, and it needs TypeScript 7, which every workspace here already pins. It costs a
+  // second process per lint run and the `oxlint-tsgolint` dev dependency; what it buys is the
+  // one rule below, which no syntax-only linter can decide.
+  "options": {
+    "typeAware": true
+  },
   "env": {
     "es2024": true
   },
@@ -35,6 +44,11 @@
     // reporter, so a copied test that was never adapted reads as the test it was copied
     // from passing twice. Not in the correctness category, so it is named here.
     "vitest/no-identical-title": "error",
+    // A promise nobody takes is a call whose failure goes nowhere and whose ordering is a
+    // guess. `ignoreVoid` keeps `void f()` as the one sanctioned way to say fire-and-forget,
+    // so the deliberate case is a word a reader can see rather than an absence they cannot.
+    // Type-aware: it needs the checker to know a call returns a promise (see `options` above).
+    "typescript/no-floating-promises": ["error", { "ignoreVoid": true }],
     "typescript/no-explicit-any": "error",
     "typescript/consistent-type-imports": "error",
     "typescript/no-non-null-assertion": "error",

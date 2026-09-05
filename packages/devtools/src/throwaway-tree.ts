@@ -37,6 +37,12 @@ export type Tool = {
   readonly argv: readonly string[];
   /** Written into every tree before the tool runs: its configuration, a manifest, a lockfile. */
   readonly scaffold?: Tree;
+  /**
+   * Added to the environment the tool runs in. A throwaway tree has no `node_modules`, so a
+   * tool that reaches for a sibling binary by walking up from its working directory finds
+   * nothing there; this is where the caller hands it the path instead.
+   */
+  readonly env?: Readonly<Record<string, string>>;
   /** The exit codes that mean the tool ran and found something. Zero is always tolerated. */
   readonly foundSomething: readonly number[];
   /** One tree that must produce a report, and the reading of it the caller depends on. */
@@ -90,6 +96,7 @@ export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
         cwd: directory,
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, ...tool.env },
       });
     } catch (cause) {
       // SAFETY: `execFileSync` rejects with an Error carrying the child's exit status and
@@ -138,6 +145,29 @@ const pathsIn = (output: string): readonly string[] =>
     ),
   ].sort();
 
+/**
+ * Where the type-aware linter's binary is, for the child oxlint spawns.
+ *
+ * oxlint runs its type-aware rules by handing the file set to `tsgolint`, which it looks for
+ * by walking up from its working directory — and a throwaway tree lives in the system's
+ * temporary directory, where there is no `node_modules` to find. Without this, every
+ * type-aware rule reads as silent, which is the one thing this runner exists to make
+ * impossible. `OXLINT_TSGOLINT_PATH` is oxlint's own override for the lookup; the platform
+ * binary is resolved the way `oxlint-tsgolint`'s own launcher resolves it, so a machine with
+ * a different architecture gets its own and never the wrong one.
+ */
+const tsgolintPath = (): string => {
+  const from = createRequire(import.meta.url);
+  const suffix = process.platform === "win32" ? ".exe" : "";
+  try {
+    return from.resolve(`@oxlint-tsgolint/${process.platform}-${process.arch}/tsgolint${suffix}`);
+  } catch {
+    throw new Error(
+      "`oxlint-tsgolint` is not in @better-answers/devtools's dependency tree, so oxlint's type-aware rules cannot run over a throwaway tree and would every one of them read as silent. Declare it as a devDependency of packages/devtools.",
+    );
+  }
+};
+
 /** oxlint over a throwaway tree: the whole report, or just the paths it named. */
 export type OxlintRunner = {
   readonly output: (tree: Tree) => string;
@@ -165,6 +195,7 @@ export const oxlintOver = (
     executable: { package: "oxlint", path: ["bin", "oxlint"] },
     argv: ["--config", ".oxlintrc.json", "--format=unix", "."],
     scaffold: { ".oxlintrc.json": configJson },
+    env: { OXLINT_TSGOLINT_PATH: tsgolintPath() },
     foundSomething: [1],
     smoke: {
       tree: smoke.tree,
