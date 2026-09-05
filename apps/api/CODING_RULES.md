@@ -13,8 +13,9 @@ resolves. `tsc` runs for types only (`--noEmit`).
 
 ## [APP2] One server, one logger, one config module
 
-`src/server.ts` builds the tier's only Hono app and takes what it needs as parameters —
-`createServer({ database })` is the shape every later mount follows. `src/logger.ts` is
+`src/server.ts` builds the tier's only Hono app and takes what it needs as one typed
+parameter — `createServer(dependencies: ServerDependencies)`, the pool, the public origin,
+the hostname list and whatever else a mount needs — is the shape every later mount follows. `src/logger.ts` is
 the tier's only logger (`[LOG1]`). `src/config.ts` is the only module in the tier that
 reads the environment (`[SEC1]`, § TYPES), and it reads the **bootstrap class alone** —
 what the deploy unit must give the process before it can reach anything. Every other
