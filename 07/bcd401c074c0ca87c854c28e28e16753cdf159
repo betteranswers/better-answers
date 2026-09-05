@@ -1,0 +1,11 @@
+docs/adr/0008-trpc-inside-openapi-and-mcp-outside.md
+  ai_agent 41-44
+docs/adr/README.md
+  ai_agent 16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "07bcd401c074c0ca87c854c28e28e16753cdf159",
+  "prompts": {}
+}
