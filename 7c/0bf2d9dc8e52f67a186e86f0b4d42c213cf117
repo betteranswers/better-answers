@@ -1,0 +1,38 @@
+apps/web/test/lint-rules.test.ts
+  s_2c3fc9d16bd52c::t_6fa681051e54ad 9-13
+apps/web/test/folder-case.test.ts
+  s_2c3fc9d16bd52c::t_b190cfeb37eac0 9-11
+CODING_RULES.md
+  s_2c3fc9d16bd52c::t_36345652536f0f 3
+apps/web/test/failed-screen.test.tsx
+  s_2c3fc9d16bd52c::t_e94fc3c8cb296f 15-16
+AGENTS.md
+  s_2c3fc9d16bd52c::t_c99a9fae4fe819 20
+docs/agents/domain.md
+  s_2c3fc9d16bd52c::t_4eeb62bc8d2cf9 12
+  s_2c3fc9d16bd52c::t_37e220435b8f13 30
+apps/web/CODING_RULES.md
+  s_2c3fc9d16bd52c::t_b360b80ccb231c 1-47
+apps/api/CODING_RULES.md
+  s_2c3fc9d16bd52c::t_a04e777102b0bc 4-5
+cubic.yaml
+  s_2c3fc9d16bd52c::t_551404463a00a5 40-42
+apps/api/tests/coding-rules-tags.test.ts
+  s_2c3fc9d16bd52c::t_7afbeec35ce563 201,207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7c0bf2d9dc8e52f67a186e86f0b4d42c213cf117",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
