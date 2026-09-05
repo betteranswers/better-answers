@@ -23,7 +23,7 @@ import type { McpScope } from "../../auth/constants.ts";
  */
 
 /** The slices' results are `readonly` throughout; a zod output type is not. This meets them. */
-export type Readonlyish<T> = T extends (infer Item)[]
+type Readonlyish<T> = T extends (infer Item)[]
   ? readonly Readonlyish<Item>[]
   : T extends object
     ? { readonly [Key in keyof T]: Readonlyish<T[Key]> }
@@ -54,6 +54,3 @@ export type Entry<Input extends z.ZodObject, Output extends z.ZodType> = {
 export const defineEntry = <Input extends z.ZodObject, Output extends z.ZodType>(
   entry: Entry<Input, Output>,
 ): Entry<Input, Output> => entry;
-
-/** The names an entry's input may never carry: the principal comes from the token (ADR 0018). */
-export const FORBIDDEN_ARGUMENT_NAMES = ["workspace", "bundle", "tenant"] as const;

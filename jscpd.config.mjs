@@ -52,5 +52,3 @@ export const jscpdConfig = {
     "**/.claude/worktrees/**",
   ],
 };
-
-export default jscpdConfig;

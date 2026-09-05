@@ -58,7 +58,7 @@ A lint rule, a tool in `check` and a hook command each land with a functional te
 
 A repository lint rule carries its rule line — a tag or an ADR — in the message it prints, so a reader who hits it reaches the rule without asking, and it lands with a functional test through that runner.
 
-Every tool named in `check` is a gate and never a report, so a finding from one is a rule citation and not a matter of taste: oxlint refuses the patterns its plugins name, and jscpd refuses a block of code copied between two files at five lines or fifty tokens, with no threshold to tune (`jscpd.config.mjs` names each exclusion with its reason, and a deliberate copy is fenced where it stands).
+Every tool named in `check` is a gate and never a report, so a finding from one is a rule citation and not a matter of taste: oxlint refuses the patterns its plugins name; knip refuses a file no code reaches, an export nothing imports, and a dependency either declared and unused or used and undeclared; and jscpd refuses a block of code copied between two files at five lines or fifty tokens, with no threshold to tune (`jscpd.config.mjs` names each exclusion with its reason, and a deliberate copy is fenced where it stands).
 
 ### [CHECK2] A suite that can run nothing fails
 

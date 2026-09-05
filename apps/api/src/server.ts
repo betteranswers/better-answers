@@ -18,7 +18,7 @@ import { routeByHostname, type PublicHostnames } from "./ingress/hostnames.ts";
 import { serveSpa } from "./ingress/spa.ts";
 import { logger as tierLogger } from "./logger.ts";
 import { createMcpSurface } from "./mcp/surface.ts";
-import { createTrpcRoutes } from "./trpc/index.ts";
+import { createTrpcRoutes } from "./trpc/mount.ts";
 
 /**
  * Everything the HTTP surface needs, passed in rather than reached for, so a test

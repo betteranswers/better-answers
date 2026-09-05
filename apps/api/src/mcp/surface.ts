@@ -11,7 +11,6 @@ import {
 } from "@modelcontextprotocol/server";
 import type { Logger } from "pino";
 
-import type { Claims } from "@better-answers/core/kernel";
 import {
   consumeCall,
   consumeIngress,
@@ -211,6 +210,3 @@ const refusedResult = (text: string) => ({
   content: [{ type: "text" as const, text }],
   isError: true,
 });
-
-/** What a claims-carrying `AuthInfo` looks like to the surface; exported for the tests' synthetic tokens. */
-export type SurfaceClaims = Claims;

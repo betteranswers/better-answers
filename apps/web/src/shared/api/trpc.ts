@@ -25,7 +25,7 @@ import type { AppRouter } from "@better-answers/api/trpc";
  */
 export const TRPC_ENDPOINT = "/trpc";
 
-export const { TRPCProvider, useTRPC, useTRPCClient } = createTRPCContext<AppRouter>();
+export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
 
 /**
  * A relative URL, because the api serves this build on the same origin (ADR 0006, amended

@@ -140,7 +140,7 @@ const sessionShape = z.object({
 });
 
 /** What Better Auth's `getSession` answers, as far as this module reads it. */
-export type SessionRecord = {
+type SessionRecord = {
   readonly user: { readonly id: string };
   readonly session: { readonly createdAt: Date; readonly activeOrganizationId?: string | null };
 };

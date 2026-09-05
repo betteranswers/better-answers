@@ -41,9 +41,9 @@
   },
   "devDependencies": {
     "@better-answers/devtools": "workspace:*",
+    "@stryker-mutator/api": "10.0.0",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
-    "@testcontainers/postgresql": "12.1.0",
     "@types/node": "24.13.3",
     "@types/nodemailer": "8.0.1",
     "@types/pg": "8.23.1",

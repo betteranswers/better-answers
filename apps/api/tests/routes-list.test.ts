@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { TRPC_IP_RULE } from "../src/auth/index.ts";
-import { TRPC_ENDPOINT } from "../src/trpc/index.ts";
+import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { signIn } from "./flow.ts";
 import { APP_HOSTNAME, startApp, type TestApp, type TestClient } from "./harness.ts";
 

@@ -20,7 +20,7 @@ import type { TestApp } from "./harness.ts";
  * is a path someone will one day serve by accident.
  */
 
-export const HARNESS_PREFIX = "/__harness";
+const HARNESS_PREFIX = "/__harness";
 
 const provisioning = z.object({
   name: z.string().min(1).optional(),

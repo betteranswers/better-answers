@@ -37,7 +37,7 @@ import { authClient } from "./auth-client.ts";
  * these keys and the pick's invalidations name them; founding the space beside the
  * factories gives it one home for T-027 to extend.
  */
-export const AUTH_KEYS = {
+const AUTH_KEYS = {
   session: ["auth", "session"],
   workspaces: ["auth", "workspaces"],
 } as const;
@@ -52,7 +52,7 @@ const unwrap = async <TData, TError>(
 };
 
 /** The session as the api answers it — `null` is a signed-out visit, not an error. */
-export const sessionOptions = () =>
+const sessionOptions = () =>
   queryOptions({
     queryKey: AUTH_KEYS.session,
     queryFn: () => unwrap(authClient.getSession()),
@@ -61,7 +61,7 @@ export const sessionOptions = () =>
 export const useSession = () => useQuery(sessionOptions());
 
 /** The workspaces the signed-in person holds a membership in. */
-export const listOrganizationsOptions = () =>
+const listOrganizationsOptions = () =>
   queryOptions({
     queryKey: AUTH_KEYS.workspaces,
     queryFn: () => unwrap(authClient.organization.list()),
@@ -70,7 +70,7 @@ export const listOrganizationsOptions = () =>
 export const useListOrganizations = () => useQuery(listOrganizationsOptions());
 
 /** Ask the api to email a six-digit sign-in code to an address. */
-export const sendVerificationOtpOptions = () =>
+const sendVerificationOtpOptions = () =>
   mutationOptions<unknown, BetterFetchError, { email: string; type: "sign-in" }>({
     mutationFn: (input) => unwrap(authClient.emailOtp.sendVerificationOtp(input)),
   });
@@ -78,7 +78,7 @@ export const sendVerificationOtpOptions = () =>
 export const useSendVerificationOtp = () => useMutation(sendVerificationOtpOptions());
 
 /** Trade an emailed code for a session. */
-export const signInEmailOtpOptions = () =>
+const signInEmailOtpOptions = () =>
   mutationOptions<unknown, BetterFetchError, { email: string; otp: string }>({
     mutationFn: (input) => unwrap(authClient.signIn.emailOtp(input)),
   });
@@ -86,7 +86,7 @@ export const signInEmailOtpOptions = () =>
 export const useSignInEmailOtp = () => useMutation(signInEmailOtpOptions());
 
 /** End the session on the server; the browser-side clearing is the screen's act. */
-export const signOutOptions = () =>
+const signOutOptions = () =>
   mutationOptions<unknown, BetterFetchError, void>({
     mutationFn: () => unwrap(authClient.signOut()),
   });
@@ -94,7 +94,7 @@ export const signOutOptions = () =>
 export const useSignOut = () => useMutation(signOutOptions());
 
 /** Make one workspace the session's active one. */
-export const setActiveOrganizationOptions = () =>
+const setActiveOrganizationOptions = () =>
   mutationOptions<unknown, BetterFetchError, { organizationId: string }>({
     mutationFn: (input) => unwrap(authClient.organization.setActive(input)),
   });
@@ -130,7 +130,7 @@ export type ResumeAnswer = { readonly redirect?: boolean; readonly url?: string 
  * attaches it as `oauth_query`, and this mutation wraps the same client call, so that
  * transport behaviour rides along unchanged.
  */
-export const oauthContinueOptions = () =>
+const oauthContinueOptions = () =>
   mutationOptions<ResumeAnswer, BetterFetchError, { postLogin: true }>({
     mutationFn: async (input) => {
       // SAFETY: the client plugin types this endpoint's answer as `any`; `ResumeAnswer`

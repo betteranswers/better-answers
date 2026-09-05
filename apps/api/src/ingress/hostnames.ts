@@ -30,7 +30,7 @@ import { z } from "zod";
 
 /** The three hostnames the deploy unit names, plus the loopback the container probes itself on. */
 export const HOSTNAME_ROLES = ["app", "agent", "apex", "loopback"] as const;
-export type HostnameRole = (typeof HOSTNAME_ROLES)[number];
+type HostnameRole = (typeof HOSTNAME_ROLES)[number];
 
 /**
  * The three of ADR 0022 (ADR 0034), as bare hostnames. `agent` and `apex` are bootstrap

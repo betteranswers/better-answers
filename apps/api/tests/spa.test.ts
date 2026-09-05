@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { TRPC_ENDPOINT } from "../src/trpc/index.ts";
+import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { AGENT_HOSTNAME, APEX_HOSTNAME, APP_HOSTNAME } from "./harness.ts";
 import { servedApp } from "./suite-app.ts";
 

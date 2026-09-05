@@ -20,6 +20,7 @@
     "@oxlint/plugins": "1.80.0",
     "@types/node": "24.13.3",
     "jscpd": "5.1.2",
+    "knip": "6.34.0",
     "oxlint": "1.80.0",
     "oxlint-tsgolint": "7.0.2001",
     "typescript": "7.0.2",

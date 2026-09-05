@@ -21,7 +21,7 @@ import { appRouter } from "./router.ts";
 /** The path the router answers on; the SPA's client is built against this one string. */
 export const TRPC_ENDPOINT = "/trpc";
 
-export type TrpcRoutesDependencies = {
+type TrpcRoutesDependencies = {
   readonly auth: Auth;
   readonly door: PostgresDoor;
 };

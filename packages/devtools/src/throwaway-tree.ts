@@ -52,12 +52,39 @@ export type Tool = {
 /** A built runner: a tree in, whatever the tool wrote to stdout out. */
 export type RunOverTree = (tree: Tree) => string;
 
+/**
+ * Where an installed package's directory is, asked two ways.
+ *
+ * The manifest is the direct question, and it is the one that fails: a package whose
+ * `exports` map does not publish `./package.json` cannot be resolved by that subpath at all
+ * — knip's does not. So the fallback resolves the package's own entry, which every
+ * `exports` map publishes, and walks up to the nearest directory holding a manifest, which
+ * for an installed package is its root.
+ */
+const packageRoot = (from: ReturnType<typeof createRequire>, name: string): string | undefined => {
+  try {
+    return path.dirname(from.resolve(`${name}/package.json`));
+  } catch {
+    // The `exports` map withheld the manifest; the entry below is the other way in.
+  }
+  let directory: string;
+  try {
+    directory = path.dirname(from.resolve(name));
+  } catch {
+    return undefined;
+  }
+  while (!existsSync(path.join(directory, "package.json"))) {
+    const parent = path.dirname(directory);
+    if (parent === directory) return undefined;
+    directory = parent;
+  }
+  return directory;
+};
+
 const resolveExecutable = (tool: Tool): string => {
   const from = createRequire(import.meta.url);
-  let root: string;
-  try {
-    root = path.dirname(from.resolve(`${tool.executable.package}/package.json`));
-  } catch {
+  const root = packageRoot(from, tool.executable.package);
+  if (root === undefined) {
     throw new Error(
       `\`${tool.executable.package}\` is not in @better-answers/devtools's dependency tree, so its binary cannot be resolved. Declare it as a devDependency of packages/devtools.`,
     );
@@ -213,4 +240,103 @@ export const oxlintOver = (
   });
 
   return { output: run, flagged: (tree) => pathsIn(run(tree)) };
+};
+
+/**
+ * The kinds of finding this repository's gate reads off knip's report. knip names more —
+ * duplicate exports, enum members, catalog entries — and every one of them fails the gate;
+ * these are the kinds a test asserts on, so the list is what a caller can name rather than
+ * what knip can find.
+ */
+const KNIP_FINDING_KINDS = [
+  "files",
+  "exports",
+  "types",
+  "dependencies",
+  "devDependencies",
+  "unlisted",
+  "binaries",
+] as const;
+
+/** One thing knip named: what kind of finding it is, the file it sits in, and its name. */
+export type KnipFinding = {
+  readonly kind: (typeof KNIP_FINDING_KINDS)[number];
+  readonly file: string;
+  readonly name: string;
+};
+
+/**
+ * knip over a throwaway tree: the findings, and nothing wider. The raw report is not on the
+ * interface, because knip's JSON is one object per file with an array per kind of finding —
+ * a caller reading it would rewrite `findingsIn` badly, and the smoke case proves that
+ * reading and no other.
+ */
+export type KnipRunner = {
+  readonly findings: (tree: Tree) => readonly KnipFinding[];
+};
+
+/**
+ * knip's `--reporter json` report: one entry per file, each carrying an array per kind of
+ * finding. Written out here rather than inferred, because this is the shape the smoke case
+ * exists to prove — a reporter that changed shape would otherwise read as a clean tree.
+ */
+type KnipReportEntry = { readonly file?: string } & {
+  readonly [Kind in (typeof KNIP_FINDING_KINDS)[number]]?: readonly { readonly name: string }[];
+};
+
+const sortKey = (finding: KnipFinding): string => `${finding.kind}:${finding.file}:${finding.name}`;
+
+const findingsIn = (output: string): readonly KnipFinding[] => {
+  const parsed: unknown = JSON.parse(output);
+  // SAFETY: the shape asserted is knip's JSON reporter contract, and the runner's smoke
+  // case is what proves that contract still holds — a report this reading cannot find is
+  // refused there, before any caller is allowed to read a silence as a clean tree.
+  const report = parsed as { readonly issues?: readonly KnipReportEntry[] };
+  return (report.issues ?? [])
+    .flatMap((entry) =>
+      KNIP_FINDING_KINDS.flatMap((kind) =>
+        (entry[kind] ?? []).map((issue) => ({
+          kind,
+          file: entry.file ?? "",
+          name: issue.name,
+        })),
+      ),
+    )
+    .sort((left, right) => sortKey(left).localeCompare(sortKey(right)));
+};
+
+/**
+ * knip over `scaffold` — a manifest and a knip configuration written into every tree, which
+ * a tree may replace when the manifest is the thing under test.
+ *
+ * The JSON reporter is pinned rather than left to knip: the default reporter draws a table
+ * whose columns wrap on a narrow terminal, so a reader looking for a name would find it or
+ * not depending on the width of the process that ran the tool. JSON is the one shape that
+ * is the same everywhere, and `findingsIn` above is the reading the smoke case proves.
+ *
+ * The smoke case is the caller's because the configuration is: a tree that must produce
+ * findings, and exactly the findings that must come back for it.
+ */
+export const knipOver = (
+  scaffold: Tree,
+  smoke: { readonly tree: Tree; readonly findings: readonly KnipFinding[] },
+): KnipRunner => {
+  const expected = [...smoke.findings].map(sortKey).sort();
+  const run = runsOverThrowawayTree({
+    executable: { package: "knip", path: ["bin", "knip.js"] },
+    argv: ["--reporter", "json"],
+    scaffold,
+    foundSomething: [1],
+    smoke: {
+      tree: smoke.tree,
+      reports: (output) => {
+        const found = findingsIn(output).map(sortKey);
+        return (
+          found.length === expected.length && found.every((key, index) => key === expected[index])
+        );
+      },
+    },
+  });
+
+  return { findings: (tree) => findingsIn(run(tree)) };
 };
