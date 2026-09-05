@@ -1,0 +1,35 @@
+packages/devtools/test/throwaway-tree.test.ts
+  s_2c3fc9d16bd52c::t_5711b4ceb1a3b6 104-123
+.oxlintrc.json
+  s_2c3fc9d16bd52c::t_611ff38935816b 28-31
+  s_2c3fc9d16bd52c::t_b40a77baa7074e 25-26
+  s_2c3fc9d16bd52c::t_f28079d5c21c82 57-75
+  s_2c3fc9d16bd52c::t_386d458561a217 27
+apps/api/tests/lint-rules.test.ts
+  s_2c3fc9d16bd52c::t_17b802a26c13fc 208,210,215
+  s_2c3fc9d16bd52c::t_88922fa1bae203 88-91,99-103
+  s_2c3fc9d16bd52c::t_a6dd2ebb3853ec 121-123,125,130
+  s_2c3fc9d16bd52c::t_47064288059ba2 160-161,164
+  s_2c3fc9d16bd52c::t_ca60f4def17318 8-20
+apps/web/src/shared/ui/kibo-ui/snippet.tsx
+  s_2c3fc9d16bd52c::t_ce63bff7845834 60-62
+packages/devtools/src/throwaway-tree.ts
+  s_2c3fc9d16bd52c::t_25b8781f6dfae3 169
+  s_2c3fc9d16bd52c::t_b1b23a7a0df618 99-101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "33bb92041f45e9cdd4d97e0ec0cc8fc9fcefbc06",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
