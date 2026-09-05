@@ -98,11 +98,13 @@ describe("id-shape, the agreement about what an id looks like", () => {
     const fixture = readIdShape();
     const atTheBoundary = boundarySchemas.workspace.select.shape.id;
 
+    // The id and the reason travel with the assertion, so a failure names the sample
+    // rather than reporting that true was not false.
     for (const id of fixture.must_parse) {
-      expect(atTheBoundary.safeParse(id).success, id).toBe(true);
+      expect({ id, parses: atTheBoundary.safeParse(id).success }).toEqual({ id, parses: true });
     }
-    for (const rejected of fixture.must_not_parse) {
-      expect(atTheBoundary.safeParse(rejected.id).success, rejected.why).toBe(false);
+    for (const { id, why } of fixture.must_not_parse) {
+      expect({ why, parses: atTheBoundary.safeParse(id).success }).toEqual({ why, parses: false });
     }
   });
 

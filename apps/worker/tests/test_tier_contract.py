@@ -75,7 +75,7 @@ def read_id_shape() -> dict[str, Any]:
     return cast("dict[str, Any]", json.loads(raw))
 
 
-def test_the_id_shape_pattern_accepts_and_refuses_exactly_what_the_fixture_says() -> None:
+def test_the_id_shape_accepts_and_refuses_exactly_what_the_fixture_says() -> None:
     fixture = read_id_shape()
     pattern = re.compile(fixture["pattern"])
 
