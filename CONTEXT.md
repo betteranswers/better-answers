@@ -195,10 +195,17 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   reach anyone beyond Control Centre; separate from sensitivity, from audience and from accepting
   suggestions. Its audit row carries the Admin's confirmations (lawful basis recorded, privacy
   information updated, DPIA reference). Unpublished content is seen by Admins, in Control Centre only.
-- **audience** — who a binding's content is for: everyone in the workspace, or named groups. Set on
-  the binding, carried with sensitivity onto every chunk and source entity, and applied with
-  *published* on every read and traversal hop. Distinct from sensitivity (how confidential) and from
-  trust (how reliable).
+- **audience** — who a binding's content is for: everyone in the workspace, or named groups (plus,
+  if needed, named individuals). Set on the binding, carried with sensitivity onto every chunk and
+  source entity, and applied with *published* on every read and traversal hop. Distinct from
+  sensitivity (how confidential) and from trust (how reliable).
+- **group** — a named set of members of one workspace: the one grouping concept, and the unit an
+  *audience* names when a binding is not for everyone. Groups are flat, and a person may belong to
+  several. A group may represent a team ("HR team", "Sales executives") — that is its name, not a
+  second concept. Membership of a group never changes what a person may do — that is their *role*;
+  a group only ever changes what they may see, via audiences. _Avoid_: team, Team (Liam,
+  05/09/2026 — aligned to the Entra access model: everything is a group, one membership lookup per
+  visibility check; sub-teams would be an additive nesting migration, never a reversal).
 - **retention class** — what the platform keeps of a binding's documents, and for how long:
   **mirror** (the source holds the record; a document gone at source keeps its chunks through a grace
   period, then loses them), **keep** (the platform holds the record — uploads; nothing leaves without
@@ -243,6 +250,13 @@ readers in these words and no others; each is a text tag, never a colour.
 Two **riders** may follow *Checked by* and never change the tier: **· imported** (a check
 recorded before the platform, kept as written) and **· source moved on** (its source changed or
 is gone since the check; the check stands; the reason is on the row). No other rider exists.
+
+- **shared beyond its evidence** — the state where a recorded Admin override lets a reader see a
+  concept whose cited evidence they may not view (ADR 0023). Never a rider and never a trust
+  signal — the tier and *Checked by* stand untouched. The evidence pane leads with the reader's
+  access ("Based on your current access, the evidence isn't included"), always names the Admin
+  whose override created the state, and never dead-ends (Liam, 05/09/2026 — exact copy polished
+  at spec time; the fixed rule is the routing, not the sentence).
 
 ## Guides and answers
 
