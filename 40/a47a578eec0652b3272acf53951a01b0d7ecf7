@@ -1,0 +1,29 @@
+apps/api/src/auth/auth.ts
+  s_529f881ca25f4e::t_9c77dfd6cc199a 348-358
+packages/core/src/workspaces/index.ts
+  s_529f881ca25f4e::t_ca7d6de297ca87 181-191
+apps/api/tests/revocation-fields.test.ts
+  s_529f881ca25f4e::t_2463e865b2f602 13-15
+  s_529f881ca25f4e::t_a9e7733d063117 80-87
+  s_529f881ca25f4e::t_2a4543bbc497c6 40-42,45
+  s_529f881ca25f4e::t_5ad04c175ad59d 37-38
+packages/core/test/workspaces.test.ts
+  s_529f881ca25f4e::t_332146012f957f 9
+  s_529f881ca25f4e::t_282b7358ee04e0 228-245
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "40a47a578eec0652b3272acf53951a01b0d7ecf7",
+  "prompts": {},
+  "sessions": {
+    "s_529f881ca25f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688411cf-a489-4e1b-b43c-905b1ccfe9f6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
