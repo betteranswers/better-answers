@@ -27,6 +27,10 @@
     // design failure anywhere, and oxlint 1.80 has no `import/no-restricted-paths`
     // to express the direction rules more precisely.
     "import/no-cycle": "error",
+    // An empty block says nothing about why it is empty, and an empty `catch` says nothing
+    // about why the error was swallowed. `allowEmptyCatch` stays off so a swallow is always
+    // a decision someone wrote down: a `catch` holding a comment is not empty and passes.
+    "no-empty": ["error", { "allowEmptyCatch": false }],
     // Two tests in one describe block with one title: the second shadows the first in the
     // reporter, so a copied test that was never adapted reads as the test it was copied
     // from passing twice. Not in the correctness category, so it is named here.

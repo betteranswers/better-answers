@@ -135,6 +135,43 @@ describe("no two tests in one describe block carry the same title", () => {
   });
 });
 
+/** A module whose one function swallows a rollback failure, with `body` as its catch block. */
+const swallow = (body: string): string =>
+  `export const rollbackQuietly = async (client: Client): Promise<void> => {\n  try {\n    await client.query("ROLLBACK");\n  } catch {${body}}\n};\n`;
+
+describe("no block is empty, and a swallowed error is a commented decision", () => {
+  const lintBlocks = ruleRunner("no-empty", {
+    tree: { "src/silent.ts": swallow("") },
+    flagged: ["src/silent.ts"],
+  });
+
+  it("fires on an empty catch — `allowEmptyCatch` is off, so a swallow says nothing by accident", () => {
+    const output = lintBlocks({ "src/silent.ts": swallow("") });
+
+    expect(output).toContain("src/silent.ts");
+    expect(output).toContain("no-empty");
+  });
+
+  it("stays silent on a catch holding a comment, which is how the Postgres door's own swallow passes", () => {
+    const output = lintBlocks({
+      "src/reasoned.ts": swallow(
+        "\n    // The connection is already gone; releasing it below is all that is left.\n  ",
+      ),
+    });
+
+    expect(output).not.toContain("src/reasoned.ts");
+  });
+
+  it("fires on an empty block that is no catch at all", () => {
+    const output = lintBlocks({
+      "src/branch.ts": `export const guard = (revoked: boolean): void => {\n  if (revoked) {\n  }\n};\n`,
+    });
+
+    expect(output).toContain("src/branch.ts");
+    expect(output).toContain("no-empty");
+  });
+});
+
 describe("ADR 0009 — the identity provider stays behind its seam", () => {
   it("refuses a better-auth import outside the auth module, and allows it inside", () => {
     const output = lint({

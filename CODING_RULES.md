@@ -78,7 +78,7 @@ Domain terms, one definition each, no implementation detail. Code uses the gloss
 
 - `strict` and `noUncheckedIndexedAccess` on; zod v4 at every boundary (input, env, tool schemas).
 - Types over enums; no unsafe `as`; no parameter mutation.
-- Errors are returned as `Result<>`; `catch` only around external libraries, via `normalizeError`.
+- Errors are returned as `Result<>`; `catch` only around external libraries, via `normalizeError`. No `catch` is empty: a swallowed error carries the comment saying why it is safe to lose, and lint holds it.
 - Unit suffixes on money and time (`timeoutMs`, `priceCents`); static imports; environment through the typed config module, never `process.env`.
 
 ## TYPES (Python)
