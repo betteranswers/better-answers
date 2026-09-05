@@ -1,0 +1,27 @@
+apps/web/src/features/auth/auth-hooks.ts
+  s_fbc34845d9a2ae::t_11461b8e9ed2d5 1-15,19-71
+  s_fbc34845d9a2ae::t_3b63423a232b28 16-18
+apps/web/src/features/auth/sign-in-screen.tsx
+  s_fbc34845d9a2ae::t_5b600ecd77a209 20-21
+  s_fbc34845d9a2ae::t_f4ccc9890307d3 10
+  s_fbc34845d9a2ae::t_cde47747a8d475 53-54
+apps/web/src/features/auth/sign-out-button.tsx
+  s_fbc34845d9a2ae::t_755ba95e9163fc 6
+  s_fbc34845d9a2ae::t_16a43f1ad900ce 16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1933d1257d24de5cb9722f0eb084057ded810fb3",
+  "prompts": {},
+  "sessions": {
+    "s_fbc34845d9a2ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1b2cfb5b-1cbf-4d7a-9221-5339e7d30a1a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
