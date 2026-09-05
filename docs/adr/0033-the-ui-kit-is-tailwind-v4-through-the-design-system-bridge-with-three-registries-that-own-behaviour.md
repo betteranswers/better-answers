@@ -196,3 +196,48 @@ the package then reads as missing. `apps/web` therefore resolves as what builds 
 amendment above, arriving at a size a rewrite-on-arrival cannot fix, because these files are a
 dependency rather than source. `apps/api` is unchanged and stays on `nodenext`; nothing in
 `apps/web` is emitted by `tsc`.
+
+## Amendment — 2026-09-05, better-auth-ui leaves; the auth module's own hooks over the client (T-046, landed by T-051)
+
+The amendment above took three things from better-auth-ui: the provider, the `localization`
+and the headless hooks. **That is reversed.** On 2026-09-05 all three are replaced by the
+platform's own, and `@better-auth-ui/core` and `@better-auth-ui/react` leave the workspace.
+The registries this ADR names are now three.
+
+**What replaced them.** The auth module's `auth-hooks.ts` — seven TanStack Query
+`queryOptions`/`mutationOptions` factories over the `better-auth` client the module already
+constructs, keeping the hook names the screens call (the session, sign-out, the email code
+and its verification, the workspaces a person holds, the pick, and the OAuth resume), in a
+query-key space the module owns, each mutation throwing the client's error object unchanged
+so the screens' status checks read what they read before. The `localization` is the module's
+own plain word map, `workspace-words.ts`, read directly by the screens that render its words.
+The provider is deleted rather than shimmed: the hooks close over the module's client and
+the app's one query cache, so there was nothing left to provide and the router root mounts
+its outlet directly. The `auth-provider` registry item — the provider wrapper and the
+plugin-type file, with their two `declare module` augmentations of a library outside the
+auth module — is removed with it, so no augmentation of a deleted library survives anywhere
+in the tree and `[DESIGN5]`'s browser half needs no exemption sentence.
+
+**Why.** Four costs for about 70 library-facing lines among the feature's 750 (the count
+and the decision are in `apps/docs-site/specs/T-046.md`). The package shipped 66 releases
+between 15 April and the pin, 12 of them in the 12 days before it, so Renovate proposed an
+update most days. Its declaration emit was broken — the extensionless re-exports recorded in
+the consequence above, filed upstream by T-042 as
+[better-auth-ui/better-auth-ui#562](https://github.com/better-auth-ui/better-auth-ui/issues/562).
+Its peer list demanded react-email, passkey and api-key packages this product will never
+use, so every install printed warnings a reader had to learn to ignore. And it was a second
+library surface: a reviewer of the auth feature had to know the hooks' contracts as well as
+the client's own, when the client already exposes everything the hooks wrapped and TanStack
+Query was already the SPA's data layer (T-036). The cost was about to compound — T-027's
+People screens built on the library would have grown the surface from nine imported names
+to about fifteen.
+
+**What stands.** The rule — the library owns behaviour, the platform owns meaning — is
+unchanged; what this reversal records is that for a sign-in whose every visible sentence is
+a platform decision, the behaviour left to own was too little to be worth a dependency. The
+three screens outside the shell are unchanged to the person at them, proved by the browser
+suite staying green without an edit. shadcn's `input` and `label`, taken the same day as
+the provider, stay: the sign-in screen renders them. `apps/web` stays on `module:
+"preserve"` and `moduleResolution: "bundler"` on the app's own grounds — Vite builds it and
+nothing in it is emitted — so the consequence recorded above outlives its trigger, and
+`nodenext` is not reopened.

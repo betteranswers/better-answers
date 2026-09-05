@@ -362,9 +362,9 @@
       // speaks screens, workspaces and roles rather than endpoints. The product signs a
       // person in by posting to Better Auth, so *somewhere* has to know its client; what
       // the rule buys is that the somewhere is one directory a reviewer can read in a
-      // sitting. So it is exactly one glob, and the registry's auth files under
-      // `shared/` are not in it — they import `@better-auth-ui/*`, which is a different
-      // package and was never banned.
+      // sitting. So it is exactly one glob with no carve-out: since T-046 the module's own
+      // hooks stand on this client, `@better-auth-ui/*` is uninstalled, and a package that
+      // is not in the lockfile needs no ban glob — its absence is the fence.
       //
       // Everything the zone overrides above ban stays banned here — no feature reaches
       // another, none reaches `app/`, none imports the api at runtime.

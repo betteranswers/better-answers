@@ -9,7 +9,6 @@ import {
 } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
-import { AuthConfiguration } from "@/features/auth/auth-configuration.tsx";
 import { ChooseWorkspaceScreen } from "@/features/auth/choose-workspace-screen.tsx";
 import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
 import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
@@ -41,17 +40,10 @@ import { UnknownScreen } from "./unknown-screen.tsx";
  */
 const BUILT_SCREENS = new Map<ScreenId, () => ReactElement>([["system", SystemScreen]]);
 
-/**
- * better-auth-ui's configuration sits here rather than above the router, because two of
- * the three things it needs are the router's own: how to navigate, and how to render a
- * link.
- */
+// Nothing sits between the root and its outlet: the auth module's hooks close over its own
+// client and the app's one query cache (T-046), so there is no provider to mount here.
 const rootRoute = createRootRoute({
-  component: () => (
-    <AuthConfiguration>
-      <Outlet />
-    </AuthConfiguration>
-  ),
+  component: Outlet,
   notFoundComponent: UnknownScreen,
 });
 

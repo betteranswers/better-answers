@@ -12,8 +12,7 @@ import { authClient } from "./auth-client.ts";
 /**
  * The platform's own hooks over the module's `better-auth` client — TanStack Query
  * `queryOptions`/`mutationOptions` factories with thin hooks over them, the same shape
- * the library's hooks had underneath, minus the library (T-046 slices 1–2; the
- * dependency leaves with its records in slice 3).
+ * the library's hooks had underneath, minus the library (T-046).
  *
  * Two contracts hold the seam:
  *

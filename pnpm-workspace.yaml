@@ -17,7 +17,3 @@ allowBuilds:
 # current version deliberately, read from the registry on the day ([DEPS1]).
 minimumReleaseAgeExclude:
   - zod@4.5.4
-  # better-auth-ui releases daily; 1.7.19 is the pin read from the registry on 03/09/2026
-  # ([DEPS1]) and is younger than the hold-back window it would otherwise wait out.
-  - "@better-auth-ui/core@1.7.19"
-  - "@better-auth-ui/react@1.7.19"

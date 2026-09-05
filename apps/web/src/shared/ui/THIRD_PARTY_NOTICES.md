@@ -9,8 +9,7 @@ Installed **3 September 2026** with `shadcn@4.20.1` and `ai-elements@1.9.0`. A s
 item carries no version of its own, so the pin is the CLI, the registry URL and the date
 (`[DEPS1]`); `apps/web/components.json` holds the URLs so a refresh lands in the same places.
 
-T-037 added three more items on the same day with the same CLI — `input`, `label` and
-better-auth-ui's `auth-provider`.
+T-037 added two more items on the same day with the same CLI — `input` and `label`.
 
 This file records vendored source only. The npm packages those items stand on are ordinary
 dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
@@ -52,23 +51,6 @@ the pin (`[DEPS1]`).
 | `ai-elements/inline-citation.tsx` | https://registry.ai-sdk.dev/inline-citation.json | `7ee8f5238d63b78f` | `618d35f1d1147d77` |
 | `input.tsx` | https://ui.shadcn.com/r/styles/new-york/input.json | `4d1a3b126cc62485` | `b1b9f3d7ab813dfe` |
 | `label.tsx` | https://ui.shadcn.com/r/styles/new-york/label.json | `ea924e70d496cbd6` | `ec7442bb079f9558` |
-| `auth/auth-provider.tsx` | https://better-auth-ui.com/r/auth-provider.json | `00e4be465aa0ed23` | `a6d7e0e8b5bba58a` |
-| `../lib/auth/auth-plugin.ts` | https://better-auth-ui.com/r/auth-provider.json | `00e4be465aa0ed23` | `9e597f2b019434b4` |
-
-The last two are better-auth-ui's, which is a registry of its own
-(<https://better-auth-ui.com>, MIT) and the fourth ADR 0033 names. `auth-plugin.ts` is the
-item's third file and lands outside this directory, under `shared/lib/auth/`, where the
-registry's `@lib` alias points; it is listed here because this file is the notice for
-everything the registries put in the tree.
-
-The npm packages behind that item, `@better-auth-ui/core` and `@better-auth-ui/react`, are
-pinned at **1.7.19**, whose declaration files carry extensionless relative re-exports — the
-runtime `.js` is correct, the `.d.ts` alone is not — so every export reads as missing to a
-`nodenext` consumer. Reported upstream as
-[better-auth-ui/better-auth-ui#562](https://github.com/better-auth-ui/better-auth-ui/issues/562)
-(T-042). `apps/web` resolves with `bundler`, which is unaffected; that setting is the
-workspace's own right one regardless (its tsconfig comment says why) and does not wait on
-the fix.
 
 `components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
 the CLI's own default form; the table records the style-qualified URL the CLI resolves it to,
@@ -92,23 +74,9 @@ how-it-is-written lint rules relaxed over this directory in `.oxlintrc.json`.
   `text-white`; the destructive button's dark hover is darkened to hold WCAG AA against 14px
   text; the default button and icon button sit on the 32px grid module (`--grid-module`).
 
-T-037's arrival edits, on the three items it added:
+T-037's arrival edits, on the two items it added:
 
 - The same extensionless-import and `"use client"` rewrites as above.
-- **better-auth-ui's error toaster is not taken.** The `auth-provider` item ships three
-  files; the third, `error-toaster.tsx`, turns every auth query and mutation error into a
-  `sonner` toast, and brings `sonner` and `next-themes` with it. The screens in this
-  product say what happened *inline*, beside the control that caused it and inside a live
-  region, because that is what the acceptance criteria ask of them and what a screen reader
-  hears in the right order; a toast would be a second announcement of the same sentence, and
-  two dependencies for it. The copied `auth-provider.tsx` therefore renders the npm
-  primitive and its children, and the docblock in it says so. The library supports this
-  directly: a mutation marked `errorPresentation: "inline"` is one the toaster ignores.
-- **The rendered sign-in screens are not taken at all**, which is a decision recorded in ADR
-  0033's 2026-09-03 amendment rather than here: the `auth` and `email-otp` items copy 28
-  files implementing passwords, sign-up, social sign-in, password reset and email change,
-  none of which this product has. What is taken from better-auth-ui is the provider above,
-  its `localization`, and the headless hooks from its npm packages.
 
 T-042's arrival edits, made 4 September 2026 when `exactOptionalPropertyTypes` came back on
 in this workspace (the flag had been off since T-036 for a reason the api's build graph owned,
@@ -144,7 +112,7 @@ line (`[A11Y1]`) and are tested with a keyboard and a screen reader.
 
 ## Notice text
 
-**MIT** (shadcn/ui, Kibo UI, better-auth-ui)
+**MIT** (shadcn/ui, Kibo UI)
 
 > Permission is hereby granted, free of charge, to any person obtaining a copy of this software
 > and associated documentation files (the "Software"), to deal in the Software without
@@ -161,7 +129,7 @@ line (`[A11Y1]`) and are tested with a keyboard and a screen reader.
 > DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-Copyright (c) 2023 shadcn; Copyright (c) 2024 Hayden Bleasel; Copyright (c) 2024 Better Auth UI.
+Copyright (c) 2023 shadcn; Copyright (c) 2024 Hayden Bleasel.
 
 **Apache-2.0** (Vercel AI Elements) — Copyright (c) 2025 Vercel, Inc. Licensed under the Apache
 License, Version 2.0; the full text is at `LICENSE` in this repository, which is the same

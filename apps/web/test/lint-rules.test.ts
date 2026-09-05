@@ -193,21 +193,22 @@ describe("better-auth is named in the identity feature and nowhere else", () => 
     const refused = flagged({
       "apps/web/src/features/auth/auth-client.ts": probe("better-auth/client"),
       "apps/web/src/features/auth/deep.ts": probe("better-auth/client/plugins"),
-      "apps/web/src/shared/ui/auth/provider.tsx": probe("@better-auth-ui/react"),
-      "apps/web/src/shared/ui/auth/reaches-the-library.tsx": probe("better-auth/react"),
+      "apps/web/src/features/auth/scoped.ts": probe("@better-auth/oauth-provider/client"),
+      "apps/web/src/shared/ui/reaches-the-library.tsx": probe("better-auth/react"),
       "apps/web/src/features/routes/reaches-the-library.ts": probe("better-auth/client"),
       "apps/web/src/shared/api/reaches-the-library.ts": probe("better-auth/client"),
       "apps/web/src/app/reaches-the-library.ts": probe("@better-auth/oauth-provider/client"),
     });
 
-    // The registry's own auth files under `shared/` are *not* in the exception: they import
-    // `@better-auth-ui/*`, which is a different package and was never banned, so one of them
-    // reaching for `better-auth` itself is refused like anywhere else.
+    // One glob and no carve-out: the registry's auth files that once sat under `shared/`
+    // left with `@better-auth-ui/*` (T-046), so `shared/ui/` reaching for `better-auth` is
+    // refused like anywhere else, and the scoped `@better-auth/*` client plugin is allowed
+    // in the module and nowhere else.
     expect(refused).toEqual([
       "apps/web/src/app/reaches-the-library.ts",
       "apps/web/src/features/routes/reaches-the-library.ts",
       "apps/web/src/shared/api/reaches-the-library.ts",
-      "apps/web/src/shared/ui/auth/reaches-the-library.tsx",
+      "apps/web/src/shared/ui/reaches-the-library.tsx",
     ]);
   });
 

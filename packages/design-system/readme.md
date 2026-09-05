@@ -240,8 +240,7 @@ SKILL.md                Agent Skills entry point
 This package shipped a full set of `.jsx` primitives and a `ui_kits/platform/`
 click-through, authored before any application existed. Both were **deleted when the
 application arrived**: the components the product uses come from the shadcn, Kibo UI and
-AI Elements registries, plus better-auth-ui for the auth screens, and a second set nothing
-imports is drift. What they proved — that the register can be built — the guidelines cards
+AI Elements registries, and a second set nothing imports is drift. What they proved — that the register can be built — the guidelines cards
 still record.
 
 What stays is the part an application consumes: the tokens, `styles.css`, and
@@ -250,13 +249,14 @@ registry component comes out in this styling with no edit to the component file.
 
 ### UI kit
 
-shadcn · Kibo UI · AI Elements · better-auth-ui.
+shadcn · Kibo UI · AI Elements.
 
-Four registries, one rule: they own behaviour — keyboard, focus, ARIA, virtualisation,
+Three registries, one rule: they own behaviour — keyboard, focus, ARIA, virtualisation,
 streaming. We own meaning — the trust words, the citation unit, the register, the marks,
-and every word on a screen. Where the two meet, take theirs and skin it. better-auth-ui
-says *organization* throughout and is taken with a `localization` override that says
-*workspace*; that override is not optional (`[GLOSSARY1]`).
+and every word on a screen. Where the two meet, take theirs and skin it. The auth screens
+are the platform's own, on the auth module's hooks over the better-auth client (ADR 0033,
+amended 2026-09-05); the client says *organization* throughout and the module's word map
+says *workspace*; that map is not optional (`[GLOSSARY1]`).
 
 The seven product-specific components the set used to hold are the ones to rebuild first on
 top of a registry primitive, because nothing off the shelf carries their meaning:

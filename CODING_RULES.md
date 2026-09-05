@@ -30,7 +30,7 @@ The shape behind these four lines is **ADR 0029** for the store doors and **ADR 
 
 No Better Auth type crosses into `packages/core`. Transports verify a bearer and build a `Principal`; nothing behind that seam knows which library minted the token, and no `better-auth` or `@better-auth/*` import appears outside an auth module.
 
-There are **two** auth modules, one per side of the wire, and no third: `apps/api/src/auth/` on the server and `apps/web/src/features/auth/` in the browser (T-037). The product signs a person in by posting to Better Auth's own endpoints, so the browser has to know its client too; what this rule buys on that side is the same thing it buys on this one — one directory owns the library, everything above it speaks screens, workspaces and roles rather than endpoints, and a reviewer can read the whole of it in a sitting. Both are lint-enforced in `.oxlintrc.json` and both have a rule test. `@better-auth-ui/*` is a different package and is not covered: its hooks are TanStack Query over the client that module owns.
+There are **two** auth modules, one per side of the wire, and no third: `apps/api/src/auth/` on the server and `apps/web/src/features/auth/` in the browser (T-037). The product signs a person in by posting to Better Auth's own endpoints, so the browser has to know its client too; what this rule buys on that side is the same thing it buys on this one — one directory owns the library, everything above it speaks screens, workspaces and roles rather than endpoints, and a reviewer can read the whole of it in a sitting. Both are lint-enforced in `.oxlintrc.json` and both have a rule test.
 
 ## TEST
 

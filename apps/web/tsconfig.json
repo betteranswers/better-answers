@@ -8,10 +8,8 @@
     // bundled web applications (with `nodenext` reserved for code Node runs, which is the
     // base config's case and never this workspace's), and it is what `create-vite`'s React
     // template ships. `preserve` keeps `verbatimModuleSyntax` and the explicit `.ts`
-    // extensions this repository writes; nothing here is emitted. The trigger for setting
-    // it (T-037) was `@better-auth-ui@1.7.19` shipping extensionless re-exports in its
-    // `.d.ts` files, which `nodenext` rightly refuses — but the setting stands on the
-    // guidance alone and stays after upstream fixes its emit.
+    // extensions this repository writes; nothing here is emitted. The setting stands on
+    // that guidance alone (T-037).
     "module": "preserve",
     "moduleResolution": "bundler",
     "types": ["vite/client"],
