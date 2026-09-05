@@ -1,0 +1,22 @@
+packages/core/src/workspaces/index.ts
+  s_529f881ca25f4e::t_245ebeeceb40fa 3,80
+  s_529f881ca25f4e::t_81d66f7aa01217 75-77
+packages/core/test/workspaces.test.ts
+  s_529f881ca25f4e::t_a5e85f045643bc 9-10,95-117,126-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "325a00d0766fee56b78611e9c50fc1f43b00ed42",
+  "prompts": {},
+  "sessions": {
+    "s_529f881ca25f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688411cf-a489-4e1b-b43c-905b1ccfe9f6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
