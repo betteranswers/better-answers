@@ -1,0 +1,38 @@
+packages/devtools/test/throwaway-tree.test.ts
+  s_2c3fc9d16bd52c::t_594a8d4068a4b9 3-4
+  s_2c3fc9d16bd52c::t_a1bc20d0a605c9 9-13
+.oxlintrc.json
+  s_2c3fc9d16bd52c::t_2b26eadf90a205 4-8
+packages/devtools/lifts/anti-slop/THIRD_PARTY_NOTICES.md
+  s_2c3fc9d16bd52c::t_50addbed188267 17-21
+  s_2c3fc9d16bd52c::t_94fd0d6c9c3396 8-11
+apps/api/tests/lint-rules.test.ts
+  s_2c3fc9d16bd52c::t_19ce75f1486487 15-18
+packages/devtools/package.json
+  s_2c3fc9d16bd52c::t_594a8d4068a4b9 17
+apps/web/test/lint-rules.test.ts
+  s_2c3fc9d16bd52c::t_1d5323c05a9451 15-17
+packages/devtools/src/throwaway-tree.ts
+  s_2c3fc9d16bd52c::t_cee7097b46689d 56
+  s_2c3fc9d16bd52c::t_c339a0080ba276 62,85,110,118
+packages/core/test/import-direction.test.ts
+  s_2c3fc9d16bd52c::t_9deff9302be942 18-19
+packages/devtools/README.md
+  s_2c3fc9d16bd52c::t_a5f593c7e25576 15-16,19-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b72d7c6cecce5e0936ef50f70c2387ebd30c9d91",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
