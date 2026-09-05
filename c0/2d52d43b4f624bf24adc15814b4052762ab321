@@ -1,0 +1,29 @@
+apps/api/tests/coding-rules-tags.test.ts
+  s_ef049562f376fa::t_1e3357a8b0cd99 1-98,101-194
+  s_ef049562f376fa::t_8b7c71a76f9f0e 99-100
+cubic.yaml
+  s_ef049562f376fa::t_1e3357a8b0cd99 37-38
+packages/design-system/guidelines/kits-adoption.card.html
+  s_ef049562f376fa::t_8bf2234e96b219 271
+  s_ef049562f376fa::t_8b7c71a76f9f0e 224
+CODING_RULES.md
+  s_ef049562f376fa::t_1e3357a8b0cd99 59-62
+docs/adr/0029-the-tier-is-apps-over-packages-business-logic-is-a-library-of-capability-slices-over-four-store-doors.md
+  s_ef049562f376fa::t_1e3357a8b0cd99 14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c02d52d43b4f624bf24adc15814b4052762ab321",
+  "prompts": {},
+  "sessions": {
+    "s_ef049562f376fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5694ad5b-a38e-4e87-b27e-ab045c653208",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
