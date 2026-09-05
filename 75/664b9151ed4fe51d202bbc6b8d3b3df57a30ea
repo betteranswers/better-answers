@@ -1,0 +1,25 @@
+packages/core/src/workspaces/index.ts
+  s_529f881ca25f4e::t_df4633b3fc4124 3
+  s_529f881ca25f4e::t_e60b77ed817bc3 64-67
+  s_529f881ca25f4e::t_cdb37ab25dd90e 45-51
+  s_529f881ca25f4e::t_2926804b870970 95-97
+packages/core/test/workspaces.test.ts
+  s_529f881ca25f4e::t_af893e5b7ad0ef 7
+  s_529f881ca25f4e::t_22351026d05c3c 133-154,167-184
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "75664b9151ed4fe51d202bbc6b8d3b3df57a30ea",
+  "prompts": {},
+  "sessions": {
+    "s_529f881ca25f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688411cf-a489-4e1b-b43c-905b1ccfe9f6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
