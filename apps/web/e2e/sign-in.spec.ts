@@ -196,6 +196,45 @@ test("the picker sends a person who is a member of nothing to the refused screen
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 });
 
+test("the picker says when the workspace list could not be read, distinct from no membership, and a retry carries the person on (T-062)", async ({
+  page,
+  request,
+}) => {
+  const email = anAddress("listfails");
+  const first = await provision(request, { name: "First List Failure", adminEmail: email });
+  const second = await provision(request, { name: "Second List Failure" });
+  await addMember(request, {
+    workspaceId: second.workspaceId,
+    userId: first.admin.id,
+    role: "Viewer",
+  });
+
+  // Failed at the network, scoped to the organization list alone: the code sent and
+  // exchanged during sign-in itself is untouched.
+  await page.route("**/organization/list", (route) => route.abort());
+
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+
+  // TanStack Query's own retries run their exponential backoff before the query settles
+  // into error, so the wait is on the outcome text rather than a fixed delay.
+  await expect(page.getByRole("alert")).toContainText("Your workspaces could not be read", {
+    timeout: 15_000,
+  });
+  await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
+  // Never told as membership in nothing — the fourth shape is not the third one.
+  await expect(page.getByRole("heading", { level: 1, name: "No workspace yet" })).toHaveCount(0);
+
+  await page.unroute("**/organization/list");
+  await page.getByRole("button", { name: "Try again" }).click();
+
+  // A successful retry carries the person on through the existing shapes unchanged — two
+  // memberships here, so the picker.
+  await expect(page.getByRole("heading", { level: 1, name: "Choose a workspace" })).toBeVisible();
+  await expect(page.getByRole("button", { name: first.name })).toBeVisible();
+  await expect(page.getByRole("button", { name: second.name })).toBeVisible();
+});
+
 test("the three screens outside the shell are keyboard-operable, landmarked and labelled", async ({
   page,
   request,

@@ -34,6 +34,13 @@ const addressIn = (answer: ResumeAnswer): string | undefined => {
  *   nothing to create. There is no create-workspace control on this screen or anywhere
  *   else in the product: workspaces are platform-provisioned (T-004 judgement call 1).
  *
+ * A fourth shape, distinct from those three and added deliberately rather than as an
+ * amendment to them (T-062, owner, 2026-09-05): **a workspace-list read that ends in
+ * error** is its own outcome, said in words, with one act — try again — and it never
+ * reads as membership in nothing. Only the workspace-list query is read this way; a
+ * session-query error already reads as signed-out and sends the person to sign in, which
+ * is the truthful outcome there.
+ *
  * A visit carrying a host's signed query resumes the authorization through Better Auth's
  * continue endpoint and follows where it says — consent, on the authorization server's own
  * origin. A visit without one lands in the shell.
@@ -118,7 +125,10 @@ export function ChooseWorkspaceScreen() {
       void navigate({ href: `/sign-in${carried}`, replace: true });
       return;
     }
-    if (held.length === 0) {
+    // A list that ended in error also holds nothing, and is not the no-membership shape:
+    // the list is unread, not empty, and the person is not sent to the refused screen for
+    // a fact the platform does not yet have.
+    if (held.length === 0 && !workspaces.isError) {
       void navigate({ href: "/no-workspace", replace: true });
       return;
     }
@@ -126,7 +136,7 @@ export function ChooseWorkspaceScreen() {
     // `openSoleWorkspace` closes over this render's mutations; re-running the effect on a
     // new identity for it would resume a flow that is already resuming.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [decided, signedOut, held.length, sole?.id, active, carried, navigate]);
+  }, [decided, signedOut, held.length, workspaces.isError, sole?.id, active, carried, navigate]);
 
   const refused = pick.error !== null || resume.error !== null;
 
@@ -155,6 +165,26 @@ export function ChooseWorkspaceScreen() {
     return (
       <AuthScreen title={WORKSPACE_WORDS.organizations}>
         <Outcome tone="said">Reading your workspaces.</Outcome>
+      </AuthScreen>
+    );
+  }
+
+  if (workspaces.isError) {
+    // The list itself, not a pick or a resume: its own outcome, so a network failure is
+    // never told as "you belong to nothing" (T-062).
+    return (
+      <AuthScreen title={WORKSPACE_WORDS.organizations}>
+        <Outcome tone="refused">Your workspaces could not be read. Try again.</Outcome>
+
+        <Button
+          type="button"
+          className="mt-6"
+          onClick={() => {
+            void workspaces.refetch();
+          }}
+        >
+          Try again
+        </Button>
       </AuthScreen>
     );
   }
