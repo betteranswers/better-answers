@@ -18,7 +18,7 @@
  *   (T-020, ADR 0031).
  * - `ActorId` and `actorIdOf` — the three forms a record the platform keeps names an
  *   actor in, and the one derivation from a Principal, so none is composed by hand
- *   (`[AUDIT3]`, ADRs 0019 and 0035). T-076.
+ *   (ADRs 0019 and 0035). T-076.
  * - `RoleRefusal` and `requireAdmin` — the one word for an act a role may not perform
  *   and the guard that narrows a `UserPrincipal` to Admin or returns it. T-076.
  * - the result convention — what a slice act returns and that it never throws across

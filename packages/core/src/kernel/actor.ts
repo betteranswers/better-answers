@@ -24,7 +24,7 @@ export type ActorId =
   | `better-answers-${string}/${string}`;
 
 /**
- * The one derivation, so no slice composes the string by hand (`[AUDIT3]`). A user
+ * The one derivation, so no slice composes the string by hand. A user
  * principal names the person it carries; the platform principal names itself — its
  * acts are audited under that identity and never under a person's.
  */

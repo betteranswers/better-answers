@@ -111,7 +111,6 @@ const CITED_NOWHERE_ELSE: Readonly<Record<string, string>> = {
   AUDIT1:
     "the ledger is T-059's; its slice tests cite the rule when they land, and until then it binds review alone",
   AUDIT2: "as AUDIT1 — the declared-acts walk that proves it is T-059's",
-  AUDIT3: "as AUDIT1 — the ActorId type and its test are T-059's",
   AUDIT4: "as AUDIT1 — the second door's type and the access-request test are T-059's",
   AUDIT5: "as AUDIT1 — each declared act's detail type is its slice's",
   AUDIT6: "as AUDIT1 — the migration that creates audit_event and its refusal tests are T-059's",
