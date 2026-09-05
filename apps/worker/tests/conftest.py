@@ -6,9 +6,11 @@ would happily replace an attribute of `better_answers_worker`, and a test that p
 the module under test proves the patch rather than the behaviour.
 
 So `monkeypatch` is handed to every test with its three replacing acts wrapped. A
-target that belongs to this tier is refused; anything else — `os`, a library, a
-fixture's own object — is patched as before, because replacing a third-party attribute
-is how an external service is kept out of a test.
+target that belongs to this tier is refused — including an instance of one of its
+classes, which carries its module through its type — and anything else is patched as
+before,
+because replacing a third-party attribute is how an external service is kept out of a
+test.
 
 **What it can see.** A target given as a dotted string, a module, a class or a function
 carries the module it came from, so ownership is read off it directly. A dictionary
@@ -39,8 +41,9 @@ type Replace = Callable[..., None]
 GUARDED_ACTS = ("setattr", "setitem", "delattr")
 
 
-def _module_of(target: object) -> str | None:
-    """The dotted module a `setattr` or `delattr` target belongs to, if it names one."""
+def _owner_of(target: object) -> str | None:
+    """The dotted name a `setattr` or `delattr` target carries: for a string target the
+    path it was given, otherwise the module the object came from."""
     if isinstance(target, str):
         # `monkeypatch.setattr("better_answers_worker.config.read_bootstrap", value)`.
         return target
@@ -61,7 +64,9 @@ def _is_a_table_of_this_tier(container: object) -> bool:
     """Whether a `setitem` target is a dictionary one of this tier's modules holds."""
     # A mapping that is not a plain dict belongs to somebody else's type — `os.environ`
     # is the one a test reaches for, and this tier's config module imports it by name,
-    # so identity alone would read it as ours.
+    # so identity alone would read it as ours. A third-party plain dict imported by name
+    # would still read as ours; no module does that today, and the day one does the fix
+    # is to reach the table through its own module rather than ours.
     if type(container) is not dict:
         return False
     for name, module in list(sys.modules.items()):
@@ -80,7 +85,7 @@ def _refuse_if_ours(act: str, target: object) -> None:
         if _is_a_table_of_this_tier(target):
             raise RuntimeError(REFUSAL.format(act=act, where="a table this tier owns"))
         return
-    module = _module_of(target)
+    module = _owner_of(target)
     if _belongs_to_this_tier(module):
         raise RuntimeError(REFUSAL.format(act=act, where=f"`{module}`"))
 

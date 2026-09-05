@@ -1,7 +1,11 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
+
+import { workspacePackages } from "./workspaces.ts";
 
 /**
  * The `check` scripts as values a test can read (`[CHECK2]`, `[CHECK3]`).
@@ -21,49 +25,13 @@ const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");
 
-/**
- * The globs under `packages:` in `pnpm-workspace.yaml`. Only the two shapes the file uses
- * are understood — a literal directory and a `<dir>/*` — and an unknown shape fails loudly
- * below rather than silently matching nothing, which is the failure this file exists for.
- */
-const workspaceGlobs = (): readonly string[] => {
-  const body = read("pnpm-workspace.yaml").split(/^packages:\s*$/m)[1] ?? "";
-  const globs: string[] = [];
-  for (const line of body.split("\n")) {
-    const entry = /^\s{2}-\s+(?<glob>\S+)\s*$/.exec(line);
-    if (entry === null) {
-      if (line.trim().length > 0 && globs.length > 0) break;
-      continue;
-    }
-    globs.push(entry.groups?.["glob"] ?? "");
-  }
-  return globs;
-};
-
-/** Every pnpm workspace directory, relative to the repository root, sorted. */
-const workspaceDirectories = (): readonly string[] =>
-  workspaceGlobs()
-    .flatMap((glob) => {
-      if (!glob.includes("*")) return [glob];
-      expect(glob.endsWith("/*"), `unsupported workspace glob ${glob}`).toBe(true);
-      const parent = glob.slice(0, -2);
-      return readdirSync(path.join(repositoryRoot, parent))
-        .map((entry) => `${parent}/${entry}`)
-        .filter((directory) =>
-          statSync(path.join(repositoryRoot, directory), { throwIfNoEntry: false })?.isDirectory(),
-        );
-    })
-    .filter((directory) =>
-      statSync(path.join(repositoryRoot, directory, "package.json"), {
-        throwIfNoEntry: false,
-      })?.isFile(),
-    )
-    .sort();
-
 type Manifest = { readonly scripts?: Readonly<Record<string, string>> };
 
 const manifestOf = (directory: string): Manifest => {
   const parsed: unknown = JSON.parse(read(path.join(directory, "package.json")));
+  // SAFETY: the parse is asserted to be an object above, and every field this file reads
+  // is optional, so a manifest missing `scripts` reads as a workspace with no scripts —
+  // which is exactly what the assertions below are about.
   expect(typeof parsed, `${directory}/package.json is not an object`).toBe("object");
   return parsed as Manifest;
 };
@@ -82,12 +50,12 @@ const NO_CHECK: Readonly<Record<string, string>> = {
 };
 
 describe("the workspaces' scripts (T-068)", () => {
-  it("reads a workspace for every glob the pnpm workspace file declares", () => {
+  it("holds every workspace the repository installs, not a list that ages alone", () => {
     // The assertions below go quiet if this list is empty, so it is asserted first: a
-    // renamed directory or a glob shape this file cannot parse fails here, loudly.
-    const directories = workspaceDirectories();
+    // renamed directory or a glob shape the reader cannot parse fails here, loudly.
+    const directories = workspacePackages();
 
-    expect(workspaceGlobs().length).toBeGreaterThan(0);
+    expect(directories.length).toBeGreaterThan(0);
     expect(directories).toContain("apps/api");
     expect(directories).toContain("apps/web");
     expect(directories).toContain("packages/core");
@@ -97,7 +65,7 @@ describe("the workspaces' scripts (T-068)", () => {
   it("has no test script that passes when it finds no tests", () => {
     // `--passWithNoTests` turns a rotted glob into a green run: the suite reports success
     // for having run nothing at all. A workspace with no tests yet writes one instead.
-    const passing = workspaceDirectories().flatMap((directory) => {
+    const passing = workspacePackages().flatMap((directory) => {
       const test = scriptsOf(directory)["test"];
       return test !== undefined && test.includes("--passWithNoTests")
         ? [`${directory}: ${test}`]
@@ -111,7 +79,7 @@ describe("the workspaces' scripts (T-068)", () => {
   });
 
   it("gates every workspace, or names the one it does not and why", () => {
-    const withoutCheck = workspaceDirectories()
+    const withoutCheck = workspacePackages()
       .filter((directory) => scriptsOf(directory)["check"] === undefined)
       .sort();
     const named = Object.keys(NO_CHECK).sort();
@@ -156,7 +124,7 @@ const stepsOf = (check: string): readonly string[] =>
 
 describe("one run of check names every failure (T-068)", () => {
   it("runs a workspace's every gate through the runner rather than chaining them", () => {
-    const chained = workspaceDirectories().flatMap((directory) => {
+    const chained = workspacePackages().flatMap((directory) => {
       const check = scriptsOf(directory)["check"];
       // `&&` stops at the first failure: a session is told about lint, fixes it, runs
       // check again and is only then told about types.
@@ -172,16 +140,17 @@ describe("one run of check names every failure (T-068)", () => {
   });
 
   it("names each of a workspace's gates as a step, and nothing that is not a script", () => {
-    for (const directory of workspaceDirectories()) {
+    for (const directory of workspacePackages()) {
       const scripts = scriptsOf(directory);
       const check = scripts["check"];
       if (check === undefined) continue;
 
       // Both directions (`[TEST7]`): a gate the workspace has and `check` does not run is
       // a gate CI never reaches, and a step naming no script is a `check` that cannot run.
-      expect(stepsOf(check), `${directory} runs a step it does not have, or misses a gate`).toEqual(
-        GATE_STEPS.filter((step) => scripts[step] !== undefined),
-      );
+      expect(
+        stepsOf(check),
+        `${directory}'s check names a step that is not one of its gates, or leaves a gate out`,
+      ).toEqual(GATE_STEPS.filter((step) => scripts[step] !== undefined));
     }
   });
 
@@ -194,5 +163,60 @@ describe("one run of check names every failure (T-068)", () => {
     // The two halves of the tree, each a step of the root's own list.
     expect(steps).toContain("check:workspaces");
     expect(steps).toContain("check:worker");
+  });
+});
+
+/**
+ * The runner itself, over a throwaway manifest. Reading the manifests says the steps are
+ * named; only running the runner says a failing step does not take the rest with it, and
+ * that the command a person or CI waits on ends non-zero when any step failed — the
+ * silent pass `pnpm run --no-bail` over a script pattern turns out to be.
+ */
+const throwaway = mkdtempSync(path.join(tmpdir(), "check-runner-"));
+
+afterAll(() => rmSync(throwaway, { recursive: true, force: true }));
+
+describe("the check runner (T-068)", () => {
+  it("runs every step it was given, and ends by naming the ones that failed", () => {
+    writeFileSync(
+      path.join(throwaway, "package.json"),
+      JSON.stringify({
+        name: "throwaway",
+        scripts: {
+          lint: "node -e \"console.log('lint ran'); process.exit(1)\"",
+          typecheck: "node -e \"console.log('typecheck ran')\"",
+          test: "node -e \"console.log('test ran'); process.exit(3)\"",
+        },
+      }),
+    );
+
+    const runner = path.join(repositoryRoot, "scripts", "check.mjs");
+    const run = spawnSync("node", [runner, "lint", "typecheck", "test"], {
+      cwd: throwaway,
+      encoding: "utf8",
+    });
+    const output = `${run.stdout}${run.stderr}`;
+
+    // The step after a failure ran, and the one after that.
+    expect(output).toContain("lint ran");
+    expect(output).toContain("typecheck ran");
+    expect(output).toContain("test ran");
+    expect(output).toContain("check failed: lint, test");
+    expect(run.status).toBe(1);
+  });
+
+  it("passes only when every step passed", () => {
+    writeFileSync(
+      path.join(throwaway, "package.json"),
+      JSON.stringify({ name: "throwaway", scripts: { lint: "node -e \"''\"" } }),
+    );
+
+    const run = spawnSync("node", [path.join(repositoryRoot, "scripts", "check.mjs"), "lint"], {
+      cwd: throwaway,
+      encoding: "utf8",
+    });
+
+    expect(run.stdout).toContain("check passed");
+    expect(run.status).toBe(0);
   });
 });

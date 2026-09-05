@@ -34,7 +34,14 @@ target-version = "py313"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20"]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20", "TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# The other half of the conftest guard: the guard wraps the `monkeypatch` fixture, and
+# these two are the way round it. Our own code is never mocked; an external service is
+# replaced behind its adapter with an in-memory implementation.
+"unittest.mock".msg = "our own code is never mocked; replace the external service behind its adapter"
+"mock".msg = "our own code is never mocked; replace the external service behind its adapter"
 
 [tool.ruff.lint.per-file-ignores]
 # The check runner is a script; it is the one place print-shaped output is allowed,

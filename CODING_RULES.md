@@ -32,7 +32,7 @@ Every test that touches data runs against a real Postgres (Testcontainers or the
 
 ### [TEST3] Our own code is never mocked
 
-Module mocking (`vi.mock`, `jest.mock`, `monkeypatch` of our modules) is banned, and enforced in both tiers: in TypeScript by lint (`anti-slop/no-module-mocking`), in Python by a conftest guard that refuses a `monkeypatch` whose target is a module under `better_answers_worker`. External services — LLMs, SaaS APIs — are replaced behind their adapter with an in-memory implementation, and a third-party attribute stays patchable.
+Module mocking (`vi.mock`, `jest.mock`, `monkeypatch` of our modules) is banned, and enforced in both tiers: in TypeScript by lint (`anti-slop/no-module-mocking`), in Python by a conftest guard that refuses a `monkeypatch` whose target is a module under `better_answers_worker`, and by a lint ban on `unittest.mock`, which is the way round it. External services — LLMs, SaaS APIs — are replaced behind their adapter with an in-memory implementation, and a third-party attribute stays patchable.
 
 ### [TEST4] Setup through factories
 
@@ -58,7 +58,7 @@ A test script never passes for having found no tests, and a browser spec left fo
 
 ### [CHECK3] One run of `check` names every failure
 
-A workspace's `check` runs every step it has — lint, types, tests, and the browser suite where there is one — even when an earlier step fails, and reports the failures together. `&&` between steps is banned: it names the first problem and hides the rest, so a session fixes one thing per run. Each tier has one runner and one list of steps; the root `check` is the same shape over its own steps, and `apps/api/tests/check-scripts.test.ts` reads each manifest for it.
+A workspace's `check` runs every step it has — lint, types, tests, and the browser suite where there is one — even when an earlier step fails, and reports the failures together. `&&` between steps is banned: it names the first problem and hides the rest, so a session fixes one thing per run. Each tier has one runner, and a manifest's steps are named in that manifest and nowhere else; the root `check` is the same shape over its own steps, so a gate is added by naming it. `apps/api/tests/check-scripts.test.ts` reads each manifest for this, and the runner is proved by a test that runs it over a throwaway manifest.
 
 ## COMMENT
 
