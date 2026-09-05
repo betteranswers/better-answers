@@ -1,0 +1,20 @@
+apps/web/test/folder-case.test.ts
+  s_2c3fc9d16bd52c::t_c7865a6e493e02 9-11
+  s_2c3fc9d16bd52c::t_c58272cf0681e2 1-8,12-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "4033c7f41ecd493177db86728e4b1f43471b837e",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
