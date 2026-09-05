@@ -1,0 +1,27 @@
+packages/devtools/src/throwaway-tree.ts
+  s_2c3fc9d16bd52c::t_e9a8af5fe73fae 58,249
+  s_2c3fc9d16bd52c::t_7b54089b967cbe 210-248,250-304
+  s_2c3fc9d16bd52c::t_93f33b783e21e0 49-57,59-64,66,68-81
+packages/devtools/test/knip.test.ts
+  s_2c3fc9d16bd52c::t_b83f7db410b15d 1-38,41-79,81-89,93-126
+  s_2c3fc9d16bd52c::t_05afcbf8a9a8ba 90-92
+  s_2c3fc9d16bd52c::t_e9a8af5fe73fae 39-40,80
+packages/devtools/README.md
+  s_2c3fc9d16bd52c::t_ee266055a9728e 20-22,25-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "67d071cbd40ff8928b9b004f225468337d04a83d",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
