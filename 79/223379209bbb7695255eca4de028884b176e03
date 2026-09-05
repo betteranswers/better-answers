@@ -1,0 +1,21 @@
+AGENTS.md
+  s_2c3fc9d16bd52c::t_bc7662ae3dd821 46
+apps/web/test/browser-suite-skill.test.ts
+  s_2c3fc9d16bd52c::t_e34bcd80dec1d9 1-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "79223379209bbb7695255eca4de028884b176e03",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
