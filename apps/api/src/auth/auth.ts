@@ -226,6 +226,14 @@ export const createAuth = (deps: AuthDependencies) => {
     // flow; under an OAuth provider both must be off (Better Auth, "OAuth Provider Mode").
     disabledPaths: ["/token"],
     user: {
+      // No `deleteUser` block, and that absence is a decision: the user row is the
+      // person id every record names a person by, `member.user_id` is a foreign key to
+      // it, and the ledger's actor will be it — so a person deleting their own row would
+      // reach a workspace's memberships and orphan an actor. Ending what a person holds
+      // is *revoke credentials* in its two scopes; erasing what is about them is the
+      // erasure routine's pseudonymisation, which keeps the id (ADR 0020, ADR 0035).
+      // Left off, the endpoint answers 404, which `tests/delete-user.test.ts` proves
+      // against a signed-in person rather than against this line.
       additionalFields: {
         // ADR 0018's revocation instant; written by the platform, never by the person.
         credentialsRevokedAt: { type: "date", required: false, input: false },
