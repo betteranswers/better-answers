@@ -1,0 +1,39 @@
+packages/devtools/src/jscpd.ts
+  s_2c3fc9d16bd52c::t_370666ae8145a5 52-54
+  s_2c3fc9d16bd52c::t_e95e0de7ebbc27 1-3,6-51,55-115
+  s_2c3fc9d16bd52c::t_0745ad625ab49e 4-5
+packages/devtools/package.json
+  s_2c3fc9d16bd52c::t_27386d701b26a9 9
+  s_2c3fc9d16bd52c::t_706d7c595a6c91 22
+  s_2c3fc9d16bd52c::t_7283efe90afe67 8
+jscpd.config.mjs
+  s_2c3fc9d16bd52c::t_8738497c050516 1-56
+scripts/jscpd.mjs
+  s_2c3fc9d16bd52c::t_fb56e12e53ffd7 1-35
+packages/devtools/test/jscpd.test.ts
+  s_2c3fc9d16bd52c::t_4cc36afcf51c8b 1-73,85-113
+  s_2c3fc9d16bd52c::t_96de98f7b7681f 74-84
+pnpm-lock.yaml
+  ai_agent 17-19,281-283,3795-3843,7871-7904
+package.json
+  s_2c3fc9d16bd52c::t_706d7c595a6c91 21
+  s_2c3fc9d16bd52c::t_57b219372fec32 7,10
+packages/devtools/tsconfig.json
+  s_2c3fc9d16bd52c::t_2fb4b3117f3425 4-7,11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "07c6e4d3e0ee68b808cb6763ee7659dc96dbd0dd",
+  "prompts": {},
+  "sessions": {
+    "s_2c3fc9d16bd52c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7e0e058b-445a-4c0c-a751-9516230833ce",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
