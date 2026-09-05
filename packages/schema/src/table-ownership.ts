@@ -1,0 +1,167 @@
+/**
+ * Who owns each table, and who else reads or writes one.
+ *
+ * ADR 0029 names the failure that no import-direction linter can ever see: one slice
+ * writing SQL against another slice's tables works perfectly, because it is the same
+ * database. The mitigation it names first is **a checked-in table-ownership map,
+ * reviewed like the export list** — this file. It is shaped like `RLS_EXEMPTIONS`
+ * beside it (T-015) for the same reason: one record a reviewer reads, every entry
+ * carrying a reason, and a test asserting the pair in both
+ * directions, so no name can be added in one place and forgotten in another
+ * (`packages/schema/test/table-ownership.test.ts`).
+ *
+ * **A slice owns a table**: the capability whose invariants the table holds, which is
+ * the write path and never a screen (ADR 0029). An owner is written as its directory
+ * name under `packages/core/src/` and the test checks that directory exists, so a map
+ * entry always reaches a module a reader can open.
+ *
+ * **Two owners are not slices**, and each is written as the repository path of the
+ * module it is, so it cannot be read as a slice name that has gone missing:
+ *
+ * - `apps/api/src/auth` — the **identity provider**. The sixteen tables of
+ *   `IDENTITY_SET` are Better Auth's own: the library declares their shapes, writes
+ *   them on every sign-in, consent, issue and refresh, and is configured in that one
+ *   directory and nowhere else (ADR 0009, lint-enforced). No slice could own them
+ *   without owning the library, and inventing an `identity` slice to hold a table
+ *   nobody in `core` writes would put a name in the tree that answers no call.
+ * - `packages/core/src/store/postgres` — the **Postgres door**. The two counters are
+ *   the limiter's own rows, read and written by the door's fixed-window helpers; the
+ *   door is explicitly not a slice (ADR 0029), and the alternative — hanging them off
+ *   `access`, which imports only `kernel` and touches no store — would be a fiction.
+ *
+ * **What is recorded here in words, because the record cannot hold it.** The both-ways
+ * test refuses an entry naming a table `src/` has not declared, and the owner test
+ * refuses a name that is not a directory today. So these facts, all of them settled by
+ * the T-063 spec, wait for the ticket that declares their table:
+ *
+ * - `audit_event` — the audit slice's, the one append-only ledger (T-059, ADR 0014).
+ * - `group`, `group_member` and `access_request` — the **members** slice's (T-060,
+ *   T-061). `members` is not a directory under `packages/core/src/` yet, so naming it
+ *   here would fail the owner test today; the choice taken is that the asserted record
+ *   holds only owners that exist, and a future owner is a sentence until its slice is.
+ *   The same slice writes `member` and `invitation` — the People acts and the
+ *   invitation T-061 mints — which is a cross-owner write this list will gain.
+ * - `group_member`, read by the Postgres door inside the resolver from T-060, where the
+ *   membership query starts aggregating the caller's group ids.
+ * - The concept, bundle-commit, evidence and verification tables and the two graph
+ *   tables — the concepts slice's (ADRs 0011, 0012, 0019, 0023).
+ *
+ * **The lint rule this map is the written trigger for** (ADR 0029; out of scope in the
+ * T-063 spec, deliberately): *a store file imports no slice's table*. Build it when a
+ * store file first reaches for one — the map is where the breach shows up as a diff, and
+ * the rule is what stops it being a diff nobody read. The counters above are the door's
+ * own rows and are not a slice's table, so they are not the breach.
+ */
+
+/**
+ * The owner of every table `src/` declares. A slice by its directory name under
+ * `packages/core/src/`; the two owners that are not slices by their path (above).
+ */
+export const IDENTITY_PROVIDER = "apps/api/src/auth";
+export const POSTGRES_DOOR = "packages/core/src/store/postgres";
+
+/** The owners that are not slices, so the owner test can admit exactly these two. */
+export const NON_SLICE_OWNERS = [IDENTITY_PROVIDER, POSTGRES_DOOR] as const;
+
+export const TABLE_OWNERS = {
+  // Better Auth's identity set (ADR 0009). Declared here, written by the library.
+  "public.user": IDENTITY_PROVIDER,
+  "public.session": IDENTITY_PROVIDER,
+  "public.account": IDENTITY_PROVIDER,
+  "public.verification": IDENTITY_PROVIDER,
+  "public.jwks": IDENTITY_PROVIDER,
+  "public.workspace": IDENTITY_PROVIDER,
+  "public.member": IDENTITY_PROVIDER,
+  "public.invitation": IDENTITY_PROVIDER,
+  "public.oauth_client": IDENTITY_PROVIDER,
+  "public.oauth_resource": IDENTITY_PROVIDER,
+  "public.oauth_client_resource": IDENTITY_PROVIDER,
+  "public.oauth_refresh_token": IDENTITY_PROVIDER,
+  "public.oauth_access_token": IDENTITY_PROVIDER,
+  "public.oauth_consent": IDENTITY_PROVIDER,
+  "public.oauth_client_assertion": IDENTITY_PROVIDER,
+  "public.rate_limit": IDENTITY_PROVIDER,
+
+  // The limiter's own rows, read and written by the door's fixed-window helpers.
+  "public.ingress_counter": POSTGRES_DOOR,
+  "public.mcp_call_counter": POSTGRES_DOOR,
+
+  // The slices.
+  "public.workspace_config": "workspaces",
+  "public.llm_route": "llm",
+  "index.chunk": "sources",
+} satisfies Record<string, string>;
+
+/** A read or a write of a table by anyone but its owner. */
+export type CrossOwnerAccess = {
+  /** The schema-qualified table, as `TABLE_OWNERS` and `RLS_EXEMPTIONS` name it. */
+  readonly table: string;
+  /** The slice or non-slice module doing the reading or writing. */
+  readonly by: string;
+  readonly access: "read" | "write" | "read and write";
+  /** Why it is allowed to, in the words a reviewer would want at the diff. */
+  readonly reason: string;
+};
+
+/**
+ * Every read and write of a table by a module that does not own it — the entries the
+ * map exists for. Each is a fact about code in the tree today; a fact about code a
+ * later ticket writes is a sentence in the docblock above, not an entry here.
+ */
+export const CROSS_OWNER_TABLE_ACCESS = [
+  {
+    table: "public.workspace",
+    by: "workspaces",
+    access: "read and write",
+    reason:
+      "Provisioning inserts the row and its config in one transaction, and the membership read looks up the workspace's name; Better Auth owns the table as its organisation model, the workspaces slice owns the tenant's lifecycle over it (ADR 0009, ADR 0029).",
+  },
+  {
+    table: "public.member",
+    by: "workspaces",
+    access: "read and write",
+    reason:
+      "Provisioning writes the first Admin membership in the same transaction as the workspace, and the slice reads the workspaces one person holds by their person id — the picker's cross-workspace read, which runs before any workspace is known (ADR 0035).",
+  },
+  {
+    table: "public.user",
+    by: "workspaces",
+    access: "read and write",
+    reason:
+      "Revoking a person's credentials writes the instant every later claim is refused against, and the membership read looks up the person's name and address for the shell (ADR 0018, ADR 0035).",
+  },
+  {
+    table: "public.session",
+    by: "workspaces",
+    access: "write",
+    reason:
+      "Revoking everywhere ends every browser session created before the instant, in the same transaction that wrote it (ADR 0018).",
+  },
+  {
+    table: "public.oauth_refresh_token",
+    by: "workspaces",
+    access: "write",
+    reason:
+      "Revocation's two scopes end the refresh tokens minted before the instant — every one of the person's, or only those whose consented workspace is this one (ADR 0035).",
+  },
+  {
+    table: "public.oauth_access_token",
+    by: "workspaces",
+    access: "write",
+    reason: "The same two scopes, so a live access token cannot outlive its refresh row.",
+  },
+  {
+    table: "public.member",
+    by: POSTGRES_DOOR,
+    access: "read",
+    reason:
+      "The Principal resolver reads the member row for (workspace, person) and the membership's revocation instant, in the transaction that sets the scope — so the role is resolved in the same transaction as the read it authorises, which is what makes the door a door (ADR 0018, ADR 0035).",
+  },
+  {
+    table: "public.user",
+    by: POSTGRES_DOOR,
+    access: "read",
+    reason:
+      "The same one resolve query joins the person's own revocation instant, so revocation's other scope costs no second round trip on the path every call takes.",
+  },
+] as const satisfies readonly CrossOwnerAccess[];
