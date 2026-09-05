@@ -216,7 +216,7 @@ the app's one query cache, so there was nothing left to provide and the router r
 its outlet directly. The `auth-provider` registry item — the provider wrapper and the
 plugin-type file, with their two `declare module` augmentations of a library outside the
 auth module — is removed with it, so no augmentation of a deleted library survives anywhere
-in the tree and the identity seam's browser half (ADR 0009) needs no exemption sentence.
+in the tree and ~~`[DESIGN5]`'s~~ the identity seam's browser half (ADR 0009, 2026-09-05 amendment) needs no exemption sentence.
 
 **Why.** Four costs for about 70 library-facing lines among the feature's 750 (the count
 and the decision are in `apps/docs-site/specs/T-046.md`). The package shipped 66 releases

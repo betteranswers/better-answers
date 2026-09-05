@@ -111,7 +111,7 @@ export function RoutesCard() {
 
       {/*
         A pending or failed read says so in words rather than showing an empty list: a reader
-        must never mistake "the platform has not answered" for "this workspace has none"
+        must never mistake "the platform has not answered" for "this workspace has none".
         `aria-live` because the list replaces this line without moving focus.
 
         The failure says what happened and who can act, in the platform's own voice — the

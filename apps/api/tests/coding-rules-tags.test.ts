@@ -27,7 +27,9 @@ import { describe, expect, it } from "vitest";
  * ("the identity seam, ADR 0009") is a pointer this test does not follow, which is the
  * point — words do not dangle. `.scratch/` and `.cubic/` are working material and a
  * generated wiki, outside the check by the ticket's decision. A tag inside a string the
- * code prints is a citation like any other, because the reader sees it the same way.
+ * code prints is a citation like any other, because the reader sees it the same way. A tag
+ * struck in an ADR's body — `~~…~~`, the index's convention for a sentence an amendment
+ * superseded — is history the ADR is bound to keep, not a citation, and is not read.
  */
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
@@ -120,9 +122,13 @@ const CITED_NOWHERE_ELSE: Readonly<Record<string, string>> = {
 
 type Citation = { readonly file: string; readonly line: number; readonly tag: string };
 
+/** In an ADR, a struck span is a sentence an amendment superseded; what it cites was retired with it. */
+const STRUCK = /~~[^~\n]+~~/g;
+
 const citationsIn = (file: string): readonly Citation[] =>
   read(file)
     .split("\n")
+    .map((text) => (file.startsWith("docs/adr/") ? text.replace(STRUCK, "") : text))
     .flatMap((text, index) =>
       [...text.matchAll(RULE_TAG)].flatMap((match) => {
         const tag = match.groups?.["tag"];
