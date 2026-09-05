@@ -17,9 +17,15 @@ and a smoke case proves the reporter's shape before any caller is allowed to rea
 
 The tool is a parameter — which package holds the binary, the command line, the exits that
 mean a finding, and the smoke case — so a second and a third tool run through this helper
-rather than each writing its own. oxlint runs through it today, with `oxlintOver` as the
-built form the lint-rule suites take. Imported through
+rather than each writing its own. Two tools run through it today, each with a built form
+that reads its reporter: `oxlintOver`, which the lint-rule suites take, and `knipOver`,
+which reads knip's JSON report as a list of findings. Imported through
 `@better-answers/devtools/throwaway-tree`.
+
+A tool's binary is found through the module graph, and a package that withholds its own
+manifest from its `exports` map — knip does — is reached through its entry instead, so the
+resolution never becomes a guessed path. Every tool run this way is a devDependency of this
+package, because that is where the resolution starts.
 
 ## `lint-rules/` — the `better-answers` oxlint plugin
 
