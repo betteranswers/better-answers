@@ -1,4 +1,3 @@
-import { useSendVerificationOtp, useSignInEmailOtp } from "@better-auth-ui/react/plugins/email-otp";
 import type { BetterFetchError } from "better-auth/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
@@ -8,7 +7,7 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
-import { authClient } from "./auth-client.ts";
+import { useSendVerificationOtp, useSignInEmailOtp } from "./auth-hooks.ts";
 import { AuthScreen, Outcome } from "./auth-screen.tsx";
 import { carriedFlow, safeReturnPath } from "./carried-flow.ts";
 
@@ -18,8 +17,8 @@ import { carriedFlow, safeReturnPath } from "./carried-flow.ts";
  * because there is none in the product (ADR 0009): a person exists because an Admin
  * added them to a workspace.
  *
- * The two acts are better-auth-ui's own mutations over Better Auth's endpoints; the words
- * are the platform's. Every outcome the person could not predict is said in a sentence —
+ * The two acts are the module's own mutations (`auth-hooks.ts`) over Better Auth's
+ * endpoints; the words are the platform's. Every outcome the person could not predict is said in a sentence —
  * that a code was sent, that it did not work, that too many have been asked for — and
  * each sits in a live region so a screen reader hears it (`[A11Y1]`, `[UX2]`).
  *
@@ -51,8 +50,8 @@ export function SignInScreen() {
   const [code, setCode] = useState("");
   const [sentTo, setSentTo] = useState<string | undefined>(undefined);
 
-  const sendCode = useSendVerificationOtp(authClient);
-  const signIn = useSignInEmailOtp(authClient);
+  const sendCode = useSendVerificationOtp();
+  const signIn = useSignInEmailOtp();
 
   /**
    * Where a signed-in person goes. A host's OAuth flow is carried on to the picker, which

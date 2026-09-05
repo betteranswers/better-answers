@@ -1,10 +1,9 @@
-import { useSignOut } from "@better-auth-ui/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 
 import { Button } from "@/shared/ui/button.tsx";
 
-import { authClient } from "./auth-client.ts";
+import { useSignOut } from "./auth-hooks.ts";
 
 /**
  * End the session, here and on the server. The cache is cleared as well as the cookie:
@@ -14,7 +13,7 @@ import { authClient } from "./auth-client.ts";
 export function SignOutButton(properties: { readonly variant?: "default" | "outline" }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const signOut = useSignOut(authClient);
+  const signOut = useSignOut();
 
   return (
     <Button
