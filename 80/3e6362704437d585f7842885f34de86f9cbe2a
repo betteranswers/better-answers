@@ -1,0 +1,32 @@
+packages/core/src/kernel/index.ts
+  s_529f881ca25f4e::t_dedb19cc620fd9 19-27,29,32-35
+packages/core/src/kernel/actor.ts
+  s_529f881ca25f4e::t_646efa45826b0a 1-32
+packages/core/src/kernel/constraint.ts
+  s_529f881ca25f4e::t_2cbbba7b0737c5 1-30
+packages/core/src/kernel/role.ts
+  s_529f881ca25f4e::t_1a29ab70a14aa8 1-31
+packages/core/src/kernel/result.ts
+  s_529f881ca25f4e::t_35edecc02b88b4 5-24
+packages/core/test/kernel.test.ts
+  s_529f881ca25f4e::t_3115ad661995d8 78
+  s_529f881ca25f4e::t_75ea46b981815c 1
+  s_529f881ca25f4e::t_653bc2951cf1ea 20-28
+  s_529f881ca25f4e::t_5c6bebc149ed98 2-19,29-77,79-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "803e6362704437d585f7842885f34de86f9cbe2a",
+  "prompts": {},
+  "sessions": {
+    "s_529f881ca25f4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "688411cf-a489-4e1b-b43c-905b1ccfe9f6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
