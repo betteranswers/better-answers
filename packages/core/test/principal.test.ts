@@ -38,7 +38,15 @@ afterAll(async () => {
 type Seeded = { workspaceId: string; userId: string; otherWorkspaceId: string };
 
 const seedMembership = async (
-  overrides: { role?: "Admin" | "Editor" | "Viewer"; revokedAt?: Date } = {},
+  overrides: {
+    role?: "Admin" | "Editor" | "Viewer";
+    /** The person-level instant: revoked everywhere. */
+    revokedAt?: Date;
+    /** The membership instant in the first workspace: revoked there and only there. */
+    revokedHereAt?: Date;
+    /** Give the person a membership in the second workspace too. */
+    memberOfBoth?: boolean;
+  } = {},
 ): Promise<Seeded> => {
   const client = await db.pool.connect();
   try {
@@ -50,7 +58,15 @@ const seedMembership = async (
       workspaceId: workspace.id,
       userId: user.id,
       role: overrides.role ?? "Viewer",
+      credentialsRevokedAt: overrides.revokedHereAt ?? null,
     });
+    if (overrides.memberOfBoth === true) {
+      await seed.member({
+        workspaceId: other.id,
+        userId: user.id,
+        role: overrides.role ?? "Viewer",
+      });
+    }
     return { workspaceId: workspace.id, userId: user.id, otherWorkspaceId: other.id };
   } finally {
     client.release();
@@ -118,6 +134,57 @@ describe("the Principal resolver", () => {
       async () => "reached",
     );
     expect(after).toEqual({ ok: true, value: "reached" });
+  });
+
+  it("refuses a credential issued before this workspace revoked the person's credentials here", async () => {
+    const revokedHereAt = new Date("2026-09-03T12:00:00Z");
+    const seeded = await seedMembership({ revokedHereAt });
+    const door = openPostgres(db.runtimePool);
+
+    const before = await withPrincipal(
+      door,
+      claimsFor(seeded, { issuedAt: new Date("2026-09-03T11:59:59Z") }),
+      async () => "reached",
+    );
+    // The same word as the person-level scope: the People screen shows one outcome.
+    expect(before).toEqual({ ok: false, error: "credentials-revoked" });
+
+    const after = await withPrincipal(
+      door,
+      claimsFor(seeded, { issuedAt: new Date("2026-09-03T12:00:01Z") }),
+      async () => "reached",
+    );
+    expect(after).toEqual({ ok: true, value: "reached" });
+  });
+
+  it("lets a person revoked in one workspace go on working in the other, role and groups intact", async () => {
+    const revokedHereAt = new Date("2026-09-03T12:00:00Z");
+    const seeded = await seedMembership({
+      role: "Editor",
+      revokedHereAt,
+      memberOfBoth: true,
+    });
+    const door = openPostgres(db.runtimePool);
+    const issuedAt = new Date("2026-09-03T11:00:00Z");
+
+    const here = await withPrincipal(door, claimsFor(seeded, { issuedAt }), async () => "reached");
+    expect(here).toEqual({ ok: false, error: "credentials-revoked" });
+
+    const there = await withPrincipal(
+      door,
+      claimsFor(seeded, { issuedAt, workspaceId: seeded.otherWorkspaceId }),
+      async (principal) => principal,
+    );
+    expect(there).toEqual({
+      ok: true,
+      value: {
+        kind: "user",
+        workspaceId: seeded.otherWorkspaceId,
+        userId: seeded.userId,
+        role: "Editor",
+        groups: [],
+      },
+    });
   });
 
   it("refuses a credential whose role claim disagrees with the member row", async () => {

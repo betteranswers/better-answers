@@ -94,29 +94,45 @@ export const withIdentityWrite = async <T>(
   work: (tx: Tx, platform: PlatformPrincipal) => Promise<T>,
 ): Promise<T> => transaction(door, (client) => work(client, platform));
 
-/** The one resolve query (ADR 0018): the member row and the person's revocation instant. */
-const MEMBERSHIP_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS revoked_at
+/**
+ * The one resolve query (ADR 0018, ADR 0035): the member row, the person's revocation
+ * instant and this membership's. Both instants come back in the one statement — a
+ * revocation costs no second round trip on the path every call takes.
+ */
+const MEMBERSHIP_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS person_revoked_at,
+            m.credentials_revoked_at AS membership_revoked_at
      FROM member m
      JOIN "user" u ON u.id = m.user_id
     WHERE m.workspace_id = $1 AND m.user_id = $2`;
 
 const isRole = (value: string): value is Role => ROLES.some((role) => role === value);
 
-/** What the resolve query returns: the member row's role and the person's revocation instant. */
-type MembershipRow = { readonly role: string; readonly revoked_at: Date | null };
+/**
+ * What the resolve query returns: the member row's role and revocation's two instants —
+ * the person's, written by the operator's act, and this membership's, written by an
+ * Admin of this workspace and reaching no other.
+ */
+type MembershipRow = {
+  readonly role: string;
+  readonly person_revoked_at: Date | null;
+  readonly membership_revoked_at: Date | null;
+};
 
 /**
  * The Principal resolver — the deep module of T-004.
  *
- * Opens one transaction, sets its scope from the claims, reads the member row and the
- * user's `credentials_revoked_at` in that transaction, and runs `work` in the same
- * transaction with the Principal it built. So the role is resolved **in the same
- * transaction as the read it authorises**, every failure is a refusal (the
+ * Opens one transaction, sets its scope from the claims, reads the member row and
+ * revocation's two instants — the person's `user.credentials_revoked_at` and this
+ * membership's `member.credentials_revoked_at` — in that transaction, and runs `work`
+ * in the same transaction with the Principal it built. So the role is resolved **in
+ * the same transaction as the read it authorises**, every failure is a refusal (the
  * transaction rolls back; there is no default role), and the Principal cannot outlive
  * the request because it exists only inside `work`.
  *
- * Refusals: no member row for the pair; a credential issued before the person's
- * `credentials_revoked_at`; a credential carrying a role the member row disagrees
+ * Refusals: no member row for the pair; a credential issued before either instant,
+ * which is one word, `credentials-revoked`, for both scopes, so the People screen
+ * shows one outcome and the refusal says nothing about whether the person belongs
+ * anywhere else (ADR 0035); a credential carrying a role the member row disagrees
  * with; a member row whose role is not one of the three; claims that fail the
  * boundary's shape. Each is its own test in `packages/core/test/principal.test.ts`.
  */
@@ -173,7 +189,10 @@ export const withPrincipal = async <T>(
 const refuse = (row: MembershipRow | undefined, claims: Claims): PrincipalRefusal | undefined => {
   if (row === undefined) return "not-a-member";
   if (!isRole(row.role)) return "role-unknown";
-  if (row.revoked_at !== null && claims.issuedAt < row.revoked_at) return "credentials-revoked";
+  // Either instant refuses, with the one word: revoked everywhere, or revoked here.
+  for (const revokedAt of [row.person_revoked_at, row.membership_revoked_at]) {
+    if (revokedAt !== null && claims.issuedAt < revokedAt) return "credentials-revoked";
+  }
   if (claims.role !== undefined && claims.role !== row.role) return "role-disagrees";
   return undefined;
 };
