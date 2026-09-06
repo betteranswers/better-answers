@@ -26,6 +26,7 @@ export * from "./identity-tables.ts";
 export * from "./audit-tables.ts";
 export * from "./group-tables.ts";
 export * from "./access-request-tables.ts";
+export * from "./concept-tables.ts";
 
 /** The five route purposes (briefing 16's record family; ADR 0031's llm-routing). */
 export const llmPurpose = pgEnum("llm_purpose", [

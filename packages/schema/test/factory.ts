@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { getTableColumns } from "drizzle-orm";
 import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
 import type pg from "pg";
@@ -5,11 +7,14 @@ import type { z } from "zod";
 
 import {
   ACCESS_REQUEST_OPEN_STATUS,
+  AUDIENCE_EVERYONE,
   boundarySchemas,
+  CONCEPT_DRAFT_STATUS,
   CREATOR_ROLE,
   CURATED_ORIGIN,
   EMBEDDING_DIMENSIONS,
   ulid,
+  VERIFICATION_PLATFORM_ORIGIN,
 } from "../src/index.ts";
 
 /**
@@ -80,7 +85,30 @@ export type TestData = {
    * boundary refuses anyway.
    */
   accessRequest(overrides?: Partial<InsertInput<"accessRequest">>): Promise<Row<"accessRequest">>;
+  /** A concept's identity; creates its own workspace unless one is named, and mints the IRI. */
+  conceptIdentity(
+    overrides?: Partial<InsertInput<"conceptIdentity">>,
+  ): Promise<Row<"conceptIdentity">>;
+  /**
+   * A concept index row; creates its own workspace and identity unless the IRI is named —
+   * a named IRI is one the caller has already minted an identity for, as a named group is
+   * for `groupMember`. Internal and open to everyone, so a seeded concept is one a reader
+   * can see; a suite testing what is withheld says `sensitivity: "Restricted"`.
+   */
+  conceptIndex(overrides?: Partial<InsertInput<"conceptIndex">>): Promise<Row<"conceptIndex">>;
+  /** A bundle commit; creates its own workspace unless one is named. The shas are git object names. */
+  bundleCommit(overrides?: Partial<InsertInput<"bundleCommit">>): Promise<Row<"bundleCommit">>;
+  /** An evidence row; creates its own workspace unless one is named. */
+  evidence(overrides?: Partial<InsertInput<"evidence">>): Promise<Row<"evidence">>;
+  /** One check of one concept; creates its own workspace and identity unless the IRI is named. */
+  conceptVerification(
+    overrides?: Partial<InsertInput<"conceptVerification">>,
+  ): Promise<Row<"conceptVerification">>;
 };
+
+/** A hash of `length` hex characters, in shape and unique per call: a stand-in, never a real digest. */
+const hexOfLength = (length: number): string =>
+  createHash("sha256").update(ulid()).digest("hex").repeat(2).slice(0, length);
 
 /** INSERT the boundary-parsed row and read it back through the select schema. */
 const insertRow = async <TName extends keyof Registry>(
@@ -328,6 +356,76 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const conceptIdentity: TestData["conceptIdentity"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const minted = ulid().toLowerCase();
+    return insertRow(client, "conceptIdentity", {
+      iri: `https://knowledge.better-answers.test/c/${minted}`,
+      mergeKey: `policy:${minted}`,
+      ...overrides,
+      workspaceId,
+    });
+  };
+
+  const conceptIndex: TestData["conceptIndex"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
+    return insertRow(client, "conceptIndex", {
+      path: `knowledge/${ulid().toLowerCase()}.md`,
+      kind: "Policy",
+      title: "Expenses",
+      frontmatter: { title: "Expenses", type: "Policy" },
+      body: "Expenses are claimed within thirty days.",
+      contentHash: hexOfLength(64),
+      commitSha: hexOfLength(40),
+      status: CONCEPT_DRAFT_STATUS,
+      publishedAt: new Date(),
+      sensitivity: "Internal",
+      audience: AUDIENCE_EVERYONE,
+      ...overrides,
+      workspaceId,
+      iri,
+    });
+  };
+
+  const bundleCommit: TestData["bundleCommit"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "bundleCommit", {
+      sha: hexOfLength(40),
+      parentSha: null,
+      auditEventId: ulid(),
+      actor: "process:better-answers-test",
+      ...overrides,
+      workspaceId,
+    });
+  };
+
+  const evidence: TestData["evidence"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "evidence", {
+      sourceDocumentId: ulid(),
+      locator: "p.4#para-2",
+      resource: "Expenses policy (2026 edition)",
+      contentVersion: null,
+      ...overrides,
+      workspaceId,
+    });
+  };
+
+  const conceptVerification: TestData["conceptVerification"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
+    return insertRow(client, "conceptVerification", {
+      id: ulid(),
+      actor: "process:better-answers-test",
+      contentHash: hexOfLength(64),
+      origin: VERIFICATION_PLATFORM_ORIGIN,
+      ...overrides,
+      workspaceId,
+      iri,
+    });
+  };
+
   return {
     workspace,
     user,
@@ -343,5 +441,10 @@ export const testData = (client: pg.PoolClient): TestData => {
     oauthAccessToken,
     auditEvent,
     accessRequest,
+    conceptIdentity,
+    conceptIndex,
+    bundleCommit,
+    evidence,
+    conceptVerification,
   };
 };

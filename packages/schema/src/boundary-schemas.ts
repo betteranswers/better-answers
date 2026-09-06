@@ -7,6 +7,19 @@ import {
   ACCESS_REQUEST_STATUSES,
 } from "./access-request-tables.ts";
 import { ACT, auditEvent, FAMILIES } from "./audit-tables.ts";
+import {
+  bundleCommit,
+  CONCEPT_STATUSES,
+  conceptIdentity,
+  conceptIndex,
+  conceptVerification,
+  CONTENT_HASH,
+  evidence,
+  GIT_SHA,
+  IRI,
+  SENSITIVITIES,
+  VERIFICATION_ORIGINS,
+} from "./concept-tables.ts";
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import { group, GROUP_ORIGINS, groupMember } from "./group-tables.ts";
@@ -122,8 +135,9 @@ const chunkRefinements = {
   embedding: z.array(z.number()).length(EMBEDDING_DIMENSIONS),
   embeddingRouteId: (schema: z.ZodString) => schema.trim().min(1),
   // The glossary's closed set (CONTEXT.md, *sensitivity*); the column stays text so
-  // the set is the boundary's to narrow, exactly as ADR 0028 intends.
-  sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(["Restricted", "Internal", "Public"])),
+  // the set is the boundary's to narrow, exactly as ADR 0028 intends. The list is the
+  // one `concept_index` narrows to as well — a readable unit's classes are one fact.
+  sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
   // *audience* is "everyone in the workspace, or named groups" — not a closed word
   // set, so the boundary narrows to non-empty only.
   audience: (schema: z.ZodString) => schema.trim().min(1),
@@ -278,6 +292,123 @@ export const accessRequestSelect = createSelectSchema(accessRequest, accessReque
 export const accessRequestInsert = createInsertSchema(accessRequest, accessRequestRefinements);
 export const accessRequestUpdate = createUpdateSchema(accessRequest, accessRequestRefinements);
 
+/**
+ * A concept's IRI (ADR 0002): the platform-minted key every record about a concept attaches
+ * by, branded so a path or a title cannot be passed where one belongs. The brand is where
+ * the kernel's `ConceptIri` comes from, as `WorkspaceId` and `GroupId` are.
+ */
+const conceptIri = (schema: z.ZodString) => schema.regex(IRI).brand<"ConceptIri">();
+
+/**
+ * A concept's frontmatter as the row holds it: OKF's flat keys — scalars and string lists —
+ * and nothing nested, so the file's shape survives the round trip and a value with somewhere
+ * to hide does not. JSON `null` stays accepted for the container because the column accepts
+ * it (`jsonb NOT NULL` refuses SQL NULL, not the JSON value) and the parity suite holds the
+ * refinement to the column's own nullability; the write path never stores one.
+ */
+const frontmatter = z.union([
+  z.record(
+    z.string(),
+    z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())]),
+  ),
+  z.null(),
+]);
+
+const conceptIdentityRefinements = {
+  workspaceId,
+  iri: conceptIri,
+  mergeKey: (schema: z.ZodString) => schema.trim().min(1),
+};
+
+export const conceptIdentitySelect = createSelectSchema(
+  conceptIdentity,
+  conceptIdentityRefinements,
+);
+export const conceptIdentityInsert = createInsertSchema(
+  conceptIdentity,
+  conceptIdentityRefinements,
+);
+export const conceptIdentityUpdate = createUpdateSchema(
+  conceptIdentity,
+  conceptIdentityRefinements,
+);
+
+/**
+ * The concept index (ADR 0012): the derived row per concept. The two hashes are narrowed to
+ * their own shapes — a git object name and the canonical-form SHA-256 — so a row can never
+ * hold one where the other belongs, and the three visibility columns are narrowed exactly as
+ * `index.chunk`'s are, because the read predicate is tested against them (`[SEC2]`).
+ */
+const conceptIndexRefinements = {
+  workspaceId,
+  iri: conceptIri,
+  path: (schema: z.ZodString) => schema.trim().min(1),
+  kind: (schema: z.ZodString) => schema.trim().min(1),
+  title: (schema: z.ZodString) => schema.trim().min(1),
+  frontmatter: (schema: z.ZodType) => schema.pipe(frontmatter),
+  contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
+  commitSha: (schema: z.ZodString) => schema.regex(GIT_SHA),
+  status: (schema: z.ZodString) => schema.pipe(z.enum(CONCEPT_STATUSES)),
+  sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
+  audience: (schema: z.ZodString) => schema.trim().min(1),
+};
+
+export const conceptIndexSelect = createSelectSchema(conceptIndex, conceptIndexRefinements);
+export const conceptIndexInsert = createInsertSchema(conceptIndex, conceptIndexRefinements);
+export const conceptIndexUpdate = createUpdateSchema(conceptIndex, conceptIndexRefinements);
+
+/**
+ * A bundle commit (ADR 0012): the sha and its parent are git object names, the audit event
+ * id is the minter's shape — the id the act minted before the commit and the commit carries
+ * in its `Audit:` trailer — and the actor is the ledger's own actor shape, so the trailer and
+ * the row cannot say different things about who acted.
+ */
+const bundleCommitRefinements = {
+  workspaceId,
+  sha: (schema: z.ZodString) => schema.regex(GIT_SHA),
+  parentSha: (schema: z.ZodString) => schema.regex(GIT_SHA),
+  auditEventId: (schema: z.ZodString) => schema.regex(ULID),
+  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+};
+
+export const bundleCommitSelect = createSelectSchema(bundleCommit, bundleCommitRefinements);
+export const bundleCommitInsert = createInsertSchema(bundleCommit, bundleCommitRefinements);
+export const bundleCommitUpdate = createUpdateSchema(bundleCommit, bundleCommitRefinements);
+
+const evidenceRefinements = {
+  workspaceId,
+  sourceDocumentId: (schema: z.ZodString) => schema.trim().min(1),
+  locator: (schema: z.ZodString) => schema.trim().min(1),
+  resource: (schema: z.ZodString) => schema.trim().min(1),
+  contentVersion: (schema: z.ZodString) => schema.trim().min(1),
+};
+
+export const evidenceSelect = createSelectSchema(evidence, evidenceRefinements);
+export const evidenceInsert = createInsertSchema(evidence, evidenceRefinements);
+export const evidenceUpdate = createUpdateSchema(evidence, evidenceRefinements);
+
+const conceptVerificationRefinements = {
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  workspaceId,
+  iri: conceptIri,
+  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+  contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
+  origin: (schema: z.ZodString) => schema.pipe(z.enum(VERIFICATION_ORIGINS)),
+};
+
+export const conceptVerificationSelect = createSelectSchema(
+  conceptVerification,
+  conceptVerificationRefinements,
+);
+export const conceptVerificationInsert = createInsertSchema(
+  conceptVerification,
+  conceptVerificationRefinements,
+);
+export const conceptVerificationUpdate = createUpdateSchema(
+  conceptVerification,
+  conceptVerificationRefinements,
+);
+
 /** One entry per table this package owns — the parity test's registry (ADR 0028). */
 export const boundarySchemas = {
   workspace: {
@@ -354,5 +485,35 @@ export const boundarySchemas = {
     select: accessRequestSelect,
     insert: accessRequestInsert,
     update: accessRequestUpdate,
+  },
+  conceptIdentity: {
+    table: conceptIdentity,
+    select: conceptIdentitySelect,
+    insert: conceptIdentityInsert,
+    update: conceptIdentityUpdate,
+  },
+  conceptIndex: {
+    table: conceptIndex,
+    select: conceptIndexSelect,
+    insert: conceptIndexInsert,
+    update: conceptIndexUpdate,
+  },
+  bundleCommit: {
+    table: bundleCommit,
+    select: bundleCommitSelect,
+    insert: bundleCommitInsert,
+    update: bundleCommitUpdate,
+  },
+  evidence: {
+    table: evidence,
+    select: evidenceSelect,
+    insert: evidenceInsert,
+    update: evidenceUpdate,
+  },
+  conceptVerification: {
+    table: conceptVerification,
+    select: conceptVerificationSelect,
+    insert: conceptVerificationInsert,
+    update: conceptVerificationUpdate,
   },
 } as const;

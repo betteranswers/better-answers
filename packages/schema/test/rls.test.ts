@@ -705,6 +705,130 @@ describe("access requests under app_rt", () => {
   });
 });
 
+/**
+ * The concept write path's own proofs (ADR 0012, migration 0015, `[SEC3]`): five tenant
+ * tables like any other, so the zero-rows proof is stated here in their words; the worker's
+ * role is refused on all five outright; the composite keys refuse a row that names another
+ * tenant's concept; and the CHECKs refuse a status, a class and an imported check that
+ * carried a hash.
+ */
+describe("the concept write path under app_rt", () => {
+  const CONCEPT_TABLES = [
+    "concept_identity",
+    "concept_index",
+    "bundle_commit",
+    "evidence",
+    "concept_verification",
+  ] as const;
+
+  it("returns zero rows on a missing scope and only the scoped tenant's concepts otherwise", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const here = await seed.conceptIndex({ workspaceId: WS_A });
+      await seed.conceptIndex({ workspaceId: WS_B });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      const unscoped = await client.query("SELECT iri FROM concept_index");
+      expect(unscoped.rows).toEqual([]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const scoped = await client.query("SELECT iri, workspace_id FROM concept_index");
+      expect(scoped.rows).toEqual([{ iri: here.iri, workspace_id: WS_A }]);
+    });
+  });
+
+  it("refuses the worker role on all five tables, reading and writing alike (migration 0015)", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.conceptIndex({ workspaceId: WS_A });
+      await seed.bundleCommit({ workspaceId: WS_A });
+      await seed.evidence({ workspaceId: WS_A });
+      await seed.conceptVerification({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      for (const table of CONCEPT_TABLES) {
+        await client.query("SAVEPOINT concept");
+        await expect(client.query(`SELECT 1 FROM "${table}" LIMIT 1`)).rejects.toThrow(
+          /permission denied/,
+        );
+        await client.query("ROLLBACK TO SAVEPOINT concept");
+        await expect(client.query(`DELETE FROM "${table}"`)).rejects.toThrow(/permission denied/);
+        await client.query("ROLLBACK TO SAVEPOINT concept");
+      }
+    });
+  });
+
+  it("refuses a concept written into another tenant, and a check naming another tenant's concept", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const theirs = await seed.conceptIdentity({ workspaceId: WS_B });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      // The policy's WITH CHECK: a row whose workspace is not the scope never lands.
+      await client.query("SAVEPOINT other_tenant");
+      await expect(
+        client.query(
+          "INSERT INTO concept_identity (workspace_id, iri, merge_key) VALUES ($1, $2, 'policy:theirs')",
+          [WS_B, `${theirs.iri}-copy`],
+        ),
+      ).rejects.toThrow(/row-level security/);
+      await client.query("ROLLBACK TO SAVEPOINT other_tenant");
+
+      // The composite key: the foreign-key check runs as the owner and bypasses the policy,
+      // so a key on the IRI alone would confirm that another tenant holds it. Keyed by the
+      // pair, it refuses inside this workspace exactly as it would for an IRI nobody minted.
+      await expect(
+        client.query(
+          "INSERT INTO concept_verification (id, workspace_id, iri, actor) VALUES ($1, $2, $3, 'process:better-answers-test')",
+          [ulid(), WS_A, theirs.iri],
+        ),
+      ).rejects.toThrow(/concept_verification_identity_fk/);
+    });
+  });
+
+  it("refuses a fifth status, a fourth class, an imported check that carried a hash, and a second commit for one ledger row", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const identity = await seed.conceptIdentity({ workspaceId: WS_A });
+      const commit = await seed.bundleCommit({ workspaceId: WS_A });
+      const columns =
+        "(workspace_id, iri, path, kind, title, frontmatter, body, content_hash, commit_sha, audience, status, sensitivity)";
+      const values = `($1, $2, $3, 'Policy', 'Expenses', '{}'::jsonb, 'body', '${"a".repeat(64)}', '${"b".repeat(40)}', 'everyone'`;
+      const rows: readonly [string, readonly unknown[], string][] = [
+        [
+          `INSERT INTO concept_index ${columns} VALUES ${values}, 'retired', 'Internal')`,
+          [WS_A, identity.iri, "knowledge/one.md"],
+          "concept_index_status_check",
+        ],
+        [
+          `INSERT INTO concept_index ${columns} VALUES ${values}, 'draft', 'Secret')`,
+          [WS_A, identity.iri, "knowledge/two.md"],
+          "concept_index_sensitivity_check",
+        ],
+        [
+          "INSERT INTO concept_verification (id, workspace_id, iri, actor, origin, content_hash) VALUES ($1, $2, $3, 'process:better-answers-test', 'imported', $4)",
+          [ulid(), WS_A, identity.iri, "a".repeat(64)],
+          "concept_verification_imported_check",
+        ],
+        [
+          "INSERT INTO bundle_commit (workspace_id, sha, audit_event_id, actor) VALUES ($1, $2, $3, 'process:better-answers-reconciler')",
+          [WS_A, "d".repeat(40), commit.auditEventId],
+          "bundle_commit_audit_event_uidx",
+        ],
+      ];
+      for (const [statement, parameters, constraint] of rows) {
+        await client.query("SAVEPOINT concept_row");
+        await expect(client.query(statement, [...parameters])).rejects.toThrow(
+          new RegExp(constraint),
+        );
+        await client.query("ROLLBACK TO SAVEPOINT concept_row");
+      }
+    });
+  });
+});
+
 describe("a tenant table under app_rt", () => {
   it("returns zero rows on a missing scope, never another tenant's", async () => {
     await withRollback(db.pool, async (client) => {
