@@ -215,6 +215,14 @@ export const renderConceptFile = (frontmatter: Frontmatter, body: string): strin
 /** The two roles that may change the bundle: an Editor and an Admin, never a Viewer. */
 const mayWrite = (principal: UserPrincipal): boolean => principal.role !== "Viewer";
 
+/**
+ * The index row's columns less the commit's sha, which does not exist yet when this parse
+ * runs: everything a caller supplies is checked at the boundary **before** the commit, so a
+ * row the boundary would refuse never becomes a commit nobody can record. The sha comes from
+ * the git door, which answers a git object name or a refusal and nothing else.
+ */
+const conceptRow = boundarySchemas.conceptIndex.insert.omit({ commitSha: true });
+
 /** The constraints this act refuses over; every other violation stays the store's Error. */
 const WRITE_CONSTRAINTS = {
   concept_index_workspace_id_path_uidx: "path-taken",
@@ -247,7 +255,7 @@ export const writeConcept = async (
   // Everything the rows will hold, parsed at the boundary before anything is committed: a
   // commit whose rows the boundary would refuse is the head-ahead state provoked on
   // purpose, and there is no reason to make one.
-  const parsed = boundarySchemas.conceptIndex.insert.safeParse({
+  const parsed = conceptRow.safeParse({
     workspaceId: principal.workspaceId,
     iri: input.iri,
     path: input.path,
@@ -256,8 +264,6 @@ export const writeConcept = async (
     frontmatter,
     body: input.body,
     contentHash,
-    // A stand-in until the commit exists; the sha the rows carry is the commit's own.
-    commitSha: "0".repeat(40),
     status: input.status ?? CONCEPT_DRAFT_STATUS,
     publishedAt: new Date(),
     sensitivity: input.sensitivity ?? SENSITIVITY_DEFAULT,
