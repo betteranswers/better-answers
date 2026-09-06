@@ -33,14 +33,9 @@
  *
  * **What is recorded here in words, because the record cannot hold it.** The both-ways
  * test refuses an entry naming a table `src/` has not declared, and the owner test
- * refuses a name that is not a directory today. So these facts, all of them settled by
- * the T-063 spec, wait for the ticket that declares their table:
+ * refuses a name that is not a directory today. So this fact, settled by the T-063 spec,
+ * waits for the ticket that declares its table:
  *
- * - `access_request` — the **members** slice's (T-061). The slice is a directory now
- *   (T-060 founded it with the group acts), so the table's row lands the day its
- *   declaration does; until then it is a sentence, because the both-ways test refuses an
- *   entry naming a table `src/` has not declared. The same slice writes `invitation` —
- *   the one T-061 mints on approve — which is a cross-owner write this list will gain.
  * - The concept, bundle-commit, evidence and verification tables and the two graph
  *   tables — the concepts slice's (ADRs 0011, 0012, 0019, 0023).
  *
@@ -98,6 +93,7 @@ export const TABLE_OWNERS = {
   "public.group_member": "members",
   "public.llm_route": "llm",
   "public.audit_event": "audit",
+  "public.access_request": "members",
   "index.chunk": "sources",
 } satisfies Record<string, string>;
 
@@ -196,5 +192,19 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "read",
     reason:
       "Adding a person to a group reads whether they are a member of the workspace first, so the act answers `not-a-member` rather than letting the composite foreign key abort the caller's transaction; T-061's request act reads the same row to answer already-a-member neutrally.",
+  },
+  {
+    table: "public.user",
+    by: "members",
+    access: "read",
+    reason:
+      "Approving a request reads the requester's address to mint the invitation to it, and the Admin's queue names each requester so a person can be told apart from a person id; both reads are by the requester id already on a row of this workspace's queue.",
+  },
+  {
+    table: "public.invitation",
+    by: "members",
+    access: "write",
+    reason:
+      "Approving an access request mints the invitation row directly, in the same transaction as the decision — a direct row write through the identity-write seam, never Better Auth's endpoint path, so T-004's two invitation fences stand until T-027 ships the accept page (ADR 0038).",
   },
 ] as const satisfies readonly CrossOwnerAccess[];

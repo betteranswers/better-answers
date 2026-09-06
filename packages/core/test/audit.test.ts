@@ -1,9 +1,8 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { type MigratedPostgres, startMigratedPostgres } from "@better-answers/schema/testing";
-import { afterAll, beforeAll, describe, expect, expectTypeOf, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { boundarySchemas, FAMILIES, ulid } from "@better-answers/schema";
 
@@ -19,6 +18,8 @@ import type { ActorId, UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres, withPrincipal, withScope } from "../src/store/postgres/index.ts";
 import { provisionWorkspace } from "../src/workspaces/index.ts";
 import { bootstrap, seedPerson } from "./platform.ts";
+import { coreSourceFiles } from "./source-tree.ts";
+import { postgresForSuite } from "./suite-postgres.ts";
 
 /**
  * The ledger through the audit slice's entry point (`[TEST1]`), against real Postgres:
@@ -27,17 +28,8 @@ import { bootstrap, seedPerson } from "./platform.ts";
  * actor the door derives or names, in the workspace the transaction is scoped to.
  */
 
-let db: MigratedPostgres;
+const db = postgresForSuite();
 
-beforeAll(async () => {
-  db = await startMigratedPostgres();
-}, 120_000);
-
-afterAll(async () => {
-  await db.stop();
-});
-
-const CORE_SRC = path.resolve(import.meta.dirname, "../src");
 const PACKAGE_JSON = path.resolve(import.meta.dirname, "../package.json");
 
 /** Every module the exports map names, loaded — so every slice's declarations have run. */
@@ -61,15 +53,10 @@ const actLiteralsIn = (files: readonly string[]): Set<string> =>
     ),
   );
 
-const sourceFiles = (): string[] =>
-  readdirSync(CORE_SRC, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
-    .map((entry) => path.join(entry.parentPath, entry.name));
-
 /** A provisioned workspace and its Admin, as a user principal's claims. */
 const provisioned = async () => {
-  const adminUserId = await seedPerson(db.pool);
-  const door = openPostgres(db.runtimePool);
+  const adminUserId = await seedPerson(db().pool);
+  const door = openPostgres(db().runtimePool);
   const workspaceId = ulid();
   const made = await provisionWorkspace(bootstrap, door, {
     id: workspaceId,
@@ -82,7 +69,7 @@ const provisioned = async () => {
 };
 
 const rowById = async (id: string) => {
-  const found = await db.pool.query<{
+  const found = await db().pool.query<{
     workspace_id: string;
     act: string;
     family: string;
@@ -123,7 +110,7 @@ describe("the declared-acts walk", () => {
     // Held by name, both ways, with this suite's own probe declarations counted in.
     await loadEveryEntryPoint();
     const registered = new Set<string>(declarations().flatMap((declaration) => declaration.acts));
-    const inTree = actLiteralsIn(sourceFiles());
+    const inTree = actLiteralsIn(coreSourceFiles());
     const inThisSuite = actLiteralsIn([path.resolve(import.meta.dirname, "audit.test.ts")]);
 
     expect([...inTree].filter((name) => !registered.has(name))).toEqual([]);
@@ -227,7 +214,7 @@ describe("the declared-acts walk", () => {
       ),
     ).toBe(false);
 
-    const offending = sourceFiles().filter((file) => wrapped.test(readFileSync(file, "utf8")));
+    const offending = coreSourceFiles().filter((file) => wrapped.test(readFileSync(file, "utf8")));
     expect(offending).toEqual([]);
   });
 });

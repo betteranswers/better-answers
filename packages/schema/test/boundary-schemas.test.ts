@@ -4,7 +4,7 @@ import { PgTable } from "drizzle-orm/pg-core";
 import type { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { boundarySchemas, EMBEDDING_DIMENSIONS } from "../src/index.ts";
+import { ACCESS_REQUEST_REASON_MAX, boundarySchemas, EMBEDDING_DIMENSIONS } from "../src/index.ts";
 import * as publicEntry from "../src/index.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "../src/drizzle-zod.ts";
 import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
@@ -24,6 +24,7 @@ const INVITATION_ID = "01J6FFFFFFFFFFFFFFFFFFFFFF";
 const GROUP_ID = "01J6JJJJJJJJJJJJJJJJJJJJJJ";
 const AUDIT_EVENT_ID = "01J6GGGGGGGGGGGGGGGGGGGGGG";
 const BATCH_ID = "01J6HHHHHHHHHHHHHHHHHHHHHH";
+const ACCESS_REQUEST_ID = "01J6KKKKKKKKKKKKKKKKKKKKKK";
 const NOW = new Date("2026-09-01T00:00:00Z");
 
 /** Rows each refined insert schema accepts — assertion 4's input. */
@@ -158,6 +159,27 @@ const acceptedRows = {
       subjectId: "01J6GGGGGGGGGGGGGGGGGGGGG4",
       detail: { confirmed: true, count: 3 },
       batchId: BATCH_ID,
+    },
+  ],
+  // A waiting request and a decided one: the second carries the whole decision — the
+  // decider, the instant and the invitation approve minted — which the row's own CHECK
+  // holds together.
+  accessRequest: [
+    {
+      id: ACCESS_REQUEST_ID,
+      workspaceId: WS_ID,
+      requesterId: USER_ID,
+      reason: "I have joined the bids team and need the answer library.",
+    },
+    {
+      id: "01J6KKKKKKKKKKKKKKKKKKKKK2",
+      workspaceId: WS_ID,
+      requesterId: USER_ID,
+      reason: "Second ask, already decided.",
+      status: "approved",
+      decidedBy: USER_ID,
+      decidedAt: NOW,
+      invitationId: INVITATION_ID,
     },
   ],
   chunk: [
@@ -295,6 +317,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "mcpCallCounter",
         "ingressCounter",
         "auditEvent",
+        "accessRequest",
         "chunk",
       ] as const;
       expect(insertOrder.toSorted()).toEqual(registryNames.toSorted());
@@ -360,6 +383,17 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.auditEvent[0], actor: "Priya Patel" },
       { ...acceptedRows.auditEvent[0], detail: { person: { name: "Priya" } } },
       { ...acceptedRows.auditEvent[2], batchId: "batch-1" },
+    ],
+    // The queue's refusals: an id not the minter's; a reason that is blank, whitespace or
+    // longer than a sentence of why; a fourth status; a requester named by address rather
+    // than by person id.
+    accessRequest: [
+      { ...acceptedRows.accessRequest[0], id: "request-1" },
+      { ...acceptedRows.accessRequest[0], reason: "" },
+      { ...acceptedRows.accessRequest[0], reason: "   " },
+      { ...acceptedRows.accessRequest[0], reason: "x".repeat(ACCESS_REQUEST_REASON_MAX + 1) },
+      { ...acceptedRows.accessRequest[0], status: "expired" },
+      { ...acceptedRows.accessRequest[0], requesterId: "priya@example.invalid" },
     ],
     chunk: [
       {
@@ -548,6 +582,23 @@ describe("5 — the inferred type is pinned", () => {
         at: Date;
         detail: Record<string, string | number | boolean> | null;
         batchId: string | null;
+      }
+    >
+  >;
+  type AccessRequestId = string & z.core.$brand<"AccessRequestId">;
+  type _accessRequestSelect = Expect<
+    Equal<
+      z.infer<typeof boundarySchemas.accessRequest.select>,
+      {
+        id: AccessRequestId;
+        workspaceId: WorkspaceId;
+        requesterId: UserId;
+        reason: string;
+        status: "waiting" | "approved" | "declined";
+        createdAt: Date;
+        decidedBy: UserId | null;
+        decidedAt: Date | null;
+        invitationId: string | null;
       }
     >
   >;

@@ -6,7 +6,7 @@ direction. The worker never migrates; this module is its read-only
 knowledge of what the app's journal built, stamped with the migration id it was
 generated from."""
 
-MIGRATION_ID = "0011_groups-substrate"
+MIGRATION_ID = "0013_access-requests-substrate"
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -19,6 +19,17 @@ TABLES: dict[str, dict[str, str]] = {
         "sensitivity": "text NOT NULL",
         "audience": "text NOT NULL",
         "binding_id": "text NOT NULL",
+    },
+    "public.access_request": {
+        "id": "text NOT NULL",
+        "workspace_id": "text NOT NULL",
+        "requester_id": "text NOT NULL",
+        "reason": "text NOT NULL",
+        "status": "text NOT NULL",
+        "created_at": "timestamp with time zone NOT NULL",
+        "decided_by": "text",
+        "decided_at": "timestamp with time zone",
+        "invitation_id": "text",
     },
     "public.account": {
         "id": "text NOT NULL",

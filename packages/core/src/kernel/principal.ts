@@ -19,6 +19,8 @@ export type UserId = z.infer<typeof boundarySchemas.user.select>["id"];
 export type Role = z.infer<typeof boundarySchemas.member.select>["role"];
 /** A ledger row's id — caller-minted, and what a governed write's commit trailer carries (ADR 0014 rule 4). */
 export type AuditEventId = z.infer<typeof boundarySchemas.auditEvent.select>["id"];
+/** An *access request*'s id — caller-minted, so the act's ledger row names it as its subject. */
+export type AccessRequestId = z.infer<typeof boundarySchemas.accessRequest.select>["id"];
 
 /**
  * A group's id (ADR 0038), from the boundary like its neighbours rather than written by

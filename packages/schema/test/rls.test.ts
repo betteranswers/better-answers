@@ -601,6 +601,110 @@ describe("the group tables under app_rt", () => {
   });
 });
 
+/**
+ * The access-request queue's own proofs (ADR 0038): a tenant table like any other, so its
+ * zero-rows proof is stated here in its own words; the worker's role is refused on it
+ * outright (migration 0013, `[SEC3]`); and the partial unique index refuses a second open
+ * request from the same person while leaving a decided one alone.
+ */
+describe("access requests under app_rt", () => {
+  it("returns zero rows on a missing scope and only the scoped tenant's rows otherwise", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const inA = await seed.accessRequest({ workspaceId: WS_A });
+      await seed.accessRequest({ workspaceId: WS_B });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      const unscoped = await client.query("SELECT id FROM access_request");
+      expect(unscoped.rows).toEqual([]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const scoped = await client.query("SELECT id, workspace_id FROM access_request");
+      expect(scoped.rows).toEqual([{ id: inA.id, workspace_id: WS_A }]);
+    });
+  });
+
+  it("refuses the worker role on the access-request queue, reading and writing alike (migration 0013)", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const person = await seed.user();
+      await seed.accessRequest({ workspaceId: WS_A, requesterId: person.id });
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await client.query("SAVEPOINT r");
+      await expect(client.query("SELECT 1 FROM access_request LIMIT 1")).rejects.toThrow(
+        /permission denied/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT r");
+      await expect(
+        client.query(
+          "INSERT INTO access_request (id, workspace_id, requester_id, reason) VALUES ($1, $2, $3, 'let me in')",
+          [ulid(), WS_A, person.id],
+        ),
+      ).rejects.toThrow(/permission denied/);
+    });
+  });
+
+  it("holds one open request per workspace and person, and counts only the waiting ones", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const person = await seed.user();
+      const waiting = { workspaceId: WS_A, requesterId: person.id };
+      await seed.accessRequest(waiting);
+
+      // The second open ask, refused by the partial unique index rather than by code.
+      await client.query("SAVEPOINT second");
+      await expect(seed.accessRequest(waiting)).rejects.toThrow(/access_request_waiting_uidx/);
+      await client.query("ROLLBACK TO SAVEPOINT second");
+
+      // Both axes of the index's WHERE, each proved by a row it lets through: the same
+      // person waiting in the other workspace, and a decided row for this person here —
+      // which is what leaves a declined person free to ask again.
+      await seed.accessRequest({ workspaceId: WS_B, requesterId: person.id });
+      const decided = await seed.accessRequest({
+        ...waiting,
+        status: "declined",
+        decidedBy: person.id,
+        decidedAt: new Date(),
+      });
+      expect(decided.status).toBe("declined");
+    });
+  });
+
+  it("refuses a fourth status and a decision that only half happened, at the row", async () => {
+    // Straight SQL rather than the factory, which would refuse the status at the boundary
+    // before any INSERT existed: the claim here is the database's own.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const person = await seed.user();
+      const rows: readonly [string, string][] = [
+        // A fourth status, with a whole decision beside it so that only the status's own
+        // CHECK can be what refuses the row.
+        [
+          "INSERT INTO access_request (id, workspace_id, requester_id, reason, status, decided_at, decided_by) VALUES ($1, $2, $3, 'why', 'expired', now(), $3)",
+          "access_request_status_check",
+        ],
+        [
+          "INSERT INTO access_request (id, workspace_id, requester_id, reason, status, decided_at) VALUES ($1, $2, $3, 'why', 'declined', now())",
+          "access_request_decision_check",
+        ],
+        [
+          "INSERT INTO access_request (id, workspace_id, requester_id, reason, status, decided_at, decided_by, invitation_id) VALUES ($1, $2, $3, 'why', 'declined', now(), $3, 'invitation-1')",
+          "access_request_decision_check",
+        ],
+      ];
+      for (const [statement, constraint] of rows) {
+        await client.query("SAVEPOINT decision");
+        await expect(client.query(statement, [ulid(), WS_A, person.id])).rejects.toThrow(
+          new RegExp(constraint),
+        );
+        await client.query("ROLLBACK TO SAVEPOINT decision");
+      }
+    });
+  });
+});
+
 describe("a tenant table under app_rt", () => {
   it("returns zero rows on a missing scope, never another tenant's", async () => {
     await withRollback(db.pool, async (client) => {

@@ -10,16 +10,17 @@
  *   Built by a transport, first parameter of every function in `core` that touches
  *   tenant data. T-004.
  * - branded ids — one per entity the glossary names, so a concept id cannot be passed
- *   where a source id belongs. `WorkspaceId`, `UserId` and `AuditEventId` today, from
- *   the boundary.
+ *   where a source id belongs. `WorkspaceId`, `UserId`, `AuditEventId` and
+ *   `AccessRequestId` today, from the boundary.
  * - the error vocabulary — the typed failures a transport maps to its own protocol.
  *   No status codes live here: four of `core`'s five callers have no notion of one.
  *   `PrincipalRefusal` today.
  * - `Result` — folded in from `packages/contracts` when that package was retired
  *   (T-020, ADR 0031).
- * - `ActorId` and `actorIdOf` — the three forms a record the platform keeps names an
- *   actor in, and the one derivation from a Principal, so none is composed by hand
- *   (ADRs 0019 and 0035). T-076.
+ * - `ActorId`, `actorIdOf` and `actorIdOfPerson` — the three forms a record the platform
+ *   keeps names an actor in, the one derivation from a Principal and the one from a person
+ *   id alone, for the act whose maker holds no Principal, so none is composed by hand
+ *   (ADRs 0019, 0035 and 0038). T-076, T-061.
  * - `RoleRefusal` and `requireAdmin` — the one word for an act a role may not perform
  *   and the guard that narrows a `UserPrincipal` to Admin or returns it. T-076.
  * - the result convention — what a slice act returns and that it never throws across
@@ -34,11 +35,12 @@ export { ulid } from "@better-answers/schema";
 export { refusalFor } from "./constraint.ts";
 export { attempt, err, normalizeError, ok } from "./result.ts";
 export type { Result } from "./result.ts";
-export { actorIdOf } from "./actor.ts";
+export { actorIdOf, actorIdOfPerson } from "./actor.ts";
 export type { ActorId, ProcessActorId } from "./actor.ts";
 export { requireAdmin } from "./role.ts";
 export type { AdminUserPrincipal, RoleRefusal } from "./role.ts";
 export type {
+  AccessRequestId,
   AuditEventId,
   Claims,
   GroupId,

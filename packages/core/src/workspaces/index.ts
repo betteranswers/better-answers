@@ -323,6 +323,49 @@ export const workspacesHeldBy = async (
 };
 
 /**
+ * Which workspace does this slug name? The read the *access request* is made through
+ * (ADR 0038, T-061): a person who is not a member types the slug their colleague gave
+ * them, and the members slice has to turn it into a workspace id before it can scope the
+ * write. `workspace` is this slice's table, so the read is a slice function rather than
+ * SQL written in another slice (ADR 0029; the table-ownership map).
+ *
+ * **Unscoped, through the identity-read door**, for `workspacesHeldBy`'s reason: it runs
+ * before a workspace is known, so there is no scope to set and a scoped read would see
+ * nothing; `workspace` is the identity set's last member and carries no policy (ADR 0009).
+ * The platform principal is the principal because the identity set is nobody's tenant. A
+ * read writes no ledger row.
+ *
+ * **It answers an id or nothing, and never says why.** A slug that names no workspace and a
+ * slug the boundary will not even accept come back the same way — `undefined` — because the
+ * one caller must answer its own seam identically whether the workspace exists or not, and a
+ * refusal word here would be the difference a caller could read the tenant list out of
+ * (ADR 0038's neutral acknowledgement). Keeping that promise is the caller's; not handing it
+ * a distinction to leak is this function's.
+ */
+export const workspaceIdBySlug = async (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  slug: string,
+): Promise<Result<WorkspaceId | undefined, Error>> => {
+  const wanted = boundarySchemas.workspace.select.shape.slug.safeParse(slug);
+  if (!wanted.success) return ok(undefined);
+
+  const found = await attempt(() =>
+    withIdentityRead(platform, door, async (tx) => {
+      const rows = await tx.query<{ id: string }>("SELECT id FROM workspace WHERE slug = $1", [
+        wanted.data,
+      ]);
+      const id = rows.rows[0]?.id;
+      // Parsed rather than asserted (ADR 0028): a value that is not a workspace id comes
+      // back as the store's Error and never as an id a caller would scope a write to.
+      return id === undefined ? undefined : boundarySchemas.workspace.select.shape.id.parse(id);
+    }),
+  );
+  if (!found.ok) return err(found.error);
+  return ok(found.value);
+};
+
+/**
  * Who the person is, where they are and at what role — the three the shell names
  * (T-037, user stories 9 and 10). The role is the Principal's, resolved in this same
  * transaction against the member row; the two names are looked up beside it.

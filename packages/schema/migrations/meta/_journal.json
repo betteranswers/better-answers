@@ -85,6 +85,20 @@
       "when": 1788722305087,
       "tag": "0011_groups-substrate",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788724439553,
+      "tag": "0012_access-requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788724443639,
+      "tag": "0013_access-requests-substrate",
+      "breakpoints": true
     }
   ]
 }
