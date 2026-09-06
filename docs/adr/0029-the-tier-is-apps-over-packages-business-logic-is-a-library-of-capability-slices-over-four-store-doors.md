@@ -63,6 +63,12 @@ packages/core/src/
   runs/             Slice: the worker control plane as the app sees it — enqueue, run and
                     heartbeat views, cancel flags. Thin over the SQL protocol functions; owns
                     no semantics of its own.
+  workspaces/       Slice: the tenant's lifecycle — provisioning (workspace, first Admin
+                    membership and config in one transaction), the picker's cross-workspace
+                    read, credentials revocation (ADRs 0009, 0035). Added 2026-09-06.
+  members/          Slice: who is in a workspace and who they are grouped with — groups and
+                    their memberships, access requests and the People acts (ADR 0038;
+                    T-048). Added 2026-09-06.
 ```
 
 **A slice is the capability that owns a set of tables and the invariants over them** — the write path, not a screen. That definition generated the list above and is the test for adding to it.
@@ -129,3 +135,7 @@ The size ceiling `[DESIGN1]` implies is a proxy that splitting a file games. The
 ## Amendment — 2026-09-05, the store door's path, and the demotion enacted (T-078)
 
 The 2026-08-29 consequence above — the tenancy rule demoted from a rule to this ADR — is enacted in full: the tag is retired, the substrate is ADR 0032's amendment of the same date, and the checkable sentences are `[SEC2]`'s and `[SEC3]`'s. The one sentence that was this ADR's alone is recorded here with its path corrected: **every query reaches its store through a store door** in `packages/core/src/store/`, exported as `@better-answers/core/store` — the rule had said `packages/core/store/`, a directory that does not exist. Import direction stays the lint rule above. Where this ADR's body cited the retired tag, the citation is struck and pointed here, as the index's convention asks; Dust's rule identifier in the body is written unbracketed for the same reason — it is not one of this repository's tags.
+
+## Amendment — 2026-09-06, the tree gains the slices built since (T-048)
+
+Two slices passed the test the tree states — the capability that owns a set of tables and the invariants over them — without gaining their rows: `workspaces/` (the tenant's lifecycle — provisioning, the picker's cross-workspace read, credentials revocation) and `members/` (groups, their memberships and access requests — T-048's three slices). Both rows are added to the tree above, dated. The table-ownership map already records their tables and ADR 0038 the model they carry; nothing else in this ADR moves.
