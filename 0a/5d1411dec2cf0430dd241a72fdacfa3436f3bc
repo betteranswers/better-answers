@@ -1,0 +1,22 @@
+docs/adr/README.md
+  s_60cb49f326e973::t_63aac035101368 37
+docs/adr/0029-the-tier-is-apps-over-packages-business-logic-is-a-library-of-capability-slices-over-four-store-doors.md
+  s_60cb49f326e973::t_685d65017e54db 138-141
+  s_60cb49f326e973::t_589585b02c5feb 66-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0a5d1411dec2cf0430dd241a72fdacfa3436f3bc",
+  "prompts": {},
+  "sessions": {
+    "s_60cb49f326e973": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e80ae313-9589-4f4b-b289-fd6b0e7de277",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
