@@ -580,14 +580,21 @@ describe("the group tables under app_rt", () => {
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      for (const statement of [
-        `SELECT 1 FROM "group" LIMIT 1`,
-        "SELECT 1 FROM group_member LIMIT 1",
-        `INSERT INTO "group" (id, workspace_id, name, origin) VALUES ('${ulid()}', '${WS_A}', 'Worker', 'admin-curated')`,
-        `INSERT INTO group_member (workspace_id, group_id, user_id) VALUES ('${WS_A}', '${ulid()}', '${ulid()}')`,
-      ]) {
+      const refused: readonly [string, readonly string[]][] = [
+        [`SELECT 1 FROM "group" LIMIT 1`, []],
+        ["SELECT 1 FROM group_member LIMIT 1", []],
+        [
+          `INSERT INTO "group" (id, workspace_id, name, origin) VALUES ($1, $2, 'Worker', 'admin-curated')`,
+          [ulid(), WS_A],
+        ],
+        [
+          "INSERT INTO group_member (workspace_id, group_id, user_id) VALUES ($1, $2, $3)",
+          [WS_A, ulid(), ulid()],
+        ],
+      ];
+      for (const [statement, values] of refused) {
         await client.query("SAVEPOINT worker_probe");
-        await expect(client.query(statement)).rejects.toThrow(/permission denied/);
+        await expect(client.query(statement, [...values])).rejects.toThrow(/permission denied/);
         await client.query("ROLLBACK TO SAVEPOINT worker_probe");
       }
     });

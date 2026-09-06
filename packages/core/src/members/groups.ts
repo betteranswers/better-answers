@@ -75,32 +75,35 @@ const GROUP_ORIGIN = boundarySchemas.group.select.shape.origin;
 const PERSON_ID = boundarySchemas.user.select.shape.id;
 
 /** What every act refuses before it reads anything: the role, and an argument of the wrong shape. */
-type Refused = RoleRefusal | "malformed";
-/** What an act that names a group adds: the scope holds no such group of that id. */
-type Missing = Refused | "no-such-group";
+type GuardRefusal = RoleRefusal | "malformed";
+/** What an act that names a group adds: this workspace holds no group of that id. */
+type TargetRefusal = GuardRefusal | "no-such-group";
 
 export type CreateGroupInput = { readonly name: string };
-export type CreateGroupRefusal = Refused | "name-taken" | Error;
+export type CreateGroupRefusal = GuardRefusal | "name-taken" | Error;
 
 export type RenameGroupInput = { readonly groupId: string; readonly name: string };
-export type RenameGroupRefusal = Missing | "name-taken" | Error;
+export type RenameGroupRefusal = TargetRefusal | "name-taken" | Error;
 
 export type DeleteGroupInput = { readonly groupId: string };
-export type DeleteGroupRefusal = Missing | Error;
+export type DeleteGroupRefusal = TargetRefusal | Error;
 
 export type GroupMemberInput = { readonly groupId: string; readonly userId: string };
-export type AddToGroupRefusal = Missing | "not-a-member" | "already-in-group" | Error;
-export type RemoveFromGroupRefusal = Missing | "not-in-group" | Error;
+export type AddToGroupRefusal = TargetRefusal | "not-a-member" | "already-in-group" | Error;
+export type RemoveFromGroupRefusal = TargetRefusal | "not-in-group" | Error;
 
-/** An act's two arguments once the guard and the boundary have both had them. */
-type Named = { readonly admin: AdminUserPrincipal; readonly groupId: GroupId };
+/** What an act acts on: the Admin performing it, and the group they named. */
+type GroupTarget = { readonly admin: AdminUserPrincipal; readonly groupId: GroupId };
 
 /**
  * The guard and the boundary in one step, for the four acts that name a group: an Editor
  * or a Viewer gets the one refusal word (`kernel/role.ts`) and an id of another shape gets
  * `malformed`, both before any statement runs.
  */
-const named = (principal: UserPrincipal, groupId: string): Result<Named, Missing> => {
+const groupTarget = (
+  principal: UserPrincipal,
+  groupId: string,
+): Result<GroupTarget, TargetRefusal> => {
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);
   const parsed = GROUP_ID.safeParse(groupId);
@@ -108,16 +111,26 @@ const named = (principal: UserPrincipal, groupId: string): Result<Named, Missing
   return ok({ admin: admin.value, groupId: parsed.data });
 };
 
-/** Whether this workspace holds the group — what tells `no-such-group` from the act's own word. */
-const holdsGroup = async (tx: Tx, { admin, groupId }: Named): Promise<Result<boolean, Error>> => {
+/**
+ * Which word a statement that changed nothing deserves. Two acts write a statement that
+ * can come back empty for either of two reasons, and only a second read tells them apart:
+ * the workspace holds the group, so the act's own word applies, or it does not, and the
+ * word is `no-such-group` — the same word a group id nobody holds gets, so an Admin of
+ * another workspace learns nothing from asking.
+ */
+const nothingChanged = async <Own extends string>(
+  tx: Tx,
+  { admin, groupId }: GroupTarget,
+  whenTheGroupIsThere: Own,
+): Promise<Own | "no-such-group" | Error> => {
   const found = await attempt(() =>
     tx.query(`SELECT 1 FROM "group" WHERE workspace_id = $1 AND id = $2`, [
       admin.workspaceId,
       groupId,
     ]),
   );
-  if (!found.ok) return err(found.error);
-  return ok(found.value.rowCount === 1);
+  if (!found.ok) return found.error;
+  return found.value.rowCount === 1 ? whenTheGroupIsThere : "no-such-group";
 };
 
 export const createGroup = async (
@@ -165,7 +178,7 @@ export const renameGroup = async (
   tx: Tx,
   input: RenameGroupInput,
 ): Promise<Result<{ groupId: GroupId }, RenameGroupRefusal>> => {
-  const target = named(principal, input.groupId);
+  const target = groupTarget(principal, input.groupId);
   if (!target.ok) return err(target.error);
   const name = GROUP_NAME.safeParse(input.name);
   if (!name.success) return err("malformed");
@@ -182,12 +195,10 @@ export const renameGroup = async (
     ),
   );
   if (!renamed.ok) return err(renamed.error);
-  if (renamed.value.rowCount === 0) {
-    // Nothing was renamed for one of two reasons, and only a second read tells them apart.
-    const holds = await holdsGroup(tx, target.value);
-    if (!holds.ok) return err(holds.error);
-    return err(holds.value ? "name-taken" : "no-such-group");
-  }
+  // Nothing was renamed either because the group is not this workspace's, or because
+  // another group of it already holds the name the `NOT EXISTS` looked for.
+  if (renamed.value.rowCount === 0)
+    return err(await nothingChanged(tx, target.value, "name-taken"));
 
   await record(admin, tx, {
     id: ulid(),
@@ -203,7 +214,7 @@ export const deleteGroup = async (
   tx: Tx,
   input: DeleteGroupInput,
 ): Promise<Result<{ groupId: GroupId }, DeleteGroupRefusal>> => {
-  const target = named(principal, input.groupId);
+  const target = groupTarget(principal, input.groupId);
   if (!target.ok) return err(target.error);
   const { admin, groupId } = target.value;
 
@@ -228,12 +239,14 @@ export const deleteGroup = async (
   return ok({ groupId });
 };
 
-/** The guard, the group id and the person id, for the two acts that name all three. */
-const namedPair = (
+/** What the two membership acts act on: a group target, and the person named beside it. */
+type MembershipTarget = GroupTarget & { readonly userId: UserId };
+
+const membershipTarget = (
   principal: UserPrincipal,
   input: GroupMemberInput,
-): Result<Named & { readonly userId: UserId }, Missing> => {
-  const target = named(principal, input.groupId);
+): Result<MembershipTarget, TargetRefusal> => {
+  const target = groupTarget(principal, input.groupId);
   if (!target.ok) return err(target.error);
   const person = PERSON_ID.safeParse(input.userId);
   if (!person.success) return err("malformed");
@@ -245,7 +258,7 @@ export const addToGroup = async (
   tx: Tx,
   input: GroupMemberInput,
 ): Promise<Result<{ groupId: GroupId; userId: UserId }, AddToGroupRefusal>> => {
-  const target = namedPair(principal, input);
+  const target = membershipTarget(principal, input);
   if (!target.ok) return err(target.error);
   const { admin, groupId, userId } = target.value;
 
@@ -289,7 +302,7 @@ export const removeFromGroup = async (
   tx: Tx,
   input: GroupMemberInput,
 ): Promise<Result<{ groupId: GroupId; userId: UserId }, RemoveFromGroupRefusal>> => {
-  const target = namedPair(principal, input);
+  const target = membershipTarget(principal, input);
   if (!target.ok) return err(target.error);
   const { admin, groupId, userId } = target.value;
 
@@ -300,10 +313,10 @@ export const removeFromGroup = async (
     ),
   );
   if (!removed.ok) return err(removed.error);
+  // Nothing was removed either because the group is not this workspace's, or because the
+  // person was never in it.
   if (removed.value.rowCount === 0) {
-    const holds = await holdsGroup(tx, target.value);
-    if (!holds.ok) return err(holds.error);
-    return err(holds.value ? "not-in-group" : "no-such-group");
+    return err(await nothingChanged(tx, target.value, "not-in-group"));
   }
 
   await record(admin, tx, {

@@ -384,10 +384,8 @@ describe("who is in a group", () => {
 /** The six acts, each as one call, so a refusal can be asserted per verb rather than once. */
 type Verb = {
   readonly name: string;
-  readonly run: (
-    principal: UserPrincipal,
-    tx: Tx,
-  ) => Promise<Result<unknown, string | Error | undefined>>;
+  /** Every act's error is a refusal word or the store's Error — the result convention's rule 2. */
+  readonly run: (principal: UserPrincipal, tx: Tx) => Promise<Result<unknown, string | Error>>;
 };
 
 const everyVerb = (groupId: string, userId: string): readonly Verb[] => [
