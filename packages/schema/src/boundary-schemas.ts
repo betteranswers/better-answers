@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ACT, auditEvent, FAMILIES } from "./audit-tables.ts";
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
+import { group, GROUP_ORIGINS, groupMember } from "./group-tables.ts";
 import {
   account,
   invitation,
@@ -46,6 +47,12 @@ import { workspace } from "./workspace-table.ts";
 
 const workspaceId = (schema: z.ZodString) => schema.regex(ULID).brand<"WorkspaceId">();
 const userId = (schema: z.ZodString) => schema.regex(ULID).brand<"UserId">();
+/**
+ * A group's id, on the group row and on every membership that names it: platform-minted,
+ * so T-006's `audience_groups` refinement can assume the shape (ADR 0038). The brand is
+ * where the kernel's `GroupId` comes from, as `WorkspaceId` and `UserId` do.
+ */
+const groupId = (schema: z.ZodString) => schema.regex(ULID).brand<"GroupId">();
 /**
  * An id of the identity set the platform reads or writes: one shape, the minter's
  * (`ulid.ts`, ADR 0035). The OAuth tables are deliberately left unnarrowed — the library
@@ -161,6 +168,27 @@ export const invitationSelect = createSelectSchema(invitation, invitationRefinem
 export const invitationInsert = createInsertSchema(invitation, invitationRefinements);
 export const invitationUpdate = createUpdateSchema(invitation, invitationRefinements);
 
+const groupRefinements = {
+  id: groupId,
+  workspaceId,
+  name: (schema: z.ZodString) => schema.trim().min(1),
+  // The closed pair (ADR 0038); the column stays text so the set is the boundary's to
+  // narrow, exactly as `chunk.sensitivity` is.
+  origin: (schema: z.ZodString) => schema.pipe(z.enum(GROUP_ORIGINS)),
+};
+
+export const groupSelect = createSelectSchema(group, groupRefinements);
+export const groupInsert = createInsertSchema(group, groupRefinements);
+export const groupUpdate = createUpdateSchema(group, groupRefinements);
+
+// Keyed by workspace, group and person, and carrying nothing else about the person: a
+// membership says who may see what, never what they may do (ADR 0038).
+const groupMemberRefinements = { workspaceId, groupId, userId };
+
+export const groupMemberSelect = createSelectSchema(groupMember, groupMemberRefinements);
+export const groupMemberInsert = createInsertSchema(groupMember, groupMemberRefinements);
+export const groupMemberUpdate = createUpdateSchema(groupMember, groupMemberRefinements);
+
 const mcpCallCounterRefinements = {
   workspaceId,
   tokenId: (schema: z.ZodString) => schema.trim().min(1),
@@ -254,6 +282,13 @@ export const boundarySchemas = {
   },
   user: { table: user, select: userSelect, insert: userInsert, update: userUpdate },
   member: { table: member, select: memberSelect, insert: memberInsert, update: memberUpdate },
+  group: { table: group, select: groupSelect, insert: groupInsert, update: groupUpdate },
+  groupMember: {
+    table: groupMember,
+    select: groupMemberSelect,
+    insert: groupMemberInsert,
+    update: groupMemberUpdate,
+  },
   mcpCallCounter: {
     table: mcpCallCounter,
     select: mcpCallCounterSelect,

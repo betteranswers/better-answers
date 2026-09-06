@@ -3,7 +3,13 @@ import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
 import type pg from "pg";
 import type { z } from "zod";
 
-import { boundarySchemas, CREATOR_ROLE, EMBEDDING_DIMENSIONS, ulid } from "../src/index.ts";
+import {
+  boundarySchemas,
+  CREATOR_ROLE,
+  CURATED_ORIGIN,
+  EMBEDDING_DIMENSIONS,
+  ulid,
+} from "../src/index.ts";
 
 /**
  * The test-data factory (`[TEST4]`): tests state what their scenario needs and get
@@ -32,6 +38,14 @@ export type TestData = {
    * People screen would write.
    */
   invitation(overrides?: Partial<InsertInput<"invitation">>): Promise<Row<"invitation">>;
+  /** A group; creates its own workspace unless one is named. Admin-curated, as every group written today is. */
+  group(overrides?: Partial<InsertInput<"group">>): Promise<Row<"group">>;
+  /**
+   * One person in one group. Creates the group unless named, and the membership the
+   * composite key needs unless the person is named — a person in a group is a member of
+   * the workspace first, and the key is what says so.
+   */
+  groupMember(overrides?: Partial<InsertInput<"groupMember">>): Promise<Row<"groupMember">>;
   /** A config row; creates its own workspace unless one is named. */
   workspaceConfig(
     overrides?: Partial<InsertInput<"workspaceConfig">>,
@@ -161,6 +175,27 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const group: TestData["group"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const id = overrides.id ?? ulid();
+    return insertRow(client, "group", {
+      id,
+      name: `Group ${id}`,
+      origin: CURATED_ORIGIN,
+      ...overrides,
+      workspaceId,
+    });
+  };
+
+  const groupMember: TestData["groupMember"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const groupId = overrides.groupId ?? (await group({ workspaceId })).id;
+    // The membership the composite key references: a person named without one would fail
+    // the foreign key, which is the invariant, not a gap the factory should paper over.
+    const userId = overrides.userId ?? (await member({ workspaceId })).userId;
+    return insertRow(client, "groupMember", { ...overrides, workspaceId, groupId, userId });
+  };
+
   const workspaceConfig: TestData["workspaceConfig"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     return insertRow(client, "workspaceConfig", {
@@ -273,6 +308,8 @@ export const testData = (client: pg.PoolClient): TestData => {
     user,
     member,
     invitation,
+    group,
+    groupMember,
     workspaceConfig,
     llmRoute,
     chunk,

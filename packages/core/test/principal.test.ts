@@ -37,7 +37,13 @@ afterAll(async () => {
   await db.stop();
 });
 
-type Seeded = { workspaceId: string; userId: string; otherWorkspaceId: string };
+type Seeded = {
+  workspaceId: string;
+  userId: string;
+  otherWorkspaceId: string;
+  /** The ids of the groups the person was put in, in each workspace. */
+  groupIds: { here: readonly string[]; there: readonly string[] };
+};
 
 const seedMembership = async (
   overrides: {
@@ -48,6 +54,8 @@ const seedMembership = async (
     revokedHereAt?: Date;
     /** Give the person a membership in the second workspace too. */
     memberOfBoth?: boolean;
+    /** How many groups of each workspace they are in — the second only when a member of both. */
+    groupsEach?: number;
   } = {},
 ): Promise<Seeded> => {
   const client = await db.pool.connect();
@@ -69,7 +77,24 @@ const seedMembership = async (
         role: overrides.role ?? "Viewer",
       });
     }
-    return { workspaceId: workspace.id, userId: user.id, otherWorkspaceId: other.id };
+    const putInGroups = async (workspaceId: string): Promise<readonly string[]> => {
+      const ids: string[] = [];
+      for (let made = 0; made < (overrides.groupsEach ?? 0); made += 1) {
+        const group = await seed.group({ workspaceId });
+        await seed.groupMember({ workspaceId, groupId: group.id, userId: user.id });
+        ids.push(group.id);
+      }
+      return ids.toSorted();
+    };
+    return {
+      workspaceId: workspace.id,
+      userId: user.id,
+      otherWorkspaceId: other.id,
+      groupIds: {
+        here: await putInGroups(workspace.id),
+        there: overrides.memberOfBoth === true ? await putInGroups(other.id) : [],
+      },
+    };
   } finally {
     client.release();
   }
@@ -159,12 +184,28 @@ describe("the Principal resolver", () => {
     expect(after).toEqual({ ok: true, value: "reached" });
   });
 
+  it("hands the caller the ids of every group they are in here, and an empty list when they are in none", async () => {
+    // ADR 0009: groups are re-read per call, not carried on a credential, so an Admin's
+    // *add to group* reaches the person on their next request rather than their next
+    // sign-in. The resolver reads them in the same one statement as the role.
+    const grouped = await seedMembership({ role: "Editor", groupsEach: 2 });
+    const alone = await seedMembership({ role: "Editor" });
+    const door = openPostgres(db.runtimePool);
+
+    const both = await withPrincipal(door, claimsFor(grouped), async ({ groups }) => groups);
+    const none = await withPrincipal(door, claimsFor(alone), async ({ groups }) => groups);
+
+    expect(both).toEqual({ ok: true, value: grouped.groupIds.here });
+    expect(none).toEqual({ ok: true, value: [] });
+  });
+
   it("lets a person revoked in one workspace go on working in the other, role and groups intact", async () => {
     const revokedHereAt = new Date("2026-09-03T12:00:00Z");
     const seeded = await seedMembership({
       role: "Editor",
       revokedHereAt,
       memberOfBoth: true,
+      groupsEach: 1,
     });
     const door = openPostgres(db.runtimePool);
     const issuedAt = new Date("2026-09-03T11:00:00Z");
@@ -177,6 +218,8 @@ describe("the Principal resolver", () => {
       claimsFor(seeded, { issuedAt, workspaceId: seeded.otherWorkspaceId }),
       async (principal) => principal,
     );
+    // The other workspace's group, and only it: a group is a set of one workspace's
+    // members, so the group this person is in here never reaches the Principal there.
     expect(there).toEqual({
       ok: true,
       value: {
@@ -184,9 +227,10 @@ describe("the Principal resolver", () => {
         workspaceId: seeded.otherWorkspaceId,
         userId: seeded.userId,
         role: "Editor",
-        groups: [],
+        groups: seeded.groupIds.there,
       },
     });
+    expect(seeded.groupIds.there).not.toEqual(seeded.groupIds.here);
   });
 
   it("refuses a credential whose role claim disagrees with the member row", async () => {

@@ -20,8 +20,12 @@ export type Role = z.infer<typeof boundarySchemas.member.select>["role"];
 /** A ledger row's id — caller-minted, and what a governed write's commit trailer carries (ADR 0014 rule 4). */
 export type AuditEventId = z.infer<typeof boundarySchemas.auditEvent.select>["id"];
 
-/** Reserved for T-006's audience work; empty until then. */
-export type GroupId = string & { readonly __brand: "GroupId" };
+/**
+ * A group's id (ADR 0038), from the boundary like its neighbours rather than written by
+ * hand: the members slice mints one, `group_member` names it, and T-006's `audience_groups`
+ * holds exactly these.
+ */
+export type GroupId = z.infer<typeof boundarySchemas.group.select>["id"];
 
 /** A person, in one workspace, at one role, on this call. */
 export type UserPrincipal = {
@@ -29,7 +33,11 @@ export type UserPrincipal = {
   readonly workspaceId: WorkspaceId;
   readonly userId: UserId;
   readonly role: Role;
-  /** Group membership is not resolved in T-004 (grilling Q7); the field is the interface's promise. */
+  /**
+   * Every group this person is in, in this workspace, read on this call — groups are
+   * re-read per call rather than carried on a credential (ADR 0009), so a person added to
+   * a group sees what it sees on their next request and never has to sign in again.
+   */
   readonly groups: readonly GroupId[];
 };
 

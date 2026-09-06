@@ -71,6 +71,20 @@
       "when": 1788708122938,
       "tag": "0009_ledger-substrate",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788722287569,
+      "tag": "0010_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788722305087,
+      "tag": "0011_groups-substrate",
+      "breakpoints": true
     }
   ]
 }
