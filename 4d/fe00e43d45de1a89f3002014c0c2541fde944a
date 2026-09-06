@@ -1,0 +1,19 @@
+packages/core/test/concepts.test.ts
+  s_6181fc5a558822::t_f04c1ea8d429a7 378-382,390
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "4dfe00e43d45de1a89f3002014c0c2541fde944a",
+  "prompts": {},
+  "sessions": {
+    "s_6181fc5a558822": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6019b35b-37fc-4524-aa66-a5eb72515b67",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
