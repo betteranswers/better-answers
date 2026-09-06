@@ -375,10 +375,11 @@ describe("a failure after the commit", () => {
       writeFor({ path: first.path, expectedHead: written.sha }),
     );
 
-    expect(clash).toEqual({ ok: false, error: "path-taken" });
-    // Nothing landed: not the identity, not the index row, not the commit row, and not the
-    // ledger row — which was written first inside the transaction, so this proves it rolled
-    // back with the act rather than that it was never reached (`[AUDIT1]`).
+    // `[TEST8]`: the rows are asserted before the returned value, because a statement that
+    // failed inside a transaction is only proved by what the transaction left. Nothing
+    // landed — not the identity, not the index row, not the commit row, and not the ledger
+    // row, which was written first inside the transaction, so this proves it rolled back
+    // with the act rather than that it was never reached (`[AUDIT1]`).
     expect(await rowsFor(scenario.workspaceId)).toEqual(before);
     // And the shape the reconciler finds: git is one commit ahead of what Postgres knows.
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
@@ -386,6 +387,7 @@ describe("a failure after the commit", () => {
     expect(history).toHaveLength(2);
     expect(recorded).toEqual([history[0]]);
     expect(await head(scenario.git, scenario.workspaceId)).toBe(history[1]);
+    expect(clash).toEqual({ ok: false, error: "path-taken" });
   });
 
   it("refuses the rows when the writer's role moved while the commit was being made", async () => {
