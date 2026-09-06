@@ -23,6 +23,7 @@ import { workspace } from "./workspace-table.ts";
 
 export { workspace } from "./workspace-table.ts";
 export * from "./identity-tables.ts";
+export * from "./audit-tables.ts";
 
 /** The five route purposes (briefing 16's record family; ADR 0031's llm-routing). */
 export const llmPurpose = pgEnum("llm_purpose", [

@@ -17,6 +17,8 @@ import type { ProcessActorId } from "./actor.ts";
 export type WorkspaceId = z.infer<typeof boundarySchemas.workspace.select>["id"];
 export type UserId = z.infer<typeof boundarySchemas.user.select>["id"];
 export type Role = z.infer<typeof boundarySchemas.member.select>["role"];
+/** A ledger row's id — caller-minted, and what a governed write's commit trailer carries (ADR 0014 rule 4). */
+export type AuditEventId = z.infer<typeof boundarySchemas.auditEvent.select>["id"];
 
 /** Reserved for T-006's audience work; empty until then. */
 export type GroupId = string & { readonly __brand: "GroupId" };

@@ -10,7 +10,8 @@
  *   Built by a transport, first parameter of every function in `core` that touches
  *   tenant data. T-004.
  * - branded ids — one per entity the glossary names, so a concept id cannot be passed
- *   where a source id belongs. `WorkspaceId` and `UserId` today, from the boundary.
+ *   where a source id belongs. `WorkspaceId`, `UserId` and `AuditEventId` today, from
+ *   the boundary.
  * - the error vocabulary — the typed failures a transport maps to its own protocol.
  *   No status codes live here: four of `core`'s five callers have no notion of one.
  *   `PrincipalRefusal` today.
@@ -38,6 +39,7 @@ export type { ActorId, ProcessActorId } from "./actor.ts";
 export { requireAdmin } from "./role.ts";
 export type { AdminUserPrincipal, RoleRefusal } from "./role.ts";
 export type {
+  AuditEventId,
   Claims,
   GroupId,
   PlatformPrincipal,

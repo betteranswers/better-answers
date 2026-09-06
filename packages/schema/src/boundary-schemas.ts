@@ -1,6 +1,7 @@
 import type { PgTable } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
+import { ACT_PATTERN, auditEvent, FAMILIES } from "./audit-tables.ts";
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import {
@@ -23,7 +24,7 @@ import {
 import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { ROLES } from "./roles.ts";
 import { llmRoute, workspaceConfig } from "./schema.ts";
-import { ULID } from "./ulid.ts";
+import { ULID, ULID_CHARACTERS } from "./ulid.ts";
 import { workspace } from "./workspace-table.ts";
 
 /**
@@ -180,6 +181,51 @@ export const ingressCounterSelect = createSelectSchema(ingressCounter, ingressCo
 export const ingressCounterInsert = createInsertSchema(ingressCounter, ingressCounterRefinements);
 export const ingressCounterUpdate = createUpdateSchema(ingressCounter, ingressCounterRefinements);
 
+/**
+ * The ledger's actor, narrowed to the three forms the kernel's `ActorId` names (ADR 0035):
+ * a person by their person id — the minter's shape, so an email cannot pass for one — the
+ * platform by `process:better-answers-<purpose>`, an agent by `better-answers-<purpose>/<version>`
+ * as ADR 0019 shapes it.
+ */
+const ACTOR_ID = new RegExp(
+  `^(human:${ULID_CHARACTERS}|process:better-answers-[a-z0-9][a-z0-9-]*|better-answers-[a-z0-9][a-z0-9-]*/[0-9A-Za-z.-]+)$`,
+);
+const ACT = new RegExp(ACT_PATTERN);
+
+/**
+ * The detail a row carries: ids and role words, and an act's confirmations as typed
+ * fields — one flat object of scalars. What each declared act's detail names is the audit
+ * slice's business; the boundary holds the container to a shape an email or a prompt has
+ * no nested place to hide in. JSON `null` stays accepted because the column accepts it —
+ * `jsonb NOT NULL` refuses SQL NULL, not the JSON value — and the parity suite holds a
+ * refinement to the column's own nullability; the audit slice's doors never write one.
+ */
+const detail = z.union([
+  z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
+  z.null(),
+]);
+
+const auditEventRefinements = {
+  id: (schema: z.ZodString) => schema.regex(ULID).brand<"AuditEventId">(),
+  workspaceId,
+  act: (schema: z.ZodString) =>
+    schema.regex(ACT).pipe(z.templateLiteral([z.enum(FAMILIES), ".", z.string(), ".", z.string()])),
+  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+  subjectId: (schema: z.ZodString) => schema.trim().min(1),
+  detail: (schema: z.ZodType) => schema.pipe(detail),
+  batchId: (schema: z.ZodString) => schema.regex(ULID),
+};
+
+// `family` and `subject_kind` are generated columns: drizzle-zod leaves them out of the
+// insert and update forms, so their narrowing belongs to the select form alone.
+export const auditEventSelect = createSelectSchema(auditEvent, {
+  ...auditEventRefinements,
+  family: (schema: z.ZodString) => schema.pipe(z.enum(FAMILIES)),
+  subjectKind: (schema: z.ZodString) => schema.trim().min(1),
+});
+export const auditEventInsert = createInsertSchema(auditEvent, auditEventRefinements);
+export const auditEventUpdate = createUpdateSchema(auditEvent, auditEventRefinements);
+
 /** One entry per table this package owns — the parity test's registry (ADR 0028). */
 export const boundarySchemas = {
   workspace: {
@@ -201,6 +247,12 @@ export const boundarySchemas = {
     update: workspaceConfigUpdate,
   },
   chunk: { table: chunk, select: chunkSelect, insert: chunkInsert, update: chunkUpdate },
+  auditEvent: {
+    table: auditEvent,
+    select: auditEventSelect,
+    insert: auditEventInsert,
+    update: auditEventUpdate,
+  },
   user: { table: user, select: userSelect, insert: userInsert, update: userUpdate },
   member: { table: member, select: memberSelect, insert: memberInsert, update: memberUpdate },
   mcpCallCounter: {

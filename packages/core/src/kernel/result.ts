@@ -19,6 +19,11 @@
  *    raises is caught here by `attempt` and comes back as a value. A transport is where
  *    a failure becomes a throw again — a `TRPCError`, a status — because that is where
  *    a protocol has words for it.
+ * 5. **A function that runs inside another act's transaction rejects instead** — the
+ *    audit slice's two doors are the case (T-059). Its failure has to abort the
+ *    transaction it is part of, so the act and its ledger row land or fail together; a
+ *    value the act might not read would let the act commit without its row. The act's
+ *    own `attempt` is where that rejection becomes a value, at the seam rule 4 names.
  *
  * The constraint helper (`constraint.ts`) is rule 2 applied to Postgres: the constraints
  * a slice refuses over become its words, and every other violation stays the Error.

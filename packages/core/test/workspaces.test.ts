@@ -8,13 +8,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { boundarySchemas, ulid } from "@better-answers/schema";
 
-import {
-  attempt,
-  type Claims,
-  type PlatformPrincipal,
-  type UserPrincipal,
-} from "../src/kernel/index.ts";
+import { attempt, type Claims, type UserPrincipal } from "../src/kernel/index.ts";
 import { answered } from "./aborted-transaction.ts";
+import { bootstrap, seedPerson } from "./platform.ts";
 import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
 import {
   provisionWorkspace,
@@ -42,19 +38,7 @@ afterAll(async () => {
   await db.stop();
 });
 
-const bootstrap: PlatformPrincipal = {
-  kind: "platform",
-  actorId: "process:better-answers-bootstrap",
-};
-
-const seedUser = async (): Promise<string> => {
-  const client = await db.pool.connect();
-  try {
-    return (await testData(client).user()).id;
-  } finally {
-    client.release();
-  }
-};
+const seedUser = (): Promise<string> => seedPerson(db.pool);
 
 const partitionExists = async (workspaceId: string): Promise<boolean> => {
   const found = await db.pool.query(
@@ -101,6 +85,39 @@ describe("provisioning a workspace", () => {
     });
   });
 
+  it("writes the first act on the ledger beside the rows it describes — the platform's, in the workspace it created", async () => {
+    const adminUserId = await seedUser();
+    const door = openPostgres(db.runtimePool);
+    const id = ulid();
+
+    const provisioned = await provisionWorkspace(bootstrap, door, {
+      id,
+      name: "Ledgered",
+      slug: `ledgered-${id.toLowerCase()}`,
+      adminUserId,
+    });
+
+    expect(provisioned.ok).toBe(true);
+    const events = await db.pool.query<{ id: string }>(
+      "SELECT id, act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1",
+      [id],
+    );
+    // One row, the platform's own, naming the first Admin by person id and role word, its
+    // id minted rather than defaulted.
+    expect(events.rows).toEqual([
+      {
+        id: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+        act: "platform.workspace.provisioned",
+        family: "platform",
+        actor: "process:better-answers-bootstrap",
+        subject_kind: "workspace",
+        subject_id: id,
+        detail: { adminUserId, role: "Admin" },
+        batch_id: null,
+      },
+    ]);
+  });
+
   it("gives the first Admin's membership an id in the one shape the platform mints, composed from nothing", async () => {
     const adminUserId = await seedUser();
     const door = openPostgres(db.runtimePool);
@@ -140,6 +157,11 @@ describe("provisioning a workspace", () => {
     const row = await db.pool.query("SELECT 1 FROM workspace WHERE id = $1", [id]);
     expect(row.rowCount).toBe(0);
     expect(await partitionExists(id)).toBe(false);
+    // The act and its event fail together: the ledger row had already been written when
+    // the membership was refused, and it went with the transaction. Read as the superuser,
+    // so a row that survived could not hide behind the policy.
+    const events = await db.pool.query("SELECT 1 FROM audit_event WHERE workspace_id = $1", [id]);
+    expect(events.rowCount).toBe(0);
   });
 
   it("refuses a slug another workspace already holds", async () => {

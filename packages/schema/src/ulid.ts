@@ -22,9 +22,11 @@ const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 /**
  * The one written form of the shape, as a source string so both a `RegExp` here and the
  * tier contract's fixture can hold the same characters. Crockford's excluded letters are
- * the gaps in the range.
+ * the gaps in the range. The unanchored characters are exported on their own for the one
+ * pattern that embeds an id inside a longer string — the ledger's actor, `human:<person id>`.
  */
-export const ULID_PATTERN = "^[0-9A-HJKMNP-TV-Z]{26}$";
+export const ULID_CHARACTERS = "[0-9A-HJKMNP-TV-Z]{26}";
+export const ULID_PATTERN = `^${ULID_CHARACTERS}$`;
 
 /**
  * The compiled pattern, so a caller asking "is this the shape the platform mints?" reads

@@ -2,7 +2,14 @@ import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { declaredTableNames } from "../scripts/worker-view.ts";
-import { EXEMPT_TABLE_NAMES, IDENTITY_SET, RLS_EXEMPTIONS, ulid } from "../src/index.ts";
+import {
+  boundarySchemas,
+  EXEMPT_TABLE_NAMES,
+  FAMILIES,
+  IDENTITY_SET,
+  RLS_EXEMPTIONS,
+  ulid,
+} from "../src/index.ts";
 import { testData } from "./factory.ts";
 import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
 
@@ -261,6 +268,167 @@ describe("the role CHECK on the identity set", () => {
       ).rejects.toThrow(/invitation_role_check/);
       await client.query("ROLLBACK TO SAVEPOINT i");
     });
+  });
+});
+
+/**
+ * The ledger's own proofs (ADR 0014 rule 4; ADR 0038): a tenant table like any other, so
+ * its zero-rows proof is stated once here in its own words, and append-only by the
+ * database — migration 0009 revokes UPDATE and DELETE from the app's role and everything
+ * from the worker's, and each refusal is asserted beside the path it serves. The four
+ * families and the act's shape are CHECKs the row itself refuses, as `member_role_check`
+ * refuses a fourth role.
+ */
+/** A ledger row in A, then the app's role scoped to A — the footing the app_rt ledger tests share. */
+const ledgerRowAsApp = async (client: pg.PoolClient) => {
+  const seed = await seedTwoWorkspaces(client);
+  const row = await seed.auditEvent({ workspaceId: WS_A });
+  await client.query("SET LOCAL ROLE app_rt");
+  await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+  return row;
+};
+
+describe("the ledger under app_rt", () => {
+  it("returns zero rows on a missing scope and only the scoped tenant's rows otherwise", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const inA = await seed.auditEvent({ workspaceId: WS_A });
+      await seed.auditEvent({ workspaceId: WS_B });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      const unscoped = await client.query("SELECT id FROM audit_event");
+      expect(unscoped.rows).toEqual([]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const scoped = await client.query("SELECT id, workspace_id FROM audit_event");
+      expect(scoped.rows).toEqual([{ id: inA.id, workspace_id: WS_A }]);
+    });
+  });
+
+  it("lets the app's role read and insert a row, and refuses it UPDATE and DELETE (migration 0009)", async () => {
+    await withRollback(db.pool, async (client) => {
+      const row = await ledgerRowAsApp(client);
+
+      // The served path: an insert in scope lands, and the database derives the two
+      // columns from the act.
+      const inserted = await client.query<{ family: string; subject_kind: string }>(
+        `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
+         VALUES ($1, $2, 'people.group.created', 'process:better-answers-test', $3, '{}')
+         RETURNING family, subject_kind`,
+        [ulid(), WS_A, ulid()],
+      );
+      expect(inserted.rows).toEqual([{ family: "people", subject_kind: "group" }]);
+
+      // The refused paths, each fenced by a savepoint because a denial aborts the transaction.
+      await client.query("SAVEPOINT u");
+      await expect(
+        client.query("UPDATE audit_event SET detail = '{}' WHERE id = $1", [row.id]),
+      ).rejects.toThrow(/permission denied/);
+      await client.query("ROLLBACK TO SAVEPOINT u");
+      await client.query("SAVEPOINT d");
+      await expect(client.query("DELETE FROM audit_event WHERE id = $1", [row.id])).rejects.toThrow(
+        /permission denied/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT d");
+      await expect(client.query("TRUNCATE audit_event")).rejects.toThrow(/permission denied/);
+    });
+  });
+
+  it("refuses the app's role every other road to a changed row: an upsert, a cross-tenant insert, a derived column written", async () => {
+    await withRollback(db.pool, async (client) => {
+      const row = await ledgerRowAsApp(client);
+
+      // INSERT … ON CONFLICT DO UPDATE is an UPDATE wearing an INSERT's privilege; Postgres
+      // asks for the UPDATE privilege on the conflict path, which 0009 revoked.
+      await client.query("SAVEPOINT upsert");
+      await expect(
+        client.query(
+          `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
+           VALUES ($1, $2, 'people.group.created', 'process:better-answers-test', $3, '{}')
+           ON CONFLICT (id) DO UPDATE SET detail = '{"edited": true}'`,
+          [row.id, WS_A, ulid()],
+        ),
+      ).rejects.toThrow(/permission denied/);
+      await client.query("ROLLBACK TO SAVEPOINT upsert");
+
+      // A row for the other tenant, from this tenant's scope: the policy's WITH CHECK.
+      await client.query("SAVEPOINT other_tenant");
+      await expect(
+        client.query(
+          `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
+           VALUES ($1, $2, 'people.group.created', 'process:better-answers-test', $3, '{}')`,
+          [ulid(), WS_B, ulid()],
+        ),
+      ).rejects.toThrow(/row-level security/);
+      await client.query("ROLLBACK TO SAVEPOINT other_tenant");
+
+      // The family and the subject kind are the database's reading of the act; a caller
+      // cannot write a family the act does not say.
+      await expect(
+        client.query(
+          `INSERT INTO audit_event (id, workspace_id, act, family, actor, subject_id, detail)
+           VALUES ($1, $2, 'people.group.created', 'platform', 'process:better-answers-test', $3, '{}')`,
+          [ulid(), WS_A, ulid()],
+        ),
+      ).rejects.toThrow(/generated|non-DEFAULT/);
+    });
+  });
+
+  it("refuses the worker role on the ledger, reading and writing alike (migration 0009)", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.auditEvent({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await client.query("SAVEPOINT r");
+      await expect(client.query("SELECT 1 FROM audit_event LIMIT 1")).rejects.toThrow(
+        /permission denied/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT r");
+      await expect(
+        client.query(
+          `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
+           VALUES ($1, $2, 'sources.binding.published', 'process:better-answers-worker', $3, '{}')`,
+          [ulid(), WS_A, ulid()],
+        ),
+      ).rejects.toThrow(/permission denied/);
+    });
+  });
+
+  it("refuses an act outside the four families or the family.subject.verb shape at the row", async () => {
+    // Straight SQL rather than the factory, which would refuse these at the boundary before
+    // any INSERT existed: the claim here is the database's own.
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      for (const act of ["billing.invoice.sent", "people.member", "People.Member.Added"]) {
+        await client.query("SAVEPOINT act");
+        await expect(
+          client.query(
+            `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
+             VALUES ($1, $2, $3, 'process:better-answers-test', $4, '{}')`,
+            [ulid(), WS_A, act, ulid()],
+          ),
+        ).rejects.toThrow(/audit_event_act_check|audit_event_family_check/);
+        await client.query("ROLLBACK TO SAVEPOINT act");
+      }
+    });
+  });
+
+  it("holds the family CHECK to the same four words the boundary narrows to, both ways", async () => {
+    // The CHECK's list is written from `FAMILIES` when the table is declared; this reads it
+    // back out of the catalogue and holds the two equal, so a fifth family can be added to
+    // neither alone.
+    const constraint = await db.pool.query<{ definition: string }>(
+      "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = 'audit_event_family_check'",
+    );
+    const inCheck = [...(constraint.rows[0]?.definition ?? "").matchAll(/'([a-z]+)'/g)].map(
+      (match) => match[1],
+    );
+    expect(inCheck.toSorted()).toEqual([...FAMILIES].toSorted());
+    expect(boundarySchemas.auditEvent.select.shape.family.out.options.toSorted()).toEqual(
+      [...FAMILIES].toSorted(),
+    );
   });
 });
 

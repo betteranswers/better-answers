@@ -1,5 +1,6 @@
 import { boundarySchemas, CREATOR_ROLE } from "@better-answers/schema";
 
+import { act, declareActs, record } from "../audit/index.ts";
 import { attempt, err, ok, refusalFor, type Result, ulid } from "../kernel/index.ts";
 import type {
   PlatformPrincipal,
@@ -33,6 +34,17 @@ import {
 export const TOOLS_LIST_TTL_MS_DEFAULT = 300_000;
 export const TOOLS_LIST_TTL_CONFIG_KEY = "mcp.tools_list_ttl_ms";
 
+/**
+ * The slice's acts on the ledger (ADR 0038). Provisioning is a platform act whose row
+ * lands in the workspace it creates — the one act of the platform's that has a workspace
+ * to land in. Revocation's acts are not here: *revoke everywhere* runs over the identity
+ * set with no workspace and stays a log line until T-028's identity-set ledger; *revoke in
+ * a workspace* is T-027's act and declares itself there.
+ */
+export const WORKSPACE_ACTS = declareActs("platform", {
+  provisioned: act("platform.workspace.provisioned", { adminUserId: "id", role: "role" }),
+});
+
 export type ProvisionWorkspaceInput = {
   readonly id: string;
   readonly name: string;
@@ -51,11 +63,13 @@ const PROVISION_CONSTRAINTS = {
 } as const satisfies Record<string, ProvisionRefusal>;
 
 /**
- * One transaction: the workspace row, its chunk partition (through the one
+ * One transaction: the workspace row, its ledger row, its chunk partition (through the one
  * SECURITY DEFINER lifecycle function, ADR 0032), the Admin membership and the
  * config row. Any failure rolls the whole act back — a workspace never exists without
  * its partition, and the test "leaves nothing behind when the admin does not exist"
- * holds that.
+ * holds that. The ledger row is written second on purpose: the failures the tests
+ * provoke come after it, so they prove the row rolls back with the act rather than that
+ * it was never reached.
  */
 export const provisionWorkspace = async (
   platform: PlatformPrincipal,
@@ -82,6 +96,14 @@ export const provisionWorkspace = async (
         row.data.name,
         row.data.slug,
       ]);
+      // `withScope` already runs as the new workspace, so the row lands in the workspace
+      // it creates; the detail names the first Admin by person id and role word.
+      await record(platform, tx, {
+        id: ulid(),
+        act: WORKSPACE_ACTS.provisioned,
+        subjectId: row.data.id,
+        detail: { adminUserId: admin.data, role: CREATOR_ROLE },
+      });
       await tx.query("SELECT create_workspace_partition($1)", [row.data.id]);
       // The membership's key is minted, never composed from the workspace and person
       // ids it sits between: nothing of ours references it, and a composed key would
@@ -115,6 +137,10 @@ export type RevokeCredentialsInput = {
  * stolen refresh token cannot mint an access token whose `iat` post-dates the
  * revocation, and a live browser session cannot consent to a new grant. The People
  * screen calls this; until then, the tests do.
+ *
+ * Not on the ledger: it runs unscoped over the identity set and has no workspace for a
+ * row to land in, so it is a log line at its caller until T-028's identity-set ledger
+ * exists (ADR 0038). The workspace-scoped act (T-027) is the one that writes a row.
  */
 export const revokeCredentials = async (
   platform: PlatformPrincipal,
@@ -260,8 +286,8 @@ export const revokeWorkspaceTokens = async (
  * (ADR 0009). `withIdentityRead` rather than the raw pool, because every statement in a
  * slice reaches Postgres through a door holding the principal it is made under
  * (ADR 0029's amendment) — and the platform principal is that principal here for the
- * reason `revokeCredentials`'s is: the identity set is not a tenant's, so the act is the
- * platform's own and is audited under its id when the ledger lands (T-059).
+ * reason `revokeCredentials`'s is: the identity set is not a tenant's, so the read is the
+ * platform's own. A read writes no ledger row.
  *
  * **It reads by person id and by nothing else**, and answers ids and nothing else: no
  * name, no role, no row count, no other person's membership. A caller that could ask
