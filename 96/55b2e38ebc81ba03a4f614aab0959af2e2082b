@@ -1,0 +1,47 @@
+packages/core/src/workspaces/index.ts
+  s_cc225aaf43ef73::t_65298a1705dfb1 44
+packages/schema/test/rls.test.ts
+  s_cc225aaf43ef73::t_0014f60ea8e206 429-430,432
+  s_cc225aaf43ef73::t_27bc26c73edbf2 431
+packages/core/test/workspaces.test.ts
+  s_cc225aaf43ef73::t_8f40ae7f2c53a3 188,190,198-202
+  s_cc225aaf43ef73::t_65c0a90191cc49 101-110
+packages/schema/src/boundary-schemas.ts
+  s_cc225aaf43ef73::t_b4172bab9a03ab 4
+packages/core/src/audit/vocabulary.ts
+  s_cc225aaf43ef73::t_27bc26c73edbf2 52-56
+  s_cc225aaf43ef73::t_8a9cf2a9d49ef8 3-51,57-148
+  s_cc225aaf43ef73::t_9fb64d987bd031 1-2
+packages/schema/src/audit-tables.ts
+  s_cc225aaf43ef73::t_16c58589fab6b4 73
+  s_cc225aaf43ef73::t_57d86f26d07002 44-45,47
+packages/core/src/audit/index.ts
+  s_cc225aaf43ef73::t_59677686ddba68 1,4,6-13,16-17,19-22,46-55,100,109,111,118
+packages/core/test/audit.test.ts
+  s_cc225aaf43ef73::t_ea5324d21f22d2 353,356-357
+  s_cc225aaf43ef73::t_27bc26c73edbf2 319-324
+  s_cc225aaf43ef73::t_26437cb5c51a04 287-289
+  s_cc225aaf43ef73::t_d0c3ad3254b457 268-273
+  s_cc225aaf43ef73::t_1afb0a47e419aa 8
+  s_cc225aaf43ef73::t_3a1d7c35de597c 243,245,254
+  s_cc225aaf43ef73::t_860f87d9913fa6 199
+  s_cc225aaf43ef73::t_2cac8c23ff13e2 341,343
+  s_cc225aaf43ef73::t_a081a6445d18fe 370,372
+  s_cc225aaf43ef73::t_f3c7bda1d7bdac 153-167,174-185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9655b2e38ebc81ba03a4f614aab0959af2e2082b",
+  "prompts": {},
+  "sessions": {
+    "s_cc225aaf43ef73": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec03dfce-1d57-4982-874c-65a51e9365ea",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
