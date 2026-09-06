@@ -113,14 +113,14 @@ const isAllowedLocation = (file: string): boolean =>
  */
 const CITED_NOWHERE_ELSE: Readonly<Record<string, string>> = {
   APP2: "one server, one logger, one config module is the tier's shape; a reviewer reads it off the tree, and no test or ADR needs to name it",
-  AUDIT1:
-    "the ledger is T-059's; its slice tests cite the rule when they land, and until then it binds review alone",
-  AUDIT2: "as AUDIT1 — the declared-acts walk that proves it is T-059's",
-  AUDIT4: "as AUDIT1 — the second door's type and the access-request test are T-059's",
-  AUDIT5: "as AUDIT1 — each declared act's detail type is its slice's",
-  AUDIT6: "as AUDIT1 — the migration that creates audit_event and its refusal tests are T-059's",
-  AUDIT7: "as AUDIT1 — the caller-minted id test is T-059's",
-  AUDIT8: "as AUDIT1 — held by the declared-acts walk, T-059's",
+  AUDIT2:
+    "the declared-acts walk and the vocabulary's tests hold it without naming the tag; it binds review alone",
+  AUDIT4: "as AUDIT2 — the second door's type and the access-request test are its slices'",
+  AUDIT5: "as AUDIT2 — each declared act's detail type is its slice's",
+  AUDIT6:
+    "as AUDIT2 — the migration that creates audit_event and its refusal tests are the schema package's",
+  AUDIT7: "as AUDIT2 — the caller-minted id test is its slice's",
+  AUDIT8: "as AUDIT2 — held by the declared-acts walk",
   WRK2: "one logger, one config module is the worker's shape; a reviewer reads it off the tree, and no test or ADR needs to name it",
 };
 

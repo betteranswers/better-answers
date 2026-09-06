@@ -9,7 +9,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { boundarySchemas, ulid } from "@better-answers/schema";
 
 import { attempt, type Claims, type UserPrincipal } from "../src/kernel/index.ts";
-import { answered } from "./aborted-transaction.ts";
 import { bootstrap, seedPerson } from "./platform.ts";
 import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
 import {
@@ -359,7 +358,7 @@ describe("revoking a person's credentials", () => {
 });
 
 describe("reading the current membership", () => {
-  it("hands a caller a store failure to read rather than one to catch", async () => {
+  it("hands a caller a store failure to read, and the aborted transaction never commits", async () => {
     const adminUserId = await seedUser();
     const door = openPostgres(db.runtimePool);
     const id = ulid();
@@ -372,14 +371,20 @@ describe("reading the current membership", () => {
     expect(provisioned.ok).toBe(true);
 
     const claims: Claims = { workspaceId: id, userId: adminUserId, issuedAt: new Date() };
-    const read = await withPrincipal(door, claims, async (principal, tx) => {
-      // A statement Postgres refuses aborts the transaction, so the read cannot run.
-      // `attempt` is the one place a rejection is caught (`CODING_RULES.md` § TYPES).
-      await attempt(() => tx.query("SELECT no_such_function()"));
-      return readMembership(principal, tx);
-    });
+    let read: Awaited<ReturnType<typeof readMembership>> | undefined;
 
-    expect(answered(read)).toBeInstanceOf(Error);
+    // `[TEST8]`: the abort is provoked inside the work, so the assertion is on the
+    // transaction's outcome first — the opener rejects — and on the value second.
+    await expect(
+      withPrincipal(door, claims, async (principal, tx) => {
+        // A statement Postgres refuses aborts the transaction, so the read cannot run.
+        // `attempt` is the one place a rejection is caught (`CODING_RULES.md` § TYPES).
+        await attempt(() => tx.query("SELECT no_such_function()"));
+        read = await readMembership(principal, tx);
+      }),
+    ).rejects.toThrow(/did not commit/);
+
+    expect(read).toMatchObject({ ok: false, error: expect.any(Error) });
   });
 });
 

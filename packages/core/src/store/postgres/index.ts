@@ -46,6 +46,18 @@ const rollbackQuietly = async (client: pg.PoolClient): Promise<void> => {
   }
 };
 
+const commit = async (client: pg.PoolClient): Promise<void> => {
+  const answer = await client.query("COMMIT");
+  // In an aborted transaction Postgres answers COMMIT with the tag ROLLBACK and no
+  // error, so a statement failure the work caught would otherwise be reported as
+  // success over rows that never landed. The tag is the only place the abort shows.
+  if (answer.command !== "COMMIT") {
+    throw new Error(
+      `the transaction did not commit: Postgres answered "${answer.command}" — a failed statement was caught inside the work, and nothing landed`,
+    );
+  }
+};
+
 const transaction = async <T>(
   door: PostgresDoor,
   work: (client: pg.PoolClient) => Promise<T>,
@@ -54,7 +66,7 @@ const transaction = async <T>(
   try {
     await client.query("BEGIN");
     const result = await work(client);
-    await client.query("COMMIT");
+    await commit(client);
     return result;
   } catch (cause) {
     await rollbackQuietly(client);
@@ -201,7 +213,7 @@ export const withPrincipal = async <T>(
       groups: [],
     };
     const value = await work(principal, client);
-    await client.query("COMMIT");
+    await commit(client);
     return ok(value);
   } catch (cause) {
     await rollbackQuietly(client);
