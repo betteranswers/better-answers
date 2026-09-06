@@ -1,0 +1,30 @@
+packages/schema/test/rls.test.ts
+  s_60cb49f326e973::t_e94278efa86dab 583-595,597
+packages/core/src/members/groups.ts
+  s_60cb49f326e973::t_0e29e20321fb22 181
+  s_60cb49f326e973::t_c685fcf9833436 242-245,248-249
+  s_60cb49f326e973::t_2709e573c096a5 316-317,319
+  s_60cb49f326e973::t_7459e4ac97d2dc 217
+  s_60cb49f326e973::t_86f19bddf31d6b 261,305
+  s_60cb49f326e973::t_f429a5e9181b21 198-199
+  s_60cb49f326e973::t_4c3170372e554d 78-80,83,86,89,92-93,95-96,103-106,114-125,132-133
+  s_60cb49f326e973::t_47883329d0bcd1 200-201
+packages/core/test/members.test.ts
+  s_60cb49f326e973::t_f93386d4e6f63a 387-388
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "369ee2432d8e3f27a380e42860a9ec0b3fd7f4f9",
+  "prompts": {},
+  "sessions": {
+    "s_60cb49f326e973": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e80ae313-9589-4f4b-b289-fd6b0e7de277",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
