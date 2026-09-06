@@ -36,7 +36,6 @@
  * refuses a name that is not a directory today. So these facts, all of them settled by
  * the T-063 spec, wait for the ticket that declares their table:
  *
- * - `audit_event` — the audit slice's, the one append-only ledger (T-059, ADR 0014).
  * - `group`, `group_member` and `access_request` — the **members** slice's (T-060,
  *   T-061). `members` is not a directory under `packages/core/src/` yet, so naming it
  *   here would fail the owner test today; the choice taken is that the asserted record
@@ -94,10 +93,12 @@ export const TABLE_OWNERS = {
   "public.ingress_counter": POSTGRES_DOOR,
   "public.mcp_call_counter": POSTGRES_DOOR,
 
-  // The modules under `packages/core/src/`: two slices, and `llm`, which owns its route
-  // table without being one (ADR 0029 rule 3).
+  // The modules under `packages/core/src/`: two slices, and the two ADR 0029 rule 3 names
+  // that own a table without being one — `llm` its route table, `audit` the one ledger
+  // every slice writes through its doors and none by its own SQL (ADR 0038).
   "public.workspace_config": "workspaces",
   "public.llm_route": "llm",
+  "public.audit_event": "audit",
   "index.chunk": "sources",
 } satisfies Record<string, string>;
 

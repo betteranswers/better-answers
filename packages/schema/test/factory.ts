@@ -53,6 +53,12 @@ export type TestData = {
   oauthAccessToken(
     overrides?: Partial<InsertInput<"oauthAccessToken">>,
   ): Promise<Row<"oauthAccessToken">>;
+  /**
+   * A ledger row; creates its own workspace unless one is named. The act is a platform
+   * probe and the actor the platform's, so a seeded row never reads as a person's act; the
+   * family and subject kind come back derived by the database, never written here.
+   */
+  auditEvent(overrides?: Partial<InsertInput<"auditEvent">>): Promise<Row<"auditEvent">>;
 };
 
 /** INSERT the boundary-parsed row and read it back through the select schema. */
@@ -248,6 +254,20 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const auditEvent: TestData["auditEvent"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "auditEvent", {
+      id: ulid(),
+      act: "platform.probe.seeded",
+      actor: "process:better-answers-test",
+      subjectId: ulid(),
+      detail: {},
+      batchId: null,
+      ...overrides,
+      workspaceId,
+    });
+  };
+
   return {
     workspace,
     user,
@@ -259,5 +279,6 @@ export const testData = (client: pg.PoolClient): TestData => {
     oauthClient,
     oauthRefreshToken,
     oauthAccessToken,
+    auditEvent,
   };
 };

@@ -57,6 +57,20 @@
       "when": 1788637098528,
       "tag": "0007_member-revocation-instant",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788708122061,
+      "tag": "0008_ledger",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788708122938,
+      "tag": "0009_ledger-substrate",
+      "breakpoints": true
     }
   ]
 }

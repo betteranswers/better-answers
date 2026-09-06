@@ -21,6 +21,8 @@ const USER_ID = "01J6CCCCCCCCCCCCCCCCCCCCCC";
 const MEMBER_ID = "01J6DDDDDDDDDDDDDDDDDDDDDD";
 const SESSION_ID = "01J6EEEEEEEEEEEEEEEEEEEEEE";
 const INVITATION_ID = "01J6FFFFFFFFFFFFFFFFFFFFFF";
+const AUDIT_EVENT_ID = "01J6GGGGGGGGGGGGGGGGGGGGGG";
+const BATCH_ID = "01J6HHHHHHHHHHHHHHHHHHHHHH";
 const NOW = new Date("2026-09-01T00:00:00Z");
 
 /** Rows each refined insert schema accepts — assertion 4's input. */
@@ -123,6 +125,35 @@ const acceptedRows = {
   rateLimit: [{ id: "limit-1", key: "ip:203.0.113.1", count: 1, lastRequest: 1 }],
   mcpCallCounter: [{ workspaceId: WS_ID, tokenId: "jti-1", windowStart: NOW, count: 1 }],
   ingressCounter: [{ scope: "ip", key: "203.0.113.1", windowStart: NOW, count: 1 }],
+  // One row per actor form the boundary admits — a person by person id, the platform, an
+  // agent — the third carrying a batch id; `family` and `subject_kind` are the database's.
+  auditEvent: [
+    {
+      id: AUDIT_EVENT_ID,
+      workspaceId: WS_ID,
+      act: "people.member.role_changed",
+      actor: `human:${USER_ID}`,
+      subjectId: USER_ID,
+      detail: { role: "Editor", previousRole: "Viewer" },
+    },
+    {
+      id: "01J6GGGGGGGGGGGGGGGGGGGGG2",
+      workspaceId: WS_ID,
+      act: "platform.workspace.provisioned",
+      actor: "process:better-answers-bootstrap",
+      subjectId: WS_ID,
+      detail: { adminUserId: USER_ID, role: "Admin" },
+    },
+    {
+      id: "01J6GGGGGGGGGGGGGGGGGGGGG3",
+      workspaceId: WS_ID,
+      act: "knowledge.suggestion.accepted",
+      actor: "better-answers-enrichment/1.2",
+      subjectId: "01J6GGGGGGGGGGGGGGGGGGGGG4",
+      detail: { confirmed: true, count: 3 },
+      batchId: BATCH_ID,
+    },
+  ],
   chunk: [
     {
       id: "chunk-1",
@@ -253,6 +284,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "rateLimit",
         "mcpCallCounter",
         "ingressCounter",
+        "auditEvent",
         "chunk",
       ] as const;
       expect(insertOrder.toSorted()).toEqual(registryNames.toSorted());
@@ -294,6 +326,19 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
     workspaceConfig: [{ ...acceptedRows.workspaceConfig[0], key: "  " }],
     ingressCounter: [{ ...acceptedRows.ingressCounter[0], scope: "user-agent" }],
     mcpCallCounter: [{ ...acceptedRows.mcpCallCounter[0], count: -1 }],
+    // The ledger's refusals: an id not the minter's; an act outside the four families, or
+    // with a segment missing; an actor that is an email, a bare person id or a display
+    // name; a nested detail, where a name or a prompt would have somewhere to hide.
+    auditEvent: [
+      { ...acceptedRows.auditEvent[0], id: "audit-1" },
+      { ...acceptedRows.auditEvent[0], act: "billing.invoice.sent" },
+      { ...acceptedRows.auditEvent[0], act: "people.member" },
+      { ...acceptedRows.auditEvent[0], actor: "human:priya@example.invalid" },
+      { ...acceptedRows.auditEvent[0], actor: USER_ID },
+      { ...acceptedRows.auditEvent[0], actor: "Priya Patel" },
+      { ...acceptedRows.auditEvent[0], detail: { person: { name: "Priya" } } },
+      { ...acceptedRows.auditEvent[2], batchId: "batch-1" },
+    ],
     chunk: [
       {
         ...acceptedRows.chunk[0],
@@ -444,6 +489,25 @@ describe("5 — the inferred type is pinned", () => {
     Equal<
       z.infer<typeof boundarySchemas.mcpCallCounter.select>,
       { workspaceId: WorkspaceId; tokenId: string; windowStart: Date; count: number }
+    >
+  >;
+  type AuditEventId = string & z.core.$brand<"AuditEventId">;
+  type Family = "people" | "knowledge" | "sources" | "platform";
+  type _auditEventSelect = Expect<
+    Equal<
+      z.infer<typeof boundarySchemas.auditEvent.select>,
+      {
+        id: AuditEventId;
+        workspaceId: WorkspaceId;
+        act: `${Family}.${string}.${string}`;
+        family: Family;
+        actor: string;
+        subjectKind: string;
+        subjectId: string;
+        at: Date;
+        detail: Record<string, string | number | boolean> | null;
+        batchId: string | null;
+      }
     >
   >;
   type _ingressCounterSelect = Expect<
