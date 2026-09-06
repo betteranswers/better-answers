@@ -1,0 +1,99 @@
+packages/schema/src/boundary-schemas.ts
+  s_60cb49f326e973::t_e80364ce8cbcd0 7
+  s_60cb49f326e973::t_cfe474f60795cc 171-191
+  s_60cb49f326e973::t_40af14fa36ecf4 51-55
+  s_60cb49f326e973::t_b610ddf233f704 285-291
+packages/schema/migrations/meta/_journal.json
+  s_60cb49f326e973::t_2d9fb33c6bab59 81-87
+  s_60cb49f326e973::t_d6d706bbe31a29 74-80
+packages/core/src/members/index.ts
+  s_60cb49f326e973::t_03c346f40c8182 1-10
+packages/schema/src/schema.ts
+  s_60cb49f326e973::t_8c81100f8718d6 27
+packages/schema/test/boundary-schemas.test.ts
+  s_60cb49f326e973::t_7e2a9b5fec367f 336-347
+  s_60cb49f326e973::t_8130251ae563ce 278-281
+  s_60cb49f326e973::t_94829082c31ef7 24
+  s_60cb49f326e973::t_da83806750d432 479-497
+  s_60cb49f326e973::t_f5d486e9afff65 56-60
+packages/core/src/members/groups.ts
+  s_60cb49f326e973::t_7bef0d03c86ad8 1-35,41-56,58-60,63-319,322-357
+  s_60cb49f326e973::t_7a456d566af538 320-321
+  s_60cb49f326e973::t_fb2ef3569103a1 57,61-62
+  s_60cb49f326e973::t_e634803de889e4 36-40
+packages/schema/migrations/meta/0010_snapshot.json
+  s_60cb49f326e973::t_b14d8d4c37cee1 1,3-2350,2361-2511
+  s_60cb49f326e973::t_d6d706bbe31a29 2,2351-2360
+packages/schema/test/rls.test.ts
+  s_60cb49f326e973::t_fc9508190c77c2 248-263
+  s_60cb49f326e973::t_bf6e42a1025277 453-513,515-520,533-596
+  s_60cb49f326e973::t_2aa5110dd373b3 514,521-532
+  s_60cb49f326e973::t_1011a12569afc2 11
+packages/schema/src/group-tables.ts
+  s_60cb49f326e973::t_564f818ab19672 67-71
+  s_60cb49f326e973::t_1c88fc4c551511 1-9
+  s_60cb49f326e973::t_c85da2d9d7202f 10-66,72-107
+packages/core/src/kernel/principal.ts
+  s_60cb49f326e973::t_7444b426c3161f 36-40
+  s_60cb49f326e973::t_1669c3b89e29b2 23-28
+packages/schema/test/factory.ts
+  s_60cb49f326e973::t_efd655cdb6d6d3 311-312
+  s_60cb49f326e973::t_907ef0969df131 178-198
+  s_60cb49f326e973::t_e9d3aaabf38a7e 6-12
+  s_60cb49f326e973::t_a26e246953d8e8 41-48
+packages/core/test/members.test.ts
+  s_60cb49f326e973::t_404a1646363a99 410,412-414
+  s_60cb49f326e973::t_826121ccfb48bb 444
+  s_60cb49f326e973::t_4386e74adc3d84 447-451,454-455,461
+  s_60cb49f326e973::t_41f23750aac6f0 144-166
+  s_60cb49f326e973::t_65ec75bf083c17 261
+  s_60cb49f326e973::t_5154addbfd2b0a 216
+  s_60cb49f326e973::t_95a32c28eacb02 11-17
+  s_60cb49f326e973::t_b4674788ebfae6 301-304
+  s_60cb49f326e973::t_9980783fff5156 331
+  s_60cb49f326e973::t_b959de6893c8aa 1-10,18-143,167-215,217-260,262-300,305-330,332-340,342,344-353,355-408,440-443,445-446,452-453,456-460,462-469,471-515
+  s_60cb49f326e973::t_90bcbb510e959c 341,343
+  s_60cb49f326e973::t_bdd647d6842fea 432-437
+  s_60cb49f326e973::t_1c33e91111ab5f 354
+  s_60cb49f326e973::t_37d55caee3b715 409,411,415-431,438-439,470
+packages/core/src/store/postgres/index.ts
+  s_60cb49f326e973::t_d498466ef7791f 158-161,167
+  s_60cb49f326e973::t_ae7de239289f53 135-143,146-150
+  s_60cb49f326e973::t_924ce767489bbc 225-228
+packages/schema/src/table-ownership.ts
+  s_60cb49f326e973::t_752ce40ab1ba8a 39-43
+  s_60cb49f326e973::t_5dd9a091c0671b 97-98
+  s_60cb49f326e973::t_675caa40d51781 186-199
+  s_60cb49f326e973::t_5c4eadc58bdc08 93-95
+packages/schema/migrations/0011_groups-substrate.sql
+  s_60cb49f326e973::t_575d71d73c9b0c 1-21
+packages/schema/migrations/meta/0011_snapshot.json
+  s_60cb49f326e973::t_2d9fb33c6bab59 1-2511
+packages/core/test/principal.test.ts
+  s_60cb49f326e973::t_1f8a13174c57fe 40-46,57-58,80-97
+  s_60cb49f326e973::t_0b272c8723e461 187-201,208
+  s_60cb49f326e973::t_f8792a8044a939 221-222,230,233
+packages/core/package.json
+  s_60cb49f326e973::t_ddd3937d81f941 19
+packages/schema/migrations/0010_groups.sql
+  s_60cb49f326e973::t_d6d706bbe31a29 6-7
+  s_60cb49f326e973::t_b14d8d4c37cee1 1-5,8-26
+apps/worker/src/better_answers_worker/schema_view.py
+  s_60cb49f326e973::t_41e492c2c07e09 9,51-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "cd15f932f7e877ef85a791c36459b54738eb13a4",
+  "prompts": {},
+  "sessions": {
+    "s_60cb49f326e973": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e80ae313-9589-4f4b-b289-fd6b0e7de277",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
