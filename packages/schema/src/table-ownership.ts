@@ -36,14 +36,11 @@
  * refuses a name that is not a directory today. So these facts, all of them settled by
  * the T-063 spec, wait for the ticket that declares their table:
  *
- * - `group`, `group_member` and `access_request` — the **members** slice's (T-060,
- *   T-061). `members` is not a directory under `packages/core/src/` yet, so naming it
- *   here would fail the owner test today; the choice taken is that the asserted record
- *   holds only owners that exist, and a future owner is a sentence until its slice is.
- *   The same slice writes `member` and `invitation` — the People acts and the
- *   invitation T-061 mints — which is a cross-owner write this list will gain.
- * - `group_member`, read by the Postgres door inside the resolver from T-060, where the
- *   membership query starts aggregating the caller's group ids.
+ * - `access_request` — the **members** slice's (T-061). The slice is a directory now
+ *   (T-060 founded it with the group acts), so the table's row lands the day its
+ *   declaration does; until then it is a sentence, because the both-ways test refuses an
+ *   entry naming a table `src/` has not declared. The same slice writes `invitation` —
+ *   the one T-061 mints on approve — which is a cross-owner write this list will gain.
  * - The concept, bundle-commit, evidence and verification tables and the two graph
  *   tables — the concepts slice's (ADRs 0011, 0012, 0019, 0023).
  *
@@ -93,10 +90,12 @@ export const TABLE_OWNERS = {
   "public.ingress_counter": POSTGRES_DOOR,
   "public.mcp_call_counter": POSTGRES_DOOR,
 
-  // The modules under `packages/core/src/`: two slices, and the two ADR 0029 rule 3 names
-  // that own a table without being one — `llm` its route table, `audit` the one ledger
-  // every slice writes through its doors and none by its own SQL (ADR 0038).
+  // The modules under `packages/core/src/`: three slices, and the two ADR 0029 rule 3
+  // names that own a table without being one — `llm` its route table, `audit` the one
+  // ledger every slice writes through its doors and none by its own SQL (ADR 0038).
   "public.workspace_config": "workspaces",
+  "public.group": "members",
+  "public.group_member": "members",
   "public.llm_route": "llm",
   "public.audit_event": "audit",
   "index.chunk": "sources",
@@ -183,5 +182,19 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "read",
     reason:
       "The same one resolve query joins the person's own revocation instant, so revocation's other scope costs no second round trip on the path every call takes.",
+  },
+  {
+    table: "public.group_member",
+    by: POSTGRES_DOOR,
+    access: "read",
+    reason:
+      "The same one resolve query aggregates the caller's group ids into the Principal, because groups are re-read per call rather than carried on a credential (ADR 0009): every visibility check then pays one membership lookup it already has (ADR 0038).",
+  },
+  {
+    table: "public.member",
+    by: "members",
+    access: "read",
+    reason:
+      "Adding a person to a group reads whether they are a member of the workspace first, so the act answers `not-a-member` rather than letting the composite foreign key abort the caller's transaction; T-061's request act reads the same row to answer already-a-member neutrally.",
   },
 ] as const satisfies readonly CrossOwnerAccess[];

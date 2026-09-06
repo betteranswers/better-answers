@@ -8,6 +8,7 @@ import {
   FAMILIES,
   IDENTITY_SET,
   RLS_EXEMPTIONS,
+  ROLES,
   ulid,
 } from "../src/index.ts";
 import { testData } from "./factory.ts";
@@ -244,6 +245,22 @@ describe("the identity set", () => {
 });
 
 describe("the role CHECK on the identity set", () => {
+  it("holds member_role_check to the same three words the boundary narrows to, both ways", async () => {
+    // The CHECK's list is written from `ROLES` when the table is declared; this reads it
+    // back out of the catalogue and holds the two equal, so a fourth role can be added to
+    // neither alone — and the refusal below is a refusal of a word neither side admits.
+    const constraint = await db.pool.query<{ definition: string }>(
+      "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = 'member_role_check'",
+    );
+    const inCheck = [...(constraint.rows[0]?.definition ?? "").matchAll(/'([A-Za-z]+)'/g)].map(
+      (match) => match[1],
+    );
+    expect(inCheck.toSorted()).toEqual([...ROLES].toSorted());
+    const role = boundarySchemas.member.select.shape.role;
+    expect(inCheck.map((word) => role.safeParse(word).success)).toEqual(inCheck.map(() => true));
+    expect(role.safeParse("Owner").success).toBe(false);
+  });
+
   it("refuses a member or invitation role outside Admin, Editor and Viewer", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
@@ -430,6 +447,157 @@ describe("the ledger under app_rt", () => {
     const family = boundarySchemas.auditEvent.select.shape.family;
     expect(inCheck.map((word) => family.safeParse(word).success)).toEqual(inCheck.map(() => true));
     expect(family.safeParse("billing").success).toBe(false);
+  });
+});
+
+/**
+ * The two group tables' own proofs (ADR 0038): tenant tables like any other, so the
+ * zero-rows proof is stated here in their words; and two cascades that are the database's
+ * promise rather than the slice's — a membership that ends takes its group rows with it,
+ * and a deleted group takes its memberships. Both run as the app's role under FORCE, so
+ * what is proved is what a deployed estate does.
+ *
+ * The composite key to `group` is the security claim: a foreign-key check bypasses RLS by
+ * Postgres's own rule, so a key on the group id alone would confirm that *somebody* holds
+ * a given id. Keyed by the workspace and the id together, it can only ever confirm a group
+ * of the workspace the referring row already names.
+ */
+/** A person in two of A's groups, a group of B's holding the same name, and the app's role scoped to A. */
+const groupsAsApp = async (client: pg.PoolClient) => {
+  const seed = await seedTwoWorkspaces(client);
+  const person = await seed.user();
+  await seed.member({ workspaceId: WS_A, userId: person.id });
+  const hr = await seed.group({ workspaceId: WS_A, name: "HR team" });
+  const sales = await seed.group({ workspaceId: WS_A, name: "Sales executives" });
+  // The same name in the other tenant: the unique index is per workspace, and seeding
+  // this row at all is the proof — it would have thrown otherwise.
+  const theirs = await seed.group({ workspaceId: WS_B, name: "HR team" });
+  for (const group of [hr, sales]) {
+    await seed.groupMember({ workspaceId: WS_A, groupId: group.id, userId: person.id });
+  }
+  await client.query("SET LOCAL ROLE app_rt");
+  await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+  return { person, hr, sales, theirs };
+};
+
+const groupIdsHeldBy = async (client: pg.PoolClient, userId: string): Promise<string[]> => {
+  const held = await client.query<{ group_id: string }>(
+    "SELECT group_id FROM group_member WHERE user_id = $1 ORDER BY group_id",
+    [userId],
+  );
+  return held.rows.map((row) => row.group_id);
+};
+
+describe("the group tables under app_rt", () => {
+  it("returns zero rows on a missing scope and only the scoped tenant's groups otherwise", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { hr, sales, theirs } = await groupsAsApp(client);
+
+      await client.query("SELECT set_config('app.workspace_id', '', true)");
+      expect((await client.query('SELECT id FROM "group"')).rows).toEqual([]);
+      expect((await client.query("SELECT group_id FROM group_member")).rows).toEqual([]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const ours = await client.query('SELECT id FROM "group" ORDER BY name');
+      expect(ours.rows).toEqual([{ id: hr.id }, { id: sales.id }]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
+      const theirSide = await client.query('SELECT id FROM "group"');
+      expect(theirSide.rows).toEqual([{ id: theirs.id }]);
+    });
+  });
+
+  it("refuses a group written into another tenant, and a membership naming another tenant's group", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { theirs, person } = await groupsAsApp(client);
+
+      await client.query("SAVEPOINT other_group");
+      await expect(
+        client.query(
+          `INSERT INTO "group" (id, workspace_id, name, origin) VALUES ($1, $2, 'Theirs', 'admin-curated')`,
+          [ulid(), WS_B],
+        ),
+      ).rejects.toThrow(/row-level security/);
+      await client.query("ROLLBACK TO SAVEPOINT other_group");
+
+      // A membership written wholly into the other tenant: the policy's WITH CHECK, on the
+      // second table as on the first.
+      await client.query("SAVEPOINT other_membership");
+      await expect(
+        client.query(
+          "INSERT INTO group_member (workspace_id, group_id, user_id) VALUES ($1, $2, $3)",
+          [WS_B, theirs.id, person.id],
+        ),
+      ).rejects.toThrow(/row-level security/);
+      await client.query("ROLLBACK TO SAVEPOINT other_membership");
+
+      // The row itself is this tenant's, so the policy admits it; what refuses it is the
+      // key, which names the workspace beside the group id — the foreign-key check runs
+      // outside RLS and still cannot find B's group under A's workspace.
+      await expect(
+        client.query(
+          "INSERT INTO group_member (workspace_id, group_id, user_id) VALUES ($1, $2, $3)",
+          [WS_A, theirs.id, person.id],
+        ),
+      ).rejects.toThrow(/group_member_group_fk/);
+    });
+  });
+
+  it("takes a person out of every group in the workspace when their membership ends", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { person, hr, sales } = await groupsAsApp(client);
+      expect(await groupIdsHeldBy(client, person.id)).toEqual([hr.id, sales.id].toSorted());
+
+      await client.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+        WS_A,
+        person.id,
+      ]);
+
+      expect(await groupIdsHeldBy(client, person.id)).toEqual([]);
+      // The groups outlive the person: a leaver empties, never deletes.
+      const groups = await client.query('SELECT count(*)::int AS held FROM "group"');
+      expect(groups.rows).toEqual([{ held: 2 }]);
+    });
+  });
+
+  it("deletes a group's memberships with the group, and leaves every other group's alone", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { person, hr, sales } = await groupsAsApp(client);
+
+      await client.query('DELETE FROM "group" WHERE workspace_id = $1 AND id = $2', [WS_A, hr.id]);
+
+      expect(await groupIdsHeldBy(client, person.id)).toEqual([sales.id]);
+    });
+  });
+
+  it("refuses the worker role on both group tables, reading and writing alike (migration 0011)", async () => {
+    // The worker holds no people data: who is in which group is applied at read time by
+    // the app, never by the worker, so a compromised worker can neither read a workspace's
+    // membership nor write itself into one.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.group({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const refused: readonly [string, readonly string[]][] = [
+        [`SELECT 1 FROM "group" LIMIT 1`, []],
+        ["SELECT 1 FROM group_member LIMIT 1", []],
+        [
+          `INSERT INTO "group" (id, workspace_id, name, origin) VALUES ($1, $2, 'Worker', 'admin-curated')`,
+          [ulid(), WS_A],
+        ],
+        [
+          "INSERT INTO group_member (workspace_id, group_id, user_id) VALUES ($1, $2, $3)",
+          [WS_A, ulid(), ulid()],
+        ],
+      ];
+      for (const [statement, values] of refused) {
+        await client.query("SAVEPOINT worker_probe");
+        await expect(client.query(statement, [...values])).rejects.toThrow(/permission denied/);
+        await client.query("ROLLBACK TO SAVEPOINT worker_probe");
+      }
+    });
   });
 });
 

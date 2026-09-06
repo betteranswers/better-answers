@@ -6,7 +6,7 @@ direction. The worker never migrates; this module is its read-only
 knowledge of what the app's journal built, stamped with the migration id it was
 generated from."""
 
-MIGRATION_ID = "0009_ledger-substrate"
+MIGRATION_ID = "0011_groups-substrate"
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -47,6 +47,19 @@ TABLES: dict[str, dict[str, str]] = {
         "at": "timestamp with time zone NOT NULL",
         "detail": "jsonb NOT NULL",
         "batch_id": "text",
+    },
+    "public.group": {
+        "id": "text NOT NULL",
+        "workspace_id": "text NOT NULL",
+        "name": "text NOT NULL",
+        "origin": "text NOT NULL",
+        "created_at": "timestamp with time zone NOT NULL",
+    },
+    "public.group_member": {
+        "workspace_id": "text NOT NULL",
+        "group_id": "text NOT NULL",
+        "user_id": "text NOT NULL",
+        "added_at": "timestamp with time zone NOT NULL",
     },
     "public.ingress_counter": {
         "scope": "text NOT NULL",

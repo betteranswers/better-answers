@@ -132,12 +132,22 @@ export const withIdentityRead = async <T>(
 /* jscpd:ignore-end */
 
 /**
- * The one resolve query (ADR 0018, ADR 0035): the member row, the person's revocation
- * instant and this membership's. Both instants come back in the one statement — a
- * revocation costs no second round trip on the path every call takes.
+ * The one resolve query (ADR 0018, ADR 0035, ADR 0038): the member row, the person's
+ * revocation instant, this membership's, and every group they are in here. All of it
+ * comes back in the one statement — a revocation and a group membership each cost no
+ * second round trip on the path every call takes.
+ *
+ * The group ids are re-read on every call rather than carried on a credential (ADR 0009),
+ * which is what lets an Admin's *add to group* take effect on the person's next request;
+ * the subquery runs inside the scope this transaction has already set, so the policy on
+ * `group_member` is a second fence behind the workspace the join already names.
  */
 const MEMBERSHIP_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS person_revoked_at,
-            m.credentials_revoked_at AS membership_revoked_at
+            m.credentials_revoked_at AS membership_revoked_at,
+            COALESCE((SELECT array_agg(gm.group_id ORDER BY gm.group_id)
+                        FROM group_member gm
+                       WHERE gm.workspace_id = m.workspace_id AND gm.user_id = m.user_id),
+                     '{}') AS group_ids
      FROM member m
      JOIN "user" u ON u.id = m.user_id
     WHERE m.workspace_id = $1 AND m.user_id = $2`;
@@ -145,14 +155,16 @@ const MEMBERSHIP_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS per
 const isRole = (value: string): value is Role => ROLES.some((role) => role === value);
 
 /**
- * What the resolve query returns: the member row's role and revocation's two instants —
- * the person's, written by the operator's act, and this membership's, written by an
- * Admin of this workspace and reaching no other.
+ * What the resolve query returns: the member row's role, revocation's two instants — the
+ * person's, written by the operator's act, and this membership's, written by an Admin of
+ * this workspace and reaching no other — and the ids of the groups they are in here,
+ * empty when they are in none.
  */
 type MembershipRow = {
   readonly role: string;
   readonly person_revoked_at: Date | null;
   readonly membership_revoked_at: Date | null;
+  readonly group_ids: readonly string[];
 };
 
 /**
@@ -210,7 +222,10 @@ export const withPrincipal = async <T>(
       workspaceId: workspaceId.data satisfies WorkspaceId,
       userId: userId.data satisfies UserId,
       role,
-      groups: [],
+      // Parsed at the boundary rather than asserted (ADR 0028): the column is a foreign
+      // key to a group the platform minted, so a value of another shape is a broken
+      // database and the throw the caller sees is the truthful answer to it.
+      groups: (row?.group_ids ?? []).map((id) => boundarySchemas.group.select.shape.id.parse(id)),
     };
     const value = await work(principal, client);
     await commit(client);

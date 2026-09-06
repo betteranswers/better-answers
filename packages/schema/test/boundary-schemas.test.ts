@@ -21,6 +21,7 @@ const USER_ID = "01J6CCCCCCCCCCCCCCCCCCCCCC";
 const MEMBER_ID = "01J6DDDDDDDDDDDDDDDDDDDDDD";
 const SESSION_ID = "01J6EEEEEEEEEEEEEEEEEEEEEE";
 const INVITATION_ID = "01J6FFFFFFFFFFFFFFFFFFFFFF";
+const GROUP_ID = "01J6JJJJJJJJJJJJJJJJJJJJJJ";
 const AUDIT_EVENT_ID = "01J6GGGGGGGGGGGGGGGGGGGGGG";
 const BATCH_ID = "01J6HHHHHHHHHHHHHHHHHHHHHH";
 const NOW = new Date("2026-09-01T00:00:00Z");
@@ -52,6 +53,11 @@ const acceptedRows = {
       credentialsRevokedAt: NOW,
     },
   ],
+  // Admin-curated, the only kind anything mints; the pair is closed at the boundary.
+  group: [{ id: GROUP_ID, workspaceId: WS_ID, name: "HR team", origin: "admin-curated" }],
+  // Keyed by the workspace, the group and the person, and carrying nothing else: the row
+  // that says what somebody may see, never what they may do.
+  groupMember: [{ workspaceId: WS_ID, groupId: GROUP_ID, userId: USER_ID }],
   session: [
     { id: SESSION_ID, expiresAt: NOW, token: "session-token", updatedAt: NOW, userId: USER_ID },
   ],
@@ -269,6 +275,10 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "llmRoute",
         "workspaceConfig",
         "member",
+        // Both group tables come after `member`: `group_member`'s composite key names the
+        // membership pair, so the membership has to be there before a group row can.
+        "group",
+        "groupMember",
         "session",
         "account",
         "verification",
@@ -323,6 +333,18 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
     ],
     session: [{ ...acceptedRows.session[0], id: "kEyIkQBmQ1EnBJnUvKMR6nSFXlQKUcuJ" }],
     invitation: [{ ...acceptedRows.invitation[0], id: "invitation-1" }],
+    // An id that is not the minter's, a nameless group, and a third origin: the pair is
+    // closed at the boundary, so the day a surface mints an implicit group it adds the
+    // word here and nowhere else.
+    group: [
+      { ...acceptedRows.group[0], id: "group-1" },
+      { ...acceptedRows.group[0], name: "   " },
+      { ...acceptedRows.group[0], origin: "self-service" },
+    ],
+    groupMember: [
+      { ...acceptedRows.groupMember[0], groupId: "group-1" },
+      { ...acceptedRows.groupMember[0], userId: "priya@example.invalid" },
+    ],
     workspaceConfig: [{ ...acceptedRows.workspaceConfig[0], key: "  " }],
     ingressCounter: [{ ...acceptedRows.ingressCounter[0], scope: "user-agent" }],
     mcpCallCounter: [{ ...acceptedRows.mcpCallCounter[0], count: -1 }],
@@ -452,6 +474,25 @@ describe("5 — the inferred type is pinned", () => {
         updatedAt: Date;
         credentialsRevokedAt: Date | null;
       }
+    >
+  >;
+  type GroupId = string & z.core.$brand<"GroupId">;
+  type _groupSelect = Expect<
+    Equal<
+      z.infer<typeof boundarySchemas.group.select>,
+      {
+        id: GroupId;
+        workspaceId: WorkspaceId;
+        name: string;
+        origin: "admin-curated" | "audience-minted";
+        createdAt: Date;
+      }
+    >
+  >;
+  type _groupMemberSelect = Expect<
+    Equal<
+      z.infer<typeof boundarySchemas.groupMember.select>,
+      { workspaceId: WorkspaceId; groupId: GroupId; userId: UserId; addedAt: Date }
     >
   >;
   type _sessionSelect = Expect<
