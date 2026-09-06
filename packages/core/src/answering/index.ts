@@ -1,4 +1,5 @@
-import { ok, type Result, type UserPrincipal } from "../kernel/index.ts";
+import { conceptByIri, type OpenedConcept } from "../concepts/index.ts";
+import { err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
 /**
@@ -9,8 +10,11 @@ import type { Tx } from "../store/postgres/index.ts";
  * T-004 lands the **contracts** the MCP surface serves and the human renderings
  * derived from them (ADR 0018: the text of every result is the human rendering, never
  * the JSON; ADR 0030: `open` returns structured content; ADR 0016: the one answer
- * contract, verdict first). The bodies are B9's: today there is no concept index to
- * read, so `find` answers no hits, `open` not found, `ask` a refuse verdict, and
+ * contract, verdict first). The bodies are B9's, with one exception: **`open` by IRI
+ * reads the concept index** (T-052), through the concepts slice's own read — a slice
+ * reaches another only through its `index.ts` (ADR 0029 rule 4), and `concept_index` is
+ * the concepts slice's table. `find` answers no hits, `open` by *locator* not found —
+ * a passage needs the source catalogue, which is B7's — `ask` a refuse verdict, and
  * `giveFeedback` a receipt. Every function takes the Principal first and runs on the
  * transaction that resolved it.
  */
@@ -191,16 +195,86 @@ export const find = async (
   input: { readonly query: string; readonly limit: number },
 ): Promise<Result<FindResult, never>> => ok({ query: input.query, hits: [] });
 
+/**
+ * The trust a concept's row and its latest check project to (ADR 0019): a check by a person
+ * earns *human-reviewed*, one by the platform or an agent *machine-confirmed*, and no check
+ * at all is *Unchecked*. The status word wins over the tier when it is not *current*, and a
+ * check whose hash is not the concept's own reads *Changed since checked* — which is what
+ * makes the hash on the verification row load-bearing rather than decorative.
+ *
+ * An imported check carries no hash and so never reads *Changed since checked*; it carries
+ * the *imported* rider instead, which never moves the tier.
+ */
+const trustOf = (concept: OpenedConcept): Trust => {
+  const { check } = concept;
+  const checkedAt = check === undefined ? null : check.at.toISOString();
+  const tier: TrustTier =
+    check === undefined
+      ? "unverified"
+      : check.actor.startsWith("human:")
+        ? "human-reviewed"
+        : "machine-confirmed";
+  const rider: TrustRider | null = check?.contentHash === null ? "imported" : null;
+  const moved = check?.contentHash != null && check.contentHash !== concept.contentHash;
+  const status: TrustStatus =
+    concept.status === "deprecated" || concept.status === "removed"
+      ? "deprecated"
+      : concept.status === "draft"
+        ? "draft"
+        : moved
+          ? "changed-since-checked"
+          : "current";
+  return { tier, status, checkedBy: check?.actor ?? null, checkedAt, rider };
+};
+
+/** What a concept's `sources[]` frontmatter entry projects to in a view (`CONTEXT.md`, *evidence*). */
+const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
+  const sources = concept.frontmatter["sources"];
+  if (!Array.isArray(sources)) return [];
+  // The file's own list, each entry `<resource>#<locator>` as OKF writes it; anything that
+  // is not a string is a file the platform did not write and is left out rather than guessed.
+  return sources.flatMap((entry) => {
+    if (typeof entry !== "string") return [];
+    const hash = entry.lastIndexOf("#");
+    return hash === -1
+      ? [{ locator: "", source: entry }]
+      : [{ locator: entry.slice(hash + 1), source: entry.slice(0, hash) }];
+  });
+};
+
+/**
+ * The verbatim fetch (ADR 0018). A concept by IRI is a real read over `concept_index`
+ * through the read predicate; **a concept this caller may not see answers exactly as one
+ * nobody minted does** — `found: false` with the IRI echoed back — because the predicate is
+ * in the statement's WHERE clause and a withheld row is not a row that came back (user
+ * story 13). A locator answers not found until the source catalogue exists (B7).
+ */
 export const open = async (
-  _principal: UserPrincipal,
-  _tx: Tx,
+  principal: UserPrincipal,
+  tx: Tx,
   input: OpenInput,
-): Promise<Result<OpenResult, never>> =>
-  ok(
-    input.iri === undefined
-      ? { found: false, locator: input.locator ?? "" }
-      : { found: false, iri: input.iri },
-  );
+): Promise<Result<OpenResult, Error>> => {
+  if (input.iri === undefined) return ok({ found: false, locator: input.locator ?? "" });
+
+  const concept = await conceptByIri(principal, tx, input.iri);
+  if (!concept.ok) return err(concept.error);
+  if (concept.value === undefined) return ok({ found: false, iri: input.iri });
+
+  const found = concept.value;
+  return ok({
+    found: true,
+    concept: {
+      iri: found.iri,
+      frontmatter: found.frontmatter,
+      body: found.body,
+      // Typed relations are derived in the graph and are never a key on the file
+      // (ADR 0010), so they arrive with the graph tables (T-053).
+      relations: [],
+      trust: trustOf(found),
+      evidence: evidenceOf(found),
+    },
+  });
+};
 
 export const ask = async (
   _principal: UserPrincipal,

@@ -337,7 +337,7 @@ export const conceptIdentityUpdate = createUpdateSchema(
  * The concept index (ADR 0012): the derived row per concept. The two hashes are narrowed to
  * their own shapes — a git object name and the canonical-form SHA-256 — so a row can never
  * hold one where the other belongs, and the three visibility columns are narrowed exactly as
- * `index.chunk`'s are, because the read predicate is tested against them (`[SEC2]`).
+ * `index.chunk`'s are, because the read predicate is tested against them (ADR 0023).
  */
 const conceptIndexRefinements = {
   workspaceId,

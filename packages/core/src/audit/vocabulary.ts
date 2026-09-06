@@ -1,4 +1,4 @@
-import { ACT, ROLES, ULID } from "@better-answers/schema";
+import { ACT, CONTENT_HASH, GIT_SHA, IRI, ROLES, ULID } from "@better-answers/schema";
 import type { boundarySchemas } from "@better-answers/schema";
 import type { z } from "zod";
 
@@ -34,26 +34,36 @@ export type DetailValue = string | number | boolean;
 /**
  * What a detail field may be, named by kind rather than by type, so that a declaration
  * reads as the rule it is held to: an **id** is the minter's shape and never an email; a
- * **role** is one of the three words; a **flag** is an act's confirmation. A kind for a
- * person's name or contact does not exist, which is how the ledger stays a table an
- * erasure never rewrites; a kind an act needs and this list lacks is added here, with the
- * act that needs it. Each kind's check runs on every write.
+ * **role** is one of the three words; a **flag** is an act's confirmation; an **iri** is a
+ * concept's platform-minted key (ADR 0002); a **hash** is a git object name or the
+ * canonical content hash (ADR 0014); a **count** is how many of something an act touched.
+ * A kind for a person's name or contact does not exist, which is how the ledger stays a
+ * table an erasure never rewrites; a kind an act needs and this list lacks is added here,
+ * with the act that needs it. Each kind's check runs on every write.
  */
 export const DETAIL_KINDS = {
   id: (value: DetailValue) => typeof value === "string" && ULID.test(value),
   role: (value: DetailValue) => typeof value === "string" && ROLES.some((role) => role === value),
   flag: (value: DetailValue) => typeof value === "boolean",
+  iri: (value: DetailValue) => typeof value === "string" && IRI.test(value),
+  // Either hash the platform writes, because both name a thing a reader can go and fetch:
+  // the commit an act made, and the content a check confirmed.
+  hash: (value: DetailValue) =>
+    typeof value === "string" && (GIT_SHA.test(value) || CONTENT_HASH.test(value)),
+  count: (value: DetailValue) => typeof value === "number" && Number.isInteger(value) && value >= 0,
 } as const;
 
 export type DetailKind = keyof typeof DETAIL_KINDS;
 /** The fields a declared act's detail carries, each named with its kind. */
 export type DetailShape = Readonly<Record<string, DetailKind>>;
 
-type DetailValueOf<K extends DetailKind> = K extends "id"
-  ? string
-  : K extends "role"
-    ? Role
-    : boolean;
+type DetailValueOf<K extends DetailKind> = K extends "role"
+  ? Role
+  : K extends "flag"
+    ? boolean
+    : K extends "count"
+      ? number
+      : string;
 
 /** The detail a row of one declared act carries: the shape's fields, each at its kind's type. */
 export type DetailOf<Shape extends DetailShape> = {

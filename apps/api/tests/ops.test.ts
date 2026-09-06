@@ -92,7 +92,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
       "graph-rebuild",
       "graph-sweep",
       "graph-counts",
-      "reconcile-watermark",
       "object-store-orphans",
       "erasure-rehearsal",
     ])("%s says `not built` — exit 3 — while its slice's tables are absent", async (command) => {
@@ -100,6 +99,17 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(NOT_BUILT);
       expect(run.lines.join("\n")).toContain("not built");
+    });
+
+    it("reconcile-watermark refuses — exit 1 — now its tables are there and the reconciler is not", async () => {
+      // T-052 landed `concept_index` and `bundle_commit`, so *not built* has stopped being
+      // true for this command; the reconciler that reads them is T-056's. That is exactly
+      // the state the third answer is for: the tables exist and this image has no
+      // implementation, which is a refusal a restore must stop on rather than a silence.
+      const run = await ops(app(), ["reconcile-watermark", "--workspace", "ws_synthetic"]);
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines.join("\n")).toContain("REFUSED");
     });
   });
 

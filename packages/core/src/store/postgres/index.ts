@@ -15,6 +15,12 @@ import type {
 /**
  * The Postgres door: the handle, the transaction helper, and the RLS session setter.
  *
+ * Four openers, and which one a call uses says who is behind it: `withScope` and
+ * `withIdentityWrite`/`withIdentityRead` for the platform's own acts; `withPrincipal` for
+ * the transport, which builds a Principal from a credential at the request boundary; and
+ * `withMembership` for a slice that owns an act's transaction and holds a Principal already
+ * (T-052's governed write), which re-reads the membership in the transaction it opens.
+ *
  * `SET LOCAL app.workspace_id` from the `Principal` on every transaction. RLS with
  * `FORCE ROW LEVEL SECURITY`, the non-owner `app_rt` role and default-deny
  * (`pgTable.withRLS()`) is the tenancy **guarantee**; this door is ergonomics over it
@@ -194,22 +200,78 @@ export const withPrincipal = async <T>(
   const userId = boundarySchemas.user.select.shape.id.safeParse(claims.userId);
   if (!workspaceId.success || !userId.success) return err("malformed-claims");
 
+  return resolveScoped(door, workspaceId.data, userId.data, (row) => refuse(row, claims), work);
+};
+
+/**
+ * The second principal-scoped door (T-052): open a transaction for a Principal a caller
+ * **already holds**, re-reading the membership inside it.
+ *
+ * `withPrincipal` above is the transport's — it builds a Principal from a credential at the
+ * request boundary. This one is a slice's, for the act that cannot use the transport's
+ * transaction because it owns its own: the governed write commits to git first and then
+ * writes its rows, and those rows land in a transaction the slice opens after the commit
+ * (ADR 0012; T-006 spec, *The governed write*). Handing that act the transport's transaction
+ * would mean holding a transaction open across a git commit, and opening it under `withScope`
+ * would mean writing a person's act under the platform's authority.
+ *
+ * So the role is resolved **in the same transaction as the writes it authorises**, exactly as
+ * it is at the request boundary, and the act re-checks its own role threshold against the
+ * `principal` this door hands back rather than the one it was called with.
+ *
+ * Refusals: the membership is gone — the person was removed from the workspace while the act
+ * was in flight — the row's role is not one of the three, or it is no longer the role the
+ * caller was authorised at. The two revocation instants are **not** re-read here: they are
+ * refused against a credential's issuance instant (ADR 0035), which a Principal does not
+ * carry, and that comparison is `withPrincipal`'s at the boundary. What this door judges is
+ * what the member row alone can say, which is what the revocation race needs (ADR 0012's
+ * 2026-09-06 amendment): a membership that went, or a role that moved, refuses the rows and
+ * leaves the commit as the reconciler's finding.
+ */
+export const withMembership = async <T>(
+  principal: UserPrincipal,
+  door: PostgresDoor,
+  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+): Promise<Result<T, PrincipalRefusal>> =>
+  resolveScoped(
+    door,
+    principal.workspaceId,
+    principal.userId,
+    (row) => {
+      if (row === undefined) return "not-a-member";
+      if (!isRole(row.role)) return "role-unknown";
+      return row.role === principal.role ? undefined : "role-disagrees";
+    },
+    work,
+  );
+
+/**
+ * What both principal-scoped doors are: one transaction, its scope set before any other
+ * statement, the membership read inside it, and `work` run with the Principal that read
+ * built — never with one a caller composed. The two differ only in what they refuse the row
+ * for, which is the callback; the body is theirs jointly, because a second copy of it is a
+ * second place the scope could be set late or the commit tag go unread.
+ */
+const resolveScoped = async <T>(
+  door: PostgresDoor,
+  workspaceId: WorkspaceId,
+  userId: UserId,
+  refusalFor: (row: MembershipRow | undefined) => PrincipalRefusal | undefined,
+  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+): Promise<Result<T, PrincipalRefusal>> => {
   const client = await door.pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId.data]);
+    await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
 
-    const membership = await client.query<MembershipRow>(MEMBERSHIP_QUERY, [
-      workspaceId.data,
-      userId.data,
-    ]);
+    const membership = await client.query<MembershipRow>(MEMBERSHIP_QUERY, [workspaceId, userId]);
     const row = membership.rows[0];
-    const refusal = refuse(row, claims);
+    const refusal = refusalFor(row);
     if (refusal !== undefined) {
       await rollbackQuietly(client);
       return err(refusal);
     }
-    // `refuse` returned nothing, so the row exists and its role is one of the three;
+    // The callback returned nothing, so the row exists and its role is one of the three;
     // the narrowing is repeated here because TypeScript cannot carry it across the call.
     const role = row?.role ?? "";
     if (!isRole(role)) {
@@ -219,8 +281,8 @@ export const withPrincipal = async <T>(
 
     const principal: UserPrincipal = {
       kind: "user",
-      workspaceId: workspaceId.data satisfies WorkspaceId,
-      userId: userId.data satisfies UserId,
+      workspaceId,
+      userId,
       role,
       // Parsed at the boundary rather than asserted (ADR 0028): the column is a foreign
       // key to a group the platform minted, so a value of another shape is a broken

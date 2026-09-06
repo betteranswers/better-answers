@@ -98,6 +98,9 @@ export const CONTENT_HASH = /^[0-9a-f]{64}$/;
 const listed = (values: readonly string[]): string =>
   values.map((value) => `'${value}'`).join(", ");
 
+/** Every instant this file records, in the one form the platform stores one (`identity-tables.ts`). */
+const stamp = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
+
 /**
  * The identity record (ADR 0002): the IRI the platform minted, and the **merge key** it was
  * minted for — what an acceptance resolves a suggestion's target by, so a concept whose
@@ -113,7 +116,7 @@ export const conceptIdentity = withRLS(
       .references(() => workspace.id, { onDelete: "cascade" }),
     iri: text("iri").notNull(),
     mergeKey: text("merge_key").notNull(),
-    mintedAt: timestamp("minted_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    mintedAt: stamp("minted_at").notNull().defaultNow(),
   },
   "workspaceId",
   (table) => [
@@ -130,7 +133,7 @@ export const conceptIdentity = withRLS(
  * frontmatter and body verbatim, the content hash a check compares against, the commit it
  * was written at, and the three visibility columns every readable unit carries (ADR 0023) —
  * which is what lets the read predicate be tested against columns on the unit itself rather
- * than against three fields of a binding a concept does not have (`[SEC2]`).
+ * than against three fields of a binding a concept does not have.
  */
 export const conceptIndex = withRLS(
   "concept_index",
@@ -148,10 +151,10 @@ export const conceptIndex = withRLS(
     commitSha: text("commit_sha").notNull(),
     status: text("status").notNull().default(CONCEPT_DRAFT_STATUS),
     // The three visibility columns (ADR 0023), as `index.chunk` carries them.
-    publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
+    publishedAt: stamp("published_at"),
     sensitivity: text("sensitivity").notNull().default(SENSITIVITY_DEFAULT),
     audience: text("audience").notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: stamp("updated_at").notNull().defaultNow(),
   },
   "workspaceId",
   (table) => [
@@ -193,9 +196,7 @@ export const bundleCommit = withRLS(
     auditEventId: text("audit_event_id").notNull(),
     /** The `Actor:` trailer's value — the kernel's `ActorId`, never the git author line. */
     actor: text("actor").notNull(),
-    committedAt: timestamp("committed_at", { withTimezone: true, mode: "date" })
-      .notNull()
-      .defaultNow(),
+    committedAt: stamp("committed_at").notNull().defaultNow(),
   },
   "workspaceId",
   (table) => [
@@ -230,9 +231,7 @@ export const evidence = withRLS(
     resource: text("resource").notNull(),
     /** The version of the content the locator pointed at; NULL when the source names none. */
     contentVersion: text("content_version"),
-    recordedAt: timestamp("recorded_at", { withTimezone: true, mode: "date" })
-      .notNull()
-      .defaultNow(),
+    recordedAt: stamp("recorded_at").notNull().defaultNow(),
   },
   "workspaceId",
   (table) => [primaryKey({ columns: [table.workspaceId, table.sourceDocumentId, table.locator] })],
@@ -257,7 +256,7 @@ export const conceptVerification = withRLS(
     iri: text("iri").notNull(),
     /** Who checked: an `ActorId`, so *verifier ≠ generator* is visible on the string alone. */
     actor: text("actor").notNull(),
-    checkedAt: timestamp("checked_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    checkedAt: stamp("checked_at").notNull().defaultNow(),
     /** What was confirmed; NULL on an imported event, which never reads *Changed since checked*. */
     contentHash: text("content_hash"),
     origin: text("origin").notNull().default(VERIFICATION_PLATFORM_ORIGIN),
