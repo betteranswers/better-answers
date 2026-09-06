@@ -1,0 +1,112 @@
+packages/schema/migrations/0008_ledger.sql
+  s_cc225aaf43ef73::t_99fde019d33513 1-20
+packages/schema/migrations/meta/0008_snapshot.json
+  s_cc225aaf43ef73::t_99fde019d33513 1-2300
+packages/schema/src/ulid.ts
+  s_cc225aaf43ef73::t_866f1b8957c674 25-26
+  s_cc225aaf43ef73::t_65fabae9a70cb5 28-29
+packages/core/test/platform.ts
+  s_cc225aaf43ef73::t_5bd8c7a90e97a4 1-25
+packages/schema/migrations/meta/0009_snapshot.json
+  s_cc225aaf43ef73::t_99fde019d33513 1-2300
+packages/schema/migrations/0009_ledger-substrate.sql
+  s_cc225aaf43ef73::t_737d37cdaaa6c9 1-21
+packages/schema/src/boundary-schemas.ts
+  s_cc225aaf43ef73::t_85f2ca08c60c0b 203-206
+  s_cc225aaf43ef73::t_7f0e1b9bca91e5 4
+  s_cc225aaf43ef73::t_b2ce16b949adee 215
+  s_cc225aaf43ef73::t_722964d11f75fd 27
+  s_cc225aaf43ef73::t_3a3197301a4cc4 184-198,202,207-214,216-228
+  s_cc225aaf43ef73::t_bc9294e98c03d8 199-201
+  s_cc225aaf43ef73::t_02dfc4275afc84 250-255
+packages/schema/src/schema.ts
+  s_cc225aaf43ef73::t_798fd39c2e5610 26
+packages/core/src/audit/index.ts
+  s_cc225aaf43ef73::t_d651940f4e2e07 1-4,6-7,9-10,12-240,242-267,269-278
+packages/core/src/kernel/index.ts
+  s_cc225aaf43ef73::t_d922b0f2574c6c 13-14
+  s_cc225aaf43ef73::t_a6a7c3d7a1a1a5 42
+apps/worker/src/better_answers_worker/schema_view.py
+  s_cc225aaf43ef73::t_99d0c2cd54883f 9,39-49
+packages/schema/src/audit-tables.ts
+  s_cc225aaf43ef73::t_2f71c28ec3af26 1-87
+packages/schema/test/rls.test.ts
+  s_cc225aaf43ef73::t_3c693c8aa637bf 337-338,340-354,356-362,364-376
+  s_cc225aaf43ef73::t_357e3694887791 282-290
+  s_cc225aaf43ef73::t_cf44b7758a744a 310,339
+  s_cc225aaf43ef73::t_b44fe360d85a59 355
+  s_cc225aaf43ef73::t_92757c6f710189 430-431
+  s_cc225aaf43ef73::t_07cbd19c7cbd87 274-281,291-309,311-336,377-399,402,404,413-428,432-434
+  s_cc225aaf43ef73::t_fc38e6f05b342c 363
+  s_cc225aaf43ef73::t_3c2ec8e3905058 400-401,403,405-412
+  s_cc225aaf43ef73::t_17768fcdce7e72 429
+  s_cc225aaf43ef73::t_6975c42c41ea9b 5-12
+docs/adr/0014-records-attach-by-iri-versioned-where-edited-audited-in-one-ledger.md
+  s_cc225aaf43ef73::t_1c7711e160816b 8
+  s_cc225aaf43ef73::t_e155b3625fed93 32
+  s_cc225aaf43ef73::t_33267970105f39 56-59
+packages/core/src/kernel/principal.ts
+  s_cc225aaf43ef73::t_d838b7a25e205a 20-21
+docs/adr/0038-the-people-data-model-groups-flat-and-entra-aligned-access-requests-answered-neutrally-and-the-ledger-founded-as-an-append-only-tenant-table.md
+  s_cc225aaf43ef73::t_f638972289e86c 1-41
+docs/adr/README.md
+  s_cc225aaf43ef73::t_b926b4bdf77094 22
+  s_cc225aaf43ef73::t_c3993506b6fbc1 46
+packages/schema/test/boundary-schemas.test.ts
+  s_cc225aaf43ef73::t_ed0a7e2457cdef 287
+  s_cc225aaf43ef73::t_2d5237bb1d86eb 24-25
+  s_cc225aaf43ef73::t_843093450fe4a4 329-341
+  s_cc225aaf43ef73::t_508ee77934ffe5 508
+  s_cc225aaf43ef73::t_cc15e1d30911ff 494-507,509-512
+  s_cc225aaf43ef73::t_c236f365213fce 128-156
+packages/core/src/kernel/result.ts
+  s_cc225aaf43ef73::t_6078552de53553 22-26
+packages/core/test/audit.test.ts
+  s_cc225aaf43ef73::t_9c4082e99120a5 130-132
+  s_cc225aaf43ef73::t_d33f3fdaa79a26 215-221,330-336
+  s_cc225aaf43ef73::t_9ae48100ef7383 18,21
+  s_cc225aaf43ef73::t_b8769112b5c93f 120-123,126-129,133
+  s_cc225aaf43ef73::t_863da37ae1a48f 71
+  s_cc225aaf43ef73::t_f13ae3d1e4eeb0 54-67
+  s_cc225aaf43ef73::t_6fc6ff9c49660a 1-17,19-20,22-53,68-70,72-119,124,134-162,167-214,222-236,240-243,245-329,337-341
+  s_cc225aaf43ef73::t_2bf577316c7144 125
+  s_cc225aaf43ef73::t_63838c875a1db7 163-166
+  s_cc225aaf43ef73::t_c5e4c533c21876 237-239,244
+packages/schema/src/table-ownership.ts
+  s_cc225aaf43ef73::t_734590bd772749 96-98,101
+packages/schema/test/factory.ts
+  s_cc225aaf43ef73::t_d86a5c76820d56 56-61
+  s_cc225aaf43ef73::t_09bb26f07d5ce9 257-264,266-270,282
+  s_cc225aaf43ef73::t_ef0e3699c03a38 265
+packages/core/src/workspaces/index.ts
+  s_cc225aaf43ef73::t_9531f40f1ccb07 140-143
+  s_cc225aaf43ef73::t_e0b68fc861e433 3
+  s_cc225aaf43ef73::t_056e728be038f2 289-290
+  s_cc225aaf43ef73::t_05493fafddd1f7 99-106
+  s_cc225aaf43ef73::t_5ae49203918acb 37-47
+  s_cc225aaf43ef73::t_f94579ae5d3825 66,70-72
+packages/core/test/workspaces.test.ts
+  s_cc225aaf43ef73::t_446f22d965cfe3 88-100,103-104,107-108,110-120
+  s_cc225aaf43ef73::t_2c3ca66653a272 11,13
+  s_cc225aaf43ef73::t_5c641603554e21 101-102,105-106,109
+  s_cc225aaf43ef73::t_06bf8c84c99588 160-164
+  s_cc225aaf43ef73::t_8bf480029a77e2 41
+packages/schema/migrations/meta/_journal.json
+  s_cc225aaf43ef73::t_99fde019d33513 60-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3d11fd4621ed4509582da91240435880fe896358",
+  "prompts": {},
+  "sessions": {
+    "s_cc225aaf43ef73": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec03dfce-1d57-4982-874c-65a51e9365ea",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
