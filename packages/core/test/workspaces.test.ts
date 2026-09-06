@@ -98,6 +98,16 @@ describe("provisioning a workspace", () => {
     });
 
     expect(provisioned.ok).toBe(true);
+    // Beside the rows it describes: the workspace, its partition, the membership and the
+    // config row are all there in the same read as the event.
+    const beside = await db.pool.query<{ rows: string }>(
+      `SELECT (SELECT count(*) FROM workspace WHERE id = $1)
+            + (SELECT count(*) FROM member WHERE workspace_id = $1)
+            + (SELECT count(*) FROM workspace_config WHERE workspace_id = $1) AS rows`,
+      [id],
+    );
+    expect(beside.rows[0]?.rows).toBe("3");
+    expect(await partitionExists(id)).toBe(true);
     const events = await db.pool.query<{ id: string }>(
       "SELECT id, act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1",
       [id],
@@ -175,8 +185,9 @@ describe("provisioning a workspace", () => {
       slug,
       adminUserId,
     });
+    const secondId = ulid();
     const second = await provisionWorkspace(bootstrap, door, {
-      id: ulid(),
+      id: secondId,
       name: "Two",
       slug,
       adminUserId,
@@ -184,6 +195,11 @@ describe("provisioning a workspace", () => {
 
     expect(first.ok).toBe(true);
     expect(second).toEqual({ ok: false, error: "slug-taken" });
+    // A refused provisioning leaves no row on the ledger either.
+    const events = await db.pool.query("SELECT 1 FROM audit_event WHERE subject_id = $1", [
+      secondId,
+    ]);
+    expect(events.rowCount).toBe(0);
   });
 
   it("refuses an id a workspace already holds", async () => {

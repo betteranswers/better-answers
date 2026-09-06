@@ -41,9 +41,10 @@ export const FAMILIES = ["people", "knowledge", "sources", "platform"] as const;
  */
 export const ACT_PATTERN = `^(${FAMILIES.join("|")})\\.[a-z][a-z_]*\\.[a-z][a-z_]*$`;
 
-const familyList = FAMILIES.map((family) => `'${family}'`).join(", ");
+/** The compiled pattern, one object for the boundary and the audit slice alike, as `ULID` is. */
+export const ACT = new RegExp(ACT_PATTERN);
 
-const stamp = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
+const familyList = FAMILIES.map((family) => `'${family}'`).join(", ");
 
 export const auditEvent = withRLS(
   "audit_event",
@@ -69,7 +70,7 @@ export const auditEvent = withRLS(
       .notNull()
       .generatedAlwaysAs(sql`split_part(act, '.', 2)`),
     subjectId: text("subject_id").notNull(),
-    at: stamp("at").notNull().defaultNow(),
+    at: timestamp("at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
     // Ids and role words, and an act's confirmations as typed fields; never an email, a name,
     // a prompt or a completion. Each declared act names the fields its detail carries.
     detail: jsonb("detail").notNull(),

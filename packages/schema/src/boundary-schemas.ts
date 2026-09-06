@@ -1,7 +1,7 @@
 import type { PgTable } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
-import { ACT_PATTERN, auditEvent, FAMILIES } from "./audit-tables.ts";
+import { ACT, auditEvent, FAMILIES } from "./audit-tables.ts";
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import {
@@ -190,7 +190,6 @@ export const ingressCounterUpdate = createUpdateSchema(ingressCounter, ingressCo
 const ACTOR_ID = new RegExp(
   `^(human:${ULID_CHARACTERS}|process:better-answers-[a-z0-9][a-z0-9-]*|better-answers-[a-z0-9][a-z0-9-]*/[0-9A-Za-z.-]+)$`,
 );
-const ACT = new RegExp(ACT_PATTERN);
 
 /**
  * The detail a row carries: ids and role words, and an act's confirmations as typed

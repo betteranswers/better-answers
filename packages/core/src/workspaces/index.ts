@@ -41,7 +41,7 @@ export const TOOLS_LIST_TTL_CONFIG_KEY = "mcp.tools_list_ttl_ms";
  * set with no workspace and stays a log line until T-028's identity-set ledger; *revoke in
  * a workspace* is T-027's act and declares itself there.
  */
-export const WORKSPACE_ACTS = declareActs("platform", {
+const WORKSPACE_ACTS = declareActs("platform", {
   provisioned: act("platform.workspace.provisioned", { adminUserId: "id", role: "role" }),
 });
 

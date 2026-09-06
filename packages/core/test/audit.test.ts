@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { type MigratedPostgres, startMigratedPostgres } from "@better-answers/schema/testing";
 import { afterAll, beforeAll, describe, expect, expectTypeOf, it } from "vitest";
 
-import { FAMILIES, ulid } from "@better-answers/schema";
+import { boundarySchemas, FAMILIES, ulid } from "@better-answers/schema";
 
 import {
   act,
@@ -150,13 +150,39 @@ describe("the declared-acts walk", () => {
   });
 
   it("refuses an act whose subject names a record that is never a ledger row", () => {
-    // Runs, the answer audit, signals, alerts, spend, backup runs and health checks are
-    // their own records; a declaration naming one is refused before any row could exist.
-    for (const subject of ["run", "answer_audit", "signal", "alert", "spend", "backup_run"]) {
+    // Runs, the answer audit, signals, alerts, spend and its rows, backup runs, health
+    // checks and the inbox are their own records; a declaration naming one is refused
+    // before any row could exist.
+    const neverASubject = [
+      "run",
+      "answer_audit",
+      "signal",
+      "alert",
+      "spend",
+      "llm_call",
+      "backup_run",
+      "health_check",
+      "inbox",
+    ];
+    for (const subject of neverASubject) {
       expect(() =>
         declareActs("platform", { probe: act(`platform.${subject}.started`, {}) }),
       ).toThrow(/never a ledger row/);
     }
+  });
+
+  it("registers nothing when one act of a declaration is refused", () => {
+    // A slice's declaration is one act of its own: the first name must not become
+    // writable while the second is refused and the whole is invisible to the walk.
+    expect(() =>
+      declareActs("platform", {
+        fine: act("platform.probe.atomic", {}),
+        refused: act("platform.run.started", {}),
+      }),
+    ).toThrow(/never a ledger row/);
+    expect(declarations().flatMap((declaration) => declaration.acts)).not.toContain(
+      "platform.probe.atomic",
+    );
   });
 
   it("refuses an act declared twice, so an act belongs to one slice", () => {
@@ -170,7 +196,7 @@ describe("the declared-acts walk", () => {
 /** An act declared once for this suite, so the doors have something declared to write. */
 const PROBE = declareActs("platform", {
   written: act("platform.probe.written", { adminUserId: "id", role: "role", confirmed: "flag" }),
-  counted: act("platform.probe.counted", { count: "count" }),
+  noted: act("platform.probe.noted", { confirmed: "flag" }),
 });
 
 describe("the first door — record, the actor derived from the Principal", () => {
@@ -214,9 +240,9 @@ describe("the first door — record, the actor derived from the Principal", () =
     const written = await withScope(bootstrap, door, workspaceId, (tx) =>
       record(bootstrap, tx, {
         id,
-        act: PROBE.counted,
+        act: PROBE.noted,
         subjectId: ulid(),
-        detail: { count: 3 },
+        detail: { confirmed: true },
         batchId,
       }),
     );
@@ -225,7 +251,7 @@ describe("the first door — record, the actor derived from the Principal", () =
     expect(await rowById(id)).toMatchObject({
       workspace_id: workspaceId,
       actor: "process:better-answers-bootstrap",
-      detail: { count: 3 },
+      detail: { confirmed: true },
       batch_id: batchId,
     });
   });
@@ -239,7 +265,12 @@ describe("the first door — record, the actor derived from the Principal", () =
     // rather than merely unwritten.
     await expect(
       withScope(bootstrap, door, "", (tx) =>
-        record(bootstrap, tx, { id, act: PROBE.counted, subjectId: ulid(), detail: { count: 1 } }),
+        record(bootstrap, tx, {
+          id,
+          act: PROBE.noted,
+          subjectId: ulid(),
+          detail: { confirmed: true },
+        }),
       ),
     ).rejects.toThrow(/row-level security|null value/);
     expect(await rowById(id)).toBeUndefined();
@@ -253,9 +284,9 @@ describe("the first door — record, the actor derived from the Principal", () =
       withScope(bootstrap, door, workspaceId, (tx) =>
         record(bootstrap, tx, {
           id,
-          act: PROBE.counted,
-          // @ts-expect-error — the act names `count` and nothing else; the runtime half.
-          detail: { count: 1, email: "priya@example.invalid" },
+          act: PROBE.noted,
+          // @ts-expect-error — the act names `confirmed` and nothing else; the runtime half.
+          detail: { confirmed: true, email: "priya@example.invalid" },
           subjectId: adminUserId,
         }),
       ),
@@ -285,7 +316,12 @@ describe("the first door — record, the actor derived from the Principal", () =
       }),
     ).rejects.toThrow(/never declared/);
     await expect(
-      write({ id: "audit-1", act: PROBE.counted, subjectId: adminUserId, detail: { count: 1 } }),
+      write({
+        id: "audit-1",
+        act: PROBE.noted,
+        subjectId: adminUserId,
+        detail: { confirmed: true },
+      }),
     ).rejects.toThrow(/refused at the boundary/);
   });
 });
@@ -302,9 +338,9 @@ describe("the second door — recordFor, the platform naming the actor", () => {
       recordFor(bootstrap, tx, {
         id,
         actor: requester,
-        act: PROBE.counted,
+        act: PROBE.noted,
         subjectId: workspaceId,
-        detail: { count: 1 },
+        detail: { confirmed: true },
       }),
     );
 
@@ -314,10 +350,11 @@ describe("the second door — recordFor, the platform naming the actor", () => {
 
   it("is not reachable from a user principal, in the type and at runtime", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
+    // The ids come through the boundary, so the brands are earned rather than asserted.
     const admin: UserPrincipal = {
       kind: "user",
-      workspaceId: workspaceId as UserPrincipal["workspaceId"],
-      userId: adminUserId as UserPrincipal["userId"],
+      workspaceId: boundarySchemas.workspace.select.shape.id.parse(workspaceId),
+      userId: boundarySchemas.user.select.shape.id.parse(adminUserId),
       role: "Admin",
       groups: [],
     };
@@ -330,9 +367,9 @@ describe("the second door — recordFor, the platform naming the actor", () => {
         recordFor(admin, tx, {
           id,
           actor: `human:${ulid()}`,
-          act: PROBE.counted,
+          act: PROBE.noted,
           subjectId: workspaceId,
-          detail: { count: 1 },
+          detail: { confirmed: true },
         }),
       ),
     ).rejects.toThrow(/only the platform principal/);

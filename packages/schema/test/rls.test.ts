@@ -426,9 +426,10 @@ describe("the ledger under app_rt", () => {
       (match) => match[1],
     );
     expect(inCheck.toSorted()).toEqual([...FAMILIES].toSorted());
-    expect(boundarySchemas.auditEvent.select.shape.family.out.options.toSorted()).toEqual(
-      [...FAMILIES].toSorted(),
-    );
+    // The boundary's half: every word the CHECK admits parses, and a fifth does not.
+    const family = boundarySchemas.auditEvent.select.shape.family;
+    expect(inCheck.map((word) => family.safeParse(word).success)).toEqual(inCheck.map(() => true));
+    expect(family.safeParse("billing").success).toBe(false);
   });
 });
 
