@@ -6,14 +6,16 @@ import {
 } from "@better-answers/schema/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { Claims } from "../src/kernel/index.ts";
+import { attempt, type Claims } from "../src/kernel/index.ts";
 import {
   consumeCall,
   consumeIngress,
   openPostgres,
   readWorkspaceConfig,
   withPrincipal,
+  withScope,
 } from "../src/store/postgres/index.ts";
+import { bootstrap } from "./platform.ts";
 
 /**
  * The Principal resolver through its interface (`[TEST1]`): claims in, a Principal
@@ -258,6 +260,38 @@ describe("the Principal resolver", () => {
     );
 
     expect(resolved).toEqual({ ok: true, value: "mine" });
+  });
+});
+
+describe("a transaction a caught failure aborted", () => {
+  // `[TEST8]`: the failure is provoked inside the work and the assertion is on the
+  // transaction's outcome, because Postgres aborts the transaction whatever the work
+  // does with the caught rejection — an opener that read only the work's value would
+  // report success for a transaction that rolled back.
+  it("rejects a person's call at commit instead of reporting success", async () => {
+    const seeded = await seedMembership();
+    const door = openPostgres(db.runtimePool);
+
+    await expect(
+      withPrincipal(door, claimsFor(seeded), async (_principal, tx) => {
+        // The refused statement aborts the transaction; `attempt` catches the
+        // rejection, so the work runs on and returns as though nothing failed.
+        await attempt(() => tx.query("SELECT no_such_function()"));
+        return "reached";
+      }),
+    ).rejects.toThrow(/did not commit/);
+  });
+
+  it("rejects the platform's call at commit instead of reporting success", async () => {
+    const seeded = await seedMembership();
+    const door = openPostgres(db.runtimePool);
+
+    await expect(
+      withScope(bootstrap, door, seeded.workspaceId, async (tx) => {
+        await attempt(() => tx.query("SELECT no_such_function()"));
+        return "reached";
+      }),
+    ).rejects.toThrow(/did not commit/);
   });
 });
 

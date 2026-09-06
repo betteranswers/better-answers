@@ -50,6 +50,10 @@ Stryker (`apps/api`, `apps/web`) and mutmut (`apps/worker`) run on a schedule �
 
 Where a list names members (the migration journal and its directory), a generated artefact mirrors a source (the worker's schema view and the migrated tables), or a registry names them (the boundary-schema registry and the exported tables), the test asserts membership both ways: every entry has its member, and every member has its entry. One direction finds the missing; only the other finds the orphan.
 
+### [TEST8] A test that provokes a failure inside a transaction asserts the transaction's outcome
+
+Postgres aborts the transaction whatever the work does with the caught rejection, so a test that swallows a statement failure and asserts only a returned value can pin a rolled-back transaction as success. The store's openers refuse to report a `COMMIT` Postgres answered with `ROLLBACK`; the test that provokes the abort asserts that rejection — or the rows — before any value.
+
 ## CHECK
 
 ### [CHECK1] Every gate is run, not remembered
@@ -124,7 +128,7 @@ The one append-only *ledger* (`audit_event`) and the audit slice that writes it.
 
 ### [AUDIT1] An act and its audit event land in one transaction
 
-Every Admin act, every governed write and every platform act writes its *audit event* through the audit slice inside the same database transaction as the rows it describes, so the two land or fail together — an act whose event cannot be written does not happen (ADR 0014 rule 4; T-048 spec). A slice that declares an act (`[AUDIT2]`) writes the event on every path that performs it. One row per act and target: a bulk act is N rows sharing one batch id, never one row hiding N. The transaction is the test: an act's test asserts its rows and its event together, and one test per slice proves they fail together.
+Every Admin act, every governed write and every platform act writes its *audit event* through the audit slice inside the same database transaction as the rows it describes, so the two land or fail together — an act whose event cannot be written does not happen (ADR 0014 rule 4; T-048 spec). A slice that declares an act (`[AUDIT2]`) writes the event on every path that performs it. One row per act and target: a bulk act is N rows sharing one batch id, never one row hiding N. The transaction is the test: an act's test asserts its rows and its event together, and one test per slice proves they fail together. The doors are called bare — no `attempt(` wraps `record(` or `recordFor(` under `packages/core/src`, held by a test beside the declared-acts walk: a wrapped door hands the abort back as a value the act might not read, and the act would commit without its event.
 
 ### [AUDIT2] An act is named `family.subject.verb`, declared, never a free string
 

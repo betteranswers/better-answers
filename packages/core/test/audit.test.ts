@@ -191,6 +191,45 @@ describe("the declared-acts walk", () => {
       /declared twice/,
     );
   });
+
+  it("finds no door call wrapped in attempt anywhere in the tree", () => {
+    // `[AUDIT1]`: the doors are called bare, so a door's rejection aborts the caller's
+    // transaction. `attempt(() => record(...))` would hand the abort back as a value
+    // the act might not read, and the act would commit without its event. The regex
+    // refuses the direct wrap in its spellings — braced or not, `return`/`await`/`void`
+    // before the call, statements ahead of it — and stops at a `with…` opener, because
+    // `attempt(() => withScope(… => record(…)))` is the sanctioned shape: there the
+    // door is bare inside the opener, and the abort still fails the whole attempt.
+    // The deep hold is `[AUDIT1]`'s per-slice fail-together test, not this pattern.
+    const wrapped =
+      /attempt\(\s*(?:async\s+)?\(\s*\)\s*=>\s*(?:\{(?:(?!with[A-Z])[^])*?)?(?:return\s+)?(?:await\s+|void\s+)?record(?:For)?\(/;
+    // The pattern is proved to bite before its silence is read as innocence.
+    expect(wrapped.test("attempt(() => record(principal, tx, event))")).toBe(true);
+    expect(wrapped.test("attempt(async () => recordFor(platform, tx, event))")).toBe(true);
+    expect(
+      wrapped.test("attempt(async () => {\n  return await record(principal, tx, event);\n})"),
+    ).toBe(true);
+    expect(wrapped.test("attempt(() => {\n  void record(principal, tx, event);\n})")).toBe(true);
+    expect(
+      wrapped.test(
+        "attempt(async () => {\n  const before = prepare();\n  return record(before, tx, event);\n})",
+      ),
+    ).toBe(true);
+    // And proved to pass the sanctioned shape, so the guard cannot outlaw the convention.
+    expect(
+      wrapped.test(
+        "attempt(() => withScope(platform, door, id, (tx) => record(platform, tx, event)))",
+      ),
+    ).toBe(false);
+    expect(
+      wrapped.test(
+        "attempt(async () => {\n  return withPrincipal(door, claims, (principal, tx) => record(principal, tx, event));\n})",
+      ),
+    ).toBe(false);
+
+    const offending = sourceFiles().filter((file) => wrapped.test(readFileSync(file, "utf8")));
+    expect(offending).toEqual([]);
+  });
 });
 
 /** An act declared once for this suite, so the doors have something declared to write. */

@@ -7,7 +7,6 @@ import {
 } from "@better-answers/schema/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { answered } from "./aborted-transaction.ts";
 import { attempt, type Claims } from "../src/kernel/index.ts";
 import { listRoutes, LLM_PURPOSES } from "../src/llm/index.ts";
 import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
@@ -135,20 +134,21 @@ describe("a workspace's model routes", () => {
     expect(visible).toEqual({ ok: true, value: [mine.workspaceId] });
   });
 
-  it("hands a caller a store failure to read rather than one to catch", async () => {
+  it("hands a caller a store failure to read, and the aborted transaction never commits", async () => {
     const seeded = await seedWorkspace([]);
+    let read: Awaited<ReturnType<typeof listRoutes>> | undefined;
 
-    const read = await withPrincipal(
-      openPostgres(db.runtimePool),
-      claimsFor(seeded),
-      async (principal, tx) => {
+    // `[TEST8]`: the abort is provoked inside the work, so the assertion is on the
+    // transaction's outcome first — the opener rejects — and on the value second.
+    await expect(
+      withPrincipal(openPostgres(db.runtimePool), claimsFor(seeded), async (principal, tx) => {
         // A statement Postgres refuses aborts the transaction, so the capability's own
         // read cannot run. `attempt` is the one place a rejection is caught (§ TYPES).
         await attempt(() => tx.query("SELECT no_such_function()"));
-        return listRoutes(principal, tx);
-      },
-    );
+        read = await listRoutes(principal, tx);
+      }),
+    ).rejects.toThrow(/did not commit/);
 
-    expect(answered(read)).toBeInstanceOf(Error);
+    expect(read).toMatchObject({ ok: false, error: expect.any(Error) });
   });
 });
