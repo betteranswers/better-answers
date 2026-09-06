@@ -1,0 +1,21 @@
+docs/adr/0012-the-concept-write-path.md
+  s_6181fc5a558822::t_b23d454f773847 59-74
+docs/adr/README.md
+  s_6181fc5a558822::t_93ffbf8ff0392d 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ef30e8cd2032a4dae804c63ca794ed73e152413d",
+  "prompts": {},
+  "sessions": {
+    "s_6181fc5a558822": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6019b35b-37fc-4524-aa66-a5eb72515b67",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
