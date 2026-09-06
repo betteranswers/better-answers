@@ -4,6 +4,7 @@ import type pg from "pg";
 import type { z } from "zod";
 
 import {
+  ACCESS_REQUEST_OPEN_STATUS,
   boundarySchemas,
   CREATOR_ROLE,
   CURATED_ORIGIN,
@@ -73,6 +74,12 @@ export type TestData = {
    * family and subject kind come back derived by the database, never written here.
    */
   auditEvent(overrides?: Partial<InsertInput<"auditEvent">>): Promise<Row<"auditEvent">>;
+  /**
+   * A waiting access request; creates its own workspace and requester unless named. The
+   * reason is a sentence of why, as a person would write one — never blank, which the
+   * boundary refuses anyway.
+   */
+  accessRequest(overrides?: Partial<InsertInput<"accessRequest">>): Promise<Row<"accessRequest">>;
 };
 
 /** INSERT the boundary-parsed row and read it back through the select schema. */
@@ -303,6 +310,24 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const accessRequest: TestData["accessRequest"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const requesterId = overrides.requesterId ?? (await user()).id;
+    return insertRow(client, "accessRequest", {
+      id: ulid(),
+      reason: "I have joined the bids team and need the answer library.",
+      // Written out rather than left to the column's default, so a factory-made request
+      // reads as what it is: waiting, with none of the decision's three columns filled.
+      status: ACCESS_REQUEST_OPEN_STATUS,
+      decidedBy: null,
+      decidedAt: null,
+      invitationId: null,
+      ...overrides,
+      workspaceId,
+      requesterId,
+    });
+  };
+
   return {
     workspace,
     user,
@@ -317,5 +342,6 @@ export const testData = (client: pg.PoolClient): TestData => {
     oauthRefreshToken,
     oauthAccessToken,
     auditEvent,
+    accessRequest,
   };
 };

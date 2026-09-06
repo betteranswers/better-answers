@@ -160,6 +160,17 @@ export const member = pgTable(
   ],
 );
 
+/**
+ * How long an invitation stands, in seconds — the organisation plugin's own default, read
+ * out of the installed plugin rather than remembered, and one exported constant rather than a
+ * copy per reader, as every pinned value in this repository is. It is here, beside
+ * the table, because `packages/core` writes an invitation row directly through the
+ * identity-write seam (ADR 0038) and cannot import the identity provider; the pin to the
+ * library is `apps/api/tests/invitation-shape.test.ts`, which reads the plugin's own source
+ * and fails the day the library's default moves.
+ */
+export const INVITATION_EXPIRY_SECONDS = 3600 * 48;
+
 export const invitation = pgTable(
   "invitation",
   {

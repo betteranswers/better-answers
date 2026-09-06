@@ -1,6 +1,11 @@
 import type { PgTable } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
+import {
+  accessRequest,
+  ACCESS_REQUEST_REASON_MAX,
+  ACCESS_REQUEST_STATUSES,
+} from "./access-request-tables.ts";
 import { ACT, auditEvent, FAMILIES } from "./audit-tables.ts";
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
@@ -253,6 +258,26 @@ export const auditEventSelect = createSelectSchema(auditEvent, {
 export const auditEventInsert = createInsertSchema(auditEvent, auditEventRefinements);
 export const auditEventUpdate = createUpdateSchema(auditEvent, auditEventRefinements);
 
+/**
+ * The *access request* (ADR 0038): the requester and the decider are person ids, the
+ * invitation the minter's shape, the status the closed set, and the reason a sentence of
+ * why — non-empty and bounded, because the surface that writes one is open to any signed-in
+ * person and an unbounded field would be storage a stranger chooses the size of.
+ */
+const accessRequestRefinements = {
+  id: (schema: z.ZodString) => schema.regex(ULID).brand<"AccessRequestId">(),
+  workspaceId,
+  requesterId: userId,
+  reason: (schema: z.ZodString) => schema.trim().min(1).max(ACCESS_REQUEST_REASON_MAX),
+  status: (schema: z.ZodString) => schema.pipe(z.enum(ACCESS_REQUEST_STATUSES)),
+  decidedBy: userId,
+  invitationId: identityId,
+};
+
+export const accessRequestSelect = createSelectSchema(accessRequest, accessRequestRefinements);
+export const accessRequestInsert = createInsertSchema(accessRequest, accessRequestRefinements);
+export const accessRequestUpdate = createUpdateSchema(accessRequest, accessRequestRefinements);
+
 /** One entry per table this package owns — the parity test's registry (ADR 0028). */
 export const boundarySchemas = {
   workspace: {
@@ -324,4 +349,10 @@ export const boundarySchemas = {
   oauthConsent: plain(oauthConsent),
   oauthClientAssertion: plain(oauthClientAssertion),
   rateLimit: plain(rateLimit),
+  accessRequest: {
+    table: accessRequest,
+    select: accessRequestSelect,
+    insert: accessRequestInsert,
+    update: accessRequestUpdate,
+  },
 } as const;

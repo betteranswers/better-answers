@@ -15,8 +15,8 @@
     "./guides": "./src/guides/index.ts",
     "./erasure": "./src/erasure/index.ts",
     "./runs": "./src/runs/index.ts",
-    "./workspaces": "./src/workspaces/index.ts",
     "./members": "./src/members/index.ts",
+    "./workspaces": "./src/workspaces/index.ts",
     "./store/postgres": "./src/store/postgres/index.ts"
   },
   "scripts": {
