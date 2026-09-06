@@ -1,0 +1,39 @@
+packages/core/test/audit.test.ts
+  s_268576476d3c87::t_5c291cc8b2c4c1 194-201,204-207
+  s_268576476d3c87::t_956803bab53416 202-203
+packages/core/test/principal.test.ts
+  s_268576476d3c87::t_f7367be37656da 266-297
+  s_268576476d3c87::t_acda2522ea1264 9,16,18
+packages/core/src/kernel/result.ts
+  s_268576476d3c87::t_b148d338cb49ba 22-28
+CODING_RULES.md
+  s_268576476d3c87::t_f494967a7e4ee3 131
+  s_268576476d3c87::t_e517fce8c896b8 53-56
+packages/core/src/store/postgres/index.ts
+  s_268576476d3c87::t_982bfc8c4664f8 69
+  s_268576476d3c87::t_8aa07d6a24c7a6 49-60
+  s_268576476d3c87::t_8ad4b27856244f 216
+apps/api/tests/coding-rules-tags.test.ts
+  s_268576476d3c87::t_a784eadd687370 116-119,122-123
+  s_268576476d3c87::t_6aa831196a0beb 120-121
+packages/core/test/llm-routes.test.ts
+  s_268576476d3c87::t_2ba02b66853466 137,139,141-144,148-150,152
+packages/core/test/workspaces.test.ts
+  s_268576476d3c87::t_017981f710a8ca 361,374-387
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1239aed5e7ac64ec98b59f8c1ac1ed9306356421",
+  "prompts": {},
+  "sessions": {
+    "s_268576476d3c87": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44ef1637-bf3d-426a-a5c9-970b9f72e0b1",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
