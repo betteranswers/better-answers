@@ -1,0 +1,24 @@
+packages/core/test/tier-contract.test.ts
+  s_3695f0cfb8d82a::t_ea35567c41f6ac 12
+  s_3695f0cfb8d82a::t_2367e4bac60923 72-76
+  s_3695f0cfb8d82a::t_6d03e13b68ae72 7
+  s_3695f0cfb8d82a::t_57286789c07036 108-111,116-119,121
+apps/api/tests/client-addresses.test.ts
+  s_3695f0cfb8d82a::t_7867d8b1c95bf9 30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3f8be41d14ee0edcc22ff949bd0cfe02285b43a7",
+  "prompts": {},
+  "sessions": {
+    "s_3695f0cfb8d82a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "602efdc2-4b25-49db-938f-df6797643aa7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
