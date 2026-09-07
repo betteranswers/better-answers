@@ -1,6 +1,15 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import { boundarySchemas, ULID_PATTERN } from "@better-answers/schema";
 
@@ -41,6 +50,35 @@ type Manifest = {
 const readManifest = (): Manifest =>
   JSON.parse(readFileSync(path.join(contractsDir, "manifest.json"), "utf8")) as Manifest;
 
+/**
+ * Every fixture a directory holds, as the manifest writes a path: sorted, relative, and
+ * neither the manifest nor the README.
+ *
+ * Dotfiles are not fixtures. macOS writes a `.DS_Store` into any directory a Finder
+ * window has opened; `contracts/` is a directory a person browses. It is git-ignored, so
+ * no manifest can list it, CI never has one, and the owner reviewing the failure cannot
+ * see it either — the suite would fail on the one machine that has one and pass on every
+ * other. The Python half applies the same rule to the same directory (ADR 0031), because
+ * a filter in one half alone leaves the other tripping on the same file.
+ */
+const fixturesOnDisk = (directory: string): readonly string[] =>
+  readdirSync(directory, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => path.relative(directory, path.join(entry.parentPath, entry.name)))
+    .filter((relative) => !relative.split(path.sep).some((segment) => segment.startsWith(".")))
+    .filter((relative) => !NOT_FIXTURES.has(relative))
+    .toSorted();
+
+/**
+ * A stand-in for `contracts/`, outside the repository. The walk's rule is proved against
+ * files this test writes rather than by dropping a `.DS_Store` into the tracked directory:
+ * that would put the proof inside the tree it is proving, and the Python half walks the
+ * same directory in another process at the same time.
+ */
+const throwaway = mkdtempSync(path.join(tmpdir(), "tier-contract-"));
+
+afterAll(() => rmSync(throwaway, { recursive: true, force: true }));
+
 describe("the tier contract", () => {
   it("speaks this tier's contract version", () => {
     expect(readManifest().contract_version).toBe(SPOKEN_CONTRACT_VERSION);
@@ -66,11 +104,26 @@ describe("the tier contract", () => {
     }
 
     // The other direction: a file on disk the manifest does not list fails too.
-    const onDisk = readdirSync(contractsDir, { recursive: true, withFileTypes: true })
-      .filter((entry) => entry.isFile())
-      .map((entry) => path.relative(contractsDir, path.join(entry.parentPath, entry.name)))
-      .filter((relative) => !NOT_FIXTURES.has(relative));
-    expect(onDisk.toSorted()).toEqual(manifest.fixtures.map((fixture) => fixture.path).toSorted());
+    expect(fixturesOnDisk(contractsDir)).toEqual(
+      manifest.fixtures.map((fixture) => fixture.path).toSorted(),
+    );
+  });
+
+  it("counts a fixture and never a dotfile, so a stray .DS_Store is not an unlisted one", () => {
+    mkdirSync(path.join(throwaway, "id-shape"));
+    writeFileSync(path.join(throwaway, "id-shape", "cases.json"), "{}");
+    writeFileSync(path.join(throwaway, "manifest.json"), "{}");
+    writeFileSync(path.join(throwaway, "README.md"), "");
+    // What macOS writes into any directory a Finder window has opened, at the root and
+    // under a fixture's own. It is git-ignored, so no manifest can list it, CI never has
+    // one and a reviewer cannot see it: without this, the suite fails on one laptop and
+    // passes everywhere else.
+    writeFileSync(path.join(throwaway, ".DS_Store"), "");
+    writeFileSync(path.join(throwaway, "id-shape", ".DS_Store"), "");
+    mkdirSync(path.join(throwaway, ".cache"));
+    writeFileSync(path.join(throwaway, ".cache", "cases.json"), "{}");
+
+    expect(fixturesOnDisk(throwaway)).toEqual(["id-shape/cases.json"]);
   });
 });
 

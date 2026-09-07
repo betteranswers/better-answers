@@ -212,7 +212,7 @@ describe("what the routes list refuses", () => {
   });
 
   it("refuses a flood from one address before it can spend a session lookup each", async () => {
-    const client = app.client("198.51.100.60");
+    const client = app.client("203.0.113.60");
     const statuses: number[] = [];
     // The window is wall-clock aligned, so a burst that straddles a boundary starts
     // its count again: ask until refused rather than a fixed number of times.
@@ -224,7 +224,7 @@ describe("what the routes list refuses", () => {
 
     expect(statuses).toContain(429);
     // Another address is unaffected: the ceiling is per client, not global.
-    expect((await listRoutes(app.client("198.51.100.61"))).status).toBe(401);
+    expect((await listRoutes(app.client("203.0.113.61"))).status).toBe(401);
   });
 
   it("refuses a session whose active workspace is not a workspace id", async () => {
