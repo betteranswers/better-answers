@@ -1,0 +1,30 @@
+packages/schema/migrations/0018_the-inbox-substrate.sql
+  s_127243e02256ac::t_156d74df52667c 123
+  s_127243e02256ac::t_ec9dc6babb83fb 153
+  s_127243e02256ac::t_ad83c72e975c95 129-130,133
+packages/core/src/concepts/inbox.ts
+  s_127243e02256ac::t_5eb90b1d23b0af 300
+packages/schema/test/rls.test.ts
+  s_127243e02256ac::t_7452036a796ac4 1120,1566,1575,1582
+packages/schema/src/concept-tables.ts
+  s_127243e02256ac::t_fbb7cc57568787 237-238,242
+  s_127243e02256ac::t_a0c3604332a91f 247,249
+packages/schema/src/boundary-schemas.ts
+  s_127243e02256ac::t_cbe1c416d6e334 379-385
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "cba692f8d5d966838622dddaf7de5635f76f0b09",
+  "prompts": {},
+  "sessions": {
+    "s_127243e02256ac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c7e92e84-0713-4b5c-8861-c989df4466c0",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
