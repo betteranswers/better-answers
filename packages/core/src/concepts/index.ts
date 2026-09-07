@@ -51,14 +51,15 @@ import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/in
  *    `Audit:` trailer and the reconciler's replay has an idempotency key on every commit
  *    it will ever find;
  * 2. take the per-repository lock, and hold it for the whole act;
- * 3. commit to the bundle, the hash precondition checked against the ref under that lock;
- * 4. open **the slice's own transaction** through `withMembership`, which re-reads the
- *    membership so the role is resolved in the same transaction as the writes it
- *    authorises, and write the ledger row, the identity, the index row, the bundle commit
- *    and the evidence in it;
- * 5. release the lock when Postgres has committed, not before.
+ * 3. read what the index already holds for this IRI, through `withMembership` — so every
+ *    refusal decidable from the concept's own row is made before a commit exists;
+ * 4. commit to the bundle, the hash precondition checked against the ref under that lock;
+ * 5. open **the slice's own transaction**, through `withMembership` again, and write the
+ *    ledger row, the identity, the index row, the bundle commit and the evidence in it —
+ *    the authority resolved in the same transaction as the writes it authorises;
+ * 6. release the lock when Postgres has committed, not before.
  *
- * The window between 3 and 4 is the reconciler's territory and nobody else's: a failure
+ * The window between 4 and 5 is the reconciler's territory and nobody else's: a failure
  * there leaves a repository head ahead of the last `bundle_commit`, which is exactly the
  * state T-056 replays. Because the lock spans both stores, `bundle_commit` history is
  * always a **prefix** of git history, so the reconciler is a watermark scan and never a
@@ -67,8 +68,8 @@ import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/in
  * **What this act does not do**: mint the IRI. A concept's IRI is an HTTPS key on a
  * platform-controlled domain (ADR 0002), and the domain is the deploy unit's one origin,
  * which `core` never reads — the environment reaches one typed config module in the api and
- * nowhere else; the caller that knows the origin hands the IRI in,
- * and the identity row this act writes is what makes it the concept's key from then on.
+ * nowhere else. The caller that knows the origin hands the IRI in, and the identity row this
+ * act writes is what makes it the concept's key from then on.
  */
 
 /**

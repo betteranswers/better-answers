@@ -98,8 +98,9 @@ export type Committed = {
 /**
  * Why a commit was refused. `stale-precondition` is the one a person sees — the content
  * moved under them, and the write is refused loudly rather than silently overwriting
- * somebody else's change (ADR 0012). The other two are a repository that is not there and
- * a path that is not one, both of which are a caller's error and never a race.
+ * somebody else's change (ADR 0012). The other three are a repository that is not there, a
+ * path that is not one inside a bundle, and a subject that is not one line: a caller's error
+ * every time, and never a race.
  */
 export type CommitRefusal =
   | "no-such-repository"
