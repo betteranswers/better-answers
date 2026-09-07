@@ -4,11 +4,12 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import { boundarySchemas, ULID_PATTERN } from "@better-answers/schema";
 
@@ -68,6 +69,11 @@ const fixturesOnDisk = (directory: string): readonly string[] =>
     .filter((relative) => !NOT_FIXTURES.has(relative))
     .toSorted();
 
+/** A directory of the shape `contracts/` has, for the test of what the walk counts. */
+const throwaway = mkdtempSync(path.join(tmpdir(), "tier-contract-"));
+
+afterAll(() => rmSync(throwaway, { recursive: true, force: true }));
+
 describe("the tier contract", () => {
   it("speaks this tier's contract version", () => {
     expect(readManifest().contract_version).toBe(SPOKEN_CONTRACT_VERSION);
@@ -99,21 +105,20 @@ describe("the tier contract", () => {
   });
 
   it("counts a fixture and never a dotfile, so a stray .DS_Store is not an unlisted one", () => {
-    const tree = mkdtempSync(path.join(tmpdir(), "tier-contract-"));
-    mkdirSync(path.join(tree, "id-shape"));
-    writeFileSync(path.join(tree, "id-shape", "cases.json"), "{}");
-    writeFileSync(path.join(tree, "manifest.json"), "{}");
-    writeFileSync(path.join(tree, "README.md"), "");
+    mkdirSync(path.join(throwaway, "id-shape"));
+    writeFileSync(path.join(throwaway, "id-shape", "cases.json"), "{}");
+    writeFileSync(path.join(throwaway, "manifest.json"), "{}");
+    writeFileSync(path.join(throwaway, "README.md"), "");
     // What macOS writes into any directory a Finder window has opened, at the root and
     // under a fixture's own. It is git-ignored, so no manifest can list it, CI never has
     // one and a reviewer cannot see it: without this, the suite fails on one laptop and
     // passes everywhere else.
-    writeFileSync(path.join(tree, ".DS_Store"), "");
-    writeFileSync(path.join(tree, "id-shape", ".DS_Store"), "");
-    mkdirSync(path.join(tree, ".cache"));
-    writeFileSync(path.join(tree, ".cache", "cases.json"), "{}");
+    writeFileSync(path.join(throwaway, ".DS_Store"), "");
+    writeFileSync(path.join(throwaway, "id-shape", ".DS_Store"), "");
+    mkdirSync(path.join(throwaway, ".cache"));
+    writeFileSync(path.join(throwaway, ".cache", "cases.json"), "{}");
 
-    expect(fixturesOnDisk(tree)).toEqual(["id-shape/cases.json"]);
+    expect(fixturesOnDisk(throwaway)).toEqual(["id-shape/cases.json"]);
   });
 });
 

@@ -27,7 +27,7 @@ describe("the address a default client is given", () => {
     expect(drawn.filter((address) => address.startsWith("203.0.113."))).toEqual([]);
   });
 
-  it("says the range is spent rather than starting it again behind the suite's back", () => {
+  it("gives a default client no address once the harness's half is spent, rather than starting it again behind the suite's back", () => {
     const next = defaultClientAddresses();
     for (let drawn = 0; drawn < 254; drawn += 1) next();
 
