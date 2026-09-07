@@ -1,0 +1,22 @@
+docs/research/t-009-mutation-testing.md
+  s_4b4d1dc56cab70::t_9653d008983d67 35-38
+  s_4b4d1dc56cab70::t_3f6d52f2927976 6-10
+  s_4b4d1dc56cab70::t_920fcc8bbe5d05 28-30
+  s_4b4d1dc56cab70::t_c7300e486aff87 322-327
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "71351d987ab4e8cf2dd3bd727f01b963f829e838",
+  "prompts": {},
+  "sessions": {
+    "s_4b4d1dc56cab70": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3899eb33-f132-4584-b7c2-863eca723a3c",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
