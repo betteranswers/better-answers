@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -50,6 +50,15 @@ const NOT_TEXT = /\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|pdf|zip|gz|sqlite)$/i
 const OUTSIDE = [".scratch/", ".cubic/"];
 
 /**
+ * A tracked symlink is a path and not prose — git keeps the target it names — and whatever it
+ * points at is walked on its own account when the tree tracks that too. Reading one would
+ * follow it to a directory and fail (`.claude/skills/better-answers-design` is the design
+ * system's package, linked where a session finds it, T-081).
+ */
+const isLink = (file: string): boolean =>
+  lstatSync(path.join(repositoryRoot, file)).isSymbolicLink();
+
+/**
  * Every file the repository tracks or would track — `--others --exclude-standard` reads a
  * new file before it is added and skips what `.gitignore` refuses, so the check sees the
  * tree a commit would carry and nothing a machine left behind.
@@ -63,7 +72,8 @@ const treeFiles = (): readonly string[] =>
     .split("\0")
     .filter((file) => file.length > 0)
     .filter((file) => !OUTSIDE.some((prefix) => file.startsWith(prefix)))
-    .filter((file) => !NOT_TEXT.test(file));
+    .filter((file) => !NOT_TEXT.test(file))
+    .filter((file) => !isLink(file));
 
 const read = (file: string): string => readFileSync(path.join(repositoryRoot, file), "utf8");
 

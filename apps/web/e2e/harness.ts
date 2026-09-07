@@ -1,4 +1,3 @@
-import { AxeBuilder } from "@axe-core/playwright";
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 
 /**
@@ -76,24 +75,6 @@ export const seedRoutes = (
 /** An address nobody else in the run will use, so a code read back is this test's. */
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
-
-/**
- * The accessibility gate a screen's suite runs: axe over the page as it stands, on the tags
- * this repository holds a screen to, with no violation tolerated (`[A11Y1]`).
- *
- * The tag list is the fact worth having in one place — a screen audited against four of the
- * five would pass while being held to less than its neighbour — and `@axe-core/playwright`
- * 4.13.0 is the version they were read from, on 03/09/2026 (`[DEPS1]`). Automated rules are
- * evidence and not proof: each suite's own keyboard traversal and aria snapshot are the rest
- * of it, which is why this helper is the gate and never the whole claim.
- */
-export const passesTheAccessibilityGate = async (page: Page): Promise<void> => {
-  const audit = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-    .analyze();
-
-  expect(audit.violations).toEqual([]);
-};
 
 /**
  * The way from the top of the shell to the screen itself, by keyboard.

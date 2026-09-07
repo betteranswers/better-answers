@@ -340,3 +340,48 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
     });
   });
 });
+
+/**
+ * The skills this repository wrote, in this checkout rather than a throwaway one (T-081).
+ *
+ * They are the two entries `.gitignore` re-includes under `.claude/skills/`, and everything
+ * that makes them reach a session is a fact about the tree: tracked, so a fresh clone has
+ * them; a relative link or a directory, so a worktree does too. Read here because the failure
+ * they are exposed to is silence — the design skill sat in `packages/design-system/` for a
+ * fortnight, tracked and correct and offered to nobody, and the ignore block that carries the
+ * browser-suite skill was itself undone and restored on 07/09/2026 with nothing to notice.
+ */
+describe("the skills this repository wrote (T-081)", () => {
+  const tracked = (directory: string): readonly string[] => {
+    const listed = spawnSync("git", ["-C", repositoryRoot, "ls-files", directory], {
+      encoding: "utf8",
+    });
+    if (listed.status !== 0) throw new Error(`git ls-files ${directory} failed:\n${listed.stderr}`);
+    return listed.stdout.split("\n").filter((line) => line !== "");
+  };
+
+  it("offers the design system's skill through a link that resolves inside the checkout", () => {
+    const link = path.join(repositoryRoot, ".claude/skills/better-answers-design");
+
+    expect(isSymlink(link)).toBe(true);
+    // Relative and inward, which is the one shape the stage above will carry into a worktree:
+    // an absolute link would point every worktree back at this checkout's own files.
+    expect(readlinkSync(link)).toBe("../../packages/design-system");
+    expect(readFileSync(path.join(link, "SKILL.md"), "utf8")).toContain(
+      "name: better-answers-design",
+    );
+  });
+
+  it("tracks both of them, so a clone that runs no installer is still offered them", () => {
+    const skills = tracked(".claude/skills");
+
+    expect(skills).toContain(".claude/skills/better-answers-design");
+    expect(skills).toContain(".claude/skills/browser-suite/SKILL.md");
+  });
+
+  it("tracks nothing else there, because the rest is third-party content (ADR 0027)", () => {
+    const ours = tracked(".claude/skills").map((file) => file.split("/")[2] ?? "");
+
+    expect([...new Set(ours)].sort()).toEqual(["better-answers-design", "browser-suite"]);
+  });
+});
