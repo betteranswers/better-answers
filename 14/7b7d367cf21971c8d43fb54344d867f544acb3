@@ -1,0 +1,20 @@
+.github/workflows/mutation.yml
+  s_e4ab68574a4d88::t_b9c1ca1725b565 80-86
+  s_e4ab68574a4d88::t_bf7113665b1d08 39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "147b7d367cf21971c8d43fb54344d867f544acb3",
+  "prompts": {},
+  "sessions": {
+    "s_e4ab68574a4d88": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3097174-7dcd-40fb-a9d9-d8c797ef1ece",
+        "model": "claude-opus-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
