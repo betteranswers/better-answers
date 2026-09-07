@@ -17,6 +17,7 @@ import type { EmailMessage } from "../src/auth/index.ts";
 import { CLIENT_IP_HEADER } from "../src/auth/index.ts";
 import { hostnameOfUrl, type PublicHostnames } from "../src/ingress/hostnames.ts";
 import { createServer } from "../src/server.ts";
+import { defaultClientAddresses } from "./client-addresses.ts";
 import { startTestDatabase, type TestDatabase } from "./postgres.ts";
 
 /**
@@ -107,7 +108,11 @@ export type TestApp = {
   removeMember(workspaceId: string, userId: string): Promise<void>;
   /** Set a workspace's config row, as the System screen will one day. */
   setWorkspaceConfig(workspaceId: string, key: string, value: string): Promise<void>;
-  /** A client on one hostname — `app.` unless a test names another (T-030, T-045). */
+  /**
+   * A client on one hostname — `app.` unless a test names another (T-030, T-045) — at an
+   * address of its own: the next one in TEST-NET-2 unless a test names one, which it does
+   * in TEST-NET-3 (`tests/client-addresses.ts` holds the two ranges apart).
+   */
   client(ip?: string, hostname?: string): TestClient;
   stop(): Promise<void>;
 };
@@ -326,10 +331,9 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     return code;
   };
 
-  const client: TestApp["client"] = (
-    ip = `203.0.113.${Math.floor(Math.random() * 250) + 1}`,
-    hostname = APP_HOSTNAME,
-  ) => {
+  const nextDefaultAddress = defaultClientAddresses();
+
+  const client: TestApp["client"] = (ip = nextDefaultAddress(), hostname = APP_HOSTNAME) => {
     const origin = `https://${hostname}`;
     const jar = new Map<string, string>();
     const remember = (response: Response) => {

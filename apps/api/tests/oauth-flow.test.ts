@@ -658,12 +658,12 @@ describe("the limits", () => {
   };
 
   it("keys the page limit on CF-Connecting-IP alone and ignores a spoofed X-Forwarded-For (Q8)", async () => {
-    const client = app.client("198.51.100.10");
+    const client = app.client("203.0.113.10");
     let spoof = 0;
 
     const statuses = await untilRefused(
       () =>
-        client.fetch("/consent", { headers: { "x-forwarded-for": `198.51.100.${(spoof += 1)}` } }),
+        client.fetch("/consent", { headers: { "x-forwarded-for": `203.0.113.${(spoof += 1)}` } }),
       30,
     );
 
@@ -671,8 +671,8 @@ describe("the limits", () => {
     // The same spoofed header from another tunnel address is not limited. The page itself
     // refuses a caller with no session; what matters here is that it is not 429.
     const other = await app
-      .client("198.51.100.11")
-      .fetch("/consent", { headers: { "x-forwarded-for": "198.51.100.1" } });
+      .client("203.0.113.11")
+      .fetch("/consent", { headers: { "x-forwarded-for": "203.0.113.1" } });
     expect(other.status).not.toBe(429);
   });
 
@@ -685,7 +685,7 @@ describe("the limits", () => {
     const statuses = await untilRefused(
       () =>
         app
-          .client(`198.51.100.${(address += 1)}`)
+          .client(`203.0.113.${(address += 1)}`)
           .json(SEND_EMAIL_CODE_PATH, { email, type: "sign-in" }),
       5,
     );
@@ -695,7 +695,7 @@ describe("the limits", () => {
   });
 
   it("lets Better Auth's own database-backed limiter refuse a flood at the email-code endpoint", async () => {
-    const client = app.client("198.51.100.40");
+    const client = app.client("203.0.113.40");
     let attempt = 0;
 
     const statuses = await untilRefused(

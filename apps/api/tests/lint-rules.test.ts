@@ -20,6 +20,10 @@ import { describe, expect, it } from "vitest";
  * The three rules T-069 adds, each a line in the base `rules` block: no two tests in one
  * describe block carry the same title, no block is empty, and no promise floats.
  *
+ * The type-aware rules T-080 adopts, none of them a line in that block: a rule the config does
+ * not name is carried by the `correctness` category, and deleting the line that switched it off
+ * is how this repository turns one on.
+ *
  * Each is applied to a throwaway tree so the assertion is as much about where the rule stays
  * silent as where it fires.
  *
@@ -64,9 +68,31 @@ const { output: lint } = oxlintOver(
 );
 
 /**
- * A runner over exactly one of the repository's base rules, its setting read out of
- * `.oxlintrc.json` rather than restated here — a restatement would pass while the real
- * config carried the rule as a warning, or not at all. The plugin list and the options
+ * The severity `name` runs at, read out of `.oxlintrc.json` rather than restated here — a
+ * restatement would pass while the real config carried the rule as a warning, or not at all.
+ *
+ * A rule the `rules` block names carries its own setting, its options and all. A rule it does
+ * not name is held by the `correctness` category, which is what adoption looks like in that
+ * file: a type-aware rule is turned on by *deleting* the line that switched it off. A reader
+ * that insisted on a line could not prove those rules at all, and the day one of them is
+ * switched back off its line reappears, this returns `"off"`, and the firing case below fails.
+ *
+ * A name that is no rule at all still fails loudly rather than reading as adopted: oxlint
+ * reports nothing for a rule it does not know, and the runner's smoke case refuses to build.
+ */
+const severityOf = (name: string): (typeof config.rules)[string] => {
+  const named = config.rules[name];
+  if (named !== undefined) return named;
+  const correctness = config.categories["correctness"];
+  if (correctness === undefined)
+    throw new Error(
+      `\`${name}\` is named in neither the rules block nor a \`correctness\` category of .oxlintrc.json, so there is no setting to run it under.`,
+    );
+  return correctness;
+};
+
+/**
+ * A runner over exactly one of the repository's base rules. The plugin list and the options
  * block travel with it, because a rule from a plugin oxlint was not told to load is a rule
  * that stays silent, and the type-aware rules need the options block to run at all.
  *
@@ -78,8 +104,7 @@ const ruleRunner = (
   name: string,
   smoke: { readonly tree: Tree; readonly flagged: readonly string[] },
 ): ((tree: Tree) => string) => {
-  const setting = config.rules[name];
-  if (setting === undefined) throw new Error(`no \`${name}\` rule in .oxlintrc.json`);
+  const setting = severityOf(name);
   const relaxed = config.overrides.filter((override) => override.rules?.[name] !== undefined);
   if (relaxed.length > 0)
     throw new Error(
@@ -212,6 +237,144 @@ describe("no promise floats — an unawaited call is awaited or `void`", () => {
     const output = lintPromises(typedTree({ "src/awaited.ts": callsRevoke("await revoke();") }));
 
     expect(output).not.toContain("src/awaited.ts");
+  });
+});
+
+/**
+ * The type-aware rules this repository carries without a line of their own.
+ *
+ * A rule joins this table by being turned on alone, run over the whole tree and finding
+ * nothing; its `"off"` line is then deleted, leaving the `correctness` category to say what
+ * severity it holds. One rule of the family is not here, because its pass did fire, and
+ * `.oxlintrc.json` still names it with what it found.
+ *
+ * A table rather than a block each, because blocks differing only in a string literal are
+ * copies of one test. Each pair is the source the rule must name, and the source that does the
+ * same work the way the rule asks for.
+ *
+ * The firing sources are written to be *typed*, not to type-check: a rule that refuses an
+ * operation TypeScript itself refuses — `no-unsafe-unary-minus` is the one — can only be shown
+ * by source the checker would reject, and the type-aware linter types a tree without judging
+ * it.
+ */
+const ADOPTED = [
+  {
+    rule: "typescript/await-thenable",
+    refuses: "an await on a call that returns no promise",
+    fires: `const count = (): number => 1;\n\nexport const total = async (): Promise<number> => await count();\n`,
+    silent: `const count = async (): Promise<number> => 1;\n\nexport const total = async (): Promise<number> => await count();\n`,
+  },
+  {
+    rule: "typescript/no-array-delete",
+    refuses: "a delete on an array index, which leaves a hole rather than shortening the array",
+    fires: `export const drop = (names: string[]): void => {\n  delete names[0];\n};\n`,
+    silent: `export const drop = (names: string[]): void => {\n  names.splice(0, 1);\n};\n`,
+  },
+  {
+    rule: "typescript/no-base-to-string",
+    refuses: "a value stringified through the default toString, which writes [object Object]",
+    fires: `type Entry = { readonly name: string };\n\nexport const label = (entry: Entry): string => String(entry);\n`,
+    silent: `type Entry = { readonly name: string };\n\nexport const label = (entry: Entry): string => String(entry.name);\n`,
+  },
+  {
+    rule: "typescript/no-duplicate-type-constituents",
+    refuses: "a union that names the same type twice",
+    fires: `export type Word = string | string;\n`,
+    silent: `export type Word = string | number;\n`,
+  },
+  {
+    rule: "typescript/no-for-in-array",
+    refuses: "a for-in over an array, which walks index strings and inherited keys",
+    fires: `export const width = (names: string[]): number => {\n  let total = 0;\n  for (const name in names) total += name.length;\n  return total;\n};\n`,
+    silent: `export const width = (names: string[]): number => {\n  let total = 0;\n  for (const name of names) total += name.length;\n  return total;\n};\n`,
+  },
+  {
+    rule: "typescript/no-implied-eval",
+    refuses: "a timer handed a string, which the platform evaluates as code",
+    fires: `export const later = (): void => {\n  setTimeout("revoke()", 0);\n};\n`,
+    silent: `export const later = (revoke: () => void): void => {\n  setTimeout(revoke, 0);\n};\n`,
+  },
+  {
+    rule: "typescript/no-meaningless-void-operator",
+    refuses: "a void on a call that already returns nothing",
+    fires: `const close = (): void => {};\n\nexport const act = (): void => void close();\n`,
+    silent: `const close = async (): Promise<void> => {};\n\nexport const act = (): void => void close();\n`,
+  },
+  {
+    rule: "typescript/no-misused-spread",
+    refuses: "an array spread into an object, which yields a map of index to element",
+    fires: `export const held = (names: readonly string[]): object => ({ ...names });\n`,
+    silent: `export const held = (entry: { readonly name: string }): object => ({ ...entry });\n`,
+  },
+  {
+    rule: "typescript/no-redundant-type-constituents",
+    refuses: "a union constituent another constituent already covers",
+    fires: `export type Word = string | "member";\n`,
+    silent: `export type Word = "admin" | "member";\n`,
+  },
+  {
+    rule: "typescript/no-unsafe-unary-minus",
+    refuses: "a unary minus on something that is no number",
+    fires: `export const negated = (word: string): number => -word;\n`,
+    silent: `export const negated = (count: number): number => -count;\n`,
+  },
+  {
+    rule: "typescript/restrict-template-expressions",
+    refuses: "an object interpolated into a template, which writes [object Object]",
+    fires: `type Entry = { readonly name: string };\n\nexport const label = (entry: Entry): string => \`entry \${entry}\`;\n`,
+    silent: `type Entry = { readonly name: string };\n\nexport const label = (entry: Entry): string => \`entry \${entry.name}\`;\n`,
+  },
+  {
+    rule: "typescript/unbound-method",
+    refuses: "a method taken off its instance, which loses the this it was written against",
+    fires: `class Door {\n  open(): void {}\n}\n\nexport const opener = new Door().open;\n`,
+    silent: `class Door {\n  open(): void {}\n}\n\nconst door = new Door();\n\nexport const opener = (): void => {\n  door.open();\n};\n`,
+  },
+] as const;
+
+/** The half of a rule's config name oxlint prints in its report: `typescript(unbound-method)`. */
+const reportedName = (rule: string): string => rule.slice(rule.indexOf("/") + 1);
+
+/**
+ * oxlint under the repository's `categories` block alone, with no `rules` key at all.
+ *
+ * `ruleRunner` switches its rule on itself, so what its cases prove is that the rule fires —
+ * not that this repository turned it on. For a rule adopted by deleting its line those are
+ * different claims, and the gap between them is exactly where an adoption could be false: a
+ * rule oxlint files under some category other than `correctness` would pass every firing and
+ * silent case below while the tree ran without it. This runner asks only the question the
+ * config answers by itself, which is whether the category holds the rule; the line's absence
+ * is `severityOf`'s half, and the two together are the claim.
+ */
+const lintUnderCategories = oxlintOver(
+  JSON.stringify({
+    plugins: config.plugins,
+    options: config.options,
+    categories: config.categories,
+  }),
+  { tree: typedTree({ "src/fires.ts": ADOPTED[0].fires }), flagged: ["src/fires.ts"] },
+).output;
+
+describe.each(ADOPTED)("$rule refuses $refuses", ({ rule, fires, silent }) => {
+  const firing = typedTree({ "src/fires.ts": fires });
+  const lintRule = ruleRunner(rule, { tree: firing, flagged: ["src/fires.ts"] });
+
+  it("names the file holding the source it refuses", () => {
+    const output = lintRule(firing);
+
+    expect(output).toContain("src/fires.ts");
+    expect(output).toContain(reportedName(rule));
+  });
+
+  it("stays silent on the source that does the same work the way it asks", () => {
+    const output = lintRule(typedTree({ "src/asked.ts": silent }));
+
+    expect(output).not.toContain("src/asked.ts");
+  });
+
+  it("is one the repository's own categories switch on, having no line of its own to do it", () => {
+    expect(config.rules).not.toHaveProperty(rule);
+    expect(lintUnderCategories(firing)).toContain(reportedName(rule));
   });
 });
 

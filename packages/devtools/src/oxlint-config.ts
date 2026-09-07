@@ -32,6 +32,13 @@ export type OxlintConfig = {
   /** The built-in plugin list and the options block: a rule run alone still needs both. */
   readonly plugins: readonly string[];
   readonly options?: Readonly<Record<string, unknown>>;
+  /**
+   * The severity each category runs at. A rule the `rules` block does not name is held by its
+   * category, which is what the config's own adoption convention leans on: a rule is switched
+   * on by *deleting* the line that switched it off. A suite that could only read the `rules`
+   * block could not reach those rules at all.
+   */
+  readonly categories: Readonly<Record<string, string>>;
 };
 
 /**

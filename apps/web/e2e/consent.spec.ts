@@ -67,6 +67,7 @@ test("sign-in, authorize, consent and the code at Claude's redirect, all on one 
   page,
   request,
   baseURL,
+  passesTheAccessibilityGate,
 }) => {
   const origin = baseURL ?? "";
   const email = anAddress("consenting");
@@ -92,6 +93,11 @@ test("sign-in, authorize, consent and the code at Claude's redirect, all on one 
   await expect(page.getByText("Stay connected until you disconnect it")).toBeVisible();
   await expect(page.getByText("hosted at claude.ai")).toBeVisible();
 
+  // Asked for here rather than left to the fixture: this test ends at the client's own
+  // redirect, which is another origin and no screen of ours, so the page a person actually
+  // reads has to be audited while the browser is still on it.
+  await passesTheAccessibilityGate();
+
   await page.getByRole("button", { name: "Connect" }).click();
 
   // The code went to Claude's redirect and nowhere else, with the host's state and the
@@ -108,6 +114,7 @@ test("a second authorization from the same client shows consent again when the h
   page,
   request,
   baseURL,
+  passesTheAccessibilityGate,
 }) => {
   // The one unverified behaviour in T-045's spec, settled here rather than assumed and
   // written into ADR 0034 either way. Better Auth keeps one consent row per person per
@@ -121,6 +128,7 @@ test("a second authorization from the same client shows consent again when the h
 
   await page.goto(authorizeUrl(origin, { prompt: "consent", state: "first" }));
   await expect(consentHeading(page)).toBeVisible();
+  await passesTheAccessibilityGate();
   await page.getByRole("button", { name: "Connect" }).click();
   expect(landedAt(page).searchParams.get("state")).toBe("first");
 
@@ -148,6 +156,7 @@ test("cancelling consent sends the client a refusal and no code", async ({
   page,
   request,
   baseURL,
+  passesTheAccessibilityGate,
 }) => {
   const origin = baseURL ?? "";
   const email = anAddress("declining");
@@ -157,6 +166,7 @@ test("cancelling consent sends the client a refusal and no code", async ({
   await signIn(page, request, email);
   await page.goto(authorizeUrl(origin, { prompt: "consent" }));
   await expect(consentHeading(page)).toBeVisible();
+  await passesTheAccessibilityGate();
 
   await page.getByRole("button", { name: "Cancel" }).click();
 

@@ -1,12 +1,5 @@
 import { expect, test } from "./browser.ts";
-import {
-  anAddress,
-  passesTheAccessibilityGate,
-  provision,
-  seedRoutes,
-  signIn,
-  skipLinkReachesTheScreen,
-} from "./harness.ts";
+import { anAddress, provision, seedRoutes, signIn, skipLinkReachesTheScreen } from "./harness.ts";
 
 /**
  * A screen that throws over the served build: the frame stands, the navigation still works,
@@ -30,6 +23,7 @@ const ROUTES_LIST = "routes.list";
 test("a screen that throws leaves the frame, the navigation and an accessible way out", async ({
   page,
   request,
+  passesTheAccessibilityGate,
 }) => {
   const email = anAddress("failed-screen");
   const workspace = await provision(request, { name: "Wharfedale Castings", adminEmail: email });
@@ -86,8 +80,10 @@ test("a screen that throws leaves the frame, the navigation and an accessible wa
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Try this screen again" })).toBeFocused();
 
-  // The rest of what a reader is left with: the keyboard traversal above is the other half.
-  await passesTheAccessibilityGate(page);
+  // Asked for here rather than left to the fixture, because the test carries on to another
+  // screen below: what has to be audited is the one that threw. The keyboard traversal above
+  // is the other half of what a reader is left with.
+  await passesTheAccessibilityGate();
 
   // The navigation still navigates, which is the whole point of the boundary sitting inside
   // the outlet: one screen is lost and the other five are read as usual. Eight lines the

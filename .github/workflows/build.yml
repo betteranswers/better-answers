@@ -39,6 +39,13 @@ jobs:
   # main precisely so a push runs it once — here — rather than twice in two workflows.
   check:
     uses: ./.github/workflows/check.yml
+    with:
+      # The image job below builds each image once, loads it and runs that image's contents
+      # test against the build it is about to push, so the suite called here leaves those
+      # tests alone: two builds of one Dockerfile in one run prove the same thing twice, and
+      # only one of them is the artefact that ships. A pull request calls `check.yml`
+      # without this and probes as usual, because a pull request builds no image.
+      images-probed-by-the-caller: true
 
   image:
     needs: check
@@ -51,6 +58,11 @@ jobs:
           - tier: api
             context: .
             dockerfile: apps/api/Dockerfile
+            # The command that reads this image's contents, run against the build before it
+            # is pushed. Carried in the matrix rather than in a step's condition because a
+            # leg is probed by having a test, not by being the api: a leg without one has
+            # nothing to run, so it takes the plain build-and-push path below.
+            probe: pnpm --filter @better-answers/api exec vitest run tests/image.test.ts
           - tier: worker
             context: apps/worker
             dockerfile: apps/worker/Dockerfile
@@ -76,22 +88,112 @@ jobs:
           tags: |
             type=sha,prefix=sha-
             type=raw,value=main
+      # The toolchain a probe command runs on. Node and pnpm because the one probe this
+      # repository has is a vitest file; a leg whose command is not a pnpm one brings its own
+      # setup here, gated on the same flag.
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        if: matrix.probe
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: matrix.probe
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - if: matrix.probe
+        run: pnpm install --frozen-lockfile
+      # The build, once, into this runner's daemon and nowhere else. It is exported again
+      # below rather than built again: the second call resolves every layer from this
+      # builder's own cache, which is what makes the two manifests one manifest.
+      #
+      # Both exports name the same media types and refuse both attestations, and that is
+      # what the summary's claim rests on. Left to itself buildx picks OCI or Docker types
+      # per exporter and per what the runner's daemon can load, and a provenance attestation
+      # wraps the manifest in an index the loaded image has no counterpart for — either way
+      # the digest read here and the digest the registry answers to would be two strings
+      # about one build. Labels are passed to both for the same reason: they are the image's
+      # own configuration, and a difference there is a difference in the digest.
+      #
+      # No tags. The probe runs the image by the id this step prints, and an untagged image
+      # cannot be confused with another run's.
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        id: load
+        if: matrix.probe
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          outputs: type=docker,oci-mediatypes=false
+          provenance: false
+          sbom: false
+          labels: ${{ steps.meta.outputs.labels }}
+          # Read only. The cache is exported by the pushing step below, which resolves every
+          # layer this one produced; exporting from both would upload one build's cache twice.
+          cache-from: type=gha
+      # With no id the probe would build an image of its own and read that, and the leg
+      # would push something nothing read — so the leg stops here instead.
+      - name: the image is read before it ships
+        if: matrix.probe
+        env:
+          IMAGE_ID: ${{ steps.load.outputs.imageid }}
+          PROBE: ${{ matrix.probe }}
+        run: |
+          if [ -z "${IMAGE_ID}" ]; then
+            echo "::error::the load reported no image id, so there is no built image to probe"
+            exit 1
+          fi
+          ${PROBE}
+      # Every leg pushes on these terms, not only a probed one. The worker and the backup
+      # gain nothing from a provenance attestation nothing here verifies, and they lose
+      # something to it: an attestation makes the tag point at an index, so the digest a
+      # person promotes out of the summary is a wrapper around the image rather than the
+      # image. When `T-084` gives those two a probe, the terms they need are already the
+      # ones they push under.
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         id: build
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
-          push: true
+          outputs: type=image,push=true,oci-mediatypes=false
+          provenance: false
+          sbom: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       # The digest, in the run's summary, in the form the deploy unit's env var takes — so a
-      # person promoting a build copies it from here rather than reading it out of a log.
+      # person promoting a build copies it from here rather than reading it out of a log. A
+      # probed leg says it twice, once from each export, because "tested" is a claim about a
+      # particular string of bytes and the summary is where that claim is made.
+      #
+      # The push has already happened when this compares them, so a difference is a red main
+      # rather than a prevented push. That is the most this can be: nothing knows the pushed
+      # digest before the push. What it does prevent is the summary saying "tested" about
+      # bytes nothing read — the two exports would have stopped being one manifest, and that
+      # is a change to this job's terms, not a flake to re-run.
       - name: digest to the job summary
+        env:
+          TIER: ${{ matrix.tier }}
+          OWNER: ${{ github.repository_owner }}
+          PROBE: ${{ matrix.probe }}
+          PROBED: ${{ steps.load.outputs.digest }}
+          PUSHED: ${{ steps.build.outputs.digest }}
         run: |
           {
-            echo "### ${{ matrix.tier }}"
+            echo "### ${TIER}"
             echo ""
-            echo "\`ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}@${{ steps.build.outputs.digest }}\`"
+            echo "\`ghcr.io/${OWNER}/${TIER}@${PUSHED}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+          # Keyed on whether the leg was probed, not on whether a digest came back: a probed
+          # leg whose build reported none would otherwise drop the claim and stay green.
+          if [ -n "${PROBE}" ]; then
+            if [ -z "${PROBED}" ]; then
+              echo "::error::${TIER} was probed but its load reported no digest, so this run cannot say what was tested"
+              exit 1
+            fi
+            {
+              echo ""
+              echo "tested \`${PROBED}\`, pushed \`${PUSHED}\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            if [ "${PROBED}" != "${PUSHED}" ]; then
+              echo "::error::${TIER} probed ${PROBED} and pushed ${PUSHED}: the two exports have stopped being one manifest"
+              exit 1
+            fi
+          fi
