@@ -25,10 +25,10 @@
   // second process per lint run and the `oxlint-tsgolint` dev dependency, taken at 7.0.2001 —
   // the version the npm registry answered with on the same day.
   //
-  // The mode is on for one rule, the floating-promise rule below. Turning it on also reaches
-  // thirteen other type-aware rules oxlint files under `correctness`, and those are switched
-  // off by name further down: adopting them is a wider decision than the ticket that brought
-  // the mode in, and a rule nobody chose is not a rule this repository holds.
+  // The mode is on for thirteen rules: the floating-promise rule named below, and the twelve
+  // other type-aware rules oxlint files under `correctness` that the category carries and the
+  // block below therefore does not name. The one it does name is the one left off, with the
+  // reason beside it.
   "options": {
     "typeAware": true
   },
@@ -54,25 +54,19 @@
     // so the deliberate case is a word a reader can see rather than an absence they cannot.
     // Type-aware: it needs the checker to know a call returns a promise (see `options` above).
     "typescript/no-floating-promises": ["error", { "ignoreVoid": true }],
-    // The other thirteen type-aware rules oxlint files under `correctness`, off by name.
-    // Not a judgement that they are wrong — the one finding they raised on the tree was real
-    // and is fixed — but the ticket that brought the type-aware mode in was scoped to the
-    // floating-promise rule, and thirteen rules every branch inherits is a decision the owner
-    // takes rather than one a lint config acquires. Deleting a line here is how each is
-    // adopted, one at a time and each with its own pass over the tree.
-    "typescript/await-thenable": "off",
-    "typescript/no-array-delete": "off",
-    "typescript/no-base-to-string": "off",
-    "typescript/no-duplicate-type-constituents": "off",
-    "typescript/no-for-in-array": "off",
-    "typescript/no-implied-eval": "off",
-    "typescript/no-meaningless-void-operator": "off",
-    "typescript/no-misused-spread": "off",
-    "typescript/no-redundant-type-constituents": "off",
-    "typescript/no-unsafe-unary-minus": "off",
+    // Twelve of the thirteen other type-aware rules oxlint files under `correctness` are not
+    // named here at all: a rule with no line of its own runs at its category's severity, which
+    // is what adoption looks like in this file, and each of the twelve is held by a firing and
+    // a silent case in apps/api/tests/lint-rules.test.ts. None of them was adopted on taste —
+    // a rule is turned on alone, run over the whole tree, and adopted only for finding
+    // nothing. The thirteenth is named below because its pass found four.
+    //
+    // Sorting without a comparator orders by each element's string form, which is the wrong
+    // order for anything but strings — and the rule ignores arrays of strings for exactly that
+    // reason. What it names in this tree are sorts of booleans and of `string | undefined`,
+    // all of them inside test assertions where the asserted order is the point. Whether those
+    // gain comparators or this line stays is the owner's call and not this config's.
     "typescript/require-array-sort-compare": "off",
-    "typescript/restrict-template-expressions": "off",
-    "typescript/unbound-method": "off",
     "typescript/no-explicit-any": "error",
     "typescript/consistent-type-imports": "error",
     "typescript/no-non-null-assertion": "error",
