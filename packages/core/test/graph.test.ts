@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   GRAPH_WALK_DEPTH,
+  GRAPH_WALK_ROW_LIMIT,
   walkFrom,
   walkTo,
   type WalkStep,
@@ -231,5 +232,48 @@ describe("a graph walk", () => {
     const after = await walked(scenario.viewer, entry);
     expect(after.map((step) => step.uid).toSorted()).toEqual([entry, nextFar].toSorted());
     expect(after.map((step) => step.uid)).not.toContain(liveFar);
+  });
+
+  it("caps a walk's answer at the template's row limit, so a dense map cannot demand unbounded work", async () => {
+    const scenario = await arrange();
+    const uids = await seeded(async (seed) => {
+      const nodes: string[] = [];
+      for (let at = 0; at < 8; at += 1) {
+        nodes.push((await seed.graphNode({ workspaceId: scenario.workspaceId })).uid);
+      }
+      for (const from of nodes) {
+        for (const to of nodes) {
+          if (from === to) continue;
+          await seed.graphEdge({ workspaceId: scenario.workspaceId, fromUid: from, toUid: to });
+        }
+      }
+      return nodes;
+    });
+
+    const steps = await walked(scenario.admin, uids[0] ?? "");
+
+    // A complete map of eight concepts holds 1,099 paths within four hops of one entry;
+    // the template's own limit is what the caller gets instead, closest rows first.
+    expect(steps.length).toBe(GRAPH_WALK_ROW_LIMIT);
+  });
+
+  it("answers with the path's node fields alone — nothing off an edge reaches a reader", async () => {
+    const scenario = await arrange();
+    const entry = await seeded(async (seed) => {
+      const a = await seed.graphNode({ workspaceId: scenario.workspaceId });
+      await seed.graphEdge({ workspaceId: scenario.workspaceId, fromUid: a.uid });
+      return a.uid;
+    });
+
+    const steps = await walked(scenario.admin, entry);
+
+    // An edge's columns name and quote another file (`to_uid`, `to_kind`, the sentence),
+    // and the from-side's visibility says nothing about the target — so until a surface
+    // applies the target's own predicate to an edge read (the door's rule; T-055, B9), a
+    // step is exactly a node: these five fields and no more.
+    expect(steps).toHaveLength(2);
+    for (const step of steps) {
+      expect(Object.keys(step).toSorted()).toEqual(["depth", "kind", "label", "path", "uid"]);
+    }
   });
 });

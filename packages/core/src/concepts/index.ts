@@ -635,6 +635,7 @@ const landRows = async (principal: UserPrincipal, tx: Tx, index: Landing): Promi
     publishedAt: index.publishedAt ?? null,
     sensitivity: index.sensitivity,
     audience: index.audience,
+    status: index.status,
     isNew: index.isNew,
   });
 };

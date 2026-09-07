@@ -407,19 +407,32 @@ describe("a governed write", () => {
  * asserted as the superuser, and the walk through the graph door is the reader's proof.
  */
 describe("the map a governed write leaves behind", () => {
-  it("maps the concept and its links in the transaction that committed them", async () => {
-    const scenario = await arrange();
+  /**
+   * A stable Product, then a stable concept whose body `write` renders over it — the
+   * two-concept arrange the link-derivation tests share, so which act made which commit
+   * is one fact here and a body per test.
+   */
+  const linkedPair = async (
+    scenario: Scenario,
+    write: (product: WriteConceptInput, filename: string) => Partial<WriteConceptInput>,
+  ) => {
     const product = writeFor({ kind: "Product", status: "stable" });
     const first = await landed(scenario, product);
-
-    const filename = product.path.split("/").at(-1) ?? "";
     const policy = writeFor({
-      kind: "Policy",
       status: "stable",
-      body: `# Details\n\nSee [the product](./${filename}) for tiers.`,
       expectedHead: first.sha,
+      ...write(product, product.path.split("/").at(-1) ?? ""),
     });
     await landed(scenario, policy);
+    return { product, policy };
+  };
+
+  it("maps the concept and its links in the transaction that committed them", async () => {
+    const scenario = await arrange();
+    const { product, policy } = await linkedPair(scenario, (_product, filename) => ({
+      kind: "Policy",
+      body: `# Details\n\nSee [the product](./${filename}) for tiers.`,
+    }));
 
     const nodes = await db().pool.query(
       "SELECT uid, label, kind, gen, sensitivity, audience FROM graph_node WHERE workspace_id = $1 ORDER BY kind",
@@ -501,36 +514,136 @@ describe("the map a governed write leaves behind", () => {
     ]);
   });
 
-  it("derives lineage from a successor's sources[] naming the concept it supersedes", async () => {
+  it("reads a link however the markdown writes it — inline, by reference, shortcut or autolink", async () => {
     const scenario = await arrange();
-    const old = writeFor({ status: "stable" });
-    const first = await landed(scenario, old);
+    // Three references to one concept, three forms; the definition line's own bracket is
+    // no link. Ordinals count every matched reference in document order — the skipped
+    // definition included — so a form change never renumbers a neighbour.
+    const { product, policy } = await linkedPair(scenario, (target, filename) => ({
+      body: [
+        "# Sources",
+        "",
+        `See [the product][target], [target] and <${target.iri}>.`,
+        "",
+        `[target]: ./${filename}`,
+      ].join("\n"),
+    }));
 
-    // The successor carries the lineage (ADR 0019): a sources[] entry naming the old
-    // concept, which the graph derives the edge from — never a key of its own.
+    const edges = await db().pool.query(
+      "SELECT uid, to_uid, to_kind, section, sentence FROM graph_edge WHERE workspace_id = $1 ORDER BY uid",
+      [scenario.workspaceId],
+    );
+    const sentence = `See the product, target and ${product.iri}.`;
+    expect(edges.rows).toEqual([
+      {
+        uid: `links_to:${policy.iri}:0`,
+        to_uid: product.iri,
+        to_kind: "Product",
+        section: "Sources",
+        sentence,
+      },
+      {
+        uid: `links_to:${policy.iri}:1`,
+        to_uid: product.iri,
+        to_kind: "Product",
+        section: "Sources",
+        sentence,
+      },
+      {
+        uid: `links_to:${policy.iri}:2`,
+        to_uid: product.iri,
+        to_kind: "Product",
+        section: "Sources",
+        sentence,
+      },
+    ]);
+  });
+
+  it("derives a succession over a deprecated concept of its kind, and a derivation over anything else", async () => {
+    const scenario = await arrange();
+    // Two cited concepts, one difference: only the first is deprecated. ADR 0019's rule —
+    // SUPERSEDES when a sources[].resource resolves to a status: deprecated concept of
+    // the same type, else DERIVED_FROM — is the whole distinction.
+    const superseded = writeFor({ status: "deprecated" });
+    const first = await landed(scenario, superseded);
+    const stillCurrent = writeFor({ status: "stable", expectedHead: first.sha });
+    const second = await landed(scenario, stillCurrent);
+
     const successor = writeFor({
       status: "stable",
-      frontmatter: { title: "Expenses v2", type: "Policy", sources: [{ resource: old.iri }] },
-      expectedHead: first.sha,
+      frontmatter: {
+        title: "Expenses v2",
+        type: "Policy",
+        sources: [{ resource: superseded.iri }, { resource: stillCurrent.iri }],
+      },
+      expectedHead: second.sha,
     });
     await landed(scenario, successor);
 
     const edges = await db().pool.query(
-      "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM graph_edge WHERE workspace_id = $1",
+      "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM graph_edge WHERE workspace_id = $1 ORDER BY uid",
       [scenario.workspaceId],
     );
+    // One `lineage:` uid prefix for both labels, so a later relabel moves no key; the
+    // lineage columns stay empty — the link columns are LINKS_TO's alone.
     expect(edges.rows).toEqual([
       {
-        uid: `supersedes:${successor.iri}:0`,
+        uid: `lineage:${successor.iri}:0`,
         label: "SUPERSEDES",
         from_uid: successor.iri,
-        to_uid: old.iri,
+        to_uid: superseded.iri,
+        from_kind: null,
+        to_kind: null,
+        section: null,
+        sentence: null,
+      },
+      {
+        uid: `lineage:${successor.iri}:1`,
+        label: "DERIVED_FROM",
+        from_uid: successor.iri,
+        to_uid: stillCurrent.iri,
         from_kind: null,
         to_kind: null,
         section: null,
         sentence: null,
       },
     ]);
+  });
+
+  it("relabels a successor's lineage when the concept it cites is deprecated", async () => {
+    const scenario = await arrange();
+    const cited = writeFor({ status: "stable" });
+    const first = await landed(scenario, cited);
+    const successor = writeFor({
+      status: "stable",
+      frontmatter: { title: "Expenses v2", type: "Policy", sources: [{ resource: cited.iri }] },
+      expectedHead: first.sha,
+    });
+    const second = await landed(scenario, successor);
+
+    const lineageLabel = async (): Promise<readonly string[]> => {
+      const rows = await db().pool.query<{ label: string }>(
+        "SELECT label FROM graph_edge WHERE workspace_id = $1 AND from_uid = $2",
+        [scenario.workspaceId, successor.iri],
+      );
+      return rows.rows.map((row) => row.label);
+    };
+    // Cited while current: a derivation.
+    expect(await lineageLabel()).toEqual(["DERIVED_FROM"]);
+
+    // The deprecation commit — a re-write of the cited concept alone — revisits its
+    // inbound lineage (ADR 0019), so the successor's edge flips with no edit to it.
+    await landed(
+      scenario,
+      writeFor({
+        iri: cited.iri,
+        mergeKey: cited.mergeKey,
+        path: cited.path,
+        status: "deprecated",
+        expectedHead: second.sha,
+      }),
+    );
+    expect(await lineageLabel()).toEqual(["SUPERSEDES"]);
   });
 });
 

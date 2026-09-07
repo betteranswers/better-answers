@@ -40,10 +40,11 @@ export const GRAPH_NODE_LABELS = [
 export const CONCEPT_NODE_LABEL = "Concept" satisfies (typeof GRAPH_NODE_LABELS)[number];
 
 /**
- * The five named edges — the platform's own bookkeeping (ADR 0026): every markdown link is
- * a `LINKS_TO`, a successor's lineage is `SUPERSEDES`, a citation is `CITES`, a source
- * entity names the concept it is by `IS_CONCEPT`, and a canonical entity's contributions
- * hang off it by `SAME_AS`. The kind of a relation is read from the sentence, never from a
+ * `LINKS_TO` — everything the company asserts between concepts — and the **five named
+ * edges** (ADR 0026's 2026-08-30 amendment): `SUPERSEDES`, `CITES` and `IS_CONCEPT` about
+ * concepts; `DERIVED_FROM` and `SAME_AS` about the platform's own bookkeeping —
+ * `DERIVED_FROM` carries trust lineage (ADR 0019) and `SAME_AS` hangs a contribution off a
+ * canonical entity. The kind of a relation is read from the sentence, never from a
  * predicate list, which is why `LINKS_TO` carries the sentence rather than a name.
  */
 export const GRAPH_EDGE_LABELS = [
@@ -51,11 +52,13 @@ export const GRAPH_EDGE_LABELS = [
   "SUPERSEDES",
   "CITES",
   "IS_CONCEPT",
+  "DERIVED_FROM",
   "SAME_AS",
 ] as const;
 
 export const LINKS_TO_LABEL = "LINKS_TO" satisfies (typeof GRAPH_EDGE_LABELS)[number];
 export const SUPERSEDES_LABEL = "SUPERSEDES" satisfies (typeof GRAPH_EDGE_LABELS)[number];
+export const DERIVED_FROM_LABEL = "DERIVED_FROM" satisfies (typeof GRAPH_EDGE_LABELS)[number];
 
 /**
  * The prefix a source-entity label wears (ADR 0032: "prefixed source-entity labels"), so a

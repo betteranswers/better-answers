@@ -55,7 +55,7 @@ CREATE TABLE "graph_edge" (
 	"published_at" timestamp with time zone,
 	"sensitivity" text DEFAULT 'Restricted' NOT NULL,
 	"audience" text DEFAULT 'everyone' NOT NULL,
-	CONSTRAINT "graph_edge_label_check" CHECK (label IN ('LINKS_TO', 'SUPERSEDES', 'CITES', 'IS_CONCEPT', 'SAME_AS') OR (gen IS NULL AND label LIKE 'source-entity:%')),
+	CONSTRAINT "graph_edge_label_check" CHECK (label IN ('LINKS_TO', 'SUPERSEDES', 'CITES', 'IS_CONCEPT', 'DERIVED_FROM', 'SAME_AS') OR (gen IS NULL AND label LIKE 'source-entity:%')),
 	CONSTRAINT "graph_edge_sensitivity_check" CHECK (sensitivity IN ('Restricted', 'Internal', 'Public')),
 	CONSTRAINT "graph_edge_links_to_check" CHECK (label = 'LINKS_TO' OR (from_kind IS NULL AND to_kind IS NULL AND section IS NULL AND sentence IS NULL))
 );

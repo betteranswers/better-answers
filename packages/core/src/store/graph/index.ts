@@ -1,7 +1,9 @@
 import {
+  CONCEPT_DEPRECATED_STATUS,
   CONCEPT_NODE_LABEL,
   citedSourceOf,
   type conceptFrontmatter,
+  DERIVED_FROM_LABEL,
   IRI,
   LINKS_TO_LABEL,
   resolvedResource,
@@ -26,9 +28,16 @@ import type { UserPrincipal } from "../../kernel/index.ts";
  * application data* amendment): RLS scopes the transaction already, and naming the pair
  * says so where a reader of the SQL can see it.
  *
- * ADR 0029's tree names this door as the module that emits the access predicate; that is
- * why it is the one store module that imports `access` — a template rendered anywhere else
- * would be a second place the predicate could be forgotten.
+ * `access` is imported here and in no other store module — ADR 0029's 2026-09-07
+ * amendment carves this door out of the store line for exactly this reason: the templates
+ * must be unable to exist without the predicate, and a renderer handed in by a caller
+ * would be a place to forget it.
+ *
+ * **A walk answers with node fields only** (`WalkStep`); no edge column is projected.
+ * `to_uid` and `to_kind` name a concept the from-side's visibility says nothing about — a
+ * guessed path in a file can mint an edge at a Restricted concept — so before any surface
+ * projects an edge's columns, the target's own predicate must be applied to that edge's
+ * read. T-055's derivation and B9's reads inherit this rule; a test pins it meanwhile.
  */
 
 /**
@@ -42,14 +51,13 @@ type Tx = Pick<pg.PoolClient, "query">;
 type Frontmatter = z.infer<typeof conceptFrontmatter>;
 
 /**
- * What the delta derives from one committed concept — the index row's own facts, handed in
- * by the slice that just wrote them. `isNew` is whether this IRI had no row before the act:
- * a newly landed concept is the one moment a *path* link written earlier can start
- * resolving, so it is when the linkers are re-derived (below).
+ * What edges derive from: one concept's index-row facts — its identity, its folded kind
+ * (the node's property, never its label), the file's content and the three visibility
+ * columns an edge copies. The shape the re-derive reads back off `concept_index` too,
+ * which is why the row and the delta share it.
  */
-export type ConceptDelta = {
+type EdgeSource = {
   readonly iri: string;
-  /** The folded kind the index row carries — the node's property, never its label. */
   readonly kind: string;
   readonly path: string;
   readonly body: string;
@@ -57,6 +65,17 @@ export type ConceptDelta = {
   readonly publishedAt: Date | null;
   readonly sensitivity: string;
   readonly audience: string;
+};
+
+/**
+ * What the delta is handed by the slice that just wrote the row: the edge facts, the
+ * concept's `status` — what the inbound lineage relabel reads, because a deprecation flips
+ * its successors' edges (ADR 0019) — and `isNew`, whether this IRI had no row before the
+ * act: a newly landed concept is the one moment a *path* link written earlier can start
+ * resolving, so it is when the concepts whose files name it are re-derived (below).
+ */
+export type ConceptDelta = EdgeSource & {
+  readonly status: string;
   readonly isNew: boolean;
 };
 
@@ -76,27 +95,89 @@ export type WalkStep = {
 export const GRAPH_WALK_DEPTH = 4;
 
 /**
+ * The walk's row cap, in the template like the depth: a dense map multiplies *paths* even
+ * at four hops, and an unbounded statement would let one file's worth of edges cost the
+ * whole box. Generous against any legitimate expansion — an answer drafts over a handful
+ * of concepts, not a thousand paths — and the closest rows win the cut, because the
+ * recursion yields shallow depths first. T-058's budget test measures the real cost.
+ */
+export const GRAPH_WALK_ROW_LIMIT = 1_000;
+
+/**
  * The derivation rule for a concept's outgoing edges, stated once because the worker's
  * full rebuild must reproduce it exactly (T-057's rebuild-equivalence):
  *
- * - Every **inline markdown link** in the body (`[text](target)`, reference-style links
- *   and autolinks deliberately not read) whose target is a concept — a concept IRI, or a
- *   bundle path resolved against the file (ADR 0019's resolution) that the index holds —
- *   is a `LINKS_TO` edge carrying the two kinds, the nearest preceding heading as its
- *   *section* and the sentence around the link, with markdown link syntax flattened to its
- *   text (ADR 0026).
- * - Every `sources[]` entry naming a concept the same two ways is a `SUPERSEDES` edge —
- *   the successor carries the lineage (ADR 0019; `docs/okf-v02.md`), one edge per
- *   superseded concept.
+ * - Every **markdown link** in the body — inline `[text](target)`; a reference in its
+ *   full, collapsed or shortcut form, resolved through the body's own `[label]: target`
+ *   definitions (first definition wins, labels case-folded and space-collapsed); an
+ *   autolink `<target>` — whose target is a concept (a concept IRI, or a bundle path
+ *   resolved against the file — ADR 0019's resolution — that the index holds) is a
+ *   `LINKS_TO` edge carrying the two kinds, the nearest preceding heading as its
+ *   *section* and the sentence around the link, link syntax flattened to its text
+ *   (ADR 0023's "every markdown link between concepts"; ADR 0026).
+ * - Every `sources[]` entry naming a concept the same two ways is a **lineage** edge —
+ *   the successor carries the lineage (`docs/okf-v02.md`) — labelled by ADR 0019's rule:
+ *   `SUPERSEDES` when it resolves to a `status: deprecated` concept of the same kind,
+ *   `DERIVED_FROM` otherwise; one edge per cited concept, and the inbound lineage labels
+ *   are revisited on every commit of the cited concept, so a deprecation flips its
+ *   successors' edges with no edit to them.
  * - An **IRI** target makes its edge whether or not the target has landed — a link to
- *   not-yet-written knowledge is legal, the edge dangles, and the walk's node join keeps a
+ *   not-yet-written knowledge is legal, the edge dangles (`DERIVED_FROM`, for lineage,
+ *   until the landing's revisit says otherwise), and the walk's node join keeps a
  *   dangling edge off every path. A **path** target makes its edge only once the index
  *   resolves it, which is what the new-concept re-derive exists for.
- * - An edge's uid is `<label>:<from IRI>:<ordinal>`, the ordinal being the reference's
- *   position among the body's links (or the `sources[]` entries), resolvable or not — so a
- *   link that starts resolving later changes no neighbour's uid.
+ * - An edge's uid is `links_to:<from IRI>:<ordinal>`, or `lineage:<from IRI>:<ordinal>`
+ *   with **one prefix for both lineage labels** so a relabel moves no key; the ordinal is
+ *   the reference's position among the body's link references of any form (or among the
+ *   `sources[]` entries), in document order, whether or not it resolves — so a link that
+ *   starts resolving later changes no neighbour's uid.
  */
-const INLINE_LINK = /\[[^\]]*\]\(\s*<?([^)\s>]+)[^)]*\)/g;
+const LINK_DEFINITION = /^ {0,3}\[([^\]]+)\]:\s*(\S+)/gm;
+
+/**
+ * Every link-reference form, one alternation so document order is one scan: inline, then
+ * full/collapsed reference, then shortcut, then autolink — the order is what lets the
+ * longer form win where two could start at one bracket.
+ */
+const LINK = /\[[^\]]*\]\([^)]*\)|\[[^\]]*\]\[[^\]]*\]|\[[^\]]*\]|<[a-z][a-z0-9+.-]*:[^>\s]*>/gi;
+
+/** A reference label as definitions key it: trimmed, spaces collapsed, case folded. */
+const normalisedLabel = (label: string): string =>
+  label.trim().replaceAll(/\s+/g, " ").toLowerCase();
+
+/** The body's `[label]: target` definitions; the first definition of a label wins. */
+const definitionsOf = (body: string): ReadonlyMap<string, string> => {
+  const definitions = new Map<string, string>();
+  for (const match of body.matchAll(LINK_DEFINITION)) {
+    const label = normalisedLabel(match[1] ?? "");
+    if (!definitions.has(label)) {
+      definitions.set(label, (match[2] ?? "").replace(/^</, "").replace(/>$/, ""));
+    }
+  }
+  return definitions;
+};
+
+/** One matched reference's target as written, or nothing — an undefined label, say. */
+const linkTargetOf = (
+  match: RegExpExecArray,
+  body: string,
+  definitions: ReadonlyMap<string, string>,
+): string | undefined => {
+  const text = match[0];
+  if (text.startsWith("<")) return text.slice(1, -1);
+  if (text.includes("](")) return /\]\(\s*<?([^)\s>]+)/.exec(text)?.[1];
+  const reference = /^\[([^\]]*)\]\[([^\]]*)\]$/.exec(text);
+  if (reference !== null) {
+    // The collapsed form `[label][]` names itself; the full form names its second pair.
+    return definitions.get(
+      normalisedLabel((reference[2] === "" ? reference[1] : reference[2]) ?? ""),
+    );
+  }
+  // A shortcut reference — unless the bracket is a definition's own label, which the
+  // colon after it says, and unless nothing defines it, in which case it is plain text.
+  if (body[match.index + text.length] === ":") return undefined;
+  return definitions.get(normalisedLabel(text.slice(1, -1)));
+};
 
 /** The link and lineage columns of one derived edge; named edges carry the four as NULL. */
 type OutgoingEdge = {
@@ -108,9 +189,13 @@ type OutgoingEdge = {
   readonly sentence: string | null;
 };
 
-/** A reference before resolution: where it points, and what the edge will carry. */
+/**
+ * A reference before resolution: where it points, and what the edge will carry. A `link`
+ * becomes `LINKS_TO`; a `lineage` reference's label is the resolution's to decide, by ADR
+ * 0019's rule.
+ */
 type OutgoingRef = {
-  readonly label: string;
+  readonly relation: "link" | "lineage";
   readonly ordinal: number;
   readonly target: Readonly<{ iri: string } | { path: string }>;
   readonly section: string | null;
@@ -138,7 +223,12 @@ const sectionAt = (body: string, index: number): string | null => {
 };
 
 /** Markdown link syntax flattened to its text, as the sentence's reader would say it. */
-const flattenedLinks = (text: string): string => text.replaceAll(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+const flattenedLinks = (text: string): string =>
+  text
+    .replaceAll(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replaceAll(/\[([^\]]*)\]\[[^\]]*\]/g, "$1")
+    .replaceAll(/\[([^\]]*)\]/g, "$1")
+    .replaceAll(/<([a-z][a-z0-9+.-]*:[^>\s]*)>/gi, "$1");
 
 /**
  * The sentence around one position: the enclosing paragraph cut at the sentence
@@ -165,18 +255,15 @@ const sentenceAt = (body: string, index: number): string => {
 };
 
 /** Every outgoing reference one concept's file makes, in the derivation rule's order. */
-const referencesOf = (concept: {
-  readonly iri: string;
-  readonly path: string;
-  readonly body: string;
-  readonly frontmatter: Frontmatter;
-}): readonly OutgoingRef[] => {
-  const links = [...concept.body.matchAll(INLINE_LINK)].flatMap((match, ordinal) => {
-    const target = targetOf(match[1] ?? "", concept.path);
+const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {
+  const definitions = definitionsOf(concept.body);
+  const links = [...concept.body.matchAll(LINK)].flatMap((match, ordinal) => {
+    const raw = linkTargetOf(match, concept.body, definitions);
+    const target = raw === undefined ? undefined : targetOf(raw, concept.path);
     if (target === undefined) return [];
     return [
       {
-        label: LINKS_TO_LABEL,
+        relation: "link" as const,
         ordinal,
         target,
         section: sectionAt(concept.body, match.index),
@@ -190,26 +277,42 @@ const referencesOf = (concept: {
     const cited = citedSourceOf(entry);
     const target = cited === undefined ? undefined : targetOf(cited.resource, concept.path);
     if (target === undefined) return [];
-    return [{ label: SUPERSEDES_LABEL, ordinal, target, section: null, sentence: null }];
+    return [{ relation: "lineage" as const, ordinal, target, section: null, sentence: null }];
   });
 
   return [...links, ...lineage];
 };
 
-/** A concept the resolution found on the index: its identity and its kind. */
-type ResolvedConcept = { readonly iri: string; readonly kind: string };
+/** A cited concept as the label rule reads it; kind and status NULL while it is unlanded. */
+type ResolvedTarget = {
+  readonly iri: string;
+  readonly kind: string | null;
+  readonly status: string | null;
+};
 
-type ResolvedRow = { readonly iri: string; readonly kind: string; readonly path: string };
+type ResolvedRow = {
+  readonly iri: string;
+  readonly kind: string;
+  readonly status: string;
+  readonly path: string;
+};
+
+/**
+ * Whether a resolved lineage target makes the reference a succession: `status: deprecated`
+ * and the same kind as the citing concept — ADR 0019's rule, and the whole of it.
+ */
+const supersedes = (target: ResolvedTarget, fromKind: string): boolean =>
+  target.status === CONCEPT_DEPRECATED_STATUS && target.kind === fromKind;
 
 /**
  * The references resolved against the index — paths to the concepts that hold them, IRIs
- * to their kinds — and reduced to the edges the file makes today. Lineage to one concept
- * is one edge however many `sources[]` entries repeat it.
+ * to their kinds and statuses — and reduced to the edges the file makes today. Lineage to
+ * one concept is one edge however many `sources[]` entries repeat it.
  */
 const resolveOutgoing = async (
   workspaceId: string,
   tx: Tx,
-  concept: Parameters<typeof referencesOf>[0],
+  concept: EdgeSource,
 ): Promise<readonly OutgoingEdge[]> => {
   const references = referencesOf(concept);
   const paths = [
@@ -219,58 +322,59 @@ const resolveOutgoing = async (
     ...new Set(references.flatMap((ref) => ("iri" in ref.target ? [ref.target.iri] : []))),
   ];
 
-  const byPath = new Map<string, ResolvedConcept>();
+  const byPath = new Map<string, ResolvedTarget>();
   if (paths.length > 0) {
     const found = await tx.query<ResolvedRow>(
-      "SELECT iri, kind, path FROM concept_index WHERE workspace_id = $1 AND path = ANY($2::text[])",
+      "SELECT iri, kind, status, path FROM concept_index WHERE workspace_id = $1 AND path = ANY($2::text[])",
       [workspaceId, paths],
     );
-    for (const row of found.rows) byPath.set(row.path, { iri: row.iri, kind: row.kind });
+    for (const row of found.rows) {
+      byPath.set(row.path, { iri: row.iri, kind: row.kind, status: row.status });
+    }
   }
-  const kindByIri = new Map<string, string>();
+  const byIri = new Map<string, ResolvedTarget>();
   if (iris.length > 0) {
     const found = await tx.query<ResolvedRow>(
-      "SELECT iri, kind, path FROM concept_index WHERE workspace_id = $1 AND iri = ANY($2::text[])",
+      "SELECT iri, kind, status, path FROM concept_index WHERE workspace_id = $1 AND iri = ANY($2::text[])",
       [workspaceId, iris],
     );
-    for (const row of found.rows) kindByIri.set(row.iri, row.kind);
+    for (const row of found.rows) {
+      byIri.set(row.iri, { iri: row.iri, kind: row.kind, status: row.status });
+    }
   }
 
-  const superseded = new Set<string>();
+  const cited = new Set<string>();
   return references.flatMap((ref) => {
     const resolved =
       "iri" in ref.target
-        ? { iri: ref.target.iri, kind: kindByIri.get(ref.target.iri) ?? null }
+        ? (byIri.get(ref.target.iri) ?? { iri: ref.target.iri, kind: null, status: null })
         : byPath.get(ref.target.path);
     if (resolved === undefined) return [];
-    if (ref.label === SUPERSEDES_LABEL) {
-      if (superseded.has(resolved.iri)) return [];
-      superseded.add(resolved.iri);
+    if (ref.relation === "lineage") {
+      if (cited.has(resolved.iri)) return [];
+      cited.add(resolved.iri);
+      return [
+        {
+          uid: `lineage:${concept.iri}:${ref.ordinal}`,
+          label: supersedes(resolved, concept.kind) ? SUPERSEDES_LABEL : DERIVED_FROM_LABEL,
+          toUid: resolved.iri,
+          toKind: null,
+          section: null,
+          sentence: null,
+        },
+      ];
     }
-    const linksTo = ref.label === LINKS_TO_LABEL;
     return [
       {
-        uid: `${ref.label.toLowerCase()}:${concept.iri}:${ref.ordinal}`,
-        label: ref.label,
+        uid: `links_to:${concept.iri}:${ref.ordinal}`,
+        label: LINKS_TO_LABEL,
         toUid: resolved.iri,
-        toKind: linksTo ? (resolved.kind ?? null) : null,
-        section: linksTo ? ref.section : null,
-        sentence: linksTo ? ref.sentence : null,
+        toKind: resolved.kind,
+        section: ref.section,
+        sentence: ref.sentence,
       },
     ];
   });
-};
-
-/** The facts an edge copies from the file it derives from, visibility included. */
-type EdgeSource = {
-  readonly iri: string;
-  readonly kind: string;
-  readonly path: string;
-  readonly body: string;
-  readonly frontmatter: Frontmatter;
-  readonly publishedAt: Date | null;
-  readonly sensitivity: string;
-  readonly audience: string;
 };
 
 /**
@@ -290,7 +394,7 @@ const replaceOutgoingEdges = async (
   await tx.query(
     `DELETE FROM graph_edge
       WHERE workspace_id = $1 AND gen = $2 AND from_uid = $3 AND label = ANY($4::text[])`,
-    [workspaceId, gen, concept.iri, [LINKS_TO_LABEL, SUPERSEDES_LABEL]],
+    [workspaceId, gen, concept.iri, [LINKS_TO_LABEL, SUPERSEDES_LABEL, DERIVED_FROM_LABEL]],
   );
   for (const edge of edges) {
     await tx.query(
@@ -316,21 +420,16 @@ const replaceOutgoingEdges = async (
   }
 };
 
-/** A `LIKE` needle with its wildcards escaped, so a filename is matched as itself. */
-const escapedLike = (needle: string): string =>
-  `%${needle.replaceAll(/[\\%_]/g, String.raw`\$&`)}%`;
-
-type LinkerRow = {
-  readonly iri: string;
-  readonly kind: string;
-  readonly path: string;
-  readonly body: string;
-  /** The row's jsonb, which the boundary parsed on the way in (ADR 0028). */
-  readonly frontmatter: Frontmatter;
-  readonly published_at: Date | null;
-  readonly sensitivity: string;
-  readonly audience: string;
-};
+/**
+ * The filename in link-target position, as a Postgres regex: preceded by the start, a
+ * space, a quote, `(`, `<`, `:`, `/` or `[` — everywhere a markdown link, a reference
+ * definition or a `sources[]` entry can put it, and nowhere a word can merely contain it.
+ * A candidate **pre-filter**, not the derivation rule: the re-derive it feeds resolves
+ * targets properly and is idempotent, so precision here is cost, never edges — which is
+ * also why the rebuild has no scan to reproduce.
+ */
+const namePattern = (filename: string): string =>
+  `(^|[\\s"'(<:/[])${filename.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}`;
 
 /**
  * The workspace's live generation, created at 1 by the first delta that needs it. The
@@ -356,14 +455,17 @@ const liveGeneration = async (workspaceId: string, tx: Tx): Promise<number> => {
  * edit. Generations are for full rebuilds only: this writes into the live one and mints
  * nothing.
  *
- * Five steps: the live generation read (created at 1 on a workspace's first delta); the
+ * Six steps: the live generation read (created at 1 on a workspace's first delta); the
  * concept's node upserted with the index row's kind and visibility; the inbound
  * `LINKS_TO` edges' `to_kind` refreshed, because a re-write may have moved the kind they
- * denormalise; the concept's outgoing edges replaced from the file; and — on a **new**
- * concept only — every concept whose file names this one's path re-derived, which is the
- * moment a link to formerly not-yet-written knowledge starts resolving. An IRI link needs
- * no re-derive: its edge was made dangling when its file landed, and the node this step
- * upserts is what completes the path.
+ * denormalise; the inbound **lineage labels revisited** — ADR 0019's "inbound links
+ * revisited on every deprecation commit", run on every commit because the label reads
+ * this concept's status and its successors' kinds, both of which this act may have moved;
+ * the concept's outgoing edges replaced from the file; and — on a **new** concept only —
+ * every concept whose file names this one's path re-derived, which is the moment a link
+ * to formerly not-yet-written knowledge starts resolving. An IRI link needs no re-derive:
+ * its edge was made dangling when its file landed, the node this step upserts completes
+ * the path, and the two refreshes above put the right kind and label on it.
  */
 export const writeConceptDelta = async (
   principal: UserPrincipal,
@@ -396,28 +498,30 @@ export const writeConceptDelta = async (
         AND to_kind IS DISTINCT FROM $4`,
     [workspaceId, gen, delta.iri, delta.kind],
   );
+  // The from-side kind is read off the citing concept's node — every landed concept has
+  // one — so a successor's own kind change relabels here too, not only a deprecation.
+  await tx.query(
+    `UPDATE graph_edge SET label = CASE
+        WHEN $4 AND EXISTS (SELECT 1 FROM graph_node n
+                             WHERE n.workspace_id = $1 AND n.gen = $2
+                               AND n.uid = graph_edge.from_uid AND n.kind = $5)
+        THEN '${SUPERSEDES_LABEL}' ELSE '${DERIVED_FROM_LABEL}' END
+      WHERE workspace_id = $1 AND gen = $2 AND to_uid = $3
+        AND label IN ('${SUPERSEDES_LABEL}', '${DERIVED_FROM_LABEL}')`,
+    [workspaceId, gen, delta.iri, delta.status === CONCEPT_DEPRECATED_STATUS, delta.kind],
+  );
   await replaceOutgoingEdges(workspaceId, gen, tx, delta);
 
   if (!delta.isNew) return;
-  const linkers = await tx.query<LinkerRow>(
-    `SELECT iri, kind, path, body, frontmatter, published_at, sensitivity, audience
+  // The concepts whose files name the landed one, by its filename in link-target
+  // position: each is re-derived whole, through the same one derivation as its own write.
+  const naming = await tx.query<EdgeSource>(
+    `SELECT iri, kind, path, body, frontmatter, published_at AS "publishedAt", sensitivity, audience
        FROM concept_index
-      WHERE workspace_id = $1 AND iri <> $2
-        AND (body LIKE $3 OR frontmatter::text LIKE $3)`,
-    [workspaceId, delta.iri, escapedLike(delta.path.split("/").at(-1) ?? delta.path)],
+      WHERE workspace_id = $1 AND iri <> $2 AND (body ~ $3 OR frontmatter::text ~ $3)`,
+    [workspaceId, delta.iri, namePattern(delta.path.split("/").at(-1) ?? delta.path)],
   );
-  for (const row of linkers.rows) {
-    await replaceOutgoingEdges(workspaceId, gen, tx, {
-      iri: row.iri,
-      kind: row.kind,
-      path: row.path,
-      body: row.body,
-      frontmatter: row.frontmatter,
-      publishedAt: row.published_at,
-      sensitivity: row.sensitivity,
-      audience: row.audience,
-    });
-  }
+  for (const row of naming.rows) await replaceOutgoingEdges(workspaceId, gen, tx, row);
 };
 
 /**
@@ -455,19 +559,16 @@ const walkStatement = (outward: boolean): string => {
        AND ${readableClause("e", 3)}
        AND ${readableClause("m", 3)}
   )
-  SELECT uid, label, kind, depth, path FROM walk ORDER BY depth, uid`;
+  SELECT uid, label, kind, depth, path
+    FROM (SELECT uid, label, kind, depth, path FROM walk LIMIT ${GRAPH_WALK_ROW_LIMIT}) reached
+   ORDER BY depth, uid`;
 };
+// The LIMIT sits inside the sort on purpose: Postgres evaluates a recursive CTE only as
+// far as its reader pulls, so the inner cap is what stops the recursion doing unbounded
+// work — an outer LIMIT above the ORDER BY would sort everything first.
 
 const WALK_FROM = walkStatement(true);
 const WALK_TO = walkStatement(false);
-
-type WalkRow = {
-  readonly uid: string;
-  readonly label: string;
-  readonly kind: string | null;
-  readonly depth: number;
-  readonly path: readonly string[];
-};
 
 const walk = async (
   statement: string,
@@ -475,18 +576,14 @@ const walk = async (
   tx: Tx,
   uid: string,
 ): Promise<readonly WalkStep[]> => {
-  const found = await tx.query<WalkRow>(statement, [
+  // The rows are the steps: the statement selects exactly `WalkStep`'s fields — node
+  // fields only, no edge column — which the shape test pins.
+  const found = await tx.query<WalkStep>(statement, [
     principal.workspaceId,
     uid,
     readableParameter(principal),
   ]);
-  return found.rows.map((row) => ({
-    uid: row.uid,
-    label: row.label,
-    kind: row.kind,
-    depth: row.depth,
-    path: row.path,
-  }));
+  return found.rows;
 };
 
 /**

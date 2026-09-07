@@ -39,6 +39,13 @@ export const CONCEPT_STATUSES = ["draft", "stable", "deprecated", "removed"] as 
 export const CONCEPT_DRAFT_STATUS = "draft" satisfies (typeof CONCEPT_STATUSES)[number];
 
 /**
+ * No longer current, kept for history, its successor linked (`CONTEXT.md`, *Deprecated*) —
+ * the status ADR 0019's lineage rule reads: a `sources[]` entry resolving to a deprecated
+ * concept of the same kind is a succession, and to anything else a derivation.
+ */
+export const CONCEPT_DEPRECATED_STATUS = "deprecated" satisfies (typeof CONCEPT_STATUSES)[number];
+
+/**
  * The three confidentiality classes (`CONTEXT.md`, *sensitivity*), the one closed list, as
  * `ROLES` is for roles. Read by every readable unit's boundary — `index.chunk`'s and
  * `concept_index`'s — so the set is one fact and not one per table.
