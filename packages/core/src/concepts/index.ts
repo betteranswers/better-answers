@@ -20,7 +20,7 @@ import {
 } from "@better-answers/schema";
 import { z } from "zod";
 
-import { readableClause, readableParameters } from "../access/index.ts";
+import { readableClause, readableParameters, visibilityOf } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
 import {
   actorIdOf,
@@ -66,6 +66,7 @@ import {
   type SuggestionKind,
   type SuggestionPayload,
 } from "./inbox.ts";
+import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
 
 export {
   declineSuggestion,
@@ -82,6 +83,16 @@ export {
   type SuggestionStatus,
   type SuggestionSummaryItem,
 } from "./inbox.ts";
+export {
+  evidencePaneOf,
+  overrideConceptClass,
+  recomputeVisibilitySourcedFrom,
+  type ConceptClassOverridden,
+  type EvidencePane,
+  type OverrideConceptClassInput,
+  type OverrideConceptClassRefusal,
+  type ReadableEvidence,
+} from "./visibility.ts";
 
 /**
  * Slice: **concepts** — the concept write path. Suggestions, the inbox, minting and
@@ -605,7 +616,10 @@ type Held = {
   readonly kind: string;
   readonly title: string;
   readonly mergeKey: string;
+  /** The class and audience as derived at the last act — the fallback a re-write rests on. */
   readonly sensitivity: string;
+  readonly audience: string;
+  readonly audienceGroups: readonly string[] | null;
   readonly status: string;
   /** What the concept says now — what an acceptance's payload was written against. */
   readonly contentHash: string;
@@ -619,6 +633,8 @@ type HeldRow = {
   readonly title: string;
   readonly merge_key: string;
   readonly sensitivity: string;
+  readonly audience: string;
+  readonly audience_groups: readonly string[] | null;
   readonly status: string;
   readonly content_hash: string;
   readonly published_at: Date | null;
@@ -633,8 +649,8 @@ type HeldRow = {
  */
 const heldByIri = async (principal: Principal, tx: Tx, iri: string): Promise<Held | undefined> => {
   const found = await tx.query<HeldRow>(
-    `SELECT c.path, c.kind, c.title, i.merge_key, c.sensitivity, c.status, c.content_hash,
-            c.published_at
+    `SELECT c.path, c.kind, c.title, i.merge_key, c.sensitivity, c.audience, c.audience_groups,
+            c.status, c.content_hash, c.published_at
        FROM concept_index c
        JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
       WHERE c.workspace_id = COALESCE($1::text, (select current_workspace_id())) AND c.iri = $2`,
@@ -649,6 +665,8 @@ const heldByIri = async (principal: Principal, tx: Tx, iri: string): Promise<Hel
         title: row.title,
         mergeKey: row.merge_key,
         sensitivity: row.sensitivity,
+        audience: row.audience,
+        audienceGroups: row.audience_groups,
         status: row.status,
         contentHash: row.content_hash,
         publishedAt: row.published_at,
@@ -683,6 +701,12 @@ type RowFacts = {
  * concept that reaches a readable status carries the instant it first did, and one that
  * leaves those statuses loses it, so the predicate's first arm is a fact about the concept
  * rather than a stamp every write renews.
+ *
+ * The class and audience here are the **fallback** the derivation rests on when the
+ * concept cites nothing that resolves to a binding (`visibility.ts`): the writer's word on
+ * a creation, and on anything else what the row holds now — the audience included, so a
+ * re-write that drops its citations never widens a named-group audience back to everyone.
+ * What the row lands with is what the derivation says, not this.
  */
 const indexRowOf = (facts: RowFacts, held: Held | undefined) => {
   const status = facts.status ?? held?.status ?? CONCEPT_DRAFT_STATUS;
@@ -700,7 +724,8 @@ const indexRowOf = (facts: RowFacts, held: Held | undefined) => {
       ? (held?.publishedAt ?? new Date())
       : null,
     sensitivity: held?.sensitivity ?? facts.sensitivity ?? SENSITIVITY_DEFAULT,
-    audience: AUDIENCE_EVERYONE,
+    audience: held?.audience ?? AUDIENCE_EVERYONE,
+    audienceGroups: held?.audienceGroups ?? null,
   });
 };
 
@@ -942,7 +967,13 @@ type Landing = z.infer<typeof conceptRow> & {
   readonly commit: Committed;
   readonly actor: ActorId;
   readonly auditEventId: string;
-  readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[];
+  /**
+   * The evidence the act was handed — the whole of what the concept cites after this act,
+   * an empty list clearing its citations — or `undefined` for a road that recovers none:
+   * the reconciler's replay, whose commit carries no document id, leaves the citations as
+   * they stand rather than clearing them and widening a derived audience by recovery.
+   */
+  readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[] | undefined;
   /** The suggestion this act decided, when it was an acceptance; absent otherwise. */
   readonly acceptance: Acceptance | undefined;
 };
@@ -951,6 +982,12 @@ type Landing = z.infer<typeof conceptRow> & {
  * The rows the act writes, in one place so the order they are written in is one fact — and
  * the one landing routine: the reconciler's replay lands through this too, under the platform
  * principal, which is why the Principal is either kind.
+ *
+ * The evidence and the citations land **before** the index row, because the row's class and
+ * audience are derived from the bindings of what the concept cites (`visibility.ts`; ADR
+ * 0023, ADR 0039): the parsed row's pair is the fallback, and what lands is the derivation
+ * — on the index row and on the map's copies of it alike, in this one transaction, so a
+ * concept is never readable for an instant at a class its evidence does not allow.
  */
 const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<void> => {
   // The identity first: the index row's composite key points at it, and a merge key that
@@ -960,40 +997,7 @@ const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<v
      ON CONFLICT (workspace_id, iri) DO UPDATE SET merge_key = EXCLUDED.merge_key`,
     [index.workspaceId, index.iri, index.mergeKey],
   );
-  await tx.query(
-    `INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter, body,
-                                content_hash, commit_sha, status, published_at, sensitivity,
-                                audience)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-     ON CONFLICT (workspace_id, iri) DO UPDATE
-        SET path = EXCLUDED.path, kind = EXCLUDED.kind, title = EXCLUDED.title,
-            frontmatter = EXCLUDED.frontmatter, body = EXCLUDED.body,
-            content_hash = EXCLUDED.content_hash, commit_sha = EXCLUDED.commit_sha,
-            status = EXCLUDED.status, published_at = EXCLUDED.published_at,
-            sensitivity = EXCLUDED.sensitivity, audience = EXCLUDED.audience,
-            updated_at = now()`,
-    [
-      index.workspaceId,
-      index.iri,
-      index.path,
-      index.kind,
-      index.title,
-      index.frontmatter,
-      index.body,
-      index.contentHash,
-      index.commit.sha,
-      index.status,
-      index.publishedAt,
-      index.sensitivity,
-      index.audience,
-    ],
-  );
-  await tx.query(
-    `INSERT INTO bundle_commit (workspace_id, sha, parent_sha, audit_event_id, actor)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [index.workspaceId, index.commit.sha, index.commit.parent, index.auditEventId, index.actor],
-  );
-  for (const piece of index.evidence) {
+  for (const piece of index.evidence ?? []) {
     await tx.query(
       `INSERT INTO evidence (workspace_id, source_document_id, locator, resource, content_version)
        VALUES ($1, $2, $3, $4, $5)
@@ -1008,10 +1012,58 @@ const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<v
       ],
     );
   }
+  if (index.evidence !== undefined) {
+    await replaceCitations(tx, index.workspaceId, index.iri, index.evidence);
+  }
+  const visibility = await conceptVisibilityFrom(tx, {
+    workspaceId: index.workspaceId,
+    iri: index.iri,
+    kind: index.kind,
+    fallback: visibilityOf({
+      sensitivity: index.sensitivity,
+      audience: index.audience,
+      audience_groups: index.audienceGroups ?? null,
+    }),
+  });
+  await tx.query(
+    `INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter, body,
+                                content_hash, commit_sha, status, published_at, sensitivity,
+                                audience, audience_groups)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+     ON CONFLICT (workspace_id, iri) DO UPDATE
+        SET path = EXCLUDED.path, kind = EXCLUDED.kind, title = EXCLUDED.title,
+            frontmatter = EXCLUDED.frontmatter, body = EXCLUDED.body,
+            content_hash = EXCLUDED.content_hash, commit_sha = EXCLUDED.commit_sha,
+            status = EXCLUDED.status, published_at = EXCLUDED.published_at,
+            sensitivity = EXCLUDED.sensitivity, audience = EXCLUDED.audience,
+            audience_groups = EXCLUDED.audience_groups, updated_at = now()`,
+    [
+      index.workspaceId,
+      index.iri,
+      index.path,
+      index.kind,
+      index.title,
+      index.frontmatter,
+      index.body,
+      index.contentHash,
+      index.commit.sha,
+      index.status,
+      index.publishedAt,
+      visibility.sensitivity,
+      visibility.audience,
+      visibility.audienceGroups,
+    ],
+  );
+  await tx.query(
+    `INSERT INTO bundle_commit (workspace_id, sha, parent_sha, audit_event_id, actor)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [index.workspaceId, index.commit.sha, index.commit.parent, index.auditEventId, index.actor],
+  );
   // The bundle-and-record graph delta, last of the bundle's rows: it resolves link targets
   // against the index this transaction just wrote, and it lands or rolls back with
   // everything above — which is what "the map is never behind for an edit" means (ADR 0023,
   // ADR 0032). An acceptance writes it too: the decision below is one act with these rows.
+  // The map's copies of the three columns are the derivation's, as the row's are.
   await writeConceptDelta(principal, tx, {
     workspaceId: index.workspaceId,
     iri: index.iri,
@@ -1020,11 +1072,7 @@ const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<v
     body: index.body,
     frontmatter: index.frontmatter ?? {},
     publishedAt: index.publishedAt ?? null,
-    sensitivity: index.sensitivity,
-    audience: index.audience,
-    // The derivation (T-055, `visibility.ts`) is what will decide the pair from the bindings
-    // of the cited evidence; until it lands here every write is for everyone.
-    audienceGroups: null,
+    ...visibility,
     status: index.status,
   });
   if (index.acceptance === undefined) return;
@@ -1336,6 +1384,38 @@ type ConceptRow = {
 };
 
 /**
+ * The one SELECT every read of a concept shares — `open`'s by IRI and `find`'s by query —
+ * with the read predicate on the row and the latest check beside it: two statements that
+ * projected a concept differently would be two chances to leak a column one of them
+ * withholds. `$1` is the read's own term; the predicate's two parameters follow it.
+ */
+const CONCEPT_SELECT = `SELECT c.iri, c.path, c.kind, c.title, c.frontmatter, c.body, c.status,
+              c.content_hash, c.commit_sha,
+              v.actor AS checked_by, v.checked_at, v.content_hash AS checked_hash
+         FROM concept_index c
+         LEFT JOIN LATERAL (
+                SELECT actor, checked_at, content_hash
+                  FROM concept_verification
+                 WHERE workspace_id = c.workspace_id AND iri = c.iri
+                 ORDER BY checked_at DESC, id DESC
+                 LIMIT 1
+              ) v ON true
+        WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}`;
+
+const openedOf = (row: ConceptRow): OpenedConcept => ({
+  iri: row.iri,
+  path: row.path,
+  kind: row.kind,
+  title: row.title,
+  frontmatter: row.frontmatter,
+  body: row.body,
+  status: row.status,
+  contentHash: row.content_hash,
+  commitSha: row.commit_sha,
+  check: checkOf(row),
+});
+
+/**
  * One concept by its IRI, or nothing — the read `open` serves (ADR 0018).
  *
  * **A concept this caller may not see and a concept nobody minted answer the same way**:
@@ -1353,38 +1433,52 @@ export const conceptByIri = async (
   iri: string,
 ): Promise<Result<OpenedConcept | undefined, Error>> => {
   const found = await attempt(() =>
-    tx.query<ConceptRow>(
-      `SELECT c.iri, c.path, c.kind, c.title, c.frontmatter, c.body, c.status,
-              c.content_hash, c.commit_sha,
-              v.actor AS checked_by, v.checked_at, v.content_hash AS checked_hash
-         FROM concept_index c
-         LEFT JOIN LATERAL (
-                SELECT actor, checked_at, content_hash
-                  FROM concept_verification
-                 WHERE workspace_id = c.workspace_id AND iri = c.iri
-                 ORDER BY checked_at DESC, id DESC
-                 LIMIT 1
-              ) v ON true
-        WHERE c.iri = $1 AND ${readableClause("c", 2)}`,
-      [iri, ...readableParameters(principal)],
-    ),
+    tx.query<ConceptRow>(`${CONCEPT_SELECT} AND c.iri = $4`, [
+      principal.workspaceId,
+      ...readableParameters(principal),
+      iri,
+    ]),
   );
   if (!found.ok) return err(found.error);
   const row = found.value.rows[0];
-  if (row === undefined) return ok(undefined);
+  return ok(row === undefined ? undefined : openedOf(row));
+};
 
-  return ok({
-    iri: row.iri,
-    path: row.path,
-    kind: row.kind,
-    title: row.title,
-    frontmatter: row.frontmatter,
-    body: row.body,
-    status: row.status,
-    contentHash: row.content_hash,
-    commitSha: row.commit_sha,
-    check: checkOf(row),
-  });
+/** The three characters `LIKE` reads as pattern, escaped, so a query is only ever text. */
+const likeEscaped = (text: string): string => text.replaceAll(/[\\%_]/g, String.raw`\$&`);
+
+/**
+ * The concepts whose title or body holds the query, as this caller may see them — `find`'s
+ * first real read over `concept_index` (T-055), through the same SELECT and the same
+ * predicate as `open`, so a hit is exactly a concept the caller could open. **A withheld
+ * concept is not a hit, not a count and not a hint** (ADR 0016): the predicate is in the
+ * WHERE clause, and the list is what came back.
+ *
+ * Matching is a substring, case-folded, by title first — ranking is B9's, and this read
+ * exists to be predicate-true over real rows rather than product-complete. A query with
+ * nothing in it matches nothing rather than everything.
+ */
+export const findConcepts = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: { readonly query: string; readonly limit: number },
+): Promise<Result<readonly OpenedConcept[], Error>> => {
+  const query = input.query.trim();
+  if (query === "" || input.limit < 1) return ok([]);
+  const found = await attempt(() =>
+    tx.query<ConceptRow>(
+      `${CONCEPT_SELECT} AND (c.title ILIKE $4 OR c.body ILIKE $4)
+        ORDER BY c.title, c.iri LIMIT $5`,
+      [
+        principal.workspaceId,
+        ...readableParameters(principal),
+        `%${likeEscaped(query)}%`,
+        input.limit,
+      ],
+    ),
+  );
+  if (!found.ok) return err(found.error);
+  return ok(found.value.rows.map(openedOf));
 };
 
 /**
@@ -1581,7 +1675,8 @@ const lastRecordedCommit = async (tx: Tx, workspaceId: string): Promise<string |
  * the most restrictive of the three otherwise (a widening is an Admin's recorded act, never a
  * recovery's guess); the status and kind are the file's, or the concept's; evidence rows
  * are not recovered, because the file's `sources[]` is a projection and the document id is
- * not in it. An acceptance — the `Suggestion:` trailer — decides its suggestion through the
+ * not in it, so the concept's standing citations are left as they are and its class is
+ * re-derived from them. An acceptance — the `Suggestion:` trailer — decides its suggestion through the
  * same rows and the same marker as the live act, from the payload the decision was made
  * from; a suggestion decided in the meantime has no payload left to read, and the commit
  * lands as the commit it is, its decision left with whoever made it.
@@ -1659,7 +1754,10 @@ const replayCommit = async (
           commit: { sha: facts.sha, parent: facts.parent },
           actor: facts.actor,
           auditEventId: facts.auditEventId,
-          evidence: [],
+          // Not recovered — the file's `sources[]` carries no document id — so the
+          // citations stand as they are and the class is re-derived from them, never
+          // widened by a recovery that cleared them.
+          evidence: undefined,
           acceptance,
         });
         return ok("landed");
