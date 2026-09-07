@@ -1,0 +1,57 @@
+packages/schema/src/concept-tables.ts
+  s_6181fc5a558822::t_406880fb1ac890 13
+  s_6181fc5a558822::t_0afaeab19624fb 130-135
+  s_6181fc5a558822::t_ca35c761f863d4 83-88,91-95,99,101-106
+  s_6181fc5a558822::t_3e8dca9e04ae58 89-90
+packages/core/src/store/git/index.ts
+  s_6181fc5a558822::t_904fda34697523 192-196
+packages/schema/src/boundary-schemas.ts
+  s_6181fc5a558822::t_8319b99b2857b2 314-327
+packages/schema/migrations/0015_concept-write-path-substrate.sql
+  s_6181fc5a558822::t_6f51aed834cb8a 28-31
+packages/schema/src/table-ownership.ts
+  s_6181fc5a558822::t_94c18575d10c3f 100-104
+packages/core/test/concepts.test.ts
+  s_6181fc5a558822::t_8d3a5b4c299907 26
+  s_6181fc5a558822::t_f10e824c48f943 4,137,941
+  s_6181fc5a558822::t_39471c8063a9bc 686,688,690-693,700-701
+  s_6181fc5a558822::t_d31b6bc4477141 577-600
+  s_6181fc5a558822::t_7c3c68b2a44b8e 675,677,679-685,687,689,696-699,702-714
+  s_6181fc5a558822::t_8748603b9d9b96 126-134
+  s_6181fc5a558822::t_abe6a52fe33dda 676,678,694-695
+packages/core/src/concepts/index.ts
+  s_6181fc5a558822::t_2435a419c23ec5 394-404,408
+  s_6181fc5a558822::t_cab8a6485839c1 482
+  s_6181fc5a558822::t_a4e8696c6bd2f5 125-129,132-138
+  s_6181fc5a558822::t_6f0365af4817e8 244-270,280-286
+packages/core/src/answering/index.ts
+  s_6181fc5a558822::t_fc95c968b3ec6d 2
+  s_6181fc5a558822::t_78d8b48f9975a6 283-287,289-297
+  s_6181fc5a558822::t_260613f33482e8 241-251,253-254,257-271
+packages/schema/test/boundary-schemas.test.ts
+  s_6181fc5a558822::t_9f0e4f0c6cc9b2 29-30
+packages/schema/test/factory.ts
+  s_6181fc5a558822::t_f545de6b9eb329 362,365
+  s_6181fc5a558822::t_4717a257ff93f8 384
+  s_6181fc5a558822::t_7fac2bbd1fa5ac 12
+  s_6181fc5a558822::t_160f85f0d56df2 364
+  s_6181fc5a558822::t_597a8ff6306e2c 13
+packages/core/src/store/postgres/index.ts
+  s_6181fc5a558822::t_2be9509abad681 221-224,230,232
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f6661bb4c61d2f7f008299928a780144b1302ec7",
+  "prompts": {},
+  "sessions": {
+    "s_6181fc5a558822": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6019b35b-37fc-4524-aa66-a5eb72515b67",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
