@@ -21,7 +21,8 @@
 # Action versions read from each action's GitHub releases page on 31/08/2026, resolved to the
 # commit SHA each tag names on 03/09/2026 (`T-040`; the reason is in check.yml's header).
 # actions/cache read from https://github.com/actions/cache/releases/tag/v6.1.0 on 07/09/2026 and
-# resolved the same day.
+# resolved the same day; `restore` and `save` are directories inside that repository, so the two
+# carry the one commit its v6.1.0 tag names.
 name: mutation
 
 on:
@@ -55,25 +56,44 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Last week's mutant results, so a file nobody touched is not re-tested. Every mutant
-      # costs a Postgres container start, which is what makes this worth a cache step at all.
+      # Last week's mutant results — or, after an overrun, the cancelled leg's own — so a file
+      # nobody touched is not re-tested. Every mutant costs a Postgres container start, which is
+      # what makes this worth a cache step at all.
       # A cache entry is written once and never overwritten, so a fixed key would pin the first
       # week's results forever: the run id makes the key new every time — so the entry is always
       # saved — and the prefix restores the newest one this workspace has. A week where nothing
       # restores (a first run, or GitHub evicting an entry it has not seen read for seven days,
       # which a weekly schedule sits exactly on) is a full run: slower, never wrong.
-      # The save is the action's post step and runs on success alone, and Stryker writes the file
-      # only when a run finishes — so a leg that hits the job timeout carries nothing forward and
-      # the week after it is full again. That is the cost to watch, not the correctness.
+      # Restore and save are separate steps because the combined action saves in a post step
+      # conditioned on success, which discards the checkpoint of the one run that needed to keep
+      # it — a leg cancelled at the job timeout. Split, the save below carries `always()` and an
+      # overrunning leg becomes next Sunday's starting point instead of next Sunday's full run.
       - name: last week's mutant results
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           # The path is the workspace's `incrementalFile`, which is where the reason for it
           # sitting under `reports/` rather than under the run's temp directory is written.
           path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
           key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}
           restore-keys: stryker-incremental-${{ matrix.name }}-
-      - run: pnpm --filter ./${{ matrix.path }} run mutation
+      # Cancellation signals the step's entry process and nothing under it, and a shell waiting
+      # on a child forwards no signal: behind `pnpm run mutation`, with a pnpm and an sh in
+      # between, Stryker was never signalled and never wrote the partial incremental report it
+      # writes on SIGINT or SIGTERM (run 34128668967). `exec` into pnpm's bin shim, which execs
+      # into node, leaves one process from the step down — so the signal is Stryker's. The
+      # workspace's `mutation` script is skipped rather than called because calling it is what
+      # interposes the shell; `stryker.config.mjs` holds the run's settings either way.
+      - name: mutation
+        working-directory: ${{ matrix.path }}
+        run: exec node_modules/.bin/stryker run
+      # First of the `always()` steps because a cancelled job has about five minutes before the
+      # runner kills everything, and the checkpoint is the one artefact the next run needs.
+      - name: this run's mutant results, whether or not it finished
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
+          key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}
       - name: score to the job summary
         if: always()
         run: |
