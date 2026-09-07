@@ -20,9 +20,9 @@ import { describe, expect, it } from "vitest";
  * The three rules T-069 adds, each a line in the base `rules` block: no two tests in one
  * describe block carry the same title, no block is empty, and no promise floats.
  *
- * The twelve type-aware rules T-080 adopts, none of them a line in that block: a rule the
- * config does not name is carried by the `correctness` category, and deleting the line that
- * switched it off is how this repository turns one on.
+ * The type-aware rules T-080 adopts, none of them a line in that block: a rule the config does
+ * not name is carried by the `correctness` category, and deleting the line that switched it off
+ * is how this repository turns one on.
  *
  * Each is applied to a throwaway tree so the assertion is as much about where the rule stays
  * silent as where it fires.
@@ -241,16 +241,16 @@ describe("no promise floats — an unawaited call is awaited or `void`", () => {
 });
 
 /**
- * The twelve type-aware rules this repository carries without a line of their own.
+ * The type-aware rules this repository carries without a line of their own.
  *
- * Each was turned on alone, run over the whole tree, found nothing, and adopted by deleting
- * its `"off"` line — which leaves the `correctness` category to say what severity it holds.
- * The thirteenth, `typescript/require-array-sort-compare`, is still named `"off"` in the
- * config, with the sorts it objected to written beside it.
+ * A rule joins this table by being turned on alone, run over the whole tree and finding
+ * nothing; its `"off"` line is then deleted, leaving the `correctness` category to say what
+ * severity it holds. One rule of the family is not here, because its pass did fire, and
+ * `.oxlintrc.json` still names it with what it found.
  *
- * A table rather than twelve blocks, because twelve blocks differing only in a string literal
- * are twelve copies of one test. Each pair is the source the rule must name, and the source
- * that does the same work the way the rule asks for.
+ * A table rather than a block each, because blocks differing only in a string literal are
+ * copies of one test. Each pair is the source the rule must name, and the source that does the
+ * same work the way the rule asks for.
  *
  * The firing sources are written to be *typed*, not to type-check: a rule that refuses an
  * operation TypeScript itself refuses — `no-unsafe-unary-minus` is the one — can only be shown
