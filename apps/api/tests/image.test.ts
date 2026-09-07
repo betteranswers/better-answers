@@ -236,36 +236,48 @@ describe.skipIf(nothingToProbeHere)("the app tier's runtime image", () => {
  * `T-084` — which writes the worker's and the backup's contents tests — turns the mechanism
  * on for them by giving those legs a command.
  *
- * These four assertions run everywhere, daemon or no daemon, because what they guard fails
- * at the one moment nobody is watching: a push to `main`, where the leg either probes the
- * bytes it ships or quietly ships bytes nothing read.
+ * These assertions run everywhere, daemon or no daemon, because what they guard fails at the
+ * one moment nobody is watching: a push to `main`, where the leg either probes the bytes it
+ * ships or quietly ships bytes nothing read.
  */
+
+const workflowStepSchema = z.object({
+  run: z.string().optional(),
+  env: z.record(z.string(), z.string()).optional(),
+  with: z.record(z.string(), z.unknown()).optional(),
+});
 
 const buildWorkflowSchema = z.object({
   jobs: z.object({
+    check: z.object({ with: z.record(z.string(), z.unknown()).optional() }),
     image: z.object({
       strategy: z.object({
         matrix: z.object({
           include: z.array(z.object({ tier: z.string(), probe: z.string().optional() })),
         }),
       }),
-      steps: z.array(
-        z.object({
-          run: z.string().optional(),
-          env: z.record(z.string(), z.string()).optional(),
-          with: z.record(z.string(), z.unknown()).optional(),
-        }),
-      ),
+      steps: z.array(workflowStepSchema),
     }),
   }),
 });
 
-type ImageStep = z.infer<typeof buildWorkflowSchema>["jobs"]["image"]["steps"][number];
+const checkWorkflowSchema = z.object({
+  on: z.object({
+    workflow_call: z.object({
+      inputs: z.record(z.string(), z.record(z.string(), z.unknown())),
+    }),
+  }),
+  jobs: z.object({ check: z.object({ steps: z.array(workflowStepSchema) }) }),
+});
 
-const imageJob = () =>
-  buildWorkflowSchema.parse(
-    parse(readFileSync(path.join(repositoryRoot, ".github/workflows/build.yml"), "utf8")),
-  ).jobs.image;
+type ImageStep = z.infer<typeof workflowStepSchema>;
+
+const workflowFile = (name: string): unknown =>
+  parse(readFileSync(path.join(repositoryRoot, ".github/workflows", name), "utf8"));
+
+const buildWorkflow = () => buildWorkflowSchema.parse(workflowFile("build.yml"));
+const checkWorkflow = () => checkWorkflowSchema.parse(workflowFile("check.yml"));
+const imageJob = () => buildWorkflow().jobs.image;
 
 /** A step's input as the string it is, or `""` — an action's inputs are also booleans. */
 const input = (step: ImageStep, name: string): string => {
@@ -316,6 +328,25 @@ describe("the job that probes the image it pushes", () => {
       [false, false],
       [false, false],
     ]);
+  });
+
+  it("stands this file down only where the caller of `check.yml` probes the image itself", () => {
+    // The deferral is the other half of the same agreement and the half whose failures are
+    // both silent: a lost mapping builds the api image twice on a push to main, and a
+    // default that flipped to true would skip the contents tests on every pull request. The
+    // input's name is read out of the wiring rather than spelled here, so the only thing
+    // this can catch is the wiring itself.
+    const check = checkWorkflow();
+    const deferring = check.jobs.check.steps.find(
+      (step) => step.env?.[PROBE_DEFERRAL_VARIABLE] !== undefined,
+    );
+    const named = /^\$\{\{\s*inputs\.([\w-]+)\s*\}\}$/.exec(
+      deferring?.env?.[PROBE_DEFERRAL_VARIABLE] ?? "",
+    )?.[1];
+
+    expect(named).toBeDefined();
+    expect(check.on.workflow_call.inputs[named ?? ""]?.["default"]).toBe(false);
+    expect(buildWorkflow().jobs.check.with?.[named ?? ""]).toBe(true);
   });
 
   it("loads before it probes and pushes after, never the other way round", () => {
