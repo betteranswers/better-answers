@@ -35,6 +35,8 @@ stdout, not the spec.
 ## Each test gets its own address
 
 Import `test` and `expect` from `apps/web/e2e/browser.ts`, which is the suite's fixture module.
+Two things ride on that import whether a spec asks for them or not: the address below, and the
+accessibility gate further down.
 
 It gives every browser context a `cf-connecting-ip` header of its own, from RFC 2544's reserved
 benchmarking block, keyed by worker index and a per-run count. It exists because every counter in
@@ -81,16 +83,26 @@ holding one.
 `[A11Y1]` is WCAG 2.2 AA tested with a keyboard and a screen reader, and the suite carries that as
 three things, of which automated rules are only one:
 
+- **An `AxeBuilder` pass** (`@axe-core/playwright`) over `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`
+  and `wcag22aa`, asserted to have no violations. **It is run for you**: the fixture in
+  `apps/web/e2e/browser.ts` audits the screen the test leaves the browser on, once the body has
+  finished. A new spec is held to it by existing, and there is nothing to remember.
 - **A keyboard traversal** reaching the screen and each of its acts without a pointer. Every
   screen's spec has one; it is the floor, not the extra.
-- **An `AxeBuilder` pass** (`@axe-core/playwright`) over `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`
-  and `wcag22aa`, asserted to have no violations. It runs where a screen has rendered substance to
-  audit, so a screen bringing real content brings one.
 - **An aria snapshot** writing out the announced structure, where what a screen *sounds like* is
   the thing under test — a row that lost its heading or a list that stopped being a list fails it
   though the pixels are unchanged.
 
+Ask for the `passesTheAccessibilityGate` fixture — called with no arguments — where the test does
+not end on the screen it is about. The routes and failed-screen specs walk on to other screens
+afterwards; every consent test ends at the client's own redirect, which is another origin and no
+screen of ours. A test that ends somewhere this product did not serve and audited nothing is
+refused by name, so an absence is a failure rather than a silence.
+
 `apps/web/e2e/routes.spec.ts` carries all three and is the model to copy.
+`apps/web/e2e/accessibility-gate.spec.ts` is the gate's own proof: two of its four tests are
+`test.fail()`, so the run prints them with a ✘ and counts them passed — that is the gate firing
+where it should, and a `Expected to fail, but passed` there means the gate has stopped running.
 
 ## Running it
 

@@ -8,7 +8,6 @@ import { expect, test } from "./browser.ts";
 import {
   addMember,
   anAddress,
-  passesTheAccessibilityGate,
   person,
   provision,
   seedRoutes,
@@ -231,6 +230,7 @@ test.describe("the System screen's routes card", () => {
   test("is reachable by keyboard and clean under axe, and leaves the rest of System unbuilt", async ({
     page,
     request,
+    passesTheAccessibilityGate,
   }) => {
     await signedInWith(page, request, {
       name: "Wharfedale Castings",
@@ -276,8 +276,10 @@ test.describe("the System screen's routes card", () => {
             - paragraph: /${FIXED_REASON_PHRASE}/
     `);
 
+    // Asked for here rather than left to the fixture, because this test carries on through
+    // the other five screens: what has to be audited is the card, not where the walk ends.
     // The keyboard traversal and the aria snapshot above are the rest of this claim.
-    await passesTheAccessibilityGate(page);
+    await passesTheAccessibilityGate();
 
     // The rest of System, and every one of the other five screens, still say they are unbuilt.
     await expect(page.getByText(/The rest of System/)).toBeVisible();

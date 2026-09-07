@@ -53,10 +53,17 @@ AGENTS.md.bak
 # `ordna skill install`. The lock itself is tracked: it is this repository's manifest of
 # what it installs, not the third parties' content, so ADR 0027 does not reach it.
 # Wildcarded rather than the directory, because git will not descend into an excluded
-# directory to re-include anything inside it — and one skill below is ours, written in this
-# repository and tracked with it, so a fresh clone or worktree has it with no install step.
+# directory to re-include anything inside it — and the two entries below are ours, written in
+# this repository and tracked with it, so a fresh clone or worktree has them with no install
+# step. The design skill is a relative symlink and not a copy: it belongs beside the
+# guidelines, tokens and assets its own text sends a reader to, which are a package
+# (`packages/design-system/`), and a copy here would be a second tracked original of a file
+# that already has one — two to edit and one to forget. A link is also what
+# `.claude/hooks/provision-skills.sh` can carry into a worktree, which it checks by resolving
+# every link under this directory and refusing any that lands outside the tree.
 .claude/skills/*
 !.claude/skills/browser-suite/
+!.claude/skills/better-answers-design
 .agents/
 tasks/AGENTS.md
 
