@@ -69,7 +69,12 @@ const fixturesOnDisk = (directory: string): readonly string[] =>
     .filter((relative) => !NOT_FIXTURES.has(relative))
     .toSorted();
 
-/** A directory of the shape `contracts/` has, for the test of what the walk counts. */
+/**
+ * A stand-in for `contracts/`, outside the repository. The walk's rule is proved against
+ * files this test writes rather than by dropping a `.DS_Store` into the tracked directory:
+ * that would put the proof inside the tree it is proving, and the Python half walks the
+ * same directory in another process at the same time.
+ */
 const throwaway = mkdtempSync(path.join(tmpdir(), "tier-contract-"));
 
 afterAll(() => rmSync(throwaway, { recursive: true, force: true }));
