@@ -1,0 +1,65 @@
+packages/core/test/suggestions.test.ts
+  s_127243e02256ac::t_f95e8cc1fbba7a 935-937,942-961,963-975
+packages/schema/src/concept-tables.ts
+  s_127243e02256ac::t_8f7912cc8e0671 236-244
+packages/schema/migrations/0017_the-inbox.sql
+  s_127243e02256ac::t_6ae09e9a2523d1 12-13
+packages/schema/test/boundary-schemas.test.ts
+  s_127243e02256ac::t_9e7022aaf83bff 619-636
+  s_127243e02256ac::t_c5ff4ab8a91ce8 7-14
+packages/core/test/workspace-with-bundle.ts
+  s_127243e02256ac::t_97af98e038285d 63
+  s_127243e02256ac::t_8765f9a995c3f5 80-81,86-94
+contracts/concept-inbox/cases.json
+  s_127243e02256ac::t_413ea85d25a5a6 122
+  s_127243e02256ac::t_56b56dc33980c2 128-147
+packages/core/src/concepts/inbox.ts
+  s_127243e02256ac::t_90563b5f2f14f8 11
+  s_127243e02256ac::t_ab1d7638b9f8db 244-249
+  s_127243e02256ac::t_dceb282632a953 278
+  s_127243e02256ac::t_500a069fa684ec 147-151,154-159,167-169,171-179
+  s_127243e02256ac::t_7847c491a4dde8 152-153
+packages/schema/migrations/0018_the-inbox-substrate.sql
+  s_127243e02256ac::t_1be91a0c5c2dab 31-65
+  s_127243e02256ac::t_297fa937ca17a2 85-100,106-108
+packages/schema/test/rls.test.ts
+  s_127243e02256ac::t_d8d0c9cfd7f350 13
+  s_127243e02256ac::t_d2e6df1942dd3f 1191-1214,1221,1228-1230,1237-1239,1241-1243,1245,1247-1297
+  s_127243e02256ac::t_536c44e9ea625f 1486,1493,1497-1512
+  s_127243e02256ac::t_b66402920558c2 7
+  s_127243e02256ac::t_dc3f8444ff9ccb 1215-1220,1222-1227,1231-1236,1240,1244,1246
+packages/schema/src/suggestion-tables.ts
+  s_127243e02256ac::t_4f4501b4386833 201-204
+  s_127243e02256ac::t_55da7ea74a05b6 6
+  s_127243e02256ac::t_133f04497d85e3 244-251
+packages/core/src/concepts/index.ts
+  s_127243e02256ac::t_779797d17c1c07 313-314
+  s_127243e02256ac::t_a588bb831d9bf9 884-897
+  s_127243e02256ac::t_4a3210b870ee5c 295-297
+  s_127243e02256ac::t_b4bb9a7de2c5f4 998-1000,1005-1011,1013,1015
+  s_127243e02256ac::t_f640bce8d44339 1083-1086
+  s_127243e02256ac::t_4b19f2cf792c55 1087-1089
+  s_127243e02256ac::t_52d516e109f5d9 540-551
+  s_127243e02256ac::t_490cc30ac119ec 612-622
+  s_127243e02256ac::t_4739f2f63c3c1a 258-267
+  s_127243e02256ac::t_f1d60c9dad4172 15,19
+packages/schema/src/boundary-schemas.ts
+  s_127243e02256ac::t_a08ead18e279d4 13
+  s_127243e02256ac::t_7ef8ecad7a6be2 377-385
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "36468d1674726258344d84d3f390d528a9c18228",
+  "prompts": {},
+  "sessions": {
+    "s_127243e02256ac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c7e92e84-0713-4b5c-8861-c989df4466c0",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
