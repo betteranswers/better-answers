@@ -1,0 +1,22 @@
+packages/schema/src/boundary-schemas.ts
+  s_6181fc5a558822::t_1b48df7c451bca 319-327,329-337
+apps/api/src/mcp/entries/index.ts
+  s_6181fc5a558822::t_c812c6e8c2d12b 3-4
+  s_6181fc5a558822::t_0a90e7c63db29c 151-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "be7b7e7b3f9a6fcb97bc48c8807078b36b6bf146",
+  "prompts": {},
+  "sessions": {
+    "s_6181fc5a558822": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6019b35b-37fc-4524-aa66-a5eb72515b67",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
