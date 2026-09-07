@@ -120,17 +120,17 @@ BEGIN
   END IF;
   -- A set is bounded by what an Admin could decide (SUGGESTION_SET_MAX in
   -- src/suggestion-tables.ts): a producer chooses how much it sends, so somebody other
-  -- than the caller has to choose the ceiling.
+  -- than the producer has to choose the ceiling.
   IF jsonb_typeof(p_requests) IS DISTINCT FROM 'array'
      OR jsonb_array_length(p_requests) NOT BETWEEN 1 AND 500 THEN
     RAISE EXCEPTION 'submit_suggestion_set: a set carries between one and 500 requests'
       USING ERRCODE = 'invalid_parameter_value';
   END IF;
-  -- **A frontmatter arrives as the caller's own JSON text, is a JSON object, and is bounded
-  -- as the caller wrote it** (CONCEPT_FRONTMATTER_MAX in src/concept-tables.ts). It is sent
+  -- **A frontmatter arrives as the producer's own JSON text, is a JSON object, and is bounded
+  -- as the producer wrote it** (CONCEPT_FRONTMATTER_MAX in src/concept-tables.ts). It is sent
   -- as a string rather than as an object so that this function measures the same characters
   -- the boundary measured: a `jsonb` value read back with `::text` is Postgres's rendering
-  -- of it, not the caller's, and the two are not within any multiplier of each other —
+  -- of it, not the producer's, and the two are not within any multiplier of each other —
   -- `{"a":1e-100}` is twelve characters sent and a hundred and nine read back, and a
   -- number may carry a scale of sixteen thousand. A bound over the rendering would
   -- therefore refuse payloads the boundary had already passed, which is the one thing a
@@ -150,7 +150,7 @@ BEGIN
         OR CASE WHEN pg_input_is_valid(e ->> 'frontmatter', 'jsonb')
                 THEN jsonb_typeof((e ->> 'frontmatter')::jsonb) END IS DISTINCT FROM 'object'
   ) THEN
-    RAISE EXCEPTION 'submit_suggestion_set: a frontmatter is the caller''s own JSON text, a JSON object of at most 64000 characters'
+    RAISE EXCEPTION 'submit_suggestion_set: a frontmatter is the producer''s own JSON text, a JSON object of at most 64000 characters'
       USING ERRCODE = 'invalid_parameter_value';
   END IF;
 

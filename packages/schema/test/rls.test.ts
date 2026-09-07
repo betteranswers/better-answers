@@ -1117,7 +1117,7 @@ const deciding = (client: pg.PoolClient, suggestionId: string) =>
 
 /**
  * One request of a submitted set, with whatever a test varies about it. The frontmatter is
- * the **caller's own JSON text**, because that is what `submit_suggestion_set` measures and
+ * the **producer's own JSON text**, because that is what `submit_suggestion_set` measures and
  * casts (migration 0018). Shared, because each test below varies one field of it and four
  * copies would be four places a change to the payload's shape has to land.
  */
@@ -1563,7 +1563,7 @@ describe("the inbox under app_rt", () => {
       // read back with `::text` is Postgres's own printing of it — `{"a":1e-100}` is twelve
       // characters sent and a hundred and nine read back, and a number may carry a scale of
       // sixteen thousand — so a bound over the rendering would refuse payloads the boundary
-      // had already passed. The frontmatter therefore arrives as the caller's own JSON text
+      // had already passed. The frontmatter therefore arrives as the producer's own JSON text
       // and is measured as sent, here, which is the only road to the row.
       const wide = JSON.stringify({ a: 1e-100, title: "Expenses" });
       expect(wide.length).toBeLessThan(CONCEPT_FRONTMATTER_MAX);
@@ -1572,14 +1572,14 @@ describe("the inbox under app_rt", () => {
       await client.query("SAVEPOINT frontmatter");
       await expect(
         submit(JSON.stringify({ title: "x".repeat(CONCEPT_FRONTMATTER_MAX) })),
-      ).rejects.toThrow(/frontmatter is the caller's own JSON text/);
+      ).rejects.toThrow(/frontmatter is the producer's own JSON text/);
       await client.query("ROLLBACK TO SAVEPOINT frontmatter");
 
       // And an object where the text belongs: refused rather than quietly rendered, which
       // would be the measurement this function exists to avoid.
       await client.query("SAVEPOINT shape");
       await expect(submit({ title: "Expenses" })).rejects.toThrow(
-        /frontmatter is the caller's own JSON text/,
+        /frontmatter is the producer's own JSON text/,
       );
       await client.query("ROLLBACK TO SAVEPOINT shape");
 

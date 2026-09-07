@@ -234,19 +234,19 @@ export const CONCEPT_STABLE_STATUS = "stable" satisfies (typeof PUBLISHED_STATUS
 export const CONTENT_HASH = /^[0-9a-f]{64}$/;
 
 /**
- * How large a concept's frontmatter may be, measured **as the caller wrote it** — the JSON
- * text a caller serialized, in **characters**, which is what Postgres's `char_length` counts
+ * How large a concept's frontmatter may be, measured **as the producer wrote it** — the JSON
+ * text a producer serialized, in **characters**, which is what Postgres's `char_length` counts
  * and so what the boundary counts too (JavaScript's `.length` would count an astral
  * character twice and make one bound into two numbers). OKF's keys plus whatever else the
  * file carried is open by design (ADR 0019), so nothing about the shape bounds it, and a
- * caller who chooses the size of what the platform stores is the defect
+ * producer who chooses the size of what the platform stores is the defect
  * `SUGGESTION_BODY_MAX` closes for the body. Sixty-four thousand characters is a wide margin
  * over a `sources[]` list a person would ever write.
  *
  * **One number and one measurement, in two places that measure the same characters**: the
- * boundary, where a caller is told; and `submit_suggestion_set`, which is the only road to a
+ * boundary, where a producer is told; and `submit_suggestion_set`, which is the only road to a
  * payload row (both runtime roles hold `REVOKE ALL` on the table) and which takes the
- * frontmatter as the caller's own text so that it can measure exactly that.
+ * frontmatter as the producer's own text so that it can measure exactly that.
  *
  * There is deliberately **no CHECK over the stored `jsonb`**. A row can only measure what
  * Postgres renders, and a rendering is not the caller's text within any multiplier:
