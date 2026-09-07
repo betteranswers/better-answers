@@ -1,4 +1,4 @@
-import { type MigratedPostgres, startMigratedPostgres } from "@better-answers/schema/testing";
+import { type MigratedPostgres, openMigratedPostgres } from "@better-answers/schema/testing";
 import type pg from "pg";
 import { afterAll, beforeAll } from "vitest";
 
@@ -12,14 +12,24 @@ import { openPostgres, withPrincipal, type Tx } from "../src/store/postgres/inde
  * The shape is `apps/api/tests/suite-app.ts`'s `appForSuite`: the helper registers the
  * lifecycle and hands back an accessor, so a suite says what it needs on its first line and
  * reads the database from a call rather than from a `let` it has to remember is assigned.
- * It became a helper when a second suite wanted the same footing and the copy gate said so;
- * a suite still carrying its own is one no ticket has touched since.
+ * It became a helper when a second suite wanted the same footing and the copy gate said so,
+ * and every data suite in this package now opens on it, so this is the one line the package
+ * reaches Postgres through.
+ *
+ * The database is copied from the template this run's `globalSetup` migrated, which
+ * `vitest.config.ts` registers — so a file pays a `CREATE DATABASE` rather than a container
+ * start, and the whole run pays one. What a suite receives is unchanged either way.
  */
 export const postgresForSuite = (): (() => MigratedPostgres) => {
   let db: MigratedPostgres | undefined;
 
+  // The allowance is a runaway guard, not a budget for the copy: it decides how long a
+  // wedged cluster hangs before Vitest calls it, and a healthy hook never approaches it.
+  // It stays at the container-start size because the opener still falls back to a container
+  // of its own wherever nothing provided a warm one, and that fallback is what needs the
+  // room — a first run on a machine with no image pulls it here.
   beforeAll(async () => {
-    db = await startMigratedPostgres();
+    db = await openMigratedPostgres();
   }, 120_000);
 
   afterAll(async () => {
