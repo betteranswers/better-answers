@@ -1120,6 +1120,30 @@ describe("what the inbox refuses before it does any work", () => {
     expect(set).toEqual({ ok: false, error: "malformed" });
   });
 
+  it("refuses a payload whose frontmatter is not a mapping, and queues nothing", async () => {
+    const scenario = await arrange();
+
+    const set = await submitSuggestionSet(
+      scenario.editor,
+      { postgres: scenario.postgres },
+      {
+        kind: "edit",
+        // @ts-expect-error — a payload is the file an acceptance would commit, and JSON's
+        // null is not one; the runtime half of what the type says.
+        requests: [requestFor({ frontmatter: null })],
+      },
+    );
+
+    // The column would take it — `jsonb` holds JSON null — and the write path would then
+    // read its keys and throw, which is a refusal nobody can act on arriving where an
+    // acceptance was expected. Refused while it is still a proposal, and nothing queued.
+    expect(set).toEqual({ ok: false, error: "malformed" });
+    const queued = await db().pool.query("SELECT 1 FROM suggestion WHERE workspace_id = $1", [
+      scenario.workspaceId,
+    ]);
+    expect(queued.rowCount).toBe(0);
+  });
+
   it("refuses the kinds no person's session may raise, whoever asks", async () => {
     const scenario = await arrange();
     const raise = (kind: SuggestionKind, principal = scenario.admin) =>

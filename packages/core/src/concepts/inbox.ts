@@ -1,5 +1,6 @@
 import {
   boundarySchemas,
+  conceptFrontmatter,
   SUGGESTION_DECLINED_STATUS,
   SUGGESTION_KINDS_FROM_THE_APP,
   SUGGESTION_RETURNED_STATUS,
@@ -254,6 +255,14 @@ export const submitSuggestionSet = async (
   const setId = ulid();
   const payloads = boundarySchemas.conceptWriteRequest.insert
     .omit({ workspaceId: true })
+    // **A payload's frontmatter is a mapping, and never JSON's null.** The column would take
+    // one — `jsonb` holds JSON null and the boundary mirrors the column, which is the rule
+    // ADR 0028's nullability assertion holds every schema to — but a payload is the file an
+    // acceptance would commit, and the write path reads its keys: a null would arrive there
+    // as a throw rather than as a refusal anybody could act on. Narrowed here, where the
+    // shape belongs to the act rather than to the row; `submit_suggestion_set` refuses one
+    // too (migration 0018), which is what makes it true of a caller that never came past here.
+    .extend({ frontmatter: conceptFrontmatter })
     .array()
     .nonempty()
     .max(SUGGESTION_SET_MAX)

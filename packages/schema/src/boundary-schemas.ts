@@ -374,10 +374,13 @@ export const conceptFrontmatter = z
     ]),
   )
   .superRefine((value, context) => {
-    // The bound the payload row also holds. Frontmatter is open — every key preserved
-    // verbatim (ADR 0019) — so nothing about its shape says how large it may be, and a
-    // caller who chose that would be choosing how much the platform stores.
-    if (JSON.stringify(value).length > CONCEPT_FRONTMATTER_MAX) {
+    // The bound `submit_suggestion_set` also holds, **in the units it counts**. Frontmatter
+    // is open — every key preserved verbatim (ADR 0019) — so nothing about its shape says
+    // how large it may be, and a caller who chose that would be choosing how much the
+    // platform stores. Spread rather than `.length`, because `.length` counts UTF-16 code
+    // units and Postgres's `char_length` counts characters: an astral character is two
+    // there and one here, and two numbers for one bound is the defect this pair had.
+    if ([...JSON.stringify(value)].length > CONCEPT_FRONTMATTER_MAX) {
       context.addIssue({
         code: "custom",
         message: `a concept's frontmatter is at most ${CONCEPT_FRONTMATTER_MAX} characters of JSON`,

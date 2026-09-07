@@ -8,6 +8,7 @@ import {
   ACCESS_REQUEST_REASON_MAX,
   boundarySchemas,
   CONCEPT_FRONTMATTER_MAX,
+  conceptFrontmatter,
   EMBEDDING_DIMENSIONS,
   SUGGESTION_BODY_MAX,
   SUGGESTION_REASON_MAX,
@@ -643,6 +644,23 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       }
     });
   }
+});
+
+describe("the frontmatter bound's unit", () => {
+  /** A frontmatter of one astral character repeated — two UTF-16 code units each. */
+  const astral = (characters: number) => ({ a: "\u{1D11E}".repeat(characters) });
+
+  it("counts the characters `char_length` counts, not the units JavaScript measures", () => {
+    // The bound is enforced in `submit_suggestion_set`, which measures the caller's own JSON
+    // text with `char_length` — characters. Measuring UTF-16 code units here would make one
+    // bound into two numbers, and the gap between them is a payload the boundary refuses and
+    // the database would have taken, or the other way about.
+    const inside = astral(CONCEPT_FRONTMATTER_MAX - 100);
+    expect(JSON.stringify(inside).length).toBeGreaterThan(CONCEPT_FRONTMATTER_MAX);
+    expect(conceptFrontmatter.safeParse(inside).success).toBe(true);
+
+    expect(conceptFrontmatter.safeParse(astral(CONCEPT_FRONTMATTER_MAX)).success).toBe(false);
+  });
 });
 
 describe("the customType exception, per shape", () => {

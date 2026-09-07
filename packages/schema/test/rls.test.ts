@@ -1115,6 +1115,34 @@ const inboxAsApp = async (client: pg.PoolClient) => {
 const deciding = (client: pg.PoolClient, suggestionId: string) =>
   client.query("SELECT set_config('app.deciding_suggestion', $1, true)", [suggestionId]);
 
+/**
+ * One request of a submitted set, with whatever a test varies about it. The frontmatter is
+ * the **caller's own JSON text**, because that is what `submit_suggestion_set` measures and
+ * casts (migration 0018). Shared, because each test below varies one field of it and four
+ * copies would be four places a change to the payload's shape has to land.
+ */
+const submitRequest = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  suggestion_id: ulid(),
+  merge_key: `policy:${ulid().toLowerCase()}`,
+  path: `knowledge/${ulid().toLowerCase()}.md`,
+  concept_kind: "Policy",
+  title: "Expenses",
+  frontmatter: '{"title":"Expenses"}',
+  body: "Expenses are claimed within thirty days.",
+  base_content_hash: null,
+  ...overrides,
+});
+
+/** Submit a set as whoever the transaction currently is — the one call all four sites make. */
+const submitSet = (
+  client: pg.PoolClient,
+  set: { readonly kind: string; readonly proposer: string; readonly requests: readonly unknown[] },
+) =>
+  client.query<{ submit_suggestion_set: string }>(
+    "SELECT * FROM submit_suggestion_set($1, $2, $3, $4::jsonb)",
+    [ulid(), set.kind, set.proposer, JSON.stringify(set.requests)],
+  );
+
 describe("the inbox under app_rt", () => {
   it("returns zero rows on a missing scope and only the scoped tenant's suggestions otherwise", async () => {
     await withRollback(db.pool, async (client) => {
@@ -1298,23 +1326,7 @@ describe("the inbox under app_rt", () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       const submit = (kind: string, proposer: string) =>
-        client.query("SELECT * FROM submit_suggestion_set($1, $2, $3, $4::jsonb)", [
-          ulid(),
-          kind,
-          proposer,
-          JSON.stringify([
-            {
-              suggestion_id: ulid(),
-              merge_key: `policy:${ulid().toLowerCase()}`,
-              path: `knowledge/${ulid().toLowerCase()}.md`,
-              concept_kind: "Policy",
-              title: "Expenses",
-              frontmatter: "{}",
-              body: "Expenses are claimed within thirty days.",
-              base_content_hash: null,
-            },
-          ]),
-        ]);
+        submitSet(client, { kind, proposer, requests: [submitRequest()] });
 
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
@@ -1362,24 +1374,11 @@ describe("the inbox under app_rt", () => {
 
       // The served path: a run's candidates, submitted as one call, landing in the
       // workspace the transaction already names — the function takes no workspace at all.
-      const submitted = await client.query<{ submit_suggestion_set: string }>(
-        "SELECT * FROM submit_suggestion_set($1, 'candidate', 'better-answers-extract/1.0', $2::jsonb)",
-        [
-          ulid(),
-          JSON.stringify([
-            {
-              suggestion_id: ulid(),
-              merge_key: "policy:expenses",
-              path: "knowledge/expenses.md",
-              concept_kind: "Policy",
-              title: "Expenses",
-              frontmatter: '{"title":"Expenses"}',
-              body: "Expenses are claimed within thirty days.",
-              base_content_hash: null,
-            },
-          ]),
-        ],
-      );
+      const submitted = await submitSet(client, {
+        kind: "candidate",
+        proposer: "better-answers-extract/1.0",
+        requests: [submitRequest({ merge_key: "policy:expenses", path: "knowledge/expenses.md" })],
+      });
       expect(submitted.rowCount).toBe(1);
     });
   });
@@ -1389,27 +1388,17 @@ describe("the inbox under app_rt", () => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      const request = () => ({
-        suggestion_id: ulid(),
-        merge_key: `policy:${ulid().toLowerCase()}`,
-        path: `knowledge/${ulid().toLowerCase()}.md`,
-        concept_kind: "Policy",
-        title: "Expenses",
-        frontmatter: "{}",
-        body: "body",
-        base_content_hash: null,
-      });
 
-      // A producer chooses how much it sends, so somebody other than the sender chooses
+      // A producer chooses how much it sends, so somebody other than the caller chooses
       // the ceiling; and a set of nothing is a call that meant to say something.
-      for (const requests of [[], Array.from({ length: 501 }, request)]) {
+      for (const requests of [[], Array.from({ length: 501 }, () => submitRequest())]) {
         await client.query("SAVEPOINT sized");
         await expect(
-          client.query("SELECT * FROM submit_suggestion_set($1, 'edit', $2, $3::jsonb)", [
-            ulid(),
-            "process:better-answers-test",
-            JSON.stringify(requests),
-          ]),
+          submitSet(client, {
+            kind: "edit",
+            proposer: "process:better-answers-test",
+            requests,
+          }),
         ).rejects.toThrow(/between one and 500 requests/);
         await client.query("ROLLBACK TO SAVEPOINT sized");
       }
@@ -1558,30 +1547,19 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("bounds a frontmatter by the characters its sender wrote, at the one road to the row (migration 0018)", async () => {
+  it("bounds a frontmatter by the characters its caller wrote, at the one road to the row (migration 0018)", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       const submit = (frontmatter: unknown) =>
-        client.query("SELECT * FROM submit_suggestion_set($1, 'candidate', $2, $3::jsonb)", [
-          ulid(),
-          "better-answers-extraction/1.2",
-          JSON.stringify([
-            {
-              suggestion_id: ulid(),
-              merge_key: `policy:${ulid().toLowerCase()}`,
-              path: `knowledge/${ulid().toLowerCase()}.md`,
-              concept_kind: "Policy",
-              title: "Expenses",
-              frontmatter,
-              body: "Expenses are claimed within thirty days.",
-              base_content_hash: null,
-            },
-          ]),
-        ]);
+        submitSet(client, {
+          kind: "candidate",
+          proposer: "better-answers-extraction/1.2",
+          requests: [submitRequest({ frontmatter })],
+        });
 
-      // **The rendering is not the sender's text, within any multiplier.** A `jsonb` column
+      // **The rendering is not the caller's text, within any multiplier.** A `jsonb` column
       // read back with `::text` is Postgres's own printing of it — `{"a":1e-100}` is twelve
       // characters sent and a hundred and nine read back, and a number may carry a scale of
       // sixteen thousand — so a bound over the rendering would refuse payloads the boundary
@@ -1599,9 +1577,21 @@ describe("the inbox under app_rt", () => {
 
       // And an object where the text belongs: refused rather than quietly rendered, which
       // would be the measurement this function exists to avoid.
+      await client.query("SAVEPOINT shape");
       await expect(submit({ title: "Expenses" })).rejects.toThrow(
         /frontmatter is the caller's own JSON text/,
       );
+      await client.query("ROLLBACK TO SAVEPOINT shape");
+
+      // A payload is the file an acceptance would commit, so its frontmatter is a mapping.
+      // A list, a bare scalar and JSON's null are all valid JSON text that casts and stores
+      // perfectly well — and then fails at the acceptance, which reads the file's keys,
+      // where the refusal is somebody else's problem and the payload is already in the queue.
+      for (const notAnObject of ["[1,2]", '"str"', "null", "7"]) {
+        await client.query("SAVEPOINT shape");
+        await expect(submit(notAnObject)).rejects.toThrow(/a JSON object of at most/);
+        await client.query("ROLLBACK TO SAVEPOINT shape");
+      }
     });
   });
 

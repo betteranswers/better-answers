@@ -146,6 +146,20 @@
       "sqlstate": "42501"
     },
     {
+      "why": "a payload is the file an acceptance would commit and the write path reads its keys, so a frontmatter is a JSON object: a list, a scalar or JSON's null would store perfectly well and fail at the acceptance instead",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R9AAAAAAAAAAAAAAAAAAAA', 'candidate', 'better-answers-extraction/1.2', '[{\"suggestion_id\": \"01J6SAKKKKKKKKKKKKKKKKKKKK\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"[1,2]\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "sqlstate": "22023"
+    },
+    {
+      "why": "and JSON's null is the one a caller reaches by accident, since a frontmatter nobody set serializes to it",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6RAAAAAAAAAAAAAAAAAAAAA', 'candidate', 'better-answers-extraction/1.2', '[{\"suggestion_id\": \"01J6SBLLLLLLLLLLLLLLLLLLLL\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"null\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "sqlstate": "22023"
+    },
+    {
       "why": "a payload's frontmatter is open by design, so its shape bounds nothing: the submit function measures the characters the caller wrote, which is the one place the sender's own serialization still exists",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",

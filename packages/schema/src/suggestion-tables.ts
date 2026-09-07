@@ -113,7 +113,7 @@ export const SUGGESTION_REASON_MAX = 2000;
  * sentence (`CONTEXT.md`), not a document, so a hundred thousand characters is generous by
  * a wide margin — and the bound exists because a producer writes this column: a compromised
  * one could otherwise fill a tenant's storage a suggestion at a time, and nothing decides
- * the size but the sender.
+ * the size but the caller.
  */
 export const SUGGESTION_BODY_MAX = 100_000;
 
@@ -270,10 +270,10 @@ export const conceptWriteRequest = withRLS(
     ),
     // The other open column a producer fills — `frontmatter` — is bounded inside
     // `submit_suggestion_set` and **not here**, because a row can only measure Postgres's
-    // rendering of the `jsonb` and that is not the sender's text within any multiplier
+    // rendering of the `jsonb` and that is not the caller's text within any multiplier
     // (`CONCEPT_FRONTMATTER_MAX` says why, and why a CHECK over the rendering would refuse
     // payloads the boundary had already passed). The function is the only road to this
-    // table, so measuring the characters the sender wrote, there, is the whole bound; the
+    // table, so measuring the characters the caller wrote, there, is the whole bound; the
     // body's bound is here because a `text` column is stored as it was sent.
   ],
 );
