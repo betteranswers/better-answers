@@ -1,0 +1,45 @@
+packages/core/test/concepts.test.ts
+  s_e0eda8eedfb8b6::t_a27cd7ad27ce2e 875-876,889-894,897-898,910
+  s_e0eda8eedfb8b6::t_14df1a2158d4f9 877-884
+packages/core/test/principal.test.ts
+  s_e0eda8eedfb8b6::t_372ecf0915f7c3 2-3
+  s_e0eda8eedfb8b6::t_a75a1fe34f8cf2 27
+  s_e0eda8eedfb8b6::t_f72e1ed27c5d2c 50,102,127,141,162,186,203,232,250,263,276,282,294,311,325,339,360
+  s_e0eda8eedfb8b6::t_5dd119b3f32a19 15
+packages/core/test/suite-postgres.ts
+  s_e0eda8eedfb8b6::t_3308ef6a97727f 15-21,26-30,32
+  s_e0eda8eedfb8b6::t_d5a5a0d18f1f0e 1
+packages/core/test/workspaces.test.ts
+  s_e0eda8eedfb8b6::t_4b4c1192c47094 19,27
+  s_e0eda8eedfb8b6::t_2a4509aa95094d 29,32,42,78,91,99,121,131,143,155,161,167,187,195,216,232,251,261,292,301,316,323,332,354,404,454,465,488,509,531,567,576
+  s_e0eda8eedfb8b6::t_5092c9a7f68912 1,3
+  s_e0eda8eedfb8b6::t_c5d2e273973120 296-299
+packages/core/vitest.config.ts
+  s_e0eda8eedfb8b6::t_511273406b398e 6-10
+packages/core/test/members.test.ts
+  s_e0eda8eedfb8b6::t_46855b1e960fbb 23
+  s_e0eda8eedfb8b6::t_f0f5f48c17fb7a 46-47,61,105,119,258,318,323
+  s_e0eda8eedfb8b6::t_3852ec46d44839 37
+  s_e0eda8eedfb8b6::t_ddbaae1f2fbdb0 2-3
+packages/core/test/llm-routes.test.ts
+  s_e0eda8eedfb8b6::t_9d115d9f31a3b7 24,117,135
+  s_e0eda8eedfb8b6::t_051423dd4bce5a 16
+  s_e0eda8eedfb8b6::t_4869f05b2b81a2 2,7
+  s_e0eda8eedfb8b6::t_c5d2e273973120 1,51-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "abed41a8f83ff9d2a600370f2086905b17dc2b77",
+  "prompts": {},
+  "sessions": {
+    "s_e0eda8eedfb8b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9789fc80-7ea8-43d4-9e45-1f2b870cb092",
+        "model": "claude-opus-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
