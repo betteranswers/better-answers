@@ -13,6 +13,7 @@ import {
   CONCEPT_STATUSES,
   conceptIdentity,
   conceptIndex,
+  citedSourceOf,
   conceptVerification,
   CONTENT_HASH,
   evidence,
@@ -318,20 +319,14 @@ const frontmatterEntry = z.record(
 );
 
 /**
- * Whether one `sources[]` entry names the resource it cites. OKF requires `resource` and the
- * hash reduces every entry to a `(resource, locator)` pair (ADR 0019), so an entry without
- * one has nothing to be reduced to and two different citations would hash alike. Both forms
- * are held to it: OKF's object, and the legacy `<resource>#<locator>` string a bundle may
- * still carry, whose resource is everything before the last `#`.
+ * Whether one `sources[]` entry names the resource it cites — **asked of the one reader**
+ * (`citedSourceOf`), never of a second copy of its rules. OKF requires `resource` and the hash
+ * reduces every entry to a `(resource, locator)` pair (ADR 0019), so what this refuses and
+ * what the hash reduces are the same judgement by construction: an entry the reader cannot
+ * read is an entry with nothing to cite.
  */
-const namesAResource = (entry: z.infer<typeof frontmatterEntry> | string): boolean => {
-  if (typeof entry === "string") {
-    const hash = entry.lastIndexOf("#");
-    return (hash === -1 ? entry : entry.slice(0, hash)).trim() !== "";
-  }
-  const resource = entry["resource"];
-  return typeof resource === "string" && resource.trim() !== "";
-};
+const namesAResource = (entry: z.infer<typeof frontmatterEntry> | string): boolean =>
+  citedSourceOf(entry) !== undefined;
 
 /**
  * The one shape a concept's frontmatter has, **exported** — because the row is not the only

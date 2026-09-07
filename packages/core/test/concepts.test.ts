@@ -362,6 +362,13 @@ describe("a governed write", () => {
 
     expect([relative, bare]).toEqual([absolute, absolute]);
     expect(swapped).not.toBe(absolute);
+    // Padding is not part of what a file cites, in **either** form: an asymmetry there would
+    // give two spellings of one citation two hashes, and a concept would un-check itself over
+    // whitespace.
+    expect(contentHashOf(cite("  /knowledge/handbook.md  "), body, path)).toBe(absolute);
+    expect(contentHashOf({ sources: ["  /knowledge/handbook.md  #p.4"] }, body, path)).toBe(
+      absolute,
+    );
     // A title the platform repaired is not the fact, and does not move the hash.
     expect(
       contentHashOf(

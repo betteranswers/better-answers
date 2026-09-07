@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   AUDIENCE_EVERYONE,
   boundarySchemas,
+  citedSourceOf,
   CONCEPT_DRAFT_STATUS,
   PUBLISHED_STATUSES,
   SENSITIVITY_DEFAULT,
@@ -250,36 +251,12 @@ const resolvedResource = (resource: string, from: string): string => {
 type HashedSource = readonly [string, string | null];
 
 /**
- * One `sources[]` entry, read whichever way a file writes it — OKF's object, or the legacy
- * `<resource>#<locator>` string a bundle may still carry. **One reader**, so the hash and the
- * view can never disagree about what a file cites: two readers over one shape was exactly the
- * defect that had `evidenceOf` dropping entries the hash was still counting.
- *
- * A resource is required (`docs/okf-v02.md`) and the boundary refuses a `sources[]` entry
- * without one in **both** forms. This reads the same rule again rather than trusting it,
- * because the hash is what a check confirmed and an entry reduced to an empty resource would
- * make two different citations hash alike; `undefined` says "nothing to cite here" rather
- * than a resource guessed from somewhere else.
- *
- * A **locator** is kept as it was written, whatever scalar carried it: YAML renders a bare
- * page number as a number, and dropping it would be the platform deciding a citation points
- * at a whole document when the file said page four.
+ * One `sources[]` entry, read whichever way a file writes it — **the boundary's own reader**
+ * (`citedSourceOf`), which the boundary's `sources[]` refinement asks the same question of.
+ * One definition, so the validator and the hash can never part company: two readers over one
+ * shape was exactly the defect that had `evidenceOf` dropping entries the hash still counted.
  */
-export const citedSource = (
-  entry: FrontmatterSource | string,
-): { readonly resource: string; readonly locator: string | null } | undefined => {
-  if (typeof entry === "string") {
-    const hash = entry.lastIndexOf("#");
-    const resource = (hash === -1 ? entry : entry.slice(0, hash)).trim();
-    return resource === ""
-      ? undefined
-      : { resource, locator: hash === -1 ? null : entry.slice(hash + 1) };
-  }
-  const resource = entry["resource"];
-  if (typeof resource !== "string" || resource.trim() === "") return undefined;
-  const locator = entry["locator"];
-  return { resource, locator: locator === undefined || locator === null ? null : String(locator) };
-};
+export { citedSourceOf as citedSource } from "@better-answers/schema";
 
 /**
  * `sources[]` **reduced to ordered `(resource, locator)` pairs** with paths resolved — ADR
@@ -292,7 +269,7 @@ const reducedSources = (
 ): readonly HashedSource[] => {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry) => {
-    const cited = citedSource(entry);
+    const cited = citedSourceOf(entry);
     return cited === undefined ? [] : [[resolvedResource(cited.resource, path), cited.locator]];
   });
 };

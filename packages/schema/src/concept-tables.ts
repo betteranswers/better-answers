@@ -108,6 +108,54 @@ export const conceptIriOf = (minted: string): string => `${CONCEPT_IRI_PREFIX}${
 /** A git object name: forty lowercase hex characters, the repository's object format. */
 export const GIT_SHA = /^[0-9a-f]{40}$/;
 
+/** What one `sources[]` entry cites: the resource, and the locator into it when it names one. */
+export type CitedSource = {
+  readonly resource: string;
+  readonly locator: string | null;
+};
+
+/**
+ * One `sources[]` entry as everything that reads one reads it — **the single definition of
+ * how a file's citation is understood**, so the boundary that validates an entry and the hash
+ * that reduces it can never part company (ADR 0019 reduces every entry to a
+ * `(resource, locator)` pair, and a validator that disagreed with the reducer would accept a
+ * citation nobody could hash).
+ *
+ * Two forms: OKF's provenance object, and the legacy `<resource>#<locator>` string a bundle
+ * may still carry, whose locator is everything after the **last** `#` — a resource may hold
+ * one of its own. A resource is required, so an entry without a non-empty one answers
+ * `undefined`: there is nothing here to cite.
+ *
+ * The resource is **trimmed in both forms**. Padding is not part of what a file cites, and an
+ * asymmetry there would give two spellings of one citation two different hashes — which is a
+ * concept un-checking itself over whitespace.
+ *
+ * It lives in this package, not in the slice that hashes, because a slice may import the
+ * boundary and the boundary may never import a slice (ADR 0029); and it belongs to the shape
+ * rather than to either reader, which is what the boundary is for (ADR 0028).
+ */
+export const citedSourceOf = (
+  entry: Readonly<Record<string, string | number | boolean | null>> | string,
+): CitedSource | undefined => {
+  if (typeof entry === "string") {
+    const hash = entry.lastIndexOf("#");
+    const resource = (hash === -1 ? entry : entry.slice(0, hash)).trim();
+    return resource === ""
+      ? undefined
+      : { resource, locator: hash === -1 ? null : entry.slice(hash + 1) };
+  }
+  const resource = entry["resource"];
+  if (typeof resource !== "string" || resource.trim() === "") return undefined;
+  const locator = entry["locator"];
+  // Whatever scalar carried the locator is kept as its string: YAML renders a bare page
+  // number as a number, and dropping it would be the platform deciding a citation points at a
+  // whole document when the file said page four.
+  return {
+    resource: resource.trim(),
+    locator: locator === undefined || locator === null ? null : String(locator),
+  };
+};
+
 /**
  * Where a bundle's concepts live and what one is called. The bundle root is `knowledge/`
  * and its manifest — the platform-reserved, non-`.md` file ADR 0002 puts at that root
