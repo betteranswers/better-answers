@@ -316,20 +316,25 @@ const frontmatterEntry = z.record(
   z.union([z.string(), z.number(), z.boolean(), z.null()]),
 );
 
-const frontmatter = z.union([
-  z.record(
+/**
+ * The one shape a concept's frontmatter has, **exported** — because the row is not the only
+ * place it appears: `open` serves it on the MCP surface, whose output schema has to accept
+ * exactly what the row can hold. Two copies of this union would be a wire that refuses a
+ * concept the database accepted, which is how the api's typecheck found the second copy.
+ */
+export const conceptFrontmatter = z.record(
+  z.string(),
+  z.union([
     z.string(),
-    z.union([
-      z.string(),
-      z.number(),
-      z.boolean(),
-      z.null(),
-      z.array(z.string()),
-      z.array(frontmatterEntry),
-    ]),
-  ),
-  z.null(),
-]);
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(z.string()),
+    z.array(frontmatterEntry),
+  ]),
+);
+
+const frontmatter = z.union([conceptFrontmatter, z.null()]);
 
 const conceptIdentityRefinements = {
   workspaceId,

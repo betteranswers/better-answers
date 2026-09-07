@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { conceptFrontmatter } from "@better-answers/schema";
+
 import {
   ask,
   find,
@@ -146,10 +148,10 @@ const openEntry = defineEntry({
         concept: z
           .object({
             iri: z.string(),
-            frontmatter: z.record(
-              z.string(),
-              z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())]),
-            ),
+            // The boundary's own schema, not a copy of it: what the row may hold is what
+            // this surface serves, and a second union here would be a wire that refused a
+            // concept the database accepted (ADR 0028).
+            frontmatter: conceptFrontmatter,
             body: z.string(),
             relations: z.array(z.object({ kind: z.string(), target: z.string() })),
             trust,
