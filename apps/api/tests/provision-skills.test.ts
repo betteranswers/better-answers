@@ -34,6 +34,13 @@ import { afterAll, describe, expect, it } from "vitest";
  * The primary checkout is a throwaway git repository shaped like this one where it matters:
  * one skill tracked under `.claude/skills/`, the rest installed and ignored. Nothing here
  * touches the real checkout or its worktrees.
+ *
+ * The tree is built here rather than through `@better-answers/devtools/throwaway-tree`,
+ * whose tree is a flat record of file contents run by a package's binary: this tool is a
+ * repository script, and what it is proved over is a git repository with a worktree and
+ * symlinks, which that runner cannot write. The runner's two fences are kept by hand — every
+ * exit but zero is read with what the script wrote (`ready`), and the copy case above is the
+ * smoke case that proves the reporter before any silence is read as a stage staying quiet.
  */
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
@@ -162,6 +169,8 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
 
   it("copies a skill link as a link, still relative, resolving inside the worktree", () => {
     const primary = primaryCheckout("links-primary", true);
+    // A link straight to a file: what it points at is not a directory, and still resolves.
+    linkSkill(primary, "guide", "../../.agents/skills/hono/SKILL.md");
     const worktree = worktreeOf(primary, "links-worktree");
 
     const run = provision(worktree);
@@ -173,6 +182,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
     const resolved = realpathSync(link);
     expect(resolved.startsWith(realpathSync(worktree) + path.sep)).toBe(true);
     expect(resolved.startsWith(realpathSync(primary) + path.sep)).toBe(false);
+    expect(isSymlink(path.join(worktree, ".claude/skills/guide"))).toBe(true);
   });
 
   it("never overwrites what the checkout already carries", () => {
@@ -227,39 +237,48 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
   });
 
   describe("when the primary checkout has no skills to give", () => {
+    /** What the stub installer does when asked: restore the lock, refuse, or say yes and do nothing. */
+    type Installer = "installs" | "refuses" | "installs nothing";
+
+    const executable = (file: string, lines: readonly string[]): void => {
+      writeFileSync(file, ["#!/usr/bin/env bash", ...lines, ""].join("\n"));
+      chmodSync(file, 0o755);
+    };
+
     /**
-     * A `npx` ahead of the real one on PATH, so the fallback's reinstall is observed and
-     * never reaches the network. The stub records what it was asked and either plays the
-     * installer — writing the skills the lock would restore — or refuses.
+     * An `npx` and an `ordna` ahead of the real ones on PATH, so the fallback's reinstall is
+     * observed and never reaches the network or the machine's own ordna. The `npx` stub
+     * records what it was asked and plays the installer as told; `ordna` writes the guide.
      */
-    const stubNpx = (name: string, succeeds: boolean): string => {
+    const stubInstallers = (name: string, installer: Installer): string => {
       const bin = path.join(scratch, `${name}-bin`);
       mkdirSync(bin);
-      const npx = path.join(bin, "npx");
-      writeFileSync(
-        npx,
-        [
-          "#!/usr/bin/env bash",
-          'printf \'%s\\n\' "$*" > "$PWD/npx-was-asked"',
-          ...(succeeds
-            ? [
-                "mkdir -p .agents/skills/hono .claude/skills",
-                "printf '# hono\\n' > .agents/skills/hono/SKILL.md",
-                "ln -s ../../.agents/skills/hono .claude/skills/hono",
-                "exit 0",
-              ]
-            : ["exit 1"]),
-          "",
-        ].join("\n"),
-      );
-      chmodSync(npx, 0o755);
+      const install = {
+        installs: [
+          "mkdir -p .agents/skills/hono .claude/skills",
+          "printf '# hono\\n' > .agents/skills/hono/SKILL.md",
+          "ln -s ../../.agents/skills/hono .claude/skills/hono",
+          "exit 0",
+        ],
+        refuses: ["exit 1"],
+        "installs nothing": ["echo 'No project skills found in skills-lock.json'", "exit 0"],
+      }[installer];
+      executable(path.join(bin, "npx"), [
+        'printf \'%s\\n\' "$*" > "$PWD/npx-was-asked"',
+        ...install,
+      ]);
+      executable(path.join(bin, "ordna"), [
+        'printf \'%s\\n\' "$*" > "$PWD/ordna-was-asked"',
+        "mkdir -p tasks",
+        "printf '# ordna\\n' > tasks/AGENTS.md",
+      ]);
       return bin;
     };
 
     it("reinstalls from the tracked manifest", () => {
       const primary = primaryCheckout("bare-primary", false);
       const worktree = worktreeOf(primary, "bare-worktree");
-      const bin = stubNpx("bare", true);
+      const bin = stubInstallers("bare", "installs");
 
       const run = provision(worktree, { PATH: `${bin}:${process.env["PATH"] ?? ""}` });
 
@@ -268,12 +287,50 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
         "experimental_install",
       );
       expect(isSymlink(path.join(worktree, ".claude/skills/hono"))).toBe(true);
+      expect(readFileSync(path.join(worktree, "ordna-was-asked"), "utf8")).toContain(
+        "skill install --out tasks/AGENTS.md",
+      );
+      expect(readFileSync(path.join(worktree, "tasks/AGENTS.md"), "utf8")).toBe("# ordna\n");
+    });
+
+    it("does not read an installer's zero exit as skills when it installed none", () => {
+      const primary = primaryCheckout("empty-primary", false);
+      const worktree = worktreeOf(primary, "empty-worktree");
+      const bin = stubInstallers("empty", "installs nothing");
+
+      const run = provision(worktree, { PATH: `${bin}:${process.env["PATH"] ?? ""}` });
+
+      expect(run.status).not.toBe(0);
+      expect(run.stderr).toContain("FAILED");
+      expect(run.stderr).toContain(".agents/skills empty");
+    });
+
+    it("still copies what the primary does have before reinstalling the rest", () => {
+      // A primary with a plugin skill and the ordna guide but no installed skills: the two
+      // it has are copied, and only the skills are reinstalled.
+      const primary = primaryCheckout("partial-primary", false);
+      write(primary, ".claude/skills/gitnexus/SKILL.md", "# gitnexus\n");
+      write(primary, "tasks/AGENTS.md", "# the primary's guide\n");
+      const worktree = worktreeOf(primary, "partial-worktree");
+      const bin = stubInstallers("partial", "installs");
+
+      const run = provision(worktree, { PATH: `${bin}:${process.env["PATH"] ?? ""}` });
+
+      ready(run);
+      expect(readFileSync(path.join(worktree, ".claude/skills/gitnexus/SKILL.md"), "utf8")).toBe(
+        "# gitnexus\n",
+      );
+      expect(readFileSync(path.join(worktree, "tasks/AGENTS.md"), "utf8")).toBe(
+        "# the primary's guide\n",
+      );
+      expect(existsSync(path.join(worktree, "ordna-was-asked"))).toBe(false);
+      expect(isSymlink(path.join(worktree, ".claude/skills/hono"))).toBe(true);
     });
 
     it("says plainly that it could not, and exits non-zero, when the reinstall fails", () => {
       const primary = primaryCheckout("refused-primary", false);
       const worktree = worktreeOf(primary, "refused-worktree");
-      const bin = stubNpx("refused", false);
+      const bin = stubInstallers("refused", "refuses");
 
       const run = provision(worktree, { PATH: `${bin}:${process.env["PATH"] ?? ""}` });
 

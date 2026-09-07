@@ -48,7 +48,7 @@ old-suggested-schema.md
 AGENTS.md.bak
 
 # agent tooling installed from third parties — never ours to publish (ADR 0027).
-# A worktree gets these copied from the main checkout by .claude/hooks/provision-skills.sh;
+# A worktree gets these copied from the primary checkout by .claude/hooks/provision-skills.sh;
 # a fresh clone reinstalls them from `skills-lock.json`, and `tasks/AGENTS.md` from
 # `ordna skill install`. The lock itself is tracked: it is this repository's manifest of
 # what it installs, not the third parties' content, so ADR 0027 does not reach it.

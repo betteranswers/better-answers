@@ -23,11 +23,16 @@ set -euo pipefail
 # An entry the checkout already carries is left alone — the tracked skill is never
 # overwritten by the primary's copy — which is also what makes a second run a no-op.
 #
-# When the primary has nothing to give (a fresh clone, or the primary is this checkout),
-# the skills are reinstalled from `skills-lock.json`, the tracked manifest of what this
-# repository installs. `npx skills experimental_install` is the installer's own restore
-# command (skills CLI, read 07/09/2026); a machine without it, or a refusal, is said
-# plainly and is a non-zero exit like every other stage's failure.
+# When the worktree still has no skills after the copy (a primary that is a fresh clone,
+# or the primary is this checkout), they are reinstalled from `skills-lock.json`, the
+# tracked manifest of what this repository installs, through the skills CLI's own restore
+# command; the ordna guide comes from `ordna skill install`. A machine without either
+# tool, or a restore that leaves the tree empty, is said plainly and is a non-zero exit
+# like every other stage's failure.
+
+# The skills CLI, pinned: read from the npm registry (`npm view skills version`) on
+# 07/09/2026. `experimental_install` is its restore-from-lock command.
+SKILLS_CLI="skills@1.5.24"
 
 USAGE="Usage: provision-skills.sh <worktree-path>"
 WORKTREE_ARG="${1:?$USAGE}"
@@ -37,76 +42,97 @@ COMMON_DIR="$(git -C "$WORKTREE_PATH" rev-parse --path-format=absolute --git-com
   || { echo "Error: '$WORKTREE_PATH' is not a git worktree." >&2; exit 1; }
 PRIMARY_PATH="$(cd "$(dirname "$COMMON_DIR")" && pwd -P)"
 
-# What the checkout cannot carry, as paths relative to a tree. `.claude/skills/*` is
-# expanded per entry so a tracked skill under it is skipped on its own and the rest copied.
-ENTRIES=(".agents" "skills-lock.json" "tasks/AGENTS.md")
-if [ -d "$PRIMARY_PATH/.claude/skills" ]; then
-  for entry in "$PRIMARY_PATH"/.claude/skills/*; do
-    [ -e "$entry" ] || [ -L "$entry" ] || continue
-    ENTRIES+=(".claude/skills/$(basename "$entry")")
-  done
-fi
+say() { echo "  skills: $*" >&2; }
+# A path that is there — including a dangling link, which `-e` alone would miss.
+present() { [ -e "$1" ] || [ -L "$1" ]; }
+has_entries() { [ -d "$1" ] && [ -n "$(ls -A "$1" 2>/dev/null)" ]; }
 
 STATUS=0
 
 # --- copy: every entry the primary has and the worktree does not ---
-# `-L` alongside `-e` because a dangling link exists too, and is the worktree's to keep.
-COPIED=0
-if [ "$PRIMARY_PATH" != "$WORKTREE_PATH" ] && [ -d "$PRIMARY_PATH/.agents/skills" ]; then
+# `.claude/skills/*` is expanded per entry so a tracked skill under it is skipped on its
+# own and the rest copied.
+if [ "$PRIMARY_PATH" != "$WORKTREE_PATH" ]; then
+  ENTRIES=(".agents" "skills-lock.json" "tasks/AGENTS.md")
+  for entry in "$PRIMARY_PATH"/.claude/skills/*; do
+    present "$entry" && ENTRIES+=(".claude/skills/$(basename "$entry")")
+  done
+  COPIED=0
   for entry in "${ENTRIES[@]}"; do
     src="$PRIMARY_PATH/$entry"
     dst="$WORKTREE_PATH/$entry"
-    { [ -e "$src" ] || [ -L "$src" ]; } || continue
-    { [ -e "$dst" ] || [ -L "$dst" ]; } && continue
+    present "$src" || continue
+    present "$dst" && continue
     mkdir -p "$(dirname "$dst")"
     # -R copies a directory whole; -P keeps a link a link rather than copying its target.
     cp -RP "$src" "$dst"
     COPIED=$((COPIED + 1))
   done
   if [ "$COPIED" -gt 0 ]; then
-    echo "  skills: copied $COPIED entries from $PRIMARY_PATH" >&2
+    say "copied $COPIED entries from $PRIMARY_PATH"
   else
-    echo "  skills: nothing to copy — the worktree already carries them" >&2
+    say "nothing to copy from $PRIMARY_PATH"
   fi
-elif [ -d "$WORKTREE_PATH/.agents/skills" ]; then
-  echo "  skills: nothing to copy — the worktree already carries them" >&2
-else
-  # --- fallback: the primary has no skills, so reinstall from the tracked manifest ---
+fi
+
+# --- reinstall: a worktree with no skills after the copy is restored from the manifest ---
+if ! has_entries "$WORKTREE_PATH/.agents/skills"; then
   if [ ! -f "$WORKTREE_PATH/skills-lock.json" ]; then
-    echo "  skills: FAILED — the primary checkout ($PRIMARY_PATH) has no installed skills and there is no skills-lock.json to reinstall from" >&2
+    say "FAILED — no installed skills to copy from $PRIMARY_PATH, and no skills-lock.json to reinstall from"
     exit 1
   fi
-  echo "  skills: the primary checkout has no installed skills — reinstalling from skills-lock.json" >&2
+  say "no installed skills to copy — reinstalling from skills-lock.json"
   if command -v npx >/dev/null 2>&1 \
-     && (cd "$WORKTREE_PATH" && npx -y skills experimental_install >&2 2>&1); then
-    echo "  skills: reinstalled from skills-lock.json" >&2
+     && (cd "$WORKTREE_PATH" && npx -y "$SKILLS_CLI" experimental_install >&2) \
+     && has_entries "$WORKTREE_PATH/.agents/skills"; then
+    say "reinstalled from skills-lock.json"
   else
-    echo "  skills: FAILED — could not reinstall from skills-lock.json (npx skills experimental_install); run it by hand in the worktree" >&2
+    say "FAILED — could not reinstall from skills-lock.json (npx $SKILLS_CLI experimental_install left .agents/skills empty); run it by hand in the worktree"
     exit 1
   fi
 fi
 
+# --- the ordna guide: not in the lock, so it has its own installer ---
+if [ ! -f "$WORKTREE_PATH/tasks/AGENTS.md" ]; then
+  if command -v ordna >/dev/null 2>&1 \
+     && (cd "$WORKTREE_PATH" && ordna skill install --out tasks/AGENTS.md >&2); then
+    say "tasks/AGENTS.md written by ordna skill install"
+  else
+    say "FAILED — tasks/AGENTS.md is missing and \`ordna skill install --out tasks/AGENTS.md\` could not write it"
+    STATUS=1
+  fi
+fi
+
 # --- verify: every .claude/skills link resolves, inside the worktree ---
+LINKS=0
 BROKEN=0
 for link in "$WORKTREE_PATH"/.claude/skills/*; do
   [ -L "$link" ] || continue
+  LINKS=$((LINKS + 1))
   name=".claude/skills/$(basename "$link")"
   target="$(readlink "$link")"
-  # Resolve physically from the link's own directory, the way the reader of the link will.
-  resolved="$(cd "$(dirname "$link")" && cd -P "$target" 2>/dev/null && pwd -P || true)"
-  if [ -z "$resolved" ]; then
-    echo "  skills: $name -> $target does not resolve" >&2
+  # Resolved physically from the link's own directory, the way a reader of the link will;
+  # the target's parent is entered rather than the target, so a link to a file resolves too.
+  parent="$(cd "$(dirname "$link")" && cd -P "$(dirname "$target")" 2>/dev/null && pwd -P || true)"
+  resolved="$parent/$(basename "$target")"
+  if [ -z "$parent" ] || ! [ -e "$resolved" ]; then
+    say "$name -> $target does not resolve"
     BROKEN=$((BROKEN + 1))
-  elif [ "${resolved#"$WORKTREE_PATH"/}" = "$resolved" ]; then
-    echo "  skills: $name -> $target resolves outside the worktree, at $resolved" >&2
+    continue
+  fi
+  [ -d "$resolved" ] && resolved="$(cd -P "$resolved" && pwd -P)"
+  if [ "${resolved#"$WORKTREE_PATH"/}" = "$resolved" ]; then
+    say "$name -> $target resolves outside the worktree, at $resolved"
     BROKEN=$((BROKEN + 1))
   fi
 done
 if [ "$BROKEN" -gt 0 ]; then
-  echo "  skills: FAILED — $BROKEN link(s) under .claude/skills do not resolve inside the worktree" >&2
+  say "FAILED — $BROKEN of $LINKS links under .claude/skills do not resolve inside the worktree"
   STATUS=1
+elif [ "$LINKS" -gt 0 ]; then
+  say "all $LINKS links under .claude/skills resolve inside the worktree"
 else
-  echo "  skills: every .claude/skills link resolves inside the worktree" >&2
+  say "no links under .claude/skills to verify"
 fi
 
 exit $STATUS
