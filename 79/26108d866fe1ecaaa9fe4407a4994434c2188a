@@ -1,0 +1,54 @@
+packages/schema/src/graph-tables.ts
+  s_127243e02256ac::t_eba6e116a47918 169-170
+  s_127243e02256ac::t_7444e965f42d18 204-205
+  s_127243e02256ac::t_fe683ff865c502 74-82,84-89
+packages/schema/src/table-ownership.ts
+  s_127243e02256ac::t_fba1d0a1d21787 19
+docs/adr/0029-the-tier-is-apps-over-packages-business-logic-is-a-library-of-capability-slices-over-four-store-doors.md
+  s_127243e02256ac::t_33ecc91d050ff3 92
+packages/core/src/store/graph/index.ts
+  s_127243e02256ac::t_f813e1ddba617b 275-280,288
+  s_127243e02256ac::t_14de14e8060fb0 408,413-414
+  s_127243e02256ac::t_e835cd46ba25dd 114-120
+  s_127243e02256ac::t_70e4a2a900ae90 460,465
+  s_127243e02256ac::t_0e7f2a67a1cf73 539,541,550
+  s_127243e02256ac::t_f45569b6bf877f 479-488,496-502
+  s_127243e02256ac::t_86bded4af2fc37 21,30
+  s_127243e02256ac::t_c3fa776b385bd7 69,71-72
+  s_127243e02256ac::t_2c6bec222c02bf 332,336
+  s_127243e02256ac::t_f72be3e5867521 147-159
+packages/schema/test/boundary-schemas.test.ts
+  s_127243e02256ac::t_faec41331fd465 319-329
+  s_127243e02256ac::t_8bf4dbf56c1aa4 289-291
+  s_127243e02256ac::t_a2809f45b36438 552-554,560-561,567
+packages/schema/migrations/0016_graph-tables.sql
+  s_127243e02256ac::t_fb35711dc54a7b 63
+  s_127243e02256ac::t_2ac138561de822 18-23,33-34
+packages/schema/test/rls.test.ts
+  s_127243e02256ac::t_98ddbdbd34fc09 995-999,1010-1029
+packages/schema/src/concept-tables.ts
+  s_127243e02256ac::t_a78d9dacc504d4 168-173,181-182
+packages/schema/src/boundary-schemas.ts
+  s_127243e02256ac::t_a5c030358f240d 484-485,494-508
+  s_127243e02256ac::t_e50c06e08394ce 574-577
+  s_127243e02256ac::t_ee17ebef5e4a44 553-561
+packages/core/test/concepts.test.ts
+  s_127243e02256ac::t_53a2ecf5f3838a 360-362,365
+  s_127243e02256ac::t_c9a9c10b8034ea 565-612,615-626
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7926108d866fe1ecaaa9fe4407a4994434c2188a",
+  "prompts": {},
+  "sessions": {
+    "s_127243e02256ac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c7e92e84-0713-4b5c-8861-c989df4466c0",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
