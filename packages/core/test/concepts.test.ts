@@ -12,24 +12,10 @@ import {
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import type { TrustStatus } from "../src/answering/index.ts";
-import type { Result, Role, UserPrincipal } from "../src/kernel/index.ts";
-import {
-  commit,
-  head,
-  initRepository,
-  PLATFORM_BOT,
-  withRepositoryLock,
-  type GitDoor,
-} from "@better-answers/core/store/git";
+import type { Result, UserPrincipal } from "../src/kernel/index.ts";
+import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/core/store/git";
 import { walkFrom } from "@better-answers/core/store/graph";
-import {
-  openPostgres,
-  type PostgresDoor,
-  type Tx,
-  withMembership,
-  withPrincipal,
-} from "../src/store/postgres/index.ts";
-import { provisionWorkspace } from "../src/workspaces/index.ts";
+import { type Tx, withMembership } from "../src/store/postgres/index.ts";
 import {
   bundleHistory,
   bundlesForSuite,
@@ -37,8 +23,8 @@ import {
   fileAtCommit,
   removeRepository,
 } from "./bundle.ts";
-import { bootstrap, seedPerson } from "./platform.ts";
 import { postgresForSuite, readingAs } from "./suite-postgres.ts";
+import { arrangeWorkspace, principalFor, type Scenario } from "./workspace-with-bundle.ts";
 
 /**
  * The governed write through the concepts slice's entry point (`[TEST1]`), against real
@@ -55,89 +41,25 @@ import { postgresForSuite, readingAs } from "./suite-postgres.ts";
 const db = postgresForSuite();
 const bundles = bundlesForSuite();
 
-/**
- * A workspace with its bundle and three people in it — the arrange block every test here
- * opens with. Provisioning, the two extra memberships and the repository are one call
- * because a governed write needs all four before it can happen at all, and a test that said
- * so in four lines would say it in four lines eleven times.
- */
-type Scenario = {
-  readonly workspaceId: string;
-  readonly postgres: PostgresDoor;
-  readonly git: GitDoor;
-  /** The Editor every write here is made by, unless a test names another role. */
-  readonly editor: UserPrincipal;
-  readonly viewer: UserPrincipal;
-  readonly admin: UserPrincipal;
-};
-
-const principalFor = async (
-  postgres: PostgresDoor,
-  workspaceId: string,
-  userId: string,
-): Promise<UserPrincipal> => {
-  // The Principal a transport resolves and hands to the act: it outlives the resolving
-  // transaction on purpose — the governed write opens its own, which is the whole point of
-  // `withMembership` re-reading the membership inside it.
-  const resolved = await withPrincipal(
-    openPostgres(db().runtimePool),
-    { workspaceId, userId, issuedAt: new Date() },
-    async (principal) => principal,
-  );
-  if (!resolved.ok) throw new Error(`the principal did not resolve: ${resolved.error}`);
-  return resolved.value;
-};
-
-const arrange = async (): Promise<Scenario> => {
-  const adminUserId = await seedPerson(db().pool);
-  const postgres = openPostgres(db().runtimePool);
-  const workspaceId = ulid();
-  const provisioned = await provisionWorkspace(bootstrap, postgres, {
-    id: workspaceId,
-    name: "Acme",
-    slug: `acme-${workspaceId.toLowerCase()}`,
-    adminUserId,
-  });
-  expect(provisioned.ok).toBe(true);
-
-  const client = await db().pool.connect();
-  const people: Record<string, string> = {};
-  try {
-    const seed = testData(client);
-    for (const role of ["Editor", "Viewer"] satisfies Role[]) {
-      const person = await seed.user();
-      await seed.member({ workspaceId, userId: person.id, role });
-      people[role] = person.id;
-    }
-  } finally {
-    client.release();
-  }
-
-  const git = bundles();
-  await initRepository(git, workspaceId);
-  return {
-    workspaceId,
-    postgres,
-    git,
-    editor: await principalFor(postgres, workspaceId, people["Editor"] ?? ""),
-    viewer: await principalFor(postgres, workspaceId, people["Viewer"] ?? ""),
-    admin: await principalFor(postgres, workspaceId, adminUserId),
-  };
-};
+/** This suite's footing: a provisioned workspace, its bundle, and its three people. */
+const arrange = (): Promise<Scenario> => arrangeWorkspace(db(), bundles());
 
 let minted = 0;
 /**
  * A concept's IRI: the one opaque form ADR 0002's amendments fix — the bare apex, `/c/`, a
  * minted id — through the minter the boundary exports, so a test can never assert against a
- * shape the boundary would refuse.
+ * shape the boundary would refuse. **No write here supplies one**: the key is never
+ * caller-settable (ADR 0002), so a creation gets its IRI back from the act and a re-write
+ * names that. This mints one only where a test needs an IRI nobody minted.
  */
-const iriFor = (): string => {
+const iriFor = (): string => conceptIriOf(ulid());
+
+const writeFor = (overrides: Partial<WriteConceptInput> = {}): WriteConceptInput => {
   minted += 1;
-  return conceptIriOf(ulid());
+  return unnamedWrite(overrides);
 };
 
-const writeFor = (overrides: Partial<WriteConceptInput> = {}): WriteConceptInput => ({
-  iri: iriFor(),
+const unnamedWrite = (overrides: Partial<WriteConceptInput>): WriteConceptInput => ({
   mergeKey: `policy:expenses-${minted}`,
   path: `knowledge/expenses-${minted}.md`,
   kind: "Policy",
@@ -152,8 +74,20 @@ const writeFor = (overrides: Partial<WriteConceptInput> = {}): WriteConceptInput
   body: "Expenses are claimed within thirty days.",
   message: "Record the expenses policy",
   author: { name: "Ada Editor", email: "ada@acme.invalid" },
-  expectedHead: null,
+  expects: { head: null },
   sensitivity: "Internal",
+  ...overrides,
+});
+
+/** A re-write of a concept an earlier act made: its IRI, its path and the head it left. */
+const rewriteOf = (
+  input: WriteConceptInput,
+  written: { readonly iri: string; readonly sha: string },
+  overrides: Partial<WriteConceptInput> = {},
+): WriteConceptInput => ({
+  ...input,
+  iri: written.iri,
+  expects: { head: written.sha },
   ...overrides,
 });
 
@@ -260,7 +194,7 @@ describe("a governed write", () => {
         '  - "resource": "/sources/handbook.pdf"',
         '    "title": "Handbook"',
         '    "locator": "p.4"',
-        `"iri": "${input.iri}"`,
+        `"iri": "${written.iri}"`,
         "---",
         "",
         "Expenses are claimed within thirty days.",
@@ -301,7 +235,7 @@ describe("a governed write", () => {
     );
     expect(row.rows).toEqual([
       {
-        iri: input.iri,
+        iri: written.iri,
         path: input.path,
         kind: "Policy",
         title: "Expenses",
@@ -320,13 +254,13 @@ describe("a governed write", () => {
     // case and plural only (ADR 0012's 2026-08-30 amendment), so the type vocabulary counts
     // them once — while the file keeps what the person wrote, because `type` is not a key the
     // platform owns (ADR 0019).
-    let expectedHead: string | null = null;
+    let head: string | null = null;
     let firstFile: { readonly sha: string; readonly path: string } | undefined;
     for (const kind of ["policy", "Policies", "POLICY"]) {
-      const base = writeFor({ kind, expectedHead });
+      const base = writeFor({ kind, expects: { head } });
       const input = { ...base, frontmatter: { ...base.frontmatter, type: kind } };
       const written = await landed(scenario, input);
-      expectedHead = written.sha;
+      head = written.sha;
       firstFile ??= { sha: written.sha, path: input.path };
     }
 
@@ -386,12 +320,12 @@ describe("a governed write", () => {
 
   it("keeps the recorded commits a prefix of the bundle's history across a chain of acts", async () => {
     const scenario = await arrange();
-    let expectedHead: string | null = null;
+    let head: string | null = null;
     const shas: string[] = [];
     for (const title of ["Expenses", "Travel", "Leave"]) {
-      const written = await landed(scenario, writeFor({ title, expectedHead }));
+      const written = await landed(scenario, writeFor({ title, expects: { head } }));
       shas.push(written.sha);
-      expectedHead = written.sha;
+      head = written.sha;
     }
 
     // The invariant the lock buys and the reconciler leans on: what Postgres knows and what
@@ -414,23 +348,31 @@ describe("a governed write", () => {
  */
 describe("the map a governed write leaves behind", () => {
   /**
+   * A concept as these tests hold it: what the act was given, and the IRI the act answered
+   * with. The IRI is never the input's — it is minted (ADR 0002) — so a test that asserts
+   * about a concept reads it off the write that made it.
+   */
+  type Written = WriteConceptInput & { readonly iri: string };
+
+  /**
    * A stable Product, then a stable concept whose body `write` renders over it — the
    * two-concept arrange the link-derivation tests share, so which act made which commit
    * is one fact here and a body per test.
    */
   const linkedPair = async (
     scenario: Scenario,
-    write: (product: WriteConceptInput, filename: string) => Partial<WriteConceptInput>,
+    write: (product: Written, filename: string) => Partial<WriteConceptInput>,
   ) => {
-    const product = writeFor({ kind: "Product", status: "stable" });
-    const first = await landed(scenario, product);
-    const policy = writeFor({
+    const input = writeFor({ kind: "Product", status: "stable" });
+    const first = await landed(scenario, input);
+    const product = { ...input, iri: first.iri };
+    const policyInput = writeFor({
       status: "stable",
-      expectedHead: first.sha,
-      ...write(product, product.path.split("/").at(-1) ?? ""),
+      expects: { head: first.sha },
+      ...write(product, input.path.split("/").at(-1) ?? ""),
     });
-    await landed(scenario, policy);
-    return { product, policy };
+    const second = await landed(scenario, policyInput);
+    return { product, policy: { ...policyInput, iri: second.iri } };
   };
 
   it("maps the concept and its links in the transaction that committed them", async () => {
@@ -505,9 +447,9 @@ describe("the map a governed write leaves behind", () => {
       kind: "Guideline",
       status: "stable",
       path: "knowledge/travel.md",
-      expectedHead: first.sha,
+      expects: { head: first.sha },
     });
-    await landed(scenario, travel);
+    const written = await landed(scenario, travel);
 
     // The landing is what resolves it: the author's edges are re-derived in the same act,
     // with the target's kind read off the index the transaction just wrote.
@@ -516,7 +458,7 @@ describe("the map a governed write leaves behind", () => {
       [scenario.workspaceId],
     );
     expect(edges.rows).toEqual([
-      { from_uid: author.iri, to_uid: travel.iri, to_kind: "Guideline" },
+      { from_uid: first.iri, to_uid: written.iri, to_kind: "Guideline" },
     ]);
   });
 
@@ -642,7 +584,7 @@ describe("the map a governed write leaves behind", () => {
     const policy = writeFor({
       status: "stable",
       body: `See [the product](./${filename}) for tiers.`,
-      expectedHead: first.sha,
+      expects: { head: first.sha },
     });
     const second = await landed(scenario, policy);
 
@@ -654,13 +596,13 @@ describe("the map a governed write leaves behind", () => {
 
     // A re-write of the *cited* concept: newness is the map's own fact, not the index's,
     // so the policy that names it is re-derived — inbound path links included.
-    await landed(scenario, { ...product, expectedHead: second.sha });
+    await landed(scenario, { ...product, iri: first.iri, expects: { head: second.sha } });
 
     const edges = await db().pool.query(
       "SELECT from_uid, to_uid FROM graph_edge WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
-    expect(edges.rows).toEqual([{ from_uid: policy.iri, to_uid: product.iri }]);
+    expect(edges.rows).toEqual([{ from_uid: second.iri, to_uid: first.iri }]);
   });
 
   it("derives a succession over a deprecated concept of its kind, and a derivation over anything else", async () => {
@@ -670,7 +612,7 @@ describe("the map a governed write leaves behind", () => {
     // the same type, else DERIVED_FROM — is the whole distinction.
     const superseded = writeFor({ status: "deprecated" });
     const first = await landed(scenario, superseded);
-    const stillCurrent = writeFor({ status: "stable", expectedHead: first.sha });
+    const stillCurrent = writeFor({ status: "stable", expects: { head: first.sha } });
     const second = await landed(scenario, stillCurrent);
 
     const successor = writeFor({
@@ -678,11 +620,11 @@ describe("the map a governed write leaves behind", () => {
       frontmatter: {
         title: "Expenses v2",
         type: "Policy",
-        sources: [{ resource: superseded.iri }, { resource: stillCurrent.iri }],
+        sources: [{ resource: first.iri }, { resource: second.iri }],
       },
-      expectedHead: second.sha,
+      expects: { head: second.sha },
     });
-    await landed(scenario, successor);
+    const third = await landed(scenario, successor);
 
     const edges = await db().pool.query(
       "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM graph_edge WHERE workspace_id = $1 ORDER BY uid",
@@ -692,20 +634,20 @@ describe("the map a governed write leaves behind", () => {
     // lineage columns stay empty — the link columns are LINKS_TO's alone.
     expect(edges.rows).toEqual([
       {
-        uid: `lineage:${successor.iri}:0`,
+        uid: `lineage:${third.iri}:0`,
         label: "SUPERSEDES",
-        from_uid: successor.iri,
-        to_uid: superseded.iri,
+        from_uid: third.iri,
+        to_uid: first.iri,
         from_kind: null,
         to_kind: null,
         section: null,
         sentence: null,
       },
       {
-        uid: `lineage:${successor.iri}:1`,
+        uid: `lineage:${third.iri}:1`,
         label: "DERIVED_FROM",
-        from_uid: successor.iri,
-        to_uid: stillCurrent.iri,
+        from_uid: third.iri,
+        to_uid: second.iri,
         from_kind: null,
         to_kind: null,
         section: null,
@@ -720,15 +662,15 @@ describe("the map a governed write leaves behind", () => {
     const first = await landed(scenario, cited);
     const successor = writeFor({
       status: "stable",
-      frontmatter: { title: "Expenses v2", type: "Policy", sources: [{ resource: cited.iri }] },
-      expectedHead: first.sha,
+      frontmatter: { title: "Expenses v2", type: "Policy", sources: [{ resource: first.iri }] },
+      expects: { head: first.sha },
     });
     const second = await landed(scenario, successor);
 
     const lineageLabel = async (): Promise<readonly string[]> => {
       const rows = await db().pool.query<{ label: string }>(
         "SELECT label FROM graph_edge WHERE workspace_id = $1 AND from_uid = $2",
-        [scenario.workspaceId, successor.iri],
+        [scenario.workspaceId, second.iri],
       );
       return rows.rows.map((row) => row.label);
     };
@@ -740,11 +682,11 @@ describe("the map a governed write leaves behind", () => {
     await landed(
       scenario,
       writeFor({
-        iri: cited.iri,
+        iri: first.iri,
         mergeKey: cited.mergeKey,
         path: cited.path,
         status: "deprecated",
-        expectedHead: second.sha,
+        expects: { head: second.sha },
       }),
     );
     expect(await lineageLabel()).toEqual(["SUPERSEDES"]);
@@ -758,7 +700,7 @@ describe("what a governed write refuses", () => {
 
     // The second write was written against an empty bundle, which is no longer what the
     // ref holds: the person is told, rather than silently overwriting the first.
-    const stale = await write(scenario, scenario.editor, writeFor({ expectedHead: null }));
+    const stale = await write(scenario, scenario.editor, writeFor({ expects: { head: null } }));
 
     expect(stale).toEqual({ ok: false, error: "stale-precondition" });
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
@@ -854,14 +796,14 @@ describe("what a re-write of an existing concept may not move", () => {
     const widened = await write(
       scenario,
       scenario.editor,
-      writeFor({ ...input, sensitivity: "Public", expectedHead: first.sha }),
+      rewriteOf(input, first, { sensitivity: "Public" }),
     );
 
     expect(widened).toEqual({ ok: false, error: "reclassification-refused" });
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
     const held = await db().pool.query<{ sensitivity: string }>(
       "SELECT sensitivity FROM concept_index WHERE workspace_id = $1 AND iri = $2",
-      [scenario.workspaceId, input.iri],
+      [scenario.workspaceId, first.iri],
     );
     expect(held.rows).toEqual([{ sensitivity: "Restricted" }]);
   });
@@ -873,16 +815,15 @@ describe("what a re-write of an existing concept may not move", () => {
 
     // No `sensitivity` on the second write. The act's default is the most restrictive of the
     // three, which on a *re-write* would silently narrow a concept its readers can see today.
-    const { sensitivity: _named, ...unclassified } = input;
+    const { sensitivity: _named, ...unclassified } = rewriteOf(input, first);
     await landed(scenario, {
       ...unclassified,
       body: "Expenses are claimed within sixty days.",
-      expectedHead: first.sha,
     });
 
     const held = await db().pool.query<{ sensitivity: string }>(
       "SELECT sensitivity FROM concept_index WHERE workspace_id = $1 AND iri = $2",
-      [scenario.workspaceId, input.iri],
+      [scenario.workspaceId, first.iri],
     );
     expect(held.rows).toEqual([{ sensitivity: "Internal" }]);
   });
@@ -894,16 +835,15 @@ describe("what a re-write of an existing concept may not move", () => {
 
     // No `status` on the second write. The act's default is *draft* — what a concept is born
     // at — and applying it here would take a published concept away from every reader.
-    const { status: _named, ...unstated } = input;
+    const { status: _named, ...unstated } = rewriteOf(input, first);
     await landed(scenario, {
       ...unstated,
       body: "Expenses are claimed within sixty days.",
-      expectedHead: first.sha,
     });
 
     const held = await db().pool.query<{ status: string; published_at: Date | null }>(
       "SELECT status, published_at FROM concept_index WHERE workspace_id = $1 AND iri = $2",
-      [scenario.workspaceId, input.iri],
+      [scenario.workspaceId, first.iri],
     );
     expect(held.rows[0]?.status).toBe("stable");
     expect(held.rows[0]?.published_at).toBeInstanceOf(Date);
@@ -917,7 +857,7 @@ describe("what a re-write of an existing concept may not move", () => {
     const moved = await write(
       scenario,
       scenario.editor,
-      writeFor({ ...input, path: "knowledge/moved.md", expectedHead: first.sha }),
+      rewriteOf(input, first, { path: "knowledge/moved.md" }),
     );
 
     expect(moved).toEqual({ ok: false, error: "rename-refused" });
@@ -1038,11 +978,7 @@ describe("authority that moved while the act was in flight", () => {
     // *issued* and a fresh sign-in mints anew, so the act's judgement is the boundary's —
     // the credential's issuance against the instant — and never "an instant is set".
     await revokeEditor(scenario, "here");
-    const afresh = await principalFor(
-      scenario.postgres,
-      scenario.workspaceId,
-      scenario.editor.userId,
-    );
+    const afresh = await principalFor(db(), scenario.workspaceId, scenario.editor.userId);
 
     const written = await write(scenario, afresh, writeFor());
 
@@ -1124,7 +1060,7 @@ describe("a failure after the commit", () => {
     const clash = await write(
       scenario,
       scenario.editor,
-      writeFor({ path: first.path, expectedHead: written.sha }),
+      writeFor({ path: first.path, expects: { head: written.sha } }),
     );
 
     // `[TEST8]`: the rows are asserted before the returned value, because a statement that
@@ -1192,11 +1128,11 @@ describe("the per-repository lock", () => {
     await landed(scenario, writeFor());
     // A failure the act meets **inside** the lock — the precondition is read there — rather
     // than one decided before it is taken, which would prove nothing about releasing it.
-    const failed = await write(scenario, scenario.editor, writeFor({ expectedHead: null }));
+    const failed = await write(scenario, scenario.editor, writeFor({ expects: { head: null } }));
     expect(failed).toEqual({ ok: false, error: "stale-precondition" });
 
     const head = await bundleHistory(scenario.git, scenario.workspaceId);
-    const next = await landed(scenario, writeFor({ expectedHead: head[0] ?? null }));
+    const next = await landed(scenario, writeFor({ expects: { head: head[0] ?? null } }));
 
     expect(next.sha).toMatch(/^[0-9a-f]{40}$/);
   });
@@ -1206,17 +1142,17 @@ describe("opening a concept by IRI", () => {
   it("hands the reader the concept the write committed, unchecked until somebody checks it", async () => {
     const scenario = await arrange();
     const input = writeFor({ status: "stable" });
-    await landed(scenario, input);
+    const written = await landed(scenario, input);
 
     const opened = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: input.iri }),
+      open(principal, tx, { iri: written.iri }),
     );
 
     expect(opened.ok).toBe(true);
     if (!opened.ok || !opened.value.found) return;
     expect(opened.value.concept).toEqual({
-      iri: input.iri,
-      frontmatter: { ...input.frontmatter, iri: input.iri },
+      iri: written.iri,
+      frontmatter: { ...input.frontmatter, iri: written.iri },
       body: input.body,
       relations: [],
       trust: {
@@ -1235,18 +1171,18 @@ describe("opening a concept by IRI", () => {
     // A draft is a concept nobody has made the company's word on yet: it has no published
     // instant, and the predicate's published arm is what keeps it out of every read.
     const input = writeFor({ status: "draft" });
-    await landed(scenario, input);
+    const written = await landed(scenario, input);
 
     const seen = await Promise.all(
       [scenario.viewer, scenario.editor, scenario.admin].map((principal) =>
-        reading(principal, (resolved, tx) => open(resolved, tx, { iri: input.iri })),
+        reading(principal, (resolved, tx) => open(resolved, tx, { iri: written.iri })),
       ),
     );
 
     expect(seen.map((result) => result.ok && result.value.found)).toEqual([false, false, false]);
     const stored = await db().pool.query<{ published_at: Date | null }>(
       "SELECT published_at FROM concept_index WHERE workspace_id = $1 AND iri = $2",
-      [scenario.workspaceId, input.iri],
+      [scenario.workspaceId, written.iri],
     );
     expect(stored.rows).toEqual([{ published_at: null }]);
   });
@@ -1259,7 +1195,7 @@ describe("opening a concept by IRI", () => {
     try {
       await testData(client).conceptVerification({
         workspaceId: scenario.workspaceId,
-        iri: input.iri,
+        iri: written.iri,
         actor: `human:${scenario.admin.userId}`,
         contentHash: written.contentHash,
       });
@@ -1268,11 +1204,11 @@ describe("opening a concept by IRI", () => {
     }
 
     const checked = await reading(scenario.viewer, (principal, tx) =>
-      conceptByIri(principal, tx, input.iri),
+      conceptByIri(principal, tx, written.iri),
     );
     expect(checked).toMatchObject({ ok: true });
     const opened = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: input.iri }),
+      open(principal, tx, { iri: written.iri }),
     );
     expect(opened.ok && opened.value.found && opened.value.concept?.trust).toMatchObject({
       tier: "human-reviewed",
@@ -1284,17 +1220,10 @@ describe("opening a concept by IRI", () => {
     // status says so without anybody recording anything (ADR 0019).
     await landed(
       scenario,
-      writeFor({
-        iri: input.iri,
-        mergeKey: input.mergeKey,
-        path: input.path,
-        status: "stable",
-        body: "Expenses are claimed within sixty days.",
-        expectedHead: written.sha,
-      }),
+      rewriteOf(input, written, { body: "Expenses are claimed within sixty days." }),
     );
     const moved = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: input.iri }),
+      open(principal, tx, { iri: written.iri }),
     );
     expect(moved.ok && moved.value.found && moved.value.concept?.trust.status).toBe(
       "changed-since-checked",
@@ -1334,10 +1263,10 @@ describe("opening a concept by IRI", () => {
         ...(staleAfter === undefined ? {} : { stale_after: staleAfter }),
       },
     });
-    await landed(scenario, input);
+    const written = await landed(scenario, input);
 
     const read = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: input.iri }),
+      open(principal, tx, { iri: written.iri }),
     );
 
     expect(read.ok && read.value.found && read.value.concept?.trust.status).toBe(expected);
@@ -1346,10 +1275,10 @@ describe("opening a concept by IRI", () => {
   it("withholds a Restricted concept from a Viewer exactly as it answers an IRI nobody minted", async () => {
     const scenario = await arrange();
     const input = writeFor({ sensitivity: "Restricted", status: "stable" });
-    await landed(scenario, input);
+    const written = await landed(scenario, input);
 
     const withheld = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: input.iri }),
+      open(principal, tx, { iri: written.iri }),
     );
     const absent = await reading(scenario.viewer, (principal, tx) =>
       open(principal, tx, { iri: iriFor() }),
@@ -1357,11 +1286,11 @@ describe("opening a concept by IRI", () => {
 
     // Indistinguishable, which is the whole requirement: the same shape, and neither says
     // anything a caller could probe with (user story 13).
-    expect(withheld).toEqual({ ok: true, value: { found: false, iri: input.iri } });
+    expect(withheld).toEqual({ ok: true, value: { found: false, iri: written.iri } });
     expect(absent.ok && absent.value.found).toBe(false);
     // The Admin, who may see it, is the proof the concept is really there.
     const seen = await reading(scenario.admin, (principal, tx) =>
-      open(principal, tx, { iri: input.iri }),
+      open(principal, tx, { iri: written.iri }),
     );
     expect(seen.ok && seen.value.found).toBe(true);
   });
@@ -1369,11 +1298,10 @@ describe("opening a concept by IRI", () => {
   it("never reaches another workspace's concept, whoever asks", async () => {
     const here = await arrange();
     const there = await arrange();
-    const input = writeFor();
-    await landed(there, input);
+    const written = await landed(there, writeFor());
 
     const reached: Result<unknown, unknown> = await reading(here.admin, (principal, tx) =>
-      conceptByIri(principal, tx, input.iri),
+      conceptByIri(principal, tx, written.iri),
     );
 
     expect(reached).toEqual({ ok: true, value: undefined });

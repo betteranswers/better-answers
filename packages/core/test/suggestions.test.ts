@@ -1,0 +1,658 @@
+import { testData } from "@better-answers/schema/testing";
+import { describe, expect, it } from "vitest";
+
+import { conceptIriOf, ulid } from "@better-answers/schema";
+
+import { open } from "../src/answering/index.ts";
+import {
+  acceptSuggestions,
+  contentHashOf,
+  declineSuggestion,
+  submitSuggestionSet,
+  suggestionSetSummary,
+  writeConcept,
+  type AcceptanceOutcome,
+  type SuggestionKind,
+  type SuggestionRequest,
+  type WriteConceptInput,
+} from "../src/concepts/index.ts";
+import type { UserPrincipal } from "../src/kernel/index.ts";
+import { bundleHistory, bundlesForSuite, commitFacts } from "./bundle.ts";
+import { postgresForSuite, readingAs } from "./suite-postgres.ts";
+import { arrangeWorkspace, type Scenario } from "./workspace-with-bundle.ts";
+
+/**
+ * Suggestions, the inbox and identity, through the concepts slice's entry point
+ * (`[TEST1]`), against real Postgres and a real bare repository.
+ *
+ * The claims: an acceptance is **one governed write** — its rows, its commit and the
+ * suggestion's decision land together or not at all; identity is resolved **at acceptance**
+ * and an acceptance whose resolution moved is refused and returned to the proposer; a
+ * decline is recorded with its reason; and the platform's citation repair re-hashes what it
+ * repaired, so a repair never turns *Checked* into *Changed since checked*.
+ */
+
+const db = postgresForSuite();
+const bundles = bundlesForSuite();
+
+const arrange = (): Promise<Scenario> => arrangeWorkspace(db(), bundles());
+
+let proposed = 0;
+
+const requestFor = (overrides: Partial<SuggestionRequest> = {}): SuggestionRequest => {
+  proposed += 1;
+  return {
+    mergeKey: `policy:expenses-${proposed}`,
+    path: `knowledge/expenses-${proposed}.md`,
+    kind: "Policy",
+    title: "Expenses",
+    frontmatter: { title: "Expenses", type: "Policy" },
+    body: "Expenses are claimed within sixty days.",
+    ...overrides,
+  };
+};
+
+/** Submit a set as this person, and hand back the ids the inbox minted. */
+const submitted = async (
+  scenario: Scenario,
+  principal: UserPrincipal,
+  kind: SuggestionKind,
+  requests: readonly SuggestionRequest[],
+) => {
+  const set = await submitSuggestionSet(
+    principal,
+    { postgres: scenario.postgres },
+    {
+      kind,
+      requests,
+    },
+  );
+  if (!set.ok) throw new Error(`the set was not submitted: ${String(set.error)}`);
+  return set.value;
+};
+
+/** The set as its decider sees it when they open it — the summary, re-rendered. */
+const summaryOf = async (scenario: Scenario, setId: string) => {
+  const read = await readingAs(db().runtimePool, scenario.admin, (principal, tx) =>
+    suggestionSetSummary(principal, tx, setId),
+  );
+  if (!read.ok) throw new Error(`the set did not render: ${String(read.error)}`);
+  return read.value;
+};
+
+/** Accept every item of a set at the targets its summary rendered. */
+const acceptAll = async (
+  scenario: Scenario,
+  setId: string,
+  principal: UserPrincipal = scenario.admin,
+): Promise<readonly AcceptanceOutcome[]> => {
+  const summary = await summaryOf(scenario, setId);
+  const accepted = await acceptSuggestions(
+    principal,
+    { git: scenario.git, postgres: scenario.postgres },
+    {
+      decisions: summary.map((item) => ({
+        suggestionId: item.suggestionId,
+        expectedTarget: item.target,
+      })),
+    },
+  );
+  if (!accepted.ok) throw new Error(`the acceptance was refused: ${String(accepted.error)}`);
+  return accepted.value;
+};
+
+/** The whole of one suggestion row, read as the superuser so no policy can hide it. */
+const suggestionRow = async (suggestionId: string) => {
+  const found = await db().pool.query<Record<string, unknown>>(
+    "SELECT status, decider, reason, target_iri FROM suggestion WHERE id = $1",
+    [suggestionId],
+  );
+  return found.rows[0];
+};
+
+/** The ledger rows one act wrote, in the shape a reader of the queue's history wants. */
+const ledgerFor = async (workspaceId: string, act: string) => {
+  const found = await db().pool.query<Record<string, unknown>>(
+    "SELECT act, subject_id, subject_kind, batch_id, detail FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY id",
+    [workspaceId, act],
+  );
+  return found.rows;
+};
+
+/** A person's own edit committed directly — what a suggestion is later proposed against. */
+const editorWrote = async (scenario: Scenario, overrides: Partial<WriteConceptInput> = {}) => {
+  proposed += 1;
+  const input: WriteConceptInput = {
+    mergeKey: `policy:expenses-${proposed}`,
+    path: `knowledge/expenses-${proposed}.md`,
+    kind: "Policy",
+    title: "Expenses",
+    frontmatter: { title: "Expenses", type: "Policy" },
+    body: "Expenses are claimed within thirty days.",
+    message: "Record the expenses policy",
+    author: { name: "Ada Editor", email: "ada@acme.invalid" },
+    expects: { head: null },
+    status: "stable",
+    sensitivity: "Internal",
+    ...overrides,
+  };
+  const written = await writeConcept(
+    scenario.editor,
+    { git: scenario.git, postgres: scenario.postgres },
+    input,
+  );
+  if (!written.ok) throw new Error(`the write was refused: ${String(written.error)}`);
+  return { input, written: written.value };
+};
+
+/**
+ * A concept an Editor committed, and a suggestion proposed against exactly that content —
+ * the arrange block every test about an acceptance over an existing concept opens with.
+ */
+const proposedAgainst = async (
+  scenario: Scenario,
+  kind: SuggestionKind,
+  wrote: Partial<WriteConceptInput> = {},
+  proposes: Partial<SuggestionRequest> = {},
+) => {
+  const { input, written } = await editorWrote(scenario, wrote);
+  const set = await submitted(scenario, scenario.editor, kind, [
+    requestFor({
+      mergeKey: input.mergeKey,
+      path: input.path,
+      baseContentHash: written.contentHash,
+      ...proposes,
+    }),
+  ]);
+  return { input, written, set };
+};
+
+/** A person's check of exactly what an act wrote — the check a repair must not un-check. */
+const checkedBy = async (
+  scenario: Scenario,
+  principal: UserPrincipal,
+  written: { readonly iri: string; readonly contentHash: string },
+): Promise<void> => {
+  const client = await db().pool.connect();
+  try {
+    await testData(client).conceptVerification({
+      workspaceId: scenario.workspaceId,
+      iri: written.iri,
+      actor: `human:${principal.userId}`,
+      contentHash: written.contentHash,
+    });
+  } finally {
+    client.release();
+  }
+};
+
+/** The trust a reader is shown for one concept, through the read the surface will make. */
+const trustOf = async (scenario: Scenario, iri: string) => {
+  const read = await readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
+    open(principal, tx, { iri }),
+  );
+  return read.ok && read.value.found ? read.value.concept?.trust : undefined;
+};
+
+describe("a suggestion set", () => {
+  it("waits with no target at all, because identity is the acceptance's to resolve", async () => {
+    const scenario = await arrange();
+
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
+
+    // Nothing platform-prepared reaches the bundle without acceptance (ADR 0012): the set
+    // is rows in the inbox and no commit anywhere.
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
+    const row = await suggestionRow(set.suggestionIds[0] ?? "");
+    expect(row).toMatchObject({ status: "waiting", target_iri: null, decider: null });
+  });
+
+  it("re-renders its summary against concept_identity every time it is opened", async () => {
+    const scenario = await arrange();
+    const request = requestFor();
+    const set = await submitted(scenario, scenario.editor, "edit", [request]);
+
+    // Opened before the concept exists: the merge key names nothing, so an acceptance
+    // would mint the IRI.
+    const before = await summaryOf(scenario, set.setId);
+    expect(before.map((item) => item.target)).toEqual([null]);
+
+    // The same merge key, now held by a concept somebody wrote in between.
+    const { written } = await editorWrote(scenario, {
+      mergeKey: request.mergeKey,
+      path: request.path,
+    });
+
+    const after = await summaryOf(scenario, set.setId);
+    expect(after.map((item) => item.target)).toEqual([written.iri]);
+    // And the payload's own precondition, read the same way: this one was written against
+    // no concept at all, so it has not moved — it has been overtaken.
+    expect(after.map((item) => item.baseMoved)).toEqual([false]);
+  });
+
+  it("is invisible to another workspace, whoever asks for it", async () => {
+    const here = await arrange();
+    const there = await arrange();
+    const set = await submitted(there, there.editor, "edit", [requestFor()]);
+
+    const reached = await readingAs(db().runtimePool, here.admin, (principal, tx) =>
+      suggestionSetSummary(principal, tx, set.setId),
+    );
+
+    expect(reached).toEqual({ ok: true, value: [] });
+  });
+});
+
+describe("accepting a suggestion", () => {
+  it("mints the concept, lands its rows and its commit, and decides the suggestion together", async () => {
+    const scenario = await arrange();
+    const request = requestFor();
+    const set = await submitted(scenario, scenario.editor, "edit", [request]);
+
+    const [outcome] = await acceptAll(scenario, set.setId);
+
+    const accepted = outcome?.accepted;
+    expect(outcome?.refused).toBeUndefined();
+    if (accepted === undefined) return;
+    // One act, one commit — carrying the `Suggestion:` trailer ADR 0012 fixes, so the
+    // bundle's history says which changes came through the gate.
+    const facts = await commitFacts(scenario.git, scenario.workspaceId, accepted.sha);
+    expect(facts.trailers).toEqual({
+      Actor: `human:${scenario.admin.userId}`,
+      Audit: accepted.auditEventId,
+      Suggestion: set.suggestionIds[0],
+    });
+    // The rows and the decision, in one transaction: the concept is in the index, the
+    // suggestion names the concept it landed on, and the ledger names the suggestion.
+    const row = await suggestionRow(set.suggestionIds[0] ?? "");
+    expect(row).toMatchObject({
+      status: "accepted",
+      target_iri: accepted.iri,
+      decider: `human:${scenario.admin.userId}`,
+      reason: null,
+    });
+    expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.accepted")).toEqual([
+      {
+        act: "knowledge.suggestion.accepted",
+        subject_id: set.suggestionIds[0],
+        subject_kind: "suggestion",
+        batch_id: null,
+        detail: {
+          iri: accepted.iri,
+          commitSha: accepted.sha,
+          contentHash: accepted.contentHash,
+          setId: set.setId,
+        },
+      },
+    ]);
+    const concept = await db().pool.query<{ iri: string; body: string }>(
+      "SELECT iri, body FROM concept_index WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(concept.rows).toEqual([{ iri: accepted.iri, body: request.body }]);
+  });
+
+  it("commits an *edit* with the proposer as git author and the platform bot as committer", async () => {
+    const scenario = await arrange();
+    const proposer = await db().pool.query<{ name: string; email: string }>(
+      'SELECT name, email FROM "user" WHERE id = $1',
+      [scenario.editor.userId],
+    );
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
+
+    const [outcome] = await acceptAll(scenario, set.setId);
+
+    // ADR 0012's 2026-08-27 amendment: a person's own change is still theirs when somebody
+    // else decides it. The accepter is on the audit event, which the trailer above carries.
+    const facts = await commitFacts(
+      scenario.git,
+      scenario.workspaceId,
+      outcome?.accepted?.sha ?? "",
+    );
+    const person = proposer.rows[0];
+    expect(facts.author).toBe(`${person?.name} <${person?.email}>`);
+    expect(facts.committer).toContain("Better Answers");
+  });
+
+  it("commits a run's candidate with the accepting Admin as git author, who has an author line", async () => {
+    const scenario = await arrange();
+    const admin = await db().pool.query<{ name: string }>('SELECT name FROM "user" WHERE id = $1', [
+      scenario.admin.userId,
+    ]);
+    // A candidate's proposer is the person who submitted it here, but its *kind* is not
+    // *edit* — and every other kind's proposer is a run's agent or a process, which has no
+    // name and address to write on an author line.
+    const set = await submitted(scenario, scenario.editor, "candidate", [requestFor()]);
+
+    const [outcome] = await acceptAll(scenario, set.setId);
+
+    const facts = await commitFacts(
+      scenario.git,
+      scenario.workspaceId,
+      outcome?.accepted?.sha ?? "",
+    );
+    expect(facts.author).toContain(admin.rows[0]?.name ?? "");
+  });
+
+  it("makes one commit per item in bulk, and shares one batch id across the ledger rows", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.editor, "candidate", [
+      requestFor(),
+      requestFor(),
+      requestFor(),
+    ]);
+
+    const outcomes = await acceptAll(scenario, set.setId);
+
+    // Each acceptance act is one governed write and one commit (ADR 0012, user story 3) —
+    // never one commit hiding three, and never one ledger row hiding three (`[AUDIT1]`).
+    expect(outcomes.map((outcome) => outcome.refused)).toEqual([undefined, undefined, undefined]);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(3);
+    const rows = await ledgerFor(scenario.workspaceId, "knowledge.suggestion.accepted");
+    expect(rows).toHaveLength(3);
+    const batches = new Set(rows.map((row) => row["batch_id"]));
+    expect(batches.size).toBe(1);
+    expect([...batches][0]).not.toBeNull();
+  });
+
+  it("re-writes the concept its merge key resolves to, rather than minting a second one", async () => {
+    const scenario = await arrange();
+    const { written, set } = await proposedAgainst(scenario, "edit");
+
+    const [outcome] = await acceptAll(scenario, set.setId);
+
+    // The same IRI, because the merge key resolved to it at the moment of the acceptance.
+    expect(outcome?.accepted?.iri).toBe(written.iri);
+    const concepts = await db().pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM concept_index WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(concepts.rows).toEqual([{ count: "1" }]);
+  });
+
+  it("refuses a Viewer and an Editor, and leaves the set waiting", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
+
+    for (const principal of [scenario.viewer, scenario.editor]) {
+      const refused = await acceptSuggestions(
+        principal,
+        { git: scenario.git, postgres: scenario.postgres },
+        { decisions: [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }] },
+      );
+      expect(refused).toEqual({ ok: false, error: "role-forbids" });
+    }
+
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
+  });
+
+  it("answers a suggestion of another workspace exactly as it answers one nobody minted", async () => {
+    const here = await arrange();
+    const there = await arrange();
+    const theirs = await submitted(there, there.editor, "edit", [requestFor()]);
+
+    const reached = await acceptSuggestions(
+      here.admin,
+      { git: here.git, postgres: here.postgres },
+      {
+        decisions: [
+          { suggestionId: theirs.suggestionIds[0] ?? "", expectedTarget: null },
+          { suggestionId: ulid(), expectedTarget: null },
+        ],
+      },
+    );
+
+    expect(reached.ok && reached.value.map((outcome) => outcome.refused)).toEqual([
+      "no-such-suggestion",
+      "no-such-suggestion",
+    ]);
+    expect(await bundleHistory(here.git, here.workspaceId)).toEqual([]);
+  });
+});
+
+describe("an acceptance whose ground moved", () => {
+  it("is refused and returned to the proposer when the resolution moved since the summary", async () => {
+    const scenario = await arrange();
+    const request = requestFor();
+    const set = await submitted(scenario, scenario.editor, "edit", [request]);
+    // Rendered while the merge key named nothing: the summary said *this would mint*.
+    const opened = await summaryOf(scenario, set.setId);
+    expect(opened.map((item) => item.target)).toEqual([null]);
+    // And then somebody wrote the concept that merge key names.
+    await editorWrote(scenario, { mergeKey: request.mergeKey, path: request.path });
+
+    const accepted = await acceptSuggestions(
+      scenario.admin,
+      { git: scenario.git, postgres: scenario.postgres },
+      { decisions: [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }] },
+    );
+
+    // Refused, with no commit of its own — and back with whoever prepared it, which is
+    // what ADR 0012's "fails loudly and returns to the proposer" means as a state.
+    expect(accepted.ok && accepted.value.map((outcome) => outcome.refused)).toEqual([
+      "resolution-moved",
+    ]);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
+    const row = await suggestionRow(set.suggestionIds[0] ?? "");
+    expect(row).toMatchObject({
+      status: "returned",
+      decider: `human:${scenario.admin.userId}`,
+      target_iri: null,
+    });
+    expect(String(row?.["reason"])).toContain("moved");
+    expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.returned")).toHaveLength(1);
+  });
+
+  it("is refused and returned when the content the payload was written against moved", async () => {
+    const scenario = await arrange();
+    const { input, written, set } = await proposedAgainst(scenario, "edit");
+    // The concept moves under the payload: the base hash it was written against is no
+    // longer what the concept says.
+    const moved = await writeConcept(
+      scenario.editor,
+      { git: scenario.git, postgres: scenario.postgres },
+      {
+        ...input,
+        iri: written.iri,
+        body: "Expenses are claimed within ninety days.",
+        expects: { head: written.sha },
+      },
+    );
+    expect(moved.ok).toBe(true);
+    const opened = await summaryOf(scenario, set.setId);
+    expect(opened.map((item) => item.baseMoved)).toEqual([true]);
+
+    const accepted = await acceptAll(scenario, set.setId);
+
+    expect(accepted.map((outcome) => outcome.refused)).toEqual(["stale-precondition"]);
+    // No commit for it: the base is read before the act reaches git.
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(2);
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "returned" });
+  });
+
+  it("refuses a second decision on a suggestion somebody has already decided", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
+    await acceptAll(scenario, set.setId);
+
+    const again = await declineSuggestion(
+      scenario.admin,
+      { postgres: scenario.postgres },
+      { suggestionId: set.suggestionIds[0] ?? "", reason: "on reflection, no" },
+    );
+
+    expect(again).toEqual({ ok: false, error: "already-decided" });
+  });
+});
+
+describe("declining a suggestion", () => {
+  it("records the decline with its reason, and commits nothing", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.editor, "candidate", [requestFor()]);
+
+    const declined = await declineSuggestion(
+      scenario.admin,
+      { postgres: scenario.postgres },
+      { suggestionId: set.suggestionIds[0] ?? "", reason: "not the company's word on this" },
+    );
+
+    expect(declined.ok && declined.value.status).toBe("declined");
+    // A producer's rejected work is a fact, not a silence (ADR 0012).
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({
+      status: "declined",
+      reason: "not the company's word on this",
+      decider: `human:${scenario.admin.userId}`,
+      target_iri: null,
+    });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
+    // The ledger names the suggestion and the set, and carries no prose (`[AUDIT5]`).
+    expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.declined")).toEqual([
+      {
+        act: "knowledge.suggestion.declined",
+        subject_id: set.suggestionIds[0],
+        subject_kind: "suggestion",
+        batch_id: null,
+        detail: { setId: set.setId },
+      },
+    ]);
+  });
+
+  it("refuses an Editor, and a reason nobody wrote", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.editor, "candidate", [requestFor()]);
+    const suggestionId = set.suggestionIds[0] ?? "";
+
+    const byEditor = await declineSuggestion(
+      scenario.editor,
+      { postgres: scenario.postgres },
+      { suggestionId, reason: "no" },
+    );
+    const blank = await declineSuggestion(
+      scenario.admin,
+      { postgres: scenario.postgres },
+      { suggestionId, reason: "   " },
+    );
+
+    expect([byEditor, blank]).toEqual([
+      { ok: false, error: "role-forbids" },
+      { ok: false, error: "malformed" },
+    ]);
+    expect(await suggestionRow(suggestionId)).toMatchObject({ status: "waiting" });
+  });
+
+  it("fails together: an act whose ledger row cannot be written writes no decision either", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.editor, "candidate", [requestFor()]);
+    const suggestionId = set.suggestionIds[0] ?? "";
+    // The ledger's own refusal, provoked from outside: the reason is longer than the row
+    // admits, so the boundary refuses the decision's own column — the act aborts with the
+    // ledger row already written inside the transaction (`[AUDIT1]`, `[TEST8]`).
+    const overlong = "x".repeat(5000);
+
+    const refused = await declineSuggestion(
+      scenario.admin,
+      { postgres: scenario.postgres },
+      { suggestionId, reason: overlong },
+    );
+
+    expect(refused).toEqual({ ok: false, error: "malformed" });
+    // The rows before the value (`[TEST8]`): nothing of the act landed.
+    expect(await suggestionRow(suggestionId)).toMatchObject({ status: "waiting" });
+    expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.declined")).toEqual([]);
+  });
+});
+
+describe("the platform's citation repair", () => {
+  it("re-hashes the checks it moved, so a repair never turns Checked into Changed since checked", async () => {
+    const scenario = await arrange();
+    // A concept citing a source by a locator, checked by a person against that content.
+    const cite = (locator: string) => ({
+      title: "Expenses",
+      type: "Policy",
+      sources: [{ resource: "/sources/handbook.pdf", title: "Handbook", locator }],
+    });
+    // The repair: the locator the source moved to, proposed and accepted like anything else.
+    // It moves the content hash, because a locator is part of what the hash is over.
+    const { input, written, set } = await proposedAgainst(
+      scenario,
+      "repair",
+      { frontmatter: cite("p.4") },
+      { frontmatter: cite("p.7"), body: "Expenses are claimed within thirty days." },
+    );
+    await checkedBy(scenario, scenario.editor, written);
+    expect(await trustOf(scenario, written.iri)).toMatchObject({
+      tier: "human-reviewed",
+      status: "current",
+    });
+
+    const [outcome] = await acceptAll(scenario, set.setId);
+
+    const repaired = outcome?.accepted;
+    if (repaired === undefined) {
+      throw new Error(`the repair was refused: ${String(outcome?.refused)}`);
+    }
+    expect(repaired.contentHash).not.toBe(written.contentHash);
+    expect(repaired.contentHash).toBe(contentHashOf(cite("p.7"), input.body, input.path));
+
+    // The whole point: the check still reads as the person's, and still reads *current*.
+    expect(await trustOf(scenario, written.iri)).toMatchObject({
+      tier: "human-reviewed",
+      status: "current",
+      checkedBy: `human:${scenario.editor.userId}`,
+    });
+    // And the row says a routine moved its hash, rather than pretending the person checked
+    // the repaired content (ADR 0019's *erasure-rewrite* twin).
+    const verification = await db().pool.query<{ origin: string; content_hash: string }>(
+      "SELECT origin, content_hash FROM concept_verification WHERE workspace_id = $1 AND iri = $2",
+      [scenario.workspaceId, written.iri],
+    );
+    expect(verification.rows).toEqual([{ origin: "repair", content_hash: repaired.contentHash }]);
+  });
+
+  it("leaves every other kind's checks exactly where they were", async () => {
+    const scenario = await arrange();
+    const { written, set } = await proposedAgainst(
+      scenario,
+      "edit",
+      {},
+      { body: "Expenses are claimed within ninety days." },
+    );
+    await checkedBy(scenario, scenario.editor, written);
+
+    await acceptAll(scenario, set.setId);
+
+    // An ordinary edit moves the content and the check says so: *Changed since checked* is
+    // the honest word for a fact somebody rewrote, and only a repair is exempt.
+    expect(await trustOf(scenario, written.iri)).toMatchObject({
+      status: "changed-since-checked",
+    });
+  });
+});
+
+describe("what a write may not do with an IRI", () => {
+  it("refuses a write naming an IRI this workspace never minted, and makes no commit", async () => {
+    const scenario = await arrange();
+
+    const refused = await writeConcept(
+      scenario.editor,
+      { git: scenario.git, postgres: scenario.postgres },
+      {
+        iri: conceptIriOf(ulid()),
+        mergeKey: "policy:invented",
+        path: "knowledge/invented.md",
+        kind: "Policy",
+        title: "Invented",
+        frontmatter: { title: "Invented" },
+        body: "A concept whose key its author chose.",
+        message: "Record a concept nobody minted",
+        author: { name: "Ada Editor", email: "ada@acme.invalid" },
+        expects: { head: null },
+      },
+    );
+
+    // ADR 0002: the key is never caller-settable, and the refusal costs no commit.
+    expect(refused).toEqual({ ok: false, error: "no-such-concept" });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
+  });
+});

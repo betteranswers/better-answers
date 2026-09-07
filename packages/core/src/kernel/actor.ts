@@ -1,6 +1,9 @@
-import { ACTOR_ID } from "@better-answers/schema";
+import { ACTOR_ID, boundarySchemas } from "@better-answers/schema";
 
 import type { Principal, UserId } from "./principal.ts";
+
+/** The one prefix a person's actor id carries, written once and read back once. */
+const PERSON_PREFIX = "human:";
 
 /**
  * The **actor id** (`CONTEXT.md`): who a record the platform keeps names — the ledger's
@@ -39,7 +42,7 @@ export type ActorId = `human:${string}` | ProcessActorId | `better-answers-${str
  * to have parsed one before it can call this at all; the shape is held a second time by the
  * ledger's actor refinement, which admits `human:` only over the minter's characters.
  */
-export const actorIdOfPerson = (personId: UserId): ActorId => `human:${personId}`;
+export const actorIdOfPerson = (personId: UserId): ActorId => `${PERSON_PREFIX}${personId}`;
 
 /**
  * The one derivation from a Principal, so no slice composes the string by hand. A user
@@ -62,4 +65,20 @@ export const isActorId = (value: string): value is ActorId => ACTOR_ID.test(valu
  * something from it — trust's tier, which a person's check earns and a machine's does not
  * (ADR 0019) — never tests the prefix itself and never disagrees with `actorIdOfPerson`.
  */
-export const isPersonActor = (actor: ActorId): boolean => actor.startsWith("human:");
+export const isPersonActor = (actor: ActorId): boolean => actor.startsWith(PERSON_PREFIX);
+
+/**
+ * The person an actor names, or nothing when it names a process or an agent — the
+ * read-back of `actorIdOfPerson`, so a caller that needs the person behind a record never
+ * takes the prefix off itself and never disagrees with the one derivation.
+ *
+ * The tail is **parsed at the boundary rather than asserted** (ADR 0028): a `human:` string
+ * over anything but the minter's characters is a record no person id was ever written into,
+ * and answering `undefined` for it is the fail-closed reading — the caller falls back to
+ * whoever is acting, rather than looking up a person nobody minted.
+ */
+export const personOfActor = (actor: ActorId): UserId | undefined => {
+  if (!isPersonActor(actor)) return undefined;
+  const parsed = boundarySchemas.user.select.shape.id.safeParse(actor.slice(PERSON_PREFIX.length));
+  return parsed.success ? parsed.data : undefined;
+};

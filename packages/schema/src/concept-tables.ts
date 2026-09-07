@@ -87,6 +87,16 @@ export const VERIFICATION_IMPORTED_ORIGIN =
   "imported" satisfies (typeof VERIFICATION_ORIGINS)[number];
 
 /**
+ * A check whose **hash the citation repair moved** (ADR 0019's *erasure-rewrite* twin;
+ * T-006 spec, *Evidence, verification and repair*). Repairing a locator changes what the
+ * concept's content hash is over, so every standing check would read *Changed since
+ * checked* the moment the repair commits — for a change nobody made to the fact. The
+ * repair re-points those checks at the content it wrote and marks them with this origin,
+ * so the row still says who checked and when, and says that a routine moved its hash.
+ */
+export const VERIFICATION_REPAIR_ORIGIN = "repair" satisfies (typeof VERIFICATION_ORIGINS)[number];
+
+/**
  * Where every concept IRI lives, and the whole of it (ADR 0002): the IRI is **opaque** —
  * `https://better-answers.com/c/<ulid>` — never derived from the path, the bundle or the
  * tenant, so it leaks no name wherever it appears.
@@ -223,8 +233,8 @@ export const CONCEPT_STABLE_STATUS = "stable" satisfies (typeof PUBLISHED_STATUS
  */
 export const CONTENT_HASH = /^[0-9a-f]{64}$/;
 
-// `listed` and `stamp` are `column-helpers.ts`'s, shared with the graph tables so the two
-// files cannot drift on how a CHECK's list or an instant is written.
+// `listed` and `stamp` are `column-helpers.ts`'s, shared with the graph and inbox tables so
+// the files cannot drift on how a CHECK's list or an instant is written.
 
 /**
  * The identity record (ADR 0002): the IRI the platform minted, and the **merge key** it was

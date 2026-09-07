@@ -1084,6 +1084,250 @@ describe("the graph tables under app_rt", () => {
   });
 });
 
+/**
+ * The inbox's own proofs (ADR 0005, ADR 0012, migration 0018, `[SEC3]`): two tenant tables
+ * like any other, so the zero-rows proof is stated here in their words; **the payload is out
+ * of every runtime role's reach** and served by one definer function granted to the app
+ * alone; the worker submits through a function and reads nothing back; and the decision
+ * CHECK refuses every half-decided row the slice would otherwise have to remember not to
+ * write.
+ */
+/** A waiting suggestion and its payload in each workspace, with the app's role scoped to A. */
+const inboxAsApp = async (client: pg.PoolClient) => {
+  const seed = await seedTwoWorkspaces(client);
+  const here = await seed.suggestion({ workspaceId: WS_A });
+  await seed.conceptWriteRequest({ workspaceId: WS_A, suggestionId: here.id });
+  const there = await seed.suggestion({ workspaceId: WS_B });
+  await seed.conceptWriteRequest({ workspaceId: WS_B, suggestionId: there.id });
+  await client.query("SET LOCAL ROLE app_rt");
+  await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+  return { seed, here, there };
+};
+
+describe("the inbox under app_rt", () => {
+  it("returns zero rows on a missing scope and only the scoped tenant's suggestions otherwise", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { here } = await inboxAsApp(client);
+
+      await client.query("SELECT set_config('app.workspace_id', '', true)");
+      expect((await client.query("SELECT id FROM suggestion")).rows).toEqual([]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const scoped = await client.query("SELECT id, workspace_id FROM suggestion");
+      expect(scoped.rows).toEqual([{ id: here.id, workspace_id: WS_A }]);
+    });
+  });
+
+  it("refuses both runtime roles the payload table itself, and serves it only through the definer function (migration 0018)", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { here } = await inboxAsApp(client);
+
+      // The app's role: no road to the table at all — not a read, not a write.
+      for (const statement of [
+        "SELECT 1 FROM concept_write_request LIMIT 1",
+        "DELETE FROM concept_write_request",
+      ]) {
+        await client.query("SAVEPOINT payload");
+        await expect(client.query(statement)).rejects.toThrow(/permission denied/);
+        await client.query("ROLLBACK TO SAVEPOINT payload");
+      }
+
+      // And the one road that is open: the acceptance path's function, which serves the
+      // payload of a suggestion that is still waiting.
+      const served = await client.query<{ merge_key: string }>(
+        "SELECT merge_key FROM concept_write_request_for($1)",
+        [here.id],
+      );
+      expect(served.rowCount).toBe(1);
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SAVEPOINT worker");
+      await expect(client.query("SELECT 1 FROM concept_write_request LIMIT 1")).rejects.toThrow(
+        /permission denied/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT worker");
+      // The function is the app's alone: a producer that could call it could read another
+      // producer's candidates out of the inbox, which ADR 0012's amendment forbids.
+      await expect(
+        client.query("SELECT 1 FROM concept_write_request_for($1)", [here.id]),
+      ).rejects.toThrow(/permission denied/);
+    });
+  });
+
+  it("withholds a payload once the suggestion is decided, and one of another tenant always", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { here, there } = await inboxAsApp(client);
+
+      // Another tenant's suggestion, asked for by id from this tenant's scope: the same
+      // answer as an id nobody minted, which is what stops the function being a probe.
+      const foreign = await client.query("SELECT 1 FROM concept_write_request_for($1)", [there.id]);
+      expect(foreign.rowCount).toBe(0);
+
+      await client.query(
+        `UPDATE suggestion SET status = 'declined', decider = 'process:better-answers-test',
+                decided_at = now(), reason = 'not the company''s word on this'
+          WHERE workspace_id = $1 AND id = $2`,
+        [WS_A, here.id],
+      );
+
+      // A decided suggestion has been committed or refused; its payload has no reader left.
+      const decided = await client.query("SELECT 1 FROM concept_write_request_for($1)", [here.id]);
+      expect(decided.rowCount).toBe(0);
+    });
+  });
+
+  it("refuses the app's role a deleted suggestion, so a decision can never become a silence", async () => {
+    await withRollback(db.pool, async (client) => {
+      const { here } = await inboxAsApp(client);
+
+      await expect(
+        client.query("DELETE FROM suggestion WHERE workspace_id = $1 AND id = $2", [WS_A, here.id]),
+      ).rejects.toThrow(/permission denied/);
+    });
+  });
+
+  it("refuses the worker role the queue, and lets it submit a set through the function alone (migration 0018)", async () => {
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await client.query("SAVEPOINT queue");
+      await expect(client.query("SELECT 1 FROM suggestion LIMIT 1")).rejects.toThrow(
+        /permission denied/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT queue");
+
+      // The served path: a run's candidates, submitted as one call, landing in the
+      // workspace the transaction already names — the function takes no workspace at all.
+      const submitted = await client.query<{ submit_suggestion_set: string }>(
+        "SELECT * FROM submit_suggestion_set($1, 'candidate', 'better-answers-extract/1.0', $2::jsonb)",
+        [
+          ulid(),
+          JSON.stringify([
+            {
+              suggestion_id: ulid(),
+              merge_key: "policy:expenses",
+              path: "knowledge/expenses.md",
+              kind: "Policy",
+              title: "Expenses",
+              frontmatter: { title: "Expenses" },
+              body: "Expenses are claimed within thirty days.",
+              base_content_hash: null,
+            },
+          ]),
+        ],
+      );
+      expect(submitted.rowCount).toBe(1);
+    });
+  });
+
+  it("refuses a submission from a transaction that names no workspace", async () => {
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      await client.query("SET LOCAL ROLE app_rt");
+
+      // The guard `[SEC3]` asks a definer function to make before it writes anything: the
+      // set lands in the scope the caller already holds, and an unscoped caller has none.
+      await expect(
+        client.query("SELECT * FROM submit_suggestion_set($1, 'edit', $2, '[]'::jsonb)", [
+          ulid(),
+          "process:better-answers-test",
+        ]),
+      ).rejects.toThrow(/scoped to no workspace/);
+    });
+  });
+
+  it("refuses every half-decided suggestion the write path forbids, each at its own constraint", async () => {
+    // Straight SQL rather than the factory, which would refuse these at the boundary before
+    // any INSERT existed: the claim here is the database's own.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const identity = await seed.conceptIdentity({ workspaceId: WS_A });
+      const columns =
+        "(workspace_id, id, set_id, kind, proposer, status, decider, decided_at, reason, target_iri)";
+      const rows: readonly [string, string][] = [
+        // A fifth status, and a kind nobody declared. The status row is a whole decision
+        // otherwise, so that only the status's own CHECK can be what refuses it.
+        [
+          `VALUES ($1, $2, $3, 'edit', $4, 'withdrawn', $4, now(), NULL, NULL)`,
+          "suggestion_status_check",
+        ],
+        [
+          `VALUES ($1, $2, $3, 'merge', $4, 'waiting', NULL, NULL, NULL, NULL)`,
+          "suggestion_kind_check",
+        ],
+        // Decided by nobody, decided at no time, and each half of the pair alone.
+        [
+          `VALUES ($1, $2, $3, 'edit', $4, 'declined', NULL, now(), 'why', NULL)`,
+          "suggestion_decision_check",
+        ],
+        [
+          `VALUES ($1, $2, $3, 'edit', $4, 'declined', $4, NULL, 'why', NULL)`,
+          "suggestion_decision_check",
+        ],
+        // A decline with no reason, and an acceptance carrying one.
+        [
+          `VALUES ($1, $2, $3, 'edit', $4, 'declined', $4, now(), NULL, NULL)`,
+          "suggestion_decision_check",
+        ],
+        [
+          `VALUES ($1, $2, $3, 'edit', $4, 'accepted', $4, now(), 'why', '${identity.iri}')`,
+          "suggestion_decision_check",
+        ],
+        // A target on anything but an acceptance, and an acceptance with no target: the
+        // target is what the acceptance resolved, so the two are one fact.
+        [
+          `VALUES ($1, $2, $3, 'edit', $4, 'waiting', NULL, NULL, NULL, '${identity.iri}')`,
+          "suggestion_decision_check",
+        ],
+        [
+          `VALUES ($1, $2, $3, 'edit', $4, 'accepted', $4, now(), NULL, NULL)`,
+          "suggestion_decision_check",
+        ],
+        // A waiting suggestion that somebody has already decided.
+        [
+          `VALUES ($1, $2, $3, 'edit', $4, 'waiting', $4, now(), NULL, NULL)`,
+          "suggestion_decision_check",
+        ],
+      ];
+      for (const [values, constraint] of rows) {
+        await client.query("SAVEPOINT decision");
+        await expect(
+          client.query(`INSERT INTO suggestion ${columns} ${values}`, [
+            WS_A,
+            ulid(),
+            ulid(),
+            "process:better-answers-test",
+          ]),
+        ).rejects.toThrow(new RegExp(constraint));
+        await client.query("ROLLBACK TO SAVEPOINT decision");
+      }
+    });
+  });
+
+  it("refuses a target naming another tenant's concept, whatever the row says", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const theirs = await seed.conceptIdentity({ workspaceId: WS_B });
+      const here = await seed.suggestion({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      // The composite key again: the foreign-key check runs as the owner and bypasses the
+      // policy, so a key on the IRI alone would confirm that another tenant holds it.
+      await expect(
+        client.query(
+          `UPDATE suggestion SET status = 'accepted', decider = 'process:better-answers-test',
+                  decided_at = now(), target_iri = $3
+            WHERE workspace_id = $1 AND id = $2`,
+          [WS_A, here.id, theirs.iri],
+        ),
+      ).rejects.toThrow(/suggestion_target_fk/);
+    });
+  });
+});
+
 describe("a tenant table under app_rt", () => {
   it("returns zero rows on a missing scope, never another tenant's", async () => {
     await withRollback(db.pool, async (client) => {

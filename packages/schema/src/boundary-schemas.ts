@@ -53,6 +53,13 @@ import {
 import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { ROLES } from "./roles.ts";
 import { llmRoute, workspaceConfig } from "./schema.ts";
+import {
+  conceptWriteRequest,
+  suggestion,
+  SUGGESTION_KINDS,
+  SUGGESTION_REASON_MAX,
+  SUGGESTION_STATUSES,
+} from "./suggestion-tables.ts";
 import { ULID, ULID_CHARACTERS } from "./ulid.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -406,16 +413,27 @@ export const conceptIdentityUpdate = createUpdateSchema(
  * hold one where the other belongs, and the three visibility columns are narrowed exactly as
  * `index.chunk`'s are, because the read predicate is tested against them (ADR 0023).
  */
-const conceptIndexRefinements = {
-  workspaceId,
-  iri: conceptIri,
-  // A place in the bundle's concept area and nothing else: the manifest at the bundle root
-  // is platform-reserved (ADR 0002), and a row pointing at it would be the index claiming a
-  // file the format does not read as a concept.
+/**
+ * A concept's file, wherever a row holds one: the derived index row, and the payload an
+ * acceptance would commit. Narrowed once, so a payload the boundary accepts is a payload the
+ * index row's boundary will accept too — otherwise a suggestion could be stored that nobody
+ * could ever accept, and the refusal would land on the Admin deciding it.
+ *
+ * The path is a place in the bundle's concept area and nothing else: the manifest at the
+ * bundle root is platform-reserved (ADR 0002), and a row pointing at it would be claiming a
+ * file the format does not read as a concept.
+ */
+const conceptFileRefinements = {
   path: (schema: z.ZodString) => schema.regex(CONCEPT_PATH),
   kind: (schema: z.ZodString) => schema.trim().min(1),
   title: (schema: z.ZodString) => schema.trim().min(1),
   frontmatter: (schema: z.ZodType) => schema.pipe(frontmatter),
+};
+
+const conceptIndexRefinements = {
+  workspaceId,
+  iri: conceptIri,
+  ...conceptFileRefinements,
   contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
   commitSha: (schema: z.ZodString) => schema.regex(GIT_SHA),
   status: (schema: z.ZodString) => schema.pipe(z.enum(CONCEPT_STATUSES)),
@@ -577,6 +595,54 @@ export const graphEdgeInsert = createInsertSchema(graphEdge, graphEdgeRefinement
 );
 export const graphEdgeUpdate = createUpdateSchema(graphEdge, graphEdgeRefinements);
 
+/**
+ * A **suggestion** (ADR 0012): the two actors are the ledger's own actor shape, so a
+ * proposer and a decider read the same way wherever they appear; the target is a concept
+ * IRI, because a resolved target is a concept and never a path; and the reason is bounded,
+ * since the surface that writes one is open to any member of the workspace.
+ */
+const suggestionRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  setId: (schema: z.ZodString) => schema.regex(ULID),
+  kind: (schema: z.ZodString) => schema.pipe(z.enum(SUGGESTION_KINDS)),
+  status: (schema: z.ZodString) => schema.pipe(z.enum(SUGGESTION_STATUSES)),
+  proposer: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+  targetIri: conceptIri,
+  decider: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+  reason: (schema: z.ZodString) => schema.trim().min(1).max(SUGGESTION_REASON_MAX),
+};
+
+export const suggestionSelect = createSelectSchema(suggestion, suggestionRefinements);
+export const suggestionInsert = createInsertSchema(suggestion, suggestionRefinements);
+export const suggestionUpdate = createUpdateSchema(suggestion, suggestionRefinements);
+
+/**
+ * A **concept write request** — a suggestion's payload: the file above, plus what it means
+ * it for and what it was written against. There is deliberately **no IRI**: identity is the
+ * acceptance's to resolve from the merge key (ADR 0012).
+ */
+const conceptWriteRequestRefinements = {
+  workspaceId,
+  suggestionId: (schema: z.ZodString) => schema.regex(ULID),
+  mergeKey: (schema: z.ZodString) => schema.trim().min(1),
+  ...conceptFileRefinements,
+  baseContentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
+};
+
+export const conceptWriteRequestSelect = createSelectSchema(
+  conceptWriteRequest,
+  conceptWriteRequestRefinements,
+);
+export const conceptWriteRequestInsert = createInsertSchema(
+  conceptWriteRequest,
+  conceptWriteRequestRefinements,
+);
+export const conceptWriteRequestUpdate = createUpdateSchema(
+  conceptWriteRequest,
+  conceptWriteRequestRefinements,
+);
+
 /** One entry per table this package owns — the parity test's registry (ADR 0028). */
 export const boundarySchemas = {
   workspace: {
@@ -701,5 +767,17 @@ export const boundarySchemas = {
     select: graphEdgeSelect,
     insert: graphEdgeInsert,
     update: graphEdgeUpdate,
+  },
+  suggestion: {
+    table: suggestion,
+    select: suggestionSelect,
+    insert: suggestionInsert,
+    update: suggestionUpdate,
+  },
+  conceptWriteRequest: {
+    table: conceptWriteRequest,
+    select: conceptWriteRequestSelect,
+    insert: conceptWriteRequestInsert,
+    update: conceptWriteRequestUpdate,
   },
 } as const;

@@ -30,6 +30,8 @@ const NOW = new Date("2026-09-01T00:00:00Z");
 const CONCEPT_IRI = "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM";
 const CONTENT_SHA256 = "a".repeat(64);
 const COMMIT_SHA = "b".repeat(40);
+const SUGGESTION_SET_ID = "01J6RRRRRRRRRRRRRRRRRRRRRR";
+const SUGGESTION_ID = "01J6SSSSSSSSSSSSSSSSSSSSSS";
 
 /** Rows each refined insert schema accepts — assertion 4's input. */
 const acceptedRows = {
@@ -328,6 +330,43 @@ const acceptedRows = {
       audience: "everyone",
     },
   ],
+  // One waiting and one accepted: the decision CHECK's two whole shapes, so the fixture
+  // proves the boundary accepts a suggestion before its decision and after it.
+  suggestion: [
+    {
+      workspaceId: WS_ID,
+      id: SUGGESTION_ID,
+      setId: SUGGESTION_SET_ID,
+      kind: "edit",
+      proposer: `human:${USER_ID}`,
+    },
+    {
+      workspaceId: WS_ID,
+      id: "01J6TTTTTTTTTTTTTTTTTTTTTT",
+      setId: SUGGESTION_SET_ID,
+      kind: "candidate",
+      status: "accepted",
+      proposer: "better-answers-extraction/1.2",
+      targetIri: CONCEPT_IRI,
+      decider: `human:${USER_ID}`,
+      decidedAt: NOW,
+    },
+  ],
+  // The payload of the waiting one: a merge key and no IRI at all, because identity is
+  // the acceptance's to resolve (ADR 0012).
+  conceptWriteRequest: [
+    {
+      workspaceId: WS_ID,
+      suggestionId: SUGGESTION_ID,
+      mergeKey: "policy:expenses",
+      path: "knowledge/expenses.md",
+      kind: "Policy",
+      title: "Expenses",
+      frontmatter: { title: "Expenses", type: "Policy", sources: [{ resource: "/s.md" }] },
+      body: "Expenses are claimed within sixty days.",
+      baseContentHash: CONTENT_SHA256,
+    },
+  ],
 } as const;
 
 const registryNames = Object.keys(boundarySchemas) as (keyof typeof boundarySchemas)[];
@@ -464,6 +503,10 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "graphGeneration",
         "graphNode",
         "graphEdge",
+        // The suggestion before its payload, which names it by the composite key, and
+        // after the identity its accepted row resolved to.
+        "suggestion",
+        "conceptWriteRequest",
         "chunk",
       ] as const;
       expect(insertOrder.toSorted()).toEqual(registryNames.toSorted());

@@ -65,9 +65,12 @@ type CommitTrailers = {
   readonly actor: ActorId;
   /** The `audit_event` id, minted before this commit so the commit can carry it. */
   readonly audit: string;
-  readonly run?: string;
-  readonly suggestion?: string;
-  readonly projection?: string;
+  // The three that name the records an act came from are explicitly `| undefined`, so an
+  // act passes what it holds — a suggestion id or nothing — rather than composing the
+  // trailer set around whether it has one.
+  readonly run?: string | undefined;
+  readonly suggestion?: string | undefined;
+  readonly projection?: string | undefined;
 };
 
 /** The person a commit is attributed to: the git author line keeps a name and an address. */

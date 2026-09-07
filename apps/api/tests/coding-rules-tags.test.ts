@@ -115,7 +115,6 @@ const CITED_NOWHERE_ELSE: Readonly<Record<string, string>> = {
   APP2: "one server, one logger, one config module is the tier's shape; a reviewer reads it off the tree, and no test or ADR needs to name it",
   AUDIT2:
     "the declared-acts walk and the vocabulary's tests hold it without naming the tag; it binds review alone",
-  AUDIT5: "as AUDIT2 — each declared act's detail type is its slice's",
   AUDIT6:
     "as AUDIT2 — the migration that creates audit_event and its refusal tests are the schema package's",
   AUDIT7: "as AUDIT2 — the caller-minted id test is its slice's",

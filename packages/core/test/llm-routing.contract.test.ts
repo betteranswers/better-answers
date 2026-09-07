@@ -1,14 +1,10 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import {
-  type MigratedPostgres,
-  startMigratedPostgres,
-  testData,
-  withRollback,
-} from "@better-answers/schema/testing";
+import { testData, withRollback } from "@better-answers/schema/testing";
+
+import { contractFixture } from "./contract-fixture.ts";
+import { postgresForSuite } from "./suite-postgres.ts";
 
 /**
  * The llm-routing agreement's TypeScript half (ADR 0031): the fixture in
@@ -40,28 +36,13 @@ const fixtureSchema = z.object({
   ),
 });
 
-const fixture = fixtureSchema.parse(
-  JSON.parse(
-    readFileSync(
-      path.resolve(import.meta.dirname, "../../../contracts/llm-routing/cases.json"),
-      "utf8",
-    ),
-  ),
-);
+const fixture = contractFixture("llm-routing", fixtureSchema);
 
-let db: MigratedPostgres;
-
-beforeAll(async () => {
-  db = await startMigratedPostgres();
-}, 120_000);
-
-afterAll(async () => {
-  await db.stop();
-});
+const db = postgresForSuite();
 
 describe("the llm-routing agreement", () => {
   it("resolves every fixtured call to exactly the route the fixture expects", async () => {
-    await withRollback(db.pool, async (client) => {
+    await withRollback(db().pool, async (client) => {
       const seed = testData(client);
       for (const workspace of fixture.workspaces) {
         await seed.workspace(workspace);
@@ -93,7 +74,7 @@ describe("the llm-routing agreement", () => {
   });
 
   it("refuses a second route for the same workspace and purpose", async () => {
-    await withRollback(db.pool, async (client) => {
+    await withRollback(db().pool, async (client) => {
       const seed = testData(client);
       const workspace = await seed.workspace();
       const route = await seed.llmRoute({ workspaceId: workspace.id });

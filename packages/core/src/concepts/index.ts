@@ -5,9 +5,15 @@ import {
   boundarySchemas,
   citedSourceOf,
   CONCEPT_DRAFT_STATUS,
+  conceptIriOf,
   PUBLISHED_STATUSES,
   resolvedResource,
   SENSITIVITY_DEFAULT,
+  SUGGESTION_ACCEPTED_STATUS,
+  SUGGESTION_EDIT_KIND,
+  SUGGESTION_REPAIR_KIND,
+  SUGGESTION_WAITING_STATUS,
+  VERIFICATION_REPAIR_ORIGIN,
 } from "@better-answers/schema";
 import type { z } from "zod";
 
@@ -19,7 +25,9 @@ import {
   err,
   isActorId,
   ok,
+  personOfActor,
   refusalFor,
+  requireAdmin,
   ulid,
   type ActorId,
   type PrincipalRefusal,
@@ -29,6 +37,7 @@ import {
 } from "../kernel/index.ts";
 import {
   commit as commitToBundle,
+  head,
   withRepositoryLock,
   type CommitAuthor,
   type CommitRefusal,
@@ -37,6 +46,29 @@ import {
 } from "../store/git/index.ts";
 import { writeConceptDelta } from "../store/graph/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import {
+  payloadFor,
+  returnToProposer,
+  targetOfMergeKey,
+  type SuggestionKind,
+  type SuggestionPayload,
+} from "./inbox.ts";
+
+export {
+  declineSuggestion,
+  submitSuggestionSet,
+  suggestionSetSummary,
+  type DecideSuggestionInput,
+  type DecideSuggestionRefusal,
+  type SubmitSuggestionSetInput,
+  type SubmitSuggestionSetRefusal,
+  type SuggestionDecided,
+  type SuggestionKind,
+  type SuggestionRequest,
+  type SuggestionSetSubmitted,
+  type SuggestionStatus,
+  type SuggestionSummaryItem,
+} from "./inbox.ts";
 
 /**
  * Slice: **concepts** — the concept write path. Suggestions, the inbox, minting and
@@ -70,24 +102,30 @@ import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/in
  * always a **prefix** of git history, so the reconciler is a watermark scan and never a
  * hole scan.
  *
- * **What this act does not do**: mint the IRI. A concept's IRI has exactly one form —
+ * **The IRI is never caller-settable** (ADR 0002). A concept's IRI has exactly one form —
  * `https://better-answers.com/c/<ulid>`, opaque and on the bare apex (ADR 0002's amendments)
- * — which the boundary holds it to and `conceptIriOf` is the one way to make. The caller
- * hands one in because a re-write has to name the concept it re-writes; the identity row this
- * act writes is what makes that IRI the concept's key from then on.
+ * — which the boundary holds it to and `conceptIriOf` is the one way to make. So a write
+ * that names none is a **creation** and mints its own, and a write that names one is a
+ * **re-write** whose IRI has to be a concept this workspace already holds: the read at step
+ * 3 is where that is decided, before a commit exists, so a caller can neither choose a
+ * concept's key nor mint an identity for a key somebody else chose.
  *
- * ADR 0002 also says the key is **never caller-settable**, which this act does not yet
- * enforce: a creation should mint its own and a supplied IRI should have to exist already.
- * The read this act makes before it commits is where that check belongs, and it is a ticket
- * rather than a line — flagged to the owner with T-054, which owns the acceptance path that
- * mints on a suggestion's behalf.
+ * **The inbox** — submitting a set, opening one, declining, returning — is `inbox.ts`,
+ * because none of it makes a commit. The acceptance is here, because an acceptance *is* a
+ * governed write: one act, one commit, one transaction, with the suggestion decided inside
+ * the same transaction as the rows.
  */
 
 /**
- * The slice's acts on the ledger. One act today: a concept committed to the bundle. The
- * subject is the concept, by IRI — every record about a concept attaches by IRI (ADR 0014) —
- * and the detail names the commit, the content it hashed and how many pieces of evidence it
- * recorded, so the ledger answers "what did this act put in the bundle" without opening git.
+ * The slice's acts on the ledger. Both are governed writes, and they differ by what was
+ * acted on: a **commit** is a person's own change and its subject is the concept, by IRI —
+ * every record about a concept attaches by IRI (ADR 0014); an **acceptance** is a decision
+ * about a suggestion and its subject is the suggestion, so the queue's history is readable
+ * off the ledger without joining the bundle. The detail names the commit and the content it
+ * hashed either way, so the ledger answers "what did this act put in the bundle" without
+ * opening git.
+ *
+ * The inbox's two decisions that make no commit — declined, returned — are `inbox.ts`'s.
  */
 const CONCEPT_ACTS = declareActs("knowledge", {
   committed: act("knowledge.concept.committed", {
@@ -95,6 +133,12 @@ const CONCEPT_ACTS = declareActs("knowledge", {
     commitSha: "gitSha",
     contentHash: "contentHash",
     evidenceCount: "count",
+  }),
+  accepted: act("knowledge.suggestion.accepted", {
+    iri: "iri",
+    commitSha: "gitSha",
+    contentHash: "contentHash",
+    setId: "id",
   }),
 });
 
@@ -156,9 +200,45 @@ export type EvidenceInput = {
   readonly contentVersion?: string;
 };
 
+/**
+ * What a write expects to find before it makes a commit — ADR 0012's precondition, in the
+ * two forms its two writers have.
+ *
+ * A person's edit names the **head** their content was written against (`null` for a
+ * bundle's first commit), and a ref that has moved refuses the write loudly rather than
+ * silently overwriting somebody else's change.
+ *
+ * An acceptance names the **base**: the content hash the payload was written against
+ * (`null` when it proposed a concept that did not exist). That is the precondition ADR
+ * 0012's 2026-08-27 amendment gives a suggestion, and it is not the ref's — a set is
+ * decided item by item against concepts that moved independently, so refusing an
+ * acceptance because somebody edited an unrelated concept would be refusing the wrong
+ * thing. Under this act's own lock the ref cannot move between the read and the commit, so
+ * an acceptance takes it as it stands.
+ */
+export type WritePrecondition = { readonly head: string | null } | { readonly base: string | null };
+
+/**
+ * The suggestion an acceptance decides (ADR 0012). Its presence is what turns a governed
+ * write into an acceptance: the commit carries the `Suggestion:` trailer, the ledger row is
+ * the acceptance act, and the suggestion's decision lands in the same transaction as the
+ * rows — so a suggestion is never accepted without its concept, or the other way about.
+ */
+export type Acceptance = {
+  readonly suggestionId: string;
+  readonly setId: string;
+  readonly kind: SuggestionKind;
+  /** The id N rows of one bulk act share (ADR 0014 rule 4); absent when the act touched one. */
+  readonly batchId?: string | undefined;
+};
+
 export type WriteConceptInput = {
-  /** The concept's IRI (ADR 0002) — its key, in the one form `conceptIriOf` makes. */
-  readonly iri: string;
+  /**
+   * The concept this write re-writes, or **nothing** to create one. Never caller-settable
+   * (ADR 0002): a creation mints its own through `conceptIriOf`, and a named one has to be
+   * a concept this workspace already holds.
+   */
+  readonly iri?: string | undefined;
   /** What an acceptance resolves this concept by, so identity survives a rename (ADR 0012). */
   readonly mergeKey: string;
   /** Where the file goes in the bundle, relative to its root. */
@@ -171,8 +251,10 @@ export type WriteConceptInput = {
   readonly message: string;
   /** The person the commit is attributed to — the git author line's name and address. */
   readonly author: CommitAuthor;
-  /** What the caller expects the ref to hold; `null` for a bundle's first commit. */
-  readonly expectedHead: string | null;
+  /** What this write was made against, in one of its two forms. */
+  readonly expects: WritePrecondition;
+  /** The suggestion this write decides, when it is an acceptance rather than an edit. */
+  readonly acceptance?: Acceptance | undefined;
   /**
    * The concept's confidentiality class. On a **new** concept the most restrictive of the
    * three when unnamed; on a re-write it may only be the class the concept already holds —
@@ -194,10 +276,12 @@ export type ConceptWritten = {
 
 /**
  * Why a governed write was refused. `stale-precondition` is the one a person is shown — the
- * content moved under them (ADR 0012) — and the two `-taken` words are a bundle that already
- * holds this path or this merge key under another IRI. `rename-refused` and
- * `reclassification-refused` are the two moves this act never makes; the principal refusals
- * are `withMembership`'s, which judges the caller's authority at time-of-act.
+ * content moved under them, whichever form the precondition took (ADR 0012) — and the two
+ * `-taken` words are a bundle that already holds this path or this merge key under another
+ * IRI. `rename-refused` and `reclassification-refused` are the two moves this act never
+ * makes, and `no-such-concept` is a write naming an IRI this workspace never minted, which
+ * ADR 0002 refuses because the key is never a caller's to choose. The principal refusals are
+ * `withMembership`'s, which judges the caller's authority at time-of-act.
  */
 export type WriteConceptRefusal =
   | RoleRefusal
@@ -207,7 +291,8 @@ export type WriteConceptRefusal =
   | "path-taken"
   | "merge-key-taken"
   | "rename-refused"
-  | "reclassification-refused";
+  | "reclassification-refused"
+  | "no-such-concept";
 
 /**
  * The frontmatter keys ADR 0014's content hash leaves out: the trust the platform derives
@@ -358,6 +443,8 @@ type Held = {
   readonly path: string;
   readonly sensitivity: string;
   readonly status: string;
+  /** What the concept says now — what an acceptance's payload was written against. */
+  readonly contentHash: string;
   /** When it first became readable; kept across a re-write, so publishing happens once. */
   readonly publishedAt: Date | null;
 };
@@ -366,6 +453,7 @@ type HeldRow = {
   readonly path: string;
   readonly sensitivity: string;
   readonly status: string;
+  readonly content_hash: string;
   readonly published_at: Date | null;
 };
 
@@ -381,7 +469,7 @@ const heldByIri = async (
   iri: string,
 ): Promise<Held | undefined> => {
   const found = await tx.query<HeldRow>(
-    `SELECT path, sensitivity, status, published_at
+    `SELECT path, sensitivity, status, content_hash, published_at
        FROM concept_index WHERE workspace_id = $1 AND iri = $2`,
     [principal.workspaceId, iri],
   );
@@ -392,6 +480,7 @@ const heldByIri = async (
         path: row.path,
         sensitivity: row.sensitivity,
         status: row.status,
+        contentHash: row.content_hash,
         publishedAt: row.published_at,
       };
 };
@@ -431,8 +520,11 @@ export const writeConcept = async (
   if (!mayWrite(principal)) return err("role-forbids");
 
   const contentHash = contentHashOf(input.frontmatter, input.body, input.path);
+  // A write that names no concept is a creation, and mints the one form an IRI has
+  // (ADR 0002); one that names a concept is held below to a concept that already exists.
+  const iri = input.iri ?? conceptIriOf(ulid());
   // The file carries its own IRI (ADR 0002's platform key), whatever the caller passed.
-  const frontmatter = { ...input.frontmatter, iri: input.iri } satisfies Frontmatter;
+  const frontmatter = { ...input.frontmatter, iri } satisfies Frontmatter;
   const mergeKey = boundarySchemas.conceptIdentity.insert.shape.mergeKey.safeParse(input.mergeKey);
   // Evidence goes through the boundary too, and before the commit: a locator the boundary
   // would refuse is one this act should never have made a commit for (ADR 0028).
@@ -457,12 +549,22 @@ export const writeConcept = async (
     // authority this act will write with. Its refusals cost no commit, which is why the two
     // that are decidable from the concept's own row are made here.
     const existing = await attempt(() =>
-      withMembership(principal, doors.postgres, (fresh, tx) => heldByIri(fresh, tx, input.iri)),
+      withMembership(principal, doors.postgres, (fresh, tx) => heldByIri(fresh, tx, iri)),
     );
     if (!existing.ok) return err(existing.error);
     if (!existing.value.ok) return err(existing.value.error);
     const held = existing.value.value;
 
+    // ADR 0002: the key is never caller-settable. A creation minted its own above; a write
+    // that named one has to name a concept this workspace already holds, or it would mint
+    // an identity for a key its caller chose.
+    if (input.iri !== undefined && held === undefined) return err("no-such-concept");
+    // The acceptance's own precondition: what the payload was written against, against
+    // what the concept says now (ADR 0012's 2026-08-27 amendment). Read here, before the
+    // commit, so a suggestion written against content that moved costs no commit at all.
+    if ("base" in input.expects && (held?.contentHash ?? null) !== input.expects.base) {
+      return err("stale-precondition");
+    }
     if (held !== undefined && held.path !== input.path) return err("rename-refused");
     if (
       held !== undefined &&
@@ -481,7 +583,7 @@ export const writeConcept = async (
     // purpose, and there is no reason to make one.
     const parsed = conceptRow.safeParse({
       workspaceId: principal.workspaceId,
-      iri: input.iri,
+      iri,
       path: input.path,
       kind: foldKind(input.kind),
       title: input.title,
@@ -506,8 +608,16 @@ export const writeConcept = async (
       content: renderConceptFile(frontmatter, input.body),
       message: input.message,
       author: input.author,
-      trailers: { actor: actorIdOf(principal), audit: auditEventId },
-      expectedHead: input.expectedHead,
+      trailers: {
+        actor: actorIdOf(principal),
+        audit: auditEventId,
+        // The `Suggestion:` trailer ADR 0012 fixes, on the acceptance's commit and on no
+        // other — so the bundle's history says which changes came through the gate.
+        suggestion: input.acceptance?.suggestionId,
+      },
+      // A person's edit names the head it was written against; an acceptance takes the ref
+      // as it stands, because its own precondition is the base and this act holds the lock.
+      expectedHead: "head" in input.expects ? input.expects.head : await head(principal, doors.git),
     });
     if (!committed.ok) return err(committed.error);
 
@@ -516,17 +626,36 @@ export const writeConcept = async (
       // on the row: a revocation landing in the window this act cannot see refuses the rows
       // here, and the commit is left as the reconciler's to find.
       withMembership(principal, doors.postgres, async (fresh, tx) => {
-        await record(fresh, tx, {
-          id: auditEventId,
-          act: CONCEPT_ACTS.committed,
-          subjectId: row.iri,
-          detail: {
-            iri: row.iri,
-            commitSha: committed.value.sha,
-            contentHash,
-            evidenceCount: evidence.data.length,
-          },
-        });
+        // Two acts and one shape: a commit's subject is the concept, an acceptance's is the
+        // suggestion it decided. Each door call is **bare** either way, because its
+        // rejection is what aborts this transaction (ADR 0014 rule 4).
+        const acceptance = input.acceptance;
+        if (acceptance === undefined) {
+          await record(fresh, tx, {
+            id: auditEventId,
+            act: CONCEPT_ACTS.committed,
+            subjectId: row.iri,
+            detail: {
+              iri: row.iri,
+              commitSha: committed.value.sha,
+              contentHash,
+              evidenceCount: evidence.data.length,
+            },
+          });
+        } else {
+          await record(fresh, tx, {
+            id: auditEventId,
+            act: CONCEPT_ACTS.accepted,
+            subjectId: acceptance.suggestionId,
+            batchId: acceptance.batchId,
+            detail: {
+              iri: row.iri,
+              commitSha: committed.value.sha,
+              contentHash,
+              setId: acceptance.setId,
+            },
+          });
+        }
         await landRows(fresh, tx, {
           ...row,
           mergeKey: mergeKey.data,
@@ -534,6 +663,7 @@ export const writeConcept = async (
           actor: actorIdOf(fresh),
           auditEventId,
           evidence: evidence.data,
+          acceptance,
         });
       }),
     );
@@ -561,6 +691,8 @@ type Landing = z.infer<typeof conceptRow> & {
   readonly actor: ActorId;
   readonly auditEventId: string;
   readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[];
+  /** The suggestion this act decided, when it was an acceptance; absent otherwise. */
+  readonly acceptance: Acceptance | undefined;
 };
 
 /** The rows the act writes, in one place so the order they are written in is one fact. */
@@ -620,9 +752,10 @@ const landRows = async (principal: UserPrincipal, tx: Tx, index: Landing): Promi
       ],
     );
   }
-  // The bundle-and-record graph delta, last: it resolves link targets against the index
-  // this transaction just wrote, and it lands or rolls back with everything above, which
-  // is what "the map is never behind for an edit" means (ADR 0023, ADR 0032).
+  // The bundle-and-record graph delta, last of the bundle's rows: it resolves link targets
+  // against the index this transaction just wrote, and it lands or rolls back with
+  // everything above — which is what "the map is never behind for an edit" means (ADR 0023,
+  // ADR 0032). An acceptance writes it too: the decision below is one act with these rows.
   await writeConceptDelta(principal, tx, {
     iri: index.iri,
     kind: index.kind,
@@ -634,6 +767,237 @@ const landRows = async (principal: UserPrincipal, tx: Tx, index: Landing): Promi
     audience: index.audience,
     status: index.status,
   });
+  if (index.acceptance === undefined) return;
+
+  // The suggestion's decision, in the same transaction as the rows its acceptance wrote:
+  // a suggestion is never accepted without its concept, or the other way about. `status`
+  // is in the WHERE, so a suggestion two people decide at once is decided once — and the
+  // loser aborts here rather than committing a decision that never happened.
+  const decided = await tx.query<{ id: string }>(
+    `UPDATE suggestion
+        SET status = $3, decider = $4, decided_at = now(), target_iri = $5
+      WHERE workspace_id = $1 AND id = $2 AND status = $6
+    RETURNING id`,
+    [
+      index.workspaceId,
+      index.acceptance.suggestionId,
+      SUGGESTION_ACCEPTED_STATUS,
+      index.actor,
+      index.iri,
+      SUGGESTION_WAITING_STATUS,
+    ],
+  );
+  if (decided.rows.length === 0) {
+    throw new Error("the suggestion was decided by somebody else while this act was in flight");
+  }
+  if (index.acceptance.kind !== SUGGESTION_REPAIR_KIND) return;
+
+  // **The repair re-hash** (T-006 spec, *Evidence, verification and repair*). Repairing a
+  // locator moves the content hash, so every standing check on this concept would read
+  // *Changed since checked* the moment this act commits — for a change nobody made to the
+  // fact. The checks are re-pointed at what the repair wrote, in this act's own
+  // transaction, and marked as hashes a routine moved: the actor and the instant stand, so
+  // *Checked by Ada* stays *Checked by Ada* and the cadence still reads the real date.
+  // An imported check carries no hash and is left exactly alone (ADR 0019).
+  await tx.query(
+    `UPDATE concept_verification SET content_hash = $3, origin = $4
+      WHERE workspace_id = $1 AND iri = $2 AND content_hash IS NOT NULL`,
+    [index.workspaceId, index.iri, index.contentHash, VERIFICATION_REPAIR_ORIGIN],
+  );
+};
+
+/**
+ * One item of an acceptance act: the suggestion, and **what the summary rendered as its
+ * target** when the person deciding it looked. `null` says the merge key named no concept
+ * then; a string says it named that one.
+ *
+ * It is a precondition and not an instruction: the acceptance resolves the merge key again,
+ * and an acceptance whose resolution has moved since the summary was rendered is refused and
+ * returned to the proposer, rather than landing on a concept nobody was shown.
+ */
+export type AcceptanceDecision = {
+  readonly suggestionId: string;
+  readonly expectedTarget: string | null;
+};
+
+export type AcceptSuggestionRefusal =
+  | WriteConceptRefusal
+  | "no-such-suggestion"
+  | "already-decided"
+  | "resolution-moved";
+
+/**
+ * What became of one suggestion in an acceptance act. Per item, because each acceptance is
+ * its own governed write and its own commit: one item's refusal is a fact about that item
+ * and never a reason to un-land the ones before it.
+ */
+export type AcceptanceOutcome = {
+  readonly suggestionId: string;
+  readonly accepted: ConceptWritten | undefined;
+  readonly refused: AcceptSuggestionRefusal | Error | undefined;
+};
+
+/** The person a commit is attributed to, read off the identity set by their person id. */
+type AuthorRow = { readonly name: string; readonly email: string };
+
+/**
+ * The git author for one acceptance: **the proposer, where ADR 0012's *edit* kind says so**
+ * — a person's own change, decided by somebody else, is still that person's change — and the
+ * accepting Admin for every other kind, whose proposer is a run's agent or a process and has
+ * no author line to write.
+ *
+ * A git author line is a name and an address, which is deliberately what the ledger's
+ * `human:<person id>` is not (ADR 0035), so the two are read from different places: the actor
+ * off the record, the line off the person the actor names.
+ */
+const authorFor = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  payload: SuggestionPayload,
+): Promise<CommitAuthor | undefined> => {
+  const proposer =
+    payload.suggestionKind === SUGGESTION_EDIT_KIND ? personOfActor(payload.proposer) : undefined;
+  // The proposer first where the kind says so, then whoever is deciding — which is also the
+  // answer when the proposer is no longer a person the identity set knows, because a commit
+  // attributed to nobody is worse than one attributed to the person who let it in.
+  for (const personId of proposer === undefined
+    ? [principal.userId]
+    : [proposer, principal.userId]) {
+    const found = await tx.query<AuthorRow>('SELECT name, email FROM "user" WHERE id = $1', [
+      personId,
+    ]);
+    const row = found.rows[0];
+    if (row !== undefined) return { name: row.name, email: row.email };
+  }
+  return undefined;
+};
+
+/** What the acceptance path needs before it can write: the payload, the target, the author. */
+type Prepared = {
+  readonly payload: SuggestionPayload;
+  readonly target: string | undefined;
+  readonly author: CommitAuthor;
+};
+
+/**
+ * The commit's subject for an acceptance. One line whatever the payload's title held: a
+ * title is open text and a newline in it would otherwise open a trailer of its own, which
+ * the git door refuses (and is right to).
+ */
+const acceptanceMessage = (title: string): string =>
+  `Accept the suggested change to ${title.replaceAll(/\s+/gu, " ").trim()}`;
+
+/**
+ * Accept suggestions — **each one its own governed write and its own commit** (ADR 0012,
+ * user story 3), whether an Admin accepted the set in bulk or reached one item.
+ *
+ * The order of one acceptance is the whole of this ticket:
+ *
+ * 1. read the payload through `concept_write_request_for`, which is the only road to it;
+ * 2. resolve the merge key against `concept_identity` **now**, in that same transaction;
+ * 3. refuse and **return to the proposer** when that resolution is not what the summary
+ *    rendered — the change is not lost, it is back with whoever prepared it;
+ * 4. hand the whole thing to `writeConcept`, which mints an IRI when the merge key resolved
+ *    to nothing and re-writes the concept when it resolved to one, holds the payload's base
+ *    hash as its precondition, and decides the suggestion in the same transaction as the
+ *    rows.
+ *
+ * Between 2 and 4 the resolution could move again, and the database is what catches it:
+ * `concept_identity_merge_key_uidx` refuses a second concept for one merge key inside the
+ * act's own transaction, so the worst case is `merge-key-taken` and never a write onto the
+ * wrong concept. Step 3 is what turns that race into a word a person can act on.
+ *
+ * A bulk act's rows share one batch id and are never one row hiding N (ADR 0014 rule 4).
+ */
+export const acceptSuggestions = async (
+  principal: UserPrincipal,
+  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
+  input: { readonly decisions: readonly AcceptanceDecision[] },
+): Promise<Result<readonly AcceptanceOutcome[], RoleRefusal | PrincipalRefusal | Error>> => {
+  // An Admin decides. ADR 0012's amendment also gives the *edit* kind to the target's
+  // owner; a concept has no owner record yet, so that arm waits for the column.
+  const admin = requireAdmin(principal);
+  if (!admin.ok) return err(admin.error);
+
+  const batchId = input.decisions.length > 1 ? ulid() : undefined;
+  const outcomes: AcceptanceOutcome[] = [];
+  for (const decision of input.decisions) {
+    outcomes.push(await acceptOne(principal, doors, decision, batchId));
+  }
+  return ok(outcomes);
+};
+
+/** One suggestion's acceptance: the read that decides it, then the governed write. */
+const acceptOne = async (
+  principal: UserPrincipal,
+  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
+  decision: AcceptanceDecision,
+  batchId: string | undefined,
+): Promise<AcceptanceOutcome> => {
+  const refused = (why: AcceptSuggestionRefusal | Error): AcceptanceOutcome => ({
+    suggestionId: decision.suggestionId,
+    accepted: undefined,
+    refused: why,
+  });
+
+  const prepared = await attempt(() =>
+    withMembership(principal, doors.postgres, async (fresh, tx) => {
+      const payload = await payloadFor(fresh, tx, decision.suggestionId);
+      if (payload === undefined) return undefined;
+      const target = await targetOfMergeKey(fresh, tx, payload.mergeKey);
+      const author = await authorFor(fresh, tx, payload);
+      return author === undefined ? undefined : { payload, target, author };
+    }),
+  );
+  if (!prepared.ok) return refused(prepared.error);
+  if (!prepared.value.ok) return refused(prepared.value.error);
+  const found: Prepared | undefined = prepared.value.value;
+  if (found === undefined) return refused("no-such-suggestion");
+
+  // The resolution the summary rendered, against the one this act just read. A merge key
+  // that moved is the acceptance ADR 0012 refuses, and the suggestion goes back rather
+  // than landing on a concept the person deciding it was never shown.
+  if ((found.target ?? null) !== decision.expectedTarget) {
+    const returned = await returnToProposer(principal, doors, {
+      suggestionId: decision.suggestionId,
+      reason: "the concept this suggestion resolves to moved after the set was opened",
+    });
+    return returned.ok ? refused("resolution-moved") : refused(returned.error);
+  }
+
+  const written = await writeConcept(principal, doors, {
+    // The resolution this act just read: a concept to re-write, or nothing to mint one.
+    iri: found.target,
+    mergeKey: found.payload.mergeKey,
+    path: found.payload.path,
+    kind: found.payload.kind,
+    title: found.payload.title,
+    frontmatter: found.payload.frontmatter,
+    body: found.payload.body,
+    message: acceptanceMessage(found.payload.title),
+    author: found.author,
+    expects: { base: found.payload.baseContentHash },
+    acceptance: {
+      suggestionId: decision.suggestionId,
+      setId: found.payload.setId,
+      kind: found.payload.suggestionKind,
+      batchId,
+    },
+  });
+  if (written.ok) {
+    return { suggestionId: decision.suggestionId, accepted: written.value, refused: undefined };
+  }
+
+  // The payload's own precondition failed: what it was written against is not what the
+  // concept says now. That is the other half of "fails loudly and returns to the proposer".
+  if (written.error === "stale-precondition") {
+    const returned = await returnToProposer(principal, doors, {
+      suggestionId: decision.suggestionId,
+      reason: "the concept moved after this suggestion was written",
+    });
+    if (!returned.ok) return refused(returned.error);
+  }
+  return refused(written.error);
 };
 
 /** The latest check of a concept, as the trust projection reads it (ADR 0019). */

@@ -1,0 +1,128 @@
+{
+  "description": "concept-inbox (ADR 0031, ADR 0012): submitting a suggestion set is one function call, the set's summary is re-rendered against concept_identity every time it is asked for, and nothing reads a payload but the acceptance path. Each suite seeds `workspaces` and `concepts`, calls submit_suggestion_set as `set.role` inside a transaction scoped to `set.workspace_id`, then reads suggestion_set_summary as app_rt in that scope and asserts one row per `expect_summary` entry, in that order. Every `refusals` entry is then run as its own role, in the named scope ('' = no scope), and must fail with the SQLSTATE given — never a value.",
+  "workspaces": [
+    { "id": "01J6AAAAAAAAAAAAAAAAAAAAAA", "name": "Workspace A" },
+    { "id": "01J6BBBBBBBBBBBBBBBBBBBBBB", "name": "Workspace B" }
+  ],
+  "concepts": [
+    {
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "iri": "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM",
+      "merge_key": "policy:expenses",
+      "path": "knowledge/expenses.md",
+      "content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "set": {
+    "role": "worker_rt",
+    "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+    "set_id": "01J6RRRRRRRRRRRRRRRRRRRRRR",
+    "kind": "candidate",
+    "proposer": "better-answers-extraction/1.2",
+    "requests": [
+      {
+        "suggestion_id": "01J6S1AAAAAAAAAAAAAAAAAAAA",
+        "merge_key": "policy:expenses",
+        "path": "knowledge/expenses.md",
+        "kind": "Policy",
+        "title": "Expenses",
+        "frontmatter": { "title": "Expenses", "type": "Policy" },
+        "body": "Expenses are claimed within sixty days.",
+        "base_content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "suggestion_id": "01J6S2BBBBBBBBBBBBBBBBBBBB",
+        "merge_key": "policy:expenses",
+        "path": "knowledge/expenses-restated.md",
+        "kind": "Policy",
+        "title": "Expenses, restated",
+        "frontmatter": { "title": "Expenses, restated", "type": "Policy" },
+        "body": "Expenses are claimed within ninety days.",
+        "base_content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      {
+        "suggestion_id": "01J6S3CCCCCCCCCCCCCCCCCCCC",
+        "merge_key": "policy:travel",
+        "path": "knowledge/travel.md",
+        "kind": "Policy",
+        "title": "Travel",
+        "frontmatter": { "title": "Travel", "type": "Policy" },
+        "body": "Travel is booked fourteen days ahead.",
+        "base_content_hash": null
+      }
+    ]
+  },
+  "expect_summary": [
+    {
+      "why": "the merge key resolves to the concept it names, and the payload was written against the content that concept still holds",
+      "suggestion_id": "01J6S1AAAAAAAAAAAAAAAAAAAA",
+      "status": "waiting",
+      "kind": "candidate",
+      "merge_key": "policy:expenses",
+      "resolved_iri": "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM",
+      "base_moved": false
+    },
+    {
+      "why": "the same merge key resolves the same way, and this payload was written against content that has moved since",
+      "suggestion_id": "01J6S2BBBBBBBBBBBBBBBBBBBB",
+      "status": "waiting",
+      "kind": "candidate",
+      "merge_key": "policy:expenses",
+      "resolved_iri": "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM",
+      "base_moved": true
+    },
+    {
+      "why": "a merge key no concept holds is a new concept, and its acceptance mints the IRI",
+      "suggestion_id": "01J6S3CCCCCCCCCCCCCCCCCCCC",
+      "status": "waiting",
+      "kind": "candidate",
+      "merge_key": "policy:travel",
+      "resolved_iri": null,
+      "base_moved": false
+    }
+  ],
+  "refusals": [
+    {
+      "why": "a payload is platform state in no knowledge layer: the app reaches it through the acceptance path's function and never through the table",
+      "role": "app_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "statement": "SELECT 1 FROM concept_write_request LIMIT 1",
+      "sqlstate": "42501"
+    },
+    {
+      "why": "no run reads another run's candidates out of the inbox: the payload function is the app's alone",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "statement": "SELECT 1 FROM concept_write_request_for('01J6S1AAAAAAAAAAAAAAAAAAAA')",
+      "sqlstate": "42501"
+    },
+    {
+      "why": "the queue is the app's; a producer submits and reads nothing back",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "statement": "SELECT 1 FROM suggestion LIMIT 1",
+      "sqlstate": "42501"
+    },
+    {
+      "why": "the summary is a decision surface, and deciding is not a producer's act",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "statement": "SELECT 1 FROM suggestion_set_summary('01J6RRRRRRRRRRRRRRRRRRRRRR')",
+      "sqlstate": "42501"
+    },
+    {
+      "why": "a decided suggestion is a fact, so the app has no road to a deleted one",
+      "role": "app_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "statement": "DELETE FROM suggestion WHERE id = '01J6S1AAAAAAAAAAAAAAAAAAAA'",
+      "sqlstate": "42501"
+    },
+    {
+      "why": "the set lands in the workspace the caller's transaction already names, and an unscoped caller has none",
+      "role": "app_rt",
+      "workspace_id": "",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6RRRRRRRRRRRRRRRRRRRRRR', 'edit', 'process:better-answers-test', '[]'::jsonb)",
+      "sqlstate": "42501"
+    }
+  ]
+}
