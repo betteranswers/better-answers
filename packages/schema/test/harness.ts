@@ -39,8 +39,8 @@ export const applyJournal = async (pool: pg.Pool): Promise<void> => {
 /**
  * The pair of pools a caller receives over a migrated database, and the `stop` that closes
  * them before `release` disposes of whatever holds it — a container on the cold path, one
- * copied database on the warm one. Written once here so neither path grows its own pool
- * settings or its own idea of what `app_rt` costs.
+ * copied database on the warm one. Written once here so neither path grows pool settings
+ * of its own, or its own way of taking `app_rt`.
  */
 export const migratedPostgresOver = (
   connectionUri: string,
