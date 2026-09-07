@@ -1,13 +1,8 @@
 import { sql } from "drizzle-orm";
 import { type AnyPgColumn, check, index, integer, text, uniqueIndex } from "drizzle-orm/pg-core";
 
-import { listed, stamp } from "./column-helpers.ts";
-import {
-  AUDIENCE_CHECK,
-  AUDIENCE_EVERYONE,
-  SENSITIVITIES,
-  SENSITIVITY_DEFAULT,
-} from "./concept-tables.ts";
+import { listed } from "./column-helpers.ts";
+import { AUDIENCE_CHECK, readableUnitColumns, SENSITIVITIES } from "./concept-tables.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -112,13 +107,6 @@ const graphRowColumns = () => ({
   label: text("label").notNull(),
 });
 
-const visibilityColumns = () => ({
-  publishedAt: stamp("published_at"),
-  sensitivity: text("sensitivity").notNull().default(SENSITIVITY_DEFAULT),
-  audience: text("audience").notNull().default(AUDIENCE_EVERYONE),
-  audienceGroups: text("audience_groups").array(),
-});
-
 /**
  * The two partitions' keys, on nodes and edges alike (ADR 0032): unique
  * `(workspace_id, gen, uid)` on the bundle-and-record rows — so a full rebuild writes the
@@ -168,7 +156,7 @@ export const graphNode = withRLS(
     ...graphRowColumns(),
     /** The concept's kind — a property, indexed, never a label (ADR 0026, ADR 0032). */
     kind: text("kind"),
-    ...visibilityColumns(),
+    ...readableUnitColumns(),
   },
   "workspaceId",
   (table) => [
@@ -202,7 +190,7 @@ export const graphEdge = withRLS(
     toKind: text("to_kind"),
     section: text("section"),
     sentence: text("sentence"),
-    ...visibilityColumns(),
+    ...readableUnitColumns(),
   },
   "workspaceId",
   (table) => [

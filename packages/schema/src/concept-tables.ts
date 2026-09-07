@@ -7,6 +7,7 @@ import {
   primaryKey,
   text,
   uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 import { ACTOR_ID_PATTERN } from "./actor-id.ts";
@@ -309,6 +310,55 @@ export const conceptIdentity = withRLS(
 );
 
 /**
+ * The composite key to the identity every record about a concept carries, cascading: a
+ * concept that has left the bundle takes its index row, its checks, its citations and its
+ * override with it. Written once, so four tables cannot disagree about which pair a
+ * concept is keyed by.
+ */
+const identityKey = (
+  table: { readonly workspaceId: AnyPgColumn; readonly iri: AnyPgColumn },
+  name: string,
+) =>
+  foreignKey({
+    columns: [table.workspaceId, table.iri],
+    foreignColumns: [conceptIdentity.workspaceId, conceptIdentity.iri],
+    name,
+  }).onDelete("cascade");
+
+/**
+ * The visibility columns a readable unit **born with fail-closed defaults** carries — a
+ * binding, a composition: unpublished, Restricted, everyone — and the two checks that hold
+ * them, written once (ADR 0023, ADR 0039). The concept index declares its own copy, because
+ * its audience carries no default: the governed write derives the pair before it lands the
+ * row, and a default there would be a value nobody decided.
+ */
+export const readableUnitColumns = () => ({
+  publishedAt: stamp("published_at"),
+  sensitivity: text("sensitivity").notNull().default(SENSITIVITY_DEFAULT),
+  audience: text("audience").notNull().default(AUDIENCE_EVERYONE),
+  audienceGroups: text("audience_groups").array(),
+});
+
+export const readableUnitChecks = (tableName: string) => [
+  check(`${tableName}_sensitivity_check`, sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
+  check(`${tableName}_audience_check`, sql.raw(AUDIENCE_CHECK)),
+];
+
+/**
+ * A readable **record** of the platform's own — a binding, a composition — keyed by the
+ * pair, born with the fail-closed visibility above, and stamped when it was made. The
+ * columns the two tables share, written once; each adds its own beside them.
+ */
+export const readableRecordColumns = () => ({
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspace.id, { onDelete: "cascade" }),
+  id: text("id").notNull(),
+  ...readableUnitColumns(),
+  createdAt: stamp("created_at").notNull().defaultNow(),
+});
+
+/**
  * A **bundle commit** (`CONTEXT.md`): one change to a bundle, recorded in the same
  * transaction as the rows it produced. Its `audit_event_id` is the id the act minted
  * *before* the commit and the commit carries in its `Audit:` trailer, which is what makes
@@ -388,11 +438,7 @@ export const conceptIndex = withRLS(
   "workspaceId",
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.iri] }),
-    foreignKey({
-      columns: [table.workspaceId, table.iri],
-      foreignColumns: [conceptIdentity.workspaceId, conceptIdentity.iri],
-      name: "concept_index_identity_fk",
-    }).onDelete("cascade"),
+    identityKey(table, "concept_index_identity_fk"),
     check("concept_index_audience_check", sql.raw(AUDIENCE_CHECK)),
     // One concept per path: the format identity is a key too, and two rows claiming one
     // file would be a bundle the index could not be checked against.
@@ -476,11 +522,7 @@ export const conceptVerification = withRLS(
     // a given check. The minter makes the id unique on its own; the pair is what makes that
     // uniqueness unaskable from outside the workspace.
     primaryKey({ columns: [table.workspaceId, table.id] }),
-    foreignKey({
-      columns: [table.workspaceId, table.iri],
-      foreignColumns: [conceptIdentity.workspaceId, conceptIdentity.iri],
-      name: "concept_verification_identity_fk",
-    }).onDelete("cascade"),
+    identityKey(table, "concept_verification_identity_fk"),
     // The trust projection's read: this concept's checks, latest first.
     index("concept_verification_workspace_id_iri_checked_at_idx").on(
       table.workspaceId,
@@ -529,11 +571,7 @@ export const conceptEvidence = withRLS(
     primaryKey({
       columns: [table.workspaceId, table.iri, table.sourceDocumentId, table.locator],
     }),
-    foreignKey({
-      columns: [table.workspaceId, table.iri],
-      foreignColumns: [conceptIdentity.workspaceId, conceptIdentity.iri],
-      name: "concept_evidence_identity_fk",
-    }).onDelete("cascade"),
+    identityKey(table, "concept_evidence_identity_fk"),
     foreignKey({
       columns: [table.workspaceId, table.sourceDocumentId, table.locator],
       foreignColumns: [evidence.workspaceId, evidence.sourceDocumentId, evidence.locator],
@@ -572,11 +610,7 @@ export const conceptClassOverride = withRLS(
   "workspaceId",
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.iri] }),
-    foreignKey({
-      columns: [table.workspaceId, table.iri],
-      foreignColumns: [conceptIdentity.workspaceId, conceptIdentity.iri],
-      name: "concept_class_override_identity_fk",
-    }).onDelete("cascade"),
+    identityKey(table, "concept_class_override_identity_fk"),
     check(
       "concept_class_override_sensitivity_check",
       sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`),

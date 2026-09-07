@@ -1,15 +1,7 @@
-import { sql } from "drizzle-orm";
-import { check, foreignKey, index, primaryKey, text } from "drizzle-orm/pg-core";
+import { foreignKey, index, primaryKey, text } from "drizzle-orm/pg-core";
 
-import { listed, stamp } from "./column-helpers.ts";
-import {
-  AUDIENCE_CHECK,
-  AUDIENCE_EVERYONE,
-  SENSITIVITIES,
-  SENSITIVITY_DEFAULT,
-} from "./concept-tables.ts";
+import { readableRecordColumns, readableUnitChecks } from "./concept-tables.ts";
 import { withRLS } from "./with-rls.ts";
-import { workspace } from "./workspace-table.ts";
 
 /**
  * The sources slice's two tables as the visibility derivation needs them (ADR 0013, ADR
@@ -32,26 +24,15 @@ import { workspace } from "./workspace-table.ts";
 
 export const sourceBinding = withRLS(
   "source_binding",
-  {
-    workspaceId: text("workspace_id")
-      .notNull()
-      .references(() => workspace.id, { onDelete: "cascade" }),
-    /** Platform-minted, so an audience's group ids and a document's binding share one shape. */
-    id: text("id").notNull(),
-    // The three permission fields (ADR 0013): published by a recorded Admin act, the class,
-    // and the audience as its word and its group-id array (ADR 0039). Fail-closed defaults:
-    // unpublished, Restricted, everyone — which a Restricted class narrows to Admins.
-    publishedAt: stamp("published_at"),
-    sensitivity: text("sensitivity").notNull().default(SENSITIVITY_DEFAULT),
-    audience: text("audience").notNull().default(AUDIENCE_EVERYONE),
-    audienceGroups: text("audience_groups").array(),
-    createdAt: stamp("created_at").notNull().defaultNow(),
-  },
+  // The id is platform-minted, so an audience's group ids and a document's binding share one
+  // shape; the three permission fields (ADR 0013) are published by a recorded Admin act, the
+  // class, and the audience as its word and its group-id array (ADR 0039), with fail-closed
+  // defaults: unpublished, Restricted, everyone — which a Restricted class narrows to Admins.
+  readableRecordColumns(),
   "workspaceId",
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
-    check("source_binding_sensitivity_check", sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
-    check("source_binding_audience_check", sql.raw(AUDIENCE_CHECK)),
+    ...readableUnitChecks("source_binding"),
   ],
 );
 
