@@ -7,8 +7,15 @@ import type { ProcessActorId } from "./actor.ts";
 /**
  * The Principal (`CONTEXT.md`, *principal*): who a call is made as. Built by
  * a transport from a verified credential, first parameter of every function in `core`
- * that touches tenant data, and alive only inside the transaction that resolved it
- * (`store/postgres`'s `withPrincipal`) — nothing caches one beyond a request.
+ * that touches tenant data, and **alive only inside the request that resolved it** —
+ * nothing caches one beyond a request.
+ *
+ * It normally lives no longer than the transaction `store/postgres`'s `withPrincipal`
+ * opened around it. The one exception is an act that owns its own transaction because it
+ * does work outside one — the governed write, which commits to git before it writes its
+ * rows (T-052): the Principal is handed on and outlives the resolving *transaction*, never
+ * the request, and the act's own door re-reads the membership in the transaction it opens,
+ * which is what makes the hand-off safe rather than merely convenient.
  *
  * The ids are the boundary schemas' brands (ADR 0028: the boundary, not the table, is
  * the source of application-level types), so a user id cannot be passed where a
@@ -41,6 +48,21 @@ export type UserPrincipal = {
    * a group sees what it sees on their next request and never has to sign in again.
    */
   readonly groups: readonly GroupId[];
+  /**
+   * When the credential this call was made with was issued, in epoch milliseconds — the
+   * instant the resolver compared revocation's two instants against, carried so that a
+   * **later transaction can make the same judgement**. Revocation ends what was *issued* and
+   * a fresh sign-in mints anew (ADR 0035), so "is this person revoked" is only answerable
+   * beside this value: an instant on the row means nothing without the issuance it cuts.
+   *
+   * An act that opens its own transaction after doing work outside one — the governed write,
+   * which commits to git first — re-reads the membership there and needs this to judge it.
+   *
+   * A number rather than a `Date`, so a Principal is immutable all the way down: a `Date` is
+   * a mutable object, and a caller that held one could move the instant this is judged
+   * against under the act holding it.
+   */
+  readonly credentialIssuedAtMs: number;
 };
 
 /**

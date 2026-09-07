@@ -26,6 +26,10 @@ const AUDIT_EVENT_ID = "01J6GGGGGGGGGGGGGGGGGGGGGG";
 const BATCH_ID = "01J6HHHHHHHHHHHHHHHHHHHHHH";
 const ACCESS_REQUEST_ID = "01J6KKKKKKKKKKKKKKKKKKKKKK";
 const NOW = new Date("2026-09-01T00:00:00Z");
+// The one form a concept IRI has: the bare apex, `/c/`, a minted id (ADR 0002's amendments).
+const CONCEPT_IRI = "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM";
+const CONTENT_SHA256 = "a".repeat(64);
+const COMMIT_SHA = "b".repeat(40);
 
 /** Rows each refined insert schema accepts — assertion 4's input. */
 const acceptedRows = {
@@ -194,6 +198,71 @@ const acceptedRows = {
       bindingId: "binding-1",
     },
   ],
+  conceptIdentity: [{ workspaceId: WS_ID, iri: CONCEPT_IRI, mergeKey: "policy:expenses" }],
+  conceptIndex: [
+    {
+      workspaceId: WS_ID,
+      iri: CONCEPT_IRI,
+      path: "knowledge/expenses.md",
+      kind: "Policy",
+      title: "Expenses",
+      frontmatter: { title: "Expenses", type: "Policy", tags: ["finance"] },
+      body: "Expenses are claimed within thirty days.",
+      contentHash: CONTENT_SHA256,
+      commitSha: COMMIT_SHA,
+      status: "stable",
+      publishedAt: NOW,
+      sensitivity: "Internal",
+      audience: "everyone",
+    },
+  ],
+  // A bundle's first commit, whose parent is NULL, and the one after it.
+  bundleCommit: [
+    {
+      workspaceId: WS_ID,
+      sha: COMMIT_SHA,
+      auditEventId: AUDIT_EVENT_ID,
+      actor: `human:${USER_ID}`,
+    },
+    {
+      workspaceId: WS_ID,
+      sha: "c".repeat(40),
+      parentSha: COMMIT_SHA,
+      auditEventId: BATCH_ID,
+      actor: "process:better-answers-reconciler",
+      committedAt: NOW,
+    },
+  ],
+  evidence: [
+    {
+      workspaceId: WS_ID,
+      sourceDocumentId: "01J6NNNNNNNNNNNNNNNNNNNNNN",
+      locator: "p.4#para-2",
+      resource: "Expenses policy (2026 edition)",
+      contentVersion: "2026-03-01",
+    },
+  ],
+  // A check the platform made, which carries its hash, and one carried in with a bundle,
+  // which carries none — the CHECK that ties `origin` to `content_hash` (ADR 0019).
+  conceptVerification: [
+    {
+      id: "01J6PPPPPPPPPPPPPPPPPPPPPP",
+      workspaceId: WS_ID,
+      iri: CONCEPT_IRI,
+      actor: `human:${USER_ID}`,
+      checkedAt: NOW,
+      contentHash: CONTENT_SHA256,
+      origin: "platform",
+    },
+    {
+      id: "01J6QQQQQQQQQQQQQQQQQQQQQQ",
+      workspaceId: WS_ID,
+      iri: CONCEPT_IRI,
+      actor: "better-answers-enrichment/1.2",
+      contentHash: null,
+      origin: "imported",
+    },
+  ],
 } as const;
 
 const registryNames = Object.keys(boundarySchemas) as (keyof typeof boundarySchemas)[];
@@ -318,6 +387,13 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "ingressCounter",
         "auditEvent",
         "accessRequest",
+        // The identity comes before the index row and the check, which name it by the
+        // composite key `(workspace_id, iri)`.
+        "conceptIdentity",
+        "conceptIndex",
+        "bundleCommit",
+        "evidence",
+        "conceptVerification",
         "chunk",
       ] as const;
       expect(insertOrder.toSorted()).toEqual(registryNames.toSorted());

@@ -6,7 +6,7 @@ direction. The worker never migrates; this module is its read-only
 knowledge of what the app's journal built, stamped with the migration id it was
 generated from."""
 
-MIGRATION_ID = "0013_access-requests-substrate"
+MIGRATION_ID = "0015_concept-write-path-substrate"
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -58,6 +58,53 @@ TABLES: dict[str, dict[str, str]] = {
         "at": "timestamp with time zone NOT NULL",
         "detail": "jsonb NOT NULL",
         "batch_id": "text",
+    },
+    "public.bundle_commit": {
+        "workspace_id": "text NOT NULL",
+        "sha": "text NOT NULL",
+        "parent_sha": "text",
+        "audit_event_id": "text NOT NULL",
+        "actor": "text NOT NULL",
+        "committed_at": "timestamp with time zone NOT NULL",
+    },
+    "public.concept_identity": {
+        "workspace_id": "text NOT NULL",
+        "iri": "text NOT NULL",
+        "merge_key": "text NOT NULL",
+        "minted_at": "timestamp with time zone NOT NULL",
+    },
+    "public.concept_index": {
+        "workspace_id": "text NOT NULL",
+        "iri": "text NOT NULL",
+        "path": "text NOT NULL",
+        "kind": "text NOT NULL",
+        "title": "text NOT NULL",
+        "frontmatter": "jsonb NOT NULL",
+        "body": "text NOT NULL",
+        "content_hash": "text NOT NULL",
+        "commit_sha": "text NOT NULL",
+        "status": "text NOT NULL",
+        "published_at": "timestamp with time zone",
+        "sensitivity": "text NOT NULL",
+        "audience": "text NOT NULL",
+        "updated_at": "timestamp with time zone NOT NULL",
+    },
+    "public.concept_verification": {
+        "id": "text NOT NULL",
+        "workspace_id": "text NOT NULL",
+        "iri": "text NOT NULL",
+        "actor": "text NOT NULL",
+        "checked_at": "timestamp with time zone NOT NULL",
+        "content_hash": "text",
+        "origin": "text NOT NULL",
+    },
+    "public.evidence": {
+        "workspace_id": "text NOT NULL",
+        "source_document_id": "text NOT NULL",
+        "locator": "text NOT NULL",
+        "resource": "text NOT NULL",
+        "content_version": "text",
+        "recorded_at": "timestamp with time zone NOT NULL",
     },
     "public.group": {
         "id": "text NOT NULL",

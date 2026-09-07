@@ -1,4 +1,6 @@
-import { ok, type Result, type UserPrincipal } from "../kernel/index.ts";
+import type { Frontmatter, FrontmatterValue } from "../concepts/index.ts";
+import { citedSource, conceptByIri, type OpenedConcept } from "../concepts/index.ts";
+import { err, isPersonActor, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
 /**
@@ -9,8 +11,11 @@ import type { Tx } from "../store/postgres/index.ts";
  * T-004 lands the **contracts** the MCP surface serves and the human renderings
  * derived from them (ADR 0018: the text of every result is the human rendering, never
  * the JSON; ADR 0030: `open` returns structured content; ADR 0016: the one answer
- * contract, verdict first). The bodies are B9's: today there is no concept index to
- * read, so `find` answers no hits, `open` not found, `ask` a refuse verdict, and
+ * contract, verdict first). The bodies are B9's, with one exception: **`open` by IRI
+ * reads the concept index** (T-052), through the concepts slice's own read — a slice
+ * reaches another only through its `index.ts` (ADR 0029 rule 4), and `concept_index` is
+ * the concepts slice's table. `find` answers no hits, `open` by *locator* not found —
+ * a passage needs the source catalogue, which is B7's — `ask` a refuse verdict, and
  * `giveFeedback` a receipt. Every function takes the Principal first and runs on the
  * transaction that resolved it.
  */
@@ -98,13 +103,17 @@ export type FindResult = {
   readonly hits: readonly FindHit[];
 };
 
-/** An OKF frontmatter value: the JSON-shaped scalars and string lists a concept file carries. */
-export type FrontmatterValue = string | number | boolean | null | readonly string[];
+/**
+ * An OKF frontmatter value, as the concepts slice defines it: the scalars, string lists and
+ * `sources[]` objects a concept file carries. Re-exported rather than restated, so the view
+ * and the row can never disagree about what a file may hold.
+ */
+export type { Frontmatter, FrontmatterSource, FrontmatterValue } from "../concepts/index.ts";
 
 /** The structured form of a concept — what `open` returns and a view renders. */
 export type ConceptView = {
   readonly iri: string;
-  readonly frontmatter: Readonly<Record<string, FrontmatterValue>>;
+  readonly frontmatter: Frontmatter;
   readonly body: string;
   readonly relations: readonly { readonly kind: string; readonly target: string }[];
   readonly trust: Trust;
@@ -191,16 +200,157 @@ export const find = async (
   input: { readonly query: string; readonly limit: number },
 ): Promise<Result<FindResult, never>> => ok({ query: input.query, hits: [] });
 
+/**
+ * The trust a concept's row and its latest check project to (ADR 0019): a check by a person
+ * earns *human-reviewed*, one by the platform or an agent *machine-confirmed*, and no check
+ * at all is *Unchecked*. The status word wins over the tier when it is not *current*, and a
+ * check whose hash is not the concept's own reads *Changed since checked* — which is what
+ * makes the hash on the verification row load-bearing rather than decorative.
+ *
+ * An imported check carries no hash and so never reads *Changed since checked*; it carries
+ * the *imported* rider instead, which never moves the tier.
+ */
+const trustOf = (concept: OpenedConcept, now: Date): Trust => {
+  const { check } = concept;
+  const checkedAt = check === undefined ? null : check.at.toISOString();
+  const tier: TrustTier =
+    check === undefined
+      ? "unverified"
+      : isPersonActor(check.actor)
+        ? "human-reviewed"
+        : "machine-confirmed";
+  const rider: TrustRider | null = check?.contentHash === null ? "imported" : null;
+  const moved = check?.contentHash != null && check.contentHash !== concept.contentHash;
+  const status: TrustStatus =
+    concept.status === "deprecated" || concept.status === "removed"
+      ? "deprecated"
+      : concept.status === "draft"
+        ? "draft"
+        : // *Out of date* comes from `stale_after` **alone** and absence means no shelf life
+          // (ADR 0019) — the reader is told the fact has expired before they are told the
+          // text moved, because a shelf life is a statement about the fact itself.
+          pastShelfLife(concept.frontmatter["stale_after"], now)
+          ? "out-of-date"
+          : moved
+            ? "changed-since-checked"
+            : "current";
+  return { tier, status, checkedBy: check?.actor ?? null, checkedAt, rider };
+};
+
+/**
+ * `stale_after`'s two forms and no others (ADR 0019): a **date**, or a **datetime with an
+ * offset**. The grammar is checked before anything is parsed, because `new Date` is not a
+ * validator — it accepts an offsetless datetime and reads it as local time, and it accepts
+ * plenty that is not a date at all. A value outside the grammar carries no shelf life, which
+ * is the same answer as absence, and absence means no shelf life.
+ */
+const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const OFFSET_DATETIME = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * Midnight UTC on a date, or nothing when the calendar has no such day. `Date.UTC` rolls an
+ * impossible day forward — `2026-02-30` comes back as March — and remaps a year below 100
+ * into the 1900s, so the fields are set on a date object and read back: `setUTCFullYear`
+ * takes the year as written.
+ */
+const utcMidnight = (year: number, month: number, day: number): number | undefined => {
+  const at = new Date(0);
+  at.setUTCFullYear(year, month - 1, day);
+  at.setUTCHours(0, 0, 0, 0);
+  const same =
+    at.getUTCFullYear() === year && at.getUTCMonth() === month - 1 && at.getUTCDate() === day;
+  return same ? at.getTime() : undefined;
+};
+
+/** A day in milliseconds — the span a date-only shelf life lasts through. */
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Whether a concept's shelf life has run out.
+ *
+ * A date alone means the concept is out of date **after that day**, not during it: `2026-03-01`
+ * is a shelf life that lasts through the first of March, so the comparison is against the end
+ * of that day in UTC — which is also the form the emitter writes one back in (ADR 0019). A
+ * datetime names the instant itself.
+ */
+const pastShelfLife = (staleAfter: FrontmatterValue | undefined, now: Date): boolean => {
+  if (typeof staleAfter !== "string") return false;
+
+  const datetime = OFFSET_DATETIME.exec(staleAfter);
+  if (datetime !== null) {
+    // The grammar holds the shape and the calendar holds the day; only then is it parsed.
+    const day = utcMidnight(Number(datetime[1]), Number(datetime[2]), Number(datetime[3]));
+    if (day === undefined) return false;
+    const instant = new Date(staleAfter);
+    return !Number.isNaN(instant.getTime()) && instant.getTime() < now.getTime();
+  }
+
+  const date = CALENDAR_DATE.exec(staleAfter);
+  if (date === null) return false;
+  const midnight = utcMidnight(Number(date[1]), Number(date[2]), Number(date[3]));
+  return midnight !== undefined && midnight + ONE_DAY_MS <= now.getTime();
+};
+
+/**
+ * What a concept's `sources[]` frontmatter entry projects to in a view (`CONTEXT.md`,
+ * *evidence*). **The file's own list is the citation record until T-055**: the `evidence`
+ * table is keyed by document and locator and is shared across the concepts that cite one, so
+ * which concept cites which is a relation the graph derives and this read does not have.
+ */
+const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
+  const sources = concept.frontmatter["sources"];
+  if (!Array.isArray(sources)) return [];
+  // **The same reader the hash uses** (`citedSource`), so the view and the hash can never
+  // disagree about what a file cites — a view that dropped an entry the hash still counted
+  // would show a reader less evidence than the check confirmed. A `title` is shown in
+  // preference to the resource where an object entry carries one, because that is what a
+  // reader recognises; the legacy string form has none.
+  return sources.flatMap((entry) => {
+    const cited = citedSource(entry);
+    if (cited === undefined) return [];
+    const title = typeof entry === "string" ? undefined : entry["title"];
+    return [
+      {
+        locator: cited.locator ?? "",
+        source: typeof title === "string" && title !== "" ? title : cited.resource,
+      },
+    ];
+  });
+};
+
+/**
+ * The verbatim fetch (ADR 0018). A concept by IRI is a real read over `concept_index`
+ * through the read predicate; **a concept this caller may not see answers exactly as one
+ * nobody minted does** — `found: false` with the IRI echoed back — because the predicate is
+ * in the statement's WHERE clause and a withheld row is not a row that came back (user
+ * story 13). A locator answers not found until the source catalogue exists (B7).
+ */
 export const open = async (
-  _principal: UserPrincipal,
-  _tx: Tx,
+  principal: UserPrincipal,
+  tx: Tx,
   input: OpenInput,
-): Promise<Result<OpenResult, never>> =>
-  ok(
-    input.iri === undefined
-      ? { found: false, locator: input.locator ?? "" }
-      : { found: false, iri: input.iri },
-  );
+): Promise<Result<OpenResult, Error>> => {
+  if (input.iri === undefined) return ok({ found: false, locator: input.locator ?? "" });
+
+  const concept = await conceptByIri(principal, tx, input.iri);
+  if (!concept.ok) return err(concept.error);
+  if (concept.value === undefined) return ok({ found: false, iri: input.iri });
+
+  const found = concept.value;
+  return ok({
+    found: true,
+    concept: {
+      iri: found.iri,
+      frontmatter: found.frontmatter,
+      body: found.body,
+      // Typed relations are derived in the graph and are never a key on the file
+      // (ADR 0010), so they arrive with the graph tables (T-053).
+      relations: [],
+      trust: trustOf(found, new Date()),
+      evidence: evidenceOf(found),
+    },
+  });
+};
 
 export const ask = async (
   _principal: UserPrincipal,

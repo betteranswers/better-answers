@@ -111,8 +111,9 @@ describe("the Principal resolver", () => {
   it("builds a Principal from the member row, with the role read in the same transaction as the work", async () => {
     const seeded = await seedMembership({ role: "Editor" });
     const door = openPostgres(db.runtimePool);
+    const claims = claimsFor(seeded);
 
-    const resolved = await withPrincipal(door, claimsFor(seeded), async (principal, tx) => {
+    const resolved = await withPrincipal(door, claims, async (principal, tx) => {
       const scope = await tx.query<{ ws: string }>("SELECT current_workspace_id() AS ws");
       return { principal, scope: scope.rows[0]?.ws };
     });
@@ -125,6 +126,9 @@ describe("the Principal resolver", () => {
       userId: seeded.userId,
       role: "Editor",
       groups: [],
+      // The credential's own instant, carried so that an act which opens a later transaction
+      // judges revocation the same way this resolve just did (T-052).
+      credentialIssuedAtMs: claims.issuedAt.getTime(),
     });
     expect(resolved.value.scope).toBe(seeded.workspaceId);
   });
@@ -228,6 +232,7 @@ describe("the Principal resolver", () => {
         userId: seeded.userId,
         role: "Editor",
         groups: seeded.groupIds.there,
+        credentialIssuedAtMs: issuedAt.getTime(),
       },
     });
     expect(seeded.groupIds.there).not.toEqual(seeded.groupIds.here);

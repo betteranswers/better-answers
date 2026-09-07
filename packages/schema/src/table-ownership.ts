@@ -36,8 +36,9 @@
  * refuses a name that is not a directory today. So this fact, settled by the T-063 spec,
  * waits for the ticket that declares its table:
  *
- * - The concept, bundle-commit, evidence and verification tables and the two graph
- *   tables — the concepts slice's (ADRs 0011, 0012, 0019, 0023).
+ * - The two graph tables — the concepts slice's (ADR 0023, ADR 0032). The concept,
+ *   bundle-commit, evidence and verification tables landed with T-052 and are entries
+ *   below rather than a sentence here.
  *
  * **The lint rule this map is the written trigger for** (ADR 0029; out of scope in the
  * T-063 spec, deliberately): *a store file imports no slice's table*. Build it when a
@@ -95,6 +96,17 @@ export const TABLE_OWNERS = {
   "public.audit_event": "audit",
   "public.access_request": "members",
   "index.chunk": "sources",
+
+  // The concept write path's five (ADRs 0011, 0012, 0019). The governed write writes four of
+  // them in the act's own transaction — the identity, the index row, the commit and the
+  // evidence — and touches the fifth not at all: `concept_verification` is written by the
+  // verify act, which is a later ticket's, and read by this slice's `conceptByIri` for the
+  // trust `open` projects. Nothing outside this slice writes any of the five.
+  "public.concept_identity": "concepts",
+  "public.concept_index": "concepts",
+  "public.bundle_commit": "concepts",
+  "public.evidence": "concepts",
+  "public.concept_verification": "concepts",
 } satisfies Record<string, string>;
 
 /** A table the schema package declares: every key of the map, and nothing else. */

@@ -383,6 +383,7 @@ describe("the second door — recordFor, the platform naming the actor", () => {
       userId: boundarySchemas.user.select.shape.id.parse(adminUserId),
       role: "Admin",
       groups: [],
+      credentialIssuedAtMs: Date.now(),
     };
     const id = ulid();
 

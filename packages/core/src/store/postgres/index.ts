@@ -15,6 +15,12 @@ import type {
 /**
  * The Postgres door: the handle, the transaction helper, and the RLS session setter.
  *
+ * Four openers, and which one a call uses says who is behind it: `withScope` and
+ * `withIdentityWrite`/`withIdentityRead` for the platform's own acts; `withPrincipal` for
+ * the transport, which builds a Principal from a credential at the request boundary; and
+ * `withMembership` for a slice that owns an act's transaction and holds a Principal already
+ * (T-052's governed write), which re-reads the membership in the transaction it opens.
+ *
  * `SET LOCAL app.workspace_id` from the `Principal` on every transaction. RLS with
  * `FORCE ROW LEVEL SECURITY`, the non-owner `app_rt` role and default-deny
  * (`pgTable.withRLS()`) is the tenancy **guarantee**; this door is ergonomics over it
@@ -152,6 +158,25 @@ const MEMBERSHIP_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS per
      JOIN "user" u ON u.id = m.user_id
     WHERE m.workspace_id = $1 AND m.user_id = $2`;
 
+/**
+ * The same read, holding the membership row until the transaction ends — what an act's own
+ * door uses and the request boundary does not.
+ *
+ * `FOR SHARE OF m, u` is what turns "we checked" into "it cannot have changed since": a
+ * revocation is an UPDATE of one of these two rows — the membership for a workspace Admin's
+ * scope, the person for the operator's — so it either commits before this read and is seen,
+ * or waits behind the lock until the act commits, in which case its instant is after the act
+ * and governs the acts that follow it. **Both** rows are held, because holding the membership
+ * alone would leave revoke-everywhere free to land mid-act. Without the lock, READ COMMITTED
+ * would let either revocation land between the read and the COMMIT, and the rows would be
+ * written for a credential ended microseconds earlier.
+ *
+ * It is not on the boundary's read, deliberately: that runs on every request, and a shared
+ * row lock per request would make the People screen's writes queue behind ordinary traffic.
+ * Only an act that writes under an authority it read earlier needs to hold it.
+ */
+const MEMBERSHIP_QUERY_HELD = `${MEMBERSHIP_QUERY} FOR SHARE OF m, u`;
+
 const isRole = (value: string): value is Role => ROLES.some((role) => role === value);
 
 /**
@@ -193,23 +218,102 @@ export const withPrincipal = async <T>(
   const workspaceId = boundarySchemas.workspace.select.shape.id.safeParse(claims.workspaceId);
   const userId = boundarySchemas.user.select.shape.id.safeParse(claims.userId);
   if (!workspaceId.success || !userId.success) return err("malformed-claims");
+  // Read once, before anything is awaited: `claims.issuedAt` is a `Date`, which is mutable,
+  // so the instant the Principal carries and the instant the refusal is judged against have
+  // to be the same number rather than two reads of an object a caller still holds.
+  const credentialIssuedAtMs = claims.issuedAt.getTime();
 
+  return resolveScoped(
+    door,
+    workspaceId.data,
+    userId.data,
+    credentialIssuedAtMs,
+    (row) => {
+      const refusal = refuse(row, credentialIssuedAtMs);
+      if (refusal !== undefined) return refusal;
+      // The boundary's own extra: a credential that names a role the row disagrees with.
+      // The act's door has no claims to disagree with, which is why this arm is here.
+      return claims.role === undefined || claims.role === row?.role ? undefined : "role-disagrees";
+    },
+    work,
+  );
+};
+
+/**
+ * The second principal-scoped door (T-052): open a transaction for a Principal a caller
+ * **already holds**, re-reading the membership inside it.
+ *
+ * `withPrincipal` above is the transport's — it builds a Principal from a credential at the
+ * request boundary. This one is a slice's, for the act that cannot use the transport's
+ * transaction because it owns its own: the governed write commits to git first and then
+ * writes its rows, and those rows land in a transaction the slice opens after the commit
+ * (ADR 0012; T-006 spec, *The governed write*). Handing that act the transport's transaction
+ * would mean holding a transaction open across a git commit, and opening it under `withScope`
+ * would mean writing a person's act under the platform's authority.
+ *
+ * So the role is resolved **in the same transaction as the writes it authorises**, exactly as
+ * it is at the request boundary, and the act re-checks its own role threshold against the
+ * `principal` this door hands back rather than the one it was called with.
+ *
+ * **It judges authority at time-of-act, by the boundary's own rule.** The membership row is
+ * read under a shared lock and every refusal the boundary makes is made again here: the
+ * membership gone, a role that moved, and — the one this door exists for — either revocation
+ * instant now cutting the credential this act rides on. That last is judged against the
+ * Principal's `credentialIssuedAtMs` and never against "an instant is set", because revocation
+ * ends what was *issued* and a fresh sign-in mints anew (ADR 0035). With the lock, a
+ * revocation cannot land between this read and the act's COMMIT, which is what makes ADR
+ * 0012's *impossible by construction* a construction rather than a hope.
+ */
+export const withMembership = async <T>(
+  principal: UserPrincipal,
+  door: PostgresDoor,
+  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+): Promise<Result<T, PrincipalRefusal>> =>
+  resolveScoped(
+    door,
+    principal.workspaceId,
+    principal.userId,
+    principal.credentialIssuedAtMs,
+    (row) => {
+      const revoked = refuse(row, principal.credentialIssuedAtMs);
+      if (revoked !== undefined) return revoked;
+      // The role the act was authorised at, against the role the row holds now. Checked
+      // after the shared refusals, so a revoked person hears one word and not two.
+      return row?.role === principal.role ? undefined : "role-disagrees";
+    },
+    work,
+    MEMBERSHIP_QUERY_HELD,
+  );
+
+/**
+ * What both principal-scoped doors are: one transaction, its scope set before any other
+ * statement, the membership read inside it, and `work` run with the Principal that read
+ * built — never with one a caller composed. The two differ only in what they refuse the row
+ * for, which is the callback; the body is theirs jointly, because a second copy of it is a
+ * second place the scope could be set late or the commit tag go unread.
+ */
+const resolveScoped = async <T>(
+  door: PostgresDoor,
+  workspaceId: WorkspaceId,
+  userId: UserId,
+  credentialIssuedAtMs: number,
+  refusalFor: (row: MembershipRow | undefined) => PrincipalRefusal | undefined,
+  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+  query: string = MEMBERSHIP_QUERY,
+): Promise<Result<T, PrincipalRefusal>> => {
   const client = await door.pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId.data]);
+    await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
 
-    const membership = await client.query<MembershipRow>(MEMBERSHIP_QUERY, [
-      workspaceId.data,
-      userId.data,
-    ]);
+    const membership = await client.query<MembershipRow>(query, [workspaceId, userId]);
     const row = membership.rows[0];
-    const refusal = refuse(row, claims);
+    const refusal = refusalFor(row);
     if (refusal !== undefined) {
       await rollbackQuietly(client);
       return err(refusal);
     }
-    // `refuse` returned nothing, so the row exists and its role is one of the three;
+    // The callback returned nothing, so the row exists and its role is one of the three;
     // the narrowing is repeated here because TypeScript cannot carry it across the call.
     const role = row?.role ?? "";
     if (!isRole(role)) {
@@ -219,13 +323,14 @@ export const withPrincipal = async <T>(
 
     const principal: UserPrincipal = {
       kind: "user",
-      workspaceId: workspaceId.data satisfies WorkspaceId,
-      userId: userId.data satisfies UserId,
+      workspaceId,
+      userId,
       role,
       // Parsed at the boundary rather than asserted (ADR 0028): the column is a foreign
       // key to a group the platform minted, so a value of another shape is a broken
       // database and the throw the caller sees is the truthful answer to it.
       groups: (row?.group_ids ?? []).map((id) => boundarySchemas.group.select.shape.id.parse(id)),
+      credentialIssuedAtMs,
     };
     const value = await work(principal, client);
     await commit(client);
@@ -238,14 +343,24 @@ export const withPrincipal = async <T>(
   }
 };
 
-const refuse = (row: MembershipRow | undefined, claims: Claims): PrincipalRefusal | undefined => {
+/**
+ * The refusals a membership row decides for **any** caller, from the row and the instant the
+ * credential was issued at. Both doors make them: at the request boundary against the claims'
+ * instant, and inside an act's own transaction against the same instant carried on the
+ * Principal, so a revocation is judged the same way wherever it is met.
+ */
+const refuse = (
+  row: MembershipRow | undefined,
+  credentialIssuedAtMs: number,
+): PrincipalRefusal | undefined => {
   if (row === undefined) return "not-a-member";
   if (!isRole(row.role)) return "role-unknown";
   // Either instant refuses, with the one word: revoked everywhere, or revoked here.
   for (const revokedAt of [row.person_revoked_at, row.membership_revoked_at]) {
-    if (revokedAt !== null && claims.issuedAt < revokedAt) return "credentials-revoked";
+    if (revokedAt !== null && credentialIssuedAtMs < revokedAt.getTime()) {
+      return "credentials-revoked";
+    }
   }
-  if (claims.role !== undefined && claims.role !== row.role) return "role-disagrees";
   return undefined;
 };
 

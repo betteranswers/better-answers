@@ -7,6 +7,21 @@ import {
   ACCESS_REQUEST_STATUSES,
 } from "./access-request-tables.ts";
 import { ACT, auditEvent, FAMILIES } from "./audit-tables.ts";
+import {
+  bundleCommit,
+  CONCEPT_PATH,
+  CONCEPT_STATUSES,
+  conceptIdentity,
+  conceptIndex,
+  citedSourceOf,
+  conceptVerification,
+  CONTENT_HASH,
+  evidence,
+  GIT_SHA,
+  IRI,
+  SENSITIVITIES,
+  VERIFICATION_ORIGINS,
+} from "./concept-tables.ts";
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import { group, GROUP_ORIGINS, groupMember } from "./group-tables.ts";
@@ -122,8 +137,9 @@ const chunkRefinements = {
   embedding: z.array(z.number()).length(EMBEDDING_DIMENSIONS),
   embeddingRouteId: (schema: z.ZodString) => schema.trim().min(1),
   // The glossary's closed set (CONTEXT.md, *sensitivity*); the column stays text so
-  // the set is the boundary's to narrow, exactly as ADR 0028 intends.
-  sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(["Restricted", "Internal", "Public"])),
+  // the set is the boundary's to narrow, exactly as ADR 0028 intends. The list is the
+  // one `concept_index` narrows to as well — a readable unit's classes are one fact.
+  sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
   // *audience* is "everyone in the workspace, or named groups" — not a closed word
   // set, so the boundary narrows to non-empty only.
   audience: (schema: z.ZodString) => schema.trim().min(1),
@@ -220,7 +236,7 @@ export const ingressCounterUpdate = createUpdateSchema(ingressCounter, ingressCo
  * platform by `process:better-answers-<purpose>`, an agent by `better-answers-<purpose>/<version>`
  * as ADR 0019 shapes it.
  */
-const ACTOR_ID = new RegExp(
+export const ACTOR_ID = new RegExp(
   `^(human:${ULID_CHARACTERS}|process:better-answers-[a-z0-9][a-z0-9-]*|better-answers-[a-z0-9][a-z0-9-]*/[0-9A-Za-z.-]+)$`,
 );
 
@@ -277,6 +293,177 @@ const accessRequestRefinements = {
 export const accessRequestSelect = createSelectSchema(accessRequest, accessRequestRefinements);
 export const accessRequestInsert = createInsertSchema(accessRequest, accessRequestRefinements);
 export const accessRequestUpdate = createUpdateSchema(accessRequest, accessRequestRefinements);
+
+/**
+ * A concept's IRI (ADR 0002): the platform-minted key every record about a concept attaches
+ * by, branded so a path or a title cannot be passed where one belongs. The brand is where
+ * the kernel's `ConceptIri` comes from, as `WorkspaceId` and `GroupId` are.
+ */
+const conceptIri = (schema: z.ZodString) => schema.regex(IRI).brand<"ConceptIri">();
+
+/**
+ * A concept's frontmatter as the row holds it: OKF's scalars and string lists, plus the one
+ * shape the spec defines as a list of objects — **`sources[]`**, whose entries carry
+ * `resource` (required), `id`, `title`, `author`, `usage_count` and `last_modified`, and the
+ * platform's `locator` beside them (`docs/okf-v02.md`). One level of nesting and no more, so
+ * the file's shape survives the round trip and a value with somewhere to hide does not.
+ *
+ * JSON `null` stays accepted for the container because the column accepts it (`jsonb NOT
+ * NULL` refuses SQL NULL, not the JSON value) and the parity suite holds the refinement to
+ * the column's own nullability; the write path never stores one.
+ */
+/** One list-of-objects entry: a flat object of scalars, whatever key it sits under. */
+const frontmatterEntry = z.record(
+  z.string(),
+  z.union([z.string(), z.number(), z.boolean(), z.null()]),
+);
+
+/**
+ * Whether one `sources[]` entry names the resource it cites — **asked of the one reader**
+ * (`citedSourceOf`), never of a second copy of its rules. OKF requires `resource` and the hash
+ * reduces every entry to a `(resource, locator)` pair (ADR 0019), so what this refuses and
+ * what the hash reduces are the same judgement by construction: an entry the reader cannot
+ * read is an entry with nothing to cite.
+ */
+const namesAResource = (entry: z.infer<typeof frontmatterEntry> | string): boolean =>
+  citedSourceOf(entry) !== undefined;
+
+/**
+ * The one shape a concept's frontmatter has, **exported** — because the row is not the only
+ * place it appears: `open` serves it on the MCP surface, whose output schema has to accept
+ * exactly what the row can hold. Two copies of this union would be a wire that refuses a
+ * concept the database accepted, which is how the api's typecheck found the second copy.
+ *
+ * **The resource requirement is `sources`' alone.** Every other key is preserved verbatim
+ * (ADR 0019), unknown keys and their nested values included, so a concept that carries some
+ * other list of objects — a vendor's, a future spec's — is a concept this refuses to lose.
+ * The requirement is a refinement over the whole record rather than over the entry type,
+ * because the entry type has no idea which key it sits under.
+ */
+export const conceptFrontmatter = z
+  .record(
+    z.string(),
+    z.union([
+      z.string(),
+      z.number(),
+      z.boolean(),
+      z.null(),
+      z.array(z.string()),
+      z.array(frontmatterEntry),
+    ]),
+  )
+  .superRefine((value, context) => {
+    const sources = value["sources"];
+    if (!Array.isArray(sources)) return;
+    for (const [index, entry] of sources.entries()) {
+      if (namesAResource(entry)) continue;
+      context.addIssue({
+        code: "custom",
+        path: ["sources", index],
+        message: "a sources[] entry names the resource it cites",
+      });
+    }
+  });
+
+const frontmatter = z.union([conceptFrontmatter, z.null()]);
+
+const conceptIdentityRefinements = {
+  workspaceId,
+  iri: conceptIri,
+  mergeKey: (schema: z.ZodString) => schema.trim().min(1),
+};
+
+export const conceptIdentitySelect = createSelectSchema(
+  conceptIdentity,
+  conceptIdentityRefinements,
+);
+export const conceptIdentityInsert = createInsertSchema(
+  conceptIdentity,
+  conceptIdentityRefinements,
+);
+export const conceptIdentityUpdate = createUpdateSchema(
+  conceptIdentity,
+  conceptIdentityRefinements,
+);
+
+/**
+ * The concept index (ADR 0012): the derived row per concept. The two hashes are narrowed to
+ * their own shapes — a git object name and the canonical-form SHA-256 — so a row can never
+ * hold one where the other belongs, and the three visibility columns are narrowed exactly as
+ * `index.chunk`'s are, because the read predicate is tested against them (ADR 0023).
+ */
+const conceptIndexRefinements = {
+  workspaceId,
+  iri: conceptIri,
+  // A place in the bundle's concept area and nothing else: the manifest at the bundle root
+  // is platform-reserved (ADR 0002), and a row pointing at it would be the index claiming a
+  // file the format does not read as a concept.
+  path: (schema: z.ZodString) => schema.regex(CONCEPT_PATH),
+  kind: (schema: z.ZodString) => schema.trim().min(1),
+  title: (schema: z.ZodString) => schema.trim().min(1),
+  frontmatter: (schema: z.ZodType) => schema.pipe(frontmatter),
+  contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
+  commitSha: (schema: z.ZodString) => schema.regex(GIT_SHA),
+  status: (schema: z.ZodString) => schema.pipe(z.enum(CONCEPT_STATUSES)),
+  sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
+  audience: (schema: z.ZodString) => schema.trim().min(1),
+};
+
+export const conceptIndexSelect = createSelectSchema(conceptIndex, conceptIndexRefinements);
+export const conceptIndexInsert = createInsertSchema(conceptIndex, conceptIndexRefinements);
+export const conceptIndexUpdate = createUpdateSchema(conceptIndex, conceptIndexRefinements);
+
+/**
+ * A bundle commit (ADR 0012): the sha and its parent are git object names, the audit event
+ * id is the minter's shape — the id the act minted before the commit and the commit carries
+ * in its `Audit:` trailer — and the actor is the ledger's own actor shape, so the trailer and
+ * the row cannot say different things about who acted.
+ */
+const bundleCommitRefinements = {
+  workspaceId,
+  sha: (schema: z.ZodString) => schema.regex(GIT_SHA),
+  parentSha: (schema: z.ZodString) => schema.regex(GIT_SHA),
+  auditEventId: (schema: z.ZodString) => schema.regex(ULID),
+  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+};
+
+export const bundleCommitSelect = createSelectSchema(bundleCommit, bundleCommitRefinements);
+export const bundleCommitInsert = createInsertSchema(bundleCommit, bundleCommitRefinements);
+export const bundleCommitUpdate = createUpdateSchema(bundleCommit, bundleCommitRefinements);
+
+const evidenceRefinements = {
+  workspaceId,
+  sourceDocumentId: (schema: z.ZodString) => schema.trim().min(1),
+  locator: (schema: z.ZodString) => schema.trim().min(1),
+  resource: (schema: z.ZodString) => schema.trim().min(1),
+  contentVersion: (schema: z.ZodString) => schema.trim().min(1),
+};
+
+export const evidenceSelect = createSelectSchema(evidence, evidenceRefinements);
+export const evidenceInsert = createInsertSchema(evidence, evidenceRefinements);
+export const evidenceUpdate = createUpdateSchema(evidence, evidenceRefinements);
+
+const conceptVerificationRefinements = {
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  workspaceId,
+  iri: conceptIri,
+  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+  contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
+  origin: (schema: z.ZodString) => schema.pipe(z.enum(VERIFICATION_ORIGINS)),
+};
+
+export const conceptVerificationSelect = createSelectSchema(
+  conceptVerification,
+  conceptVerificationRefinements,
+);
+export const conceptVerificationInsert = createInsertSchema(
+  conceptVerification,
+  conceptVerificationRefinements,
+);
+export const conceptVerificationUpdate = createUpdateSchema(
+  conceptVerification,
+  conceptVerificationRefinements,
+);
 
 /** One entry per table this package owns — the parity test's registry (ADR 0028). */
 export const boundarySchemas = {
@@ -354,5 +541,35 @@ export const boundarySchemas = {
     select: accessRequestSelect,
     insert: accessRequestInsert,
     update: accessRequestUpdate,
+  },
+  conceptIdentity: {
+    table: conceptIdentity,
+    select: conceptIdentitySelect,
+    insert: conceptIdentityInsert,
+    update: conceptIdentityUpdate,
+  },
+  conceptIndex: {
+    table: conceptIndex,
+    select: conceptIndexSelect,
+    insert: conceptIndexInsert,
+    update: conceptIndexUpdate,
+  },
+  bundleCommit: {
+    table: bundleCommit,
+    select: bundleCommitSelect,
+    insert: bundleCommitInsert,
+    update: bundleCommitUpdate,
+  },
+  evidence: {
+    table: evidence,
+    select: evidenceSelect,
+    insert: evidenceInsert,
+    update: evidenceUpdate,
+  },
+  conceptVerification: {
+    table: conceptVerification,
+    select: conceptVerificationSelect,
+    insert: conceptVerificationInsert,
+    update: conceptVerificationUpdate,
   },
 } as const;

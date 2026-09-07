@@ -1,0 +1,119 @@
+import { execFile } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
+
+import { afterAll, beforeAll } from "vitest";
+
+import { openGit, type GitDoor } from "@better-answers/core/store/git";
+
+/**
+ * One real bare repository per suite, in a temporary directory — the git half of what a
+ * governed write's tests need, written once here beside `suite-postgres.ts`, which is the
+ * Postgres half.
+ *
+ * Real, not a fake: the door shells out to the git binary (ADR 0024), so the only way to
+ * assert what a commit *is* — its author, its committer, its trailers, its tree — is to ask
+ * git about the repository the act actually wrote (`[TEST1]`, `[TEST3]`).
+ */
+
+const run = promisify(execFile);
+
+export const bundlesForSuite = (): (() => GitDoor) => {
+  let root: string | undefined;
+
+  beforeAll(async () => {
+    root = await mkdtemp(path.join(tmpdir(), "better-answers-bundles-"));
+  });
+
+  afterAll(async () => {
+    if (root !== undefined) await rm(root, { recursive: true, force: true });
+  });
+
+  return () => {
+    // Reached only from a test body, which runs after `beforeAll`; the throw is what a
+    // caller gets instead of `undefined` if that ever stops being true.
+    if (root === undefined) throw new Error("the suite's bundle root was read before it existed");
+    return openGit(root);
+  };
+};
+
+const git = async (door: GitDoor, workspaceId: string, arguments_: readonly string[]) => {
+  const { stdout } = await run("git", [
+    "--git-dir",
+    path.join(door.root, `${workspaceId}.git`),
+    ...arguments_,
+  ]);
+  return stdout;
+};
+
+/** One commit as git itself reports it — every field a governed write's tests assert on. */
+export type CommitFacts = {
+  readonly sha: string;
+  /** The message's first line, before the blank line the trailers sit under. */
+  readonly subject: string;
+  /** `Name <address>`, the two identity lines a commit carries. */
+  readonly author: string;
+  readonly committer: string;
+  /** The trailers by key, in ADR 0012's names: `Actor`, `Audit`, `Run`, `Suggestion`, `Projection`. */
+  readonly trailers: Readonly<Record<string, string>>;
+  readonly parents: readonly string[];
+  /** Every path in the commit's tree, so a commit that lost a file is visible. */
+  readonly files: readonly string[];
+};
+
+const FIELD = "%H%n%s%n%an <%ae>%n%cn <%ce>%n%P%n%B";
+
+export const commitFacts = async (
+  door: GitDoor,
+  workspaceId: string,
+  sha: string,
+): Promise<CommitFacts> => {
+  const shown = await git(door, workspaceId, ["show", "-s", `--format=${FIELD}`, sha]);
+  const [id = "", subject = "", author = "", committer = "", parents = "", ...message] =
+    shown.split("\n");
+  // The trailers are the block **after the message's blank line**, never any line of the
+  // message that happens to look like one — which is the whole point of refusing a subject
+  // that carries a newline: a reader that matched the first `Key: value` anywhere would take
+  // a forged trailer as the real one, and this harness must not be the reader that does.
+  const blank = message.indexOf("");
+  const trailers: Record<string, string> = {};
+  for (const line of blank === -1 ? [] : message.slice(blank + 1)) {
+    const match = /^([A-Za-z][A-Za-z-]*): (.+)$/.exec(line);
+    if (match?.[1] !== undefined && match[2] !== undefined) trailers[match[1]] = match[2];
+  }
+  const tree = await git(door, workspaceId, ["ls-tree", "-r", "--name-only", sha]);
+  return {
+    sha: id,
+    subject,
+    author,
+    committer,
+    trailers,
+    parents: parents.split(" ").filter((parent) => parent !== ""),
+    files: tree.split("\n").filter((file) => file !== ""),
+  };
+};
+
+/** A file's bytes at a commit, as the worker would read them over its read-only mount. */
+export const fileAtCommit = (
+  door: GitDoor,
+  workspaceId: string,
+  sha: string,
+  file: string,
+): Promise<string> => git(door, workspaceId, ["show", `${sha}:${file}`]);
+
+/** Every commit on the bundle's ref, oldest first — the history `bundle_commit` is a prefix of. */
+export const bundleHistory = async (
+  door: GitDoor,
+  workspaceId: string,
+): Promise<readonly string[]> => {
+  // `rev-list` has no way of saying "this branch has no commits yet" but a non-zero exit, and
+  // a bundle with no commits is where every bundle starts — the empty list is the answer.
+  const listed = await git(door, workspaceId, ["rev-list", "--reverse", "main"]).catch(() => "");
+  return listed.split("\n").filter((sha) => sha !== "");
+};
+
+/** Take a workspace's bundle away, for the tests about a repository that is not there. */
+export const removeRepository = (door: GitDoor, workspaceId: string): Promise<void> =>
+  rm(path.join(door.root, `${workspaceId}.git`), { recursive: true, force: true });

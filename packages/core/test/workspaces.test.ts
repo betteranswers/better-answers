@@ -346,6 +346,7 @@ describe("revoking a person's credentials", () => {
       userId: "user-admin" as UserPrincipal["userId"],
       role: "Admin",
       groups: [],
+      credentialIssuedAtMs: Date.now(),
     };
 
     // *Revoke everywhere* is the operator's act (the platform principal until T-028),
