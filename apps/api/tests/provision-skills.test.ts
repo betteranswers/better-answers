@@ -275,12 +275,20 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
       return bin;
     };
 
-    it("reinstalls from the tracked manifest", () => {
-      const primary = primaryCheckout("bare-primary", false);
-      const worktree = worktreeOf(primary, "bare-worktree");
-      const bin = stubInstallers("bare", "installs");
-
+    /**
+     * A worktree of a primary that never installed anything, provisioned with the stubs on
+     * PATH — the primary's other contents, if any, are the caller's to add first.
+     */
+    const bare = (name: string, installer: Installer): { worktree: string; run: Run } => {
+      const primary = primaryCheckout(`${name}-primary`, false);
+      const worktree = worktreeOf(primary, `${name}-worktree`);
+      const bin = stubInstallers(name, installer);
       const run = provision(worktree, { PATH: `${bin}:${process.env["PATH"] ?? ""}` });
+      return { worktree, run };
+    };
+
+    it("reinstalls from the tracked manifest", () => {
+      const { worktree, run } = bare("restored", "installs");
 
       ready(run);
       expect(readFileSync(path.join(worktree, "npx-was-asked"), "utf8")).toContain(
@@ -294,11 +302,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
     });
 
     it("does not read an installer's zero exit as skills when it installed none", () => {
-      const primary = primaryCheckout("empty-primary", false);
-      const worktree = worktreeOf(primary, "empty-worktree");
-      const bin = stubInstallers("empty", "installs nothing");
-
-      const run = provision(worktree, { PATH: `${bin}:${process.env["PATH"] ?? ""}` });
+      const { run } = bare("empty", "installs nothing");
 
       expect(run.status).not.toBe(0);
       expect(run.stderr).toContain("FAILED");
@@ -328,11 +332,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
     });
 
     it("says plainly that it could not, and exits non-zero, when the reinstall fails", () => {
-      const primary = primaryCheckout("refused-primary", false);
-      const worktree = worktreeOf(primary, "refused-worktree");
-      const bin = stubInstallers("refused", "refuses");
-
-      const run = provision(worktree, { PATH: `${bin}:${process.env["PATH"] ?? ""}` });
+      const { run } = bare("refused", "refuses");
 
       expect(run.status).not.toBe(0);
       expect(run.stderr).toContain("skills-lock.json");
