@@ -1,0 +1,95 @@
+packages/core/test/principal.test.ts
+  s_6181fc5a558822::t_1deeb58470c0cd 114,116,129-131
+  s_6181fc5a558822::t_bfe360f9648b53 235
+packages/core/src/kernel/principal.ts
+  s_6181fc5a558822::t_9c0a05fa0e1434 44-54
+CONTEXT.md
+  s_6181fc5a558822::t_1e8db018eaefe1 106-110
+packages/schema/migrations/meta/_journal.json
+  s_6181fc5a558822::t_61f56e67f4d0bd 106
+  s_6181fc5a558822::t_5fc7a6abe918cc 113
+packages/schema/src/concept-tables.ts
+  s_6181fc5a558822::t_0cd6375afb3ad4 253
+  s_6181fc5a558822::t_143f59f602893a 266-270
+packages/schema/migrations/0014_concept-write-path.sql
+  s_6181fc5a558822::t_61f56e67f4d0bd 43,50
+packages/core/src/concepts/index.ts
+  s_6181fc5a558822::t_8f7505bf2b37fb 422-427,429-430,432
+  s_6181fc5a558822::t_d21fd4ff77be28 282-295,308-319,327-371,384-386,396,400,405
+  s_6181fc5a558822::t_72011fbff4f0ac 484,496-497
+  s_6181fc5a558822::t_b89f6750f6ce55 580,583-594
+  s_6181fc5a558822::t_3f6741a99e6450 142-144,152-154
+  s_6181fc5a558822::t_c3d21fe75a86a2 243-269
+  s_6181fc5a558822::t_4d1360cda50cac 120-124
+  s_6181fc5a558822::t_29f4edba158099 9,17,21,32
+docs/adr/0012-the-concept-write-path.md
+  s_6181fc5a558822::t_7c8f4da3830df8 72
+packages/core/src/store/postgres/index.ts
+  s_6181fc5a558822::t_c66b025d641343 161-177
+  s_6181fc5a558822::t_dfb3496becce1e 296,303
+  s_6181fc5a558822::t_c36269eb2cf084 327
+  s_6181fc5a558822::t_f98196bec202c2 220-233
+  s_6181fc5a558822::t_fd03645dd41ce8 293
+  s_6181fc5a558822::t_24827f9a673622 270
+  s_6181fc5a558822::t_62eeb3419da652 340-349,354
+  s_6181fc5a558822::t_8f09ff1bb6e641 252-259,272-276,279
+docs/adr/README.md
+  s_6181fc5a558822::t_390a9ef5a4a498 20
+packages/core/test/workspaces.test.ts
+  s_6181fc5a558822::t_8bb55aaa1705bd 349
+packages/core/src/answering/index.ts
+  s_6181fc5a558822::t_a78efe0964613c 2
+  s_6181fc5a558822::t_c0d51576785c61 230-235
+  s_6181fc5a558822::t_2999ccd32b9704 214
+packages/schema/migrations/meta/0015_snapshot.json
+  s_6181fc5a558822::t_5fc7a6abe918cc 2-3,3059,3147-3155
+packages/core/test/concepts.test.ts
+  s_6181fc5a558822::t_ea4c075446c4a1 28-34
+  s_6181fc5a558822::t_996dd7677798ff 359-409,411,413-439
+  s_6181fc5a558822::t_a7539bc4f34fff 465-487,501-506,508-532,536
+  s_6181fc5a558822::t_9fa26a65cd8a4f 622,638,647-665
+  s_6181fc5a558822::t_ce89193d9652d8 488-500,507
+  s_6181fc5a558822::t_8a49016145e1dd 410,412
+  s_6181fc5a558822::t_fcffcc733e2693 442-457
+  s_6181fc5a558822::t_c6f49bf7d061f1 20
+  s_6181fc5a558822::t_7ba11b1368b713 720
+  s_6181fc5a558822::t_8be0a4ae4cfc3d 346-349,351
+packages/schema/src/boundary-schemas.ts
+  s_6181fc5a558822::t_00a4450373b3e6 237
+packages/core/src/kernel/actor.ts
+  s_6181fc5a558822::t_fb2857c03ed22a 51-65
+  s_6181fc5a558822::t_ebebaae8b272bb 1-2
+packages/core/src/kernel/index.ts
+  s_6181fc5a558822::t_9b1271b36221b2 38
+packages/core/package.json
+  s_6181fc5a558822::t_cd5837a07cccce 20-21
+packages/core/test/kernel.test.ts
+  s_6181fc5a558822::t_8bb55aaa1705bd 28
+packages/schema/migrations/meta/0014_snapshot.json
+  s_6181fc5a558822::t_61f56e67f4d0bd 2,3059,3147-3155
+packages/core/src/store/git/index.ts
+  s_6181fc5a558822::t_ab1fb88a8363c9 104-108
+  s_6181fc5a558822::t_d4f320abe2fec5 157-168
+  s_6181fc5a558822::t_abd5e32597b842 208
+packages/core/test/audit.test.ts
+  s_6181fc5a558822::t_d797c510d58e08 386
+packages/core/test/bundle.ts
+  s_6181fc5a558822::t_dcc748aae211e6 106-108,111-114
+  s_6181fc5a558822::t_c6f49bf7d061f1 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "df1b132f1116fa7e60ed6817324e80bfac75adb1",
+  "prompts": {},
+  "sessions": {
+    "s_6181fc5a558822": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6019b35b-37fc-4524-aa66-a5eb72515b67",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
