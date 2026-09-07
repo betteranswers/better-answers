@@ -3,16 +3,27 @@ set -euo pipefail
 
 # .claude/hooks/provision-worktree.sh <worktree-path>
 #
-# Installs a fresh checkout's dependencies so an agent's first act in a worktree is
-# its task, not `pnpm install`. Run by .claude/hooks/worktree-create-hook.sh for every
-# worktree Claude Code creates; runnable by hand after `git worktree add`.
+# Installs a fresh checkout's dependencies and the agent tooling a checkout cannot carry,
+# so an agent's first act in a worktree is its task, not `pnpm install`. Run by
+# .claude/hooks/worktree-create-hook.sh for every worktree Claude Code creates; runnable
+# by hand after `git worktree add`, which fires no hook.
 #
-# Install, never symlink or clone from the main checkout. pnpm and uv both install by
-# hard link from a global store (seconds), and both write links that are relative to
-# the real tree: pnpm's workspace links (`node_modules/@better-answers/core ->
-# ../../packages/core`) and uv's editable `.pth`. A `node_modules` or `.venv` shared
-# with `main` would import main's `packages/core` and worker source, so a worktree's
-# tests would run against code it is not editing.
+# Three stages, each reporting on its own line and none stopping the next:
+#   pnpm install  — the TypeScript workspaces
+#   uv sync       — the Python worker
+#   skills        — .claude/hooks/provision-skills.sh: the installed, ignored agent
+#                   tooling (`.agents/`, `.claude/skills/*`, `tasks/AGENTS.md`)
+#
+# `node_modules` and `.venv` are installed, never symlinked or copied from the main
+# checkout. pnpm and uv both install by hard link from a global store (seconds), and
+# both write links that are relative to the real tree: pnpm's workspace links
+# (`node_modules/@better-answers/core -> ../../packages/core`) and uv's editable
+# `.pth`. A `node_modules` or `.venv` shared with `main` would import main's
+# `packages/core` and worker source, so a worktree's tests would run against code it
+# is not editing. That rule is about path resolution, and it does not reach the skills:
+# a skill is static markdown that resolves nothing, so the skills stage copies it from
+# the main checkout — copies, so the worktree's set is its own and the relative links
+# under `.claude/skills/` resolve inside the tree they sit in.
 #
 # Nothing is copied from `.env.local`: no workspace, test or compose file reads it
 # (checked 02/09/2026), and tests reach Postgres through Testcontainers. If that
@@ -68,6 +79,9 @@ if [ -f "$WORKER/pyproject.toml" ]; then
     STATUS=1
   fi
 fi
+
+# --- skills: the installed agent tooling, copied from the main checkout ---
+bash "$(dirname "${BASH_SOURCE[0]}")/provision-skills.sh" "$WORKTREE_PATH" || STATUS=1
 
 echo "provision-worktree: $([ $STATUS -eq 0 ] && echo ready || echo incomplete)" >&2
 exit $STATUS
