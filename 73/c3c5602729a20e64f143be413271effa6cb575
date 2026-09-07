@@ -1,0 +1,31 @@
+packages/schema/src/graph-tables.ts
+  s_876a3fbbae1185::t_535890f9fb1a69 5,159,193
+packages/schema/src/source-tables.ts
+  s_876a3fbbae1185::t_1c4b2139830d5a 1
+  s_876a3fbbae1185::t_535890f9fb1a69 3,27-31
+  s_876a3fbbae1185::t_8c53ffa74155be 35
+packages/schema/src/concept-tables.ts
+  s_876a3fbbae1185::t_a2be3f8d72ba8c 10
+  s_876a3fbbae1185::t_c02b24e200d319 348-360
+  s_876a3fbbae1185::t_cd4fdd339ce78d 441,525,574,613
+  s_876a3fbbae1185::t_e705395d9ecf7f 313-347
+packages/schema/src/composition-tables.ts
+  s_876a3fbbae1185::t_535890f9fb1a69 4,23-25
+  s_876a3fbbae1185::t_9f294db23379f3 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "73c3c5602729a20e64f143be413271effa6cb575",
+  "prompts": {},
+  "sessions": {
+    "s_876a3fbbae1185": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9e05c9c3-cbbb-4563-b5b8-659867a07e7e",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
