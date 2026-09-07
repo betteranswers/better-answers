@@ -1,0 +1,29 @@
+apps/api/tests/provision-skills.test.ts
+  s_3695f0cfb8d82a::t_194c2a00381990 349-351
+.github/workflows/build.yml
+  s_3695f0cfb8d82a::t_194c2a00381990 61-64,130-131,136-142
+.github/workflows/check.yml
+  s_3695f0cfb8d82a::t_194c2a00381990 25-29
+apps/web/e2e/consent.spec.ts
+  s_3695f0cfb8d82a::t_194c2a00381990 96-98
+apps/web/e2e/accessibility-gate.spec.ts
+  s_3695f0cfb8d82a::t_194c2a00381990 21-23
+apps/api/tests/mcp-surface.test.ts
+  s_3695f0cfb8d82a::t_194c2a00381990 8,272-273
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d3d6ffe5367cfe13cb8fd01537674bf2a2b1d1ae",
+  "prompts": {},
+  "sessions": {
+    "s_3695f0cfb8d82a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "602efdc2-4b25-49db-938f-df6797643aa7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
