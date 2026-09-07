@@ -1,0 +1,42 @@
+packages/core/test/suggestions.test.ts
+  s_127243e02256ac::t_d1218a7c1c74db 1123-1128,1130-1148
+packages/schema/migrations/0018_the-inbox-substrate.sql
+  s_127243e02256ac::t_05c7823af3279b 102-107,109
+  s_127243e02256ac::t_3b96132dbd82ac 31-45,59-61
+packages/core/src/concepts/index.ts
+  s_127243e02256ac::t_091148185ab0cd 838-842
+  s_127243e02256ac::t_9eebbef65bbe2a 51
+packages/schema/src/suggestion-tables.ts
+  s_127243e02256ac::t_fa86accaf66fe2 271-276,279
+  s_127243e02256ac::t_cd2605253974ae 48-60,62-70,72-73
+  s_127243e02256ac::t_5c30a56d57c09a 6
+packages/core/src/concepts/inbox.ts
+  s_127243e02256ac::t_2f35b06019c46c 245-248,251-253
+  s_127243e02256ac::t_cc474cff50b886 228-234
+  s_127243e02256ac::t_e0b7553eb88583 306-320
+  s_127243e02256ac::t_f56c9a22779958 396-399
+  s_127243e02256ac::t_9f1d6dffd679cd 4
+packages/schema/test/rls.test.ts
+  s_127243e02256ac::t_9a391567d4bf0a 1110-1118
+  s_127243e02256ac::t_804709a2f677b8 1214-1216,1223
+  s_127243e02256ac::t_536f4a4fd21ff1 1178
+  s_127243e02256ac::t_624ac167a636be 1265-1297
+packages/schema/src/concept-tables.ts
+  s_127243e02256ac::t_b44842260ca779 237-242,246-264
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "18f018c08291b9666059f619991a51e0773a08fe",
+  "prompts": {},
+  "sessions": {
+    "s_127243e02256ac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c7e92e84-0713-4b5c-8861-c989df4466c0",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
