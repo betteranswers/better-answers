@@ -311,38 +311,64 @@ const conceptIri = (schema: z.ZodString) => schema.regex(IRI).brand<"ConceptIri"
  * NULL` refuses SQL NULL, not the JSON value) and the parity suite holds the refinement to
  * the column's own nullability; the write path never stores one.
  */
+/** One list-of-objects entry: a flat object of scalars, whatever key it sits under. */
+const frontmatterEntry = z.record(
+  z.string(),
+  z.union([z.string(), z.number(), z.boolean(), z.null()]),
+);
+
 /**
- * One `sources[]` entry: OKF's provenance object, whose **`resource` is required** — it is
- * the whole of what the entry cites, and the hash reduces every entry to a
- * `(resource, locator)` pair (ADR 0019). An entry without one is refused here rather than
- * hashed as an empty string, which would make two different citations hash alike.
- *
- * A bundle may also carry the legacy `<resource>#<locator>` string form, which the array's
- * other arm accepts; the slice reads both through one reader.
+ * Whether one `sources[]` entry names the resource it cites. OKF requires `resource` and the
+ * hash reduces every entry to a `(resource, locator)` pair (ADR 0019), so an entry without
+ * one has nothing to be reduced to and two different citations would hash alike. Both forms
+ * are held to it: OKF's object, and the legacy `<resource>#<locator>` string a bundle may
+ * still carry, whose resource is everything before the last `#`.
  */
-const frontmatterEntry = z
-  .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
-  .refine((entry) => typeof entry["resource"] === "string" && entry["resource"].trim() !== "", {
-    message: "a sources[] entry names the resource it cites",
-  });
+const namesAResource = (entry: z.infer<typeof frontmatterEntry> | string): boolean => {
+  if (typeof entry === "string") {
+    const hash = entry.lastIndexOf("#");
+    return (hash === -1 ? entry : entry.slice(0, hash)).trim() !== "";
+  }
+  const resource = entry["resource"];
+  return typeof resource === "string" && resource.trim() !== "";
+};
 
 /**
  * The one shape a concept's frontmatter has, **exported** — because the row is not the only
  * place it appears: `open` serves it on the MCP surface, whose output schema has to accept
  * exactly what the row can hold. Two copies of this union would be a wire that refuses a
  * concept the database accepted, which is how the api's typecheck found the second copy.
+ *
+ * **The resource requirement is `sources`' alone.** Every other key is preserved verbatim
+ * (ADR 0019), unknown keys and their nested values included, so a concept that carries some
+ * other list of objects — a vendor's, a future spec's — is a concept this refuses to lose.
+ * The requirement is a refinement over the whole record rather than over the entry type,
+ * because the entry type has no idea which key it sits under.
  */
-export const conceptFrontmatter = z.record(
-  z.string(),
-  z.union([
+export const conceptFrontmatter = z
+  .record(
     z.string(),
-    z.number(),
-    z.boolean(),
-    z.null(),
-    z.array(z.string()),
-    z.array(frontmatterEntry),
-  ]),
-);
+    z.union([
+      z.string(),
+      z.number(),
+      z.boolean(),
+      z.null(),
+      z.array(z.string()),
+      z.array(frontmatterEntry),
+    ]),
+  )
+  .superRefine((value, context) => {
+    const sources = value["sources"];
+    if (!Array.isArray(sources)) return;
+    for (const [index, entry] of sources.entries()) {
+      if (namesAResource(entry)) continue;
+      context.addIssue({
+        code: "custom",
+        path: ["sources", index],
+        message: "a sources[] entry names the resource it cites",
+      });
+    }
+  });
 
 const frontmatter = z.union([conceptFrontmatter, z.null()]);
 

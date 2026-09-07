@@ -255,16 +255,22 @@ type HashedSource = readonly [string, string | null];
  * view can never disagree about what a file cites: two readers over one shape was exactly the
  * defect that had `evidenceOf` dropping entries the hash was still counting.
  *
- * A resource is required (`docs/okf-v02.md`), so an entry without one is nothing this can
- * read — the boundary refuses such a frontmatter before it reaches here, and `undefined` is
- * what says so rather than a resource guessed from somewhere else.
+ * A resource is required (`docs/okf-v02.md`) and the boundary refuses a `sources[]` entry
+ * without one in **both** forms. This reads the same rule again rather than trusting it,
+ * because the hash is what a check confirmed and an entry reduced to an empty resource would
+ * make two different citations hash alike; `undefined` says "nothing to cite here" rather
+ * than a resource guessed from somewhere else.
+ *
+ * A **locator** is kept as it was written, whatever scalar carried it: YAML renders a bare
+ * page number as a number, and dropping it would be the platform deciding a citation points
+ * at a whole document when the file said page four.
  */
 export const citedSource = (
   entry: FrontmatterSource | string,
 ): { readonly resource: string; readonly locator: string | null } | undefined => {
   if (typeof entry === "string") {
     const hash = entry.lastIndexOf("#");
-    const resource = hash === -1 ? entry : entry.slice(0, hash);
+    const resource = (hash === -1 ? entry : entry.slice(0, hash)).trim();
     return resource === ""
       ? undefined
       : { resource, locator: hash === -1 ? null : entry.slice(hash + 1) };
@@ -272,7 +278,7 @@ export const citedSource = (
   const resource = entry["resource"];
   if (typeof resource !== "string" || resource.trim() === "") return undefined;
   const locator = entry["locator"];
-  return { resource, locator: typeof locator === "string" ? locator : null };
+  return { resource, locator: locator === undefined || locator === null ? null : String(locator) };
 };
 
 /**

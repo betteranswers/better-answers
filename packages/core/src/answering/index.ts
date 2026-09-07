@@ -238,37 +238,57 @@ const trustOf = (concept: OpenedConcept, now: Date): Trust => {
 };
 
 /**
- * Whether a concept's shelf life has run out. `stale_after` is read as a **date** or a
- * datetime with an offset (ADR 0019); anything else is a value the platform did not write, and
- * no shelf life is claimed from it — the same answer as absence, because absence means no
- * shelf life and a reader must never be told *Out of date* from a string nobody could parse.
+ * `stale_after`'s two forms and no others (ADR 0019): a **date**, or a **datetime with an
+ * offset**. The grammar is checked before anything is parsed, because `new Date` is not a
+ * validator — it accepts an offsetless datetime and reads it as local time, and it accepts
+ * plenty that is not a date at all. A value outside the grammar carries no shelf life, which
+ * is the same answer as absence, and absence means no shelf life.
+ */
+const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const OFFSET_DATETIME = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * Midnight UTC on a date, or nothing when the calendar has no such day. `Date.UTC` rolls an
+ * impossible day forward — `2026-02-30` comes back as March — and remaps a year below 100
+ * into the 1900s, so the fields are set on a date object and read back: `setUTCFullYear`
+ * takes the year as written.
+ */
+const utcMidnight = (year: number, month: number, day: number): number | undefined => {
+  const at = new Date(0);
+  at.setUTCFullYear(year, month - 1, day);
+  at.setUTCHours(0, 0, 0, 0);
+  const same =
+    at.getUTCFullYear() === year && at.getUTCMonth() === month - 1 && at.getUTCDate() === day;
+  return same ? at.getTime() : undefined;
+};
+
+/** A day in milliseconds — the span a date-only shelf life lasts through. */
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Whether a concept's shelf life has run out.
  *
  * A date alone means the concept is out of date **after that day**, not during it: `2026-03-01`
  * is a shelf life that lasts through the first of March, so the comparison is against the end
- * of that day in UTC — which is also how the emitter writes one back (ADR 0019).
- *
- * `Date` accepts `2026-02-30` and rolls it into March, so a date is read field by field and
- * checked against the calendar rather than handed to the parser and trusted.
+ * of that day in UTC — which is also the form the emitter writes one back in (ADR 0019). A
+ * datetime names the instant itself.
  */
-const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
-
 const pastShelfLife = (staleAfter: FrontmatterValue | undefined, now: Date): boolean => {
   if (typeof staleAfter !== "string") return false;
-  const date = CALENDAR_DATE.exec(staleAfter);
-  if (date === null) {
-    // A datetime with an offset: the instant it names is the end of the shelf life.
+
+  const datetime = OFFSET_DATETIME.exec(staleAfter);
+  if (datetime !== null) {
+    // The grammar holds the shape and the calendar holds the day; only then is it parsed.
+    const day = utcMidnight(Number(datetime[1]), Number(datetime[2]), Number(datetime[3]));
+    if (day === undefined) return false;
     const instant = new Date(staleAfter);
     return !Number.isNaN(instant.getTime()) && instant.getTime() < now.getTime();
   }
-  const [year, month, day] = [Number(date[1]), Number(date[2]), Number(date[3])];
-  const midnight = Date.UTC(year, month - 1, day);
-  // `Date.UTC` rolls an impossible day into the next month, so a round trip is what tells a
-  // real date from one that only looks like it: 2026-02-30 comes back as March.
-  const rolled = new Date(midnight);
-  if (rolled.getUTCFullYear() !== year || rolled.getUTCMonth() !== month - 1) return false;
-  if (rolled.getUTCDate() !== day) return false;
-  // The end of the named day, so the concept is out of date the moment after it.
-  return midnight + 24 * 60 * 60 * 1000 <= now.getTime();
+
+  const date = CALENDAR_DATE.exec(staleAfter);
+  if (date === null) return false;
+  const midnight = utcMidnight(Number(date[1]), Number(date[2]), Number(date[3]));
+  return midnight !== undefined && midnight + ONE_DAY_MS <= now.getTime();
 };
 
 /**

@@ -1,4 +1,5 @@
 import { testData } from "@better-answers/schema/testing";
+import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import { conceptIriOf, ulid } from "@better-answers/schema";
@@ -10,6 +11,7 @@ import {
   writeConcept,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
+import type { TrustStatus } from "../src/answering/index.ts";
 import type { Result, Role, UserPrincipal } from "../src/kernel/index.ts";
 import {
   commit,
@@ -599,6 +601,36 @@ const revoke = (
 const revokeEditor = (scenario: Scenario, scope: RevocationScope): Promise<unknown> =>
   revoke(db().pool, scenario, scope);
 
+/** Which backend a held connection is, so a test can ask Postgres about that one alone. */
+const backendPidOf = async (client: pg.PoolClient): Promise<number> => {
+  const found = await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+  const pid = found.rows[0]?.pid;
+  if (pid === undefined) throw new Error("the connection did not name its backend");
+  return pid;
+};
+
+/** Whether that backend is waiting on a lock — Postgres's own account of it, not a guess. */
+const isBlockedOnALock = async (pid: number): Promise<boolean> => {
+  const found = await db().pool.query("SELECT 1 FROM pg_locks WHERE pid = $1 AND NOT granted", [
+    pid,
+  ]);
+  return (found.rowCount ?? 0) > 0;
+};
+
+/**
+ * Wait for a condition the database reports, polling rather than sleeping: a slow machine
+ * takes more turns to see the same state instead of failing a stopwatch. The cap is a
+ * runaway guard, not a timing assumption — the test fails on it only if the state never
+ * arrives at all.
+ */
+const until = async (condition: () => Promise<boolean>): Promise<void> => {
+  for (let turn = 0; turn < 200; turn += 1) {
+    if (await condition()) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error("the condition never held");
+};
+
 /** What a refused act leaves behind: no rows of its own, and every commit it made still there. */
 const expectCommitsWithoutRows = async (scenario: Scenario, commits: number): Promise<void> => {
   expect(await rowsFor(scenario.workspaceId)).toMatchObject({ concepts: "0", commits: "0" });
@@ -682,25 +714,29 @@ describe("authority that moved while the act was in flight", () => {
       // between the door's read and the act's COMMIT. Driven through the door's own callback,
       // which is the seam that lets a test hold the act's transaction open.
       const revoker = await db().pool.connect();
-      let blockedFor: number | undefined;
+      let settled = false;
       let waiting: Promise<unknown> = Promise.resolve();
       try {
+        const pid = await backendPidOf(revoker);
         await withMembership(scenario.editor, scenario.postgres, async () => {
-          const startedAt = Date.now();
           // Fired while the act's transaction holds the rows, and **never awaited in here**:
           // the act is what releases the lock, so waiting for the revocation inside the act
           // would be the act waiting for itself.
           waiting = revoke(revoker, scenario, scope).then(() => {
-            blockedFor = Date.now() - startedAt;
+            settled = true;
           });
-          await new Promise((resolve) => setTimeout(resolve, 150));
-          // Still waiting after 150ms, because the act has not committed yet.
-          expect(blockedFor).toBeUndefined();
+
+          // Waited for as a **state Postgres reports**, never a stretch of wall clock: the
+          // revoking backend is asked for repeatedly until it says it is blocked on a lock,
+          // so a starved runner takes longer to observe the same fact rather than failing.
+          await until(() => isBlockedOnALock(pid));
+          // Blocked, and therefore not done — which is the whole claim.
+          expect(settled).toBe(false);
         });
 
         await waiting;
-        // Released by the act's COMMIT, not before.
-        expect(blockedFor).toBeGreaterThanOrEqual(140);
+        // Released by the act's COMMIT, and only then.
+        expect(settled).toBe(true);
       } finally {
         revoker.release();
       }
@@ -908,25 +944,46 @@ describe("opening a concept by IRI", () => {
     );
   });
 
-  it("reads Out of date off the shelf life alone, and says nothing when there is none", async () => {
+  /**
+   * `stale_after` is the whole of *Out of date* and absence means no shelf life (ADR 0019), so
+   * a reader is told exactly what any other consumer of the same file would derive — and told
+   * nothing at all from a value that is not one of the two forms the ADR names. The far-future
+   * dates keep these cases true for the next thousand years rather than the next few.
+   */
+  const SHELF_LIVES: readonly (readonly [string, string | undefined, TrustStatus])[] = [
+    ["no shelf life at all", undefined, "current"],
+    ["a date long past", "2020-01-01", "out-of-date"],
+    // The boundary of the date-only form: a shelf life lasts *through* the day it names, so a
+    // date that has not ended yet is not past — and one that ended is.
+    ["today, which the concept lasts through", new Date().toISOString().slice(0, 10), "current"],
+    ["a date far ahead", "3000-01-01", "current"],
+    ["an offset datetime long past", "2020-01-01T00:00:00Z", "out-of-date"],
+    ["an offset datetime far ahead", "3000-01-01T00:00:00+01:00", "current"],
+    // Outside the grammar: an impossible calendar day, an offsetless datetime `Date` would
+    // read as local time, and a sentence. None of them is a shelf life.
+    ["an impossible calendar day", "2026-02-30", "current"],
+    ["a datetime with no offset", "2020-01-01T00:00:00", "current"],
+    ["a two-digit year `Date` would remap", "0020-01-01", "out-of-date"],
+    ["something that is not a date", "when the contract ends", "current"],
+  ];
+
+  it.each(SHELF_LIVES)("reads %s as %s", async (_why, staleAfter, expected) => {
     const scenario = await arrange();
-    // `stale_after` is the whole of it and absence means no shelf life (ADR 0019) — the
-    // reader is told the same thing any other consumer of the file would derive.
-    const expired = writeFor({
+    const input = writeFor({
       status: "stable",
-      frontmatter: { title: "Expenses", type: "Policy", stale_after: "2020-01-01" },
+      frontmatter: {
+        title: "Expenses",
+        type: "Policy",
+        ...(staleAfter === undefined ? {} : { stale_after: staleAfter }),
+      },
     });
-    const first = await landed(scenario, expired);
-    const evergreen = writeFor({ status: "stable", expectedHead: first.sha });
-    await landed(scenario, evergreen);
+    await landed(scenario, input);
 
-    const read = async (iri: string) =>
-      reading(scenario.viewer, (principal, tx) => open(principal, tx, { iri }));
+    const read = await reading(scenario.viewer, (principal, tx) =>
+      open(principal, tx, { iri: input.iri }),
+    );
 
-    const stale = await read(expired.iri);
-    expect(stale.ok && stale.value.found && stale.value.concept?.trust.status).toBe("out-of-date");
-    const fresh = await read(evergreen.iri);
-    expect(fresh.ok && fresh.value.found && fresh.value.concept?.trust.status).toBe("current");
+    expect(read.ok && read.value.found && read.value.concept?.trust.status).toBe(expected);
   });
 
   it("withholds a Restricted concept from a Viewer exactly as it answers an IRI nobody minted", async () => {

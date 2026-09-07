@@ -80,16 +80,16 @@ export const VERIFICATION_IMPORTED_ORIGIN =
   "imported" satisfies (typeof VERIFICATION_ORIGINS)[number];
 
 /**
- * Where every concept IRI lives, and the whole of it (ADR 0002's 2026-08-25 and 2026-08-27
- * amendments): the IRI is **opaque** — `https://better-answers.com/c/<ulid>` — never derived
- * from the path, the bundle or the tenant, so it leaks no name wherever it appears.
+ * Where every concept IRI lives, and the whole of it (ADR 0002): the IRI is **opaque** —
+ * `https://better-answers.com/c/<ulid>` — never derived from the path, the bundle or the
+ * tenant, so it leaks no name wherever it appears.
  *
- * **The bare apex, and deliberately not the deploy unit's origin.** ADR 0002 reserves the
- * apex for identity and redirection precisely so an IRI outlives every surface, which is why
- * pinning it here reads nothing from the environment and is no deploy-unit configuration: it
- * is a product constant, like the platform bot's address, and it is the same value in every
- * estate on purpose. A staging concept carries a production-shaped IRI and that is the
- * decision — "a persistent redirector can front it later without changing identities".
+ * **The bare apex, and deliberately not the deploy unit's origin**, which is why pinning it
+ * here reads nothing from the environment and is no deploy-unit configuration: the apex is
+ * reserved for identity and redirection so that an IRI outlives every surface, so it is a
+ * product constant like the platform bot's address and the same value in every estate on
+ * purpose. A staging concept carries a production-shaped IRI, and a persistent redirector can
+ * front it later without changing identities.
  */
 export const CONCEPT_IRI_PREFIX = "https://better-answers.com/c/";
 
