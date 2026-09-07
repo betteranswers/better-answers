@@ -4,6 +4,7 @@ import { Pool } from "pg";
 
 import { requireBootstrap, requireIdentityBootstrap } from "./config.ts";
 import { logger } from "./logger.ts";
+import { RECONCILER_INTERVAL_MS, startReconciler } from "./reconciler.ts";
 import { createServer } from "./server.ts";
 
 const bootstrap = requireBootstrap("the app");
@@ -59,3 +60,13 @@ serve(
     logger.info({ port: address.port }, "app listening");
   },
 );
+
+// The reconciler's trigger (ADR 0012, amended 2026-09-06): only where there are bundles
+// to open. Without a root the process still serves — nothing in it writes a bundle either
+// — and the line says so rather than leaving a silent gap in the recovery path.
+if (bootstrap.gitStoreDir === undefined) {
+  logger.warn("no repositories' root is configured (GIT_STORE_DIR): the head check is not running");
+} else {
+  startReconciler({ database, gitStoreDir: bootstrap.gitStoreDir });
+  logger.info({ interval_ms: RECONCILER_INTERVAL_MS }, "head check running");
+}
