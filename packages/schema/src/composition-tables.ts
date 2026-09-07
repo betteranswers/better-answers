@@ -1,16 +1,8 @@
 import { sql } from "drizzle-orm";
 import { check, foreignKey, index, integer, primaryKey, text } from "drizzle-orm/pg-core";
 
-import { listed, stamp } from "./column-helpers.ts";
-import {
-  AUDIENCE_CHECK,
-  AUDIENCE_EVERYONE,
-  conceptIdentity,
-  SENSITIVITIES,
-  SENSITIVITY_DEFAULT,
-} from "./concept-tables.ts";
+import { conceptIdentity, readableRecordColumns, readableUnitChecks } from "./concept-tables.ts";
 import { withRLS } from "./with-rls.ts";
-import { workspace } from "./workspace-table.ts";
 
 /**
  * A **composition** and its **includes** as the visibility cascade and the footnote read
@@ -28,24 +20,13 @@ import { workspace } from "./workspace-table.ts";
 
 export const composition = withRLS(
   "composition",
-  {
-    workspaceId: text("workspace_id")
-      .notNull()
-      .references(() => workspace.id, { onDelete: "cascade" }),
-    id: text("id").notNull(),
-    // The three visibility columns every readable unit carries (ADR 0023), the audience as
-    // its word and its group-id array (ADR 0039). Fail-closed defaults, as everywhere.
-    publishedAt: stamp("published_at"),
-    sensitivity: text("sensitivity").notNull().default(SENSITIVITY_DEFAULT),
-    audience: text("audience").notNull().default(AUDIENCE_EVERYONE),
-    audienceGroups: text("audience_groups").array(),
-    createdAt: stamp("created_at").notNull().defaultNow(),
-  },
+  // The three visibility columns every readable unit carries (ADR 0023), the audience as its
+  // word and its group-id array (ADR 0039), with fail-closed defaults, as everywhere.
+  readableRecordColumns(),
   "workspaceId",
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
-    check("composition_sensitivity_check", sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
-    check("composition_audience_check", sql.raw(AUDIENCE_CHECK)),
+    ...readableUnitChecks("composition"),
   ],
 );
 

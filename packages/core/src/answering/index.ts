@@ -1,5 +1,5 @@
 import type { Frontmatter, FrontmatterValue } from "../concepts/index.ts";
-import { citedSource, conceptByIri, type OpenedConcept } from "../concepts/index.ts";
+import { citedSource, conceptByIri, findConcepts, type OpenedConcept } from "../concepts/index.ts";
 import { err, isPersonActor, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
@@ -189,16 +189,48 @@ export type FeedbackReceipt = {
 };
 
 /**
- * The four acts answer a `Result` (the kernel's result convention, `kernel/result.ts`)
- * with `never` for its error: B9's bodies read no store yet, so there is nothing that
- * can fail and no refusal word to name. The shape is the one the bodies will keep —
- * when the concept index arrives the union widens and no caller is reshaped.
+ * The four acts answer a `Result` (the kernel's result convention, `kernel/result.ts`).
+ * `ask` and `giveFeedback` still declare `never` for their error: B9's bodies read no
+ * store yet, so there is nothing that can fail and no refusal word to name. `find` and
+ * `open` read the concept index now, so their unions carry the store's own Error — the
+ * shape the convention's rule 3 promised would not change when a body arrived, and did not.
+ */
+
+/** The bundle a concept's path sits in: its root directory, `knowledge/` today (ADR 0002). */
+const bundleOf = (path: string): string => path.split("/")[0] ?? path;
+
+/** A concept's `tags` as OKF's list of strings; anything else is no tags. */
+const tagsOf = (frontmatter: Frontmatter): readonly string[] => {
+  const tags = frontmatter["tags"];
+  return Array.isArray(tags) ? tags.filter((tag) => typeof tag === "string") : [];
+};
+
+/**
+ * The preview (ADR 0018): the concepts matching the query that this caller may see, each
+ * as a hit — kind, title, trust — through the concepts slice's own read, which shares
+ * `open`'s SELECT and its predicate. **A withheld concept is not a hit, not a count and
+ * not a hint** (ADR 0016); ranking is B9's.
  */
 export const find = async (
-  _principal: UserPrincipal,
-  _tx: Tx,
+  principal: UserPrincipal,
+  tx: Tx,
   input: { readonly query: string; readonly limit: number },
-): Promise<Result<FindResult, never>> => ok({ query: input.query, hits: [] });
+): Promise<Result<FindResult, Error>> => {
+  const found = await findConcepts(principal, tx, input);
+  if (!found.ok) return err(found.error);
+  const now = new Date();
+  return ok({
+    query: input.query,
+    hits: found.value.map((concept) => ({
+      iri: concept.iri,
+      kind: concept.kind,
+      title: concept.title,
+      trust: trustOf(concept, now),
+      bundle: bundleOf(concept.path),
+      tags: tagsOf(concept.frontmatter),
+    })),
+  });
+};
 
 /**
  * The trust a concept's row and its latest check project to (ADR 0019): a check by a person
@@ -293,9 +325,11 @@ const pastShelfLife = (staleAfter: FrontmatterValue | undefined, now: Date): boo
 
 /**
  * What a concept's `sources[]` frontmatter entry projects to in a view (`CONTEXT.md`,
- * *evidence*). **The file's own list is the citation record until T-055**: the `evidence`
- * table is keyed by document and locator and is shared across the concepts that cite one, so
- * which concept cites which is a relation the graph derives and this read does not have.
+ * *evidence*). **The file's own list is what `open` shows**: it is the concept's own
+ * projection of what it rests on, readable by anyone who may read the concept. Which of
+ * that evidence the reader may *open* is the evidence pane's question, answered by the
+ * concepts slice's `evidencePaneOf` through the predicate on each binding (T-055), and
+ * not restated here.
  */
 const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
   const sources = concept.frontmatter["sources"];

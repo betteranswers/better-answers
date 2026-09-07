@@ -145,6 +145,7 @@ export const audienceIntersection = (audiences: readonly Audience[]): Audience |
  * leaks by derivation; only a recorded Admin override may widen it. Keyed by the folded
  * kind the index row carries.
  */
+// oxlint-disable-next-line anti-slop/no-known-value-widening -- kinds are open (ADR 0026): a concept arrives with whatever folded kind its file carries, so the floor is looked up by any string and the open dictionary is the decision, not an omission.
 export const KIND_FLOOR: Readonly<Record<string, Sensitivity>> = { Person: RESTRICTED };
 
 /**
@@ -230,15 +231,36 @@ export const visibilityOf = (row: VisibilityRow): Visibility => {
     audience: row.audience,
     audienceGroups: row.audience_groups,
   });
-  if (parsed.audience === AUDIENCE_GROUPS && parsed.audienceGroups !== null) {
-    return {
-      sensitivity: parsed.sensitivity,
-      audience: AUDIENCE_GROUPS,
-      audienceGroups: parsed.audienceGroups,
-    };
+  const visibility = visibilityFrom(parsed);
+  if (visibility === undefined) {
+    throw new Error("a readable unit's audience word and its group list disagree");
   }
-  if (parsed.audience === AUDIENCE_EVERYONE && parsed.audienceGroups === null) {
-    return { sensitivity: parsed.sensitivity, ...EVERYONE };
+  return visibility;
+};
+
+/**
+ * The same three fields as a **caller** hands them — a narrowing's or an override's
+ * arguments — read as a `Visibility`, or nothing. A caller's disagreement between the word
+ * and the list is `malformed`, a word to answer with, where a row's is a broken database;
+ * the two readings share this so they cannot disagree about what the pair means.
+ */
+export const visibilityFrom = (fields: {
+  readonly sensitivity: string;
+  readonly audience: string;
+  readonly audienceGroups?: readonly string[] | null | undefined;
+}): Visibility | undefined => {
+  const parsed = VISIBILITY.safeParse({
+    sensitivity: fields.sensitivity,
+    audience: fields.audience,
+    audienceGroups: fields.audienceGroups ?? null,
+  });
+  if (!parsed.success) return undefined;
+  const { sensitivity, audience, audienceGroups } = parsed.data;
+  if (audience === AUDIENCE_GROUPS && audienceGroups !== null) {
+    return { sensitivity, audience: AUDIENCE_GROUPS, audienceGroups };
   }
-  throw new Error("a readable unit's audience word and its group list disagree");
+  if (audience === AUDIENCE_EVERYONE && audienceGroups === null) {
+    return { sensitivity, ...EVERYONE };
+  }
+  return undefined;
 };
