@@ -18,8 +18,7 @@ import type { UserPrincipal } from "../../kernel/index.ts";
 /**
  * The graph door: the one graph query module in this tier (ADR 0032) — the delta builder
  * the governed write's transaction runs, and the prepared recursive-CTE traversal
- * templates. The graph is plain Postgres tables under RLS; there is no AGE, no Cypher and
- * no second engine (ADR 0032 superseding ADR 0023's engine), so the templates interpolate
+ * templates. The graph is plain Postgres tables under RLS, so the templates interpolate
  * `access`'s one SQL predicate — on **every element of every path**, not on the endpoints
  * alone, because a traversal that filters only where it starts and ends leaks the middle,
  * and a path with one withheld element is no path.
@@ -28,8 +27,7 @@ import type { UserPrincipal } from "../../kernel/index.ts";
  * application data* amendment): RLS scopes the transaction already, and naming the pair
  * says so where a reader of the SQL can see it.
  *
- * `access` is imported here and in no other store module — ADR 0029's 2026-09-07
- * amendment carves this door out of the store line for exactly this reason: the templates
+ * `access` is imported here and in no other store module (ADR 0029): a traversal template
  * must be unable to exist without the predicate, and a renderer handed in by a caller
  * would be a place to forget it.
  *
@@ -68,15 +66,13 @@ type EdgeSource = {
 };
 
 /**
- * What the delta is handed by the slice that just wrote the row: the edge facts, the
+ * What the delta is handed by the slice that just wrote the row: the edge facts, and the
  * concept's `status` — what the inbound lineage relabel reads, because a deprecation flips
- * its successors' edges (ADR 0019) — and `isNew`, whether this IRI had no row before the
- * act: a newly landed concept is the one moment a *path* link written earlier can start
- * resolving, so it is when the concepts whose files name it are re-derived (below).
+ * its successors' edges (ADR 0019). Whether the concept is newly on the map is this door's
+ * own read, off `graph_node` (`writeConceptDelta`), never a fact handed in.
  */
 export type ConceptDelta = EdgeSource & {
   readonly status: string;
-  readonly isNew: boolean;
 };
 
 /** What one row of the map answers a walk with: the element, and the path that reached it. */
@@ -115,6 +111,13 @@ export const GRAPH_WALK_ROW_LIMIT = 1_000;
  *   `LINKS_TO` edge carrying the two kinds, the nearest preceding heading as its
  *   *section* and the sentence around the link, link syntax flattened to its text
  *   (ADR 0023's "every markdown link between concepts"; ADR 0026).
+ * - An **image** (`![…]`, in any reference form) derives no edge — a transclusion shows a
+ *   resource, it does not assert between concepts — but is matched and holds its ordinal,
+ *   exactly as an unresolvable target does, so removing the `!` later renumbers no
+ *   neighbour. A reference, a `[label]: target` definition or a heading inside an
+ *   **inline code span or fenced code block** is quotation, not assertion: spans and
+ *   fences are blanked to spaces (offsets kept) before every scan, so code derives no
+ *   edge, defines no label, names no section and holds no ordinal.
  * - Every `sources[]` entry naming a concept the same two ways is a **lineage** edge —
  *   the successor carries the lineage (`docs/okf-v02.md`) — labelled by ADR 0019's rule:
  *   `SUPERSEDES` when it resolves to a `status: deprecated` concept of the same kind,
@@ -140,6 +143,19 @@ const LINK_DEFINITION = /^ {0,3}\[([^\]]+)\]:\s*(\S+)/gm;
  * longer form win where two could start at one bracket.
  */
 const LINK = /\[[^\]]*\]\([^)]*\)|\[[^\]]*\]\[[^\]]*\]|\[[^\]]*\]|<[a-z][a-z0-9+.-]*:[^>\s]*>/gi;
+
+/** A fenced code block: the fence line, everything to the matching close (or the file's end). */
+const FENCED_BLOCK = /^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1[ \t]*$|(?![\s\S]))/gm;
+
+/** An inline code span: a backtick run, its content, the same run again. */
+const CODE_SPAN = /(`+)[\s\S]*?\1/g;
+
+/** Everything but the newlines blanked, so an index into the prose is an index into the file. */
+const blanked = (text: string): string => text.replaceAll(/[^\n]/g, " ");
+
+/** The body's prose: code blanked before any scan — fences first, so a span cannot eat a fence. */
+const proseOf = (body: string): string =>
+  body.replace(FENCED_BLOCK, blanked).replace(CODE_SPAN, blanked);
 
 /** A reference label as definitions key it: trimmed, spaces collapsed, case folded. */
 const normalisedLabel = (label: string): string =>
@@ -256,9 +272,12 @@ const sentenceAt = (body: string, index: number): string => {
 
 /** Every outgoing reference one concept's file makes, in the derivation rule's order. */
 const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {
-  const definitions = definitionsOf(concept.body);
-  const links = [...concept.body.matchAll(LINK)].flatMap((match, ordinal) => {
-    const raw = linkTargetOf(match, concept.body, definitions);
+  const prose = proseOf(concept.body);
+  const definitions = definitionsOf(prose);
+  const links = [...prose.matchAll(LINK)].flatMap((match, ordinal) => {
+    // An image: matched, holding its ordinal, deriving nothing.
+    if (prose[match.index - 1] === "!") return [];
+    const raw = linkTargetOf(match, prose, definitions);
     const target = raw === undefined ? undefined : targetOf(raw, concept.path);
     if (target === undefined) return [];
     return [
@@ -266,7 +285,7 @@ const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {
         relation: "link" as const,
         ordinal,
         target,
-        section: sectionAt(concept.body, match.index),
+        section: sectionAt(prose, match.index),
         sentence: sentenceAt(concept.body, match.index),
       },
     ];
@@ -310,10 +329,11 @@ const supersedes = (target: ResolvedTarget, fromKind: string): boolean =>
  * one concept is one edge however many `sources[]` entries repeat it.
  */
 const resolveOutgoing = async (
-  workspaceId: string,
+  principal: UserPrincipal,
   tx: Tx,
   concept: EdgeSource,
 ): Promise<readonly OutgoingEdge[]> => {
+  const workspaceId = principal.workspaceId;
   const references = referencesOf(concept);
   const paths = [
     ...new Set(references.flatMap((ref) => ("path" in ref.target ? [ref.target.path] : []))),
@@ -385,12 +405,13 @@ const resolveOutgoing = async (
  * until T-055's derivation refines the rule.
  */
 const replaceOutgoingEdges = async (
-  workspaceId: string,
+  principal: UserPrincipal,
   gen: number,
   tx: Tx,
   concept: EdgeSource,
 ): Promise<void> => {
-  const edges = await resolveOutgoing(workspaceId, tx, concept);
+  const workspaceId = principal.workspaceId;
+  const edges = await resolveOutgoing(principal, tx, concept);
   await tx.query(
     `DELETE FROM graph_edge
       WHERE workspace_id = $1 AND gen = $2 AND from_uid = $3 AND label = ANY($4::text[])`,
@@ -436,12 +457,12 @@ const namePattern = (filename: string): string =>
  * no-op `DO UPDATE` is what makes one statement both the create and the read; a full
  * rebuild's flip is an ordinary `UPDATE` of this row and never this door's business.
  */
-const liveGeneration = async (workspaceId: string, tx: Tx): Promise<number> => {
+const liveGeneration = async (principal: UserPrincipal, tx: Tx): Promise<number> => {
   const row = await tx.query<{ live_gen: number }>(
     `INSERT INTO graph_generation (workspace_id, live_gen) VALUES ($1, 1)
      ON CONFLICT (workspace_id) DO UPDATE SET live_gen = graph_generation.live_gen
      RETURNING live_gen`,
-    [workspaceId],
+    [principal.workspaceId],
   );
   const liveGen = row.rows[0]?.live_gen;
   if (liveGen === undefined) throw new Error("the live generation could not be read");
@@ -455,17 +476,16 @@ const liveGeneration = async (workspaceId: string, tx: Tx): Promise<number> => {
  * edit. Generations are for full rebuilds only: this writes into the live one and mints
  * nothing.
  *
- * Six steps: the live generation read (created at 1 on a workspace's first delta); the
- * concept's node upserted with the index row's kind and visibility; the inbound
- * `LINKS_TO` edges' `to_kind` refreshed, because a re-write may have moved the kind they
- * denormalise; the inbound **lineage labels revisited** — ADR 0019's "inbound links
- * revisited on every deprecation commit", run on every commit because the label reads
- * this concept's status and its successors' kinds, both of which this act may have moved;
- * the concept's outgoing edges replaced from the file; and — on a **new** concept only —
- * every concept whose file names this one's path re-derived, which is the moment a link
- * to formerly not-yet-written knowledge starts resolving. An IRI link needs no re-derive:
- * its edge was made dangling when its file landed, the node this step upserts completes
- * the path, and the two refreshes above put the right kind and label on it.
+ * The inbound refreshes run on every commit, not only a deprecation's: a `LINKS_TO` edge
+ * denormalises this concept's kind, and a lineage label reads this concept's status and
+ * its successors' kinds (ADR 0019's "inbound links revisited"), any of which this act may
+ * have moved. The linker re-derive runs only when the live generation held **no node for
+ * this IRI** before the act — the moment a link to formerly not-yet-written knowledge
+ * starts resolving. Newness is read off the map itself, never handed in: an index row
+ * older than the graph tables, or a restore that carried the records without the derived
+ * store, backfills its inbound path links on its first edit this way. An IRI link needs
+ * no re-derive: its edge was made dangling when its file landed, the node upsert
+ * completes the path, and the two refreshes put the right kind and label on it.
  */
 export const writeConceptDelta = async (
   principal: UserPrincipal,
@@ -473,7 +493,13 @@ export const writeConceptDelta = async (
   delta: ConceptDelta,
 ): Promise<void> => {
   const workspaceId = principal.workspaceId;
-  const gen = await liveGeneration(workspaceId, tx);
+  const gen = await liveGeneration(principal, tx);
+
+  const mapped = await tx.query(
+    "SELECT 1 FROM graph_node WHERE workspace_id = $1 AND gen = $2 AND uid = $3",
+    [workspaceId, gen, delta.iri],
+  );
+  const isNew = mapped.rowCount === 0;
 
   await tx.query(
     `INSERT INTO graph_node (workspace_id, gen, uid, label, kind, published_at, sensitivity, audience)
@@ -510,9 +536,9 @@ export const writeConceptDelta = async (
         AND label IN ('${SUPERSEDES_LABEL}', '${DERIVED_FROM_LABEL}')`,
     [workspaceId, gen, delta.iri, delta.status === CONCEPT_DEPRECATED_STATUS, delta.kind],
   );
-  await replaceOutgoingEdges(workspaceId, gen, tx, delta);
+  await replaceOutgoingEdges(principal, gen, tx, delta);
 
-  if (!delta.isNew) return;
+  if (!isNew) return;
   // The concepts whose files name the landed one, by its filename in link-target
   // position: each is re-derived whole, through the same one derivation as its own write.
   const naming = await tx.query<EdgeSource>(
@@ -521,7 +547,7 @@ export const writeConceptDelta = async (
       WHERE workspace_id = $1 AND iri <> $2 AND (body ~ $3 OR frontmatter::text ~ $3)`,
     [workspaceId, delta.iri, namePattern(delta.path.split("/").at(-1) ?? delta.path)],
   );
-  for (const row of naming.rows) await replaceOutgoingEdges(workspaceId, gen, tx, row);
+  for (const row of naming.rows) await replaceOutgoingEdges(principal, gen, tx, row);
 };
 
 /**

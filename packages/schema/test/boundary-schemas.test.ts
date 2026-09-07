@@ -286,7 +286,9 @@ const acceptedRows = {
       audience: "everyone",
     },
   ],
-  // A LINKS_TO with the four link columns, and a named edge, which may carry none of them.
+  // A LINKS_TO with the four link columns; a named edge, which may carry none of them; and
+  // the source-entity partition's own closed-label edge — `IS_CONCEPT` at `gen` NULL (ADR
+  // 0026's amendment), which the edge schemas must keep accepting.
   graphEdge: [
     {
       workspaceId: WS_ID,
@@ -312,6 +314,17 @@ const acceptedRows = {
       toUid: "https://better-answers.com/c/01J6SSSSSSSSSSSSSSSSSSSSSS",
       publishedAt: NOW,
       sensitivity: "Internal",
+      audience: "everyone",
+    },
+    {
+      workspaceId: WS_ID,
+      gen: null,
+      uid: "is_concept:01J6NNNNNNNNNNNNNNNNNNNNNN:person:abc123",
+      label: "IS_CONCEPT",
+      fromUid: "01J6NNNNNNNNNNNNNNNNNNNNNN:person:abc123",
+      toUid: CONCEPT_IRI,
+      publishedAt: NOW,
+      sensitivity: "Restricted",
       audience: "everyone",
     },
   ],
@@ -536,17 +549,22 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.chunk[0], sensitivity: "Secret" },
     ],
     // The graph's refusals: a generation before the first, a label outside the closed set
-    // that wears no source-entity prefix, and a class outside the three.
+    // that wears no source-entity prefix, a class outside the three — and the label family
+    // parted from its partition: a source-entity label inside a generation on either
+    // table, and a closed node label carrying none.
     graphGeneration: [{ ...acceptedRows.graphGeneration[0], liveGen: 0 }],
     graphNode: [
       { ...acceptedRows.graphNode[0], label: "Widget" },
       { ...acceptedRows.graphNode[0], sensitivity: "Secret" },
       { ...acceptedRows.graphNode[0], gen: 0 },
+      { ...acceptedRows.graphNode[0], gen: null },
+      { ...acceptedRows.graphNode[1], gen: 1 },
     ],
     graphEdge: [
       { ...acceptedRows.graphEdge[0], label: "RELATES_TO" },
       { ...acceptedRows.graphEdge[0], sensitivity: "Secret" },
       { ...acceptedRows.graphEdge[0], fromUid: "   " },
+      { ...acceptedRows.graphEdge[1], label: "source-entity:mentions" },
     ],
   } as const;
 

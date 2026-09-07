@@ -15,9 +15,12 @@ ALTER TABLE "graph_generation" ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
 -- The two unique indexes are the two partitions' keys (ADR 0032): `(workspace_id, gen, uid)`
 -- on the bundle-and-record rows, `(workspace_id, uid)` on source entities, which carry no
--- generation. The label CHECK ties the source-entity prefix to the missing `gen`, so a
--- prefixed label cannot enter the rebuilt partition nor a closed label lose its generation's
--- flip.
+-- generation, counted from 1 where one is carried at all. A node's label CHECK names its
+-- partition both ways — a prefixed label cannot enter the rebuilt partition, nor a closed
+-- label lose its generation's flip. An edge's closed set is admitted in either partition,
+-- because the source-entity partition's own edges wear closed labels (`IS_CONCEPT`,
+-- `SAME_AS` — ADR 0026's amendment; reconciled per document, ADR 0023): only the prefix is
+-- tied to the missing `gen` there.
 CREATE TABLE "graph_node" (
 	"workspace_id" text NOT NULL REFERENCES "public"."workspace"("id") ON DELETE cascade,
 	"gen" integer,
@@ -27,7 +30,8 @@ CREATE TABLE "graph_node" (
 	"published_at" timestamp with time zone,
 	"sensitivity" text DEFAULT 'Restricted' NOT NULL,
 	"audience" text DEFAULT 'everyone' NOT NULL,
-	CONSTRAINT "graph_node_label_check" CHECK (label IN ('Concept', 'Section', 'Source', 'Actor', 'Composition', 'Evidence', 'CanonicalEntity') OR (gen IS NULL AND label LIKE 'source-entity:%')),
+	CONSTRAINT "graph_node_label_check" CHECK ((gen IS NOT NULL AND label IN ('Concept', 'Section', 'Source', 'Actor', 'Composition', 'Evidence', 'CanonicalEntity')) OR (gen IS NULL AND label LIKE 'source-entity:%')),
+	CONSTRAINT "graph_node_gen_check" CHECK (gen IS NULL OR gen > 0),
 	CONSTRAINT "graph_node_sensitivity_check" CHECK (sensitivity IN ('Restricted', 'Internal', 'Public'))
 );
 --> statement-breakpoint
@@ -56,6 +60,7 @@ CREATE TABLE "graph_edge" (
 	"sensitivity" text DEFAULT 'Restricted' NOT NULL,
 	"audience" text DEFAULT 'everyone' NOT NULL,
 	CONSTRAINT "graph_edge_label_check" CHECK (label IN ('LINKS_TO', 'SUPERSEDES', 'CITES', 'IS_CONCEPT', 'DERIVED_FROM', 'SAME_AS') OR (gen IS NULL AND label LIKE 'source-entity:%')),
+	CONSTRAINT "graph_edge_gen_check" CHECK (gen IS NULL OR gen > 0),
 	CONSTRAINT "graph_edge_sensitivity_check" CHECK (sensitivity IN ('Restricted', 'Internal', 'Public')),
 	CONSTRAINT "graph_edge_links_to_check" CHECK (label = 'LINKS_TO' OR (from_kind IS NULL AND to_kind IS NULL AND section IS NULL AND sentence IS NULL))
 );

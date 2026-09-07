@@ -357,9 +357,12 @@ describe("a governed write", () => {
     const absolute = contentHashOf(cite("/knowledge/handbook.md"), body, path);
     const relative = contentHashOf(cite("./../handbook.md"), body, path);
     const bare = contentHashOf(cite("../handbook.md"), body, path);
+    // An absolute spelling with dot segments is the same place: the normaliser runs on
+    // absolute paths too, or two spellings of one citation would hash apart.
+    const dotted = contentHashOf(cite("/knowledge/policies/../handbook.md"), body, path);
     const swapped = contentHashOf(cite("/knowledge/other.md"), body, path);
 
-    expect([relative, bare]).toEqual([absolute, absolute]);
+    expect([relative, bare, dotted]).toEqual([absolute, absolute, absolute]);
     expect(swapped).not.toBe(absolute);
     // Padding is not part of what a file cites, in **either** form: an asymmetry there would
     // give two spellings of one citation two hashes, and a concept would un-check itself over
@@ -557,6 +560,68 @@ describe("the map a governed write leaves behind", () => {
         sentence,
       },
     ]);
+  });
+
+  it("derives no edge from an image or from code that merely names the concept", async () => {
+    const scenario = await arrange();
+    // An image is a transclusion and code is quotation, neither an assertion between
+    // concepts. The image still holds its ordinal — removing the `!` later renumbers no
+    // neighbour — while code is blanked before the scan and holds none.
+    const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
+      body: [
+        "# Details",
+        "",
+        `![the product](./${filename}) shows the tiers; \`[a link](./${filename})\` is how one is written.`,
+        "",
+        "```md",
+        `A fenced example: [the product](./${filename}).`,
+        "```",
+        "",
+        `Only [the product](./${filename}) itself maps.`,
+      ].join("\n"),
+    }));
+
+    const edges = await db().pool.query(
+      "SELECT uid, to_uid, section, sentence FROM graph_edge WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(edges.rows).toEqual([
+      {
+        uid: `links_to:${policy.iri}:1`,
+        to_uid: product.iri,
+        section: "Details",
+        sentence: "Only the product itself maps.",
+      },
+    ]);
+  });
+
+  it("re-derives a linker's edges from an edit of the concept it names, when the map lost them", async () => {
+    const scenario = await arrange();
+    const product = writeFor({ kind: "Product", status: "stable" });
+    const first = await landed(scenario, product);
+    const filename = product.path.split("/").at(-1) ?? "";
+    const policy = writeFor({
+      status: "stable",
+      body: `See [the product](./${filename}) for tiers.`,
+      expectedHead: first.sha,
+    });
+    const second = await landed(scenario, policy);
+
+    // The derived rows vanish while the index stands — the shape of a workspace whose
+    // concepts predate the graph tables, or of a restore that carried the records and not
+    // the derived store.
+    await db().pool.query("DELETE FROM graph_edge WHERE workspace_id = $1", [scenario.workspaceId]);
+    await db().pool.query("DELETE FROM graph_node WHERE workspace_id = $1", [scenario.workspaceId]);
+
+    // A re-write of the *cited* concept: newness is the map's own fact, not the index's,
+    // so the policy that names it is re-derived — inbound path links included.
+    await landed(scenario, { ...product, expectedHead: second.sha });
+
+    const edges = await db().pool.query(
+      "SELECT from_uid, to_uid FROM graph_edge WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(edges.rows).toEqual([{ from_uid: policy.iri, to_uid: product.iri }]);
   });
 
   it("derives a succession over a deprecated concept of its kind, and a derivation over anything else", async () => {

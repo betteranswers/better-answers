@@ -481,8 +481,8 @@ export const conceptVerificationUpdate = createUpdateSchema(
 /**
  * A graph label: the partition's closed set, or the prefixed source-entity form (ADR 0032).
  * The prefix arm is the boundary's whole rule for a source-entity label until the lift that
- * writes them lands its closed set (B7); the tie between the prefix and a missing `gen` is
- * the table's own CHECK, because a refinement sees one column at a time.
+ * writes them lands its closed set (B7); the tie between the label family and `gen` is the
+ * insert schemas' own cross-field refinement below, mirroring each table's CHECK.
  */
 const graphLabel = (labels: readonly string[]) => (schema: z.ZodString) =>
   schema.refine(
@@ -490,6 +490,22 @@ const graphLabel = (labels: readonly string[]) => (schema: z.ZodString) =>
       labels.some((known) => known === label) || label.startsWith(SOURCE_ENTITY_LABEL_PREFIX),
     { message: "a graph label is one of the closed set, or wears the source-entity prefix" },
   );
+
+/**
+ * The label family and the generation held together, as the tables' CHECKs hold them —
+ * refused here so the invalid pair never reaches an INSERT. A prefixed source-entity label
+ * carries no `gen` on either table; a closed **node** label is a bundle-and-record row and
+ * must carry one; a closed **edge** label is admitted in either partition, because the
+ * source-entity partition's own edges wear closed labels (`IS_CONCEPT`, `SAME_AS` — ADR
+ * 0026's amendment).
+ */
+type GraphRowInput = { readonly label: string; readonly gen?: number | null };
+
+const sourceEntityCarriesNoGen = (row: GraphRowInput): boolean =>
+  !row.label.startsWith(SOURCE_ENTITY_LABEL_PREFIX) || row.gen === null || row.gen === undefined;
+
+const closedNodeLabelCarriesGen = (row: GraphRowInput): boolean =>
+  row.label.startsWith(SOURCE_ENTITY_LABEL_PREFIX) || (row.gen !== null && row.gen !== undefined);
 
 /** A generation: the rebuild counter's value, from 1 — `gen` and `live_gen` alike. */
 const generation = (schema: z.ZodNumber) => schema.int().positive();
@@ -534,7 +550,15 @@ const graphNodeRefinements = {
 };
 
 export const graphNodeSelect = createSelectSchema(graphNode, graphNodeRefinements);
-export const graphNodeInsert = createInsertSchema(graphNode, graphNodeRefinements);
+export const graphNodeInsert = createInsertSchema(graphNode, graphNodeRefinements)
+  .refine(sourceEntityCarriesNoGen, {
+    message: "a source-entity label carries no generation",
+    path: ["gen"],
+  })
+  .refine(closedNodeLabelCarriesGen, {
+    message: "a closed node label is a bundle-and-record row and carries its generation",
+    path: ["gen"],
+  });
 export const graphNodeUpdate = createUpdateSchema(graphNode, graphNodeRefinements);
 
 const graphEdgeRefinements = {
@@ -547,7 +571,10 @@ const graphEdgeRefinements = {
 };
 
 export const graphEdgeSelect = createSelectSchema(graphEdge, graphEdgeRefinements);
-export const graphEdgeInsert = createInsertSchema(graphEdge, graphEdgeRefinements);
+export const graphEdgeInsert = createInsertSchema(graphEdge, graphEdgeRefinements).refine(
+  sourceEntityCarriesNoGen,
+  { message: "a source-entity label carries no generation", path: ["gen"] },
+);
 export const graphEdgeUpdate = createUpdateSchema(graphEdge, graphEdgeRefinements);
 
 /** One entry per table this package owns — the parity test's registry (ADR 0028). */

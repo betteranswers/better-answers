@@ -534,7 +534,6 @@ export const writeConcept = async (
           actor: actorIdOf(fresh),
           auditEventId,
           evidence: evidence.data,
-          isNew: held === undefined,
         });
       }),
     );
@@ -562,8 +561,6 @@ type Landing = z.infer<typeof conceptRow> & {
   readonly actor: ActorId;
   readonly auditEventId: string;
   readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[];
-  /** Whether the IRI had no row before this act — what tells the delta a link may now resolve. */
-  readonly isNew: boolean;
 };
 
 /** The rows the act writes, in one place so the order they are written in is one fact. */
@@ -636,7 +633,6 @@ const landRows = async (principal: UserPrincipal, tx: Tx, index: Landing): Promi
     sensitivity: index.sensitivity,
     audience: index.audience,
     status: index.status,
-    isNew: index.isNew,
   });
 };
 

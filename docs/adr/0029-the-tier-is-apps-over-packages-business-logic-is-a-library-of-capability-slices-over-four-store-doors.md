@@ -89,7 +89,7 @@ packages/core/src/
 ## Import direction — five rules
 
 1. `kernel` imports nothing else in `core`. Everything may import `kernel`.
-2. `access` and `store` import only `kernel`.
+2. ~~`access` and `store` import only `kernel`.~~ `access` imports only `kernel`; `store` imports only `kernel`, except that `store/graph` also imports `access`, because a traversal template must be *unable* to exist without the predicate (struck 2026-09-07; amendment below).
 3. `llm` and `audit` import `kernel`, `access` and `store` — never a slice, never each other.
 4. A slice imports `kernel`, `access`, the store doors, `llm`, `audit`, and **other slices only through their `index.ts`** — never internals, never another slice's `*.store.ts`. The slice graph is acyclic. `erasure` sits at the top; nothing imports it.
 5. Nothing in `core` imports a transport or a transport's dependency. Transports import slice `index.ts` files only.

@@ -992,8 +992,11 @@ describe("the graph tables under app_rt", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const rows: readonly [string, readonly unknown[], string][] = [
-        // A label outside the closed set, and the prefixed form inside a generation: the
-        // source-entity prefix holds only where `gen IS NULL` (ADR 0032).
+        // Each label family bound to its partition (ADR 0032): a label outside the closed
+        // set; the prefixed form inside a generation, on either table; and a closed *node*
+        // label carrying no generation — a node's rule holds both ways, an edge's closed
+        // set is admitted at `gen` NULL because `IS_CONCEPT` and `SAME_AS` live there
+        // (ADR 0026's amendment).
         [
           "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'uid-1', 'Widget')",
           [WS_A],
@@ -1003,6 +1006,27 @@ describe("the graph tables under app_rt", () => {
           "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'uid-2', 'source-entity:Person')",
           [WS_A],
           "graph_node_label_check",
+        ],
+        [
+          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, NULL, 'uid-6', 'Concept')",
+          [WS_A],
+          "graph_node_label_check",
+        ],
+        [
+          "INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid) VALUES ($1, 1, 'edge-2', 'source-entity:mentions', 'a', 'b')",
+          [WS_A],
+          "graph_edge_label_check",
+        ],
+        // A generation before the first, on the rows as on the counter's own row below.
+        [
+          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 0, 'uid-7', 'Concept')",
+          [WS_A],
+          "graph_node_gen_check",
+        ],
+        [
+          "INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid) VALUES ($1, 0, 'edge-3', 'LINKS_TO', 'a', 'b')",
+          [WS_A],
+          "graph_edge_gen_check",
         ],
         [
           "INSERT INTO graph_node (workspace_id, gen, uid, label, sensitivity) VALUES ($1, 1, 'uid-3', 'Concept', 'Secret')",

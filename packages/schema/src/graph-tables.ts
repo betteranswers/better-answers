@@ -71,12 +71,22 @@ export const DERIVED_FROM_LABEL = "DERIVED_FROM" satisfies (typeof GRAPH_EDGE_LA
 export const SOURCE_ENTITY_LABEL_PREFIX = "source-entity:";
 
 /**
- * A partition's label rule, written from the closed lists so the CHECK and the constant
- * cannot drift: the closed set wherever, and the prefixed source-entity form only on a row
- * with no generation.
+ * The label rules, written from the closed lists so the CHECK and the constant cannot
+ * drift — and deliberately asymmetric between the tables. A **node**'s label names its
+ * partition both ways: a closed label is a bundle-and-record row and carries `gen`, the
+ * prefixed form is a source entity and carries none — so a closed-label node can never
+ * escape a rebuild's flip by dropping its generation. An **edge**'s closed set is admitted
+ * in either partition, because the source-entity partition's own edges wear closed labels:
+ * `IS_CONCEPT` resolves a source entity to a concept and `SAME_AS` hangs a contribution
+ * off a canonical entity (ADR 0026's 2026-08-30 amendment), reconciled per document
+ * rather than rebuilt (ADR 0023) — only the prefix is tied to the missing `gen`.
  */
-const labelCheck = (labels: readonly string[]): string =>
-  `label IN (${listed(labels)}) OR (gen IS NULL AND label LIKE '${SOURCE_ENTITY_LABEL_PREFIX}%')`;
+const nodeLabelCheck = `(gen IS NOT NULL AND label IN (${listed(GRAPH_NODE_LABELS)})) OR (gen IS NULL AND label LIKE '${SOURCE_ENTITY_LABEL_PREFIX}%')`;
+
+const edgeLabelCheck = `label IN (${listed(GRAPH_EDGE_LABELS)}) OR (gen IS NULL AND label LIKE '${SOURCE_ENTITY_LABEL_PREFIX}%')`;
+
+/** A generation counts from 1, as `live_gen` does; NULL is the source-entity partition's. */
+const genCheck = "gen IS NULL OR gen > 0";
 
 /**
  * What a node and an edge carry alike, built fresh per table because a drizzle column
@@ -156,7 +166,8 @@ export const graphNode = withRLS(
   (table) => [
     ...partitionKeys("graph_node", table),
     index("graph_node_kind_idx").on(table.workspaceId, table.kind),
-    check("graph_node_label_check", sql.raw(labelCheck(GRAPH_NODE_LABELS))),
+    check("graph_node_label_check", sql.raw(nodeLabelCheck)),
+    check("graph_node_gen_check", sql.raw(genCheck)),
     check("graph_node_sensitivity_check", sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
   ],
 );
@@ -190,7 +201,8 @@ export const graphEdge = withRLS(
     // The two ends, indexed for the traversal templates' expansion in either direction.
     index("graph_edge_from_idx").on(table.workspaceId, table.fromUid),
     index("graph_edge_to_idx").on(table.workspaceId, table.toUid),
-    check("graph_edge_label_check", sql.raw(labelCheck(GRAPH_EDGE_LABELS))),
+    check("graph_edge_label_check", sql.raw(edgeLabelCheck)),
+    check("graph_edge_gen_check", sql.raw(genCheck)),
     check("graph_edge_sensitivity_check", sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
     check(
       "graph_edge_links_to_check",

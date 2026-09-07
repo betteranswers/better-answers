@@ -16,7 +16,7 @@
  * `packages/core/src/`: `workspaces`, `sources`. `llm` is written the same way without
  * being a slice (ADR 0029 rule 3: `llm` and `audit` import `kernel`, `access` and
  * `store`, never a slice and never each other), because the name still opens a
- * directory. Two owners are not under `packages/core/src/` at all, and each is written
+ * directory. Three owners are not under `packages/core/src/` at all, and each is written
  * as the repository path of the module it is — a form no directory name there can take,
  * so the two kinds can never be confused:
  *
