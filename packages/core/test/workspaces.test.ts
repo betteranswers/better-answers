@@ -449,6 +449,13 @@ describe("revoking a person's tokens in one workspace", () => {
     }
   };
 
+  /**
+   * The act all three cases drive, differing only in the ids and the instant handed to it —
+   * so what each case is about is the argument it varies, not the door it opens first.
+   */
+  const endTokens = (input: { workspaceId: string; userId: string; at: Date }) =>
+    revokeWorkspaceTokens(bootstrap, openPostgres(db().runtimePool), input);
+
   /** The grants this seeding's tokens now count as ended, in their words. */
   const endedGrants = async (seeded: Seeded): Promise<readonly string[]> => {
     const rows = await db().pool.query<{ id: string }>(
@@ -462,13 +469,8 @@ describe("revoking a person's tokens in one workspace", () => {
 
   it("ends the refresh and access tokens consented to this workspace before the instant, and no others", async () => {
     const seeded = await seedTwoWorkspaces();
-    const door = openPostgres(db().runtimePool);
 
-    const ended = await revokeWorkspaceTokens(bootstrap, door, {
-      workspaceId: seeded.here,
-      userId: seeded.userId,
-      at,
-    });
+    const ended = await endTokens({ workspaceId: seeded.here, userId: seeded.userId, at });
 
     expect(ended).toEqual({
       ok: true,
@@ -485,9 +487,8 @@ describe("revoking a person's tokens in one workspace", () => {
 
   it("cannot reach the other workspace's tokens even when the instant is now", async () => {
     const seeded = await seedTwoWorkspaces();
-    const door = openPostgres(db().runtimePool);
 
-    const ended = await revokeWorkspaceTokens(bootstrap, door, {
+    const ended = await endTokens({
       workspaceId: seeded.here,
       userId: seeded.userId,
       at: new Date("2036-01-01T00:00:00Z"),
@@ -506,9 +507,8 @@ describe("revoking a person's tokens in one workspace", () => {
 
   it("refuses a workspace id or a person id that is not one, and ends nothing", async () => {
     const seeded = await seedTwoWorkspaces();
-    const door = openPostgres(db().runtimePool);
 
-    const malformed = await revokeWorkspaceTokens(bootstrap, door, {
+    const malformed = await endTokens({
       workspaceId: "not-a-ulid",
       userId: seeded.userId,
       at,

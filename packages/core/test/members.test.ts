@@ -4,13 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import { attempt } from "../src/kernel/index.ts";
 import type { Result, Role, UserPrincipal } from "../src/kernel/index.ts";
-import { bootstrap, seedPerson } from "./platform.ts";
-import {
-  openPostgres,
-  type PostgresDoor,
-  type Tx,
-  withPrincipal,
-} from "../src/store/postgres/index.ts";
+import { type ProvisionedWorkspace, provisionedWorkspace, seedPerson } from "./platform.ts";
+import { type Tx, withPrincipal } from "../src/store/postgres/index.ts";
 import {
   addToGroup,
   createGroup,
@@ -19,7 +14,6 @@ import {
   removeFromGroup,
   renameGroup,
 } from "../src/members/index.ts";
-import { provisionWorkspace } from "../src/workspaces/index.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
 /**
@@ -36,25 +30,9 @@ import { postgresForSuite } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
-type Workspace = {
-  readonly door: PostgresDoor;
-  readonly workspaceId: string;
-  readonly adminUserId: string;
-};
+type Workspace = ProvisionedWorkspace;
 
-const provisioned = async (name: string): Promise<Workspace> => {
-  const adminUserId = await seedPerson(db().pool);
-  const door = openPostgres(db().runtimePool);
-  const workspaceId = ulid();
-  const made = await provisionWorkspace(bootstrap, door, {
-    id: workspaceId,
-    name,
-    slug: `${name.toLowerCase()}-${workspaceId.toLowerCase()}`,
-    adminUserId,
-  });
-  expect(made.ok).toBe(true);
-  return { door, workspaceId, adminUserId };
-};
+const provisioned = (name: string): Promise<Workspace> => provisionedWorkspace(db(), name);
 
 /** A person of this workspace at the role named; their person id. */
 const seedMemberAt = async (workspace: Workspace, role: Role): Promise<string> => {
