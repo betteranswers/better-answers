@@ -62,6 +62,9 @@ jobs:
       # saved — and the prefix restores the newest one this workspace has. A week where nothing
       # restores (a first run, or GitHub evicting an entry it has not seen read for seven days,
       # which a weekly schedule sits exactly on) is a full run: slower, never wrong.
+      # The save is the action's post step and runs on success alone, and Stryker writes the file
+      # only when a run finishes — so a leg that hits the job timeout carries nothing forward and
+      # the week after it is full again. That is the cost to watch, not the correctness.
       - name: last week's mutant results
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
