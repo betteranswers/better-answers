@@ -6,7 +6,7 @@ direction. The worker never migrates; this module is its read-only
 knowledge of what the app's journal built, stamped with the migration id it was
 generated from."""
 
-MIGRATION_ID = "0015_concept-write-path-substrate"
+MIGRATION_ID = "0016_graph-tables"
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -105,6 +105,35 @@ TABLES: dict[str, dict[str, str]] = {
         "resource": "text NOT NULL",
         "content_version": "text",
         "recorded_at": "timestamp with time zone NOT NULL",
+    },
+    "public.graph_edge": {
+        "workspace_id": "text NOT NULL",
+        "gen": "integer",
+        "uid": "text NOT NULL",
+        "label": "text NOT NULL",
+        "from_uid": "text NOT NULL",
+        "to_uid": "text NOT NULL",
+        "from_kind": "text",
+        "to_kind": "text",
+        "section": "text",
+        "sentence": "text",
+        "published_at": "timestamp with time zone",
+        "sensitivity": "text NOT NULL",
+        "audience": "text NOT NULL",
+    },
+    "public.graph_generation": {
+        "workspace_id": "text NOT NULL",
+        "live_gen": "integer NOT NULL",
+    },
+    "public.graph_node": {
+        "workspace_id": "text NOT NULL",
+        "gen": "integer",
+        "uid": "text NOT NULL",
+        "label": "text NOT NULL",
+        "kind": "text",
+        "published_at": "timestamp with time zone",
+        "sensitivity": "text NOT NULL",
+        "audience": "text NOT NULL",
     },
     "public.group": {
         "id": "text NOT NULL",

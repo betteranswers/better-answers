@@ -113,6 +113,13 @@
       "when": 1788741476298,
       "tag": "0015_concept-write-path-substrate",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1788772299770,
+      "tag": "0016_graph-tables",
+      "breakpoints": true
     }
   ]
 }

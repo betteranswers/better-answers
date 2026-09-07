@@ -21,6 +21,7 @@ import {
   withRepositoryLock,
   type GitDoor,
 } from "@better-answers/core/store/git";
+import { walkFrom } from "@better-answers/core/store/graph";
 import {
   openPostgres,
   type PostgresDoor,
@@ -37,7 +38,7 @@ import {
   removeRepository,
 } from "./bundle.ts";
 import { bootstrap, seedPerson } from "./platform.ts";
-import { postgresForSuite } from "./suite-postgres.ts";
+import { postgresForSuite, readingAs } from "./suite-postgres.ts";
 
 /**
  * The governed write through the concepts slice's entry point (`[TEST1]`), against real
@@ -177,7 +178,9 @@ const rowsFor = async (workspaceId: string) => {
             (SELECT count(*) FROM concept_index WHERE workspace_id = $1) AS concepts,
             (SELECT count(*) FROM bundle_commit WHERE workspace_id = $1) AS commits,
             (SELECT count(*) FROM evidence WHERE workspace_id = $1) AS evidence,
-            (SELECT count(*) FROM audit_event WHERE workspace_id = $1) AS events`,
+            (SELECT count(*) FROM audit_event WHERE workspace_id = $1) AS events,
+            (SELECT count(*) FROM graph_node WHERE workspace_id = $1) AS nodes,
+            (SELECT count(*) FROM graph_edge WHERE workspace_id = $1) AS edges`,
     [workspaceId],
   );
   return counted.rows[0];
@@ -193,18 +196,10 @@ const recordedCommits = async (workspaceId: string): Promise<readonly string[]> 
 };
 
 /** Run a read as this person, inside one transaction, the way a transport would. */
-const reading = async <T>(
+const reading = <T>(
   principal: UserPrincipal,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<T> => {
-  const read = await withPrincipal(
-    openPostgres(db().runtimePool),
-    { workspaceId: principal.workspaceId, userId: principal.userId, issuedAt: new Date() },
-    work,
-  );
-  if (!read.ok) throw new Error(`the principal did not resolve: ${read.error}`);
-  return read.value;
-};
+): Promise<T> => readingAs(db().runtimePool, principal, work);
 
 describe("a governed write", () => {
   it("lands one commit with the person as author and the platform bot as committer", async () => {
@@ -295,6 +290,10 @@ describe("a governed write", () => {
       evidence: "2",
       // The workspace's provisioning wrote the first, this act the second.
       events: "2",
+      // The bundle-and-record delta, in the same transaction: the concept's node, and no
+      // edge because nothing here links to a concept (ADR 0023).
+      nodes: "1",
+      edges: "0",
     });
     const row = await db().pool.query<Record<string, unknown>>(
       "SELECT iri, path, kind, title, content_hash, commit_sha, status, sensitivity, audience FROM concept_index WHERE workspace_id = $1",
@@ -398,6 +397,140 @@ describe("a governed write", () => {
       [scenario.workspaceId],
     );
     expect(parents.rows.map((row) => row.parent_sha)).toEqual([null, shas[0], shas[1]]);
+  });
+});
+
+/**
+ * The bundle-and-record graph delta joins the act's transaction (ADR 0023, ADR 0032): an
+ * edit's map change lands with its rows, in the live generation, and the map is never
+ * behind for an edit — no watermark, no debounce, no *updating* phrase. The rows are
+ * asserted as the superuser, and the walk through the graph door is the reader's proof.
+ */
+describe("the map a governed write leaves behind", () => {
+  it("maps the concept and its links in the transaction that committed them", async () => {
+    const scenario = await arrange();
+    const product = writeFor({ kind: "Product", status: "stable" });
+    const first = await landed(scenario, product);
+
+    const filename = product.path.split("/").at(-1) ?? "";
+    const policy = writeFor({
+      kind: "Policy",
+      status: "stable",
+      body: `# Details\n\nSee [the product](./${filename}) for tiers.`,
+      expectedHead: first.sha,
+    });
+    await landed(scenario, policy);
+
+    const nodes = await db().pool.query(
+      "SELECT uid, label, kind, gen, sensitivity, audience FROM graph_node WHERE workspace_id = $1 ORDER BY kind",
+      [scenario.workspaceId],
+    );
+    expect(nodes.rows).toEqual([
+      {
+        uid: policy.iri,
+        label: "Concept",
+        kind: "Policy",
+        gen: 1,
+        sensitivity: "Internal",
+        audience: "everyone",
+      },
+      {
+        uid: product.iri,
+        label: "Concept",
+        kind: "Product",
+        gen: 1,
+        sensitivity: "Internal",
+        audience: "everyone",
+      },
+    ]);
+    // The link as ADR 0026 holds it: the two kinds, the section the link sits under and
+    // the sentence around it, flattened to what a reader would say.
+    const edges = await db().pool.query(
+      "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM graph_edge WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(edges.rows).toEqual([
+      {
+        uid: `links_to:${policy.iri}:0`,
+        label: "LINKS_TO",
+        from_uid: policy.iri,
+        to_uid: product.iri,
+        from_kind: "Policy",
+        to_kind: "Product",
+        section: "Details",
+        sentence: "See the product for tiers.",
+      },
+    ]);
+    // And the map answers at once: a Viewer's walk from the policy reaches the product.
+    const steps = await reading(scenario.viewer, (principal, tx) =>
+      walkFrom(principal, tx, policy.iri),
+    );
+    expect(steps.map((step) => ({ uid: step.uid, depth: step.depth }))).toEqual([
+      { uid: policy.iri, depth: 0 },
+      { uid: product.iri, depth: 1 },
+    ]);
+  });
+
+  it("maps a link to not-yet-written knowledge when that knowledge lands", async () => {
+    const scenario = await arrange();
+    // A path link to a concept nobody has written: legal (docs/okf-v02.md), and no edge
+    // yet, because a path is not an identity until the index holds it.
+    const author = writeFor({
+      status: "stable",
+      body: "See [travel](./travel.md) once it is written.",
+    });
+    const first = await landed(scenario, author);
+    expect(await rowsFor(scenario.workspaceId)).toMatchObject({ edges: "0" });
+
+    const travel = writeFor({
+      kind: "Guideline",
+      status: "stable",
+      path: "knowledge/travel.md",
+      expectedHead: first.sha,
+    });
+    await landed(scenario, travel);
+
+    // The landing is what resolves it: the author's edges are re-derived in the same act,
+    // with the target's kind read off the index the transaction just wrote.
+    const edges = await db().pool.query(
+      "SELECT from_uid, to_uid, to_kind FROM graph_edge WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(edges.rows).toEqual([
+      { from_uid: author.iri, to_uid: travel.iri, to_kind: "Guideline" },
+    ]);
+  });
+
+  it("derives lineage from a successor's sources[] naming the concept it supersedes", async () => {
+    const scenario = await arrange();
+    const old = writeFor({ status: "stable" });
+    const first = await landed(scenario, old);
+
+    // The successor carries the lineage (ADR 0019): a sources[] entry naming the old
+    // concept, which the graph derives the edge from — never a key of its own.
+    const successor = writeFor({
+      status: "stable",
+      frontmatter: { title: "Expenses v2", type: "Policy", sources: [{ resource: old.iri }] },
+      expectedHead: first.sha,
+    });
+    await landed(scenario, successor);
+
+    const edges = await db().pool.query(
+      "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM graph_edge WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(edges.rows).toEqual([
+      {
+        uid: `supersedes:${successor.iri}:0`,
+        label: "SUPERSEDES",
+        from_uid: successor.iri,
+        to_uid: old.iri,
+        from_kind: null,
+        to_kind: null,
+        section: null,
+        sentence: null,
+      },
+    ]);
   });
 });
 

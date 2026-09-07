@@ -6,6 +6,7 @@ import {
   citedSourceOf,
   CONCEPT_DRAFT_STATUS,
   PUBLISHED_STATUSES,
+  resolvedResource,
   SENSITIVITY_DEFAULT,
 } from "@better-answers/schema";
 import type { z } from "zod";
@@ -34,6 +35,7 @@ import {
   type Committed,
   type GitDoor,
 } from "../store/git/index.ts";
+import { writeConceptDelta } from "../store/graph/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 
 /**
@@ -57,8 +59,9 @@ import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/in
  *    refusal decidable from the concept's own row is made before a commit exists;
  * 4. commit to the bundle, the hash precondition checked against the ref under that lock;
  * 5. open **the slice's own transaction**, through `withMembership` again, and write the
- *    ledger row, the identity, the index row, the bundle commit and the evidence in it —
- *    the authority resolved in the same transaction as the writes it authorises;
+ *    ledger row, the identity, the index row, the bundle commit, the evidence and the
+ *    bundle-and-record graph delta in it — the authority resolved in the same transaction
+ *    as the writes it authorises, and the map never behind for an edit (ADR 0023);
  * 6. release the lock when Postgres has committed, not before.
  *
  * The window between 4 and 5 is the reconciler's territory and nobody else's: a failure
@@ -228,24 +231,10 @@ const normalisedBody = (body: string): string =>
     .join("\n")
     .replace(/\n+$/, "")}\n`;
 
-/**
- * A `resource` as the hash sees it: **paths resolved to `/abs.md`** (ADR 0019). The parser
- * accepts `/abs.md`, `./rel.md` and a bare `dir/x.md`, so two files naming one concept three
- * ways must hash alike — and a link rewrite that only changes the spelling must not un-check
- * the concept. A URL is left as it stands: it is already absolute and is not a path in this
- * bundle.
- */
-const resolvedResource = (resource: string, from: string): string => {
-  if (resource.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(resource)) return resource;
-  const directory = from.slice(0, from.lastIndexOf("/"));
-  const segments: string[] = [];
-  for (const segment of `${directory}/${resource}`.split("/")) {
-    if (segment === "" || segment === ".") continue;
-    if (segment === "..") segments.pop();
-    else segments.push(segment);
-  }
-  return `/${segments.join("/")}`;
-};
+// `resolvedResource` — the hash's path resolution — is the boundary's (`@better-answers/schema`),
+// beside `citedSourceOf` and for the same reason: the graph door's delta resolves the same
+// references, and two resolutions would be two chances to disagree about which concept a
+// file names (ADR 0019).
 
 /** One `sources[]` entry as the hash carries it: the resolved resource, then the locator. */
 type HashedSource = readonly [string, string | null];
@@ -538,13 +527,14 @@ export const writeConcept = async (
             evidenceCount: evidence.data.length,
           },
         });
-        await landRows(tx, {
+        await landRows(fresh, tx, {
           ...row,
           mergeKey: mergeKey.data,
           commit: committed.value,
           actor: actorIdOf(fresh),
           auditEventId,
           evidence: evidence.data,
+          isNew: held === undefined,
         });
       }),
     );
@@ -563,7 +553,7 @@ export const writeConcept = async (
 
 /**
  * Everything the act's transaction writes beside its ledger row: the index row the boundary
- * parsed, and the five facts the act itself supplies. The row's columns are named once — by
+ * parsed, and the facts the act itself supplies. The row's columns are named once — by
  * the boundary — rather than restated here and again at the call site.
  */
 type Landing = z.infer<typeof conceptRow> & {
@@ -572,10 +562,12 @@ type Landing = z.infer<typeof conceptRow> & {
   readonly actor: ActorId;
   readonly auditEventId: string;
   readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[];
+  /** Whether the IRI had no row before this act — what tells the delta a link may now resolve. */
+  readonly isNew: boolean;
 };
 
 /** The rows the act writes, in one place so the order they are written in is one fact. */
-const landRows = async (tx: Tx, index: Landing): Promise<void> => {
+const landRows = async (principal: UserPrincipal, tx: Tx, index: Landing): Promise<void> => {
   // The identity first: the index row's composite key points at it, and a merge key that
   // moved is upkeep on the row that already exists rather than a second identity.
   await tx.query(
@@ -631,6 +623,20 @@ const landRows = async (tx: Tx, index: Landing): Promise<void> => {
       ],
     );
   }
+  // The bundle-and-record graph delta, last: it resolves link targets against the index
+  // this transaction just wrote, and it lands or rolls back with everything above, which
+  // is what "the map is never behind for an edit" means (ADR 0023, ADR 0032).
+  await writeConceptDelta(principal, tx, {
+    iri: index.iri,
+    kind: index.kind,
+    path: index.path,
+    body: index.body,
+    frontmatter: index.frontmatter ?? {},
+    publishedAt: index.publishedAt ?? null,
+    sensitivity: index.sensitivity,
+    audience: index.audience,
+    isNew: index.isNew,
+  });
 };
 
 /** The latest check of a concept, as the trust projection reads it (ADR 0019). */

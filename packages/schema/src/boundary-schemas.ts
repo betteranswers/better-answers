@@ -24,6 +24,14 @@ import {
 } from "./concept-tables.ts";
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
+import {
+  GRAPH_EDGE_LABELS,
+  GRAPH_NODE_LABELS,
+  graphEdge,
+  graphGeneration,
+  graphNode,
+  SOURCE_ENTITY_LABEL_PREFIX,
+} from "./graph-tables.ts";
 import { group, GROUP_ORIGINS, groupMember } from "./group-tables.ts";
 import {
   account,
@@ -129,6 +137,18 @@ export const workspaceConfigUpdate = createUpdateSchema(
   workspaceConfigRefinements,
 );
 
+/**
+ * The two class columns every readable unit narrows alike, so its classes are one fact
+ * across `index.chunk`, `concept_index` and the graph rows (ADR 0023): *sensitivity* to
+ * the glossary's closed set — the column stays text so the set is the boundary's to
+ * narrow, exactly as ADR 0028 intends — and *audience* to non-empty only, because
+ * "everyone in the workspace, or named groups" is not a closed word set.
+ */
+const readableUnit = {
+  sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
+  audience: (schema: z.ZodString) => schema.trim().min(1),
+};
+
 const chunkRefinements = {
   id: (schema: z.ZodString) => schema.trim().min(1),
   workspaceId,
@@ -136,13 +156,7 @@ const chunkRefinements = {
   // length narrows to what the column's vector(N) accepts.
   embedding: z.array(z.number()).length(EMBEDDING_DIMENSIONS),
   embeddingRouteId: (schema: z.ZodString) => schema.trim().min(1),
-  // The glossary's closed set (CONTEXT.md, *sensitivity*); the column stays text so
-  // the set is the boundary's to narrow, exactly as ADR 0028 intends. The list is the
-  // one `concept_index` narrows to as well — a readable unit's classes are one fact.
-  sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
-  // *audience* is "everyone in the workspace, or named groups" — not a closed word
-  // set, so the boundary narrows to non-empty only.
-  audience: (schema: z.ZodString) => schema.trim().min(1),
+  ...readableUnit,
   bindingId: (schema: z.ZodString) => schema.trim().min(1),
 };
 
@@ -405,8 +419,7 @@ const conceptIndexRefinements = {
   contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
   commitSha: (schema: z.ZodString) => schema.regex(GIT_SHA),
   status: (schema: z.ZodString) => schema.pipe(z.enum(CONCEPT_STATUSES)),
-  sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
-  audience: (schema: z.ZodString) => schema.trim().min(1),
+  ...readableUnit,
 };
 
 export const conceptIndexSelect = createSelectSchema(conceptIndex, conceptIndexRefinements);
@@ -464,6 +477,78 @@ export const conceptVerificationUpdate = createUpdateSchema(
   conceptVerification,
   conceptVerificationRefinements,
 );
+
+/**
+ * A graph label: the partition's closed set, or the prefixed source-entity form (ADR 0032).
+ * The prefix arm is the boundary's whole rule for a source-entity label until the lift that
+ * writes them lands its closed set (B7); the tie between the prefix and a missing `gen` is
+ * the table's own CHECK, because a refinement sees one column at a time.
+ */
+const graphLabel = (labels: readonly string[]) => (schema: z.ZodString) =>
+  schema.refine(
+    (label) =>
+      labels.some((known) => known === label) || label.startsWith(SOURCE_ENTITY_LABEL_PREFIX),
+    { message: "a graph label is one of the closed set, or wears the source-entity prefix" },
+  );
+
+/** A generation: the rebuild counter's value, from 1 — `gen` and `live_gen` alike. */
+const generation = (schema: z.ZodNumber) => schema.int().positive();
+
+const graphGenerationRefinements = {
+  workspaceId,
+  liveGen: generation,
+};
+
+export const graphGenerationSelect = createSelectSchema(
+  graphGeneration,
+  graphGenerationRefinements,
+);
+export const graphGenerationInsert = createInsertSchema(
+  graphGeneration,
+  graphGenerationRefinements,
+);
+export const graphGenerationUpdate = createUpdateSchema(
+  graphGeneration,
+  graphGenerationRefinements,
+);
+
+/** A graph row's text — a uid, a kind: non-empty, because an empty one names nothing. */
+const graphKey = (schema: z.ZodString) => schema.trim().min(1);
+
+/**
+ * The graph rows (ADR 0032): what a node and an edge narrow alike — the label's rule is
+ * per table, the visibility columns exactly `concept_index`'s, because the read predicate
+ * is tested against them.
+ */
+const graphRow = {
+  workspaceId,
+  gen: generation,
+  uid: graphKey,
+  ...readableUnit,
+};
+
+const graphNodeRefinements = {
+  ...graphRow,
+  label: graphLabel(GRAPH_NODE_LABELS),
+  kind: graphKey,
+};
+
+export const graphNodeSelect = createSelectSchema(graphNode, graphNodeRefinements);
+export const graphNodeInsert = createInsertSchema(graphNode, graphNodeRefinements);
+export const graphNodeUpdate = createUpdateSchema(graphNode, graphNodeRefinements);
+
+const graphEdgeRefinements = {
+  ...graphRow,
+  label: graphLabel(GRAPH_EDGE_LABELS),
+  fromUid: graphKey,
+  toUid: graphKey,
+  fromKind: graphKey,
+  toKind: graphKey,
+};
+
+export const graphEdgeSelect = createSelectSchema(graphEdge, graphEdgeRefinements);
+export const graphEdgeInsert = createInsertSchema(graphEdge, graphEdgeRefinements);
+export const graphEdgeUpdate = createUpdateSchema(graphEdge, graphEdgeRefinements);
 
 /** One entry per table this package owns — the parity test's registry (ADR 0028). */
 export const boundarySchemas = {
@@ -571,5 +656,23 @@ export const boundarySchemas = {
     select: conceptVerificationSelect,
     insert: conceptVerificationInsert,
     update: conceptVerificationUpdate,
+  },
+  graphGeneration: {
+    table: graphGeneration,
+    select: graphGenerationSelect,
+    insert: graphGenerationInsert,
+    update: graphGenerationUpdate,
+  },
+  graphNode: {
+    table: graphNode,
+    select: graphNodeSelect,
+    insert: graphNodeInsert,
+    update: graphNodeUpdate,
+  },
+  graphEdge: {
+    table: graphEdge,
+    select: graphEdgeSelect,
+    insert: graphEdgeInsert,
+    update: graphEdgeUpdate,
   },
 } as const;

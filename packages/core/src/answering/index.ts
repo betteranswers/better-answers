@@ -343,8 +343,10 @@ export const open = async (
       iri: found.iri,
       frontmatter: found.frontmatter,
       body: found.body,
-      // Typed relations are derived in the graph and are never a key on the file
-      // (ADR 0010), so they arrive with the graph tables (T-053).
+      // Typed relations are derived in the graph and are never a key on the file (ADR
+      // 0010). The edges exist (T-053's delta); the read that projects them into `open`
+      // is the answering slice's own later work (B9), so this stays empty rather than
+      // half-read.
       relations: [],
       trust: trustOf(found, new Date()),
       evidence: evidenceOf(found),

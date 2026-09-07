@@ -18,7 +18,8 @@
     "./members": "./src/members/index.ts",
     "./workspaces": "./src/workspaces/index.ts",
     "./store/postgres": "./src/store/postgres/index.ts",
-    "./store/git": "./src/store/git/index.ts"
+    "./store/git": "./src/store/git/index.ts",
+    "./store/graph": "./src/store/graph/index.ts"
   },
   "scripts": {
     "lint": "oxlint --config ../../.oxlintrc.json .",

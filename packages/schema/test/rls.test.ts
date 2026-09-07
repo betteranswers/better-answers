@@ -52,6 +52,19 @@ const seedTwoWorkspaces = async (client: pg.PoolClient) => {
   return seed;
 };
 
+/** Rows visible per table under the role and scope the client holds — the zero-rows probe. */
+const countedRows = async (
+  client: pg.PoolClient,
+  tables: readonly string[],
+): Promise<readonly { table: string; rows: number }[]> => {
+  const rows: { table: string; rows: number }[] = [];
+  for (const table of tables) {
+    const found = await client.query(`SELECT 1 FROM "${table}"`);
+    rows.push({ table, rows: found.rowCount ?? 0 });
+  }
+  return rows;
+};
+
 const rlsFlags = async (qualified: string) => {
   const [schema, table] = qualified.split(".");
   const flags = await db.pool.query(
@@ -735,20 +748,15 @@ describe("the concept write path under app_rt", () => {
       }
       await client.query("SET LOCAL ROLE app_rt");
 
-      const counted = async (): Promise<readonly { table: string; rows: number }[]> => {
-        const rows: { table: string; rows: number }[] = [];
-        for (const table of CONCEPT_TABLES) {
-          const found = await client.query(`SELECT 1 FROM "${table}"`);
-          rows.push({ table, rows: found.rowCount ?? 0 });
-        }
-        return rows;
-      };
-
-      expect(await counted()).toEqual(CONCEPT_TABLES.map((table) => ({ table, rows: 0 })));
+      expect(await countedRows(client, CONCEPT_TABLES)).toEqual(
+        CONCEPT_TABLES.map((table) => ({ table, rows: 0 })),
+      );
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       // One each, never two: the other workspace's row is not in a scoped read at all.
-      expect(await counted()).toEqual(CONCEPT_TABLES.map((table) => ({ table, rows: 1 })));
+      expect(await countedRows(client, CONCEPT_TABLES)).toEqual(
+        CONCEPT_TABLES.map((table) => ({ table, rows: 1 })),
+      );
     });
   });
 
@@ -893,6 +901,161 @@ describe("the concept write path under app_rt", () => {
         /concept_index_bundle_commit_fk/,
       );
       await client.query("ROLLBACK TO SAVEPOINT dangling");
+    });
+  });
+});
+
+/**
+ * The graph tables' own proofs (ADR 0032, migration 0016, `[SEC3]`): three tenant tables
+ * like any other, so the zero-rows proof is stated here in their words; the worker's role
+ * is refused on all three outright; the policy's WITH CHECK refuses a node written into
+ * another tenant; and the CHECKs and unique indexes refuse a label outside the closed set,
+ * a prefixed label inside a generation, a class outside the three, a doubled key in either
+ * partition and a second live-generation row — while the side-by-side shape a full rebuild
+ * needs (one uid in two generations) lands.
+ */
+describe("the graph tables under app_rt", () => {
+  const GRAPH_TABLES = ["graph_generation", "graph_node", "graph_edge"] as const;
+
+  it("returns zero rows on a missing scope and only the scoped tenant's rows otherwise, on all three", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      for (const workspaceId of [WS_A, WS_B]) {
+        // One node, one edge and the generation row they stamp, in each workspace: the
+        // claim is about all three tables, not the neighbour that happened to be seeded.
+        const from = await seed.graphNode({ workspaceId });
+        await seed.graphEdge({ workspaceId, fromUid: from.uid });
+      }
+      await client.query("SET LOCAL ROLE app_rt");
+
+      expect(await countedRows(client, GRAPH_TABLES)).toEqual(
+        GRAPH_TABLES.map((table) => ({ table, rows: 0 })),
+      );
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      // One generation row, the seeded node and the target the edge factory minted —
+      // never the other workspace's.
+      expect(await countedRows(client, GRAPH_TABLES)).toEqual([
+        { table: "graph_generation", rows: 1 },
+        { table: "graph_node", rows: 2 },
+        { table: "graph_edge", rows: 1 },
+      ]);
+    });
+  });
+
+  it("refuses the worker role on all three graph tables, reading and writing alike (migration 0016)", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.graphNode({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      for (const table of GRAPH_TABLES) {
+        await client.query("SAVEPOINT graph_probe");
+        await expect(client.query(`SELECT 1 FROM "${table}" LIMIT 1`)).rejects.toThrow(
+          /permission denied/,
+        );
+        await client.query("ROLLBACK TO SAVEPOINT graph_probe");
+        await expect(client.query(`DELETE FROM "${table}"`)).rejects.toThrow(/permission denied/);
+        await client.query("ROLLBACK TO SAVEPOINT graph_probe");
+      }
+    });
+  });
+
+  it("refuses a node written into another tenant, from this tenant's scope", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.graphGeneration({ workspaceId: WS_B });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await expect(
+        client.query(
+          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'uid-b', 'Concept')",
+          [WS_B],
+        ),
+      ).rejects.toThrow(/row-level security/);
+    });
+  });
+
+  it("refuses every row the graph's sentences forbid, each at its own constraint", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const node = await seed.graphNode({ workspaceId: WS_A });
+      const entity = await seed.graphNode({
+        workspaceId: WS_A,
+        gen: null,
+        label: "source-entity:Person",
+        kind: null,
+      });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const rows: readonly [string, readonly unknown[], string][] = [
+        // A label outside the closed set, and the prefixed form inside a generation: the
+        // source-entity prefix holds only where `gen IS NULL` (ADR 0032).
+        [
+          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'uid-1', 'Widget')",
+          [WS_A],
+          "graph_node_label_check",
+        ],
+        [
+          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'uid-2', 'source-entity:Person')",
+          [WS_A],
+          "graph_node_label_check",
+        ],
+        [
+          "INSERT INTO graph_node (workspace_id, gen, uid, label, sensitivity) VALUES ($1, 1, 'uid-3', 'Concept', 'Secret')",
+          [WS_A],
+          "graph_node_sensitivity_check",
+        ],
+        // The two partitions' keys: a doubled `(workspace, gen, uid)` in the
+        // bundle-and-record partition, and a doubled `(workspace, uid)` among the
+        // source entities, which carry no generation to tell two rows apart by.
+        [
+          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, $2, $3, 'Concept')",
+          [WS_A, node.gen, node.uid],
+          "graph_node_bundle_uidx",
+        ],
+        [
+          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, NULL, $2, 'source-entity:Person')",
+          [WS_A, entity.uid],
+          "graph_node_source_entity_uidx",
+        ],
+        // The link columns are LINKS_TO's alone: a named edge cannot smuggle prose.
+        [
+          "INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid, sentence) VALUES ($1, 1, 'edge-1', 'SUPERSEDES', 'a', 'b', 'smuggled')",
+          [WS_A],
+          "graph_edge_links_to_check",
+        ],
+        // One live generation per workspace, and never a generation before the first.
+        [
+          "INSERT INTO graph_generation (workspace_id, live_gen) VALUES ($1, 2)",
+          [WS_A],
+          "graph_generation_pkey",
+        ],
+        // The scoped workspace, so the row's own CHECK is what refuses it — Postgres
+        // evaluates a CHECK before the key, so the doubled workspace never masks it.
+        [
+          "INSERT INTO graph_generation (workspace_id, live_gen) VALUES ($1, 0)",
+          [WS_A],
+          "graph_generation_live_gen_check",
+        ],
+      ];
+      for (const [statement, parameters, constraint] of rows) {
+        await client.query("SAVEPOINT graph_row");
+        await expect(client.query(statement, [...parameters])).rejects.toThrow(
+          new RegExp(constraint),
+        );
+        await client.query("ROLLBACK TO SAVEPOINT graph_row");
+      }
+
+      // The shape a full rebuild writes beside the live map (ADR 0023): the same uid in
+      // the next generation lands, because the key carries the generation.
+      await client.query(
+        "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, $2, $3, 'Concept')",
+        [WS_A, (node.gen ?? 0) + 1, node.uid],
+      );
     });
   });
 });

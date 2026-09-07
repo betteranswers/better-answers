@@ -6,10 +6,10 @@ import {
   jsonb,
   primaryKey,
   text,
-  timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+import { listed, stamp } from "./column-helpers.ts";
 import { ULID_CHARACTERS } from "./ulid.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
@@ -157,6 +157,31 @@ export const citedSourceOf = (
 };
 
 /**
+ * A resource or a link target as ADR 0019 resolves it: **paths resolved to `/abs.md`**. A
+ * file may name one concept three ways — `/abs.md`, `./rel.md`, a bare `dir/x.md` — and two
+ * spellings of one reference must land alike, for the content hash (a link rewrite that
+ * only changes the spelling must not un-check the concept) and for the map (two spellings
+ * are one edge). A URL is left as it stands: it is already absolute and is not a path in
+ * this bundle.
+ *
+ * It lives here beside `citedSourceOf` for the same reason that does: the hash in the
+ * concepts slice and the delta builder in the graph door both resolve, a slice may import
+ * the boundary and the boundary may never import a slice (ADR 0029), and two resolutions
+ * would be two chances to disagree about which concept a file names.
+ */
+export const resolvedResource = (resource: string, from: string): string => {
+  if (resource.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(resource)) return resource;
+  const directory = from.slice(0, from.lastIndexOf("/"));
+  const segments: string[] = [];
+  for (const segment of `${directory}/${resource}`.split("/")) {
+    if (segment === "" || segment === ".") continue;
+    if (segment === "..") segments.pop();
+    else segments.push(segment);
+  }
+  return `/${segments.join("/")}`;
+};
+
+/**
  * Where a bundle's concepts live and what one is called. The bundle root is `knowledge/`
  * and its manifest — the platform-reserved, non-`.md` file ADR 0002 puts at that root
  * (`knowledge/manifest.yaml`) — is excluded by the `.md` ending rather than by name, so a
@@ -188,11 +213,8 @@ export const CONCEPT_STABLE_STATUS = "stable" satisfies (typeof PUBLISHED_STATUS
  */
 export const CONTENT_HASH = /^[0-9a-f]{64}$/;
 
-const listed = (values: readonly string[]): string =>
-  values.map((value) => `'${value}'`).join(", ");
-
-/** Every instant this file records, in the one form the platform stores one (`identity-tables.ts`). */
-const stamp = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
+// `listed` and `stamp` are `column-helpers.ts`'s, shared with the graph tables so the two
+// files cannot drift on how a CHECK's list or an instant is written.
 
 /**
  * The identity record (ADR 0002): the IRI the platform minted, and the **merge key** it was
