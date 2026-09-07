@@ -1,0 +1,21 @@
+apps/api/vitest.config.ts
+  s_e0eda8eedfb8b6::t_917174fe0eb66d 6-10
+apps/api/tests/postgres.ts
+  s_e0eda8eedfb8b6::t_c0b1d9ab6c0eea 1,10-15,21,27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9ff53694ba0b3ecd73568d6670429e6681af12b1",
+  "prompts": {},
+  "sessions": {
+    "s_e0eda8eedfb8b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9789fc80-7ea8-43d4-9e45-1f2b870cb092",
+        "model": "claude-opus-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
