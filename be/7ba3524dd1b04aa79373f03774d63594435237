@@ -1,0 +1,40 @@
+.github/workflows/build.yml
+  s_3695f0cfb8d82a::t_70e6e447c492d2 93-128,131-136,142-144,150-158,160-162,164-165,168,170,179-183,185-187
+  s_3695f0cfb8d82a::t_dc571a6518b435 163,172-178,184
+  s_3695f0cfb8d82a::t_0ed3248b7e17c6 129-130
+  s_3695f0cfb8d82a::t_ff733d73df3485 61-67
+  s_3695f0cfb8d82a::t_6d4567e74a2fa4 42-48
+apps/api/tests/image.test.ts
+  s_3695f0cfb8d82a::t_934fad63fe3a3b 229-276,279-297,299-308,312-323,325-331
+  s_3695f0cfb8d82a::t_184f154b2593be 167-171
+  s_3695f0cfb8d82a::t_78dc2b41c72c0e 298
+  s_3695f0cfb8d82a::t_dc5f622afa52db 309-311
+  s_3695f0cfb8d82a::t_db66327230f7d8 204
+  s_3695f0cfb8d82a::t_711ab0091fe217 324
+  s_3695f0cfb8d82a::t_d630468df5ea66 148-153,155
+  s_3695f0cfb8d82a::t_34e414ebf09891 277-278
+  s_3695f0cfb8d82a::t_c744657bb90ecb 8
+  s_3695f0cfb8d82a::t_33dcc3c423bea7 205
+  s_3695f0cfb8d82a::t_a475608c37b667 33-40
+  s_3695f0cfb8d82a::t_e7e55d1f262f55 111-120
+  s_3695f0cfb8d82a::t_70c683c5045db8 128-147
+.github/workflows/check.yml
+  s_3695f0cfb8d82a::t_90797030eb1079 85-87,89-90
+  s_3695f0cfb8d82a::t_519234b917447f 22-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "be7ba3524dd1b04aa79373f03774d63594435237",
+  "prompts": {},
+  "sessions": {
+    "s_3695f0cfb8d82a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "602efdc2-4b25-49db-938f-df6797643aa7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
