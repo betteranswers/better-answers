@@ -249,7 +249,7 @@ export const CONTENT_HASH = /^[0-9a-f]{64}$/;
  * frontmatter as the producer's own text so that it can measure exactly that.
  *
  * There is deliberately **no CHECK over the stored `jsonb`**. A row can only measure what
- * Postgres renders, and a rendering is not the caller's text within any multiplier:
+ * Postgres renders, and a rendering is not the producer's text within any multiplier:
  * `{"a":1e-100}` is twelve characters sent and a hundred and nine read back, because `jsonb`
  * keeps a numeric and prints it in full. A CHECK over the rendering would refuse payloads the
  * boundary had already passed — a backstop that fires on good input is worse than none —
