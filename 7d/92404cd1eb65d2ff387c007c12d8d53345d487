@@ -1,0 +1,44 @@
+apps/worker/tests/test_tier_contract.py
+  s_3695f0cfb8d82a::t_26b2acc186c6ec 87-100
+  s_3695f0cfb8d82a::t_fdd2c407406832 37-61
+  s_3695f0cfb8d82a::t_f16d6eb60b37f2 82-83
+apps/api/tests/client-addresses.test.ts
+  s_3695f0cfb8d82a::t_f4e5d591e7c588 36-37
+  s_3695f0cfb8d82a::t_91ff157987afb2 38
+  s_3695f0cfb8d82a::t_7bf2e0e0f12f2a 19-28
+  s_3695f0cfb8d82a::t_ec6d82abe0f333 1-18,40
+  s_3695f0cfb8d82a::t_e4be883f97559f 29-35,39
+packages/core/test/tier-contract.test.ts
+  s_3695f0cfb8d82a::t_574792f79e55c8 100-116
+  s_3695f0cfb8d82a::t_9c321e691eb688 1-9
+  s_3695f0cfb8d82a::t_32db7b5d4590f5 96-98
+  s_3695f0cfb8d82a::t_4cccd1bee1988a 52-70
+apps/api/tests/harness.ts
+  s_3695f0cfb8d82a::t_9ab63036a3654b 111-115
+  s_3695f0cfb8d82a::t_7731e8959ebab0 334-336
+  s_3695f0cfb8d82a::t_e6428a271d699f 20
+apps/api/tests/routes-list.test.ts
+  s_3695f0cfb8d82a::t_311cfc097ea8a8 215,227
+apps/api/tests/oauth-flow.test.ts
+  s_3695f0cfb8d82a::t_311cfc097ea8a8 661,666,674-675,688,698
+apps/api/tests/client-addresses.ts
+  s_3695f0cfb8d82a::t_13d97b808fd6b3 21-22,28-35
+  s_3695f0cfb8d82a::t_31419b8c0d66c0 1-2,18-19,23-27,36-38
+  s_3695f0cfb8d82a::t_edbe844c9b77e1 3-17,20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7d92404cd1eb65d2ff387c007c12d8d53345d487",
+  "prompts": {},
+  "sessions": {
+    "s_3695f0cfb8d82a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "602efdc2-4b25-49db-938f-df6797643aa7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
