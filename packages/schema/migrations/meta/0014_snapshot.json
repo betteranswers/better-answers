@@ -1,5 +1,5 @@
 {
-  "id": "32e46c25-fdc7-498f-b799-a00468eec3f8",
+  "id": "10d38c4f-4422-4af4-b999-aae55d9728a4",
   "prevId": "f04825e7-487c-4360-9c61-9d481b58c7bf",
   "version": "7",
   "dialect": "postgresql",
@@ -3056,7 +3056,7 @@
         "id": {
           "name": "id",
           "type": "text",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true
         },
         "workspace_id": {
@@ -3144,7 +3144,15 @@
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "concept_verification_workspace_id_id_pk": {
+          "name": "concept_verification_workspace_id_id_pk",
+          "columns": [
+            "workspace_id",
+            "id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {
         "concept_verification_workspace_isolation": {

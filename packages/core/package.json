@@ -17,7 +17,8 @@
     "./runs": "./src/runs/index.ts",
     "./members": "./src/members/index.ts",
     "./workspaces": "./src/workspaces/index.ts",
-    "./store/postgres": "./src/store/postgres/index.ts"
+    "./store/postgres": "./src/store/postgres/index.ts",
+    "./store/git": "./src/store/git/index.ts"
   },
   "scripts": {
     "lint": "oxlint --config ../../.oxlintrc.json .",

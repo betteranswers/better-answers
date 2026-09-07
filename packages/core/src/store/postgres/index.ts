@@ -158,6 +158,23 @@ const MEMBERSHIP_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS per
      JOIN "user" u ON u.id = m.user_id
     WHERE m.workspace_id = $1 AND m.user_id = $2`;
 
+/**
+ * The same read, holding the membership row until the transaction ends — what an act's own
+ * door uses and the request boundary does not.
+ *
+ * `FOR SHARE OF m` is what turns "we checked" into "it cannot have changed since": a
+ * revocation is an UPDATE of this row, so it either commits before this read — and is seen —
+ * or waits behind this lock until the act commits, in which case its instant is after the
+ * act and governs the acts that follow it. Without the lock, READ COMMITTED would let a
+ * revocation land between the read and the COMMIT, and the rows would be written for a
+ * credential ended microseconds earlier.
+ *
+ * It is not on the boundary's read, deliberately: that runs on every request, and a shared
+ * row lock per request would make the People screen's writes queue behind ordinary traffic.
+ * Only an act that writes under an authority it read earlier needs to hold it.
+ */
+const MEMBERSHIP_QUERY_HELD = `${MEMBERSHIP_QUERY} FOR SHARE OF m`;
+
 const isRole = (value: string): value is Role => ROLES.some((role) => role === value);
 
 /**
@@ -200,7 +217,20 @@ export const withPrincipal = async <T>(
   const userId = boundarySchemas.user.select.shape.id.safeParse(claims.userId);
   if (!workspaceId.success || !userId.success) return err("malformed-claims");
 
-  return resolveScoped(door, workspaceId.data, userId.data, (row) => refuse(row, claims), work);
+  return resolveScoped(
+    door,
+    workspaceId.data,
+    userId.data,
+    claims.issuedAt,
+    (row) => {
+      const refusal = refuse(row, claims.issuedAt);
+      if (refusal !== undefined) return refusal;
+      // The boundary's own extra: a credential that names a role the row disagrees with.
+      // The act's door has no claims to disagree with, which is why this arm is here.
+      return claims.role === undefined || claims.role === row?.role ? undefined : "role-disagrees";
+    },
+    work,
+  );
 };
 
 /**
@@ -219,14 +249,14 @@ export const withPrincipal = async <T>(
  * it is at the request boundary, and the act re-checks its own role threshold against the
  * `principal` this door hands back rather than the one it was called with.
  *
- * Refusals: the membership is gone — the person was removed from the workspace while the act
- * was in flight — the row's role is not one of the three, or it is no longer the role the
- * caller was authorised at. The two revocation instants are **not** re-read here: they are
- * refused against a credential's issuance instant (ADR 0035), which a Principal does not
- * carry, and that comparison is `withPrincipal`'s at the boundary. What this door judges is
- * what the member row alone can say, which is what the revocation race needs (ADR 0012's
- * 2026-09-06 amendment): a membership that went, or a role that moved, refuses the rows and
- * leaves the commit as the reconciler's finding.
+ * **It judges authority at time-of-act, by the boundary's own rule.** The membership row is
+ * read under a shared lock and every refusal the boundary makes is made again here: the
+ * membership gone, a role that moved, and — the one this door exists for — either revocation
+ * instant now cutting the credential this act rides on. That last is judged against the
+ * Principal's `credentialIssuedAt` and never against "an instant is set", because revocation
+ * ends what was *issued* and a fresh sign-in mints anew (ADR 0035). With the lock, a
+ * revocation cannot land between this read and the act's COMMIT, which is what makes ADR
+ * 0012's *impossible by construction* a construction rather than a hope.
  */
 export const withMembership = async <T>(
   principal: UserPrincipal,
@@ -237,12 +267,16 @@ export const withMembership = async <T>(
     door,
     principal.workspaceId,
     principal.userId,
+    principal.credentialIssuedAt,
     (row) => {
-      if (row === undefined) return "not-a-member";
-      if (!isRole(row.role)) return "role-unknown";
-      return row.role === principal.role ? undefined : "role-disagrees";
+      const revoked = refuse(row, principal.credentialIssuedAt);
+      if (revoked !== undefined) return revoked;
+      // The role the act was authorised at, against the role the row holds now. Checked
+      // after the shared refusals, so a revoked person hears one word and not two.
+      return row?.role === principal.role ? undefined : "role-disagrees";
     },
     work,
+    MEMBERSHIP_QUERY_HELD,
   );
 
 /**
@@ -256,15 +290,17 @@ const resolveScoped = async <T>(
   door: PostgresDoor,
   workspaceId: WorkspaceId,
   userId: UserId,
+  credentialIssuedAt: Date,
   refusalFor: (row: MembershipRow | undefined) => PrincipalRefusal | undefined,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+  query: string = MEMBERSHIP_QUERY,
 ): Promise<Result<T, PrincipalRefusal>> => {
   const client = await door.pool.connect();
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
 
-    const membership = await client.query<MembershipRow>(MEMBERSHIP_QUERY, [workspaceId, userId]);
+    const membership = await client.query<MembershipRow>(query, [workspaceId, userId]);
     const row = membership.rows[0];
     const refusal = refusalFor(row);
     if (refusal !== undefined) {
@@ -288,6 +324,7 @@ const resolveScoped = async <T>(
       // key to a group the platform minted, so a value of another shape is a broken
       // database and the throw the caller sees is the truthful answer to it.
       groups: (row?.group_ids ?? []).map((id) => boundarySchemas.group.select.shape.id.parse(id)),
+      credentialIssuedAt,
     };
     const value = await work(principal, client);
     await commit(client);
@@ -300,14 +337,22 @@ const resolveScoped = async <T>(
   }
 };
 
-const refuse = (row: MembershipRow | undefined, claims: Claims): PrincipalRefusal | undefined => {
+/**
+ * The refusals a membership row decides for **any** caller, from the row and the instant the
+ * credential was issued at. Both doors make them: at the request boundary against the claims'
+ * instant, and inside an act's own transaction against the same instant carried on the
+ * Principal, so a revocation is judged the same way wherever it is met.
+ */
+const refuse = (
+  row: MembershipRow | undefined,
+  credentialIssuedAt: Date,
+): PrincipalRefusal | undefined => {
   if (row === undefined) return "not-a-member";
   if (!isRole(row.role)) return "role-unknown";
   // Either instant refuses, with the one word: revoked everywhere, or revoked here.
   for (const revokedAt of [row.person_revoked_at, row.membership_revoked_at]) {
-    if (revokedAt !== null && claims.issuedAt < revokedAt) return "credentials-revoked";
+    if (revokedAt !== null && credentialIssuedAt < revokedAt) return "credentials-revoked";
   }
-  if (claims.role !== undefined && claims.role !== row.role) return "role-disagrees";
   return undefined;
 };
 

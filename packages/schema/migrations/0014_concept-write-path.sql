@@ -40,13 +40,14 @@ CREATE TABLE "concept_index" (
 --> statement-breakpoint
 ALTER TABLE "concept_index" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "concept_verification" (
-	"id" text PRIMARY KEY NOT NULL,
+	"id" text NOT NULL,
 	"workspace_id" text NOT NULL,
 	"iri" text NOT NULL,
 	"actor" text NOT NULL,
 	"checked_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"content_hash" text,
 	"origin" text DEFAULT 'platform' NOT NULL,
+	CONSTRAINT "concept_verification_workspace_id_id_pk" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "concept_verification_origin_check" CHECK (origin IN ('platform', 'imported', 'erasure-rewrite', 'repair')),
 	CONSTRAINT "concept_verification_imported_check" CHECK (origin <> 'imported' OR content_hash IS NULL)
 );

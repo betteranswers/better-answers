@@ -6,6 +6,7 @@ import {
   CONCEPT_DRAFT_STATUS,
   SENSITIVITY_DEFAULT,
 } from "@better-answers/schema";
+import type { z } from "zod";
 
 import { readableClause, readableParameter } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
@@ -13,9 +14,11 @@ import {
   actorIdOf,
   attempt,
   err,
+  isActorId,
   ok,
   refusalFor,
   ulid,
+  type ActorId,
   type PrincipalRefusal,
   type Result,
   type RoleRefusal,
@@ -26,6 +29,7 @@ import {
   withRepositoryLock,
   type CommitAuthor,
   type CommitRefusal,
+  type Committed,
   type GitDoor,
 } from "../store/git/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
@@ -113,7 +117,11 @@ export type WriteConceptInput = {
   readonly author: CommitAuthor;
   /** What the caller expects the ref to hold; `null` for a bundle's first commit. */
   readonly expectedHead: string | null;
-  /** The concept's confidentiality class; the most restrictive of the three when unnamed. */
+  /**
+   * The concept's confidentiality class. On a **new** concept the most restrictive of the
+   * three when unnamed; on a re-write it may only be the class the concept already holds —
+   * a class is derived from the evidence a concept cites (ADR 0023), never chosen by an edit.
+   */
   readonly sensitivity?: string;
   readonly status?: string;
   readonly evidence?: readonly EvidenceInput[];
@@ -131,9 +139,9 @@ export type ConceptWritten = {
 /**
  * Why a governed write was refused. `stale-precondition` is the one a person is shown — the
  * content moved under them (ADR 0012) — and the two `-taken` words are a bundle that already
- * holds this path or this merge key under another IRI. The principal refusals are
- * `withMembership`'s: the membership went, or the role moved, while the act was in flight,
- * which is the revocation race ADR 0012's amendment governs.
+ * holds this path or this merge key under another IRI. `rename-refused` and
+ * `reclassification-refused` are the two moves this act never makes; the principal refusals
+ * are `withMembership`'s, which judges the caller's authority at time-of-act.
  */
 export type WriteConceptRefusal =
   | RoleRefusal
@@ -141,7 +149,9 @@ export type WriteConceptRefusal =
   | PrincipalRefusal
   | "malformed"
   | "path-taken"
-  | "merge-key-taken";
+  | "merge-key-taken"
+  | "rename-refused"
+  | "reclassification-refused";
 
 /**
  * The frontmatter keys ADR 0014's content hash leaves out: the trust the platform derives
@@ -230,6 +240,34 @@ const WRITE_CONSTRAINTS = {
 } as const;
 
 /**
+ * The statuses a reader may see. A **draft** is a concept nobody has made the company's word
+ * on yet and a **removed** one has left the bundle (`CONTEXT.md`, *discard*): neither is
+ * published, so neither carries a published instant and neither passes the read predicate's
+ * first arm. *stable* and *deprecated* are both readable — deprecation is a trust word shown
+ * to a reader, not a way of hiding a concept from them (ADR 0019).
+ */
+const PUBLISHED_STATUSES: ReadonlySet<string> = new Set(["stable", "deprecated"]);
+
+/** What the index already holds for this IRI — the facts a re-write may not move. */
+type Held = {
+  readonly path: string;
+  readonly sensitivity: string;
+  /** When it first became readable; kept across a re-write, so publishing happens once. */
+  readonly publishedAt: Date | null;
+};
+
+const heldByIri = async (tx: Tx, workspaceId: string, iri: string): Promise<Held | undefined> => {
+  const found = await tx.query<{ path: string; sensitivity: string; published_at: Date | null }>(
+    "SELECT path, sensitivity, published_at FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+    [workspaceId, iri],
+  );
+  const row = found.rows[0];
+  return row === undefined
+    ? undefined
+    : { path: row.path, sensitivity: row.sensitivity, publishedAt: row.published_at };
+};
+
+/**
  * One governed write: one act, one commit, one transaction (ADR 0012).
  *
  * The act's own transaction is opened **after** the commit and inside the lock, which is
@@ -241,6 +279,20 @@ const WRITE_CONSTRAINTS = {
  *
  * The audit door is called **bare** (ADR 0014 rule 4): its rejection is what aborts this
  * transaction, and a `Result` it handed back could be one this act did not read.
+ *
+ * **Two things a re-write never moves: the concept's path and its class.** Both are minted
+ * with the concept and both are decided elsewhere afterwards — a rename is a governed *move*
+ * that rewrites inbound links in the same commit (ADR 0012), and a class is derived from the
+ * evidence a concept cites or set by a recorded Admin override (ADR 0023). Left open, this
+ * act would be the shortest path to both a silent reclassification (an Editor widening a
+ * Restricted concept to Public) and a silent narrowing (a re-write that names no class and
+ * takes the safe default, hiding a concept its readers can see today). So an existing
+ * concept's class is **kept** when the write names none, and **refused** when it names a
+ * different one; a differing path is refused the same way.
+ *
+ * Both are decided by the read this act makes **before it commits**, so a refused re-write
+ * leaves no commit at all: a rename that refused after committing would leave a file at a
+ * path no row names, and a replay that refuses for ever.
  */
 export const writeConcept = async (
   principal: UserPrincipal,
@@ -252,26 +304,19 @@ export const writeConcept = async (
   const contentHash = contentHashOf(input.frontmatter, input.body);
   // The file carries its own IRI (ADR 0002's platform key), whatever the caller passed.
   const frontmatter = { ...input.frontmatter, iri: input.iri } satisfies Frontmatter;
-  // Everything the rows will hold, parsed at the boundary before anything is committed: a
-  // commit whose rows the boundary would refuse is the head-ahead state provoked on
-  // purpose, and there is no reason to make one.
-  const parsed = conceptRow.safeParse({
-    workspaceId: principal.workspaceId,
-    iri: input.iri,
-    path: input.path,
-    kind: input.kind,
-    title: input.title,
-    frontmatter,
-    body: input.body,
-    contentHash,
-    status: input.status ?? CONCEPT_DRAFT_STATUS,
-    publishedAt: new Date(),
-    sensitivity: input.sensitivity ?? SENSITIVITY_DEFAULT,
-    audience: AUDIENCE_EVERYONE,
-  });
   const mergeKey = boundarySchemas.conceptIdentity.insert.shape.mergeKey.safeParse(input.mergeKey);
-  if (!parsed.success || !mergeKey.success) return err("malformed");
-  const row = parsed.data;
+  // Evidence goes through the boundary too, and before the commit: a locator the boundary
+  // would refuse is one this act should never have made a commit for (ADR 0028).
+  const evidence = boundarySchemas.evidence.insert.array().safeParse(
+    (input.evidence ?? []).map((piece) => ({
+      workspaceId: principal.workspaceId,
+      sourceDocumentId: piece.sourceDocumentId,
+      locator: piece.locator,
+      resource: piece.resource,
+      contentVersion: piece.contentVersion ?? null,
+    })),
+  );
+  if (!mergeKey.success || !evidence.success) return err("malformed");
 
   // Minted before the commit so the commit carries it (ADR 0012's 2026-09-06 amendment):
   // an id minted after the commit would leave the trailer empty exactly when the row was
@@ -279,6 +324,51 @@ export const writeConcept = async (
   const auditEventId = ulid();
 
   return withRepositoryLock(doors.git, principal.workspaceId, async () => {
+    // The act's first transaction: what the index already holds for this IRI, read under the
+    // authority this act will write with. Its refusals cost no commit, which is why the two
+    // that are decidable from the concept's own row are made here.
+    const existing = await attempt(() =>
+      withMembership(principal, doors.postgres, (_fresh, tx) =>
+        heldByIri(tx, principal.workspaceId, input.iri),
+      ),
+    );
+    if (!existing.ok) return err(existing.error);
+    if (!existing.value.ok) return err(existing.value.error);
+    const held = existing.value.value;
+
+    if (held !== undefined && held.path !== input.path) return err("rename-refused");
+    if (
+      held !== undefined &&
+      input.sensitivity !== undefined &&
+      input.sensitivity !== held.sensitivity
+    ) {
+      return err("reclassification-refused");
+    }
+
+    const status = input.status ?? CONCEPT_DRAFT_STATUS;
+    // Everything the rows will hold, parsed at the boundary before anything is committed: a
+    // commit whose rows the boundary would refuse is the head-ahead state provoked on
+    // purpose, and there is no reason to make one.
+    const parsed = conceptRow.safeParse({
+      workspaceId: principal.workspaceId,
+      iri: input.iri,
+      path: input.path,
+      kind: input.kind,
+      title: input.title,
+      frontmatter,
+      body: input.body,
+      contentHash,
+      status,
+      // Published once and kept: a concept that reaches a readable status carries the instant
+      // it first did, and one that leaves those statuses loses it, so the predicate's first
+      // arm is a fact about the concept rather than a stamp every write renews.
+      publishedAt: PUBLISHED_STATUSES.has(status) ? (held?.publishedAt ?? new Date()) : null,
+      sensitivity: held?.sensitivity ?? input.sensitivity ?? SENSITIVITY_DEFAULT,
+      audience: AUDIENCE_EVERYONE,
+    });
+    if (!parsed.success) return err("malformed");
+    const row = parsed.data;
+
     const committed = await commitToBundle(doors.git, {
       workspaceId: principal.workspaceId,
       path: row.path,
@@ -291,10 +381,9 @@ export const writeConcept = async (
     if (!committed.ok) return err(committed.error);
 
     const landed = await attempt(() =>
-      // The door's own re-read is this act's second role check: an Editor demoted to Viewer
-      // or a person removed from the workspace while the commit was being made is refused
-      // here — `role-disagrees` or `not-a-member` — and the transaction rolls back before a
-      // statement runs, which leaves the commit as the reconciler's to find.
+      // The door re-reads the membership in the transaction that writes, under a shared lock
+      // on the row: a revocation landing in the window this act cannot see refuses the rows
+      // here, and the commit is left as the reconciler's to find.
       withMembership(principal, doors.postgres, async (fresh, tx) => {
         await record(fresh, tx, {
           id: auditEventId,
@@ -304,27 +393,16 @@ export const writeConcept = async (
             iri: row.iri,
             commitSha: committed.value.sha,
             contentHash,
-            evidenceCount: input.evidence?.length ?? 0,
+            evidenceCount: evidence.data.length,
           },
         });
         await landRows(tx, {
-          workspaceId: row.workspaceId,
-          iri: row.iri,
-          path: row.path,
-          kind: row.kind,
-          title: row.title,
-          frontmatter,
-          body: row.body,
-          contentHash: row.contentHash,
-          status: row.status,
-          publishedAt: row.publishedAt,
-          sensitivity: row.sensitivity,
-          audience: row.audience,
+          ...row,
           mergeKey: mergeKey.data,
           commit: committed.value,
           actor: actorIdOf(fresh),
           auditEventId,
-          evidence: input.evidence ?? [],
+          evidence: evidence.data,
         });
       }),
     );
@@ -341,25 +419,17 @@ export const writeConcept = async (
   });
 };
 
-/** Everything the act's transaction writes beside its ledger row. */
-type Landing = {
-  readonly workspaceId: string;
-  readonly iri: string;
-  readonly path: string;
-  readonly kind: string;
-  readonly title: string;
-  readonly frontmatter: Frontmatter;
-  readonly body: string;
-  readonly contentHash: string;
-  readonly status: string;
-  readonly publishedAt: Date | null | undefined;
-  readonly sensitivity: string;
-  readonly audience: string;
+/**
+ * Everything the act's transaction writes beside its ledger row: the index row the boundary
+ * parsed, and the five facts the act itself supplies. The row's columns are named once — by
+ * the boundary — rather than restated here and again at the call site.
+ */
+type Landing = z.infer<typeof conceptRow> & {
   readonly mergeKey: string;
-  readonly commit: { readonly sha: string; readonly parent: string | null };
-  readonly actor: string;
+  readonly commit: Committed;
+  readonly actor: ActorId;
   readonly auditEventId: string;
-  readonly evidence: readonly EvidenceInput[];
+  readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[];
 };
 
 /** The rows the act writes, in one place so the order they are written in is one fact. */
@@ -411,7 +481,7 @@ const landRows = async (tx: Tx, index: Landing): Promise<void> => {
        ON CONFLICT (workspace_id, source_document_id, locator) DO UPDATE
           SET resource = EXCLUDED.resource, content_version = EXCLUDED.content_version`,
       [
-        index.workspaceId,
+        piece.workspaceId,
         piece.sourceDocumentId,
         piece.locator,
         piece.resource,
@@ -423,7 +493,8 @@ const landRows = async (tx: Tx, index: Landing): Promise<void> => {
 
 /** The latest check of a concept, as the trust projection reads it (ADR 0019). */
 export type ConceptCheck = {
-  readonly actor: string;
+  /** Who checked — a person, the platform or an agent, in the kernel's one shape (ADR 0035). */
+  readonly actor: ActorId;
   readonly at: Date;
   /** What was confirmed; `null` on an imported check, which never reads *Changed since checked*. */
   readonly contentHash: string | null;
@@ -506,9 +577,19 @@ export const conceptByIri = async (
     status: row.status,
     contentHash: row.content_hash,
     commitSha: row.commit_sha,
-    check:
-      row.checked_by === null || row.checked_at === null
-        ? undefined
-        : { actor: row.checked_by, at: row.checked_at, contentHash: row.checked_hash },
+    check: checkOf(row),
   });
+};
+
+/**
+ * The latest check as the trust projection reads it, or nothing. The actor column is parsed
+ * on the way out rather than asserted: a value that is not one of the three forms is a broken
+ * database, and a check nobody can attribute moves no tier — so it reads as *Unchecked*,
+ * which is the fail-closed answer and not a guess about who checked.
+ */
+const checkOf = (row: ConceptRow): ConceptCheck | undefined => {
+  if (row.checked_by === null || row.checked_at === null || !isActorId(row.checked_by)) {
+    return undefined;
+  }
+  return { actor: row.checked_by, at: row.checked_at, contentHash: row.checked_hash };
 };

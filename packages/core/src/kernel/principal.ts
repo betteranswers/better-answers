@@ -41,6 +41,17 @@ export type UserPrincipal = {
    * a group sees what it sees on their next request and never has to sign in again.
    */
   readonly groups: readonly GroupId[];
+  /**
+   * When the credential this call was made with was issued — the instant the resolver
+   * compared revocation's two instants against, carried so that a **later transaction can
+   * make the same judgement**. Revocation ends what was *issued* and a fresh sign-in mints
+   * anew (ADR 0035), so "is this person revoked" is only answerable beside this value: an
+   * instant on the row means nothing without the issuance it cuts.
+   *
+   * An act that opens its own transaction after doing work outside one — the governed write,
+   * which commits to git first — re-reads the membership there and needs this to judge it.
+   */
+  readonly credentialIssuedAt: Date;
 };
 
 /**

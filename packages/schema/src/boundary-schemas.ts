@@ -234,7 +234,7 @@ export const ingressCounterUpdate = createUpdateSchema(ingressCounter, ingressCo
  * platform by `process:better-answers-<purpose>`, an agent by `better-answers-<purpose>/<version>`
  * as ADR 0019 shapes it.
  */
-const ACTOR_ID = new RegExp(
+export const ACTOR_ID = new RegExp(
   `^(human:${ULID_CHARACTERS}|process:better-answers-[a-z0-9][a-z0-9-]*|better-answers-[a-z0-9][a-z0-9-]*/[0-9A-Za-z.-]+)$`,
 );
 

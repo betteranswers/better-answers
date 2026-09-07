@@ -250,7 +250,7 @@ export const evidence = withRLS(
 export const conceptVerification = withRLS(
   "concept_verification",
   {
-    id: text("id").primaryKey(),
+    id: text("id").notNull(),
     workspaceId: text("workspace_id").notNull(),
     /** The concept checked, by IRI — every record attaches by IRI and restates nothing (ADR 0014). */
     iri: text("iri").notNull(),
@@ -263,6 +263,11 @@ export const conceptVerification = withRLS(
   },
   "workspaceId",
   (table) => [
+    // Keyed by the pair, as every other key in this file is: an id alone would be the one
+    // global key here, and a caller who could probe it would learn that some workspace holds
+    // a given check. The minter makes the id unique on its own; the pair is what makes that
+    // uniqueness unaskable from outside the workspace.
+    primaryKey({ columns: [table.workspaceId, table.id] }),
     foreignKey({
       columns: [table.workspaceId, table.iri],
       foreignColumns: [conceptIdentity.workspaceId, conceptIdentity.iri],

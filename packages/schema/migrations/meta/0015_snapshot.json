@@ -1,6 +1,6 @@
 {
-  "id": "766a71c5-e050-40db-a5f7-5281dbde425f",
-  "prevId": "32e46c25-fdc7-498f-b799-a00468eec3f8",
+  "id": "57894656-142c-46ec-9c0c-eb8901f1c369",
+  "prevId": "10d38c4f-4422-4af4-b999-aae55d9728a4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3056,7 +3056,7 @@
         "id": {
           "name": "id",
           "type": "text",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true
         },
         "workspace_id": {
@@ -3144,7 +3144,15 @@
           "onDelete": "cascade"
         }
       },
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "concept_verification_workspace_id_id_pk": {
+          "name": "concept_verification_workspace_id_id_pk",
+          "columns": [
+            "workspace_id",
+            "id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {
         "concept_verification_workspace_isolation": {

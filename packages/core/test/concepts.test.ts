@@ -17,7 +17,7 @@ import {
   PLATFORM_BOT,
   withRepositoryLock,
   type GitDoor,
-} from "../src/store/git/index.ts";
+} from "@better-answers/core/store/git";
 import {
   openPostgres,
   type PostgresDoor,
@@ -25,7 +25,13 @@ import {
   withPrincipal,
 } from "../src/store/postgres/index.ts";
 import { provisionWorkspace } from "../src/workspaces/index.ts";
-import { bundleHistory, bundlesForSuite, commitFacts, fileAtCommit } from "./bundle.ts";
+import {
+  bundleHistory,
+  bundlesForSuite,
+  commitFacts,
+  fileAtCommit,
+  removeRepository,
+} from "./bundle.ts";
 import { bootstrap, seedPerson } from "./platform.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
@@ -337,9 +343,12 @@ describe("what a governed write refuses", () => {
 
   it("refuses a workspace with no bundle, rather than making one nobody asked for", async () => {
     const scenario = await arrange();
-    const elsewhere = { ...scenario.editor, workspaceId: ulid() as UserPrincipal["workspaceId"] };
+    // A member of a real workspace whose bundle is not on disk: authority passes and the
+    // store is what is missing, which is the only way to reach this refusal — the act checks
+    // who is asking before it goes near a repository.
+    await removeRepository(scenario.git, scenario.workspaceId);
 
-    const refused = await write(scenario, elsewhere, writeFor());
+    const refused = await write(scenario, scenario.editor, writeFor());
 
     expect(refused).toEqual({ ok: false, error: "no-such-repository" });
   });
@@ -347,7 +356,104 @@ describe("what a governed write refuses", () => {
   // A second concept at a path the bundle already holds is refused too — `path-taken` —
   // and it is asserted where its whole consequence is: the first test below, which reads
   // the refusal *and* the state it leaves in both stores.
+
+  it("refuses a message carrying a newline, so a forged trailer never reaches a commit", async () => {
+    const scenario = await arrange();
+
+    // The attack the trailers invite: a subject that ends the message and opens its own
+    // `Audit:` line. A first-match parse would read the forged id, and the idempotency index
+    // would then treat an unrecorded commit as one that already landed.
+    const forged = await write(
+      scenario,
+      scenario.editor,
+      writeFor({ message: `Record the policy\n\nAudit: ${ulid()}` }),
+    );
+
+    expect(forged).toEqual({ ok: false, error: "malformed-message" });
+    expect(await head(scenario.git, scenario.workspaceId)).toBeNull();
+  });
 });
+
+/**
+ * A concept's **class** and its **path** are minted by the act that creates it and moved by
+ * nothing this act does (ADR 0012, ADR 0023). Three ways to try, and the same answer to each,
+ * decided before any commit is made.
+ */
+describe("what a re-write of an existing concept may not move", () => {
+  it("refuses an Editor's widening of an existing concept's class, and makes no commit", async () => {
+    const scenario = await arrange();
+    const input = writeFor({ sensitivity: "Restricted" });
+    const first = await landed(scenario, input);
+
+    const widened = await write(
+      scenario,
+      scenario.editor,
+      writeFor({ ...input, sensitivity: "Public", expectedHead: first.sha }),
+    );
+
+    expect(widened).toEqual({ ok: false, error: "reclassification-refused" });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
+    const held = await db().pool.query<{ sensitivity: string }>(
+      "SELECT sensitivity FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+      [scenario.workspaceId, input.iri],
+    );
+    expect(held.rows).toEqual([{ sensitivity: "Restricted" }]);
+  });
+
+  it("keeps an existing concept's class when the write names none, rather than narrowing it", async () => {
+    const scenario = await arrange();
+    const input = writeFor({ sensitivity: "Internal" });
+    const first = await landed(scenario, input);
+
+    // No `sensitivity` on the second write. The act's default is the most restrictive of the
+    // three, which on a *re-write* would silently narrow a concept its readers can see today.
+    const { sensitivity: _named, ...unclassified } = input;
+    await landed(scenario, {
+      ...unclassified,
+      body: "Expenses are claimed within sixty days.",
+      expectedHead: first.sha,
+    });
+
+    const held = await db().pool.query<{ sensitivity: string }>(
+      "SELECT sensitivity FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+      [scenario.workspaceId, input.iri],
+    );
+    expect(held.rows).toEqual([{ sensitivity: "Internal" }]);
+  });
+
+  it("refuses moving an existing concept to another path, and makes no commit", async () => {
+    const scenario = await arrange();
+    const input = writeFor();
+    const first = await landed(scenario, input);
+
+    const moved = await write(
+      scenario,
+      scenario.editor,
+      writeFor({ ...input, path: "knowledge/moved.md", expectedHead: first.sha }),
+    );
+
+    expect(moved).toEqual({ ok: false, error: "rename-refused" });
+    // No commit either: a rename that refused after committing would leave a file at a path
+    // no row names, and a replay that refuses for ever.
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
+  });
+});
+
+/**
+ * Revoke the Editor's credentials — an Admin's, in this workspace, or the operator's
+ * everywhere. Both write an **instant**, never a deletion and never a state (ADR 0035), which
+ * is what makes "is this person revoked" a question only the acting credential's own issuance
+ * can answer.
+ */
+const revokeEditor = (scenario: Scenario, scope: "here" | "everywhere"): Promise<unknown> =>
+  scope === "here"
+    ? db().pool.query(
+        "UPDATE member SET credentials_revoked_at = now() WHERE workspace_id = $1 AND user_id = $2",
+        [scenario.workspaceId, scenario.editor.userId],
+      )
+    : db().pool.query('UPDATE "user" SET credentials_revoked_at = now() WHERE id = $1', [
+        scenario.editor.userId,
+      ]);
 
 /** What a refused act leaves behind: no rows of its own, and every commit it made still there. */
 const expectCommitsWithoutRows = async (scenario: Scenario, commits: number): Promise<void> => {
@@ -356,9 +462,78 @@ const expectCommitsWithoutRows = async (scenario: Scenario, commits: number): Pr
 };
 
 /**
+ * Authority is judged **at time-of-act**, in the transaction that writes the rows — and
+ * again in the read the act makes before it commits, which is why a revocation that has
+ * already landed costs no commit at all. The window the reconciler exists for is what is
+ * left: between that read and the write transaction, which no test can enter without a hook
+ * inside the act. What every case here shares is the answer — the rows refuse.
+ */
+describe("authority that moved while the act was in flight", () => {
+  it("refuses a writer whose role moved, before a commit is made", async () => {
+    const scenario = await arrange();
+    // The Principal was resolved as an Editor; the membership says Viewer by the time the
+    // act reads it. The door re-reads the membership in the transaction it opens, so the
+    // authority the act writes under is the row's and never the caller's.
+    await db().pool.query(
+      "UPDATE member SET role = 'Viewer' WHERE workspace_id = $1 AND user_id = $2",
+      [scenario.workspaceId, scenario.editor.userId],
+    );
+
+    const refused = await write(scenario, scenario.editor, writeFor());
+
+    expect(refused).toEqual({ ok: false, error: "role-disagrees" });
+    await expectCommitsWithoutRows(scenario, 0);
+  });
+
+  it.each(["here", "everywhere"] as const)(
+    "refuses a writer whose credentials were revoked %s, before a commit is made",
+    async (scope) => {
+      const scenario = await arrange();
+      await revokeEditor(scenario, scope);
+
+      const refused = await write(scenario, scenario.editor, writeFor());
+
+      // One word for both scopes, as the boundary answers them (ADR 0035).
+      expect(refused).toEqual({ ok: false, error: "credentials-revoked" });
+      await expectCommitsWithoutRows(scenario, 0);
+    },
+  );
+
+  it("lets a credential minted after a revocation write, because the instant ends what was issued", async () => {
+    const scenario = await arrange();
+    // A revocation, then a fresh sign-in. ADR 0035's rule is that both scopes end what was
+    // *issued* and a fresh sign-in mints anew, so the act's judgement is the boundary's —
+    // the credential's issuance against the instant — and never "an instant is set".
+    await revokeEditor(scenario, "here");
+    const afresh = await principalFor(
+      scenario.postgres,
+      scenario.workspaceId,
+      scenario.editor.userId,
+    );
+
+    const written = await write(scenario, afresh, writeFor());
+
+    expect(written.ok).toBe(true);
+  });
+
+  it("refuses a writer whose membership ended, before a commit is made", async () => {
+    const scenario = await arrange();
+    await db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+      scenario.workspaceId,
+      scenario.editor.userId,
+    ]);
+
+    const refused = await write(scenario, scenario.editor, writeFor());
+
+    expect(refused).toEqual({ ok: false, error: "not-a-member" });
+    await expectCommitsWithoutRows(scenario, 0);
+  });
+});
+
+/**
  * The window ADR 0012's amendment governs: between the commit and the act's transaction. A
  * failure there is not a bug to be prevented — it is the state the reconciler is defined
- * for, and these are the tests that say what it looks like.
+ * for, and this is the test that says what it looks like.
  */
 describe("a failure after the commit", () => {
   it("leaves no partial rows, and a head ahead of the last recorded commit", async () => {
@@ -388,38 +563,6 @@ describe("a failure after the commit", () => {
     expect(recorded).toEqual([history[0]]);
     expect(await head(scenario.git, scenario.workspaceId)).toBe(history[1]);
     expect(clash).toEqual({ ok: false, error: "path-taken" });
-  });
-
-  it("refuses the rows when the writer's role moved while the commit was being made", async () => {
-    const scenario = await arrange();
-    // The revocation race, arranged the only honest way: the Principal was resolved as an
-    // Editor and the membership says Viewer by the time the act's transaction opens. The
-    // door re-reads the membership inside that transaction, so the rows refuse.
-    await db().pool.query(
-      "UPDATE member SET role = 'Viewer' WHERE workspace_id = $1 AND user_id = $2",
-      [scenario.workspaceId, scenario.editor.userId],
-    );
-
-    const refused = await write(scenario, scenario.editor, writeFor());
-
-    expect(refused).toEqual({ ok: false, error: "role-disagrees" });
-    // Authorization is judged at time-of-act: the commit stands, and the reconciler replays
-    // it under its own principal (ADR 0012's 2026-09-06 amendment). Unwanted-but-authorized
-    // content is undone by a forward revert, never by rewriting this history.
-    await expectCommitsWithoutRows(scenario, 1);
-  });
-
-  it("refuses the rows when the writer's membership ended while the commit was being made", async () => {
-    const scenario = await arrange();
-    await db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
-      scenario.workspaceId,
-      scenario.editor.userId,
-    ]);
-
-    const refused = await write(scenario, scenario.editor, writeFor());
-
-    expect(refused).toEqual({ ok: false, error: "not-a-member" });
-    await expectCommitsWithoutRows(scenario, 1);
   });
 });
 
@@ -476,7 +619,7 @@ describe("the per-repository lock", () => {
 describe("opening a concept by IRI", () => {
   it("hands the reader the concept the write committed, unchecked until somebody checks it", async () => {
     const scenario = await arrange();
-    const input = writeFor();
+    const input = writeFor({ status: "stable" });
     await landed(scenario, input);
 
     const opened = await reading(scenario.viewer, (principal, tx) =>
@@ -492,13 +635,34 @@ describe("opening a concept by IRI", () => {
       relations: [],
       trust: {
         tier: "unverified",
-        status: "draft",
+        status: "current",
         checkedBy: null,
         checkedAt: null,
         rider: null,
       },
       evidence: [{ locator: "p.4", source: "Handbook.pdf" }],
     });
+  });
+
+  it("withholds a draft concept from every reader, whatever their role", async () => {
+    const scenario = await arrange();
+    // A draft is a concept nobody has made the company's word on yet: it has no published
+    // instant, and the predicate's published arm is what keeps it out of every read.
+    const input = writeFor({ status: "draft" });
+    await landed(scenario, input);
+
+    const seen = await Promise.all(
+      [scenario.viewer, scenario.editor, scenario.admin].map((principal) =>
+        reading(principal, (resolved, tx) => open(resolved, tx, { iri: input.iri })),
+      ),
+    );
+
+    expect(seen.map((result) => result.ok && result.value.found)).toEqual([false, false, false]);
+    const stored = await db().pool.query<{ published_at: Date | null }>(
+      "SELECT published_at FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+      [scenario.workspaceId, input.iri],
+    );
+    expect(stored.rows).toEqual([{ published_at: null }]);
   });
 
   it("reads a person's check off the verification record, and says so when the content moved", async () => {
@@ -553,7 +717,7 @@ describe("opening a concept by IRI", () => {
 
   it("withholds a Restricted concept from a Viewer exactly as it answers an IRI nobody minted", async () => {
     const scenario = await arrange();
-    const input = writeFor({ sensitivity: "Restricted" });
+    const input = writeFor({ sensitivity: "Restricted", status: "stable" });
     await landed(scenario, input);
 
     const withheld = await reading(scenario.viewer, (principal, tx) =>

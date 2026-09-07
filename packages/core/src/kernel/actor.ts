@@ -1,3 +1,5 @@
+import { ACTOR_ID } from "@better-answers/schema";
+
 import type { Principal, UserId } from "./principal.ts";
 
 /**
@@ -46,3 +48,18 @@ export const actorIdOfPerson = (personId: UserId): ActorId => `human:${personId}
  */
 export const actorIdOf = (principal: Principal): ActorId =>
   principal.kind === "platform" ? principal.actorId : actorIdOfPerson(principal.userId);
+
+/**
+ * Whether a string the platform wrote is one of the three forms — the parse a record's actor
+ * column needs on the way back out, against the boundary's own pattern (ADR 0028) rather than
+ * a second one written here. A column that fails it is a broken database, and a reader that
+ * narrowed without asking would carry the breakage into a type that promises otherwise.
+ */
+export const isActorId = (value: string): value is ActorId => ACTOR_ID.test(value);
+
+/**
+ * Whether an actor is a person. The one place the `human:` form is read, so a caller deriving
+ * something from it — trust's tier, which a person's check earns and a machine's does not
+ * (ADR 0019) — never tests the prefix itself and never disagrees with `actorIdOfPerson`.
+ */
+export const isPersonActor = (actor: ActorId): boolean => actor.startsWith("human:");

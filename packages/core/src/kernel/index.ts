@@ -35,7 +35,7 @@ export { ulid } from "@better-answers/schema";
 export { refusalFor } from "./constraint.ts";
 export { attempt, err, normalizeError, ok } from "./result.ts";
 export type { Result } from "./result.ts";
-export { actorIdOf, actorIdOfPerson } from "./actor.ts";
+export { actorIdOf, actorIdOfPerson, isActorId, isPersonActor } from "./actor.ts";
 export type { ActorId, ProcessActorId } from "./actor.ts";
 export { requireAdmin } from "./role.ts";
 export type { AdminUserPrincipal, RoleRefusal } from "./role.ts";

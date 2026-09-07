@@ -1,5 +1,5 @@
 import { conceptByIri, type OpenedConcept } from "../concepts/index.ts";
-import { err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
+import { err, isPersonActor, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
 /**
@@ -211,7 +211,7 @@ const trustOf = (concept: OpenedConcept): Trust => {
   const tier: TrustTier =
     check === undefined
       ? "unverified"
-      : check.actor.startsWith("human:")
+      : isPersonActor(check.actor)
         ? "human-reviewed"
         : "machine-confirmed";
   const rider: TrustRider | null = check?.contentHash === null ? "imported" : null;
@@ -227,7 +227,12 @@ const trustOf = (concept: OpenedConcept): Trust => {
   return { tier, status, checkedBy: check?.actor ?? null, checkedAt, rider };
 };
 
-/** What a concept's `sources[]` frontmatter entry projects to in a view (`CONTEXT.md`, *evidence*). */
+/**
+ * What a concept's `sources[]` frontmatter entry projects to in a view (`CONTEXT.md`,
+ * *evidence*). **The file's own list is the citation record until T-055**: the `evidence`
+ * table is keyed by document and locator and is shared across the concepts that cite one, so
+ * which concept cites which is a relation the graph derives and this read does not have.
+ */
 const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
   const sources = concept.frontmatter["sources"];
   if (!Array.isArray(sources)) return [];

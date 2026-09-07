@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 import { afterAll, beforeAll } from "vitest";
 
-import { openGit, type GitDoor } from "../src/store/git/index.ts";
+import { openGit, type GitDoor } from "@better-answers/core/store/git";
 
 /**
  * One real bare repository per suite, in a temporary directory — the git half of what a
@@ -103,6 +103,12 @@ export const bundleHistory = async (
   door: GitDoor,
   workspaceId: string,
 ): Promise<readonly string[]> => {
-  const listed = await git(door, workspaceId, ["rev-list", "--reverse", "main"]);
+  // `rev-list` has no way of saying "this branch has no commits yet" but a non-zero exit, and
+  // a bundle with no commits is where every bundle starts — the empty list is the answer.
+  const listed = await git(door, workspaceId, ["rev-list", "--reverse", "main"]).catch(() => "");
   return listed.split("\n").filter((sha) => sha !== "");
 };
+
+/** Take a workspace's bundle away, for the tests about a repository that is not there. */
+export const removeRepository = (door: GitDoor, workspaceId: string): Promise<void> =>
+  rm(path.join(door.root, `${workspaceId}.git`), { recursive: true, force: true });

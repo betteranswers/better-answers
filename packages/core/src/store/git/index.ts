@@ -101,7 +101,11 @@ export type Committed = {
  * somebody else's change (ADR 0012). The other two are a repository that is not there and
  * a path that is not one, both of which are a caller's error and never a race.
  */
-export type CommitRefusal = "no-such-repository" | "stale-precondition" | "malformed-path";
+export type CommitRefusal =
+  | "no-such-repository"
+  | "stale-precondition"
+  | "malformed-path"
+  | "malformed-message";
 
 const repositoryPath = (door: GitDoor, workspaceId: string): string =>
   path.join(door.root, `${workspaceId}.git`);
@@ -150,6 +154,18 @@ export const head = async (door: GitDoor, workspaceId: string): Promise<string |
   }
 };
 
+/**
+ * A commit's subject: one line, and one line only.
+ *
+ * The trailers sit under this text, and a parser reads them by line — so a subject carrying
+ * its own newline could open an `Audit:` line of its own choosing, and a first-match read
+ * would take the forged id instead of the real one. Through the unique index over
+ * `(workspace_id, audit_event_id)` that is a commit the reconciler could be told had already
+ * landed when nothing of it ever did. Refused here, at the door that composes the message,
+ * because that is the one place the two halves are joined.
+ */
+const isSubjectLine = (message: string): boolean => message.length > 0 && !/[\r\n]/.test(message);
+
 /** The commit's message: the subject, a blank line, then the trailers in ADR 0012's order. */
 const messageWith = (message: string, trailers: CommitTrailers): string => {
   const lines = [
@@ -189,6 +205,7 @@ export const commit = async (
   request: CommitRequest,
 ): Promise<Result<Committed, CommitRefusal | Error>> => {
   if (!isBundlePath(request.path)) return err("malformed-path");
+  if (!isSubjectLine(request.message)) return err("malformed-message");
   const gitDir = repositoryPath(door, request.workspaceId);
 
   try {
