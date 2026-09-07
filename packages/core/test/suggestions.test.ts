@@ -110,6 +110,37 @@ const refusalOf = (outcome: AcceptanceOutcome): unknown =>
 const acceptedOf = (outcome: AcceptanceOutcome | undefined): ConceptWritten | undefined =>
   outcome?.outcome.ok === true ? outcome.outcome.value : undefined;
 
+/**
+ * Accept a one-item set and hand back what it landed. A test about what an acceptance
+ * *does* has no business restating "and it was not refused" in four lines; a test about a
+ * refusal calls `acceptAll` above and reads the outcome itself.
+ */
+const acceptedOne = async (scenario: Scenario, setId: string): Promise<ConceptWritten> => {
+  const [outcome] = await acceptAll(scenario, setId);
+  if (outcome === undefined) throw new Error("the acceptance returned no outcome");
+  const accepted = acceptedOf(outcome);
+  if (accepted === undefined) {
+    throw new Error(`the acceptance was refused: ${String(refusalOf(outcome))}`);
+  }
+  return accepted;
+};
+
+/**
+ * How many rows of one of the act's tables this workspace holds, counted as the superuser
+ * so no policy can hide a survivor — the shape every "what did the transaction leave"
+ * assertion here reads, written once so two of them cannot ask it differently.
+ */
+const countOf = async (
+  table: "concept_index" | "graph_node",
+  workspaceId: string,
+): Promise<string | undefined> => {
+  const counted = await db().pool.query<{ count: string }>(
+    `SELECT count(*)::text AS count FROM ${table} WHERE workspace_id = $1`,
+    [workspaceId],
+  );
+  return counted.rows[0]?.count;
+};
+
 /** The whole of one suggestion row, read as the superuser so no policy can hide it. */
 const suggestionRow = async (suggestionId: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
@@ -298,11 +329,8 @@ describe("accepting a suggestion", () => {
     const request = requestFor();
     const set = await submitted(scenario, scenario.editor, "edit", [request]);
 
-    const [outcome] = await acceptAll(scenario, set.setId);
+    const accepted = await acceptedOne(scenario, set.setId);
 
-    const accepted = acceptedOf(outcome);
-    expect(outcome === undefined ? undefined : refusalOf(outcome)).toBeUndefined();
-    if (accepted === undefined) return;
     // One act, one commit — carrying the `Suggestion:` trailer ADR 0012 fixes, so the
     // bundle's history says which changes came through the gate.
     const facts = await commitFacts(scenario.git, scenario.workspaceId, accepted.sha);
@@ -339,6 +367,37 @@ describe("accepting a suggestion", () => {
       [scenario.workspaceId],
     );
     expect(concept.rows).toEqual([{ iri: accepted.iri, body: request.body }]);
+  });
+
+  it("lands the graph delta in the acceptance's own transaction, so the map is never behind for one", async () => {
+    const scenario = await arrange();
+    // A concept for the suggestion's body to link to, so the delta has both a node and an
+    // edge to write and the crossing shows in both tables.
+    const { input: cited, written } = await editorWrote(scenario);
+    const filename = cited.path.split("/").at(-1) ?? "";
+    const set = await submitted(scenario, scenario.editor, "edit", [
+      requestFor({ body: `See [the policy](./${filename}) for the rule.` }),
+    ]);
+
+    const accepted = await acceptedOne(scenario, set.setId);
+
+    // An acceptance is a governed write like any other, so the bundle-and-record delta is
+    // written by the transaction that wrote the rows and decided the suggestion (ADR 0023,
+    // ADR 0032) — the accepted concept is in the live generation and its link is an edge,
+    // with no second act between the decision and the map.
+    const nodes = await db().pool.query<{ uid: string; gen: number }>(
+      "SELECT uid, gen FROM graph_node WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(nodes.rows.map((row) => row.uid).toSorted()).toEqual(
+      [written.iri, accepted.iri].toSorted(),
+    );
+    expect(nodes.rows.map((row) => row.gen)).toEqual([1, 1]);
+    const edges = await db().pool.query(
+      "SELECT from_uid, to_uid FROM graph_edge WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(edges.rows).toEqual([{ from_uid: accepted.iri, to_uid: written.iri }]);
   });
 
   it("commits an *edit* with the proposer as git author and the platform bot as committer", async () => {
@@ -654,11 +713,10 @@ describe("an acceptance whose transaction fails after it", () => {
 
     // The rows first (`[TEST8]`): one concept, one accepted ledger row, one decision — and
     // the second suggestion untouched, still waiting for somebody to decide it.
-    const concepts = await db().pool.query<{ count: string }>(
-      "SELECT count(*)::text AS count FROM concept_index WHERE workspace_id = $1",
-      [scenario.workspaceId],
-    );
-    expect(concepts.rows).toEqual([{ count: "1" }]);
+    expect(await countOf("concept_index", scenario.workspaceId)).toBe("1");
+    // The graph delta is written by that same transaction, so a rolled-back acceptance
+    // leaves no node behind either — the map cannot be ahead of the rows it derives from.
+    expect(await countOf("graph_node", scenario.workspaceId)).toBe("1");
     expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.accepted")).toHaveLength(1);
     expect(await suggestionRow(set.suggestionIds[1] ?? "")).toMatchObject({
       status: "waiting",
@@ -832,11 +890,7 @@ describe("two acts over one suggestion", () => {
     // a commit nothing records. Both minted an IRI of their own, so nothing but the read
     // inside the lock could have stopped the second.
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
-    const concepts = await db().pool.query<{ count: string }>(
-      "SELECT count(*)::text AS count FROM concept_index WHERE workspace_id = $1",
-      [scenario.workspaceId],
-    );
-    expect(concepts.rows).toEqual([{ count: "1" }]);
+    expect(await countOf("concept_index", scenario.workspaceId)).toBe("1");
     const refusals = [first, second].flatMap((result) =>
       result.ok ? result.value.map(refusalOf) : [result.error],
     );
