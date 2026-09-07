@@ -97,8 +97,11 @@ export const TABLE_OWNERS = {
   "public.access_request": "members",
   "index.chunk": "sources",
 
-  // The concept write path's five (ADRs 0011, 0012, 0019): the governed write writes all
-  // of them in the act's own transaction, and nothing else writes any of them.
+  // The concept write path's five (ADRs 0011, 0012, 0019). The governed write writes four
+  // of them in the act's own transaction — the identity, the index row, the commit and the
+  // evidence — and reads the fifth: a check is written by the verify act, which is a later
+  // ticket's, and `open` reads it for the trust it projects. Nothing outside this slice
+  // writes any of the five.
   "public.concept_identity": "concepts",
   "public.concept_index": "concepts",
   "public.bundle_commit": "concepts",

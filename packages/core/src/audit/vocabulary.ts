@@ -35,21 +35,22 @@ export type DetailValue = string | number | boolean;
  * What a detail field may be, named by kind rather than by type, so that a declaration
  * reads as the rule it is held to: an **id** is the minter's shape and never an email; a
  * **role** is one of the three words; a **flag** is an act's confirmation; an **iri** is a
- * concept's platform-minted key (ADR 0002); a **hash** is a git object name or the
- * canonical content hash (ADR 0014); a **count** is how many of something an act touched.
- * A kind for a person's name or contact does not exist, which is how the ledger stays a
- * table an erasure never rewrites; a kind an act needs and this list lacks is added here,
- * with the act that needs it. Each kind's check runs on every write.
+ * concept's platform-minted key (ADR 0002); a **gitSha** is a commit's object name and a
+ * **contentHash** the canonical hash of what a check confirmed (ADR 0014) — two kinds and
+ * not one, because they are two different lengths over two different things and a field
+ * that accepted either would accept a commit where a content hash belongs; a **count** is
+ * how many of something an act touched. A kind for a person's name or contact does not
+ * exist, which is how the ledger stays a table an erasure never rewrites; a kind an act
+ * needs and this list lacks is added here, with the act that needs it. Each kind's check
+ * runs on every write.
  */
 export const DETAIL_KINDS = {
   id: (value: DetailValue) => typeof value === "string" && ULID.test(value),
   role: (value: DetailValue) => typeof value === "string" && ROLES.some((role) => role === value),
   flag: (value: DetailValue) => typeof value === "boolean",
   iri: (value: DetailValue) => typeof value === "string" && IRI.test(value),
-  // Either hash the platform writes, because both name a thing a reader can go and fetch:
-  // the commit an act made, and the content a check confirmed.
-  hash: (value: DetailValue) =>
-    typeof value === "string" && (GIT_SHA.test(value) || CONTENT_HASH.test(value)),
+  gitSha: (value: DetailValue) => typeof value === "string" && GIT_SHA.test(value),
+  contentHash: (value: DetailValue) => typeof value === "string" && CONTENT_HASH.test(value),
   count: (value: DetailValue) => typeof value === "number" && Number.isInteger(value) && value >= 0,
 } as const;
 

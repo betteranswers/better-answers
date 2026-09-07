@@ -25,7 +25,7 @@ const person = (role: UserPrincipal["role"]): UserPrincipal => ({
   userId: boundarySchemas.user.select.shape.id.parse(PERSON_ID),
   role,
   groups: [],
-  credentialIssuedAt: new Date(),
+  credentialIssuedAtMs: Date.now(),
 });
 
 const bootstrap: PlatformPrincipal = {

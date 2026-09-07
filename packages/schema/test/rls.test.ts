@@ -721,19 +721,34 @@ describe("the concept write path under app_rt", () => {
     "concept_verification",
   ] as const;
 
-  it("returns zero rows on a missing scope and only the scoped tenant's concepts otherwise", async () => {
+  it("returns zero rows on a missing scope and only the scoped tenant's rows otherwise, on every one of the five", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
-      const here = await seed.conceptIndex({ workspaceId: WS_A });
-      await seed.conceptIndex({ workspaceId: WS_B });
+      // One row of every table in each workspace: the claim is about all five, and asserting
+      // it on the index row alone would leave the other four proved by their neighbour.
+      for (const workspaceId of [WS_A, WS_B]) {
+        const identity = await seed.conceptIdentity({ workspaceId });
+        const commit = await seed.bundleCommit({ workspaceId });
+        await seed.conceptIndex({ workspaceId, iri: identity.iri, commitSha: commit.sha });
+        await seed.evidence({ workspaceId });
+        await seed.conceptVerification({ workspaceId, iri: identity.iri });
+      }
       await client.query("SET LOCAL ROLE app_rt");
 
-      const unscoped = await client.query("SELECT iri FROM concept_index");
-      expect(unscoped.rows).toEqual([]);
+      const counted = async (): Promise<readonly { table: string; rows: number }[]> => {
+        const rows: { table: string; rows: number }[] = [];
+        for (const table of CONCEPT_TABLES) {
+          const found = await client.query(`SELECT 1 FROM "${table}"`);
+          rows.push({ table, rows: found.rowCount ?? 0 });
+        }
+        return rows;
+      };
+
+      expect(await counted()).toEqual(CONCEPT_TABLES.map((table) => ({ table, rows: 0 })));
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      const scoped = await client.query("SELECT iri, workspace_id FROM concept_index");
-      expect(scoped.rows).toEqual([{ iri: here.iri, workspace_id: WS_A }]);
+      // One each, never two: the other workspace's row is not in a scoped read at all.
+      expect(await counted()).toEqual(CONCEPT_TABLES.map((table) => ({ table, rows: 1 })));
     });
   });
 
@@ -781,41 +796,71 @@ describe("the concept write path under app_rt", () => {
       // pair, it refuses inside this workspace exactly as it would for an IRI nobody minted.
       await expect(
         client.query(
-          "INSERT INTO concept_verification (id, workspace_id, iri, actor) VALUES ($1, $2, $3, 'process:better-answers-test')",
-          [ulid(), WS_A, theirs.iri],
+          `INSERT INTO concept_verification (id, workspace_id, iri, actor, content_hash)
+           VALUES ($1, $2, $3, 'process:better-answers-test', $4)`,
+          [ulid(), WS_A, theirs.iri, "a".repeat(64)],
         ),
       ).rejects.toThrow(/concept_verification_identity_fk/);
     });
   });
 
-  it("refuses a fifth status, a fourth class, an imported check that carried a hash, and a second commit for one ledger row", async () => {
+  it("refuses every row the write path's sentences forbid, each at its own constraint", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const identity = await seed.conceptIdentity({ workspaceId: WS_A });
       const commit = await seed.bundleCommit({ workspaceId: WS_A });
       const columns =
-        "(workspace_id, iri, path, kind, title, frontmatter, body, content_hash, commit_sha, audience, status, sensitivity)";
-      const values = `($1, $2, $3, 'Policy', 'Expenses', '{}'::jsonb, 'body', '${"a".repeat(64)}', '${"b".repeat(40)}', 'everyone'`;
+        "(workspace_id, iri, path, kind, title, frontmatter, body, content_hash, commit_sha, audience, status, sensitivity, published_at)";
+      const values = `($1, $2, $3, 'Policy', 'Expenses', '{}'::jsonb, 'body', '${"a".repeat(64)}', '${commit.sha}', 'everyone'`;
       const rows: readonly [string, readonly unknown[], string][] = [
         [
-          `INSERT INTO concept_index ${columns} VALUES ${values}, 'retired', 'Internal')`,
+          // No published instant, so the published CHECK is satisfied and only the status's
+          // own can be what refuses the row.
+          `INSERT INTO concept_index ${columns} VALUES ${values}, 'retired', 'Internal', NULL)`,
           [WS_A, identity.iri, "knowledge/one.md"],
           "concept_index_status_check",
         ],
         [
-          `INSERT INTO concept_index ${columns} VALUES ${values}, 'draft', 'Secret')`,
+          `INSERT INTO concept_index ${columns} VALUES ${values}, 'draft', 'Secret', NULL)`,
           [WS_A, identity.iri, "knowledge/two.md"],
           "concept_index_sensitivity_check",
+        ],
+        // A concept a reader may reach that carries no published instant, and a draft that
+        // carries one: the predicate's first arm reads this column, so both directions are
+        // the database's to refuse.
+        [
+          `INSERT INTO concept_index ${columns} VALUES ${values}, 'stable', 'Internal', NULL)`,
+          [WS_A, identity.iri, "knowledge/three.md"],
+          "concept_index_published_check",
+        ],
+        [
+          `INSERT INTO concept_index ${columns} VALUES ${values}, 'draft', 'Internal', now())`,
+          [WS_A, identity.iri, "knowledge/four.md"],
+          "concept_index_published_check",
         ],
         [
           "INSERT INTO concept_verification (id, workspace_id, iri, actor, origin, content_hash) VALUES ($1, $2, $3, 'process:better-answers-test', 'imported', $4)",
           [ulid(), WS_A, identity.iri, "a".repeat(64)],
           "concept_verification_imported_check",
         ],
+        // The other direction of the same sentence: a check the platform made, with nothing
+        // recorded as confirmed.
+        [
+          "INSERT INTO concept_verification (id, workspace_id, iri, actor, origin, content_hash) VALUES ($1, $2, $3, 'process:better-answers-test', 'platform', NULL)",
+          [ulid(), WS_A, identity.iri],
+          "concept_verification_imported_check",
+        ],
         [
           "INSERT INTO bundle_commit (workspace_id, sha, audit_event_id, actor) VALUES ($1, $2, $3, 'process:better-answers-reconciler')",
           [WS_A, "d".repeat(40), commit.auditEventId],
           "bundle_commit_audit_event_uidx",
+        ],
+        // A commit whose parent this workspace never recorded: the chain is the database's,
+        // so `bundle_commit` cannot hold a history with a link missing from it.
+        [
+          "INSERT INTO bundle_commit (workspace_id, sha, parent_sha, audit_event_id, actor) VALUES ($1, $2, $3, $4, 'process:better-answers-reconciler')",
+          [WS_A, "d".repeat(40), "e".repeat(40), ulid()],
+          "bundle_commit_parent_fk",
         ],
       ];
       for (const [statement, parameters, constraint] of rows) {
@@ -825,6 +870,29 @@ describe("the concept write path under app_rt", () => {
         );
         await client.query("ROLLBACK TO SAVEPOINT concept_row");
       }
+    });
+  });
+
+  it("refuses an index row naming a commit the workspace never recorded, when the act ends", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const identity = await seed.conceptIdentity({ workspaceId: WS_A });
+      await client.query("SAVEPOINT dangling");
+      await client.query(
+        `INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter, body,
+                                    content_hash, commit_sha, audience, status, sensitivity,
+                                    published_at)
+         VALUES ($1, $2, 'knowledge/one.md', 'Policy', 'Expenses', '{}'::jsonb, 'body', $3, $4,
+                 'everyone', 'stable', 'Internal', now())`,
+        [WS_A, identity.iri, "a".repeat(64), "f".repeat(40)],
+      );
+
+      // Deferred: the row lands, and the constraint speaks when the act would end. `SET
+      // CONSTRAINTS ALL IMMEDIATE` is how a test reaches that moment without committing.
+      await expect(client.query("SET CONSTRAINTS ALL IMMEDIATE")).rejects.toThrow(
+        /concept_index_bundle_commit_fk/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT dangling");
     });
   });
 });

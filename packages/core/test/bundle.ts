@@ -73,9 +73,14 @@ export const commitFacts = async (
   const shown = await git(door, workspaceId, ["show", "-s", `--format=${FIELD}`, sha]);
   const [id = "", subject = "", author = "", committer = "", parents = "", ...message] =
     shown.split("\n");
+  // The trailers are the block **after the message's blank line**, never any line of the
+  // message that happens to look like one — which is the whole point of refusing a subject
+  // that carries a newline: a reader that matched the first `Key: value` anywhere would take
+  // a forged trailer as the real one, and this harness must not be the reader that does.
+  const blank = message.indexOf("");
   const trailers: Record<string, string> = {};
-  for (const line of message) {
-    const match = /^([A-Za-z][A-Za-z-]*): (.+)$/.exec(line.trim());
+  for (const line of blank === -1 ? [] : message.slice(blank + 1)) {
+    const match = /^([A-Za-z][A-Za-z-]*): (.+)$/.exec(line);
     if (match?.[1] !== undefined && match[2] !== undefined) trailers[match[1]] = match[2];
   }
   const tree = await git(door, workspaceId, ["ls-tree", "-r", "--name-only", sha]);

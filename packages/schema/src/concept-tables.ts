@@ -81,12 +81,36 @@ export const VERIFICATION_IMPORTED_ORIGIN =
 /**
  * A concept's **IRI** (ADR 0002): the platform-minted, dereferenceable HTTPS key that
  * survives a rename and is what every record about a concept refers to it by (ADR 0014).
- * The shape and nothing more — that it dereferences is the serving surface's business.
+ *
+ * **The host is deliberately unvalidated.** ADR 0002 fixes the *form* — "a dereferenceable
+ * HTTPS IRI on a platform-controlled domain" — and names no path shape; which domain that is
+ * belongs to the deploy unit's one origin, which this package and `packages/core` never read
+ * (ADR 0029 rule 5). Pinning a hostname here would bind the library to one deployment and
+ * make every other estate's own IRIs invalid at the boundary. So this holds the scheme, and
+ * the caller that knows the origin is what makes an IRI the platform's.
  */
 export const IRI = /^https:\/\/\S+$/;
 
 /** A git object name: forty lowercase hex characters, the repository's object format. */
 export const GIT_SHA = /^[0-9a-f]{40}$/;
+
+/**
+ * Where a bundle's concepts live and what one is called. The bundle root is `knowledge/`
+ * and its manifest — the platform-reserved, non-`.md` file ADR 0002 puts at that root
+ * (`knowledge/manifest.yaml`) — is excluded by the `.md` ending rather than by name, so a
+ * second reserved file of any other kind is excluded the same way and this pattern does not
+ * become a list to keep. No `.` or `..` segment, so a path is a place in the tree and never
+ * a way out of it.
+ */
+export const CONCEPT_PATH = /^knowledge\/(?!.*\/\.{1,2}\/)(?!\.{1,2}\/)[^/\s][^\s]*\.md$/;
+
+/**
+ * The statuses whose rows a reader may reach. A **draft** is a concept nobody has made the
+ * company's word on yet and a **removed** one has left the bundle (`CONTEXT.md`, *discard*);
+ * *stable* and *deprecated* are both readable, because deprecation is a trust word shown to a
+ * reader and not a way of hiding a concept from them (ADR 0019).
+ */
+export const PUBLISHED_STATUSES = ["stable", "deprecated"] as const;
 
 /**
  * A content hash the platform writes: SHA-256 over the canonical form ADR 0014 fixes, so a
@@ -124,6 +148,52 @@ export const conceptIdentity = withRLS(
     primaryKey({ columns: [table.workspaceId, table.iri] }),
     // One concept per merge key: the index the acceptance path reads its refusal off.
     uniqueIndex("concept_identity_merge_key_uidx").on(table.workspaceId, table.mergeKey),
+  ],
+);
+
+/**
+ * A **bundle commit** (`CONTEXT.md`): one change to a bundle, recorded in the same
+ * transaction as the rows it produced. Its `audit_event_id` is the id the act minted
+ * *before* the commit and the commit carries in its `Audit:` trailer, which is what makes
+ * the reconciler's replay idempotent — a trailer id already on a row is a commit that landed
+ * (ADR 0012's amendment).
+ *
+ * There is no foreign key to `audit_event`, deliberately: a key on the ledger's id alone
+ * would confirm another tenant's row through a check that bypasses row-level security, and a
+ * composite key would need a second unique index on the ledger to point at. The join is by
+ * the pair of ids, and the pair is written in one transaction.
+ */
+export const bundleCommit = withRLS(
+  "bundle_commit",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    sha: text("sha").notNull(),
+    /** What the ref held when the precondition was checked; NULL for a bundle's first commit. */
+    parentSha: text("parent_sha"),
+    auditEventId: text("audit_event_id").notNull(),
+    /** The `Actor:` trailer's value — the kernel's `ActorId`, never the git author line. */
+    actor: text("actor").notNull(),
+    committedAt: stamp("committed_at").notNull().defaultNow(),
+  },
+  "workspaceId",
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.sha] }),
+    // One commit per ledger row: the replay's idempotency, made the database's, so a second
+    // replay of the same commit is refused by the index rather than by remembering to check.
+    uniqueIndex("bundle_commit_audit_event_uidx").on(table.workspaceId, table.auditEventId),
+    // The chain, made the database's: a commit's parent is a commit this workspace already
+    // recorded, so the prefix invariant cannot be broken by a row that names a stranger. A
+    // bundle's first commit has no parent, and a composite key with a NULL column is not
+    // checked at all — which is the shape the first commit needs and gets for free.
+    foreignKey({
+      columns: [table.workspaceId, table.parentSha],
+      foreignColumns: [table.workspaceId, table.sha],
+      name: "bundle_commit_parent_fk",
+    }),
+    // The watermark scan's index: the last commit this workspace's rows know about.
+    index("bundle_commit_workspace_id_committed_at_idx").on(table.workspaceId, table.committedAt),
   ],
 );
 
@@ -167,45 +237,23 @@ export const conceptIndex = withRLS(
     // One concept per path: the format identity is a key too, and two rows claiming one
     // file would be a bundle the index could not be checked against.
     uniqueIndex("concept_index_workspace_id_path_uidx").on(table.workspaceId, table.path),
+    // The commit this row was written at is a commit this workspace recorded. **Deferred**,
+    // because the two land in one transaction and the index row is written before the commit
+    // row it names — the order is the act's, and the constraint is checked when the act ends.
+    foreignKey({
+      columns: [table.workspaceId, table.commitSha],
+      foreignColumns: [bundleCommit.workspaceId, bundleCommit.sha],
+      name: "concept_index_bundle_commit_fk",
+    }),
     check("concept_index_status_check", sql.raw(`status IN (${listed(CONCEPT_STATUSES)})`)),
     check("concept_index_sensitivity_check", sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
-  ],
-);
-
-/**
- * A **bundle commit** (`CONTEXT.md`): one change to a bundle, recorded in the same
- * transaction as the rows it produced. Its `audit_event_id` is the id the act minted
- * *before* the commit and the commit carries in its `Audit:` trailer, which is what makes
- * the reconciler's replay idempotent — a trailer id already on a row is a commit that landed
- * (ADR 0012's amendment).
- *
- * There is no foreign key to `audit_event`, deliberately: a key on the ledger's id alone
- * would confirm another tenant's row through a check that bypasses row-level security, and a
- * composite key would need a second unique index on the ledger to point at. The join is by
- * the pair of ids, and the pair is written in one transaction.
- */
-export const bundleCommit = withRLS(
-  "bundle_commit",
-  {
-    workspaceId: text("workspace_id")
-      .notNull()
-      .references(() => workspace.id, { onDelete: "cascade" }),
-    sha: text("sha").notNull(),
-    /** What the ref held when the precondition was checked; NULL for a bundle's first commit. */
-    parentSha: text("parent_sha"),
-    auditEventId: text("audit_event_id").notNull(),
-    /** The `Actor:` trailer's value — the kernel's `ActorId`, never the git author line. */
-    actor: text("actor").notNull(),
-    committedAt: stamp("committed_at").notNull().defaultNow(),
-  },
-  "workspaceId",
-  (table) => [
-    primaryKey({ columns: [table.workspaceId, table.sha] }),
-    // One commit per ledger row: the replay's idempotency, made the database's, so a second
-    // replay of the same commit is refused by the index rather than by remembering to check.
-    uniqueIndex("bundle_commit_audit_event_uidx").on(table.workspaceId, table.auditEventId),
-    // The watermark scan's index: the last commit this workspace's rows know about.
-    index("bundle_commit_workspace_id_committed_at_idx").on(table.workspaceId, table.committedAt),
+    // Published exactly when the status says a reader may reach it, made the database's
+    // sentence: a *draft* or *removed* row carrying an instant would pass the read
+    // predicate's first arm, and a *stable* row without one would be invisible to everybody.
+    check(
+      "concept_index_published_check",
+      sql.raw(`(status IN (${listed(PUBLISHED_STATUSES)})) = (published_at IS NOT NULL)`),
+    ),
   ],
 );
 
@@ -283,11 +331,14 @@ export const conceptVerification = withRLS(
       "concept_verification_origin_check",
       sql.raw(`origin IN (${listed(VERIFICATION_ORIGINS)})`),
     ),
-    // An imported event has no content hash (ADR 0019), made the database's sentence: a row
-    // that carried one would show *Changed since checked* for a check nobody here made.
+    // **Imported, and only imported, has no content hash** (ADR 0019), made the database's
+    // sentence in both directions: a row that carried one would show *Changed since checked*
+    // for a check nobody here made, and a *platform*, *repair* or *erasure-rewrite* row
+    // without one would be a check that had confirmed nothing in particular — each of those
+    // three is written by a routine that hashes what it confirmed.
     check(
       "concept_verification_imported_check",
-      sql.raw(`origin <> '${VERIFICATION_IMPORTED_ORIGIN}' OR content_hash IS NULL`),
+      sql.raw(`(origin = '${VERIFICATION_IMPORTED_ORIGIN}') = (content_hash IS NULL)`),
     ),
   ],
 );

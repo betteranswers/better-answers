@@ -4,16 +4,21 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { err, ok, type ActorId, type Result } from "../../kernel/index.ts";
+import { err, ok, type ActorId, type Result, type UserPrincipal } from "../../kernel/index.ts";
 
 /**
  * The git door: the governed write to the per-workspace bare repository (ADR 0024).
  *
- * RLS does not reach here, which is why Principal-first-argument is load-bearing rather
- * than decorative — the `Principal` is what carries workspace isolation to this store. The
- * door never sees a Principal: it takes the workspace id the slice read off one, which is
- * what makes "one repository per workspace" a path this module computes and never a caller's
- * string.
+ * RLS does not reach here, which is why **Principal-first-argument is load-bearing rather
+ * than decorative — the `Principal` is what carries workspace isolation to this store**
+ * (ADR 0029's tenancy section, in those words; the constitution's rule binds every
+ * `packages/core` function that reads or writes tenant data, doors included). So every entry
+ * that reaches a workspace's bundle takes the Principal first and derives the repository from
+ * `principal.workspaceId`: which repository is opened is this module's arithmetic and never a
+ * caller's string, and no call site can name one workspace's bundle while acting as another's
+ * member.
+ *
+ * `initRepository` is the exception and says why where it stands.
  *
  * **git is a binary we consume, never code we write** (ADR 0005), so this module is the
  * plumbing commands and nothing else: `hash-object`, `read-tree`, `update-index`,
@@ -72,7 +77,6 @@ export type CommitAuthor = {
 };
 
 export type CommitRequest = {
-  readonly workspaceId: string;
   /** The file's path inside the bundle, and the content to put there. */
   readonly path: string;
   readonly content: string;
@@ -111,6 +115,10 @@ export type CommitRefusal =
 const repositoryPath = (door: GitDoor, workspaceId: string): string =>
   path.join(door.root, `${workspaceId}.git`);
 
+/** The bundle of the workspace this call is made in, and of no other. */
+const bundleOf = (door: GitDoor, principal: UserPrincipal): string =>
+  repositoryPath(door, principal.workspaceId);
+
 const git = async (
   gitDir: string,
   arguments_: readonly string[],
@@ -121,7 +129,12 @@ const git = async (
     // site: `env` replaces rather than extends, so a bare object would leave the binary
     // without a PATH to be found on. `packages/devtools/src/throwaway-tree.ts` spawns the
     // repository's own tools the same way.
-    env: { ...process.env, ...options.env },
+    //
+    // `LC_ALL=C` pins the binary's messages to English, because one of them is read below to
+    // tell a lost compare-and-swap from a real failure. A machine that ran under another
+    // locale would classify a stale precondition as a store error and hand a person the
+    // wrong outcome.
+    env: { ...process.env, ...options.env, LC_ALL: "C" },
     maxBuffer: 64 * 1024 * 1024,
   });
   if (options.input !== undefined) {
@@ -132,10 +145,14 @@ const git = async (
 };
 
 /**
- * Create a workspace's bare repository. Called by the test harness today and by
- * provisioning when the workspace lifecycle reaches this store; the governed write never
- * creates one, so a commit against a workspace with no repository is a refusal a caller can
- * read rather than a repository nobody asked for.
+ * Create a workspace's empty bare repository — the one entry here that takes a workspace id
+ * rather than a Principal, and the reason is what it does: it runs **before anybody can be a
+ * member acting in that workspace**, at provisioning, and it reads and writes no tenant data,
+ * only an empty object store. Every entry below reaches a bundle's contents and takes the
+ * Principal.
+ *
+ * The governed write never calls this, so a commit against a workspace with no repository is
+ * a refusal a caller can read rather than a repository nobody asked for.
  */
 export const initRepository = async (door: GitDoor, workspaceId: string): Promise<string> => {
   const gitDir = repositoryPath(door, workspaceId);
@@ -143,11 +160,14 @@ export const initRepository = async (door: GitDoor, workspaceId: string): Promis
   return gitDir;
 };
 
-/** What the bundle's ref holds now; `null` when the repository has no commits yet. */
-export const head = async (door: GitDoor, workspaceId: string): Promise<string | null> => {
-  const gitDir = repositoryPath(door, workspaceId);
+/** What this workspace's bundle ref holds now; `null` when the repository has no commits yet. */
+export const head = async (principal: UserPrincipal, door: GitDoor): Promise<string | null> => {
   try {
-    return await git(gitDir, ["rev-parse", "--verify", `${BUNDLE_REF}^{commit}`]);
+    return await git(bundleOf(door, principal), [
+      "rev-parse",
+      "--verify",
+      `${BUNDLE_REF}^{commit}`,
+    ]);
   } catch {
     // An unborn branch is not a failure: a bundle with no commits is where every bundle
     // starts, and `rev-parse --verify` has no way of saying so but a non-zero exit.
@@ -167,17 +187,33 @@ export const head = async (door: GitDoor, workspaceId: string): Promise<string |
  */
 const isSubjectLine = (message: string): boolean => message.length > 0 && !/[\r\n]/.test(message);
 
-/** The commit's message: the subject, a blank line, then the trailers in ADR 0012's order. */
-const messageWith = (message: string, trailers: CommitTrailers): string => {
-  const lines = [
-    `Actor: ${trailers.actor}`,
-    `Audit: ${trailers.audit}`,
-    ...(trailers.run === undefined ? [] : [`Run: ${trailers.run}`]),
-    ...(trailers.suggestion === undefined ? [] : [`Suggestion: ${trailers.suggestion}`]),
-    ...(trailers.projection === undefined ? [] : [`Projection: ${trailers.projection}`]),
+/**
+ * The trailers, each on its own line. A **value** carrying a line break would open a trailer
+ * of its own exactly as a subject would, so every one is held to a single line here — even
+ * the two whose types already refuse it. The type is a compile-time promise about the callers
+ * that exist; this is the run-time one about every caller there will be, and it costs a
+ * regular expression.
+ */
+const trailerLines = (trailers: CommitTrailers): readonly string[] | undefined => {
+  const named: readonly (readonly [string, string | undefined])[] = [
+    ["Actor", trailers.actor],
+    ["Audit", trailers.audit],
+    ["Run", trailers.run],
+    ["Suggestion", trailers.suggestion],
+    ["Projection", trailers.projection],
   ];
-  return `${message}\n\n${lines.join("\n")}\n`;
+  const lines: string[] = [];
+  for (const [key, value] of named) {
+    if (value === undefined) continue;
+    if (!isSubjectLine(value)) return undefined;
+    lines.push(`${key}: ${value}`);
+  }
+  return lines;
 };
+
+/** The commit's message: the subject, a blank line, then the trailers in ADR 0012's order. */
+const messageWith = (message: string, lines: readonly string[]): string =>
+  `${message}\n\n${lines.join("\n")}\n`;
 
 /**
  * A path inside the bundle and nothing else: relative, no `..` segment, no leading slash.
@@ -202,12 +238,14 @@ const isBundlePath = (candidate: string): boolean =>
  * against anything else that ever touches the repository.
  */
 export const commit = async (
+  principal: UserPrincipal,
   door: GitDoor,
   request: CommitRequest,
 ): Promise<Result<Committed, CommitRefusal | Error>> => {
   if (!isBundlePath(request.path)) return err("malformed-path");
-  if (!isSubjectLine(request.message)) return err("malformed-message");
-  const gitDir = repositoryPath(door, request.workspaceId);
+  const trailers = trailerLines(request.trailers);
+  if (!isSubjectLine(request.message) || trailers === undefined) return err("malformed-message");
+  const gitDir = bundleOf(door, principal);
 
   try {
     await run("git", ["--git-dir", gitDir, "rev-parse", "--git-dir"]);
@@ -217,7 +255,7 @@ export const commit = async (
     return err("no-such-repository");
   }
 
-  const parent = await head(door, request.workspaceId);
+  const parent = await head(principal, door);
   if (parent !== request.expectedHead) return err("stale-precondition");
 
   const index = await mkdtemp(path.join(tmpdir(), "better-answers-index-"));
@@ -241,7 +279,7 @@ export const commit = async (
         tree,
         ...(parent === null ? [] : ["-p", parent]),
         "-m",
-        messageWith(request.message, request.trailers),
+        messageWith(request.message, trailers),
       ],
       {
         env: {
@@ -295,11 +333,11 @@ export const commit = async (
 const locks = new Map<string, Promise<unknown>>();
 
 export const withRepositoryLock = async <T>(
+  principal: UserPrincipal,
   door: GitDoor,
-  workspaceId: string,
   work: () => Promise<T>,
 ): Promise<T> => {
-  const key = repositoryPath(door, workspaceId);
+  const key = bundleOf(door, principal);
   const ahead = locks.get(key) ?? Promise.resolve();
   const mine = ahead.then(work, work);
   // The chain the next waiter joins never rejects, so one act's failure does not become

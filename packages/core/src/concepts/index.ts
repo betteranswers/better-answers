@@ -4,6 +4,7 @@ import {
   AUDIENCE_EVERYONE,
   boundarySchemas,
   CONCEPT_DRAFT_STATUS,
+  PUBLISHED_STATUSES,
   SENSITIVITY_DEFAULT,
 } from "@better-answers/schema";
 import type { z } from "zod";
@@ -81,16 +82,59 @@ import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/in
 const CONCEPT_ACTS = declareActs("knowledge", {
   committed: act("knowledge.concept.committed", {
     iri: "iri",
-    commitSha: "hash",
-    contentHash: "hash",
+    commitSha: "gitSha",
+    contentHash: "contentHash",
     evidenceCount: "count",
   }),
 });
 
-/** An OKF frontmatter value: the flat scalars and string lists a concept file carries. */
-export type FrontmatterValue = string | number | boolean | null | readonly string[];
+/**
+ * One `sources[]` entry (`docs/okf-v02.md`): OKF's provenance object — `resource` required,
+ * `id`, `title`, `author`, `usage_count`, `last_modified` — and the platform's `locator`
+ * beside them — one of the two keys the platform may add to a concept file at all (ADR 0002).
+ */
+export type FrontmatterSource = Readonly<Record<string, string | number | boolean | null>>;
+
+/**
+ * An OKF frontmatter value: scalars, string lists, and the one list of objects the spec
+ * defines. One level of nesting and no more, which is what the boundary narrows to.
+ */
+export type FrontmatterValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly string[]
+  | readonly FrontmatterSource[];
 
 export type Frontmatter = Readonly<Record<string, FrontmatterValue>>;
+
+/**
+ * A kind, folded for **case and plural only** (ADR 0012's 2026-08-30 amendment, ADR 0026): an
+ * unknown kind is the ordinary case, so `policy`, `Policy` and `Policies` are one kind and the
+ * type vocabulary counts them once.
+ *
+ * The fold reaches the **row** and never the file: `type` is not a code-owned key, and ADR
+ * 0019 keeps every key the platform does not own verbatim in the bundle. So a person's
+ * spelling survives export while the index groups by one word.
+ *
+ * The plural rule is the conservative English one and says so: `-ies` → `-y`, `-ses`/`-xes`/
+ * `-zes`/`-ches`/`-shes` → drop `-es`, a trailing `-s` dropped unless the word ends `-ss`,
+ * `-us` or `-is`. Irregulars (`Analyses`) fold wrongly and are folded consistently, which is
+ * what matters for grouping; a kind vocabulary that ever needs more is a ticket, not a guess.
+ */
+export const foldKind = (kind: string): string =>
+  kind
+    .trim()
+    .split(/\s+/)
+    .map((word) => {
+      const cased = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      if (cased.endsWith("ies")) return `${cased.slice(0, -3)}y`;
+      if (/(s|x|z|ch|sh)es$/.test(cased)) return cased.slice(0, -2);
+      if (/(ss|us|is)$/.test(cased) || !cased.endsWith("s")) return cased;
+      return cased.slice(0, -1);
+    })
+    .join(" ");
 
 /** One piece of evidence recorded at commit time (`CONTEXT.md`, *evidence*). */
 export type EvidenceInput = {
@@ -177,35 +221,95 @@ const normalisedBody = (body: string): string =>
     .replace(/\n+$/, "")}\n`;
 
 /**
- * The content hash a check confirms (ADR 0014): SHA-256 over the canonical JSON of the
- * frontmatter without the trust and identity keys, and the normalised body.
- *
- * RFC 8785's canonicalisation is *sorted keys, no insignificant whitespace*, which for a
- * flat object of scalars and string lists is exactly what this produces — and flat is all a
- * concept's frontmatter can be, because the boundary refuses anything nested. A frontmatter
- * that ever gains a nested value needs the full canonicaliser here, and the boundary is what
- * would have to allow it first.
+ * A `resource` as the hash sees it: **paths resolved to `/abs.md`** (ADR 0019). The parser
+ * accepts `/abs.md`, `./rel.md` and a bare `dir/x.md`, so two files naming one concept three
+ * ways must hash alike — and a link rewrite that only changes the spelling must not un-check
+ * the concept. A URL is left as it stands: it is already absolute and is not a path in this
+ * bundle.
  */
-export const contentHashOf = (frontmatter: Frontmatter, body: string): string => {
-  const hashed = Object.keys(frontmatter)
-    .filter((key) => !UNHASHED_KEYS.has(key))
-    .toSorted();
-  const canonical = `{${hashed
-    .map((key) => `${JSON.stringify(key)}:${JSON.stringify(frontmatter[key])}`)
-    .join(",")}}`;
-  return createHash("sha256")
-    .update(`${canonical}\n${normalisedBody(body)}`, "utf8")
-    .digest("hex");
+const resolvedResource = (resource: string, from: string): string => {
+  if (resource.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(resource)) return resource;
+  const directory = from.slice(0, from.lastIndexOf("/"));
+  const segments: string[] = [];
+  for (const segment of `${directory}/${resource}`.split("/")) {
+    if (segment === "" || segment === ".") continue;
+    if (segment === "..") segments.pop();
+    else segments.push(segment);
+  }
+  return `/${segments.join("/")}`;
 };
+
+/** One `sources[]` entry as the hash carries it: the resolved resource, then the locator. */
+type HashedSource = readonly [string, string | number | boolean | null];
+
+/**
+ * `sources[]` **reduced to ordered `(resource, locator)` pairs** with paths resolved — ADR
+ * 0019's own reduction, and what makes a source-title fix or a `usage_count` update leave a
+ * check standing while a swapped source un-checks it.
+ */
+const reducedSources = (
+  value: FrontmatterValue | undefined,
+  path: string,
+): readonly HashedSource[] =>
+  Array.isArray(value)
+    ? value.map((entry) =>
+        typeof entry === "string"
+          ? [resolvedResource(entry, path), null]
+          : [resolvedResource(String(entry["resource"] ?? ""), path), entry["locator"] ?? null],
+      )
+    : [];
+
+/**
+ * The frontmatter as ADR 0014's hash reads it, written straight as canonical JSON: keys
+ * sorted, the trust and identity keys dropped, `sources[]` reduced. A string rather than an
+ * object, because the object was never anything but a step on the way to these bytes.
+ */
+const canonicalFrontmatter = (frontmatter: Frontmatter, path: string): string => {
+  const pairs = Object.keys(frontmatter)
+    .toSorted()
+    .filter((key) => !UNHASHED_KEYS.has(key))
+    .map((key) => {
+      const value = frontmatter[key];
+      const reduced = key === "sources" ? reducedSources(value, path) : value;
+      return `${JSON.stringify(key)}:${JSON.stringify(reduced)}`;
+    });
+  return `{${pairs.join(",")}}`;
+};
+
+/**
+ * The content hash a check confirms (ADR 0014, ADR 0019): SHA-256 over the canonical JSON of
+ * the frontmatter — trust and identity keys removed, `sources[]` reduced to its ordered
+ * `(resource, locator)` pairs — and the normalised body.
+ *
+ * RFC 8785's canonicalisation is *sorted keys, no insignificant whitespace*, which is what
+ * this produces for the one shape a concept's frontmatter can hold: scalars, string lists and
+ * `sources[]`'s objects, whose own keys never reach the hash because the reduction replaces
+ * them with a pair. The concept's own path is an argument because the reduction resolves a
+ * relative `resource` against it.
+ */
+export const contentHashOf = (frontmatter: Frontmatter, body: string, path: string): string =>
+  createHash("sha256")
+    .update(`${canonicalFrontmatter(frontmatter, path)}\n${normalisedBody(body)}`, "utf8")
+    .digest("hex");
+
+/** One `sources[]` entry as YAML: a block of quoted keys under a list dash. */
+const yamlEntry = (entry: FrontmatterSource): string =>
+  Object.entries(entry)
+    .map(
+      ([key, value], index) =>
+        `${index === 0 ? "  - " : "    "}${JSON.stringify(key)}: ${JSON.stringify(value)}`,
+    )
+    .join("\n");
 
 /** One frontmatter value as YAML: a list over lines, everything else as JSON, which YAML reads. */
 const yamlValue = (value: FrontmatterValue): string => {
-  if (Array.isArray(value)) {
-    return value.length === 0
-      ? " []"
-      : `\n${value.map((item) => `  - ${JSON.stringify(item)}`).join("\n")}`;
-  }
-  return ` ${JSON.stringify(value)}`;
+  if (!Array.isArray(value)) return ` ${JSON.stringify(value)}`;
+  if (value.length === 0) return " []";
+  return `\n${value
+    .map((item) =>
+      typeof item === "object" && item !== null ? yamlEntry(item) : `  - ${JSON.stringify(item)}`,
+    )
+    .join("\n")}`;
 };
 
 /**
@@ -214,12 +318,17 @@ const yamlValue = (value: FrontmatterValue): string => {
  * the file is the thing a company keeps; the content hash above is what needs an order
  * nobody chose, and it sorts its own.
  *
- * JSON is a subset of YAML 1.2, so every scalar is written as JSON and is read back by any
- * YAML parser — which is what "readable by any OKF tool" (ADR 0012) has to mean for a file
+ * **Every key is quoted**, not only every value. A concept's frontmatter is open — OKF's keys
+ * plus whatever else the file carried, preserved verbatim (ADR 0019) — so a key holding a
+ * colon, a `#` or a leading `-` would otherwise write YAML that parses as something else.
+ * JSON is a subset of YAML 1.2, so quoting is all that is needed and any YAML parser reads
+ * the result back, which is what "readable by any OKF tool" (ADR 0012) has to mean for a file
  * this tier writes and the Python tier parses.
  */
 export const renderConceptFile = (frontmatter: Frontmatter, body: string): string => {
-  const lines = Object.entries(frontmatter).map(([key, value]) => `${key}:${yamlValue(value)}`);
+  const lines = Object.entries(frontmatter).map(
+    ([key, value]) => `${JSON.stringify(key)}:${yamlValue(value)}`,
+  );
   return `---\n${lines.join("\n")}\n---\n\n${normalisedBody(body)}`;
 };
 
@@ -240,32 +349,37 @@ const WRITE_CONSTRAINTS = {
   concept_identity_merge_key_uidx: "merge-key-taken",
 } as const;
 
-/**
- * The statuses a reader may see. A **draft** is a concept nobody has made the company's word
- * on yet and a **removed** one has left the bundle (`CONTEXT.md`, *discard*): neither is
- * published, so neither carries a published instant and neither passes the read predicate's
- * first arm. *stable* and *deprecated* are both readable — deprecation is a trust word shown
- * to a reader, not a way of hiding a concept from them (ADR 0019).
- */
-const PUBLISHED_STATUSES: ReadonlySet<string> = new Set(["stable", "deprecated"]);
-
-/** What the index already holds for this IRI — the facts a re-write may not move. */
+/** What the index already holds for this IRI — the facts a re-write keeps or may not move. */
 type Held = {
   readonly path: string;
   readonly sensitivity: string;
+  readonly status: string;
   /** When it first became readable; kept across a re-write, so publishing happens once. */
   readonly publishedAt: Date | null;
 };
 
+type HeldRow = {
+  readonly path: string;
+  readonly sensitivity: string;
+  readonly status: string;
+  readonly published_at: Date | null;
+};
+
 const heldByIri = async (tx: Tx, workspaceId: string, iri: string): Promise<Held | undefined> => {
-  const found = await tx.query<{ path: string; sensitivity: string; published_at: Date | null }>(
-    "SELECT path, sensitivity, published_at FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+  const found = await tx.query<HeldRow>(
+    `SELECT path, sensitivity, status, published_at
+       FROM concept_index WHERE workspace_id = $1 AND iri = $2`,
     [workspaceId, iri],
   );
   const row = found.rows[0];
   return row === undefined
     ? undefined
-    : { path: row.path, sensitivity: row.sensitivity, publishedAt: row.published_at };
+    : {
+        path: row.path,
+        sensitivity: row.sensitivity,
+        status: row.status,
+        publishedAt: row.published_at,
+      };
 };
 
 /**
@@ -302,7 +416,7 @@ export const writeConcept = async (
 ): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
   if (!mayWrite(principal)) return err("role-forbids");
 
-  const contentHash = contentHashOf(input.frontmatter, input.body);
+  const contentHash = contentHashOf(input.frontmatter, input.body, input.path);
   // The file carries its own IRI (ADR 0002's platform key), whatever the caller passed.
   const frontmatter = { ...input.frontmatter, iri: input.iri } satisfies Frontmatter;
   const mergeKey = boundarySchemas.conceptIdentity.insert.shape.mergeKey.safeParse(input.mergeKey);
@@ -324,7 +438,7 @@ export const writeConcept = async (
   // never written, which is the one case the reconciler exists for.
   const auditEventId = ulid();
 
-  return withRepositoryLock(doors.git, principal.workspaceId, async () => {
+  return withRepositoryLock(principal, doors.git, async () => {
     // The act's first transaction: what the index already holds for this IRI, read under the
     // authority this act will write with. Its refusals cost no commit, which is why the two
     // that are decidable from the concept's own row are made here.
@@ -346,7 +460,10 @@ export const writeConcept = async (
       return err("reclassification-refused");
     }
 
-    const status = input.status ?? CONCEPT_DRAFT_STATUS;
+    // A status the write does not name is the one the concept already holds, exactly as its
+    // class is: the draft default is what a concept is *born* at, and applying it to a
+    // re-write would un-publish a stable concept nobody asked to un-publish.
+    const status = input.status ?? held?.status ?? CONCEPT_DRAFT_STATUS;
     // Everything the rows will hold, parsed at the boundary before anything is committed: a
     // commit whose rows the boundary would refuse is the head-ahead state provoked on
     // purpose, and there is no reason to make one.
@@ -354,7 +471,7 @@ export const writeConcept = async (
       workspaceId: principal.workspaceId,
       iri: input.iri,
       path: input.path,
-      kind: input.kind,
+      kind: foldKind(input.kind),
       title: input.title,
       frontmatter,
       body: input.body,
@@ -363,15 +480,16 @@ export const writeConcept = async (
       // Published once and kept: a concept that reaches a readable status carries the instant
       // it first did, and one that leaves those statuses loses it, so the predicate's first
       // arm is a fact about the concept rather than a stamp every write renews.
-      publishedAt: PUBLISHED_STATUSES.has(status) ? (held?.publishedAt ?? new Date()) : null,
+      publishedAt: PUBLISHED_STATUSES.some((published) => published === status)
+        ? (held?.publishedAt ?? new Date())
+        : null,
       sensitivity: held?.sensitivity ?? input.sensitivity ?? SENSITIVITY_DEFAULT,
       audience: AUDIENCE_EVERYONE,
     });
     if (!parsed.success) return err("malformed");
     const row = parsed.data;
 
-    const committed = await commitToBundle(doors.git, {
-      workspaceId: principal.workspaceId,
+    const committed = await commitToBundle(principal, doors.git, {
       path: row.path,
       content: renderConceptFile(frontmatter, input.body),
       message: input.message,

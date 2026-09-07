@@ -9,6 +9,7 @@ import {
 import { ACT, auditEvent, FAMILIES } from "./audit-tables.ts";
 import {
   bundleCommit,
+  CONCEPT_PATH,
   CONCEPT_STATUSES,
   conceptIdentity,
   conceptIndex,
@@ -300,16 +301,32 @@ export const accessRequestUpdate = createUpdateSchema(accessRequest, accessReque
 const conceptIri = (schema: z.ZodString) => schema.regex(IRI).brand<"ConceptIri">();
 
 /**
- * A concept's frontmatter as the row holds it: OKF's flat keys — scalars and string lists —
- * and nothing nested, so the file's shape survives the round trip and a value with somewhere
- * to hide does not. JSON `null` stays accepted for the container because the column accepts
- * it (`jsonb NOT NULL` refuses SQL NULL, not the JSON value) and the parity suite holds the
- * refinement to the column's own nullability; the write path never stores one.
+ * A concept's frontmatter as the row holds it: OKF's scalars and string lists, plus the one
+ * shape the spec defines as a list of objects — **`sources[]`**, whose entries carry
+ * `resource` (required), `id`, `title`, `author`, `usage_count` and `last_modified`, and the
+ * platform's `locator` beside them (`docs/okf-v02.md`). One level of nesting and no more, so
+ * the file's shape survives the round trip and a value with somewhere to hide does not.
+ *
+ * JSON `null` stays accepted for the container because the column accepts it (`jsonb NOT
+ * NULL` refuses SQL NULL, not the JSON value) and the parity suite holds the refinement to
+ * the column's own nullability; the write path never stores one.
  */
+const frontmatterEntry = z.record(
+  z.string(),
+  z.union([z.string(), z.number(), z.boolean(), z.null()]),
+);
+
 const frontmatter = z.union([
   z.record(
     z.string(),
-    z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())]),
+    z.union([
+      z.string(),
+      z.number(),
+      z.boolean(),
+      z.null(),
+      z.array(z.string()),
+      z.array(frontmatterEntry),
+    ]),
   ),
   z.null(),
 ]);
@@ -342,7 +359,10 @@ export const conceptIdentityUpdate = createUpdateSchema(
 const conceptIndexRefinements = {
   workspaceId,
   iri: conceptIri,
-  path: (schema: z.ZodString) => schema.trim().min(1),
+  // A place in the bundle's concept area and nothing else: the manifest at the bundle root
+  // is platform-reserved (ADR 0002), and a row pointing at it would be the index claiming a
+  // file the format does not read as a concept.
+  path: (schema: z.ZodString) => schema.regex(CONCEPT_PATH),
   kind: (schema: z.ZodString) => schema.trim().min(1),
   title: (schema: z.ZodString) => schema.trim().min(1),
   frontmatter: (schema: z.ZodType) => schema.pipe(frontmatter),

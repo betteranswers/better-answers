@@ -35,7 +35,8 @@ CREATE TABLE "concept_index" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "concept_index_workspace_id_iri_pk" PRIMARY KEY("workspace_id","iri"),
 	CONSTRAINT "concept_index_status_check" CHECK (status IN ('draft', 'stable', 'deprecated', 'removed')),
-	CONSTRAINT "concept_index_sensitivity_check" CHECK (sensitivity IN ('Restricted', 'Internal', 'Public'))
+	CONSTRAINT "concept_index_sensitivity_check" CHECK (sensitivity IN ('Restricted', 'Internal', 'Public')),
+	CONSTRAINT "concept_index_published_check" CHECK ((status IN ('stable', 'deprecated')) = (published_at IS NOT NULL))
 );
 --> statement-breakpoint
 ALTER TABLE "concept_index" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
@@ -49,7 +50,7 @@ CREATE TABLE "concept_verification" (
 	"origin" text DEFAULT 'platform' NOT NULL,
 	CONSTRAINT "concept_verification_workspace_id_id_pk" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "concept_verification_origin_check" CHECK (origin IN ('platform', 'imported', 'erasure-rewrite', 'repair')),
-	CONSTRAINT "concept_verification_imported_check" CHECK (origin <> 'imported' OR content_hash IS NULL)
+	CONSTRAINT "concept_verification_imported_check" CHECK ((origin = 'imported') = (content_hash IS NULL))
 );
 --> statement-breakpoint
 ALTER TABLE "concept_verification" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
@@ -65,8 +66,10 @@ CREATE TABLE "evidence" (
 --> statement-breakpoint
 ALTER TABLE "evidence" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "bundle_commit" ADD CONSTRAINT "bundle_commit_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "bundle_commit" ADD CONSTRAINT "bundle_commit_parent_fk" FOREIGN KEY ("workspace_id","parent_sha") REFERENCES "public"."bundle_commit"("workspace_id","sha") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "concept_identity" ADD CONSTRAINT "concept_identity_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "concept_index" ADD CONSTRAINT "concept_index_identity_fk" FOREIGN KEY ("workspace_id","iri") REFERENCES "public"."concept_identity"("workspace_id","iri") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "concept_index" ADD CONSTRAINT "concept_index_bundle_commit_fk" FOREIGN KEY ("workspace_id","commit_sha") REFERENCES "public"."bundle_commit"("workspace_id","sha") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "concept_verification" ADD CONSTRAINT "concept_verification_identity_fk" FOREIGN KEY ("workspace_id","iri") REFERENCES "public"."concept_identity"("workspace_id","iri") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "evidence" ADD CONSTRAINT "evidence_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "bundle_commit_audit_event_uidx" ON "bundle_commit" USING btree ("workspace_id","audit_event_id");--> statement-breakpoint

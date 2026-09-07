@@ -1,3 +1,4 @@
+import type { Frontmatter, FrontmatterValue } from "../concepts/index.ts";
 import { conceptByIri, type OpenedConcept } from "../concepts/index.ts";
 import { err, isPersonActor, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
@@ -102,13 +103,17 @@ export type FindResult = {
   readonly hits: readonly FindHit[];
 };
 
-/** An OKF frontmatter value: the JSON-shaped scalars and string lists a concept file carries. */
-export type FrontmatterValue = string | number | boolean | null | readonly string[];
+/**
+ * An OKF frontmatter value, as the concepts slice defines it: the scalars, string lists and
+ * `sources[]` objects a concept file carries. Re-exported rather than restated, so the view
+ * and the row can never disagree about what a file may hold.
+ */
+export type { Frontmatter, FrontmatterSource, FrontmatterValue } from "../concepts/index.ts";
 
 /** The structured form of a concept — what `open` returns and a view renders. */
 export type ConceptView = {
   readonly iri: string;
-  readonly frontmatter: Readonly<Record<string, FrontmatterValue>>;
+  readonly frontmatter: Frontmatter;
   readonly body: string;
   readonly relations: readonly { readonly kind: string; readonly target: string }[];
   readonly trust: Trust;
@@ -205,7 +210,7 @@ export const find = async (
  * An imported check carries no hash and so never reads *Changed since checked*; it carries
  * the *imported* rider instead, which never moves the tier.
  */
-const trustOf = (concept: OpenedConcept): Trust => {
+const trustOf = (concept: OpenedConcept, now: Date): Trust => {
   const { check } = concept;
   const checkedAt = check === undefined ? null : check.at.toISOString();
   const tier: TrustTier =
@@ -221,10 +226,26 @@ const trustOf = (concept: OpenedConcept): Trust => {
       ? "deprecated"
       : concept.status === "draft"
         ? "draft"
-        : moved
-          ? "changed-since-checked"
-          : "current";
+        : // *Out of date* comes from `stale_after` **alone** and absence means no shelf life
+          // (ADR 0019) — the reader is told the fact has expired before they are told the
+          // text moved, because a shelf life is a statement about the fact itself.
+          pastShelfLife(concept.frontmatter["stale_after"], now)
+          ? "out-of-date"
+          : moved
+            ? "changed-since-checked"
+            : "current";
   return { tier, status, checkedBy: check?.actor ?? null, checkedAt, rider };
+};
+
+/**
+ * Whether a concept's shelf life has run out. `stale_after` is read as a date or a datetime
+ * with an offset (ADR 0019); anything else is a value the platform did not write and no
+ * shelf life is claimed from it, which is the same answer as absence.
+ */
+const pastShelfLife = (staleAfter: FrontmatterValue | undefined, now: Date): boolean => {
+  if (typeof staleAfter !== "string") return false;
+  const until = new Date(staleAfter);
+  return !Number.isNaN(until.getTime()) && until.getTime() < now.getTime();
 };
 
 /**
@@ -236,14 +257,15 @@ const trustOf = (concept: OpenedConcept): Trust => {
 const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
   const sources = concept.frontmatter["sources"];
   if (!Array.isArray(sources)) return [];
-  // The file's own list, each entry `<resource>#<locator>` as OKF writes it; anything that
-  // is not a string is a file the platform did not write and is left out rather than guessed.
+  // OKF's own shape: each entry is an object with `resource` required and the platform's
+  // `locator` beside it (`docs/okf-v02.md`). A `title` is shown in preference to
+  // the resource where the file carries one, because that is what a reader recognises.
   return sources.flatMap((entry) => {
-    if (typeof entry !== "string") return [];
-    const hash = entry.lastIndexOf("#");
-    return hash === -1
-      ? [{ locator: "", source: entry }]
-      : [{ locator: entry.slice(hash + 1), source: entry.slice(0, hash) }];
+    if (typeof entry !== "object" || entry === null) return [];
+    const source = entry["title"] ?? entry["resource"];
+    if (typeof source !== "string") return [];
+    const locator = entry["locator"];
+    return [{ locator: typeof locator === "string" ? locator : "", source }];
   });
 };
 
@@ -275,7 +297,7 @@ export const open = async (
       // Typed relations are derived in the graph and are never a key on the file
       // (ADR 0010), so they arrive with the graph tables (T-053).
       relations: [],
-      trust: trustOf(found),
+      trust: trustOf(found, new Date()),
       evidence: evidenceOf(found),
     },
   });

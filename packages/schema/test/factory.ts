@@ -9,10 +9,10 @@ import {
   ACCESS_REQUEST_OPEN_STATUS,
   AUDIENCE_EVERYONE,
   boundarySchemas,
-  CONCEPT_DRAFT_STATUS,
   CREATOR_ROLE,
   CURATED_ORIGIN,
   EMBEDDING_DIMENSIONS,
+  PUBLISHED_STATUSES,
   ulid,
   VERIFICATION_PLATFORM_ORIGIN,
 } from "../src/index.ts";
@@ -370,6 +370,9 @@ export const testData = (client: pg.PoolClient): TestData => {
   const conceptIndex: TestData["conceptIndex"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
+    // Stable and published, because a seeded concept is one a reader can see — and because
+    // the row's own CHECK ties the two: a draft carries no published instant.
+    const commit = overrides.commitSha ?? (await bundleCommit({ workspaceId })).sha;
     return insertRow(client, "conceptIndex", {
       path: `knowledge/${ulid().toLowerCase()}.md`,
       kind: "Policy",
@@ -377,14 +380,14 @@ export const testData = (client: pg.PoolClient): TestData => {
       frontmatter: { title: "Expenses", type: "Policy" },
       body: "Expenses are claimed within thirty days.",
       contentHash: hexOfLength(64),
-      commitSha: hexOfLength(40),
-      status: CONCEPT_DRAFT_STATUS,
+      status: PUBLISHED_STATUSES[0],
       publishedAt: new Date(),
       sensitivity: "Internal",
       audience: AUDIENCE_EVERYONE,
       ...overrides,
       workspaceId,
       iri,
+      commitSha: commit,
     });
   };
 

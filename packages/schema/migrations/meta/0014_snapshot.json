@@ -1,5 +1,5 @@
 {
-  "id": "10d38c4f-4422-4af4-b999-aae55d9728a4",
+  "id": "85efc9c5-6b89-4ca8-aba3-d03c3af7a540",
   "prevId": "f04825e7-487c-4360-9c61-9d481b58c7bf",
   "version": "7",
   "dialect": "postgresql",
@@ -2763,6 +2763,21 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "bundle_commit_parent_fk": {
+          "name": "bundle_commit_parent_fk",
+          "tableFrom": "bundle_commit",
+          "tableTo": "bundle_commit",
+          "columnsFrom": [
+            "workspace_id",
+            "parent_sha"
+          ],
+          "columnsTo": [
+            "workspace_id",
+            "sha"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -3013,6 +3028,21 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "concept_index_bundle_commit_fk": {
+          "name": "concept_index_bundle_commit_fk",
+          "tableFrom": "concept_index",
+          "tableTo": "bundle_commit",
+          "columnsFrom": [
+            "workspace_id",
+            "commit_sha"
+          ],
+          "columnsTo": [
+            "workspace_id",
+            "sha"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -3045,6 +3075,10 @@
         "concept_index_sensitivity_check": {
           "name": "concept_index_sensitivity_check",
           "value": "sensitivity IN ('Restricted', 'Internal', 'Public')"
+        },
+        "concept_index_published_check": {
+          "name": "concept_index_published_check",
+          "value": "(status IN ('stable', 'deprecated')) = (published_at IS NOT NULL)"
         }
       },
       "isRLSEnabled": true
@@ -3173,7 +3207,7 @@
         },
         "concept_verification_imported_check": {
           "name": "concept_verification_imported_check",
-          "value": "origin <> 'imported' OR content_hash IS NULL"
+          "value": "(origin = 'imported') = (content_hash IS NULL)"
         }
       },
       "isRLSEnabled": true

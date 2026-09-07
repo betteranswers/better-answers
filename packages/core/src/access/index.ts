@@ -53,6 +53,8 @@ export const readableClause = (alias: string, roleParameter: number): string =>
 
 /**
  * What the clause's one placeholder is filled with. A function rather than a field read at
- * the call site, so a caller cannot fill the placeholder with something that is not a role.
+ * the call site, because the two have to move together: the day the predicate's third arm
+ * takes the caller's group ids as well, every call site keeps working and only this pair
+ * changes. A caller that read `principal.role` itself would be a second place to remember.
  */
 export const readableParameter = (principal: UserPrincipal): string => principal.role;

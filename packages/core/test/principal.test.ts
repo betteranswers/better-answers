@@ -128,7 +128,7 @@ describe("the Principal resolver", () => {
       groups: [],
       // The credential's own instant, carried so that an act which opens a later transaction
       // judges revocation the same way this resolve just did (T-052).
-      credentialIssuedAt: claims.issuedAt,
+      credentialIssuedAtMs: claims.issuedAt.getTime(),
     });
     expect(resolved.value.scope).toBe(seeded.workspaceId);
   });
@@ -232,7 +232,7 @@ describe("the Principal resolver", () => {
         userId: seeded.userId,
         role: "Editor",
         groups: seeded.groupIds.there,
-        credentialIssuedAt: issuedAt,
+        credentialIssuedAtMs: issuedAt.getTime(),
       },
     });
     expect(seeded.groupIds.there).not.toEqual(seeded.groupIds.here);

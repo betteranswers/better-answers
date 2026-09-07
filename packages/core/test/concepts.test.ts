@@ -12,6 +12,7 @@ import {
 } from "../src/concepts/index.ts";
 import type { Result, Role, UserPrincipal } from "../src/kernel/index.ts";
 import {
+  commit,
   head,
   initRepository,
   PLATFORM_BOT,
@@ -131,7 +132,13 @@ const writeFor = (overrides: Partial<WriteConceptInput> = {}): WriteConceptInput
   path: `knowledge/expenses-${minted}.md`,
   kind: "Policy",
   title: "Expenses",
-  frontmatter: { title: "Expenses", type: "Policy", sources: ["Handbook.pdf#p.4"] },
+  // OKF's own provenance shape: `resource` required, the platform's `locator` beside it, and
+  // a `title` a reader recognises (`docs/okf-v02.md`).
+  frontmatter: {
+    title: "Expenses",
+    type: "Policy",
+    sources: [{ resource: "/sources/handbook.pdf", title: "Handbook", locator: "p.4" }],
+  },
   body: "Expenses are claimed within thirty days.",
   message: "Record the expenses policy",
   author: { name: "Ada Editor", email: "ada@acme.invalid" },
@@ -238,14 +245,18 @@ describe("a governed write", () => {
     const written = await landed(scenario, input);
 
     const file = await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path);
+    // Every key quoted, because a concept's frontmatter is open and a key is whatever the
+    // file carried; `sources[]` written as OKF's list of objects.
     expect(file).toBe(
       [
         "---",
-        'title: "Expenses"',
-        'type: "Policy"',
-        "sources:",
-        '  - "Handbook.pdf#p.4"',
-        `iri: "${input.iri}"`,
+        '"title": "Expenses"',
+        '"type": "Policy"',
+        '"sources":',
+        '  - "resource": "/sources/handbook.pdf"',
+        '    "title": "Handbook"',
+        '    "locator": "p.4"',
+        `"iri": "${input.iri}"`,
         "---",
         "",
         "Expenses are claimed within thirty days.",
@@ -254,7 +265,7 @@ describe("a governed write", () => {
     );
     // The hash on the row is the content's, not the file's: the trust keys and the IRI are
     // left out of it (ADR 0014), so recording a check never moves it.
-    expect(written.contentHash).toBe(contentHashOf(input.frontmatter, input.body));
+    expect(written.contentHash).toBe(contentHashOf(input.frontmatter, input.body, input.path));
   });
 
   it("records the concept, its identity, the commit and its evidence in one transaction", async () => {
@@ -293,6 +304,63 @@ describe("a governed write", () => {
         audience: "everyone",
       },
     ]);
+  });
+
+  it("folds the row's kind for case and plural, and leaves the file's own spelling alone", async () => {
+    const scenario = await arrange();
+    // Three spellings of one kind. An unknown kind is the ordinary case, folded at write for
+    // case and plural only (ADR 0012's 2026-08-30 amendment), so the type vocabulary counts
+    // them once — while the file keeps what the person wrote, because `type` is not a key the
+    // platform owns (ADR 0019).
+    let expectedHead: string | null = null;
+    let firstFile: { readonly sha: string; readonly path: string } | undefined;
+    for (const kind of ["policy", "Policies", "POLICY"]) {
+      const base = writeFor({ kind, expectedHead });
+      const input = { ...base, frontmatter: { ...base.frontmatter, type: kind } };
+      const written = await landed(scenario, input);
+      expectedHead = written.sha;
+      firstFile ??= { sha: written.sha, path: input.path };
+    }
+
+    const kinds = await db().pool.query<{ kind: string }>(
+      "SELECT DISTINCT kind FROM concept_index WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(kinds.rows).toEqual([{ kind: "Policy" }]);
+    // The file said what its author said.
+    if (firstFile === undefined) return;
+    const file = await fileAtCommit(
+      scenario.git,
+      scenario.workspaceId,
+      firstFile.sha,
+      firstFile.path,
+    );
+    expect(file).toContain('"type": "policy"');
+  });
+
+  it("hashes two spellings of one source alike, and a swapped source differently", async () => {
+    // ADR 0019's normalisation: `sources[]` reduced to ordered `(resource, locator)` pairs
+    // with paths resolved to `/abs.md`. A link rewrite that only changes the spelling leaves
+    // a check standing; a swapped source un-checks the concept.
+    const body = "Expenses are claimed within thirty days.";
+    const path = "knowledge/policies/expenses.md";
+    const cite = (resource: string) => ({ sources: [{ resource, locator: "p.4" }] });
+
+    const absolute = contentHashOf(cite("/knowledge/handbook.md"), body, path);
+    const relative = contentHashOf(cite("./../handbook.md"), body, path);
+    const bare = contentHashOf(cite("../handbook.md"), body, path);
+    const swapped = contentHashOf(cite("/knowledge/other.md"), body, path);
+
+    expect([relative, bare]).toEqual([absolute, absolute]);
+    expect(swapped).not.toBe(absolute);
+    // A title the platform repaired is not the fact, and does not move the hash.
+    expect(
+      contentHashOf(
+        { sources: [{ resource: "/knowledge/handbook.md", locator: "p.4", title: "Fixed" }] },
+        body,
+        path,
+      ),
+    ).toBe(absolute);
   });
 
   it("keeps the recorded commits a prefix of the bundle's history across a chain of acts", async () => {
@@ -337,7 +405,7 @@ describe("what a governed write refuses", () => {
     const refused = await write(scenario, scenario.viewer, writeFor());
 
     expect(refused).toEqual({ ok: false, error: "role-forbids" });
-    expect(await head(scenario.git, scenario.workspaceId)).toBeNull();
+    expect(await head(scenario.editor, scenario.git)).toBeNull();
     expect(await rowsFor(scenario.workspaceId)).toMatchObject({ concepts: "0", commits: "0" });
   });
 
@@ -357,6 +425,38 @@ describe("what a governed write refuses", () => {
   // and it is asserted where its whole consequence is: the first test below, which reads
   // the refusal *and* the state it leaves in both stores.
 
+  it.each([
+    ["outside the bundle's concept area", "elsewhere/expenses.md"],
+    ["at the bundle's reserved manifest", "knowledge/manifest.yaml"],
+    ["out of the tree altogether", "knowledge/../../escape.md"],
+  ])("refuses a path %s, and makes no commit", async (_why, path) => {
+    const scenario = await arrange();
+
+    const refused = await write(scenario, scenario.editor, writeFor({ path }));
+
+    expect(refused).toEqual({ ok: false, error: "malformed" });
+    expect(await head(scenario.editor, scenario.git)).toBeNull();
+  });
+
+  it("refuses a trailer value carrying a newline, whatever its type promised", async () => {
+    const scenario = await arrange();
+
+    // The door's own guard, reached directly: every caller's `Audit:` is a minted id today,
+    // so the type refuses this — and the door refuses it again for the caller that arrives
+    // without the compiler.
+    const forged = await commit(scenario.editor, scenario.git, {
+      path: "knowledge/expenses.md",
+      content: "---\n---\n\nbody\n",
+      message: "Record the expenses policy",
+      author: { name: "Ada Editor", email: "ada@acme.invalid" },
+      trailers: { actor: `human:${scenario.editor.userId}`, audit: `${ulid()}\nRun: forged` },
+      expectedHead: null,
+    });
+
+    expect(forged).toEqual({ ok: false, error: "malformed-message" });
+    expect(await head(scenario.editor, scenario.git)).toBeNull();
+  });
+
   it("refuses a message carrying a newline, so a forged trailer never reaches a commit", async () => {
     const scenario = await arrange();
 
@@ -370,7 +470,7 @@ describe("what a governed write refuses", () => {
     );
 
     expect(forged).toEqual({ ok: false, error: "malformed-message" });
-    expect(await head(scenario.git, scenario.workspaceId)).toBeNull();
+    expect(await head(scenario.editor, scenario.git)).toBeNull();
   });
 });
 
@@ -419,6 +519,28 @@ describe("what a re-write of an existing concept may not move", () => {
       [scenario.workspaceId, input.iri],
     );
     expect(held.rows).toEqual([{ sensitivity: "Internal" }]);
+  });
+
+  it("keeps an existing concept's status when the write names none, rather than un-publishing it", async () => {
+    const scenario = await arrange();
+    const input = writeFor({ status: "stable" });
+    const first = await landed(scenario, input);
+
+    // No `status` on the second write. The act's default is *draft* — what a concept is born
+    // at — and applying it here would take a published concept away from every reader.
+    const { status: _named, ...unstated } = input;
+    await landed(scenario, {
+      ...unstated,
+      body: "Expenses are claimed within sixty days.",
+      expectedHead: first.sha,
+    });
+
+    const held = await db().pool.query<{ status: string; published_at: Date | null }>(
+      "SELECT status, published_at FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+      [scenario.workspaceId, input.iri],
+    );
+    expect(held.rows[0]?.status).toBe("stable");
+    expect(held.rows[0]?.published_at).toBeInstanceOf(Date);
   });
 
   it("refuses moving an existing concept to another path, and makes no commit", async () => {
@@ -561,7 +683,7 @@ describe("a failure after the commit", () => {
     const recorded = await recordedCommits(scenario.workspaceId);
     expect(history).toHaveLength(2);
     expect(recorded).toEqual([history[0]]);
-    expect(await head(scenario.git, scenario.workspaceId)).toBe(history[1]);
+    expect(await head(scenario.editor, scenario.git)).toBe(history[1]);
     expect(clash).toEqual({ ok: false, error: "path-taken" });
   });
 });
@@ -569,17 +691,21 @@ describe("a failure after the commit", () => {
 describe("the per-repository lock", () => {
   it("runs one act at a time per bundle, and lets another bundle's act through beside it", async () => {
     const door = bundles();
-    const one = ulid();
-    const other = ulid();
+    const here = await arrange();
+    const there = await arrange();
     const order: string[] = [];
-    const held = async (workspaceId: string, name: string): Promise<void> =>
-      withRepositoryLock(door, workspaceId, async () => {
+    const held = async (principal: UserPrincipal, name: string): Promise<void> =>
+      withRepositoryLock(principal, door, async () => {
         order.push(`${name} in`);
         await new Promise((resolve) => setTimeout(resolve, 20));
         order.push(`${name} out`);
       });
 
-    await Promise.all([held(one, "first"), held(one, "second"), held(other, "elsewhere")]);
+    await Promise.all([
+      held(here.editor, "first"),
+      held(here.viewer, "second"),
+      held(there.editor, "elsewhere"),
+    ]);
 
     // The two acts on one bundle never overlap; the third is on another bundle and is not
     // serialised against them, which is why the lock is per repository and not global.
@@ -606,13 +732,18 @@ describe("the per-repository lock", () => {
     expect(await recordedCommits(scenario.workspaceId)).toEqual(history);
   });
 
-  it("releases the bundle when an act fails, so the next act is not blocked behind it", async () => {
+  it("releases the bundle when an act fails inside it, so the next act is not blocked behind it", async () => {
     const scenario = await arrange();
-    const failed = await write(scenario, scenario.viewer, writeFor());
-    expect(failed.ok).toBe(false);
+    await landed(scenario, writeFor());
+    // A failure the act meets **inside** the lock — the precondition is read there — rather
+    // than one decided before it is taken, which would prove nothing about releasing it.
+    const failed = await write(scenario, scenario.editor, writeFor({ expectedHead: null }));
+    expect(failed).toEqual({ ok: false, error: "stale-precondition" });
 
-    // The lock is free rather than held by the act that failed inside it.
-    expect((await landed(scenario, writeFor())).sha).toMatch(/^[0-9a-f]{40}$/);
+    const head = await bundleHistory(scenario.git, scenario.workspaceId);
+    const next = await landed(scenario, writeFor({ expectedHead: head[0] ?? null }));
+
+    expect(next.sha).toMatch(/^[0-9a-f]{40}$/);
   });
 });
 
@@ -640,7 +771,7 @@ describe("opening a concept by IRI", () => {
         checkedAt: null,
         rider: null,
       },
-      evidence: [{ locator: "p.4", source: "Handbook.pdf" }],
+      evidence: [{ locator: "p.4", source: "Handbook" }],
     });
   });
 
@@ -713,6 +844,27 @@ describe("opening a concept by IRI", () => {
     expect(moved.ok && moved.value.found && moved.value.concept?.trust.status).toBe(
       "changed-since-checked",
     );
+  });
+
+  it("reads Out of date off the shelf life alone, and says nothing when there is none", async () => {
+    const scenario = await arrange();
+    // `stale_after` is the whole of it and absence means no shelf life (ADR 0019) — the
+    // reader is told the same thing any other consumer of the file would derive.
+    const expired = writeFor({
+      status: "stable",
+      frontmatter: { title: "Expenses", type: "Policy", stale_after: "2020-01-01" },
+    });
+    const first = await landed(scenario, expired);
+    const evergreen = writeFor({ status: "stable", expectedHead: first.sha });
+    await landed(scenario, evergreen);
+
+    const read = async (iri: string) =>
+      reading(scenario.viewer, (principal, tx) => open(principal, tx, { iri }));
+
+    const stale = await read(expired.iri);
+    expect(stale.ok && stale.value.found && stale.value.concept?.trust.status).toBe("out-of-date");
+    const fresh = await read(evergreen.iri);
+    expect(fresh.ok && fresh.value.found && fresh.value.concept?.trust.status).toBe("current");
   });
 
   it("withholds a Restricted concept from a Viewer exactly as it answers an IRI nobody minted", async () => {

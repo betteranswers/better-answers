@@ -103,11 +103,11 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **bundle commit** — one change to a bundle, by whatever path; what the sync derives from.
 - **concept index** — the platform's derived row for every concept, written when the concept's
   commit is made, checked by the sync, never edited. The only "both" of the minting rule.
-- **merge key** — what a concept is recognised by when its IRI is not yet known: the natural
-  key a suggestion's payload carries, which an acceptance resolves the target from at the
-  moment it commits, never before. One concept per merge key in a workspace, so a concept
-  whose identity moved between proposal and decision refuses the acceptance rather than
-  landing on the wrong concept. _Avoid_: natural key, identity key.
+- **merge key** — what a concept is recognised by when its IRI is not yet known: the words a
+  suggestion's payload carries about the concept it means, which an acceptance resolves the
+  target from at the moment it commits, never before. One concept per merge key in a
+  workspace, so a concept whose identity moved between proposal and decision refuses the
+  acceptance rather than landing on the wrong concept. _Avoid_: natural key, identity key.
 - **suggestion** — a change to the company's knowledge or its configuration — prepared by the
   platform (candidate concepts from a run, a platform-bundle or template
   update, an alias merge, a composition rewrite), or by a person who may not commit it (kind
