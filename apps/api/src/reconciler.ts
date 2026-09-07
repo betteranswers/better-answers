@@ -16,7 +16,7 @@ import { logger as tierLogger } from "./logger.ts";
  * The periodic head check — the reconciler's trigger in the api process (ADR 0012, amended
  * 2026-09-06; T-006 spec, *The reconciler*). On an interval it asks every workspace's bundle
  * whether its head is ahead of its rows, and the slice replays what the rows missed through
- * the live handler, under the reconciler's own principal and never a person's (`[SEC2]`).
+ * the live handler, under the reconciler's own principal and never a person's.
  * This file is the trigger and nothing else: what a replay is, and what it lands, is the
  * concepts slice's (ADR 0029); the api tier says when, and says what came of it.
  *

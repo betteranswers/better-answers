@@ -262,8 +262,8 @@ const reasonOf = (reason: string | Error): string =>
  * The reconciler on demand — the restore path (ADR 0012, amended 2026-09-06; T-006 spec,
  * *Ops and the budget*): after a database is restored from a dump, the repository is ahead
  * of it, and this replays what the rows missed through the same slice function the app's
- * periodic head check runs. Under the reconciler's own principal and never a person's
- * (`[SEC2]`): the command takes no actor, because recovery is booked to nobody.
+ * periodic head check runs. Under the reconciler's own principal and never a person's:
+ * the command takes no actor, because recovery is booked to nobody.
  *
  * *Done* is the rows and the bundle agreeing when the run ends, with what it took to get
  * there in the line. *Refused* is anything else the operator has to look at: no root to open

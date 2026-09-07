@@ -88,7 +88,7 @@ export type LedgerRow = z.infer<typeof boundarySchemas.auditEvent.select>;
  * reconciler's hits are it over `platform.reconciler.replayed`. Inside the caller's
  * transaction and under its scope — a user principal's own workspace, written so a
  * disagreement with the scope reads nothing; the platform's, the scope alone. A read
- * writes no row (`[AUDIT8]`).
+ * writes no row.
  */
 export const eventsOfAct = async (
   principal: Principal,
