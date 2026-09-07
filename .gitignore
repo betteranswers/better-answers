@@ -48,14 +48,16 @@ old-suggested-schema.md
 AGENTS.md.bak
 
 # agent tooling installed from third parties — never ours to publish (ADR 0027).
-# Skills are reinstalled from their sources; `tasks/AGENTS.md` from `ordna skill install`.
+# A worktree gets these copied from the primary checkout by .claude/hooks/provision-skills.sh;
+# a fresh clone reinstalls them from `skills-lock.json`, and `tasks/AGENTS.md` from
+# `ordna skill install`. The lock itself is tracked: it is this repository's manifest of
+# what it installs, not the third parties' content, so ADR 0027 does not reach it.
 # Wildcarded rather than the directory, because git will not descend into an excluded
 # directory to re-include anything inside it — and one skill below is ours, written in this
 # repository and tracked with it, so a fresh clone or worktree has it with no install step.
 .claude/skills/*
 !.claude/skills/browser-suite/
 .agents/
-skills-lock.json
 tasks/AGENTS.md
 
 # Worktrees created by background agents (Claude Code `isolation: worktree`).
