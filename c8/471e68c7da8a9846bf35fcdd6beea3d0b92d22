@@ -1,0 +1,35 @@
+packages/core/src/concepts/index.ts
+  s_876a3fbbae1185::t_df5640e7ad6d40 577-578
+  s_876a3fbbae1185::t_3b659c1bf5fb78 1733-1772
+  s_876a3fbbae1185::t_cd7dcd7a22a479 24
+packages/core/test/workspace-with-bundle.ts
+  s_876a3fbbae1185::t_13125bad554fc8 41-51
+  s_876a3fbbae1185::t_d3cb657c242d19 9,11
+  s_876a3fbbae1185::t_7b751c0c2f1c16 34-40
+packages/core/test/suggestions.test.ts
+  s_876a3fbbae1185::t_44bcf9f4409c0e 21-23
+  s_876a3fbbae1185::t_da05a1b7e284ff 36
+packages/core/test/reconciler.test.ts
+  s_876a3fbbae1185::t_3877d40cc5191b 718-755
+  s_876a3fbbae1185::t_147d9a28d7c57b 13
+  s_876a3fbbae1185::t_ae35129214b8f9 32-33
+  s_876a3fbbae1185::t_9129a019ee1585 50
+packages/core/src/store/git/index.ts
+  s_876a3fbbae1185::t_253c94587fc4c0 468,470-477
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c8471e68c7da8a9846bf35fcdd6beea3d0b92d22",
+  "prompts": {},
+  "sessions": {
+    "s_876a3fbbae1185": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9e05c9c3-cbbb-4563-b5b8-659867a07e7e",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
