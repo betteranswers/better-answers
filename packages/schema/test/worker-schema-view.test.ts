@@ -8,7 +8,8 @@ import {
   renderWorkerSchemaView,
 } from "../scripts/worker-view.ts";
 import { lastMigrationTag } from "../src/journal.ts";
-import { type MigratedPostgres, startMigratedPostgres } from "./harness.ts";
+import type { MigratedPostgres } from "./harness.ts";
+import { openMigratedPostgres } from "./warm-postgres.ts";
 
 /**
  * The drift check, both directions (ADR 0032): regenerate the worker's schema view
@@ -22,8 +23,11 @@ const viewPath = path.resolve(
 );
 let db: MigratedPostgres;
 
+// Still the container start's 120 seconds, though what this hook does now is one
+// `CREATE DATABASE … TEMPLATE`. An unused ceiling costs a passing run nothing, and the
+// honest number wants the warm hook measured on CI hardware, not guessed at locally.
 beforeAll(async () => {
-  db = await startMigratedPostgres();
+  db = await openMigratedPostgres();
 }, 120_000);
 
 afterAll(async () => {
