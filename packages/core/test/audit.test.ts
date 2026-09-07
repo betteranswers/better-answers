@@ -18,7 +18,7 @@ import type { ActorId, UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres, withPrincipal, withScope } from "../src/store/postgres/index.ts";
 import { provisionWorkspace } from "../src/workspaces/index.ts";
 import { bootstrap, seedPerson } from "./platform.ts";
-import { coreSourceFiles } from "./source-tree.ts";
+import { coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
 /**
@@ -104,21 +104,24 @@ describe("the declared-acts walk", () => {
     }
   });
 
-  it("reaches every act declared in the tree, and every act it reached is declared in the tree", async () => {
-    // `[TEST7]`: an act declared in a file its slice's entry point never imports would be
-    // one the walk cannot see; a registration no source names would be one nobody can read.
-    // Held by name, both ways, with this suite's own probe declarations counted in.
-    await loadEveryEntryPoint();
-    const registered = new Set<string>(declarations().flatMap((declaration) => declaration.acts));
-    const inTree = actLiteralsIn(coreSourceFiles());
-    const inThisSuite = actLiteralsIn([path.resolve(import.meta.dirname, "audit.test.ts")]);
+  it.skipIf(sourceTreeIsInstrumented())(
+    "reaches every act declared in the tree, and every act it reached is declared in the tree",
+    async () => {
+      // `[TEST7]`: an act declared in a file its slice's entry point never imports would be
+      // one the walk cannot see; a registration no source names would be one nobody can read.
+      // Held by name, both ways, with this suite's own probe declarations counted in.
+      await loadEveryEntryPoint();
+      const registered = new Set<string>(declarations().flatMap((declaration) => declaration.acts));
+      const inTree = actLiteralsIn(coreSourceFiles());
+      const inThisSuite = actLiteralsIn([path.resolve(import.meta.dirname, "audit.test.ts")]);
 
-    expect([...inTree].filter((name) => !registered.has(name))).toEqual([]);
-    expect([...registered].filter((name) => !inTree.has(name) && !inThisSuite.has(name))).toEqual(
-      [],
-    );
-    expect(inTree.size).toBeGreaterThan(0);
-  });
+      expect([...inTree].filter((name) => !registered.has(name))).toEqual([]);
+      expect([...registered].filter((name) => !inTree.has(name) && !inThisSuite.has(name))).toEqual(
+        [],
+      );
+      expect(inTree.size).toBeGreaterThan(0);
+    },
+  );
 
   it("refuses an act declared under a family that is not its first word", () => {
     expect(() =>
@@ -179,44 +182,49 @@ describe("the declared-acts walk", () => {
     );
   });
 
-  it("finds no door call wrapped in attempt anywhere in the tree", () => {
-    // `[AUDIT1]`: the doors are called bare, so a door's rejection aborts the caller's
-    // transaction. `attempt(() => record(...))` would hand the abort back as a value
-    // the act might not read, and the act would commit without its event. The regex
-    // refuses the direct wrap in its spellings — braced or not, `return`/`await`/`void`
-    // before the call, statements ahead of it — and stops at a `with…` opener, because
-    // `attempt(() => withScope(… => record(…)))` is the sanctioned shape: there the
-    // door is bare inside the opener, and the abort still fails the whole attempt.
-    // The deep hold is `[AUDIT1]`'s per-slice fail-together test, not this pattern.
-    const wrapped =
-      /attempt\(\s*(?:async\s+)?\(\s*\)\s*=>\s*(?:\{(?:(?!with[A-Z])[^])*?)?(?:return\s+)?(?:await\s+|void\s+)?record(?:For)?\(/;
-    // The pattern is proved to bite before its silence is read as innocence.
-    expect(wrapped.test("attempt(() => record(principal, tx, event))")).toBe(true);
-    expect(wrapped.test("attempt(async () => recordFor(platform, tx, event))")).toBe(true);
-    expect(
-      wrapped.test("attempt(async () => {\n  return await record(principal, tx, event);\n})"),
-    ).toBe(true);
-    expect(wrapped.test("attempt(() => {\n  void record(principal, tx, event);\n})")).toBe(true);
-    expect(
-      wrapped.test(
-        "attempt(async () => {\n  const before = prepare();\n  return record(before, tx, event);\n})",
-      ),
-    ).toBe(true);
-    // And proved to pass the sanctioned shape, so the guard cannot outlaw the convention.
-    expect(
-      wrapped.test(
-        "attempt(() => withScope(platform, door, id, (tx) => record(platform, tx, event)))",
-      ),
-    ).toBe(false);
-    expect(
-      wrapped.test(
-        "attempt(async () => {\n  return withPrincipal(door, claims, (principal, tx) => record(principal, tx, event));\n})",
-      ),
-    ).toBe(false);
+  it.skipIf(sourceTreeIsInstrumented())(
+    "finds no door call wrapped in attempt anywhere in the tree",
+    () => {
+      // `[AUDIT1]`: the doors are called bare, so a door's rejection aborts the caller's
+      // transaction. `attempt(() => record(...))` would hand the abort back as a value
+      // the act might not read, and the act would commit without its event. The regex
+      // refuses the direct wrap in its spellings — braced or not, `return`/`await`/`void`
+      // before the call, statements ahead of it — and stops at a `with…` opener, because
+      // `attempt(() => withScope(… => record(…)))` is the sanctioned shape: there the
+      // door is bare inside the opener, and the abort still fails the whole attempt.
+      // The deep hold is `[AUDIT1]`'s per-slice fail-together test, not this pattern.
+      const wrapped =
+        /attempt\(\s*(?:async\s+)?\(\s*\)\s*=>\s*(?:\{(?:(?!with[A-Z])[^])*?)?(?:return\s+)?(?:await\s+|void\s+)?record(?:For)?\(/;
+      // The pattern is proved to bite before its silence is read as innocence.
+      expect(wrapped.test("attempt(() => record(principal, tx, event))")).toBe(true);
+      expect(wrapped.test("attempt(async () => recordFor(platform, tx, event))")).toBe(true);
+      expect(
+        wrapped.test("attempt(async () => {\n  return await record(principal, tx, event);\n})"),
+      ).toBe(true);
+      expect(wrapped.test("attempt(() => {\n  void record(principal, tx, event);\n})")).toBe(true);
+      expect(
+        wrapped.test(
+          "attempt(async () => {\n  const before = prepare();\n  return record(before, tx, event);\n})",
+        ),
+      ).toBe(true);
+      // And proved to pass the sanctioned shape, so the guard cannot outlaw the convention.
+      expect(
+        wrapped.test(
+          "attempt(() => withScope(platform, door, id, (tx) => record(platform, tx, event)))",
+        ),
+      ).toBe(false);
+      expect(
+        wrapped.test(
+          "attempt(async () => {\n  return withPrincipal(door, claims, (principal, tx) => record(principal, tx, event));\n})",
+        ),
+      ).toBe(false);
 
-    const offending = coreSourceFiles().filter((file) => wrapped.test(readFileSync(file, "utf8")));
-    expect(offending).toEqual([]);
-  });
+      const offending = coreSourceFiles().filter((file) =>
+        wrapped.test(readFileSync(file, "utf8")),
+      );
+      expect(offending).toEqual([]);
+    },
+  );
 });
 
 /** An act declared once for this suite, so the doors have something declared to write. */

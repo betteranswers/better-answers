@@ -10,8 +10,10 @@ __pycache__/
 .turbo/
 coverage/
 # `reports/mutation/` carries a slash, so git anchored it to the repository root and left
-# `apps/api/reports/` and `apps/web/reports/` tracked. Every workspace writes its mutation report
-# under its own `reports/`, so the pattern has to match at any depth.
+# `apps/api/reports/` and `packages/core/reports/` tracked. Every workspace on the mutation
+# schedule writes its report and its incremental result file under its own `reports/`, so the
+# pattern has to match at any depth — and the incremental file is git-ignored on purpose:
+# actions/cache is what carries it from week to week.
 reports/
 
 # Mutation testing leftovers: mutmut copies the tier into `apps/worker/mutants/`, and

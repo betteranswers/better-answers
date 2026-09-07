@@ -25,6 +25,7 @@
     "lint": "oxlint --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "mutation": "stryker run",
     "check": "node ../../scripts/check.mjs lint typecheck test"
   },
   "dependencies": {
@@ -33,6 +34,9 @@
   },
   "devDependencies": {
     "@better-answers/devtools": "workspace:*",
+    "@stryker-mutator/api": "10.0.0",
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
     "@types/node": "24.13.3",
     "@types/pg": "8.23.1",
     "typescript": "7.0.2",

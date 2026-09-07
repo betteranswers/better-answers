@@ -44,7 +44,7 @@ A test title says what the system does for whom, not which function it calls.
 
 ### [TEST6] Mutation testing runs on a schedule
 
-Stryker (`apps/api`, `apps/web`) and mutmut (`apps/worker`) run on a schedule — weekly on hosted runners (a nightly run is most of the free minutes), nightly once a self-hosted runner exists; a falling mutation score is a task.
+Stryker runs on a schedule over `apps/api` and `packages/core` — weekly on hosted runners (a nightly run is most of the free minutes), nightly once a self-hosted runner exists; a falling mutation score is a task, never a failed build. A workspace joins the schedule when the suite that would kill its mutants is one the runner can execute and the source it would mutate is behaviour this repository wrote: `apps/web` is out because its interface is a browser driving a served build (`[TEST1]`) and Stryker's Vitest runner cannot drive it, and `apps/worker` is out until `T-006`, its mutatable source being configuration and a generated schema view.
 
 ### [TEST7] A pair is checked in both directions
 
