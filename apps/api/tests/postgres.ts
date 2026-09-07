@@ -10,7 +10,7 @@ import type { Pool } from "pg";
  *
  * This is the one line in `apps/api` that decides where that Postgres comes from. Under
  * Vitest it is a database copied from the template the run's `globalSetup` migrated, so
- * this tier's data files share one container instead of starting thirteen; outside Vitest
+ * this tier's data files share one container instead of one per data file; outside Vitest
  * — Playwright's served app in `serve.ts`, the local loop in `local.ts` — the same call
  * starts a container of its own. Neither caller had to learn the difference.
  */
