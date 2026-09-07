@@ -14,7 +14,8 @@ import {
   ulid,
 } from "../src/index.ts";
 import { testData } from "./factory.ts";
-import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
+import { type MigratedPostgres, withRollback } from "./harness.ts";
+import { openMigratedPostgres } from "./warm-postgres.ts";
 
 /**
  * The isolation proofs ADR 0032 names: a missing scope (empty GUC) returns zero rows,
@@ -32,8 +33,11 @@ import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./ha
 
 let db: MigratedPostgres;
 
+// Still the container start's 120 seconds, though what this hook does now is one
+// `CREATE DATABASE … TEMPLATE`. An unused ceiling costs a passing run nothing, and the
+// honest number wants the warm hook measured on CI hardware, not guessed at locally.
 beforeAll(async () => {
-  db = await startMigratedPostgres();
+  db = await openMigratedPostgres();
 }, 120_000);
 
 afterAll(async () => {

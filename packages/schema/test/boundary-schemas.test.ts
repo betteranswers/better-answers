@@ -15,7 +15,8 @@ import {
 } from "../src/index.ts";
 import * as publicEntry from "../src/index.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "../src/drizzle-zod.ts";
-import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
+import { type MigratedPostgres, withRollback } from "./harness.ts";
+import { openMigratedPostgres } from "./warm-postgres.ts";
 
 /**
  * ADR 0028's five assertions, over the registry, against a real Postgres
@@ -456,8 +457,11 @@ describe("3 — optionality and nullability agree, per key, at runtime", () => {
 describe("4 — a refinement only narrows, proved against the column", () => {
   let db: MigratedPostgres;
 
+  // Still the container start's 120 seconds, though what this hook does now is one
+  // `CREATE DATABASE … TEMPLATE`. An unused ceiling costs a passing run nothing, and the
+  // honest number wants the warm hook measured on CI hardware, not guessed at locally.
   beforeAll(async () => {
-    db = await startMigratedPostgres();
+    db = await openMigratedPostgres();
   }, 120_000);
 
   afterAll(async () => {
