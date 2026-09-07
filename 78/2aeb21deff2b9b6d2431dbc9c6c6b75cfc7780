@@ -1,0 +1,46 @@
+apps/web/e2e/browser.ts
+  s_3695f0cfb8d82a::t_bc8a98a6d70021 1-2,5-6,8-10,15-60,74-112
+apps/api/tests/provision-skills.test.ts
+  s_3695f0cfb8d82a::t_77c12d36b654f9 343-387
+apps/api/tests/coding-rules-tags.test.ts
+  s_3695f0cfb8d82a::t_dbc00420b818a7 53-60
+  s_3695f0cfb8d82a::t_638e7dea6b6fb3 75-76
+  s_3695f0cfb8d82a::t_cbe50551552e57 2
+apps/web/e2e/consent.spec.ts
+  s_3695f0cfb8d82a::t_6d6d70c56b1ab7 117
+  s_3695f0cfb8d82a::t_490f2fba5d8dbf 169
+  s_3695f0cfb8d82a::t_971c21a7d392f9 70
+  s_3695f0cfb8d82a::t_a33f0a12189b48 96-100
+  s_3695f0cfb8d82a::t_a3e33b365c2cf6 131
+  s_3695f0cfb8d82a::t_1a54afd2264ba1 159
+apps/web/e2e/accessibility-gate.spec.ts
+  s_3695f0cfb8d82a::t_001405bd08c5e4 1-78
+apps/web/e2e/routes.spec.ts
+  s_3695f0cfb8d82a::t_9ffbfbbd2123ca 233,279-280,282
+.gitignore
+  s_3695f0cfb8d82a::t_e5487699d4c8f4 56-63,66
+apps/web/e2e/failed-screen.spec.ts
+  s_3695f0cfb8d82a::t_ff977cc758a1a6 2
+  s_3695f0cfb8d82a::t_9ffbfbbd2123ca 26,83-86
+AGENTS.md
+  s_3695f0cfb8d82a::t_988a2b9a34a033 46
+.claude/skills/browser-suite/SKILL.md
+  s_3695f0cfb8d82a::t_37050faf07713b 38-39
+  s_3695f0cfb8d82a::t_8ef75821f7fa9a 86-89,96-101,103-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "782aeb21deff2b9b6d2431dbc9c6c6b75cfc7780",
+  "prompts": {},
+  "sessions": {
+    "s_3695f0cfb8d82a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "602efdc2-4b25-49db-938f-df6797643aa7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
