@@ -5,17 +5,19 @@ import type { UserPrincipal } from "../kernel/index.ts";
  *
  * ADR 0029 rule 2 — `access` imports only `kernel`.
  *
- * The surface this module is aiming at: the predicate as data, a SQL renderer, a graph
- * renderer, and one shared test corpus asserting both produce identical inclusion sets. Two
- * renderers over one definition is the point; a predicate written twice is a predicate that
- * drifts. **Only the SQL renderer exists today** (T-052), because only one store holds a
- * readable unit; the second renderer arrives with the graph tables (T-053), and the corpus
- * arrives with it: one adapter is a hypothetical seam, and two is a real one.
+ * **One definition, one SQL renderer, and no second.** This module once promised a graph
+ * (Cypher) renderer beside the SQL one, with a corpus holding the two to identical
+ * inclusion sets — that died with the engine: the graph is plain Postgres tables carrying
+ * the same three columns as every other readable unit (ADR 0032 superseding ADR 0023's
+ * engine), so the one renderer below serves `concept_index`, every `index.chunk` row and
+ * the graph's nodes and edges alike, and the graph door's traversal templates interpolate
+ * it on every element of every path (T-053). A predicate written twice is a predicate that
+ * drifts, which is why the second renderer's death is a simplification and not a gap.
  *
- * Tested against columns on the readable unit — `concept_index`, `composition` and every
- * `index.chunk` row carry `published_at`, `sensitivity` and `audience` — never against
- * three fields of a source binding, because a concept and a composition have no binding
- * (ADR 0023).
+ * Tested against columns on the readable unit — `concept_index`, `composition`, every
+ * `index.chunk` row and the graph tables carry `published_at`, `sensitivity` and
+ * `audience` — never against three fields of a source binding, because a concept and a
+ * composition have no binding (ADR 0023).
  */
 
 /**

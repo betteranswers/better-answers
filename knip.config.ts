@@ -54,13 +54,12 @@ const config: KnipConfig = {
 
     "packages/core": {
       ignore: [
-        // The graph and object-store doors (ADR 0029): each is a module whose invariant
-        // is written down and whose implementation has not landed. They are not exported
-        // from the store barrel, because exporting an empty door would widen an interface
-        // for nothing, and they are not deleted, because the invariant is the decision.
-        // Delete a line the day its door gains an implementation — the git door's went
-        // with T-052, which is what a landed door looks like here.
-        "src/store/graph/index.ts",
+        // The object-store door (ADR 0029): a module whose invariant is written down and
+        // whose implementation has not landed. It is not exported from the store barrel,
+        // because exporting an empty door would widen an interface for nothing, and it is
+        // not deleted, because the invariant is the decision. Delete this line the day
+        // the door gains an implementation — the git door's went with T-052 and the graph
+        // door's with T-053, which is what a landed door looks like here.
         "src/store/objects/index.ts",
       ],
     },

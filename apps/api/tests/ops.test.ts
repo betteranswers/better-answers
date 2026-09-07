@@ -88,29 +88,30 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   describe("the slice-owned commands", () => {
-    it.each([
-      "graph-rebuild",
-      "graph-sweep",
-      "graph-counts",
-      "object-store-orphans",
-      "erasure-rehearsal",
-    ])("%s says `not built` — exit 3 — while its slice's tables are absent", async (command) => {
-      const run = await ops(app(), [command, "--workspace", "ws_synthetic", "--wait", "--list"]);
+    it.each(["object-store-orphans", "erasure-rehearsal"])(
+      "%s says `not built` — exit 3 — while its slice's tables are absent",
+      async (command) => {
+        const run = await ops(app(), [command, "--workspace", "ws_synthetic", "--wait", "--list"]);
 
-      expect(run.exitCode).toBe(NOT_BUILT);
-      expect(run.lines.join("\n")).toContain("not built");
-    });
+        expect(run.exitCode).toBe(NOT_BUILT);
+        expect(run.lines.join("\n")).toContain("not built");
+      },
+    );
 
-    it("reconcile-watermark refuses — exit 1 — now its tables are there and the reconciler is not", async () => {
-      // T-052 landed `concept_index` and `bundle_commit`, so *not built* has stopped being
-      // true for this command; the reconciler that reads them is T-056's. That is exactly
-      // the state the third answer is for: the tables exist and this image has no
-      // implementation, which is a refusal a restore must stop on rather than a silence.
-      const run = await ops(app(), ["reconcile-watermark", "--workspace", "ws_synthetic"]);
+    it.each(["reconcile-watermark", "graph-rebuild", "graph-sweep", "graph-counts"])(
+      "%s refuses — exit 1 — now its tables are there and the implementation is not",
+      async (command) => {
+        // T-052 landed `concept_index` and `bundle_commit`, and T-053 the graph tables, so
+        // *not built* has stopped being true for these commands; the reconciler is T-056's
+        // and the graph ops are T-058's. That is exactly the state the third answer is
+        // for: the tables exist and this image has no implementation, which is a refusal a
+        // restore must stop on rather than a silence.
+        const run = await ops(app(), [command, "--workspace", "ws_synthetic", "--wait"]);
 
-      expect(run.exitCode).toBe(1);
-      expect(run.lines.join("\n")).toContain("REFUSED");
-    });
+        expect(run.exitCode).toBe(1);
+        expect(run.lines.join("\n")).toContain("REFUSED");
+      },
+    );
   });
 
   describe("smoke — the platform answers through its interface", () => {

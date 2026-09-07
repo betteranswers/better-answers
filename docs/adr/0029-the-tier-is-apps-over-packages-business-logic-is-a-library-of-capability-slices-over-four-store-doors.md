@@ -41,8 +41,9 @@ packages/core/src/
     postgres/       The handle, the transaction helper, and the RLS session setter
                     (SET LOCAL app.workspace_id, from the Principal).
     git/            The governed write to the per-workspace bare repository (ADR 0024).
-    graph/          The AGE query and delta builder; emits access's Cypher predicate on every
-                    element of every path (ADR 0023).
+    graph/          The delta builder and the recursive-CTE walk templates over the graph
+                    tables; emits access's SQL predicate on every element of every path
+                    (ADR 0032; this line and rule 2 amended 2026-09-07).
     objects/        Object-store access; per-workspace prefix discipline lives here alone.
   llm/              Route resolution per workspace and purpose, and the llm_call ledger.
   audit/            The one append-only ledger: the typed event vocabulary and one write
@@ -88,7 +89,7 @@ packages/core/src/
 ## Import direction — five rules
 
 1. `kernel` imports nothing else in `core`. Everything may import `kernel`.
-2. `access` and `store` import only `kernel`.
+2. ~~`access` and `store` import only `kernel`.~~ `access` imports only `kernel`; `store` imports only `kernel`, except that `store/graph` also imports `access`, because a traversal template must be *unable* to exist without the predicate (struck 2026-09-07; amendment below).
 3. `llm` and `audit` import `kernel`, `access` and `store` — never a slice, never each other.
 4. A slice imports `kernel`, `access`, the store doors, `llm`, `audit`, and **other slices only through their `index.ts`** — never internals, never another slice's `*.store.ts`. The slice graph is acyclic. `erasure` sits at the top; nothing imports it.
 5. Nothing in `core` imports a transport or a transport's dependency. Transports import slice `index.ts` files only.
@@ -139,3 +140,9 @@ The 2026-08-29 consequence above — the tenancy rule demoted from a rule to thi
 ## Amendment — 2026-09-06, the tree gains the slices built since (T-048)
 
 Two slices passed the test the tree states — the capability that owns a set of tables and the invariants over them — without gaining their rows: `workspaces/` (the tenant's lifecycle — provisioning, the picker's cross-workspace read, credentials revocation) and `members/` (groups, their memberships and access requests — T-048's three slices). Both rows are added to the tree above, dated. The table-ownership map already records their tables and ADR 0038 the model they carry; nothing else in this ADR moves.
+
+## Amendment — 2026-09-07, the graph door emits the predicate, so it imports `access` (T-053)
+
+Rule 2 above says `access` and `store` import only `kernel`, while the tree said the graph door "emits `access`'s Cypher predicate on every element of every path" — two sentences that could not both hold, written when the plan was a second (Cypher) renderer. The engine died (ADR 0032) and the second renderer with it: the graph is plain tables carrying the same three visibility columns as every readable unit, so the read predicate has **one definition and one SQL renderer, in `access`**, and the graph door's traversal templates interpolate it (ADR 0023's "the read predicate lives once" and ADR 0032's recursive-CTE templates, built by T-053).
+
+The conflict is resolved in the emission sentence's favour: **the graph door is the one store module that imports `access`**. Rule 2 now reads — `access` imports only `kernel`; `store` imports only `kernel`, except that `store/graph` also imports `access`, because a traversal template must be *unable* to exist without the predicate. The alternative — the rendered clause handed in as a parameter — was rejected as a place a caller forgets, which is the drift ADR 0023 built the one-module rule against. The tree's graph-door line is rewritten above in this commit, sweeping its stale AGE/Cypher wording. `access` still imports only `kernel`, no store file imports another store file, and everything else in this ADR stands.

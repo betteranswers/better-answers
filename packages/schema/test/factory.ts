@@ -105,6 +105,22 @@ export type TestData = {
   conceptVerification(
     overrides?: Partial<InsertInput<"conceptVerification">>,
   ): Promise<Row<"conceptVerification">>;
+  /** A workspace's live-generation row; creates its own workspace unless one is named. */
+  graphGeneration(
+    overrides?: Partial<InsertInput<"graphGeneration">>,
+  ): Promise<Row<"graphGeneration">>;
+  /**
+   * A graph node in the workspace's live generation (created at 1 when absent), published
+   * and open to everyone, so a seeded node is one a walk can reach; a suite testing what
+   * is withheld names `sensitivity: "Restricted"` or `publishedAt: null`, and one seeding
+   * a source entity names `gen: null` with a prefixed label.
+   */
+  graphNode(overrides?: Partial<InsertInput<"graphNode">>): Promise<Row<"graphNode">>;
+  /**
+   * A graph edge in the live generation; creates its two endpoint nodes unless the uids
+   * are named, and carries the link columns only when it is a `LINKS_TO`.
+   */
+  graphEdge(overrides?: Partial<InsertInput<"graphEdge">>): Promise<Row<"graphEdge">>;
 };
 
 /** A hash of `length` hex characters, in shape and unique per call: a stand-in, never a real digest. */
@@ -430,6 +446,76 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const graphGeneration: TestData["graphGeneration"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "graphGeneration", { liveGen: 1, ...overrides, workspaceId });
+  };
+
+  /** The workspace's live generation, read or created — what a seeded row stamps by default. */
+  const liveGenFor = async (workspaceId: string): Promise<number> => {
+    const found = await client.query<{ live_gen: number }>(
+      "SELECT live_gen FROM graph_generation WHERE workspace_id = $1",
+      [workspaceId],
+    );
+    const live = found.rows[0]?.live_gen;
+    return live ?? (await graphGeneration({ workspaceId })).liveGen;
+  };
+
+  /** `gen` as a seeded row carries it: an explicit value or null stands, else the live one. */
+  const genFor = async (
+    overrides: { readonly gen?: number | null; readonly workspaceId?: string },
+    workspaceId: string,
+  ): Promise<number | null> =>
+    Object.hasOwn(overrides, "gen") ? (overrides.gen ?? null) : liveGenFor(workspaceId);
+
+  const graphNode: TestData["graphNode"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const gen = await genFor(overrides, workspaceId);
+    return insertRow(client, "graphNode", {
+      uid: conceptIriOf(ulid()),
+      label: "Concept",
+      kind: "Policy",
+      publishedAt: new Date(),
+      sensitivity: "Internal",
+      audience: AUDIENCE_EVERYONE,
+      ...overrides,
+      gen,
+      workspaceId,
+    });
+  };
+
+  const graphEdge: TestData["graphEdge"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const gen = await genFor(overrides, workspaceId);
+    const fromUid = overrides.fromUid ?? (await graphNode({ workspaceId, gen })).uid;
+    const toUid = overrides.toUid ?? (await graphNode({ workspaceId, gen })).uid;
+    const label = overrides.label ?? "LINKS_TO";
+    // The link columns are LINKS_TO's alone (graph_edge_links_to_check); a named edge
+    // seeded with defaults would otherwise be refused by the row it was meant to arrange.
+    const link =
+      label === "LINKS_TO"
+        ? {
+            fromKind: "Policy",
+            toKind: "Policy",
+            section: "Details",
+            sentence: "One policy rests on another.",
+          }
+        : { fromKind: null, toKind: null, section: null, sentence: null };
+    return insertRow(client, "graphEdge", {
+      uid: `links_to:${ulid()}`,
+      publishedAt: new Date(),
+      sensitivity: "Internal",
+      audience: AUDIENCE_EVERYONE,
+      ...link,
+      ...overrides,
+      label,
+      fromUid,
+      toUid,
+      gen,
+      workspaceId,
+    });
+  };
+
   return {
     workspace,
     user,
@@ -450,5 +536,8 @@ export const testData = (client: pg.PoolClient): TestData => {
     bundleCommit,
     evidence,
     conceptVerification,
+    graphGeneration,
+    graphNode,
+    graphEdge,
   };
 };

@@ -1,5 +1,9 @@
 import { type MigratedPostgres, startMigratedPostgres } from "@better-answers/schema/testing";
+import type pg from "pg";
 import { afterAll, beforeAll } from "vitest";
+
+import type { UserPrincipal } from "../src/kernel/index.ts";
+import { openPostgres, withPrincipal, type Tx } from "../src/store/postgres/index.ts";
 
 /**
  * One migrated Postgres for a suite, started once and stopped once — the arrange block every
@@ -28,4 +32,24 @@ export const postgresForSuite = (): (() => MigratedPostgres) => {
     if (db === undefined) throw new Error("the suite's Postgres was read before it started");
     return db;
   };
+};
+
+/**
+ * Run a read as this person, inside one transaction, the way a transport would — resolve
+ * the Principal at the boundary and hand `work` the transaction it was resolved in. Shared
+ * by every suite that reads as somebody, so which door a read goes through is one fact
+ * here and not a copy per suite.
+ */
+export const readingAs = async <T>(
+  pool: pg.Pool,
+  reader: { readonly workspaceId: string; readonly userId: string },
+  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+): Promise<T> => {
+  const read = await withPrincipal(
+    openPostgres(pool),
+    { workspaceId: reader.workspaceId, userId: reader.userId, issuedAt: new Date() },
+    work,
+  );
+  if (!read.ok) throw new Error(`the principal did not resolve: ${read.error}`);
+  return read.value;
 };

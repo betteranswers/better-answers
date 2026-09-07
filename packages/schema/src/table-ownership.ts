@@ -16,9 +16,10 @@
  * `packages/core/src/`: `workspaces`, `sources`. `llm` is written the same way without
  * being a slice (ADR 0029 rule 3: `llm` and `audit` import `kernel`, `access` and
  * `store`, never a slice and never each other), because the name still opens a
- * directory. Two owners are not under `packages/core/src/` at all, and each is written
- * as the repository path of the module it is — a form no directory name there can take,
- * so the two kinds can never be confused:
+ * directory. Three owners are not a directory name under `packages/core/src/` — the
+ * identity provider lives outside it, and the two doors sit a level deeper — so each is
+ * written as the repository path of the module it is, a form no directory name there can
+ * take, and the two kinds can never be confused:
  *
  * - `apps/api/src/auth` — the **identity provider**. The sixteen tables of
  *   `IDENTITY_SET` are Better Auth's own: the library declares their shapes, writes
@@ -30,15 +31,10 @@
  *   the limiter's own rows, read and written by the door's fixed-window helpers; the
  *   door is explicitly not a slice (ADR 0029), and the alternative — hanging them off
  *   `access`, which imports only `kernel` and touches no store — would be a fiction.
- *
- * **What is recorded here in words, because the record cannot hold it.** The both-ways
- * test refuses an entry naming a table `src/` has not declared, and the owner test
- * refuses a name that is not a directory today. So this fact, settled by the T-063 spec,
- * waits for the ticket that declares its table:
- *
- * - The two graph tables — the concepts slice's (ADR 0023, ADR 0032). The concept,
- *   bundle-commit, evidence and verification tables landed with T-052 and are entries
- *   below rather than a sentence here.
+ * - `packages/core/src/store/graph` — the **graph door**: the delta builder and the
+ *   traversal templates, the one graph query module in this tier (ADR 0032). It writes
+ *   the graph tables inside the governed write's transaction and is not a slice, so its
+ *   access to the concepts slice's tables is recorded below rather than owned.
  *
  * **The lint rule this map is the written trigger for** (ADR 0029; out of scope in the
  * T-063 spec, deliberately): *a store file imports no slice's table*. Build it when a
@@ -49,13 +45,14 @@
 
 export const IDENTITY_PROVIDER = "apps/api/src/auth";
 export const POSTGRES_DOOR = "packages/core/src/store/postgres";
+export const GRAPH_DOOR = "packages/core/src/store/graph";
 
 /**
- * The two owners that live outside `packages/core/src/` and so are written as paths. The
- * owner test admits exactly these two and holds each to a directory that exists; every
- * other owner it holds to a directory under `packages/core/src/`.
+ * The owners that are not a directory name under `packages/core/src/` and so are written
+ * as paths. The owner test admits exactly these and holds each to a directory that
+ * exists; every other owner it holds to a directory under `packages/core/src/`.
  */
-export const OWNERS_OUTSIDE_CORE = [IDENTITY_PROVIDER, POSTGRES_DOOR] as const;
+export const OWNERS_OUTSIDE_CORE = [IDENTITY_PROVIDER, POSTGRES_DOOR, GRAPH_DOOR] as const;
 
 /**
  * The owner of every table `src/` declares — written out rather than derived, so a
@@ -107,6 +104,14 @@ export const TABLE_OWNERS = {
   "public.bundle_commit": "concepts",
   "public.evidence": "concepts",
   "public.concept_verification": "concepts",
+
+  // The graph (ADR 0023, ADR 0032): the concepts slice's, because the governed write's
+  // transaction is where the bundle-and-record delta lands — the act that owns the
+  // transaction owns the invariants over these rows. The graph door writes them for it,
+  // recorded below.
+  "public.graph_generation": "concepts",
+  "public.graph_node": "concepts",
+  "public.graph_edge": "concepts",
 } satisfies Record<string, string>;
 
 /** A table the schema package declares: every key of the map, and nothing else. */
@@ -218,5 +223,33 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "write",
     reason:
       "Approving an access request mints the invitation row directly, in the same transaction as the decision — a direct row write through the identity-write seam, never Better Auth's endpoint path, so T-004's two invitation fences stand until T-027 ships the accept page (ADR 0038).",
+  },
+  {
+    table: "public.graph_generation",
+    by: GRAPH_DOOR,
+    access: "read and write",
+    reason:
+      "The delta builder creates the live-generation row on a workspace's first delta and binds it on every write; the traversal templates bind it on every walk, so a rebuild's flip is one row update every read sees at once (ADR 0023, ADR 0032).",
+  },
+  {
+    table: "public.graph_node",
+    by: GRAPH_DOOR,
+    access: "read and write",
+    reason:
+      "The delta builder upserts the bundle-and-record nodes inside the governed write's transaction, and the traversal templates read them with the predicate on every element of every path (ADR 0023, ADR 0032).",
+  },
+  {
+    table: "public.graph_edge",
+    by: GRAPH_DOOR,
+    access: "read and write",
+    reason:
+      "The delta builder replaces a concept's outgoing edges inside the governed write's transaction, and the traversal templates read them with the predicate on every element of every path (ADR 0023, ADR 0032).",
+  },
+  {
+    table: "public.concept_index",
+    by: GRAPH_DOOR,
+    access: "read",
+    reason:
+      "The delta builder resolves a link's target to a concept and reads its kind off the index inside the act's own transaction, and a newly landed concept's linkers are found there — the map is derived from the rows the same transaction just wrote (ADR 0023).",
   },
 ] as const satisfies readonly CrossOwnerAccess[];

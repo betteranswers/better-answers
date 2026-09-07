@@ -14,8 +14,13 @@ import { journalEntries, journalMigrationFiles } from "../src/journal.ts";
 
 const CUSTOM_MARKER = "-- Custom migration (hand-written SQL; ADR 0032).";
 // Any mention of the quoted schema at all — `"index".chunk` and `CREATE SCHEMA
-// "index"` alike — and the graph tables by name.
-const FORBIDDEN_IN_GENERATED = [/"index"/u, /\bgraph_node\b/u, /\bgraph_edge\b/u];
+// "index"` alike — and the graph tables by name, the live-generation row's included.
+const FORBIDDEN_IN_GENERATED = [
+  /"index"/u,
+  /\bgraph_node\b/u,
+  /\bgraph_edge\b/u,
+  /\bgraph_generation\b/u,
+];
 
 describe("the migration journal", () => {
   it("has a file for every entry, and no .sql file the journal does not know", () => {

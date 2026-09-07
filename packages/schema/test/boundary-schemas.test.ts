@@ -263,6 +263,71 @@ const acceptedRows = {
       origin: "imported",
     },
   ],
+  graphGeneration: [{ workspaceId: WS_ID, liveGen: 1 }],
+  // One row per partition (ADR 0032): a bundle-and-record node in the live generation,
+  // and a source entity, which carries no generation and wears the prefixed label.
+  graphNode: [
+    {
+      workspaceId: WS_ID,
+      gen: 1,
+      uid: CONCEPT_IRI,
+      label: "Concept",
+      kind: "Policy",
+      publishedAt: NOW,
+      sensitivity: "Internal",
+      audience: "everyone",
+    },
+    {
+      workspaceId: WS_ID,
+      gen: null,
+      uid: "01J6NNNNNNNNNNNNNNNNNNNNNN:person:abc123",
+      label: "source-entity:Person",
+      sensitivity: "Restricted",
+      audience: "everyone",
+    },
+  ],
+  // A LINKS_TO with the four link columns; a named edge, which may carry none of them; and
+  // the source-entity partition's own closed-label edge — `IS_CONCEPT` at `gen` NULL (ADR
+  // 0026's amendment), which the edge schemas must keep accepting.
+  graphEdge: [
+    {
+      workspaceId: WS_ID,
+      gen: 1,
+      uid: `links_to:${CONCEPT_IRI}:0`,
+      label: "LINKS_TO",
+      fromUid: CONCEPT_IRI,
+      toUid: "https://better-answers.com/c/01J6RRRRRRRRRRRRRRRRRRRRRR",
+      fromKind: "Policy",
+      toKind: "Product",
+      section: "Details",
+      sentence: "The expenses policy applies per product tier.",
+      publishedAt: NOW,
+      sensitivity: "Internal",
+      audience: "everyone",
+    },
+    {
+      workspaceId: WS_ID,
+      gen: 1,
+      uid: `supersedes:${CONCEPT_IRI}`,
+      label: "SUPERSEDES",
+      fromUid: CONCEPT_IRI,
+      toUid: "https://better-answers.com/c/01J6SSSSSSSSSSSSSSSSSSSSSS",
+      publishedAt: NOW,
+      sensitivity: "Internal",
+      audience: "everyone",
+    },
+    {
+      workspaceId: WS_ID,
+      gen: null,
+      uid: "is_concept:01J6NNNNNNNNNNNNNNNNNNNNNN:person:abc123",
+      label: "IS_CONCEPT",
+      fromUid: "01J6NNNNNNNNNNNNNNNNNNNNNN:person:abc123",
+      toUid: CONCEPT_IRI,
+      publishedAt: NOW,
+      sensitivity: "Restricted",
+      audience: "everyone",
+    },
+  ],
 } as const;
 
 const registryNames = Object.keys(boundarySchemas) as (keyof typeof boundarySchemas)[];
@@ -394,6 +459,11 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "bundleCommit",
         "evidence",
         "conceptVerification",
+        // The generation row before the rows that stamp it — not a key, but the reading
+        // order a walk binds — and edges after the nodes they run between.
+        "graphGeneration",
+        "graphNode",
+        "graphEdge",
         "chunk",
       ] as const;
       expect(insertOrder.toSorted()).toEqual(registryNames.toSorted());
@@ -477,6 +547,24 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
         embedding: Array.from({ length: EMBEDDING_DIMENSIONS - 1 }, () => 0.5),
       },
       { ...acceptedRows.chunk[0], sensitivity: "Secret" },
+    ],
+    // The graph's refusals: a generation before the first, a label outside the closed set
+    // that wears no source-entity prefix, a class outside the three — and the label family
+    // parted from its partition: a source-entity label inside a generation on either
+    // table, and a closed node label carrying none.
+    graphGeneration: [{ ...acceptedRows.graphGeneration[0], liveGen: 0 }],
+    graphNode: [
+      { ...acceptedRows.graphNode[0], label: "Widget" },
+      { ...acceptedRows.graphNode[0], sensitivity: "Secret" },
+      { ...acceptedRows.graphNode[0], gen: 0 },
+      { ...acceptedRows.graphNode[0], gen: null },
+      { ...acceptedRows.graphNode[1], gen: 1 },
+    ],
+    graphEdge: [
+      { ...acceptedRows.graphEdge[0], label: "RELATES_TO" },
+      { ...acceptedRows.graphEdge[0], sensitivity: "Secret" },
+      { ...acceptedRows.graphEdge[0], fromUid: "   " },
+      { ...acceptedRows.graphEdge[1], label: "source-entity:mentions" },
     ],
   } as const;
 

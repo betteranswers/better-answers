@@ -21,6 +21,7 @@ import {
   withRepositoryLock,
   type GitDoor,
 } from "@better-answers/core/store/git";
+import { walkFrom } from "@better-answers/core/store/graph";
 import {
   openPostgres,
   type PostgresDoor,
@@ -37,7 +38,7 @@ import {
   removeRepository,
 } from "./bundle.ts";
 import { bootstrap, seedPerson } from "./platform.ts";
-import { postgresForSuite } from "./suite-postgres.ts";
+import { postgresForSuite, readingAs } from "./suite-postgres.ts";
 
 /**
  * The governed write through the concepts slice's entry point (`[TEST1]`), against real
@@ -177,7 +178,9 @@ const rowsFor = async (workspaceId: string) => {
             (SELECT count(*) FROM concept_index WHERE workspace_id = $1) AS concepts,
             (SELECT count(*) FROM bundle_commit WHERE workspace_id = $1) AS commits,
             (SELECT count(*) FROM evidence WHERE workspace_id = $1) AS evidence,
-            (SELECT count(*) FROM audit_event WHERE workspace_id = $1) AS events`,
+            (SELECT count(*) FROM audit_event WHERE workspace_id = $1) AS events,
+            (SELECT count(*) FROM graph_node WHERE workspace_id = $1) AS nodes,
+            (SELECT count(*) FROM graph_edge WHERE workspace_id = $1) AS edges`,
     [workspaceId],
   );
   return counted.rows[0];
@@ -193,18 +196,10 @@ const recordedCommits = async (workspaceId: string): Promise<readonly string[]> 
 };
 
 /** Run a read as this person, inside one transaction, the way a transport would. */
-const reading = async <T>(
+const reading = <T>(
   principal: UserPrincipal,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<T> => {
-  const read = await withPrincipal(
-    openPostgres(db().runtimePool),
-    { workspaceId: principal.workspaceId, userId: principal.userId, issuedAt: new Date() },
-    work,
-  );
-  if (!read.ok) throw new Error(`the principal did not resolve: ${read.error}`);
-  return read.value;
-};
+): Promise<T> => readingAs(db().runtimePool, principal, work);
 
 describe("a governed write", () => {
   it("lands one commit with the person as author and the platform bot as committer", async () => {
@@ -295,6 +290,10 @@ describe("a governed write", () => {
       evidence: "2",
       // The workspace's provisioning wrote the first, this act the second.
       events: "2",
+      // The bundle-and-record delta, in the same transaction: the concept's node, and no
+      // edge because nothing here links to a concept (ADR 0023).
+      nodes: "1",
+      edges: "0",
     });
     const row = await db().pool.query<Record<string, unknown>>(
       "SELECT iri, path, kind, title, content_hash, commit_sha, status, sensitivity, audience FROM concept_index WHERE workspace_id = $1",
@@ -358,10 +357,16 @@ describe("a governed write", () => {
     const absolute = contentHashOf(cite("/knowledge/handbook.md"), body, path);
     const relative = contentHashOf(cite("./../handbook.md"), body, path);
     const bare = contentHashOf(cite("../handbook.md"), body, path);
+    // An absolute spelling with dot segments is the same place: the normaliser runs on
+    // absolute paths too, or two spellings of one citation would hash apart.
+    const dotted = contentHashOf(cite("/knowledge/policies/../handbook.md"), body, path);
     const swapped = contentHashOf(cite("/knowledge/other.md"), body, path);
 
-    expect([relative, bare]).toEqual([absolute, absolute]);
+    expect([relative, bare, dotted]).toEqual([absolute, absolute, absolute]);
     expect(swapped).not.toBe(absolute);
+    // A protocol-relative resource is external, like any URL: never folded into the
+    // bundle's paths, so it cannot collide with a local concept's citation.
+    expect(contentHashOf(cite("//knowledge/handbook.md"), body, path)).not.toBe(absolute);
     // Padding is not part of what a file cites, in **either** form: an asymmetry there would
     // give two spellings of one citation two hashes, and a concept would un-check itself over
     // whitespace.
@@ -398,6 +403,351 @@ describe("a governed write", () => {
       [scenario.workspaceId],
     );
     expect(parents.rows.map((row) => row.parent_sha)).toEqual([null, shas[0], shas[1]]);
+  });
+});
+
+/**
+ * The bundle-and-record graph delta joins the act's transaction (ADR 0023, ADR 0032): an
+ * edit's map change lands with its rows, in the live generation, and the map is never
+ * behind for an edit — no watermark, no debounce, no *updating* phrase. The rows are
+ * asserted as the superuser, and the walk through the graph door is the reader's proof.
+ */
+describe("the map a governed write leaves behind", () => {
+  /**
+   * A stable Product, then a stable concept whose body `write` renders over it — the
+   * two-concept arrange the link-derivation tests share, so which act made which commit
+   * is one fact here and a body per test.
+   */
+  const linkedPair = async (
+    scenario: Scenario,
+    write: (product: WriteConceptInput, filename: string) => Partial<WriteConceptInput>,
+  ) => {
+    const product = writeFor({ kind: "Product", status: "stable" });
+    const first = await landed(scenario, product);
+    const policy = writeFor({
+      status: "stable",
+      expectedHead: first.sha,
+      ...write(product, product.path.split("/").at(-1) ?? ""),
+    });
+    await landed(scenario, policy);
+    return { product, policy };
+  };
+
+  it("maps the concept and its links in the transaction that committed them", async () => {
+    const scenario = await arrange();
+    const { product, policy } = await linkedPair(scenario, (_product, filename) => ({
+      kind: "Policy",
+      body: `# Details\n\nSee [the product](./${filename}) for tiers.`,
+    }));
+
+    const nodes = await db().pool.query(
+      "SELECT uid, label, kind, gen, sensitivity, audience FROM graph_node WHERE workspace_id = $1 ORDER BY kind",
+      [scenario.workspaceId],
+    );
+    expect(nodes.rows).toEqual([
+      {
+        uid: policy.iri,
+        label: "Concept",
+        kind: "Policy",
+        gen: 1,
+        sensitivity: "Internal",
+        audience: "everyone",
+      },
+      {
+        uid: product.iri,
+        label: "Concept",
+        kind: "Product",
+        gen: 1,
+        sensitivity: "Internal",
+        audience: "everyone",
+      },
+    ]);
+    // The link as ADR 0026 holds it: the two kinds, the section the link sits under and
+    // the sentence around it, flattened to what a reader would say.
+    const edges = await db().pool.query(
+      "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM graph_edge WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(edges.rows).toEqual([
+      {
+        uid: `links_to:${policy.iri}:0`,
+        label: "LINKS_TO",
+        from_uid: policy.iri,
+        to_uid: product.iri,
+        from_kind: "Policy",
+        to_kind: "Product",
+        section: "Details",
+        sentence: "See the product for tiers.",
+      },
+    ]);
+    // And the map answers at once: a Viewer's walk from the policy reaches the product.
+    const steps = await reading(scenario.viewer, (principal, tx) =>
+      walkFrom(principal, tx, policy.iri),
+    );
+    expect(steps.map((step) => ({ uid: step.uid, depth: step.depth }))).toEqual([
+      { uid: policy.iri, depth: 0 },
+      { uid: product.iri, depth: 1 },
+    ]);
+  });
+
+  it("maps a link to not-yet-written knowledge when that knowledge lands", async () => {
+    const scenario = await arrange();
+    // A path link to a concept nobody has written: legal (docs/okf-v02.md), and no edge
+    // yet, because a path is not an identity until the index holds it.
+    const author = writeFor({
+      status: "stable",
+      body: "See [travel](./travel.md) once it is written.",
+    });
+    const first = await landed(scenario, author);
+    expect(await rowsFor(scenario.workspaceId)).toMatchObject({ edges: "0" });
+
+    const travel = writeFor({
+      kind: "Guideline",
+      status: "stable",
+      path: "knowledge/travel.md",
+      expectedHead: first.sha,
+    });
+    await landed(scenario, travel);
+
+    // The landing is what resolves it: the author's edges are re-derived in the same act,
+    // with the target's kind read off the index the transaction just wrote.
+    const edges = await db().pool.query(
+      "SELECT from_uid, to_uid, to_kind FROM graph_edge WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(edges.rows).toEqual([
+      { from_uid: author.iri, to_uid: travel.iri, to_kind: "Guideline" },
+    ]);
+  });
+
+  it("reads a link however the markdown writes it — inline, by reference, shortcut or autolink", async () => {
+    const scenario = await arrange();
+    // Three references to one concept, three forms; the definition line's own bracket is
+    // no link. Ordinals count every matched reference in document order — the skipped
+    // definition included — so a form change never renumbers a neighbour.
+    const { product, policy } = await linkedPair(scenario, (target, filename) => ({
+      body: [
+        "# Sources",
+        "",
+        `See [the product][target], [target] and <${target.iri}>.`,
+        "",
+        `[target]: ./${filename}`,
+      ].join("\n"),
+    }));
+
+    const edges = await db().pool.query(
+      "SELECT uid, to_uid, to_kind, section, sentence FROM graph_edge WHERE workspace_id = $1 ORDER BY uid",
+      [scenario.workspaceId],
+    );
+    const sentence = `See the product, target and ${product.iri}.`;
+    expect(edges.rows).toEqual([
+      {
+        uid: `links_to:${policy.iri}:0`,
+        to_uid: product.iri,
+        to_kind: "Product",
+        section: "Sources",
+        sentence,
+      },
+      {
+        uid: `links_to:${policy.iri}:1`,
+        to_uid: product.iri,
+        to_kind: "Product",
+        section: "Sources",
+        sentence,
+      },
+      {
+        uid: `links_to:${policy.iri}:2`,
+        to_uid: product.iri,
+        to_kind: "Product",
+        section: "Sources",
+        sentence,
+      },
+    ]);
+  });
+
+  it("keeps images, quoted code and protocol-relative targets off the map a reader walks", async () => {
+    const scenario = await arrange();
+    // An image is a transclusion, code is quotation and `//host/…` points outside the
+    // bundle — none asserts between concepts. The image still holds its ordinal —
+    // removing the `!` later renumbers no neighbour — while code is blanked before the
+    // scan and holds none. The fence closes on a longer run of its own character, as
+    // CommonMark allows.
+    const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
+      body: [
+        "# Details",
+        "",
+        `![the product](./${filename}) shows the tiers; \`[a link](./${filename})\` is how one is written.`,
+        "",
+        "```md",
+        `A fenced example: [the product](./${filename}).`,
+        "`````",
+        "",
+        `Only [the product](./${filename}) itself maps.`,
+        "",
+        `A [protocol-relative](//knowledge/${filename}) target is external.`,
+      ].join("\n"),
+    }));
+
+    const edges = await db().pool.query(
+      "SELECT uid, to_uid, section, sentence FROM graph_edge WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(edges.rows).toEqual([
+      {
+        uid: `links_to:${policy.iri}:1`,
+        to_uid: product.iri,
+        section: "Details",
+        sentence: "Only the product itself maps.",
+      },
+    ]);
+  });
+
+  it("keeps mapping an Editor's links past long unmatched backtick runs in the body", async () => {
+    const scenario = await arrange();
+    // The pairing the span scanner implements, against tenant input a backtracking regex
+    // would choke on: an unpaired run is literal text, and a double-backtick span holding
+    // a single backtick closes at the next run of exactly its own length. The middle
+    // paragraph is the shape that once made the pairing rescan — many distinct unpaired
+    // lengths followed by many paired short runs.
+    const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
+      body: [
+        "# Details",
+        "",
+        `A crafted ${"`".repeat(2000)} run is literal text, not a span.`,
+        "",
+        `Then ${Array.from({ length: 60 }, (_, width) => "`".repeat(width + 3)).join(" x ")} never pair, while ${"`a` ".repeat(400)}all do.`,
+        "",
+        `And \`\`a span with \` inside\`\` still hides its code: [the product](./${filename}) maps.`,
+      ].join("\n"),
+    }));
+
+    const edges = await db().pool.query(
+      "SELECT uid, to_uid, sentence FROM graph_edge WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(edges.rows).toEqual([
+      {
+        uid: `links_to:${policy.iri}:0`,
+        to_uid: product.iri,
+        sentence: "And still hides its code: the product maps.",
+      },
+    ]);
+  });
+
+  it("backfills the map a reader walks when an edit lands on a concept the map had lost", async () => {
+    const scenario = await arrange();
+    const product = writeFor({ kind: "Product", status: "stable" });
+    const first = await landed(scenario, product);
+    const filename = product.path.split("/").at(-1) ?? "";
+    const policy = writeFor({
+      status: "stable",
+      body: `See [the product](./${filename}) for tiers.`,
+      expectedHead: first.sha,
+    });
+    const second = await landed(scenario, policy);
+
+    // The derived rows vanish while the index stands — the shape of a workspace whose
+    // concepts predate the graph tables, or of a restore that carried the records and not
+    // the derived store.
+    await db().pool.query("DELETE FROM graph_edge WHERE workspace_id = $1", [scenario.workspaceId]);
+    await db().pool.query("DELETE FROM graph_node WHERE workspace_id = $1", [scenario.workspaceId]);
+
+    // A re-write of the *cited* concept: newness is the map's own fact, not the index's,
+    // so the policy that names it is re-derived — inbound path links included.
+    await landed(scenario, { ...product, expectedHead: second.sha });
+
+    const edges = await db().pool.query(
+      "SELECT from_uid, to_uid FROM graph_edge WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(edges.rows).toEqual([{ from_uid: policy.iri, to_uid: product.iri }]);
+  });
+
+  it("derives a succession over a deprecated concept of its kind, and a derivation over anything else", async () => {
+    const scenario = await arrange();
+    // Two cited concepts, one difference: only the first is deprecated. ADR 0019's rule —
+    // SUPERSEDES when a sources[].resource resolves to a status: deprecated concept of
+    // the same type, else DERIVED_FROM — is the whole distinction.
+    const superseded = writeFor({ status: "deprecated" });
+    const first = await landed(scenario, superseded);
+    const stillCurrent = writeFor({ status: "stable", expectedHead: first.sha });
+    const second = await landed(scenario, stillCurrent);
+
+    const successor = writeFor({
+      status: "stable",
+      frontmatter: {
+        title: "Expenses v2",
+        type: "Policy",
+        sources: [{ resource: superseded.iri }, { resource: stillCurrent.iri }],
+      },
+      expectedHead: second.sha,
+    });
+    await landed(scenario, successor);
+
+    const edges = await db().pool.query(
+      "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM graph_edge WHERE workspace_id = $1 ORDER BY uid",
+      [scenario.workspaceId],
+    );
+    // One `lineage:` uid prefix for both labels, so a later relabel moves no key; the
+    // lineage columns stay empty — the link columns are LINKS_TO's alone.
+    expect(edges.rows).toEqual([
+      {
+        uid: `lineage:${successor.iri}:0`,
+        label: "SUPERSEDES",
+        from_uid: successor.iri,
+        to_uid: superseded.iri,
+        from_kind: null,
+        to_kind: null,
+        section: null,
+        sentence: null,
+      },
+      {
+        uid: `lineage:${successor.iri}:1`,
+        label: "DERIVED_FROM",
+        from_uid: successor.iri,
+        to_uid: stillCurrent.iri,
+        from_kind: null,
+        to_kind: null,
+        section: null,
+        sentence: null,
+      },
+    ]);
+  });
+
+  it("relabels a successor's lineage when the concept it cites is deprecated", async () => {
+    const scenario = await arrange();
+    const cited = writeFor({ status: "stable" });
+    const first = await landed(scenario, cited);
+    const successor = writeFor({
+      status: "stable",
+      frontmatter: { title: "Expenses v2", type: "Policy", sources: [{ resource: cited.iri }] },
+      expectedHead: first.sha,
+    });
+    const second = await landed(scenario, successor);
+
+    const lineageLabel = async (): Promise<readonly string[]> => {
+      const rows = await db().pool.query<{ label: string }>(
+        "SELECT label FROM graph_edge WHERE workspace_id = $1 AND from_uid = $2",
+        [scenario.workspaceId, successor.iri],
+      );
+      return rows.rows.map((row) => row.label);
+    };
+    // Cited while current: a derivation.
+    expect(await lineageLabel()).toEqual(["DERIVED_FROM"]);
+
+    // The deprecation commit — a re-write of the cited concept alone — revisits its
+    // inbound lineage (ADR 0019), so the successor's edge flips with no edit to it.
+    await landed(
+      scenario,
+      writeFor({
+        iri: cited.iri,
+        mergeKey: cited.mergeKey,
+        path: cited.path,
+        status: "deprecated",
+        expectedHead: second.sha,
+      }),
+    );
+    expect(await lineageLabel()).toEqual(["SUPERSEDES"]);
   });
 });
 
