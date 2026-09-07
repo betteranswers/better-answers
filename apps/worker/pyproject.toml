@@ -61,7 +61,12 @@ addopts = "-q --strict-markers"
 # An expected failure that passes is a bug that was fixed and an `xfail` that outlived it.
 xfail_strict = true
 
-# Mutation testing, weekly on a schedule (.github/workflows/mutation.yml).
+# Mutation testing, parked rather than scheduled: no job in .github/workflows/mutation.yml
+# runs this today, and `uv run --frozen mutmut run` is the way to run it by hand. The tier's
+# mutatable source is a few dozen lines of configuration and logging plus a schema view
+# generated from the migration journal, so a score now would measure the generator. The
+# settings stay because `T-006` is what gives the worker behaviour worth mutating, and the
+# leg rejoins the schedule with it.
 # `check.py` is the check runner script, not tier behaviour — the same reason `apps/api`
 # leaves `main.ts` and `migrate.ts` out of Stryker's `mutate`.
 [tool.mutmut]

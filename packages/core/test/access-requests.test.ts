@@ -17,7 +17,7 @@ import {
 import { openPostgres, type Tx, withPrincipal } from "../src/store/postgres/index.ts";
 import { provisionWorkspace } from "../src/workspaces/index.ts";
 import { bootstrap, seedPerson } from "./platform.ts";
-import { asSliceRelative, coreSourceFiles } from "./source-tree.ts";
+import { asSliceRelative, coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
 /**
@@ -532,21 +532,24 @@ describe("who may decide", () => {
 });
 
 describe("the actor-naming door", () => {
-  it("is called by the request act and by nothing else in the tree", async () => {
-    // `[AUDIT4]`: the second door takes an explicit actor, and the *access request* is its
-    // one caller — the act whose maker holds no Principal. A second caller would be a second
-    // place a row could be booked to somebody other than the person making the call, which
-    // is the whole thing the door's type exists to stop; the count is held here because the
-    // criterion is this ticket's.
-    const call = /\brecordFor\(/;
-    // Proved to bite before its silence is read as innocence — and proved to leave the
-    // door's own declaration alone, which is `export const recordFor = <A…>(` and no call.
-    expect(call.test("await recordFor(platform, tx, event);")).toBe(true);
-    expect(call.test("export const recordFor = <A extends Act>(")).toBe(false);
-    expect(call.test("import { record } from '../audit/index.ts';")).toBe(false);
+  it.skipIf(sourceTreeIsInstrumented())(
+    "is called by the request act and by nothing else in the tree",
+    async () => {
+      // `[AUDIT4]`: the second door takes an explicit actor, and the *access request* is its
+      // one caller — the act whose maker holds no Principal. A second caller would be a second
+      // place a row could be booked to somebody other than the person making the call, which
+      // is the whole thing the door's type exists to stop; the count is held here because the
+      // criterion is this ticket's.
+      const call = /\brecordFor\(/;
+      // Proved to bite before its silence is read as innocence — and proved to leave the
+      // door's own declaration alone, which is `export const recordFor = <A…>(` and no call.
+      expect(call.test("await recordFor(platform, tx, event);")).toBe(true);
+      expect(call.test("export const recordFor = <A extends Act>(")).toBe(false);
+      expect(call.test("import { record } from '../audit/index.ts';")).toBe(false);
 
-    const callers = coreSourceFiles().filter((file) => call.test(readFileSync(file, "utf8")));
+      const callers = coreSourceFiles().filter((file) => call.test(readFileSync(file, "utf8")));
 
-    expect(asSliceRelative(callers).toSorted()).toEqual(["members/requests.ts"]);
-  });
+      expect(asSliceRelative(callers).toSorted()).toEqual(["members/requests.ts"]);
+    },
+  );
 });

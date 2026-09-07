@@ -21,6 +21,18 @@ export default {
   inPlace: true,
   tempDirName: "reports/mutation/.stryker-tmp",
 
+  // Incremental mode: each mutant's result is stored and reused next week for every file
+  // whose source and covering tests are unchanged. Without it this leg pays a Postgres
+  // container start for every mutant in the tier, changed or not, which is the cost that
+  // bounds it. The workflow restores and saves the file with actions/cache, and nothing
+  // else carries it — `reports/` is git-ignored.
+  incremental: true,
+  // Under `reports/` so the restore lands in a git-ignored directory and leaves the working
+  // tree clean, and beside the run's other output rather than inside `tempDirName`: the
+  // temp directory and its backup are deleted after a successful run, so an incremental
+  // file kept there would be thrown away by the very run that wrote it.
+  incrementalFile: "reports/mutation/stryker-incremental.json",
+
   reporters: ["progress", "clear-text", "json"],
   jsonReporter: { fileName: "reports/mutation/mutation.json" },
 

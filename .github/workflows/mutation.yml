@@ -1,11 +1,27 @@
-# Mutation testing on a schedule: Stryker for apps/api and apps/web, mutmut for apps/worker.
+# Mutation testing on a schedule: Stryker for apps/api and packages/core.
 # WEEKLY on hosted runners, not nightly: a nightly run is ~1,800 of the 2,000 free minutes on a 2-vCPU runner
 # (ticket 41 Q1, research 69). Nightly returns with a self-hosted runner on VPC 2 — a one-line runs-on change.
 # A falling score is an ordna task, not a failed build — the job posts the numbers, it does not gate.
-# Neither tool exits non-zero on a survivor here (Stryker's thresholds.break is null, mutmut's run always
-# exits 0), so a red job means the harness itself broke, which is worth seeing.
+# Stryker does not exit non-zero on a survivor here (thresholds.break is null in both configs), so a red
+# job means the harness itself broke, which is worth seeing.
+#
+# TWO LEGS, AND WHAT WOULD BRING A THIRD BACK. A score is only worth reporting where the tests that
+# produce it exercise the code being mutated, which is what removed the other two:
+#   - apps/web. Its primary test interface is a browser — Playwright against a served build — and
+#     Stryker's Vitest runner cannot drive it. What is left for the runner is three jsdom files
+#     against a dozen components, so the score would be dominated by mutants no test covers and
+#     would move when jsdom coverage moved while staying blind to the suite that exercises the SPA.
+#     It comes back when a runner can drive the browser suite, or when component tests through
+#     Testing Library cover the screens on their own. `apps/web/stryker.config.mjs` went with it.
+#   - apps/worker. Its mutatable source is a few dozen lines of configuration and logging plus a
+#     schema view generated from the migration journal, so a mutmut score today measures the
+#     generator. It comes back with `T-006`, which is where the worker gets behaviour worth
+#     mutating; the tier keeps mutmut and its settings in `apps/worker/pyproject.toml` ready for it.
+#
 # Action versions read from each action's GitHub releases page on 31/08/2026, resolved to the
 # commit SHA each tag names on 03/09/2026 (`T-040`; the reason is in check.yml's header).
+# actions/cache read from https://github.com/actions/cache/releases/tag/v6.1.0 on 07/09/2026 and
+# resolved the same day.
 name: mutation
 
 on:
@@ -29,8 +45,8 @@ jobs:
         include:
           - name: api
             path: apps/api
-          - name: web
-            path: apps/web
+          - name: core
+            path: packages/core
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -39,6 +55,21 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Last week's mutant results, so a file nobody touched is not re-tested. Every mutant
+      # costs a Postgres container start, which is what makes this worth a cache step at all.
+      # A cache entry is written once and never overwritten, so a fixed key would pin the first
+      # week's results forever: the run id makes the key new every time — so the entry is always
+      # saved — and the prefix restores the newest one this workspace has. A week where nothing
+      # restores (a first run, or GitHub evicting an entry it has not seen read for seven days,
+      # which a weekly schedule sits exactly on) is a full run: slower, never wrong.
+      - name: last week's mutant results
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          # The path is the workspace's `incrementalFile`, which is where the reason for it
+          # sitting under `reports/` rather than under the run's temp directory is written.
+          path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
+          key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}
+          restore-keys: stryker-incremental-${{ matrix.name }}-
       - run: pnpm --filter ./${{ matrix.path }} run mutation
       - name: score to the job summary
         if: always()
@@ -64,24 +95,3 @@ jobs:
           name: stryker-${{ matrix.name }}
           path: ${{ matrix.path }}/reports/mutation/mutation.json
           retention-days: 14
-
-  mutmut:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    defaults: { run: { working-directory: apps/worker } }
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          enable-cache: true
-      - run: uv sync --frozen
-      - run: uv run --frozen mutmut run
-      - name: survivors to the job summary
-        if: always()
-        run: |
-          {
-            echo "### worker mutation survivors"
-            echo '```'
-            uv run --frozen mutmut results | tail -n 20
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
