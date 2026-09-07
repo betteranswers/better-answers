@@ -28,6 +28,41 @@ REVOKE ALL ON "suggestion" FROM worker_rt;
 -- writes a decision as an UPDATE and never as a DELETE, so DELETE goes.
 REVOKE DELETE ON "suggestion" FROM app_rt;
 --> statement-breakpoint
+-- **A decision happens once, and what a suggestion is was settled when it was raised.**
+-- DELETE is gone above, but the app keeps a general UPDATE — it is how a decision is
+-- written — and nothing in the row's own CHECKs says an *accepted* row may not be turned
+-- back into a waiting one, or a declined one re-decided by somebody else. Left open, app
+-- code could mark a suggestion accepted with no commit, no ledger row and no graph delta,
+-- which is the one thing the acceptance's transaction exists to make impossible. The
+-- workflow is held here for the same reason the DELETE is: the queue's history is a fact
+-- about who decided what, and a fact a caller can rewrite is not one.
+CREATE FUNCTION suggestion_decides_once() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $$
+BEGIN
+  IF OLD.status <> 'waiting' THEN
+    RAISE EXCEPTION 'suggestion %: decided as % already, and a decision is never rewritten',
+      OLD.id, OLD.status USING ERRCODE = 'integrity_constraint_violation';
+  END IF;
+  IF NEW.status = 'waiting' THEN
+    RAISE EXCEPTION 'suggestion %: an update to a waiting suggestion decides it', OLD.id
+      USING ERRCODE = 'integrity_constraint_violation';
+  END IF;
+  -- What the suggestion *is* — whose it is, which set it arrived in, what kind of change
+  -- it proposes and when it was raised — is the proposer's, and a decision only decides.
+  IF (NEW.workspace_id, NEW.id, NEW.set_id, NEW.kind, NEW.proposer, NEW.proposed_at)
+     IS DISTINCT FROM
+     (OLD.workspace_id, OLD.id, OLD.set_id, OLD.kind, OLD.proposer, OLD.proposed_at) THEN
+    RAISE EXCEPTION 'suggestion %: a decision decides, and never restates what was proposed',
+      OLD.id USING ERRCODE = 'integrity_constraint_violation';
+  END IF;
+  RETURN NEW;
+END $$;
+--> statement-breakpoint
+CREATE TRIGGER suggestion_decides_once_trigger
+BEFORE UPDATE ON "suggestion" FOR EACH ROW EXECUTE FUNCTION suggestion_decides_once();
+--> statement-breakpoint
 -- concept-inbox (ADR 0031): **submitting a suggestion set is one function call**, and the
 -- transition is the database's rather than two clients' agreeing interpretation of it.
 --
@@ -47,10 +82,30 @@ SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
   v_workspace text := nullif(current_setting('app.workspace_id', true), '');
+  -- **Which tier is calling**, read past SECURITY DEFINER, which replaces `current_user`
+  -- with this function's owner and so cannot answer it. The `role` GUC holds what the
+  -- caller last `SET ROLE`'d to and is *not* pushed aside by the definer context — it reads
+  -- `none` when nobody set one, and then the caller is whoever logged in, which is how the
+  -- estate connects (each tier logs in as its own runtime role).
+  v_caller text := coalesce(nullif(current_setting('role', true), 'none'), session_user);
+  -- The kinds each tier may raise. An *edit* is a person's own change, offered through the
+  -- app; a *candidate* and a *promotion* come out of a run; a *repair* is the platform's own
+  -- citation routine (ADR 0019), which runs in the worker. Held here because `p_kind` and
+  -- `p_proposer` are both the caller's words: a compromised worker could otherwise submit
+  -- an `edit` under a `human:` proposer — a form the row's CHECK accepts — and put a change
+  -- in a person's name into the queue an Admin decides from.
+  v_permitted text[] := CASE v_caller
+    WHEN 'app_rt' THEN ARRAY['edit', 'candidate', 'promotion']
+    WHEN 'worker_rt' THEN ARRAY['candidate', 'promotion', 'repair']
+  END;
 BEGIN
   IF v_workspace IS NULL THEN
     RAISE EXCEPTION 'submit_suggestion_set: the transaction is scoped to no workspace'
       USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF v_permitted IS NULL OR NOT (p_kind = ANY (v_permitted)) THEN
+    RAISE EXCEPTION 'submit_suggestion_set: % may not raise a suggestion of kind %',
+      v_caller, p_kind USING ERRCODE = 'insufficient_privilege';
   END IF;
   -- A set is bounded by what an Admin could decide (SUGGESTION_SET_MAX in
   -- src/suggestion-tables.ts): a producer chooses how much it sends, so somebody other

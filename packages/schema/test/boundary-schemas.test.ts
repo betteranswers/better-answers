@@ -4,7 +4,14 @@ import { PgTable } from "drizzle-orm/pg-core";
 import type { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ACCESS_REQUEST_REASON_MAX, boundarySchemas, EMBEDDING_DIMENSIONS } from "../src/index.ts";
+import {
+  ACCESS_REQUEST_REASON_MAX,
+  boundarySchemas,
+  CONCEPT_FRONTMATTER_MAX,
+  EMBEDDING_DIMENSIONS,
+  SUGGESTION_BODY_MAX,
+  SUGGESTION_REASON_MAX,
+} from "../src/index.ts";
 import * as publicEntry from "../src/index.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "../src/drizzle-zod.ts";
 import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
@@ -608,6 +615,24 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.graphEdge[0], sensitivity: "Secret" },
       { ...acceptedRows.graphEdge[0], fromUid: "   " },
       { ...acceptedRows.graphEdge[1], label: "source-entity:mentions" },
+    ],
+    // The queue's refusals: a fifth kind, a proposer that is an address rather than an
+    // actor, and a reason longer than the column carries.
+    suggestion: [
+      { ...acceptedRows.suggestion[0], kind: "merge" },
+      { ...acceptedRows.suggestion[0], proposer: "ada@acme.invalid" },
+      { ...acceptedRows.suggestion[0], reason: "x".repeat(SUGGESTION_REASON_MAX + 1) },
+    ],
+    // The payload's refusals: the bundle's manifest, which is not a concept file — and the
+    // two columns a producer fills at a size of its own choosing, each held to its bound,
+    // so a compromised one cannot fill a tenant's storage a suggestion at a time.
+    conceptWriteRequest: [
+      { ...acceptedRows.conceptWriteRequest[0], path: "knowledge/manifest.yaml" },
+      { ...acceptedRows.conceptWriteRequest[0], body: "x".repeat(SUGGESTION_BODY_MAX + 1) },
+      {
+        ...acceptedRows.conceptWriteRequest[0],
+        frontmatter: { title: "x".repeat(CONCEPT_FRONTMATTER_MAX) },
+      },
     ],
   } as const;
 

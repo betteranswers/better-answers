@@ -10,6 +10,7 @@ import { ACTOR_ID as ACTOR_ID_REGEX } from "./actor-id.ts";
 import { ACT, auditEvent, FAMILIES } from "./audit-tables.ts";
 import {
   bundleCommit,
+  CONCEPT_FRONTMATTER_MAX,
   CONCEPT_PATH,
   CONCEPT_STATUSES,
   conceptIdentity,
@@ -373,6 +374,15 @@ export const conceptFrontmatter = z
     ]),
   )
   .superRefine((value, context) => {
+    // The bound the payload row also holds. Frontmatter is open — every key preserved
+    // verbatim (ADR 0019) — so nothing about its shape says how large it may be, and a
+    // caller who chose that would be choosing how much the platform stores.
+    if (JSON.stringify(value).length > CONCEPT_FRONTMATTER_MAX) {
+      context.addIssue({
+        code: "custom",
+        message: `a concept's frontmatter is at most ${CONCEPT_FRONTMATTER_MAX} characters of JSON`,
+      });
+    }
     const sources = value["sources"];
     if (!Array.isArray(sources)) return;
     for (const [index, entry] of sources.entries()) {

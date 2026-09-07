@@ -233,6 +233,15 @@ export const CONCEPT_STABLE_STATUS = "stable" satisfies (typeof PUBLISHED_STATUS
  */
 export const CONTENT_HASH = /^[0-9a-f]{64}$/;
 
+/**
+ * How large a concept's frontmatter may be, measured over the JSON a row stores. OKF's keys
+ * plus whatever else the file carried is open by design (ADR 0019), so nothing about the
+ * shape bounds it — and a caller who chooses the size of what the platform stores is the
+ * defect `SUGGESTION_BODY_MAX` closes for the body. Sixty-four thousand characters is a
+ * wide margin over a `sources[]` list a person would ever write.
+ */
+export const CONCEPT_FRONTMATTER_MAX = 64_000;
+
 // `listed` and `stamp` are `column-helpers.ts`'s, shared with the graph and inbox tables so
 // the files cannot drift on how a CHECK's list or an instant is written.
 

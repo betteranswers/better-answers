@@ -8,6 +8,7 @@ import {
 } from "@better-answers/schema";
 import type { z } from "zod";
 
+import { readableClause, readableParameter } from "../access/index.ts";
 import { act, declareActs, record, type Act } from "../audit/index.ts";
 import {
   actorIdOf,
@@ -143,10 +144,19 @@ const summaryItem = (row: SummaryRow): SuggestionSummaryItem => {
  * anybody tries.
  *
  * **An Admin, or the person who proposed the set, and nobody else.** A summary names every
- * item's title, path, merge key and resolved IRI, and none of that is filtered by what the
- * reader may see: a Viewer who could open any set would learn that a concept withheld from
- * them exists, which is the one thing `open` by IRI is built never to reveal (user story
- * 13). Deciding is an Admin's; seeing what you yourself offered is your own.
+ * item's title, path and merge key, and none of that is filtered by what the reader may
+ * see: a Viewer who could open any set would learn that a concept withheld from them
+ * exists, which is the one thing `open` by IRI is built never to reveal (user story 13).
+ * Deciding is an Admin's; seeing what you yourself offered is your own.
+ *
+ * **The resolution is filtered, and by the one read predicate** (`readableClause`), checked
+ * beside this read rather than inside the definer function — which serves the app's
+ * role and knows nothing of the person behind it. A proposer who is a plain member sees
+ * their own item with no resolved target and a `baseMoved` that reads exactly as it would
+ * for a merge key naming no concept at all, so a withheld concept is indistinguishable from
+ * one nobody minted. The **Admin deciding** sees the resolution whatever it is, draft
+ * included: the target is what they are being asked to write onto, and a decision surface
+ * that hid it would be asking them to decide blind.
  */
 export const suggestionSetSummary = async (
   principal: UserPrincipal,
@@ -154,13 +164,19 @@ export const suggestionSetSummary = async (
   setId: string,
 ): Promise<Result<readonly SuggestionSummaryItem[], RoleRefusal | Error>> => {
   const found = await attempt(() =>
-    // RLS scopes the function's own WHERE clause by the transaction's workspace; naming
-    // the Principal here is what says so where a reader of the call can see it.
+    // RLS scopes the function's own WHERE clause by the transaction's workspace, and scopes
+    // the join below the same way; naming the Principal here is what says so where a reader
+    // of the call can see it.
     tx.query<SummaryRow>(
-      `SELECT suggestion_id, kind, status, proposer, decider, reason, merge_key, title, path,
-              resolved_iri, base_moved
-         FROM suggestion_set_summary($1)`,
-      [setId],
+      `SELECT s.suggestion_id, s.kind, s.status, s.proposer, s.decider, s.reason,
+              s.merge_key, s.title, s.path, c.iri AS resolved_iri,
+              CASE WHEN c.iri IS NULL THEN s.base_content_hash IS NOT NULL ELSE s.base_moved END
+                AS base_moved
+         FROM suggestion_set_summary($1) s
+         LEFT JOIN concept_index c
+                ON c.iri = s.resolved_iri
+               AND ($2 = 'Admin' OR (${readableClause("c", 2)}))`,
+      [setId, readableParameter(principal)],
     ),
   );
   if (!found.ok) return err(found.error);
@@ -225,7 +241,12 @@ export const submitSuggestionSet = async (
   doors: { readonly postgres: PostgresDoor },
   input: SubmitSuggestionSetInput,
 ): Promise<Result<SuggestionSetSubmitted, SubmitSuggestionSetRefusal | Error>> => {
-  if (input.kind === SUGGESTION_REPAIR_KIND) return err("kind-forbids");
+  // The kind goes through the boundary like everything else a caller supplies: a word off
+  // the enum reaches the row's own CHECK, and a caller told `malformed` can act on it where
+  // a raw constraint error is the store's failure escaping as this act's answer.
+  const kind = boundarySchemas.suggestion.insert.shape.kind.safeParse(input.kind);
+  if (!kind.success) return err("malformed");
+  if (kind.data === SUGGESTION_REPAIR_KIND) return err("kind-forbids");
   const setId = ulid();
   const payloads = boundarySchemas.conceptWriteRequest.insert
     .omit({ workspaceId: true })
@@ -254,7 +275,7 @@ export const submitSuggestionSet = async (
         "SELECT submitted AS suggestion_id FROM submit_suggestion_set($1, $2, $3, $4::jsonb) AS submitted",
         [
           setId,
-          input.kind,
+          kind.data,
           actorIdOf(fresh),
           JSON.stringify(
             payloads.data.map((payload) => ({

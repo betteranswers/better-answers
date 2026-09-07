@@ -4,11 +4,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { declaredTableNames } from "../scripts/worker-view.ts";
 import {
   boundarySchemas,
+  CONCEPT_FRONTMATTER_MAX,
   EXEMPT_TABLE_NAMES,
   FAMILIES,
   IDENTITY_SET,
   RLS_EXEMPTIONS,
   ROLES,
+  SUGGESTION_BODY_MAX,
   ulid,
 } from "../src/index.ts";
 import { testData } from "./factory.ts";
@@ -1186,6 +1188,113 @@ describe("the inbox under app_rt", () => {
     });
   });
 
+  it("decides a waiting suggestion once, and refuses every road back out of a decision (migration 0018)", async () => {
+    // The privilege the app keeps is a general UPDATE — it is how a decision is written —
+    // so what a decision *is* has to be the database's own sentence too: without this,
+    // app code could mark a suggestion accepted with no commit, no ledger row and no
+    // graph delta, which is the one thing the acceptance's transaction exists to prevent.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const decided = await seed.suggestion({ workspaceId: WS_A });
+      const waiting = await seed.suggestion({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const decline = (id: string, extra = "") =>
+        client.query(
+          `UPDATE suggestion
+              SET status = 'declined', decider = 'process:better-answers-test',
+                  decided_at = now(), reason = 'not the company''s word on this'${extra}
+            WHERE workspace_id = $1 AND id = $2`,
+          [WS_A, id],
+        );
+
+      // The served path first: a waiting suggestion is declined, once.
+      expect((await decline(decided.id)).rowCount).toBe(1);
+
+      // A second decision over the first, and the first undone back to waiting; then, on a
+      // suggestion still waiting, an update that decides nothing and a decision that also
+      // restates what was proposed. Thunks, because each one has to run behind its own
+      // savepoint — a failed statement aborts everything after it (`[TEST8]`).
+      const refusals: readonly [() => Promise<unknown>, RegExp][] = [
+        [() => decline(decided.id), /decided as declined already/],
+        [
+          () =>
+            client.query(
+              `UPDATE suggestion SET status = 'waiting', decider = NULL, decided_at = NULL,
+                      reason = NULL WHERE workspace_id = $1 AND id = $2`,
+              [WS_A, decided.id],
+            ),
+          /decided as declined already/,
+        ],
+        [
+          () =>
+            client.query("UPDATE suggestion SET set_id = $3 WHERE workspace_id = $1 AND id = $2", [
+              WS_A,
+              waiting.id,
+              ulid(),
+            ]),
+          /an update to a waiting suggestion decides it/,
+        ],
+        [
+          () => decline(waiting.id, ", proposer = 'human:01J6CCCCCCCCCCCCCCCCCCCCCC'"),
+          /never restates what was proposed/,
+        ],
+      ];
+      for (const [statement, message] of refusals) {
+        await client.query("SAVEPOINT decision");
+        await expect(statement()).rejects.toThrow(message);
+        await client.query("ROLLBACK TO SAVEPOINT decision");
+      }
+    });
+  });
+
+  it("lets each tier raise only the kinds that are its own, whatever a caller names (migration 0018)", async () => {
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      const submit = (kind: string, proposer: string) =>
+        client.query("SELECT * FROM submit_suggestion_set($1, $2, $3, $4::jsonb)", [
+          ulid(),
+          kind,
+          proposer,
+          JSON.stringify([
+            {
+              suggestion_id: ulid(),
+              merge_key: `policy:${ulid().toLowerCase()}`,
+              path: `knowledge/${ulid().toLowerCase()}.md`,
+              concept_kind: "Policy",
+              title: "Expenses",
+              frontmatter: {},
+              body: "Expenses are claimed within thirty days.",
+              base_content_hash: null,
+            },
+          ]),
+        ]);
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      // Both `p_kind` and `p_proposer` are the caller's words, so a compromised producer
+      // could otherwise submit an *edit* under a `human:` proposer — a form the row's own
+      // CHECK accepts — and put a change in a person's name into the queue an Admin
+      // decides from. Which tier is calling is what the function reads instead.
+      await client.query("SAVEPOINT kind");
+      await expect(submit("edit", "human:01J6CCCCCCCCCCCCCCCCCCCCCC")).rejects.toThrow(
+        /worker_rt may not raise a suggestion of kind edit/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT kind");
+
+      // And the served path beside it: the platform's own citation repair, which is a
+      // routine the worker runs.
+      const repaired = await submit("repair", "process:better-answers-citation-repair");
+      expect(repaired.rowCount).toBe(1);
+
+      await client.query("SET LOCAL ROLE app_rt");
+      await expect(submit("repair", "process:better-answers-citation-repair")).rejects.toThrow(
+        /app_rt may not raise a suggestion of kind repair/,
+      );
+    });
+  });
+
   it("refuses the worker role the queue, and lets it submit a set through the function alone (migration 0018)", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
@@ -1374,24 +1483,33 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("refuses a payload larger than a concept could be, at the row", async () => {
+  it("refuses a payload larger than a concept could be, at the row, in both of its open columns", async () => {
     // Straight SQL rather than the factory, which would refuse it at the boundary before
     // any INSERT existed: the claim here is the database's own, because the row is written
     // by a definer function both tiers call and no boundary stands in front of that.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const here = await seed.suggestion({ workspaceId: WS_A });
-
-      // A concept is a fact stated once, not a document; a producer writes this column, so
-      // the size is somebody else's to bound.
-      await expect(
+      const write = (frontmatter: string, body: string) =>
         client.query(
           `INSERT INTO concept_write_request
              (workspace_id, suggestion_id, merge_key, path, concept_kind, title, frontmatter, body)
-           VALUES ($1, $2, 'policy:big', 'knowledge/big.md', 'Policy', 'Big', '{}'::jsonb, $3)`,
-          [WS_A, here.id, "x".repeat(100_001)],
-        ),
-      ).rejects.toThrow(/concept_write_request_body_length_check/);
+           VALUES ($1, $2, 'policy:big', 'knowledge/big.md', 'Policy', 'Big', $3::jsonb, $4)`,
+          [WS_A, here.id, frontmatter, body],
+        );
+
+      // A concept is a fact stated once, not a document; and its frontmatter is open by
+      // design (ADR 0019), so its shape bounds nothing either. A producer writes both
+      // columns, so the size of each is somebody else's to bound.
+      await client.query("SAVEPOINT sized");
+      await expect(write("{}", "x".repeat(SUGGESTION_BODY_MAX + 1))).rejects.toThrow(
+        /concept_write_request_body_length_check/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT sized");
+
+      await expect(
+        write(JSON.stringify({ title: "x".repeat(CONCEPT_FRONTMATTER_MAX) }), "b"),
+      ).rejects.toThrow(/concept_write_request_frontmatter_length_check/);
     });
   });
 

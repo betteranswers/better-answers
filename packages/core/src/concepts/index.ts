@@ -12,10 +12,11 @@ import {
   SUGGESTION_ACCEPTED_STATUS,
   SUGGESTION_EDIT_KIND,
   SUGGESTION_REPAIR_KIND,
+  SUGGESTION_SET_MAX,
   SUGGESTION_WAITING_STATUS,
   VERIFICATION_REPAIR_ORIGIN,
 } from "@better-answers/schema";
-import type { z } from "zod";
+import { z } from "zod";
 
 import { readableClause, readableParameter } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
@@ -254,7 +255,16 @@ export type WriteConceptInput = {
   readonly author: CommitAuthor;
   /** What this write was made against, in one of its two forms. */
   readonly expects: WritePrecondition;
-  /** The suggestion this write decides, when it is an acceptance rather than an edit. */
+  /**
+   * The suggestion this write decides, when it is an acceptance rather than an edit.
+   *
+   * **An acceptance is an Admin's, and its precondition is the `{base}` form.** The two are
+   * coupled at runtime rather than in this type: a discriminated union here would be a
+   * union every caller and every test constructing a `Partial<>` of this would have to
+   * narrow, for a coupling `writeConcept` has to check anyway — the act is reached by more
+   * than one road (the reconciler's replay is the next), and a type is not what holds a
+   * road the type system never sees.
+   */
   readonly acceptance?: Acceptance | undefined;
   /**
    * The concept's confidentiality class. On a **new** concept the most restrictive of the
@@ -282,8 +292,9 @@ export type ConceptWritten = {
  * IRI. `rename-refused` and `reclassification-refused` are the two moves this act never
  * makes, and `no-such-concept` is a write naming an IRI this workspace never minted, which
  * ADR 0002 refuses because the key is never a caller's to choose. `already-decided` is an
- * acceptance of a suggestion somebody decided first. The principal refusals are
- * `withMembership`'s, which judges the caller's authority at time-of-act.
+ * acceptance of a suggestion somebody decided first, and `resolution-moved` one whose named
+ * target no longer answers to the merge key it was proposed under. The principal refusals
+ * are `withMembership`'s, which judges the caller's authority at time-of-act.
  *
  * **Every one of them is read before the commit.** A refusal that came after would leave a
  * commit no row records — which is the reconciler's territory, and the reconciler is for
@@ -299,7 +310,8 @@ export type WriteConceptRefusal =
   | "rename-refused"
   | "reclassification-refused"
   | "no-such-concept"
-  | "already-decided";
+  | "already-decided"
+  | "resolution-moved";
 
 /**
  * The frontmatter keys ADR 0014's content hash leaves out: the trust the platform derives
@@ -525,6 +537,18 @@ export const writeConcept = async (
   input: WriteConceptInput,
 ): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
   if (!mayWrite(principal)) return err("role-forbids");
+  // **What makes this an acceptance is checked here, not at the road that reached it.**
+  // `acceptSuggestions` is one caller and the reconciler's replay will be another, so the
+  // Admin gate and the precondition's form belong to the act: a write handed an
+  // `acceptance` by any road decides a suggestion, writes the acceptance's ledger row and
+  // carries the `Suggestion:` trailer, and doing that from an Editor's authority — or
+  // against the ref's head rather than the payload's base — would be the gate ADR 0012
+  // puts in front of the bundle, skipped.
+  if (input.acceptance !== undefined) {
+    const admin = requireAdmin(principal);
+    if (!admin.ok) return err(admin.error);
+    if (!("base" in input.expects)) return err("malformed");
+  }
 
   const contentHash = contentHashOf(input.frontmatter, input.body, input.path);
   // A write that names no concept is a creation, and mints the one form an IRI has
@@ -585,6 +609,17 @@ export const writeConcept = async (
     // A key that resolves to nothing is free — a creation takes it, and a re-write may
     // move its own concept onto it.
     if (resolved !== undefined && resolved !== iri) return err("merge-key-taken");
+    // **And the other half of that sentence, for an acceptance that named its target.** A
+    // key resolving to nothing is free for an ordinary write — a re-write may move its own
+    // concept onto one — but an acceptance was prepared against a concept the merge key
+    // *did* resolve to, and a key that now resolves to nothing means somebody moved that
+    // concept onto another key after the summary was rendered. Landing it would silently
+    // put the old key back, undoing a move nobody asked to undo. The change is not lost:
+    // it goes back to whoever prepared it, like every other moved ground (ADR 0012's
+    // 2026-08-27 amendment).
+    if (input.acceptance !== undefined && input.iri !== undefined && resolved !== iri) {
+      return err("resolution-moved");
+    }
     // The acceptance's own precondition: what the payload was written against, against
     // what the concept says now (ADR 0012's 2026-08-27 amendment). Read here, before the
     // commit, so a suggestion written against content that moved costs no commit at all.
@@ -846,6 +881,20 @@ export type AcceptanceDecision = {
   readonly expectedTarget: string | null;
 };
 
+/**
+ * What an acceptance act is allowed to be asked for, read off the boundary that already
+ * narrows the two columns these name — the suggestion's id and a resolved target's IRI —
+ * and bounded by the size of a set, since a bulk acceptance decides one.
+ */
+const ACCEPTANCE_DECISIONS = z
+  .object({
+    suggestionId: boundarySchemas.suggestion.select.shape.id,
+    expectedTarget: boundarySchemas.suggestion.select.shape.targetIri,
+  })
+  .array()
+  .nonempty()
+  .max(SUGGESTION_SET_MAX);
+
 export type AcceptSuggestionRefusal =
   | WriteConceptRefusal
   | "no-such-suggestion"
@@ -946,15 +995,24 @@ export const acceptSuggestions = async (
   principal: UserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
   input: { readonly decisions: readonly AcceptanceDecision[] },
-): Promise<Result<readonly AcceptanceOutcome[], RoleRefusal | PrincipalRefusal | Error>> => {
+): Promise<
+  Result<readonly AcceptanceOutcome[], RoleRefusal | PrincipalRefusal | "malformed" | Error>
+> => {
   // An Admin decides. ADR 0012's amendment also gives the *edit* kind to the target's
   // owner; a concept has no owner record yet, so that arm waits for the column.
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);
+  // The request's own shape, through the boundary before any work: this is a transport's
+  // argument, so an id of no known form or a target that is not an IRI is a caller's
+  // mistake to be told about — not a statement to be sent, an item at a time, to a store
+  // that will refuse it in the store's own words. The ceiling is a set's, because a bulk
+  // acceptance decides a set and each item is its own commit.
+  const decisions = ACCEPTANCE_DECISIONS.safeParse(input.decisions);
+  if (!decisions.success) return err("malformed");
 
-  const batchId = input.decisions.length > 1 ? ulid() : undefined;
+  const batchId = decisions.data.length > 1 ? ulid() : undefined;
   const outcomes: AcceptanceOutcome[] = [];
-  for (const decision of input.decisions) {
+  for (const decision of decisions.data) {
     outcomes.push(await acceptOne(principal, doors, decision, batchId));
   }
   return ok(outcomes);
@@ -1022,11 +1080,13 @@ const acceptOne = async (
   });
   if (written.ok) return { suggestionId: decision.suggestionId, outcome: ok(written.value) };
 
-  // The two refusals the act read under its lock that mean *this suggestion's ground moved*:
-  // the merge key now belongs to another concept, and the content the payload was written
-  // against is no longer what the concept says. Both are "fails loudly and returns to the
-  // proposer" (ADR 0012's 2026-08-27 amendment), and neither cost a commit.
-  if (written.error === "merge-key-taken") return returning("resolution-moved", moved);
+  // The refusals the act read under its lock that mean *this suggestion's ground moved*:
+  // the merge key now belongs to another concept or to none, and the content the payload
+  // was written against is no longer what the concept says. All are "fails loudly and
+  // returns to the proposer" (ADR 0012's 2026-08-27 amendment), and none cost a commit.
+  if (written.error === "merge-key-taken" || written.error === "resolution-moved") {
+    return returning("resolution-moved", moved);
+  }
   if (written.error === "stale-precondition") {
     return returning("stale-precondition", "the concept moved after this suggestion was written");
   }

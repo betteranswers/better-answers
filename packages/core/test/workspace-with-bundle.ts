@@ -60,7 +60,7 @@ export const arrangeWorkspace = async (db: MigratedPostgres, git: GitDoor): Prom
   if (!provisioned.ok) throw new Error(`the workspace was not provisioned: ${provisioned.error}`);
 
   const client = await db.pool.connect();
-  const people: Record<string, string> = {};
+  const people: Partial<Record<Role, string>> = {};
   try {
     const seed = testData(client);
     for (const role of ["Editor", "Viewer"] satisfies Role[]) {
@@ -77,10 +77,21 @@ export const arrangeWorkspace = async (db: MigratedPostgres, git: GitDoor): Prom
     workspaceId,
     postgres,
     git,
-    editor: await principalFor(db, workspaceId, people["Editor"] ?? ""),
-    viewer: await principalFor(db, workspaceId, people["Viewer"] ?? ""),
+    editor: await principalFor(db, workspaceId, personOf(people, "Editor")),
+    viewer: await principalFor(db, workspaceId, personOf(people, "Viewer")),
     admin: await principalFor(db, workspaceId, adminUserId),
   };
+};
+
+/**
+ * The person seeded for one role. A fallback here would hand `principalFor` an id nobody
+ * holds and the suite would fail somewhere else entirely — the arrange block is the thing
+ * that broke, so it is the thing that says so.
+ */
+const personOf = (people: Partial<Record<Role, string>>, role: Role): string => {
+  const person = people[role];
+  if (person === undefined) throw new Error(`no ${role} was seeded into this workspace`);
+  return person;
 };
 
 // Reading as somebody is `suite-postgres.ts`'s `readingAs`, shared with every other suite

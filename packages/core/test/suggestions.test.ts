@@ -932,12 +932,47 @@ describe("who may open a suggestion set", () => {
       opened(scenario.viewer),
     ]);
 
-    // A summary names every item's title, path, merge key and resolved IRI, none of it
-    // filtered by what the reader may see — so a Viewer who could open any set would learn
-    // that a concept withheld from them exists, which `open` by IRI is built never to say.
+    // A summary names every item's title, path and merge key, none of it filtered by what
+    // the reader may see — so a Viewer who could open any set would learn that a concept
+    // withheld from them exists, which `open` by IRI is built never to say.
     expect(byAdmin.ok && byAdmin.value).toHaveLength(1);
     expect(byProposer.ok && byProposer.value).toHaveLength(1);
     expect(byStranger).toEqual({ ok: false, error: "role-forbids" });
+  });
+
+  it("shows a proposer no resolution they may not read, and the deciding Admin the one they must", async () => {
+    const scenario = await arrange();
+    // A concept its proposer cannot read: *Restricted* reaches Admins and named members,
+    // and the Editor here is neither.
+    const { input, written } = await editorWrote(scenario, { sensitivity: "Restricted" });
+    const set = await submitted(scenario, scenario.editor, "edit", [
+      requestFor({
+        mergeKey: input.mergeKey,
+        path: input.path,
+        baseContentHash: written.contentHash,
+      }),
+    ]);
+    const opened = (principal: UserPrincipal) =>
+      readingAs(db().runtimePool, principal, (resolved, tx) =>
+        suggestionSetSummary(resolved, tx, set.setId),
+      );
+
+    const [byProposer, byAdmin] = await Promise.all([
+      opened(scenario.editor),
+      opened(scenario.admin),
+    ]);
+
+    // The proposer sees their own item, and it reads exactly as one whose merge key names
+    // no concept at all: no target, and a base that has "moved" because there is nothing
+    // there to have written it against. So a withheld concept's existence is not a fact
+    // the inbox hands out (user story 13).
+    expect(byProposer.ok && byProposer.value.map((item) => [item.target, item.baseMoved])).toEqual([
+      [null, true],
+    ]);
+    // The Admin is the one deciding, and the target is what they would be writing onto.
+    expect(byAdmin.ok && byAdmin.value.map((item) => [item.target, item.baseMoved])).toEqual([
+      [written.iri, false],
+    ]);
   });
 });
 
@@ -965,5 +1000,147 @@ describe("what a write may not do with an IRI", () => {
     // ADR 0002: the key is never caller-settable, and the refusal costs no commit.
     expect(refused).toEqual({ ok: false, error: "no-such-concept" });
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
+  });
+});
+
+/**
+ * The act's own gates, read at the act and not at the road that reached it.
+ * `acceptSuggestions` is one caller of `writeConcept` and the reconciler's replay will be
+ * another, so what makes a write an acceptance — an Admin's authority, the payload's base
+ * as its precondition, and a merge key that still resolves to the target it names — is
+ * checked inside the act, where every road passes.
+ */
+describe("an acceptance reached straight through the write path", () => {
+  /** The acceptance `acceptSuggestions` would hand the act, with one thing about it moved. */
+  const acceptanceOf = (
+    input: WriteConceptInput,
+    written: ConceptWritten,
+    set: { readonly setId: string; readonly suggestionIds: readonly string[] },
+    overrides: Partial<WriteConceptInput> = {},
+  ): WriteConceptInput => ({
+    ...input,
+    iri: written.iri,
+    expects: { base: written.contentHash },
+    acceptance: { suggestionId: set.suggestionIds[0] ?? "", setId: set.setId, kind: "edit" },
+    ...overrides,
+  });
+
+  /**
+   * What a refused acceptance leaves behind: the commits the arrange block made and no
+   * more, and a suggestion still waiting for somebody to decide it. Every refusal here
+   * asserts the same two facts, and asserting them two ways would be two claims.
+   */
+  const leftWaiting = async (
+    scenario: Scenario,
+    set: { readonly suggestionIds: readonly string[] },
+    commits: number,
+  ): Promise<void> => {
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(commits);
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
+  };
+
+  it("refuses an Editor, because a decision is an Admin's whichever road reached the act", async () => {
+    const scenario = await arrange();
+    const { input, written, set } = await proposedAgainst(scenario, "edit");
+
+    const refused = await writeConcept(
+      scenario.editor,
+      doorsOf(scenario),
+      acceptanceOf(input, written, set),
+    );
+
+    // An Editor may commit their own change all day; what they may not do is decide
+    // somebody else's, which is the gate ADR 0012 puts in front of the bundle.
+    expect(refused).toEqual({ ok: false, error: "role-forbids" });
+    await leftWaiting(scenario, set, 1);
+  });
+
+  it("refuses one made against the ref's head rather than the payload's base", async () => {
+    const scenario = await arrange();
+    const { input, written, set } = await proposedAgainst(scenario, "edit");
+
+    const refused = await writeConcept(
+      scenario.admin,
+      doorsOf(scenario),
+      acceptanceOf(input, written, set, { expects: { head: written.sha } }),
+    );
+
+    // The two preconditions are not interchangeable: a suggestion is decided against the
+    // content its payload was written against (ADR 0012's 2026-08-27 amendment), and an
+    // acceptance holding the ref instead would land a payload over content that moved.
+    expect(refused).toEqual({ ok: false, error: "malformed" });
+    await leftWaiting(scenario, set, 1);
+  });
+
+  it("refuses one whose named target no longer answers to the merge key it was proposed under", async () => {
+    const scenario = await arrange();
+    const { input, written, set } = await proposedAgainst(scenario, "edit");
+
+    // The concept moves onto another merge key, carrying exactly the content the payload
+    // was written against — so the base precondition still holds and the *only* thing that
+    // moved is the resolution. Accepting here would put the old key back on the concept and
+    // undo a move nobody asked to undo.
+    const moved = await writeConcept(scenario.editor, doorsOf(scenario), {
+      ...input,
+      iri: written.iri,
+      mergeKey: `${input.mergeKey}-renamed`,
+      expects: { head: written.sha },
+    });
+    expect(moved.ok).toBe(true);
+
+    const refused = await writeConcept(
+      scenario.admin,
+      doorsOf(scenario),
+      acceptanceOf(input, written, set),
+    );
+
+    expect(refused).toEqual({ ok: false, error: "resolution-moved" });
+    // The write and the move, and nothing from the acceptance: the resolution is read
+    // under this act's own lock, before there is a commit to leave behind.
+    await leftWaiting(scenario, set, 2);
+  });
+});
+
+describe("what the inbox refuses before it does any work", () => {
+  it("refuses a kind nobody declared, in the word a caller can act on", async () => {
+    const scenario = await arrange();
+
+    const set = await submitSuggestionSet(
+      scenario.editor,
+      { postgres: scenario.postgres },
+      // @ts-expect-error — a fifth kind is not one; the runtime half of what the type says.
+      { kind: "merge", requests: [requestFor()] },
+    );
+
+    // Not the row's CHECK escaping as this act's answer: a caller told `malformed` knows
+    // what they sent was wrong, where a raw constraint error is the store's failure.
+    expect(set).toEqual({ ok: false, error: "malformed" });
+  });
+
+  it("refuses an acceptance asked for in ids of no known form, and decides nothing", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
+
+    const asked = await Promise.all([
+      acceptSuggestions(scenario.admin, doorsOf(scenario), {
+        decisions: [{ suggestionId: "suggestion-1", expectedTarget: null }],
+      }),
+      acceptSuggestions(scenario.admin, doorsOf(scenario), {
+        decisions: [
+          { suggestionId: set.suggestionIds[0] ?? "", expectedTarget: "knowledge/expenses.md" },
+        ],
+      }),
+      acceptSuggestions(scenario.admin, doorsOf(scenario), { decisions: [] }),
+    ]);
+
+    // The request's own shape, through the boundary before any work: an id the minter never
+    // made, a target that is a path rather than an IRI, and a call that meant to say
+    // something. None of them reaches a store to be refused in the store's words.
+    expect(asked).toEqual([
+      { ok: false, error: "malformed" },
+      { ok: false, error: "malformed" },
+      { ok: false, error: "malformed" },
+    ]);
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
   });
 });

@@ -119,9 +119,30 @@
     },
     {
       "why": "a repair is the platform running its own citation repair: accepting one re-points every standing check at the content it wrote, so nobody but a platform process may raise one",
-      "role": "app_rt",
+      "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "statement": "SELECT * FROM submit_suggestion_set('01J6R2AAAAAAAAAAAAAAAAAAAA', 'repair', 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', '[{\"suggestion_id\": \"01J6S4DDDDDDDDDDDDDDDDDDDD\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": {}, \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "sqlstate": "23514"
+    },
+    {
+      "why": "an *edit* is a person's own change, offered through the app: the kind and the proposer are both the caller's words, so a producer that could raise one could put a change in a person's name into the queue an Admin decides from",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R5AAAAAAAAAAAAAAAAAAAA', 'edit', 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', '[{\"suggestion_id\": \"01J6S6FFFFFFFFFFFFFFFFFFFF\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": {}, \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "sqlstate": "42501"
+    },
+    {
+      "why": "the platform's own citation repair is a routine the worker runs, and not a set the app may raise",
+      "role": "app_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R6AAAAAAAAAAAAAAAAAAAA', 'repair', 'process:better-answers-citation-repair', '[{\"suggestion_id\": \"01J6S7GGGGGGGGGGGGGGGGGGGG\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": {}, \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "sqlstate": "42501"
+    },
+    {
+      "why": "a payload's frontmatter is open by design, so its shape bounds nothing: a producer that chose its size would choose how much the platform stores",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R7AAAAAAAAAAAAAAAAAAAA', 'candidate', 'better-answers-extraction/1.2', jsonb_build_array(jsonb_build_object('suggestion_id', '01J6S8HHHHHHHHHHHHHHHHHHHH', 'merge_key', 'policy:expenses', 'path', 'knowledge/expenses.md', 'concept_kind', 'Policy', 'title', 'Expenses', 'frontmatter', jsonb_build_object('title', repeat('x', 64000)), 'body', 'b', 'base_content_hash', NULL)))",
       "sqlstate": "23514"
     },
     {

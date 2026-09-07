@@ -3,7 +3,7 @@ import { check, foreignKey, index, jsonb, primaryKey, text } from "drizzle-orm/p
 
 import { ACTOR_ID_PATTERN, PLATFORM_ACTOR_PREFIX } from "./actor-id.ts";
 import { listed, stamp } from "./column-helpers.ts";
-import { conceptIdentity } from "./concept-tables.ts";
+import { CONCEPT_FRONTMATTER_MAX, conceptIdentity } from "./concept-tables.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -198,9 +198,10 @@ export const suggestion = withRLS(
  * to, so an acceptance over a body that moved fails loudly (ADR 0012's 2026-08-27
  * amendment). It is the payload's precondition exactly as the ref's sha is a person's edit's.
  *
- * The key to `suggestion` is **deferred**: the two land in one statement of the submit
- * function, and deferring the check to the end of the transaction lets that statement write
- * them in whichever order reads best, as `concept_index`'s key to its commit does.
+ * The key to `suggestion` is an ordinary immediate one, and the submit function is written
+ * around it: two statements rather than one, so the payload's key is checked against a
+ * suggestion row that already exists. Deferring it would buy nothing here — there is no
+ * order these two have to be written in that the function cannot simply take.
  */
 export const conceptWriteRequest = withRLS(
   "concept_write_request",
@@ -239,6 +240,14 @@ export const conceptWriteRequest = withRLS(
     check(
       "concept_write_request_body_length_check",
       sql.raw(`char_length(body) <= ${SUGGESTION_BODY_MAX}`),
+    ),
+    // The body's bound, over the other column a producer fills. Frontmatter is open by
+    // design (ADR 0019), so its shape bounds nothing, and this row is written by a definer
+    // function both tiers call — past every boundary the app parses through, which is why
+    // the bound is stated here as well as at the boundary.
+    check(
+      "concept_write_request_frontmatter_length_check",
+      sql.raw(`char_length(frontmatter::text) <= ${CONCEPT_FRONTMATTER_MAX}`),
     ),
   ],
 );
