@@ -1,0 +1,22 @@
+apps/api/tests/image.test.ts
+  s_3695f0cfb8d82a::t_2cb9cc16478fc5 333-351
+  s_3695f0cfb8d82a::t_d40d54c5e0d7d5 239-241,244-249,252,259-267,270,273-276,278-280
+.github/workflows/build.yml
+  s_3695f0cfb8d82a::t_1def6fe1b867bc 137-142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "259fd39c55460055c13c075a0f17119a3598856c",
+  "prompts": {},
+  "sessions": {
+    "s_3695f0cfb8d82a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "602efdc2-4b25-49db-938f-df6797643aa7",
+        "model": "unknown"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
