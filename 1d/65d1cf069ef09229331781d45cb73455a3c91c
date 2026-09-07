@@ -1,0 +1,21 @@
+packages/core/test/sourced-concept.ts
+  s_876a3fbbae1185::t_4c9c12addc9ce1 28-29,32,35
+  s_876a3fbbae1185::t_b83a34ee9bf4c2 14-15
+  s_876a3fbbae1185::t_3567f983b2089f 139-156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1d65d1cf069ef09229331781d45cb73455a3c91c",
+  "prompts": {},
+  "sessions": {
+    "s_876a3fbbae1185": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9e05c9c3-cbbb-4563-b5b8-659867a07e7e",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
