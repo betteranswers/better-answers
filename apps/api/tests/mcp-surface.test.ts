@@ -263,12 +263,19 @@ describe("era-independent", () => {
 
   it("counts every call against the token and answers 429 with one sentence past the ceiling (ADR 0018)", async () => {
     const { client, token } = await connect();
-    let last: Response | undefined;
-    for (let call = 0; call < 121; call += 1) last = await modern(client, token, "tools/list");
+    // The counter is a fixed window aligned to the clock, so a burst of exactly max + 1
+    // calls may straddle a boundary and never be refused (about one run in twenty). Up to
+    // 2·max + 1 calls put max + 1 into one window whatever the clock does; the first
+    // refusal is the answer asserted on.
+    let refused: Response | undefined;
+    for (let call = 0; call < 241 && refused === undefined; call += 1) {
+      const answer = await modern(client, token, "tools/list");
+      if (answer.status === 429) refused = answer;
+    }
 
-    expect(last?.status).toBe(429);
-    expect(last?.headers.get("retry-after")).not.toBeNull();
-    const body = (await last?.json()) as Rpc;
+    expect(refused?.status).toBe(429);
+    expect(refused?.headers.get("retry-after")).not.toBeNull();
+    const body = (await refused?.json()) as Rpc;
     expect(String(body["error_description"])).toContain("an Admin can raise the ceiling in System");
   });
 });
