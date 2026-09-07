@@ -1,0 +1,122 @@
+packages/core/test/kernel.test.ts
+  s_6181fc5a558822::t_6275fd203391c3 28
+packages/core/test/workspaces.test.ts
+  s_6181fc5a558822::t_6275fd203391c3 349
+CONTEXT.md
+  s_6181fc5a558822::t_2cc0dea1fafd1d 106-110
+packages/schema/migrations/meta/0014_snapshot.json
+  s_6181fc5a558822::t_c76c0bffe4a51d 2,2766-2780,3031-3045,3078-3081,3210
+packages/schema/migrations/meta/_journal.json
+  s_6181fc5a558822::t_c76c0bffe4a51d 106,113
+docs/adr/README.md
+  s_6181fc5a558822::t_1412a604a3902c 20
+packages/schema/src/concept-tables.ts
+  s_6181fc5a558822::t_5e94d2d4929b20 334-338,341
+  s_6181fc5a558822::t_a82e9290b9f299 84-90
+  s_6181fc5a558822::t_f0cd7864d15c91 186-194
+  s_6181fc5a558822::t_c3fda441eb5d1d 98-114
+  s_6181fc5a558822::t_6f2e6b195082a1 155-185,195-199
+  s_6181fc5a558822::t_b7fe90ff22ee58 240-247,250-256
+packages/schema/src/table-ownership.ts
+  s_6181fc5a558822::t_426888c3f3cc5a 100-104
+packages/core/src/access/index.ts
+  s_6181fc5a558822::t_afb449c1036315 56-58
+packages/core/test/principal.test.ts
+  s_6181fc5a558822::t_6275fd203391c3 131,235
+packages/core/src/answering/index.ts
+  s_6181fc5a558822::t_70870f3584ca1d 213,229-236,240-248
+  s_6181fc5a558822::t_d4d2bf50683a79 1
+  s_6181fc5a558822::t_06b2dad086d1bb 261
+  s_6181fc5a558822::t_39116073fb83b3 260,262,264-268
+  s_6181fc5a558822::t_326a12189a8dc3 106-111,116
+  s_6181fc5a558822::t_74f0dc58b9781d 300
+packages/core/src/kernel/principal.ts
+  s_6181fc5a558822::t_851f8f1e0eeb9e 10-18
+  s_6181fc5a558822::t_aef4306ab1e61d 52-56,60-63,65
+packages/core/src/store/postgres/index.ts
+  s_6181fc5a558822::t_f3efec86f76f02 226,228,272,274,295,329,350,356-358
+  s_6181fc5a558822::t_8ae18041072362 165-172,178
+  s_6181fc5a558822::t_4b9f42069eb5e2 258
+packages/schema/src/boundary-schemas.ts
+  s_6181fc5a558822::t_bd4004f0f0f893 304-312,314-318,322-329
+  s_6181fc5a558822::t_ff2bc292ff2965 362-365
+  s_6181fc5a558822::t_5628da42d9452b 12
+packages/schema/migrations/0014_concept-write-path.sql
+  s_6181fc5a558822::t_c76c0bffe4a51d 38-39,53,69,72
+packages/core/test/audit.test.ts
+  s_6181fc5a558822::t_6275fd203391c3 386
+packages/schema/migrations/meta/0015_snapshot.json
+  s_6181fc5a558822::t_c76c0bffe4a51d 2-3,2766-2780,3031-3045,3078-3081,3210
+packages/core/test/concepts.test.ts
+  s_6181fc5a558822::t_6801f7b55585f4 524-545
+  s_6181fc5a558822::t_614dc836a27c2f 694-695,697-698,704-708
+  s_6181fc5a558822::t_2f771b139b5d62 774
+  s_6181fc5a558822::t_db069d97fd3017 315-317,320-323,331,335-336
+  s_6181fc5a558822::t_0cae5b704408f6 428-459
+  s_6181fc5a558822::t_49bf26156e153e 735,737-744,746
+  s_6181fc5a558822::t_984ccb87f4122d 268,408,473,686
+  s_6181fc5a558822::t_6e88bae2c8cd7a 849-856,860-869
+  s_6181fc5a558822::t_ac96db755e49f2 857-859
+  s_6181fc5a558822::t_4af98d2f2dccf5 248-249,253-259
+  s_6181fc5a558822::t_033f99cade1146 135-141
+  s_6181fc5a558822::t_baaceec0ec8324 15
+  s_6181fc5a558822::t_f4a475f0ee36d8 309-314,324-330,332-334,337-365
+  s_6181fc5a558822::t_be6d63add61ac9 318-319
+packages/schema/migrations/0015_concept-write-path-substrate.sql
+  s_6181fc5a558822::t_68659f9e04bc9f 2-4,18-25,28,31-33
+packages/core/src/store/git/index.ts
+  s_6181fc5a558822::t_2bb560f5443fd4 148-155,163
+  s_6181fc5a558822::t_86cecf87e7b364 336,340
+  s_6181fc5a558822::t_51c6b517033d35 118-121,132-137
+  s_6181fc5a558822::t_53fbd933473520 282
+  s_6181fc5a558822::t_a5360e8ecec1a8 190-203,205-211,214-216
+  s_6181fc5a558822::t_c7ae367747be9b 16-19
+  s_6181fc5a558822::t_913a48fc5231f5 7,12-13,20-21
+  s_6181fc5a558822::t_620f8386a7b004 14-15
+  s_6181fc5a558822::t_07cb596e5a3e7e 241,246-248,258
+packages/core/src/audit/vocabulary.ts
+  s_6181fc5a558822::t_20fe9309af86ac 38-45,52-53
+packages/core/test/bundle.ts
+  s_6181fc5a558822::t_1dd61d4cff6d4b 76-80,82-83
+packages/schema/test/rls.test.ts
+  s_6181fc5a558822::t_317c72d03b7259 731-732
+  s_6181fc5a558822::t_1b1be827fe140e 807,813-814,824,828-840,846-852,858-864,875-895
+  s_6181fc5a558822::t_643f98f3576ded 799-801
+  s_6181fc5a558822::t_adb07115bbc6f5 724,727-730,733-735,738-747,750-751
+  s_6181fc5a558822::t_72d3b38b4d6b7b 817-819
+docs/adr/0012-the-concept-write-path.md
+  s_6181fc5a558822::t_9bc390b80b6206 72-74
+packages/schema/test/factory.ts
+  s_6181fc5a558822::t_5db93fefc87844 15
+  s_6181fc5a558822::t_0df862e652d233 373-375,383,390
+packages/core/src/concepts/index.ts
+  s_6181fc5a558822::t_89d5078cd64b34 250-253
+  s_6181fc5a558822::t_5c6c21a0fa9215 132,134
+  s_6181fc5a558822::t_65b2a0cfa9954f 91-93,95-108,112-131,133,135-137
+  s_6181fc5a558822::t_3911b53a127acd 94
+  s_6181fc5a558822::t_244aa5b79c7a43 352,356,361-367,369-371,377-382
+  s_6181fc5a558822::t_580ad54770d4f5 224-241,245,249,279-291,295-303,306-312,321-325,329-331
+  s_6181fc5a558822::t_659690ba700b2e 419
+  s_6181fc5a558822::t_272c0e66f7a3b0 7
+  s_6181fc5a558822::t_690f509930d0a3 292
+  s_6181fc5a558822::t_16fd14f8f74e84 242-244,246-248,254-265,267-269,271-276
+  s_6181fc5a558822::t_5e507895ea0ff4 441
+  s_6181fc5a558822::t_a98a09f8cf5b3e 463-466,474,483-485,492
+  s_6181fc5a558822::t_58e440daf209f6 85-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e64b5d183944317533b7d65dcd675194772a5dee",
+  "prompts": {},
+  "sessions": {
+    "s_6181fc5a558822": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6019b35b-37fc-4524-aa66-a5eb72515b67",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    }
+  }
+}
