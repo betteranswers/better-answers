@@ -6,9 +6,11 @@ import {
   ACCESS_REQUEST_REASON_MAX,
   ACCESS_REQUEST_STATUSES,
 } from "./access-request-tables.ts";
+import { ACTOR_ID as ACTOR_ID_REGEX } from "./actor-id.ts";
 import { ACT, auditEvent, FAMILIES } from "./audit-tables.ts";
 import {
   bundleCommit,
+  CONCEPT_FRONTMATTER_MAX,
   CONCEPT_PATH,
   CONCEPT_STATUSES,
   conceptIdentity,
@@ -53,7 +55,15 @@ import {
 import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { ROLES } from "./roles.ts";
 import { llmRoute, workspaceConfig } from "./schema.ts";
-import { ULID, ULID_CHARACTERS } from "./ulid.ts";
+import {
+  conceptWriteRequest,
+  suggestion,
+  SUGGESTION_BODY_MAX,
+  SUGGESTION_KINDS,
+  SUGGESTION_REASON_MAX,
+  SUGGESTION_STATUSES,
+} from "./suggestion-tables.ts";
+import { ULID } from "./ulid.ts";
 import { workspace } from "./workspace-table.ts";
 
 /**
@@ -245,14 +255,11 @@ export const ingressCounterInsert = createInsertSchema(ingressCounter, ingressCo
 export const ingressCounterUpdate = createUpdateSchema(ingressCounter, ingressCounterRefinements);
 
 /**
- * The ledger's actor, narrowed to the three forms the kernel's `ActorId` names (ADR 0035):
- * a person by their person id — the minter's shape, so an email cannot pass for one — the
- * platform by `process:better-answers-<purpose>`, an agent by `better-answers-<purpose>/<version>`
- * as ADR 0019 shapes it.
+ * The ledger's actor, narrowed to the three forms the kernel's `ActorId` names — the one
+ * pattern `actor-id.ts` writes, so a refinement here and a CHECK on a row are held to the
+ * same characters. Re-exported, because the package's callers have always read it here.
  */
-export const ACTOR_ID = new RegExp(
-  `^(human:${ULID_CHARACTERS}|process:better-answers-[a-z0-9][a-z0-9-]*|better-answers-[a-z0-9][a-z0-9-]*/[0-9A-Za-z.-]+)$`,
-);
+export { ACTOR_ID } from "./actor-id.ts";
 
 /**
  * The detail a row carries: ids and role words, and an act's confirmations as typed
@@ -272,7 +279,7 @@ const auditEventRefinements = {
   workspaceId,
   act: (schema: z.ZodString) =>
     schema.regex(ACT).pipe(z.templateLiteral([z.enum(FAMILIES), ".", z.string(), ".", z.string()])),
-  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
   subjectId: (schema: z.ZodString) => schema.trim().min(1),
   detail: (schema: z.ZodType) => schema.pipe(detail),
   batchId: (schema: z.ZodString) => schema.regex(ULID),
@@ -367,6 +374,20 @@ export const conceptFrontmatter = z
     ]),
   )
   .superRefine((value, context) => {
+    // The bound `submit_suggestion_set` also holds, **in the units it counts**. Frontmatter
+    // is open — every key preserved verbatim (ADR 0019) — so nothing about its shape says
+    // how large it may be, and a producer who chose that would be choosing how much the
+    // platform stores. Counted by iteration rather than `.length`, because `.length` counts
+    // UTF-16 code units and Postgres's `char_length` counts characters: an astral character
+    // is two there and one here, and two numbers for one bound is the defect this pair had.
+    let characters = 0;
+    for (const _ of JSON.stringify(value)) characters += 1;
+    if (characters > CONCEPT_FRONTMATTER_MAX) {
+      context.addIssue({
+        code: "custom",
+        message: `a concept's frontmatter is at most ${CONCEPT_FRONTMATTER_MAX} characters of JSON`,
+      });
+    }
     const sources = value["sources"];
     if (!Array.isArray(sources)) return;
     for (const [index, entry] of sources.entries()) {
@@ -406,16 +427,34 @@ export const conceptIdentityUpdate = createUpdateSchema(
  * hold one where the other belongs, and the three visibility columns are narrowed exactly as
  * `index.chunk`'s are, because the read predicate is tested against them (ADR 0023).
  */
+/**
+ * A concept's file, wherever a row holds one: the derived index row, and the payload an
+ * acceptance would commit. Narrowed once, so a payload the boundary accepts is a payload the
+ * index row's boundary will accept too — otherwise a suggestion could be stored that nobody
+ * could ever accept, and the refusal would land on the Admin deciding it.
+ *
+ * The path is a place in the bundle's concept area and nothing else: the manifest at the
+ * bundle root is platform-reserved (ADR 0002), and a row pointing at it would be claiming a
+ * file the format does not read as a concept.
+ */
+const conceptFileRefinements = {
+  path: (schema: z.ZodString) => schema.regex(CONCEPT_PATH),
+  title: (schema: z.ZodString) => schema.trim().min(1),
+  frontmatter: (schema: z.ZodType) => schema.pipe(frontmatter),
+};
+
+/**
+ * The OKF `type` a file carries, under whichever column name its table gives it: `kind` on
+ * the index row, which is the folded word the type vocabulary counts, and `concept_kind` on
+ * a payload, where the bare word would read as the *suggestion's* kind.
+ */
+const conceptKind = (schema: z.ZodString) => schema.trim().min(1);
+
 const conceptIndexRefinements = {
   workspaceId,
   iri: conceptIri,
-  // A place in the bundle's concept area and nothing else: the manifest at the bundle root
-  // is platform-reserved (ADR 0002), and a row pointing at it would be the index claiming a
-  // file the format does not read as a concept.
-  path: (schema: z.ZodString) => schema.regex(CONCEPT_PATH),
-  kind: (schema: z.ZodString) => schema.trim().min(1),
-  title: (schema: z.ZodString) => schema.trim().min(1),
-  frontmatter: (schema: z.ZodType) => schema.pipe(frontmatter),
+  ...conceptFileRefinements,
+  kind: conceptKind,
   contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
   commitSha: (schema: z.ZodString) => schema.regex(GIT_SHA),
   status: (schema: z.ZodString) => schema.pipe(z.enum(CONCEPT_STATUSES)),
@@ -437,7 +476,7 @@ const bundleCommitRefinements = {
   sha: (schema: z.ZodString) => schema.regex(GIT_SHA),
   parentSha: (schema: z.ZodString) => schema.regex(GIT_SHA),
   auditEventId: (schema: z.ZodString) => schema.regex(ULID),
-  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
 };
 
 export const bundleCommitSelect = createSelectSchema(bundleCommit, bundleCommitRefinements);
@@ -460,7 +499,7 @@ const conceptVerificationRefinements = {
   id: (schema: z.ZodString) => schema.regex(ULID),
   workspaceId,
   iri: conceptIri,
-  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
   contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
   origin: (schema: z.ZodString) => schema.pipe(z.enum(VERIFICATION_ORIGINS)),
 };
@@ -576,6 +615,58 @@ export const graphEdgeInsert = createInsertSchema(graphEdge, graphEdgeRefinement
   { message: "a source-entity label carries no generation", path: ["gen"] },
 );
 export const graphEdgeUpdate = createUpdateSchema(graphEdge, graphEdgeRefinements);
+
+/**
+ * A **suggestion** (ADR 0012): the two actors are the ledger's own actor shape, so a
+ * proposer and a decider read the same way wherever they appear; the target is a concept
+ * IRI, because a resolved target is a concept and never a path; and the reason is bounded,
+ * since the surface that writes one is open to any member of the workspace.
+ */
+const suggestionRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  setId: (schema: z.ZodString) => schema.regex(ULID),
+  kind: (schema: z.ZodString) => schema.pipe(z.enum(SUGGESTION_KINDS)),
+  status: (schema: z.ZodString) => schema.pipe(z.enum(SUGGESTION_STATUSES)),
+  proposer: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
+  targetIri: conceptIri,
+  decider: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
+  reason: (schema: z.ZodString) => schema.trim().min(1).max(SUGGESTION_REASON_MAX),
+};
+
+export const suggestionSelect = createSelectSchema(suggestion, suggestionRefinements);
+export const suggestionInsert = createInsertSchema(suggestion, suggestionRefinements);
+export const suggestionUpdate = createUpdateSchema(suggestion, suggestionRefinements);
+
+/**
+ * A **concept write request** — a suggestion's payload: the file above, plus what it means
+ * it for and what it was written against. There is deliberately **no IRI**: identity is the
+ * acceptance's to resolve from the merge key (ADR 0012).
+ */
+const conceptWriteRequestRefinements = {
+  workspaceId,
+  suggestionId: (schema: z.ZodString) => schema.regex(ULID),
+  mergeKey: (schema: z.ZodString) => schema.trim().min(1),
+  ...conceptFileRefinements,
+  conceptKind,
+  // The bound the column holds, held here too, so a payload too large to store is refused
+  // where a caller can be told rather than by the row it never reached.
+  body: (schema: z.ZodString) => schema.max(SUGGESTION_BODY_MAX),
+  baseContentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
+};
+
+export const conceptWriteRequestSelect = createSelectSchema(
+  conceptWriteRequest,
+  conceptWriteRequestRefinements,
+);
+export const conceptWriteRequestInsert = createInsertSchema(
+  conceptWriteRequest,
+  conceptWriteRequestRefinements,
+);
+export const conceptWriteRequestUpdate = createUpdateSchema(
+  conceptWriteRequest,
+  conceptWriteRequestRefinements,
+);
 
 /** One entry per table this package owns — the parity test's registry (ADR 0028). */
 export const boundarySchemas = {
@@ -701,5 +792,17 @@ export const boundarySchemas = {
     select: graphEdgeSelect,
     insert: graphEdgeInsert,
     update: graphEdgeUpdate,
+  },
+  suggestion: {
+    table: suggestion,
+    select: suggestionSelect,
+    insert: suggestionInsert,
+    update: suggestionUpdate,
+  },
+  conceptWriteRequest: {
+    table: conceptWriteRequest,
+    select: conceptWriteRequestSelect,
+    insert: conceptWriteRequestInsert,
+    update: conceptWriteRequestUpdate,
   },
 } as const;

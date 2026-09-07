@@ -102,3 +102,52 @@ def seed_llm_route(
         ),
     )
     return _returning_row(cursor)
+
+
+def seed_concept_identity(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    iri: str,
+    merge_key: str,
+) -> dict[str, Any]:
+    """A concept's identity: the IRI the platform minted, and the merge key it holds.
+
+    What an acceptance resolves a suggestion's target against (ADR 0002, ADR 0012), so
+    the inbox conformance suite needs one before a merge key can resolve to anything.
+    """
+    cursor.execute(
+        "INSERT INTO concept_identity (workspace_id, iri, merge_key)"
+        " VALUES (%s, %s, %s) RETURNING *",
+        (workspace_id, iri, merge_key),
+    )
+    return _returning_row(cursor)
+
+
+def seed_concept_index(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    iri: str,
+    path: str,
+    content_hash: str,
+) -> dict[str, Any]:
+    """A concept's derived row, with the bundle commit it names.
+
+    The index row's key to its commit is real, so the commit is written first here
+    rather than left to a deferral the caller would have to remember.
+    """
+    sha = secrets.token_hex(20)
+    cursor.execute(
+        "INSERT INTO bundle_commit (workspace_id, sha, audit_event_id, actor)"
+        " VALUES (%s, %s, %s, 'process:better-answers-test')",
+        (workspace_id, sha, ulid()),
+    )
+    cursor.execute(
+        "INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter,"
+        " body, content_hash, commit_sha, status, published_at, sensitivity, audience)"
+        " VALUES (%s, %s, %s, 'Policy', 'Expenses', '{}'::jsonb, 'body', %s, %s,"
+        " 'stable', now(), 'Internal', 'everyone') RETURNING *",
+        (workspace_id, iri, path, content_hash, sha),
+    )
+    return _returning_row(cursor)

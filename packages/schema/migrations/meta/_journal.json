@@ -120,6 +120,20 @@
       "when": 1788772299770,
       "tag": "0016_graph-tables",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788781365698,
+      "tag": "0017_the-inbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788781371397,
+      "tag": "0018_the-inbox-substrate",
+      "breakpoints": true
     }
   ]
 }

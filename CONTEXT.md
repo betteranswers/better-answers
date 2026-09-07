@@ -114,8 +114,22 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   *edit*: a concept's text, a Brief, a missing fact, a new concept raised from unmapped
   passages; kind *promotion*: an answer proposed as an `Answer`, decided singly at the gate) — which the target's owner or an Admin
   accepts or declines before it is applied. Nothing platform-prepared enters a bundle without
-  acceptance; every kind but *edit* is an Admin's to decide, in Control Centre.
+  acceptance; every kind but *edit* is an Admin's to decide, in Control Centre. A suggestion
+  the platform refused mid-acceptance is **returned**: handed back to its proposer with the
+  reason, recording who was deciding it, because what it was written against moved.
   _Avoid_: proposal (the bid document), offered change, revision.
+- **inbox** — where suggestions wait to be decided: the queue of one workspace's suggestions
+  and their payloads, platform state in no knowledge layer. Nothing reads a payload but the
+  acceptance path, and no run reads another run's candidates out of it. _Avoid_: queue (a
+  worker's), review queue.
+- **concept write request** — a suggestion's payload: the concept file it would write and the
+  merge key it means it for, committed on acceptance and never on validation. It carries no
+  IRI, because identity is the acceptance's to resolve. _Avoid_: draft, pending concept.
+- **citation repair** — the platform's own fix for a source that moved on: a new locator into
+  the same document, raised as a suggestion of kind *repair* — which nobody but the platform
+  may raise — and decided like any other. Its acceptance re-points every standing check at the
+  content it wrote, so repairing a citation never turns *Checked* into *Changed since checked*.
+  _Avoid_: relink, locator fix.
 - **discard (a concept)** — removing a concept that was never stable and nothing cites or links:
   the file leaves the bundle, its identity and audit trail stay as a *removed concept*. Any
   concept that has been stable, or is cited or linked, is deprecated instead, never removed.

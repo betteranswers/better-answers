@@ -64,7 +64,8 @@ export type AuditEvent<A extends Act> = {
   readonly act: A;
   readonly subjectId: string;
   readonly detail: DetailOf<A["detail"]>;
-  readonly batchId?: string;
+  /** Explicitly `| undefined`, so a bulk act's caller passes the id it holds, batch or none. */
+  readonly batchId?: string | undefined;
 };
 
 /** What a door answers: the row's id, and the actor it was booked to. */

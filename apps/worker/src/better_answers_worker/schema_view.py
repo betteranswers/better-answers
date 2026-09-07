@@ -6,7 +6,7 @@ direction. The worker never migrates; this module is its read-only
 knowledge of what the app's journal built, stamped with the migration id it was
 generated from."""
 
-MIGRATION_ID = "0016_graph-tables"
+MIGRATION_ID = "0018_the-inbox-substrate"
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -97,6 +97,17 @@ TABLES: dict[str, dict[str, str]] = {
         "checked_at": "timestamp with time zone NOT NULL",
         "content_hash": "text",
         "origin": "text NOT NULL",
+    },
+    "public.concept_write_request": {
+        "workspace_id": "text NOT NULL",
+        "suggestion_id": "text NOT NULL",
+        "merge_key": "text NOT NULL",
+        "path": "text NOT NULL",
+        "concept_kind": "text NOT NULL",
+        "title": "text NOT NULL",
+        "frontmatter": "jsonb NOT NULL",
+        "body": "text NOT NULL",
+        "base_content_hash": "text",
     },
     "public.evidence": {
         "workspace_id": "text NOT NULL",
@@ -325,6 +336,19 @@ TABLES: dict[str, dict[str, str]] = {
         "user_agent": "text",
         "user_id": "text NOT NULL",
         "active_workspace_id": "text",
+    },
+    "public.suggestion": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "set_id": "text NOT NULL",
+        "kind": "text NOT NULL",
+        "status": "text NOT NULL",
+        "proposer": "text NOT NULL",
+        "target_iri": "text",
+        "decider": "text",
+        "reason": "text",
+        "proposed_at": "timestamp with time zone NOT NULL",
+        "decided_at": "timestamp with time zone",
     },
     "public.user": {
         "id": "text NOT NULL",

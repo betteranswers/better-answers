@@ -4,7 +4,15 @@ import { PgTable } from "drizzle-orm/pg-core";
 import type { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ACCESS_REQUEST_REASON_MAX, boundarySchemas, EMBEDDING_DIMENSIONS } from "../src/index.ts";
+import {
+  ACCESS_REQUEST_REASON_MAX,
+  boundarySchemas,
+  CONCEPT_FRONTMATTER_MAX,
+  conceptFrontmatter,
+  EMBEDDING_DIMENSIONS,
+  SUGGESTION_BODY_MAX,
+  SUGGESTION_REASON_MAX,
+} from "../src/index.ts";
 import * as publicEntry from "../src/index.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "../src/drizzle-zod.ts";
 import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
@@ -30,6 +38,8 @@ const NOW = new Date("2026-09-01T00:00:00Z");
 const CONCEPT_IRI = "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM";
 const CONTENT_SHA256 = "a".repeat(64);
 const COMMIT_SHA = "b".repeat(40);
+const SUGGESTION_SET_ID = "01J6RRRRRRRRRRRRRRRRRRRRRR";
+const SUGGESTION_ID = "01J6SSSSSSSSSSSSSSSSSSSSSS";
 
 /** Rows each refined insert schema accepts — assertion 4's input. */
 const acceptedRows = {
@@ -328,6 +338,43 @@ const acceptedRows = {
       audience: "everyone",
     },
   ],
+  // One waiting and one accepted: the decision CHECK's two whole shapes, so the fixture
+  // proves the boundary accepts a suggestion before its decision and after it.
+  suggestion: [
+    {
+      workspaceId: WS_ID,
+      id: SUGGESTION_ID,
+      setId: SUGGESTION_SET_ID,
+      kind: "edit",
+      proposer: `human:${USER_ID}`,
+    },
+    {
+      workspaceId: WS_ID,
+      id: "01J6TTTTTTTTTTTTTTTTTTTTTT",
+      setId: SUGGESTION_SET_ID,
+      kind: "candidate",
+      status: "accepted",
+      proposer: "better-answers-extraction/1.2",
+      targetIri: CONCEPT_IRI,
+      decider: `human:${USER_ID}`,
+      decidedAt: NOW,
+    },
+  ],
+  // The payload of the waiting one: a merge key and no IRI at all, because identity is
+  // the acceptance's to resolve (ADR 0012).
+  conceptWriteRequest: [
+    {
+      workspaceId: WS_ID,
+      suggestionId: SUGGESTION_ID,
+      mergeKey: "policy:expenses",
+      path: "knowledge/expenses.md",
+      conceptKind: "Policy",
+      title: "Expenses",
+      frontmatter: { title: "Expenses", type: "Policy", sources: [{ resource: "/s.md" }] },
+      body: "Expenses are claimed within sixty days.",
+      baseContentHash: CONTENT_SHA256,
+    },
+  ],
 } as const;
 
 const registryNames = Object.keys(boundarySchemas) as (keyof typeof boundarySchemas)[];
@@ -464,6 +511,10 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "graphGeneration",
         "graphNode",
         "graphEdge",
+        // The suggestion before its payload, which names it by the composite key, and
+        // after the identity its accepted row resolved to.
+        "suggestion",
+        "conceptWriteRequest",
         "chunk",
       ] as const;
       expect(insertOrder.toSorted()).toEqual(registryNames.toSorted());
@@ -566,6 +617,24 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.graphEdge[0], fromUid: "   " },
       { ...acceptedRows.graphEdge[1], label: "source-entity:mentions" },
     ],
+    // The queue's refusals: a fifth kind, a proposer that is an address rather than an
+    // actor, and a reason longer than the column carries.
+    suggestion: [
+      { ...acceptedRows.suggestion[0], kind: "merge" },
+      { ...acceptedRows.suggestion[0], proposer: "ada@acme.invalid" },
+      { ...acceptedRows.suggestion[0], reason: "x".repeat(SUGGESTION_REASON_MAX + 1) },
+    ],
+    // The payload's refusals: the bundle's manifest, which is not a concept file — and the
+    // two columns a producer fills at a size of its own choosing, each held to its bound,
+    // so a compromised one cannot fill a tenant's storage a suggestion at a time.
+    conceptWriteRequest: [
+      { ...acceptedRows.conceptWriteRequest[0], path: "knowledge/manifest.yaml" },
+      { ...acceptedRows.conceptWriteRequest[0], body: "x".repeat(SUGGESTION_BODY_MAX + 1) },
+      {
+        ...acceptedRows.conceptWriteRequest[0],
+        frontmatter: { title: "x".repeat(CONCEPT_FRONTMATTER_MAX) },
+      },
+    ],
   } as const;
 
   for (const name of Object.keys(rejectedRows) as (keyof typeof rejectedRows)[]) {
@@ -575,6 +644,23 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       }
     });
   }
+});
+
+describe("the frontmatter bound's unit", () => {
+  /** A frontmatter of one astral character repeated — two UTF-16 code units each. */
+  const astral = (characters: number) => ({ a: "\u{1D11E}".repeat(characters) });
+
+  it("counts the characters `char_length` counts, not the units JavaScript measures", () => {
+    // The bound is enforced in `submit_suggestion_set`, which measures the caller's own JSON
+    // text with `char_length` — characters. Measuring UTF-16 code units here would make one
+    // bound into two numbers, and the gap between them is a payload the boundary refuses and
+    // the database would have taken, or the other way about.
+    const inside = astral(CONCEPT_FRONTMATTER_MAX - 100);
+    expect(JSON.stringify(inside).length).toBeGreaterThan(CONCEPT_FRONTMATTER_MAX);
+    expect(conceptFrontmatter.safeParse(inside).success).toBe(true);
+
+    expect(conceptFrontmatter.safeParse(astral(CONCEPT_FRONTMATTER_MAX)).success).toBe(false);
+  });
 });
 
 describe("the customType exception, per shape", () => {

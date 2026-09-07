@@ -87,6 +87,16 @@ export const VERIFICATION_IMPORTED_ORIGIN =
   "imported" satisfies (typeof VERIFICATION_ORIGINS)[number];
 
 /**
+ * A check whose **hash the citation repair moved** (ADR 0019's *erasure-rewrite* twin;
+ * T-006 spec, *Evidence, verification and repair*). Repairing a locator changes what the
+ * concept's content hash is over, so every standing check would read *Changed since
+ * checked* the moment the repair commits — for a change nobody made to the fact. The
+ * repair re-points those checks at the content it wrote and marks them with this origin,
+ * so the row still says who checked and when, and says that a routine moved its hash.
+ */
+export const VERIFICATION_REPAIR_ORIGIN = "repair" satisfies (typeof VERIFICATION_ORIGINS)[number];
+
+/**
  * Where every concept IRI lives, and the whole of it (ADR 0002): the IRI is **opaque** —
  * `https://better-answers.com/c/<ulid>` — never derived from the path, the bundle or the
  * tenant, so it leaks no name wherever it appears.
@@ -223,8 +233,33 @@ export const CONCEPT_STABLE_STATUS = "stable" satisfies (typeof PUBLISHED_STATUS
  */
 export const CONTENT_HASH = /^[0-9a-f]{64}$/;
 
-// `listed` and `stamp` are `column-helpers.ts`'s, shared with the graph tables so the two
-// files cannot drift on how a CHECK's list or an instant is written.
+/**
+ * How large a concept's frontmatter may be, measured **as the producer wrote it** — the JSON
+ * text a producer serialized, in **characters**, which is what Postgres's `char_length` counts
+ * and so what the boundary counts too (JavaScript's `.length` would count an astral
+ * character twice and make one bound into two numbers). OKF's keys plus whatever else the
+ * file carried is open by design (ADR 0019), so nothing about the shape bounds it, and a
+ * producer who chooses the size of what the platform stores is the defect
+ * `SUGGESTION_BODY_MAX` closes for the body. Sixty-four thousand characters is a wide margin
+ * over a `sources[]` list a person would ever write.
+ *
+ * **One number and one measurement, in two places that measure the same characters**: the
+ * boundary, where a producer is told; and `submit_suggestion_set`, which is the only road to a
+ * payload row (both runtime roles hold `REVOKE ALL` on the table) and which takes the
+ * frontmatter as the producer's own text so that it can measure exactly that.
+ *
+ * There is deliberately **no CHECK over the stored `jsonb`**. A row can only measure what
+ * Postgres renders, and a rendering is not the producer's text within any multiplier:
+ * `{"a":1e-100}` is twelve characters sent and a hundred and nine read back, because `jsonb`
+ * keeps a numeric and prints it in full. A CHECK over the rendering would refuse payloads the
+ * boundary had already passed — a backstop that fires on good input is worse than none —
+ * and it would be guarding a storage cost that is not there, since the numeric it renders
+ * long is stored short.
+ */
+export const CONCEPT_FRONTMATTER_MAX = 64_000;
+
+// `listed` and `stamp` are `column-helpers.ts`'s, shared with the graph and inbox tables so
+// the files cannot drift on how a CHECK's list or an instant is written.
 
 /**
  * The identity record (ADR 0002): the IRI the platform minted, and the **merge key** it was

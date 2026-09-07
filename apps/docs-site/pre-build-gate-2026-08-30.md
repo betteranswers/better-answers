@@ -307,6 +307,11 @@ ADR 0023's named spike, with scale **F4**'s condition added — run it **under c
 
 **Sequencing note.** B1 → B2 is a hard chain; B3, B4, B5 and B6 all run off B2 and are independent of each other. The first genuinely client-visible moment is B4's drill, which ADR 0022 requires before any client data — so it should not be scheduled last.
 
+**Addendum (2026-09-07, during B5's build) — two obligations the map revisit must place.** Both were found by B5's adversarial review passes and are pinned in code but carried by no ticket, deliberately: the blocks they land in are not yet cut, and the map is to be revisited before they are.
+
+- **Edge columns are never projected without the target's predicate.** A `graph_edge` row denormalises its target's IRI and kind while wearing the *from*-concept's visibility, so a guessed path can mint an edge naming a withheld concept. Safe today because every walk returns node fields alone — pinned by test, with the rule in the graph door's docblock: *before any surface projects an edge's columns, the target's own predicate must be applied.* The first surface that would — `open`'s relations projection, **B9** — inherits the rule; whatever block the revisit gives that surface must carry it as an acceptance criterion.
+- **The owner arm of ADR 0012's decision gate has no record to stand on.** The *edit* kind is decided by "the target's owner or an Admin", but no concept-owner record exists anywhere in the schema, so T-054 gates every suggestion decision to Admin alone, stated in the concepts slice docblock. The revisit either mints the owner record (and says which block builds it — the concepts product surface, **B8**, is the natural home) or amends ADR 0012 to drop the arm; the Admin-only gate must not ossify by default.
+
 ---
 
 ## §8 — What the five lenses found

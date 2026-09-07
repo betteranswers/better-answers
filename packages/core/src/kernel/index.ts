@@ -20,7 +20,9 @@
  * - `ActorId`, `actorIdOf` and `actorIdOfPerson` — the three forms a record the platform
  *   keeps names an actor in, the one derivation from a Principal and the one from a person
  *   id alone, for the act whose maker holds no Principal, so none is composed by hand
- *   (ADRs 0019, 0035 and 0038). T-076, T-061.
+ *   (ADRs 0019, 0035 and 0038). `personOfActor` reads one back, for the act that needs the
+ *   person a record names — an acceptance commits with the proposer as git author, and a
+ *   git author line is a name and an address. T-076, T-061, T-054.
  * - `RoleRefusal` and `requireAdmin` — the one word for an act a role may not perform
  *   and the guard that narrows a `UserPrincipal` to Admin or returns it. T-076.
  * - the result convention — what a slice act returns and that it never throws across
@@ -35,7 +37,7 @@ export { ulid } from "@better-answers/schema";
 export { refusalFor } from "./constraint.ts";
 export { attempt, err, normalizeError, ok } from "./result.ts";
 export type { Result } from "./result.ts";
-export { actorIdOf, actorIdOfPerson, isActorId, isPersonActor } from "./actor.ts";
+export { actorIdOf, actorIdOfPerson, isActorId, isPersonActor, personOfActor } from "./actor.ts";
 export type { ActorId, ProcessActorId } from "./actor.ts";
 export { requireAdmin } from "./role.ts";
 export type { AdminUserPrincipal, RoleRefusal } from "./role.ts";

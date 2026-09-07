@@ -14,6 +14,8 @@ import {
   CREATOR_ROLE,
   CURATED_ORIGIN,
   EMBEDDING_DIMENSIONS,
+  SUGGESTION_EDIT_KIND,
+  SUGGESTION_WAITING_STATUS,
   ulid,
   VERIFICATION_PLATFORM_ORIGIN,
 } from "../src/index.ts";
@@ -121,6 +123,19 @@ export type TestData = {
    * are named, and carries the link columns only when it is a `LINKS_TO`.
    */
   graphEdge(overrides?: Partial<InsertInput<"graphEdge">>): Promise<Row<"graphEdge">>;
+  /**
+   * A waiting suggestion; creates its own workspace unless one is named. A person's *edit*
+   * proposed by a process id, so a seeded row never reads as somebody's act, and none of
+   * the decision's four columns filled — which is what *waiting* means.
+   */
+  suggestion(overrides?: Partial<InsertInput<"suggestion">>): Promise<Row<"suggestion">>;
+  /**
+   * A suggestion's payload; creates the suggestion it belongs to unless one is named. It
+   * carries a merge key and no IRI, because identity is the acceptance's to resolve.
+   */
+  conceptWriteRequest(
+    overrides?: Partial<InsertInput<"conceptWriteRequest">>,
+  ): Promise<Row<"conceptWriteRequest">>;
 };
 
 /** A hash of `length` hex characters, in shape and unique per call: a stand-in, never a real digest. */
@@ -516,6 +531,42 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const suggestion: TestData["suggestion"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "suggestion", {
+      id: ulid(),
+      setId: ulid(),
+      kind: SUGGESTION_EDIT_KIND,
+      // Written out rather than left to the column's default, so a factory-made suggestion
+      // reads as what it is: waiting, with none of the decision's four columns filled.
+      status: SUGGESTION_WAITING_STATUS,
+      proposer: "process:better-answers-test",
+      targetIri: null,
+      decider: null,
+      reason: null,
+      decidedAt: null,
+      ...overrides,
+      workspaceId,
+    });
+  };
+
+  const conceptWriteRequest: TestData["conceptWriteRequest"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const suggestionId = overrides.suggestionId ?? (await suggestion({ workspaceId })).id;
+    return insertRow(client, "conceptWriteRequest", {
+      mergeKey: `policy:${ulid().toLowerCase()}`,
+      path: `knowledge/${ulid().toLowerCase()}.md`,
+      conceptKind: "Policy",
+      title: "Expenses",
+      frontmatter: { title: "Expenses", type: "Policy" },
+      body: "Expenses are claimed within thirty days.",
+      baseContentHash: null,
+      ...overrides,
+      workspaceId,
+      suggestionId,
+    });
+  };
+
   return {
     workspace,
     user,
@@ -539,5 +590,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     graphGeneration,
     graphNode,
     graphEdge,
+    suggestion,
+    conceptWriteRequest,
   };
 };

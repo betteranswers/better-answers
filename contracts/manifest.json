@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "agreements": {
     "queue": { "form": "sql-function" },
     "concept-inbox": { "form": "sql-function" },
@@ -11,6 +11,7 @@
   },
   "fixtures": [
     { "agreement": "llm-routing", "path": "llm-routing/cases.json" },
-    { "agreement": "id-shape", "path": "id-shape/cases.json" }
+    { "agreement": "id-shape", "path": "id-shape/cases.json" },
+    { "agreement": "concept-inbox", "path": "concept-inbox/cases.json" }
   ]
 }

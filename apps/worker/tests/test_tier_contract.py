@@ -14,7 +14,10 @@ import re
 from pathlib import Path
 from typing import Any, cast
 
-SPOKEN_CONTRACT_VERSION = 1
+import pytest
+from psycopg import Cursor
+
+SPOKEN_CONTRACT_VERSION = 2
 SPOKEN_AGREEMENTS = {
     "concept-inbox": "sql-function",
     "cost-ledger": "generated",
@@ -179,4 +182,121 @@ def test_llm_routing_resolves_every_fixtured_call() -> None:
             rows = cursor.fetchall()
             resolved = rows[0][0] if rows else None
             assert resolved == call["expect_route_id"], call
+        connection.rollback()
+
+
+# --- concept-inbox: the queue both tiers write to (ADR 0031, ADR 0012) ----------------
+#
+# The fixture is the contract: this tier submits a run's candidates as one call to
+# submit_suggestion_set and reads nothing back — the queue and the payload are the
+# app's. The summary is asserted here too, because the agreement is what the *database*
+# promises and either tier must be able to read the same answer out of it.
+#
+# Refusals are held by SQLSTATE and not by message text: the message is the server's
+# prose, the code is the agreement.
+
+
+def read_concept_inbox() -> dict[str, Any]:
+    raw = (CONTRACTS_DIR / "concept-inbox" / "cases.json").read_text(encoding="utf-8")
+    return cast("dict[str, Any]", json.loads(raw))
+
+
+def _seed_inbox_fixture(cursor: Cursor[Any], fixture: dict[str, Any]) -> None:
+    from factories import seed_concept_identity, seed_concept_index, seed_workspace
+
+    for workspace in fixture["workspaces"]:
+        seed_workspace(cursor, workspace_id=workspace["id"], name=workspace["name"])
+    for concept in fixture["concepts"]:
+        seed_concept_identity(
+            cursor,
+            workspace_id=concept["workspace_id"],
+            iri=concept["iri"],
+            merge_key=concept["merge_key"],
+        )
+        seed_concept_index(
+            cursor,
+            workspace_id=concept["workspace_id"],
+            iri=concept["iri"],
+            path=concept["path"],
+            content_hash=concept["content_hash"],
+        )
+
+
+def _submit_fixture_set(cursor: Cursor[Any], fixture: dict[str, Any]) -> int:
+    submission = fixture["set"]
+    cursor.execute(f"SET LOCAL ROLE {submission['role']}")
+    cursor.execute(
+        "SELECT set_config('app.workspace_id', %s, true)", (submission["workspace_id"],)
+    )
+    cursor.execute(
+        "SELECT * FROM submit_suggestion_set(%s, %s, %s, %s::jsonb)",
+        (
+            submission["set_id"],
+            submission["kind"],
+            submission["proposer"],
+            json.dumps(submission["requests"]),
+        ),
+    )
+    submitted = len(cursor.fetchall())
+    cursor.execute("RESET ROLE")
+    return submitted
+
+
+def test_the_inbox_takes_a_whole_set_in_one_call_and_re_renders_its_summary() -> None:
+    from pg_harness import migrated_postgres
+
+    fixture = read_concept_inbox()
+
+    with migrated_postgres() as connection, connection.cursor() as cursor:
+        _seed_inbox_fixture(cursor, fixture)
+        assert _submit_fixture_set(cursor, fixture) == len(fixture["set"]["requests"])
+
+        cursor.execute("SET LOCAL ROLE app_rt")
+        cursor.execute(
+            "SELECT suggestion_id, status, kind, merge_key, resolved_iri, base_moved"
+            " FROM suggestion_set_summary(%s)",
+            (fixture["set"]["set_id"],),
+        )
+        summary = cursor.fetchall()
+        assert summary == [
+            (
+                expected["suggestion_id"],
+                expected["status"],
+                expected["kind"],
+                expected["merge_key"],
+                expected["resolved_iri"],
+                expected["base_moved"],
+            )
+            for expected in fixture["expect_summary"]
+        ]
+        connection.rollback()
+
+
+def test_the_inbox_refuses_every_road_the_fixture_says_is_closed() -> None:
+    import psycopg
+
+    from pg_harness import migrated_postgres
+
+    fixture = read_concept_inbox()
+
+    with migrated_postgres() as connection, connection.cursor() as cursor:
+        _seed_inbox_fixture(cursor, fixture)
+        _submit_fixture_set(cursor, fixture)
+
+        for refusal in fixture["refusals"]:
+            cursor.execute("SAVEPOINT probe")
+            cursor.execute(f"SET LOCAL ROLE {refusal['role']}")
+            cursor.execute(
+                "SELECT set_config('app.workspace_id', %s, true)",
+                (refusal["workspace_id"],),
+            )
+            try:
+                cursor.execute(refusal["statement"])
+            except psycopg.Error as refused:
+                assert refused.sqlstate == refusal["sqlstate"], refusal["why"]
+            else:
+                pytest.fail(f"the statement was allowed: {refusal['why']}")
+            finally:
+                cursor.execute("ROLLBACK TO SAVEPOINT probe")
+                cursor.execute("RESET ROLE")
         connection.rollback()
