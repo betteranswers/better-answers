@@ -167,24 +167,37 @@ const blanked = (text: string): string => text.replaceAll(/[^\n]/g, " ");
  */
 const blankedSpans = (body: string): string => {
   const runs = [...body.matchAll(/`+/g)];
+  // Every run's place in the list, queued per length in document order: an opener reads
+  // the head of its own length's queue, discarding entries at or before itself — a run a
+  // blanked span already consumed included — so no run is scanned twice and the pairing
+  // stays linear whatever mix of unpaired lengths the input carries.
+  const queued = new Map<number, number[]>();
+  for (const [position, run] of runs.entries()) {
+    const queue = queued.get(run[0].length);
+    if (queue === undefined) queued.set(run[0].length, [position]);
+    else queue.push(position);
+  }
+  const heads = new Map<number, number>();
+
   const pieces: string[] = [];
   let cursor = 0;
   for (let at = 0; at < runs.length; at += 1) {
     const opener = runs[at];
     if (opener === undefined) continue;
-    let closer;
-    for (let ahead = at + 1; ahead < runs.length; ahead += 1) {
-      const candidate = runs[ahead];
-      if (candidate !== undefined && candidate[0].length === opener[0].length) {
-        closer = candidate;
-        at = ahead;
-        break;
-      }
+    const queue = queued.get(opener[0].length) ?? [];
+    let head = heads.get(opener[0].length) ?? 0;
+    while (head < queue.length) {
+      const position = queue[head];
+      if (position === undefined || position > at) break;
+      head += 1;
     }
+    heads.set(opener[0].length, head);
+    const closer = runs[queue[head] ?? -1];
     if (closer === undefined) continue;
     const end = closer.index + closer[0].length;
     pieces.push(body.slice(cursor, opener.index), blanked(body.slice(opener.index, end)));
     cursor = end;
+    at = queue[head] ?? at;
   }
   pieces.push(body.slice(cursor));
   return pieces.join("");

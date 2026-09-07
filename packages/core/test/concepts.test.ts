@@ -602,16 +602,20 @@ describe("the map a governed write leaves behind", () => {
     ]);
   });
 
-  it("keeps mapping an Editor's links past a long unmatched backtick run in the body", async () => {
+  it("keeps mapping an Editor's links past long unmatched backtick runs in the body", async () => {
     const scenario = await arrange();
     // The pairing the span scanner implements, against tenant input a backtracking regex
     // would choke on: an unpaired run is literal text, and a double-backtick span holding
-    // a single backtick closes at the next run of exactly its own length.
+    // a single backtick closes at the next run of exactly its own length. The middle
+    // paragraph is the shape that once made the pairing rescan — many distinct unpaired
+    // lengths followed by many paired short runs.
     const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
       body: [
         "# Details",
         "",
         `A crafted ${"`".repeat(2000)} run is literal text, not a span.`,
+        "",
+        `Then ${Array.from({ length: 60 }, (_, width) => "`".repeat(width + 3)).join(" x ")} never pair, while ${"`a` ".repeat(400)}all do.`,
         "",
         `And \`\`a span with \` inside\`\` still hides its code: [the product](./${filename}) maps.`,
       ].join("\n"),
