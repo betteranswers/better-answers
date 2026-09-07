@@ -169,8 +169,10 @@ export const citedSourceOf = (
  * `./rel.md`, a bare `dir/x.md` — and two spellings of one reference must land alike, for
  * the content hash (a link rewrite that only changes the spelling must not un-check the
  * concept) and for the map (two spellings are one edge), which is why an absolute path
- * goes through the same segment normalisation as a relative one. A URL is left as it
- * stands: it is already absolute and is not a path in this bundle.
+ * goes through the same segment normalisation as a relative one. A URL — scheme'd or
+ * protocol-relative (`//host/…`) — is left as it stands: it is already absolute and is
+ * not a path in this bundle, so folding it into one would let an external reference
+ * collide with a local concept's citation.
  *
  * It lives here beside `citedSourceOf` for the same reason that does: the hash in the
  * concepts slice and the delta builder in the graph door both resolve, a slice may import
@@ -178,7 +180,7 @@ export const citedSourceOf = (
  * would be two chances to disagree about which concept a file names.
  */
 export const resolvedResource = (resource: string, from: string): string => {
-  if (/^[a-z][a-z0-9+.-]*:/i.test(resource)) return resource;
+  if (resource.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(resource)) return resource;
   const directory = resource.startsWith("/") ? "" : from.slice(0, from.lastIndexOf("/"));
   const segments: string[] = [];
   for (const segment of `${directory}/${resource}`.split("/")) {

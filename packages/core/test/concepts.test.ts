@@ -364,6 +364,9 @@ describe("a governed write", () => {
 
     expect([relative, bare, dotted]).toEqual([absolute, absolute, absolute]);
     expect(swapped).not.toBe(absolute);
+    // A protocol-relative resource is external, like any URL: never folded into the
+    // bundle's paths, so it cannot collide with a local concept's citation.
+    expect(contentHashOf(cite("//knowledge/handbook.md"), body, path)).not.toBe(absolute);
     // Padding is not part of what a file cites, in **either** form: an asymmetry there would
     // give two spellings of one citation two hashes, and a concept would un-check itself over
     // whitespace.
@@ -562,11 +565,13 @@ describe("the map a governed write leaves behind", () => {
     ]);
   });
 
-  it("derives no edge from an image or from code that merely names the concept", async () => {
+  it("keeps images, quoted code and protocol-relative targets off the map a reader walks", async () => {
     const scenario = await arrange();
-    // An image is a transclusion and code is quotation, neither an assertion between
-    // concepts. The image still holds its ordinal — removing the `!` later renumbers no
-    // neighbour — while code is blanked before the scan and holds none.
+    // An image is a transclusion, code is quotation and `//host/…` points outside the
+    // bundle — none asserts between concepts. The image still holds its ordinal —
+    // removing the `!` later renumbers no neighbour — while code is blanked before the
+    // scan and holds none. The fence closes on a longer run of its own character, as
+    // CommonMark allows.
     const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
       body: [
         "# Details",
@@ -575,9 +580,11 @@ describe("the map a governed write leaves behind", () => {
         "",
         "```md",
         `A fenced example: [the product](./${filename}).`,
-        "```",
+        "`````",
         "",
         `Only [the product](./${filename}) itself maps.`,
+        "",
+        `A [protocol-relative](//knowledge/${filename}) target is external.`,
       ].join("\n"),
     }));
 
@@ -595,7 +602,35 @@ describe("the map a governed write leaves behind", () => {
     ]);
   });
 
-  it("re-derives a linker's edges from an edit of the concept it names, when the map lost them", async () => {
+  it("keeps mapping an Editor's links past a long unmatched backtick run in the body", async () => {
+    const scenario = await arrange();
+    // The pairing the span scanner implements, against tenant input a backtracking regex
+    // would choke on: an unpaired run is literal text, and a double-backtick span holding
+    // a single backtick closes at the next run of exactly its own length.
+    const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
+      body: [
+        "# Details",
+        "",
+        `A crafted ${"`".repeat(2000)} run is literal text, not a span.`,
+        "",
+        `And \`\`a span with \` inside\`\` still hides its code: [the product](./${filename}) maps.`,
+      ].join("\n"),
+    }));
+
+    const edges = await db().pool.query(
+      "SELECT uid, to_uid, sentence FROM graph_edge WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(edges.rows).toEqual([
+      {
+        uid: `links_to:${policy.iri}:0`,
+        to_uid: product.iri,
+        sentence: "And still hides its code: the product maps.",
+      },
+    ]);
+  });
+
+  it("backfills the map a reader walks when an edit lands on a concept the map had lost", async () => {
     const scenario = await arrange();
     const product = writeFor({ kind: "Product", status: "stable" });
     const first = await landed(scenario, product);

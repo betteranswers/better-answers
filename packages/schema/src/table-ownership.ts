@@ -16,9 +16,10 @@
  * `packages/core/src/`: `workspaces`, `sources`. `llm` is written the same way without
  * being a slice (ADR 0029 rule 3: `llm` and `audit` import `kernel`, `access` and
  * `store`, never a slice and never each other), because the name still opens a
- * directory. Three owners are not under `packages/core/src/` at all, and each is written
- * as the repository path of the module it is — a form no directory name there can take,
- * so the two kinds can never be confused:
+ * directory. Three owners are not a directory name under `packages/core/src/` — the
+ * identity provider lives outside it, and the two doors sit a level deeper — so each is
+ * written as the repository path of the module it is, a form no directory name there can
+ * take, and the two kinds can never be confused:
  *
  * - `apps/api/src/auth` — the **identity provider**. The sixteen tables of
  *   `IDENTITY_SET` are Better Auth's own: the library declares their shapes, writes

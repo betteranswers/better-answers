@@ -116,8 +116,12 @@ export const GRAPH_WALK_ROW_LIMIT = 1_000;
  *   exactly as an unresolvable target does, so removing the `!` later renumbers no
  *   neighbour. A reference, a `[label]: target` definition or a heading inside an
  *   **inline code span or fenced code block** is quotation, not assertion: spans and
- *   fences are blanked to spaces (offsets kept) before every scan, so code derives no
- *   edge, defines no label, names no section and holds no ordinal.
+ *   fences are blanked to spaces (offsets kept) before every scan — a fence closes at the
+ *   first fence line of its own character at least its opener's length, a span pairs a
+ *   backtick run with the next run of exactly its length, an unpaired run is literal
+ *   text (CommonMark's rules) — so code derives no edge, defines no label, names no
+ *   section, holds no ordinal and enters no sentence. A **protocol-relative** target
+ *   (`//host/…`) is an external resource like any scheme'd URL, never a concept.
  * - Every `sources[]` entry naming a concept the same two ways is a **lineage** edge —
  *   the successor carries the lineage (`docs/okf-v02.md`) — labelled by ADR 0019's rule:
  *   `SUPERSEDES` when it resolves to a `status: deprecated` concept of the same kind,
@@ -144,18 +148,50 @@ const LINK_DEFINITION = /^ {0,3}\[([^\]]+)\]:\s*(\S+)/gm;
  */
 const LINK = /\[[^\]]*\]\([^)]*\)|\[[^\]]*\]\[[^\]]*\]|\[[^\]]*\]|<[a-z][a-z0-9+.-]*:[^>\s]*>/gi;
 
-/** A fenced code block: the fence line, everything to the matching close (or the file's end). */
-const FENCED_BLOCK = /^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1[ \t]*$|(?![\s\S]))/gm;
-
-/** An inline code span: a backtick run, its content, the same run again. */
-const CODE_SPAN = /(`+)[\s\S]*?\1/g;
+/**
+ * A fenced code block: the fence line, everything to the first closing fence of its own
+ * character **at least the opener's length** (CommonMark allows a longer closer), or the
+ * file's end.
+ */
+const FENCED_BLOCK = /^ {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1\2*[ \t]*$|(?![\s\S]))/gm;
 
 /** Everything but the newlines blanked, so an index into the prose is an index into the file. */
 const blanked = (text: string): string => text.replaceAll(/[^\n]/g, " ");
 
+/**
+ * Inline code spans blanked by one left-to-right pass over the backtick runs: a run
+ * closes with the next run of exactly its length, an unpaired run is literal text
+ * (CommonMark). A scanner rather than a backtracking regex, because the body is tenant
+ * input and a long unmatched run would cost a regex quadratic time inside the governed
+ * write's transaction.
+ */
+const blankedSpans = (body: string): string => {
+  const runs = [...body.matchAll(/`+/g)];
+  const pieces: string[] = [];
+  let cursor = 0;
+  for (let at = 0; at < runs.length; at += 1) {
+    const opener = runs[at];
+    if (opener === undefined) continue;
+    let closer;
+    for (let ahead = at + 1; ahead < runs.length; ahead += 1) {
+      const candidate = runs[ahead];
+      if (candidate !== undefined && candidate[0].length === opener[0].length) {
+        closer = candidate;
+        at = ahead;
+        break;
+      }
+    }
+    if (closer === undefined) continue;
+    const end = closer.index + closer[0].length;
+    pieces.push(body.slice(cursor, opener.index), blanked(body.slice(opener.index, end)));
+    cursor = end;
+  }
+  pieces.push(body.slice(cursor));
+  return pieces.join("");
+};
+
 /** The body's prose: code blanked before any scan — fences first, so a span cannot eat a fence. */
-const proseOf = (body: string): string =>
-  body.replace(FENCED_BLOCK, blanked).replace(CODE_SPAN, blanked);
+const proseOf = (body: string): string => blankedSpans(body.replace(FENCED_BLOCK, blanked));
 
 /** A reference label as definitions key it: trimmed, spaces collapsed, case folded. */
 const normalisedLabel = (label: string): string =>
@@ -223,8 +259,9 @@ const targetOf = (raw: string, from: string): OutgoingRef["target"] | undefined 
   const bare = raw.split("#")[0] ?? "";
   if (bare === "") return undefined;
   if (IRI.test(bare)) return { iri: bare };
-  // Any other scheme'd target is an external resource, never a concept.
-  if (/^[a-z][a-z0-9+.-]*:/i.test(bare)) return undefined;
+  // Any other scheme'd target — and the protocol-relative `//host/…` form — is an
+  // external resource, never a concept.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(bare) || bare.startsWith("//")) return undefined;
   return { path: resolvedResource(bare, from).slice(1) };
 };
 
@@ -286,7 +323,8 @@ const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {
         ordinal,
         target,
         section: sectionAt(prose, match.index),
-        sentence: sentenceAt(concept.body, match.index),
+        // The prose, as the section reads it: a quoted code link never enters a sentence.
+        sentence: sentenceAt(prose, match.index),
       },
     ];
   });
