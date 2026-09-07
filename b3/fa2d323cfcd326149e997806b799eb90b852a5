@@ -1,0 +1,11 @@
+docs/adr/README.md
+  ai_agent 47
+docs/adr/0039-an-audience-is-a-word-and-a-group-id-array-on-every-readable-unit-combined-by-intersection-with-everyone-the-identity-an-empty-intersection-forcing-restricted-and-an-implicit-group-a-group-row-nothing-here-mints.md
+  ai_agent 1-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b3fa2d323cfcd326149e997806b799eb90b852a5",
+  "prompts": {}
+}
