@@ -1,10 +1,6 @@
-import {
-  type MigratedPostgres,
-  startMigratedPostgres,
-  testData,
-} from "@better-answers/schema/testing";
+import { testData } from "@better-answers/schema/testing";
 import pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { boundarySchemas, ulid } from "@better-answers/schema";
 
@@ -20,6 +16,7 @@ import {
   TOOLS_LIST_TTL_MS_DEFAULT,
   workspacesHeldBy,
 } from "../src/workspaces/index.ts";
+import { postgresForSuite } from "./suite-postgres.ts";
 
 /**
  * Workspace provisioning through its interface: one act, one transaction, under a
@@ -27,20 +24,12 @@ import {
  * catalogue and through the resolver; what it refuses leaves nothing behind.
  */
 
-let db: MigratedPostgres;
+const db = postgresForSuite();
 
-beforeAll(async () => {
-  db = await startMigratedPostgres();
-}, 120_000);
-
-afterAll(async () => {
-  await db.stop();
-});
-
-const seedUser = (): Promise<string> => seedPerson(db.pool);
+const seedUser = (): Promise<string> => seedPerson(db().pool);
 
 const partitionExists = async (workspaceId: string): Promise<boolean> => {
-  const found = await db.pool.query(
+  const found = await db().pool.query(
     "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'index' AND c.relname = $1",
     [`chunk_${workspaceId}`],
   );
@@ -50,7 +39,7 @@ const partitionExists = async (workspaceId: string): Promise<boolean> => {
 describe("provisioning a workspace", () => {
   it("creates the workspace, its chunk partition, its first Admin and its config row in one act", async () => {
     const adminUserId = await seedUser();
-    const door = openPostgres(db.runtimePool);
+    const door = openPostgres(db().runtimePool);
     const id = ulid();
 
     const provisioned = await provisionWorkspace(bootstrap, door, {
@@ -86,7 +75,7 @@ describe("provisioning a workspace", () => {
 
   it("writes the first act on the ledger beside the rows it describes — the platform's, in the workspace it created", async () => {
     const adminUserId = await seedUser();
-    const door = openPostgres(db.runtimePool);
+    const door = openPostgres(db().runtimePool);
     const id = ulid();
 
     const provisioned = await provisionWorkspace(bootstrap, door, {
@@ -99,7 +88,7 @@ describe("provisioning a workspace", () => {
     expect(provisioned.ok).toBe(true);
     // Beside the rows it describes: the workspace, its partition, the membership and the
     // config row are all there in the same read as the event.
-    const beside = await db.pool.query<{ rows: string }>(
+    const beside = await db().pool.query<{ rows: string }>(
       `SELECT (SELECT count(*) FROM workspace WHERE id = $1)
             + (SELECT count(*) FROM member WHERE workspace_id = $1)
             + (SELECT count(*) FROM workspace_config WHERE workspace_id = $1) AS rows`,
@@ -107,7 +96,7 @@ describe("provisioning a workspace", () => {
     );
     expect(beside.rows[0]?.rows).toBe("3");
     expect(await partitionExists(id)).toBe(true);
-    const events = await db.pool.query<{ id: string }>(
+    const events = await db().pool.query<{ id: string }>(
       "SELECT id, act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1",
       [id],
     );
@@ -129,7 +118,7 @@ describe("provisioning a workspace", () => {
 
   it("gives the first Admin's membership an id in the one shape the platform mints, composed from nothing", async () => {
     const adminUserId = await seedUser();
-    const door = openPostgres(db.runtimePool);
+    const door = openPostgres(db().runtimePool);
     const id = ulid();
 
     await provisionWorkspace(bootstrap, door, {
@@ -139,7 +128,7 @@ describe("provisioning a workspace", () => {
       adminUserId,
     });
 
-    const row = await db.pool.query<{ id: string }>(
+    const row = await db().pool.query<{ id: string }>(
       "SELECT id FROM member WHERE workspace_id = $1 AND user_id = $2",
       [id, adminUserId],
     );
@@ -151,7 +140,7 @@ describe("provisioning a workspace", () => {
   });
 
   it("leaves nothing behind when the admin does not exist — no workspace without its partition", async () => {
-    const door = openPostgres(db.runtimePool);
+    const door = openPostgres(db().runtimePool);
     const id = ulid();
 
     const provisioned = await provisionWorkspace(bootstrap, door, {
@@ -163,19 +152,19 @@ describe("provisioning a workspace", () => {
     });
 
     expect(provisioned).toEqual({ ok: false, error: "no-such-user" });
-    const row = await db.pool.query("SELECT 1 FROM workspace WHERE id = $1", [id]);
+    const row = await db().pool.query("SELECT 1 FROM workspace WHERE id = $1", [id]);
     expect(row.rowCount).toBe(0);
     expect(await partitionExists(id)).toBe(false);
     // The act and its event fail together: the ledger row had already been written when
     // the membership was refused, and it went with the transaction. Read as the superuser,
     // so a row that survived could not hide behind the policy.
-    const events = await db.pool.query("SELECT 1 FROM audit_event WHERE workspace_id = $1", [id]);
+    const events = await db().pool.query("SELECT 1 FROM audit_event WHERE workspace_id = $1", [id]);
     expect(events.rowCount).toBe(0);
   });
 
   it("refuses a slug another workspace already holds", async () => {
     const adminUserId = await seedUser();
-    const door = openPostgres(db.runtimePool);
+    const door = openPostgres(db().runtimePool);
     const slug = `taken-${ulid().toLowerCase()}`;
 
     const first = await provisionWorkspace(bootstrap, door, {
@@ -195,7 +184,7 @@ describe("provisioning a workspace", () => {
     expect(first.ok).toBe(true);
     expect(second).toEqual({ ok: false, error: "slug-taken" });
     // A refused provisioning leaves no row on the ledger either.
-    const events = await db.pool.query("SELECT 1 FROM audit_event WHERE subject_id = $1", [
+    const events = await db().pool.query("SELECT 1 FROM audit_event WHERE subject_id = $1", [
       secondId,
     ]);
     expect(events.rowCount).toBe(0);
@@ -203,7 +192,7 @@ describe("provisioning a workspace", () => {
 
   it("refuses an id a workspace already holds", async () => {
     const adminUserId = await seedUser();
-    const door = openPostgres(db.runtimePool);
+    const door = openPostgres(db().runtimePool);
     const id = ulid();
 
     const first = await provisionWorkspace(bootstrap, door, {
@@ -224,7 +213,7 @@ describe("provisioning a workspace", () => {
   });
 
   it("refuses an id that is not a workspace id", async () => {
-    const door = openPostgres(db.runtimePool);
+    const door = openPostgres(db().runtimePool);
 
     const provisioned = await provisionWorkspace(bootstrap, door, {
       id: "not-a-ulid",
@@ -240,7 +229,7 @@ describe("provisioning a workspace", () => {
     // A failure the act names no word for: the pool is gone, so nothing about it is a
     // refusal a caller can do anything with. The seam still answers a value — the
     // kernel's result convention — and the value carries the store's Error.
-    const gone = new pg.Pool(db.runtimePool.options);
+    const gone = new pg.Pool(db().runtimePool.options);
     await gone.end();
 
     const provisioned = await provisionWorkspace(bootstrap, openPostgres(gone), {
@@ -259,7 +248,7 @@ describe("provisioning a workspace", () => {
 describe("revoking a person's credentials", () => {
   it("writes the instant, ends the earlier sessions and revokes the earlier refresh tokens in one act", async () => {
     const adminUserId = await seedUser();
-    const door = openPostgres(db.runtimePool);
+    const door = openPostgres(db().runtimePool);
     const id = ulid();
     await provisionWorkspace(bootstrap, door, {
       id,
@@ -269,7 +258,7 @@ describe("revoking a person's credentials", () => {
     });
     const at = new Date("2026-09-02T12:00:00Z");
     // A session and a refresh token created before the instant, and one after.
-    const superuser = await db.pool.connect();
+    const superuser = await db().pool.connect();
     try {
       await superuser.query(
         "INSERT INTO session (id, expires_at, token, created_at, updated_at, user_id) VALUES ('s-old', now(), 'tok-old', $2, now(), $1)",
@@ -300,15 +289,16 @@ describe("revoking a person's credentials", () => {
       ok: true,
       value: { userId: adminUserId, actorId: "process:better-answers-bootstrap" },
     });
-    const after = await db.pool.query('SELECT credentials_revoked_at FROM "user" WHERE id = $1', [
+    const after = await db().pool.query('SELECT credentials_revoked_at FROM "user" WHERE id = $1', [
       adminUserId,
     ]);
     expect(after.rows[0]?.credentials_revoked_at).toEqual(at);
-    const sessions = await db.pool.query("SELECT id FROM session WHERE user_id = $1 ORDER BY id", [
-      adminUserId,
-    ]);
+    const sessions = await db().pool.query(
+      "SELECT id FROM session WHERE user_id = $1 ORDER BY id",
+      [adminUserId],
+    );
     expect(sessions.rows).toEqual([{ id: "s-new" }]);
-    const tokens = await db.pool.query(
+    const tokens = await db().pool.query(
       "SELECT id, revoked IS NOT NULL AS revoked FROM oauth_refresh_token WHERE user_id = $1 ORDER BY id",
       [adminUserId],
     );
@@ -323,14 +313,14 @@ describe("revoking a person's credentials", () => {
       at: new Date("2026-09-02T10:00:00Z"),
     });
     expect(earlier.ok).toBe(true);
-    const kept = await db.pool.query('SELECT credentials_revoked_at FROM "user" WHERE id = $1', [
+    const kept = await db().pool.query('SELECT credentials_revoked_at FROM "user" WHERE id = $1', [
       adminUserId,
     ]);
     expect(kept.rows[0]?.credentials_revoked_at).toEqual(at);
   });
 
   it("refuses a person who does not exist and leaves nothing behind", async () => {
-    const door = openPostgres(db.runtimePool);
+    const door = openPostgres(db().runtimePool);
     const revoked = await revokeCredentials(bootstrap, door, {
       userId: "user-missing",
       at: new Date(),
@@ -339,7 +329,7 @@ describe("revoking a person's credentials", () => {
   });
 
   it("is not reachable from a workspace Admin's own principal", () => {
-    const door = openPostgres(db.runtimePool);
+    const door = openPostgres(db().runtimePool);
     const admin: UserPrincipal = {
       kind: "user",
       workspaceId: ulid() as UserPrincipal["workspaceId"],
@@ -361,7 +351,7 @@ describe("revoking a person's credentials", () => {
 describe("reading the current membership", () => {
   it("hands a caller a store failure to read, and the aborted transaction never commits", async () => {
     const adminUserId = await seedUser();
-    const door = openPostgres(db.runtimePool);
+    const door = openPostgres(db().runtimePool);
     const id = ulid();
     const provisioned = await provisionWorkspace(bootstrap, door, {
       id,
@@ -411,7 +401,7 @@ describe("revoking a person's tokens in one workspace", () => {
   };
 
   const seedTwoWorkspaces = async (): Promise<Seeded> => {
-    const client = await db.pool.connect();
+    const client = await db().pool.connect();
     try {
       const seed = testData(client);
       const here = await seed.workspace();
@@ -459,9 +449,16 @@ describe("revoking a person's tokens in one workspace", () => {
     }
   };
 
+  /**
+   * The act all three cases drive, differing only in the ids and the instant handed to it —
+   * so what each case is about is the argument it varies, not the door it opens first.
+   */
+  const endTokens = (input: { workspaceId: string; userId: string; at: Date }) =>
+    revokeWorkspaceTokens(bootstrap, openPostgres(db().runtimePool), input);
+
   /** The grants this seeding's tokens now count as ended, in their words. */
   const endedGrants = async (seeded: Seeded): Promise<readonly string[]> => {
-    const rows = await db.pool.query<{ id: string }>(
+    const rows = await db().pool.query<{ id: string }>(
       `SELECT id FROM oauth_refresh_token WHERE client_id = $1 AND revoked IS NOT NULL
        UNION ALL
        SELECT id FROM oauth_access_token WHERE client_id = $1 AND revoked IS NOT NULL`,
@@ -472,13 +469,8 @@ describe("revoking a person's tokens in one workspace", () => {
 
   it("ends the refresh and access tokens consented to this workspace before the instant, and no others", async () => {
     const seeded = await seedTwoWorkspaces();
-    const door = openPostgres(db.runtimePool);
 
-    const ended = await revokeWorkspaceTokens(bootstrap, door, {
-      workspaceId: seeded.here,
-      userId: seeded.userId,
-      at,
-    });
+    const ended = await endTokens({ workspaceId: seeded.here, userId: seeded.userId, at });
 
     expect(ended).toEqual({
       ok: true,
@@ -495,9 +487,8 @@ describe("revoking a person's tokens in one workspace", () => {
 
   it("cannot reach the other workspace's tokens even when the instant is now", async () => {
     const seeded = await seedTwoWorkspaces();
-    const door = openPostgres(db.runtimePool);
 
-    const ended = await revokeWorkspaceTokens(bootstrap, door, {
+    const ended = await endTokens({
       workspaceId: seeded.here,
       userId: seeded.userId,
       at: new Date("2036-01-01T00:00:00Z"),
@@ -516,9 +507,8 @@ describe("revoking a person's tokens in one workspace", () => {
 
   it("refuses a workspace id or a person id that is not one, and ends nothing", async () => {
     const seeded = await seedTwoWorkspaces();
-    const door = openPostgres(db.runtimePool);
 
-    const malformed = await revokeWorkspaceTokens(bootstrap, door, {
+    const malformed = await endTokens({
       workspaceId: "not-a-ulid",
       userId: seeded.userId,
       at,
@@ -538,7 +528,7 @@ describe("revoking a person's tokens in one workspace", () => {
  */
 describe("the workspaces a person holds", () => {
   it("answers that person's workspace ids in id order, and nothing about anybody else", async () => {
-    const door = openPostgres(db.runtimePool);
+    const door = openPostgres(db().runtimePool);
     const person = await seedUser();
     const colleague = await seedUser();
     const held: string[] = [];
@@ -574,7 +564,7 @@ describe("the workspaces a person holds", () => {
   it("answers an empty list for a person who holds none, rather than a refusal to handle", async () => {
     // The picker's own case: a person signs in before anybody has put them in a
     // workspace. Holding none is an answer, not a failure.
-    const door = openPostgres(db.runtimePool);
+    const door = openPostgres(db().runtimePool);
 
     expect(await workspacesHeldBy(bootstrap, door, await seedUser())).toEqual({
       ok: true,
@@ -583,7 +573,7 @@ describe("the workspaces a person holds", () => {
   });
 
   it("refuses an id that is not a person id, so no argument of another shape reaches the statement", async () => {
-    const door = openPostgres(db.runtimePool);
+    const door = openPostgres(db().runtimePool);
 
     expect(await workspacesHeldBy(bootstrap, door, "' OR true --")).toEqual({
       ok: false,

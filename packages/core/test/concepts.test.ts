@@ -872,16 +872,30 @@ describe("what a re-write of an existing concept may not move", () => {
  * everywhere. Both write an **instant**, never a deletion and never a state (ADR 0035), which
  * is what makes "is this person revoked" a question only the acting credential's own issuance
  * can answer.
+ *
+ * The instant is **bound**, the way `revokeCredentials` binds its `at`, and never Postgres's
+ * `now()`. The resolver decides revocation by comparing this instant against the credential's
+ * own issuance, and that issuance is stamped by this process — so `now()` would answer one
+ * side of the comparison from the container's clock and the other from the host's. Only
+ * milliseconds separate the two events, which is the size of the offset between two clocks,
+ * so their order would be settled by drift rather than by the order the test wrote them in:
+ * a refusal that never arrives, or one that arrives for a credential minted afterwards.
+ * Bound from here, one clock answers both sides. Production never has the question — the act
+ * takes its instant from the app's own clock as a parameter.
  */
 const REVOCATIONS = {
   here: {
     statement:
-      "UPDATE member SET credentials_revoked_at = now() WHERE workspace_id = $1 AND user_id = $2",
-    parameters: (scenario: Scenario) => [scenario.workspaceId, scenario.editor.userId],
+      "UPDATE member SET credentials_revoked_at = $3 WHERE workspace_id = $1 AND user_id = $2",
+    parameters: (scenario: Scenario, at: Date) => [
+      scenario.workspaceId,
+      scenario.editor.userId,
+      at,
+    ],
   },
   everywhere: {
-    statement: 'UPDATE "user" SET credentials_revoked_at = now() WHERE id = $1',
-    parameters: (scenario: Scenario) => [scenario.editor.userId],
+    statement: 'UPDATE "user" SET credentials_revoked_at = $2 WHERE id = $1',
+    parameters: (scenario: Scenario, at: Date) => [scenario.editor.userId, at],
   },
 } as const;
 
@@ -893,7 +907,7 @@ const revoke = (
   scenario: Scenario,
   scope: RevocationScope,
 ): Promise<unknown> =>
-  client.query(REVOCATIONS[scope].statement, REVOCATIONS[scope].parameters(scenario));
+  client.query(REVOCATIONS[scope].statement, REVOCATIONS[scope].parameters(scenario, new Date()));
 
 const revokeEditor = (scenario: Scenario, scope: RevocationScope): Promise<unknown> =>
   revoke(db().pool, scenario, scope);

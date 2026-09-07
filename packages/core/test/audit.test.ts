@@ -15,9 +15,8 @@ import {
   recordFor,
 } from "../src/audit/index.ts";
 import type { ActorId, UserPrincipal } from "../src/kernel/index.ts";
-import { openPostgres, withPrincipal, withScope } from "../src/store/postgres/index.ts";
-import { provisionWorkspace } from "../src/workspaces/index.ts";
-import { bootstrap, seedPerson } from "./platform.ts";
+import { withPrincipal, withScope } from "../src/store/postgres/index.ts";
+import { bootstrap, provisionedWorkspace } from "./platform.ts";
 import { coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
@@ -54,19 +53,7 @@ const actLiteralsIn = (files: readonly string[]): Set<string> =>
   );
 
 /** A provisioned workspace and its Admin, as a user principal's claims. */
-const provisioned = async () => {
-  const adminUserId = await seedPerson(db().pool);
-  const door = openPostgres(db().runtimePool);
-  const workspaceId = ulid();
-  const made = await provisionWorkspace(bootstrap, door, {
-    id: workspaceId,
-    name: "Ledger",
-    slug: `ledger-${workspaceId.toLowerCase()}`,
-    adminUserId,
-  });
-  expect(made.ok).toBe(true);
-  return { door, workspaceId, adminUserId };
-};
+const provisioned = () => provisionedWorkspace(db(), "Ledger");
 
 const rowById = async (id: string) => {
   const found = await db().pool.query<{

@@ -1,20 +1,11 @@
 import { ulid } from "@better-answers/schema";
-import {
-  type MigratedPostgres,
-  startMigratedPostgres,
-  testData,
-} from "@better-answers/schema/testing";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { testData } from "@better-answers/schema/testing";
+import { describe, expect, it } from "vitest";
 
 import { attempt } from "../src/kernel/index.ts";
 import type { Result, Role, UserPrincipal } from "../src/kernel/index.ts";
-import { bootstrap, seedPerson } from "./platform.ts";
-import {
-  openPostgres,
-  type PostgresDoor,
-  type Tx,
-  withPrincipal,
-} from "../src/store/postgres/index.ts";
+import { type ProvisionedWorkspace, provisionedWorkspace, seedPerson } from "./platform.ts";
+import { type Tx, withPrincipal } from "../src/store/postgres/index.ts";
 import {
   addToGroup,
   createGroup,
@@ -23,7 +14,7 @@ import {
   removeFromGroup,
   renameGroup,
 } from "../src/members/index.ts";
-import { provisionWorkspace } from "../src/workspaces/index.ts";
+import { postgresForSuite } from "./suite-postgres.ts";
 
 /**
  * The members slice's group acts through its entry point (`[TEST1]`), against real
@@ -37,39 +28,15 @@ import { provisionWorkspace } from "../src/workspaces/index.ts";
  * id resolves to no row under this transaction's scope.
  */
 
-let db: MigratedPostgres;
+const db = postgresForSuite();
 
-beforeAll(async () => {
-  db = await startMigratedPostgres();
-}, 120_000);
+type Workspace = ProvisionedWorkspace;
 
-afterAll(async () => {
-  await db.stop();
-});
-
-type Workspace = {
-  readonly door: PostgresDoor;
-  readonly workspaceId: string;
-  readonly adminUserId: string;
-};
-
-const provisioned = async (name: string): Promise<Workspace> => {
-  const adminUserId = await seedPerson(db.pool);
-  const door = openPostgres(db.runtimePool);
-  const workspaceId = ulid();
-  const made = await provisionWorkspace(bootstrap, door, {
-    id: workspaceId,
-    name,
-    slug: `${name.toLowerCase()}-${workspaceId.toLowerCase()}`,
-    adminUserId,
-  });
-  expect(made.ok).toBe(true);
-  return { door, workspaceId, adminUserId };
-};
+const provisioned = (name: string): Promise<Workspace> => provisionedWorkspace(db(), name);
 
 /** A person of this workspace at the role named; their person id. */
 const seedMemberAt = async (workspace: Workspace, role: Role): Promise<string> => {
-  const client = await db.pool.connect();
+  const client = await db().pool.connect();
   try {
     const seed = testData(client);
     const person = await seed.user();
@@ -113,7 +80,7 @@ const peopleActs = async (
     detail: Record<string, string>;
   }[]
 > => {
-  const rows = await db.pool.query<{
+  const rows = await db().pool.query<{
     act: string;
     actor: string;
     subject_kind: string;
@@ -127,7 +94,7 @@ const peopleActs = async (
 };
 
 const groupRowCount = async (workspaceId: string): Promise<number> => {
-  const counted = await db.pool.query<{ held: number }>(
+  const counted = await db().pool.query<{ held: number }>(
     `SELECT count(*)::int AS held FROM "group" WHERE workspace_id = $1`,
     [workspaceId],
   );
@@ -266,7 +233,7 @@ describe("deleting a group", () => {
 
     expect(deleted).toEqual({ ok: true, value: { groupId } });
     expect(await asAdmin(workspace, listGroups)).toEqual({ ok: true, value: [] });
-    const memberships = await db.pool.query("SELECT 1 FROM group_member WHERE group_id = $1", [
+    const memberships = await db().pool.query("SELECT 1 FROM group_member WHERE group_id = $1", [
       groupId,
     ]);
     expect(memberships.rowCount).toBe(0);
@@ -326,12 +293,12 @@ describe("who is in a group", () => {
   it("refuses a person who is not a member of the workspace, and adds nobody", async () => {
     const workspace = await provisioned("Kappa");
     const groupId = await madeGroup(workspace, "HR team");
-    const stranger = await seedPerson(db.pool);
+    const stranger = await seedPerson(db().pool);
 
     const added = await putInGroup(workspace, groupId, stranger);
 
     expect(added).toEqual({ ok: false, error: "not-a-member" });
-    const memberships = await db.pool.query("SELECT 1 FROM group_member WHERE group_id = $1", [
+    const memberships = await db().pool.query("SELECT 1 FROM group_member WHERE group_id = $1", [
       groupId,
     ]);
     expect(memberships.rowCount).toBe(0);
