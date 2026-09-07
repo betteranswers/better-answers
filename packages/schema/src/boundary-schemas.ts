@@ -8,11 +8,15 @@ import {
 } from "./access-request-tables.ts";
 import { ACTOR_ID as ACTOR_ID_REGEX } from "./actor-id.ts";
 import { ACT, auditEvent, FAMILIES } from "./audit-tables.ts";
+import { composition, compositionInclude } from "./composition-tables.ts";
 import {
+  AUDIENCES,
   bundleCommit,
   CONCEPT_FRONTMATTER_MAX,
   CONCEPT_PATH,
   CONCEPT_STATUSES,
+  conceptClassOverride,
+  conceptEvidence,
   conceptIdentity,
   conceptIndex,
   citedSourceOf,
@@ -55,6 +59,7 @@ import {
 import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { ROLES } from "./roles.ts";
 import { llmRoute, workspaceConfig } from "./schema.ts";
+import { sourceBinding, sourceDocument } from "./source-tables.ts";
 import {
   conceptWriteRequest,
   suggestion,
@@ -91,6 +96,10 @@ const userId = (schema: z.ZodString) => schema.regex(ULID).brand<"UserId">();
  * where the kernel's `GroupId` comes from, as `WorkspaceId` and `UserId` do.
  */
 const groupId = (schema: z.ZodString) => schema.regex(ULID).brand<"GroupId">();
+/** A source binding's id — the minter's shape, as a document's `binding_id` names one (ADR 0013). */
+const bindingId = (schema: z.ZodString) => schema.regex(ULID).brand<"BindingId">();
+/** A composition's id — the minter's shape, as an include's `composition_id` names one. */
+const compositionId = (schema: z.ZodString) => schema.regex(ULID).brand<"CompositionId">();
 /**
  * An id of the identity set the platform reads or writes: one shape, the minter's
  * (`ulid.ts`, ADR 0035). The OAuth tables are deliberately left unnarrowed — the library
@@ -148,15 +157,24 @@ export const workspaceConfigUpdate = createUpdateSchema(
 );
 
 /**
- * The two class columns every readable unit narrows alike, so its classes are one fact
- * across `index.chunk`, `concept_index` and the graph rows (ADR 0023): *sensitivity* to
- * the glossary's closed set — the column stays text so the set is the boundary's to
- * narrow, exactly as ADR 0028 intends — and *audience* to non-empty only, because
- * "everyone in the workspace, or named groups" is not a closed word set.
+ * The three visibility columns every readable unit narrows alike, so its classes are one
+ * fact across `index.chunk`, `concept_index`, `composition`, the graph rows and the binding
+ * they derive from (ADR 0023, ADR 0039): *sensitivity* to the glossary's closed set — the
+ * column stays text so the set is the boundary's to narrow, exactly as ADR 0028 intends —
+ * *audience* to the closed pair, and *audience_groups* to platform-minted group ids, at
+ * least one when the array is there at all.
+ *
+ * The tie between the word and the array — *everyone* over no array, *groups* over a
+ * non-empty one — is the row's own CHECK (`AUDIENCE_CHECK`) and deliberately not a second
+ * refinement over the object: the governed write parses the index row's insert schema with
+ * the commit's sha omitted, and zod refuses `.omit()` over an object that carries a
+ * refinement. One rule in one place, proved against the row in `test/rls.test.ts`, beats two
+ * that could disagree.
  */
 const readableUnit = {
   sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
-  audience: (schema: z.ZodString) => schema.trim().min(1),
+  audience: (schema: z.ZodString) => schema.pipe(z.enum(AUDIENCES)),
+  audienceGroups: (schema: z.ZodArray<z.ZodString>) => z.array(groupId(schema.element)).min(1),
 };
 
 const chunkRefinements = {
@@ -517,6 +535,117 @@ export const conceptVerificationUpdate = createUpdateSchema(
   conceptVerificationRefinements,
 );
 
+/** A citation: the concept by IRI, the evidence by the key `evidence` itself carries. */
+const conceptEvidenceRefinements = {
+  workspaceId,
+  iri: conceptIri,
+  sourceDocumentId: (schema: z.ZodString) => schema.trim().min(1),
+  locator: (schema: z.ZodString) => schema.trim().min(1),
+};
+
+export const conceptEvidenceSelect = createSelectSchema(
+  conceptEvidence,
+  conceptEvidenceRefinements,
+);
+export const conceptEvidenceInsert = createInsertSchema(
+  conceptEvidence,
+  conceptEvidenceRefinements,
+);
+export const conceptEvidenceUpdate = createUpdateSchema(
+  conceptEvidence,
+  conceptEvidenceRefinements,
+);
+
+/**
+ * A recorded Admin override (ADR 0039): the class and audience narrowed as every readable
+ * unit's are, the Admin in the ledger's actor form, and the ledger row's id in the minter's
+ * shape — the row half of *an audit event and a row*.
+ */
+const conceptClassOverrideRefinements = {
+  workspaceId,
+  iri: conceptIri,
+  ...readableUnit,
+  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
+  auditEventId: (schema: z.ZodString) => schema.regex(ULID),
+};
+
+export const conceptClassOverrideSelect = createSelectSchema(
+  conceptClassOverride,
+  conceptClassOverrideRefinements,
+);
+export const conceptClassOverrideInsert = createInsertSchema(
+  conceptClassOverride,
+  conceptClassOverrideRefinements,
+);
+export const conceptClassOverrideUpdate = createUpdateSchema(
+  conceptClassOverride,
+  conceptClassOverrideRefinements,
+);
+
+/**
+ * A source binding as the derivation reads it (ADR 0013, ADR 0039): the three visibility
+ * columns narrowed as every readable unit's are, its id the minter's shape.
+ */
+const sourceBindingRefinements = {
+  workspaceId,
+  id: bindingId,
+  ...readableUnit,
+};
+
+export const sourceBindingSelect = createSelectSchema(sourceBinding, sourceBindingRefinements);
+export const sourceBindingInsert = createInsertSchema(sourceBinding, sourceBindingRefinements);
+export const sourceBindingUpdate = createUpdateSchema(sourceBinding, sourceBindingRefinements);
+
+/**
+ * A source document as the derivation reads it: its id is what `evidence` names, narrowed
+ * exactly as `evidence.source_document_id` is, and its binding is the minter's shape.
+ */
+const sourceDocumentRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.trim().min(1),
+  bindingId,
+};
+
+export const sourceDocumentSelect = createSelectSchema(sourceDocument, sourceDocumentRefinements);
+export const sourceDocumentInsert = createInsertSchema(sourceDocument, sourceDocumentRefinements);
+export const sourceDocumentUpdate = createUpdateSchema(sourceDocument, sourceDocumentRefinements);
+
+/** A composition (ADR 0004, ADR 0015): a readable unit, its id the minter's shape. */
+const compositionRefinements = {
+  workspaceId,
+  id: compositionId,
+  ...readableUnit,
+};
+
+export const compositionSelect = createSelectSchema(composition, compositionRefinements);
+export const compositionInsert = createInsertSchema(composition, compositionRefinements);
+export const compositionUpdate = createUpdateSchema(composition, compositionRefinements);
+
+/**
+ * An include (ADR 0015): its id is the label a citation marker carries, non-empty; its place
+ * a non-negative ordinal; the concept it names an IRI.
+ */
+const compositionIncludeRefinements = {
+  workspaceId,
+  compositionId,
+  id: (schema: z.ZodString) => schema.trim().min(1),
+  ordinal: (schema: z.ZodNumber) => schema.int().nonnegative(),
+  iri: conceptIri,
+};
+
+export const compositionIncludeSelect = createSelectSchema(
+  compositionInclude,
+  compositionIncludeRefinements,
+);
+export const compositionIncludeInsert = createInsertSchema(
+  compositionInclude,
+  compositionIncludeRefinements,
+);
+export const compositionIncludeUpdate = createUpdateSchema(
+  compositionInclude,
+  compositionIncludeRefinements,
+);
+
 /**
  * A graph label: the partition's closed set, or the prefixed source-entity form (ADR 0032).
  * The prefix arm is the boundary's whole rule for a source-entity label until the lift that
@@ -804,5 +933,41 @@ export const boundarySchemas = {
     select: conceptWriteRequestSelect,
     insert: conceptWriteRequestInsert,
     update: conceptWriteRequestUpdate,
+  },
+  conceptEvidence: {
+    table: conceptEvidence,
+    select: conceptEvidenceSelect,
+    insert: conceptEvidenceInsert,
+    update: conceptEvidenceUpdate,
+  },
+  conceptClassOverride: {
+    table: conceptClassOverride,
+    select: conceptClassOverrideSelect,
+    insert: conceptClassOverrideInsert,
+    update: conceptClassOverrideUpdate,
+  },
+  sourceBinding: {
+    table: sourceBinding,
+    select: sourceBindingSelect,
+    insert: sourceBindingInsert,
+    update: sourceBindingUpdate,
+  },
+  sourceDocument: {
+    table: sourceDocument,
+    select: sourceDocumentSelect,
+    insert: sourceDocumentInsert,
+    update: sourceDocumentUpdate,
+  },
+  composition: {
+    table: composition,
+    select: compositionSelect,
+    insert: compositionInsert,
+    update: compositionUpdate,
+  },
+  compositionInclude: {
+    table: compositionInclude,
+    select: compositionIncludeSelect,
+    insert: compositionIncludeInsert,
+    update: compositionIncludeUpdate,
   },
 } as const;

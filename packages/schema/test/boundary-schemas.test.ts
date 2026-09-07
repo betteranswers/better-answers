@@ -40,6 +40,10 @@ const CONTENT_SHA256 = "a".repeat(64);
 const COMMIT_SHA = "b".repeat(40);
 const SUGGESTION_SET_ID = "01J6RRRRRRRRRRRRRRRRRRRRRR";
 const SUGGESTION_ID = "01J6SSSSSSSSSSSSSSSSSSSSSS";
+const BINDING_ID = "01J6VVVVVVVVVVVVVVVVVVVVVV";
+// The document the evidence row below locates into, catalogued under the binding above.
+const DOCUMENT_ID = "01J6NNNNNNNNNNNNNNNNNNNNNN";
+const COMPOSITION_ID = "01J6WWWWWWWWWWWWWWWWWWWWWW";
 
 /** Rows each refined insert schema accepts — assertion 4's input. */
 const acceptedRows = {
@@ -204,9 +208,57 @@ const acceptedRows = {
       embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.5),
       embeddingRouteId: "route-embed",
       sensitivity: "Internal",
-      audience: "Everyone",
+      audience: "everyone",
       bindingId: "binding-1",
     },
+  ],
+  // A binding narrowed to Admins over no array, and one for named groups — the two whole
+  // shapes of the audience pair (ADR 0039), so the array refinement is proved on the column.
+  sourceBinding: [
+    {
+      workspaceId: WS_ID,
+      id: BINDING_ID,
+      publishedAt: NOW,
+      sensitivity: "Restricted",
+      audience: "everyone",
+    },
+    {
+      workspaceId: WS_ID,
+      id: "01J6VVVVVVVVVVVVVVVVVVVVV2",
+      publishedAt: NOW,
+      sensitivity: "Internal",
+      audience: "groups",
+      audienceGroups: [GROUP_ID],
+    },
+  ],
+  sourceDocument: [{ workspaceId: WS_ID, id: DOCUMENT_ID, bindingId: BINDING_ID }],
+  // The citation: the concept above, the evidence row above by its own key.
+  conceptEvidence: [
+    { workspaceId: WS_ID, iri: CONCEPT_IRI, sourceDocumentId: DOCUMENT_ID, locator: "p.4#para-2" },
+  ],
+  // An Admin's override to named groups, booked to the ledger row above.
+  conceptClassOverride: [
+    {
+      workspaceId: WS_ID,
+      iri: CONCEPT_IRI,
+      sensitivity: "Internal",
+      audience: "groups",
+      audienceGroups: [GROUP_ID],
+      actor: `human:${USER_ID}`,
+      auditEventId: AUDIT_EVENT_ID,
+    },
+  ],
+  composition: [
+    {
+      workspaceId: WS_ID,
+      id: COMPOSITION_ID,
+      publishedAt: NOW,
+      sensitivity: "Internal",
+      audience: "everyone",
+    },
+  ],
+  compositionInclude: [
+    { workspaceId: WS_ID, compositionId: COMPOSITION_ID, id: "i1", ordinal: 0, iri: CONCEPT_IRI },
   ],
   conceptIdentity: [{ workspaceId: WS_ID, iri: CONCEPT_IRI, mergeKey: "policy:expenses" }],
   conceptIndex: [
@@ -515,6 +567,15 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         // after the identity its accepted row resolved to.
         "suggestion",
         "conceptWriteRequest",
+        // The binding before the document it yielded; the citation after the identity and
+        // the evidence row its key names; the override after the identity; the composition
+        // before the include that names it and the concept it includes.
+        "sourceBinding",
+        "sourceDocument",
+        "conceptEvidence",
+        "conceptClassOverride",
+        "composition",
+        "compositionInclude",
         "chunk",
       ] as const;
       expect(insertOrder.toSorted()).toEqual(registryNames.toSorted());
@@ -670,7 +731,7 @@ describe("the customType exception, per shape", () => {
   const tooShort = Array.from({ length: EMBEDDING_DIMENSIONS - 1 }, () => 0);
 
   it("chunk.select requires an embedding of the route's width", () => {
-    const row = { ...acceptedRows.chunk[0], publishedAt: null };
+    const row = { ...acceptedRows.chunk[0], publishedAt: null, audienceGroups: null };
     const select = boundarySchemas.chunk.select;
     expect(select.safeParse(row).success).toBe(true);
     expect(select.safeParse({ ...row, embedding: undefined }).success).toBe(false);
@@ -869,7 +930,8 @@ describe("5 — the inferred type is pinned", () => {
         embeddingRouteId: string;
         publishedAt: Date | null;
         sensitivity: "Restricted" | "Internal" | "Public";
-        audience: string;
+        audience: "everyone" | "groups";
+        audienceGroups: GroupId[] | null;
         bindingId: string;
       }
     >

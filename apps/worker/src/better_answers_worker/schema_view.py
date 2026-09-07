@@ -6,7 +6,7 @@ direction. The worker never migrates; this module is its read-only
 knowledge of what the app's journal built, stamped with the migration id it was
 generated from."""
 
-MIGRATION_ID = "0018_the-inbox-substrate"
+MIGRATION_ID = "0020_audience-substrate"
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -19,6 +19,7 @@ TABLES: dict[str, dict[str, str]] = {
         "sensitivity": "text NOT NULL",
         "audience": "text NOT NULL",
         "binding_id": "text NOT NULL",
+        "audience_groups": "text[]",
     },
     "public.access_request": {
         "id": "text NOT NULL",
@@ -67,6 +68,38 @@ TABLES: dict[str, dict[str, str]] = {
         "actor": "text NOT NULL",
         "committed_at": "timestamp with time zone NOT NULL",
     },
+    "public.composition": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "published_at": "timestamp with time zone",
+        "sensitivity": "text NOT NULL",
+        "audience": "text NOT NULL",
+        "audience_groups": "text[]",
+        "created_at": "timestamp with time zone NOT NULL",
+    },
+    "public.composition_include": {
+        "workspace_id": "text NOT NULL",
+        "composition_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "ordinal": "integer NOT NULL",
+        "iri": "text NOT NULL",
+    },
+    "public.concept_class_override": {
+        "workspace_id": "text NOT NULL",
+        "iri": "text NOT NULL",
+        "sensitivity": "text NOT NULL",
+        "audience": "text NOT NULL",
+        "audience_groups": "text[]",
+        "actor": "text NOT NULL",
+        "audit_event_id": "text NOT NULL",
+        "recorded_at": "timestamp with time zone NOT NULL",
+    },
+    "public.concept_evidence": {
+        "workspace_id": "text NOT NULL",
+        "iri": "text NOT NULL",
+        "source_document_id": "text NOT NULL",
+        "locator": "text NOT NULL",
+    },
     "public.concept_identity": {
         "workspace_id": "text NOT NULL",
         "iri": "text NOT NULL",
@@ -88,6 +121,7 @@ TABLES: dict[str, dict[str, str]] = {
         "sensitivity": "text NOT NULL",
         "audience": "text NOT NULL",
         "updated_at": "timestamp with time zone NOT NULL",
+        "audience_groups": "text[]",
     },
     "public.concept_verification": {
         "id": "text NOT NULL",
@@ -131,6 +165,7 @@ TABLES: dict[str, dict[str, str]] = {
         "published_at": "timestamp with time zone",
         "sensitivity": "text NOT NULL",
         "audience": "text NOT NULL",
+        "audience_groups": "text[]",
     },
     "public.graph_generation": {
         "workspace_id": "text NOT NULL",
@@ -145,6 +180,7 @@ TABLES: dict[str, dict[str, str]] = {
         "published_at": "timestamp with time zone",
         "sensitivity": "text NOT NULL",
         "audience": "text NOT NULL",
+        "audience_groups": "text[]",
     },
     "public.group": {
         "id": "text NOT NULL",
@@ -336,6 +372,20 @@ TABLES: dict[str, dict[str, str]] = {
         "user_agent": "text",
         "user_id": "text NOT NULL",
         "active_workspace_id": "text",
+    },
+    "public.source_binding": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "published_at": "timestamp with time zone",
+        "sensitivity": "text NOT NULL",
+        "audience": "text NOT NULL",
+        "audience_groups": "text[]",
+        "created_at": "timestamp with time zone NOT NULL",
+    },
+    "public.source_document": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "binding_id": "text NOT NULL",
     },
     "public.suggestion": {
         "workspace_id": "text NOT NULL",

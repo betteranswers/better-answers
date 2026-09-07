@@ -18,7 +18,7 @@ import {
 } from "@better-answers/schema";
 import { z } from "zod";
 
-import { readableClause, readableParameter } from "../access/index.ts";
+import { readableClause, readableParameters } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
 import {
   actorIdOf,
@@ -827,6 +827,9 @@ const landRows = async (principal: UserPrincipal, tx: Tx, index: Landing): Promi
     publishedAt: index.publishedAt ?? null,
     sensitivity: index.sensitivity,
     audience: index.audience,
+    // The derivation (T-055, `visibility.ts`) is what will decide the pair from the bindings
+    // of the cited evidence; until it lands here every write is for everyone.
+    audienceGroups: null,
     status: index.status,
   });
   if (index.acceptance === undefined) return;
@@ -1168,7 +1171,7 @@ export const conceptByIri = async (
                  LIMIT 1
               ) v ON true
         WHERE c.iri = $1 AND ${readableClause("c", 2)}`,
-      [iri, readableParameter(principal)],
+      [iri, ...readableParameters(principal)],
     ),
   );
   if (!found.ok) return err(found.error);

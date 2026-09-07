@@ -13,7 +13,7 @@ import {
   SUGGESTION_BODY_MAX,
   ulid,
 } from "../src/index.ts";
-import { testData } from "./factory.ts";
+import { type TestData, testData } from "./factory.ts";
 import { type MigratedPostgres, startMigratedPostgres, withRollback } from "./harness.ts";
 
 /**
@@ -1820,6 +1820,271 @@ describe("the workspace-lifecycle function", () => {
       await expect(client.query(`SELECT id FROM "index"."chunk_${WS_A}"`)).rejects.toThrow(
         /permission denied/,
       );
+    });
+  });
+});
+
+/**
+ * The audience pair on every readable unit (ADR 0039; migrations 0019 and 0020, `[SEC3]`):
+ * the word and the array are one fact the row holds — *everyone* over no array, *groups*
+ * over a non-empty one with no NULL element — refused in every half-shape on every table
+ * that carries the pair, the hand-written chunk and graph DDL included, with the two whole
+ * shapes landing beside the refusals. An empty intersection is therefore never a row: the
+ * derivation forces the unit Restricted instead.
+ */
+describe("the audience pair on every readable unit", () => {
+  /** Every table carrying the pair, seeded with one row of A's, and the CHECK that holds it. */
+  const AUDIENCE_TABLES: readonly [string, string, (seed: TestData) => Promise<unknown>][] = [
+    [
+      "concept_index",
+      "concept_index_audience_check",
+      (seed) => seed.conceptIndex({ workspaceId: WS_A }),
+    ],
+    ["graph_node", "graph_node_audience_check", (seed) => seed.graphNode({ workspaceId: WS_A })],
+    ["graph_edge", "graph_edge_audience_check", (seed) => seed.graphEdge({ workspaceId: WS_A })],
+    ['"index".chunk', "chunk_audience_check", (seed) => seed.chunk({ workspaceId: WS_A })],
+    [
+      "source_binding",
+      "source_binding_audience_check",
+      (seed) => seed.sourceBinding({ workspaceId: WS_A }),
+    ],
+    [
+      "composition",
+      "composition_audience_check",
+      (seed) => seed.composition({ workspaceId: WS_A }),
+    ],
+    [
+      "concept_class_override",
+      "concept_class_override_audience_check",
+      (seed) => seed.conceptClassOverride({ workspaceId: WS_A }),
+    ],
+  ];
+
+  it.each(AUDIENCE_TABLES)(
+    "holds the word to the array on %s, refusing every half-shape and landing both whole ones",
+    async (table, constraint, seedOne) => {
+      await withRollback(db.pool, async (client) => {
+        const seed = await seedTwoWorkspaces(client);
+        await seedOne(seed);
+        await client.query("SET LOCAL ROLE app_rt");
+        await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+        // *groups* over nothing, over an empty array and over a NULL element; *everyone*
+        // over an array; and a word outside the pair. Each aborts the transaction, so each
+        // runs behind its own savepoint (`[TEST8]`).
+        const halfShapes = [
+          "audience = 'groups', audience_groups = NULL",
+          "audience = 'groups', audience_groups = '{}'",
+          "audience = 'groups', audience_groups = ARRAY[NULL]::text[]",
+          "audience = 'everyone', audience_groups = ARRAY['01J6JJJJJJJJJJJJJJJJJJJJJJ']",
+          "audience = 'members', audience_groups = NULL",
+        ];
+        for (const half of halfShapes) {
+          await client.query("SAVEPOINT half_shape");
+          await expect(
+            client.query(`UPDATE ${table} SET ${half} WHERE workspace_id = $1`, [WS_A]),
+          ).rejects.toThrow(new RegExp(constraint));
+          await client.query("ROLLBACK TO SAVEPOINT half_shape");
+        }
+
+        // The served paths: named groups, and back to everyone.
+        const narrowed = await client.query(
+          `UPDATE ${table} SET audience = 'groups', audience_groups = ARRAY['01J6JJJJJJJJJJJJJJJJJJJJJJ'] WHERE workspace_id = $1`,
+          [WS_A],
+        );
+        expect(narrowed.rowCount).toBeGreaterThan(0);
+        const widened = await client.query(
+          `UPDATE ${table} SET audience = 'everyone', audience_groups = NULL WHERE workspace_id = $1`,
+          [WS_A],
+        );
+        expect(widened.rowCount).toBe(narrowed.rowCount);
+      });
+    },
+  );
+});
+
+/**
+ * The derivation's six tables (ADR 0039; migrations 0019 and 0020, `[SEC3]`): tenant tables
+ * like any other, so the zero-rows proof is stated here in their words; the worker's role is
+ * refused on all six outright; every composite key refuses a row naming another tenant's
+ * binding, concept or evidence; the override's own CHECKs refuse an actor of no known form
+ * and a class outside the three; and the citation's key keeps cited evidence while a
+ * citation names it.
+ */
+describe("the derivation's tables under app_rt", () => {
+  const DERIVATION_TABLES = [
+    "source_binding",
+    "source_document",
+    "concept_evidence",
+    "concept_class_override",
+    "composition",
+    "composition_include",
+  ] as const;
+
+  /** One row of every table in one workspace: a binding, its document, a cited concept, its override, a composition including it. */
+  const seedOneOfEach = async (seed: TestData, workspaceId: string) => {
+    const binding = await seed.sourceBinding({ workspaceId });
+    const document = await seed.sourceDocument({ workspaceId, bindingId: binding.id });
+    const identity = await seed.conceptIdentity({ workspaceId });
+    const cited = await seed.conceptEvidence({
+      workspaceId,
+      iri: identity.iri,
+      sourceDocumentId: document.id,
+    });
+    await seed.conceptClassOverride({ workspaceId, iri: identity.iri });
+    const composed = await seed.composition({ workspaceId });
+    await seed.compositionInclude({ workspaceId, compositionId: composed.id, iri: identity.iri });
+    return { binding, document, identity, cited, composed };
+  };
+
+  it("returns zero rows on a missing scope and only the scoped tenant's rows otherwise, on all six", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      for (const workspaceId of [WS_A, WS_B]) await seedOneOfEach(seed, workspaceId);
+      await client.query("SET LOCAL ROLE app_rt");
+
+      expect(await countedRows(client, DERIVATION_TABLES)).toEqual(
+        DERIVATION_TABLES.map((table) => ({ table, rows: 0 })),
+      );
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      expect(await countedRows(client, DERIVATION_TABLES)).toEqual(
+        DERIVATION_TABLES.map((table) => ({ table, rows: 1 })),
+      );
+    });
+  });
+
+  it("refuses the worker role on all six tables, reading and writing alike (migration 0020)", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seedOneOfEach(seed, WS_A);
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      for (const table of DERIVATION_TABLES) {
+        await client.query("SAVEPOINT derivation_probe");
+        await expect(client.query(`SELECT 1 FROM "${table}" LIMIT 1`)).rejects.toThrow(
+          /permission denied/,
+        );
+        await client.query("ROLLBACK TO SAVEPOINT derivation_probe");
+        await expect(client.query(`DELETE FROM "${table}"`)).rejects.toThrow(/permission denied/);
+        await client.query("ROLLBACK TO SAVEPOINT derivation_probe");
+      }
+    });
+  });
+
+  it("refuses a row naming another tenant's binding or concept, and a citation of evidence nobody recorded, each at its key", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const ours = await seedOneOfEach(seed, WS_A);
+      const theirs = await seedOneOfEach(seed, WS_B);
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      // Every key names the workspace beside the id: a foreign-key check runs outside RLS
+      // and still cannot find B's binding or concept under A's workspace — the same refusal
+      // an id nobody minted gets, so a prober learns nothing.
+      const rows: readonly [string, readonly unknown[], string][] = [
+        [
+          "INSERT INTO source_document (workspace_id, id, binding_id) VALUES ($1, $2, $3)",
+          [WS_A, ulid(), theirs.binding.id],
+          "source_document_binding_fk",
+        ],
+        [
+          "INSERT INTO composition_include (workspace_id, composition_id, id, ordinal, iri) VALUES ($1, $2, 'i9', 9, $3)",
+          [WS_A, ours.composed.id, theirs.identity.iri],
+          "composition_include_identity_fk",
+        ],
+        [
+          `INSERT INTO concept_class_override (workspace_id, iri, sensitivity, audience, actor, audit_event_id)
+           VALUES ($1, $2, 'Internal', 'everyone', 'process:better-answers-test', $3)`,
+          [WS_A, theirs.identity.iri, ulid()],
+          "concept_class_override_identity_fk",
+        ],
+        // A citation of evidence no row records: a concept cites what was recorded at its
+        // commit, never a locator nobody kept.
+        [
+          "INSERT INTO concept_evidence (workspace_id, iri, source_document_id, locator) VALUES ($1, $2, $3, 'p.99')",
+          [WS_A, ours.identity.iri, ours.document.id],
+          "concept_evidence_evidence_fk",
+        ],
+      ];
+      for (const [statement, parameters, constraint] of rows) {
+        await client.query("SAVEPOINT derivation_row");
+        await expect(client.query(statement, [...parameters])).rejects.toThrow(
+          new RegExp(constraint),
+        );
+        await client.query("ROLLBACK TO SAVEPOINT derivation_row");
+      }
+    });
+  });
+
+  it("refuses an override by an actor of no known form, or to a class outside the three", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const identity = await seed.conceptIdentity({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const override = (actor: string, sensitivity: string) =>
+        client.query(
+          `INSERT INTO concept_class_override (workspace_id, iri, sensitivity, audience, actor, audit_event_id)
+           VALUES ($1, $2, $3, 'everyone', $4, $5)`,
+          [WS_A, identity.iri, sensitivity, actor, ulid()],
+        );
+
+      // The evidence pane names the overriding Admin off this column, so it holds the
+      // ledger's actor form and never a display name.
+      await client.query("SAVEPOINT actor");
+      await expect(override("Ada Admin", "Internal")).rejects.toThrow(
+        /concept_class_override_actor_check/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT actor");
+      await client.query("SAVEPOINT class");
+      await expect(override("human:01J6CCCCCCCCCCCCCCCCCCCCCC", "Secret")).rejects.toThrow(
+        /concept_class_override_sensitivity_check/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT class");
+      // And the served path beside them.
+      const landed = await override("human:01J6CCCCCCCCCCCCCCCCCCCCCC", "Internal");
+      expect(landed.rowCount).toBe(1);
+    });
+  });
+
+  it("keeps cited evidence while a citation names it, and takes the citation with its concept", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const ours = await seedOneOfEach(seed, WS_A);
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      // Cited evidence outlives its source (ADR 0013): the key refuses the delete rather
+      // than cascading the citation away.
+      await client.query("SAVEPOINT cited");
+      await expect(
+        client.query(
+          "DELETE FROM evidence WHERE workspace_id = $1 AND source_document_id = $2 AND locator = $3",
+          [WS_A, ours.cited.sourceDocumentId, ours.cited.locator],
+        ),
+      ).rejects.toThrow(/concept_evidence_evidence_fk/);
+      await client.query("ROLLBACK TO SAVEPOINT cited");
+
+      // A concept that has left the bundle cites nothing: the identity's cascade takes the
+      // citation, the override and the include that named it.
+      await client.query("DELETE FROM concept_identity WHERE workspace_id = $1 AND iri = $2", [
+        WS_A,
+        ours.identity.iri,
+      ]);
+      expect(
+        await countedRows(client, [
+          "concept_evidence",
+          "concept_class_override",
+          "composition_include",
+        ]),
+      ).toEqual([
+        { table: "concept_evidence", rows: 0 },
+        { table: "concept_class_override", rows: 0 },
+        { table: "composition_include", rows: 0 },
+      ]);
     });
   });
 });

@@ -12,8 +12,8 @@ import {
 import type pg from "pg";
 import type { z } from "zod";
 
-import { readableClause, readableParameter } from "../../access/index.ts";
-import type { UserPrincipal } from "../../kernel/index.ts";
+import { readableClause, readableParameters } from "../../access/index.ts";
+import type { Principal, UserPrincipal } from "../../kernel/index.ts";
 
 /**
  * The graph door: the one graph query module in this tier (ADR 0032) — the delta builder
@@ -50,9 +50,10 @@ type Frontmatter = z.infer<typeof conceptFrontmatter>;
 
 /**
  * What edges derive from: one concept's index-row facts — its identity, its folded kind
- * (the node's property, never its label), the file's content and the three visibility
- * columns an edge copies. The shape the re-derive reads back off `concept_index` too,
- * which is why the row and the delta share it.
+ * (the node's property, never its label), the file's content and the visibility columns
+ * an edge copies, the audience as its word and its group-id array (ADR 0039). The shape
+ * the re-derive reads back off `concept_index` too, which is why the row and the delta
+ * share it.
  */
 type EdgeSource = {
   readonly iri: string;
@@ -63,6 +64,7 @@ type EdgeSource = {
   readonly publishedAt: Date | null;
   readonly sensitivity: string;
   readonly audience: string;
+  readonly audienceGroups: readonly string[] | null;
 };
 
 /**
@@ -449,11 +451,18 @@ const resolveOutgoing = async (
 };
 
 /**
+ * The edge labels a concept's own file derives — the ones its outgoing re-derive replaces,
+ * and the ones the derivation's recompute rewrites the visibility of, because they wear
+ * the from-concept's columns.
+ */
+const DERIVED_EDGE_LABELS = [LINKS_TO_LABEL, SUPERSEDES_LABEL, DERIVED_FROM_LABEL];
+
+/**
  * One concept's outgoing edges replaced in the live generation: deleted and re-derived
  * from the file as it stands, so a removed link leaves the map in the same act. An edge
  * wears the **from**-concept's visibility columns — its section and sentence are that
- * file's content, which is what the predicate on the edge must be able to withhold —
- * until T-055's derivation refines the rule.
+ * file's content, which is what the predicate on the edge must be able to withhold — and
+ * the derivation's recompute rewrites them with the node's (`writeConceptVisibility`).
  */
 const replaceOutgoingEdges = async (
   principal: UserPrincipal,
@@ -466,13 +475,14 @@ const replaceOutgoingEdges = async (
   await tx.query(
     `DELETE FROM graph_edge
       WHERE workspace_id = $1 AND gen = $2 AND from_uid = $3 AND label = ANY($4::text[])`,
-    [workspaceId, gen, concept.iri, [LINKS_TO_LABEL, SUPERSEDES_LABEL, DERIVED_FROM_LABEL]],
+    [workspaceId, gen, concept.iri, DERIVED_EDGE_LABELS],
   );
   for (const edge of edges) {
     await tx.query(
       `INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid, from_kind,
-                               to_kind, section, sentence, published_at, sensitivity, audience)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+                               to_kind, section, sentence, published_at, sensitivity, audience,
+                               audience_groups)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
       [
         workspaceId,
         gen,
@@ -487,6 +497,7 @@ const replaceOutgoingEdges = async (
         concept.publishedAt,
         concept.sensitivity,
         concept.audience,
+        concept.audienceGroups,
       ],
     );
   }
@@ -553,11 +564,13 @@ export const writeConceptDelta = async (
   const isNew = mapped.rowCount === 0;
 
   await tx.query(
-    `INSERT INTO graph_node (workspace_id, gen, uid, label, kind, published_at, sensitivity, audience)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO graph_node (workspace_id, gen, uid, label, kind, published_at, sensitivity,
+                             audience, audience_groups)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (workspace_id, gen, uid) WHERE gen IS NOT NULL
      DO UPDATE SET kind = EXCLUDED.kind, published_at = EXCLUDED.published_at,
-                   sensitivity = EXCLUDED.sensitivity, audience = EXCLUDED.audience`,
+                   sensitivity = EXCLUDED.sensitivity, audience = EXCLUDED.audience,
+                   audience_groups = EXCLUDED.audience_groups`,
     [
       workspaceId,
       gen,
@@ -567,6 +580,7 @@ export const writeConceptDelta = async (
       delta.publishedAt,
       delta.sensitivity,
       delta.audience,
+      delta.audienceGroups,
     ],
   );
   await tx.query(
@@ -593,12 +607,66 @@ export const writeConceptDelta = async (
   // The concepts whose files name the landed one, by its filename in link-target
   // position: each is re-derived whole, through the same one derivation as its own write.
   const naming = await tx.query<EdgeSource>(
-    `SELECT iri, kind, path, body, frontmatter, published_at AS "publishedAt", sensitivity, audience
+    `SELECT iri, kind, path, body, frontmatter, published_at AS "publishedAt", sensitivity,
+            audience, audience_groups AS "audienceGroups"
        FROM concept_index
       WHERE workspace_id = $1 AND iri <> $2 AND (body ~ $3 OR frontmatter::text ~ $3)`,
     [workspaceId, delta.iri, namePattern(delta.path.split("/").at(-1) ?? delta.path)],
   );
   for (const row of naming.rows) await replaceOutgoingEdges(principal, gen, tx, row);
+};
+
+/** One concept's visibility as the map copies it: the node's, and its outgoing edges'. */
+export type ConceptVisibility = {
+  readonly workspaceId: string;
+  readonly iri: string;
+  readonly sensitivity: string;
+  readonly audience: string;
+  readonly audienceGroups: readonly string[] | null;
+};
+
+/**
+ * The map's copies of one concept's visibility columns, rewritten in the live generation
+ * — its node, and the edges it is the from-side of, which wear its columns because their
+ * section and sentence are its file's content. The derivation's recompute calls this in the
+ * same transaction as the index row it moved (ADR 0023: synchronous, inside the narrowing
+ * act's own transaction), so the walk never forks from `concept_index`. An edge *into* the
+ * concept wears its own from-side's columns and is left alone; before any surface projects
+ * an edge's columns, the target's own predicate must be applied (the docblock above).
+ *
+ * The workspace is the argument's, so a platform principal can call this as a person's act
+ * can; a workspace not the transaction's scope updates nothing, which is RLS's answer and
+ * the right one. A workspace the map never held is nothing to keep in step.
+ */
+export const writeConceptVisibility = async (
+  principal: Principal,
+  tx: Tx,
+  visibility: ConceptVisibility,
+): Promise<void> => {
+  const live = await tx.query<{ live_gen: number }>(
+    "SELECT live_gen FROM graph_generation WHERE workspace_id = $1",
+    [visibility.workspaceId],
+  );
+  const gen = live.rows[0]?.live_gen;
+  if (gen === undefined) return;
+  const columns = [
+    visibility.workspaceId,
+    gen,
+    visibility.iri,
+    visibility.sensitivity,
+    visibility.audience,
+    visibility.audienceGroups,
+  ];
+  await tx.query(
+    `UPDATE graph_node SET sensitivity = $4, audience = $5, audience_groups = $6
+      WHERE workspace_id = $1 AND gen = $2 AND uid = $3`,
+    columns,
+  );
+  await tx.query(
+    `UPDATE graph_edge SET sensitivity = $4, audience = $5, audience_groups = $6
+      WHERE workspace_id = $1 AND gen = $2 AND from_uid = $3 AND label = ANY($7::text[])`,
+    [...columns, DERIVED_EDGE_LABELS],
+  );
 };
 
 /**
@@ -609,9 +677,9 @@ export const writeConceptDelta = async (
  * graph-side index (ADR 0023); depth is the template's literal; a bundle-and-record row
  * binds the live generation and a source entity, which carries none, walks beside it.
  *
- * $1 is the workspace, $2 the entry uid, $3 the predicate's parameter
- * (`readableParameter`). The cycle guard is the path itself: a step never revisits a uid
- * its path already holds.
+ * $1 is the workspace, $2 the entry uid, $3 and $4 the predicate's two parameters
+ * (`readableParameters`: the role, then the caller's group ids). The cycle guard is the
+ * path itself: a step never revisits a uid its path already holds.
  */
 const walkStatement = (outward: boolean): string => {
   const [source, sink] = outward ? ["from_uid", "to_uid"] : ["to_uid", "from_uid"];
@@ -658,7 +726,7 @@ const walk = async (
   const found = await tx.query<WalkStep>(statement, [
     principal.workspaceId,
     uid,
-    readableParameter(principal),
+    ...readableParameters(principal),
   ]);
   return found.rows;
 };

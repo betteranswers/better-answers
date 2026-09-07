@@ -1,4 +1,13 @@
-import { ACT, CONTENT_HASH, GIT_SHA, IRI, ROLES, ULID } from "@better-answers/schema";
+import {
+  ACT,
+  AUDIENCES,
+  CONTENT_HASH,
+  GIT_SHA,
+  IRI,
+  ROLES,
+  SENSITIVITIES,
+  ULID,
+} from "@better-answers/schema";
 import type { boundarySchemas } from "@better-answers/schema";
 import type { z } from "zod";
 
@@ -39,10 +48,12 @@ export type DetailValue = string | number | boolean;
  * **contentHash** the canonical hash of what a check confirmed (ADR 0014) — two kinds and
  * not one, because they are two different lengths over two different things and a field
  * that accepted either would accept a commit where a content hash belongs; a **count** is
- * how many of something an act touched. A kind for a person's name or contact does not
- * exist, which is how the ledger stays a table an erasure never rewrites; a kind an act
- * needs and this list lacks is added here, with the act that needs it. Each kind's check
- * runs on every write.
+ * how many of something an act touched; a **sensitivity** is one of the three class words
+ * and an **audience** one of the two audience words, so a narrowing and an override say
+ * what they decided in the glossary's own vocabulary (ADR 0039). A kind for a person's name
+ * or contact does not exist, which is how the ledger stays a table an erasure never
+ * rewrites; a kind an act needs and this list lacks is added here, with the act that needs
+ * it. Each kind's check runs on every write.
  */
 export const DETAIL_KINDS = {
   id: (value: DetailValue) => typeof value === "string" && ULID.test(value),
@@ -52,6 +63,10 @@ export const DETAIL_KINDS = {
   gitSha: (value: DetailValue) => typeof value === "string" && GIT_SHA.test(value),
   contentHash: (value: DetailValue) => typeof value === "string" && CONTENT_HASH.test(value),
   count: (value: DetailValue) => typeof value === "number" && Number.isInteger(value) && value >= 0,
+  sensitivity: (value: DetailValue) =>
+    typeof value === "string" && SENSITIVITIES.some((word) => word === value),
+  audience: (value: DetailValue) =>
+    typeof value === "string" && AUDIENCES.some((word) => word === value),
 } as const;
 
 export type DetailKind = keyof typeof DETAIL_KINDS;

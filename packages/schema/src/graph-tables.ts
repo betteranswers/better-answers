@@ -2,7 +2,12 @@ import { sql } from "drizzle-orm";
 import { type AnyPgColumn, check, index, integer, text, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { listed, stamp } from "./column-helpers.ts";
-import { SENSITIVITIES, SENSITIVITY_DEFAULT, AUDIENCE_EVERYONE } from "./concept-tables.ts";
+import {
+  AUDIENCE_CHECK,
+  AUDIENCE_EVERYONE,
+  SENSITIVITIES,
+  SENSITIVITY_DEFAULT,
+} from "./concept-tables.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -93,8 +98,10 @@ const genCheck = "gen IS NULL OR gen > 0";
  * builder belongs to one table: the tenant, the partition stamp (`gen` — NULL on a source
  * entity, which has none), the key and the label; and the three visibility columns the
  * read predicate tests, exactly as `concept_index` and every `index.chunk` row carry them
- * (ADR 0023's amendment; ADR 0032) — columns and fail-closed defaults only, because the
- * derivation cascade, the audience representation and the per-kind floor are T-055's.
+ * (ADR 0023's amendment; ADR 0032) — the audience as its word and its group-id array (ADR
+ * 0039), with fail-closed defaults. The rows are copies: the governed write's delta writes
+ * them from the index row, and the derivation's recompute rewrites them in the same
+ * transaction as the index row it moved, or the walk would fork from `concept_index`.
  */
 const graphRowColumns = () => ({
   workspaceId: text("workspace_id")
@@ -109,6 +116,7 @@ const visibilityColumns = () => ({
   publishedAt: stamp("published_at"),
   sensitivity: text("sensitivity").notNull().default(SENSITIVITY_DEFAULT),
   audience: text("audience").notNull().default(AUDIENCE_EVERYONE),
+  audienceGroups: text("audience_groups").array(),
 });
 
 /**
@@ -169,6 +177,7 @@ export const graphNode = withRLS(
     check("graph_node_label_check", sql.raw(nodeLabelCheck)),
     check("graph_node_gen_check", sql.raw(genCheck)),
     check("graph_node_sensitivity_check", sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
+    check("graph_node_audience_check", sql.raw(AUDIENCE_CHECK)),
   ],
 );
 
@@ -204,6 +213,7 @@ export const graphEdge = withRLS(
     check("graph_edge_label_check", sql.raw(edgeLabelCheck)),
     check("graph_edge_gen_check", sql.raw(genCheck)),
     check("graph_edge_sensitivity_check", sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
+    check("graph_edge_audience_check", sql.raw(AUDIENCE_CHECK)),
     check(
       "graph_edge_links_to_check",
       sql.raw(

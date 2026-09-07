@@ -9,7 +9,7 @@ import {
 } from "@better-answers/schema";
 import type { z } from "zod";
 
-import { readableClause, readableParameter } from "../access/index.ts";
+import { readableClause, readableParameters } from "../access/index.ts";
 import { act, declareActs, record, type Act } from "../audit/index.ts";
 import {
   actorIdOf,
@@ -177,7 +177,7 @@ export const suggestionSetSummary = async (
          LEFT JOIN concept_index c
                 ON c.iri = s.resolved_iri
                AND ($2 = 'Admin' OR (${readableClause("c", 2)}))`,
-      [setId, readableParameter(principal)],
+      [setId, ...readableParameters(principal)],
     ),
   );
   if (!found.ok) return err(found.error);
