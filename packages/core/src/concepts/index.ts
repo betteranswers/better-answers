@@ -21,7 +21,7 @@ import {
 import { z } from "zod";
 
 import { readableClause, readableParameters } from "../access/index.ts";
-import { act, declareActs, record } from "../audit/index.ts";
+import { act, declareActs, eventsOfAct, record } from "../audit/index.ts";
 import {
   actorIdOf,
   attempt,
@@ -574,8 +574,8 @@ const mayWrite = (principal: UserPrincipal): boolean => principal.role !== "View
  * these three back off the file rather than off a row that was lost. A caller's own
  * `type` and `status` keys stand as written (ADR 0019 keeps every key verbatim).
  */
-const fileFrontmatterOf = (input: WriteConceptInput, iri: string): Frontmatter => {
-  const named: Record<string, FrontmatterValue> = { ...input.frontmatter };
+const fileFrontmatterOf = (input: WriteConceptInput, iri: string) => {
+  const named = { ...input.frontmatter };
   if (typeof named["type"] !== "string") named["type"] = input.kind;
   if (input.status !== undefined) named["status"] = input.status;
   named["iri"] = iri;
@@ -1728,6 +1728,46 @@ export const reconcile = async (
       stopped,
     });
   });
+};
+
+/** One reconciler hit: a commit the replay landed, as its ledger row records it. */
+export type ReconcilerHit = {
+  readonly commitSha: string;
+  /** The commit's `Audit:` id — the row's id, and `bundle_commit.audit_event_id`. */
+  readonly auditEventId: string;
+  readonly at: Date;
+  /** The batch a bulk replay's rows share; `null` for a run that landed one commit. */
+  readonly batchId: string | null;
+};
+
+/**
+ * *Reconciler hits* — the signal ADR 0012 names, in the sense ADR 0025 gives the word: a
+ * query over rows the platform already keeps, never a counter. The rows are the
+ * `platform.reconciler.replayed` events the replay writes, one per commit landed, oldest
+ * first, from an instant when the caller names one. The api's head check writes nothing
+ * else about a hit, so the ledger is the whole record and this read is the whole signal.
+ */
+export const reconcilerHits = async (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  input: { readonly workspaceId: string; readonly since?: Date | undefined },
+): Promise<Result<readonly ReconcilerHit[], "malformed" | Error>> => {
+  const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
+  if (!workspace.success) return err("malformed");
+  const read = await attempt(() =>
+    withScope(platform, door, workspace.data, (tx) =>
+      eventsOfAct(platform, tx, RECONCILER_ACTS.replayed, input.since),
+    ),
+  );
+  if (!read.ok) return err(read.error);
+  return ok(
+    read.value.map((row) => ({
+      commitSha: row.subjectId,
+      auditEventId: row.id,
+      at: row.at,
+      batchId: row.batchId,
+    })),
+  );
 };
 
 /** One workspace's outcome of a run over every workspace. */

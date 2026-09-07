@@ -10,6 +10,7 @@ import {
   reconcile,
   reconcileEveryWorkspace,
   RECONCILER,
+  reconcilerHits,
   renderConceptFile,
   submitSuggestionSet,
   suggestionSetSummary,
@@ -23,14 +24,13 @@ import { actorIdOf, type UserPrincipal } from "../src/kernel/index.ts";
 import { commit, withRepositoryLock } from "@better-answers/core/store/git";
 import {
   bundleHistory,
-  bundlesForSuite,
   commitFacts,
   divergeHistory,
   fileAtCommit,
   removeRepository,
 } from "./bundle.ts";
-import { postgresForSuite, readingAs } from "./suite-postgres.ts";
-import { arrangeWorkspace, type Scenario } from "./workspace-with-bundle.ts";
+import { readingAs } from "./suite-postgres.ts";
+import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 /**
  * The reconciler through the concepts slice's entry point (`[TEST1]`), against real
@@ -47,12 +47,7 @@ import { arrangeWorkspace, type Scenario } from "./workspace-with-bundle.ts";
  * come back: a person's own commit and an Admin's acceptance.
  */
 
-const db = postgresForSuite();
-const bundles = bundlesForSuite();
-
-const arrange = (): Promise<Scenario> => arrangeWorkspace(db(), bundles());
-
-const doorsOf = (scenario: Scenario) => ({ git: scenario.git, postgres: scenario.postgres });
+const { db, arrange } = suiteWithBundles();
 
 let written = 0;
 
@@ -717,6 +712,44 @@ describe("the periodic head check's pass", () => {
     });
     // One bundle's refusal is that bundle's fact, and the others were not left behind.
     expect(outcomes.get(missing.workspaceId)).toEqual({ ok: false, error: "no-such-repository" });
+  });
+});
+
+describe("reconciler hits", () => {
+  it("are a query over the ledger rows the replay wrote — oldest first, from an instant when one is named — and never a counter", async () => {
+    const scenario = await arrange();
+    const [first = ""] = await writeInTheWindow(scenario, scenario.editor, guideline("Bikes"));
+    const history = await writeInTheWindow(
+      scenario,
+      scenario.editor,
+      guideline("Trains", { expects: { head: first } }),
+    );
+    // Nothing has been replayed, so there is nothing to count: the signal reads zero rows.
+    expect(await reconcilerHits(RECONCILER, scenario.postgres, scenario)).toEqual({
+      ok: true,
+      value: [],
+    });
+
+    await reconciled(scenario);
+
+    const hits = await reconcilerHits(RECONCILER, scenario.postgres, scenario);
+    expect(hits.ok).toBe(true);
+    if (!hits.ok) return;
+    // One hit per commit landed, keyed by the commit's own `Audit:` id, sharing the run's batch.
+    expect(hits.value.map((hit) => hit.commitSha)).toEqual(history);
+    const facts = await commitFacts(scenario.git, scenario.workspaceId, first);
+    expect(hits.value[0]?.auditEventId).toBe(facts.trailers["Audit"]);
+    expect(hits.value[0]?.batchId).not.toBeNull();
+    expect(hits.value[1]?.batchId).toBe(hits.value[0]?.batchId);
+    // From an instant after the run: the rows are all older, so the window holds none.
+    const later = new Date(Date.now() + 60_000);
+    expect(
+      await reconcilerHits(RECONCILER, scenario.postgres, { ...scenario, since: later }),
+    ).toEqual({ ok: true, value: [] });
+    expect(await reconcilerHits(RECONCILER, scenario.postgres, { workspaceId: "nope" })).toEqual({
+      ok: false,
+      error: "malformed",
+    });
   });
 });
 

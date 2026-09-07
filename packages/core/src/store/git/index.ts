@@ -465,14 +465,16 @@ const TRAILER_LINE = /^([A-Za-z][A-Za-z-]*): (.+)$/;
  * the last paragraph and never the first match, so this half keeps the promise the other
  * half made.
  */
-const trailersOf = (message: string): Readonly<Record<string, string>> => {
+const trailersOf = (message: string) => {
   const block = message.trimEnd().split("\n\n").at(-1) ?? "";
-  const trailers: Record<string, string> = {};
-  for (const line of block.split("\n")) {
-    const match = TRAILER_LINE.exec(line);
-    if (match?.[1] !== undefined && match[2] !== undefined) trailers[match[1]] = match[2];
-  }
-  return trailers;
+  return Object.fromEntries(
+    block.split("\n").flatMap((line) => {
+      const match = TRAILER_LINE.exec(line);
+      return match?.[1] !== undefined && match[2] !== undefined
+        ? [[match[1], match[2]] as const]
+        : [];
+    }),
+  );
 };
 
 export const readCommit = async (

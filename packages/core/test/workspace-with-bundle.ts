@@ -6,7 +6,9 @@ import type { Role, UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres, withPrincipal, type PostgresDoor } from "../src/store/postgres/index.ts";
 import { provisionWorkspace } from "../src/workspaces/index.ts";
 import { ulid } from "../src/kernel/index.ts";
+import { bundlesForSuite } from "./bundle.ts";
 import { bootstrap, seedPerson } from "./platform.ts";
+import { postgresForSuite } from "./suite-postgres.ts";
 
 /**
  * A provisioned workspace with its bundle and three people in it — the arrange block every
@@ -26,6 +28,25 @@ export type Scenario = {
   readonly editor: UserPrincipal;
   readonly viewer: UserPrincipal;
   readonly admin: UserPrincipal;
+};
+
+/**
+ * Both doors, as every act in the concepts slice takes them — a write, a decision and a
+ * replay each hold the bundle's lock and open the rows' transaction. One helper for the
+ * suites that hand a scenario to an act, so the pair is one fact and not a copy per suite.
+ */
+export const doorsOf = (scenario: Scenario) => ({ git: scenario.git, postgres: scenario.postgres });
+
+/**
+ * A suite's whole footing on one line: the migrated Postgres, the bundle root, and the
+ * arrange block over both. The two `forSuite` helpers register the lifecycle each; this
+ * pairs them, because every suite over the write path opens with the same three lines and
+ * the copy gate said so the third time they were written.
+ */
+export const suiteWithBundles = () => {
+  const db = postgresForSuite();
+  const bundles = bundlesForSuite();
+  return { db, bundles, arrange: (): Promise<Scenario> => arrangeWorkspace(db(), bundles()) };
 };
 
 /**
