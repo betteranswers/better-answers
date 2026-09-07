@@ -1,0 +1,19 @@
+apps/api/tests/mcp-surface.test.ts
+  s_3695f0cfb8d82a::t_2fd51aeaf3bedf 266-274,276-278
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "037c1b658509a57def5570a832d14d16629128fe",
+  "prompts": {},
+  "sessions": {
+    "s_3695f0cfb8d82a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "602efdc2-4b25-49db-938f-df6797643aa7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
