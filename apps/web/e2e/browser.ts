@@ -84,7 +84,7 @@ export const test = base.extend<BrowserFixtures>({
    * client's own redirect, and a browser that never opened a screen is still on `about:blank`
    * — leaves the fixture no screen of ours to read. Rather than audit whatever is there or
    * quietly audit nothing, it asks the test what it audited: the exposed call is how such a
-   * spec gates the screen it is actually about, and a spec that made neither is refused.
+   * spec gates the screen it is actually about, and a spec that never made one is refused.
    *
    * A test that has already failed is not audited. Axe would report the wreckage of whatever
    * went wrong, and a second failure on top of the real one buries it.
