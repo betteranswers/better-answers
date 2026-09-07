@@ -1,0 +1,23 @@
+packages/core/test/suggestions.test.ts
+  s_127243e02256ac::t_04c5e33caddc31 717-719
+  s_127243e02256ac::t_72500a3d3bc707 332
+  s_127243e02256ac::t_5f82106a0d98e4 372-402
+  s_127243e02256ac::t_6cca7a8d05f3dc 716,893
+  s_127243e02256ac::t_2ac8f61f340dbd 113-143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "8d4393f700302afb78c965f7e43b15922286a949",
+  "prompts": {},
+  "sessions": {
+    "s_127243e02256ac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c7e92e84-0713-4b5c-8861-c989df4466c0",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    }
+  }
+}
