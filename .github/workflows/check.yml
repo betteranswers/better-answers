@@ -19,6 +19,16 @@ on:
   # once — before the images are built, never beside them (`T-018`). A `push` trigger here as
   # well would put both runs in the one group below and have them queue behind each other.
   workflow_call:
+    inputs:
+      images-probed-by-the-caller:
+        description: >-
+          Set by a caller whose own job builds each image, loads it and runs that image's
+          contents test against the build it is about to push (`T-043`). The suite here then
+          leaves those tests to that job, so a push to main builds the api image once rather
+          than once on this runner and once on that one. A pull request builds no image, has
+          no such job, passes nothing, and probes as usual.
+        type: boolean
+        default: false
 
 # A pull request cancels the run it supersedes; a run CALLED by build.yml never does.
 #
@@ -72,5 +82,9 @@ jobs:
       # browser is not in the pnpm store, so it is installed here. Chromium alone: the
       # suite runs one project.
       - run: pnpm --filter @better-answers/web exec playwright install --with-deps chromium
-      # One command, every workspace — the root `check` runs them all.
+      # One command, every workspace — the root `check` runs them all. The image tests read
+      # the variable below and stand down when the caller's own job probes what it pushes;
+      # a pull request evaluates it to the empty string and probes.
       - run: pnpm check
+        env:
+          IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller }}
