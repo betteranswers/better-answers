@@ -1,0 +1,24 @@
+apps/api/tests/reconciler.test.ts
+  s_876a3fbbae1185::t_623386a2d0b4af 1-86
+apps/api/src/main.ts
+  s_876a3fbbae1185::t_50bcaba3b6f349 7
+  s_876a3fbbae1185::t_e989cce18063f3 63-72
+apps/api/src/reconciler.ts
+  s_876a3fbbae1185::t_20293cfcf14b8e 1-135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "6b8ec737d6efd7dd90362561280aaca9c9f16abb",
+  "prompts": {},
+  "sessions": {
+    "s_876a3fbbae1185": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9e05c9c3-cbbb-4563-b5b8-659867a07e7e",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
