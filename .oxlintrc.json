@@ -28,8 +28,9 @@
   // The mode reaches further than the floating-promise rule below: oxlint files a family of
   // type-aware rules under `correctness`, and the category holds every one of them the `rules`
   // block does not name. So a type-aware rule is switched *off* by having a line here and
-  // adopted by losing it, which reads backwards from the rest of this file — the only ones
-  // named below are the ones this repository declined.
+  // adopted by losing it, which reads backwards from the rest of this file. Two below are
+  // named anyway: the floating-promise rule, because it carries options the category cannot
+  // give it, and the sort rule, because it is the one declined.
   "options": {
     "typeAware": true
   },

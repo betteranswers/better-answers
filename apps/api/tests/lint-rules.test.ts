@@ -335,6 +335,26 @@ const ADOPTED = [
 /** The half of a rule's config name oxlint prints in its report: `typescript(unbound-method)`. */
 const reportedName = (rule: string): string => rule.slice(rule.indexOf("/") + 1);
 
+/**
+ * oxlint under the repository's `categories` block alone, with no `rules` key at all.
+ *
+ * `ruleRunner` switches its rule on itself, so what its cases prove is that the rule fires —
+ * not that this repository turned it on. For a rule adopted by deleting its line those are
+ * different claims, and the gap between them is exactly where an adoption could be false: a
+ * rule oxlint files under some category other than `correctness` would pass every firing and
+ * silent case below while the tree ran without it. This runner asks only the question the
+ * config answers by itself, which is whether the category holds the rule; the line's absence
+ * is `severityOf`'s half, and the two together are the claim.
+ */
+const lintUnderCategories = oxlintOver(
+  JSON.stringify({
+    plugins: config.plugins,
+    options: config.options,
+    categories: config.categories,
+  }),
+  { tree: typedTree({ "src/fires.ts": ADOPTED[0].fires }), flagged: ["src/fires.ts"] },
+).output;
+
 describe.each(ADOPTED)("$rule refuses $refuses", ({ rule, fires, silent }) => {
   const firing = typedTree({ "src/fires.ts": fires });
   const lintRule = ruleRunner(rule, { tree: firing, flagged: ["src/fires.ts"] });
@@ -350,6 +370,11 @@ describe.each(ADOPTED)("$rule refuses $refuses", ({ rule, fires, silent }) => {
     const output = lintRule(typedTree({ "src/asked.ts": silent }));
 
     expect(output).not.toContain("src/asked.ts");
+  });
+
+  it("is one the repository's own categories switch on, having no line of its own to do it", () => {
+    expect(config.rules).not.toHaveProperty(rule);
+    expect(lintUnderCategories(firing)).toContain(reportedName(rule));
   });
 });
 
