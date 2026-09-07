@@ -229,7 +229,14 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "concepts",
     access: "read",
     reason:
-      "Accepting an *edit* suggestion commits with the proposer as git author (ADR 0012's 2026-08-27 amendment), and a git author line is a name and an address — which the ledger's `human:<person id>` deliberately is not, so the act reads them off the person the proposer names, by a person id already on a suggestion of this workspace.",
+      "Accepting an *edit* suggestion commits with the proposer as git author (ADR 0012's 2026-08-27 amendment), and a git author line is a name and an address — which the ledger's `human:<person id>` deliberately is not, so the act reads them off the person the proposer names.",
+  },
+  {
+    table: "public.member",
+    by: "concepts",
+    access: "read",
+    reason:
+      "The same read joins the membership: a proposer is a string a producer wrote and `user` is global by design (ADR 0009), so a lookup by id alone would let a compromised producer put any person on the platform into another tenant's commit. Only a member of this workspace can be named as an author.",
   },
   {
     table: "public.invitation",

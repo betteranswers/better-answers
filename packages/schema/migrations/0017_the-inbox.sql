@@ -3,12 +3,13 @@ CREATE TABLE "concept_write_request" (
 	"suggestion_id" text NOT NULL,
 	"merge_key" text NOT NULL,
 	"path" text NOT NULL,
-	"kind" text NOT NULL,
+	"concept_kind" text NOT NULL,
 	"title" text NOT NULL,
 	"frontmatter" jsonb NOT NULL,
 	"body" text NOT NULL,
 	"base_content_hash" text,
-	CONSTRAINT "concept_write_request_workspace_id_suggestion_id_pk" PRIMARY KEY("workspace_id","suggestion_id")
+	CONSTRAINT "concept_write_request_workspace_id_suggestion_id_pk" PRIMARY KEY("workspace_id","suggestion_id"),
+	CONSTRAINT "concept_write_request_body_length_check" CHECK (char_length(body) <= 100000)
 );
 --> statement-breakpoint
 ALTER TABLE "concept_write_request" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
@@ -27,6 +28,9 @@ CREATE TABLE "suggestion" (
 	CONSTRAINT "suggestion_workspace_id_id_pk" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "suggestion_kind_check" CHECK (kind IN ('edit', 'candidate', 'promotion', 'repair')),
 	CONSTRAINT "suggestion_status_check" CHECK (status IN ('waiting', 'accepted', 'declined', 'returned')),
+	CONSTRAINT "suggestion_proposer_check" CHECK (proposer ~ '^(human:[0-9A-HJKMNP-TV-Z]{26}|process:better-answers-[a-z0-9][a-z0-9-]*|better-answers-[a-z0-9][a-z0-9-]*/[0-9A-Za-z.-]+)$'),
+	CONSTRAINT "suggestion_decider_check" CHECK (decider IS NULL OR decider ~ '^(human:[0-9A-HJKMNP-TV-Z]{26}|process:better-answers-[a-z0-9][a-z0-9-]*|better-answers-[a-z0-9][a-z0-9-]*/[0-9A-Za-z.-]+)$'),
+	CONSTRAINT "suggestion_repair_proposer_check" CHECK (kind <> 'repair' OR proposer LIKE 'process:better-answers-%'),
 	CONSTRAINT "suggestion_reason_length_check" CHECK (reason IS NULL OR char_length(reason) BETWEEN 1 AND 2000),
 	CONSTRAINT "suggestion_decision_check" CHECK ((status = 'waiting') = (decided_at IS NULL)
          AND (decided_at IS NULL) = (decider IS NULL)

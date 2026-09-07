@@ -103,7 +103,7 @@ TABLES: dict[str, dict[str, str]] = {
         "suggestion_id": "text NOT NULL",
         "merge_key": "text NOT NULL",
         "path": "text NOT NULL",
-        "kind": "text NOT NULL",
+        "concept_kind": "text NOT NULL",
         "title": "text NOT NULL",
         "frontmatter": "jsonb NOT NULL",
         "body": "text NOT NULL",

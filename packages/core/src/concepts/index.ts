@@ -49,6 +49,7 @@ import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/in
 import {
   payloadFor,
   returnToProposer,
+  suggestionIsWaiting,
   targetOfMergeKey,
   type SuggestionKind,
   type SuggestionPayload,
@@ -280,8 +281,13 @@ export type ConceptWritten = {
  * `-taken` words are a bundle that already holds this path or this merge key under another
  * IRI. `rename-refused` and `reclassification-refused` are the two moves this act never
  * makes, and `no-such-concept` is a write naming an IRI this workspace never minted, which
- * ADR 0002 refuses because the key is never a caller's to choose. The principal refusals are
+ * ADR 0002 refuses because the key is never a caller's to choose. `already-decided` is an
+ * acceptance of a suggestion somebody decided first. The principal refusals are
  * `withMembership`'s, which judges the caller's authority at time-of-act.
+ *
+ * **Every one of them is read before the commit.** A refusal that came after would leave a
+ * commit no row records — which is the reconciler's territory, and the reconciler is for
+ * crashes, not for acts the platform meant to refuse.
  */
 export type WriteConceptRefusal =
   | RoleRefusal
@@ -292,7 +298,8 @@ export type WriteConceptRefusal =
   | "merge-key-taken"
   | "rename-refused"
   | "reclassification-refused"
-  | "no-such-concept";
+  | "no-such-concept"
+  | "already-decided";
 
 /**
  * The frontmatter keys ADR 0014's content hash leaves out: the trust the platform derives
@@ -545,20 +552,39 @@ export const writeConcept = async (
   const auditEventId = ulid();
 
   return withRepositoryLock(principal, doors.git, async () => {
-    // The act's first transaction: what the index already holds for this IRI, read under the
-    // authority this act will write with. Its refusals cost no commit, which is why the two
-    // that are decidable from the concept's own row are made here.
+    // **The act's first transaction, and every refusal that can be read out of a row.** It
+    // runs inside the lock, so nothing it reads can move before the rows land: identity is
+    // written only by this act, and a suggestion's decision is held by the same lock. That
+    // is what makes each of these refusals cost **no commit** — the difference between a
+    // caller being told no and a commit nobody can record.
     const existing = await attempt(() =>
-      withMembership(principal, doors.postgres, (fresh, tx) => heldByIri(fresh, tx, iri)),
+      withMembership(principal, doors.postgres, async (fresh, tx) => ({
+        held: await heldByIri(fresh, tx, iri),
+        // The merge key's resolution, read here rather than beside the act, so an
+        // acceptance resolves identity *at acceptance* and inside the lock that holds it.
+        resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
+        waiting:
+          input.acceptance === undefined ||
+          (await suggestionIsWaiting(fresh, tx, input.acceptance.suggestionId)),
+      })),
     );
     if (!existing.ok) return err(existing.error);
     if (!existing.value.ok) return err(existing.value.error);
-    const held = existing.value.value;
+    const { held, resolved, waiting } = existing.value.value;
 
     // ADR 0002: the key is never caller-settable. A creation minted its own above; a write
     // that named one has to name a concept this workspace already holds, or it would mint
     // an identity for a key its caller chose.
     if (input.iri !== undefined && held === undefined) return err("no-such-concept");
+    // A suggestion somebody decided while this act was being prepared. Refused here and not
+    // in the transaction that lands the rows, because a commit whose `Suggestion:` trailer
+    // named a declined suggestion is an orphan the reconciler's replay would land.
+    if (!waiting) return err("already-decided");
+    // One concept per merge key: the unique index says so and this says so first, so the
+    // refusal is a word a caller can act on rather than a commit the act cannot record.
+    // A key that resolves to nothing is free — a creation takes it, and a re-write may
+    // move its own concept onto it.
+    if (resolved !== undefined && resolved !== iri) return err("merge-key-taken");
     // The acceptance's own precondition: what the payload was written against, against
     // what the concept says now (ADR 0012's 2026-08-27 amendment). Read here, before the
     // commit, so a suggestion written against content that moved costs no commit at all.
@@ -829,12 +855,12 @@ export type AcceptSuggestionRefusal =
 /**
  * What became of one suggestion in an acceptance act. Per item, because each acceptance is
  * its own governed write and its own commit: one item's refusal is a fact about that item
- * and never a reason to un-land the ones before it.
+ * and never a reason to un-land the ones before it — so the act as a whole succeeds and each
+ * item carries its own `Result`, which is the shape every other refusal in `core` takes.
  */
 export type AcceptanceOutcome = {
   readonly suggestionId: string;
-  readonly accepted: ConceptWritten | undefined;
-  readonly refused: AcceptSuggestionRefusal | Error | undefined;
+  readonly outcome: Result<ConceptWritten, AcceptSuggestionRefusal | Error>;
 };
 
 /** The person a commit is attributed to, read off the identity set by their person id. */
@@ -849,6 +875,12 @@ type AuthorRow = { readonly name: string; readonly email: string };
  * A git author line is a name and an address, which is deliberately what the ledger's
  * `human:<person id>` is not (ADR 0035), so the two are read from different places: the actor
  * off the record, the line off the person the actor names.
+ *
+ * **Only a member of this workspace can be named**, which is the join and not a courtesy: a
+ * proposer is a string a producer wrote, and `user` is global by design (ADR 0009), so a
+ * lookup by id alone would let a compromised producer put any person on the platform — their
+ * name and their address — into another tenant's commit. A proposer who is not a member here
+ * falls back to whoever is deciding, who is a member by construction.
  */
 const authorFor = async (
   principal: UserPrincipal,
@@ -856,16 +888,16 @@ const authorFor = async (
   payload: SuggestionPayload,
 ): Promise<CommitAuthor | undefined> => {
   const proposer =
-    payload.suggestionKind === SUGGESTION_EDIT_KIND ? personOfActor(payload.proposer) : undefined;
-  // The proposer first where the kind says so, then whoever is deciding — which is also the
-  // answer when the proposer is no longer a person the identity set knows, because a commit
-  // attributed to nobody is worse than one attributed to the person who let it in.
+    payload.kind === SUGGESTION_EDIT_KIND ? personOfActor(payload.proposer) : undefined;
   for (const personId of proposer === undefined
     ? [principal.userId]
     : [proposer, principal.userId]) {
-    const found = await tx.query<AuthorRow>('SELECT name, email FROM "user" WHERE id = $1', [
-      personId,
-    ]);
+    const found = await tx.query<AuthorRow>(
+      `SELECT u.name, u.email FROM "user" u
+         JOIN member m ON m.user_id = u.id AND m.workspace_id = $2
+        WHERE u.id = $1`,
+      [personId, principal.workspaceId],
+    );
     const row = found.rows[0];
     if (row !== undefined) return { name: row.name, email: row.email };
   }
@@ -893,19 +925,20 @@ const acceptanceMessage = (title: string): string =>
  *
  * The order of one acceptance is the whole of this ticket:
  *
- * 1. read the payload through `concept_write_request_for`, which is the only road to it;
- * 2. resolve the merge key against `concept_identity` **now**, in that same transaction;
- * 3. refuse and **return to the proposer** when that resolution is not what the summary
+ * 1. read the payload through `concept_write_request_for`, which is the only road to it,
+ *    and the merge key's resolution beside it — what the person deciding was shown;
+ * 2. refuse and **return to the proposer** when that resolution is not what the summary
  *    rendered — the change is not lost, it is back with whoever prepared it;
- * 4. hand the whole thing to `writeConcept`, which mints an IRI when the merge key resolved
- *    to nothing and re-writes the concept when it resolved to one, holds the payload's base
- *    hash as its precondition, and decides the suggestion in the same transaction as the
- *    rows.
+ * 3. hand the whole thing to `writeConcept`, which **reads the resolution again inside its
+ *    own lock, before it commits**, mints an IRI when the merge key resolves to nothing and
+ *    re-writes the concept when it resolves to one, holds the payload's base hash as its
+ *    precondition, and decides the suggestion in the same transaction as the rows.
  *
- * Between 2 and 4 the resolution could move again, and the database is what catches it:
- * `concept_identity_merge_key_uidx` refuses a second concept for one merge key inside the
- * act's own transaction, so the worst case is `merge-key-taken` and never a write onto the
- * wrong concept. Step 3 is what turns that race into a word a person can act on.
+ * **Step 1 is a courtesy and step 3 is the guarantee.** The resolution read here is outside
+ * the act's lock and could move before the act runs; the read inside the lock cannot, because
+ * `concept_identity` is written only by a governed write and a suggestion's decision is held
+ * by the same lock. So an acceptance whose ground moved is refused with no commit either
+ * way — this step only decides which word the caller hears, and whether the item goes back.
  *
  * A bulk act's rows share one batch id and are never one row hiding N (ADR 0014 rule 4).
  */
@@ -936,9 +969,16 @@ const acceptOne = async (
 ): Promise<AcceptanceOutcome> => {
   const refused = (why: AcceptSuggestionRefusal | Error): AcceptanceOutcome => ({
     suggestionId: decision.suggestionId,
-    accepted: undefined,
-    refused: why,
+    outcome: err(why),
   });
+  /** Hand this item back to whoever prepared it, and answer with the word that sent it. */
+  const returning = async (why: AcceptSuggestionRefusal, reason: string) => {
+    const returned = await returnToProposer(principal, doors, {
+      suggestionId: decision.suggestionId,
+      reason,
+    });
+    return refused(returned.ok ? why : returned.error);
+  };
 
   const prepared = await attempt(() =>
     withMembership(principal, doors.postgres, async (fresh, tx) => {
@@ -954,23 +994,19 @@ const acceptOne = async (
   const found: Prepared | undefined = prepared.value.value;
   if (found === undefined) return refused("no-such-suggestion");
 
-  // The resolution the summary rendered, against the one this act just read. A merge key
-  // that moved is the acceptance ADR 0012 refuses, and the suggestion goes back rather
-  // than landing on a concept the person deciding it was never shown.
+  const moved = "the concept this suggestion resolves to moved after the set was opened";
+  // The resolution the summary rendered, against the one this act just read.
   if ((found.target ?? null) !== decision.expectedTarget) {
-    const returned = await returnToProposer(principal, doors, {
-      suggestionId: decision.suggestionId,
-      reason: "the concept this suggestion resolves to moved after the set was opened",
-    });
-    return returned.ok ? refused("resolution-moved") : refused(returned.error);
+    return returning("resolution-moved", moved);
   }
 
   const written = await writeConcept(principal, doors, {
     // The resolution this act just read: a concept to re-write, or nothing to mint one.
+    // The act reads it again under its own lock, which is what actually decides it.
     iri: found.target,
     mergeKey: found.payload.mergeKey,
     path: found.payload.path,
-    kind: found.payload.kind,
+    kind: found.payload.conceptKind,
     title: found.payload.title,
     frontmatter: found.payload.frontmatter,
     body: found.payload.body,
@@ -980,22 +1016,19 @@ const acceptOne = async (
     acceptance: {
       suggestionId: decision.suggestionId,
       setId: found.payload.setId,
-      kind: found.payload.suggestionKind,
+      kind: found.payload.kind,
       batchId,
     },
   });
-  if (written.ok) {
-    return { suggestionId: decision.suggestionId, accepted: written.value, refused: undefined };
-  }
+  if (written.ok) return { suggestionId: decision.suggestionId, outcome: ok(written.value) };
 
-  // The payload's own precondition failed: what it was written against is not what the
-  // concept says now. That is the other half of "fails loudly and returns to the proposer".
+  // The two refusals the act read under its lock that mean *this suggestion's ground moved*:
+  // the merge key now belongs to another concept, and the content the payload was written
+  // against is no longer what the concept says. Both are "fails loudly and returns to the
+  // proposer" (ADR 0012's 2026-08-27 amendment), and neither cost a commit.
+  if (written.error === "merge-key-taken") return returning("resolution-moved", moved);
   if (written.error === "stale-precondition") {
-    const returned = await returnToProposer(principal, doors, {
-      suggestionId: decision.suggestionId,
-      reason: "the concept moved after this suggestion was written",
-    });
-    if (!returned.ok) return refused(returned.error);
+    return returning("stale-precondition", "the concept moved after this suggestion was written");
   }
   return refused(written.error);
 };

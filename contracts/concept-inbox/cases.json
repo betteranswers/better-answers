@@ -24,7 +24,7 @@
         "suggestion_id": "01J6S1AAAAAAAAAAAAAAAAAAAA",
         "merge_key": "policy:expenses",
         "path": "knowledge/expenses.md",
-        "kind": "Policy",
+        "concept_kind": "Policy",
         "title": "Expenses",
         "frontmatter": { "title": "Expenses", "type": "Policy" },
         "body": "Expenses are claimed within sixty days.",
@@ -34,7 +34,7 @@
         "suggestion_id": "01J6S2BBBBBBBBBBBBBBBBBBBB",
         "merge_key": "policy:expenses",
         "path": "knowledge/expenses-restated.md",
-        "kind": "Policy",
+        "concept_kind": "Policy",
         "title": "Expenses, restated",
         "frontmatter": { "title": "Expenses, restated", "type": "Policy" },
         "body": "Expenses are claimed within ninety days.",
@@ -44,7 +44,7 @@
         "suggestion_id": "01J6S3CCCCCCCCCCCCCCCCCCCC",
         "merge_key": "policy:travel",
         "path": "knowledge/travel.md",
-        "kind": "Policy",
+        "concept_kind": "Policy",
         "title": "Travel",
         "frontmatter": { "title": "Travel", "type": "Policy" },
         "body": "Travel is booked fourteen days ahead.",
@@ -116,6 +116,27 @@
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "statement": "DELETE FROM suggestion WHERE id = '01J6S1AAAAAAAAAAAAAAAAAAAA'",
       "sqlstate": "42501"
+    },
+    {
+      "why": "a repair is the platform running its own citation repair: accepting one re-points every standing check at the content it wrote, so nobody but a platform process may raise one",
+      "role": "app_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R2AAAAAAAAAAAAAAAAAAAA', 'repair', 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', '[{\"suggestion_id\": \"01J6S4DDDDDDDDDDDDDDDDDDDD\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": {}, \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "sqlstate": "23514"
+    },
+    {
+      "why": "an actor of no known form is not a proposer, however a producer spells it",
+      "role": "app_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R3AAAAAAAAAAAAAAAAAAAA', 'edit', 'ada@acme.invalid', '[{\"suggestion_id\": \"01J6S5EEEEEEEEEEEEEEEEEEEE\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": {}, \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "sqlstate": "23514"
+    },
+    {
+      "why": "a set is bounded by what an Admin could decide, so a producer does not choose how much it sends",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R4AAAAAAAAAAAAAAAAAAAA', 'candidate', 'better-answers-extraction/1.2', '[]'::jsonb)",
+      "sqlstate": "22023"
     },
     {
       "why": "the set lands in the workspace the caller's transaction already names, and an unscoped caller has none",

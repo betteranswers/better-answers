@@ -1,7 +1,9 @@
 import {
   boundarySchemas,
   SUGGESTION_DECLINED_STATUS,
+  SUGGESTION_REPAIR_KIND,
   SUGGESTION_RETURNED_STATUS,
+  SUGGESTION_SET_MAX,
   SUGGESTION_WAITING_STATUS,
 } from "@better-answers/schema";
 import type { z } from "zod";
@@ -21,6 +23,7 @@ import {
   type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
+import { withRepositoryLock, type GitDoor } from "../store/git/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import type { Frontmatter } from "./index.ts";
 
@@ -138,12 +141,18 @@ const summaryItem = (row: SummaryRow): SuggestionSummaryItem => {
  * gives the app a payload it holds no privilege on. `target` is what an acceptance carries
  * back as its precondition; `baseMoved` is what says an acceptance would be refused before
  * anybody tries.
+ *
+ * **An Admin, or the person who proposed the set, and nobody else.** A summary names every
+ * item's title, path, merge key and resolved IRI, and none of that is filtered by what the
+ * reader may see: a Viewer who could open any set would learn that a concept withheld from
+ * them exists, which is the one thing `open` by IRI is built never to reveal (user story
+ * 13). Deciding is an Admin's; seeing what you yourself offered is your own.
  */
 export const suggestionSetSummary = async (
   principal: UserPrincipal,
   tx: Tx,
   setId: string,
-): Promise<Result<readonly SuggestionSummaryItem[], Error>> => {
+): Promise<Result<readonly SuggestionSummaryItem[], RoleRefusal | Error>> => {
   const found = await attempt(() =>
     // RLS scopes the function's own WHERE clause by the transaction's workspace; naming
     // the Principal here is what says so where a reader of the call can see it.
@@ -155,6 +164,13 @@ export const suggestionSetSummary = async (
     ),
   );
   if (!found.ok) return err(found.error);
+  // The gate runs on the rows and before they are handed back, so a set this caller may
+  // not open answers a refusal rather than its contents. A set nobody minted is empty, and
+  // empty passes — an id that resolved to nothing tells a prober nothing either way.
+  const mine = actorIdOf(principal);
+  if (principal.role !== "Admin" && found.value.rows.some((row) => row.proposer !== mine)) {
+    return err("role-forbids");
+  }
   // The reading is inside an `attempt` too: a row whose actor is of no known form is a
   // broken database, and the throw becomes this act's own value rather than the caller's.
   return attempt(async () => found.value.rows.map(summaryItem));
@@ -165,7 +181,8 @@ export type SuggestionRequest = {
   /** What this payload means, before any IRI is known (`CONTEXT.md`, *merge key*). */
   readonly mergeKey: string;
   readonly path: string;
-  readonly kind: string;
+  /** The OKF `type` the file carries — never the suggestion's own kind, which is the set's. */
+  readonly conceptKind: string;
   readonly title: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
@@ -183,7 +200,7 @@ export type SuggestionSetSubmitted = {
   readonly suggestionIds: readonly string[];
 };
 
-export type SubmitSuggestionSetRefusal = PrincipalRefusal | "malformed";
+export type SubmitSuggestionSetRefusal = PrincipalRefusal | "malformed" | "kind-forbids";
 
 /**
  * Submit one suggestion set — **one function call**, which is the form ADR 0031 fixes for
@@ -192,28 +209,35 @@ export type SubmitSuggestionSetRefusal = PrincipalRefusal | "malformed";
  *
  * Any member may submit: a Viewer may *suggest* a change they may not commit (ADR 0019),
  * and the gate ADR 0012 cares about is the decision, not the offer. The proposer is the
- * caller, derived by the kernel's one function and never composed here.
+ * caller, derived by the kernel's one function and never composed here — **which is the
+ * whole of what a person may raise**: a *repair* is the platform running its own citation
+ * repair, and accepting one re-points every standing check at the content it wrote, so a
+ * person raising one could make somebody else's check vouch for content they never saw.
+ * The row's own CHECK is what makes that impossible; this refusal is the word a caller
+ * hears instead of the store's error.
  *
- * The payload goes through the boundary before the call, so a path or a frontmatter the
- * index row would refuse is refused while it is still a proposal — rather than at the
- * moment an Admin accepts it, when the refusal is somebody else's problem.
+ * The payload goes through the boundary before the call, so a path, a frontmatter or a body
+ * the row would refuse is refused while it is still a proposal — rather than at the moment
+ * an Admin accepts it, when the refusal is somebody else's problem.
  */
 export const submitSuggestionSet = async (
   principal: UserPrincipal,
   doors: { readonly postgres: PostgresDoor },
   input: SubmitSuggestionSetInput,
 ): Promise<Result<SuggestionSetSubmitted, SubmitSuggestionSetRefusal | Error>> => {
+  if (input.kind === SUGGESTION_REPAIR_KIND) return err("kind-forbids");
   const setId = ulid();
   const payloads = boundarySchemas.conceptWriteRequest.insert
     .omit({ workspaceId: true })
     .array()
     .nonempty()
+    .max(SUGGESTION_SET_MAX)
     .safeParse(
       input.requests.map((request) => ({
         suggestionId: ulid(),
         mergeKey: request.mergeKey,
         path: request.path,
-        kind: request.kind,
+        conceptKind: request.conceptKind,
         title: request.title,
         frontmatter: request.frontmatter,
         body: request.body,
@@ -237,7 +261,7 @@ export const submitSuggestionSet = async (
               suggestion_id: payload.suggestionId,
               merge_key: payload.mergeKey,
               path: payload.path,
-              kind: payload.kind,
+              concept_kind: payload.conceptKind,
               title: payload.title,
               frontmatter: payload.frontmatter,
               body: payload.body,
@@ -283,14 +307,24 @@ export type SuggestionDecided = {
  * writes it, so the fail-together test provokes its failure after the row exists and proves
  * it rolled back with the act rather than that it was never reached (ADR 0014 rule 4).
  *
- * The row is read **under a lock**, so a suggestion two people decide at once is decided
- * once: the second waits behind the first and then reads the status the first wrote. Without
- * it the ledger row would be written against a row a concurrent decision had already taken,
- * and the act would commit an event for a decision that never happened.
+ * The row is read **under two locks**, and they answer two different races.
+ *
+ * `FOR UPDATE` is the one for two people deciding at once: the second waits behind the first
+ * and then reads the status the first wrote. Without it the ledger row would be written
+ * against a row a concurrent decision had already taken, and the act would commit an event
+ * for a decision that never happened.
+ *
+ * The **per-repository lock** is the one for a decision racing an *acceptance*, and it is
+ * why a decision that makes no commit takes a lock named after a repository. An acceptance
+ * spans two stores: it reads the suggestion, commits to git, then writes its rows. A decline
+ * landing inside that span would leave a commit whose `Suggestion:` trailer named a declined
+ * suggestion — an orphan the reconciler's replay rule would then land (ADR 0012's 2026-09-06
+ * amendment). Held here, a decision and an acceptance of one suggestion are one after the
+ * other, so that span has nothing to interleave with.
  */
 const decide = async (
   principal: UserPrincipal,
-  doors: { readonly postgres: PostgresDoor },
+  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
   input: DecideSuggestionInput,
   decision: { readonly status: SuggestionStatus; readonly act: Act },
 ): Promise<Result<SuggestionDecided, DecideSuggestionRefusal | Error>> => {
@@ -302,44 +336,46 @@ const decide = async (
   const reason = boundarySchemas.suggestion.insert.shape.reason.safeParse(input.reason);
   if (!reason.success || reason.data === null) return err("malformed");
 
-  const decided = await attempt(() =>
-    withMembership(principal, doors.postgres, async (fresh, tx) => {
-      const waiting = await tx.query<{ set_id: string; status: string }>(
-        "SELECT set_id, status FROM suggestion WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
-        [fresh.workspaceId, input.suggestionId],
-      );
-      const row = waiting.rows[0];
-      if (row === undefined) return err("no-such-suggestion" as const);
-      if (row.status !== SUGGESTION_WAITING_STATUS) return err("already-decided" as const);
+  const decided = await withRepositoryLock(principal, doors.git, () =>
+    attempt(() =>
+      withMembership(principal, doors.postgres, async (fresh, tx) => {
+        const waiting = await tx.query<{ set_id: string; status: string }>(
+          "SELECT set_id, status FROM suggestion WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
+          [fresh.workspaceId, input.suggestionId],
+        );
+        const row = waiting.rows[0];
+        if (row === undefined) return err("no-such-suggestion" as const);
+        if (row.status !== SUGGESTION_WAITING_STATUS) return err("already-decided" as const);
 
-      await record(fresh, tx, {
-        id: ulid(),
-        act: decision.act,
-        subjectId: input.suggestionId,
-        detail: { setId: row.set_id },
-      });
-      const written = await tx.query<{ id: string }>(
-        `UPDATE suggestion
-            SET status = $3, decider = $4, decided_at = now(), reason = $5
-          WHERE workspace_id = $1 AND id = $2 AND status = $6
-        RETURNING id`,
-        [
-          fresh.workspaceId,
-          input.suggestionId,
-          decision.status,
-          actorIdOf(fresh),
-          reason.data,
-          SUGGESTION_WAITING_STATUS,
-        ],
-      );
-      // Unreachable while the lock above holds, and a **throw** rather than a refusal if it
-      // ever is not: the ledger row is already written, so a value here would commit an
-      // event for a decision that did not happen.
-      if (written.rows.length === 0) {
-        throw new Error("the suggestion moved under the lock that was holding it");
-      }
-      return ok({ suggestionId: input.suggestionId, setId: row.set_id, status: decision.status });
-    }),
+        await record(fresh, tx, {
+          id: ulid(),
+          act: decision.act,
+          subjectId: input.suggestionId,
+          detail: { setId: row.set_id },
+        });
+        const written = await tx.query<{ id: string }>(
+          `UPDATE suggestion
+              SET status = $3, decider = $4, decided_at = now(), reason = $5
+            WHERE workspace_id = $1 AND id = $2 AND status = $6
+          RETURNING id`,
+          [
+            fresh.workspaceId,
+            input.suggestionId,
+            decision.status,
+            actorIdOf(fresh),
+            reason.data,
+            SUGGESTION_WAITING_STATUS,
+          ],
+        );
+        // Unreachable while the lock above holds, and a **throw** rather than a refusal if
+        // it ever is not: the ledger row is already written, so a value here would commit
+        // an event for a decision that did not happen.
+        if (written.rows.length === 0) {
+          throw new Error("the suggestion moved under the lock that was holding it");
+        }
+        return ok({ suggestionId: input.suggestionId, setId: row.set_id, status: decision.status });
+      }),
+    ),
   );
   if (!decided.ok) return err(decided.error);
   if (!decided.value.ok) return err(decided.value.error);
@@ -354,7 +390,7 @@ const decide = async (
  */
 export const declineSuggestion = (
   principal: UserPrincipal,
-  doors: { readonly postgres: PostgresDoor },
+  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
   input: DecideSuggestionInput,
 ): Promise<Result<SuggestionDecided, DecideSuggestionRefusal | Error>> =>
   decide(principal, doors, input, {
@@ -372,7 +408,7 @@ export const declineSuggestion = (
  */
 export const returnToProposer = (
   principal: UserPrincipal,
-  doors: { readonly postgres: PostgresDoor },
+  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
   input: DecideSuggestionInput,
 ): Promise<Result<SuggestionDecided, DecideSuggestionRefusal | Error>> =>
   decide(principal, doors, input, {
@@ -380,14 +416,20 @@ export const returnToProposer = (
     act: INBOX_ACTS.returned,
   });
 
-/** A suggestion's payload, as the acceptance path reads it — and nothing else may. */
+/**
+ * A suggestion's payload, as the acceptance path reads it — and nothing else may.
+ *
+ * `kind` is the **suggestion's**, everywhere the word appears in this slice; the OKF type
+ * the file carries is `conceptKind`. The two were both called *kind* once, in adjacent
+ * types, and the bare word flipped meaning between them.
+ */
 export type SuggestionPayload = {
   readonly setId: string;
-  readonly suggestionKind: SuggestionKind;
+  readonly kind: SuggestionKind;
   readonly proposer: ActorId;
   readonly mergeKey: string;
   readonly path: string;
-  readonly kind: string;
+  readonly conceptKind: string;
   readonly title: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
@@ -396,11 +438,11 @@ export type SuggestionPayload = {
 
 type PayloadRow = {
   readonly set_id: string;
-  readonly suggestion_kind: string;
+  readonly kind: string;
   readonly proposer: string;
   readonly merge_key: string;
   readonly path: string;
-  readonly kind: string;
+  readonly concept_kind: string;
   readonly title: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
@@ -421,26 +463,43 @@ export const payloadFor = async (
   suggestionId: string,
 ): Promise<SuggestionPayload | undefined> => {
   const found = await tx.query<PayloadRow>(
-    `SELECT set_id, suggestion_kind, proposer, merge_key, path, kind, title, frontmatter, body,
+    `SELECT set_id, kind, proposer, merge_key, path, concept_kind, title, frontmatter, body,
             base_content_hash
        FROM concept_write_request_for($1)`,
     [suggestionId],
   );
   const row = found.rows[0];
   if (row === undefined) return undefined;
-  const kind = boundarySchemas.suggestion.select.shape.kind.parse(row.suggestion_kind);
   return {
     setId: row.set_id,
-    suggestionKind: kind,
+    kind: boundarySchemas.suggestion.select.shape.kind.parse(row.kind),
     proposer: actorOf(row.proposer),
     mergeKey: row.merge_key,
     path: row.path,
-    kind: row.kind,
+    conceptKind: row.concept_kind,
     title: row.title,
     frontmatter: row.frontmatter,
     body: row.body,
     baseContentHash: row.base_content_hash,
   };
+};
+
+/**
+ * Whether a suggestion is still waiting for its decision — the read an acceptance makes
+ * **before it commits**, so an acceptance of a suggestion somebody has already declined
+ * costs no commit at all. It is a second reading of what `payloadFor` implies, and it is
+ * made inside the act rather than beside it, which is the whole of its point.
+ */
+export const suggestionIsWaiting = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  suggestionId: string,
+): Promise<boolean> => {
+  const found = await tx.query<{ status: string }>(
+    "SELECT status FROM suggestion WHERE workspace_id = $1 AND id = $2",
+    [principal.workspaceId, suggestionId],
+  );
+  return found.rows[0]?.status === SUGGESTION_WAITING_STATUS;
 };
 
 /**

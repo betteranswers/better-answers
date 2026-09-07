@@ -52,23 +52,30 @@ BEGIN
     RAISE EXCEPTION 'submit_suggestion_set: the transaction is scoped to no workspace'
       USING ERRCODE = 'insufficient_privilege';
   END IF;
-  IF jsonb_typeof(p_requests) IS DISTINCT FROM 'array' OR jsonb_array_length(p_requests) = 0 THEN
-    RAISE EXCEPTION 'submit_suggestion_set: a set carries at least one request'
+  -- A set is bounded by what an Admin could decide (SUGGESTION_SET_MAX in
+  -- src/suggestion-tables.ts): a producer chooses how much it sends, so somebody other
+  -- than the sender has to choose the ceiling.
+  IF jsonb_typeof(p_requests) IS DISTINCT FROM 'array'
+     OR jsonb_array_length(p_requests) NOT BETWEEN 1 AND 500 THEN
+    RAISE EXCEPTION 'submit_suggestion_set: a set carries between one and 500 requests'
       USING ERRCODE = 'invalid_parameter_value';
   END IF;
 
+  -- The proposer's *form*, and the kind a form may raise, are the row's own CHECKs
+  -- (`suggestion_proposer_check`, `suggestion_repair_proposer_check`): held where a
+  -- compromised producer calling this function cannot argue with them.
   INSERT INTO public.suggestion (workspace_id, id, set_id, kind, proposer)
   SELECT v_workspace, r.suggestion_id, p_set_id, p_kind, p_proposer
     FROM jsonb_to_recordset(p_requests) AS r(suggestion_id text);
 
   RETURN QUERY
   INSERT INTO public.concept_write_request
-         (workspace_id, suggestion_id, merge_key, path, kind, title, frontmatter, body,
-          base_content_hash)
-  SELECT v_workspace, r.suggestion_id, r.merge_key, r.path, r.kind, r.title, r.frontmatter,
-         r.body, r.base_content_hash
+         (workspace_id, suggestion_id, merge_key, path, concept_kind, title, frontmatter,
+          body, base_content_hash)
+  SELECT v_workspace, r.suggestion_id, r.merge_key, r.path, r.concept_kind, r.title,
+         r.frontmatter, r.body, r.base_content_hash
     FROM jsonb_to_recordset(p_requests)
-      AS r(suggestion_id text, merge_key text, path text, kind text, title text,
+      AS r(suggestion_id text, merge_key text, path text, concept_kind text, title text,
            frontmatter jsonb, body text, base_content_hash text)
   RETURNING suggestion_id;
 END $$;
@@ -122,14 +129,14 @@ GRANT EXECUTE ON FUNCTION suggestion_set_summary(text) TO app_rt;
 -- or refused, and its payload has no reader left.
 CREATE FUNCTION concept_write_request_for(p_suggestion_id text)
 RETURNS TABLE (
-  merge_key text, path text, kind text, title text, frontmatter jsonb, body text,
-  base_content_hash text, set_id text, suggestion_kind text, proposer text
+  merge_key text, path text, concept_kind text, title text, frontmatter jsonb, body text,
+  base_content_hash text, set_id text, kind text, proposer text
 )
 LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, pg_temp
 AS $$
-  SELECT r.merge_key, r.path, r.kind, r.title, r.frontmatter, r.body, r.base_content_hash,
-         s.set_id, s.kind, s.proposer
+  SELECT r.merge_key, r.path, r.concept_kind, r.title, r.frontmatter, r.body,
+         r.base_content_hash, s.set_id, s.kind, s.proposer
     FROM public.concept_write_request r
     JOIN public.suggestion s
       ON s.workspace_id = r.workspace_id AND s.id = r.suggestion_id

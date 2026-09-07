@@ -115,8 +115,9 @@ describe("the concept-inbox agreement", () => {
         [fixture.set.set_id],
       );
 
-      // The `why` travels with the assertion, so a failure names the case rather than
-      // reporting that one array was not another.
+      // The whole set at once and in the fixture's order: the summary's own promise is
+      // that every item resolves the way the fixture says, so asserting item by item would
+      // let a row the function never returned pass unnoticed.
       expect(summary.rows).toEqual(
         fixture.expect_summary.map((expected) => ({
           suggestion_id: expected.suggestion_id,

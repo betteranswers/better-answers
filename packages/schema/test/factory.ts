@@ -556,7 +556,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     return insertRow(client, "conceptWriteRequest", {
       mergeKey: `policy:${ulid().toLowerCase()}`,
       path: `knowledge/${ulid().toLowerCase()}.md`,
-      kind: "Policy",
+      conceptKind: "Policy",
       title: "Expenses",
       frontmatter: { title: "Expenses", type: "Policy" },
       body: "Expenses are claimed within thirty days.",

@@ -7,9 +7,10 @@ import { timestamp } from "drizzle-orm/pg-core";
  *
  * They live here rather than beside one of their callers because the concept write path,
  * the graph and the inbox each declare a tableful of them, and a second copy is a second
- * place a CHECK's quoting or a column's timezone could quietly differ. Deliberately **not**
- * re-exported from the package's entry point — they are how a table is written, never what
- * a boundary's caller needs.
+ * place a CHECK's quoting or a column's timezone could quietly differ — a table whose
+ * instants read back as strings while its neighbour's read back as dates is a bug nobody
+ * finds until a comparison fails. Deliberately **not** re-exported from the package's
+ * entry point — they are how a table is written, never what a boundary's caller needs.
  */
 
 /** A closed word set as a CHECK's list: quoted, comma-separated, in the order declared. */

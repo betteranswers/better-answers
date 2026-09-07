@@ -360,7 +360,7 @@ const acceptedRows = {
       suggestionId: SUGGESTION_ID,
       mergeKey: "policy:expenses",
       path: "knowledge/expenses.md",
-      kind: "Policy",
+      conceptKind: "Policy",
       title: "Expenses",
       frontmatter: { title: "Expenses", type: "Policy", sources: [{ resource: "/s.md" }] },
       body: "Expenses are claimed within sixty days.",

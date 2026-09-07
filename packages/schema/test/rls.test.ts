@@ -1209,7 +1209,7 @@ describe("the inbox under app_rt", () => {
               suggestion_id: ulid(),
               merge_key: "policy:expenses",
               path: "knowledge/expenses.md",
-              kind: "Policy",
+              concept_kind: "Policy",
               title: "Expenses",
               frontmatter: { title: "Expenses" },
               body: "Expenses are claimed within thirty days.",
@@ -1219,6 +1219,38 @@ describe("the inbox under app_rt", () => {
         ],
       );
       expect(submitted.rowCount).toBe(1);
+    });
+  });
+
+  it("refuses a set larger than one an Admin could decide, and one carrying nothing", async () => {
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const request = () => ({
+        suggestion_id: ulid(),
+        merge_key: `policy:${ulid().toLowerCase()}`,
+        path: `knowledge/${ulid().toLowerCase()}.md`,
+        concept_kind: "Policy",
+        title: "Expenses",
+        frontmatter: {},
+        body: "body",
+        base_content_hash: null,
+      });
+
+      // A producer chooses how much it sends, so somebody other than the sender chooses
+      // the ceiling; and a set of nothing is a call that meant to say something.
+      for (const requests of [[], Array.from({ length: 501 }, request)]) {
+        await client.query("SAVEPOINT sized");
+        await expect(
+          client.query("SELECT * FROM submit_suggestion_set($1, 'edit', $2, $3::jsonb)", [
+            ulid(),
+            "process:better-answers-test",
+            JSON.stringify(requests),
+          ]),
+        ).rejects.toThrow(/between one and 500 requests/);
+        await client.query("ROLLBACK TO SAVEPOINT sized");
+      }
     });
   });
 
@@ -1290,6 +1322,12 @@ describe("the inbox under app_rt", () => {
           `VALUES ($1, $2, $3, 'edit', $4, 'waiting', $4, now(), NULL, NULL)`,
           "suggestion_decision_check",
         ],
+        // A decider of no known form — the row is written by a definer function both tiers
+        // call, which is past every boundary the app parses through.
+        [
+          `VALUES ($1, $2, $3, 'edit', $4, 'declined', 'Ada Editor', now(), 'why', NULL)`,
+          "suggestion_decider_check",
+        ],
       ];
       for (const [values, constraint] of rows) {
         await client.query("SAVEPOINT decision");
@@ -1303,6 +1341,57 @@ describe("the inbox under app_rt", () => {
         ).rejects.toThrow(new RegExp(constraint));
         await client.query("ROLLBACK TO SAVEPOINT decision");
       }
+
+      // The proposer's own two rules, each read off the value the row carries: an actor of
+      // no known form at all, and — the security one — a **repair nobody but the platform
+      // may raise**. Accepting a repair re-points every standing check at the content it
+      // wrote, so a member who could raise one could make somebody's check vouch for
+      // content they never saw; not even an agent's output qualifies, because the repair is
+      // the platform's own routine (ADR 0019).
+      const proposers: readonly [string, string, string][] = [
+        ["edit", "ada@acme.invalid", "suggestion_proposer_check"],
+        ["repair", "human:01J6CCCCCCCCCCCCCCCCCCCCCC", "suggestion_repair_proposer_check"],
+        ["repair", "better-answers-citation-repair/1.0", "suggestion_repair_proposer_check"],
+      ];
+      for (const [kind, proposer, constraint] of proposers) {
+        await client.query("SAVEPOINT proposer");
+        await expect(
+          client.query(
+            `INSERT INTO suggestion (workspace_id, id, set_id, kind, proposer)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [WS_A, ulid(), ulid(), kind, proposer],
+          ),
+        ).rejects.toThrow(new RegExp(constraint));
+        await client.query("ROLLBACK TO SAVEPOINT proposer");
+      }
+      // And the served path the refusals sit beside: the platform's own repair lands.
+      const platform = await client.query(
+        `INSERT INTO suggestion (workspace_id, id, set_id, kind, proposer)
+         VALUES ($1, $2, $3, 'repair', 'process:better-answers-citation-repair') RETURNING id`,
+        [WS_A, ulid(), ulid()],
+      );
+      expect(platform.rowCount).toBe(1);
+    });
+  });
+
+  it("refuses a payload larger than a concept could be, at the row", async () => {
+    // Straight SQL rather than the factory, which would refuse it at the boundary before
+    // any INSERT existed: the claim here is the database's own, because the row is written
+    // by a definer function both tiers call and no boundary stands in front of that.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const here = await seed.suggestion({ workspaceId: WS_A });
+
+      // A concept is a fact stated once, not a document; a producer writes this column, so
+      // the size is somebody else's to bound.
+      await expect(
+        client.query(
+          `INSERT INTO concept_write_request
+             (workspace_id, suggestion_id, merge_key, path, concept_kind, title, frontmatter, body)
+           VALUES ($1, $2, 'policy:big', 'knowledge/big.md', 'Policy', 'Big', '{}'::jsonb, $3)`,
+          [WS_A, here.id, "x".repeat(100_001)],
+        ),
+      ).rejects.toThrow(/concept_write_request_body_length_check/);
     });
   });
 

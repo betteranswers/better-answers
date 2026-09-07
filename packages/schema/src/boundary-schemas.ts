@@ -6,6 +6,7 @@ import {
   ACCESS_REQUEST_REASON_MAX,
   ACCESS_REQUEST_STATUSES,
 } from "./access-request-tables.ts";
+import { ACTOR_ID as ACTOR_ID_REGEX } from "./actor-id.ts";
 import { ACT, auditEvent, FAMILIES } from "./audit-tables.ts";
 import {
   bundleCommit,
@@ -56,11 +57,12 @@ import { llmRoute, workspaceConfig } from "./schema.ts";
 import {
   conceptWriteRequest,
   suggestion,
+  SUGGESTION_BODY_MAX,
   SUGGESTION_KINDS,
   SUGGESTION_REASON_MAX,
   SUGGESTION_STATUSES,
 } from "./suggestion-tables.ts";
-import { ULID, ULID_CHARACTERS } from "./ulid.ts";
+import { ULID } from "./ulid.ts";
 import { workspace } from "./workspace-table.ts";
 
 /**
@@ -252,14 +254,11 @@ export const ingressCounterInsert = createInsertSchema(ingressCounter, ingressCo
 export const ingressCounterUpdate = createUpdateSchema(ingressCounter, ingressCounterRefinements);
 
 /**
- * The ledger's actor, narrowed to the three forms the kernel's `ActorId` names (ADR 0035):
- * a person by their person id — the minter's shape, so an email cannot pass for one — the
- * platform by `process:better-answers-<purpose>`, an agent by `better-answers-<purpose>/<version>`
- * as ADR 0019 shapes it.
+ * The ledger's actor, narrowed to the three forms the kernel's `ActorId` names — the one
+ * pattern `actor-id.ts` writes, so a refinement here and a CHECK on a row are held to the
+ * same characters. Re-exported, because the package's callers have always read it here.
  */
-export const ACTOR_ID = new RegExp(
-  `^(human:${ULID_CHARACTERS}|process:better-answers-[a-z0-9][a-z0-9-]*|better-answers-[a-z0-9][a-z0-9-]*/[0-9A-Za-z.-]+)$`,
-);
+export { ACTOR_ID } from "./actor-id.ts";
 
 /**
  * The detail a row carries: ids and role words, and an act's confirmations as typed
@@ -279,7 +278,7 @@ const auditEventRefinements = {
   workspaceId,
   act: (schema: z.ZodString) =>
     schema.regex(ACT).pipe(z.templateLiteral([z.enum(FAMILIES), ".", z.string(), ".", z.string()])),
-  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
   subjectId: (schema: z.ZodString) => schema.trim().min(1),
   detail: (schema: z.ZodType) => schema.pipe(detail),
   batchId: (schema: z.ZodString) => schema.regex(ULID),
@@ -425,15 +424,22 @@ export const conceptIdentityUpdate = createUpdateSchema(
  */
 const conceptFileRefinements = {
   path: (schema: z.ZodString) => schema.regex(CONCEPT_PATH),
-  kind: (schema: z.ZodString) => schema.trim().min(1),
   title: (schema: z.ZodString) => schema.trim().min(1),
   frontmatter: (schema: z.ZodType) => schema.pipe(frontmatter),
 };
+
+/**
+ * The OKF `type` a file carries, under whichever column name its table gives it: `kind` on
+ * the index row, which is the folded word the type vocabulary counts, and `concept_kind` on
+ * a payload, where the bare word would read as the *suggestion's* kind.
+ */
+const conceptKind = (schema: z.ZodString) => schema.trim().min(1);
 
 const conceptIndexRefinements = {
   workspaceId,
   iri: conceptIri,
   ...conceptFileRefinements,
+  kind: conceptKind,
   contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
   commitSha: (schema: z.ZodString) => schema.regex(GIT_SHA),
   status: (schema: z.ZodString) => schema.pipe(z.enum(CONCEPT_STATUSES)),
@@ -455,7 +461,7 @@ const bundleCommitRefinements = {
   sha: (schema: z.ZodString) => schema.regex(GIT_SHA),
   parentSha: (schema: z.ZodString) => schema.regex(GIT_SHA),
   auditEventId: (schema: z.ZodString) => schema.regex(ULID),
-  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
 };
 
 export const bundleCommitSelect = createSelectSchema(bundleCommit, bundleCommitRefinements);
@@ -478,7 +484,7 @@ const conceptVerificationRefinements = {
   id: (schema: z.ZodString) => schema.regex(ULID),
   workspaceId,
   iri: conceptIri,
-  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+  actor: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
   contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
   origin: (schema: z.ZodString) => schema.pipe(z.enum(VERIFICATION_ORIGINS)),
 };
@@ -607,9 +613,9 @@ const suggestionRefinements = {
   setId: (schema: z.ZodString) => schema.regex(ULID),
   kind: (schema: z.ZodString) => schema.pipe(z.enum(SUGGESTION_KINDS)),
   status: (schema: z.ZodString) => schema.pipe(z.enum(SUGGESTION_STATUSES)),
-  proposer: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+  proposer: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
   targetIri: conceptIri,
-  decider: (schema: z.ZodString) => schema.regex(ACTOR_ID),
+  decider: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
   reason: (schema: z.ZodString) => schema.trim().min(1).max(SUGGESTION_REASON_MAX),
 };
 
@@ -627,6 +633,10 @@ const conceptWriteRequestRefinements = {
   suggestionId: (schema: z.ZodString) => schema.regex(ULID),
   mergeKey: (schema: z.ZodString) => schema.trim().min(1),
   ...conceptFileRefinements,
+  conceptKind,
+  // The bound the column holds, held here too, so a payload too large to store is refused
+  // where a caller can be told rather than by the row it never reached.
+  body: (schema: z.ZodString) => schema.max(SUGGESTION_BODY_MAX),
   baseContentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
 };
 

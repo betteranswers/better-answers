@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { check, foreignKey, index, jsonb, primaryKey, text } from "drizzle-orm/pg-core";
 
+import { ACTOR_ID_PATTERN, PLATFORM_ACTOR_PREFIX } from "./actor-id.ts";
 import { listed, stamp } from "./column-helpers.ts";
 import { conceptIdentity } from "./concept-tables.ts";
 import { withRLS } from "./with-rls.ts";
@@ -81,6 +82,22 @@ export const SUGGESTION_RETURNED_STATUS = "returned" satisfies (typeof SUGGESTIO
 export const SUGGESTION_REASON_MAX = 2000;
 
 /**
+ * How long a payload's body may be. A concept is a fact stated once and citable in one
+ * sentence (`CONTEXT.md`), not a document, so a hundred thousand characters is generous by
+ * a wide margin — and the bound exists because a producer writes this column: a compromised
+ * one could otherwise fill a tenant's storage a suggestion at a time, and nothing decides
+ * the size but the sender.
+ */
+export const SUGGESTION_BODY_MAX = 100_000;
+
+/**
+ * How many changes one submission may carry. A run yields one suggestion set (ADR 0012) and
+ * an Admin reviews it, so a set is bounded by what a person could decide; the number is here
+ * rather than in the function that enforces it, so both tiers read one fact.
+ */
+export const SUGGESTION_SET_MAX = 500;
+
+/**
  * A **suggestion** (`CONTEXT.md`): a change prepared by the platform or by a person who may
  * not commit it, waiting until the target's owner or an Admin accepts or declines it.
  *
@@ -128,6 +145,24 @@ export const suggestion = withRLS(
     index("suggestion_workspace_id_set_id_idx").on(table.workspaceId, table.setId),
     check("suggestion_kind_check", sql.raw(`kind IN (${listed(SUGGESTION_KINDS)})`)),
     check("suggestion_status_check", sql.raw(`status IN (${listed(SUGGESTION_STATUSES)})`)),
+    // The two actor columns hold the one shape an actor id has, at the row — because the
+    // row is written by a definer function both tiers call, which is past every boundary
+    // the app parses through. A producer that could write any string here could name a
+    // person it had no business naming.
+    check("suggestion_proposer_check", sql.raw(`proposer ~ '^${ACTOR_ID_PATTERN}$'`)),
+    check(
+      "suggestion_decider_check",
+      sql.raw(`decider IS NULL OR decider ~ '^${ACTOR_ID_PATTERN}$'`),
+    ),
+    // **A repair is the platform's own act.** ADR 0019's citation repair is a routine the
+    // platform runs, and accepting one re-points every standing check at the content it
+    // wrote — so a member who could raise one could make *Checked by Ada* vouch for content
+    // Ada never checked, with an Admin's click as the only thing between. Held at the row,
+    // where no producer and no transport can argue with it.
+    check(
+      "suggestion_repair_proposer_check",
+      sql.raw(`kind <> '${SUGGESTION_REPAIR_KIND}' OR proposer LIKE '${PLATFORM_ACTOR_PREFIX}%'`),
+    ),
     check(
       "suggestion_reason_length_check",
       sql.raw(`reason IS NULL OR char_length(reason) BETWEEN 1 AND ${SUGGESTION_REASON_MAX}`),
@@ -185,7 +220,7 @@ export const conceptWriteRequest = withRLS(
     // are equal by design rather than by construction.
     path: text("path").notNull(),
     /** The OKF `type` as the payload's producer spelled it; the write path folds it. */
-    kind: text("kind").notNull(),
+    conceptKind: text("concept_kind").notNull(),
     title: text("title").notNull(),
     frontmatter: jsonb("frontmatter").notNull(),
     body: text("body").notNull(),
@@ -201,5 +236,9 @@ export const conceptWriteRequest = withRLS(
       foreignColumns: [suggestion.workspaceId, suggestion.id],
       name: "concept_write_request_suggestion_fk",
     }).onDelete("cascade"),
+    check(
+      "concept_write_request_body_length_check",
+      sql.raw(`char_length(body) <= ${SUGGESTION_BODY_MAX}`),
+    ),
   ],
 );

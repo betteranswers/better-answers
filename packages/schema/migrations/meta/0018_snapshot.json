@@ -1,6 +1,6 @@
 {
-  "id": "d007ed07-39bf-4a81-a71e-bb349eee5a77",
-  "prevId": "39ea246d-ebd9-4346-a9ab-915b2d715051",
+  "id": "a6899162-9e0b-45b5-b4bb-ad6416408665",
+  "prevId": "07238967-aefc-410b-83f1-334f004455b6",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3324,8 +3324,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "kind": {
-          "name": "kind",
+        "concept_kind": {
+          "name": "concept_kind",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -3408,7 +3408,12 @@
           "withCheck": "\"concept_write_request\".\"workspace_id\" = (select current_workspace_id())"
         }
       },
-      "checkConstraints": {},
+      "checkConstraints": {
+        "concept_write_request_body_length_check": {
+          "name": "concept_write_request_body_length_check",
+          "value": "char_length(body) <= 100000"
+        }
+      },
       "isRLSEnabled": true
     },
     "public.suggestion": {
@@ -3567,6 +3572,18 @@
         "suggestion_status_check": {
           "name": "suggestion_status_check",
           "value": "status IN ('waiting', 'accepted', 'declined', 'returned')"
+        },
+        "suggestion_proposer_check": {
+          "name": "suggestion_proposer_check",
+          "value": "proposer ~ '^(human:[0-9A-HJKMNP-TV-Z]{26}|process:better-answers-[a-z0-9][a-z0-9-]*|better-answers-[a-z0-9][a-z0-9-]*/[0-9A-Za-z.-]+)$'"
+        },
+        "suggestion_decider_check": {
+          "name": "suggestion_decider_check",
+          "value": "decider IS NULL OR decider ~ '^(human:[0-9A-HJKMNP-TV-Z]{26}|process:better-answers-[a-z0-9][a-z0-9-]*|better-answers-[a-z0-9][a-z0-9-]*/[0-9A-Za-z.-]+)$'"
+        },
+        "suggestion_repair_proposer_check": {
+          "name": "suggestion_repair_proposer_check",
+          "value": "kind <> 'repair' OR proposer LIKE 'process:better-answers-%'"
         },
         "suggestion_reason_length_check": {
           "name": "suggestion_reason_length_check",
