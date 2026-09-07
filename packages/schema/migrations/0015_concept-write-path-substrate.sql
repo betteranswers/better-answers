@@ -25,9 +25,10 @@ ALTER TABLE "concept_index"
 --> statement-breakpoint
 -- The worker writes none of these and reads none of them yet. The bundle is written only
 -- by the app, one commit per act (ADR 0012), so a worker that could write here would be a
--- second writer of the map with no commit behind it; and the nightly parser audit that will
--- read the index to cross-check its own parse is not built (T-057), so the SELECT it needs
--- lands in the same migration as the job that reads it rather than standing here unused.
+-- second writer of the map with no commit behind it; and the job that will read the index to
+-- cross-check the Python parser against the app's is not built (T-057), so the SELECT it
+-- needs lands in the same migration as the job that reads it rather than standing here
+-- unused.
 -- Proved by "refuses the worker role on all five tables, reading and writing alike
 -- (migration 0015)" in packages/schema/test/rls.test.ts, beside the served path the app's
 -- role keeps.

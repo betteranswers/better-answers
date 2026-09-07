@@ -218,14 +218,18 @@ export const withPrincipal = async <T>(
   const workspaceId = boundarySchemas.workspace.select.shape.id.safeParse(claims.workspaceId);
   const userId = boundarySchemas.user.select.shape.id.safeParse(claims.userId);
   if (!workspaceId.success || !userId.success) return err("malformed-claims");
+  // Read once, before anything is awaited: `claims.issuedAt` is a `Date`, which is mutable,
+  // so the instant the Principal carries and the instant the refusal is judged against have
+  // to be the same number rather than two reads of an object a caller still holds.
+  const credentialIssuedAtMs = claims.issuedAt.getTime();
 
   return resolveScoped(
     door,
     workspaceId.data,
     userId.data,
-    claims.issuedAt.getTime(),
+    credentialIssuedAtMs,
     (row) => {
-      const refusal = refuse(row, claims.issuedAt.getTime());
+      const refusal = refuse(row, credentialIssuedAtMs);
       if (refusal !== undefined) return refusal;
       // The boundary's own extra: a credential that names a role the row disagrees with.
       // The act's door has no claims to disagree with, which is why this arm is here.

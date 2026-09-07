@@ -1,5 +1,5 @@
 import type { Frontmatter, FrontmatterValue } from "../concepts/index.ts";
-import { conceptByIri, type OpenedConcept } from "../concepts/index.ts";
+import { citedSource, conceptByIri, type OpenedConcept } from "../concepts/index.ts";
 import { err, isPersonActor, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
@@ -238,14 +238,37 @@ const trustOf = (concept: OpenedConcept, now: Date): Trust => {
 };
 
 /**
- * Whether a concept's shelf life has run out. `stale_after` is read as a date or a datetime
- * with an offset (ADR 0019); anything else is a value the platform did not write and no
- * shelf life is claimed from it, which is the same answer as absence.
+ * Whether a concept's shelf life has run out. `stale_after` is read as a **date** or a
+ * datetime with an offset (ADR 0019); anything else is a value the platform did not write, and
+ * no shelf life is claimed from it — the same answer as absence, because absence means no
+ * shelf life and a reader must never be told *Out of date* from a string nobody could parse.
+ *
+ * A date alone means the concept is out of date **after that day**, not during it: `2026-03-01`
+ * is a shelf life that lasts through the first of March, so the comparison is against the end
+ * of that day in UTC — which is also how the emitter writes one back (ADR 0019).
+ *
+ * `Date` accepts `2026-02-30` and rolls it into March, so a date is read field by field and
+ * checked against the calendar rather than handed to the parser and trusted.
  */
+const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 const pastShelfLife = (staleAfter: FrontmatterValue | undefined, now: Date): boolean => {
   if (typeof staleAfter !== "string") return false;
-  const until = new Date(staleAfter);
-  return !Number.isNaN(until.getTime()) && until.getTime() < now.getTime();
+  const date = CALENDAR_DATE.exec(staleAfter);
+  if (date === null) {
+    // A datetime with an offset: the instant it names is the end of the shelf life.
+    const instant = new Date(staleAfter);
+    return !Number.isNaN(instant.getTime()) && instant.getTime() < now.getTime();
+  }
+  const [year, month, day] = [Number(date[1]), Number(date[2]), Number(date[3])];
+  const midnight = Date.UTC(year, month - 1, day);
+  // `Date.UTC` rolls an impossible day into the next month, so a round trip is what tells a
+  // real date from one that only looks like it: 2026-02-30 comes back as March.
+  const rolled = new Date(midnight);
+  if (rolled.getUTCFullYear() !== year || rolled.getUTCMonth() !== month - 1) return false;
+  if (rolled.getUTCDate() !== day) return false;
+  // The end of the named day, so the concept is out of date the moment after it.
+  return midnight + 24 * 60 * 60 * 1000 <= now.getTime();
 };
 
 /**
@@ -257,15 +280,21 @@ const pastShelfLife = (staleAfter: FrontmatterValue | undefined, now: Date): boo
 const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
   const sources = concept.frontmatter["sources"];
   if (!Array.isArray(sources)) return [];
-  // OKF's own shape: each entry is an object with `resource` required and the platform's
-  // `locator` beside it (`docs/okf-v02.md`). A `title` is shown in preference to
-  // the resource where the file carries one, because that is what a reader recognises.
+  // **The same reader the hash uses** (`citedSource`), so the view and the hash can never
+  // disagree about what a file cites — a view that dropped an entry the hash still counted
+  // would show a reader less evidence than the check confirmed. A `title` is shown in
+  // preference to the resource where an object entry carries one, because that is what a
+  // reader recognises; the legacy string form has none.
   return sources.flatMap((entry) => {
-    if (typeof entry !== "object" || entry === null) return [];
-    const source = entry["title"] ?? entry["resource"];
-    if (typeof source !== "string") return [];
-    const locator = entry["locator"];
-    return [{ locator: typeof locator === "string" ? locator : "", source }];
+    const cited = citedSource(entry);
+    if (cited === undefined) return [];
+    const title = typeof entry === "string" ? undefined : entry["title"];
+    return [
+      {
+        locator: cited.locator ?? "",
+        source: typeof title === "string" && title !== "" ? title : cited.resource,
+      },
+    ];
   });
 };
 

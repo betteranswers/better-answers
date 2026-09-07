@@ -66,11 +66,17 @@ import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/in
  * always a **prefix** of git history, so the reconciler is a watermark scan and never a
  * hole scan.
  *
- * **What this act does not do**: mint the IRI. A concept's IRI is an HTTPS key on a
- * platform-controlled domain (ADR 0002), and the domain is the deploy unit's one origin,
- * which `core` never reads — the environment reaches one typed config module in the api and
- * nowhere else. The caller that knows the origin hands the IRI in, and the identity row this
- * act writes is what makes it the concept's key from then on.
+ * **What this act does not do**: mint the IRI. A concept's IRI has exactly one form —
+ * `https://better-answers.com/c/<ulid>`, opaque and on the bare apex (ADR 0002's amendments)
+ * — which the boundary holds it to and `conceptIriOf` is the one way to make. The caller
+ * hands one in because a re-write has to name the concept it re-writes; the identity row this
+ * act writes is what makes that IRI the concept's key from then on.
+ *
+ * ADR 0002 also says the key is **never caller-settable**, which this act does not yet
+ * enforce: a creation should mint its own and a supplied IRI should have to exist already.
+ * The read this act makes before it commits is where that check belongs, and it is a ticket
+ * rather than a line — flagged to the owner with T-054, which owns the acceptance path that
+ * mints on a suggestion's behalf.
  */
 
 /**
@@ -122,19 +128,20 @@ export type Frontmatter = Readonly<Record<string, FrontmatterValue>>;
  * `-zes`/`-ches`/`-shes` → drop `-es`, a trailing `-s` dropped unless the word ends `-ss`,
  * `-us` or `-is`. Irregulars (`Analyses`) fold wrongly and are folded consistently, which is
  * what matters for grouping; a kind vocabulary that ever needs more is a ticket, not a guess.
+ *
+ * **Case and plural, and nothing else** — the amendment's word is *only*. Whatever separates
+ * the words of a kind is left exactly as it was written, because collapsing it would be a
+ * third fold nobody decided: `Rate  Card` and `Rate Card` stay two kinds, and the day they
+ * should not is a rule to write down first. The boundary trims the ends.
  */
 export const foldKind = (kind: string): string =>
-  kind
-    .trim()
-    .split(/\s+/)
-    .map((word) => {
-      const cased = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-      if (cased.endsWith("ies")) return `${cased.slice(0, -3)}y`;
-      if (/(s|x|z|ch|sh)es$/.test(cased)) return cased.slice(0, -2);
-      if (/(ss|us|is)$/.test(cased) || !cased.endsWith("s")) return cased;
-      return cased.slice(0, -1);
-    })
-    .join(" ");
+  kind.replaceAll(/\S+/g, (word) => {
+    const cased = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    if (cased.endsWith("ies")) return `${cased.slice(0, -3)}y`;
+    if (/(s|x|z|ch|sh)es$/.test(cased)) return cased.slice(0, -2);
+    if (/(ss|us|is)$/.test(cased) || !cased.endsWith("s")) return cased;
+    return cased.slice(0, -1);
+  });
 
 /** One piece of evidence recorded at commit time (`CONTEXT.md`, *evidence*). */
 export type EvidenceInput = {
@@ -146,7 +153,7 @@ export type EvidenceInput = {
 };
 
 export type WriteConceptInput = {
-  /** The concept's IRI (ADR 0002) — its key, minted by whoever knows the platform's origin. */
+  /** The concept's IRI (ADR 0002) — its key, in the one form `conceptIriOf` makes. */
   readonly iri: string;
   /** What an acceptance resolves this concept by, so identity survives a rename (ADR 0012). */
   readonly mergeKey: string;
@@ -240,7 +247,33 @@ const resolvedResource = (resource: string, from: string): string => {
 };
 
 /** One `sources[]` entry as the hash carries it: the resolved resource, then the locator. */
-type HashedSource = readonly [string, string | number | boolean | null];
+type HashedSource = readonly [string, string | null];
+
+/**
+ * One `sources[]` entry, read whichever way a file writes it — OKF's object, or the legacy
+ * `<resource>#<locator>` string a bundle may still carry. **One reader**, so the hash and the
+ * view can never disagree about what a file cites: two readers over one shape was exactly the
+ * defect that had `evidenceOf` dropping entries the hash was still counting.
+ *
+ * A resource is required (`docs/okf-v02.md`), so an entry without one is nothing this can
+ * read — the boundary refuses such a frontmatter before it reaches here, and `undefined` is
+ * what says so rather than a resource guessed from somewhere else.
+ */
+export const citedSource = (
+  entry: FrontmatterSource | string,
+): { readonly resource: string; readonly locator: string | null } | undefined => {
+  if (typeof entry === "string") {
+    const hash = entry.lastIndexOf("#");
+    const resource = hash === -1 ? entry : entry.slice(0, hash);
+    return resource === ""
+      ? undefined
+      : { resource, locator: hash === -1 ? null : entry.slice(hash + 1) };
+  }
+  const resource = entry["resource"];
+  if (typeof resource !== "string" || resource.trim() === "") return undefined;
+  const locator = entry["locator"];
+  return { resource, locator: typeof locator === "string" ? locator : null };
+};
 
 /**
  * `sources[]` **reduced to ordered `(resource, locator)` pairs** with paths resolved — ADR
@@ -250,14 +283,13 @@ type HashedSource = readonly [string, string | number | boolean | null];
 const reducedSources = (
   value: FrontmatterValue | undefined,
   path: string,
-): readonly HashedSource[] =>
-  Array.isArray(value)
-    ? value.map((entry) =>
-        typeof entry === "string"
-          ? [resolvedResource(entry, path), null]
-          : [resolvedResource(String(entry["resource"] ?? ""), path), entry["locator"] ?? null],
-      )
-    : [];
+): readonly HashedSource[] => {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    const cited = citedSource(entry);
+    return cited === undefined ? [] : [[resolvedResource(cited.resource, path), cited.locator]];
+  });
+};
 
 /**
  * The frontmatter as ADR 0014's hash reads it, written straight as canonical JSON: keys
@@ -365,11 +397,21 @@ type HeldRow = {
   readonly published_at: Date | null;
 };
 
-const heldByIri = async (tx: Tx, workspaceId: string, iri: string): Promise<Held | undefined> => {
+/**
+ * The Principal first, as every function here that reaches tenant data takes it: the
+ * workspace this reads in is the one the caller is acting in, and never a string a call site
+ * chose (ADR 0029). RLS scopes the statement already; naming the pair says so where a reader
+ * of the SQL can see it.
+ */
+const heldByIri = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  iri: string,
+): Promise<Held | undefined> => {
   const found = await tx.query<HeldRow>(
     `SELECT path, sensitivity, status, published_at
        FROM concept_index WHERE workspace_id = $1 AND iri = $2`,
-    [workspaceId, iri],
+    [principal.workspaceId, iri],
   );
   const row = found.rows[0];
   return row === undefined
@@ -443,9 +485,7 @@ export const writeConcept = async (
     // authority this act will write with. Its refusals cost no commit, which is why the two
     // that are decidable from the concept's own row are made here.
     const existing = await attempt(() =>
-      withMembership(principal, doors.postgres, (_fresh, tx) =>
-        heldByIri(tx, principal.workspaceId, input.iri),
-      ),
+      withMembership(principal, doors.postgres, (fresh, tx) => heldByIri(fresh, tx, input.iri)),
     );
     if (!existing.ok) return err(existing.error);
     if (!existing.value.ok) return err(existing.value.error);

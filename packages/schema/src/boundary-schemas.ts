@@ -311,10 +311,20 @@ const conceptIri = (schema: z.ZodString) => schema.regex(IRI).brand<"ConceptIri"
  * NULL` refuses SQL NULL, not the JSON value) and the parity suite holds the refinement to
  * the column's own nullability; the write path never stores one.
  */
-const frontmatterEntry = z.record(
-  z.string(),
-  z.union([z.string(), z.number(), z.boolean(), z.null()]),
-);
+/**
+ * One `sources[]` entry: OKF's provenance object, whose **`resource` is required** — it is
+ * the whole of what the entry cites, and the hash reduces every entry to a
+ * `(resource, locator)` pair (ADR 0019). An entry without one is refused here rather than
+ * hashed as an empty string, which would make two different citations hash alike.
+ *
+ * A bundle may also carry the legacy `<resource>#<locator>` string form, which the array's
+ * other arm accepts; the slice reads both through one reader.
+ */
+const frontmatterEntry = z
+  .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+  .refine((entry) => typeof entry["resource"] === "string" && entry["resource"].trim() !== "", {
+    message: "a sources[] entry names the resource it cites",
+  });
 
 /**
  * The one shape a concept's frontmatter has, **exported** — because the row is not the only

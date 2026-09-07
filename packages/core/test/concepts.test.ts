@@ -1,7 +1,7 @@
 import { testData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
 
-import { ulid } from "@better-answers/schema";
+import { conceptIriOf, ulid } from "@better-answers/schema";
 
 import { open } from "../src/answering/index.ts";
 import {
@@ -23,6 +23,7 @@ import {
   openPostgres,
   type PostgresDoor,
   type Tx,
+  withMembership,
   withPrincipal,
 } from "../src/store/postgres/index.ts";
 import { provisionWorkspace } from "../src/workspaces/index.ts";
@@ -122,12 +123,18 @@ const arrange = async (): Promise<Scenario> => {
 };
 
 let minted = 0;
-/** A concept's IRI, minted the way the caller that knows the platform's origin would. */
-const iriFor = (slug: string): string =>
-  `https://knowledge.better-answers.test/c/${slug}-${(minted += 1)}`;
+/**
+ * A concept's IRI: the one opaque form ADR 0002's amendments fix — the bare apex, `/c/`, a
+ * minted id — through the minter the boundary exports, so a test can never assert against a
+ * shape the boundary would refuse.
+ */
+const iriFor = (): string => {
+  minted += 1;
+  return conceptIriOf(ulid());
+};
 
 const writeFor = (overrides: Partial<WriteConceptInput> = {}): WriteConceptInput => ({
-  iri: iriFor("expenses"),
+  iri: iriFor(),
   mergeKey: `policy:expenses-${minted}`,
   path: `knowledge/expenses-${minted}.md`,
   kind: "Policy",
@@ -567,15 +574,30 @@ describe("what a re-write of an existing concept may not move", () => {
  * is what makes "is this person revoked" a question only the acting credential's own issuance
  * can answer.
  */
-const revokeEditor = (scenario: Scenario, scope: "here" | "everywhere"): Promise<unknown> =>
-  scope === "here"
-    ? db().pool.query(
-        "UPDATE member SET credentials_revoked_at = now() WHERE workspace_id = $1 AND user_id = $2",
-        [scenario.workspaceId, scenario.editor.userId],
-      )
-    : db().pool.query('UPDATE "user" SET credentials_revoked_at = now() WHERE id = $1', [
-        scenario.editor.userId,
-      ]);
+const REVOCATIONS = {
+  here: {
+    statement:
+      "UPDATE member SET credentials_revoked_at = now() WHERE workspace_id = $1 AND user_id = $2",
+    parameters: (scenario: Scenario) => [scenario.workspaceId, scenario.editor.userId],
+  },
+  everywhere: {
+    statement: 'UPDATE "user" SET credentials_revoked_at = now() WHERE id = $1',
+    parameters: (scenario: Scenario) => [scenario.editor.userId],
+  },
+} as const;
+
+type RevocationScope = keyof typeof REVOCATIONS;
+
+/** The revocation, run on a client of the caller's choosing — the pool, or one held open. */
+const revoke = (
+  client: { query: (statement: string, parameters: readonly unknown[]) => Promise<unknown> },
+  scenario: Scenario,
+  scope: RevocationScope,
+): Promise<unknown> =>
+  client.query(REVOCATIONS[scope].statement, REVOCATIONS[scope].parameters(scenario));
+
+const revokeEditor = (scenario: Scenario, scope: RevocationScope): Promise<unknown> =>
+  revoke(db().pool, scenario, scope);
 
 /** What a refused act leaves behind: no rows of its own, and every commit it made still there. */
 const expectCommitsWithoutRows = async (scenario: Scenario, commits: number): Promise<void> => {
@@ -650,6 +672,46 @@ describe("authority that moved while the act was in flight", () => {
     expect(refused).toEqual({ ok: false, error: "not-a-member" });
     await expectCommitsWithoutRows(scenario, 0);
   });
+
+  it.each(["here", "everywhere"] as const)(
+    "makes a revocation %s wait for the act holding the membership, and refuses the act after it",
+    async (scope) => {
+      const scenario = await arrange();
+      // The lock the act's door takes (`FOR SHARE OF m, u`) is what makes ADR 0012's
+      // *impossible by construction* a construction: a revocation of either row cannot land
+      // between the door's read and the act's COMMIT. Driven through the door's own callback,
+      // which is the seam that lets a test hold the act's transaction open.
+      const revoker = await db().pool.connect();
+      let blockedFor: number | undefined;
+      let waiting: Promise<unknown> = Promise.resolve();
+      try {
+        await withMembership(scenario.editor, scenario.postgres, async () => {
+          const startedAt = Date.now();
+          // Fired while the act's transaction holds the rows, and **never awaited in here**:
+          // the act is what releases the lock, so waiting for the revocation inside the act
+          // would be the act waiting for itself.
+          waiting = revoke(revoker, scenario, scope).then(() => {
+            blockedFor = Date.now() - startedAt;
+          });
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          // Still waiting after 150ms, because the act has not committed yet.
+          expect(blockedFor).toBeUndefined();
+        });
+
+        await waiting;
+        // Released by the act's COMMIT, not before.
+        expect(blockedFor).toBeGreaterThanOrEqual(140);
+      } finally {
+        revoker.release();
+      }
+
+      // And the revocation, now committed, refuses the next act's rows — with no commit,
+      // because the act reads its authority before it reaches git.
+      const refused = await write(scenario, scenario.editor, writeFor());
+      expect(refused).toEqual({ ok: false, error: "credentials-revoked" });
+      await expectCommitsWithoutRows(scenario, 0);
+    },
+  );
 });
 
 /**
@@ -876,7 +938,7 @@ describe("opening a concept by IRI", () => {
       open(principal, tx, { iri: input.iri }),
     );
     const absent = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: iriFor("never-minted") }),
+      open(principal, tx, { iri: iriFor() }),
     );
 
     // Indistinguishable, which is the whole requirement: the same shape, and neither says

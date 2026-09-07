@@ -26,7 +26,8 @@ const AUDIT_EVENT_ID = "01J6GGGGGGGGGGGGGGGGGGGGGG";
 const BATCH_ID = "01J6HHHHHHHHHHHHHHHHHHHHHH";
 const ACCESS_REQUEST_ID = "01J6KKKKKKKKKKKKKKKKKKKKKK";
 const NOW = new Date("2026-09-01T00:00:00Z");
-const CONCEPT_IRI = "https://knowledge.better-answers.test/c/01j6mmmmmmmmmmmmmmmmmmmmmm";
+// The one form a concept IRI has: the bare apex, `/c/`, a minted id (ADR 0002's amendments).
+const CONCEPT_IRI = "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM";
 const CONTENT_SHA256 = "a".repeat(64);
 const COMMIT_SHA = "b".repeat(40);
 

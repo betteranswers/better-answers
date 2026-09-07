@@ -9,10 +9,11 @@ import {
   ACCESS_REQUEST_OPEN_STATUS,
   AUDIENCE_EVERYONE,
   boundarySchemas,
+  CONCEPT_STABLE_STATUS,
+  conceptIriOf,
   CREATOR_ROLE,
   CURATED_ORIGIN,
   EMBEDDING_DIMENSIONS,
-  PUBLISHED_STATUSES,
   ulid,
   VERIFICATION_PLATFORM_ORIGIN,
 } from "../src/index.ts";
@@ -358,10 +359,10 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const conceptIdentity: TestData["conceptIdentity"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
-    const minted = ulid().toLowerCase();
+    const minted = ulid();
     return insertRow(client, "conceptIdentity", {
-      iri: `https://knowledge.better-answers.test/c/${minted}`,
-      mergeKey: `policy:${minted}`,
+      iri: conceptIriOf(minted),
+      mergeKey: `policy:${minted.toLowerCase()}`,
       ...overrides,
       workspaceId,
     });
@@ -380,7 +381,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       frontmatter: { title: "Expenses", type: "Policy" },
       body: "Expenses are claimed within thirty days.",
       contentHash: hexOfLength(64),
-      status: PUBLISHED_STATUSES[0],
+      status: CONCEPT_STABLE_STATUS,
       publishedAt: new Date(),
       sensitivity: "Internal",
       audience: AUDIENCE_EVERYONE,

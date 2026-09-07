@@ -10,6 +10,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+import { ULID_CHARACTERS } from "./ulid.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -79,17 +80,30 @@ export const VERIFICATION_IMPORTED_ORIGIN =
   "imported" satisfies (typeof VERIFICATION_ORIGINS)[number];
 
 /**
+ * Where every concept IRI lives, and the whole of it (ADR 0002's 2026-08-25 and 2026-08-27
+ * amendments): the IRI is **opaque** — `https://better-answers.com/c/<ulid>` — never derived
+ * from the path, the bundle or the tenant, so it leaks no name wherever it appears.
+ *
+ * **The bare apex, and deliberately not the deploy unit's origin.** ADR 0002 reserves the
+ * apex for identity and redirection precisely so an IRI outlives every surface, which is why
+ * pinning it here reads nothing from the environment and is no deploy-unit configuration: it
+ * is a product constant, like the platform bot's address, and it is the same value in every
+ * estate on purpose. A staging concept carries a production-shaped IRI and that is the
+ * decision — "a persistent redirector can front it later without changing identities".
+ */
+export const CONCEPT_IRI_PREFIX = "https://better-answers.com/c/";
+
+/**
  * A concept's **IRI** (ADR 0002): the platform-minted, dereferenceable HTTPS key that
  * survives a rename and is what every record about a concept refers to it by (ADR 0014).
- *
- * **The host is deliberately unvalidated.** ADR 0002 fixes the *form* — "a dereferenceable
- * HTTPS IRI on a platform-controlled domain" — and names no path shape; which domain that is
- * belongs to the deploy unit's one origin, which this package and `packages/core` never read
- * (ADR 0029 rule 5). Pinning a hostname here would bind the library to one deployment and
- * make every other estate's own IRIs invalid at the boundary. So this holds the scheme, and
- * the caller that knows the origin is what makes an IRI the platform's.
+ * The prefix above and a minted id, exactly — nothing else is a concept IRI.
  */
-export const IRI = /^https:\/\/\S+$/;
+export const IRI = new RegExp(
+  `^${CONCEPT_IRI_PREFIX.replaceAll(".", String.raw`\.`)}${ULID_CHARACTERS}$`,
+);
+
+/** The one way a concept IRI is made, so no caller composes the string by hand. */
+export const conceptIriOf = (minted: string): string => `${CONCEPT_IRI_PREFIX}${minted}`;
 
 /** A git object name: forty lowercase hex characters, the repository's object format. */
 export const GIT_SHA = /^[0-9a-f]{40}$/;
@@ -111,6 +125,13 @@ export const CONCEPT_PATH = /^knowledge\/(?!.*\/\.{1,2}\/)(?!\.{1,2}\/)[^/\s][^\
  * reader and not a way of hiding a concept from them (ADR 0019).
  */
 export const PUBLISHED_STATUSES = ["stable", "deprecated"] as const;
+
+/**
+ * What a concept reaches when somebody makes it the company's word on a thing — the status a
+ * seeded or published concept carries, named rather than reached by position, so a reader
+ * never has to know which end of the list above means what.
+ */
+export const CONCEPT_STABLE_STATUS = "stable" satisfies (typeof PUBLISHED_STATUSES)[number];
 
 /**
  * A content hash the platform writes: SHA-256 over the canonical form ADR 0014 fixes, so a

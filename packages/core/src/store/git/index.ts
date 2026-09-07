@@ -189,10 +189,11 @@ const isSubjectLine = (message: string): boolean => message.length > 0 && !/[\r\
 
 /**
  * The trailers, each on its own line. A **value** carrying a line break would open a trailer
- * of its own exactly as a subject would, so every one is held to a single line here — even
- * the two whose types already refuse it. The type is a compile-time promise about the callers
- * that exist; this is the run-time one about every caller there will be, and it costs a
- * regular expression.
+ * of its own exactly as a subject would, so every one is held to a single line here.
+ *
+ * No value's type refuses a newline on its own — `ActorId` is a template-literal union whose
+ * tail is `string`, and the other four are plain strings — so this check is the whole of the
+ * guarantee rather than a second layer over one. It costs a regular expression per trailer.
  */
 const trailerLines = (trailers: CommitTrailers): readonly string[] | undefined => {
   const named: readonly (readonly [string, string | undefined])[] = [
