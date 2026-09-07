@@ -93,9 +93,9 @@ test("sign-in, authorize, consent and the code at Claude's redirect, all on one 
   await expect(page.getByText("Stay connected until you disconnect it")).toBeVisible();
   await expect(page.getByText("hosted at claude.ai")).toBeVisible();
 
-  // Asked for here rather than left to the fixture: every test in this file ends at the
-  // client's own redirect, which is another origin and no screen of ours, so the page a
-  // person actually reads has to be audited while the browser is still on it.
+  // Asked for here rather than left to the fixture: this test ends at the client's own
+  // redirect, which is another origin and no screen of ours, so the page a person actually
+  // reads has to be audited while the browser is still on it.
   await passesTheAccessibilityGate();
 
   await page.getByRole("button", { name: "Connect" }).click();

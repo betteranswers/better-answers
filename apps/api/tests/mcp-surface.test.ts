@@ -5,6 +5,7 @@ import {
   TOOLS_LIST_TTL_MS_DEFAULT,
 } from "@better-answers/core/workspaces";
 
+import { MCP_TOKEN_RULE } from "../src/auth/constants.ts";
 import { connectAsHost } from "./flow.ts";
 import { startApp, type TestApp, type TestClient } from "./harness.ts";
 
@@ -268,7 +269,8 @@ describe("era-independent", () => {
     // 2·max + 1 calls put max + 1 into one window whatever the clock does; the first
     // refusal is the answer asserted on.
     let refused: Response | undefined;
-    for (let call = 0; call < 241 && refused === undefined; call += 1) {
+    const enough = 2 * MCP_TOKEN_RULE.max + 1;
+    for (let call = 0; call < enough && refused === undefined; call += 1) {
       const answer = await modern(client, token, "tools/list");
       if (answer.status === 429) refused = answer;
     }

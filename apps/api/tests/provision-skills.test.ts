@@ -346,10 +346,9 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
  *
  * They are the two entries `.gitignore` re-includes under `.claude/skills/`, and everything
  * that makes them reach a session is a fact about the tree: tracked, so a fresh clone has
- * them; a relative link or a directory, so a worktree does too. Read here because the failure
- * they are exposed to is silence — the design skill sat in `packages/design-system/` for a
- * fortnight, tracked and correct and offered to nobody, and the ignore block that carries the
- * browser-suite skill was itself undone and restored on 07/09/2026 with nothing to notice.
+ * them; a relative link or a directory, so a worktree does too. Read here, over the real
+ * checkout rather than a throwaway one, because the failure they are exposed to is silence: a
+ * skill that is tracked, correct and offered to nobody fails nothing else.
  */
 describe("the skills this repository wrote (T-081)", () => {
   const tracked = (directory: string): readonly string[] => {

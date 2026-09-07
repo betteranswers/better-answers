@@ -22,11 +22,11 @@ on:
     inputs:
       images-probed-by-the-caller:
         description: >-
-          Set by a caller whose own job builds each image, loads it and runs that image's
-          contents test against the build it is about to push (`T-043`). The suite here then
-          leaves those tests to that job, so a push to main builds the api image once rather
-          than once on this runner and once on that one. A pull request builds no image, has
-          no such job, passes nothing, and probes as usual.
+          Set by a caller whose own job builds the images, loads each one that has a
+          contents test and runs that test against the build it is about to push (`T-043`).
+          The suite here then leaves those tests to that job, so a push to main builds a
+          probed image once rather than once on this runner and once on that one. A pull
+          request builds no image, has no such job, passes nothing, and probes as usual.
         type: boolean
         default: false
 

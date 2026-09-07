@@ -58,12 +58,10 @@ jobs:
           - tier: api
             context: .
             dockerfile: apps/api/Dockerfile
-            # The command that reads this image's contents. A leg that has one is built,
-            # loaded into this runner's daemon and probed by that command before anything
-            # is pushed; a leg without one is built and pushed as it always was. The api is
-            # the only tier with a contents test today — `T-084` writes the worker's and the
-            # backup's, and turning this on for them is a line here plus whatever toolchain
-            # their command needs, not a rewrite of the steps below.
+            # The command that reads this image's contents, run against the build before it
+            # is pushed. Carried in the matrix rather than in a step's condition because a
+            # leg is probed by having a test, not by being the api: a leg without one has
+            # nothing to run, so it takes the plain build-and-push path below.
             probe: pnpm --filter @better-answers/api exec vitest run tests/image.test.ts
           - tier: worker
             context: apps/worker
@@ -129,11 +127,19 @@ jobs:
           # Read only. The cache is exported by the pushing step below, which resolves every
           # layer this one produced; exporting from both would upload one build's cache twice.
           cache-from: type=gha
+      # With no id the probe would build an image of its own and read that, and the leg
+      # would push something nothing read — so the leg stops here instead.
       - name: the image is read before it ships
         if: matrix.probe
         env:
           IMAGE_ID: ${{ steps.load.outputs.imageid }}
-        run: ${{ matrix.probe }}
+          PROBE: ${{ matrix.probe }}
+        run: |
+          if [ -z "${IMAGE_ID}" ]; then
+            echo "::error::the load reported no image id, so there is no built image to probe"
+            exit 1
+          fi
+          ${PROBE}
       # Every leg pushes on these terms, not only a probed one. The worker and the backup
       # gain nothing from a provenance attestation nothing here verifies, and they lose
       # something to it: an attestation makes the tag point at an index, so the digest a

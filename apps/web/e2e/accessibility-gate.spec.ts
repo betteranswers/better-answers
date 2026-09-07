@@ -18,8 +18,9 @@ import { expect, test } from "./browser.ts";
  * which Playwright checks in both directions: it fails the run when the test passes as well
  * as when it does not. A gate that stopped running turns both green-by-failure tests into
  * "expected to fail, but passed" and the suite goes red. Their bodies are two lines against
- * the sign-in screen every other spec already proves renders, so there is nothing else in
- * them that could fail and be read as the gate firing.
+ * the sign-in screen, and `test.fail()` would swallow a failure to render it as readily as
+ * the gate's; the fourth test below renders the same screen without `test.fail()`, so a
+ * broken sign-in fails there in the open rather than passing here in disguise.
  */
 
 /**
