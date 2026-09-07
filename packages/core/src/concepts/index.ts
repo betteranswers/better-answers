@@ -48,6 +48,7 @@ import {
 import { writeConceptDelta } from "../store/graph/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import {
+  markDeciding,
   payloadFor,
   returnToProposer,
   suggestionIsWaiting,
@@ -834,6 +835,11 @@ const landRows = async (principal: UserPrincipal, tx: Tx, index: Landing): Promi
   // a suggestion is never accepted without its concept, or the other way about. `status`
   // is in the WHERE, so a suggestion two people decide at once is decided once — and the
   // loser aborts here rather than committing a decision that never happened.
+  //
+  // The marker first, because the row's trigger refuses a decision from a transaction that
+  // has not said it is making one (migration 0018): an acceptance is the one road that may
+  // decide by accepting, and this is where it says so.
+  await markDeciding(tx, index.acceptance.suggestionId);
   const decided = await tx.query<{ id: string }>(
     `UPDATE suggestion
         SET status = $3, decider = $4, decided_at = now(), target_iri = $5

@@ -427,10 +427,13 @@ describe("accepting a suggestion", () => {
     const admin = await db().pool.query<{ name: string }>('SELECT name FROM "user" WHERE id = $1', [
       scenario.admin.userId,
     ]);
-    // A candidate's proposer is the person who submitted it here, but its *kind* is not
-    // *edit* — and every other kind's proposer is a run's agent or a process, which has no
-    // name and address to write on an author line.
-    const set = await submitted(scenario, scenario.editor, "candidate", [requestFor()]);
+    // A run's candidate, seeded as a run raises one: its proposer is an agent, which is
+    // exactly what has no name and address to write on an author line — and a *candidate*
+    // has no road through a person's session at all, so this is the only way it arrives.
+    const set = await seededSuggestion(scenario, requestFor(), {
+      kind: "candidate",
+      proposer: "better-answers-extraction/1.2",
+    });
 
     const [outcome] = await acceptAll(scenario, set.setId);
 
@@ -475,7 +478,7 @@ describe("accepting a suggestion", () => {
 
   it("makes one commit per item in bulk, and shares one batch id across the ledger rows", async () => {
     const scenario = await arrange();
-    const set = await submitted(scenario, scenario.editor, "candidate", [
+    const set = await submitted(scenario, scenario.editor, "edit", [
       requestFor(),
       requestFor(),
       requestFor(),
@@ -625,7 +628,7 @@ describe("an acceptance whose ground moved", () => {
 describe("declining a suggestion", () => {
   it("records the decline with its reason, and commits nothing", async () => {
     const scenario = await arrange();
-    const set = await submitted(scenario, scenario.editor, "candidate", [requestFor()]);
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
 
     const declined = await declineSuggestion(scenario.admin, doorsOf(scenario), {
       suggestionId: set.suggestionIds[0] ?? "",
@@ -655,7 +658,7 @@ describe("declining a suggestion", () => {
 
   it("refuses an Editor, and a reason nobody wrote", async () => {
     const scenario = await arrange();
-    const set = await submitted(scenario, scenario.editor, "candidate", [requestFor()]);
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = set.suggestionIds[0] ?? "";
 
     const byEditor = await declineSuggestion(scenario.editor, doorsOf(scenario), {
@@ -676,7 +679,7 @@ describe("declining a suggestion", () => {
 
   it("refuses a reason longer than the row will carry, before it opens a transaction at all", async () => {
     const scenario = await arrange();
-    const set = await submitted(scenario, scenario.editor, "candidate", [requestFor()]);
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = set.suggestionIds[0] ?? "";
 
     const refused = await declineSuggestion(scenario.admin, doorsOf(scenario), {
@@ -704,7 +707,7 @@ describe("an acceptance whose transaction fails after it", () => {
     // the path is not a pre-commit refusal, because two concepts at one path is a fact only
     // the index knows — and the unique index then refuses the row it landed for.
     const first = requestFor();
-    const set = await submitted(scenario, scenario.editor, "candidate", [
+    const set = await submitted(scenario, scenario.editor, "edit", [
       first,
       requestFor({ path: first.path }),
     ]);
@@ -840,7 +843,7 @@ describe("the platform's citation repair", () => {
 describe("two acts over one suggestion", () => {
   it("lets one of an acceptance and a decline through, and leaves no commit for the other", async () => {
     const scenario = await arrange();
-    const set = await submitted(scenario, scenario.editor, "candidate", [requestFor()]);
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = set.suggestionIds[0] ?? "";
 
     const [accepted, declined] = await Promise.all([
@@ -878,7 +881,7 @@ describe("two acts over one suggestion", () => {
 
   it("lets one of two Admins accept the same new concept, and refuses the other with no commit", async () => {
     const scenario = await arrange();
-    const set = await submitted(scenario, scenario.editor, "candidate", [requestFor()]);
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const decisions = [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }];
 
     const [first, second] = await Promise.all([
@@ -1115,6 +1118,32 @@ describe("what the inbox refuses before it does any work", () => {
     // Not the row's CHECK escaping as this act's answer: a caller told `malformed` knows
     // what they sent was wrong, where a raw constraint error is the store's failure.
     expect(set).toEqual({ ok: false, error: "malformed" });
+  });
+
+  it("refuses the kinds no person's session may raise, whoever asks", async () => {
+    const scenario = await arrange();
+    const raise = (kind: SuggestionKind, principal = scenario.admin) =>
+      submitSuggestionSet(
+        principal,
+        { postgres: scenario.postgres },
+        { kind, requests: [requestFor()] },
+      );
+
+    const refused = await Promise.all([
+      // A *candidate* is what a run found, and a *repair* is the platform running its own
+      // citation repair — accepting one re-points every standing check at the content it
+      // wrote, so a person raising one could make somebody else's check vouch for content
+      // they never saw. Neither has a road through a session, an Admin's included.
+      raise("candidate"),
+      raise("repair"),
+      raise("candidate", scenario.editor),
+    ]);
+
+    expect(refused).toEqual([
+      { ok: false, error: "kind-forbids" },
+      { ok: false, error: "kind-forbids" },
+      { ok: false, error: "kind-forbids" },
+    ]);
   });
 
   it("refuses an acceptance asked for in ids of no known form, and decides nothing", async () => {

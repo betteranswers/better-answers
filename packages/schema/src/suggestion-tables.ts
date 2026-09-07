@@ -3,7 +3,7 @@ import { check, foreignKey, index, jsonb, primaryKey, text } from "drizzle-orm/p
 
 import { ACTOR_ID_PATTERN, PLATFORM_ACTOR_PREFIX } from "./actor-id.ts";
 import { listed, stamp } from "./column-helpers.ts";
-import { CONCEPT_FRONTMATTER_MAX, conceptIdentity } from "./concept-tables.ts";
+import { CONCEPT_FRONTMATTER_ROW_MAX, conceptIdentity } from "./concept-tables.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -43,6 +43,33 @@ export const SUGGESTION_KINDS = ["edit", "candidate", "promotion", "repair"] as 
  * acceptance makes, because the change is theirs and the acceptance is only the decision.
  */
 export const SUGGESTION_EDIT_KIND = "edit" satisfies (typeof SUGGESTION_KINDS)[number];
+
+/**
+ * The kinds the **app** may raise, and so the kinds `submitSuggestionSet` accepts. A person
+ * offers an *edit*; a *promotion* is an answer offered as an `Answer` (ADR 0017's gate),
+ * whose surface is a person's and whose writer does not exist yet, so it is left open to
+ * both tiers rather than guessed at in one direction.
+ *
+ * What is **not** here is the point: a *candidate* is a run's output and a *repair* is the
+ * platform's own routine, and neither has a road through a person's session. The database
+ * holds this list too — `submit_suggestion_set` reads which tier is calling, because the
+ * kind and the proposer are both the caller's words — and the migration names this constant
+ * as the fact it copies, exactly as it names `SUGGESTION_SET_MAX`.
+ */
+export const SUGGESTION_KINDS_FROM_THE_APP = [
+  "edit",
+  "promotion",
+] as const satisfies readonly (typeof SUGGESTION_KINDS)[number][];
+
+/**
+ * The kinds a **run** may raise: its own *candidate* concepts, the platform's citation
+ * *repair* (a routine the worker runs), and a *promotion*, for the same reason as above.
+ */
+export const SUGGESTION_KINDS_FROM_A_RUN = [
+  "candidate",
+  "promotion",
+  "repair",
+] as const satisfies readonly (typeof SUGGESTION_KINDS)[number][];
 
 /**
  * The platform's citation repair (ADR 0019): the fix a *source moved on* request asks for,
@@ -241,13 +268,15 @@ export const conceptWriteRequest = withRLS(
       "concept_write_request_body_length_check",
       sql.raw(`char_length(body) <= ${SUGGESTION_BODY_MAX}`),
     ),
-    // The body's bound, over the other column a producer fills. Frontmatter is open by
-    // design (ADR 0019), so its shape bounds nothing, and this row is written by a definer
-    // function both tiers call — past every boundary the app parses through, which is why
-    // the bound is stated here as well as at the boundary.
+    // The **backstop** over the other column a producer fills, and deliberately a wider
+    // number than the boundary's: frontmatter is open by design (ADR 0019) so its shape
+    // bounds nothing, and this row is written by a definer function both tiers call — past
+    // every boundary the app parses through. `CONCEPT_FRONTMATTER_ROW_MAX` says why the two
+    // numbers differ; what matters here is that a caller is refused at the boundary and
+    // only a caller that went round it ever reaches this.
     check(
       "concept_write_request_frontmatter_length_check",
-      sql.raw(`char_length(frontmatter::text) <= ${CONCEPT_FRONTMATTER_MAX}`),
+      sql.raw(`char_length(frontmatter::text) <= ${CONCEPT_FRONTMATTER_ROW_MAX}`),
     ),
   ],
 );

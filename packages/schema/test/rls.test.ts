@@ -5,6 +5,7 @@ import { declaredTableNames } from "../scripts/worker-view.ts";
 import {
   boundarySchemas,
   CONCEPT_FRONTMATTER_MAX,
+  CONCEPT_FRONTMATTER_ROW_MAX,
   EXEMPT_TABLE_NAMES,
   FAMILIES,
   IDENTITY_SET,
@@ -1106,6 +1107,15 @@ const inboxAsApp = async (client: pg.PoolClient) => {
   return { seed, here, there };
 };
 
+/**
+ * Say which suggestion this transaction is deciding, as the concepts slice's decision and
+ * acceptance paths do (`markDeciding`). The row's trigger refuses a decision that arrives
+ * without it, so a test asserting the *served* path has to speak the same sentence the
+ * slice speaks; the test below asserts what happens when nobody does.
+ */
+const deciding = (client: pg.PoolClient, suggestionId: string) =>
+  client.query("SELECT set_config('app.deciding_suggestion', $1, true)", [suggestionId]);
+
 describe("the inbox under app_rt", () => {
   it("returns zero rows on a missing scope and only the scoped tenant's suggestions otherwise", async () => {
     await withRollback(db.pool, async (client) => {
@@ -1165,6 +1175,7 @@ describe("the inbox under app_rt", () => {
       const foreign = await client.query("SELECT 1 FROM concept_write_request_for($1)", [there.id]);
       expect(foreign.rowCount).toBe(0);
 
+      await deciding(client, here.id);
       await client.query(
         `UPDATE suggestion SET status = 'declined', decider = 'process:better-answers-test',
                 decided_at = now(), reason = 'not the company''s word on this'
@@ -1200,14 +1211,16 @@ describe("the inbox under app_rt", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      const decline = (id: string, extra = "") =>
-        client.query(
+      const decline = async (id: string, extra = "") => {
+        await deciding(client, id);
+        return client.query(
           `UPDATE suggestion
               SET status = 'declined', decider = 'process:better-answers-test',
                   decided_at = now(), reason = 'not the company''s word on this'${extra}
             WHERE workspace_id = $1 AND id = $2`,
           [WS_A, id],
         );
+      };
 
       // The served path first: a waiting suggestion is declined, once.
       expect((await decline(decided.id)).rowCount).toBe(1);
@@ -1246,6 +1259,39 @@ describe("the inbox under app_rt", () => {
         await expect(statement()).rejects.toThrow(message);
         await client.query("ROLLBACK TO SAVEPOINT decision");
       }
+    });
+  });
+
+  it("refuses a first decision from a transaction that never said it was making one (migration 0018)", async () => {
+    // The decision trigger's other half. Refusing a *second* decision leaves the first one
+    // open to any UPDATE the app can write — a suggestion marked accepted with no commit,
+    // no ledger row and no graph delta, which is exactly what the acceptance's transaction
+    // exists to make impossible. So the transaction has to name what it is deciding, and
+    // the concepts slice's two decision paths are the only things that say it.
+    await withRollback(db.pool, async (client) => {
+      const { here } = await inboxAsApp(client);
+      const decline = (id: string) =>
+        client.query(
+          `UPDATE suggestion SET status = 'declined', decider = 'process:better-answers-test',
+                  decided_at = now(), reason = 'not the company''s word on this'
+            WHERE workspace_id = $1 AND id = $2`,
+          [WS_A, id],
+        );
+
+      await client.query("SAVEPOINT bare");
+      await expect(decline(here.id)).rejects.toThrow(/this transaction is not making it/);
+      await client.query("ROLLBACK TO SAVEPOINT bare");
+
+      // And a marker naming some *other* suggestion is no marker at all: the act names the
+      // row it is deciding, not merely that it is deciding something.
+      await deciding(client, ulid());
+      await client.query("SAVEPOINT elsewhere");
+      await expect(decline(here.id)).rejects.toThrow(/this transaction is not making it/);
+      await client.query("ROLLBACK TO SAVEPOINT elsewhere");
+
+      // The served path beside the refusals, in the words the slice speaks.
+      await deciding(client, here.id);
+      expect((await decline(here.id)).rowCount).toBe(1);
     });
   });
 
@@ -1289,8 +1335,16 @@ describe("the inbox under app_rt", () => {
       expect(repaired.rowCount).toBe(1);
 
       await client.query("SET LOCAL ROLE app_rt");
+      // And what the app may not raise: the platform's own repair, and a run's candidate —
+      // a candidate is what a run *found*, so an app that could raise one could put work
+      // no run did into the queue an Admin decides from.
+      await client.query("SAVEPOINT app");
       await expect(submit("repair", "process:better-answers-citation-repair")).rejects.toThrow(
         /app_rt may not raise a suggestion of kind repair/,
+      );
+      await client.query("ROLLBACK TO SAVEPOINT app");
+      await expect(submit("candidate", "better-answers-extraction/1.2")).rejects.toThrow(
+        /app_rt may not raise a suggestion of kind candidate/,
       );
     });
   });
@@ -1507,8 +1561,15 @@ describe("the inbox under app_rt", () => {
       );
       await client.query("ROLLBACK TO SAVEPOINT sized");
 
+      // The row's bound is the wider backstop, not the boundary's number: a frontmatter
+      // between the two is one the boundary already refused, and only a caller that went
+      // round the boundary — a producer reaching the definer function — gets this far.
+      const underTheBackstop = JSON.stringify({ title: "x".repeat(CONCEPT_FRONTMATTER_MAX) });
+      expect((await write(underTheBackstop, "b")).rowCount).toBe(1);
+      await client.query("ROLLBACK TO SAVEPOINT sized");
+
       await expect(
-        write(JSON.stringify({ title: "x".repeat(CONCEPT_FRONTMATTER_MAX) }), "b"),
+        write(JSON.stringify({ title: "x".repeat(CONCEPT_FRONTMATTER_ROW_MAX) }), "b"),
       ).rejects.toThrow(/concept_write_request_frontmatter_length_check/);
     });
   });
@@ -1520,6 +1581,7 @@ describe("the inbox under app_rt", () => {
       const here = await seed.suggestion({ workspaceId: WS_A });
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      await deciding(client, here.id);
 
       // The composite key again: the foreign-key check runs as the owner and bypasses the
       // policy, so a key on the IRI alone would confirm that another tenant holds it.

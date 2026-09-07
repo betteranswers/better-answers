@@ -10,7 +10,7 @@ CREATE TABLE "concept_write_request" (
 	"base_content_hash" text,
 	CONSTRAINT "concept_write_request_workspace_id_suggestion_id_pk" PRIMARY KEY("workspace_id","suggestion_id"),
 	CONSTRAINT "concept_write_request_body_length_check" CHECK (char_length(body) <= 100000),
-	CONSTRAINT "concept_write_request_frontmatter_length_check" CHECK (char_length(frontmatter::text) <= 64000)
+	CONSTRAINT "concept_write_request_frontmatter_length_check" CHECK (char_length(frontmatter::text) <= 128000)
 );
 --> statement-breakpoint
 ALTER TABLE "concept_write_request" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint

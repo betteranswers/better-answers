@@ -3415,7 +3415,7 @@
         },
         "concept_write_request_frontmatter_length_check": {
           "name": "concept_write_request_frontmatter_length_check",
-          "value": "char_length(frontmatter::text) <= 64000"
+          "value": "char_length(frontmatter::text) <= 128000"
         }
       },
       "isRLSEnabled": true

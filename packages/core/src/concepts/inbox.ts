@@ -1,7 +1,7 @@
 import {
   boundarySchemas,
   SUGGESTION_DECLINED_STATUS,
-  SUGGESTION_REPAIR_KIND,
+  SUGGESTION_KINDS_FROM_THE_APP,
   SUGGESTION_RETURNED_STATUS,
   SUGGESTION_SET_MAX,
   SUGGESTION_WAITING_STATUS,
@@ -225,12 +225,13 @@ export type SubmitSuggestionSetRefusal = PrincipalRefusal | "malformed" | "kind-
  *
  * Any member may submit: a Viewer may *suggest* a change they may not commit (ADR 0019),
  * and the gate ADR 0012 cares about is the decision, not the offer. The proposer is the
- * caller, derived by the kernel's one function and never composed here — **which is the
- * whole of what a person may raise**: a *repair* is the platform running its own citation
- * repair, and accepting one re-points every standing check at the content it wrote, so a
- * person raising one could make somebody else's check vouch for content they never saw.
- * The row's own CHECK is what makes that impossible; this refusal is the word a caller
- * hears instead of the store's error.
+ * caller, derived by the kernel's one function and never composed here — and the kinds this
+ * road may carry are `SUGGESTION_KINDS_FROM_THE_APP`, because a *candidate* is a run's
+ * output and a *repair* is the platform's own citation routine. Accepting a repair re-points
+ * every standing check at the content it wrote, so a person raising one could make somebody
+ * else's check vouch for content they never saw. `submit_suggestion_set` holds the same list
+ * against the calling tier, which is what makes it true of a compromised caller too; this
+ * refusal is the word an honest caller hears instead of the store's error.
  *
  * The payload goes through the boundary before the call, so a path, a frontmatter or a body
  * the row would refuse is refused while it is still a proposal — rather than at the moment
@@ -241,12 +242,15 @@ export const submitSuggestionSet = async (
   doors: { readonly postgres: PostgresDoor },
   input: SubmitSuggestionSetInput,
 ): Promise<Result<SuggestionSetSubmitted, SubmitSuggestionSetRefusal | Error>> => {
-  // The kind goes through the boundary like everything else a caller supplies: a word off
-  // the enum reaches the row's own CHECK, and a caller told `malformed` can act on it where
-  // a raw constraint error is the store's failure escaping as this act's answer.
+  // The kind goes through the boundary like everything else a caller supplies, and then
+  // through the app's own list: a word off the enum is `malformed`, and a kind no person's
+  // session may raise is `kind-forbids` — two different things a caller can act on, where
+  // either reaching the database would be the store's failure escaping as this act's answer.
   const kind = boundarySchemas.suggestion.insert.shape.kind.safeParse(input.kind);
   if (!kind.success) return err("malformed");
-  if (kind.data === SUGGESTION_REPAIR_KIND) return err("kind-forbids");
+  if (!SUGGESTION_KINDS_FROM_THE_APP.some((allowed) => allowed === kind.data)) {
+    return err("kind-forbids");
+  }
   const setId = ulid();
   const payloads = boundarySchemas.conceptWriteRequest.insert
     .omit({ workspaceId: true })
@@ -297,6 +301,21 @@ export const submitSuggestionSet = async (
   if (!submitted.ok) return err(submitted.error);
   if (!submitted.value.ok) return err(submitted.value.error);
   return ok({ setId, suggestionIds: submitted.value.value });
+};
+
+/**
+ * Name the suggestion this transaction is deciding — the marker `suggestion`'s trigger
+ * demands before it will let a waiting row become a decided one (migration 0018), so the
+ * governed paths are the only paths a decision travels and a second road cannot be added by
+ * accident. It is set **transaction-locally**, which is what stops it outliving the act or
+ * reaching whoever holds the pooled connection next.
+ *
+ * Exported to `index.ts` and nowhere else: the acceptance is a governed write and lives with
+ * `writeConcept`, but the decision it makes is this module's, so both paths set one marker
+ * rather than two spellings of one.
+ */
+export const markDeciding = async (tx: Tx, suggestionId: string): Promise<void> => {
+  await tx.query("SELECT set_config('app.deciding_suggestion', $1, true)", [suggestionId]);
 };
 
 export type DecideSuggestionInput = {
@@ -374,6 +393,10 @@ const decide = async (
           subjectId: input.suggestionId,
           detail: { setId: row.set_id },
         });
+        // The transaction says which suggestion it is deciding, and the row's trigger
+        // refuses a decision that arrives without it (migration 0018). Local, so it dies
+        // with this transaction rather than travelling on the pooled connection.
+        await markDeciding(tx, input.suggestionId);
         const written = await tx.query<{ id: string }>(
           `UPDATE suggestion
               SET status = $3, decider = $4, decided_at = now(), reason = $5

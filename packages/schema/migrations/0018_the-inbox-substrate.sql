@@ -28,14 +28,21 @@ REVOKE ALL ON "suggestion" FROM worker_rt;
 -- writes a decision as an UPDATE and never as a DELETE, so DELETE goes.
 REVOKE DELETE ON "suggestion" FROM app_rt;
 --> statement-breakpoint
--- **A decision happens once, and what a suggestion is was settled when it was raised.**
--- DELETE is gone above, but the app keeps a general UPDATE — it is how a decision is
--- written — and nothing in the row's own CHECKs says an *accepted* row may not be turned
--- back into a waiting one, or a declined one re-decided by somebody else. Left open, app
--- code could mark a suggestion accepted with no commit, no ledger row and no graph delta,
--- which is the one thing the acceptance's transaction exists to make impossible. The
--- workflow is held here for the same reason the DELETE is: the queue's history is a fact
--- about who decided what, and a fact a caller can rewrite is not one.
+-- **A decision happens once, it is made by the act that makes it, and what a suggestion is
+-- was settled when it was raised.** DELETE is gone above, but the app keeps a general
+-- UPDATE — it is how a decision is written — and nothing in the row's own CHECKs says an
+-- *accepted* row may not be turned back into a waiting one, or a waiting one marked
+-- accepted by a statement that made no commit, wrote no ledger row and derived no graph
+-- delta. That last is the one thing the acceptance's transaction exists to make impossible,
+-- so the transaction has to be able to say it is the one making the decision: the slice's
+-- decision path and its acceptance path both set `app.deciding_suggestion` — transaction-
+-- local, so it cannot outlive the act or reach a pooled connection's next caller — and this
+-- refuses a waiting row's decision that arrives without it.
+--
+-- It is a guard against the platform taking the short road, **not** against a compromised
+-- role: anything that can write the row can also set the marker. What it buys is that the
+-- governed path is the only path a reviewer has to read, and that a second road cannot be
+-- added by accident.
 CREATE FUNCTION suggestion_decides_once() RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
@@ -48,6 +55,10 @@ BEGIN
   IF NEW.status = 'waiting' THEN
     RAISE EXCEPTION 'suggestion %: an update to a waiting suggestion decides it', OLD.id
       USING ERRCODE = 'integrity_constraint_violation';
+  END IF;
+  IF nullif(current_setting('app.deciding_suggestion', true), '') IS DISTINCT FROM OLD.id THEN
+    RAISE EXCEPTION 'suggestion %: a decision is the concepts slice''s act, and this transaction is not making it',
+      OLD.id USING ERRCODE = 'integrity_constraint_violation';
   END IF;
   -- What the suggestion *is* — whose it is, which set it arrived in, what kind of change
   -- it proposes and when it was raised — is the proposer's, and a decision only decides.
@@ -88,14 +99,14 @@ DECLARE
   -- `none` when nobody set one, and then the caller is whoever logged in, which is how the
   -- estate connects (each tier logs in as its own runtime role).
   v_caller text := coalesce(nullif(current_setting('role', true), 'none'), session_user);
-  -- The kinds each tier may raise. An *edit* is a person's own change, offered through the
-  -- app; a *candidate* and a *promotion* come out of a run; a *repair* is the platform's own
-  -- citation routine (ADR 0019), which runs in the worker. Held here because `p_kind` and
-  -- `p_proposer` are both the caller's words: a compromised worker could otherwise submit
-  -- an `edit` under a `human:` proposer — a form the row's CHECK accepts — and put a change
-  -- in a person's name into the queue an Admin decides from.
+  -- The kinds each tier may raise (SUGGESTION_KINDS_FROM_THE_APP and
+  -- SUGGESTION_KINDS_FROM_A_RUN in src/suggestion-tables.ts, which say why each list is
+  -- what it is). Held here because `p_kind` and `p_proposer` are both the caller's words: a
+  -- compromised worker could otherwise submit an *edit* under a `human:` proposer — a form
+  -- the row's CHECK accepts — and put a change in a person's name into the queue an Admin
+  -- decides from, and a compromised app could raise a run's *candidate* nobody ran.
   v_permitted text[] := CASE v_caller
-    WHEN 'app_rt' THEN ARRAY['edit', 'candidate', 'promotion']
+    WHEN 'app_rt' THEN ARRAY['edit', 'promotion']
     WHEN 'worker_rt' THEN ARRAY['candidate', 'promotion', 'repair']
   END;
 BEGIN
