@@ -76,14 +76,13 @@ jobs:
           path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
           key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}
           restore-keys: stryker-incremental-${{ matrix.name }}-
-      # Cancellation signals the step's entry process and nothing under it, and a shell waiting on
-      # a child forwards no signal: behind `pnpm run mutation` Stryker ran below a pnpm and an sh,
-      # was never signalled, and the runner killed it as an orphan (run 34128668967) — so it never
-      # wrote the partial incremental report it writes whenever it catches SIGINT or SIGTERM.
-      # `exec` hands the entry process to pnpm's bin shim, which execs into node — one process
-      # from the step down, so the runner's SIGINT is Stryker's. The workspace's `mutation` script
-      # is skipped rather than called because calling it is what interposed the shell;
-      # `stryker.config.mjs` holds the run's settings either way.
+      # Cancellation signals the step's entry process and nothing under it, and a shell waiting
+      # on a child forwards no signal: behind `pnpm run mutation`, with a pnpm and an sh in
+      # between, Stryker was never signalled and never wrote the partial incremental report it
+      # writes on SIGINT or SIGTERM (run 34128668967). `exec` into pnpm's bin shim, which execs
+      # into node, leaves one process from the step down — so the signal is Stryker's. The
+      # workspace's `mutation` script is skipped rather than called because calling it is what
+      # interposes the shell; `stryker.config.mjs` holds the run's settings either way.
       - name: mutation
         working-directory: ${{ matrix.path }}
         run: exec node_modules/.bin/stryker run
