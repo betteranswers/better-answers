@@ -34,6 +34,31 @@ def read_manifest() -> dict[str, Any]:
     return cast("dict[str, Any]", json.loads(raw))
 
 
+def fixtures_on_disk(directory: Path) -> set[str]:
+    """Every fixture a directory holds, as the manifest writes a path.
+
+    Dotfiles are not fixtures. macOS writes a ``.DS_Store`` into any directory a
+    Finder window has opened, and ``contracts/`` is a directory a person browses;
+    ``rglob`` returns it exactly as the TypeScript half's ``readdirSync`` does. It
+    is git-ignored, so no manifest can list it, CI never has one, and the owner
+    reviewing the failure cannot see it — the suite would fail on the one machine
+    that has one and pass on every other. The TypeScript half applies the same rule
+    to the same directory (ADR 0031); a filter in one half alone leaves the other
+    tripping on the same file.
+    """
+    found: set[str] = set()
+    for file in directory.rglob("*"):
+        if not file.is_file():
+            continue
+        relative = file.relative_to(directory)
+        if any(part.startswith(".") for part in relative.parts):
+            continue
+        if str(relative) in NOT_FIXTURES:
+            continue
+        found.add(str(relative))
+    return found
+
+
 def test_speaks_this_tiers_contract_version() -> None:
     assert read_manifest()["contract_version"] == SPOKEN_CONTRACT_VERSION
 
@@ -54,12 +79,25 @@ def test_lists_a_fixture_if_and_only_if_it_exists_under_an_agreement_it_names() 
         assert (CONTRACTS_DIR / fixture["path"]).exists()
 
     # The other direction: a file on disk the manifest does not list fails too.
-    on_disk = {
-        str(file.relative_to(CONTRACTS_DIR))
-        for file in CONTRACTS_DIR.rglob("*")
-        if file.is_file() and str(file.relative_to(CONTRACTS_DIR)) not in NOT_FIXTURES
+    assert fixtures_on_disk(CONTRACTS_DIR) == {
+        fixture["path"] for fixture in manifest["fixtures"]
     }
-    assert on_disk == {fixture["path"] for fixture in manifest["fixtures"]}
+
+
+def test_counts_a_fixture_and_never_a_dotfile(tmp_path: Path) -> None:
+    (tmp_path / "id-shape").mkdir()
+    (tmp_path / "id-shape" / "cases.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "manifest.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "README.md").write_text("", encoding="utf-8")
+    # What macOS writes into any directory a Finder window has opened, at the root and
+    # under a fixture's own. `rglob` returns it exactly as `readdirSync` does, which is
+    # why both halves need the same filter: fixing one leaves the other tripping on it.
+    (tmp_path / ".DS_Store").write_text("", encoding="utf-8")
+    (tmp_path / "id-shape" / ".DS_Store").write_text("", encoding="utf-8")
+    (tmp_path / ".cache").mkdir()
+    (tmp_path / ".cache" / "cases.json").write_text("{}", encoding="utf-8")
+
+    assert fixtures_on_disk(tmp_path) == {"id-shape/cases.json"}
 
 
 # --- id-shape: one id shape, whichever tier minted it (ADR 0035) ----------------------
