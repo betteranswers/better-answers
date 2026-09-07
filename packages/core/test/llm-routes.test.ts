@@ -1,15 +1,10 @@
-import {
-  CONFIGURED_LLM_ROUTES,
-  LISTED_LLM_ROUTES,
-  type MigratedPostgres,
-  startMigratedPostgres,
-  testData,
-} from "@better-answers/schema/testing";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { CONFIGURED_LLM_ROUTES, LISTED_LLM_ROUTES, testData } from "@better-answers/schema/testing";
+import { describe, expect, it } from "vitest";
 
 import { attempt, type Claims } from "../src/kernel/index.ts";
 import { listRoutes, LLM_PURPOSES } from "../src/llm/index.ts";
 import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
+import { postgresForSuite } from "./suite-postgres.ts";
 
 /**
  * The routes capability through the `llm` slice's export (`[TEST1]`): the workspace's
@@ -18,15 +13,7 @@ import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
  * and read back through the runtime pool, where RLS applies.
  */
 
-let db: MigratedPostgres;
-
-beforeAll(async () => {
-  db = await startMigratedPostgres();
-}, 120_000);
-
-afterAll(async () => {
-  await db.stop();
-});
+const db = postgresForSuite();
 
 type Seeded = { readonly workspaceId: string; readonly userId: string };
 
@@ -34,7 +21,7 @@ type Seeded = { readonly workspaceId: string; readonly userId: string };
 const seedWorkspace = async (
   routes: readonly { purpose: "answering" | "embedding"; provider: string; model: string }[],
 ): Promise<Seeded> => {
-  const client = await db.pool.connect();
+  const client = await db().pool.connect();
   try {
     const seed = testData(client);
     const workspace = await seed.workspace();
@@ -61,7 +48,11 @@ const claimsFor = (seeded: Seeded): Claims => ({
 });
 
 const listAs = async (seeded: Seeded) => {
-  const resolved = await withPrincipal(openPostgres(db.runtimePool), claimsFor(seeded), listRoutes);
+  const resolved = await withPrincipal(
+    openPostgres(db().runtimePool),
+    claimsFor(seeded),
+    listRoutes,
+  );
   if (!resolved.ok) throw new Error(`the Principal was refused: ${resolved.error}`);
   const listed = resolved.value;
   if (!listed.ok) throw listed.error;
@@ -123,7 +114,7 @@ describe("a workspace's model routes", () => {
     // the policy — not the `WHERE workspace_id = $1` the capability also writes — is
     // what leaves the other workspace's rows out of the answer.
     const visible = await withPrincipal(
-      openPostgres(db.runtimePool),
+      openPostgres(db().runtimePool),
       claimsFor(mine),
       async (_principal, tx) => {
         const all = await tx.query<{ workspace_id: string }>("SELECT workspace_id FROM llm_route");
@@ -141,7 +132,7 @@ describe("a workspace's model routes", () => {
     // `[TEST8]`: the abort is provoked inside the work, so the assertion is on the
     // transaction's outcome first — the opener rejects — and on the value second.
     await expect(
-      withPrincipal(openPostgres(db.runtimePool), claimsFor(seeded), async (principal, tx) => {
+      withPrincipal(openPostgres(db().runtimePool), claimsFor(seeded), async (principal, tx) => {
         // A statement Postgres refuses aborts the transaction, so the capability's own
         // read cannot run. `attempt` is the one place a rejection is caught (§ TYPES).
         await attempt(() => tx.query("SELECT no_such_function()"));
