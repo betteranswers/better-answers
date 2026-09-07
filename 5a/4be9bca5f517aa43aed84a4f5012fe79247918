@@ -1,0 +1,27 @@
+packages/core/test/members.test.ts
+  s_e0eda8eedfb8b6::t_b28c0b93f341b6 33,35
+  s_e0eda8eedfb8b6::t_2d58d9dfa27508 7-8
+packages/core/test/workspaces.test.ts
+  s_e0eda8eedfb8b6::t_295c6de8b10d91 452-458,473,491,511
+packages/core/test/platform.ts
+  s_e0eda8eedfb8b6::t_588ca468ce3b16 1-2,6-7,20-48
+packages/core/test/audit.test.ts
+  s_e0eda8eedfb8b6::t_b28c0b93f341b6 19,56
+  s_e0eda8eedfb8b6::t_2d58d9dfa27508 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "5a4be9bca5f517aa43aed84a4f5012fe79247918",
+  "prompts": {},
+  "sessions": {
+    "s_e0eda8eedfb8b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9789fc80-7ea8-43d4-9e45-1f2b870cb092",
+        "model": "claude-opus-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
