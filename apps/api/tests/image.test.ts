@@ -309,7 +309,13 @@ describe("the job that probes the image it pushes", () => {
     const steps = imageJob().steps;
     const probed = steps[probeStepAt(steps)];
 
-    expect(probed?.run).toEqual("${{ matrix.probe }}");
+    // The command comes in through the environment, so the step runs the matrix's probe
+    // and nothing else; and it is refused an empty id, because this file would then build
+    // an image of its own and let an unread one ship.
+    expect(probed?.env?.["PROBE"]).toEqual("${{ matrix.probe }}");
+    expect(probed?.run).toContain("${PROBE}");
+    expect(probed?.run).toContain(`-z "\${${IMAGE_ID_VARIABLE}}"`);
+    expect(probed?.run).toContain("exit 1");
     expect(probed?.env?.[IMAGE_ID_VARIABLE]).toContain("outputs.imageid");
   });
 
