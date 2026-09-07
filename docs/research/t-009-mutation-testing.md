@@ -3,7 +3,11 @@
 Research only. Nothing in this document has been applied to the tree. Written
 07/09/2026 against the Stryker docs at stryker-mutator.io, the StrykerJS source
 on `master`, the Vitest source on `main`, and the GitHub Actions docs. Source-code
-claims carry the file path in the owning repo. The situation researched: two
+claims carry the file path in the owning repo. The workspaces pin
+`@stryker-mutator/core` and its Vitest runner at **10.0.0** and `vitest` at
+**4.1.11** (both `package.json`s, read 07/09/2026); the source branches read were
+the moving heads of those repos on the day, so a claim acted on in code should be
+confirmed against the `v10.0.0` / `v4.1.11` tags at that moment (`[DEPS1]`). The situation researched: two
 weekly StrykerJS legs in `.github/workflows/mutation.yml` (`timeout-minutes: 120`,
 Vitest 4 runner, `concurrency: 2`, `inPlace: true`, `incremental: true` on api),
 where `packages/core` (1,951 mutants) finishes in 1h29m52s at 76.37% and
@@ -21,13 +25,17 @@ economics, and the source supports it precisely.** The Vitest runner keeps **one
 warm Vitest instance per Stryker worker for the whole run** and re-runs tests
 inside it per mutant; mutants are switched by a global flag, never by
 re-instrumentation (§ 1.2). A per-file `beforeAll` re-executes on **every mutant
-run**, so today each of the api leg's mutants pays a container start. A Vitest
+run**, so today each *executed* mutant with covering tests pays a container start
+(a NoCoverage mutant, or one reused from the incremental file, runs no tests and
+pays nothing). A Vitest
 `globalSetup` is guarded to initialise **once per worker process** and tear down
 only when the instance closes (§ 1.3) — a Postgres started there and handed to
 tests via `provide`/`inject` stays warm across all ~900 mutants a worker runs.
 Two caveats: a **timed-out mutant disposes and recreates the whole worker
-process** (container restart, § 1.4), and each of the 2 workers owns its own
-container (unchanged from today).
+process** (container restart, § 1.4), and each of the 2 workers would own its own
+container — two live at once, matching today's steady-state count (each worker's
+active test file currently holds one), but held for the whole run instead of
+recreated per file.
 
 **(3) Raise the timeout — cheap, and half of the fix is a workflow bug we already
 have.** `timeout-minutes` may rise to the runner's 6-hour job execution limit
@@ -311,8 +319,12 @@ Cancelled-path steps still fit inside GitHub's five-minute cancellation budget
 ("After the 5 minute cancellation timeout period, the server will forcibly
 terminate all jobs", same cancellation reference). Our run-id key scheme already
 makes every save a fresh entry, so `restore` + `save if: always()` is a drop-in
-change — and it converts the api leg from "times out, restarts from zero every
-week" to "converges across weeks", independent of every other lever.
+change. Convergence across weeks then depends on one more condition: the
+cancellation signal actually reaching Stryker (§ 2.2's caveat — and run
+34128668967 showed it does *not* today: Stryker died as an orphan behind `sh`
+with no partial-write log line). The cache split and the signal-delivery fix go
+together, and the short-`timeout-minutes` dispatch in § 2.2 is the proof both
+work before weekly convergence is promised.
 
 ### 2.4 Raising the timeout instead
 
