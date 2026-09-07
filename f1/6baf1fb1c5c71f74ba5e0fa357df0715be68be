@@ -1,0 +1,37 @@
+packages/schema/test/rls.test.ts
+  s_0c3bfea64667cc::t_bddc7035ac0b48 36-37
+apps/api/tests/suite-app.ts
+  s_0c3bfea64667cc::t_01a07a3968b6b4 24
+  s_0c3bfea64667cc::t_bddc7035ac0b48 12-13
+packages/schema/test/worker-schema-view.test.ts
+  s_0c3bfea64667cc::t_bddc7035ac0b48 26-27
+apps/api/stryker.config.mjs
+  ai_agent 43-49
+packages/schema/test/boundary-schemas.test.ts
+  s_0c3bfea64667cc::t_bddc7035ac0b48 460-461
+.github/workflows/mutation.yml
+  s_0c3bfea64667cc::t_bddc7035ac0b48 60,63-65
+apps/api/vitest.config.ts
+  s_0c3bfea64667cc::t_bddc7035ac0b48 13-14
+  s_0c3bfea64667cc::t_e16b749393744a 15
+packages/core/stryker.config.mjs
+  ai_agent 49-55
+packages/core/test/suite-postgres.ts
+  s_0c3bfea64667cc::t_bddc7035ac0b48 26-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f16baf1fb1c5c71f74ba5e0fa357df0715be68be",
+  "prompts": {},
+  "sessions": {
+    "s_0c3bfea64667cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9d3ba688-6883-4a0b-bfd6-2d1c408628e5",
+        "model": "claude-opus-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
