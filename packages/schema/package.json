@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./testing": "./test/testing.ts"
+    "./testing": "./test/testing.ts",
+    "./testing/warm-postgres": "./test/warm-postgres.ts"
   },
   "scripts": {
     "generate": "drizzle-kit generate",

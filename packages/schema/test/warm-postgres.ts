@@ -1,0 +1,211 @@
+import { createHash } from "node:crypto";
+import path from "node:path";
+
+import { PostgreSqlContainer } from "@testcontainers/postgresql";
+import pg from "pg";
+import { expect, inject } from "vitest";
+import type { TestProject } from "vitest/node";
+
+import { POSTGRES_IMAGE } from "../src/postgres-image.ts";
+import {
+  applyJournal,
+  type MigratedPostgres,
+  migratedPostgresOver,
+  startMigratedPostgres,
+} from "./harness.ts";
+
+/**
+ * The warm half of the harness: one container and one migrated template per Vitest run,
+ * a database per test file copied from that template.
+ *
+ * What it buys is the container start leaving the per-file path. Vitest initialises a
+ * `globalSetup` once per project instance and tears it down only when the instance
+ * closes, while a file's `beforeAll` re-runs on every mutant Stryker activates inside
+ * that same instance — so under the weekly mutation run the container is started once a
+ * worker rather than once a mutant (`docs/research/t-009-mutation-testing.md` §1.2–1.3).
+ * A file still gets a fully migrated, empty database of its own, because all seeding is
+ * per-test through the factory (`[TEST4]`) and a template copy is the migrated database
+ * with zero rows in it.
+ *
+ * Register it from a workspace's Vitest config:
+ * `globalSetup: ["@better-answers/schema/testing/warm-postgres"]`.
+ */
+
+/** What `globalSetup` hands every test file: where the cluster is, and what to copy. */
+export type WarmPostgres = {
+  /**
+   * The container's own database. A session cannot create or drop the database it is
+   * connected to, so this is where a file issues its `CREATE DATABASE` from.
+   */
+  readonly connectionUri: string;
+  /** The migrated database each file's database is copied from. */
+  readonly templateDatabase: string;
+};
+
+declare module "vitest" {
+  interface ProvidedContext {
+    /**
+     * Absent outside a Vitest run, and in a workspace whose Vitest config has not
+     * registered this `globalSetup` — both of which the opener reads as "start your own".
+     */
+    warmPostgres?: WarmPostgres;
+  }
+}
+
+/**
+ * The template's name. One per container, and a container belongs to one Vitest instance,
+ * so a fixed name cannot collide with anything.
+ */
+const TEMPLATE_DATABASE = "better_answers_template";
+
+/**
+ * An identifier Postgres reads literally. Every name reaching the DDL below is built in
+ * this file out of `[a-z0-9_]`, so this changes nothing today; it is here so that the day
+ * a name carries a character Postgres would fold or reject, the statement still names the
+ * database the caller meant.
+ */
+const quoted = (identifier: string): string => `"${identifier.replaceAll('"', '""')}"`;
+
+/** The same connection facts, pointed at another database on the same cluster. */
+const uriForDatabase = (connectionUri: string, database: string): string => {
+  const uri = new URL(connectionUri);
+  uri.pathname = `/${database}`;
+  return uri.toString();
+};
+
+/**
+ * One short-lived superuser connection to the container's own database, for the `CREATE`
+ * and `DROP` a file's database needs. A single client rather than a pool: a file's
+ * connection budget is its two pools and nothing else, and this connection is gone before
+ * the pools open.
+ */
+const withAdmin = async <T>(
+  connectionUri: string,
+  work: (admin: pg.Client) => Promise<T>,
+): Promise<T> => {
+  const admin = new pg.Client({ connectionString: connectionUri });
+  await admin.connect();
+  try {
+    return await work(admin);
+  } finally {
+    await admin.end();
+  }
+};
+
+/**
+ * The Vitest `globalSetup`: one container, one migrated template, and the facts a file
+ * needs to copy it. The migration pool is closed before anything is provided, because
+ * Postgres refuses `CREATE DATABASE … TEMPLATE` while the template has a live connection —
+ * the first file to open would fail with "source database is being accessed by other
+ * users". The returned teardown is what stops the container, and Vitest calls it only when
+ * the instance closes.
+ */
+const startWarmPostgres = async (project: TestProject): Promise<() => Promise<void>> => {
+  const container = await new PostgreSqlContainer(POSTGRES_IMAGE).start();
+  const connectionUri = container.getConnectionUri();
+  try {
+    await withAdmin(connectionUri, async (admin) => {
+      await admin.query(`CREATE DATABASE ${quoted(TEMPLATE_DATABASE)}`);
+    });
+    const migrationPool = new pg.Pool({
+      connectionString: uriForDatabase(connectionUri, TEMPLATE_DATABASE),
+      max: 1,
+    });
+    try {
+      await applyJournal(migrationPool);
+    } finally {
+      await migrationPool.end();
+    }
+  } catch (error) {
+    await container.stop();
+    throw error;
+  }
+  project.provide("warmPostgres", { connectionUri, templateDatabase: TEMPLATE_DATABASE });
+  return async () => {
+    await container.stop();
+  };
+};
+
+export default startWarmPostgres;
+
+/** The warm cluster this run was given, or `undefined` where there is none. */
+const providedWarmPostgres = (): WarmPostgres | undefined => {
+  try {
+    return inject("warmPostgres");
+  } catch {
+    // `inject` reads Vitest's per-worker state, and outside a Vitest run — the browser
+    // suite's served app, the local loop, the worker-view generator — there is none, so
+    // the call throws rather than answering. Losing that error is safe because absence is
+    // exactly what the caller is asking about: no warm cluster here, start your own.
+    return undefined;
+  }
+};
+
+/**
+ * The database a file is named after: deterministic, so the same file's `beforeAll`
+ * re-running inside one long-lived cluster asks for the same name every time. That is what
+ * makes the drop-then-create below self-cleaning — under Stryker a covering file's hooks
+ * re-run once per mutant, ~900 a worker, and a run that bails skips its `afterAll`, so a
+ * fresh name each time would leave a database behind on every one of them.
+ *
+ * The digest is over the whole key, which keeps two files of the same basename in
+ * different directories apart; the stem is kept in front of it so `\l` stays readable
+ * while a run is stuck. Postgres truncates an identifier at 63 bytes and the longest this
+ * yields is 56.
+ */
+const databaseNameFor = (databaseKey: string): string => {
+  const stem = path
+    .basename(databaseKey)
+    .replaceAll(/[^a-z0-9]+/giu, "_")
+    .toLowerCase();
+  const digest = createHash("sha256").update(databaseKey).digest("hex").slice(0, 12);
+  return `ba_${stem.slice(0, 40)}_${digest}`;
+};
+
+/** The file Vitest is running, which is the unit a fresh database belongs to. */
+const runningTestFile = (): string => {
+  const { testPath } = expect.getState();
+  if (testPath === undefined) {
+    throw new Error(
+      "the warm harness was opened with no running test file to name a database after; pass a key",
+    );
+  }
+  return testPath;
+};
+
+/**
+ * One migrated Postgres for this test file — a `MigratedPostgres` exactly as
+ * `startMigratedPostgres` returns, over a database copied from the run's migrated
+ * template. Never a second migrate, never a second container.
+ *
+ * Where no warm cluster was provided the call falls back to `startMigratedPostgres`, so
+ * the same line works under Playwright's served app, under the local loop and under a
+ * plain `node` script.
+ *
+ * `stop()` closes this file's two pools and drops its database; the container outlives it,
+ * and is stopped only when the Vitest instance closes.
+ *
+ * @param databaseKey what the database is named after. Defaults to the running test file,
+ *   which is what a caller wants: one database per file, the same one on a re-run. A test
+ *   proving that two databases are independent is the reason this can be said explicitly.
+ */
+export const openMigratedPostgres = async (databaseKey?: string): Promise<MigratedPostgres> => {
+  const warm = providedWarmPostgres();
+  if (warm === undefined) return startMigratedPostgres();
+
+  const database = databaseNameFor(databaseKey ?? runningTestFile());
+  await withAdmin(warm.connectionUri, async (admin) => {
+    // `FORCE` because the leftover being dropped may still hold connections: the run that
+    // made it bailed before its `afterAll`, and its pools' sockets outlive the module
+    // registry Vitest resets between runs. Postgres 13 and later; the pinned image is 18.
+    await admin.query(`DROP DATABASE IF EXISTS ${quoted(database)} WITH (FORCE)`);
+    await admin.query(
+      `CREATE DATABASE ${quoted(database)} TEMPLATE ${quoted(warm.templateDatabase)}`,
+    );
+  });
+  return migratedPostgresOver(uriForDatabase(warm.connectionUri, database), async () => {
+    await withAdmin(warm.connectionUri, async (admin) => {
+      await admin.query(`DROP DATABASE IF EXISTS ${quoted(database)} WITH (FORCE)`);
+    });
+  });
+};
