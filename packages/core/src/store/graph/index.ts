@@ -49,13 +49,20 @@ type Tx = Pick<pg.PoolClient, "query">;
 type Frontmatter = z.infer<typeof conceptFrontmatter>;
 
 /**
- * What edges derive from: one concept's index-row facts — its identity, its folded kind
- * (the node's property, never its label), the file's content and the visibility columns
- * an edge copies, the audience as its word and its group-id array (ADR 0039). The shape
- * the re-derive reads back off `concept_index` too, which is why the row and the delta
- * share it.
+ * What edges derive from: one concept's index-row facts — the workspace the row belongs to,
+ * its identity, its folded kind (the node's property, never its label), the file's content
+ * and the visibility columns an edge copies, the audience as its word and its group-id
+ * array (ADR 0039). The shape the re-derive reads back off `concept_index` too, which is
+ * why the row and the delta share it.
+ *
+ * The workspace is the **row's**, as `concept_index` carries it, rather than the principal's:
+ * the write lands under a user principal from the live handler and under the platform's from
+ * the reconciler's replay (ADR 0012's 2026-09-06 amendment), and the platform principal
+ * carries no workspace. A user principal's disagreeing with it would be refused by the
+ * policy rather than landed, which is the audit door's reasoning for the same choice.
  */
 type EdgeSource = {
+  readonly workspaceId: string;
   readonly iri: string;
   readonly kind: string;
   readonly path: string;
@@ -381,12 +388,8 @@ const supersedes = (target: ResolvedTarget, fromKind: string): boolean =>
  * to their kinds and statuses — and reduced to the edges the file makes today. Lineage to
  * one concept is one edge however many `sources[]` entries repeat it.
  */
-const resolveOutgoing = async (
-  principal: UserPrincipal,
-  tx: Tx,
-  concept: EdgeSource,
-): Promise<readonly OutgoingEdge[]> => {
-  const workspaceId = principal.workspaceId;
+const resolveOutgoing = async (tx: Tx, concept: EdgeSource): Promise<readonly OutgoingEdge[]> => {
+  const workspaceId = concept.workspaceId;
   const references = referencesOf(concept);
   const paths = [
     ...new Set(references.flatMap((ref) => ("path" in ref.target ? [ref.target.path] : []))),
@@ -464,14 +467,9 @@ const DERIVED_EDGE_LABELS = [LINKS_TO_LABEL, SUPERSEDES_LABEL, DERIVED_FROM_LABE
  * file's content, which is what the predicate on the edge must be able to withhold — and
  * the derivation's recompute rewrites them with the node's (`writeConceptVisibility`).
  */
-const replaceOutgoingEdges = async (
-  principal: UserPrincipal,
-  gen: number,
-  tx: Tx,
-  concept: EdgeSource,
-): Promise<void> => {
-  const workspaceId = principal.workspaceId;
-  const edges = await resolveOutgoing(principal, tx, concept);
+const replaceOutgoingEdges = async (gen: number, tx: Tx, concept: EdgeSource): Promise<void> => {
+  const workspaceId = concept.workspaceId;
+  const edges = await resolveOutgoing(tx, concept);
   await tx.query(
     `DELETE FROM graph_edge
       WHERE workspace_id = $1 AND gen = $2 AND from_uid = $3 AND label = ANY($4::text[])`,
@@ -519,12 +517,12 @@ const namePattern = (filename: string): string =>
  * no-op `DO UPDATE` is what makes one statement both the create and the read; a full
  * rebuild's flip is an ordinary `UPDATE` of this row and never this door's business.
  */
-const liveGeneration = async (principal: UserPrincipal, tx: Tx): Promise<number> => {
+const liveGeneration = async (workspaceId: string, tx: Tx): Promise<number> => {
   const row = await tx.query<{ live_gen: number }>(
     `INSERT INTO graph_generation (workspace_id, live_gen) VALUES ($1, 1)
      ON CONFLICT (workspace_id) DO UPDATE SET live_gen = graph_generation.live_gen
      RETURNING live_gen`,
-    [principal.workspaceId],
+    [workspaceId],
   );
   const liveGen = row.rows[0]?.live_gen;
   if (liveGen === undefined) throw new Error("the live generation could not be read");
@@ -548,14 +546,18 @@ const liveGeneration = async (principal: UserPrincipal, tx: Tx): Promise<number>
  * store, backfills its inbound path links on its first edit this way. An IRI link needs
  * no re-derive: its edge was made dangling when its file landed, the node upsert
  * completes the path, and the two refreshes put the right kind and label on it.
+ *
+ * The Principal is either kind: a person's, from the live handler, or the platform's, from
+ * the reconciler's replay of a commit whose rows were lost. The workspace the delta lands in
+ * is the row's own (`EdgeSource`), so the two roads write the same statements.
  */
 export const writeConceptDelta = async (
-  principal: UserPrincipal,
+  principal: Principal,
   tx: Tx,
   delta: ConceptDelta,
 ): Promise<void> => {
-  const workspaceId = principal.workspaceId;
-  const gen = await liveGeneration(principal, tx);
+  const workspaceId = delta.workspaceId;
+  const gen = await liveGeneration(workspaceId, tx);
 
   const mapped = await tx.query(
     "SELECT 1 FROM graph_node WHERE workspace_id = $1 AND gen = $2 AND uid = $3",
@@ -601,19 +603,20 @@ export const writeConceptDelta = async (
         AND label IN ('${SUPERSEDES_LABEL}', '${DERIVED_FROM_LABEL}')`,
     [workspaceId, gen, delta.iri, delta.status === CONCEPT_DEPRECATED_STATUS, delta.kind],
   );
-  await replaceOutgoingEdges(principal, gen, tx, delta);
+  await replaceOutgoingEdges(gen, tx, delta);
 
   if (!isNew) return;
   // The concepts whose files name the landed one, by its filename in link-target
   // position: each is re-derived whole, through the same one derivation as its own write.
   const naming = await tx.query<EdgeSource>(
-    `SELECT iri, kind, path, body, frontmatter, published_at AS "publishedAt", sensitivity,
-            audience, audience_groups AS "audienceGroups"
+    `SELECT workspace_id AS "workspaceId", iri, kind, path, body, frontmatter,
+            published_at AS "publishedAt", sensitivity, audience,
+            audience_groups AS "audienceGroups"
        FROM concept_index
       WHERE workspace_id = $1 AND iri <> $2 AND (body ~ $3 OR frontmatter::text ~ $3)`,
     [workspaceId, delta.iri, namePattern(delta.path.split("/").at(-1) ?? delta.path)],
   );
-  for (const row of naming.rows) await replaceOutgoingEdges(principal, gen, tx, row);
+  for (const row of naming.rows) await replaceOutgoingEdges(gen, tx, row);
 };
 
 /** One concept's visibility as the map copies it: the node's, and its outgoing edges'. */

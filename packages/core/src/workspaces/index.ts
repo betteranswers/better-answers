@@ -323,6 +323,34 @@ export const workspacesHeldBy = async (
 };
 
 /**
+ * Every workspace the platform holds, by id — the read the reconciler's periodic head check
+ * is made through (T-056; ADR 0012's 2026-09-06 amendment): one bundle per workspace, and
+ * the check asks each in turn whether its head is ahead of its rows. `workspace` is this
+ * slice's table, so the read is a slice function rather than SQL written in another slice
+ * (ADR 0029; the table-ownership map).
+ *
+ * **Unscoped, through the identity-read door**, for `workspacesHeldBy`'s reason: it runs
+ * for no workspace in particular, and `workspace` is the identity set's last member and
+ * carries no policy (ADR 0009). The platform principal is the principal because the list of
+ * tenants is nobody's tenant data — and the platform is the only principal that may hold it,
+ * which the parameter's type says. A read writes no ledger row.
+ */
+export const workspaceIds = async (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+): Promise<Result<readonly WorkspaceId[], Error>> => {
+  const listed = await attempt(() =>
+    withIdentityRead(platform, door, async (tx) => {
+      const rows = await tx.query<{ id: string }>("SELECT id FROM workspace ORDER BY id");
+      // Parsed at the boundary rather than asserted (ADR 0028), as `workspacesHeldBy` does.
+      return rows.rows.map((row) => boundarySchemas.workspace.select.shape.id.parse(row.id));
+    }),
+  );
+  if (!listed.ok) return err(listed.error);
+  return ok(listed.value);
+};
+
+/**
  * Which workspace does this slug name? The read the *access request* is made through
  * (ADR 0038, T-061): a person who is not a member types the slug their colleague gave
  * them, and the members slice has to turn it into a workspace id before it can scope the

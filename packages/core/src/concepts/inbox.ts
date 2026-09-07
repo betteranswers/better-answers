@@ -20,6 +20,7 @@ import {
   requireAdmin,
   ulid,
   type ActorId,
+  type Principal,
   type PrincipalRefusal,
   type Result,
   type RoleRefusal,
@@ -513,9 +514,13 @@ type PayloadRow = {
  * table: a decided suggestion has been committed or refused and its payload has no reader
  * left, and the function answers a suggestion of another workspace exactly as it answers
  * one nobody minted (migration 0018).
+ *
+ * The Principal is either kind: the deciding Admin's, or the platform's when the reconciler
+ * replays an acceptance whose rows were lost and reads the payload the decision was made
+ * from. The function scopes itself by the transaction, so both read the same way.
  */
 export const payloadFor = async (
-  principal: UserPrincipal,
+  principal: Principal,
   tx: Tx,
   suggestionId: string,
 ): Promise<SuggestionPayload | undefined> => {
@@ -563,15 +568,21 @@ export const suggestionIsWaiting = async (
  * What a merge key resolves to **now**, or nothing — `concept_identity` read in the
  * transaction that is about to act on the answer. The one resolution, so the acceptance
  * path and the summary can never mean two different things by "the target".
+ *
+ * The Principal is either kind. A user principal's workspace is named in the statement, so a
+ * disagreement with the transaction's scope is refused by the policy rather than read; the
+ * platform principal carries none, so the scope alone says which workspace is read — the
+ * audit door's shape, for the reconciler's replay of a commit whose rows were lost.
  */
 export const targetOfMergeKey = async (
-  principal: UserPrincipal,
+  principal: Principal,
   tx: Tx,
   mergeKey: string,
 ): Promise<string | undefined> => {
   const found = await tx.query<{ iri: string }>(
-    "SELECT iri FROM concept_identity WHERE workspace_id = $1 AND merge_key = $2",
-    [principal.workspaceId, mergeKey],
+    `SELECT iri FROM concept_identity
+      WHERE workspace_id = COALESCE($1::text, (select current_workspace_id())) AND merge_key = $2`,
+    [principal.kind === "user" ? principal.workspaceId : null, mergeKey],
   );
   return found.rows[0]?.iri;
 };
