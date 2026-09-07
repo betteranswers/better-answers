@@ -1,0 +1,29 @@
+packages/core/test/concepts.test.ts
+  s_6181fc5a558822::t_dcafddfe46f83b 369-371
+  s_6181fc5a558822::t_41fc14d9e1ea93 365-368
+packages/schema/src/concept-tables.ts
+  s_6181fc5a558822::t_e54174ac1b9af8 111-158
+packages/schema/src/boundary-schemas.ts
+  s_6181fc5a558822::t_105cdccb6974ab 322-326,328-329
+  s_6181fc5a558822::t_8ec96b93d65850 16
+packages/core/src/concepts/index.ts
+  s_6181fc5a558822::t_2e7710c3b10b16 6
+  s_6181fc5a558822::t_808d39bc67a9c6 254-257,259
+  s_6181fc5a558822::t_66d8a8597997e5 272
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "934f24e2edbaffbb8ef10a91dc3918503265d366",
+  "prompts": {},
+  "sessions": {
+    "s_6181fc5a558822": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6019b35b-37fc-4524-aa66-a5eb72515b67",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
