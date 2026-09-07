@@ -1,0 +1,113 @@
+packages/core/test/graph.test.ts
+  s_127243e02256ac::t_be67aacd421ecd 4-9,139-142
+  s_127243e02256ac::t_2e5d1b430ee20e 1-3,10-138,143-235
+packages/schema/src/graph-tables.ts
+  s_127243e02256ac::t_be67aacd421ecd 2
+  s_127243e02256ac::t_fed8330c13dc9f 1,3,5-76,118-141,143-146,148-149,151-153,155-173,175-181,183-185,187-199
+  s_127243e02256ac::t_f8dbb3aa4a4366 4,77-117,142,147,150,154,174,182,186
+packages/schema/src/index.ts
+  s_127243e02256ac::t_0530b07b176b9f 4
+packages/core/test/suite-postgres.ts
+  s_127243e02256ac::t_e0ca218fc2e6b4 2,5-6
+  s_127243e02256ac::t_8c045f5ea00a67 36-55
+packages/core/test/concepts.test.ts
+  s_127243e02256ac::t_4e43b47aaeaed8 24
+  s_127243e02256ac::t_3642a32d968c69 41
+  s_127243e02256ac::t_b38df46dbc7c68 403-428,445-536
+  s_127243e02256ac::t_688b95e8068533 293-296
+  s_127243e02256ac::t_be67aacd421ecd 429-444
+  s_127243e02256ac::t_15824ac2438c8f 181-183
+  s_127243e02256ac::t_4d7c6ca0bad4ff 199,202
+packages/schema/src/column-helpers.ts
+  s_127243e02256ac::t_83dd1283be9fb8 1-14
+packages/core/package.json
+  s_127243e02256ac::t_5f7df95bf3c04a 21-22
+packages/schema/migrations/0016_graph-tables.sql
+  s_127243e02256ac::t_53d5b801f98886 1-99
+packages/schema/test/boundary-schemas.test.ts
+  s_127243e02256ac::t_bdd3f38e75c5ea 266-317
+  s_127243e02256ac::t_8b08c025d7c413 538-550
+  s_127243e02256ac::t_4bc39ef6d662f2 449-453
+packages/schema/migrations/meta/0016_snapshot.json
+  s_127243e02256ac::t_3f0f2fcbeedb39 1-3323
+packages/schema/migrations/meta/_journal.json
+  s_127243e02256ac::t_3f0f2fcbeedb39 116-122
+packages/core/src/concepts/index.ts
+  s_127243e02256ac::t_5b3cd59a6b041d 62-64
+  s_127243e02256ac::t_067e0abd8fd6f2 9
+  s_127243e02256ac::t_7a2d0d5635fc81 234-237
+  s_127243e02256ac::t_5ad059d8fb02f3 556
+  s_127243e02256ac::t_44adfd639d083e 565-566,570
+  s_127243e02256ac::t_4fa6002bd20f26 626-639
+  s_127243e02256ac::t_62060c565580a9 38
+  s_127243e02256ac::t_fb55f1a4b0d4f8 530,537
+knip.config.ts
+  s_127243e02256ac::t_45d6d33f3bc12b 57-62
+apps/api/tests/ops.test.ts
+  s_127243e02256ac::t_60f83f11aa9bec 91-109,111-114
+packages/schema/src/concept-tables.ts
+  s_127243e02256ac::t_4ad172668822ea 160-183
+  s_127243e02256ac::t_eacbea0bb984ce 216-217
+  s_127243e02256ac::t_a667262e9f8fa2 12
+packages/schema/src/boundary-schemas.ts
+  s_127243e02256ac::t_e49d8de080a3d2 27-34
+  s_127243e02256ac::t_5cf1b9f19defd1 515
+  s_127243e02256ac::t_8ff7f0b183c010 422
+  s_127243e02256ac::t_b9824eec618bf6 516-517,519-521,523,526-531,533,541,543-546
+  s_127243e02256ac::t_ce23b26fe21cb7 660-677
+  s_127243e02256ac::t_d96220821e51d2 481-514,518,522,524-525,532,534-540,542,547-552
+  s_127243e02256ac::t_38eb1656cb6440 140-151,159
+packages/core/src/store/graph/index.ts
+  s_127243e02256ac::t_be67aacd421ecd 215-220
+  s_127243e02256ac::t_ac9018c4e4df11 1-3,5-10,12-15,17-23,25-40,44-55,57-171,173-189,191-214,221-243,245-269,271-319,322-327,330-495,497-508
+  s_127243e02256ac::t_e6543319cc5ddb 172
+  s_127243e02256ac::t_62f181df1df807 270
+  s_127243e02256ac::t_4c8792493b537b 328-329
+  s_127243e02256ac::t_3c9bf8988b5c98 4
+  s_127243e02256ac::t_f9d0c8c57dd908 244
+  s_127243e02256ac::t_cc2a9dead9a8bd 41-43,56
+  s_127243e02256ac::t_75889f8ee96601 11
+  s_127243e02256ac::t_c2608e713f446b 190
+  s_127243e02256ac::t_c6b03e9715dd60 320-321
+packages/core/src/access/index.ts
+  s_127243e02256ac::t_0a024c40bca67c 8-15,17-20
+apps/worker/src/better_answers_worker/schema_view.py
+  s_127243e02256ac::t_256eb16271ad52 9,109-136
+packages/schema/src/table-ownership.ts
+  s_127243e02256ac::t_fb2fe3dc837b76 47,50-52,54
+  s_127243e02256ac::t_aa538b72c0819a 106-113
+  s_127243e02256ac::t_a6423c92a66090 33-36
+  s_127243e02256ac::t_d7f7ca19a704b1 226-253
+packages/schema/test/factory.ts
+  s_127243e02256ac::t_ab5508da5c1d6b 449-518
+  s_127243e02256ac::t_6122a04ff8634b 108,112-123
+  s_127243e02256ac::t_be67aacd421ecd 109-111
+  s_127243e02256ac::t_bbfbab2d7fbec9 539-541
+packages/schema/test/rls.test.ts
+  s_127243e02256ac::t_0551433753a739 936,940
+  s_127243e02256ac::t_5d4343f4745ec4 751-753,757-759
+  s_127243e02256ac::t_1109d561c8146c 55-67
+  s_127243e02256ac::t_cc877480d2cd50 931-933,938
+  s_127243e02256ac::t_5c16d821dfb835 908-930,934-935,937,939,941-1036,1039-1040,1042-1062
+  s_127243e02256ac::t_8a1de9a28061a6 1037-1038,1041
+packages/schema/test/migration-ownership.test.ts
+  s_127243e02256ac::t_648ca39faf3087 17-23
+packages/core/src/answering/index.ts
+  s_127243e02256ac::t_ef771bae8860dc 346-349
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e2b90cbd956b5f43a56d7ef5471a33ef3a8f320a",
+  "prompts": {},
+  "sessions": {
+    "s_127243e02256ac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c7e92e84-0713-4b5c-8861-c989df4466c0",
+        "model": "claude-fable-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
