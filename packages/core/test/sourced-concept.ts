@@ -11,9 +11,8 @@ import {
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { addToGroup, createGroup } from "../src/members/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
-import { bundlesForSuite } from "./bundle.ts";
-import { postgresForSuite, readingAs } from "./suite-postgres.ts";
-import { arrangeWorkspace, type Scenario } from "./workspace-with-bundle.ts";
+import { readingAs } from "./suite-postgres.ts";
+import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 /**
  * The arrange block of every suite about *who may see a concept* (T-055), written once: a
@@ -26,15 +25,14 @@ import { arrangeWorkspace, type Scenario } from "./workspace-with-bundle.ts";
  */
 
 /**
- * A suite's footing, registered once per file: one migrated Postgres, one bundle root, a
- * provisioned workspace per test, and a read as somebody the way a transport makes it.
+ * The write path's footing (`suiteWithBundles`) plus the one thing every visibility suite
+ * adds to it: a read as somebody, the way a transport makes it.
  */
 export const visibilitySuite = () => {
-  const db = postgresForSuite();
-  const bundles = bundlesForSuite();
+  const { db, arrange } = suiteWithBundles();
   return {
     db,
-    arrange: (): Promise<Scenario> => arrangeWorkspace(db(), bundles()),
+    arrange,
     reading: <T>(
       principal: UserPrincipal,
       work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
@@ -138,28 +136,24 @@ export const conceptCiting = async (
   sequence += 1;
   const path = overrides.path ?? `knowledge/sourced-${sequence}.md`;
   const title = overrides.title ?? `Sourced note ${sequence}`;
-  const written = await writeConcept(
-    writer,
-    { git: scenario.git, postgres: scenario.postgres },
-    {
-      mergeKey: `note:sourced-${sequence}`,
-      path,
-      kind: "Note",
-      title,
-      frontmatter: { title, type: "Note" },
-      body: `Note ${sequence} rests on what it cites.`,
-      message: `Record sourced note ${sequence}`,
-      author: { name: "Ada Editor", email: "ada@acme.invalid" },
-      expects: { head: await head(writer, scenario.git) },
-      status: "stable",
-      evidence: documents.map((sourceDocumentId, at) => ({
-        sourceDocumentId,
-        locator: `p.${at + 1}`,
-        resource: `Document ${at + 1}`,
-      })),
-      ...overrides,
-    },
-  );
+  const written = await writeConcept(writer, doorsOf(scenario), {
+    mergeKey: `note:sourced-${sequence}`,
+    path,
+    kind: "Note",
+    title,
+    frontmatter: { title, type: "Note" },
+    body: `Note ${sequence} rests on what it cites.`,
+    message: `Record sourced note ${sequence}`,
+    author: { name: "Ada Editor", email: "ada@acme.invalid" },
+    expects: { head: await head(writer, scenario.git) },
+    status: "stable",
+    evidence: documents.map((sourceDocumentId, at) => ({
+      sourceDocumentId,
+      locator: `p.${at + 1}`,
+      resource: `Document ${at + 1}`,
+    })),
+    ...overrides,
+  });
   if (!written.ok) throw new Error(`the write was refused: ${String(written.error)}`);
   return { ...written.value, path, title };
 };
