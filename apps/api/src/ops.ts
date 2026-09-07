@@ -9,7 +9,8 @@ import { runOps } from "./ops/index.ts";
  * image (`restore-drill.sh`, `restore-production.sh`; ADR 0022). Bootstrap is read once
  * here, as `main.ts` and `migrate.ts` read it, and everything else is an
  * argument. The identity bootstrap is optional: `migrate`'s environment has the
- * database alone, and only `smoke` wants the app hostname.
+ * database alone, and only `smoke` wants the app hostname; the repositories' root is
+ * optional for the same reason, and only `reconcile-watermark` wants it.
  */
 const bootstrap = requireBootstrap("pnpm ops");
 const identity = readIdentityBootstrap();
@@ -28,6 +29,7 @@ const exitCode = await runOps(process.argv.slice(2), pool, {
     process.stdout.write(`${line}\n`);
   },
   appHostname: identity.ok ? identity.value.hostnames.app : undefined,
+  gitStoreDir: bootstrap.gitStoreDir,
 }).finally(() => pool.end());
 
 process.exit(exitCode);

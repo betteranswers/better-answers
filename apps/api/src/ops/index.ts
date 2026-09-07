@@ -1,5 +1,7 @@
 import type { Pool } from "pg";
 
+import { RECONCILER, reconcile } from "@better-answers/core/concepts";
+import { openGit } from "@better-answers/core/store/git";
 import { openPostgres, tablesPresent } from "@better-answers/core/store/postgres";
 
 /**
@@ -42,6 +44,11 @@ export type OpsIo = {
   readonly say: (line: string) => void;
   /** The app hostname the smoke test sends as `Host` when it is reached on the loopback. */
   readonly appHostname?: string | undefined;
+  /**
+   * The bare repositories' root (`GIT_STORE_DIR`), for `reconcile-watermark`: the one
+   * command that opens a bundle. Absent, it refuses rather than guessing a path.
+   */
+  readonly gitStoreDir?: string | undefined;
 };
 
 /** `pg-20260903T020500Z` (a dump stamp) or any ISO 8601 instant, as a Date. */
@@ -84,7 +91,7 @@ const NEEDS = {
   "graph-rebuild": ["graph_node", "graph_edge"],
   "graph-sweep": ["graph_node", "graph_edge"],
   "graph-counts": ["graph_node", "graph_edge"],
-  "reconcile-watermark": ["concept_index"],
+  "reconcile-watermark": ["concept_index", "bundle_commit"],
   "object-store-orphans": ["source_document"],
   "erasure-rehearsal": ["erasure_request", "suppression"],
 } as const;
@@ -95,7 +102,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   replay-erasures --since <dump stamp | ISO instant>      re-apply every erasure completed after a dump (mandatory in every restore)
   graph-rebuild | graph-sweep --workspace <id> [--wait]    the graph as a repair path (ADR 0023, 0032)
   graph-counts --workspace <id>                             nodes per label and edges, as JSON, for the drill's diff (the graph slice's)
-  reconcile-watermark --workspace <id>                      recovery order step 2
+  reconcile-watermark --workspace <id>                      recovery order step 2: replay the commits the rows missed (ADR 0012)
   object-store-orphans --workspace <id> [--list]            recovery order step 5
   smoke --url <origin> [--workspace <id>] [--find] [--guide] [--ask]
   erasure-rehearsal --workspace <id> --synthetic --report <file>
@@ -237,6 +244,7 @@ const sliceCommand = async (
     );
     return NOT_BUILT;
   }
+  if (command === "reconcile-watermark") return reconcileWatermark(pool, workspaceId, io);
   // The tables exist, so the slice has landed and its own query module answers this —
   // never SQL written here: the api tier is transports, and a tenant read belongs to
   // `packages/core` (ADR 0029). Until that module is wired in, refusing is the honest answer.
@@ -244,6 +252,53 @@ const sliceCommand = async (
     `${command}: REFUSED — its tables exist but this image carries no implementation; the slice's task fills it in`,
   );
   return REFUSED;
+};
+
+/** A refusal's word, or a store's own failure, as one line says it. */
+const reasonOf = (reason: string | Error): string =>
+  typeof reason === "string" ? reason : reason.message;
+
+/**
+ * The reconciler on demand — the restore path (ADR 0012, amended 2026-09-06; T-006 spec,
+ * *Ops and the budget*): after a database is restored from a dump, the repository is ahead
+ * of it, and this replays what the rows missed through the same slice function the app's
+ * periodic head check runs. Under the reconciler's own principal and never a person's
+ * (`[SEC2]`): the command takes no actor, because recovery is booked to nobody.
+ *
+ * *Done* is the rows and the bundle agreeing when the run ends, with what it took to get
+ * there in the line. *Refused* is anything else the operator has to look at: no root to open
+ * the bundle from, a bundle that is not there or whose history the rows disagree with, or a
+ * commit the index would not take — the run lands everything before that commit, stops,
+ * names it, and that workspace is stuck behind it until a person acts (ADR 0012, amended
+ * 2026-09-07). It is never skipped, so a stop is a refusal and the drill halts on it.
+ */
+const reconcileWatermark = async (pool: Pool, workspaceId: string, io: OpsIo): Promise<number> => {
+  if (io.gitStoreDir === undefined) {
+    io.say(
+      "reconcile-watermark: REFUSED — no repositories' root is configured (GIT_STORE_DIR), so the bundle cannot be opened; the estate sets it to /data/git on the api service",
+    );
+    return REFUSED;
+  }
+  const doors = { git: openGit(io.gitStoreDir), postgres: openPostgres(pool) };
+  const run = await reconcile(RECONCILER, doors, { workspaceId });
+  if (!run.ok) {
+    if (run.error === "malformed") {
+      io.say(`reconcile-watermark: --workspace ${workspaceId} is not a workspace id`);
+      return USAGE;
+    }
+    io.say(`reconcile-watermark: REFUSED — ${reasonOf(run.error)}`);
+    return REFUSED;
+  }
+  const { head, watermark, replayed, skipped, stopped } = run.value;
+  const found = `head ${head ?? "none"}, watermark ${watermark ?? "none"}, replayed ${replayed.length}, already landed ${skipped.length}`;
+  if (stopped !== undefined) {
+    io.say(
+      `reconcile-watermark: REFUSED — stopped at ${stopped.sha} (${reasonOf(stopped.reason)}); ${found}; every commit before it landed and nothing after it was attempted, and this workspace stays behind that commit until a person acts (ADR 0012)`,
+    );
+    return REFUSED;
+  }
+  io.say(`reconcile-watermark: done — ${found}`);
+  return DONE;
 };
 
 const isSliceCommand = (command: string): command is SliceCommand => command in NEEDS;
