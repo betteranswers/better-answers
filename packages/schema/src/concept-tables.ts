@@ -234,34 +234,27 @@ export const CONCEPT_STABLE_STATUS = "stable" satisfies (typeof PUBLISHED_STATUS
 export const CONTENT_HASH = /^[0-9a-f]{64}$/;
 
 /**
- * How large a concept's frontmatter may be, **as the boundary measures it**: the length of
- * `JSON.stringify`'s compact form. OKF's keys plus whatever else the file carried is open by
- * design (ADR 0019), so nothing about the shape bounds it — and a caller who chooses the
- * size of what the platform stores is the defect `SUGGESTION_BODY_MAX` closes for the body.
- * Sixty-four thousand characters is a wide margin over a `sources[]` list a person would
- * ever write.
+ * How large a concept's frontmatter may be, measured **as the sender wrote it** — the length
+ * of the JSON text a caller serialized. OKF's keys plus whatever else the file carried is
+ * open by design (ADR 0019), so nothing about the shape bounds it, and a caller who chooses
+ * the size of what the platform stores is the defect `SUGGESTION_BODY_MAX` closes for the
+ * body. Sixty-four thousand characters is a wide margin over a `sources[]` list a person
+ * would ever write.
+ *
+ * **One number and one measurement, in two places that measure the same characters**: the
+ * boundary, where a caller is told; and `submit_suggestion_set`, which is the only road to a
+ * payload row (both runtime roles hold `REVOKE ALL` on the table) and which takes the
+ * frontmatter as the caller's own text so that it can measure exactly that.
+ *
+ * There is deliberately **no CHECK over the stored `jsonb`**. A row can only measure what
+ * Postgres renders, and a rendering is not the sender's text within any multiplier:
+ * `{"a":1e-100}` is twelve characters sent and a hundred and nine read back, because `jsonb`
+ * keeps a numeric and prints it in full. A CHECK over the rendering would refuse payloads the
+ * boundary had already passed — a backstop that fires on good input is worse than none —
+ * and it would be guarding a storage cost that is not there, since the numeric it renders
+ * long is stored short.
  */
 export const CONCEPT_FRONTMATTER_MAX = 64_000;
-
-/**
- * The same bound **as a row can measure it**, which is a different measurement and so a
- * different number. Postgres stores `jsonb` and reads it back canonically — keys sorted, a
- * space after every `:` and every `,` — and `char_length` counts code points, where
- * JavaScript's `.length` counts UTF-16 units. So a frontmatter the boundary accepts can be
- * longer at the row, and a row CHECK set to the same number would refuse it in the store's
- * words after the friendly refusal had already passed it.
- *
- * Twice is the ceiling and not a guess: every space canonical output adds sits against a
- * `:` or a `,` that is already one character of the compact form, so the canonical text is
- * at most twice as long — and the two differences that run the other way (a surrogate pair
- * counting two in JavaScript and one code point here, a number Postgres writes shorter) only
- * make the row's measurement smaller.
- *
- * **This is a backstop, never the bound.** The bound a caller is refused by is
- * `CONCEPT_FRONTMATTER_MAX`; this is what stops a producer reaching the row through the
- * definer function, which no boundary stands in front of.
- */
-export const CONCEPT_FRONTMATTER_ROW_MAX = CONCEPT_FRONTMATTER_MAX * 2;
 
 // `listed` and `stamp` are `column-helpers.ts`'s, shared with the graph and inbox tables so
 // the files cannot drift on how a CHECK's list or an instant is written.

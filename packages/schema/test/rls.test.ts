@@ -5,7 +5,6 @@ import { declaredTableNames } from "../scripts/worker-view.ts";
 import {
   boundarySchemas,
   CONCEPT_FRONTMATTER_MAX,
-  CONCEPT_FRONTMATTER_ROW_MAX,
   EXEMPT_TABLE_NAMES,
   FAMILIES,
   IDENTITY_SET,
@@ -1310,7 +1309,7 @@ describe("the inbox under app_rt", () => {
               path: `knowledge/${ulid().toLowerCase()}.md`,
               concept_kind: "Policy",
               title: "Expenses",
-              frontmatter: {},
+              frontmatter: "{}",
               body: "Expenses are claimed within thirty days.",
               base_content_hash: null,
             },
@@ -1374,7 +1373,7 @@ describe("the inbox under app_rt", () => {
               path: "knowledge/expenses.md",
               concept_kind: "Policy",
               title: "Expenses",
-              frontmatter: { title: "Expenses" },
+              frontmatter: '{"title":"Expenses"}',
               body: "Expenses are claimed within thirty days.",
               base_content_hash: null,
             },
@@ -1396,7 +1395,7 @@ describe("the inbox under app_rt", () => {
         path: `knowledge/${ulid().toLowerCase()}.md`,
         concept_kind: "Policy",
         title: "Expenses",
-        frontmatter: {},
+        frontmatter: "{}",
         body: "body",
         base_content_hash: null,
       });
@@ -1537,40 +1536,72 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("refuses a payload larger than a concept could be, at the row, in both of its open columns", async () => {
+  it("refuses a body larger than a concept could be, at the row", async () => {
     // Straight SQL rather than the factory, which would refuse it at the boundary before
     // any INSERT existed: the claim here is the database's own, because the row is written
     // by a definer function both tiers call and no boundary stands in front of that.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const here = await seed.suggestion({ workspaceId: WS_A });
-      const write = (frontmatter: string, body: string) =>
+
+      // A concept is a fact stated once, not a document; a producer writes this column, so
+      // the size is somebody else's to bound. Its `frontmatter` neighbour is bounded in
+      // `submit_suggestion_set` instead, and the test below says why.
+      await expect(
         client.query(
           `INSERT INTO concept_write_request
              (workspace_id, suggestion_id, merge_key, path, concept_kind, title, frontmatter, body)
-           VALUES ($1, $2, 'policy:big', 'knowledge/big.md', 'Policy', 'Big', $3::jsonb, $4)`,
-          [WS_A, here.id, frontmatter, body],
-        );
+           VALUES ($1, $2, 'policy:big', 'knowledge/big.md', 'Policy', 'Big', '{}'::jsonb, $3)`,
+          [WS_A, here.id, "x".repeat(SUGGESTION_BODY_MAX + 1)],
+        ),
+      ).rejects.toThrow(/concept_write_request_body_length_check/);
+    });
+  });
 
-      // A concept is a fact stated once, not a document; and its frontmatter is open by
-      // design (ADR 0019), so its shape bounds nothing either. A producer writes both
-      // columns, so the size of each is somebody else's to bound.
-      await client.query("SAVEPOINT sized");
-      await expect(write("{}", "x".repeat(SUGGESTION_BODY_MAX + 1))).rejects.toThrow(
-        /concept_write_request_body_length_check/,
-      );
-      await client.query("ROLLBACK TO SAVEPOINT sized");
+  it("bounds a frontmatter by the characters its sender wrote, at the one road to the row (migration 0018)", async () => {
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const submit = (frontmatter: unknown) =>
+        client.query("SELECT * FROM submit_suggestion_set($1, 'candidate', $2, $3::jsonb)", [
+          ulid(),
+          "better-answers-extraction/1.2",
+          JSON.stringify([
+            {
+              suggestion_id: ulid(),
+              merge_key: `policy:${ulid().toLowerCase()}`,
+              path: `knowledge/${ulid().toLowerCase()}.md`,
+              concept_kind: "Policy",
+              title: "Expenses",
+              frontmatter,
+              body: "Expenses are claimed within thirty days.",
+              base_content_hash: null,
+            },
+          ]),
+        ]);
 
-      // The row's bound is the wider backstop, not the boundary's number: a frontmatter
-      // between the two is one the boundary already refused, and only a caller that went
-      // round the boundary — a producer reaching the definer function — gets this far.
-      const underTheBackstop = JSON.stringify({ title: "x".repeat(CONCEPT_FRONTMATTER_MAX) });
-      expect((await write(underTheBackstop, "b")).rowCount).toBe(1);
-      await client.query("ROLLBACK TO SAVEPOINT sized");
+      // **The rendering is not the sender's text, within any multiplier.** A `jsonb` column
+      // read back with `::text` is Postgres's own printing of it — `{"a":1e-100}` is twelve
+      // characters sent and a hundred and nine read back, and a number may carry a scale of
+      // sixteen thousand — so a bound over the rendering would refuse payloads the boundary
+      // had already passed. The frontmatter therefore arrives as the caller's own JSON text
+      // and is measured as sent, here, which is the only road to the row.
+      const wide = JSON.stringify({ a: 1e-100, title: "Expenses" });
+      expect(wide.length).toBeLessThan(CONCEPT_FRONTMATTER_MAX);
+      expect((await submit(wide)).rowCount).toBe(1);
 
+      await client.query("SAVEPOINT frontmatter");
       await expect(
-        write(JSON.stringify({ title: "x".repeat(CONCEPT_FRONTMATTER_ROW_MAX) }), "b"),
-      ).rejects.toThrow(/concept_write_request_frontmatter_length_check/);
+        submit(JSON.stringify({ title: "x".repeat(CONCEPT_FRONTMATTER_MAX) })),
+      ).rejects.toThrow(/frontmatter is the caller's own JSON text/);
+      await client.query("ROLLBACK TO SAVEPOINT frontmatter");
+
+      // And an object where the text belongs: refused rather than quietly rendered, which
+      // would be the measurement this function exists to avoid.
+      await expect(submit({ title: "Expenses" })).rejects.toThrow(
+        /frontmatter is the caller's own JSON text/,
+      );
     });
   });
 

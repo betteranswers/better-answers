@@ -26,7 +26,7 @@
         "path": "knowledge/expenses.md",
         "concept_kind": "Policy",
         "title": "Expenses",
-        "frontmatter": { "title": "Expenses", "type": "Policy" },
+        "frontmatter": "{\"title\":\"Expenses\",\"type\":\"Policy\"}",
         "body": "Expenses are claimed within sixty days.",
         "base_content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       },
@@ -36,7 +36,7 @@
         "path": "knowledge/expenses-restated.md",
         "concept_kind": "Policy",
         "title": "Expenses, restated",
-        "frontmatter": { "title": "Expenses, restated", "type": "Policy" },
+        "frontmatter": "{\"title\":\"Expenses, restated\",\"type\":\"Policy\"}",
         "body": "Expenses are claimed within ninety days.",
         "base_content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       },
@@ -46,7 +46,7 @@
         "path": "knowledge/travel.md",
         "concept_kind": "Policy",
         "title": "Travel",
-        "frontmatter": { "title": "Travel", "type": "Policy" },
+        "frontmatter": "{\"title\":\"Travel\",\"type\":\"Policy\"}",
         "body": "Travel is booked fourteen days ahead.",
         "base_content_hash": null
       }
@@ -121,42 +121,42 @@
       "why": "a repair is the platform running its own citation repair: accepting one re-points every standing check at the content it wrote, so nobody but a platform process may raise one",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
-      "statement": "SELECT * FROM submit_suggestion_set('01J6R2AAAAAAAAAAAAAAAAAAAA', 'repair', 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', '[{\"suggestion_id\": \"01J6S4DDDDDDDDDDDDDDDDDDDD\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": {}, \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R2AAAAAAAAAAAAAAAAAAAA', 'repair', 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', '[{\"suggestion_id\": \"01J6S4DDDDDDDDDDDDDDDDDDDD\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"{}\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
       "sqlstate": "23514"
     },
     {
       "why": "an *edit* is a person's own change, offered through the app: the kind and the proposer are both the caller's words, so a producer that could raise one could put a change in a person's name into the queue an Admin decides from",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
-      "statement": "SELECT * FROM submit_suggestion_set('01J6R5AAAAAAAAAAAAAAAAAAAA', 'edit', 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', '[{\"suggestion_id\": \"01J6S6FFFFFFFFFFFFFFFFFFFF\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": {}, \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R5AAAAAAAAAAAAAAAAAAAA', 'edit', 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', '[{\"suggestion_id\": \"01J6S6FFFFFFFFFFFFFFFFFFFF\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"{}\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
       "sqlstate": "42501"
     },
     {
       "why": "a *candidate* is what a run found, so an app that could raise one could put work no run did into the queue an Admin decides from",
       "role": "app_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
-      "statement": "SELECT * FROM submit_suggestion_set('01J6R8AAAAAAAAAAAAAAAAAAAA', 'candidate', 'better-answers-extraction/1.2', '[{\"suggestion_id\": \"01J6S9JJJJJJJJJJJJJJJJJJJJ\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": {}, \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R8AAAAAAAAAAAAAAAAAAAA', 'candidate', 'better-answers-extraction/1.2', '[{\"suggestion_id\": \"01J6S9JJJJJJJJJJJJJJJJJJJJ\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"{}\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
       "sqlstate": "42501"
     },
     {
       "why": "the platform's own citation repair is a routine the worker runs, and not a set the app may raise",
       "role": "app_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
-      "statement": "SELECT * FROM submit_suggestion_set('01J6R6AAAAAAAAAAAAAAAAAAAA', 'repair', 'process:better-answers-citation-repair', '[{\"suggestion_id\": \"01J6S7GGGGGGGGGGGGGGGGGGGG\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": {}, \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R6AAAAAAAAAAAAAAAAAAAA', 'repair', 'process:better-answers-citation-repair', '[{\"suggestion_id\": \"01J6S7GGGGGGGGGGGGGGGGGGGG\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"{}\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
       "sqlstate": "42501"
     },
     {
-      "why": "a payload's frontmatter is open by design, so its shape bounds nothing: the row's backstop is what stops a producer reaching past the boundary and choosing how much the platform stores",
+      "why": "a payload's frontmatter is open by design, so its shape bounds nothing: the submit function measures the characters the caller wrote, which is the one place the sender's own serialization still exists",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
-      "statement": "SELECT * FROM submit_suggestion_set('01J6R7AAAAAAAAAAAAAAAAAAAA', 'candidate', 'better-answers-extraction/1.2', jsonb_build_array(jsonb_build_object('suggestion_id', '01J6S8HHHHHHHHHHHHHHHHHHHH', 'merge_key', 'policy:expenses', 'path', 'knowledge/expenses.md', 'concept_kind', 'Policy', 'title', 'Expenses', 'frontmatter', jsonb_build_object('title', repeat('x', 130000)), 'body', 'b', 'base_content_hash', NULL)))",
-      "sqlstate": "23514"
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R7AAAAAAAAAAAAAAAAAAAA', 'candidate', 'better-answers-extraction/1.2', jsonb_build_array(jsonb_build_object('suggestion_id', '01J6S8HHHHHHHHHHHHHHHHHHHH', 'merge_key', 'policy:expenses', 'path', 'knowledge/expenses.md', 'concept_kind', 'Policy', 'title', 'Expenses', 'frontmatter', '{\"title\":\"' || repeat('x', 64000) || '\"}', 'body', 'b', 'base_content_hash', NULL)))",
+      "sqlstate": "22023"
     },
     {
       "why": "an actor of no known form is not a proposer, however a producer spells it",
       "role": "app_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
-      "statement": "SELECT * FROM submit_suggestion_set('01J6R3AAAAAAAAAAAAAAAAAAAA', 'edit', 'ada@acme.invalid', '[{\"suggestion_id\": \"01J6S5EEEEEEEEEEEEEEEEEEEE\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": {}, \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
+      "statement": "SELECT * FROM submit_suggestion_set('01J6R3AAAAAAAAAAAAAAAAAAAA', 'edit', 'ada@acme.invalid', '[{\"suggestion_id\": \"01J6S5EEEEEEEEEEEEEEEEEEEE\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"{}\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
       "sqlstate": "23514"
     },
     {

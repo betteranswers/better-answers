@@ -3,7 +3,7 @@ import { check, foreignKey, index, jsonb, primaryKey, text } from "drizzle-orm/p
 
 import { ACTOR_ID_PATTERN, PLATFORM_ACTOR_PREFIX } from "./actor-id.ts";
 import { listed, stamp } from "./column-helpers.ts";
-import { CONCEPT_FRONTMATTER_ROW_MAX, conceptIdentity } from "./concept-tables.ts";
+import { conceptIdentity } from "./concept-tables.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -268,15 +268,12 @@ export const conceptWriteRequest = withRLS(
       "concept_write_request_body_length_check",
       sql.raw(`char_length(body) <= ${SUGGESTION_BODY_MAX}`),
     ),
-    // The **backstop** over the other column a producer fills, and deliberately a wider
-    // number than the boundary's: frontmatter is open by design (ADR 0019) so its shape
-    // bounds nothing, and this row is written by a definer function both tiers call — past
-    // every boundary the app parses through. `CONCEPT_FRONTMATTER_ROW_MAX` says why the two
-    // numbers differ; what matters here is that a caller is refused at the boundary and
-    // only a caller that went round it ever reaches this.
-    check(
-      "concept_write_request_frontmatter_length_check",
-      sql.raw(`char_length(frontmatter::text) <= ${CONCEPT_FRONTMATTER_ROW_MAX}`),
-    ),
+    // The other open column a producer fills — `frontmatter` — is bounded inside
+    // `submit_suggestion_set` and **not here**, because a row can only measure Postgres's
+    // rendering of the `jsonb` and that is not the sender's text within any multiplier
+    // (`CONCEPT_FRONTMATTER_MAX` says why, and why a CHECK over the rendering would refuse
+    // payloads the boundary had already passed). The function is the only road to this
+    // table, so measuring the characters the sender wrote, there, is the whole bound; the
+    // body's bound is here because a `text` column is stored as it was sent.
   ],
 );

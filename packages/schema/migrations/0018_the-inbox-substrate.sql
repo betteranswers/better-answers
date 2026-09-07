@@ -126,6 +126,24 @@ BEGIN
     RAISE EXCEPTION 'submit_suggestion_set: a set carries between one and 500 requests'
       USING ERRCODE = 'invalid_parameter_value';
   END IF;
+  -- **A frontmatter arrives as the caller's own JSON text, and is bounded as the caller
+  -- wrote it** (CONCEPT_FRONTMATTER_MAX in src/concept-tables.ts). It is sent as a string
+  -- rather than as an object so that this function measures the same characters the
+  -- boundary measured: a `jsonb` value read back with `::text` is Postgres's rendering of
+  -- it, not the sender's, and the two are not within any multiplier of each other —
+  -- `{"a":1e-100}` is twelve characters sent and a hundred and nine read back, and a
+  -- number may carry a scale of sixteen thousand. A bound over the rendering would
+  -- therefore refuse payloads the boundary had already passed, which is the one thing a
+  -- backstop must never do. This is the *only* road to the row (both runtime roles hold
+  -- REVOKE ALL on the table), so one measurement here is the whole bound.
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(p_requests) AS e
+     WHERE jsonb_typeof(e -> 'frontmatter') IS DISTINCT FROM 'string'
+        OR char_length(e ->> 'frontmatter') > 64000
+  ) THEN
+    RAISE EXCEPTION 'submit_suggestion_set: a frontmatter is the caller''s own JSON text, of at most 64000 characters'
+      USING ERRCODE = 'invalid_parameter_value';
+  END IF;
 
   -- The proposer's *form*, and the kind a form may raise, are the row's own CHECKs
   -- (`suggestion_proposer_check`, `suggestion_repair_proposer_check`): held where a
@@ -138,11 +156,12 @@ BEGIN
   INSERT INTO public.concept_write_request
          (workspace_id, suggestion_id, merge_key, path, concept_kind, title, frontmatter,
           body, base_content_hash)
+  -- The cast is here and after the bound above, so what was measured is what is stored.
   SELECT v_workspace, r.suggestion_id, r.merge_key, r.path, r.concept_kind, r.title,
-         r.frontmatter, r.body, r.base_content_hash
+         r.frontmatter::jsonb, r.body, r.base_content_hash
     FROM jsonb_to_recordset(p_requests)
       AS r(suggestion_id text, merge_key text, path text, concept_kind text, title text,
-           frontmatter jsonb, body text, base_content_hash text)
+           frontmatter text, body text, base_content_hash text)
   RETURNING suggestion_id;
 END $$;
 --> statement-breakpoint

@@ -288,7 +288,11 @@ export const submitSuggestionSet = async (
               path: payload.path,
               concept_kind: payload.conceptKind,
               title: payload.title,
-              frontmatter: payload.frontmatter,
+              // The frontmatter as **this caller serialized it**, and not as an object the
+              // function would have to render back: the bound the boundary just applied is
+              // over exactly these characters, and Postgres's rendering of the same value
+              // is not within any multiplier of them (migration 0018).
+              frontmatter: JSON.stringify(payload.frontmatter),
               body: payload.body,
               base_content_hash: payload.baseContentHash,
             })),
