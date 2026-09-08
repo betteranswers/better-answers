@@ -3,6 +3,7 @@ import { serve } from "@hono/node-server";
 import { describe, expect, it } from "vitest";
 
 import { writeConcept } from "@better-answers/core/concepts";
+import { systemClock } from "@better-answers/core/kernel";
 import { head, initRepository, openGit } from "@better-answers/core/store/git";
 import { openPostgres, withPrincipal } from "@better-answers/core/store/postgres";
 import { testData } from "@better-answers/schema/testing";
@@ -33,6 +34,7 @@ const ioFor = (app: TestApp, stdin = ""): OpsIo & { readonly lines: string[] } =
     },
     appHostname: APP_HOSTNAME,
     gitStoreDir: app.gitStoreDir,
+    clock: systemClock(),
   };
 };
 
@@ -431,7 +433,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       try {
         const lost = await writeConcept(
           principal.value,
-          { git, postgres: openPostgres(app().database.pool) },
+          { git, postgres: openPostgres(app().database.pool), clock: systemClock() },
           {
             mergeKey: "note:restore-drill",
             path: "knowledge/restore-drill.md",

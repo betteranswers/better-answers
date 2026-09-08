@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { systemClock } from "@better-answers/core/kernel";
 import { initRepository, openGit } from "@better-answers/core/store/git";
 
 import { RECONCILER_INTERVAL_MS, startReconciler } from "../src/reconciler.ts";
@@ -41,6 +42,7 @@ describe("the periodic head check", () => {
       database: app().database.pool,
       gitStoreDir: app().gitStoreDir,
       logger,
+      clock: systemClock(),
     });
 
     // Nothing before the first interval: starting is not a tick.
@@ -70,6 +72,7 @@ describe("the periodic head check", () => {
       database: app().database.pool,
       gitStoreDir: app().gitStoreDir,
       logger,
+      clock: systemClock(),
     });
 
     // The first tick is in flight — it is asking Postgres — when the interval fires again.

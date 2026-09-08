@@ -11,6 +11,7 @@ import {
 } from "@modelcontextprotocol/server";
 import type { Logger } from "pino";
 
+import type { Clock } from "@better-answers/core/kernel";
 import {
   consumeCall,
   consumeIngress,
@@ -60,6 +61,8 @@ export type McpSurfaceDependencies = {
   readonly mcpUrl: string;
   readonly logger: Logger;
   readonly serverVersion: string;
+  /** This process's Clock (ADR 0040): one reading per call, for the counters and the entries. */
+  readonly clock: Clock;
 };
 
 const CEILING_MESSAGE =
@@ -111,7 +114,7 @@ export const createMcpSurface = (
             return refusedResult("This call carried no verified credential.");
           }
           const outcome = await withPrincipal(deps.door, bearer.claims, (principal, tx) =>
-            entry.run(principal, tx, args),
+            entry.run(principal, tx, args, deps.clock.now()),
           );
           if (!outcome.ok) {
             log.warn(
@@ -143,6 +146,7 @@ export const createMcpSurface = (
       "ip",
       clientIpOf(request.headers),
       MCP_UNAUTHENTICATED_IP_RULE,
+      deps.clock.now(),
     );
     return flood.allowed ? undefined : tooManyRequests(flood.retryAfterSeconds, CEILING_MESSAGE);
   };
@@ -176,7 +180,7 @@ export const createMcpSurface = (
     if (bearer === undefined) return bearerAuthChallengeResponse(refused(), challengeOptions);
 
     const gate = await withPrincipal(deps.door, bearer.claims, async (principal, tx) => ({
-      ceiling: await consumeCall(principal, tx, bearer.tokenId, MCP_TOKEN_RULE),
+      ceiling: await consumeCall(principal, tx, bearer.tokenId, MCP_TOKEN_RULE, deps.clock.now()),
       ttl: await readWorkspaceConfig(principal, tx, TOOLS_LIST_TTL_CONFIG_KEY),
     }));
     if (!gate.ok) {

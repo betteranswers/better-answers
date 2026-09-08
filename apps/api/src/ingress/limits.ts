@@ -2,6 +2,7 @@ import { isIPv6 } from "node:net";
 
 import type { MiddlewareHandler } from "hono";
 
+import type { Clock } from "@better-answers/core/kernel";
 import {
   consumeIngress,
   type CounterRule,
@@ -55,9 +56,19 @@ export const tooManyRequests = (retryAfterSeconds: number, description: string):
     { status: 429, headers: { "retry-after": String(retryAfterSeconds) } },
   );
 
-export const limitByIp = (door: PostgresDoor, rule: CounterRule): MiddlewareHandler => {
+export const limitByIp = (
+  door: PostgresDoor,
+  rule: CounterRule,
+  clock: Clock,
+): MiddlewareHandler => {
   return async (context, next) => {
-    const outcome = await consumeIngress(door, "ip", clientIpOf(context.req.raw.headers), rule);
+    const outcome = await consumeIngress(
+      door,
+      "ip",
+      clientIpOf(context.req.raw.headers),
+      rule,
+      clock.now(),
+    );
     if (!outcome.allowed) {
       return tooManyRequests(
         outcome.retryAfterSeconds,

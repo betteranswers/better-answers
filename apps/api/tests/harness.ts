@@ -7,7 +7,7 @@ import type { Hono } from "hono";
 import type { Pool } from "pg";
 import { pino } from "pino";
 
-import type { PlatformPrincipal } from "@better-answers/core/kernel";
+import { systemClock, type Clock, type PlatformPrincipal } from "@better-answers/core/kernel";
 import { openPostgres } from "@better-answers/core/store/postgres";
 import {
   provisionWorkspace,
@@ -201,6 +201,7 @@ export const serverFor = (pool: Pool): Hono =>
     sendEmail: async () => {},
     fetchClientMetadataResource: cimdFixture,
     logger: pino({ level: "silent" }),
+    clock: systemClock(),
   });
 
 /**
@@ -224,6 +225,8 @@ export type TestAppOptions = {
    * code from here, never from the app's logger, which `[LOG1]` forbids from holding one.
    */
   readonly onEmail?: ((message: EmailMessage) => void) | undefined;
+  /** This app's Clock (ADR 0040); a real one unless a test pins its own. */
+  readonly clock?: Clock | undefined;
 };
 
 export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> => {
@@ -260,6 +263,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     },
     logger,
     webRoot: options.webRoot,
+    clock: options.clock ?? systemClock(),
   });
   const door = openPostgres(database.pool);
 

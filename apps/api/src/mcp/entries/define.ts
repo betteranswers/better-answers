@@ -19,7 +19,9 @@ import type { McpScope } from "../../auth/constants.ts";
  *
  * `run` takes the Principal first and the transaction that resolved it; the surface
  * wraps every call in `withPrincipal`, so the role is read in the same transaction as
- * the read the entry does.
+ * the read the entry does. It is handed the surface's Clock's reading last (ADR 0040) —
+ * one instant per call, read once by the surface and never by an entry — for the two
+ * entries that need one; the others simply do not name the parameter.
  */
 
 /** The slices' results are `readonly` throughout; a zod output type is not. This meets them. */
@@ -46,6 +48,7 @@ export type Entry<Input extends z.ZodObject, Output extends z.ZodType> = {
     principal: UserPrincipal,
     tx: Tx,
     args: z.infer<Input>,
+    now: Date,
   ) => Promise<Readonlyish<z.infer<Output>>>;
   /** The text of the result — the human rendering, never `JSON.stringify` of the structure. */
   readonly render: (result: Readonlyish<z.infer<Output>>) => string;

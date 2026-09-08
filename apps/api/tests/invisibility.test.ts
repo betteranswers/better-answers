@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { writeConcept } from "@better-answers/core/concepts";
-import type { UserPrincipal } from "@better-answers/core/kernel";
+import { systemClock, type UserPrincipal } from "@better-answers/core/kernel";
 import { initRepository, openGit } from "@better-answers/core/store/git";
 import { openPostgres, withPrincipal } from "@better-answers/core/store/postgres";
 import { testData } from "@better-answers/schema/testing";
@@ -113,7 +113,7 @@ const restrictedSourcedConcept = async () => {
   await initRepository(git, workspace.workspaceId);
   const written = await writeConcept(
     await principalFor(workspace.workspaceId, workspace.admin.id),
-    { git, postgres: openPostgres(app.database.pool) },
+    { git, postgres: openPostgres(app.database.pool), clock: systemClock() },
     {
       mergeKey: "note:board-remuneration",
       path: "knowledge/board-remuneration.md",

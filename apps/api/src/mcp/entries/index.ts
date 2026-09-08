@@ -82,7 +82,7 @@ const findEntry = defineEntry({
     idempotentHint: true,
     openWorldHint: false,
   },
-  run: async (principal, tx, args) => valueOrThrow(await find(principal, tx, args)),
+  run: async (principal, tx, args, now) => valueOrThrow(await find(principal, tx, args, now)),
   render: renderFind,
 });
 
@@ -177,12 +177,13 @@ const openEntry = defineEntry({
     idempotentHint: true,
     openWorldHint: false,
   },
-  run: async (principal, tx, args) =>
+  run: async (principal, tx, args, now) =>
     valueOrThrow(
       await open(
         principal,
         tx,
         args.iri === undefined ? { locator: args.locator ?? "" } : { iri: args.iri },
+        now,
       ),
     ),
   render: renderOpen,
