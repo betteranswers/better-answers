@@ -1,0 +1,36 @@
+apps/api/tests/provision-worktree.test.ts
+  s_5cc55f18f6b9e2::t_33fe9a6e1d5ff6 77-83
+  s_5cc55f18f6b9e2::t_d73add27f4fcdd 102
+  s_5cc55f18f6b9e2::t_0cfacf318b5487 46-72
+apps/api/tests/check-scripts.test.ts
+  s_5cc55f18f6b9e2::t_b78fe20c230df7 170-185,190-194
+  s_5cc55f18f6b9e2::t_2ddc79ff1101f2 186-189
+docs/agents/mutation-triage.md
+  s_5cc55f18f6b9e2::t_4b19d7cafaed26 1-45
+AGENTS.md
+  s_5cc55f18f6b9e2::t_a3d0059b3f9510 62-65
+.claude/hooks/provision-worktree.sh
+  s_5cc55f18f6b9e2::t_944a19603506f9 11-12,18-24
+  s_5cc55f18f6b9e2::t_ff81b7625b6504 58-72
+CODING_RULES.md
+  s_5cc55f18f6b9e2::t_3f2d972093a743 57-60
+  s_5cc55f18f6b9e2::t_13506de8089b6f 79-82
+apps/api/stryker.config.mjs
+  s_5cc55f18f6b9e2::t_94f49b555f242d 25-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "be08a78a0182f8e8862cd7cd2805255a0d13f297",
+  "prompts": {},
+  "sessions": {
+    "s_5cc55f18f6b9e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "494d3590-8e7e-4928-8a08-4aa57b92c7f0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
