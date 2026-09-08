@@ -7,8 +7,14 @@ import {
   reconcile,
   sweepGraph,
 } from "@better-answers/core/concepts";
+import { enqueueJob, JOB_IS_OVER, jobById, type RebuildReason } from "@better-answers/core/runs";
 import { openGit } from "@better-answers/core/store/git";
-import { openPostgres, tablesPresent } from "@better-answers/core/store/postgres";
+import {
+  openPostgres,
+  tablesPresent,
+  type PostgresDoor,
+} from "@better-answers/core/store/postgres";
+import { FULL_REBUILD_KIND, REBUILD_REASONS } from "@better-answers/schema";
 
 /**
  * The `pnpm ops` commands the estate's restore scripts call (ADR 0022; `restore-drill.sh`,
@@ -94,7 +100,9 @@ const flagValue = (flags: Flags, name: string): string | undefined => {
 
 /** The tables each slice-owned command needs before it can mean anything. */
 const NEEDS = {
-  "graph-rebuild": ["graph_generation", "graph_node", "graph_edge"],
+  // The rebuild needs the queue as well as the map: it is the worker that makes the map
+  // again, and this command puts the job on the queue and waits for the row to say so.
+  "graph-rebuild": ["graph_generation", "graph_node", "graph_edge", "job"],
   "graph-sweep": ["graph_generation", "graph_node", "graph_edge"],
   "graph-counts": ["graph_generation", "graph_node", "graph_edge"],
   "reconcile-watermark": ["concept_index", "bundle_commit"],
@@ -104,9 +112,29 @@ const NEEDS = {
 
 type SliceCommand = keyof typeof NEEDS;
 
+/**
+ * The rebuild's reason when the caller names none. The restore drill is this command's
+ * caller, and ADR 0023 asks every rebuild to say which of six things it happened for; a
+ * command that guessed *first-sync* or left the column empty would put a false reason in a
+ * row an operator reads later.
+ */
+const REBUILD_DEFAULT_REASON = "drill";
+
+/**
+ * How long `--wait` waits, and how often it looks. ADR 0032 promises the rebuild in two
+ * minutes and the drill's report times it against that; ten minutes is the point past which
+ * an operator should be reading the worker's own rows rather than this line, so it is a
+ * refusal and not a longer wait. An estate whose worker is slower says `--wait <seconds>`,
+ * which is the flag's other shape and not a second constant.
+ */
+const WAIT_SECONDS = 600;
+const WAIT_POLL_MS = 2_000;
+
 const USAGE_TEXT = `usage: pnpm ops <command> [options]
   replay-erasures --since <dump stamp | ISO instant>      re-apply every erasure completed after a dump (mandatory in every restore)
-  graph-rebuild --workspace <id> [--wait]                   the graph as a repair path (ADR 0023, 0032)
+  graph-rebuild --workspace <id> [--reason <word>] [--wait [seconds]]   the map made again by the worker (ADR 0023, 0032)
+    --reason  one of ${REBUILD_REASONS.join(" · ")} (default ${REBUILD_DEFAULT_REASON})
+    --wait    poll the job until it is over, ${WAIT_SECONDS} seconds unless another number is given
   graph-sweep --workspace <id>                              delete every generation of the map but the live one
   graph-counts --workspace <id>                             nodes per label and edges, as JSON, for the drill's diff
   reconcile-watermark --workspace <id>                      recovery order step 2: replay the commits the rows missed (ADR 0012)
@@ -252,6 +280,7 @@ const sliceCommand = async (
     return NOT_BUILT;
   }
   if (command === "reconcile-watermark") return reconcileWatermark(pool, workspaceId, io);
+  if (command === "graph-rebuild") return graphRebuildCommand(pool, workspaceId, flags, io);
   if (command === "graph-counts") return graphCountsCommand(pool, workspaceId, io);
   if (command === "graph-sweep") return graphSweepCommand(pool, workspaceId, io);
   // The tables exist, so the slice has landed and its own query module answers this —
@@ -307,6 +336,104 @@ const graphCountsCommand = async (pool: Pool, workspaceId: string, io: OpsIo): P
   const { liveGen, nodes, edges } = counted.value;
   io.say(JSON.stringify({ live_gen: liveGen, nodes, edges }));
   return DONE;
+};
+
+/** `--reason <word>` read as one of ADR 0023's six, or nothing at all. */
+const rebuildReasonOf = (flags: Flags): RebuildReason | undefined => {
+  const given = flagValue(flags, "reason") ?? REBUILD_DEFAULT_REASON;
+  return REBUILD_REASONS.find((reason) => reason === given);
+};
+
+/**
+ * `--wait` in its two shapes: bare, which is the default budget, or a whole number of
+ * seconds. Nothing at all means do not wait; `"malformed"` is a value that is neither.
+ */
+const waitSecondsOf = (flags: Flags): number | "malformed" | undefined => {
+  const given = flags.get("wait");
+  if (given === undefined) return undefined;
+  if (given === true) return WAIT_SECONDS;
+  const seconds = Number(given);
+  return Number.isInteger(seconds) && seconds > 0 ? seconds : "malformed";
+};
+
+const after = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/**
+ * `--wait`: the job polled until it is over or the budget runs out. A rebuild is claimed by
+ * whichever worker is free and runs in that process, so there is nothing here to hold open
+ * and nothing to be notified through — the row is the only place the outcome appears.
+ *
+ * *Done* is the one status that is done. **Failed and poisoned are refusals**, because the
+ * drill's next step diffs this workspace's counts against production's and a map that was
+ * never rebuilt would fail that comparison for the wrong reason; and so is a job still on
+ * the queue when the budget runs out, because a worker that has not claimed a rebuild in ten
+ * minutes is the thing an operator has to look at.
+ */
+const waitForJob = async (
+  door: PostgresDoor,
+  workspaceId: string,
+  jobId: string,
+  seconds: number,
+  io: OpsIo,
+): Promise<number> => {
+  const deadline = Date.now() + seconds * 1_000;
+  const pollMs = Math.min(WAIT_POLL_MS, seconds * 1_000);
+  let job = await jobById(GRAPH_MAINTENANCE, door, { workspaceId, jobId });
+  while (job.ok && !JOB_IS_OVER.includes(job.value.status) && Date.now() < deadline) {
+    await after(Math.min(pollMs, Math.max(deadline - Date.now(), 0)));
+    job = await jobById(GRAPH_MAINTENANCE, door, { workspaceId, jobId });
+  }
+  if (!job.ok) return refused("graph-rebuild", workspaceId, job.error, io);
+  const { status, attempts } = job.value;
+  if (status === "done") {
+    io.say(`graph-rebuild: done — job ${jobId} rebuilt the map on ${counted(attempts, "attempt")}`);
+    return DONE;
+  }
+  const ending = JOB_IS_OVER.includes(status)
+    ? `${status} after ${counted(attempts, "attempt")}; the job's own row says what it found`
+    : `still ${status} after ${counted(seconds, "second")}, so nothing has rebuilt this map`;
+  io.say(`graph-rebuild: REFUSED — job ${jobId} is ${ending}`);
+  return REFUSED;
+};
+
+/**
+ * The map made again (ADR 0023's full rebuild; recovery order step 3). The work is the
+ * worker's and this command does not do it: it puts a `full-rebuild` job on the queue
+ * through the runs slice and answers the id, so the api tier writes no SQL against another
+ * module's table and the rebuild runs in the tier that owns it.
+ */
+const graphRebuildCommand = async (
+  pool: Pool,
+  workspaceId: string,
+  flags: Flags,
+  io: OpsIo,
+): Promise<number> => {
+  const reason = rebuildReasonOf(flags);
+  if (reason === undefined) {
+    io.say(`graph-rebuild: --reason must be one of ${REBUILD_REASONS.join(", ")}`);
+    return USAGE;
+  }
+  const wait = waitSecondsOf(flags);
+  if (wait === "malformed") {
+    io.say("graph-rebuild: --wait takes no value, or a whole number of seconds");
+    return USAGE;
+  }
+  const door = openPostgres(pool);
+  const enqueued = await enqueueJob(GRAPH_MAINTENANCE, door, {
+    workspaceId,
+    kind: FULL_REBUILD_KIND,
+    reason,
+  });
+  if (!enqueued.ok) return refused("graph-rebuild", workspaceId, enqueued.error, io);
+  const { jobId } = enqueued.value;
+  if (wait === undefined) {
+    io.say(`graph-rebuild: done — enqueued ${jobId}`);
+    return DONE;
+  }
+  return waitForJob(door, workspaceId, jobId, wait, io);
 };
 
 /** The drill's report is read by a person, so a noun agrees with what it counts. */

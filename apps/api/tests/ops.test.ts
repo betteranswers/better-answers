@@ -62,6 +62,37 @@ const mapped = async (app: TestApp, workspaceId: string): Promise<void> => {
 /** The one line a graph command answers with, as JSON. */
 const answered = (run: Run): unknown => JSON.parse(run.lines[0] ?? "");
 
+type QueuedJob = { id: string; kind: string; reason: string | null; status: string };
+
+/** Every job on a workspace's queue, read as the superuser so no policy can hide one. */
+const jobsOf = async (app: TestApp, workspaceId: string): Promise<readonly QueuedJob[]> => {
+  const found = await app.database.superuser.query<QueuedJob>(
+    "SELECT id, kind, reason, status FROM job WHERE workspace_id = $1",
+    [workspaceId],
+  );
+  return found.rows;
+};
+
+/**
+ * The worker's end of the job, as a test stands in for it: the row this command queued,
+ * moved to a status it never leaves. The queue's own `claim_job` takes the oldest claimable
+ * job rather than one named by id — it is the worker's protocol and the queue agreement is
+ * where it is proved — so a test that wants *this* job finished moves this job's row, and
+ * what is under test here is the command's reading of a status it did not write.
+ */
+const finishTheJob = async (app: TestApp, workspaceId: string, status: string): Promise<void> => {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
+    const moved = await app.database.superuser.query(
+      `UPDATE job SET status = $2, finished_at = now()
+        WHERE workspace_id = $1 AND status = 'queued'`,
+      [workspaceId, status],
+    );
+    if ((moved.rowCount ?? 0) > 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(`nothing was ever queued in ${workspaceId}`);
+};
+
 describe("pnpm ops — the restore scripts' commands", () => {
   const app = servedApp();
 
@@ -124,21 +155,119 @@ describe("pnpm ops — the restore scripts' commands", () => {
       },
     );
 
-    it.each(["graph-rebuild", "object-store-orphans"])(
+    it.each(["object-store-orphans"])(
       "%s refuses — exit 1 — now its tables are there and the implementation is not",
       async (command) => {
         // T-053 landed the graph tables and T-055 `source_document`, so *not built* has
-        // stopped being true for these commands; T-058 filled in the two graph commands
-        // below, the rebuild waits on the worker's queue and the orphan sweep on the
-        // sources slice. That is exactly the state the third answer is for: the tables
-        // exist and this image has no implementation, which is a refusal a restore must
-        // stop on rather than a silence.
+        // stopped being true for this command; T-058 filled in the three graph commands
+        // below and the orphan sweep waits on the sources slice. That is exactly the state
+        // the third answer is for: the tables exist and this image has no implementation,
+        // which is a refusal a restore must stop on rather than a silence.
         const run = await ops(app(), [command, "--workspace", "ws_synthetic", "--wait"]);
 
         expect(run.exitCode).toBe(1);
         expect(run.lines.join("\n")).toContain("REFUSED");
       },
     );
+  });
+
+  describe("graph-rebuild — the map made again, on the worker's queue", () => {
+    it("queues a full rebuild for the drill and answers the id of the job it queued", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await ops(app(), ["graph-rebuild", "--workspace", workspaceId]);
+
+      expect(run.exitCode).toBe(0);
+      const queued = await jobsOf(app(), workspaceId);
+      // The reason defaults to the drill's, because the restore drill is the caller.
+      expect(queued).toEqual([
+        { id: expect.any(String), kind: "full-rebuild", reason: "drill", status: "queued" },
+      ]);
+      expect(run.lines).toEqual([`graph-rebuild: done — enqueued ${queued[0]?.id}`]);
+    });
+
+    it("takes one of ADR 0023's six reasons when the caller names one", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await ops(app(), [
+        "graph-rebuild",
+        "--workspace",
+        workspaceId,
+        "--reason",
+        "upgrade",
+      ]);
+
+      expect(run.exitCode).toBe(0);
+      expect((await jobsOf(app(), workspaceId))[0]?.reason).toBe("upgrade");
+    });
+
+    it("answers usage to a reason that is not one of the six, and queues nothing", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await ops(app(), [
+        "graph-rebuild",
+        "--workspace",
+        workspaceId,
+        "--reason",
+        "because-i-said-so",
+      ]);
+
+      expect(run.exitCode).toBe(2);
+      expect(await jobsOf(app(), workspaceId)).toEqual([]);
+    });
+
+    it("answers usage to a workspace that is not an id, before it queues anything", async () => {
+      const run = await ops(app(), ["graph-rebuild", "--workspace", "ws_synthetic"]);
+
+      expect(run.exitCode).toBe(2);
+    });
+
+    it("answers usage to a --wait that is neither bare nor a whole number of seconds", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await ops(app(), ["graph-rebuild", "--workspace", workspaceId, "--wait", "soon"]);
+
+      expect(run.exitCode).toBe(2);
+      expect(await jobsOf(app(), workspaceId)).toEqual([]);
+    });
+
+    it("waits for the job it queued and is done once the worker has finished it", async () => {
+      const { workspaceId } = await app().provision();
+
+      const waiting = ops(app(), ["graph-rebuild", "--workspace", workspaceId, "--wait"]);
+      await finishTheJob(app(), workspaceId, "done");
+      const run = await waiting;
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines.join("\n")).toContain("rebuilt the map");
+    });
+
+    it.each(["failed", "poisoned"])(
+      "refuses — so the restore stops — when the job it waited for is %s",
+      async (status) => {
+        const { workspaceId } = await app().provision();
+
+        const waiting = ops(app(), ["graph-rebuild", "--workspace", workspaceId, "--wait"]);
+        await finishTheJob(app(), workspaceId, status);
+        const run = await waiting;
+
+        expect(run.exitCode).toBe(1);
+        expect(run.lines.join("\n")).toContain("REFUSED");
+        expect(run.lines.join("\n")).toContain(status);
+      },
+    );
+
+    it("refuses when the job is still queued at the end of the wait it was given", async () => {
+      const { workspaceId } = await app().provision();
+
+      // A one-second wait, because nothing claims the job in this process: the drill's own
+      // wait is ten minutes and the flag is what an estate with a slower worker changes.
+      const run = await ops(app(), ["graph-rebuild", "--workspace", workspaceId, "--wait", "1"]);
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines.join("\n")).toContain("still queued");
+      expect((await jobsOf(app(), workspaceId))[0]?.status).toBe("queued");
+    });
   });
 
   describe("graph-counts — nodes per label and edges, as JSON, for the drill's diff", () => {
