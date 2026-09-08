@@ -12,6 +12,7 @@ import {
   submitSuggestionSet,
   suggestionSetSummary,
   writeConcept,
+  type AcceptanceDecision,
   type AcceptanceOutcome,
   type ConceptWritten,
   type SuggestionKind,
@@ -1085,19 +1086,50 @@ describe("an acceptance whose ground moved under its own lock", () => {
       expectedTarget: item.target,
     }));
 
+  /**
+   * Accept a set and let the act **park on `table`**, run `moves` while it waits there, then
+   * let it go and hand back what each item answered. Which table an act stops on is the whole
+   * of what a case here chooses: it decides which of the act's own reads have already
+   * happened, and so which window the move lands in.
+   */
+  const acceptingParkedOn = async (
+    scenario: Scenario,
+    table: string,
+    decisions: readonly AcceptanceDecision[],
+    moves: () => Promise<void>,
+  ): Promise<readonly AcceptanceOutcome[]> => {
+    let accepting: ReturnType<typeof acceptSuggestions> | undefined;
+    await holdingTable(db().pool, table, async () => {
+      accepting = acceptSuggestions(scenario.admin, doorsOf(scenario), { decisions });
+      await until(() => isBlockedOnTable(db().pool, table));
+      await moves();
+    });
+    const accepted = await accepting;
+    if (accepted?.ok !== true) {
+      throw new Error(`the acceptance act itself was refused: ${String(accepted?.error)}`);
+    }
+    return accepted.value;
+  };
+
+  /** What a returned item leaves: the word the caller hears, and the row its proposer sees. */
+  const expectReturned = async (
+    outcomes: readonly AcceptanceOutcome[],
+    suggestionId: string,
+  ): Promise<void> => {
+    expect(outcomes.map(refusalOf)).toEqual(["resolution-moved"]);
+    expect(await suggestionRow(suggestionId)).toMatchObject({ status: "returned", reason: MOVED });
+  };
+
   it("returns the item to its proposer when the merge key is taken while it commits", async () => {
     const scenario = await arrange();
     const request = requestFor();
     const set = await submitted(scenario, scenario.editor, "edit", [request]);
     const decisions = await decisionsFor(scenario, set.setId);
-    let accepting: ReturnType<typeof acceptSuggestions> | undefined;
 
     // The act reads the key as free, mints an IRI and commits — and only then reaches the
     // transaction that writes the rows, which is where another act's identity is waiting.
     // Parked on `audit_event`, which that transaction writes before any row of its own.
-    await holdingTable(db().pool, "audit_event", async () => {
-      accepting = acceptSuggestions(scenario.admin, doorsOf(scenario), { decisions });
-      await until(() => isBlockedOnTable(db().pool, "audit_event"));
+    const outcomes = await acceptingParkedOn(scenario, "audit_event", decisions, async () => {
       const client = await db().pool.connect();
       try {
         await testData(client).conceptIdentity({
@@ -1108,13 +1140,8 @@ describe("an acceptance whose ground moved under its own lock", () => {
         client.release();
       }
     });
-    const accepted = await accepting;
 
-    expect(accepted?.ok === true && accepted.value.map(refusalOf)).toEqual(["resolution-moved"]);
-    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({
-      status: "returned",
-      reason: MOVED,
-    });
+    await expectReturned(outcomes, set.suggestionIds[0] ?? "");
     // The commit is real and no row records it — the reconciler's own shape, which is what
     // a refusal *after* the commit costs and why every other one is read before it.
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
@@ -1125,29 +1152,21 @@ describe("an acceptance whose ground moved under its own lock", () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
     const decisions = await decisionsFor(scenario, set.setId);
-    let accepting: ReturnType<typeof acceptSuggestions> | undefined;
 
     // The summary rendered this concept as the target and the act read the same thing; the
     // move lands between that read and the act's own, under the lock. Parked on
     // `concept_index`, which the act's first transaction reads and the preparing read
     // never touches.
-    await holdingTable(db().pool, "concept_index", async () => {
-      accepting = acceptSuggestions(scenario.admin, doorsOf(scenario), { decisions });
-      await until(() => isBlockedOnTable(db().pool, "concept_index"));
+    const outcomes = await acceptingParkedOn(scenario, "concept_index", decisions, async () => {
       await db().pool.query(
         "UPDATE concept_identity SET merge_key = $3 WHERE workspace_id = $1 AND iri = $2",
         [scenario.workspaceId, written.iri, `${input.mergeKey}-renamed`],
       );
     });
-    const accepted = await accepting;
 
     // Landing it would put the old key back on the concept and undo a move nobody asked to
     // undo — so it is refused before the commit, and this one costs none.
-    expect(accepted?.ok === true && accepted.value.map(refusalOf)).toEqual(["resolution-moved"]);
-    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({
-      status: "returned",
-      reason: MOVED,
-    });
+    await expectReturned(outcomes, set.suggestionIds[0] ?? "");
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
   });
 
@@ -1156,16 +1175,13 @@ describe("an acceptance whose ground moved under its own lock", () => {
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = set.suggestionIds[0] ?? "";
     const decisions = await decisionsFor(scenario, set.setId);
-    let accepting: ReturnType<typeof acceptSuggestions> | undefined;
 
     // The per-repository lock is in-process and one api process (ADR 0024's estate), so the
     // decision this transaction is about to write can still be taken by a second process —
     // which is exactly what `status` in the UPDATE's WHERE clause is there to catch. Written
     // as that second process would write it: the marker the row's trigger demands, then the
     // decision.
-    await holdingTable(db().pool, "audit_event", async () => {
-      accepting = acceptSuggestions(scenario.admin, doorsOf(scenario), { decisions });
-      await until(() => isBlockedOnTable(db().pool, "audit_event"));
+    const outcomes = await acceptingParkedOn(scenario, "audit_event", decisions, async () => {
       const elsewhere = await db().pool.connect();
       try {
         await elsewhere.query("BEGIN");
@@ -1183,12 +1199,11 @@ describe("an acceptance whose ground moved under its own lock", () => {
         elsewhere.release();
       }
     });
-    const accepted = await accepting;
 
     // The ledger row is already written by then, so a *value* here would commit an event for
     // a decision that never happened: the act throws, its transaction rolls back, and the
     // caller hears the store's own failure with the sentence that names why.
-    const outcome = accepted?.ok === true ? accepted.value[0]?.outcome : undefined;
+    const outcome = outcomes[0]?.outcome;
     expect(outcome).toEqual({ ok: false, error: expect.any(Error) });
     expect(outcome?.ok === false && String(outcome.error)).toContain(
       "decided by somebody else while this act was in flight",

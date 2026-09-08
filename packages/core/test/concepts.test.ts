@@ -1310,6 +1310,50 @@ describe("authority that moved while the act was in flight", () => {
 });
 
 /**
+ * The read `open` is a projection of, taken at its own seam. Trust is derived from what this
+ * read answers (ADR 0019), so the two facts the projection cannot re-derive belong here: that
+ * an unchecked concept answers *no check* rather than an unattributable one, and that a store
+ * that failed answers as itself rather than as a concept nobody minted.
+ */
+describe("the read a concept's trust is derived from", () => {
+  it("reads no check at all off a concept nobody has checked", async () => {
+    const scenario = await arrange();
+    const written = await landed(scenario, writeFor({ status: "stable" }));
+
+    const opened = await reading(scenario.viewer, (principal, tx) =>
+      conceptByIri(principal, tx, written.iri),
+    );
+
+    // Fail-closed on the platform's own trust signal: a concept with no verification row
+    // answers *no check*, never a check whose reviewer and instant are both nothing —
+    // which the trust projection would have to guess at.
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    expect(opened.value?.check).toBeUndefined();
+    expect(opened.value?.contentHash).toBe(written.contentHash);
+  });
+
+  it("hands a reader the store's own failure rather than a concept nobody minted", async () => {
+    const scenario = await arrange();
+    const written = await landed(scenario, writeFor({ status: "stable" }));
+    let read: Result<unknown, unknown> | undefined;
+
+    // `[TEST8]`: the transaction is aborted before the read, so the read meets the store
+    // failing and the transaction's own outcome is asserted before the value.
+    await expect(
+      reading(scenario.viewer, async (principal, tx) => {
+        await abortTheTransaction(tx);
+        read = await conceptByIri(principal, tx, written.iri);
+      }),
+    ).rejects.toThrow(/did not commit/);
+
+    // A concept withheld and a concept nobody minted both answer `undefined`, so a store
+    // that failed answering as either would be a read a caller could not tell from a miss.
+    expect(read).toEqual({ ok: false, error: expect.any(Error) });
+  });
+});
+
+/**
  * The window ADR 0012's amendment governs: between the commit and the act's transaction. A
  * failure there is not a bug to be prevented — it is the state the reconciler is defined
  * for, and this is the test that says what it looks like.
@@ -1430,42 +1474,6 @@ describe("opening a concept by IRI", () => {
       },
       evidence: [{ locator: "p.4", source: "Handbook" }],
     });
-  });
-
-  it("reads no check at all off a concept nobody has checked", async () => {
-    const scenario = await arrange();
-    const written = await landed(scenario, writeFor({ status: "stable" }));
-
-    const opened = await reading(scenario.viewer, (principal, tx) =>
-      conceptByIri(principal, tx, written.iri),
-    );
-
-    // Fail-closed on the platform's own trust signal: a concept with no verification row
-    // answers *no check*, never a check whose reviewer and instant are both nothing —
-    // which the trust projection would have to guess at.
-    expect(opened.ok).toBe(true);
-    if (!opened.ok) return;
-    expect(opened.value?.check).toBeUndefined();
-    expect(opened.value?.contentHash).toBe(written.contentHash);
-  });
-
-  it("hands a reader the store's own failure rather than a concept nobody minted", async () => {
-    const scenario = await arrange();
-    const written = await landed(scenario, writeFor({ status: "stable" }));
-    let read: Result<unknown, unknown> | undefined;
-
-    // `[TEST8]`: the transaction is aborted before the read, so the read meets the store
-    // failing and the transaction's own outcome is asserted before the value.
-    await expect(
-      reading(scenario.viewer, async (principal, tx) => {
-        await abortTheTransaction(tx);
-        read = await conceptByIri(principal, tx, written.iri);
-      }),
-    ).rejects.toThrow(/did not commit/);
-
-    // A concept withheld and a concept nobody minted both answer `undefined`, so a store
-    // that failed answering as either would be a read a caller could not tell from a miss.
-    expect(read).toEqual({ ok: false, error: expect.any(Error) });
   });
 
   it("withholds a draft concept from every reader, whatever their role", async () => {
