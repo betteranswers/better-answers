@@ -144,6 +144,32 @@ def test_the_loop_claims_runs_and_finishes_a_nightly_audit_it_scheduled_itself(
     assert outcome["mismatched"] == []
 
 
+def test_a_job_commits_as_it_goes_and_another_connection_sees_it_finish_after_the_claim(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    """The claim, the work and the finish are three transactions, each committed where
+    its block ends — on the connection the image opens, not this suite's — so an app
+    polling the row sees it move while the worker lives, and the row says when the job
+    was claimed and when it finished as two instants rather than one.
+    """
+    workspace = seed_workspace(database.cursor())["id"]
+    database.commit()
+    bootstrap = bootstrap_for(database, tmp_path)
+
+    with loop.connected(bootstrap.database_url) as worker:
+        assert loop.tick(worker, bootstrap) is False  # schedules the audit
+        assert loop.tick(worker, bootstrap) is True  # claims, runs and finishes it
+        # Read from this suite's own connection while the worker's is still open: what
+        # the worker wrote is committed, and its two stamps are two transactions' now().
+        with database.cursor() as cursor:
+            cursor.execute(
+                "SELECT status, finished_at > claimed_at FROM job"
+                " WHERE workspace_id = %s",
+                (workspace,),
+            )
+            assert cursor.fetchall() == [("done", True)]
+
+
 def test_the_audit_reports_a_mismatch_as_a_state_and_never_as_a_refusal(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:

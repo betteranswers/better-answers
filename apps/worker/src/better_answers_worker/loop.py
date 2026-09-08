@@ -194,6 +194,24 @@ def tick(connection: psycopg.Connection, bootstrap: Bootstrap) -> bool:
     return worked
 
 
+def connected(database_url: str) -> psycopg.Connection:
+    """The loop's connection, **in autocommit** — so each `queue.scoped` block is a
+    transaction of its own, begun and committed where the block says.
+
+    psycopg opens a transaction on the first statement of a connection that is not in
+    autocommit, and every `transaction()` block entered after that is a savepoint inside
+    it, released and never committed. The loop reads the schema stamp and the workspace
+    list before its first scoped block, so on a plain connection it claimed, ran and
+    finished every job inside one transaction nobody committed until the process exited:
+    no other connection saw a claim, a finish or a self-scheduled audit while the worker
+    lived — a `--wait` polling from the app would never have seen the row move — and
+    `now()` stamped `claimed_at` and `finished_at` with one frozen instant. `--once`
+    hid it, because leaving the connection's block commits. The heartbeat's connection
+    never met this: `scoped` is its first statement, so its blocks were transactions.
+    """
+    return psycopg.connect(database_url, autocommit=True)
+
+
 def main() -> int:
     """`better-answers-worker` — the image's command, and the loop itself."""
     parser = argparse.ArgumentParser(prog="better-answers-worker")
@@ -205,7 +223,7 @@ def main() -> int:
     once = parser.parse_args().once
 
     bootstrap = read_bootstrap()
-    with psycopg.connect(bootstrap.database_url) as connection:
+    with connected(bootstrap.database_url) as connection:
         stamped = False
         while True:
             if not schema_stamp_matches(connection):
