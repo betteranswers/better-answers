@@ -145,8 +145,7 @@ const wrote = async (
 /** One suggestion, submitted by the Editor and accepted by the Admin — the acceptance path. */
 const accepted = async (
   scenario: Scenario,
-  request: Omit<SuggestionRequest, "mergeKey" | "path" | "conceptKind" | "title"> &
-    Partial<SuggestionRequest>,
+  request: Partial<SuggestionRequest> & { readonly body: string },
 ): Promise<ConceptWritten> => {
   sequence += 1;
   const set = await submitSuggestionSet(
@@ -156,12 +155,12 @@ const accepted = async (
       kind: "edit",
       requests: [
         {
+          frontmatter: { title: `Accepted note ${sequence}`, type: "Note" },
+          ...request,
           mergeKey: `note:accepted-${sequence}`,
           path: `knowledge/accepted-${sequence}.md`,
           conceptKind: "Note",
           title: `Accepted note ${sequence}`,
-          frontmatter: { title: `Accepted note ${sequence}`, type: "Note" },
-          ...request,
         },
       ],
     },
