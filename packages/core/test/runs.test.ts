@@ -220,6 +220,32 @@ describe("waiting on a job somebody queued", () => {
     expect(over.ok && over.value.outcome).toEqual({ checked: 2, mismatched: [] });
   });
 
+  it("answers a person polling in their own workspace, whichever road queued the job", async () => {
+    // The two roads meet on one row: cron queues the audit as the platform, and the
+    // workspace's own Admin reads that job back through their membership. A `--wait` on the
+    // ops command and a person asking after the same job are one read, not two.
+    const scenario = await arrange();
+    const cron = await enqueueJob(graphMaintenance, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+      kind: "nightly-audit",
+    });
+    if (!cron.ok) throw new Error(`the job was not queued: ${String(cron.error)}`);
+
+    const asked = await jobById(scenario.admin, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+      jobId: cron.value.jobId,
+    });
+
+    expect(asked.ok && asked.value).toEqual({
+      jobId: cron.value.jobId,
+      kind: "nightly-audit",
+      reason: null,
+      status: "queued",
+      attempts: 0,
+      outcome: null,
+    });
+  });
+
   it("says no-such-job for an id this workspace never held, rather than an empty answer", async () => {
     // A caller polling an id it was never given has the wrong id or the wrong workspace; a
     // null would let it poll that mistake until its timeout.
