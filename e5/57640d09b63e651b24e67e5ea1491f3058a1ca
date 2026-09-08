@@ -1,0 +1,69 @@
+packages/schema/src/journal.ts
+  s_d26544dcfeb424::t_8c2fda8ba8bb96 17,20-28,36-37,40,42-43
+packages/schema/src/table-ownership.ts
+  s_d26544dcfeb424::t_09c5cbab5a280e 49-55
+  s_d26544dcfeb424::t_bd86af76a631f3 115-120
+  s_d26544dcfeb424::t_5f5d6a9ed10ebf 321-354
+packages/schema/migrations/meta/0021_snapshot.json
+  s_d26544dcfeb424::t_55ddd741723be6 1-4456
+packages/schema/scripts/worker-view.ts
+  s_d26544dcfeb424::t_c704c5a7a58110 72-85
+  s_d26544dcfeb424::t_38441d9ce5ce18 99-100,104
+packages/schema/test/factory.ts
+  s_d26544dcfeb424::t_b61f3b651b95d8 17
+  s_d26544dcfeb424::t_a1ec3d4d53834f 18-19,745
+  s_d26544dcfeb424::t_f24d6a6329d7c9 579-581,584-589,597-601
+  s_d26544dcfeb424::t_de382220d9cfaa 168-173
+  s_d26544dcfeb424::t_45817aaeb2889b 582-583,590-596
+packages/schema/src/schema.ts
+  s_d26544dcfeb424::t_40cc91bdc012f7 33
+packages/schema/src/boundary-schemas.ts
+  s_d26544dcfeb424::t_42e0977031d60a 966
+  s_d26544dcfeb424::t_5e8365af379d06 42
+  s_d26544dcfeb424::t_8ac20806e467e2 750-760,762-788
+packages/schema/scripts/generate-worker-schema.ts
+  s_d26544dcfeb424::t_a962489a93a1d5 5
+  s_d26544dcfeb424::t_9bf18497aa5345 22,28
+packages/schema/migrations/0022_the-queue-substrate.sql
+  s_d26544dcfeb424::t_c5473d76410830 5-192
+  s_d26544dcfeb424::t_9ccef5ab982bac 1-4
+packages/schema/migrations/0016_graph-tables.sql
+  s_d26544dcfeb424::t_f97fa234891eb9 97-105
+packages/schema/migrations/meta/0022_snapshot.json
+  s_d26544dcfeb424::t_9d9860a4190a13 1-4456
+packages/schema/migrations/meta/_journal.json
+  s_d26544dcfeb424::t_ab48d1e38b8f3e 156
+  s_d26544dcfeb424::t_8422fbe4a39643 158-164
+  s_d26544dcfeb424::t_55ddd741723be6 151-155,157
+apps/worker/src/better_answers_worker/schema_view.py
+  s_d26544dcfeb424::t_9cdac2398c95f1 7-8,10-12,217-231
+packages/schema/test/boundary-schemas.test.ts
+  s_d26544dcfeb424::t_272bc436566422 589-590
+  s_d26544dcfeb424::t_4d7671ff9edac8 394-415
+packages/schema/test/rls.test.ts
+  s_d26544dcfeb424::t_d2cde0477fa9dc 1003-1009,1012,1016-1058,1060-1065,1067
+  s_d26544dcfeb424::t_1d752dd7ae587e 2197-2242,2249-2323
+  s_d26544dcfeb424::t_049b06bdafefda 2243-2248
+  s_d26544dcfeb424::t_bc5d08b7bed6ec 766-774,784,796-837
+packages/schema/test/worker-schema-view.test.ts
+  s_d26544dcfeb424::t_9bbc8c9890f8ce 52,54,56-71
+  s_d26544dcfeb424::t_5f7cd6f0ae218f 10
+packages/schema/src/job-tables.ts
+  s_d26544dcfeb424::t_ed639e21f55a07 1-156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e557640d09b63e651b24e67e5ea1491f3058a1ca",
+  "prompts": {},
+  "sessions": {
+    "s_d26544dcfeb424": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b919cca-a019-4c62-9322-519e3b9e0f24",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
