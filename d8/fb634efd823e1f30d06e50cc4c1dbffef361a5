@@ -1,0 +1,51 @@
+packages/core/test/suggestions.test.ts
+  s_9735fc29ef62df::t_9aaee6cf444195 1546-1581
+  s_9735fc29ef62df::t_ef195bf1c452b9 1436-1450
+  s_9735fc29ef62df::t_30d33a3bed0614 2
+  s_9735fc29ef62df::t_c0bb4cf1d28cce 322-376,381,383-390
+  s_9735fc29ef62df::t_299ac70e91abf4 21-22,24-31
+  s_9735fc29ef62df::t_80851b6fc22624 377-380,382
+  s_9735fc29ef62df::t_eb4ee27e83c34e 1070-1280
+  s_9735fc29ef62df::t_b3f8ee370d412b 758-826
+packages/core/test/concepts.test.ts
+  s_9735fc29ef62df::t_e240e0c8015e76 1435-1470
+  s_9735fc29ef62df::t_3e30bca1e645bb 2,11-12,14,21
+  s_9735fc29ef62df::t_fcc94b28d65794 29-36
+  s_9735fc29ef62df::t_08ba85f1969b13 383-451,453-525
+  s_9735fc29ef62df::t_3298a8087b7349 951-993
+  s_9735fc29ef62df::t_4eed8a25e83226 215-220
+  s_9735fc29ef62df::t_4617904c02f5f8 1280-1281,1283-1285,1287-1290,1295-1296
+  s_9735fc29ef62df::t_6014f725b873e1 265-289
+  s_9735fc29ef62df::t_0db5aee266e669 1270-1279,1282,1286,1291-1294,1297-1309
+packages/core/test/members.test.ts
+  s_9735fc29ef62df::t_b3daa30065d878 373-379,387-389,395-400,402,417-427,429,431-438,440,442-471,473,477-528
+  s_9735fc29ef62df::t_c0c1d4489cf474 380-386,390-394,401,403-416
+  s_9735fc29ef62df::t_a1bfa1c574cc26 428,430
+  s_9735fc29ef62df::t_caad5bed3f1cca 472,474-476
+  s_9735fc29ef62df::t_7f7f90334e072d 439,441
+packages/core/test/access-requests.test.ts
+  s_9735fc29ef62df::t_375a3de9984c0b 419-429
+  s_9735fc29ef62df::t_e914217571493e 394-418,430-467
+  s_9735fc29ef62df::t_0d207e740b7b39 581-583,585-594,597,601
+  s_9735fc29ef62df::t_59622612e4bb73 584,595-596,598-600
+  s_9735fc29ef62df::t_f86d66fa018e9a 242-267
+packages/core/test/suite-postgres.ts
+  s_9735fc29ef62df::t_e18d57793d9609 66-67,116-158
+  s_9735fc29ef62df::t_1a5aae19cfe8a0 68-115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d8fb634efd823e1f30d06e50cc4c1dbffef361a5",
+  "prompts": {},
+  "sessions": {
+    "s_9735fc29ef62df": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "947d5c06-ba2f-479f-a6b2-58726b109426",
+        "model": "claude-opus-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
