@@ -1,8 +1,20 @@
 import { testData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
 
-import { bundleHealth, enqueueJob } from "../src/runs/index.ts";
+import type { PlatformPrincipal } from "../src/kernel/index.ts";
+import { bundleHealth, enqueueJob, JOB_IS_OVER, jobById } from "../src/runs/index.ts";
 import { suiteWithBundles } from "./workspace-with-bundle.ts";
+
+/**
+ * The principal `pnpm ops graph-rebuild` runs under: the platform acting as itself, with no
+ * person behind it and no workspace of its own. It is the whole reason the enqueue takes a
+ * `Principal` rather than a person's — the drill runs from cron inside a container, and work
+ * that outlives a session runs under a platform principal, never a live one.
+ */
+const graphMaintenance: PlatformPrincipal = {
+  kind: "platform",
+  actorId: "process:better-answers-graph",
+};
 
 /**
  * The runs slice through its own interface (`[TEST1]`): what the app may put on the
@@ -22,12 +34,18 @@ const finishedAudit = async (
   workspaceId: string,
   outcome: Readonly<Record<string, unknown>>,
   finishedAt: Date,
+  jobId?: string,
 ) => {
   const client = await db().pool.connect();
   try {
     const seed = testData(client);
+    await client.query("DELETE FROM job WHERE workspace_id = $1 AND id = $2", [
+      workspaceId,
+      jobId ?? "",
+    ]);
     await seed.job({
       workspaceId,
+      ...(jobId === undefined ? {} : { id: jobId }),
       kind: "nightly-audit",
       status: "done",
       attempts: 1,
@@ -46,6 +64,7 @@ describe("what the app puts on the worker's queue", () => {
     const scenario = await arrange();
 
     const queued = await enqueueJob(scenario.admin, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
       kind: "full-rebuild",
       reason: "drill",
     });
@@ -57,7 +76,7 @@ describe("what the app puts on the worker's queue", () => {
     );
     expect(rows.rows).toEqual([
       {
-        id: queued.value,
+        id: queued.value.jobId,
         kind: "full-rebuild",
         reason: "drill",
         status: "queued",
@@ -71,6 +90,7 @@ describe("what the app puts on the worker's queue", () => {
     const scenario = await arrange();
 
     const queued = await enqueueJob(scenario.admin, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
       kind: "nightly-audit",
     });
 
@@ -82,11 +102,68 @@ describe("what the app puts on the worker's queue", () => {
     expect(rows.rows).toEqual([{ reason: null }]);
   });
 
+  it("queues for the platform, which names the workspace because it holds none of its own", async () => {
+    // `pnpm ops graph-rebuild` has no session to resolve, so the workspace is the argument
+    // and the scope is set from it — the Postgres door's own shape for a platform act.
+    const scenario = await arrange();
+
+    const queued = await enqueueJob(graphMaintenance, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+      kind: "full-rebuild",
+      reason: "reconciler",
+    });
+
+    if (!queued.ok) throw new Error(`the job was not queued: ${String(queued.error)}`);
+    const rows = await db().pool.query<{ id: string; reason: string }>(
+      "SELECT id, reason FROM job WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(rows.rows).toEqual([{ id: queued.value.jobId, reason: "reconciler" }]);
+  });
+
+  it("refuses a person who names another tenant's workspace, rather than quietly using their own", async () => {
+    // A caller that named another tenant has the wrong idea; handing it a job in its own
+    // workspace would bury that, and RLS would have refused the row anyway.
+    const scenario = await arrange();
+    const elsewhere = await arrange();
+
+    const queued = await enqueueJob(scenario.admin, scenario.postgres, {
+      workspaceId: elsewhere.workspaceId,
+      kind: "nightly-audit",
+    });
+
+    expect(queued).toEqual({ ok: false, error: "malformed" });
+    const rows = await db().pool.query("SELECT 1 FROM job WHERE workspace_id = ANY($1::text[])", [
+      [scenario.workspaceId, elsewhere.workspaceId],
+    ]);
+    expect(rows.rowCount).toBe(0);
+  });
+
+  it("refuses a rebuild with no reason and an audit that carries one, before any statement", async () => {
+    const scenario = await arrange();
+
+    const noReason = await enqueueJob(graphMaintenance, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+      kind: "full-rebuild",
+    } as Parameters<typeof enqueueJob>[2]);
+    const spuriousReason = await enqueueJob(graphMaintenance, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+      kind: "nightly-audit",
+      reason: "drill",
+    } as Parameters<typeof enqueueJob>[2]);
+
+    expect([noReason, spuriousReason]).toEqual([
+      { ok: false, error: "malformed" },
+      { ok: false, error: "malformed" },
+    ]);
+  });
+
   it("refuses an Editor and a Viewer, because a rebuild is an act over the whole workspace", async () => {
     const scenario = await arrange();
 
     for (const person of [scenario.editor, scenario.viewer]) {
       const queued = await enqueueJob(person, scenario.postgres, {
+        workspaceId: scenario.workspaceId,
         kind: "full-rebuild",
         reason: "drill",
       });
@@ -99,11 +176,84 @@ describe("what the app puts on the worker's queue", () => {
   });
 });
 
+describe("waiting on a job somebody queued", () => {
+  it("answers the job's status and its outcome, so a caller can poll the one it queued", async () => {
+    const scenario = await arrange();
+    const queued = await enqueueJob(graphMaintenance, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+      kind: "full-rebuild",
+      reason: "drill",
+    });
+    if (!queued.ok) throw new Error(`the job was not queued: ${String(queued.error)}`);
+
+    const waiting = await jobById(graphMaintenance, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+      jobId: queued.value.jobId,
+    });
+
+    expect(waiting).toEqual({
+      ok: true,
+      value: {
+        jobId: queued.value.jobId,
+        kind: "full-rebuild",
+        reason: "drill",
+        status: "queued",
+        attempts: 0,
+        outcome: null,
+      },
+    });
+    // Nothing terminal yet, which is what keeps a `--wait` polling.
+    expect(JOB_IS_OVER).not.toContain(waiting.ok ? waiting.value.status : "queued");
+
+    // And once a worker has finished it, the same read carries what it found.
+    await finishedAudit(
+      scenario.workspaceId,
+      { checked: 2, mismatched: [] },
+      new Date("2026-09-07T02:00:00Z"),
+      queued.value.jobId,
+    );
+    const over = await jobById(graphMaintenance, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+      jobId: queued.value.jobId,
+    });
+    expect(over.ok && over.value.status).toBe("done");
+    expect(over.ok && over.value.outcome).toEqual({ checked: 2, mismatched: [] });
+  });
+
+  it("says no-such-job for an id this workspace never held, rather than an empty answer", async () => {
+    // A caller polling an id it was never given has the wrong id or the wrong workspace; a
+    // null would let it poll that mistake until its timeout.
+    const scenario = await arrange();
+    const elsewhere = await arrange();
+    const queued = await enqueueJob(graphMaintenance, elsewhere.postgres, {
+      workspaceId: elsewhere.workspaceId,
+      kind: "nightly-audit",
+    });
+    if (!queued.ok) throw new Error(`the job was not queued: ${String(queued.error)}`);
+
+    expect(
+      await jobById(graphMaintenance, scenario.postgres, {
+        workspaceId: scenario.workspaceId,
+        jobId: queued.value.jobId,
+      }),
+    ).toEqual({ ok: false, error: "no-such-job" });
+    expect(
+      await jobById(scenario.admin, scenario.postgres, {
+        workspaceId: elsewhere.workspaceId,
+        jobId: queued.value.jobId,
+      }),
+    ).toEqual({ ok: false, error: "no-such-job" });
+  });
+});
+
 describe("what the platform can say about the two parsers agreeing", () => {
   it("says never-audited until an audit has finished", async () => {
     const scenario = await arrange();
     // A job that is only queued has found nothing yet, so it says nothing about health.
-    await enqueueJob(scenario.admin, scenario.postgres, { kind: "nightly-audit" });
+    await enqueueJob(scenario.admin, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+      kind: "nightly-audit",
+    });
 
     const health = await bundleHealth(scenario.admin, scenario.postgres);
 

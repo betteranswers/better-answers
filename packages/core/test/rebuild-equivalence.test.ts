@@ -321,6 +321,7 @@ describe("the worker's rebuild against the app's own map", () => {
     expect(liveEdges.length).toBeGreaterThan(6);
 
     const queued = await enqueueJob(scenario.admin, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
       kind: "full-rebuild",
       reason: "drill",
     });
@@ -328,6 +329,7 @@ describe("the worker's rebuild against the app's own map", () => {
     // A second job, so the same two passes also prove the two parsers agree over the very
     // bundle these acts wrote — which is the nightly audit's whole claim.
     const audit = await enqueueJob(scenario.admin, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
       kind: "nightly-audit",
     });
     expect(audit.ok).toBe(true);
@@ -364,6 +366,7 @@ describe("the worker's rebuild against the app's own map", () => {
     await buildTheMap(scenario);
 
     const audit = await enqueueJob(scenario.admin, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
       kind: "nightly-audit",
     });
     expect(audit.ok).toBe(true);

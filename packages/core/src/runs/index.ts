@@ -1,8 +1,9 @@
 import {
   boundarySchemas,
+  FULL_REBUILD_KIND,
   NIGHTLY_AUDIT_KIND,
-  type FULL_REBUILD_KIND,
   type JOB_KINDS,
+  type JOB_STATUSES,
   type REBUILD_REASONS,
 } from "@better-answers/schema";
 
@@ -12,12 +13,13 @@ import {
   ok,
   requireAdmin,
   ulid,
+  type Principal,
   type PrincipalRefusal,
   type Result,
   type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { withMembership, type PostgresDoor } from "../store/postgres/index.ts";
+import { withMembership, withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 
 /**
  * Slice: **runs** — the worker control plane as the app sees it.
@@ -29,14 +31,22 @@ import { withMembership, type PostgresDoor } from "../store/postgres/index.ts";
  * which is why there is no claiming here: a transition two clients each implemented would
  * be two readings of one rule.
  *
- * A job is **not an audit event and never becomes one**: runs are their own
- * record. Enqueueing, claiming and finishing write no ledger row, and this slice calls no
- * audit door.
+ * A job is **not an audit event and never becomes one**: runs are their own record, as the
+ * audit slice's own vocabulary says, and its declared-acts walk refuses an act whose subject
+ * names one. Enqueueing, claiming and finishing write no ledger row, and this slice calls no
+ * audit door. What a job did is read off the job.
+ *
+ * **Both principals reach this queue, and they are not the same road.** A person's enqueue is
+ * an Admin's act in their own workspace, re-checked inside the transaction. The platform's
+ * runs for no person at all — the ops commands are cron's, inside a container, with no
+ * session to resolve — so it names the workspace as an argument and is scoped to it, which is
+ * the shape the Postgres door already has for a platform act.
  *
  * ADR 0029 rule 3 — imports `kernel` and `store`; never another slice.
  */
 
 export type JobKind = (typeof JOB_KINDS)[number];
+export type JobStatus = (typeof JOB_STATUSES)[number];
 export type RebuildReason = (typeof REBUILD_REASONS)[number];
 
 /**
@@ -59,53 +69,190 @@ export type BundleHealth =
   | "never-audited";
 
 /**
- * Put a job on this workspace's queue, and answer the id it was given.
+ * What a caller puts on the queue: the workspace, the kind, and — for a rebuild — which of
+ * ADR 0023's six reasons it is happening for.
  *
- * **Admin's, and by the same reasoning as every other act over the whole workspace**: a
- * rebuild throws the derived map away and makes it again, and an audit is the platform
- * checking itself; neither is a thing an Editor does in the course of writing a concept.
- * The role is re-checked inside the transaction (`withMembership`), so a role that moved
- * between the request boundary and the write refuses here.
+ * The workspace is **always named**, on both roads. A platform principal carries none
+ * (`CONTEXT.md`), so it has to; and a user principal's is checked against it rather than
+ * quietly preferred, because a call that named another tenant's workspace is a caller with
+ * the wrong idea, and answering it with its own workspace's job would hide that.
+ */
+export type EnqueueJobInput = { readonly workspaceId: string } & EnqueuedJob;
+
+/**
+ * What an enqueue refuses in a word: a role that may not ask for one, and a job the queue
+ * does not carry — a kind it does not know, a rebuild with no reason, an audit with one, or
+ * a workspace that is not the caller's.
+ */
+export type EnqueueJobRefusal = RoleRefusal | "malformed";
+
+/** The job as this slice answers for it, which is all a caller needs to wait on one. */
+export type JobState = {
+  readonly jobId: string;
+  readonly kind: JobKind;
+  readonly reason: RebuildReason | null;
+  readonly status: JobStatus;
+  /** How many times it has been claimed; a claim increments it before the work starts. */
+  readonly attempts: number;
+  /** What the job found — counts, ids and paths — and `null` until it has finished. */
+  readonly outcome: JobOutcome | null;
+};
+
+/**
+ * What a job's outcome holds: counts, and the ids and paths the counts were taken at. The
+ * keys are open — the shape belongs to the job that wrote it, and B7 adds kinds — but the
+ * values are exactly what the column's boundary admits, so a reader of one knows it can hold
+ * no nested object and therefore no person's name and no concept's body.
+ */
+type OutcomeScalar = string | number | boolean | null;
+export type JobOutcomeValue =
+  | OutcomeScalar
+  | readonly OutcomeScalar[]
+  | readonly Readonly<Record<string, OutcomeScalar>>[];
+export type JobOutcome = Readonly<Record<string, JobOutcomeValue>>;
+
+/** The three statuses a job never leaves — what a caller polling one is waiting for. */
+export const JOB_IS_OVER: readonly JobStatus[] = ["done", "failed", "poisoned"];
+
+/** The row the two reads project, before the boundary narrows it. */
+type JobRow = {
+  readonly id: string;
+  readonly kind: JobKind;
+  readonly reason: RebuildReason | null;
+  readonly status: JobStatus;
+  readonly attempts: number;
+  readonly outcome: JobOutcome | null;
+};
+
+/**
+ * Run `work` in one transaction scoped to `workspaceId`, by the road the principal has.
+ *
+ * A **person's** goes through `withMembership`, which re-reads the membership under a shared
+ * lock and refuses a role that moved since the request boundary — so an Admin demoted between
+ * the call and the write does not get their job. A **platform** principal has no membership to
+ * re-read and no person behind it, so it takes `withScope`, which is the door's own shape for
+ * an act the platform makes as itself. The two are one function because everything after the
+ * scope is set is identical, and two copies would be two places to set it late.
+ */
+const inWorkspace = async <T>(
+  principal: Principal,
+  door: PostgresDoor,
+  workspaceId: string,
+  work: (tx: Tx) => Promise<T>,
+): Promise<Result<T, PrincipalRefusal | Error>> => {
+  if (principal.kind === "platform") {
+    return attempt(() => withScope(principal, door, workspaceId, (tx) => work(tx)));
+  }
+  const held = await attempt(() => withMembership(principal, door, (_fresh, tx) => work(tx)));
+  if (!held.ok) return err(held.error);
+  if (!held.value.ok) return err(held.value.error);
+  return ok(held.value.value);
+};
+
+/**
+ * Put a job on a workspace's queue, and answer the id it was given.
+ *
+ * **A person's enqueue is an Admin's**, by the same reasoning as every other act over the
+ * whole workspace: a rebuild throws the derived map away and makes it again, and an audit is
+ * the platform checking itself; neither is a thing an Editor does in the course of writing a
+ * concept. The role is re-checked inside the transaction, so a role that moved between the
+ * request boundary and the write refuses here.
+ *
+ * **The platform's has no role to check and no person to name.** `pnpm ops graph-rebuild` runs
+ * from cron inside a container with no session to resolve, and work that outlives a session
+ * runs under a platform principal, never a live one. So the platform road is the principal's
+ * own type: nothing is invented, and the workspace it acts in is the argument beside it.
  *
  * The id is minted before the insert, as every id the platform writes for itself is
- * (ADR 0035), and answered so a caller can wait for the job it queued rather than for the
- * next one to appear.
+ * (ADR 0035), and answered so a caller can wait for the job it queued rather than for the next
+ * one to appear.
  */
 export const enqueueJob = async (
-  principal: UserPrincipal,
+  principal: Principal,
   door: PostgresDoor,
-  job: EnqueuedJob,
-): Promise<Result<string, RoleRefusal | PrincipalRefusal | Error>> => {
-  const admin = requireAdmin(principal);
-  if (!admin.ok) return err(admin.error);
+  input: EnqueueJobInput,
+): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal | PrincipalRefusal | Error>> => {
+  if (principal.kind === "user") {
+    const admin = requireAdmin(principal);
+    if (!admin.ok) return err(admin.error);
+    // A person acts in the workspace their credential names, and nowhere else. Refused
+    // rather than silently corrected: a caller that named another tenant is a caller with
+    // the wrong idea, and handing it a job in its own workspace would bury that.
+    if (input.workspaceId !== principal.workspaceId) return err("malformed");
+  }
 
-  const id = ulid();
+  // The pair the row's CHECK ties together, checked here too: a rebuild says why it is
+  // happening and nothing else carries a reason. The type says so already, but a transport
+  // parses a request into this input and a refusal is a word a caller can act on, where the
+  // row's constraint is an aborted transaction somebody has to read the SQL to understand.
+  if ((input.kind === FULL_REBUILD_KIND) !== ("reason" in input && input.reason !== undefined)) {
+    return err("malformed");
+  }
+
+  const jobId = ulid();
   const parsed = boundarySchemas.job.insert
     .pick({ workspaceId: true, id: true, kind: true, reason: true })
     .safeParse({
-      workspaceId: principal.workspaceId,
-      id,
-      kind: job.kind,
-      reason: "reason" in job ? job.reason : null,
+      workspaceId: input.workspaceId,
+      id: jobId,
+      kind: input.kind,
+      reason: "reason" in input ? input.reason : null,
     });
-  // The boundary parses before the statement, so a kind or a reason the row would refuse
-  // is refused where the caller can be told rather than by an aborted transaction.
-  if (!parsed.success) return err(new Error("the job was not a job this queue carries"));
+  // The boundary parses before the statement, so a kind or a reason the row would refuse is
+  // refused where the caller can be told rather than by an aborted transaction.
+  if (!parsed.success) return err("malformed");
 
-  const written = await attempt(() =>
-    withMembership(principal, door, async (fresh, tx) => {
-      await tx.query("INSERT INTO job (workspace_id, id, kind, reason) VALUES ($1, $2, $3, $4)", [
-        fresh.workspaceId,
-        parsed.data.id,
-        parsed.data.kind,
-        parsed.data.reason,
-      ]);
-      return parsed.data.id;
-    }),
-  );
+  const written = await inWorkspace(principal, door, input.workspaceId, async (tx) => {
+    await tx.query("INSERT INTO job (workspace_id, id, kind, reason) VALUES ($1, $2, $3, $4)", [
+      parsed.data.workspaceId,
+      parsed.data.id,
+      parsed.data.kind,
+      parsed.data.reason,
+    ]);
+  });
   if (!written.ok) return err(written.error);
-  if (!written.value.ok) return err(written.value.error);
-  return ok(written.value.value);
+  return ok({ jobId });
+};
+
+/**
+ * One job as it stands — what a caller waiting on the job it queued reads.
+ *
+ * The `--wait` on an ops command is a poll over this: a rebuild is claimed by whichever
+ * worker is free, runs in that process, and reports by writing its own row, so there is
+ * nothing for a caller to hold open and nothing to be notified through. It reads through the
+ * slice for the ordinary reason a transport reads through one: `apps/api` writes no SQL of
+ * its own against another module's table (ADR 0029).
+ *
+ * `no-such-job` rather than an empty answer, because a caller polling an id it was handed and
+ * finding nothing has been given the wrong id or the wrong workspace, and a `null` would let
+ * it poll that mistake until its timeout.
+ */
+export const jobById = async (
+  principal: Principal,
+  door: PostgresDoor,
+  input: { readonly workspaceId: string; readonly jobId: string },
+): Promise<Result<JobState, "no-such-job" | PrincipalRefusal | Error>> => {
+  if (principal.kind === "user" && input.workspaceId !== principal.workspaceId) {
+    return err("no-such-job");
+  }
+  const read = await inWorkspace(principal, door, input.workspaceId, (tx) =>
+    tx.query<JobRow>(
+      "SELECT id, kind, reason, status, attempts, outcome FROM job WHERE workspace_id = $1 AND id = $2",
+      [input.workspaceId, input.jobId],
+    ),
+  );
+  if (!read.ok) return err(read.error);
+
+  const row = read.value.rows[0];
+  if (row === undefined) return err("no-such-job");
+  return ok({
+    jobId: row.id,
+    kind: row.kind,
+    reason: row.reason,
+    status: row.status,
+    attempts: row.attempts,
+    outcome: row.outcome,
+  });
 };
 
 type OutcomeRow = {
