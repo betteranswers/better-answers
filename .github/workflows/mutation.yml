@@ -36,8 +36,8 @@ permissions:
 jobs:
   stryker:
     runs-on: ubuntu-latest
-    # Twice the longest full leg either workspace has run. The week that restores nothing is
-    # what this has to cover, and the hardening tickets ahead lengthen both suites.
+    # A leg that restores nothing is the week this has to cover, and both finish inside an
+    # hour; the rest is room for the hardening tickets ahead lengthening both suites.
     timeout-minutes: 120
     strategy:
       fail-fast: false

@@ -457,11 +457,9 @@ describe("3 — optionality and nullability agree, per key, at runtime", () => {
 describe("4 — a refinement only narrows, proved against the column", () => {
   let db: MigratedPostgres;
 
-  // A runaway guard, not a budget for the copy: the room is for the opener's cold fallback,
-  // which pays a container start wherever nothing provided a warm one.
   beforeAll(async () => {
     db = await openMigratedPostgres();
-  }, 120_000);
+  });
 
   afterAll(async () => {
     await db.stop();

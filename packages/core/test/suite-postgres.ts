@@ -23,11 +23,9 @@ import { openPostgres, withPrincipal, type Tx } from "../src/store/postgres/inde
 export const postgresForSuite = (): (() => MigratedPostgres) => {
   let db: MigratedPostgres | undefined;
 
-  // A runaway guard, not a budget for the copy: the room is for the opener's cold fallback,
-  // which pays a container start wherever nothing provided a warm one.
   beforeAll(async () => {
     db = await openMigratedPostgres();
-  }, 120_000);
+  });
 
   afterAll(async () => {
     await db?.stop();

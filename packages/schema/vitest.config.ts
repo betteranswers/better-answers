@@ -12,5 +12,8 @@ export default defineConfig({
     globalSetup: [fileURLToPath(new URL("./test/warm-postgres.ts", import.meta.url))],
     // A cold run pulls the Postgres image before the first test.
     testTimeout: 60_000,
+    // A runaway guard, not a budget for the copy: the room is for the opener's cold fallback,
+    // which pays a container start wherever nothing provided a warm one.
+    hookTimeout: 120_000,
   },
 });

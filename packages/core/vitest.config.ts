@@ -10,5 +10,8 @@ export default defineConfig({
     globalSetup: ["@better-answers/schema/testing/warm-postgres"],
     // The import-direction test shells out to oxlint over a temporary tree.
     testTimeout: 60_000,
+    // A runaway guard, not a budget for the copy: the room is for the opener's cold fallback,
+    // which pays a container start wherever nothing provided a warm one.
+    hookTimeout: 120_000,
   },
 });
