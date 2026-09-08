@@ -1,0 +1,21 @@
+docs/adr/0040-the-clock-is-a-kernel-value-the-api-constructs-once-at-boot-and-hands-to-every-act-that-reads-time-a-rows-own-timestamp-stays-the-databases-now-and-the-worker-is-handed-no-clock.md
+  s_f34fe14b1ea788::t_00985087b2d50d 1-174
+docs/adr/README.md
+  s_f34fe14b1ea788::t_6fc66d21329497 48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b42eff32f4ae452a845d4d6fc01d82ab07371411",
+  "prompts": {},
+  "sessions": {
+    "s_f34fe14b1ea788": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e15aef24-178a-41a4-8fe6-f8657414f765",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
