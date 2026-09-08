@@ -1,0 +1,20 @@
+packages/schema/test/harness.ts
+  s_578fc273156aca::t_32bad99cdb0350 103-104
+  s_578fc273156aca::t_4086d88505ecba 49-75,80-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e46ee2387fc28af5475dce640f5e3d3c13271043",
+  "prompts": {},
+  "sessions": {
+    "s_578fc273156aca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7fd855c0-fa36-4857-b2aa-2256c7fa0ffd",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
