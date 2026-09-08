@@ -92,7 +92,7 @@ export function Frame() {
           <section aria-label="You" className="mt-auto flex flex-col gap-2 text-sm">
             <p className="font-medium text-foreground">{person.workspace.name}</p>
             <p className="text-muted-foreground">
-              {person.person.name ?? person.person.email} — {person.role}
+              {person.person.name} — {person.role}
             </p>
             <div>
               <SignOutButton />

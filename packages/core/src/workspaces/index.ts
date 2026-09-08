@@ -400,8 +400,7 @@ export const workspaceIdBySlug = async (
  */
 export type Membership = {
   readonly workspace: { readonly id: WorkspaceId; readonly name: string };
-  /** `name` is null until a person has told us one; the shell falls back to the address. */
-  readonly person: { readonly id: UserId; readonly name: string | null; readonly email: string };
+  readonly person: { readonly id: UserId; readonly name: string; readonly email: string };
   readonly role: Role;
 };
 
@@ -429,10 +428,11 @@ export const readMembership = async (
   if (name === undefined) return err("no-such-workspace");
 
   const person = await attempt(() =>
-    tx.query<{ name: string | null; email: string }>(
-      'SELECT name, email FROM "user" WHERE id = $1',
-      [principal.userId],
-    ),
+    // `name` is `NOT NULL` on `"user"` (`identity-tables.ts`); the column, not this read,
+    // is where a person without one would be refused.
+    tx.query<{ name: string; email: string }>('SELECT name, email FROM "user" WHERE id = $1', [
+      principal.userId,
+    ]),
   );
   if (!person.ok) return err(person.error);
   const row = person.value.rows[0];
