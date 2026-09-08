@@ -2,11 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import { conceptIriOf, ulid } from "@better-answers/schema";
 
+import { head } from "@better-answers/core/store/git";
+
 import { find, open } from "../src/answering/index.ts";
-import { evidencePaneOf, overrideConceptClass } from "../src/concepts/index.ts";
+import {
+  evidencePaneOf,
+  overrideConceptClass,
+  writeConcept,
+  type WriteConceptInput,
+} from "../src/concepts/index.ts";
 import { attempt, type UserPrincipal } from "../src/kernel/index.ts";
 import { narrowBinding } from "../src/sources/index.ts";
-import type { Scenario } from "./workspace-with-bundle.ts";
+import { bundleHistory } from "./bundle.ts";
+import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
 import {
   bindingForGroups,
   bindingHolding,
@@ -20,6 +28,7 @@ import {
   seededBy,
   visibilityHeld,
   visibilitySuite,
+  type SourcedConcept,
 } from "./sourced-concept.ts";
 
 /**
@@ -169,7 +178,8 @@ describe("what a governed write derives from the bindings of what it cites", () 
 
   it("keeps a re-write's audience when it drops the citations that named it, rather than widening", async () => {
     const scenario = await arrange();
-    const { groupId: hr, written } = await conceptForGroup(db(), scenario, "HR", []);
+    // The Editor is in the group, so the concept is theirs to re-write.
+    const { groupId: hr, written } = await conceptForGroup(db(), scenario, "HR", [scenario.editor]);
 
     await conceptCiting(scenario, scenario.editor, [], {
       iri: written.iri,
@@ -182,6 +192,97 @@ describe("what a governed write derives from the bindings of what it cites", () 
       audience: "groups",
       audience_groups: [hr],
     });
+  });
+});
+
+/**
+ * A re-write of one concept by this person, citing these documents — the act as `writeConcept`
+ * answers it, refusal and all, against the bundle's current head.
+ */
+const rewriteCiting = async (
+  scenario: Scenario,
+  writer: UserPrincipal,
+  written: SourcedConcept,
+  documents: readonly string[],
+  overrides: Partial<WriteConceptInput> = {},
+) =>
+  writeConcept(writer, doorsOf(scenario), {
+    iri: written.iri,
+    mergeKey: written.mergeKey,
+    path: written.path,
+    kind: "Note",
+    title: written.title,
+    frontmatter: { title: written.title, type: "Note" },
+    body: "The note says something else now.",
+    message: "Re-write the note",
+    author: { name: "Ada Editor", email: "ada@acme.invalid" },
+    expects: { head: await head(writer, scenario.git) },
+    evidence: documents.map((sourceDocumentId, at) => ({
+      sourceDocumentId,
+      locator: `p.${at + 1}`,
+      resource: `Document ${at + 1}`,
+    })),
+    ...overrides,
+  });
+
+describe("what a re-write may not do to the class a concept holds", () => {
+  it("refuses a re-write whose new citations would widen the class or audience the concept holds, and makes no commit", async () => {
+    const scenario = await arrange();
+    const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
+    const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
+    const forHr = await bindingForGroups(db(), scenario.workspaceId, [hr]);
+    // The Admin may read a Restricted concept, so the refusal below is the widening's alone.
+    const restrictedNote = await conceptCiting(scenario, scenario.admin, [restricted.documentId]);
+    const hrNote = await conceptCiting(scenario, scenario.editor, [forHr.documentId]);
+    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+
+    // Swapping the Restricted document for an Internal one would land the concept Internal
+    // — an un-narrowing no Admin recorded; swapping HR's for everyone's widens the audience.
+    const widenedClass = await rewriteCiting(scenario, scenario.admin, restrictedNote, [
+      internal.documentId,
+    ]);
+    const widenedAudience = await rewriteCiting(scenario, scenario.editor, hrNote, [
+      internal.documentId,
+    ]);
+
+    expect(widenedClass).toEqual({ ok: false, error: "widening-refused" });
+    expect(widenedAudience).toEqual({ ok: false, error: "widening-refused" });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
+    expect(await heldRow(scenario.workspaceId, restrictedNote.iri)).toEqual({
+      sensitivity: "Restricted",
+      ...EVERYONE,
+    });
+    expect(await heldRow(scenario.workspaceId, hrNote.iri)).toEqual({
+      sensitivity: "Internal",
+      audience: "groups",
+      audience_groups: [hr],
+    });
+  });
+
+  it("an Editor cannot re-write a concept the predicate withholds from them, even one they wrote", async () => {
+    const scenario = await arrange();
+    const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const board = await groupNamed(db(), scenario, "Board", []);
+    const forBoard = await bindingForGroups(db(), scenario.workspaceId, [board]);
+    const restrictedNote = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
+    const boardNote = await conceptCiting(scenario, scenario.editor, [forBoard.documentId]);
+    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+
+    const byClass = await rewriteCiting(scenario, scenario.editor, restrictedNote, [
+      restricted.documentId,
+    ]);
+    const byAudience = await rewriteCiting(scenario, scenario.editor, boardNote, [
+      forBoard.documentId,
+    ]);
+    // The Admin reaches the Restricted one and re-writes it; the audience narrows Admins too.
+    const byAdmin = await rewriteCiting(scenario, scenario.admin, restrictedNote, [
+      restricted.documentId,
+    ]);
+
+    expect(byClass).toEqual({ ok: false, error: "no-such-concept" });
+    expect(byAudience).toEqual({ ok: false, error: "no-such-concept" });
+    expect(byAdmin.ok).toBe(true);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(before.length + 1);
   });
 });
 

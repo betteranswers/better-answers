@@ -20,7 +20,13 @@ import {
 } from "@better-answers/schema";
 import { z } from "zod";
 
-import { readableClause, readableParameters, visibilityOf } from "../access/index.ts";
+import {
+  readableClause,
+  readableParameters,
+  sensitivityAndAudienceClause,
+  visibilityOf,
+  widens,
+} from "../access/index.ts";
 import { act, declareActs, eventsOfAct, record } from "../audit/index.ts";
 import {
   actorIdOf,
@@ -319,8 +325,12 @@ export type ConceptWritten = {
  * Why a governed write was refused. `stale-precondition` is the one a person is shown — the
  * content moved under them, whichever form the precondition took (ADR 0012) — and the two
  * `-taken` words are a bundle that already holds this path or this merge key under another
- * IRI. `rename-refused` and `reclassification-refused` are the two moves this act never
- * makes, and `no-such-concept` is a write naming an IRI this workspace never minted, which
+ * IRI. `rename-refused` and `reclassification-refused` are two moves this act never makes,
+ * and `widening-refused` the third: a re-write whose new citations would derive a class or
+ * an audience wider than the concept holds, which is an Admin's recorded act
+ * (`overrideConceptClass`) and never a re-write's. `no-such-concept` is a write naming an IRI
+ * this workspace never minted — **or one the read predicate withholds from the writer**,
+ * answered in the same word so a re-write is no oracle for what a person may not see — which
  * ADR 0002 refuses because the key is never a caller's to choose. `already-decided` is an
  * acceptance of a suggestion somebody decided first, and `resolution-moved` one whose named
  * target no longer answers to the merge key it was proposed under. The principal refusals
@@ -339,6 +349,7 @@ export type WriteConceptRefusal =
   | "merge-key-taken"
   | "rename-refused"
   | "reclassification-refused"
+  | "widening-refused"
   | "no-such-concept"
   | "already-decided"
   | "resolution-moved";
@@ -654,15 +665,29 @@ type HeldRow = {
  * chose (ADR 0029). RLS scopes the statement already; naming the pair says so where a reader
  * of the SQL can see it — and for the platform principal, which carries no workspace, the
  * scope alone says which one is read, as the audit door reads it.
+ *
+ * **A person reaches the row through the class and audience arms of the read predicate.** A
+ * concept a writer may not see for its class or its audience is not theirs to re-write, and
+ * a row this read withholds is a row this act never held — so the write answers exactly as
+ * it does for an IRI nobody minted, and a re-write is no oracle for what `open` withholds.
+ * The published arm is not applied: a draft is its author's to re-write on the way to
+ * publishing it. The platform reads every row, because the replay is recovery of an act that
+ * was authorised when its commit was made, never a second judgement of it.
  */
 const heldByIri = async (principal: Principal, tx: Tx, iri: string): Promise<Held | undefined> => {
+  const predicate = principal.kind === "user" ? `AND ${sensitivityAndAudienceClause("c", 3)}` : "";
   const found = await tx.query<HeldRow>(
     `SELECT c.path, c.kind, c.title, i.merge_key, c.sensitivity, c.audience, c.audience_groups,
             c.status, c.content_hash, c.published_at
        FROM concept_index c
        JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
-      WHERE c.workspace_id = COALESCE($1::text, (select current_workspace_id())) AND c.iri = $2`,
-    [principal.kind === "user" ? principal.workspaceId : null, iri],
+      WHERE c.workspace_id = COALESCE($1::text, (select current_workspace_id())) AND c.iri = $2
+        ${predicate}`,
+    [
+      principal.kind === "user" ? principal.workspaceId : null,
+      iri,
+      ...(principal.kind === "user" ? readableParameters(principal) : []),
+    ],
   );
   const row = found.rows[0];
   return row === undefined
@@ -680,6 +705,14 @@ const heldByIri = async (principal: Principal, tx: Tx, iri: string): Promise<Hel
         publishedAt: row.published_at,
       };
 };
+
+/** The pair a concept holds, read as a `Visibility` — the fallback a re-write's derivation rests on. */
+const heldVisibilityOf = (held: Held) =>
+  visibilityOf({
+    sensitivity: held.sensitivity,
+    audience: held.audience,
+    audience_groups: held.audienceGroups,
+  });
 
 /**
  * What a write supplies for its index row, by whichever road it came: the file's facts, and
@@ -760,9 +793,18 @@ const indexRowOf = (facts: RowFacts, held: Held | undefined) => {
  * concept's class is **kept** when the write names none, and **refused** when it names a
  * different one; a differing path is refused the same way.
  *
- * Both are decided by the read this act makes **before it commits**, so a refused re-write
- * leaves no commit at all: a rename that refused after committing would leave a file at a
- * path no row names, and a replay that refuses for ever.
+ * **Nor may a re-write widen the class by swapping its evidence.** What lands is the
+ * derivation over the new citations, not the word the write names, so the act derives what
+ * the new evidence *would* land — the same derivation the landing runs, over the documents
+ * about to be cited — and refuses when that is wider on any term than what the concept
+ * holds: a narrowing is what evidence does, a widening is an Admin's recorded act (ADR 0023,
+ * ADR 0039). And the concept has to be one the writer may see: the read at step 3 applies
+ * the predicate's class and audience arms, so a withheld concept is refused as one nobody
+ * minted.
+ *
+ * All of it is decided by the read this act makes **before it commits**, so a refused
+ * re-write leaves no commit at all: a rename that refused after committing would leave a
+ * file at a path no row names, and a replay that refuses for ever.
  */
 export const writeConcept = async (
   principal: UserPrincipal,
@@ -814,19 +856,35 @@ export const writeConcept = async (
     // is what makes each of these refusals cost **no commit** — the difference between a
     // caller being told no and a commit nobody can record.
     const existing = await attempt(() =>
-      withMembership(principal, doors.postgres, async (fresh, tx) => ({
-        held: await heldByIri(fresh, tx, iri),
-        // The merge key's resolution, read here rather than beside the act, so an
-        // acceptance resolves identity *at acceptance* and inside the lock that holds it.
-        resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
-        waiting:
-          input.acceptance === undefined ||
-          (await suggestionIsWaiting(fresh, tx, input.acceptance.suggestionId)),
-      })),
+      withMembership(principal, doors.postgres, async (fresh, tx) => {
+        const held = await heldByIri(fresh, tx, iri);
+        return {
+          held,
+          // What the new citations would derive for a concept that exists — asked of the
+          // same derivation the landing runs, so the widening check and the landing cannot
+          // disagree about what the evidence says.
+          derived:
+            held === undefined
+              ? undefined
+              : await conceptVisibilityFrom(tx, {
+                  workspaceId: fresh.workspaceId,
+                  iri,
+                  kind: foldKind(input.kind),
+                  fallback: heldVisibilityOf(held),
+                  citing: evidence.data.map((piece) => piece.sourceDocumentId),
+                }),
+          // The merge key's resolution, read here rather than beside the act, so an
+          // acceptance resolves identity *at acceptance* and inside the lock that holds it.
+          resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
+          waiting:
+            input.acceptance === undefined ||
+            (await suggestionIsWaiting(fresh, tx, input.acceptance.suggestionId)),
+        };
+      }),
     );
     if (!existing.ok) return err(existing.error);
     if (!existing.value.ok) return err(existing.value.error);
-    const { held, resolved, waiting } = existing.value.value;
+    const { held, derived, resolved, waiting } = existing.value.value;
 
     // ADR 0002: the key is never caller-settable. A creation minted its own above; a write
     // that named one has to name a concept this workspace already holds, or it would mint
@@ -865,6 +923,14 @@ export const writeConcept = async (
       input.sensitivity !== held.sensitivity
     ) {
       return err("reclassification-refused");
+    }
+    // The class the new evidence derives, against the class the concept holds: wider on
+    // any term — a looser class, everyone where groups were named, a group the list did not
+    // hold — is the un-narrowing only an Admin's recorded override may make. A standing
+    // override is what the derivation answers and what the row holds, so it never reads as
+    // a widening here.
+    if (held !== undefined && derived !== undefined && widens(heldVisibilityOf(held), derived)) {
+      return err("widening-refused");
     }
 
     // Everything the rows will hold, parsed at the boundary before anything is committed: a

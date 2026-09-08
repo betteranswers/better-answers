@@ -94,7 +94,20 @@ export const RESTRICTED_TO_ADMINS: Visibility = { sensitivity: RESTRICTED, ...EV
  */
 export const readableClause = (alias: string, at: number): string =>
   `${alias}.published_at IS NOT NULL
-     AND (${alias}.sensitivity <> '${RESTRICTED}' OR $${at} = 'Admin')
+     AND ${sensitivityAndAudienceClause(alias, at)}`;
+
+/**
+ * The predicate's last two clauses alone — the class and the audience, **who a unit is for**
+ * — without the first, which says whether it has entered the company's knowledge yet. A
+ * *read* needs all three. A *re-write* needs these two: a concept a person may not see for
+ * its class or its audience is not theirs to change either, or the write path would be a
+ * side door onto what the read path withholds — while a draft is exactly what its author
+ * re-writes on the way to publishing it, so the published arm has no place on a writer's
+ * check. Rendered from the same words as `readableClause`, so the two cannot drift; the
+ * placeholders are the same two, filled by `readableParameters`.
+ */
+export const sensitivityAndAudienceClause = (alias: string, at: number): string =>
+  `(${alias}.sensitivity <> '${RESTRICTED}' OR $${at} = 'Admin')
      AND (${alias}.audience = '${AUDIENCE_EVERYONE}' OR ${alias}.audience_groups && $${at + 1}::text[])`;
 
 /**

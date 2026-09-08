@@ -788,14 +788,16 @@ describe("what a governed write refuses", () => {
  * decided before any commit is made.
  */
 describe("what a re-write of an existing concept may not move", () => {
-  it("refuses an Editor's widening of an existing concept's class, and makes no commit", async () => {
+  it("refuses a named widening of an existing concept's class, and makes no commit", async () => {
     const scenario = await arrange();
     const input = writeFor({ sensitivity: "Restricted" });
     const first = await landed(scenario, input);
 
+    // The Admin, who may see a Restricted concept: an Editor is refused a step earlier, as
+    // for a concept nobody minted (`visibility.test.ts`), and never reaches this word.
     const widened = await write(
       scenario,
-      scenario.editor,
+      scenario.admin,
       rewriteOf(input, first, { sensitivity: "Public" }),
     );
 

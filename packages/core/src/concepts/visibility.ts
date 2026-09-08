@@ -125,6 +125,11 @@ const overrideOf = async (
  * citation whose document the catalogue does not hold contributes no binding: it cannot
  * widen, because it derives nothing, and it cannot narrow, because there is nothing to
  * narrow by.
+ *
+ * The citations are the concept's standing rows, or — when the caller names `citing` — the
+ * documents a write is *about to* cite, so the governed write can ask **before it commits**
+ * what its new evidence would derive and refuse a widening while a refusal still costs no
+ * commit. One derivation either way: the same bindings, the same override, the same floor.
  */
 export const conceptVisibilityFrom = async (
   tx: Tx,
@@ -133,16 +138,27 @@ export const conceptVisibilityFrom = async (
     readonly iri: string;
     readonly kind: string;
     readonly fallback: Visibility;
+    /** The document ids to derive from instead of the standing citations, when a write asks ahead. */
+    readonly citing?: readonly string[] | undefined;
   },
 ): Promise<Visibility> => {
-  const bindings = await tx.query<VisibilityRow>(
-    `SELECT b.sensitivity, b.audience, b.audience_groups
-       FROM concept_evidence ce
-       JOIN source_document d ON d.workspace_id = ce.workspace_id AND d.id = ce.source_document_id
-       JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
-      WHERE ce.workspace_id = $1 AND ce.iri = $2`,
-    [concept.workspaceId, concept.iri],
-  );
+  const bindings =
+    concept.citing === undefined
+      ? await tx.query<VisibilityRow>(
+          `SELECT b.sensitivity, b.audience, b.audience_groups
+             FROM concept_evidence ce
+             JOIN source_document d ON d.workspace_id = ce.workspace_id AND d.id = ce.source_document_id
+             JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
+            WHERE ce.workspace_id = $1 AND ce.iri = $2`,
+          [concept.workspaceId, concept.iri],
+        )
+      : await tx.query<VisibilityRow>(
+          `SELECT b.sensitivity, b.audience, b.audience_groups
+             FROM source_document d
+             JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
+            WHERE d.workspace_id = $1 AND d.id = ANY($2::text[])`,
+          [concept.workspaceId, [...new Set(concept.citing)]],
+        );
   const override = await overrideOf(tx, concept.workspaceId, concept.iri);
   return derivedVisibility({
     kind: concept.kind,

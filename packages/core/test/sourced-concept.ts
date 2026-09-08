@@ -117,8 +117,12 @@ export const conceptOnBoth = async (
   return { restricted, internal, written };
 };
 
-/** A written concept, with the path the suite's links and re-writes name it by, and its title. */
-export type SourcedConcept = ConceptWritten & { readonly path: string; readonly title: string };
+/** A written concept, with the path, merge key and title the suite's links and re-writes name it by. */
+export type SourcedConcept = ConceptWritten & {
+  readonly path: string;
+  readonly mergeKey: string;
+  readonly title: string;
+};
 
 let sequence = 0;
 
@@ -136,8 +140,9 @@ export const conceptCiting = async (
   sequence += 1;
   const path = overrides.path ?? `knowledge/sourced-${sequence}.md`;
   const title = overrides.title ?? `Sourced note ${sequence}`;
+  const mergeKey = overrides.mergeKey ?? `note:sourced-${sequence}`;
   const written = await writeConcept(writer, doorsOf(scenario), {
-    mergeKey: `note:sourced-${sequence}`,
+    mergeKey,
     path,
     kind: "Note",
     title,
@@ -155,7 +160,7 @@ export const conceptCiting = async (
     ...overrides,
   });
   if (!written.ok) throw new Error(`the write was refused: ${String(written.error)}`);
-  return { ...written.value, path, title };
+  return { ...written.value, path, mergeKey, title };
 };
 
 /**

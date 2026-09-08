@@ -21,6 +21,7 @@ import {
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import { actorIdOf, type UserPrincipal } from "../src/kernel/index.ts";
+import { narrowBinding } from "../src/sources/index.ts";
 import { commit, withRepositoryLock } from "@better-answers/core/store/git";
 import {
   bundleHistory,
@@ -29,6 +30,7 @@ import {
   fileAtCommit,
   removeRepository,
 } from "./bundle.ts";
+import { bindingHolding } from "./sourced-concept.ts";
 import { readingAs } from "./suite-postgres.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -419,6 +421,42 @@ describe("a re-write whose rows were lost", () => {
       [scenario.workspaceId],
     );
     expect(counted.rows).toEqual([{ concepts: "1", identities: "1" }]);
+  });
+
+  it("is replayed even once its author may no longer read the concept, because the replay is the platform's and never a second judgement", async () => {
+    const scenario = await arrange();
+    const binding = await bindingHolding(db(), scenario.workspaceId);
+    const cited = [{ sourceDocumentId: binding.documentId, locator: "p.1", resource: "Handbook" }];
+    const input = guideline("Hospitality", { evidence: cited });
+    const first = await landed(scenario, scenario.editor, input);
+    const body = "# Hospitality\n\nA meal a day, receipted.";
+    const history = await writeInTheWindow(scenario, scenario.editor, {
+      ...input,
+      iri: first.iri,
+      body,
+      expects: { head: first.sha },
+    });
+    // Before the tick, the Admin narrows the binding: the concept is Restricted now, and the
+    // Editor who made the lost commit could not re-write it live any more.
+    const narrowed = await readingAs(db().runtimePool, scenario.admin, (admin, tx) =>
+      narrowBinding(admin, tx, {
+        bindingId: binding.bindingId,
+        sensitivity: "Restricted",
+        audience: "everyone",
+      }),
+    );
+    expect(narrowed.ok).toBe(true);
+
+    const run = await reconciled(scenario);
+
+    // The act was authorised when its commit was made; the replay lands it under the
+    // platform, whose read of the row has no predicate, at the class the evidence derives.
+    expect(run).toMatchObject({ replayed: [history[1]], stopped: undefined });
+    expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
+      content_hash: contentHashOf(input.frontmatter, body, input.path),
+      commit_sha: history[1],
+      sensitivity: "Restricted",
+    });
   });
 });
 
