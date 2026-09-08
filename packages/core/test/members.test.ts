@@ -14,7 +14,7 @@ import {
   removeFromGroup,
   renameGroup,
 } from "../src/members/index.ts";
-import { postgresForSuite } from "./suite-postgres.ts";
+import { abortTheTransaction, postgresForSuite, whileWritesAreRefused } from "./suite-postgres.ts";
 
 /**
  * The members slice's group acts through its entry point (`[TEST1]`), against real
@@ -369,6 +369,162 @@ const everyVerb = (groupId: string, userId: string): readonly Verb[] => [
   },
   { name: "list", run: listGroups },
 ];
+
+/** The verbs that name a group, and the two that name a person beside it. */
+const namingAGroup = (verbs: readonly Verb[]): readonly Verb[] =>
+  verbs.filter((verb) => verb.name !== "make" && verb.name !== "list");
+
+const namingAPerson = (verbs: readonly Verb[]): readonly Verb[] =>
+  verbs.filter((verb) => verb.name === "add to" || verb.name === "remove from");
+
+type VerbOutcome = { readonly verb: string; readonly outcome: unknown };
+
+/**
+ * Run every verb in one Admin's transaction, in order, filling `outcomes` as it goes. The
+ * array is the caller's because a transaction that fails to commit rejects, and what each
+ * verb answered before it did is exactly what the caller is asserting (`[TEST8]`).
+ */
+const eachVerb = async (
+  workspace: Workspace,
+  verbs: readonly Verb[],
+  outcomes: VerbOutcome[],
+  before: (tx: Tx) => Promise<void> = async () => undefined,
+): Promise<void> => {
+  await asPerson(workspace, workspace.adminUserId, async (principal, tx) => {
+    await before(tx);
+    for (const verb of verbs) {
+      outcomes.push({ verb: verb.name, outcome: await verb.run(principal, tx) });
+    }
+  });
+};
+
+const refusedAlike = (verbs: readonly Verb[], error: unknown): readonly VerbOutcome[] =>
+  verbs.map((verb) => ({ verb: verb.name, outcome: { ok: false, error } }));
+
+/**
+ * Run `work` with `table` renamed away, so every statement against it fails — how a test
+ * reaches an act's store-failure arm when the statement that has to fail is not the first
+ * one the act runs.
+ */
+const whileTheTableIsGone = async <T>(table: string, work: () => Promise<T>): Promise<T> => {
+  await db().pool.query(`ALTER TABLE "${table}" RENAME TO "${table}_gone"`);
+  try {
+    return await work();
+  } finally {
+    await db().pool.query(`ALTER TABLE "${table}_gone" RENAME TO "${table}"`);
+  }
+};
+
+/**
+ * The boundary each verb crosses **before any statement runs** (ADR 0028): an id or a name
+ * of another shape is a caller's mistake to be told about, never a string handed to a
+ * parameterised query as if it were an id the platform had minted.
+ */
+describe("what a group act refuses before it reads anything", () => {
+  it("refuses a group id of no known form to every verb that names one", async () => {
+    const workspace = await provisioned("Shapeless");
+    const person = await seedMemberAt(workspace, "Viewer");
+    const verbs = namingAGroup(everyVerb("' OR true --", person));
+    const outcomes: VerbOutcome[] = [];
+
+    await eachVerb(workspace, verbs, outcomes);
+
+    expect(outcomes).toEqual(refusedAlike(verbs, "malformed"));
+    expect(await groupRowCount(workspace.workspaceId)).toBe(0);
+  });
+
+  it("refuses a person id of no known form to both verbs that name one", async () => {
+    const { workspace, groupId } = await oneGroupOnePerson("Nameless");
+    const verbs = namingAPerson(everyVerb(groupId, "' OR true --"));
+    const outcomes: VerbOutcome[] = [];
+
+    await eachVerb(workspace, verbs, outcomes);
+
+    // `no-such-group` and `not-a-member` are facts about this workspace; a person id of no
+    // known form is a fact about the request, and the two are not interchangeable.
+    expect(outcomes).toEqual(refusedAlike(verbs, "malformed"));
+  });
+
+  it("refuses a rename to a name that is blank once trimmed, and renames nothing", async () => {
+    const { workspace, groupId } = await oneGroupOnePerson("Blank");
+
+    const renamed = await asAdmin(workspace, (principal, tx) =>
+      renameGroup(principal, tx, { groupId, name: "   " }),
+    );
+
+    expect(renamed).toEqual({ ok: false, error: "malformed" });
+    expect(await asAdmin(workspace, listGroups)).toEqual({
+      ok: true,
+      value: [{ id: groupId, name: "HR team", origin: "admin-curated", memberCount: 1 }],
+    });
+  });
+});
+
+/**
+ * The store failing under an act is not a refusal a caller can act on, and every verb here
+ * hands it back as itself. Provoked against the real database rather than behind a fake
+ * door (`[TEST1]`, `[TEST3]`), and asserted with the transaction's own outcome (`[TEST8]`).
+ */
+describe("an act whose statement the store refuses", () => {
+  it("hands the caller the store's own failure from every verb, and writes nothing", async () => {
+    const { workspace, person, groupId } = await oneGroupOnePerson("Failing");
+    const verbs = everyVerb(groupId, person);
+    const outcomes: VerbOutcome[] = [];
+
+    await expect(eachVerb(workspace, verbs, outcomes, abortTheTransaction)).rejects.toThrow(
+      /did not commit/,
+    );
+
+    expect(outcomes).toEqual(refusedAlike(verbs, expect.any(Error)));
+    // The arrange block's two acts and nothing this transaction attempted.
+    expect((await peopleActs(workspace.workspaceId)).map((event) => event.act)).toEqual([
+      "people.group.created",
+      "people.group.member_added",
+    ]);
+  });
+
+  it("hands the caller the store's own failure rather than a membership it never wrote", async () => {
+    const workspace = await provisioned("Unwritten");
+    const person = await seedMemberAt(workspace, "Viewer");
+    const groupId = await madeGroup(workspace, "HR team");
+    let added: unknown;
+
+    // The two preconditions read fine — the group is there and the person is a member — and
+    // the row itself is what the store refuses, which is the arm no aborted transaction
+    // reaches because it fails the read first.
+    await expect(
+      whileWritesAreRefused(db().pool, "group_member", () =>
+        asPerson(workspace, workspace.adminUserId, async (principal, tx) => {
+          added = await addToGroup(principal, tx, { groupId, userId: person });
+        }),
+      ),
+    ).rejects.toThrow(/did not commit/);
+
+    expect(added).toEqual({ ok: false, error: expect.any(Error) });
+    expect(await asAdmin(workspace, listGroups)).toEqual({
+      ok: true,
+      value: [{ id: groupId, name: "HR team", origin: "admin-curated", memberCount: 0 }],
+    });
+  });
+
+  it("hands the caller the store's own failure rather than a word for a statement that changed nothing", async () => {
+    const { workspace, person } = await oneGroupOnePerson("Wordless");
+    let removed: unknown;
+
+    // Nothing was removed, so the act reads the group to know which of two words the caller
+    // deserves — and that read is what meets the store. The table is renamed away for the
+    // act, which is one shape of a store that has lost a relation under it.
+    await expect(
+      whileTheTableIsGone("group", () =>
+        asPerson(workspace, workspace.adminUserId, async (principal, tx) => {
+          removed = await removeFromGroup(principal, tx, { groupId: ulid(), userId: person });
+        }),
+      ),
+    ).rejects.toThrow(/did not commit/);
+
+    expect(removed).toEqual({ ok: false, error: expect.any(Error) });
+  });
+});
 
 describe("a role that may not shape who sees what", () => {
   it.each(["Editor", "Viewer"] as const)(
