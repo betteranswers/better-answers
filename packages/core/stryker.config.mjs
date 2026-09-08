@@ -21,12 +21,12 @@ export default {
   mutate: ["src/**/*.ts"],
   coverageAnalysis: "perTest",
 
-  // A static mutant with no per-test coverage is `Ignored` rather than run against the whole
-  // suite and reported `Survived` with `testsCompleted: 0`, for the reason recorded in full in
-  // apps/api/stryker.config.mjs, read from @stryker-mutator/core 10.0.0's
-  // `dist/src/mutants/mutant-test-planner.js` lines 71–99 on 08/09/2026. The rows this
-  // package lost to that hole were its `declareActs` strings.
-  ignoreStatic: true,
+  // `ignoreStatic` stays off, for the reason recorded in full in apps/api/stryker.config.mjs.
+  // This package is where the option did the most harm: every module-scope mutant here is
+  // covered by exactly one test, the declared-acts walk, which reaches every slice through a
+  // dynamic import vitest's `related` lookup cannot see — so with the option on, 192 mutants
+  // ran no test and read as survivors, most of them kills the whole suite had made a run
+  // earlier (run 34263846345 against 34168928594).
 
   // In place rather than in Stryker's sandbox, for the reason recorded in full in
   // apps/api/stryker.config.mjs: the sandbox rewrites `extends` in the copied tsconfig
