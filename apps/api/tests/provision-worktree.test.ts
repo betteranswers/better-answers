@@ -3,8 +3,9 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync }
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 import { afterAll, describe, expect, it } from "vitest";
+
+import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 
 /**
  * The upstream stage of worktree provisioning, run over a throwaway clone and a worktree of
@@ -19,13 +20,10 @@ import { afterAll, describe, expect, it } from "vitest";
  * that has skills to give, so the script reaches its last line and its exit is read.
  */
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
-const script = path.join(repositoryRoot, ".claude/hooks/provision-worktree.sh");
+const script = path.resolve(import.meta.dirname, "../../../.claude/hooks/provision-worktree.sh");
 
 const scratch = mkdtempSync(path.join(tmpdir(), "provision-worktree-"));
-afterAll(() => {
-  rmSync(scratch, { recursive: true, force: true });
-});
+afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
 /** An origin with one commit on `main`, and a clone of it holding installed skills. */
 const clonedPrimary = (name: string): string => {
