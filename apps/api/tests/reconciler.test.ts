@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { initRepository, openGit } from "@better-answers/core/store/git";
+import { initRepository } from "@better-answers/core/store/git";
 
 import { RECONCILER_INTERVAL_MS, startReconciler } from "../src/reconciler.ts";
-import { capturingLogger, type LogLine } from "./harness.ts";
+import { capturingLogger, openTestGit, type LogLine } from "./harness.ts";
 import { appForSuite } from "./suite-app.ts";
 
 /**
@@ -35,7 +35,7 @@ describe("the periodic head check", () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     const held = await app().provision();
     const bare = await app().provision();
-    await initRepository(openGit(app().gitStoreDir), held.workspaceId);
+    await initRepository(openTestGit(app()), held.workspaceId);
     const { logger, logs } = capturingLogger("debug");
     const reconciler = startReconciler({
       database: app().database.pool,
@@ -82,5 +82,27 @@ describe("the periodic head check", () => {
 
     expect(ticks(logs)).toHaveLength(1);
     expect(skips(logs)).toHaveLength(1);
+  });
+
+  it("cannot start when the repositories' root names a missing directory, and says so on the way out", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const { logger, logs } = capturingLogger();
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    const reconciler = startReconciler({
+      database: app().database.pool,
+      gitStoreDir: `${app().gitStoreDir}/does-not-exist`,
+      logger,
+    });
+
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(logs[0]).toMatchObject({
+      level: 50,
+      reason: "no-such-root",
+      msg: "the head check cannot start",
+    });
+
+    exit.mockRestore();
+    await reconciler.stop();
   });
 });

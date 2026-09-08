@@ -80,10 +80,18 @@ const summaryOf = (outcomes: readonly WorkspaceReconciled[]) => {
 
 export const startReconciler = (dependencies: ReconcilerDependencies): Reconciler => {
   const logger = dependencies.logger ?? tierLogger;
-  const doors = {
-    git: openGit(dependencies.gitStoreDir),
-    postgres: openPostgres(dependencies.database),
-  };
+  const git = openGit(dependencies.gitStoreDir);
+  if (!git.ok) {
+    // The same shape `requireBootstrap` refuses in (`config.ts`'s `orExit`): one line saying
+    // why, then a non-zero exit — never a silent warn-and-continue over a root that names
+    // nothing the door can open.
+    logger.error(
+      { reason: git.error, git_store_dir: dependencies.gitStoreDir },
+      "the head check cannot start",
+    );
+    process.exit(1);
+  }
+  const doors = { git: git.value, postgres: openPostgres(dependencies.database) };
 
   const tick = async (): Promise<void> => {
     const pass = await attempt(() => reconcileEveryWorkspace(RECONCILER, doors));

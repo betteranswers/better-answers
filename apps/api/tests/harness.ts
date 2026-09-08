@@ -8,6 +8,7 @@ import type { Pool } from "pg";
 import { pino } from "pino";
 
 import type { PlatformPrincipal } from "@better-answers/core/kernel";
+import { openGit, type GitDoor } from "@better-answers/core/store/git";
 import { openPostgres } from "@better-answers/core/store/postgres";
 import {
   provisionWorkspace,
@@ -202,6 +203,17 @@ export const serverFor = (pool: Pool): Hono =>
     fetchClientMetadataResource: cimdFixture,
     logger: pino({ level: "silent" }),
   });
+
+/**
+ * The app's own git door, opened fresh: `TestApp.gitStoreDir` is always the directory
+ * `startApp` just created, so the only way this refuses is the door's own check regressing —
+ * the throw is what a test sees instead of a `GitDoor` built from a root nobody validated.
+ */
+export const openTestGit = (app: TestApp): GitDoor => {
+  const opened = openGit(app.gitStoreDir);
+  if (!opened.ok) throw new Error(`the test app's git store was refused: ${opened.error}`);
+  return opened.value;
+};
 
 /**
  * What a suite may vary about the app it starts. The defaults are the ones every suite
