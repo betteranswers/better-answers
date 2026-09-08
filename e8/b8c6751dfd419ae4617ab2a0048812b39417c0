@@ -1,0 +1,89 @@
+packages/core/src/concepts/file.ts
+  s_578fc273156aca::t_0fd9bd930873d8 98-99,101
+  s_578fc273156aca::t_23e34714913333 107-109,115-123,125,127-137
+contracts/manifest.json
+  s_578fc273156aca::t_f88cb09b1c24df 2,10-11,17-18
+contracts/queue/cases.json
+  s_578fc273156aca::t_2dacc51c3243f7 227
+  s_578fc273156aca::t_19fec5f50f867c 217
+  s_578fc273156aca::t_7ce5dfbaf17405 5-6
+  s_578fc273156aca::t_c0ea8505ee633a 169
+  s_578fc273156aca::t_39639b97223c34 179
+  s_578fc273156aca::t_0f27ec992f737f 189
+apps/worker/tests/test_tier_contract.py
+  s_578fc273156aca::t_af6ecdcc5b00ea 457-461
+  s_578fc273156aca::t_6cabc20d5af025 435-436,438-441,447-453,462-476,478-485
+  s_578fc273156aca::t_48e2f4def7028f 437
+  s_578fc273156aca::t_ff7c95dd4f6c2c 20,22
+  s_578fc273156aca::t_dec52eec21454c 442-446
+  s_578fc273156aca::t_71aadf22b25996 454-456
+  s_578fc273156aca::t_cce673cfd1bb70 477
+packages/core/test/concepts.test.ts
+  s_578fc273156aca::t_9ca9d9de1d5694 431,435-438
+  s_578fc273156aca::t_b27ad3090dc4c9 471
+  s_578fc273156aca::t_dd07daa2f5b76b 485
+packages/core/test/graph-ops.test.ts
+  s_578fc273156aca::t_31415cb6e1c102 167-169
+apps/worker/tests/test_work_loop.py
+  s_578fc273156aca::t_7ded80bcad8830 312,459
+deploy/restore-drill.sh
+  s_578fc273156aca::t_7ddcad3db629f7 162,164-165
+  s_578fc273156aca::t_62203dd885da92 64-71
+apps/worker/src/better_answers_worker/concept_file.py
+  s_578fc273156aca::t_6f4945867d77f1 33
+  s_578fc273156aca::t_0a399ce195001e 67
+docs/adr/README.md
+  s_578fc273156aca::t_76b1ebc53ee185 39
+packages/core/src/sources/index.ts
+  s_578fc273156aca::t_4f4389ce638790 126
+  s_578fc273156aca::t_71aadf22b25996 15-18
+  s_578fc273156aca::t_260336aafd046f 108
+contracts/README.md
+  s_578fc273156aca::t_8a3c2829d173bb 5
+  s_578fc273156aca::t_23b1c04c0b7077 13
+packages/core/src/guides/index.ts
+  s_578fc273156aca::t_adccff061e4303 7
+  s_578fc273156aca::t_5d27f3b89b154b 120
+  s_578fc273156aca::t_a4dc9c81796697 52-64
+docs/adr/0031-the-tier-contract-is-six-agreements-in-three-forms-fixtured-in-one-language-neutral-directory-both-suites-read.md
+  s_578fc273156aca::t_c6c9ce0e390013 19
+  s_578fc273156aca::t_13eb1af0219b5a 25-28
+packages/core/src/concepts/index.ts
+  s_578fc273156aca::t_2495c90e81c763 94
+CONTEXT.md
+  s_578fc273156aca::t_e6266cd74e16ee 227-231
+  s_578fc273156aca::t_b23db56903c8ae 199-204
+apps/worker/tests/test_concept_file.py
+  s_578fc273156aca::t_e46249ae80bb71 7-11
+  s_578fc273156aca::t_00b13603cdf2a4 151-152
+packages/schema/test/worker-schema-view.test.ts
+  s_578fc273156aca::t_9b7fe9a0ef392c 86-90
+packages/core/src/concepts/visibility.ts
+  s_578fc273156aca::t_172231a3b713e2 395-399
+  s_578fc273156aca::t_9cc535ecbebe8e 246-253,255
+contracts/concept-file/cases.json
+  s_578fc273156aca::t_1e965b4619ee48 1-107
+packages/core/test/tier-contract.test.ts
+  s_578fc273156aca::t_d254f658ce3b13 29,31
+packages/schema/src/journal.ts
+  s_578fc273156aca::t_1f2704e21273ec 30-39,43,51-52,56-58,60,62-63,66,69-76,79-84
+  s_578fc273156aca::t_1cb2747b998ba5 40-42
+packages/core/test/concept-file.contract.test.ts
+  s_578fc273156aca::t_b396043b378e8b 1-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e8b8c6751dfd419ae4617ab2a0048812b39417c0",
+  "prompts": {},
+  "sessions": {
+    "s_578fc273156aca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7fd855c0-fa36-4857-b2aa-2256c7fa0ffd",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
