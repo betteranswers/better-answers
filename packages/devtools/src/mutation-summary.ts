@@ -190,11 +190,11 @@ const NO_BASELINE =
   "no baseline — nothing was restored to compare against, so this run's report is the next run's baseline";
 
 /** What follows a row whose baseline held no kill: the reader should know it is not drift. */
-const NOTE: Readonly<Record<NewSurvivor["before"], string>> = {
+const NOTE = {
   killed: "",
   absent: " (not in the baseline)",
   "no verdict": " (no verdict in the baseline)",
-};
+} as const satisfies Record<NewSurvivor["before"], string>;
 
 const MATCHING =
   "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by order.";

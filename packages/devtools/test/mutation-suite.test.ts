@@ -2,8 +2,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { testsReachingNoSource } from "@better-answers/devtools/mutation-suite";
+import { mutationSuite, testsReachingNoSource } from "@better-answers/devtools/mutation-suite";
 import { afterAll, describe, expect, it } from "vitest";
+import { configDefaults } from "vitest/config";
 
 /**
  * Which test files the mutation run leaves out: the ones that reach the workspace's `src`
@@ -64,6 +65,24 @@ describe("the test files the mutation run leaves out (T-107)", () => {
       "tests/reads-the-tree.test.ts",
       "tests/sibling-only.test.ts",
     ]);
+  });
+
+  it("shapes a workspace's config with those files excluded and the rest of it kept", () => {
+    const root = path.join(scratch, "shaped");
+    write(root, "src/answer.ts", "export const answer = 1;\n");
+    write(root, "tests/reaches.test.ts", 'import { answer } from "../src/answer.ts";\n');
+    write(root, "tests/reads.test.ts", 'import { readFileSync } from "node:fs";\n');
+
+    const shaped = mutationSuite(
+      { test: { include: ["tests/**/*.test.ts"], testTimeout: 60_000 } },
+      root,
+      "tests",
+      "@example/shaped",
+    );
+
+    expect(shaped.test?.include).toEqual(["tests/**/*.test.ts"]);
+    expect(shaped.test?.testTimeout).toBe(60_000);
+    expect(shaped.test?.exclude).toEqual([...configDefaults.exclude, "tests/reads.test.ts"]);
   });
 
   it("leaves nothing out of a workspace whose every test reaches src", () => {
