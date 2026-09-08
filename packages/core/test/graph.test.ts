@@ -1,4 +1,4 @@
-import { testData, type TestData } from "@better-answers/schema/testing";
+import type { TestData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,7 +8,7 @@ import {
   walkTo,
   type WalkStep,
 } from "@better-answers/core/store/graph";
-import { postgresForSuite, readingAs } from "./suite-postgres.ts";
+import { postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
 
 /**
  * The traversal templates through the graph door (`[TEST1]`), over factory-seeded rows on
@@ -27,14 +27,8 @@ type MapScenario = {
   readonly viewer: { readonly workspaceId: string; readonly userId: string };
 };
 
-const seeded = async <T>(work: (seed: TestData) => Promise<T>): Promise<T> => {
-  const client = await db().pool.connect();
-  try {
-    return await work(testData(client));
-  } finally {
-    client.release();
-  }
-};
+const seeded = <T>(work: (seed: TestData) => Promise<T>): Promise<T> =>
+  seedingWith(db().pool, work);
 
 const arrange = (): Promise<MapScenario> =>
   seeded(async (seed) => {

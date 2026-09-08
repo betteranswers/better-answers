@@ -861,7 +861,8 @@ const SWEEP = `WITH live AS (
 
 /**
  * The sweep, inside the caller's transaction: the caller writes the ledger row for it in
- * the same one, which is why this takes a transaction and never a door (`[AUDIT1]`).
+ * the same one, which is why this takes a transaction and never a door: an act and the
+ * event that books it land or fail together.
  */
 export const sweepNonLiveGenerations = async (
   platform: PlatformPrincipal,

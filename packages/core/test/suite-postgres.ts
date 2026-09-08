@@ -1,4 +1,9 @@
-import { type MigratedPostgres, openMigratedPostgres } from "@better-answers/schema/testing";
+import {
+  openMigratedPostgres,
+  testData,
+  type MigratedPostgres,
+  type TestData,
+} from "@better-answers/schema/testing";
 import type pg from "pg";
 import { afterAll, beforeAll } from "vitest";
 
@@ -37,6 +42,24 @@ export const postgresForSuite = (): (() => MigratedPostgres) => {
     if (db === undefined) throw new Error("the suite's Postgres was read before it started");
     return db;
   };
+};
+
+/**
+ * Build rows through the factory, as the superuser, on one connection given back at the
+ * end — the arrange every suite that seeds a map opens with. Beside `readingAs` for the
+ * same reason: which pool a seed goes through is one fact here, not a copy per suite, and
+ * the copy gate said so the second time it was written.
+ */
+export const seedingWith = async <T>(
+  pool: pg.Pool,
+  work: (seed: TestData) => Promise<T>,
+): Promise<T> => {
+  const client = await pool.connect();
+  try {
+    return await work(testData(client));
+  } finally {
+    client.release();
+  }
 };
 
 /**

@@ -1,10 +1,10 @@
-import { testData, type TestData } from "@better-answers/schema/testing";
+import type { TestData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
 
 import { GRAPH_MAINTENANCE, graphCounts, sweepGraph } from "@better-answers/core/concepts";
 
 import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
-import { postgresForSuite } from "./suite-postgres.ts";
+import { postgresForSuite, seedingWith } from "./suite-postgres.ts";
 
 /**
  * The two graph maintenance acts the restore drill calls — the per-label count of the map
@@ -12,23 +12,24 @@ import { postgresForSuite } from "./suite-postgres.ts";
  * the concepts slice's interface (`[TEST1]`), on real Postgres.
  *
  * Both run under the graph maintenance principal and never a person's: the drill has no
- * session behind it. The count writes no ledger row, because a read is not an act
- * (`[AUDIT8]`); the sweep writes one row per generation it removed, in the transaction
- * that removed it (`[AUDIT1]`).
+ * session behind it. The count writes no ledger row, because a read is not an act; the
+ * sweep writes one row per generation it removed, in the transaction that removed it
+ * (`[AUDIT1]`).
  */
 
 const db = postgresForSuite();
 
-const seeded = async <T>(work: (seed: TestData) => Promise<T>): Promise<T> => {
-  const client = await db().pool.connect();
-  try {
-    return await work(testData(client));
-  } finally {
-    client.release();
-  }
-};
+const seeded = <T>(work: (seed: TestData) => Promise<T>): Promise<T> =>
+  seedingWith(db().pool, work);
 
 const arrange = (): Promise<ProvisionedWorkspace> => provisionedWorkspace(db(), "Mapped");
+
+/** The two acts as a test calls them: under the maintenance principal, through this door. */
+const counting = (workspace: ProvisionedWorkspace, workspaceId = workspace.workspaceId) =>
+  graphCounts(GRAPH_MAINTENANCE, workspace.door, { workspaceId });
+
+const sweeping = (workspace: ProvisionedWorkspace, workspaceId = workspace.workspaceId) =>
+  sweepGraph(GRAPH_MAINTENANCE, workspace.door, { workspaceId });
 
 /** The rows one generation of a workspace's map still holds, read past the policy. */
 const rowsOf = async (workspaceId: string, gen: number | null): Promise<[number, number]> => {
@@ -94,9 +95,7 @@ describe("counting a workspace's map", () => {
     const workspace = await arrange();
     await mapWithLeftovers(workspace);
 
-    const counted = await graphCounts(GRAPH_MAINTENANCE, workspace.door, {
-      workspaceId: workspace.workspaceId,
-    });
+    const counted = await counting(workspace);
 
     // Generation 2 holds a node and an edge of its own and appears nowhere: the counts are
     // exactly the set a walk binds — the live generation, and the partition with no
@@ -114,9 +113,7 @@ describe("counting a workspace's map", () => {
   it("answers a workspace nobody has mapped with zeroes, so a restore over an empty map is done and not a failure", async () => {
     const workspace = await arrange();
 
-    const counted = await graphCounts(GRAPH_MAINTENANCE, workspace.door, {
-      workspaceId: workspace.workspaceId,
-    });
+    const counted = await counting(workspace);
 
     expect(counted).toEqual({ ok: true, value: { liveGen: null, nodes: {}, edges: {} } });
   });
@@ -126,9 +123,7 @@ describe("counting a workspace's map", () => {
     const theirs = await arrange();
     await mapWithLeftovers(theirs);
 
-    const counted = await graphCounts(GRAPH_MAINTENANCE, ours.door, {
-      workspaceId: ours.workspaceId,
-    });
+    const counted = await counting(ours);
 
     expect(counted).toEqual({ ok: true, value: { liveGen: null, nodes: {}, edges: {} } });
   });
@@ -136,9 +131,7 @@ describe("counting a workspace's map", () => {
   it("says a workspace that is not an id is malformed, before it reads anything", async () => {
     const workspace = await arrange();
 
-    const counted = await graphCounts(GRAPH_MAINTENANCE, workspace.door, {
-      workspaceId: "ws_synthetic",
-    });
+    const counted = await counting(workspace, "ws_synthetic");
 
     expect(counted).toEqual({ ok: false, error: "malformed" });
   });
@@ -147,9 +140,7 @@ describe("counting a workspace's map", () => {
     const workspace = await arrange();
     await mapWithLeftovers(workspace);
 
-    await graphCounts(GRAPH_MAINTENANCE, workspace.door, {
-      workspaceId: workspace.workspaceId,
-    });
+    await counting(workspace);
 
     expect(await sweptEvents(workspace.workspaceId)).toEqual([]);
   });
@@ -160,9 +151,7 @@ describe("sweeping a workspace's map", () => {
     const workspace = await arrange();
     await mapWithLeftovers(workspace);
 
-    const swept = await sweepGraph(GRAPH_MAINTENANCE, workspace.door, {
-      workspaceId: workspace.workspaceId,
-    });
+    const swept = await sweeping(workspace);
 
     expect(swept).toEqual({ ok: true, value: [{ gen: 2, nodes: 2, edges: 1 }] });
     expect(await rowsOf(workspace.workspaceId, 1)).toEqual([2, 1]);
@@ -178,9 +167,7 @@ describe("sweeping a workspace's map", () => {
       await seed.graphEdge({ workspaceId: workspace.workspaceId, gen: 3, fromUid: third.uid });
     });
 
-    const swept = await sweepGraph(GRAPH_MAINTENANCE, workspace.door, {
-      workspaceId: workspace.workspaceId,
-    });
+    const swept = await sweeping(workspace);
 
     expect(swept).toEqual({
       ok: true,
@@ -205,9 +192,7 @@ describe("sweeping a workspace's map", () => {
     const workspace = await arrange();
     await seeded((seed) => seed.graphNode({ workspaceId: workspace.workspaceId }));
 
-    const swept = await sweepGraph(GRAPH_MAINTENANCE, workspace.door, {
-      workspaceId: workspace.workspaceId,
-    });
+    const swept = await sweeping(workspace);
 
     expect(swept).toEqual({ ok: true, value: [] });
     expect(await rowsOf(workspace.workspaceId, 1)).toEqual([1, 0]);
@@ -224,9 +209,7 @@ describe("sweeping a workspace's map", () => {
       workspace.workspaceId,
     ]);
 
-    const swept = await sweepGraph(GRAPH_MAINTENANCE, workspace.door, {
-      workspaceId: workspace.workspaceId,
-    });
+    const swept = await sweeping(workspace);
 
     expect(swept).toEqual({ ok: true, value: [] });
     expect(await rowsOf(workspace.workspaceId, 7)).toEqual([1, 0]);
@@ -238,9 +221,7 @@ describe("sweeping a workspace's map", () => {
     await mapWithLeftovers(ours);
     await mapWithLeftovers(theirs);
 
-    const swept = await sweepGraph(GRAPH_MAINTENANCE, ours.door, {
-      workspaceId: ours.workspaceId,
-    });
+    const swept = await sweeping(ours);
 
     expect(swept).toEqual({ ok: true, value: [{ gen: 2, nodes: 2, edges: 1 }] });
     expect(await rowsOf(theirs.workspaceId, 2)).toEqual([2, 1]);
@@ -249,9 +230,7 @@ describe("sweeping a workspace's map", () => {
   it("says a workspace that is not an id is malformed, before it deletes anything", async () => {
     const workspace = await arrange();
 
-    const swept = await sweepGraph(GRAPH_MAINTENANCE, workspace.door, {
-      workspaceId: "ws_synthetic",
-    });
+    const swept = await sweeping(workspace, "ws_synthetic");
 
     expect(swept).toEqual({ ok: false, error: "malformed" });
   });
@@ -267,9 +246,7 @@ describe("a sweep whose ledger row cannot be written", () => {
     await mapWithLeftovers(workspace);
     await db().pool.query("REVOKE INSERT ON audit_event FROM app_rt");
     try {
-      const swept = await sweepGraph(GRAPH_MAINTENANCE, workspace.door, {
-        workspaceId: workspace.workspaceId,
-      });
+      const swept = await sweeping(workspace);
 
       expect(swept.ok).toBe(false);
       expect(await rowsOf(workspace.workspaceId, 2)).toEqual([2, 1]);

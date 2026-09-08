@@ -31,7 +31,8 @@ const GRAPH_ACTOR = "process:better-answers-graph";
  * is: the type is what holds "under `process:better-answers-graph`" at compile time, so no
  * other platform act can sweep a workspace's map under its own name. There is no person
  * behind either act — the drill and the recovery order are the callers — so a user
- * principal cannot reach them at all (`[SEC2]`, `[AUDIT4]`).
+ * principal cannot reach them at all, and the row each act books names this actor and
+ * never a person's session.
  */
 export type GraphMaintenancePrincipal = PlatformPrincipal & {
   readonly actorId: typeof GRAPH_ACTOR;
@@ -44,12 +45,12 @@ export const GRAPH_MAINTENANCE: GraphMaintenancePrincipal = {
 
 /**
  * The sweep's one act. Its subject is the **generation removed**, so a sweep of three
- * generations is three rows sharing one batch id rather than one row hiding three
- * (`[AUDIT1]`), and the ledger answers "what happened to generation 2" by subject like any
- * other record. The detail carries the generation again beside the counts, as the
- * reconciler's carries its commit sha beside its subject, so a row reads whole.
+ * generations is three rows sharing one batch id rather than one row hiding three, and the
+ * ledger answers "what happened to generation 2" by subject as it does for any other
+ * record. The detail carries the generation again beside the counts, as the reconciler's
+ * carries its commit sha beside its subject, so a row reads whole.
  *
- * The count has no act: a read writes no row (`[AUDIT8]`).
+ * The count has no act, because a read writes no row.
  */
 const GRAPH_ACTS = declareActs("platform", {
   swept: act("platform.graph.swept", {
@@ -83,7 +84,7 @@ export const graphCounts = async (
 /**
  * Every generation but the live one removed, in one transaction, with its ledger rows
  * written in that same transaction — so a sweep whose events cannot be written removes
- * nothing (`[AUDIT1]`). A workspace with nothing to sweep is *done* with an empty list and
+ * nothing. A workspace with nothing to sweep is *done* with an empty list and
  * writes no row; so is a workspace whose generation row is absent, because a sweep that
  * could not say which generation is live would be a sweep of the map.
  */
