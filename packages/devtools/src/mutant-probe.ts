@@ -1,6 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -17,10 +16,10 @@ import path from "node:path";
  *
  * The mutation is pinned to the source text — a line number and the text that must be on
  * it — so a probe written against one revision refuses to run against another rather than
- * mutating whatever moved there. The suite is the workspace's own vitest, resolved from the
- * directory that holds the file's nearest manifest, with an optional filter; a verdict is
- * only read when the suite ran at least one test, because a suite that collected nothing
- * killed nothing.
+ * mutating whatever moved there. The suite is the workspace's own vitest — the one on the bin
+ * path of the directory holding the file's nearest manifest — with an optional filter; a
+ * verdict is only read when every test file ran, because a file that failed to collect asked
+ * the mutant nothing, and a suite that collected nothing killed nothing.
  */
 
 /** One verdict the probe can reach. What kept it from one is said on stderr, not here. */
@@ -101,16 +100,16 @@ const gitSync = (cwd: string, args: readonly string[]): GitAnswer => {
   return { status: result.status, out: `${result.stdout}${result.stderr}` };
 };
 
-/** The vitest the workspace installed, found from the workspace and not from this package. */
-const vitestEntryFor = (workspace: string): string | undefined => {
-  try {
-    const manifest = createRequire(path.join(workspace, "package.json")).resolve(
-      "vitest/package.json",
-    );
-    return path.join(path.dirname(manifest), "vitest.mjs");
-  } catch {
-    return undefined;
-  }
+/**
+ * The vitest the workspace's own `test` script runs: pnpm's shim on the workspace's bin path,
+ * not vitest's entry module. The shim exports a `NODE_PATH` that reaches pnpm's hoisted
+ * store, and a suite that resolves a platform binary through it — the type-aware linter the
+ * import-direction suite runs — fails to collect when vitest is started any other way, which
+ * would read as a kill the mutation never earned.
+ */
+const vitestShimFor = (workspace: string): string | undefined => {
+  const shim = path.join(workspace, "node_modules", ".bin", "vitest");
+  return existsSync(shim) ? shim : undefined;
 };
 
 /** The mutated file's text, or the reason the mutation does not fit the source. */
@@ -161,6 +160,8 @@ type SuiteOutcome =
 type VitestReport = {
   readonly numTotalTests?: number;
   readonly numFailedTests?: number;
+  readonly numTotalTestSuites?: number;
+  readonly numFailedTestSuites?: number;
   readonly success?: boolean;
 };
 
@@ -189,7 +190,7 @@ const killGroup = (pid: number, signal: NodeJS.Signals): void => {
  */
 const runSuite = (
   workspace: string,
-  entry: string,
+  shim: string,
   mutation: Mutation,
   interrupted: { value: boolean },
 ): Promise<SuiteOutcome> =>
@@ -197,9 +198,8 @@ const runSuite = (
     const reportDirectory = mkdtempSync(path.join(tmpdir(), "mutant-probe-"));
     const reportFile = path.join(reportDirectory, "report.json");
     const child = spawn(
-      process.execPath,
+      shim,
       [
-        entry,
         "run",
         "--reporter=default",
         "--reporter=json",
@@ -253,6 +253,13 @@ const runSuite = (
           kind: "did not run",
           detail: `vitest exited ${code === null ? `on ${String(signal)}` : String(code)} having run no test`,
         });
+      } else if (!report.success && report.numFailedTests === 0) {
+        // A red run with no red test: a file failed to collect, so its tests never asked
+        // the mutant anything. Neither verdict is earned.
+        resolve({
+          kind: "did not run",
+          detail: `${String(report.numFailedTestSuites ?? "some")} of ${String(report.numTotalTestSuites ?? "the")} test files failed to run, and no test failed`,
+        });
       } else {
         resolve({
           kind: "ran",
@@ -290,9 +297,9 @@ export const mutantProbe = async (argv: readonly string[]): Promise<number> => {
     complain(`no package.json above ${mutation.file}, so there is no workspace whose suite to run`);
     return 2;
   }
-  const entry = vitestEntryFor(workspace);
-  if (entry === undefined) {
-    complain(`${workspace} does not install vitest, so its suite cannot be run`);
+  const shim = vitestShimFor(workspace);
+  if (shim === undefined) {
+    complain(`${workspace} has no vitest on its bin path, so its suite cannot be run`);
     return 2;
   }
   const relative = path.relative(workspace, mutation.file);
@@ -326,7 +333,7 @@ export const mutantProbe = async (argv: readonly string[]): Promise<number> => {
     complain(
       `${relative}:${String(mutation.line)} \`${mutation.from}\` → \`${mutation.to}\`, running ${mutation.suite ?? "the whole suite"} in ${workspace}`,
     );
-    outcome = await runSuite(workspace, entry, mutation, interrupted);
+    outcome = await runSuite(workspace, shim, mutation, interrupted);
   } finally {
     writeFileSync(mutation.file, original);
     const restored = readFileSync(mutation.file, "utf8") === original;

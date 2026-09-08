@@ -40,6 +40,9 @@ afterAll(() => {
 /** The installed vitest, linked into each throwaway tree so its suite resolves the import. */
 const vitestRoot = path.dirname(createRequire(import.meta.url).resolve("vitest/package.json"));
 
+/** What pnpm would have put on the tree's bin path: a shim that starts that vitest. */
+const VITEST_SHIM = `#!/bin/sh\nexec node "${path.join(vitestRoot, "vitest.mjs")}" "$@"\n`;
+
 const SOURCE = `export const answer = (n: number): number => n + 1;
 export const label = "answer";
 `;
@@ -67,9 +70,11 @@ it("adds one, slowly", { timeout: 60_000 }, async () => {
 /**
  * A workspace shaped like the ones the probe runs over: a manifest with a `test` script, a
  * source file under `src`, a suite under `test`, everything committed — and the installed
- * vitest linked in, ignored, so the suite's `import "vitest"` resolves from the tree.
+ * vitest linked in, ignored, with a shim on the bin path, so the suite's `import "vitest"`
+ * resolves from the tree and the probe finds vitest where pnpm would have put it. A second
+ * suite file, when a case needs one, is untracked: it is the case's, not the tree's.
  */
-const workspace = (name: string, suite = SUITE): string => {
+const workspace = (name: string, suite = SUITE, extraSuite?: string): string => {
   const root = throwawayRepository(path.join(scratch, name));
   writeUnder(
     root,
@@ -86,8 +91,10 @@ const workspace = (name: string, suite = SUITE): string => {
   writeUnder(root, "test/answer.test.ts", suite);
   gitIn(root, "add", "-A");
   gitIn(root, "commit", "-q", "-m", "tracked");
-  mkdirSync(path.join(root, "node_modules"));
+  mkdirSync(path.join(root, "node_modules/.bin"), { recursive: true });
   symlinkSync(vitestRoot, path.join(root, "node_modules/vitest"));
+  writeFileSync(path.join(root, "node_modules/.bin/vitest"), VITEST_SHIM, { mode: 0o755 });
+  if (extraSuite !== undefined) writeUnder(root, "test/extra.test.ts", extraSuite);
   return root;
 };
 
@@ -232,6 +239,21 @@ describe("the mutant probe over a throwaway workspace (T-098)", () => {
     expect(run.status).not.toBe(0);
     expect(verdictOf(run)).toBeUndefined();
     expect(run.stderr).toContain("did not run");
+    expect(source(root)).toBe(SOURCE);
+  });
+
+  it("refuses a verdict when one test file failed to run, even though every test that ran passed", () => {
+    // The suite that mutated audit's tenancy ternary in the T-098 controls: a file that failed
+    // to collect for a reason of its own, and a red run with no red test. Under the mutation
+    // `label` is blank, which no test checks — so this is not a kill, and it is not a survival
+    // either, because the file that did not run might have asked.
+    const root = workspace("half-ran", SUITE, "this is not a test\n");
+
+    const run = probe(root, { line: 2, from: '"answer"', to: '""' });
+
+    expect(run.status).not.toBe(0);
+    expect(verdictOf(run)).toBeUndefined();
+    expect(run.stderr).toContain("1 of 2 test files failed to run");
     expect(source(root)).toBe(SOURCE);
   });
 
