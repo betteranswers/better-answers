@@ -1,0 +1,19 @@
+apps/api/tests/lefthook-config.test.ts
+  s_ab39f633b089ef::t_6889c59caf6136 74,79,83,86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1a50e7a9e3d5a7cdc79bf500f5a8ca2db0f04f74",
+  "prompts": {},
+  "sessions": {
+    "s_ab39f633b089ef": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a96f8026-e962-4701-9fc2-3116e30f5681",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
