@@ -96,6 +96,11 @@ type BindingRow = {
  * documents, and the guides slice every composition including one of them. A narrowing
  * that changes nothing is allowed and recomputes all the same; the derivation is
  * idempotent.
+ *
+ * The binding's row is read `FOR UPDATE`, so this act queues behind a governed write whose
+ * derivation holds the row `FOR SHARE` (`concepts/visibility.ts`) and its cascade then sees
+ * that write's citation — the other half of the lock that keeps a write landing beside a
+ * narrowing from committing a class the narrowed binding no longer allows.
  */
 export const narrowBinding = async (
   principal: UserPrincipal,
@@ -111,7 +116,7 @@ export const narrowBinding = async (
 
   const known = await attempt(async () => ({
     binding: await tx.query<BindingRow>(
-      "SELECT sensitivity, audience, audience_groups FROM source_binding WHERE workspace_id = $1 AND id = $2",
+      "SELECT sensitivity, audience, audience_groups FROM source_binding WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
       [workspaceId, bindingId.data],
     ),
     groups: await holdsEveryGroup(admin.value, tx, next.audienceGroups ?? []),

@@ -130,6 +130,14 @@ const overrideOf = async (
  * documents a write is *about to* cite, so the governed write can ask **before it commits**
  * what its new evidence would derive and refuse a widening while a refusal still costs no
  * commit. One derivation either way: the same bindings, the same override, the same floor.
+ *
+ * The binding rows are read `FOR SHARE`. Under READ COMMITTED a plain read beside an open
+ * narrowing sees the binding as it was, derives the wider class, and commits after the
+ * narrowing whose cascade never saw this concept's citation — a concept citing a Restricted
+ * binding at Internal until the next recompute. The share lock makes the derivation wait
+ * for a narrowing in flight, and holds the narrowing's own `FOR UPDATE` read
+ * (`sources.narrowBinding`) behind a derivation in flight, so the two orders are the only
+ * two: the write derives from the narrowed binding, or the cascade recomputes the write.
  */
 export const conceptVisibilityFrom = async (
   tx: Tx,
@@ -149,14 +157,16 @@ export const conceptVisibilityFrom = async (
              FROM concept_evidence ce
              JOIN source_document d ON d.workspace_id = ce.workspace_id AND d.id = ce.source_document_id
              JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
-            WHERE ce.workspace_id = $1 AND ce.iri = $2`,
+            WHERE ce.workspace_id = $1 AND ce.iri = $2
+            FOR SHARE OF b`,
           [concept.workspaceId, concept.iri],
         )
       : await tx.query<VisibilityRow>(
           `SELECT b.sensitivity, b.audience, b.audience_groups
              FROM source_document d
              JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
-            WHERE d.workspace_id = $1 AND d.id = ANY($2::text[])`,
+            WHERE d.workspace_id = $1 AND d.id = ANY($2::text[])
+            FOR SHARE OF b`,
           [concept.workspaceId, [...new Set(concept.citing)]],
         );
   const override = await overrideOf(tx, concept.workspaceId, concept.iri);

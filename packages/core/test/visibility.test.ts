@@ -65,6 +65,22 @@ const rowAndNode = async (workspaceId: string, iri: string) => ({
 /** The row and the node both at one pair — the derivation's answer, on the map too. */
 const bothAt = (pair: object) => ({ row: pair, node: pair });
 
+/**
+ * Whether some other connection to this suite's database is waiting on a row lock, polled
+ * for up to five seconds — how a test about two connections sees that the second has
+ * reached the row the first holds, rather than guessing from a pause.
+ */
+const someoneWaitsOnALock = async (): Promise<boolean> => {
+  for (let polled = 0; polled < 50; polled += 1) {
+    const found = await db().pool.query(
+      "SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'",
+    );
+    if ((found.rowCount ?? 0) > 0) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return false;
+};
+
 /** A composition seeded as including these concepts, Internal and open to everyone. */
 const compositionIncluding = (workspaceId: string, iris: readonly string[]): Promise<string> =>
   seededBy(db(), async (seed) => {
@@ -548,6 +564,53 @@ describe("narrowing a binding", () => {
       "malformed",
       "malformed",
     ]);
+  });
+
+  it("holds a write landing beside it until it has committed, so the write derives from the narrowed binding and never lands wider", async () => {
+    const scenario = await arrange();
+    const binding = await bindingHolding(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
+
+    // The narrowing on a second connection, held open across the write: READ COMMITTED
+    // would let a plain read of the binding see the row before the narrowing and derive
+    // Internal, then commit after it — a concept citing a Restricted binding at Internal
+    // until the next recompute. The write has to wait on the binding row instead.
+    const narrowing = await db().runtimePool.connect();
+    try {
+      await narrowing.query("BEGIN");
+      await narrowing.query("SELECT set_config('app.workspace_id', $1, true)", [
+        scenario.workspaceId,
+      ]);
+      const narrowed = await narrowBinding(scenario.admin, narrowing, {
+        bindingId: binding.bindingId,
+        sensitivity: "Restricted",
+        audience: "everyone",
+      });
+      expect(narrowed.ok).toBe(true);
+
+      let settled = false;
+      const write = rewriteCiting(scenario, scenario.editor, written, [binding.documentId]).then(
+        (outcome) => {
+          settled = true;
+          return outcome;
+        },
+      );
+      // The write is queued on a row the narrowing holds — seen from the database itself,
+      // because "still pending after a pause" would also be true of a write that was merely
+      // slow to reach it.
+      expect(await someoneWaitsOnALock()).toBe(true);
+      expect(settled).toBe(false);
+
+      await narrowing.query("COMMIT");
+      expect(await write).toMatchObject({ ok: true });
+    } finally {
+      // A no-op after the COMMIT; what frees the write if an assertion above failed first.
+      await attempt(() => narrowing.query("ROLLBACK"));
+      narrowing.release();
+    }
+    expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
+      bothAt({ sensitivity: "Restricted", ...EVERYONE }),
+    );
   });
 
   it("leaves neither the narrowed row, nor the cascade, nor its ledger row when the transaction fails after it", async () => {
