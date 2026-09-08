@@ -145,8 +145,9 @@ describe("the warm harness", () => {
     // on the file's database by the facts the run provides every file, and it keeps an
     // `error` listener the harness's pools have no need of, because the termination it is
     // about to receive is this test's outcome and not a throw. Kept, not `once`: pg raises a
-    // second `error` for the socket closing under a client that never called `end()`, and
-    // only the first — the termination's own code — is the answer.
+    // second `error` for the socket closing under a client that never called `end()`
+    // (pg 8.23.0 `lib/client.js:203-224`), and only the first — the termination's own code —
+    // is the answer.
     const warm = inject("warmPostgres");
     if (warm === undefined) throw new Error("this run provided no warm cluster");
     const held = await openMigratedPostgres("held-open");

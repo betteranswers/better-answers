@@ -94,15 +94,21 @@ const withAdmin = async <T>(
 };
 
 /**
- * How long `stop()` waits for a file's own sessions to leave its database before dropping it
- * anyway, and how often it looks. A backend that has read its Terminate is gone within a
- * millisecond or so; the allowance is a runaway guard for one that never reads it, so a
- * wedged session cannot hold a teardown open to the hook allowance.
+ * How long `stop()` waits for the sessions on a file's database to leave before dropping it
+ * anyway. A backend that has read its Terminate leaves at once; the allowance is a runaway
+ * guard for one that never reads it, so a wedged session cannot hold a teardown open to the
+ * hook allowance.
  */
 const SESSIONS_GONE_TIMEOUT_MS = 5_000;
+
+/** How often the wait looks again. */
 const SESSIONS_GONE_POLL_MS = 20;
 
-/** The sessions still open on a database — a file's own, once its pools have been told to end. */
+/**
+ * The sessions still open on a database: a file's own pools' clients on their way out, and
+ * anything a test left connected. Client backends only, because an autovacuum worker on the
+ * database carries its `datname` too and would hold the wait for nothing it owns.
+ */
 const sessionsOn = async (admin: pg.Client, database: string): Promise<number> => {
   const counted = await admin.query<{ n: number }>(
     "SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = $1 AND backend_type = 'client backend'",
@@ -121,8 +127,9 @@ const sessionsOn = async (admin: pg.Client, database: string): Promise<number> =
  * socket (pg 8.23.0 `lib/connection.js:210-219`). So when `stop()` reaches the drop, every
  * backend has been told to leave and may not yet have read it. A `DROP DATABASE … WITH
  * (FORCE)` that lands first sends that backend SIGTERM; it answers on the still-open socket
- * with FATAL 57P01, which pg raises as `error` on the client (`lib/client.js:416-423`)
- * whatever its `_ending` says, the client's one listener hands it to the pool (pg-pool
+ * with FATAL 57P01, which pg reads as a backend error message with no query active
+ * (`lib/client.js:426-435`) and raises as `error` on the client (`lib/client.js:416-423`)
+ * whatever its `_ending` says; the client's one listener hands it to the pool (pg-pool
  * `index.js:52-62`), and a pool with no `error` listener throws it — an unhandled error
  * blamed on whichever test file was tearing down.
  *
