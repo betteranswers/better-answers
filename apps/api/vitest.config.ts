@@ -10,8 +10,9 @@ export default defineConfig({
     globalSetup: ["@better-answers/schema/testing/warm-postgres"],
     // A cold run pulls the Postgres image before the first test.
     testTimeout: 60_000,
-    // A runaway guard, not a budget: the room is for the opener's cold fallback, which pays a
-    // container start where the warm path pays a template copy. `image.test.ts` sets its own.
+    // A runaway guard, not a budget: it decides how long a wedged cluster hangs before Vitest
+    // calls it. The template copy it governs is milliseconds; nothing healthy approaches this.
+    // `image.test.ts` sets its own, because a docker build is not this call.
     hookTimeout: 120_000,
   },
 });
