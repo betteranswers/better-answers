@@ -69,6 +69,12 @@ xfail_strict = true
 # leg rejoins the schedule with it.
 # `check.py` is the check runner script, not tier behaviour — the same reason `apps/api`
 # leaves `main.ts` and `migrate.ts` out of Stryker's `mutate`.
+# `tests/` below is the selection mutmut's stats pass collects, not what every mutant runs:
+# a mutant runs only the tests that pass recorded against its function, and one no test
+# reached is reported "no tests". So `tests/test_image.py`, which builds the worker image,
+# costs one build per `mutmut run` — for as long as it imports nothing from
+# `src/better_answers_worker` in-process, which is the same constraint
+# `apps/api/tests/image-probe.ts` states for Stryker's static-mutant filter.
 [tool.mutmut]
 source_paths = ["src/better_answers_worker"]
 do_not_mutate = ["src/better_answers_worker/check.py"]
