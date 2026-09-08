@@ -1,0 +1,35 @@
+apps/api/tests/oauth-flow.test.ts
+  s_0c3bfea64667cc::t_b285bcc877f39e 40
+.github/workflows/mutation.yml
+  s_0c3bfea64667cc::t_b285bcc877f39e 39-40
+apps/api/tests/mcp-surface.test.ts
+  s_0c3bfea64667cc::t_b285bcc877f39e 25
+packages/core/vitest.config.ts
+  s_0c3bfea64667cc::t_bf57580fac87bd 13-15
+packages/schema/test/rls.test.ts
+  s_0c3bfea64667cc::t_bf57580fac87bd 38
+packages/schema/vitest.config.ts
+  s_0c3bfea64667cc::t_bf57580fac87bd 15-17
+packages/schema/test/boundary-schemas.test.ts
+  s_0c3bfea64667cc::t_bf57580fac87bd 462
+packages/schema/test/worker-schema-view.test.ts
+  s_0c3bfea64667cc::t_bf57580fac87bd 28
+packages/core/test/suite-postgres.ts
+  s_0c3bfea64667cc::t_bf57580fac87bd 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a7a9ee93bacc36f3d01cff1812ce0bb27d7e7c04",
+  "prompts": {},
+  "sessions": {
+    "s_0c3bfea64667cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9d3ba688-6883-4a0b-bfd6-2d1c408628e5",
+        "model": "claude-opus-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
