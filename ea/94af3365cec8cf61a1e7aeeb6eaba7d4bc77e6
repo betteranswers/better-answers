@@ -1,0 +1,24 @@
+packages/core/test/graph.test.ts
+  s_9735fc29ef62df::t_91b9cd74dd880d 470-495,503,513-514,519,521-522,527,531-532,537,557-558,563,573,578-579,584,595,601-602,607,619-620,625,633,639,643,651,656,660,670,676,678,681
+  s_9735fc29ef62df::t_29013fb72ee32f 385
+  s_9735fc29ef62df::t_99c682cbd40bc1 349-368,371
+packages/core/test/principal.test.ts
+  s_9735fc29ef62df::t_91b9cd74dd880d 364-367
+  s_9735fc29ef62df::t_351b93990802c8 351-361,370-373
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ea94af3365cec8cf61a1e7aeeb6eaba7d4bc77e6",
+  "prompts": {},
+  "sessions": {
+    "s_9735fc29ef62df": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "947d5c06-ba2f-479f-a6b2-58726b109426",
+        "model": "claude-opus-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
