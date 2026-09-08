@@ -86,10 +86,13 @@ export const readingAs = async <T>(
  * Wait for a condition the database reports, polling rather than sleeping: a slow machine
  * takes more turns to see the same state instead of failing a stopwatch. The cap is a
  * runaway guard, not a timing assumption — a test fails on it only if the state never
- * arrives at all.
+ * arrives at all. Forty-five seconds, because the root `check` runs every workspace's suite
+ * at once (CI too) and under that load a governed write took more than the five seconds an
+ * earlier cap allowed to reach the row it parks on; the file's own 60 s test timeout is what
+ * this must stay inside.
  */
 export const until = async (condition: () => Promise<boolean>): Promise<void> => {
-  for (let turn = 0; turn < 200; turn += 1) {
+  for (let turn = 0; turn < 1_800; turn += 1) {
     if (await condition()) return;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }

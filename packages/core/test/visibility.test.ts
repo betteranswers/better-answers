@@ -15,6 +15,7 @@ import { footnotesOf } from "../src/guides/index.ts";
 import { attempt, type UserPrincipal } from "../src/kernel/index.ts";
 import { narrowBinding } from "../src/sources/index.ts";
 import { bundleHistory } from "./bundle.ts";
+import { until } from "./suite-postgres.ts";
 import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
 import {
   bindingForGroups,
@@ -66,19 +67,16 @@ const rowAndNode = async (workspaceId: string, iri: string) => ({
 const bothAt = (pair: object) => ({ row: pair, node: pair });
 
 /**
- * Whether some other connection to this suite's database is waiting on a row lock, polled
- * for up to five seconds — how a test about two connections sees that the second has
- * reached the row the first holds, rather than guessing from a pause.
+ * Whether some other connection to this suite's database is waiting on a row lock — how a
+ * test about two connections sees that the second has reached the row the first holds,
+ * rather than guessing from a pause. Polled through `until`, whose cap is the one runaway
+ * guard every two-connection test here shares.
  */
 const someoneWaitsOnALock = async (): Promise<boolean> => {
-  for (let polled = 0; polled < 50; polled += 1) {
-    const found = await db().pool.query(
-      "SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'",
-    );
-    if ((found.rowCount ?? 0) > 0) return true;
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  return false;
+  const found = await db().pool.query(
+    "SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'",
+  );
+  return (found.rowCount ?? 0) > 0;
 };
 
 /** A composition seeded as including these concepts, Internal and open to everyone. */
@@ -595,7 +593,7 @@ describe("narrowing a binding", () => {
         settled = true;
         return outcome;
       });
-      expect(await someoneWaitsOnALock()).toBe(true);
+      await until(someoneWaitsOnALock);
       expect(settled).toBe(false);
 
       await narrowing.query("COMMIT");
