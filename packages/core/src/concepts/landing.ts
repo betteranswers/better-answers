@@ -20,7 +20,7 @@ import {
 import type { ActorId, Principal } from "../kernel/index.ts";
 import type { Committed } from "../store/git/index.ts";
 import { recomputeCompositionsIncluding } from "../guides/index.ts";
-import { writeConceptDelta } from "../store/graph/index.ts";
+import { citedSourcesOf, writeConceptDelta } from "../store/graph/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import type { Frontmatter } from "./file.ts";
 import { markDeciding } from "./inbox.ts";
@@ -382,7 +382,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
     kind: index.kind,
     path: index.path,
     body: index.body,
-    frontmatter: index.frontmatter ?? {},
+    sources: citedSourcesOf(index.frontmatter ?? {}),
     publishedAt: index.publishedAt ?? null,
     ...visibility,
     status: index.status,

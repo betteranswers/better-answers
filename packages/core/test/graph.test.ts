@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { QueryResultRow } from "pg";
 
 import {
+  citedSourcesOf,
   GRAPH_WALK_DEPTH,
   GRAPH_WALK_ROW_LIMIT,
   walkFrom,
@@ -301,7 +302,7 @@ const deltaOf = (row: IndexRow, overrides: Partial<ConceptDelta> = {}): ConceptD
     kind: row.kind,
     path: row.path,
     body: row.body,
-    frontmatter: row.frontmatter,
+    sources: citedSourcesOf(row.frontmatter),
     publishedAt: row.publishedAt,
     sensitivity: row.sensitivity,
     audience: row.audience,
