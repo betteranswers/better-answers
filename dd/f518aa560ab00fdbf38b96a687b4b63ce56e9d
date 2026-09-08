@@ -1,0 +1,33 @@
+docs/adr/README.md
+  s_f34fe14b1ea788::t_5c6b3ee37a6401 32
+docs/adr/0024-the-forge-is-bare-git-repositories-the-app-writes-and-two-4gb-boxes-run-v01.md
+  s_f34fe14b1ea788::t_bd6b6e1850626d 43-48
+packages/core/src/store/git/index.ts
+  s_f34fe14b1ea788::t_5b2aea1e0aab60 57-59
+  s_f34fe14b1ea788::t_76b00e6bf105ba 51-56,60-76
+  s_f34fe14b1ea788::t_b49ea73b37aee7 202-204
+  s_f34fe14b1ea788::t_0f063b3828ca7b 2
+packages/core/test/bundle.ts
+  s_f34fe14b1ea788::t_c0ecb0b1a3d8f0 38-43
+packages/core/test/git.test.ts
+  s_f34fe14b1ea788::t_c93ac6b476f6aa 2,12
+  s_f34fe14b1ea788::t_99c1b4443b8cbd 81-100
+CONTEXT.md
+  s_f34fe14b1ea788::t_b76ddebdb4a049 494-496
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ddf518aa560ab00fdbf38b96a687b4b63ce56e9d",
+  "prompts": {},
+  "sessions": {
+    "s_f34fe14b1ea788": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e15aef24-178a-41a4-8fe6-f8657414f765",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
