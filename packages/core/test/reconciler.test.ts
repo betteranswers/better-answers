@@ -683,6 +683,36 @@ describe("a commit the rows cannot take", () => {
     expect(await replayedEvents(scenario.workspaceId)).toEqual([]);
   });
 
+  it("stops at a commit that moves a concept to another path, as the live handler refuses a rename, and leaves the row where it was", async () => {
+    const scenario = await arrange();
+    const input = guideline("Bridges");
+    const written = await landed(scenario, scenario.editor, input);
+    // The concept's own file, committed at another path through the door — a rename the live
+    // act never makes (ADR 0012: a rename is a governed move that rewrites inbound links),
+    // so nothing but a hand-forged commit can put one on the ref.
+    const moved = await commit(scenario.editor, scenario.git, {
+      path: "knowledge/guidelines/bridges-moved.md",
+      content: await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path),
+      message: "Move the bridges guideline by hand",
+      author: { name: "Grace Editor", email: "grace@acme.invalid" },
+      trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
+      expectedHead: written.sha,
+    });
+    expect(moved.ok).toBe(true);
+
+    const run = await reconciled(scenario);
+
+    expect(run).toMatchObject({
+      replayed: [],
+      stopped: { sha: moved.ok ? moved.value.sha : "", reason: "rename-refused" },
+    });
+    expect(await conceptRow(scenario.workspaceId, written.iri)).toMatchObject({
+      path: input.path,
+      commit_sha: written.sha,
+    });
+    expect(await recordedChain(scenario.workspaceId)).toEqual([[written.sha, null]]);
+  });
+
   it("stops at a commit the governed write did not make, rather than guessing what it meant", async () => {
     const scenario = await arrange();
     // A commit through the door itself, carrying a file outside the renderer's grammar.
@@ -829,6 +859,9 @@ describe("a concept file read back", () => {
     ["a list mixing strings and entries", '---\n"tags":\n  - "a"\n  - "k": 1\n---\n\n'],
     ["an object where a scalar goes", '---\n"title": {"a": 1}\n---\n\n'],
     ["an item outside a list", '---\n  - "a"\n---\n\n'],
+    // The renderer writes each key once; a second `iri` or `type` would otherwise be the
+    // one a hand-forged commit chose, quietly winning over the first.
+    ["a key written twice", '---\n"title": "one"\n"title": "two"\n---\n\n'],
   ])("refuses what the renderer never wrote — %s", (_shape, file) => {
     expect(parseConceptFile(file)).toEqual({ ok: false, error: "malformed" });
   });

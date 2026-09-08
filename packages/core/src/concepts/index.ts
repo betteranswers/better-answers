@@ -578,7 +578,9 @@ export const parseConceptFile = (
   let at = 1;
   while (at < close) {
     const pair = pairOf(lines[at] ?? "");
-    if (pair === undefined) return err("malformed");
+    // A key the renderer wrote once and the file carries twice is a file it did not write:
+    // letting the later one win would let a forged `iri` or `type` win over the first.
+    if (pair === undefined || Object.hasOwn(frontmatter, pair.key)) return err("malformed");
     at += 1;
     if (pair.rest !== undefined) {
       const value = pair.rest === "[]" ? [] : scalarOf(pair.rest);
@@ -1643,11 +1645,18 @@ const RECONCILER_ACTS = declareActs("platform", {
 /**
  * Why one commit could not be replayed. `unreadable-commit` is a commit the governed write
  * did not make — no `Actor:` or `Audit:` trailer, no single concept file, a file outside the
- * renderer's grammar, or a creation whose file names no `type` or `title`. The other two are
- * the index refusing the rows the commit would need, which is what a commit the live act
- * could not record either looks like on replay.
+ * renderer's grammar, or a creation whose file names no `type` or `title`. `rename-refused`
+ * is a commit that puts a concept's file at a path other than the one its row holds — the
+ * move the live handler refuses before it commits, so only a commit the governed write did
+ * not make can carry one, and the replay stops at it rather than landing a rename by
+ * recovery. The other two are the index refusing the rows the commit would need, which is
+ * what a commit the live act could not record either looks like on replay.
  */
-export type ReplayRefusal = "unreadable-commit" | "path-taken" | "merge-key-taken";
+export type ReplayRefusal =
+  | "unreadable-commit"
+  | "rename-refused"
+  | "path-taken"
+  | "merge-key-taken";
 
 export type Reconciled = {
   readonly workspaceId: string;
@@ -1802,6 +1811,10 @@ const replayCommit = async (
         if ((known.rowCount ?? 0) > 0) return ok("skipped");
 
         const held = await heldByIri(platform, tx, facts.iri);
+        // The one refusal the live act reads off the row that a replay has to read again: a
+        // file at a path the row does not hold is a rename, which the handler never makes,
+        // and the replay stops there as it stops at a path the index refuses (ADR 0012).
+        if (held !== undefined && held.path !== facts.path) return err("rename-refused");
         const payload =
           facts.suggestionId === undefined
             ? undefined
