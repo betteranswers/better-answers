@@ -36,6 +36,8 @@ permissions:
 jobs:
   stryker:
     runs-on: ubuntu-latest
+    # A leg that restores nothing is the week this has to cover, and both finish inside an
+    # hour; the rest is room for the hardening tickets ahead lengthening both suites.
     timeout-minutes: 120
     strategy:
       fail-fast: false
@@ -57,13 +59,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # Last week's mutant results — or, after an overrun, the cancelled leg's own — so a file
-      # nobody touched is not re-tested. Every mutant costs a Postgres container start, which is
-      # what makes this worth a cache step at all.
+      # nobody touched is not re-tested.
       # A cache entry is written once and never overwritten, so a fixed key would pin the first
       # week's results forever: the run id makes the key new every time — so the entry is always
-      # saved — and the prefix restores the newest one this workspace has. A week where nothing
-      # restores (a first run, or GitHub evicting an entry it has not seen read for seven days,
-      # which a weekly schedule sits exactly on) is a full run: slower, never wrong.
+      # saved — and the prefix restores the newest one this workspace has. The attempt number is
+      # on the key too, because a re-run keeps the run id and would reserve its own first
+      # attempt's entry, be refused, and discard what it proved.
+      # A week where nothing restores (a first run, or GitHub evicting an entry it has not seen
+      # read for seven days, which a weekly schedule sits exactly on) is a full run: slower,
+      # never wrong, and `timeout-minutes` above is sized for exactly that week.
       # Restore and save are separate steps because the combined action saves in a post step
       # conditioned on success, which discards the checkpoint of the one run that needed to keep
       # it — a leg cancelled at the job timeout. Split, the save below carries `always()` and an
@@ -74,7 +78,7 @@ jobs:
           # The path is the workspace's `incrementalFile`, which is where the reason for it
           # sitting under `reports/` rather than under the run's temp directory is written.
           path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
-          key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}
+          key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: stryker-incremental-${{ matrix.name }}-
       # Cancellation signals the step's entry process and nothing under it, and a shell waiting
       # on a child forwards no signal: behind `pnpm run mutation`, with a pnpm and an sh in
@@ -93,7 +97,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
-          key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}
+          key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: score to the job summary
         if: always()
         run: |

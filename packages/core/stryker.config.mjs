@@ -46,10 +46,13 @@ export default {
   // colour the report alone.
   thresholds: { high: 80, low: 60, break: null },
 
-  // Every data suite here opens a migrated Testcontainers Postgres in its `beforeAll`, and
-  // Vitest resets module state per run — so a mutant pays a container start before its
-  // first assertion, and the timeout has to clear one.
-  timeoutMS: 300_000,
+  // Slack over the covering tests' measured time and Stryker's own measured overhead, so it
+  // need only clear a file's re-import and its template copy. A hung mutant is billed it.
+  timeoutMS: 30_000,
+
+  // Never raise: restarting a worker discards the Postgres container its `globalSetup` started,
+  // and every mutant after it pays a container start again.
+  maxTestRunnerReuse: 0,
 
   // Each test runner process owns a Postgres container. Two is what a 2-vCPU hosted runner
   // can hold without the containers starving each other (`runs-on` in the workflow).
