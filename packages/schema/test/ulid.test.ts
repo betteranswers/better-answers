@@ -55,7 +55,7 @@ describe("the minter, for anything that keeps an id", () => {
 
     const [first, second] = [ulid(), ulid()];
 
-    expect(second?.slice(0, 10)).toBe(first?.slice(0, 10));
+    expect(second.slice(0, 10)).toBe(first.slice(0, 10));
   });
 
   it("mints ids that sort in the order they were minted, across two instants and across a year", () => {

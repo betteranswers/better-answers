@@ -40,7 +40,7 @@ type Field = {
 };
 
 const invitationFields = (): Readonly<Record<string, Field>> => {
-  const plugins: readonly unknown[] = auth.options.plugins ?? [];
+  const plugins: readonly unknown[] = auth.options.plugins;
   const organisation = plugins.find(
     (plugin): plugin is { schema?: { invitation?: { fields?: Record<string, Field> } } } =>
       typeof plugin === "object" &&

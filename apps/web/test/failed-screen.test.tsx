@@ -111,7 +111,7 @@ describe("a screen that throws", () => {
 
     // The card threw a `TypeError` reading `.map` off an object. None of that is a reader's:
     // it names the platform's own internals and there is nothing a reader can do with it.
-    const shown = container.textContent ?? "";
+    const shown = container.textContent;
     expect(shown).not.toContain("map is not a function");
     expect(shown).not.toContain("TypeError");
     expect(shown).not.toContain("Error");

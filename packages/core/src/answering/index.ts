@@ -373,7 +373,7 @@ export const open = async (
   tx: Tx,
   input: OpenInput,
 ): Promise<Result<OpenResult, Error>> => {
-  if (input.iri === undefined) return ok({ found: false, locator: input.locator ?? "" });
+  if (input.iri === undefined) return ok({ found: false, locator: input.locator });
 
   const concept = await conceptByIri(principal, tx, input.iri);
   if (!concept.ok) return err(concept.error);

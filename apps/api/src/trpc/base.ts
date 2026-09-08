@@ -67,7 +67,7 @@ export const workspaceProcedure = trpc.procedure.use(async ({ ctx, next }) => {
     });
   }
   const session = read.value;
-  if (session === null || session === undefined) throw unauthorized("no-session");
+  if (session === null) throw unauthorized("no-session");
 
   // The session is read once and handed to the same reader `/me` passes, so the
   // difference between "not signed in" and "no workspace picked" is kept.

@@ -1529,8 +1529,8 @@ describe("the per-repository lock", () => {
       write(scenario, scenario.editor, writeFor()),
     ]);
 
-    expect([first?.ok, second?.ok].toSorted()).toEqual([false, true]);
-    const refused = first?.ok === false ? first : second;
+    expect([first.ok, second.ok].toSorted()).toEqual([false, true]);
+    const refused = first.ok === false ? first : second;
     expect(refused).toEqual({ ok: false, error: "stale-precondition" });
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
     expect(history).toHaveLength(1);

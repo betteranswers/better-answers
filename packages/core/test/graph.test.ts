@@ -621,6 +621,16 @@ describe("what a body's markdown makes an edge of", () => {
     ]);
   });
 
+  it("never closes a run with one of another length, so a link between the two stays prose", async () => {
+    const { target, links } = await derived("See ``[the product](./product.md)` for tiers.");
+
+    // Two lengths, one run each, neither paired: a scanner that took the next run of *any*
+    // length as the closer would blank the link between them and derive nothing.
+    expect(links).toEqual([
+      { to_uid: target.iri, section: null, sentence: "See ``the product` for tiers." },
+    ]);
+  });
+
   it("takes a definition from a line of its own, however it spaces the colon, and from nowhere else", async () => {
     const { target, links } = await derived(
       [

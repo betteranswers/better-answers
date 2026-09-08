@@ -39,7 +39,7 @@ describe("the SPA's tRPC client", () => {
       </Providers>,
     );
 
-    expect(JSON.parse(screen.getByTestId("probe").textContent ?? "null")).toEqual([
+    expect(JSON.parse(screen.getByTestId("probe").textContent)).toEqual([
       ["routes", "list"],
       { type: "query" },
     ]);

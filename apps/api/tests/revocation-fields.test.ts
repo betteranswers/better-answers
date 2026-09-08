@@ -34,7 +34,7 @@ const PLATFORM_DATE = { type: "date", required: false, input: false };
 
 /** The organisation plugin's member schema, off the built instance's plugin list. */
 const memberSchema = (): { additionalFields?: Record<string, Declared> } | undefined => {
-  const plugins: readonly unknown[] = auth.options.plugins ?? [];
+  const plugins: readonly unknown[] = auth.options.plugins;
   const organisation = plugins.find(
     (
       plugin,
@@ -51,7 +51,7 @@ const memberSchema = (): { additionalFields?: Record<string, Declared> } | undef
 
 describe("the revocation instants the identity provider carries", () => {
   it("gives a person one instant on their user row, which the person cannot set", () => {
-    const fields: Record<string, Declared> = auth.options.user?.additionalFields ?? {};
+    const fields: Record<string, Declared> = auth.options.user.additionalFields;
 
     expect(platformWritten(fields["credentialsRevokedAt"])).toEqual(PLATFORM_DATE);
   });

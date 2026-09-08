@@ -4,6 +4,7 @@ import {
   oxlintOverrideFor,
   readOxlintConfig,
   repositoryRoot,
+  type OxlintConfig,
 } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver, type Tree } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
@@ -199,12 +200,13 @@ describe("no block is empty, and a swallowed error is a commented decision", () 
 /**
  * A tree the type-aware linter can build a program from. `tsgolint` reads a `tsconfig.json`
  * to type the files it lints, so a type-aware rule over a tree without one has nothing to
- * say — which would read as the rule staying silent.
+ * say — which would read as the rule staying silent. `include` is the program's, so a case
+ * about a path outside `src` names the directory that holds it.
  */
-const typedTree = (files: Tree): Tree => ({
+const typedTree = (files: Tree, include: readonly string[] = ["src"]): Tree => ({
   "tsconfig.json": JSON.stringify({
     compilerOptions: { target: "esnext", module: "esnext", strict: true, noEmit: true },
-    include: ["src"],
+    include,
   }),
   ...files,
 });
@@ -237,6 +239,79 @@ describe("no promise floats — an unawaited call is awaited or `void`", () => {
     const output = lintPromises(typedTree({ "src/awaited.ts": callsRevoke("await revoke();") }));
 
     expect(output).not.toContain("src/awaited.ts");
+  });
+});
+
+/**
+ * A module reading a session the reader answers as a record or `null`, refusing it with
+ * `guard` — the shape the tRPC base had when T-102 switched the rule on.
+ */
+const refusesSession = (guard: string): string =>
+  `type Session = { readonly id: string };\nconst readSession = (): Session | null => null;\n\nexport const sessionId = (): string => {\n  const session = readSession();\n  if (${guard}) return "";\n  return session.id;\n};\n`;
+
+const UNNECESSARY_CONDITION = "typescript/no-unnecessary-condition";
+const REGISTRY_ZONE = "apps/web/src/shared/ui/**";
+
+/**
+ * The registry override, narrowed to the one rule under test. `ruleRunner` refuses a rule an
+ * override re-sets, because a runner that dropped the override would prove the rule somewhere
+ * it no longer holds; this runner carries the override instead and proves the zone both ways.
+ * The other rules that override relaxes stay out, so a plugin the throwaway config never loads
+ * is never named in it.
+ */
+const registryZone = (): OxlintConfig["overrides"][number] => {
+  const override = oxlintOverrideFor(REGISTRY_ZONE);
+  const setting = override.rules?.[UNNECESSARY_CONDITION];
+  return {
+    files: override.files,
+    rules: setting === undefined ? {} : { [UNNECESSARY_CONDITION]: setting },
+  };
+};
+
+describe("one guard per condition — a value the type refused is not refused again ([DESIGN4])", () => {
+  const twice = typedTree({
+    "src/twice.ts": refusesSession("session === null || session === undefined"),
+  });
+  const lintGuards = oxlintOver(
+    JSON.stringify({
+      plugins: config.plugins,
+      options: config.options,
+      rules: { [UNNECESSARY_CONDITION]: severityOf(UNNECESSARY_CONDITION) },
+      overrides: [registryZone()],
+    }),
+    { tree: twice, flagged: ["src/twice.ts"] },
+  ).output;
+
+  it("fires on a guard the type makes unreachable — the second half of a check on `T | null`", () => {
+    const output = lintGuards(twice);
+
+    expect(output).toContain("src/twice.ts");
+    expect(output).toContain("no-unnecessary-condition");
+  });
+
+  it("stays silent on the one guard the type leaves reachable", () => {
+    const output = lintGuards(typedTree({ "src/once.ts": refusesSession("session === null") }));
+
+    expect(output).not.toContain("src/once.ts");
+  });
+
+  it("leaves registry source as its upstream wrote it (ADR 0033), and fires on the same source one directory over", () => {
+    const output = lintGuards(
+      typedTree(
+        {
+          "apps/web/src/shared/ui/twice.ts": refusesSession(
+            "session === null || session === undefined",
+          ),
+          "apps/web/src/features/twice.ts": refusesSession(
+            "session === null || session === undefined",
+          ),
+        },
+        ["apps"],
+      ),
+    );
+
+    expect(output).toContain("apps/web/src/features/twice.ts");
+    expect(output).not.toContain("apps/web/src/shared/ui/twice.ts");
   });
 });
 
