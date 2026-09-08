@@ -8,6 +8,7 @@
     "check:workspaces": "pnpm -r --no-bail --if-present run check",
     "check:worker": "cd apps/worker && uv run --frozen check",
     "jscpd": "node scripts/jscpd.mjs",
+    "mutant-probe": "node scripts/mutant-probe.mjs",
     "lint": "oxlint",
     "knip": "knip",
     "format": "oxfmt",

@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./jscpd": "./src/jscpd.ts",
+    "./mutant-probe": "./src/mutant-probe.ts",
     "./oxlint-config": "./src/oxlint-config.ts",
     "./throwaway-tree": "./src/throwaway-tree.ts"
   },

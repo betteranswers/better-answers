@@ -16,6 +16,11 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import {
+  gitIn as git,
+  throwawayRepository,
+  writeUnder as write,
+} from "@better-answers/devtools/throwaway-tree";
 import { afterAll, describe, expect, it } from "vitest";
 
 /**
@@ -35,12 +40,12 @@ import { afterAll, describe, expect, it } from "vitest";
  * one skill tracked under `.claude/skills/`, the rest installed and ignored. Nothing here
  * touches the real checkout or its worktrees.
  *
- * The tree is built here rather than through `@better-answers/devtools/throwaway-tree`,
- * whose tree is a flat record of file contents run by a package's binary: this tool is a
- * repository script, and what it is proved over is a git repository with a worktree and
- * symlinks, which that runner cannot write. The runner's two fences are kept by hand — every
- * exit but zero is read with what the script wrote (`ready`), and the copy case above is the
- * smoke case that proves the reporter before any silence is read as a stage staying quiet.
+ * The tree is not the runner's flat record of file contents run by a package's binary: this
+ * tool is a repository script, and what it is proved over is a git repository with a worktree
+ * and symlinks. It is built from the devtools' throwaway repository instead, and the runner's
+ * two fences are kept by hand — every exit but zero is read with what the script wrote
+ * (`ready`), and the copy case above is the smoke case that proves the reporter before any
+ * silence is read as a stage staying quiet.
  */
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
@@ -50,19 +55,6 @@ const scratch = mkdtempSync(path.join(tmpdir(), "provision-skills-"));
 afterAll(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
-
-const git = (directory: string, ...args: readonly string[]): void => {
-  const result = spawnSync("git", ["-C", directory, ...args], { encoding: "utf8" });
-  if (result.status !== 0) {
-    throw new Error(`git ${args.join(" ")} failed:\n${result.stdout}\n${result.stderr}`);
-  }
-};
-
-const write = (root: string, relative: string, content: string): void => {
-  const destination = path.join(root, relative);
-  mkdirSync(path.dirname(destination), { recursive: true });
-  writeFileSync(destination, content);
-};
 
 /** A relative symlink from `.claude/skills/<name>` into `.agents/skills/<name>`. */
 const linkSkill = (root: string, name: string, target = `../../.agents/skills/${name}`): void => {
@@ -85,11 +77,7 @@ const TRACKED_SKILL = "# browser-suite\n\nThe one skill this repository wrote.\n
  * manifest, then the installed tooling on top, untracked and ignored.
  */
 const primaryCheckout = (name: string, installed: boolean): string => {
-  const root = path.join(scratch, name);
-  mkdirSync(root);
-  git(root, "init", "-q", "-b", "main");
-  git(root, "config", "user.email", "test@example.invalid");
-  git(root, "config", "user.name", "provision-skills test");
+  const root = throwawayRepository(path.join(scratch, name));
   write(root, ".gitignore", IGNORE);
   write(root, ".claude/skills/browser-suite/SKILL.md", TRACKED_SKILL);
   write(root, "skills-lock.json", '{ "version": 1, "skills": {} }\n');

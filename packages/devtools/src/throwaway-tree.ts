@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -98,12 +98,42 @@ const resolveExecutable = (tool: Tool): string => {
   return binary;
 };
 
+/** Write `content` at `relative` under `root`, making the directories on the way. */
+export const writeUnder = (root: string, relative: string, content: string): void => {
+  const destination = path.join(root, relative);
+  mkdirSync(path.dirname(destination), { recursive: true });
+  writeFileSync(destination, content);
+};
+
 const writeTree = (directory: string, tree: Tree): void => {
-  for (const [file, source] of Object.entries(tree)) {
-    const destination = path.join(directory, file);
-    mkdirSync(path.dirname(destination), { recursive: true });
-    writeFileSync(destination, source);
+  for (const [file, source] of Object.entries(tree)) writeUnder(directory, file, source);
+};
+
+/**
+ * Run one git command in `directory` and hand back its stdout; a non-zero exit is thrown with
+ * both streams, because a throwaway repository that failed to take shape must not read as one
+ * that did.
+ */
+export const gitIn = (directory: string, ...args: readonly string[]): string => {
+  const result = spawnSync("git", ["-C", directory, ...args], { encoding: "utf8" });
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(" ")} failed:\n${result.stdout}\n${result.stderr}`);
   }
+  return result.stdout;
+};
+
+/**
+ * A throwaway git repository at `root`, for the tools whose subject is a repository rather
+ * than a flat tree — a worktree to provision, a file to mutate and restore against `HEAD`.
+ * Made, initialised on `main` and given an identity, so the caller's next line can commit;
+ * what it holds is the caller's to write, with `writeUnder` and `gitIn`.
+ */
+export const throwawayRepository = (root: string): string => {
+  mkdirSync(root);
+  gitIn(root, "init", "-q", "-b", "main");
+  gitIn(root, "config", "user.email", "test@example.invalid");
+  gitIn(root, "config", "user.name", "throwaway repository");
+  return root;
 };
 
 /**
