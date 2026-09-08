@@ -27,7 +27,7 @@ import {
 import { recomputeCompositionsIncluding } from "../guides/index.ts";
 import { holdsEveryGroup } from "../members/index.ts";
 import { writeConceptVisibility } from "../store/graph/index.ts";
-import type { Tx } from "../store/postgres/index.ts";
+import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 
 /**
  * The concepts slice's half of *who may see this* (ADR 0023, ADR 0039; T-006 spec,
@@ -83,20 +83,20 @@ export type Citation = {
  * file would be a second opinion about the relation the derivation depends on.
  */
 export const replaceCitations = async (
+  principal: Principal,
   tx: Tx,
-  workspaceId: string,
   iri: string,
   citations: readonly Citation[],
 ): Promise<void> => {
-  await tx.query("DELETE FROM concept_evidence WHERE workspace_id = $1 AND iri = $2", [
-    workspaceId,
-    iri,
-  ]);
+  await tx.query(
+    `DELETE FROM concept_evidence WHERE workspace_id = ${scopeClause(1)} AND iri = $2`,
+    [scopeParameter(principal), iri],
+  );
   for (const citation of citations) {
     await tx.query(
       `INSERT INTO concept_evidence (workspace_id, iri, source_document_id, locator)
-       VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
-      [workspaceId, iri, citation.sourceDocumentId, citation.locator],
+       VALUES (${scopeClause(1)}, $2, $3, $4) ON CONFLICT DO NOTHING`,
+      [scopeParameter(principal), iri, citation.sourceDocumentId, citation.locator],
     );
   }
 };
@@ -105,14 +105,14 @@ export const replaceCitations = async (
 type OverrideRow = VisibilityRow & { readonly actor: string; readonly recorded_at: Date };
 
 const overrideOf = async (
+  principal: Principal,
   tx: Tx,
-  workspaceId: string,
   iri: string,
 ): Promise<OverrideRow | undefined> => {
   const found = await tx.query<OverrideRow>(
     `SELECT sensitivity, audience, audience_groups, actor, recorded_at
-       FROM concept_class_override WHERE workspace_id = $1 AND iri = $2`,
-    [workspaceId, iri],
+       FROM concept_class_override WHERE workspace_id = ${scopeClause(1)} AND iri = $2`,
+    [scopeParameter(principal), iri],
   );
   return found.rows[0];
 };
@@ -140,9 +140,9 @@ const overrideOf = async (
  * two: the write derives from the narrowed binding, or the cascade recomputes the write.
  */
 export const conceptVisibilityFrom = async (
+  principal: Principal,
   tx: Tx,
   concept: {
-    readonly workspaceId: string;
     readonly iri: string;
     readonly kind: string;
     readonly fallback: Visibility;
@@ -163,19 +163,19 @@ export const conceptVisibilityFrom = async (
              FROM concept_evidence ce
              JOIN source_document d ON d.workspace_id = ce.workspace_id AND d.id = ce.source_document_id
              JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
-            WHERE ce.workspace_id = $1 AND ce.iri = $2
+            WHERE ce.workspace_id = ${scopeClause(1)} AND ce.iri = $2
             FOR SHARE OF b`,
-          [concept.workspaceId, concept.iri],
+          [scopeParameter(principal), concept.iri],
         )
       : await tx.query<VisibilityRow>(
           `SELECT b.sensitivity, b.audience, b.audience_groups
              FROM source_document d
              JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
-            WHERE d.workspace_id = $1 AND d.id = ANY($2::text[])
+            WHERE d.workspace_id = ${scopeClause(1)} AND d.id = ANY($2::text[])
             FOR SHARE OF b`,
-          [concept.workspaceId, [...new Set(concept.citing)]],
+          [scopeParameter(principal), [...new Set(concept.citing)]],
         );
-  const override = await overrideOf(tx, concept.workspaceId, concept.iri);
+  const override = await overrideOf(principal, tx, concept.iri);
   return derivedVisibility({
     kind: concept.kind,
     from: [...bindings.rows.map(visibilityOf), ...(concept.alsoOn ?? [])],
@@ -184,28 +184,28 @@ export const conceptVisibilityFrom = async (
   });
 };
 
-type IndexVisibilityRow = VisibilityRow & { readonly kind: string };
+type IndexVisibilityRow = VisibilityRow & { readonly workspace_id: string; readonly kind: string };
 
 /**
  * One concept re-derived from the rows as they stand and rewritten — the index row and,
  * through the graph door, the map's copies of it — in the caller's transaction. What the
  * row holds now is the fallback, so a concept whose citations no longer resolve keeps its
- * class rather than taking a default nobody decided.
+ * class rather than taking a default nobody decided. The graph door is handed the row's
+ * own workspace, which is what its copies carry.
  */
 const recomputeConceptVisibility = async (
   principal: Principal,
   tx: Tx,
-  workspaceId: string,
   iri: string,
 ): Promise<Visibility | undefined> => {
   const held = await tx.query<IndexVisibilityRow>(
-    "SELECT kind, sensitivity, audience, audience_groups FROM concept_index WHERE workspace_id = $1 AND iri = $2",
-    [workspaceId, iri],
+    `SELECT workspace_id, kind, sensitivity, audience, audience_groups FROM concept_index
+      WHERE workspace_id = ${scopeClause(1)} AND iri = $2`,
+    [scopeParameter(principal), iri],
   );
   const row = held.rows[0];
   if (row === undefined) return undefined;
-  const visibility = await conceptVisibilityFrom(tx, {
-    workspaceId,
+  const visibility = await conceptVisibilityFrom(principal, tx, {
     iri,
     kind: row.kind,
     fallback: visibilityOf(row),
@@ -213,9 +213,13 @@ const recomputeConceptVisibility = async (
   await tx.query(
     `UPDATE concept_index SET sensitivity = $3, audience = $4, audience_groups = $5, updated_at = now()
       WHERE workspace_id = $1 AND iri = $2`,
-    [workspaceId, iri, visibility.sensitivity, visibility.audience, visibility.audienceGroups],
+    [row.workspace_id, iri, visibility.sensitivity, visibility.audience, visibility.audienceGroups],
   );
-  await writeConceptVisibility(principal, tx, { workspaceId, iri, ...visibility });
+  await writeConceptVisibility(principal, tx, {
+    workspaceId: row.workspace_id,
+    iri,
+    ...visibility,
+  });
   return visibility;
 };
 
@@ -229,19 +233,19 @@ const recomputeConceptVisibility = async (
 export const recomputeVisibilitySourcedFrom = async (
   principal: Principal,
   tx: Tx,
-  input: { readonly workspaceId: string; readonly bindingId: string },
+  input: { readonly bindingId: string },
 ): Promise<readonly string[]> => {
   const citing = await tx.query<{ iri: string }>(
     `SELECT DISTINCT ce.iri
        FROM concept_evidence ce
        JOIN source_document d ON d.workspace_id = ce.workspace_id AND d.id = ce.source_document_id
-      WHERE ce.workspace_id = $1 AND d.binding_id = $2
+      WHERE ce.workspace_id = ${scopeClause(1)} AND d.binding_id = $2
       ORDER BY ce.iri`,
-    [input.workspaceId, input.bindingId],
+    [scopeParameter(principal), input.bindingId],
   );
   const moved: string[] = [];
   for (const { iri } of citing.rows) {
-    const visibility = await recomputeConceptVisibility(principal, tx, input.workspaceId, iri);
+    const visibility = await recomputeConceptVisibility(principal, tx, iri);
     if (visibility !== undefined) moved.push(iri);
   }
   return moved;
@@ -339,8 +343,8 @@ export const overrideConceptClass = async (
     detail: { iri: iri.data, sensitivity: visibility.sensitivity, audience: visibility.audience },
   });
   const cascaded = await attempt(async () => {
-    await recomputeConceptVisibility(admin.value, tx, workspaceId, iri.data);
-    return recomputeCompositionsIncluding(admin.value, tx, { workspaceId, iris: [iri.data] });
+    await recomputeConceptVisibility(admin.value, tx, iri.data);
+    return recomputeCompositionsIncluding(admin.value, tx, { iris: [iri.data] });
   });
   if (!cascaded.ok) return err(cascaded.error);
   return ok({ iri: iri.data, auditEventId, visibility, compositions: cascaded.value });
@@ -433,7 +437,7 @@ export const evidencePaneOf = async (
     return {
       cited: cited.rows[0]?.cited ?? 0,
       readable: readable.rows,
-      override: await overrideOf(tx, principal.workspaceId, iri),
+      override: await overrideOf(principal, tx, iri),
     };
   });
   if (!read.ok) return err(read.error);

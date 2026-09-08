@@ -27,7 +27,13 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { withRepositoryLock, type GitDoor } from "../store/git/index.ts";
-import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import {
+  scopeClause,
+  scopeParameter,
+  withMembership,
+  type PostgresDoor,
+  type Tx,
+} from "../store/postgres/index.ts";
 import type { Frontmatter } from "./index.ts";
 
 /**
@@ -580,9 +586,8 @@ export const targetOfMergeKey = async (
   mergeKey: string,
 ): Promise<string | undefined> => {
   const found = await tx.query<{ iri: string }>(
-    `SELECT iri FROM concept_identity
-      WHERE workspace_id = COALESCE($1::text, (select current_workspace_id())) AND merge_key = $2`,
-    [principal.kind === "user" ? principal.workspaceId : null, mergeKey],
+    `SELECT iri FROM concept_identity WHERE workspace_id = ${scopeClause(1)} AND merge_key = $2`,
+    [scopeParameter(principal), mergeKey],
   );
   return found.rows[0]?.iri;
 };

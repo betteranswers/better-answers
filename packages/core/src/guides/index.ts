@@ -13,7 +13,7 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import type { Tx } from "../store/postgres/index.ts";
+import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 
 /**
  * Slice: **guides** — guides, compositions, includes, sections, footnotes, the renderer,
@@ -36,8 +36,8 @@ export type Footnote = {
   readonly title: string;
 };
 
-/** A composition's own three columns, read as the fallback its recompute keeps. */
-type CompositionRow = VisibilityRow & { readonly id: string };
+/** A composition's own three columns, read as the fallback its recompute keeps, and its keys. */
+type CompositionRow = VisibilityRow & { readonly workspace_id: string; readonly id: string };
 
 /**
  * The cascade's second level, in the caller's transaction: every composition including one
@@ -49,24 +49,24 @@ type CompositionRow = VisibilityRow & { readonly id: string };
  * Takes the transaction rather than a door, so its failure aborts the act it runs inside
  * (the kernel's result convention, rule 5): a recompute that could half-land would leave the
  * guide-footnote leak ADR 0023's two-level rule exists to close. The Principal is either
- * kind — a person's narrowing, or the platform's replay — and the workspace is the caller's,
- * as the rows it recomputes carry it.
+ * kind — a person's narrowing or write, or the platform's replay — and names the workspace
+ * the statements reach, through the Postgres door's one idiom for both kinds.
  *
  * Answers the ids of the compositions it rewrote, so the act can say what it moved.
  */
 export const recomputeCompositionsIncluding = async (
-  _principal: Principal,
+  principal: Principal,
   tx: Tx,
-  input: { readonly workspaceId: string; readonly iris: readonly string[] },
+  input: { readonly iris: readonly string[] },
 ): Promise<readonly string[]> => {
   if (input.iris.length === 0) return [];
   const including = await tx.query<CompositionRow>(
-    `SELECT DISTINCT p.id, p.sensitivity, p.audience, p.audience_groups
+    `SELECT DISTINCT p.workspace_id, p.id, p.sensitivity, p.audience, p.audience_groups
        FROM composition p
        JOIN composition_include i ON i.workspace_id = p.workspace_id AND i.composition_id = p.id
-      WHERE p.workspace_id = $1 AND i.iri = ANY($2::text[])
+      WHERE p.workspace_id = ${scopeClause(1)} AND i.iri = ANY($2::text[])
       ORDER BY p.id`,
-    [input.workspaceId, [...new Set(input.iris)]],
+    [scopeParameter(principal), [...new Set(input.iris)]],
   );
   const moved: string[] = [];
   for (const composition of including.rows) {
@@ -75,7 +75,7 @@ export const recomputeCompositionsIncluding = async (
          FROM composition_include i
          JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
         WHERE i.workspace_id = $1 AND i.composition_id = $2`,
-      [input.workspaceId, composition.id],
+      [composition.workspace_id, composition.id],
     );
     const derived = derivedVisibility({
       from: includes.rows.map(visibilityOf),
@@ -85,7 +85,7 @@ export const recomputeCompositionsIncluding = async (
       `UPDATE composition SET sensitivity = $3, audience = $4, audience_groups = $5
         WHERE workspace_id = $1 AND id = $2`,
       [
-        input.workspaceId,
+        composition.workspace_id,
         composition.id,
         derived.sensitivity,
         derived.audience,

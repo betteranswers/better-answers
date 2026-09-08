@@ -145,11 +145,9 @@ export const narrowBinding = async (
   });
   const cascaded = await attempt(async () => {
     const concepts = await recomputeVisibilitySourcedFrom(admin.value, tx, {
-      workspaceId,
       bindingId: bindingId.data,
     });
     const compositions = await recomputeCompositionsIncluding(admin.value, tx, {
-      workspaceId,
       iris: concepts,
     });
     return { concepts, compositions };

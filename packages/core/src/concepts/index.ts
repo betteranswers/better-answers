@@ -64,7 +64,14 @@ import {
 } from "../store/git/index.ts";
 import { recomputeCompositionsIncluding } from "../guides/index.ts";
 import { writeConceptDelta } from "../store/graph/index.ts";
-import { withMembership, withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import {
+  scopeClause,
+  scopeParameter,
+  withMembership,
+  withScope,
+  type PostgresDoor,
+  type Tx,
+} from "../store/postgres/index.ts";
 import { workspaceIds } from "../workspaces/index.ts";
 import {
   markDeciding,
@@ -686,10 +693,10 @@ const heldByIri = async (principal: Principal, tx: Tx, iri: string): Promise<Hel
             c.status, c.content_hash, c.published_at
        FROM concept_index c
        JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
-      WHERE c.workspace_id = COALESCE($1::text, (select current_workspace_id())) AND c.iri = $2
+      WHERE c.workspace_id = ${scopeClause(1)} AND c.iri = $2
         ${predicate}`,
     [
-      principal.kind === "user" ? principal.workspaceId : null,
+      scopeParameter(principal),
       iri,
       ...(principal.kind === "user" ? readableParameters(principal) : []),
     ],
@@ -877,8 +884,7 @@ export const writeConcept = async (
           derived:
             held === undefined
               ? undefined
-              : await conceptVisibilityFrom(tx, {
-                  workspaceId: fresh.workspaceId,
+              : await conceptVisibilityFrom(fresh, tx, {
                   iri,
                   kind: foldKind(input.kind),
                   fallback: heldVisibilityOf(held),
@@ -1110,15 +1116,14 @@ const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<v
     );
   }
   if (index.evidence !== undefined) {
-    await replaceCitations(tx, index.workspaceId, index.iri, index.evidence);
+    await replaceCitations(principal, tx, index.iri, index.evidence);
   }
   const held = visibilityOf({
     sensitivity: index.sensitivity,
     audience: index.audience,
     audience_groups: index.audienceGroups ?? null,
   });
-  const visibility = await conceptVisibilityFrom(tx, {
-    workspaceId: index.workspaceId,
+  const visibility = await conceptVisibilityFrom(principal, tx, {
     iri: index.iri,
     kind: index.kind,
     fallback: held,
@@ -1178,10 +1183,7 @@ const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<v
   // restrictive of its includes, and an include that just narrowed narrows it now, in this
   // transaction — the same rule the narrowing act runs (ADR 0023, ADR 0039).
   if (!sameVisibility(held, visibility)) {
-    await recomputeCompositionsIncluding(principal, tx, {
-      workspaceId: index.workspaceId,
-      iris: [index.iri],
-    });
+    await recomputeCompositionsIncluding(principal, tx, { iris: [index.iri] });
   }
   if (index.acceptance === undefined) return;
 
@@ -1799,10 +1801,11 @@ const fileCitesTheStandingEvidence = async (
 };
 
 /** The last commit the rows know about, or nothing — the watermark the scan starts after. */
-const lastRecordedCommit = async (tx: Tx, workspaceId: string): Promise<string | null> => {
+const lastRecordedCommit = async (platform: PlatformPrincipal, tx: Tx): Promise<string | null> => {
   const found = await tx.query<{ sha: string }>(
-    "SELECT sha FROM bundle_commit WHERE workspace_id = $1 ORDER BY committed_at DESC, sha DESC LIMIT 1",
-    [workspaceId],
+    `SELECT sha FROM bundle_commit WHERE workspace_id = ${scopeClause(1)}
+      ORDER BY committed_at DESC, sha DESC LIMIT 1`,
+    [scopeParameter(platform)],
   );
   return found.rows[0]?.sha ?? null;
 };
@@ -1959,7 +1962,7 @@ export const reconcile = async (
 
   return withRepositoryLockAs(platform, doors.git, workspaceId, async () => {
     const watermark = await attempt(() =>
-      withScope(platform, doors.postgres, workspaceId, (tx) => lastRecordedCommit(tx, workspaceId)),
+      withScope(platform, doors.postgres, workspaceId, (tx) => lastRecordedCommit(platform, tx)),
     );
     if (!watermark.ok) return err(watermark.error);
     const scanned = await commitsAfter(platform, doors.git, workspaceId, watermark.value);
