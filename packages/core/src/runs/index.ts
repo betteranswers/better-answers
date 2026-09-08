@@ -226,14 +226,23 @@ export const enqueueJob = async (
  * `no-such-job` rather than an empty answer, because a caller polling an id it was handed and
  * finding nothing has been given the wrong id or the wrong workspace, and a `null` would let
  * it poll that mistake until its timeout.
+ *
+ * **A person reading one is an Admin**, which is `bundleHealth`'s gate beside it and for the
+ * same reason: an audit's `outcome` carries the paths of every file whose hash disagreed with
+ * its row, and there is no other read in this slice through which a Viewer or an Editor sees
+ * the shape of the bundle. Scope is not the gate here — the policy admits every member of the
+ * workspace — so the role is checked beside the data access, in front of it. The platform road
+ * has no role to check and is the one the ops command's `--wait` polls on.
  */
 export const jobById = async (
   principal: Principal,
   door: PostgresDoor,
   input: { readonly workspaceId: string; readonly jobId: string },
-): Promise<Result<JobState, "no-such-job" | PrincipalRefusal | Error>> => {
-  if (principal.kind === "user" && input.workspaceId !== principal.workspaceId) {
-    return err("no-such-job");
+): Promise<Result<JobState, "no-such-job" | RoleRefusal | PrincipalRefusal | Error>> => {
+  if (principal.kind === "user") {
+    const admin = requireAdmin(principal);
+    if (!admin.ok) return err(admin.error);
+    if (input.workspaceId !== principal.workspaceId) return err("no-such-job");
   }
   const read = await inWorkspace(principal, door, input.workspaceId, (tx) =>
     tx.query<JobRow>(

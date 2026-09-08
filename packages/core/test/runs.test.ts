@@ -246,6 +246,32 @@ describe("waiting on a job somebody queued", () => {
     });
   });
 
+  it("refuses a Viewer and an Editor, because an audit's outcome names the bundle's files", async () => {
+    // `bundleHealth`'s gate, for the material it has it for: a finished audit's outcome lists
+    // every file whose hash disagreed with its row, and no other read in this slice shows a
+    // member below Admin the shape of the bundle. Scope does not decide it — every member of
+    // the workspace passes the policy — so the role is checked in front of the read.
+    const scenario = await arrange();
+    const cron = await enqueueJob(graphMaintenance, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+      kind: "nightly-audit",
+    });
+    if (!cron.ok) throw new Error(`the job was not queued: ${String(cron.error)}`);
+    const asking = { workspaceId: scenario.workspaceId, jobId: cron.value.jobId };
+
+    for (const person of [scenario.viewer, scenario.editor]) {
+      const asked = await jobById(person, scenario.postgres, asking);
+      expect({ role: person.role, asked }).toEqual({
+        role: person.role,
+        asked: { ok: false, error: "role-forbids" },
+      });
+    }
+    // The two roads that may read it are unaffected: the workspace's Admin, and the platform
+    // principal the ops command's `--wait` polls under, which has no role to check at all.
+    expect((await jobById(scenario.admin, scenario.postgres, asking)).ok).toBe(true);
+    expect((await jobById(graphMaintenance, scenario.postgres, asking)).ok).toBe(true);
+  });
+
   it("says no-such-job for an id this workspace never held, rather than an empty answer", async () => {
     // A caller polling an id it was never given has the wrong id or the wrong workspace; a
     // null would let it poll that mistake until its timeout.
