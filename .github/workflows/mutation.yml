@@ -1,6 +1,8 @@
 # Mutation testing on a schedule: Stryker for apps/api and packages/core.
-# WEEKLY on hosted runners, not nightly: a nightly run is ~1,800 of the 2,000 free minutes on a 2-vCPU runner
-# (ticket 41 Q1, research 69). Nightly returns with a self-hosted runner on VPC 2 — a one-line runs-on change.
+# WEEKLY, Sundays 02:17 UTC, on hosted runners. The cadence is a choice and not a budget — the
+# repository is public, so hosted standard runners carry no minute cap, and both legs finish
+# inside an hour — and the coding rules' mutation-schedule rule is where the choice is made and
+# where it changes (nightly is sequenced behind T-090's summary, T-106).
 # A falling score is an ordna task, not a failed build — the job posts the numbers, it does not gate.
 # Stryker does not exit non-zero on a survivor here (thresholds.break is null in both configs), so a red
 # job means the harness itself broke, which is worth seeing.

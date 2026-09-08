@@ -13,6 +13,17 @@ export default {
   mutate: ["src/**/*.ts", "!src/main.ts", "!src/migrate.ts"],
   coverageAnalysis: "perTest",
 
+  // A mutant no test covers per test — a module-level declaration, run once when the file
+  // loads — is "static" to the planner. With this off the planner runs the whole suite for
+  // it; when that run completes no test, the report says `Survived` with `testsCompleted: 0`,
+  // a mutant nothing tested counted as one everything failed to kill (31 such rows across
+  // T-088 and T-089's reports, all on `declareActs` strings). With it on, a static mutant with
+  // no per-test coverage is `Ignored` under Stryker's own reason string and leaves the score,
+  // while a hybrid mutant — static plus per-test coverage — still runs against its covering
+  // tests. Read from @stryker-mutator/core 10.0.0, `dist/src/mutants/mutant-test-planner.js`
+  // lines 71–99 (`planMutant`: the `isStatic` / `ignoreStatic` decision), on 08/09/2026.
+  ignoreStatic: true,
+
   // Stryker's sandbox copies the workspace to a temp directory and rewrites `extends` in the
   // copied tsconfig — but that rewrite calls `ts.parseConfigFileTextToJson`, which TypeScript 7
   // no longer exposes, and without it Vite cannot resolve `../../tsconfig.base.json` from the
