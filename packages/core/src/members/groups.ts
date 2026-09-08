@@ -335,19 +335,27 @@ export const removeFromGroup = async (
  * word for that rather than landing a row the predicate reads as *nobody*. A read of the
  * slice's own table, in the caller's transaction; the ids are the boundary's shape already,
  * or the caller would not hold a `GroupId`. Empty is vacuously true: *everyone* names none.
+ *
+ * **An Admin's question, refused to anyone else before the table is read**: its callers are
+ * the Admin acts that write an audience, and which groups a workspace holds is what an
+ * audience is written against — the same reason `listGroups` is an Admin's — so an Editor
+ * reaching this would have an existence oracle over the group table that no verb of this
+ * slice grants them.
  */
 export const holdsEveryGroup = async (
   principal: UserPrincipal,
   tx: Tx,
   groupIds: readonly GroupId[],
-): Promise<boolean> => {
+): Promise<Result<boolean, RoleRefusal>> => {
+  const admin = requireAdmin(principal);
+  if (!admin.ok) return err(admin.error);
   const distinct = [...new Set(groupIds)];
-  if (distinct.length === 0) return true;
+  if (distinct.length === 0) return ok(true);
   const found = await tx.query<{ held: number }>(
     `SELECT count(*)::int AS held FROM "group" WHERE workspace_id = $1 AND id = ANY($2::text[])`,
-    [principal.workspaceId, distinct],
+    [admin.value.workspaceId, distinct],
   );
-  return found.rows[0]?.held === distinct.length;
+  return ok(found.rows[0]?.held === distinct.length);
 };
 
 /**

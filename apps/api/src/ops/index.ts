@@ -122,19 +122,21 @@ const REBUILD_DEFAULT_REASON = "drill";
 
 /**
  * How long `--wait` waits, and how often it looks. ADR 0032 promises the rebuild in two
- * minutes and the drill's report times it against that; ten minutes is the point past which
- * an operator should be reading the worker's own rows rather than this line, so it is a
- * refusal and not a longer wait. An estate whose worker is slower says `--wait <seconds>`,
- * which is the flag's other shape and not a second constant.
+ * minutes per workspace and the drill's report times it against that, so two minutes is the
+ * default: a rebuild not over by then has missed the promise, and the command refuses rather
+ * than masking the miss by waiting on. An estate whose worker is slower, or an operator who
+ * knows why this one is, says so explicitly with `--wait-seconds <n>`; the default is never
+ * longer than the budget it stands for.
  */
-const WAIT_SECONDS = 600;
+const WAIT_SECONDS = 120;
 const WAIT_POLL_MS = 2_000;
 
 const USAGE_TEXT = `usage: pnpm ops <command> [options]
   replay-erasures --since <dump stamp | ISO instant>      re-apply every erasure completed after a dump (mandatory in every restore)
-  graph-rebuild --workspace <id> [--reason <word>] [--wait [seconds]]   the map made again by the worker (ADR 0023, 0032)
+  graph-rebuild --workspace <id> [--reason <word>] [--wait | --wait-seconds <n>]   the map made again by the worker (ADR 0023, 0032)
     --reason  one of ${REBUILD_REASONS.join(" · ")} (default ${REBUILD_DEFAULT_REASON})
-    --wait    poll the job until it is over, ${WAIT_SECONDS} seconds unless another number is given
+    --wait    poll the job until it is over, ${WAIT_SECONDS} seconds — the per-workspace budget (ADR 0032)
+    --wait-seconds <n>  the same, for a whole number of seconds an operator names instead
   graph-sweep --workspace <id>                              delete every generation of the map but the live one
   graph-counts --workspace <id>                             nodes per label and edges, as JSON, for the drill's diff
   reconcile-watermark --workspace <id>                      recovery order step 2: replay the commits the rows missed (ADR 0012)
@@ -345,14 +347,17 @@ const rebuildReasonOf = (flags: Flags): RebuildReason | undefined => {
 };
 
 /**
- * `--wait` in its two shapes: bare, which is the default budget, or a whole number of
- * seconds. Nothing at all means do not wait; `"malformed"` is a value that is neither.
+ * The wait, in its two flags: a bare `--wait` is the budget, and `--wait-seconds <n>` is a
+ * whole number of seconds an operator names instead. Nothing at all means do not wait;
+ * `"malformed"` is a `--wait` carrying a value or a `--wait-seconds` that is not a count.
  */
 const waitSecondsOf = (flags: Flags): number | "malformed" | undefined => {
-  const given = flags.get("wait");
-  if (given === undefined) return undefined;
-  if (given === true) return WAIT_SECONDS;
-  const seconds = Number(given);
+  const bare = flags.get("wait");
+  const named = flags.get("wait-seconds");
+  if (bare === undefined && named === undefined) return undefined;
+  if (bare !== undefined && bare !== true) return "malformed";
+  if (named === undefined) return WAIT_SECONDS;
+  const seconds = Number(named);
   return Number.isInteger(seconds) && seconds > 0 ? seconds : "malformed";
 };
 
@@ -369,8 +374,8 @@ const after = (ms: number): Promise<void> =>
  * *Done* is the one status that is done. **Failed and poisoned are refusals**, because the
  * drill's next step diffs this workspace's counts against production's and a map that was
  * never rebuilt would fail that comparison for the wrong reason; and so is a job still on
- * the queue when the budget runs out, because a worker that has not claimed a rebuild in ten
- * minutes is the thing an operator has to look at.
+ * the queue when the budget runs out, because a worker that has not claimed a rebuild in the
+ * two minutes the promise allows is the thing an operator has to look at.
  */
 const waitForJob = async (
   door: PostgresDoor,
@@ -418,7 +423,7 @@ const graphRebuildCommand = async (
   }
   const wait = waitSecondsOf(flags);
   if (wait === "malformed") {
-    io.say("graph-rebuild: --wait takes no value, or a whole number of seconds");
+    io.say("graph-rebuild: --wait takes no value; --wait-seconds takes a whole number of seconds");
     return USAGE;
   }
   const door = openPostgres(pool);

@@ -1,5 +1,5 @@
 {
-  "id": "f20290e0-66a6-49ec-89f2-ffea14de4225",
+  "id": "e945b1eb-3936-4de7-a8fe-d6dc07cf712d",
   "prevId": "aabba22b-0e2e-400e-a6c1-7f8450bcb337",
   "version": "7",
   "dialect": "postgresql",
@@ -4416,7 +4416,7 @@
         },
         "job_claim_check": {
           "name": "job_claim_check",
-          "value": "(claimed_by IS NULL) = (claimed_at IS NULL)"
+          "value": "(claimed_by IS NULL) = (claimed_at IS NULL)\n         AND (status <> 'claimed'\n              OR (claimed_by IS NOT NULL AND claimed_at IS NOT NULL\n                  AND lease_expires_at IS NOT NULL AND heartbeat_at IS NOT NULL))"
         },
         "job_finished_check": {
           "name": "job_finished_check",
@@ -4424,7 +4424,7 @@
         },
         "job_outcome_check": {
           "name": "job_outcome_check",
-          "value": "outcome IS NULL OR status IN ('done', 'failed')"
+          "value": "(outcome IS NOT NULL) = (status IN ('done', 'failed'))"
         }
       },
       "isRLSEnabled": true

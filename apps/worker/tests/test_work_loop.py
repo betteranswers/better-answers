@@ -24,6 +24,11 @@ import pytest
 
 from better_answers_worker import health, loop, queue
 from better_answers_worker.audit import run_audit
+from better_answers_worker.bundle import (
+    NotAWorkspaceIdError,
+    concepts_at_head,
+    repository_path,
+)
 from better_answers_worker.concept_file import content_hash_of, parse_concept_file
 from better_answers_worker.config import Bootstrap
 from better_answers_worker.ids import ulid
@@ -100,6 +105,22 @@ def seed_concept(
     return content
 
 
+def seed_expenses(
+    cursor: psycopg.Cursor,
+    workspace: str,
+    body: str = "Expenses are claimed within sixty days.",
+) -> str:
+    """The one concept most cases here start from, as the app would have written it."""
+    return seed_concept(
+        cursor,
+        workspace_id=workspace,
+        iri=IRI,
+        path="knowledge/expenses.md",
+        frontmatter={"title": "Expenses", "type": "Policy", "iri": IRI},
+        body=body,
+    )
+
+
 def bootstrap_for(database: psycopg.Connection, git_store: Path) -> Bootstrap:
     return Bootstrap(
         database_url=_WHERE[database],
@@ -114,14 +135,7 @@ def test_the_loop_claims_runs_and_finishes_a_nightly_audit_it_scheduled_itself(
     workspace = seed_workspace(database.cursor())["id"]
     body = "Expenses are claimed within sixty days."
     with database.cursor() as cursor:
-        content = seed_concept(
-            cursor,
-            workspace_id=workspace,
-            iri=IRI,
-            path="knowledge/expenses.md",
-            frontmatter={"title": "Expenses", "type": "Policy", "iri": IRI},
-            body=body,
-        )
+        content = seed_expenses(cursor, workspace, body)
     database.commit()
     write_bundle(tmp_path, workspace, {"knowledge/expenses.md": content})
 
@@ -234,6 +248,140 @@ def test_a_claim_is_visible_and_the_lease_moves_while_a_job_runs_through_the_loo
     assert (finished[0], finished[2]) == ("done", True)
 
 
+def test_a_failed_audit_counts_as_run_so_the_loop_queues_no_other_every_idle_tick(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = seed_workspace(database.cursor())["id"]
+    database.commit()
+    # A bundle directory that is not a repository: the audit raises on it, and the job
+    # ends *failed* — the terminal verdict an operator should be reading.
+    (tmp_path / f"{workspace}.git").mkdir()
+    bootstrap = bootstrap_for(database, tmp_path)
+
+    assert loop.tick(database, bootstrap) is False  # schedules the audit
+    assert loop.tick(database, bootstrap) is True  # claims it, and it fails
+    # And the next idle tick schedules nothing: a failure is the last audit this loop
+    # ran, not an audit that never happened, so the next one comes round a day later.
+    assert loop.tick(database, bootstrap) is False
+
+    with database.cursor() as cursor:
+        cursor.execute(
+            "SELECT status FROM job WHERE workspace_id = %s ORDER BY enqueued_at",
+            (workspace,),
+        )
+        assert cursor.fetchall() == [("failed",)]
+
+
+def test_refuses_a_workspace_id_that_is_not_one_before_it_touches_the_store(
+    tmp_path: Path,
+) -> None:
+    # Every id the loop hands this module came off a row the app wrote; what these hold
+    # is that the path is arithmetic over an id and never over a caller's string.
+    workspace = ulid()
+    (tmp_path / "store").mkdir()
+
+    assert repository_path(str(tmp_path / "store"), workspace) == (
+        (tmp_path / "store" / f"{workspace}.git").resolve()
+    )
+    for escape in ("../escape", "..", f"{workspace}/../..", "", workspace.lower()):
+        with pytest.raises(NotAWorkspaceIdError):
+            concepts_at_head(str(tmp_path / "store"), escape)
+
+    # And a repository directory that is a link out of the store is refused too — the
+    # shape check cannot see it, the containment check can.
+    elsewhere = tmp_path / "elsewhere.git"
+    elsewhere.mkdir()
+    (tmp_path / "store" / f"{workspace}.git").symlink_to(elsewhere)
+    with pytest.raises(NotAWorkspaceIdError):
+        concepts_at_head(str(tmp_path / "store"), workspace)
+
+
+def test_a_rebuild_holds_the_generation_row_before_it_reads_so_a_write_beside_it_lands(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    """The app's delta takes the generation row as it lands an edit; a rebuild that read
+    the records before taking that row would build the next generation without the edit
+    a concurrent write had not yet committed, and lose it at the flip. So the row comes
+    first: here a write is held open beyond its index row and its generation lock, the
+    rebuild is started beside it and seen from the database to be waiting, and the
+    write then commits — and the generation the rebuild flips live carries its concept.
+    """
+    workspace = seed_workspace(database.cursor())["id"]
+    with database.cursor() as cursor:
+        expenses = seed_expenses(cursor, workspace)
+        cursor.execute(
+            "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, 1)",
+            (workspace,),
+        )
+    database.commit()
+    dsn = _WHERE[database]
+
+    outcomes: list[Any] = []
+    with psycopg.connect(dsn) as writer, queue.connected(dsn) as worker:
+        with writer.cursor() as cursor:
+            # The write, as the app lands it: the commit is already in the bundle
+            # (below), its index row is written, and it holds the generation row the
+            # delta takes — uncommitted, for as long as the rebuild is made to wait.
+            receipts = seed_concept(
+                cursor,
+                workspace_id=workspace,
+                iri=OTHER_IRI,
+                path="knowledge/receipts.md",
+                frontmatter={"title": "Receipts", "type": "Evidence", "iri": OTHER_IRI},
+                body="Receipts are kept for six years.",
+                kind="Evidence",
+            )
+            cursor.execute(
+                "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, 1)"
+                " ON CONFLICT (workspace_id) DO UPDATE"
+                " SET live_gen = graph_generation.live_gen RETURNING live_gen",
+                (workspace,),
+            )
+        write_bundle(
+            tmp_path,
+            workspace,
+            {"knowledge/expenses.md": expenses, "knowledge/receipts.md": receipts},
+        )
+
+        def rebuild() -> None:
+            with scoped(worker, workspace) as cursor:
+                outcomes.append(run_rebuild(cursor, str(tmp_path), workspace))
+
+        rebuilding = threading.Thread(target=rebuild)
+        rebuilding.start()
+        try:
+            waiting = None
+            for _ in range(200):
+                with database.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT 1 FROM pg_stat_activity"
+                        " WHERE datname = current_database()"
+                        " AND wait_event_type = 'Lock'"
+                    )
+                    waiting = cursor.fetchone()
+                if waiting is not None:
+                    break
+                time.sleep(0.05)
+            assert waiting is not None, "the rebuild never waited on the generation row"
+        finally:
+            writer.commit()
+            rebuilding.join(timeout=30)
+
+    assert len(outcomes) == 1
+    outcome = outcomes[0]
+    # Both concepts, the one the write landed while the rebuild waited included, and
+    # no file the index did not know: the rebuild read the records after the write
+    # committed.
+    assert (outcome.generation, outcome.nodes, outcome.missing_row) == (2, 2, [])
+    with database.cursor() as cursor:
+        cursor.execute(
+            "SELECT uid FROM graph_node WHERE workspace_id = %s AND gen = 2"
+            " ORDER BY uid",
+            (workspace,),
+        )
+        assert cursor.fetchall() == [(IRI,), (OTHER_IRI,)]
+
+
 def test_the_audit_reports_a_mismatch_as_a_state_and_never_as_a_refusal(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
@@ -241,14 +389,7 @@ def test_the_audit_reports_a_mismatch_as_a_state_and_never_as_a_refusal(
     # and a disagreement is a fact the outcome carries — never a job that failed.
     workspace = seed_workspace(database.cursor())["id"]
     with database.cursor() as cursor:
-        content = seed_concept(
-            cursor,
-            workspace_id=workspace,
-            iri=IRI,
-            path="knowledge/expenses.md",
-            frontmatter={"title": "Expenses", "type": "Policy", "iri": IRI},
-            body="Expenses are claimed within sixty days.",
-        )
+        content = seed_expenses(cursor, workspace)
         # The bundle moves under the row, which is what a drifted parse looks like from
         # here: the file says one thing and the row's hash says another.
         cursor.execute(
@@ -300,13 +441,10 @@ def test_a_rebuild_writes_the_next_generation_beside_the_live_one_and_flips_it(
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
     with database.cursor() as cursor:
-        expenses = seed_concept(
+        expenses = seed_expenses(
             cursor,
-            workspace_id=workspace,
-            iri=IRI,
-            path="knowledge/expenses.md",
-            frontmatter={"title": "Expenses", "type": "Policy", "iri": IRI},
-            body=f"## Details\n\nExpenses rest on [receipts]({OTHER_IRI}).",
+            workspace,
+            f"## Details\n\nExpenses rest on [receipts]({OTHER_IRI}).",
         )
         receipts = seed_concept(
             cursor,

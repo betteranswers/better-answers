@@ -26,10 +26,34 @@ const journalSchema = z.object({
  */
 export type JournalEntry = { readonly tag: string; readonly when: number };
 
+/**
+ * The journal's entries as one document holds them — **refusing two migrations at one
+ * instant**. The worker's stamp check compares `when` alone, so two entries sharing one would
+ * make a database stopped after the earlier of them read as stamped with the later: the
+ * worker would claim against a schema one migration short of the view it was generated from.
+ * drizzle-kit mints `when` from its own clock and never repeats one in practice; this is what
+ * turns "in practice" into a fact the generator and the drift test hold, and a hand-edited
+ * journal cannot get past.
+ */
+type JournalDocument = z.input<typeof journalSchema>;
+
+export const journalEntriesOf = (document: JournalDocument): readonly JournalEntry[] => {
+  const { entries } = journalSchema.parse(document);
+  for (const [position, entry] of entries.entries()) {
+    const earlier = entries[position - 1];
+    if (earlier !== undefined && entry.when <= earlier.when) {
+      throw new Error(
+        `the journal's instants must strictly increase, but ${entry.tag} (${entry.when}) does not follow ${earlier.tag} (${earlier.when}): the worker's stamp check could not tell the two apart`,
+      );
+    }
+  }
+  return entries;
+};
+
 export const journalEntries = (): readonly JournalEntry[] =>
-  journalSchema.parse(
+  journalEntriesOf(
     JSON.parse(readFileSync(path.join(migrationsFolder, "meta", "_journal.json"), "utf8")),
-  ).entries;
+  );
 
 export const journalMigrationFiles = (): readonly string[] =>
   journalEntries().map((entry) => path.join(migrationsFolder, `${entry.tag}.sql`));

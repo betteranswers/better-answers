@@ -12,9 +12,8 @@ import {
   type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { recomputeVisibilitySourcedFrom } from "../concepts/index.ts";
+import { openingACascade, recomputeVisibilitySourcedFrom } from "../concepts/index.ts";
 import { recomputeCompositionsIncluding } from "../guides/index.ts";
-import { holdsEveryGroup } from "../members/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
 /**
@@ -101,6 +100,13 @@ type BindingRow = {
  * derivation holds the row `FOR SHARE` (`concepts/visibility.ts`) and its cascade then sees
  * that write's citation — the other half of the lock that keeps a write landing beside a
  * narrowing from committing a class the narrowed binding no longer allows.
+ *
+ * **Before that, at the very head of the transaction, the workspace's cascade lock**
+ * (`openingACascade`, over `serialisingCascades`): two narrowings of two bindings one concept cites would otherwise
+ * each hold its own binding and want the other `FOR SHARE` through that concept — a deadlock
+ * Postgres ends by aborting one Admin's act with a store failure. Narrowings in one workspace
+ * run one after the other instead, which is what "synchronous, in the act's own transaction"
+ * has to mean when there are two of them.
  */
 export const narrowBinding = async (
   principal: UserPrincipal,
@@ -114,17 +120,18 @@ export const narrowBinding = async (
   if (!bindingId.success || next === undefined) return err("malformed");
   const { workspaceId } = admin.value;
 
-  const known = await attempt(async () => ({
-    binding: await tx.query<BindingRow>(
+  const groups = await openingACascade(admin.value, tx, next.audienceGroups ?? []);
+  if (!groups.ok) return err(groups.error);
+  const known = await attempt(() =>
+    tx.query<BindingRow>(
       "SELECT sensitivity, audience, audience_groups FROM source_binding WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
       [workspaceId, bindingId.data],
     ),
-    groups: await holdsEveryGroup(admin.value, tx, next.audienceGroups ?? []),
-  }));
+  );
   if (!known.ok) return err(known.error);
-  const current = known.value.binding.rows[0];
+  const current = known.value.rows[0];
   if (current === undefined) return err("no-such-binding");
-  if (!known.value.groups) return err("no-such-group");
+  if (!groups.value) return err("no-such-group");
   if (widens(visibilityOf(current), next)) return err("widening-refused");
 
   const auditEventId = ulid();

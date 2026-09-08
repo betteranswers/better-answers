@@ -25,6 +25,15 @@ that says the two parsers have parted.
 
 The whole thing is one transaction, so a rebuild that dies halfway leaves the live
 generation exactly where it was.
+
+**The generation row is taken first, before the bundle or a record is read.** The app's
+delta takes the same row lock as it lands an edit (`liveGeneration` in the graph door,
+the ``INSERT … ON CONFLICT DO UPDATE`` this tier's `live_generation` copies), so the two
+orders are the only two: a write that got there first has committed its rows before this
+reads them, or it waits behind this rebuild and lands its delta in the generation this
+rebuild flips live. A rebuild that read first and locked afterwards would build ``N+1``
+from records a concurrent write had not yet committed, and that write, landing in ``N``
+while the rebuild waited, would be lost the moment ``N+1`` went live.
 """
 
 from dataclasses import dataclass
@@ -125,15 +134,17 @@ def run_rebuild(
 ) -> RebuildOutcome:
     """Write the next generation from the bundle and the records, then flip it live."""
     outcome = RebuildOutcome()
+    # The row lock before any read — see the module docblock: what a write beside this
+    # rebuild has committed is what this rebuild reads, or the write waits for the flip.
+    live = live_generation(cursor, workspace_id)
+    outcome.generation = live + 1
+
     try:
         blobs = concepts_at_head(git_store_dir, workspace_id)
     except NoSuchBundleError:
         blobs = []
     files = {blob.path: blob.content for blob in blobs}
     records = _records(cursor, workspace_id)
-
-    live = live_generation(cursor, workspace_id)
-    outcome.generation = live + 1
 
     by_path = {
         record.path: ResolvedTarget(record.iri, record.kind, record.status)

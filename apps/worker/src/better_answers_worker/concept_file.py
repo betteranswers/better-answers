@@ -29,6 +29,7 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
+from decimal import Decimal
 from typing import Any
 
 #: A frontmatter value, in the shapes the renderer writes: a scalar, a list of strings,
@@ -63,10 +64,18 @@ _FRONTMATTER_LINE = re.compile(r'^("(?:[^"\\]|\\.)*"):(?: (.*))?$')
 UNHASHED_KEYS = frozenset({"generated", "verified", "stale_after", "status", "iri"})
 
 
+def _not_a_number(constant: str) -> Scalar:
+    """`NaN`, `Infinity` and `-Infinity` refused: JSON has no such values and the app's
+    parser (`JSON.parse`) answers `malformed` to the text, so accepting them here would
+    be reading a file the app never wrote and could never read back.
+    """
+    raise MalformedConceptFileError(f"not a JSON value: {constant!r}")
+
+
 def _scalar_of(text: str) -> Scalar:
     """A JSON text read as one scalar the frontmatter may hold, or a refusal."""
     try:
-        value: Any = json.loads(text)
+        value: Any = json.loads(text, parse_constant=_not_a_number)
     except ValueError as cause:
         raise MalformedConceptFileError(f"not a JSON value: {text!r}") from cause
     # `bool` before `int`, because Python's bool is an int and the two are different
@@ -91,7 +100,13 @@ def _pair_of(line: str) -> tuple[str, str | None]:
 def _list_items_of(
     lines: list[str], start: int, close: int
 ) -> tuple[Sequence[str] | Sequence[SourceEntry], int]:
-    """The items of one list, from the line after its key, and where the list ended."""
+    """The items of one list, from the line after its key, and where the list ended.
+
+    A key with no inline value and no item beneath it is refused, as the app's parser
+    refuses it: the renderer writes an empty list as `` []`` on the key's own line, so a
+    bare key is a line it never wrote, and a reader that took it as empty would count a
+    field as cleared that the file said nothing about.
+    """
     strings: list[str] = []
     entries: list[dict[str, Scalar]] = []
     at = start
@@ -120,6 +135,8 @@ def _list_items_of(
             key, rest = _pair_of(lines[at][4:])
             at += 1
         entries.append(entry)
+    if at == start:
+        raise MalformedConceptFileError("a key with no value and no items")
     if strings and entries:
         raise MalformedConceptFileError("a list is strings or objects, never a mix")
     return (entries if entries else strings), at
@@ -148,6 +165,11 @@ def parse_concept_file(content: str) -> tuple[Frontmatter, str]:
     at = 1
     while at < close:
         key, rest = _pair_of(lines[at])
+        # A key the renderer wrote once and the file carries twice is a file it did not
+        # write, and the app's parser refuses it: letting the later one win would let a
+        # forged `iri` or `type` win over the first.
+        if key in frontmatter:
+            raise MalformedConceptFileError(f"a key written twice: {key!r}")
         at += 1
         if rest is not None:
             frontmatter[key] = [] if rest == "[]" else _scalar_of(rest)
@@ -225,19 +247,51 @@ def _as_javascript(value: Scalar) -> str:
     return "" if value is None else value
 
 
-def _number_text(value: int | float) -> str:
-    """A number as `JSON.stringify` writes it.
+#: Past this, JavaScript's one number type can no longer hold an integer exactly, and an
+#: integer the file wrote is read there as the nearest double.
+_EXACT_INTEGER = 2**53
 
-    The one place the two languages disagree by default: Python writes an integral float
-    as ``4.0`` and JavaScript writes ``4``, because JavaScript has one number type. A
-    locator of ``4`` read out of a file must hash the same whichever tier read it, so an
-    integral float is written without its fraction here.
+
+def _number_text(value: int | float) -> str:
+    """A number as `JSON.stringify` writes it — ECMAScript's `Number::toString`.
+
+    The one place the two languages disagree by default, and not only on ``4.0`` against
+    ``4``: Python writes ``1e-07`` where JavaScript writes ``1e-7``, ``1e-05`` where it
+    writes ``0.00001``, and a twenty-two-digit integer where it writes ``1e+21``. A
+    number read out of a file must hash the same whichever tier read it, so this
+    reproduces the other tier's rule from the same shortest round-trip digits both
+    languages choose — the digits ``s`` and the decimal exponent ``n`` of
+    ``s * 10^(n-k)``, ``k`` digits long: plain digits up to twenty-one of them, a
+    decimal point inside them or after up to five leading zeros, and the exponent form
+    beyond that, with the sign
+    always written on the exponent. An integer the double cannot hold exactly is read as
+    JavaScript reads it, as the nearest double, so a file's ``12345678901234567890``
+    hashes as the ``12345678901234567000`` the app's parse made of it.
     """
     if isinstance(value, bool):
         return "true" if value else "false"
-    if isinstance(value, float) and value.is_integer():
-        return str(int(value))
-    return json.dumps(value)
+    if isinstance(value, int) and abs(value) < _EXACT_INTEGER:
+        return str(value)
+    number = float(value)
+    if number == 0:
+        return "0"
+    sign, digits, exponent = Decimal(repr(number)).normalize().as_tuple()
+    if not isinstance(exponent, int):
+        raise MalformedConceptFileError(f"not a finite number: {value!r}")
+    figures = "".join(str(digit) for digit in digits)
+    k = len(figures)
+    n = exponent + k
+    if k <= n <= 21:
+        text = figures + "0" * (n - k)
+    elif 0 < n <= 21:
+        text = f"{figures[:n]}.{figures[n:]}"
+    elif -6 < n <= 0:
+        text = "0." + "0" * (-n) + figures
+    else:
+        power = n - 1
+        mantissa = figures if k == 1 else f"{figures[0]}.{figures[1:]}"
+        text = f"{mantissa}e{'+' if power >= 0 else '-'}{abs(power)}"
+    return f"-{text}" if sign else text
 
 
 def _json_text(value: object) -> str:
@@ -255,9 +309,12 @@ def _json_text(value: object) -> str:
     if isinstance(value, tuple):
         return "[" + ",".join(_json_text(item) for item in value) + "]"
     if isinstance(value, dict):
+        # Keys sorted as the other tier sorts them, so a list of objects under any key
+        # but `sources` hashes the same whichever order a producer wrote them in (RFC
+        # 8785); `sources[]` never reaches here, reduced to pairs before it could.
         pairs = (
-            f"{json.dumps(key, ensure_ascii=False)}:{_json_text(item)}"
-            for key, item in value.items()
+            f"{json.dumps(key, ensure_ascii=False)}:{_json_text(value[key])}"
+            for key in sorted(value, key=_utf16_order)
         )
         return "{" + ",".join(pairs) + "}"
     raise MalformedConceptFileError(f"not a value the hash can carry: {value!r}")

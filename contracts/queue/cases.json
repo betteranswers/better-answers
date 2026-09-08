@@ -1,9 +1,15 @@
 {
-  "description": "queue (ADR 0031, ADR 0005): the worker's control plane is rows, and the claim protocol is four SQL functions both tiers call — claim_job, heartbeat_job, finish_job, fail_job — all SECURITY INVOKER, so the caller's own role and the transaction's workspace scope are what fence every row they touch. Each suite seeds `workspaces` and `jobs` as the container's superuser (an `enqueued_ago_seconds` and a `lease_expires_in_seconds` are written as instants relative to now, which is how the fixture advances time without waiting), then runs each entry of `claims` as its `role` in its `workspace_id` scope ('' = no scope) and asserts the ids `claim_job` returned, in that order — an empty list meaning zero rows. Every entry of `calls` is then run in the same way and must answer exactly `expect`, and `expect_final` is read back per job as the superuser, `attempts` and `status` together, so a poisoning or a lost lease is visible as the row it left behind.",
+  "description": "queue (ADR 0031, ADR 0005): the worker's control plane is rows, and the claim protocol is four SQL functions both tiers call — claim_job, heartbeat_job, finish_job, fail_job — all SECURITY INVOKER, so the caller's own role and the transaction's workspace scope are what fence every row they touch. Each suite seeds `workspaces` and `jobs` as the container's superuser (an `enqueued_ago_seconds` and a `lease_expires_in_seconds` are written as instants relative to now, which is how the fixture advances time without waiting), then runs each entry of `claims` as its `role` in its `workspace_id` scope ('' = no scope) and asserts the ids `claim_job` returned, in that order — an empty list meaning zero rows. Every entry of `calls` is then run in the same way and must answer exactly `expect`, and `expect_final` is read back per job as the superuser, `attempts` and `status` together, so a poisoning or a lost lease is visible as the row it left behind. A lease that has lapsed revokes its claimant: the heartbeat, the finish and the failure all answer false to the worker that let it lapse, whether or not anybody has claimed the job since, because from that instant the job is the queue's to hand out again.",
   "lease_seconds": 60,
   "workspaces": [
-    { "id": "01J6AAAAAAAAAAAAAAAAAAAAAA", "name": "Workspace A" },
-    { "id": "01J6BBBBBBBBBBBBBBBBBBBBBB", "name": "Workspace B" }
+    {
+      "id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "name": "Workspace A"
+    },
+    {
+      "id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "name": "Workspace B"
+    }
   ],
   "jobs": [
     {
@@ -70,6 +76,19 @@
       "enqueued_ago_seconds": 600,
       "claimed_by": null,
       "lease_expires_in_seconds": null
+    },
+    {
+      "why": "claimed by a worker that let its lease lapse and nobody has claimed since: the lease's lapsing alone revokes that worker, so its late heartbeat and its late finish are both refused",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6J6BBBBBBBBBBBBBBBBBBBB",
+      "kind": "nightly-audit",
+      "reason": null,
+      "status": "claimed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 100,
+      "claimed_by": "worker-slow",
+      "lease_expires_in_seconds": -30
     }
   ],
   "claims": [
@@ -153,7 +172,10 @@
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "job_id": "01J6J2AAAAAAAAAAAAAAAAAAAA",
       "worker_id": "worker-1",
-      "outcome": { "checked": 2, "mismatched": [] },
+      "outcome": {
+        "checked": 2,
+        "mismatched": []
+      },
       "expect": true
     },
     {
@@ -163,7 +185,10 @@
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "job_id": "01J6J2AAAAAAAAAAAAAAAAAAAA",
       "worker_id": "worker-1",
-      "outcome": { "checked": 2, "mismatched": [] },
+      "outcome": {
+        "checked": 2,
+        "mismatched": []
+      },
       "expect": false
     },
     {
@@ -173,7 +198,9 @@
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "job_id": "01J6J1AAAAAAAAAAAAAAAAAAAA",
       "worker_id": "worker-1",
-      "outcome": { "unparsed": ["knowledge/expenses.md"] },
+      "outcome": {
+        "unparsed": ["knowledge/expenses.md"]
+      },
       "expect": true
     },
     {
@@ -183,6 +210,40 @@
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "job_id": "01J6J1AAAAAAAAAAAAAAAAAAAA",
       "worker_id": "worker-1",
+      "expect": false
+    },
+    {
+      "why": "a heartbeat after the lease lapsed is refused, even though nobody has claimed the job since — the lapse itself revoked the claimant, and pushing the lease out again would race whichever claim was about to win it",
+      "function": "heartbeat_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "job_id": "01J6J6BBBBBBBBBBBBBBBBBBBB",
+      "worker_id": "worker-slow",
+      "expect": false
+    },
+    {
+      "why": "a finish after the lease lapsed is refused the same way: the run that let its lease go does not get to stamp done over a job the queue is about to hand out again",
+      "function": "finish_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "job_id": "01J6J6BBBBBBBBBBBBBBBBBBBB",
+      "worker_id": "worker-slow",
+      "outcome": {
+        "checked": 1,
+        "mismatched": []
+      },
+      "expect": false
+    },
+    {
+      "why": "and a failure after the lease lapsed too, because a terminal verdict from a revoked claimant would bury the next claim's own outcome",
+      "function": "fail_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "job_id": "01J6J6BBBBBBBBBBBBBBBBBBBB",
+      "worker_id": "worker-slow",
+      "outcome": {
+        "error": "TimeoutError"
+      },
       "expect": false
     }
   ],
@@ -226,6 +287,14 @@
       "status": "claimed",
       "attempts": 1,
       "claimed_by": "ops-1"
+    },
+    {
+      "why": "still claimed by the worker that let its lease lapse, untouched by its refused calls, on the attempt it was claimed with — the next claim in this workspace takes it",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6J6BBBBBBBBBBBBBBBBBBBB",
+      "status": "claimed",
+      "attempts": 1,
+      "claimed_by": "worker-slow"
     }
   ]
 }

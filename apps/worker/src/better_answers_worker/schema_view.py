@@ -9,7 +9,7 @@ migrator writes into `drizzle.__drizzle_migrations.created_at`."""
 
 MIGRATION_ID = "0022_the-queue-substrate"
 
-MIGRATION_WHEN = 1788867619838
+MIGRATION_WHEN = 1788883705941
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {

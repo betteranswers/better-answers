@@ -19,9 +19,12 @@ CREATE TABLE "job" (
 	CONSTRAINT "job_reason_check" CHECK ((reason IS NOT NULL) = (kind = 'full-rebuild')
          AND (reason IS NULL OR reason IN ('first-sync', 'route-change', 'reconciler', 'erasure', 'upgrade', 'drill'))),
 	CONSTRAINT "job_attempts_check" CHECK (attempts >= 0 AND max_attempts >= 1 AND attempts <= max_attempts),
-	CONSTRAINT "job_claim_check" CHECK ((claimed_by IS NULL) = (claimed_at IS NULL)),
+	CONSTRAINT "job_claim_check" CHECK ((claimed_by IS NULL) = (claimed_at IS NULL)
+         AND (status <> 'claimed'
+              OR (claimed_by IS NOT NULL AND claimed_at IS NOT NULL
+                  AND lease_expires_at IS NOT NULL AND heartbeat_at IS NOT NULL))),
 	CONSTRAINT "job_finished_check" CHECK ((finished_at IS NOT NULL) = (status IN ('done', 'failed', 'poisoned'))),
-	CONSTRAINT "job_outcome_check" CHECK (outcome IS NULL OR status IN ('done', 'failed'))
+	CONSTRAINT "job_outcome_check" CHECK ((outcome IS NOT NULL) = (status IN ('done', 'failed')))
 );
 --> statement-breakpoint
 ALTER TABLE "job" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint

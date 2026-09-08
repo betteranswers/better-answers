@@ -102,11 +102,28 @@ const canonicalFrontmatter = (frontmatter: Frontmatter, path: string): string =>
     .filter((key) => !UNHASHED_KEYS.has(key))
     .map((key) => {
       const value = frontmatter[key];
-      const reduced = key === "sources" ? reducedSources(value, path) : value;
+      const reduced = key === "sources" ? reducedSources(value, path) : canonicalValue(value);
       return `${JSON.stringify(key)}:${JSON.stringify(reduced)}`;
     });
   return `{${pairs.join(",")}}`;
 };
+
+/**
+ * A value as the hash reads it: a list of objects under any key but `sources` — a vendor's,
+ * a future spec's, preserved verbatim (ADR 0019) — has each object's keys sorted, so the hash
+ * is the same whichever order a producer wrote them in (RFC 8785). `sources[]` never reaches
+ * here: the reduction replaces its objects with pairs.
+ */
+const canonicalValue = (value: FrontmatterValue | undefined): FrontmatterValue | undefined =>
+  Array.isArray(value)
+    ? value.map((item) =>
+        typeof item === "object" && item !== null
+          ? Object.fromEntries(
+              Object.entries(item).toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+            )
+          : item,
+      )
+    : value;
 
 /**
  * The content hash a check confirms (ADR 0014, ADR 0019): SHA-256 over the canonical JSON of
@@ -114,10 +131,11 @@ const canonicalFrontmatter = (frontmatter: Frontmatter, path: string): string =>
  * `(resource, locator)` pairs — and the normalised body.
  *
  * RFC 8785's canonicalisation is *sorted keys, no insignificant whitespace*, which is what
- * this produces for the one shape a concept's frontmatter can hold: scalars, string lists and
- * `sources[]`'s objects, whose own keys never reach the hash because the reduction replaces
- * them with a pair. The concept's own path is an argument because the reduction resolves a
- * relative `resource` against it.
+ * this produces for every shape a concept's frontmatter can hold: scalars, string lists,
+ * `sources[]`'s objects — whose own keys never reach the hash because the reduction replaces
+ * them with a pair — and any other list of objects, whose keys are sorted on the way in. The
+ * concept's own path is an argument because the reduction resolves a relative `resource`
+ * against it.
  */
 export const contentHashOf = (frontmatter: Frontmatter, body: string, path: string): string =>
   createHash("sha256")
@@ -196,7 +214,10 @@ const pairOf = (
 /**
  * The items of one list, from the line after its key: `  - ` opens an item, and an entry's
  * later fields sit indented beneath it. A list is strings or OKF's objects and never a mix —
- * the renderer writes no other shape, so a mix is a file it did not write.
+ * the renderer writes no other shape, so a mix is a file it did not write. Nor is a key with
+ * no inline value and no item beneath it: the renderer writes an empty list as ` []` on the
+ * key's own line, so a bare key is a file it never wrote, and reading it as empty would let a
+ * replay land a field as cleared that the commit never said anything about.
  */
 const listItemsOf = (
   lines: readonly string[],
@@ -231,7 +252,7 @@ const listItemsOf = (
     }
     entries.push(entry);
   }
-  if (strings.length > 0 && entries.length > 0) return undefined;
+  if (at === from || (strings.length > 0 && entries.length > 0)) return undefined;
   return { value: entries.length > 0 ? entries : strings, next: at };
 };
 

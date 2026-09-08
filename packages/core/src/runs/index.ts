@@ -6,6 +6,7 @@ import {
   type JOB_STATUSES,
   type REBUILD_REASONS,
 } from "@better-answers/schema";
+import type { z } from "zod";
 
 import {
   attempt,
@@ -103,13 +104,30 @@ export type JobState = {
  * keys are open — the shape belongs to the job that wrote it, and B7 adds kinds — but the
  * values are exactly what the column's boundary admits, so a reader of one knows it can hold
  * no nested object and therefore no person's name and no concept's body.
+ *
+ * **The boundary's own shape, parsed on every read.** The finish functions take any JSONB
+ * the claimant hands them — the queue agreement's functions are the database's and carry no
+ * schema — so what holds the contract is that every outcome the app reads back goes through
+ * the boundary first: one that grew a nested place to hide content in is an outcome this
+ * slice will not serve, not a value it hands a caller under the documented type.
  */
-type OutcomeScalar = string | number | boolean | null;
-export type JobOutcomeValue =
-  | OutcomeScalar
-  | readonly OutcomeScalar[]
-  | readonly Readonly<Record<string, OutcomeScalar>>[];
-export type JobOutcome = Readonly<Record<string, JobOutcomeValue>>;
+const OUTCOME = boundarySchemas.job.select.shape.outcome;
+export type JobOutcome = NonNullable<z.infer<typeof OUTCOME>>;
+/** What the column hands the driver before the boundary has read it. */
+type OutcomeColumn = z.input<typeof OUTCOME>;
+
+/**
+ * A row's outcome as the boundary reads it. A caller that asked for a job and got one whose
+ * outcome the boundary refuses is handed the refusal as the store's own failure: the row is
+ * the worker's, the shape is the agreement's, and a value outside it is a fact about the
+ * queue that an operator has to look at rather than a job to report on.
+ */
+const outcomeOf = (raw: OutcomeColumn): Result<JobOutcome | null, Error> => {
+  const parsed = OUTCOME.safeParse(raw);
+  return parsed.success
+    ? ok(parsed.data)
+    : err(new Error("the job's outcome is not the shape the queue agreement admits"));
+};
 
 /** The three statuses a job never leaves — what a caller polling one is waiting for. */
 export const JOB_IS_OVER: readonly JobStatus[] = ["done", "failed", "poisoned"];
@@ -121,7 +139,7 @@ type JobRow = {
   readonly reason: RebuildReason | null;
   readonly status: JobStatus;
   readonly attempts: number;
-  readonly outcome: JobOutcome | null;
+  readonly outcome: OutcomeColumn;
 };
 
 /**
@@ -269,19 +287,28 @@ export const jobById = async (
 
   const row = read.value.rows[0];
   if (row === undefined) return err("no-such-job");
+  const outcome = outcomeOf(row.outcome);
+  if (!outcome.ok) return err(outcome.error);
   return ok({
     jobId: row.id,
     kind: row.kind,
     reason: row.reason,
     status: row.status,
     attempts: row.attempts,
-    outcome: row.outcome,
+    outcome: outcome.value,
   });
 };
 
-type OutcomeRow = {
-  readonly outcome: { readonly mismatched?: readonly unknown[] } | null;
-};
+type OutcomeRow = { readonly outcome: OutcomeColumn };
+
+/**
+ * The four lists a nightly audit's outcome carries, every one of which must be empty for a
+ * bundle to be healthy: a file whose hash is not the row's, a file the grammar cannot read,
+ * a file the index does not know, and a row whose file is gone (`ParseFindings` in
+ * `apps/worker`). Each is the repository and the index disagreeing, and health that read
+ * only the first would call a bundle healthy over a file nobody can parse.
+ */
+const AUDIT_FINDINGS = ["mismatched", "unparsed", "missing_row", "missing_file"] as const;
 
 /**
  * **Bundle health**: whether the app's parse and the worker's still agree about this
@@ -296,6 +323,10 @@ type OutcomeRow = {
  * Three answers and no fourth. *never-audited* is its own word rather than folded into
  * *healthy*, because "nobody has checked" and "somebody checked and found nothing wrong"
  * are different things to show a person — and the second is the only one that is good news.
+ * *Healthy* is every finding list present and empty; anything else the outcome says — a
+ * finding, a list missing, a value that is not a list, an outcome outside the boundary's
+ * shape — is *mismatched*, because the fail-closed reading of "I cannot tell" is the one
+ * that puts a person in front of the bundle.
  */
 export const bundleHealth = async (
   principal: UserPrincipal,
@@ -317,10 +348,14 @@ export const bundleHealth = async (
   if (!read.ok) return err(read.error);
   if (!read.value.ok) return err(read.value.error);
 
-  const outcome = read.value.value.rows[0]?.outcome;
-  if (outcome === undefined) return ok("never-audited");
-  // An outcome the worker wrote always carries the list; one that somehow does not is read
-  // as a mismatch rather than as health, because the fail-closed reading of "I cannot tell"
-  // is the one that puts a person in front of the bundle.
-  return ok(outcome === null || (outcome.mismatched?.length ?? 1) > 0 ? "mismatched" : "healthy");
+  const row = read.value.value.rows[0];
+  if (row === undefined) return ok("never-audited");
+  const outcome = outcomeOf(row.outcome);
+  if (!outcome.ok || outcome.value === null) return ok("mismatched");
+  const findings = outcome.value;
+  const clean = AUDIT_FINDINGS.every((finding) => {
+    const found = findings[finding];
+    return Array.isArray(found) && found.length === 0;
+  });
+  return ok(clean ? "healthy" : "mismatched");
 };

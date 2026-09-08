@@ -25,6 +25,8 @@ from dulwich.objects import Blob, Commit, Tree
 from dulwich.refs import Ref
 from dulwich.repo import Repo
 
+from .ids import ID_SHAPE
+
 #: The one ref a bundle's history hangs off. One branch per repository and no other: the
 #: bundle is written only by the app, one commit per act (ADR 0012).
 BUNDLE_REF = Ref(b"refs/heads/main")
@@ -49,11 +51,33 @@ class ConceptBlob:
     content: str
 
 
+class NotAWorkspaceIdError(ValueError):
+    """A workspace id that is not one — refused before it reaches a path.
+
+    Every id this tier is handed comes off a row the app wrote, so this is never met by
+    the loop; it is what keeps the arithmetic below an arithmetic, whatever hands it a
+    string.
+    """
+
+
 def repository_path(git_store_dir: str, workspace_id: str) -> Path:
     """Which repository a workspace's bundle is, which is this module's arithmetic and
     never a caller's string.
+
+    Two guards, because a path built from a string is a path a string can steer: the id
+    is held to the one shape an id has (`ID_SHAPE`, the tier contract's), and the path
+    it makes is held to lie beneath the git store — the second refusing what the first
+    cannot see, such as a repository directory that is a link out of the store.
     """
-    return Path(git_store_dir) / f"{workspace_id}.git"
+    if not ID_SHAPE.fullmatch(workspace_id):
+        raise NotAWorkspaceIdError(f"not a workspace id: {workspace_id!r}")
+    store = Path(git_store_dir).resolve()
+    path = (store / f"{workspace_id}.git").resolve()
+    if not path.is_relative_to(store):
+        raise NotAWorkspaceIdError(
+            f"the bundle for {workspace_id} is not under the store"
+        )
+    return path
 
 
 def _walk(repository: Repo, tree: Tree, prefix: str) -> list[ConceptBlob]:

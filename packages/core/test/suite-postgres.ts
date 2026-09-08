@@ -152,6 +152,58 @@ export const abortTheTransaction = async (tx: Tx): Promise<void> => {
 };
 
 /**
+ * Run `work` while every act's first write to `table` **parks** — held inside its own
+ * transaction, holding every lock it took on the way there — until `work` calls `release`.
+ * The seam a two-connection test needs to reach a window *inside* an act that exposes none,
+ * and to hold a second act against it: a trigger that waits on an advisory lock this holds,
+ * so the act's own statements decide where it stops and the test decides when it goes on. A
+ * test using this names the table it is stopping at and why, as `holdingTable` does.
+ *
+ * `pool` is the superuser's, because the trigger is DDL. The act parks on **its** connection,
+ * so a suite doing this holds one pool connection per parked act until `release`.
+ */
+export const whileActsWaitAt = async <T>(
+  pool: pg.Pool,
+  table: string,
+  event: "INSERT" | "UPDATE",
+  work: (release: () => Promise<void>) => Promise<T>,
+): Promise<T> => {
+  const holder = await pool.connect();
+  const key = "hashtext('test-acts-wait-at')";
+  let released = false;
+  const release = async (): Promise<void> => {
+    if (released) return;
+    released = true;
+    await holder.query(`SELECT pg_advisory_unlock(${key}, ${key})`);
+  };
+  await holder.query(`SELECT pg_advisory_lock(${key}, ${key})`);
+  await pool.query(
+    `CREATE OR REPLACE FUNCTION test_acts_wait_at() RETURNS trigger LANGUAGE plpgsql AS $$
+     BEGIN PERFORM pg_advisory_xact_lock(${key}, ${key}); RETURN NEW; END $$`,
+  );
+  await pool.query(
+    `CREATE TRIGGER test_acts_wait_at BEFORE ${event} ON "${table}"
+     FOR EACH ROW EXECUTE FUNCTION test_acts_wait_at()`,
+  );
+  try {
+    return await work(release);
+  } finally {
+    await release();
+    holder.release();
+    await pool.query(`DROP TRIGGER test_acts_wait_at ON "${table}"`);
+    await pool.query("DROP FUNCTION test_acts_wait_at()");
+  }
+};
+
+/** How many other connections to this database are waiting on a lock right now. */
+export const countWaitingOnLocks = async (pool: pg.Pool): Promise<number> => {
+  const found = await pool.query<{ waiting: string }>(
+    "SELECT count(*) AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'",
+  );
+  return Number(found.rows[0]?.waiting ?? 0);
+};
+
+/**
  * Run `work` while the store refuses every write to `table` — a trigger that raises, which
  * is how a test fails **one** statement of an act whose earlier reads have to succeed. A
  * transaction it aborts is the caller's, so the same `[TEST8]` rule applies.

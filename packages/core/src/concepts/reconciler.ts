@@ -215,8 +215,8 @@ const derivedMergeKey = async (
  * the one reading of "did this commit change what the concept cites" a replay can make.
  */
 const fileCitesTheStandingEvidence = async (
+  platform: PlatformPrincipal,
   tx: Tx,
-  workspaceId: string,
   facts: CommitFacts,
 ): Promise<boolean> => {
   const standing = await tx.query<{ resource: string; locator: string }>(
@@ -224,8 +224,8 @@ const fileCitesTheStandingEvidence = async (
        FROM concept_evidence ce
        JOIN evidence e ON e.workspace_id = ce.workspace_id
                       AND e.source_document_id = ce.source_document_id AND e.locator = ce.locator
-      WHERE ce.workspace_id = $1 AND ce.iri = $2`,
-    [workspaceId, facts.iri],
+      WHERE ce.workspace_id = ${scopeClause(1)} AND ce.iri = $2`,
+    [scopeParameter(platform), facts.iri],
   );
   const pairs = (sources: readonly HashedSource[]) =>
     new Set(sources.map((pair) => JSON.stringify(pair)));
@@ -334,7 +334,7 @@ const replayCommit = async (
           payload?.mergeKey ??
           held?.mergeKey ??
           (await derivedMergeKey(platform, tx, row.iri, row.kind, row.title));
-        const evidenceAgrees = await fileCitesTheStandingEvidence(tx, workspaceId, facts);
+        const evidenceAgrees = await fileCitesTheStandingEvidence(platform, tx, facts);
 
         // The door is called bare (ADR 0014 rule 4): its rejection aborts this transaction.
         await record(platform, tx, {

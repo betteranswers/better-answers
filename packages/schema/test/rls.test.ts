@@ -68,8 +68,16 @@ const countedRows = async (
   return rows;
 };
 
-/** A statement that must be refused, the reason a reader wants beside it, and its parameters. */
-type Refusal = readonly [statement: string, why: string, parameters?: readonly unknown[]];
+/**
+ * A statement that must be refused, the reason a reader wants beside it, its parameters,
+ * and the refusal's own words — a privilege's unless the case says otherwise.
+ */
+type Refusal = readonly [
+  statement: string,
+  why: string,
+  parameters?: readonly unknown[],
+  message?: RegExp,
+];
 
 /**
  * Every statement in turn, each inside its own savepoint, each asserted with its reason
@@ -78,7 +86,7 @@ type Refusal = readonly [statement: string, why: string, parameters?: readonly u
  * same question, and a copy per suite is three chances to forget the savepoint.
  */
 const refusesEach = async (client: pg.PoolClient, refusals: readonly Refusal[]): Promise<void> => {
-  for (const [statement, why, parameters = []] of refusals) {
+  for (const [statement, why, parameters = [], message = /permission denied/] of refusals) {
     await client.query("SAVEPOINT refusal_probe");
     const outcome = await client
       .query(statement, [...parameters])
@@ -86,7 +94,7 @@ const refusesEach = async (client: pg.PoolClient, refusals: readonly Refusal[]):
       .catch((cause: unknown) => (cause as { message: string }).message);
     expect({ why, outcome }).toEqual({
       why,
-      outcome: expect.stringMatching(/permission denied/),
+      outcome: expect.stringMatching(message),
     });
     await client.query("ROLLBACK TO SAVEPOINT refusal_probe");
   }
@@ -1067,6 +1075,98 @@ describe("the graph tables under app_rt", () => {
     });
   });
 
+  it("refuses a flip to any generation but the next, and a row in any generation but the live one or the next (migration 0022)", async () => {
+    // The grants say what a role may touch; these two triggers say which generation. A
+    // rebuild writes `live + 1` and flips to it, an edit's delta writes into `live`, and
+    // nothing else is a map write (ADR 0023, ADR 0032) — so a flip back to a swept
+    // generation, or forward past one nobody built, and a row stamped into either, are
+    // refused by the database rather than left to the code that chose `live + 1`.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.graphNode({ workspaceId: WS_A });
+      await seed.workspace({ id: "01J6CCCCCCCCCCCCCCCCCCCCCC", name: "C" });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      // The served path: the live generation, the one being built, the source-entity
+      // partition that carries none, and the flip to the next.
+      const served: readonly [string, readonly unknown[]][] = [
+        [
+          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'live', 'Concept')",
+          [WS_A],
+        ],
+        [
+          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 2, 'next', 'Concept')",
+          [WS_A],
+        ],
+        [
+          "INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid) VALUES ($1, 2, 'e-next', 'LINKS_TO', 'next', 'live')",
+          [WS_A],
+        ],
+        [
+          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, NULL, 'entity', 'source-entity:Person')",
+          [WS_A],
+        ],
+        ["UPDATE graph_generation SET live_gen = 2 WHERE workspace_id = $1", [WS_A]],
+        // Re-asserting the live generation is not a flip; the delta's read does exactly this.
+        [
+          "INSERT INTO graph_generation (workspace_id, live_gen) VALUES ($1, 1) ON CONFLICT (workspace_id) DO UPDATE SET live_gen = graph_generation.live_gen",
+          [WS_A],
+        ],
+      ];
+      for (const [statement, parameters] of served) {
+        await client.query(statement, [...parameters]);
+      }
+
+      await refusesEach(client, [
+        [
+          "UPDATE graph_generation SET live_gen = 4 WHERE workspace_id = $1",
+          "a flip past the generation being built exposes a map nobody wrote",
+          [WS_A],
+          /flips only to the next/,
+        ],
+        [
+          "UPDATE graph_generation SET live_gen = 1 WHERE workspace_id = $1",
+          "a flip back is a swept generation served as the map",
+          [WS_A],
+          /flips only to the next/,
+        ],
+        [
+          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'retired', 'Concept')",
+          "a node into the retired generation, now that 2 is live",
+          [WS_A],
+          /lands in the live generation or the next/,
+        ],
+        [
+          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 4, 'far', 'Concept')",
+          "a node into a generation nobody is building",
+          [WS_A],
+          /lands in the live generation or the next/,
+        ],
+        [
+          "INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid) VALUES ($1, 4, 'e-far', 'LINKS_TO', 'next', 'live')",
+          "and an edge the same",
+          [WS_A],
+          /lands in the live generation or the next/,
+        ],
+      ]);
+
+      // A workspace with no generation row has no live generation for a row to land in:
+      // the delta and the rebuild both create the row first, and nothing else writes a map.
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [
+        "01J6CCCCCCCCCCCCCCCCCCCCCC",
+      ]);
+      await client.query("SAVEPOINT guard_probe");
+      await expect(
+        client.query(
+          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'first', 'Concept')",
+          ["01J6CCCCCCCCCCCCCCCCCCCCCC"],
+        ),
+      ).rejects.toThrow(/lands in the live generation or the next/);
+      await client.query("ROLLBACK TO SAVEPOINT guard_probe");
+    });
+  });
+
   it("refuses a node written into another tenant, from this tenant's scope", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
@@ -1074,12 +1174,23 @@ describe("the graph tables under app_rt", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
+      // A source entity carries no generation, so the policy is the whole of what refuses
+      // it; a bundle-and-record row is refused a step earlier, by the generation guard,
+      // which under this scope can see no live generation of the other tenant's at all.
+      await client.query("SAVEPOINT other_tenant");
+      await expect(
+        client.query(
+          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, NULL, 'uid-b', 'source-entity:Person')",
+          [WS_B],
+        ),
+      ).rejects.toThrow(/row-level security/);
+      await client.query("ROLLBACK TO SAVEPOINT other_tenant");
       await expect(
         client.query(
           "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'uid-b', 'Concept')",
           [WS_B],
         ),
-      ).rejects.toThrow(/row-level security/);
+      ).rejects.toThrow(/lands in the live generation or the next: live is <NULL>/);
     });
   });
 
@@ -2245,6 +2356,31 @@ describe("the queue under both runtime roles", () => {
         [theirs.id],
       );
       expect(untouched.rows).toEqual([{ status: "queued", claimed_by: null }]);
+    });
+  });
+
+  it("refuses both runtime roles a DELETE on the queue, while the claim protocol still moves a row (migration 0022)", async () => {
+    // A job's row is the record of a run and nothing removes one: the queue retires a job
+    // by moving its status through the four functions, never by taking the row away, so the
+    // default DELETE migration 0000 would have handed both roles is revoked.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const job = await seed.job({ workspaceId: WS_A });
+      for (const role of ["app_rt", "worker_rt"]) {
+        await client.query(`SET LOCAL ROLE ${role}`);
+        await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+        await refusesEach(client, [["DELETE FROM job", `${role} removing the record of a run`]]);
+        await client.query("RESET ROLE");
+      }
+
+      // The served path: the row still moves, through the function, under the worker's role.
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const claimed = await client.query<{ id: string }>(
+        "SELECT id FROM claim_job($1, $2::interval)",
+        ["worker-1", "60 seconds"],
+      );
+      expect(claimed.rows).toEqual([{ id: job.id }]);
     });
   });
 

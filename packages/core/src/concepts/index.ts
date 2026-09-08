@@ -91,6 +91,7 @@ export {
 export {
   evidencePaneOf,
   overrideConceptClass,
+  openingACascade,
   recomputeVisibilitySourcedFrom,
   type ConceptClassOverridden,
   type EvidencePane,
@@ -320,17 +321,24 @@ export { citedSourceOf as citedSource } from "@better-answers/schema";
 const mayWrite = (principal: UserPrincipal): boolean => principal.role !== "Viewer";
 
 /**
- * The file's frontmatter as the act writes it: what the caller gave, the `type` the act
- * was told where the file names none, the `status` it names, and the IRI the platform
- * minted — OKF's own keys and ADR 0002's one platform key, nothing else. The row is built
- * from the same facts, so the file says what the row says: the bundle is the truth and the
- * row is derived from it (ADR 0012), and the reconciler's replay of this commit reads
- * these three back off the file rather than off a row that was lost. A caller's own
- * `type` and `status` keys stand as written (ADR 0019 keeps every key verbatim).
+ * The file's frontmatter as the act writes it: what the caller gave, the `type` and the
+ * `title` the act was told where the file names neither, the `status` it names, and the IRI
+ * the platform minted — OKF's own keys and ADR 0002's one platform key, nothing else. The
+ * row is built from the same facts, so the file says what the row says: the bundle is the
+ * truth and the row is derived from it (ADR 0012), and the reconciler's replay of this
+ * commit reads all four back off the file rather than off a row that was lost — a creation
+ * whose file carried no title would be a commit the replay could not land. A caller's own
+ * `type`, `title` and `status` keys stand as written (ADR 0019 keeps every key verbatim).
+ *
+ * **The content hash is taken over this, the frontmatter the file carries**, never over
+ * what the caller gave: `type` and `title` are hashed keys, so a row hashed before they
+ * were written in would carry a number the nightly audit's parse of the file could never
+ * reproduce, and every such concept would read as mismatched.
  */
 const fileFrontmatterOf = (input: WriteConceptInput, iri: string) => {
   const named = { ...input.frontmatter };
   if (typeof named["type"] !== "string") named["type"] = input.kind;
+  if (typeof named["title"] !== "string") named["title"] = input.title;
   if (input.status !== undefined) named["status"] = input.status;
   named["iri"] = iri;
   return named;
@@ -391,11 +399,11 @@ export const writeConcept = async (
     if (!("base" in input.expects)) return err("malformed");
   }
 
-  const contentHash = contentHashOf(input.frontmatter, input.body, input.path);
   // A write that names no concept is a creation, and mints the one form an IRI has
   // (ADR 0002); one that names a concept is held below to a concept that already exists.
   const iri = input.iri ?? conceptIriOf(ulid());
   const frontmatter = fileFrontmatterOf(input, iri);
+  const contentHash = contentHashOf(frontmatter, input.body, input.path);
   const mergeKey = boundarySchemas.conceptIdentity.insert.shape.mergeKey.safeParse(input.mergeKey);
   // Evidence goes through the boundary too, and before the commit: a locator the boundary
   // would refuse is one this act should never have made a commit for (ADR 0028).

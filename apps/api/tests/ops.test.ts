@@ -82,8 +82,11 @@ const jobsOf = async (app: TestApp, workspaceId: string): Promise<readonly Queue
  */
 const finishTheJob = async (app: TestApp, workspaceId: string, status: string): Promise<void> => {
   for (let attempt = 0; attempt < 400; attempt += 1) {
+    // The row's own CHECK ties an outcome to the two finishes and to nothing else, so the
+    // stand-in writes one exactly where the worker would.
     const moved = await app.database.superuser.query(
-      `UPDATE job SET status = $2, finished_at = now()
+      `UPDATE job SET status = $2, finished_at = now(),
+              outcome = CASE WHEN $2 IN ('done', 'failed') THEN '{"generation": 2}'::jsonb END
         WHERE workspace_id = $1 AND status = 'queued'`,
       [workspaceId, status],
     );
@@ -222,13 +225,30 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.exitCode).toBe(2);
     });
 
-    it("answers usage to a --wait that is neither bare nor a whole number of seconds", async () => {
+    it.each([
+      ["a --wait carrying a value", ["--wait", "soon"]],
+      ["a --wait-seconds that is not a whole number of seconds", ["--wait-seconds", "soon"]],
+      ["a --wait-seconds of no seconds at all", ["--wait-seconds", "0"]],
+    ])("answers usage to %s, and queues nothing", async (_shape, flags) => {
       const { workspaceId } = await app().provision();
 
-      const run = await ops(app(), ["graph-rebuild", "--workspace", workspaceId, "--wait", "soon"]);
+      const run = await ops(app(), ["graph-rebuild", "--workspace", workspaceId, ...flags]);
 
       expect(run.exitCode).toBe(2);
       expect(await jobsOf(app(), workspaceId)).toEqual([]);
+    });
+
+    it("waits the rebuild's own budget by default — ADR 0032's two minutes — and says so in its usage", async () => {
+      // The budget is the promise, not a multiple of a measurement: a rebuild that has not
+      // finished in two minutes is the thing an operator has to look at, and a longer wait
+      // is asked for explicitly with --wait-seconds rather than granted by the default.
+      const run = await ops(app(), ["help"]);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines.join("\n")).toContain(
+        "--wait    poll the job until it is over, 120 seconds",
+      );
+      expect(run.lines.join("\n")).toContain("--wait-seconds <n>");
     });
 
     it("waits for the job it queued and is done once the worker has finished it", async () => {
@@ -261,8 +281,15 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const { workspaceId } = await app().provision();
 
       // A one-second wait, because nothing claims the job in this process: the drill's own
-      // wait is ten minutes and the flag is what an estate with a slower worker changes.
-      const run = await ops(app(), ["graph-rebuild", "--workspace", workspaceId, "--wait", "1"]);
+      // wait is the two-minute budget and this flag is what an estate with a slower worker
+      // says explicitly.
+      const run = await ops(app(), [
+        "graph-rebuild",
+        "--workspace",
+        workspaceId,
+        "--wait-seconds",
+        "1",
+      ]);
 
       expect(run.exitCode).toBe(1);
       expect(run.lines.join("\n")).toContain("still queued");

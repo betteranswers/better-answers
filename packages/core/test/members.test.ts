@@ -1,4 +1,4 @@
-import { ulid } from "@better-answers/schema";
+import { boundarySchemas, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
 
@@ -10,6 +10,7 @@ import {
   addToGroup,
   createGroup,
   deleteGroup,
+  holdsEveryGroup,
   listGroups,
   removeFromGroup,
   renameGroup,
@@ -527,6 +528,26 @@ describe("an act whose statement the store refuses", () => {
 });
 
 describe("a role that may not shape who sees what", () => {
+  it.each(["Editor", "Viewer"] as const)(
+    "refuses a %s the question of which groups the workspace holds, before the table is read, and answers it to the Admin",
+    async (role) => {
+      // The question every act that writes an audience asks first; an answer to anyone
+      // else would be an existence oracle over the group table that no verb grants them.
+      const { workspace, person, groupId } = await oneGroupOnePerson(`Asking${role}`, role);
+      const asked = boundarySchemas.group.select.shape.id.parse(groupId);
+
+      const refused = await asPerson(workspace, person, (principal, tx) =>
+        holdsEveryGroup(principal, tx, [asked]),
+      );
+      const answered = await asAdmin(workspace, (principal, tx) =>
+        holdsEveryGroup(principal, tx, [asked]),
+      );
+
+      expect(refused).toEqual({ ok: true, value: { ok: false, error: "role-forbids" } });
+      expect(answered).toEqual({ ok: true, value: true });
+    },
+  );
+
   it.each(["Editor", "Viewer"] as const)(
     "refuses every verb to a %s, with the one word, even from inside the group",
     async (role) => {

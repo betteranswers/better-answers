@@ -7,7 +7,7 @@ import {
   introspect,
   renderWorkerSchemaView,
 } from "../scripts/worker-view.ts";
-import { lastMigration } from "../src/journal.ts";
+import { journalEntries, journalEntriesOf, lastMigration } from "../src/journal.ts";
 import type { MigratedPostgres } from "./harness.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
@@ -69,5 +69,24 @@ describe("the worker's schema view", () => {
 
     expect(readFileSync(viewPath, "utf8")).toContain(`MIGRATION_WHEN = ${migration.when}`);
     expect(Number(stamped.rows[0]?.created_at)).toBe(migration.when);
+  });
+
+  it("refuses a journal whose migrations share an instant, because the stamp check could not tell them apart", () => {
+    // The stamp the worker compares is `when` alone: two migrations at one instant would let
+    // a database stopped after the earlier one read as stamped with the later, and the view
+    // would claim against a schema one migration short. The committed journal is held to it
+    // as a whole, and a journal with the defect is refused before any view is rendered.
+    const entries = journalEntries();
+    expect(entries.map((entry) => entry.when)).toEqual(
+      entries.map((entry) => entry.when).toSorted((a, b) => a - b),
+    );
+    expect(new Set(entries.map((entry) => entry.when)).size).toBe(entries.length);
+
+    const last = entries.at(-1);
+    expect(() =>
+      journalEntriesOf({
+        entries: [...entries, { tag: "9999_a-second-at-the-same-instant", when: last?.when ?? 0 }],
+      }),
+    ).toThrow(/strictly increase/);
   });
 });

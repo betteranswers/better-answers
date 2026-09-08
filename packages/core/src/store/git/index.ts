@@ -244,6 +244,14 @@ const messageWith = (message: string, lines: readonly string[]): string =>
 const isBundlePath = (candidate: string): boolean =>
   candidate.length > 0 &&
   !candidate.startsWith("/") &&
+  // No control character: a tab or a newline in a path is a name no OKF tool reads back and
+  // a line git's own listings would have to quote — and the reader below takes NUL-delimited
+  // listings for exactly the characters git does quote, so this is what keeps the two
+  // ends of the door agreeing on what a path can be.
+  !candidate.split("").some((character) => {
+    const code = character.charCodeAt(0);
+    return code < 0x20 || code === 0x7f;
+  }) &&
   !candidate.split("/").some((segment) => segment === "" || segment === "." || segment === "..");
 
 /**
@@ -489,24 +497,27 @@ export const readCommit = async (
   const [id = "", parents = "", ...message] = shown.split("\0");
   const parentList = parents.split(" ").filter((parent) => parent !== "");
   // `--root` so a bundle's first commit lists its files against the empty tree rather
-  // than against nothing; `-r` so a file under a directory is one line and not a tree.
+  // than against nothing; `-r` so a file under a directory is one line and not a tree; `-z`
+  // so the listing is NUL-delimited and **never quoted** — with a line-shaped listing git
+  // quotes and octal-escapes any path outside ASCII (`core.quotePath`), and a concept whose
+  // filename carries an accent would come back as a name the repository does not hold.
   const changed = await git(gitDir, [
     "diff-tree",
     "--root",
     "--no-commit-id",
     "--name-status",
     "-r",
+    "-z",
     sha,
   ]);
-  const files = changed
-    .split("\n")
-    .filter((line) => line !== "")
-    .map((line) => line.split("\t"))
-    .flatMap(([status, file]) =>
-      // Added or modified, and nothing else: a deletion has no content to land, and a
-      // rename or a copy is not a change this door's `commit` makes.
-      (status === "A" || status === "M") && file !== undefined ? [file] : [],
-    );
+  const fields = changed.split("\0");
+  const files: string[] = [];
+  for (let at = 0; at + 1 < fields.length; at += 2) {
+    const [status, file] = [fields[at], fields[at + 1]];
+    // Added or modified, and nothing else: a deletion has no content to land, and a
+    // rename or a copy is not a change this door's `commit` makes.
+    if ((status === "A" || status === "M") && file !== undefined && file !== "") files.push(file);
+  }
   const file = files[0];
   const change =
     files.length === 1 && file !== undefined

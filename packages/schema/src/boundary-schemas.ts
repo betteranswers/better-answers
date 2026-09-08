@@ -352,11 +352,18 @@ const conceptIri = (schema: z.ZodString) => schema.regex(IRI).brand<"ConceptIri"
  * NULL` refuses SQL NULL, not the JSON value) and the parity suite holds the refinement to
  * the column's own nullability; the write path never stores one.
  */
-/** One list-of-objects entry: a flat object of scalars, whatever key it sits under. */
-const frontmatterEntry = z.record(
-  z.string(),
-  z.union([z.string(), z.number(), z.boolean(), z.null()]),
-);
+/**
+ * One list-of-objects entry: a flat object of scalars, whatever key it sits under, with at
+ * least one key. The renderer writes an entry as its keys' lines under a list dash, so an
+ * empty object has no line to be written as and would come back off the file as nothing —
+ * a shape the parser refuses — and refusing it here, before the commit, is what keeps a
+ * replay from ever meeting it.
+ */
+const frontmatterEntry = z
+  .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+  .refine((entry) => Object.keys(entry).length > 0, {
+    message: "a list entry carries at least one key",
+  });
 
 /**
  * Whether one `sources[]` entry names the resource it cites — **asked of the one reader**

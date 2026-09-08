@@ -127,9 +127,14 @@ type HeldRow = {
  * concept a writer may not see for its class or its audience is not theirs to re-write, and
  * a row this read withholds is a row this act never held — so the write answers exactly as
  * it does for an IRI nobody minted, and a re-write is no oracle for what `open` withholds.
- * The published arm is not applied: a draft is its author's to re-write on the way to
- * publishing it. The platform reads every row, because the replay is recovery of an act that
- * was authorised when its commit was made, never a second judgement of it.
+ * **The published arm is not applied, by decision**: it gates readers, and a writer is an
+ * Editor or an Admin (ADR 0012), whose re-write of a draft is the road to publishing it —
+ * every creation lands as a draft, so applying that arm here would make every draft
+ * un-rewritable by anyone, and a draft has no author of record to make an exception for
+ * (the commit's author is git's fact, never the row's). What withholds a concept from a
+ * writer is its class and its audience, exactly the two arms a Viewer is withheld by. The
+ * platform reads every row, because the replay is recovery of an act that was authorised
+ * when its commit was made, never a second judgement of it.
  */
 export const heldByIri = async (
   principal: Principal,
@@ -203,9 +208,12 @@ type RowFacts = {
  * the live write's and the reconciler's replay — so a replayed commit lands the row its act
  * would have.
  *
- * A status the write does not name is the one the concept already holds, exactly as its
- * class is: the draft default is what a concept is *born* at, and applying it to a re-write
- * would un-publish a stable concept nobody asked to un-publish. Published once and kept: a
+ * A status the write does not name is **the one the file carries**, where the file names
+ * one — the file is the truth and the row is derived from it (ADR 0012), and a row that
+ * said *draft* under a file that said *stable* would hide a concept its own file publishes
+ * and then flip it on replay — and otherwise the one the concept already holds, exactly as
+ * its class is: the draft default is what a concept is *born* at, and applying it to a
+ * re-write would un-publish a stable concept nobody asked to un-publish. Published once and kept: a
  * concept that reaches a readable status carries the instant it first did, and one that
  * leaves those statuses loses it, so the predicate's first arm is a fact about the concept
  * rather than a stamp every write renews.
@@ -217,7 +225,12 @@ type RowFacts = {
  * What the row lands with is what the derivation says, not this.
  */
 export const indexRowOf = (facts: RowFacts, held: Held | undefined) => {
-  const status = facts.status ?? held?.status ?? CONCEPT_DRAFT_STATUS;
+  const fileStatus = facts.frontmatter["status"];
+  const status =
+    facts.status ??
+    (typeof fileStatus === "string" ? fileStatus : undefined) ??
+    held?.status ??
+    CONCEPT_DRAFT_STATUS;
   return conceptRow.safeParse({
     workspaceId: facts.workspaceId,
     iri: facts.iri,

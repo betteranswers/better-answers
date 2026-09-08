@@ -13,9 +13,9 @@ import {
 } from "../src/concepts/index.ts";
 import { footnotesOf } from "../src/guides/index.ts";
 import { attempt, type UserPrincipal } from "../src/kernel/index.ts";
-import { narrowBinding } from "../src/sources/index.ts";
+import { narrowBinding, type NarrowBindingInput } from "../src/sources/index.ts";
 import { bundleHistory } from "./bundle.ts";
-import { until } from "./suite-postgres.ts";
+import { countWaitingOnLocks, until, whileActsWaitAt } from "./suite-postgres.ts";
 import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
 import {
   bindingForGroups,
@@ -645,6 +645,176 @@ describe("narrowing a binding", () => {
     expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
       bothAt({ sensitivity: "Restricted", ...EVERYONE }),
     );
+  });
+
+  it("counts an include whose concept has no row as Restricted, so a composition never widens over a concept nobody can yet say the class of", async () => {
+    const scenario = await arrange();
+    const binding = await bindingHolding(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
+    // An include naming an identity with no index row — a creation whose rows were lost in
+    // the crash window and not yet replayed, as the cascade may find one.
+    const composition = await seededBy(db(), async (seed) => {
+      const page = await seed.composition({ workspaceId: scenario.workspaceId });
+      await seed.compositionInclude({
+        workspaceId: scenario.workspaceId,
+        compositionId: page.id,
+        iri: written.iri,
+        ordinal: 0,
+      });
+      await seed.compositionInclude({
+        workspaceId: scenario.workspaceId,
+        compositionId: page.id,
+        ordinal: 1,
+      });
+      return page.id;
+    });
+
+    // A narrowing that changes nothing recomputes all the same, and that is the road to the
+    // composition's recompute here.
+    const narrowed = await reading(scenario.admin, (admin, tx) =>
+      narrowBinding(admin, tx, {
+        bindingId: binding.bindingId,
+        sensitivity: "Internal",
+        audience: "everyone",
+      }),
+    );
+
+    expect(narrowed).toMatchObject({ ok: true, value: { compositions: [composition] } });
+    // Not the Internal its one readable include would derive: the missing include stands
+    // in at the most restrictive visibility there is until its row does.
+    expect(
+      await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
+    ).toEqual({ sensitivity: "Restricted", ...EVERYONE });
+  });
+
+  /**
+   * A re-write started and **parked** at its first write to `table` by `whileActsWaitAt`,
+   * a narrowing then started beside it and seen from the database to be waiting too, and
+   * the pair released: the shape of every race between the write road and the cascade.
+   */
+  const narrowingBesideAParkedWrite = async (
+    scenario: Scenario,
+    table: string,
+    event: "INSERT" | "UPDATE",
+    write: () => Promise<Awaited<ReturnType<typeof rewriteCiting>>>,
+    narrowing: NarrowBindingInput,
+  ): Promise<void> => {
+    await whileActsWaitAt(db().pool, table, event, async (release) => {
+      const rewriting = write();
+      await until(async () => (await countWaitingOnLocks(db().pool)) >= 1);
+      const narrowed = reading(scenario.admin, (admin, tx) => narrowBinding(admin, tx, narrowing));
+      await until(async () => (await countWaitingOnLocks(db().pool)) >= 2);
+      await release();
+      expect(await rewriting).toMatchObject({ ok: true });
+      expect(await narrowed).toMatchObject({ ok: true });
+    });
+  };
+
+  it("re-derives a concept from what it cites after waiting on a re-write's row, so a narrowing of the citation the re-write dropped never overwrites what the re-write landed", async () => {
+    const scenario = await arrange();
+    const dropped = await bindingHolding(db(), scenario.workspaceId);
+    const kept = await bindingHolding(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.editor, [dropped.documentId]);
+
+    // The re-write swaps its citation from one binding to the other and is held inside its
+    // landing — its row taken, its citations replaced, the commit row not yet written —
+    // while the binding it dropped is narrowed. The cascade sees the concept as still citing
+    // that binding (the swap is uncommitted), reaches the row and waits.
+    await narrowingBesideAParkedWrite(
+      scenario,
+      "bundle_commit",
+      "INSERT",
+      () => rewriteCiting(scenario, scenario.editor, written, [kept.documentId]),
+      { bindingId: dropped.bindingId, sensitivity: "Restricted", audience: "everyone" },
+    );
+
+    // Internal — what the binding it now cites allows — and not the Restricted a cascade
+    // deriving from the citation it had already dropped would have written over it.
+    expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
+      bothAt({ sensitivity: "Internal", ...EVERYONE }),
+    );
+  });
+
+  it("recomputes a composition two acts reach one after the other, so two disjoint audiences intersect to nobody rather than to the last writer's groups", async () => {
+    const scenario = await arrange();
+    const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
+    const sales = await groupNamed(db(), scenario, "Sales", [scenario.viewer]);
+    const forHr = await bindingForGroups(db(), scenario.workspaceId, [hr]);
+    const open = await bindingHolding(db(), scenario.workspaceId);
+    const other = await bindingHolding(db(), scenario.workspaceId);
+    const narrowing = await conceptCiting(scenario, scenario.editor, [other.documentId]);
+    const cited = await conceptCiting(scenario, scenario.editor, [open.documentId]);
+    const composition = await compositionIncluding(scenario.workspaceId, [
+      narrowing.iri,
+      cited.iri,
+    ]);
+
+    // The re-write takes its concept to HR alone and is held at its composition update,
+    // having derived the page from the other include as it stood — everyone. The narrowing
+    // then takes the other include to Sales alone and reaches the same page.
+    await narrowingBesideAParkedWrite(
+      scenario,
+      "composition",
+      "UPDATE",
+      () => rewriteCiting(scenario, scenario.editor, narrowing, [forHr.documentId]),
+      {
+        bindingId: open.bindingId,
+        sensitivity: "Internal",
+        audience: "groups",
+        audienceGroups: [sales],
+      },
+    );
+
+    // HR and Sales share nobody: the page is for nobody, which is Restricted for everyone
+    // (ADR 0039) — never the groups of whichever act wrote last.
+    expect(
+      await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
+    ).toEqual({ sensitivity: "Restricted", ...EVERYONE });
+  });
+
+  it("lands two narrowings of two bindings one concept cites one after the other, never as a deadlock", async () => {
+    const scenario = await arrange();
+    const first = await bindingHolding(db(), scenario.workspaceId);
+    const second = await bindingHolding(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.editor, [
+      first.documentId,
+      second.documentId,
+    ]);
+
+    // The first narrowing is held at its ledger row — its binding taken, its cascade not
+    // yet run — while the second narrowing starts. Without one lock at the head, each would
+    // hold its own binding and want the other through the concept citing both, and Postgres
+    // would end one Admin's act with an error.
+    await whileActsWaitAt(db().pool, "audit_event", "INSERT", async (release) => {
+      // The second starts only once the first is parked, so the order is the one the
+      // deadlock needs and never the one a fast first narrowing would have finished in.
+      const narrowings: Promise<Awaited<ReturnType<typeof narrowBinding>>>[] = [];
+      for (const [at, binding] of [first, second].entries()) {
+        narrowings.push(
+          reading(scenario.admin, (admin, tx) =>
+            narrowBinding(admin, tx, {
+              bindingId: binding.bindingId,
+              sensitivity: "Restricted",
+              audience: "everyone",
+            }),
+          ),
+        );
+        await until(async () => (await countWaitingOnLocks(db().pool)) >= at + 1);
+      }
+      const settling = Promise.all(narrowings);
+      await until(async () => (await countWaitingOnLocks(db().pool)) >= 2);
+      await release();
+      const [one, two] = await settling;
+      expect(one).toMatchObject({ ok: true });
+      expect(two).toMatchObject({ ok: true });
+    });
+
+    expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
+      bothAt({ sensitivity: "Restricted", ...EVERYONE }),
+    );
+    expect(
+      await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed"),
+    ).toHaveLength(2);
   });
 
   it("leaves neither the narrowed row, nor the cascade, nor its ledger row when the transaction fails after it", async () => {

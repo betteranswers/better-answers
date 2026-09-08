@@ -24,6 +24,12 @@ way the queue itself resolves it — by the lease:
   that has stopped claiming, which is the failure this check exists to catch and the one
   an HTTP probe could never see.
 
+**One worker in the estate, by decision** (`MAX_CONCURRENT_RUNS=1`, ADR 0024): the idle
+half of the check reads the whole queue as this worker's, which is true while this is
+the only worker there is. A second replica draining the queue would let a worker whose
+loop had stopped read as healthy on the other's work; the day a second replica exists,
+the idle half asks for this worker's own liveness rather than the queue's emptiness.
+
 It asks the question **per workspace**, because `job` is a tenant table under RLS: an
 unscoped transaction sees no rows at all, so a check written as one query over the whole
 table would answer *healthy* by seeing nothing, every time, for ever. The workspaces

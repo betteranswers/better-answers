@@ -59,6 +59,9 @@ export const JOB_STATUSES = ["queued", "claimed", "done", "failed", "poisoned"] 
 /** What a job is born at: waiting for the worker that claims it. */
 export const JOB_QUEUED_STATUS = "queued" satisfies (typeof JOB_STATUSES)[number];
 
+/** Held by one worker under a lease it must keep confirming. */
+export const JOB_CLAIMED_STATUS = "claimed" satisfies (typeof JOB_STATUSES)[number];
+
 /** The statuses a job never leaves — the two finishes and the reaper's verdict. */
 export const JOB_TERMINAL_STATUSES = ["done", "failed", "poisoned"] as const;
 
@@ -81,6 +84,13 @@ export const JOB_MAX_ATTEMPTS = 3;
  * Never content, never an address and never a person's name: a job's outcome is a record
  * the platform keeps, and one that held any of those would have to be rewritten on erasure,
  * which is a thing the platform does to files and never to a record of what a run found.
+ * **Its shape is the boundary's** (`outcome` in `boundary-schemas.ts`): one flat object
+ * whose values are a scalar, a list of scalars, or a list of flat objects of scalars — the
+ * auditor's `{path, expected, actual}` triple and nothing deeper. The worker writes exactly
+ * that shape (`ParseFindings.as_row`, `RebuildOutcome.as_row` and the failure's `{error}` in
+ * `apps/worker`), and the app parses every outcome it reads back through the boundary before
+ * it answers a caller, so an outcome that grew a nested place to hide content in is refused
+ * on the way out rather than served.
  *
  * A job is not an *audit event* and never becomes one: runs are their own record, as the
  * audit slice's own vocabulary says. There is no ledger row for enqueueing, claiming or
@@ -139,16 +149,28 @@ export const job = withRLS(
       "job_attempts_check",
       sql.raw("attempts >= 0 AND max_attempts >= 1 AND attempts <= max_attempts"),
     ),
-    check("job_claim_check", sql.raw("(claimed_by IS NULL) = (claimed_at IS NULL)")),
+    // A claimant and its claim instant come together, and a *claimed* row carries the whole
+    // of its lease — who holds it, since when, until when, and the last heartbeat — because a
+    // claimed row missing one of them is a job nothing can heartbeat, finish or reclaim.
+    check(
+      "job_claim_check",
+      sql.raw(
+        `(claimed_by IS NULL) = (claimed_at IS NULL)
+         AND (status <> '${JOB_CLAIMED_STATUS}'
+              OR (claimed_by IS NOT NULL AND claimed_at IS NOT NULL
+                  AND lease_expires_at IS NOT NULL AND heartbeat_at IS NOT NULL))`,
+      ),
+    ),
     check(
       "job_finished_check",
       sql.raw(`(finished_at IS NOT NULL) = (status IN (${listed(JOB_TERMINAL_STATUSES)}))`),
     ),
-    // A poisoned job ran nothing, so it found nothing: an outcome on one would be a report
-    // about work that never happened.
+    // The two finishes carry an outcome and nothing else does: a poisoned job ran nothing, so
+    // it found nothing, and a done or failed job with no outcome would be a terminal row that
+    // cannot say what the run it reports found.
     check(
       "job_outcome_check",
-      sql.raw(`outcome IS NULL OR status IN (${listed(JOB_FINISHED_STATUSES)})`),
+      sql.raw(`(outcome IS NOT NULL) = (status IN (${listed(JOB_FINISHED_STATUSES)}))`),
     ),
   ],
 );

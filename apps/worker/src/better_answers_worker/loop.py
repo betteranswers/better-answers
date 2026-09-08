@@ -64,11 +64,19 @@ def schema_stamp_matches(connection: psycopg.Connection) -> bool:
 
 def _due_for_audit(cursor: psycopg.Cursor) -> bool:
     """Whether this workspace's nightly audit is due — more than a day since the last
-    one finished, or never run at all. A job already waiting is not a second one to
+    one ended, or never run at all. A job already waiting is not a second one to
     enqueue.
+
+    An audit that ended *failed* or *poisoned* counts as run: it is the last thing this
+    loop did about the workspace, and a cadence that counted only *done* would put a
+    new audit on the queue every idle tick for as long as the failure lasted — a queue
+    of terminal jobs growing five seconds at a time, each burying the outcome an
+    operator should be reading. The next audit comes round a day later, as it does after
+    a good one.
     """
     cursor.execute(
-        "SELECT max(finished_at) FILTER (WHERE status = 'done'),"
+        "SELECT max(finished_at)"
+        " FILTER (WHERE status IN ('done', 'failed', 'poisoned')),"
         " count(*) FILTER (WHERE status IN ('queued', 'claimed'))"
         " FROM job WHERE kind = 'nightly-audit'"
     )

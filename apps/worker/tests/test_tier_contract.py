@@ -17,7 +17,7 @@ from typing import Any, cast
 import pytest
 from psycopg import Cursor
 
-SPOKEN_CONTRACT_VERSION = 3
+SPOKEN_CONTRACT_VERSION = 4
 SPOKEN_AGREEMENTS = {
     "concept-inbox": "sql-function",
     "cost-ledger": "generated",
@@ -124,6 +124,14 @@ def test_the_id_shape_accepts_and_refuses_exactly_what_the_fixture_says() -> Non
         assert pattern.fullmatch(identifier), identifier
     for rejected in fixture["must_not_parse"]:
         assert not pattern.fullmatch(rejected["id"]), rejected["why"]
+
+
+def test_the_shape_this_tier_holds_a_workspace_id_to_is_the_fixtures_own() -> None:
+    # `bundle.py` refuses to turn a workspace id into a path unless it has this shape;
+    # the copy in `ids.py` is held to the fixture's pattern, so it can never drift.
+    from better_answers_worker.ids import ID_SHAPE
+
+    assert ID_SHAPE.pattern == read_id_shape()["pattern"]
 
 
 def test_an_id_minted_in_this_tier_matches_the_shape_the_other_tier_parses() -> None:

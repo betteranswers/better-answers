@@ -41,6 +41,35 @@ const auditQueuedByCron = async (
   return cron.value.jobId;
 };
 
+/**
+ * A nightly audit that found nothing, in the shape the worker writes (`ParseFindings.as_row`
+ * in `apps/worker`): the count, and the four lists a bundle is healthy only when all are
+ * empty.
+ */
+const NOTHING_FOUND = {
+  checked: 1,
+  mismatched: [],
+  unparsed: [],
+  missing_row: [],
+  missing_file: [],
+} as const;
+
+/**
+ * An outcome written past the boundary — as the worker's finish function would take it, the
+ * column being JSONB and the function the database's — onto a job the factory finished.
+ */
+const outcomeWrittenRaw = async (workspaceId: string, jobId: string, outcome: unknown) => {
+  await db().pool.query("UPDATE job SET outcome = $3 WHERE workspace_id = $1 AND id = $2", [
+    workspaceId,
+    jobId,
+    JSON.stringify(outcome),
+  ]);
+};
+
+/** A nightly audit over three files that found nothing, finished at this instant. */
+const foundNothingOn = (workspaceId: string, at: string) =>
+  finishedAudit(workspaceId, { ...NOTHING_FOUND, checked: 3 }, new Date(at));
+
 /** What the worker would have written when it finished an audit, as the app sees it. */
 const finishedAudit = async (
   workspaceId: string,
@@ -232,6 +261,31 @@ describe("waiting on a job somebody queued", () => {
     expect(over.ok && over.value.outcome).toEqual({ checked: 2, mismatched: [] });
   });
 
+  it("hands back the store's failure, never the value, for a finished job whose outcome is not the shape the queue agreement admits", async () => {
+    // The finish functions take any JSONB; the boundary is what holds the agreement, and a
+    // nested outcome — the one place content could hide — is refused on the way out.
+    const scenario = await arrange();
+    const jobId = await auditQueuedByCron(scenario);
+    await finishedAudit(
+      scenario.workspaceId,
+      NOTHING_FOUND,
+      new Date("2026-09-07T02:00:00Z"),
+      jobId,
+    );
+    await outcomeWrittenRaw(scenario.workspaceId, jobId, {
+      checked: 1,
+      mismatched: [{ path: "knowledge/expenses.md", body: { text: "…" } }],
+    });
+
+    const read = await jobById(graphMaintenance, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+      jobId,
+    });
+
+    expect(read.ok).toBe(false);
+    expect(read.ok ? "" : String(read.error)).toContain("queue agreement");
+  });
+
   it("answers a person polling in their own workspace, whichever road queued the job", async () => {
     // The two roads meet on one row: cron queues the audit as the platform, and the
     // workspace's own Admin reads that job back through their membership. A `--wait` on the
@@ -315,13 +369,10 @@ describe("what the platform can say about the two parsers agreeing", () => {
     expect(health).toEqual({ ok: true, value: "never-audited" });
   });
 
-  it("says healthy when the last audit found no mismatch", async () => {
+  it("says healthy when the last audit found nothing in any of its four lists", async () => {
     const scenario = await arrange();
-    await finishedAudit(
-      scenario.workspaceId,
-      { checked: 3, mismatched: [], unparsed: [] },
-      new Date("2026-09-07T02:00:00Z"),
-    );
+
+    await foundNothingOn(scenario.workspaceId, "2026-09-07T02:00:00Z");
 
     expect(await bundleHealth(scenario.admin, scenario.postgres)).toEqual({
       ok: true,
@@ -329,11 +380,62 @@ describe("what the platform can say about the two parsers agreeing", () => {
     });
   });
 
+  it.each([
+    ["a file whose hash is not the row's", { mismatched: [{ path: "knowledge/expenses.md" }] }],
+    ["a file the grammar cannot read", { unparsed: ["knowledge/strange.md"] }],
+    ["a file the index does not know", { missing_row: ["knowledge/new.md"] }],
+    ["a row whose file is gone", { missing_file: ["knowledge/gone.md"] }],
+  ])(
+    "says mismatched over %s — every finding is the repository and the index disagreeing",
+    async (_finding, found) => {
+      const scenario = await arrange();
+      await finishedAudit(
+        scenario.workspaceId,
+        { ...NOTHING_FOUND, ...found },
+        new Date("2026-09-07T02:00:00Z"),
+      );
+
+      expect(await bundleHealth(scenario.admin, scenario.postgres)).toEqual({
+        ok: true,
+        value: "mismatched",
+      });
+    },
+  );
+
+  it.each([
+    ["a list missing", { checked: 3, mismatched: [], unparsed: [] }],
+    ["a finding that is not a list", { ...NOTHING_FOUND, mismatched: "" }],
+    [
+      "an outcome outside the boundary's shape",
+      { ...NOTHING_FOUND, mismatched: [{ deep: { path: "x" } }] },
+    ],
+  ])(
+    "says mismatched, never healthy, over an outcome it cannot read as clean — %s",
+    async (_shape, outcome) => {
+      // The fail-closed reading of "I cannot tell" is the one that puts a person in front
+      // of the bundle; a worker that wrote a shape this cannot read is itself the finding.
+      const scenario = await arrange();
+      const jobId = await auditQueuedByCron(scenario);
+      await finishedAudit(
+        scenario.workspaceId,
+        NOTHING_FOUND,
+        new Date("2026-09-07T02:00:00Z"),
+        jobId,
+      );
+      await outcomeWrittenRaw(scenario.workspaceId, jobId, outcome);
+
+      expect(await bundleHealth(scenario.admin, scenario.postgres)).toEqual({
+        ok: true,
+        value: "mismatched",
+      });
+    },
+  );
+
   it("reads the latest finished audit, so a mismatch put right stops being one", async () => {
     const scenario = await arrange();
     await finishedAudit(
       scenario.workspaceId,
-      { checked: 3, mismatched: [{ path: "knowledge/expenses.md" }] },
+      { ...NOTHING_FOUND, checked: 3, mismatched: [{ path: "knowledge/expenses.md" }] },
       new Date("2026-09-06T02:00:00Z"),
     );
 
@@ -342,11 +444,7 @@ describe("what the platform can say about the two parsers agreeing", () => {
       value: "mismatched",
     });
 
-    await finishedAudit(
-      scenario.workspaceId,
-      { checked: 3, mismatched: [] },
-      new Date("2026-09-07T02:00:00Z"),
-    );
+    await foundNothingOn(scenario.workspaceId, "2026-09-07T02:00:00Z");
 
     expect(await bundleHealth(scenario.admin, scenario.postgres)).toEqual({
       ok: true,

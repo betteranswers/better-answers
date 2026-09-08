@@ -19,6 +19,8 @@ import {
   requireAdmin,
   ulid,
   type ActorId,
+  type AdminUserPrincipal,
+  type GroupId,
   type Principal,
   type Result,
   type RoleRefusal,
@@ -219,11 +221,61 @@ export const conceptVisibilityFrom = async (
 type IndexVisibilityRow = VisibilityRow & { readonly workspace_id: string; readonly kind: string };
 
 /**
+ * **The lock every act that cascades takes at its head**, before it reads or holds any row:
+ * one transaction-scoped advisory lock per workspace, so a narrowing and an override in one
+ * workspace run one after the other and never beside each other.
+ *
+ * Without it two narrowings deadlock. Each holds its own binding `FOR UPDATE` and then, for a
+ * concept citing both bindings, asks `conceptVisibilityFrom` for the other `FOR SHARE` — two
+ * acts each holding what the other wants, which Postgres resolves by aborting one of them
+ * with an error an Admin cannot act on. Locking every binding a cascade could reach in one
+ * deterministic order would need the cascade's whole closure read before the act begins;
+ * one lock per workspace is the same serialisation in one statement, and the acts that take
+ * it are an Admin's few. The governed write does not take it: its derivation holds bindings
+ * `FOR SHARE` and then its own row, the orders analysed in `conceptVisibilityFrom`, and a
+ * write beside a cascade waits on a row rather than deadlocking with it.
+ */
+const serialisingCascades = async (principal: Principal, tx: Tx): Promise<void> => {
+  await tx.query(
+    `SELECT pg_advisory_xact_lock(hashtext('visibility-cascade'), hashtext(${scopeClause(1)}))`,
+    [scopeParameter(principal)],
+  );
+};
+
+/**
+ * The head every act that writes an audience shares: the workspace's cascade lock, then
+ * whether the workspace holds every group the act names (`holdsEveryGroup`, an Admin's
+ * question). Answered as one `Result` so the two acts read one gate and not two copies of
+ * it; what each then reads of its own rows — the binding, the concept — is its own.
+ */
+export const openingACascade = async (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  groupIds: readonly GroupId[],
+): Promise<Result<boolean, RoleRefusal | Error>> => {
+  const serialised = await attempt(() => serialisingCascades(admin, tx));
+  if (!serialised.ok) return err(serialised.error);
+  const groups = await attempt(() => holdsEveryGroup(admin, tx, groupIds));
+  if (!groups.ok) return err(groups.error);
+  return groups.value;
+};
+
+/**
  * One concept re-derived from the rows as they stand and rewritten — the index row and,
  * through the graph door, the map's copies of it — in the caller's transaction. What the
  * row holds now is the fallback, so a concept whose citations no longer resolve keeps its
  * class rather than taking a default nobody decided. The graph door is handed the row's
  * own workspace, which is what its copies carry.
+ *
+ * **The row is taken `FOR UPDATE` first, and the citations are read after.** A re-write in
+ * flight holds this row while it lands, and may have changed what the concept cites — dropped
+ * the very citation this cascade is recomputing for. A cascade that read the citations first
+ * and waited on the row afterwards would then overwrite the re-write's newer visibility with
+ * one derived from evidence the concept no longer cites; waiting on the row first means what
+ * this reads is what the re-write left. Row-first is safe here and not in the write's own
+ * derivation because the acts that reach this hold `serialisingCascades`: the one other act
+ * that takes a binding `FOR UPDATE` and then wants a row is another cascade, and no two run
+ * at once.
  */
 const recomputeConceptVisibility = async (
   principal: Principal,
@@ -232,7 +284,7 @@ const recomputeConceptVisibility = async (
 ): Promise<Visibility | undefined> => {
   const held = await tx.query<IndexVisibilityRow>(
     `SELECT workspace_id, kind, sensitivity, audience, audience_groups FROM concept_index
-      WHERE workspace_id = ${scopeClause(1)} AND iri = $2`,
+      WHERE workspace_id = ${scopeClause(1)} AND iri = $2 FOR UPDATE`,
     [scopeParameter(principal), iri],
   );
   const row = held.rows[0];
@@ -334,16 +386,19 @@ export const overrideConceptClass = async (
   if (!iri.success || visibility === undefined) return err("malformed");
   const { workspaceId } = admin.value;
 
-  const known = await attempt(async () => ({
-    concept: await tx.query("SELECT 1 FROM concept_identity WHERE workspace_id = $1 AND iri = $2", [
+  // At the head, before any row is read: an override cascades, and cascades in one
+  // workspace run one after the other (`serialisingCascades`).
+  const groups = await openingACascade(admin.value, tx, visibility.audienceGroups ?? []);
+  if (!groups.ok) return err(groups.error);
+  const known = await attempt(() =>
+    tx.query("SELECT 1 FROM concept_identity WHERE workspace_id = $1 AND iri = $2", [
       workspaceId,
       iri.data,
     ]),
-    groups: await holdsEveryGroup(admin.value, tx, visibility.audienceGroups ?? []),
-  }));
+  );
   if (!known.ok) return err(known.error);
-  if (known.value.concept.rowCount === 0) return err("no-such-concept");
-  if (!known.value.groups) return err("no-such-group");
+  if (known.value.rowCount === 0) return err("no-such-concept");
+  if (!groups.value) return err("no-such-group");
 
   const auditEventId = ulid();
   const recorded = await attempt(() =>

@@ -44,5 +44,21 @@ def test_a_chunk_ends_at_a_paragraph_and_never_grows_past_its_size() -> None:
     assert all(f"Paragraph {number}." in joined for number in range(6))
 
 
+def test_one_paragraph_past_the_ceiling_is_cut_at_it_and_loses_nothing() -> None:
+    # The one case that is cut rather than divided at a paragraph: a single paragraph
+    # past the ceiling, after a short one that has to be flushed first.
+    short = "A short paragraph first."
+    long = "".join(f"w{number:04d} " for number in range(300)).strip()
+    assert len(long) > CHUNK_MAX_CHARACTERS
+
+    chunks = chunks_of(render_concept_file(FRONTMATTER, f"{short}\n\n{long}"))
+
+    assert chunks[0] == short
+    assert all(len(chunk) <= CHUNK_MAX_CHARACTERS for chunk in chunks)
+    # Every character of the long paragraph survives, in order: a cut divides, never
+    # drops.
+    assert "".join(chunks[1:]) == long
+
+
 def test_a_concept_with_no_body_yields_no_chunks() -> None:
     assert chunks_of(render_concept_file(FRONTMATTER, "")) == []

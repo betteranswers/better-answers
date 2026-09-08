@@ -16,11 +16,18 @@ for a function whose specification is fixed.
 It mints ids, never secrets: the time half is public by design.
 """
 
+import re
 import secrets
 import time
 
 #: Crockford base32, in value order: no I, L, O or U, so no digit is misread aloud.
 _ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+#: The one shape an id has, as ``contracts/id-shape/cases.json`` states it — what this
+#: tier holds an id to before it turns one into anything but a row key. The conformance
+#: suite reads the fixture's own pattern and holds this copy equal to it, so the copy
+#: cannot drift; it is a copy because a module here cannot import a fixture at runtime.
+ID_SHAPE = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
 
 _TIME_CHARACTERS = 10
 _RANDOM_CHARACTERS = 16

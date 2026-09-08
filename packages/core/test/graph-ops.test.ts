@@ -162,9 +162,18 @@ describe("sweeping a workspace's map", () => {
   it("writes one ledger row per generation removed, sharing a batch id, with the counts it removed", async () => {
     const workspace = await arrange();
     await mapWithLeftovers(workspace);
+    // A second rebuild's generation beside the first's, flipped live as a rebuild flips it
+    // — the database admits a row only in the live generation or the next (migration
+    // 0022) — so the leftovers are the two generations before it.
     await seeded(async (seed) => {
+      await db().pool.query("UPDATE graph_generation SET live_gen = 2 WHERE workspace_id = $1", [
+        workspace.workspaceId,
+      ]);
       const third = await seed.graphNode({ workspaceId: workspace.workspaceId, gen: 3 });
       await seed.graphEdge({ workspaceId: workspace.workspaceId, gen: 3, fromUid: third.uid });
+      await db().pool.query("UPDATE graph_generation SET live_gen = 3 WHERE workspace_id = $1", [
+        workspace.workspaceId,
+      ]);
     });
 
     const swept = await sweeping(workspace);
@@ -172,15 +181,15 @@ describe("sweeping a workspace's map", () => {
     expect(swept).toEqual({
       ok: true,
       value: [
+        { gen: 1, nodes: 2, edges: 1 },
         { gen: 2, nodes: 2, edges: 1 },
-        { gen: 3, nodes: 2, edges: 1 },
       ],
     });
     const events = await sweptEvents(workspace.workspaceId);
-    expect(events.map((event) => event.subject_id)).toEqual(["2", "3"]);
+    expect(events.map((event) => event.subject_id)).toEqual(["1", "2"]);
     expect(events.map((event) => event.detail)).toEqual([
+      { generation: 1, nodes: 2, edges: 1 },
       { generation: 2, nodes: 2, edges: 1 },
-      { generation: 3, nodes: 2, edges: 1 },
     ]);
     // A bulk act is N rows sharing one batch id, never one row hiding N (`[AUDIT1]`).
     const batches = new Set(events.map((event) => event.batch_id));
@@ -204,7 +213,10 @@ describe("sweeping a workspace's map", () => {
     // Rows with a generation and no `graph_generation` row to say which one is live: a
     // restore that carried the map without its one-row pointer. Which generation is live
     // is unknown, so a sweep that guessed would delete the map.
-    await seeded((seed) => seed.graphNode({ workspaceId: workspace.workspaceId, gen: 7 }));
+    await seeded(async (seed) => {
+      await seed.graphGeneration({ workspaceId: workspace.workspaceId, liveGen: 7 });
+      await seed.graphNode({ workspaceId: workspace.workspaceId, gen: 7 });
+    });
     await db().pool.query("DELETE FROM graph_generation WHERE workspace_id = $1", [
       workspace.workspaceId,
     ]);

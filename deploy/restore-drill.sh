@@ -147,8 +147,22 @@ say "## 6 counts diff against production's stamped run (ADR 0023) — production
 if ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts" && [ -s "${WORK}/staging.counts" ]; then
   cat "${WORK}/staging.counts" >> "${REPORT}"
   # The SQL travels on stdin: an argument would be re-split by the shell on the far side of the SSH hop.
-  printf '%s' "select counts_json from graph_sync_run where workspace_id = '${DRILL_WORKSPACE}' and outcome = 'ok' order by finished_at desc limit 1" \
-    | ${PROD_PSQL} -At > "${WORK}/prod.counts" 2>/dev/null || : > "${WORK}/prod.counts"
+  # Production is read in two steps, so a hop that fails is never mistaken for a run that was
+  # never stamped: first whether the stamped-run table exists there at all, then the latest
+  # good run's counts. An SSH or psql failure stops the drill — a report that said "no stamped
+  # run" over a connection that never answered would be the diff quietly skipped — and only an
+  # absent table or an empty answer is the baseline being absent.
+  if ! stamped=$(printf '%s' "select to_regclass('public.graph_sync_run') is not null" | ${PROD_PSQL} -At); then
+    say "REFUSED: production could not be read for the counts diff — the SSH hop or psql failed"; exit 1
+  fi
+  if [ "${stamped}" = "t" ]; then
+    if ! printf '%s' "select counts_json from graph_sync_run where workspace_id = '${DRILL_WORKSPACE}' and outcome = 'ok' order by finished_at desc limit 1" \
+      | ${PROD_PSQL} -At > "${WORK}/prod.counts"; then
+      say "REFUSED: production could not be read for the counts diff — the SSH hop or psql failed"; exit 1
+    fi
+  else
+    : > "${WORK}/prod.counts"
+  fi
   if [ ! -s "${WORK}/prod.counts" ]; then
     # `graph_sync_run` is the worker's stamped record of a sync and no task has built it yet,
     # so production has nothing to diff against. The staging counts stand in the report as

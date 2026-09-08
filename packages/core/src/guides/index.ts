@@ -2,6 +2,7 @@ import {
   derivedVisibility,
   readableClause,
   readableParameters,
+  RESTRICTED_TO_ADMINS,
   visibilityOf,
   type VisibilityRow,
 } from "../access/index.ts";
@@ -39,12 +40,33 @@ export type Footnote = {
 /** A composition's own three columns, read as the fallback its recompute keeps, and its keys. */
 type CompositionRow = VisibilityRow & { readonly workspace_id: string; readonly id: string };
 
+/** One include as the recompute reads it: the concept's pair, or nothing where the concept has no row. */
+type IncludeRow = {
+  readonly sensitivity: string | null;
+  readonly audience: string | null;
+  readonly audience_groups: readonly string[] | null;
+};
+
 /**
  * The cascade's second level, in the caller's transaction: every composition including one
  * of the concepts named is re-derived from what its includes hold **now** — the most
  * restrictive class, the audiences' intersection, an empty intersection forcing Restricted
- * (ADR 0039) — and rewritten. A composition has no kind, so no floor applies; one whose
- * includes' rows are all gone keeps what it holds, which is the fail-closed answer.
+ * (ADR 0039) — and rewritten. A composition has no kind, so no floor applies.
+ *
+ * **An include whose concept has no index row counts as Restricted**, never as absent. An
+ * include names an identity, and an identity can stand without its row — a creation whose
+ * rows were lost in the crash window and not yet replayed — so dropping it from the
+ * derivation would widen the composition to whatever its other includes allow, over a
+ * concept nobody can yet say the class of. The most restrictive visibility there is stands
+ * in until the row does; a composition whose includes' rows are all gone therefore lands
+ * Restricted too, which is the same fail-closed answer.
+ *
+ * **Each composition's row is taken `FOR UPDATE` before its includes are read**, so two
+ * cascades reaching one composition — a narrowing and a governed write landing beside it —
+ * recompute it one after the other, the second reading what the first committed: under
+ * READ COMMITTED each would otherwise derive from the other's includes as they stood before
+ * either moved, and the last to write would store one include's groups where the two
+ * together intersect to nobody.
  *
  * Takes the transaction rather than a door, so its failure aborts the act it runs inside
  * (the kernel's result convention, rule 5): a recompute that could half-land would leave the
@@ -61,24 +83,34 @@ export const recomputeCompositionsIncluding = async (
 ): Promise<readonly string[]> => {
   if (input.iris.length === 0) return [];
   const including = await tx.query<CompositionRow>(
-    `SELECT DISTINCT p.workspace_id, p.id, p.sensitivity, p.audience, p.audience_groups
+    `SELECT p.workspace_id, p.id, p.sensitivity, p.audience, p.audience_groups
        FROM composition p
-       JOIN composition_include i ON i.workspace_id = p.workspace_id AND i.composition_id = p.id
-      WHERE p.workspace_id = ${scopeClause(1)} AND i.iri = ANY($2::text[])
-      ORDER BY p.id`,
+      WHERE p.workspace_id = ${scopeClause(1)}
+        AND p.id IN (SELECT i.composition_id FROM composition_include i
+                      WHERE i.workspace_id = p.workspace_id AND i.iri = ANY($2::text[]))
+      ORDER BY p.id
+      FOR UPDATE`,
     [scopeParameter(principal), [...new Set(input.iris)]],
   );
   const moved: string[] = [];
   for (const composition of including.rows) {
-    const includes = await tx.query<VisibilityRow>(
+    const includes = await tx.query<IncludeRow>(
       `SELECT c.sensitivity, c.audience, c.audience_groups
          FROM composition_include i
-         JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
+         LEFT JOIN concept_index c ON c.workspace_id = i.workspace_id AND c.iri = i.iri
         WHERE i.workspace_id = $1 AND i.composition_id = $2`,
       [composition.workspace_id, composition.id],
     );
     const derived = derivedVisibility({
-      from: includes.rows.map(visibilityOf),
+      from: includes.rows.map((include) =>
+        include.sensitivity === null || include.audience === null
+          ? RESTRICTED_TO_ADMINS
+          : visibilityOf({
+              sensitivity: include.sensitivity,
+              audience: include.audience,
+              audience_groups: include.audience_groups,
+            }),
+      ),
       fallback: visibilityOf(composition),
     });
     await tx.query(

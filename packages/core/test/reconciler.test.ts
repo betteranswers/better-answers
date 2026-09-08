@@ -388,6 +388,42 @@ describe("a commit whose rows were lost", () => {
   });
 });
 
+describe("a commit whose rows were lost, carrying what the replay has to read off it", () => {
+  it("is replayed from a creation whose caller gave the file no title, because the act writes the title into the file it commits", async () => {
+    const scenario = await arrange();
+    const input = guideline("Parking", { frontmatter: { type: "Guideline" } });
+    const [sha = ""] = await writeInTheWindow(scenario, scenario.editor, input);
+
+    const run = await reconciled(scenario);
+
+    // The commit is the whole of what the replay has, so the file has to carry every fact
+    // the row is built from — the title as much as the type and the status.
+    expect(run.stopped).toBeUndefined();
+    expect(run.replayed).toEqual([sha]);
+    const iri = await iriOfFile(scenario, sha, input.path);
+    expect(await conceptRow(scenario.workspaceId, iri)).toMatchObject({
+      title: "Parking",
+      kind: "Guideline",
+      merge_key: "Guideline:parking",
+    });
+  });
+
+  it("is replayed from a file whose name is not ASCII, which a line-shaped listing from git would have quoted", async () => {
+    const scenario = await arrange();
+    const input = guideline("Café", { path: "knowledge/guidelines/café.md" });
+    const [sha = ""] = await writeInTheWindow(scenario, scenario.editor, input);
+
+    const run = await reconciled(scenario);
+
+    expect(run.stopped).toBeUndefined();
+    const iri = await iriOfFile(scenario, sha, input.path);
+    expect(await conceptRow(scenario.workspaceId, iri)).toMatchObject({
+      path: "knowledge/guidelines/café.md",
+      commit_sha: sha,
+    });
+  });
+});
+
 describe("a re-write whose rows were lost", () => {
   it("keeps the concept's identity, class and status, and lands the new content at the commit, while the file's sources and the standing citations agree", async () => {
     const scenario = await arrange();
@@ -920,6 +956,10 @@ describe("a concept file read back", () => {
     // The renderer writes each key once; a second `iri` or `type` would otherwise be the
     // one a hand-forged commit chose, quietly winning over the first.
     ["a key written twice", '---\n"title": "one"\n"title": "two"\n---\n\n'],
+    // The renderer writes an empty list as ` []` on the key's line; a bare key is a field
+    // the file says nothing about, and reading it as empty would replay a clearing.
+    ["a key with no value and no items beneath it", '---\n"tags":\n"title": "x"\n---\n\n'],
+    ["a bare key at the end of the frontmatter", '---\n"title": "x"\n"tags":\n---\n\n'],
   ])("refuses what the renderer never wrote — %s", (_shape, file) => {
     expect(parseConceptFile(file)).toEqual({ ok: false, error: "malformed" });
   });

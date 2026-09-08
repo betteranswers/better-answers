@@ -123,7 +123,10 @@ def claim(
 
 
 def heartbeat(cursor: psycopg.Cursor, job_id: str, worker_id: str) -> bool:
-    """Push this worker's lease out. `False` means the lease is somebody else's now."""
+    """Push this worker's lease out. `False` means the lease is no longer this worker's:
+    somebody else holds the job, or the lease lapsed — which alone revokes the claimant,
+    whether or not anybody has claimed since.
+    """
     cursor.execute(
         "SELECT heartbeat_job(%s, %s, %s::interval)",
         (job_id, worker_id, f"{LEASE_SECONDS} seconds"),
@@ -182,7 +185,9 @@ def keeping_alive(
 def finish(
     cursor: psycopg.Cursor, job_id: str, worker_id: str, outcome: Mapping[str, Any]
 ) -> bool:
-    """Record what the job found and end it. `False`: the lease had already lapsed."""
+    """Record what the job found and end it. `False`: the lease had already lapsed, and
+    the job is the queue's to hand out again — the loop logs the finish as unrecorded.
+    """
     cursor.execute(
         "SELECT finish_job(%s, %s, %s::jsonb)", (job_id, worker_id, json.dumps(outcome))
     )
