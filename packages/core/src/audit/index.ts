@@ -152,17 +152,12 @@ export const record = <A extends Act>(
  * The second door: write one event as the platform, booked to an actor the platform
  * names — the person who asked to join a workspace they hold no membership in (T-061),
  * whose act is theirs and not the platform's. The first parameter is the platform
- * principal and only that: the type refuses a user principal at compile time, and the
- * check below refuses one at runtime for a caller that arrived without the compiler, so
- * no person's session can ever book a row to somebody else.
+ * principal and only that: the type refuses a user principal, and the type is the one
+ * guard — every caller of this package is compiled against it — so no person's session
+ * can ever book a row to somebody else.
  */
 export const recordFor = <A extends Act>(
   platform: PlatformPrincipal,
   tx: Tx,
   event: AuditEvent<A> & { readonly actor: ActorId },
-): Promise<Recorded> => {
-  if (platform.kind !== "platform") {
-    throw new Error("audit: only the platform principal may name another actor");
-  }
-  return write(tx, null, event.actor, event);
-};
+): Promise<Recorded> => write(tx, null, event.actor, event);

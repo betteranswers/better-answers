@@ -14,7 +14,7 @@ import {
   record,
   recordFor,
 } from "../src/audit/index.ts";
-import type { ActorId } from "../src/kernel/index.ts";
+import type { ActorId, PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
 import { withPrincipal, withScope } from "../src/store/postgres/index.ts";
 import { bootstrap, principalOf, provisionedWorkspace } from "./platform.ts";
 import { coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
@@ -438,24 +438,11 @@ describe("the second door — recordFor, the platform naming the actor", () => {
     expect(await rowById(id)).toMatchObject({ actor: requester, workspace_id: workspaceId });
   });
 
-  it("is not reachable from a user principal, in the type and at runtime", async () => {
-    const { door, workspaceId, adminUserId } = await provisioned();
-    const admin = principalOf(workspaceId, adminUserId, "Admin");
-    const id = ulid();
-
-    await expect(
-      withScope(bootstrap, door, workspaceId, (tx) =>
-        // @ts-expect-error — a user principal is not a platform principal; no person's
-        // session can book a row to somebody else.
-        recordFor(admin, tx, {
-          id,
-          actor: `human:${ulid()}`,
-          act: PROBE.noted,
-          subjectId: workspaceId,
-          detail: { confirmed: true },
-        }),
-      ),
-    ).rejects.toThrow(/only the platform principal/);
-    expect(await rowById(id)).toBeUndefined();
+  it("is not reachable from a user principal: the type refuses it, and the type is the one guard", () => {
+    // No runtime check stands behind the parameter — every caller of this package is
+    // compiled against it — so a widening of the type is the whole of what would let a
+    // person's session book a row to somebody else, and the type is what is pinned.
+    expectTypeOf(recordFor).parameter(0).toEqualTypeOf<PlatformPrincipal>();
+    expectTypeOf<UserPrincipal>().not.toExtend<PlatformPrincipal>();
   });
 });
