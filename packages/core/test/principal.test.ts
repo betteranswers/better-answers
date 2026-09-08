@@ -8,6 +8,7 @@ import {
   consumeIngress,
   openPostgres,
   readWorkspaceConfig,
+  tablesPresent,
   withPrincipal,
   withScope,
 } from "../src/store/postgres/index.ts";
@@ -258,6 +259,41 @@ describe("the Principal resolver", () => {
     expect(resolved).toEqual({ ok: false, error: "malformed-claims" });
   });
 
+  it.each([
+    ["the workspace id", { workspaceId: "not-a-ulid" }],
+    ["the user id", { userId: "" }],
+  ] as const)(
+    "refuses claims where %s alone is malformed, not only when both are",
+    async (_which, malformed) => {
+      const seeded = await seedMembership();
+      const door = openPostgres(db().runtimePool);
+
+      const resolved = await withPrincipal(
+        door,
+        claimsFor(seeded, malformed),
+        async () => "reached",
+      );
+
+      expect(resolved).toEqual({ ok: false, error: "malformed-claims" });
+    },
+  );
+
+  it("lets a credential issued at the revocation's own instant through, because revocation ends what came before it", async () => {
+    // The boundary the two ±1s tests above straddle and neither stands on. Revocation ends
+    // what was *issued* (ADR 0035), and a credential minted at the instant itself was not.
+    const revokedAt = new Date("2026-09-05T09:00:00.000Z");
+    const seeded = await seedMembership({ revokedAt, revokedHereAt: revokedAt });
+    const door = openPostgres(db().runtimePool);
+
+    const atTheInstant = await withPrincipal(
+      door,
+      claimsFor(seeded, { issuedAt: new Date(revokedAt) }),
+      async () => "reached",
+    );
+
+    expect(atTheInstant).toEqual({ ok: true, value: "reached" });
+  });
+
   it("rolls the work back when it throws, and never leaves a Principal behind", async () => {
     const seeded = await seedMembership({ role: "Admin" });
     const door = openPostgres(db().runtimePool);
@@ -298,6 +334,76 @@ describe("the Principal resolver", () => {
     );
 
     expect(resolved).toEqual({ ok: true, value: "mine" });
+  });
+});
+
+/**
+ * `member.role` is held to the three by a CHECK constraint, so a row outside them is a
+ * database that has stopped agreeing with the code — which is the only thing `role-unknown`
+ * is for. Dropping the constraint for the length of the test is how that database is
+ * reached; the copy this suite runs against is its own, and the constraint goes back on.
+ */
+const withRoleOutsideTheThree = async (
+  seeded: Seeded,
+  work: () => Promise<void>,
+): Promise<void> => {
+  const pool = db().pool;
+  await pool.query("ALTER TABLE member DROP CONSTRAINT member_role_check");
+  try {
+    await pool.query("UPDATE member SET role = 'Owner' WHERE workspace_id = $1 AND user_id = $2", [
+      seeded.workspaceId,
+      seeded.userId,
+    ]);
+    await work();
+  } finally {
+    await pool.query("UPDATE member SET role = 'Viewer' WHERE role NOT IN ('Admin', 'Editor')");
+    await pool.query(
+      "ALTER TABLE member ADD CONSTRAINT member_role_check CHECK (role IN ('Admin', 'Editor', 'Viewer'))",
+    );
+  }
+};
+
+describe("a member row carrying a role the platform does not have", () => {
+  it("refuses it rather than building a Principal at a role nothing grants", async () => {
+    const seeded = await seedMembership();
+    const door = openPostgres(db().runtimePool);
+
+    await withRoleOutsideTheThree(seeded, async () => {
+      const resolved = await withPrincipal(door, claimsFor(seeded), async () => "reached");
+
+      expect(resolved).toEqual({ ok: false, error: "role-unknown" });
+    });
+  });
+});
+
+describe("a workspace's config", () => {
+  it("answers a key nobody set with nothing, rather than failing the transaction it runs in", async () => {
+    const seeded = await seedMembership();
+    const door = openPostgres(db().runtimePool);
+
+    // The unset key is the ordinary case, not the exceptional one: the MCP surface reads a
+    // TTL this way and falls back to its default, inside the bearer gate's own transaction.
+    const resolved = await withPrincipal(door, claimsFor(seeded), (principal, tx) =>
+      readWorkspaceConfig(principal, tx, `unset-${ulid()}`),
+    );
+
+    expect(resolved).toEqual({ ok: true, value: undefined });
+  });
+});
+
+describe("the catalogue read the estate's restore commands make", () => {
+  it("names the tables that are there and stays silent about the ones that are not", async () => {
+    const door = openPostgres(db().runtimePool);
+
+    const present = await tablesPresent(door, ["member", "workspace", "table_nobody_migrated"]);
+
+    expect(present.toSorted()).toEqual(["member", "workspace"]);
+  });
+
+  it("answers nothing when asked about nothing", async () => {
+    const door = openPostgres(db().runtimePool);
+
+    expect(await tablesPresent(door, [])).toEqual([]);
   });
 });
 
