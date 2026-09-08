@@ -20,8 +20,9 @@ export default {
   // filter cannot see, so a module no other test imports statically ran no test — 30 rows
   // `Survived` with `testsCompleted: 0` in run 34168928594, 192 in run 34263846345. Cost per
   // mutant, job time over mutants tested: 1.3 s in run 34168928594 with the option on; the
-  // run with it off is recorded in T-107's Progress.
-  vitest: { configFile: "vitest.config.ts", related: false },
+  // run with it off is recorded in T-107's Progress. The suite is the one
+  // `vitest.mutation.config.ts` shapes: every test file that reaches `src`.
+  vitest: { configFile: "vitest.mutation.config.ts", related: false },
 
   // Everything under `src` is behaviour. Unlike a tier, this package has no process entry
   // point to leave out: nothing here starts a server or reads a bootstrap, which is what

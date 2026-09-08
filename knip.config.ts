@@ -27,6 +27,9 @@ const config: KnipConfig = {
 
   workspaces: {
     "apps/api": {
+      // The mutation run's vitest config, named by `stryker.config.mjs`'s `vitest.configFile`
+      // — a string in a Stryker config, which knip's Stryker plugin does not follow.
+      entry: ["vitest.mutation.config.ts"],
       ignore: [
         // A verbatim third-party snapshot (ADR 0027): edited upstream and never here, which
         // is why it also sits outside this repository's linter, formatter and compiler.
@@ -53,6 +56,8 @@ const config: KnipConfig = {
     },
 
     "packages/core": {
+      // As under `apps/api`: named by `stryker.config.mjs`, an edge knip cannot see.
+      entry: ["vitest.mutation.config.ts"],
       ignore: [
         // The object-store door (ADR 0029): a module whose invariant is written down and
         // whose implementation has not landed. It is not exported from the store barrel,

@@ -173,11 +173,20 @@ describe("the mutation summary (T-090)", () => {
         "### core mutation score: 0% (0/2 mutants killed)",
         "### core new survivors: 1",
         "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by order.",
-        '- `src/answer.ts:3` — StringLiteral — `""`',
+        '- `src/answer.ts:3` — StringLiteral — `""` (no verdict in the baseline)',
         "### core mutants that ran no test: 1 — the runner resolved no test file for them, which is a runner fault to fix (`vitest.related`, T-107), never a survivor to triage",
         '- `src/answer.ts:2` — StringLiteral — `""`',
         "",
       ].join("\n"),
+    );
+  });
+
+  it("marks a survivor the baseline ignored as one with no verdict, not as drift", () => {
+    const baseline = report(SOURCE, [mutant("StringLiteral", '""', LABEL, "Ignored")]);
+    const current = report(SOURCE, [mutant("StringLiteral", '""', LABEL, "Survived", 1)]);
+
+    expect(mutationSummary("api", current, baseline)).toContain(
+      '- `src/answer.ts:2` — StringLiteral — `""` (no verdict in the baseline)\n',
     );
   });
 

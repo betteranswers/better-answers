@@ -72,7 +72,16 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
+      # The worker's tier too: core's rebuild-equivalence suite runs the worker through uv
+      # against the app's own map, and a suite file the mutation run keeps is one it runs.
+      # On both legs, not core's alone: the install is seconds with the cache, and a suite
+      # file that spawns uv can appear in either. Pinned as in check.yml.
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
       - run: pnpm install --frozen-lockfile
+      - run: uv sync --frozen
+        working-directory: apps/worker
       # The previous run's mutant results — or, after an overrun, the cancelled leg's own — so
       # a file nobody touched is not re-tested.
       # A cache entry is written once and never overwritten, so a fixed key would pin the first

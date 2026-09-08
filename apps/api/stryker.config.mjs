@@ -14,10 +14,12 @@ export default {
   // no test file, runs nothing, and is reported `Survived` with `testsCompleted: 0`: 9 such
   // rows here in run 34168928594. Off, a covered mutant still runs only the test files its
   // covering tests name (the per-test filter names them, lines 143–150), and a static mutant
-  // runs the whole suite, which is what the plan for it says. Cost measured per mutant, job
-  // time over mutants tested: 1.7 s in run 34168928594 with the option on; the run with it
-  // off is recorded in T-107's Progress.
-  vitest: { configFile: "vitest.config.ts", related: false },
+  // runs the whole suite, which is what the plan for it says — the suite as
+  // `vitest.mutation.config.ts` shapes it, without the test files that reach no `src`, since
+  // a docker build per static mutant is cost for a verdict it cannot give. Cost measured per
+  // mutant, job time over mutants tested: 1.7 s in run 34168928594 with the option on; the
+  // run with it off is recorded in T-107's Progress.
+  vitest: { configFile: "vitest.mutation.config.ts", related: false },
 
   // `main.ts` and `migrate.ts` are the tier's entry points, not its behaviour: they read the
   // bootstrap and hand off, and nothing crosses a seam a test could reach.

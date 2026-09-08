@@ -75,6 +75,14 @@ as survivors (`[TEST6]`). A first run says "no baseline"; the script exits zero 
 reports hold, so the summary never gates. Its suite asserts the prose a reader sees, line by
 line, and runs the script over files.
 
+`src/mutation-suite.ts` is the reading behind each leg's `vitest.mutation.config.ts`: the
+test files that reach the workspace's `src` by no import — read from the source text,
+following relative imports through the workspace and the package's own name, conservative
+about a dynamic import it cannot follow — which the mutation run leaves out, because with
+vitest's `related` filter off a static mutant runs the whole suite and an image build per
+mutant is cost for a verdict it cannot give. Derived, so a new test file is placed by what
+it imports rather than by a list someone remembers.
+
 ## `lint-rules/` — the `better-answers` oxlint plugin
 
 The repository's own rules: the ones that hold a rule in `CODING_RULES.md` or an ADR rather
