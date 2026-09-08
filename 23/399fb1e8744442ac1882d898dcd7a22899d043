@@ -1,0 +1,19 @@
+packages/core/test/visibility.test.ts
+  s_d26544dcfeb424::t_9c75fe469031dd 569-579,587,594-597,602,608-621,633-642
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "23399fb1e8744442ac1882d898dcd7a22899d043",
+  "prompts": {},
+  "sessions": {
+    "s_d26544dcfeb424": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b919cca-a019-4c62-9322-519e3b9e0f24",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
