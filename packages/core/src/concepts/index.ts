@@ -1,35 +1,13 @@
-import { createHash } from "node:crypto";
-
 import {
-  AUDIENCE_EVERYONE,
   boundarySchemas,
-  citedSourceOf,
-  CONCEPT_DRAFT_STATUS,
   conceptIriOf,
-  IRI,
-  PUBLISHED_STATUSES,
-  resolvedResource,
-  SENSITIVITY_DEFAULT,
-  SUGGESTION_ACCEPTED_STATUS,
   SUGGESTION_EDIT_KIND,
-  SUGGESTION_REPAIR_KIND,
   SUGGESTION_SET_MAX,
-  SUGGESTION_WAITING_STATUS,
-  ULID,
-  VERIFICATION_REPAIR_ORIGIN,
 } from "@better-answers/schema";
 import { z } from "zod";
 
-import {
-  readableClause,
-  readableParameters,
-  RESTRICTED_TO_ADMINS,
-  sensitivityAndAudienceClause,
-  visibilityOf,
-  widens,
-  type Visibility,
-} from "../access/index.ts";
-import { act, declareActs, eventsOfAct, record } from "../audit/index.ts";
+import { readableClause, readableParameters, widens } from "../access/index.ts";
+import { act, declareActs, record } from "../audit/index.ts";
 import {
   actorIdOf,
   attempt,
@@ -41,40 +19,22 @@ import {
   requireAdmin,
   ulid,
   type ActorId,
-  type PlatformPrincipal,
-  type Principal,
   type PrincipalRefusal,
   type Result,
   type RoleRefusal,
   type UserPrincipal,
-  type WorkspaceId,
 } from "../kernel/index.ts";
 import {
   commit as commitToBundle,
-  commitsAfter,
   head,
-  readCommit,
   withRepositoryLock,
-  withRepositoryLockAs,
   type CommitAuthor,
-  type CommitRead,
   type CommitRefusal,
-  type Committed,
   type GitDoor,
 } from "../store/git/index.ts";
-import { recomputeCompositionsIncluding } from "../guides/index.ts";
-import { writeConceptDelta } from "../store/graph/index.ts";
+import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import { contentHashOf, renderConceptFile, type Frontmatter } from "./file.ts";
 import {
-  scopeClause,
-  scopeParameter,
-  withMembership,
-  withScope,
-  type PostgresDoor,
-  type Tx,
-} from "../store/postgres/index.ts";
-import { workspaceIds } from "../workspaces/index.ts";
-import {
-  markDeciding,
   payloadFor,
   returnToProposer,
   suggestionIsWaiting,
@@ -82,8 +42,37 @@ import {
   type SuggestionKind,
   type SuggestionPayload,
 } from "./inbox.ts";
-import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
+import {
+  foldKind,
+  heldByIri,
+  heldVisibilityOf,
+  indexRowOf,
+  landRows,
+  WRITE_CONSTRAINTS,
+} from "./landing.ts";
+import { conceptVisibilityFrom } from "./visibility.ts";
 
+export {
+  contentHashOf,
+  parseConceptFile,
+  renderConceptFile,
+  type Frontmatter,
+  type FrontmatterSource,
+  type FrontmatterValue,
+} from "./file.ts";
+export { foldKind } from "./landing.ts";
+export {
+  RECONCILER,
+  reconcile,
+  reconcileEveryWorkspace,
+  reconcilerHits,
+  type ReconcileRefusal,
+  type Reconciled,
+  type ReconcilerHit,
+  type ReconcilerPrincipal,
+  type ReplayRefusal,
+  type WorkspaceReconciled,
+} from "./reconciler.ts";
 export {
   declineSuggestion,
   submitSuggestionSet,
@@ -161,7 +150,11 @@ export type { GraphCounts, SweptGeneration } from "../store/graph/index.ts";
  * **The inbox** — submitting a set, opening one, declining, returning — is `inbox.ts`,
  * because none of it makes a commit. The acceptance is here, because an acceptance *is* a
  * governed write: one act, one commit, one transaction, with the suggestion decided inside
- * the same transaction as the rows.
+ * the same transaction as the rows. The file's grammar — render, parse, hash — is `file.ts`;
+ * what the index holds, the row a write builds and the routine that lands it is
+ * `landing.ts`, which the live act and the replay both land through; the reconciler's replay
+ * is `reconciler.ts`; the class and audience a concept lands with is `visibility.ts`. This
+ * module re-exports all of it, so the slice has one face.
  */
 
 /**
@@ -189,55 +182,6 @@ const CONCEPT_ACTS = declareActs("knowledge", {
     setId: "id",
   }),
 });
-
-/**
- * One `sources[]` entry (`docs/okf-v02.md`): OKF's provenance object — `resource` required,
- * `id`, `title`, `author`, `usage_count`, `last_modified` — and the platform's `locator`
- * beside them — one of the two keys the platform may add to a concept file at all (ADR 0002).
- */
-export type FrontmatterSource = Readonly<Record<string, string | number | boolean | null>>;
-
-/**
- * An OKF frontmatter value: scalars, string lists, and the one list of objects the spec
- * defines. One level of nesting and no more, which is what the boundary narrows to.
- */
-export type FrontmatterValue =
-  | string
-  | number
-  | boolean
-  | null
-  | readonly string[]
-  | readonly FrontmatterSource[];
-
-export type Frontmatter = Readonly<Record<string, FrontmatterValue>>;
-
-/**
- * A kind, folded for **case and plural only** (ADR 0012's 2026-08-30 amendment, ADR 0026): an
- * unknown kind is the ordinary case, so `policy`, `Policy` and `Policies` are one kind and the
- * type vocabulary counts them once.
- *
- * The fold reaches the **row** and never the file: `type` is not a code-owned key, and ADR
- * 0019 keeps every key the platform does not own verbatim in the bundle. So a person's
- * spelling survives export while the index groups by one word.
- *
- * The plural rule is the conservative English one and says so: `-ies` → `-y`, `-ses`/`-xes`/
- * `-zes`/`-ches`/`-shes` → drop `-es`, a trailing `-s` dropped unless the word ends `-ss`,
- * `-us` or `-is`. Irregulars (`Analyses`) fold wrongly and are folded consistently, which is
- * what matters for grouping; a kind vocabulary that ever needs more is a ticket, not a guess.
- *
- * **Case and plural, and nothing else** — the amendment's word is *only*. Whatever separates
- * the words of a kind is left exactly as it was written, because collapsing it would be a
- * third fold nobody decided: `Rate  Card` and `Rate Card` stay two kinds, and the day they
- * should not is a rule to write down first. The boundary trims the ends.
- */
-export const foldKind = (kind: string): string =>
-  kind.replaceAll(/\S+/g, (word) => {
-    const cased = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    if (cased.endsWith("ies")) return `${cased.slice(0, -3)}y`;
-    if (/(s|x|z|ch|sh)es$/.test(cased)) return cased.slice(0, -2);
-    if (/(ss|us|is)$/.test(cased) || !cased.endsWith("s")) return cased;
-    return cased.slice(0, -1);
-  });
 
 /** One piece of evidence recorded at commit time (`CONTEXT.md`, *evidence*). */
 export type EvidenceInput = {
@@ -365,244 +309,12 @@ export type WriteConceptRefusal =
   | "resolution-moved";
 
 /**
- * The frontmatter keys ADR 0014's content hash leaves out: the trust the platform derives
- * and the identity it minted. Hashing them would make a check of its own recording move the
- * hash and turn *Checked* into *Changed since checked* on the next read.
- */
-const UNHASHED_KEYS: ReadonlySet<string> = new Set([
-  "generated",
-  "verified",
-  "stale_after",
-  "status",
-  "iri",
-]);
-
-/** The body as ADR 0014 normalises it: `\r\n` to `\n`, no trailing whitespace, one final newline. */
-const normalisedBody = (body: string): string =>
-  `${body
-    .replaceAll("\r\n", "\n")
-    .split("\n")
-    .map((line) => line.replace(/[ \t]+$/, ""))
-    .join("\n")
-    .replace(/\n+$/, "")}\n`;
-
-// `resolvedResource` — the hash's path resolution — is the boundary's (`@better-answers/schema`),
-// beside `citedSourceOf` and for the same reason: the graph door's delta resolves the same
-// references, and two resolutions would be two chances to disagree about which concept a
-// file names (ADR 0019).
-
-/** One `sources[]` entry as the hash carries it: the resolved resource, then the locator. */
-type HashedSource = readonly [string, string | null];
-
-/**
  * One `sources[]` entry, read whichever way a file writes it — **the boundary's own reader**
  * (`citedSourceOf`), which the boundary's `sources[]` refinement asks the same question of.
  * One definition, so the validator and the hash can never part company: two readers over one
  * shape was exactly the defect that had `evidenceOf` dropping entries the hash still counted.
  */
 export { citedSourceOf as citedSource } from "@better-answers/schema";
-
-/**
- * `sources[]` **reduced to ordered `(resource, locator)` pairs** with paths resolved — ADR
- * 0019's own reduction, and what makes a source-title fix or a `usage_count` update leave a
- * check standing while a swapped source un-checks it.
- */
-const reducedSources = (
-  value: FrontmatterValue | undefined,
-  path: string,
-): readonly HashedSource[] => {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
-    const cited = citedSourceOf(entry);
-    return cited === undefined ? [] : [[resolvedResource(cited.resource, path), cited.locator]];
-  });
-};
-
-/**
- * The frontmatter as ADR 0014's hash reads it, written straight as canonical JSON: keys
- * sorted, the trust and identity keys dropped, `sources[]` reduced. A string rather than an
- * object, because the object was never anything but a step on the way to these bytes.
- */
-const canonicalFrontmatter = (frontmatter: Frontmatter, path: string): string => {
-  const pairs = Object.keys(frontmatter)
-    .toSorted()
-    .filter((key) => !UNHASHED_KEYS.has(key))
-    .map((key) => {
-      const value = frontmatter[key];
-      const reduced = key === "sources" ? reducedSources(value, path) : value;
-      return `${JSON.stringify(key)}:${JSON.stringify(reduced)}`;
-    });
-  return `{${pairs.join(",")}}`;
-};
-
-/**
- * The content hash a check confirms (ADR 0014, ADR 0019): SHA-256 over the canonical JSON of
- * the frontmatter — trust and identity keys removed, `sources[]` reduced to its ordered
- * `(resource, locator)` pairs — and the normalised body.
- *
- * RFC 8785's canonicalisation is *sorted keys, no insignificant whitespace*, which is what
- * this produces for the one shape a concept's frontmatter can hold: scalars, string lists and
- * `sources[]`'s objects, whose own keys never reach the hash because the reduction replaces
- * them with a pair. The concept's own path is an argument because the reduction resolves a
- * relative `resource` against it.
- */
-export const contentHashOf = (frontmatter: Frontmatter, body: string, path: string): string =>
-  createHash("sha256")
-    .update(`${canonicalFrontmatter(frontmatter, path)}\n${normalisedBody(body)}`, "utf8")
-    .digest("hex");
-
-/** One `sources[]` entry as YAML: a block of quoted keys under a list dash. */
-const yamlEntry = (entry: FrontmatterSource): string =>
-  Object.entries(entry)
-    .map(
-      ([key, value], index) =>
-        `${index === 0 ? "  - " : "    "}${JSON.stringify(key)}: ${JSON.stringify(value)}`,
-    )
-    .join("\n");
-
-/** One frontmatter value as YAML: a list over lines, everything else as JSON, which YAML reads. */
-const yamlValue = (value: FrontmatterValue): string => {
-  if (!Array.isArray(value)) return ` ${JSON.stringify(value)}`;
-  if (value.length === 0) return " []";
-  return `\n${value
-    .map((item) =>
-      typeof item === "object" && item !== null ? yamlEntry(item) : `  - ${JSON.stringify(item)}`,
-    )
-    .join("\n")}`;
-};
-
-/**
- * The file as it lands in the bundle: YAML frontmatter between `---` fences, then the body.
- * Keys keep the order they were given, because that is the order a person wrote them and
- * the file is the thing a company keeps; the content hash above is what needs an order
- * nobody chose, and it sorts its own.
- *
- * **Every key is quoted**, not only every value. A concept's frontmatter is open — OKF's keys
- * plus whatever else the file carried, preserved verbatim (ADR 0019) — so a key holding a
- * colon, a `#` or a leading `-` would otherwise write YAML that parses as something else.
- * JSON is a subset of YAML 1.2, so quoting is all that is needed and any YAML parser reads
- * the result back, which is what "readable by any OKF tool" (ADR 0012) has to mean for a file
- * this tier writes and the Python tier parses.
- */
-export const renderConceptFile = (frontmatter: Frontmatter, body: string): string => {
-  const lines = Object.entries(frontmatter).map(
-    ([key, value]) => `${JSON.stringify(key)}:${yamlValue(value)}`,
-  );
-  return `---\n${lines.join("\n")}\n---\n\n${normalisedBody(body)}`;
-};
-
-/** One line of the frontmatter as the renderer writes it: a JSON-quoted key, a colon, then a value or nothing. */
-const FRONTMATTER_LINE = /^("(?:[^"\\]|\\.)*"):(?: (.*))?$/;
-
-/** A JSON text read as one scalar the frontmatter may hold, or nothing for anything else. */
-const scalarOf = (text: string): string | number | boolean | null | undefined => {
-  try {
-    const value: unknown = JSON.parse(text);
-    return typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "boolean" ||
-      value === null
-      ? value
-      : undefined;
-  } catch {
-    // Text that is not JSON is a line the renderer never wrote, and "no scalar" is the
-    // whole of what a caller needs to know about it — the parse below answers `malformed`.
-    return undefined;
-  }
-};
-
-/** A frontmatter line split into its key and what follows the colon — `undefined` when a list follows. */
-const pairOf = (
-  line: string,
-): { readonly key: string; readonly rest: string | undefined } | undefined => {
-  const match = FRONTMATTER_LINE.exec(line);
-  const key = match?.[1] === undefined ? undefined : scalarOf(match[1]);
-  return match === null || typeof key !== "string" ? undefined : { key, rest: match[2] };
-};
-
-/**
- * The items of one list, from the line after its key: `  - ` opens an item, and an entry's
- * later fields sit indented beneath it. A list is strings or OKF's objects and never a mix —
- * the renderer writes no other shape, so a mix is a file it did not write.
- */
-const listItemsOf = (
-  lines: readonly string[],
-  from: number,
-  close: number,
-):
-  | { readonly value: readonly string[] | readonly FrontmatterSource[]; readonly next: number }
-  | undefined => {
-  const strings: string[] = [];
-  const entries: FrontmatterSource[] = [];
-  let at = from;
-  while (at < close && (lines[at] ?? "").startsWith("  - ")) {
-    const opener = (lines[at] ?? "").slice(4);
-    at += 1;
-    let field = pairOf(opener);
-    if (field === undefined) {
-      const item = scalarOf(opener);
-      if (typeof item !== "string") return undefined;
-      strings.push(item);
-      continue;
-    }
-    const entry: Record<string, string | number | boolean | null> = {};
-    while (field !== undefined) {
-      const value = field.rest === undefined ? undefined : scalarOf(field.rest);
-      if (value === undefined) return undefined;
-      entry[field.key] = value;
-      const continuation = lines[at] ?? "";
-      if (at >= close || !continuation.startsWith("    ")) break;
-      field = pairOf(continuation.slice(4));
-      if (field === undefined) return undefined;
-      at += 1;
-    }
-    entries.push(entry);
-  }
-  if (strings.length > 0 && entries.length > 0) return undefined;
-  return { value: entries.length > 0 ? entries : strings, next: at };
-};
-
-/**
- * The file read back — `renderConceptFile`'s inverse, and deliberately no more than that.
- *
- * The bundle is written only by the app, one commit per act (ADR 0012), so every file on
- * the ref was rendered by the function above and this reads exactly that grammar: quoted
- * keys, JSON values, OKF's one list of objects. A general YAML reader would accept files
- * the platform never wrote and read some of them differently from the Python tier, whose
- * parser the nightly audit cross-checks against this one hash by hash (T-057). What the
- * grammar does not cover answers `malformed`, and the reconciler stops at such a commit
- * rather than guessing what it meant.
- *
- * The body comes back as the renderer normalised it — one trailing newline — which is what
- * the content hash is over either way (`contentHashOf`).
- */
-export const parseConceptFile = (
-  content: string,
-): Result<{ readonly frontmatter: Frontmatter; readonly body: string }, "malformed"> => {
-  const lines = content.split("\n");
-  const close = lines[0] === "---" ? lines.indexOf("---", 1) : -1;
-  if (close === -1 || lines[close + 1] !== "") return err("malformed");
-  const frontmatter: Record<string, FrontmatterValue> = {};
-  let at = 1;
-  while (at < close) {
-    const pair = pairOf(lines[at] ?? "");
-    // A key the renderer wrote once and the file carries twice is a file it did not write:
-    // letting the later one win would let a forged `iri` or `type` win over the first.
-    if (pair === undefined || Object.hasOwn(frontmatter, pair.key)) return err("malformed");
-    at += 1;
-    if (pair.rest !== undefined) {
-      const value = pair.rest === "[]" ? [] : scalarOf(pair.rest);
-      if (value === undefined) return err("malformed");
-      frontmatter[pair.key] = value;
-      continue;
-    }
-    const items = listItemsOf(lines, at, close);
-    if (items === undefined) return err("malformed");
-    frontmatter[pair.key] = items.value;
-    at = items.next;
-  }
-  return ok({ frontmatter, body: lines.slice(close + 2).join("\n") });
-};
 
 /** The two roles that may change the bundle: an Editor and an Admin, never a Viewer. */
 const mayWrite = (principal: UserPrincipal): boolean => principal.role !== "Viewer";
@@ -622,170 +334,6 @@ const fileFrontmatterOf = (input: WriteConceptInput, iri: string) => {
   if (input.status !== undefined) named["status"] = input.status;
   named["iri"] = iri;
   return named;
-};
-
-/**
- * The index row's columns less the commit's sha, which does not exist yet when this parse
- * runs: everything a caller supplies is checked at the boundary **before** the commit, so a
- * row the boundary would refuse never becomes a commit nobody can record. The sha comes from
- * the git door, which answers a git object name or a refusal and nothing else.
- */
-const conceptRow = boundarySchemas.conceptIndex.insert.omit({ commitSha: true });
-
-/** The constraints this act refuses over; every other violation stays the store's Error. */
-const WRITE_CONSTRAINTS = {
-  concept_index_workspace_id_path_uidx: "path-taken",
-  concept_identity_merge_key_uidx: "merge-key-taken",
-} as const;
-
-/**
- * What the index already holds for this IRI — the facts a re-write keeps or may not move,
- * and the three a replayed commit falls back on when its file does not carry them.
- */
-type Held = {
-  readonly path: string;
-  readonly kind: string;
-  readonly title: string;
-  readonly mergeKey: string;
-  /** The class and audience as derived at the last act — the fallback a re-write rests on. */
-  readonly sensitivity: string;
-  readonly audience: string;
-  readonly audienceGroups: readonly string[] | null;
-  readonly status: string;
-  /** What the concept says now — what an acceptance's payload was written against. */
-  readonly contentHash: string;
-  /** When it first became readable; kept across a re-write, so publishing happens once. */
-  readonly publishedAt: Date | null;
-};
-
-type HeldRow = {
-  readonly path: string;
-  readonly kind: string;
-  readonly title: string;
-  readonly merge_key: string;
-  readonly sensitivity: string;
-  readonly audience: string;
-  readonly audience_groups: readonly string[] | null;
-  readonly status: string;
-  readonly content_hash: string;
-  readonly published_at: Date | null;
-};
-
-/**
- * The Principal first, as every function here that reaches tenant data takes it: the
- * workspace this reads in is the one the caller is acting in, and never a string a call site
- * chose (ADR 0029). RLS scopes the statement already; naming the pair says so where a reader
- * of the SQL can see it — and for the platform principal, which carries no workspace, the
- * scope alone says which one is read, as the audit door reads it.
- *
- * **A person reaches the row through the class and audience arms of the read predicate.** A
- * concept a writer may not see for its class or its audience is not theirs to re-write, and
- * a row this read withholds is a row this act never held — so the write answers exactly as
- * it does for an IRI nobody minted, and a re-write is no oracle for what `open` withholds.
- * The published arm is not applied: a draft is its author's to re-write on the way to
- * publishing it. The platform reads every row, because the replay is recovery of an act that
- * was authorised when its commit was made, never a second judgement of it.
- */
-const heldByIri = async (principal: Principal, tx: Tx, iri: string): Promise<Held | undefined> => {
-  const predicate = principal.kind === "user" ? `AND ${sensitivityAndAudienceClause("c", 3)}` : "";
-  const found = await tx.query<HeldRow>(
-    `SELECT c.path, c.kind, c.title, i.merge_key, c.sensitivity, c.audience, c.audience_groups,
-            c.status, c.content_hash, c.published_at
-       FROM concept_index c
-       JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
-      WHERE c.workspace_id = ${scopeClause(1)} AND c.iri = $2
-        ${predicate}`,
-    [
-      scopeParameter(principal),
-      iri,
-      ...(principal.kind === "user" ? readableParameters(principal) : []),
-    ],
-  );
-  const row = found.rows[0];
-  return row === undefined
-    ? undefined
-    : {
-        path: row.path,
-        kind: row.kind,
-        title: row.title,
-        mergeKey: row.merge_key,
-        sensitivity: row.sensitivity,
-        audience: row.audience,
-        audienceGroups: row.audience_groups,
-        status: row.status,
-        contentHash: row.content_hash,
-        publishedAt: row.published_at,
-      };
-};
-
-/** Whether two visibilities are one: the same class, the same word, the same groups in the same order. */
-const sameVisibility = (one: Visibility, other: Visibility): boolean =>
-  one.sensitivity === other.sensitivity &&
-  one.audience === other.audience &&
-  (one.audienceGroups ?? []).join(" ") === (other.audienceGroups ?? []).join(" ");
-
-/** The pair a concept holds, read as a `Visibility` — the fallback a re-write's derivation rests on. */
-const heldVisibilityOf = (held: Held) =>
-  visibilityOf({
-    sensitivity: held.sensitivity,
-    audience: held.audience,
-    audience_groups: held.audienceGroups,
-  });
-
-/**
- * What a write supplies for its index row, by whichever road it came: the file's facts, and
- * the status and class it names or leaves to what the concept already holds.
- */
-type RowFacts = {
-  readonly workspaceId: string;
-  readonly iri: string;
-  readonly path: string;
-  readonly kind: string;
-  readonly title: string;
-  readonly frontmatter: Frontmatter;
-  readonly body: string;
-  readonly contentHash: string;
-  readonly status: string | undefined;
-  readonly sensitivity: string | undefined;
-};
-
-/**
- * The index row as the boundary parses it, built the one way for both roads to the rows —
- * the live write's and the reconciler's replay — so a replayed commit lands the row its act
- * would have.
- *
- * A status the write does not name is the one the concept already holds, exactly as its
- * class is: the draft default is what a concept is *born* at, and applying it to a re-write
- * would un-publish a stable concept nobody asked to un-publish. Published once and kept: a
- * concept that reaches a readable status carries the instant it first did, and one that
- * leaves those statuses loses it, so the predicate's first arm is a fact about the concept
- * rather than a stamp every write renews.
- *
- * The class and audience here are the **fallback** the derivation rests on when the
- * concept cites nothing that resolves to a binding (`visibility.ts`): the writer's word on
- * a creation, and on anything else what the row holds now — the audience included, so a
- * re-write that drops its citations never widens a named-group audience back to everyone.
- * What the row lands with is what the derivation says, not this.
- */
-const indexRowOf = (facts: RowFacts, held: Held | undefined) => {
-  const status = facts.status ?? held?.status ?? CONCEPT_DRAFT_STATUS;
-  return conceptRow.safeParse({
-    workspaceId: facts.workspaceId,
-    iri: facts.iri,
-    path: facts.path,
-    kind: foldKind(facts.kind),
-    title: facts.title,
-    frontmatter: facts.frontmatter,
-    body: facts.body,
-    contentHash: facts.contentHash,
-    status,
-    publishedAt: PUBLISHED_STATUSES.some((published) => published === status)
-      ? (held?.publishedAt ?? new Date())
-      : null,
-    sensitivity: held?.sensitivity ?? facts.sensitivity ?? SENSITIVITY_DEFAULT,
-    audience: held?.audience ?? AUDIENCE_EVERYONE,
-    audienceGroups: held?.audienceGroups ?? null,
-  });
 };
 
 /**
@@ -1047,186 +595,6 @@ export const writeConcept = async (
 
     return ok({ iri: row.iri, sha: committed.value.sha, auditEventId, contentHash });
   });
-};
-
-/**
- * Everything the act's transaction writes beside its ledger row: the index row the boundary
- * parsed, and the facts the act itself supplies. The row's columns are named once — by
- * the boundary — rather than restated here and again at the call site.
- */
-type Landing = z.infer<typeof conceptRow> & {
-  readonly mergeKey: string;
-  readonly commit: Committed;
-  readonly actor: ActorId;
-  readonly auditEventId: string;
-  /**
-   * The evidence the act was handed — the whole of what the concept cites after this act,
-   * an empty list clearing its citations — or `undefined` for a road that recovers none:
-   * the reconciler's replay, whose commit carries no document id, leaves the citations as
-   * they stand rather than clearing them and widening a derived audience by recovery.
-   */
-  readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[] | undefined;
-  /**
-   * Units the concept rests on beside the bindings of its citations: nothing for the live
-   * act, and for a replay whose file cites what the standing citations do not, the most
-   * restrictive visibility there is — so a recovery that cannot recover the evidence lands
-   * the concept Restricted rather than at the class the citations it lost derived.
-   */
-  readonly restsAlsoOn: readonly Visibility[];
-  /** The suggestion this act decided, when it was an acceptance; absent otherwise. */
-  readonly acceptance: Acceptance | undefined;
-};
-
-/**
- * The rows the act writes, in one place so the order they are written in is one fact — and
- * the one landing routine: the reconciler's replay lands through this too, under the platform
- * principal, which is why the Principal is either kind.
- *
- * The evidence and the citations land **before** the index row, because the row's class and
- * audience are derived from the bindings of what the concept cites (`visibility.ts`; ADR
- * 0023, ADR 0039): the parsed row's pair is the fallback, and what lands is the derivation
- * — on the index row and on the map's copies of it alike, in this one transaction, so a
- * concept is never readable for an instant at a class its evidence does not allow. And
- * when the derivation moves the pair off what the row held, the cascade's second level runs
- * here as it runs inside a narrowing: every composition including this concept is
- * re-derived in the same transaction, so a re-write that narrows a concept never leaves a
- * guide page wider than what it includes.
- */
-const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<void> => {
-  // The identity first: the index row's composite key points at it, and a merge key that
-  // moved is upkeep on the row that already exists rather than a second identity.
-  await tx.query(
-    `INSERT INTO concept_identity (workspace_id, iri, merge_key) VALUES ($1, $2, $3)
-     ON CONFLICT (workspace_id, iri) DO UPDATE SET merge_key = EXCLUDED.merge_key`,
-    [index.workspaceId, index.iri, index.mergeKey],
-  );
-  for (const piece of index.evidence ?? []) {
-    await tx.query(
-      `INSERT INTO evidence (workspace_id, source_document_id, locator, resource, content_version)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (workspace_id, source_document_id, locator) DO UPDATE
-          SET resource = EXCLUDED.resource, content_version = EXCLUDED.content_version`,
-      [
-        piece.workspaceId,
-        piece.sourceDocumentId,
-        piece.locator,
-        piece.resource,
-        piece.contentVersion ?? null,
-      ],
-    );
-  }
-  if (index.evidence !== undefined) {
-    await replaceCitations(principal, tx, index.iri, index.evidence);
-  }
-  const held = visibilityOf({
-    sensitivity: index.sensitivity,
-    audience: index.audience,
-    audience_groups: index.audienceGroups ?? null,
-  });
-  const visibility = await conceptVisibilityFrom(principal, tx, {
-    iri: index.iri,
-    kind: index.kind,
-    fallback: held,
-    alsoOn: index.restsAlsoOn,
-  });
-  await tx.query(
-    `INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter, body,
-                                content_hash, commit_sha, status, published_at, sensitivity,
-                                audience, audience_groups)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-     ON CONFLICT (workspace_id, iri) DO UPDATE
-        SET path = EXCLUDED.path, kind = EXCLUDED.kind, title = EXCLUDED.title,
-            frontmatter = EXCLUDED.frontmatter, body = EXCLUDED.body,
-            content_hash = EXCLUDED.content_hash, commit_sha = EXCLUDED.commit_sha,
-            status = EXCLUDED.status, published_at = EXCLUDED.published_at,
-            sensitivity = EXCLUDED.sensitivity, audience = EXCLUDED.audience,
-            audience_groups = EXCLUDED.audience_groups, updated_at = now()`,
-    [
-      index.workspaceId,
-      index.iri,
-      index.path,
-      index.kind,
-      index.title,
-      index.frontmatter,
-      index.body,
-      index.contentHash,
-      index.commit.sha,
-      index.status,
-      index.publishedAt,
-      visibility.sensitivity,
-      visibility.audience,
-      visibility.audienceGroups,
-    ],
-  );
-  await tx.query(
-    `INSERT INTO bundle_commit (workspace_id, sha, parent_sha, audit_event_id, actor)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [index.workspaceId, index.commit.sha, index.commit.parent, index.auditEventId, index.actor],
-  );
-  // The bundle-and-record graph delta, last of the bundle's rows: it resolves link targets
-  // against the index this transaction just wrote, and it lands or rolls back with
-  // everything above — which is what "the map is never behind for an edit" means (ADR 0023,
-  // ADR 0032). An acceptance writes it too: the decision below is one act with these rows.
-  // The map's copies of the three columns are the derivation's, as the row's are.
-  await writeConceptDelta(principal, tx, {
-    workspaceId: index.workspaceId,
-    iri: index.iri,
-    kind: index.kind,
-    path: index.path,
-    body: index.body,
-    frontmatter: index.frontmatter ?? {},
-    publishedAt: index.publishedAt ?? null,
-    ...visibility,
-    status: index.status,
-  });
-  // The cascade's second level, when the pair moved: a composition's columns are the most
-  // restrictive of its includes, and an include that just narrowed narrows it now, in this
-  // transaction — the same rule the narrowing act runs (ADR 0023, ADR 0039).
-  if (!sameVisibility(held, visibility)) {
-    await recomputeCompositionsIncluding(principal, tx, { iris: [index.iri] });
-  }
-  if (index.acceptance === undefined) return;
-
-  // The suggestion's decision, in the same transaction as the rows its acceptance wrote:
-  // a suggestion is never accepted without its concept, or the other way about. `status`
-  // is in the WHERE, so a suggestion two people decide at once is decided once — and the
-  // loser aborts here rather than committing a decision that never happened.
-  //
-  // The marker first, because the row's trigger refuses a decision from a transaction that
-  // has not said it is making one (migration 0018): an acceptance is the one road that may
-  // decide by accepting, and this is where it says so.
-  await markDeciding(tx, index.acceptance.suggestionId);
-  const decided = await tx.query<{ id: string }>(
-    `UPDATE suggestion
-        SET status = $3, decider = $4, decided_at = now(), target_iri = $5
-      WHERE workspace_id = $1 AND id = $2 AND status = $6
-    RETURNING id`,
-    [
-      index.workspaceId,
-      index.acceptance.suggestionId,
-      SUGGESTION_ACCEPTED_STATUS,
-      index.actor,
-      index.iri,
-      SUGGESTION_WAITING_STATUS,
-    ],
-  );
-  if (decided.rows.length === 0) {
-    throw new Error("the suggestion was decided by somebody else while this act was in flight");
-  }
-  if (index.acceptance.kind !== SUGGESTION_REPAIR_KIND) return;
-
-  // **The repair re-hash** (T-006 spec, *Evidence, verification and repair*). Repairing a
-  // locator moves the content hash, so every standing check on this concept would read
-  // *Changed since checked* the moment this act commits — for a change nobody made to the
-  // fact. The checks are re-pointed at what the repair wrote, in this act's own
-  // transaction, and marked as hashes a routine moved: the actor and the instant stand, so
-  // *Checked by Ada* stays *Checked by Ada* and the cadence still reads the real date.
-  // An imported check carries no hash and is left exactly alone (ADR 0019).
-  await tx.query(
-    `UPDATE concept_verification SET content_hash = $3, origin = $4
-      WHERE workspace_id = $1 AND iri = $2 AND content_hash IS NOT NULL`,
-    [index.workspaceId, index.iri, index.contentHash, VERIFICATION_REPAIR_ORIGIN],
-  );
 };
 
 /**
@@ -1602,455 +970,4 @@ const checkOf = (row: ConceptRow): ConceptCheck | undefined => {
     return undefined;
   }
   return { actor: row.checked_by, at: row.checked_at, contentHash: row.checked_hash };
-};
-
-/**
- * **The reconciler** (ADR 0012's 2026-09-06 amendment; T-006 spec, *The reconciler*). The
- * window between a governed write's commit and its rows — step 4 to step 5 above — is the
- * one place the platform can die with the bundle ahead of what Postgres knows, and this is
- * the defined action for it: find the repository head ahead of the last `bundle_commit`,
- * and replay the missed commits **in order, oldest first, through the same handler the live
- * write uses** — `indexRowOf` builds the row and `landRows` lands it, exactly as they do for
- * the live act — idempotent on the ids the trailers carry.
- *
- * It runs under the platform's own principal, `process:better-answers-reconciler`, and its
- * acts are audited under that identity and never a person's. What a replay lands is
- * **recovery, not re-authorization**: the act was authorised when its commit was made — an
- * acceptance's Admin gate and its `{base}` precondition were both read before that commit
- * existed — so the replay carries that context in the commit itself (the `Actor:` trailer
- * names who acted, `Suggestion:` says it was an acceptance) rather than judging a role it
- * does not hold. A revocation that landed inside the window changes nothing about this:
- * authorization is judged at time-of-act, and unwanted content is undone forward.
- */
-
-/** The reconciler's actor id — the platform principal's one form (`CONTEXT.md`, *actor id*). */
-const RECONCILER_ACTOR = "process:better-answers-reconciler";
-
-/**
- * The reconciler's principal, narrowed to its own actor: the type is what holds "under
- * `process:better-answers-reconciler`" at compile time, so no other platform act can replay
- * a bundle under its own name. `AdminUserPrincipal` is the same shape for a role.
- */
-export type ReconcilerPrincipal = PlatformPrincipal & {
-  readonly actorId: typeof RECONCILER_ACTOR;
-};
-
-export const RECONCILER: ReconcilerPrincipal = { kind: "platform", actorId: RECONCILER_ACTOR };
-
-/**
- * The reconciler's one act on the ledger. Its row takes the **commit's own `Audit:` id**, so
- * `bundle_commit.audit_event_id` joins the ledger on one id whichever road landed the rows
- * (ADR 0014 rule 4) — the person's act live, the reconciler's replay after a crash — and the
- * subject is the commit replayed. The detail says what the commit put in the bundle — and
- * whether the file's `sources[]` agreed with the standing citations, which is what decided
- * whether the class landed was the citations' or Restricted, so an operator reading the
- * ledger sees why a replayed concept came back Restricted. Who acted is on the commit and
- * on `bundle_commit.actor`, as the `Actor:` trailer wrote it.
- *
- * *Reconciler hits* are a query over these rows (ADR 0025) and never a counter.
- */
-const RECONCILER_ACTS = declareActs("platform", {
-  replayed: act("platform.reconciler.replayed", {
-    iri: "iri",
-    commitSha: "gitSha",
-    contentHash: "contentHash",
-    evidenceAgrees: "flag",
-  }),
-});
-
-/**
- * Why one commit could not be replayed. `unreadable-commit` is a commit the governed write
- * did not make — no `Actor:` or `Audit:` trailer, no single concept file, a file outside the
- * renderer's grammar, or a creation whose file names no `type` or `title`. `rename-refused`
- * is a commit that puts a concept's file at a path other than the one its row holds — the
- * move the live handler refuses before it commits, so only a commit the governed write did
- * not make can carry one, and the replay stops at it rather than landing a rename by
- * recovery. The other two are the index refusing the rows the commit would need, which is
- * what a commit the live act could not record either looks like on replay.
- */
-export type ReplayRefusal =
-  | "unreadable-commit"
-  | "rename-refused"
-  | "path-taken"
-  | "merge-key-taken";
-
-export type Reconciled = {
-  readonly workspaceId: string;
-  /** The bundle's head as the run found it; `null` for a bundle with no commits. */
-  readonly head: string | null;
-  /** The last commit the rows knew before the run; `null` when they knew none. */
-  readonly watermark: string | null;
-  /** The commits this run landed, oldest first. */
-  readonly replayed: readonly string[];
-  /** The commits whose trailer id already had its rows: already landed, left as they were. */
-  readonly skipped: readonly string[];
-  /**
-   * The commit the run stopped at and why, when the rows did not catch up with the head.
-   * Every commit before it landed; nothing after it was attempted, because each commit's
-   * row names its parent's and the prefix invariant is what the replay preserves.
-   */
-  readonly stopped: { readonly sha: string; readonly reason: ReplayRefusal | Error } | undefined;
-};
-
-/**
- * Why a run refused as a whole. `history-diverged` is the recorded history not being a
- * prefix of the bundle's — a database and a repository that disagree about the past, which
- * no replay makes right and a person has to look at; `no-such-repository` is a workspace
- * whose bundle is not on disk, which on a restore means the repository store was not.
- */
-export type ReconcileRefusal = "malformed" | "no-such-repository" | "history-diverged";
-
-/** What one replayed commit came to: landed, or already there. */
-type Replayed = "landed" | "skipped";
-
-/** The facts a replay reads off one commit: who acted, the ledger id, the file, its identity. */
-type CommitFacts = {
-  readonly sha: string;
-  readonly parent: string | null;
-  readonly actor: ActorId;
-  readonly auditEventId: string;
-  readonly suggestionId: string | undefined;
-  readonly path: string;
-  readonly frontmatter: Frontmatter;
-  readonly body: string;
-  readonly iri: string;
-};
-
-/**
- * A commit as the governed write made it, or nothing: the two trailers every act carries
- * in the kernel's and the minter's shapes, one concept file, and the IRI the file carries —
- * the one identity a commit does carry (ADR 0002), read off the file rather than minted.
- */
-const factsOf = (read: CommitRead): CommitFacts | undefined => {
-  const actor = read.trailers["Actor"];
-  const audit = read.trailers["Audit"];
-  if (actor === undefined || !isActorId(actor) || audit === undefined || !ULID.test(audit)) {
-    return undefined;
-  }
-  if (read.change === undefined) return undefined;
-  const parsed = parseConceptFile(read.change.content);
-  if (!parsed.ok) return undefined;
-  const iri = parsed.value.frontmatter["iri"];
-  if (typeof iri !== "string" || !IRI.test(iri)) return undefined;
-  return {
-    sha: read.sha,
-    parent: read.parent,
-    actor,
-    auditEventId: audit,
-    suggestionId: read.trailers["Suggestion"],
-    path: read.change.path,
-    frontmatter: parsed.value.frontmatter,
-    body: parsed.value.body,
-    iri,
-  };
-};
-
-/** A frontmatter key's value when it is a string, as `type`, `title` and `status` are. */
-const stringIn = (frontmatter: Frontmatter, key: string): string | undefined => {
-  const value = frontmatter[key];
-  return typeof value === "string" ? value : undefined;
-};
-
-/**
- * The merge key for a replayed creation that carries none. A person's own write names its
- * merge key to the act and nowhere else — it is a row's fact and the commit does not carry
- * it — so a lost creation gets ADR 0003's derivation, the kind and the normalised label:
- * what a producer means by "this concept" when it has no IRI. A derived key another concept
- * already holds falls back to the IRI itself, which is unique by construction: the restore
- * path lands rather than stopping on two concepts sharing a title.
- */
-const derivedMergeKey = async (
-  platform: PlatformPrincipal,
-  tx: Tx,
-  iri: string,
-  kind: string,
-  title: string,
-): Promise<string> => {
-  const derived = `${kind}:${title.trim().replaceAll(/\s+/g, " ").toLowerCase()}`;
-  const holder = await targetOfMergeKey(platform, tx, derived);
-  return holder === undefined || holder === iri ? derived : iri;
-};
-
-/**
- * Whether a replayed file's `sources[]` is the concept's standing citations — the file's
- * entries and the citations' projection (`concept_evidence` joined to its `evidence` rows)
- * each reduced to the `(resource, locator)` pairs the content hash reduces them to, resolved
- * against the file's path, and compared as sets. The file carries no document id, so this is
- * the one reading of "did this commit change what the concept cites" a replay can make.
- */
-const fileCitesTheStandingEvidence = async (
-  tx: Tx,
-  workspaceId: string,
-  facts: CommitFacts,
-): Promise<boolean> => {
-  const standing = await tx.query<{ resource: string; locator: string }>(
-    `SELECT e.resource, ce.locator
-       FROM concept_evidence ce
-       JOIN evidence e ON e.workspace_id = ce.workspace_id
-                      AND e.source_document_id = ce.source_document_id AND e.locator = ce.locator
-      WHERE ce.workspace_id = $1 AND ce.iri = $2`,
-    [workspaceId, facts.iri],
-  );
-  const pairs = (sources: readonly HashedSource[]) =>
-    new Set(sources.map((pair) => JSON.stringify(pair)));
-  const cited = pairs(reducedSources(facts.frontmatter["sources"], facts.path));
-  const held = pairs(
-    standing.rows.map((row) => [resolvedResource(row.resource, facts.path), row.locator]),
-  );
-  return cited.size === held.size && [...cited].every((pair) => held.has(pair));
-};
-
-/** The last commit the rows know about, or nothing — the watermark the scan starts after. */
-const lastRecordedCommit = async (platform: PlatformPrincipal, tx: Tx): Promise<string | null> => {
-  const found = await tx.query<{ sha: string }>(
-    `SELECT sha FROM bundle_commit WHERE workspace_id = ${scopeClause(1)}
-      ORDER BY committed_at DESC, sha DESC LIMIT 1`,
-    [scopeParameter(platform)],
-  );
-  return found.rows[0]?.sha ?? null;
-};
-
-/**
- * One commit replayed: read back, its rows built as the live act builds them, and landed in
- * one transaction under the platform's scope — the ledger row first, as every act in this
- * slice writes it, so the fail-together proof provokes its failure after the row exists.
- *
- * **Idempotent on the trailer id.** A commit whose `Audit:` id — or whose sha — already has
- * its `bundle_commit` row is already landed: skipped, never re-written and never an error,
- * which is what lets the periodic check and the restore path run as often as they like.
- * The unique index over `(workspace_id, audit_event_id)` holds the same rule for anything
- * that got past this read.
- *
- * What the commit carries is what the replay lands, and what it does not carry it recovers
- * as fail-closed as the live act would: the class is the concept's own where it exists and
- * the most restrictive of the three otherwise (a widening is an Admin's recorded act, never a
- * recovery's guess); the status and kind are the file's, or the concept's; evidence rows
- * are not recovered, because the file's `sources[]` is a projection and the document id is
- * not in it, so the concept's standing citations are left as they are and its class is
- * re-derived from them — **when the file cites them**. A file whose `sources[]` is not the
- * standing citations' projection is a lost commit that changed what the concept cites, and
- * the citations it lost may well be the narrower ones, so the replay lands the concept
- * Restricted (as a creation whose commit carries no evidence lands) and its ledger row says
- * the evidence did not agree. An acceptance — the `Suggestion:` trailer — decides its
- * suggestion through the same rows and the same marker as the live act, from the payload
- * the decision was made from; a suggestion decided in the meantime has no payload left to
- * read, and the commit lands as the commit it is, its decision left with whoever made it.
- */
-const replayCommit = async (
-  platform: ReconcilerPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
-  workspaceId: WorkspaceId,
-  sha: string,
-  batchId: string | undefined,
-): Promise<Result<Replayed, ReplayRefusal | Error>> => {
-  const read = await attempt(() => readCommit(platform, doors.git, workspaceId, sha));
-  if (!read.ok) return err(read.error);
-  const facts = factsOf(read.value);
-  if (facts === undefined) return err("unreadable-commit");
-
-  const landed = await attempt(() =>
-    withScope(
-      platform,
-      doors.postgres,
-      workspaceId,
-      async (tx): Promise<Result<Replayed, ReplayRefusal>> => {
-        const known = await tx.query(
-          "SELECT 1 FROM bundle_commit WHERE workspace_id = $1 AND (sha = $2 OR audit_event_id = $3)",
-          [workspaceId, facts.sha, facts.auditEventId],
-        );
-        if ((known.rowCount ?? 0) > 0) return ok("skipped");
-
-        const held = await heldByIri(platform, tx, facts.iri);
-        // The one refusal the live act reads off the row that a replay has to read again: a
-        // file at a path the row does not hold is a rename, which the handler never makes,
-        // and the replay stops there as it stops at a path the index refuses (ADR 0012).
-        if (held !== undefined && held.path !== facts.path) return err("rename-refused");
-        const payload =
-          facts.suggestionId === undefined
-            ? undefined
-            : await payloadFor(platform, tx, facts.suggestionId);
-        const acceptance: Acceptance | undefined =
-          facts.suggestionId === undefined || payload === undefined
-            ? undefined
-            : { suggestionId: facts.suggestionId, setId: payload.setId, kind: payload.kind };
-        const kind = stringIn(facts.frontmatter, "type") ?? held?.kind;
-        const title = stringIn(facts.frontmatter, "title") ?? held?.title;
-        if (kind === undefined || title === undefined) return err("unreadable-commit");
-        const contentHash = contentHashOf(facts.frontmatter, facts.body, facts.path);
-        const parsed = indexRowOf(
-          {
-            workspaceId,
-            iri: facts.iri,
-            path: facts.path,
-            kind,
-            title,
-            frontmatter: facts.frontmatter,
-            body: facts.body,
-            contentHash,
-            status: stringIn(facts.frontmatter, "status"),
-            sensitivity: undefined,
-          },
-          held,
-        );
-        if (!parsed.success) return err("unreadable-commit");
-        const row = parsed.data;
-        const mergeKey =
-          payload?.mergeKey ??
-          held?.mergeKey ??
-          (await derivedMergeKey(platform, tx, row.iri, row.kind, row.title));
-        const evidenceAgrees = await fileCitesTheStandingEvidence(tx, workspaceId, facts);
-
-        // The door is called bare (ADR 0014 rule 4): its rejection aborts this transaction.
-        await record(platform, tx, {
-          id: facts.auditEventId,
-          act: RECONCILER_ACTS.replayed,
-          subjectId: facts.sha,
-          batchId,
-          detail: { iri: row.iri, commitSha: facts.sha, contentHash, evidenceAgrees },
-        });
-        await landRows(platform, tx, {
-          ...row,
-          mergeKey,
-          commit: { sha: facts.sha, parent: facts.parent },
-          actor: facts.actor,
-          auditEventId: facts.auditEventId,
-          // Not recovered — the file's `sources[]` carries no document id — so the
-          // citations stand as they are and the class is re-derived from them, never
-          // widened by a recovery that cleared them.
-          evidence: undefined,
-          // And where the file does not cite them, from the most restrictive visibility
-          // there is beside them: the citations the commit lost may be the narrower ones.
-          restsAlsoOn: evidenceAgrees ? [] : [RESTRICTED_TO_ADMINS],
-          acceptance,
-        });
-        return ok("landed");
-      },
-    ),
-  );
-  if (!landed.ok) {
-    const named = refusalFor(landed.error, WRITE_CONSTRAINTS);
-    return err(typeof named === "string" ? named : landed.error);
-  }
-  return landed.value;
-};
-
-/**
- * Reconcile one workspace's bundle with its rows: the defined action, on demand. The
- * periodic head check in the api process calls this for every workspace, and
- * `pnpm ops reconcile-watermark` calls it for one — the restore path, when a database has
- * been restored from a dump and the repository is ahead of it.
- *
- * **Under the per-repository lock**, held from the watermark read through the last commit's
- * landing: a live write waits behind a replay and a replay behind a live write, so the
- * prefix invariant holds through both, and a second run of this function on the same
- * bundle waits rather than replaying beside the first. A run that finds nothing missed
- * costs one read of `bundle_commit` and one of the ref.
- *
- * A run stops at the first commit it cannot land and says which; everything before it has
- * landed, each in its own transaction, and a later run picks up where this one stopped
- * once whatever stopped it has been put right. A bulk replay's ledger rows share one batch
- * id (ADR 0014 rule 4).
- */
-export const reconcile = async (
-  platform: ReconcilerPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
-  input: { readonly workspaceId: string },
-): Promise<Result<Reconciled, ReconcileRefusal | Error>> => {
-  const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
-  if (!workspace.success) return err("malformed");
-  const workspaceId = workspace.data;
-
-  return withRepositoryLockAs(platform, doors.git, workspaceId, async () => {
-    const watermark = await attempt(() =>
-      withScope(platform, doors.postgres, workspaceId, (tx) => lastRecordedCommit(platform, tx)),
-    );
-    if (!watermark.ok) return err(watermark.error);
-    const scanned = await commitsAfter(platform, doors.git, workspaceId, watermark.value);
-    if (!scanned.ok) return err(scanned.error);
-
-    const batchId = scanned.value.missed.length > 1 ? ulid() : undefined;
-    const replayed: string[] = [];
-    const skipped: string[] = [];
-    let stopped: Reconciled["stopped"];
-    for (const sha of scanned.value.missed) {
-      const outcome = await replayCommit(platform, doors, workspaceId, sha, batchId);
-      if (!outcome.ok) {
-        stopped = { sha, reason: outcome.error };
-        break;
-      }
-      (outcome.value === "landed" ? replayed : skipped).push(sha);
-    }
-    return ok({
-      workspaceId,
-      head: scanned.value.head,
-      watermark: watermark.value,
-      replayed,
-      skipped,
-      stopped,
-    });
-  });
-};
-
-/** One reconciler hit: a commit the replay landed, as its ledger row records it. */
-export type ReconcilerHit = {
-  readonly commitSha: string;
-  /** The commit's `Audit:` id — the row's id, and `bundle_commit.audit_event_id`. */
-  readonly auditEventId: string;
-  readonly at: Date;
-  /** The batch a bulk replay's rows share; `null` for a run that landed one commit. */
-  readonly batchId: string | null;
-};
-
-/**
- * *Reconciler hits* — the signal ADR 0012 names, in the sense ADR 0025 gives the word: a
- * query over rows the platform already keeps, never a counter. The rows are the
- * `platform.reconciler.replayed` events the replay writes, one per commit landed, oldest
- * first, from an instant when the caller names one. The api's head check writes nothing
- * else about a hit, so the ledger is the whole record and this read is the whole signal.
- */
-export const reconcilerHits = async (
-  platform: PlatformPrincipal,
-  door: PostgresDoor,
-  input: { readonly workspaceId: string; readonly since?: Date | undefined },
-): Promise<Result<readonly ReconcilerHit[], "malformed" | Error>> => {
-  const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
-  if (!workspace.success) return err("malformed");
-  const read = await attempt(() =>
-    withScope(platform, door, workspace.data, (tx) =>
-      eventsOfAct(platform, tx, RECONCILER_ACTS.replayed, input.since),
-    ),
-  );
-  if (!read.ok) return err(read.error);
-  return ok(
-    read.value.map((row) => ({
-      commitSha: row.subjectId,
-      auditEventId: row.id,
-      at: row.at,
-      batchId: row.batchId,
-    })),
-  );
-};
-
-/** One workspace's outcome of a run over every workspace. */
-export type WorkspaceReconciled = {
-  readonly workspaceId: string;
-  readonly outcome: Result<Reconciled, ReconcileRefusal | Error>;
-};
-
-/**
- * The periodic head check's whole pass: every workspace the platform holds, reconciled one
- * after the other. One bundle's refusal is that bundle's fact and never a reason to leave
- * the others behind, so each carries its own `Result`, as a bulk acceptance's items do.
- */
-export const reconcileEveryWorkspace = async (
-  platform: ReconcilerPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
-): Promise<Result<readonly WorkspaceReconciled[], Error>> => {
-  const held = await workspaceIds(platform, doors.postgres);
-  if (!held.ok) return err(held.error);
-  const outcomes: WorkspaceReconciled[] = [];
-  for (const workspaceId of held.value) {
-    outcomes.push({ workspaceId, outcome: await reconcile(platform, doors, { workspaceId }) });
-  }
-  return ok(outcomes);
 };
