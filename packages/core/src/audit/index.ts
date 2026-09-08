@@ -122,6 +122,10 @@ const detailRefusal = (shape: DetailShape, detail: Readonly<Record<string, Detai
   }
   for (const [field, kind] of Object.entries(shape)) {
     const value = detail[field];
+    // Every DETAIL_KINDS predicate starts with a `typeof` check, none of which a
+    // `value` of `undefined` ever passes — so a missing field would still be refused
+    // one line down. This check stays for the sharper message naming what is missing,
+    // never the fallback "is not a kind" a masked check would settle for.
     if (value === undefined) return `detail is missing the field ${field}`;
     if (!DETAIL_KINDS[kind](value)) return `detail's ${field} is not a ${kind}`;
   }
@@ -167,6 +171,8 @@ const write = async <A extends Act>(
       row.data.batchId,
     ],
   );
+  // A plain `INSERT ... RETURNING` with no `ON CONFLICT` always yields exactly one row;
+  // Postgres guarantees it, not the type, which is all the throw below is guarding.
   const id = inserted.rows[0]?.id;
   if (id === undefined) throw new Error(`audit: ${event.act.name} landed no row`);
   return { id: boundarySchemas.auditEvent.select.shape.id.parse(id), actorId: actor };

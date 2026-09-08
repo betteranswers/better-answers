@@ -21,6 +21,9 @@ export const refusalFor = <Refusal extends string>(
   // node-postgres puts the violated constraint's name on the error it throws. Read as a
   // whole name first: a substring search over a map with `member_pkey` and
   // `member_pkey_v2` in it would answer whichever was declared first.
+  // The fallback's exact text is arbitrary: it only has to miss every real constraint
+  // name, which "" and any other placeholder do alike, so the lookup below answers the
+  // same `undefined` whichever one stands here.
   const constraint =
     "constraint" in error && typeof error.constraint === "string" ? error.constraint : "";
   const named = byConstraint[constraint];

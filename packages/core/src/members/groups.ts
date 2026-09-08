@@ -273,6 +273,8 @@ export const addToGroup = async (
     ),
   );
   if (!known.ok) return err(known.error);
+  // `SELECT EXISTS(...), EXISTS(...)` with no `FROM` always answers exactly one row, so
+  // `row` is never undefined; the `?.` below is for the type, not a real absent row.
   const row = known.value.rows[0];
   if (row?.holds_group !== true) return err("no-such-group");
   if (!row.is_member) return err("not-a-member");
