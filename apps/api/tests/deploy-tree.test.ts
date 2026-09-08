@@ -12,6 +12,11 @@ import { POSTGRES_IMAGE } from "@better-answers/schema";
  * quiet edit could break: a script that stops parsing, a production restore that grows the
  * drill's wipe trap, a service that loses its memory limit, a placeholder that comes back,
  * a digest the release matches loosely, the two fences drifting apart in name.
+ *
+ * That first sentence is why the backup image's *built* half is not here. Every assertion
+ * below is text about a file; starting a container from `deploy/backup.Dockerfile` would
+ * make it untrue for a reader who relies on it, so the probe lives in
+ * `apps/api/tests/backup-image.test.ts` (T-084) and the two name each other.
  */
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
@@ -77,6 +82,9 @@ describe("the deploy tree (T-005)", () => {
   });
 
   it("builds the backup image on the one pinned database image, so pg_dump never skews from the server ([DEPS2])", () => {
+    // The claim about the Dockerfile. The claim about the image it builds — that the
+    // `pg_dump` in it answers with this major — is `backup-image.test.ts`'s, against the
+    // same constant.
     expect(read("deploy/backup.Dockerfile")).toContain(`FROM ${POSTGRES_IMAGE}`);
   });
 

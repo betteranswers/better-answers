@@ -12,6 +12,11 @@
 # VPC 2 (ADR 0024); curl, jq, cron. `backup.sh` is baked in, not bind-mounted: an image by
 # digest that read its job from the checkout beside it would be half an image.
 #
+# Every claim in that paragraph is read off the BUILT image by
+# `apps/api/tests/backup-image.test.ts` (T-084), which `build.yml` runs against this image
+# before it is pushed: the major pg_dump actually answers with, each tool resolving, the
+# script where cron looks for it, and the schedule matching the modes the script accepts.
+#
 # Versions: pgvector 0.8.6-pg18-trixie by digest, read 01/09/2026 (the schema
 # package's pin); rclone v1.75.0, read 28/08/2026 (research 68 §1); age v1.3.2, read from
 # github.com/FiloSottile/age/releases on 03/09/2026 (T-005).

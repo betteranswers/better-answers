@@ -1,22 +1,29 @@
-import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { parse } from "yaml";
+import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import {
+  buildWorkflow,
+  fileFromTheWorkspace,
+  IMAGE_ID_VARIABLE,
+  imageJob,
+  type ImageStep,
+  legFor,
+  matrixLegs,
+  nothingToProbeHere,
+  PROBE_DEFERRAL_VARIABLE,
+  readTheImage,
+  repositoryRoot,
+  readWorkflow,
+  workflowStepSchema,
+} from "./image-probe.ts";
 import { workspacePackages } from "./workspaces.ts";
 
-const run = promisify(execFile);
-
-const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
-
 /**
- * The runtime image's contents, asserted through the one interface a deploy unit has on
- * them: a container started from the image.
+ * The app tier's runtime image's contents, asserted through the one interface a deploy unit
+ * has on them: a container started from the image.
  *
  * What is being guarded is the shape of `apps/api/Dockerfile`'s last stage, and the two
  * ways it silently goes wrong. A `COPY` written a little too wide, or a production install
@@ -31,23 +38,11 @@ const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
  * the workspace or a dependency moved between `dependencies` and `devDependencies` changes
  * what this test demands without anyone remembering to edit it.
  *
- * **Two ways this file runs.** Given no image id it builds the image and probes what it
- * built, which is what a laptop and a pull request do. Given one it probes that image and
- * builds nothing: `build.yml`'s image job loads its own build, hands the id here and pushes
- * only if these four tests pass, so the artefact that ships is the artefact that was read
- * (T-043). A push to `main` runs the second alone — `check.yml` is told by its caller that
- * the job which pushes does the probing — because two builds of one Dockerfile in one run
- * prove the same thing twice and only one of them is the thing that ships.
+ * The daemon rule, the image id and the build-and-remove lifecycle are `image-probe.ts`'s,
+ * shared with the worker's and the backup's probes (`T-084`). The second half of this file
+ * holds the mechanism those three legs run under, because this is the file `build.yml`'s
+ * api leg names.
  */
-
-const dockerIsAvailable = async (): Promise<boolean> => {
-  try {
-    await run("docker", ["info", "--format", "{{.ServerVersion}}"], { timeout: 20_000 });
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 const manifestSchema = z.object({
   dependencies: z.record(z.string(), z.string()).optional(),
@@ -108,85 +103,17 @@ process.stdout.write(JSON.stringify({
 }));
 `;
 
-/** The api image built from the repository root, answering with the id the build printed. */
-const buildTheImage = async (): Promise<string> => {
-  const built = await run("docker", ["build", "--quiet", "--file", "apps/api/Dockerfile", "."], {
-    cwd: repositoryRoot,
-    timeout: 900_000,
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  return built.stdout.trim();
-};
-
-const dockerAnswers = await dockerIsAvailable();
-// A laptop without Docker still runs `check`; CI does not get that latitude. `build.yml`
-// gates the push on this workflow, so a CI job that quietly skipped these four tests would
-// leave the image ungoverned while reporting green — the one outcome the gate exists to
-// prevent. Skipped off CI, failed on it, and never silent on either.
-const daemonIsRequired = (process.env["CI"] ?? "") !== "";
-
-/**
- * The name the image id arrives under. It is read here and asserted against `build.yml`
- * below, because the two halves are one agreement: an id passed under a name this file
- * does not read would leave it building its own image and calling that the shipped one.
- */
-const IMAGE_ID_VARIABLE = "IMAGE_ID";
-const suppliedImage = (process.env[IMAGE_ID_VARIABLE] ?? "").trim();
-
-/**
- * Set by `check.yml` when the workflow calling it has a job that pushes these images, and
- * by nothing else. That job loads each build and runs this file against it, so probing
- * here as well would build the api image a second time on a second runner to learn what
- * the first already knows. A pull request has no such job, passes nothing, and probes.
- *
- * Exactly `"true"` and nothing looser: a value nobody meant to set leaves the probe
- * running, which is the direction a mistake here has to fail in.
- */
-const PROBE_DEFERRAL_VARIABLE = "IMAGE_PROBE_DEFERRED";
-const probeRunsInTheJobThatPushes = process.env[PROBE_DEFERRAL_VARIABLE] === "true";
-
-// Two reasons to stand down and no third: the run's own pushing job is doing this, or no
-// daemon answered on a machine that is allowed none. A missing daemon on CI is a failure
-// rather than a skip, which is the `daemonIsRequired` half above.
-const nothingToProbeHere = probeRunsInTheJobThatPushes || (!dockerAnswers && !daemonIsRequired);
-
 describe.skipIf(nothingToProbeHere)("the app tier's runtime image", () => {
   let contents: ImageContents;
-  let builtHere: string | undefined;
   const developmentOnly = developmentOnlyPackages();
 
   beforeAll(async () => {
-    if (!dockerAnswers) {
-      throw new Error(
-        "no Docker daemon answered, so the runtime image cannot be read: on CI these tests fail rather than skip, because build.yml gates the image push on this workflow",
-      );
-    }
-    // The image is run by the id the build prints, and is never tagged. A tag is a name on
-    // the daemon, and the daemon is shared: two worktrees running `check` at once would
-    // overwrite each other's tag and one would read the other's image. The id cannot be
-    // taken from under this test. A supplied id is the same kind of thing — the id the
-    // workflow's own load printed — for the same reason.
-    const image = suppliedImage === "" ? await buildTheImage() : suppliedImage;
-    // Only an image this file built is this file's to remove.
-    if (suppliedImage === "") builtHere = image;
-    const { stdout } = await run(
-      "docker",
-      [
-        "run",
-        "--rm",
-        "--env",
-        "PROBE_NAMES",
-        "--env",
-        "PROBE_REQUIRED",
-        image,
-        "node",
-        "-e",
-        probe,
-      ],
+    const leg = legFor("api");
+    const stdout = await readTheImage(
+      { dockerfile: leg.dockerfile, context: leg.context },
       {
-        timeout: 120_000,
-        env: {
-          ...process.env,
+        command: ["node", "-e", probe],
+        environment: {
           PROBE_NAMES: JSON.stringify(developmentOnly),
           // Entry points from each library's `exports` map, because that is the only way
           // in: `packages/core` publishes capability slices and no root entry at all.
@@ -195,15 +122,10 @@ describe.skipIf(nothingToProbeHere)("the app tier's runtime image", () => {
       },
     );
     contents = contentsSchema.parse(JSON.parse(stdout));
+    // A cold build, a container and the removal of an untagged image, in one hook. The
+    // allowance is the build's; `apps/api`'s global `hookTimeout` is a runaway guard for
+    // hooks that open a database and cannot cover this one.
   }, 1_020_000);
-
-  afterAll(async () => {
-    // The image is untagged, so leaving it behind leaves a dangling half-gigabyte on the
-    // machine for every run whose source differed from the last. Failure to remove it is not
-    // a failure of the suite: another run may hold the same id.
-    if (builtHere === undefined) return;
-    await run("docker", ["rmi", "--force", builtHere], { timeout: 120_000 }).catch(() => undefined);
-  }, 130_000);
 
   it("gives the app no development dependency it could load", () => {
     expect(developmentOnly.length).toBeGreaterThan(0);
@@ -228,38 +150,18 @@ describe.skipIf(nothingToProbeHere)("the app tier's runtime image", () => {
 });
 
 /**
- * The other half of the agreement, read off `build.yml` (T-043).
+ * The other half of the agreement, read off `build.yml` (T-043, T-084).
  *
  * The job that pushes carries the mechanism: a matrix leg with a `probe` command is built
  * into the runner's daemon, probed by that command against the id the load printed, and
- * pushed only after the probe passes. A leg without one is built and pushed as before, and
- * `T-084` — which writes the worker's and the backup's contents tests — turns the mechanism
- * on for them by giving those legs a command.
+ * pushed only after the probe passes. A leg declares what its probe needs to run under —
+ * `probe-toolchain` — and the job installs that toolchain and no other, so a fourth image
+ * joins by carrying two matrix fields rather than by a rewrite.
  *
  * These assertions run everywhere, daemon or no daemon, because what they guard fails at the
- * one moment nobody is watching: a push to `main`, where the leg either probes the bytes it
+ * one moment nobody is watching: a push to `main`, where a leg either probes the bytes it
  * ships or quietly ships bytes nothing read.
  */
-
-const workflowStepSchema = z.object({
-  run: z.string().optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  with: z.record(z.string(), z.unknown()).optional(),
-});
-
-const buildWorkflowSchema = z.object({
-  jobs: z.object({
-    check: z.object({ with: z.record(z.string(), z.unknown()).optional() }),
-    image: z.object({
-      strategy: z.object({
-        matrix: z.object({
-          include: z.array(z.object({ tier: z.string(), probe: z.string().optional() })),
-        }),
-      }),
-      steps: z.array(workflowStepSchema),
-    }),
-  }),
-});
 
 const checkWorkflowSchema = z.object({
   on: z.object({
@@ -270,14 +172,7 @@ const checkWorkflowSchema = z.object({
   jobs: z.object({ check: z.object({ steps: z.array(workflowStepSchema) }) }),
 });
 
-type ImageStep = z.infer<typeof workflowStepSchema>;
-
-const workflowFile = (name: string): unknown =>
-  parse(readFileSync(path.join(repositoryRoot, ".github/workflows", name), "utf8"));
-
-const buildWorkflow = () => buildWorkflowSchema.parse(workflowFile("build.yml"));
-const checkWorkflow = () => checkWorkflowSchema.parse(workflowFile("check.yml"));
-const imageJob = () => buildWorkflow().jobs.image;
+const checkWorkflow = () => readWorkflow("check.yml", checkWorkflowSchema);
 
 /** A step's input as the string it is, or `""` — an action's inputs are also booleans. */
 const input = (step: ImageStep, name: string): string => {
@@ -291,26 +186,55 @@ const probeStepAt = (steps: readonly ImageStep[]): number =>
 
 describe("the job that probes the image it pushes", () => {
   it("gives the api leg this file as its probe, so the file cannot move without the workflow", () => {
-    const legs = imageJob().strategy.matrix.include;
-    const api = legs.find((leg) => leg.tier === "api");
-    // Derived, not spelled: what the workflow must name is wherever this file actually is,
-    // relative to the workspace whose runner the probe command names.
-    const hereFromTheWorkspace = path.relative(
-      path.join(repositoryRoot, "apps/api"),
-      fileURLToPath(import.meta.url),
-    );
+    const api = legFor("api");
 
-    expect(legs.length).toBeGreaterThan(1);
-    expect(api?.probe).toContain("@better-answers/api");
-    expect(api?.probe).toContain(hereFromTheWorkspace);
+    expect(matrixLegs().length).toBeGreaterThan(1);
+    expect(api.probe).toContain("@better-answers/api");
+    expect(api.probe).toContain(fileFromTheWorkspace(import.meta.url, "apps/api"));
   });
 
-  it("hands every probe the id of the build it loaded, under the name this file reads", () => {
+  it("reads every image it pushes, so no leg ships bytes nothing looked at", () => {
+    // The list is `build.yml`'s own, not one written here: a leg added without a probe
+    // fails this rather than quietly joining the two that had none before `T-084`.
+    const unprobed = matrixLegs()
+      .filter((leg) => leg.probe === undefined)
+      .map((leg) => leg.tier);
+
+    expect(matrixLegs().length).toBeGreaterThan(2);
+    expect(unprobed).toEqual([]);
+  });
+
+  it("installs the toolchain each probe needs, and names no tier to decide it", () => {
+    const steps = imageJob().steps;
+    // A step belongs to a toolchain by testing for it, so the set of toolchains the job
+    // can run is read out of the steps rather than listed here.
+    const installed = new Set(
+      steps.flatMap(
+        (step) => /matrix\.probe-toolchain == '([\w-]+)'/.exec(step.if ?? "")?.[1] ?? [],
+      ),
+    );
+    // [TEST7] both ways: a probe whose runtime nothing installs cannot run, and a
+    // toolchain installed for a leg that has no probe is a setup step nobody needs.
+    const unserved = matrixLegs().flatMap((leg) => {
+      const toolchain = leg["probe-toolchain"];
+      if (leg.probe === undefined) return toolchain === undefined ? [] : [`${leg.tier}: no probe`];
+      if (toolchain === undefined) return [`${leg.tier}: no toolchain`];
+      return installed.has(toolchain) ? [] : [`${leg.tier}: ${toolchain} is never installed`];
+    });
+
+    expect(installed.size).toBeGreaterThan(1);
+    expect(unserved).toEqual([]);
+    // The tier is never the condition. `matrix.tier` in a step's `if` would make the
+    // mechanism a list of images instead of a property a leg carries.
+    expect(steps.filter((step) => (step.if ?? "").includes("matrix.tier"))).toEqual([]);
+  });
+
+  it("hands every probe the id of the build it loaded, under the name every probe reads", () => {
     const steps = imageJob().steps;
     const probed = steps[probeStepAt(steps)];
 
     // The command comes in through the environment, so the step runs the matrix's probe
-    // and nothing else; and it is refused an empty id, because this file would then build
+    // and nothing else; and it is refused an empty id, because a probe would then build
     // an image of its own and let an unread one ship.
     expect(probed?.env?.["PROBE"]).toEqual("${{ matrix.probe }}");
     expect(probed?.run).toContain("${PROBE}");
@@ -336,9 +260,9 @@ describe("the job that probes the image it pushes", () => {
     ]);
   });
 
-  it("stands this file down only where the caller of `check.yml` probes the image itself", () => {
+  it("stands the probes down only where the caller of `check.yml` probes the images itself", () => {
     // The deferral is the other half of the same agreement and the half whose failures are
-    // both silent: a lost mapping builds the api image twice on a push to main, and a
+    // both silent: a lost mapping builds every image twice on a push to main, and a
     // default that flipped to true would skip the contents tests on every pull request. The
     // input's name is read out of the wiring rather than spelled here, so the only thing
     // this can catch is the wiring itself.
