@@ -3,6 +3,7 @@ import { serve } from "@hono/node-server";
 import { describe, expect, it } from "vitest";
 
 import { initRepository, openGit } from "@better-answers/core/store/git";
+import { testData } from "@better-answers/schema/testing";
 
 import { fetchHonouringHost } from "../src/ops/http-fetch.ts";
 import { NOT_BUILT, parseSince, runOps, type OpsIo } from "../src/ops/index.ts";
@@ -38,6 +39,26 @@ const ops = async (app: TestApp, argv: readonly string[], stdin = ""): Promise<R
   const exitCode = await runOps(argv, app.database.superuser, io);
   return { exitCode, lines: io.lines };
 };
+
+/**
+ * A map of two concepts and the link between them in the live generation, and a rebuild's
+ * leftovers in a second generation beside it — what the two graph commands are asked about.
+ */
+const mapped = async (app: TestApp, workspaceId: string): Promise<void> => {
+  const client = await app.database.superuser.connect();
+  try {
+    const seed = testData(client);
+    const entry = await seed.graphNode({ workspaceId });
+    await seed.graphEdge({ workspaceId, fromUid: entry.uid });
+    const left = await seed.graphNode({ workspaceId, gen: 2 });
+    await seed.graphEdge({ workspaceId, gen: 2, fromUid: left.uid });
+  } finally {
+    client.release();
+  }
+};
+
+/** The one line a graph command answers with, as JSON. */
+const answered = (run: Run): unknown => JSON.parse(run.lines[0] ?? "");
 
 describe("pnpm ops — the restore scripts' commands", () => {
   const app = servedApp();
@@ -101,20 +122,89 @@ describe("pnpm ops — the restore scripts' commands", () => {
       },
     );
 
-    it.each(["graph-rebuild", "graph-sweep", "graph-counts", "object-store-orphans"])(
+    it.each(["graph-rebuild", "object-store-orphans"])(
       "%s refuses — exit 1 — now its tables are there and the implementation is not",
       async (command) => {
         // T-053 landed the graph tables and T-055 `source_document`, so *not built* has
-        // stopped being true for these commands; the graph ops are T-058's and the orphan
-        // sweep the sources slice's. That is exactly the state the third answer is for: the
-        // tables exist and this image has no implementation, which is a refusal a restore
-        // must stop on rather than a silence.
+        // stopped being true for these commands; T-058 filled in the two graph commands
+        // below, the rebuild waits on the worker's queue and the orphan sweep on the
+        // sources slice. That is exactly the state the third answer is for: the tables
+        // exist and this image has no implementation, which is a refusal a restore must
+        // stop on rather than a silence.
         const run = await ops(app(), [command, "--workspace", "ws_synthetic", "--wait"]);
 
         expect(run.exitCode).toBe(1);
         expect(run.lines.join("\n")).toContain("REFUSED");
       },
     );
+  });
+
+  describe("graph-counts — nodes per label and edges, as JSON, for the drill's diff", () => {
+    it("answers the live generation and the source entities beside it, on one line a diff can read", async () => {
+      const { workspaceId } = await app().provision();
+      await mapped(app(), workspaceId);
+
+      const run = await ops(app(), ["graph-counts", "--workspace", workspaceId]);
+
+      expect(run.exitCode).toBe(0);
+      // One line, because the drill redirects it to a file and diffs it against the counts
+      // production's last good sync run stamped (`restore-drill.sh` step 6).
+      expect(run.lines).toHaveLength(1);
+      expect(answered(run)).toEqual({
+        live_gen: 1,
+        nodes: { Concept: 2 },
+        edges: { LINKS_TO: 1 },
+      });
+    });
+
+    it("is done over a workspace nobody has mapped, answering zero of everything rather than refusing", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await ops(app(), ["graph-counts", "--workspace", workspaceId]);
+
+      expect(run.exitCode).toBe(0);
+      expect(answered(run)).toEqual({ live_gen: null, nodes: {}, edges: {} });
+    });
+
+    it("answers usage to a workspace that is not an id, before it reads anything", async () => {
+      const run = await ops(app(), ["graph-counts", "--workspace", "ws_synthetic"]);
+
+      expect(run.exitCode).toBe(2);
+    });
+  });
+
+  describe("graph-sweep — the generations a finished rebuild left behind", () => {
+    it("removes every generation but the live one and says which, with what each held", async () => {
+      const { workspaceId } = await app().provision();
+      await mapped(app(), workspaceId);
+
+      const run = await ops(app(), ["graph-sweep", "--workspace", workspaceId, "--wait"]);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual(["graph-sweep: done — swept generation 2 (2 nodes, 1 edge)"]);
+      // The live generation is untouched, which is what the counts read back says.
+      const counted = await ops(app(), ["graph-counts", "--workspace", workspaceId]);
+      expect(answered(counted)).toEqual({
+        live_gen: 1,
+        nodes: { Concept: 2 },
+        edges: { LINKS_TO: 1 },
+      });
+    });
+
+    it("is done with nothing to sweep over a workspace whose map is only its live generation", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await ops(app(), ["graph-sweep", "--workspace", workspaceId]);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual(["graph-sweep: done — nothing to sweep"]);
+    });
+
+    it("answers usage to a workspace that is not an id, before it deletes anything", async () => {
+      const run = await ops(app(), ["graph-sweep", "--workspace", "ws_synthetic"]);
+
+      expect(run.exitCode).toBe(2);
+    });
   });
 
   describe("reconcile-watermark — the reconciler on demand, which is the restore path", () => {

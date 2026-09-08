@@ -1,6 +1,12 @@
 import type { Pool } from "pg";
 
-import { RECONCILER, reconcile } from "@better-answers/core/concepts";
+import {
+  GRAPH_MAINTENANCE,
+  graphCounts,
+  RECONCILER,
+  reconcile,
+  sweepGraph,
+} from "@better-answers/core/concepts";
 import { openGit } from "@better-answers/core/store/git";
 import { openPostgres, tablesPresent } from "@better-answers/core/store/postgres";
 
@@ -88,9 +94,9 @@ const flagValue = (flags: Flags, name: string): string | undefined => {
 
 /** The tables each slice-owned command needs before it can mean anything. */
 const NEEDS = {
-  "graph-rebuild": ["graph_node", "graph_edge"],
-  "graph-sweep": ["graph_node", "graph_edge"],
-  "graph-counts": ["graph_node", "graph_edge"],
+  "graph-rebuild": ["graph_generation", "graph_node", "graph_edge"],
+  "graph-sweep": ["graph_generation", "graph_node", "graph_edge"],
+  "graph-counts": ["graph_generation", "graph_node", "graph_edge"],
   "reconcile-watermark": ["concept_index", "bundle_commit"],
   "object-store-orphans": ["source_document"],
   "erasure-rehearsal": ["erasure_request", "suppression"],
@@ -100,8 +106,9 @@ type SliceCommand = keyof typeof NEEDS;
 
 const USAGE_TEXT = `usage: pnpm ops <command> [options]
   replay-erasures --since <dump stamp | ISO instant>      re-apply every erasure completed after a dump (mandatory in every restore)
-  graph-rebuild | graph-sweep --workspace <id> [--wait]    the graph as a repair path (ADR 0023, 0032)
-  graph-counts --workspace <id>                             nodes per label and edges, as JSON, for the drill's diff (the graph slice's)
+  graph-rebuild --workspace <id> [--wait]                   the graph as a repair path (ADR 0023, 0032)
+  graph-sweep --workspace <id>                              delete every generation of the map but the live one
+  graph-counts --workspace <id>                             nodes per label and edges, as JSON, for the drill's diff
   reconcile-watermark --workspace <id>                      recovery order step 2: replay the commits the rows missed (ADR 0012)
   object-store-orphans --workspace <id> [--list]            recovery order step 5
   smoke --url <origin> [--workspace <id>] [--find] [--guide] [--ask]
@@ -245,6 +252,8 @@ const sliceCommand = async (
     return NOT_BUILT;
   }
   if (command === "reconcile-watermark") return reconcileWatermark(pool, workspaceId, io);
+  if (command === "graph-counts") return graphCountsCommand(pool, workspaceId, io);
+  if (command === "graph-sweep") return graphSweepCommand(pool, workspaceId, io);
   // The tables exist, so the slice has landed and its own query module answers this —
   // never SQL written here: the api tier is transports, and a tenant read belongs to
   // `packages/core` (ADR 0029). Until that module is wired in, refusing is the honest answer.
@@ -257,6 +266,71 @@ const sliceCommand = async (
 /** A refusal's word, or a store's own failure, as one line says it. */
 const reasonOf = (reason: string | Error): string =>
   typeof reason === "string" ? reason : reason.message;
+
+/**
+ * A slice-backed command's refusal, said the one way for all of them: a `--workspace` the
+ * boundary will not read as a workspace id is the caller's mistake and answers usage,
+ * before the command is blamed for it; every other refusal is one the operator has to look
+ * at, and stops the restore.
+ */
+const refused = (
+  command: SliceCommand,
+  workspaceId: string,
+  reason: string | Error,
+  io: OpsIo,
+): number => {
+  if (reason === "malformed") {
+    io.say(`${command}: --workspace ${workspaceId} is not a workspace id`);
+    return USAGE;
+  }
+  io.say(`${command}: REFUSED — ${reasonOf(reason)}`);
+  return REFUSED;
+};
+
+/**
+ * The map by the numbers (T-006 spec, *Ops and the budget*): the live generation, and how
+ * many nodes and edges wear each label — the live generation's and the source entities'
+ * beside them, which is the set a read binds (ADR 0023).
+ *
+ * **One line of JSON and nothing else**, because the drill redirects this to a file and
+ * diffs it against the counts production's last good sync run stamped (`restore-drill.sh`
+ * step 6): a second line would be a difference in every diff. A workspace nobody has
+ * mapped answers zero of everything and is *done* — the tables are there, the map is
+ * empty, and a restore over an empty map is a restore that worked.
+ */
+const graphCountsCommand = async (pool: Pool, workspaceId: string, io: OpsIo): Promise<number> => {
+  const counted = await graphCounts(GRAPH_MAINTENANCE, openPostgres(pool), { workspaceId });
+  if (!counted.ok) return refused("graph-counts", workspaceId, counted.error, io);
+  const { liveGen, nodes, edges } = counted.value;
+  io.say(JSON.stringify({ live_gen: liveGen, nodes, edges }));
+  return DONE;
+};
+
+/** The drill's report is read by a person, so a noun agrees with what it counts. */
+const plural = (many: number, noun: string): string => `${noun}${many === 1 ? "" : "s"}`;
+const counted = (many: number, noun: string): string => `${many} ${plural(many, noun)}`;
+
+/**
+ * The generations a finished rebuild left behind, deleted (ADR 0032: generations exist for
+ * full rebuilds, and the flip is one row update). Never the live one and never the
+ * source-entity partition; a workspace with nothing to sweep is *done*, and so is one whose
+ * map is only its live generation — an empty sweep is proof, not a silence.
+ */
+const graphSweepCommand = async (pool: Pool, workspaceId: string, io: OpsIo): Promise<number> => {
+  const swept = await sweepGraph(GRAPH_MAINTENANCE, openPostgres(pool), { workspaceId });
+  if (!swept.ok) return refused("graph-sweep", workspaceId, swept.error, io);
+  if (swept.value.length === 0) {
+    io.say("graph-sweep: done — nothing to sweep");
+    return DONE;
+  }
+  const generations = swept.value.map((generation) => generation.gen).join(", ");
+  const nodes = swept.value.reduce((total, generation) => total + generation.nodes, 0);
+  const edges = swept.value.reduce((total, generation) => total + generation.edges, 0);
+  io.say(
+    `graph-sweep: done — swept ${plural(swept.value.length, "generation")} ${generations} (${counted(nodes, "node")}, ${counted(edges, "edge")})`,
+  );
+  return DONE;
+};
 
 /**
  * The reconciler on demand — the restore path (ADR 0012, amended 2026-09-06; T-006 spec,
@@ -281,14 +355,7 @@ const reconcileWatermark = async (pool: Pool, workspaceId: string, io: OpsIo): P
   }
   const doors = { git: openGit(io.gitStoreDir), postgres: openPostgres(pool) };
   const run = await reconcile(RECONCILER, doors, { workspaceId });
-  if (!run.ok) {
-    if (run.error === "malformed") {
-      io.say(`reconcile-watermark: --workspace ${workspaceId} is not a workspace id`);
-      return USAGE;
-    }
-    io.say(`reconcile-watermark: REFUSED — ${reasonOf(run.error)}`);
-    return REFUSED;
-  }
+  if (!run.ok) return refused("reconcile-watermark", workspaceId, run.error, io);
   const { head, watermark, replayed, skipped, stopped } = run.value;
   const found = `head ${head ?? "none"}, watermark ${watermark ?? "none"}, replayed ${replayed.length}, already landed ${skipped.length}`;
   if (stopped !== undefined) {

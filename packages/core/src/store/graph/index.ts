@@ -13,7 +13,7 @@ import type pg from "pg";
 import type { z } from "zod";
 
 import { readableClause, readableParameters } from "../../access/index.ts";
-import type { Principal, UserPrincipal } from "../../kernel/index.ts";
+import type { PlatformPrincipal, Principal, UserPrincipal } from "../../kernel/index.ts";
 
 /**
  * The graph door: the one graph query module in this tier (ADR 0032) — the delta builder
@@ -751,3 +751,123 @@ export const walkTo = (
   tx: Tx,
   uid: string,
 ): Promise<readonly WalkStep[]> => walk(WALK_TO, principal, tx, uid);
+
+/**
+ * One workspace's map by the numbers: the generation a read binds today, and how many
+ * nodes and edges carry each label. `liveGen` is `null` for a workspace no delta has ever
+ * created the generation row for — a map that does not exist yet, which counts as zero of
+ * everything rather than as a failure.
+ */
+export type GraphCounts = {
+  readonly liveGen: number | null;
+  readonly nodes: Readonly<Record<string, number>>;
+  readonly edges: Readonly<Record<string, number>>;
+};
+
+/**
+ * The rows counted are **exactly the set a walk binds** — the live generation, and the
+ * source-entity partition (`gen IS NULL`), which carries no generation because it is
+ * reconciled per document and walks beside the live one (ADR 0023). A rebuild's other
+ * generations are scratch nobody can read and are left out; they are what the sweep is
+ * for. Source entities need no key of their own: their rows wear their own labels
+ * (`source-entity:Person`, `IS_CONCEPT`), which is how a reader of the counts tells them
+ * from the generation's.
+ */
+const countsStatement = (table: "graph_node" | "graph_edge"): string =>
+  `SELECT label, count(*)::int AS count
+     FROM ${table}
+    WHERE workspace_id = $1 AND (gen IS NULL OR gen = $2::int)
+    GROUP BY label
+    ORDER BY label`;
+
+const COUNT_NODES = countsStatement("graph_node");
+const COUNT_EDGES = countsStatement("graph_edge");
+
+const countsOf = async (
+  statement: string,
+  tx: Tx,
+  workspaceId: string,
+  liveGen: number | null,
+): Promise<Record<string, number>> => {
+  const found = await tx.query<{ label: string; count: number }>(statement, [workspaceId, liveGen]);
+  return Object.fromEntries(found.rows.map((row) => [row.label, row.count]));
+};
+
+/**
+ * The count the restore drill diffs against production's stamped run (ADR 0022): what the
+ * map holds, per label, for the generation a read binds. Not a predicate read — the
+ * platform principal is what the type asks for, and no reader-facing surface calls this,
+ * because a per-label total over withheld rows would answer a question the predicate is
+ * there to refuse.
+ */
+export const countMap = async (
+  platform: PlatformPrincipal,
+  tx: Tx,
+  workspaceId: string,
+): Promise<GraphCounts> => {
+  const live = await tx.query<{ live_gen: number }>(
+    "SELECT live_gen FROM graph_generation WHERE workspace_id = $1",
+    [workspaceId],
+  );
+  const liveGen = live.rows[0]?.live_gen ?? null;
+  return {
+    liveGen,
+    nodes: await countsOf(COUNT_NODES, tx, workspaceId, liveGen),
+    edges: await countsOf(COUNT_EDGES, tx, workspaceId, liveGen),
+  };
+};
+
+/** One generation a sweep removed, and what it held. */
+export type SweptGeneration = {
+  readonly gen: number;
+  readonly nodes: number;
+  readonly edges: number;
+};
+
+/**
+ * Every generation but the live one, deleted in one statement — a finished rebuild's
+ * leftovers and the flip's predecessor, which nothing reads once the generation row moved.
+ *
+ * Two things are never touched, and the statement is written so that neither can be by
+ * accident. The **source-entity partition** carries `gen IS NULL` and is excluded by the
+ * `gen IS NOT NULL` term, because it belongs to no generation and a sweep is not a
+ * reconcile. And a workspace whose `graph_generation` row is absent — a restore that
+ * carried the map without its one-row pointer — sweeps **nothing**: the subquery answers
+ * NULL, `gen <> NULL` is NULL, and no row matches. Not knowing which generation is live
+ * is the one state in which deleting a generation would delete the map.
+ */
+const SWEEP = `WITH live AS (
+    SELECT live_gen FROM graph_generation WHERE workspace_id = $1
+  ),
+  swept_nodes AS (
+    DELETE FROM graph_node
+     WHERE workspace_id = $1 AND gen IS NOT NULL AND gen <> (SELECT live_gen FROM live)
+    RETURNING gen
+  ),
+  swept_edges AS (
+    DELETE FROM graph_edge
+     WHERE workspace_id = $1 AND gen IS NOT NULL AND gen <> (SELECT live_gen FROM live)
+    RETURNING gen
+  ),
+  counted AS (
+    SELECT gen, count(*)::int AS nodes, 0 AS edges FROM swept_nodes GROUP BY gen
+    UNION ALL
+    SELECT gen, 0 AS nodes, count(*)::int AS edges FROM swept_edges GROUP BY gen
+  )
+  SELECT gen, sum(nodes)::int AS nodes, sum(edges)::int AS edges
+    FROM counted
+   GROUP BY gen
+   ORDER BY gen`;
+
+/**
+ * The sweep, inside the caller's transaction: the caller writes the ledger row for it in
+ * the same one, which is why this takes a transaction and never a door (`[AUDIT1]`).
+ */
+export const sweepNonLiveGenerations = async (
+  platform: PlatformPrincipal,
+  tx: Tx,
+  workspaceId: string,
+): Promise<readonly SweptGeneration[]> => {
+  const swept = await tx.query<SweptGeneration>(SWEEP, [workspaceId]);
+  return swept.rows;
+};

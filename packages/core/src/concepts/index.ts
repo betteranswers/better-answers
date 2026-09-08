@@ -93,6 +93,14 @@ export {
   type OverrideConceptClassRefusal,
   type ReadableEvidence,
 } from "./visibility.ts";
+export {
+  GRAPH_MAINTENANCE,
+  graphCounts,
+  sweepGraph,
+  type GraphMaintenancePrincipal,
+  type GraphMaintenanceRefusal,
+} from "./graph-maintenance.ts";
+export type { GraphCounts, SweptGeneration } from "../store/graph/index.ts";
 
 /**
  * Slice: **concepts** — the concept write path. Suggestions, the inbox, minting and
