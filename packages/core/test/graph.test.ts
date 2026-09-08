@@ -653,7 +653,7 @@ describe("what a body's markdown makes an edge of", () => {
     const policy = await authorOf(
       scenario,
       [
-        "Details in [the product][Price  Book].",
+        "Details in [the product][  Price  Book  ].",
         "",
         "[pricebook]: ./other.md",
         "[price book]: <./product.md>",
@@ -663,8 +663,8 @@ describe("what a body's markdown makes an edge of", () => {
 
     await land(scenario, deltaOf(policy));
 
-    // One label, three ways it could go wrong: a neighbouring label that differs only by a
-    // space, a second definition of the same label, and an autolink-bracketed target.
+    // One label, four ways it could go wrong: padding around it, a neighbouring label that
+    // differs only by a space, a second definition of the same label, and a bracketed target.
     expect((await linksFrom(scenario, policy.iri)).map((edge) => edge.to_uid)).toEqual([
       product.iri,
     ]);
