@@ -286,6 +286,46 @@ describe("what a re-write may not do to the class a concept holds", () => {
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(before.length + 1);
   });
 
+  it("answers an Editor's re-write of a withheld IRI word for word as one of an IRI nobody minted, and refuses a creation onto a withheld concept's merge key before any commit", async () => {
+    const scenario = await arrange();
+    const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
+      kind: "Person",
+      frontmatter: { title: "Jane Doe", type: "Person" },
+      mergeKey: "person:jane doe",
+    });
+    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+
+    const ofWithheld = await rewriteCiting(scenario, scenario.editor, withheld, []);
+    const ofAbsent = await rewriteCiting(
+      scenario,
+      scenario.editor,
+      { ...withheld, iri: conceptIriOf(ulid()) },
+      [],
+    );
+    // The one oracle that cannot close: a key is one concept's, so a creation onto a key a
+    // withheld concept holds cannot land as a creation onto a free key would. What the act
+    // guarantees is that the refusal is read before the commit — a commit refused by the
+    // index afterwards would be the reconciler's stop, and a way for an Editor to wedge the
+    // bundle behind it (ADR 0012, 2026-09-07).
+    const ontoKey = await writeConcept(scenario.editor, doorsOf(scenario), {
+      mergeKey: withheld.mergeKey,
+      path: "knowledge/jane-doe-again.md",
+      kind: "Person",
+      title: "Jane Doe",
+      frontmatter: { title: "Jane Doe", type: "Person" },
+      body: "A second card.",
+      message: "Record a second card",
+      author: { name: "Ada Editor", email: "ada@acme.invalid" },
+      expects: { head: await head(scenario.editor, scenario.git) },
+    });
+
+    expect(ofWithheld).toEqual({ ok: false, error: "no-such-concept" });
+    expect(ofAbsent).toEqual(ofWithheld);
+    expect(ontoKey).toEqual({ ok: false, error: "merge-key-taken" });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
+  });
+
   it("a re-write that narrows a concept takes its compositions with it, on the write road as on the narrowing's", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
