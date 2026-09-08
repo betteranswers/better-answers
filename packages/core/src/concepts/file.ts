@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { citedSourceOf, resolvedResource } from "@better-answers/schema";
+import { citedSourcesOf, resolvedResource } from "@better-answers/schema";
 
 import { err, ok, type Result } from "../kernel/index.ts";
 
@@ -75,21 +75,22 @@ const normalisedBody = (body: string): string =>
 /** One `sources[]` entry as the hash carries it: the resolved resource, then the locator. */
 export type HashedSource = readonly [string, string | null];
 
+/** A file read for the write path: its content hash, and the reduction the hash was made from. */
+type HashedFile = {
+  readonly contentHash: string;
+  readonly sources: readonly HashedSource[];
+};
+
 /**
  * `sources[]` **reduced to ordered `(resource, locator)` pairs** with paths resolved — ADR
  * 0019's own reduction, and what makes a source-title fix or a `usage_count` update leave a
  * check standing while a swapped source un-checks it.
  */
-export const reducedSources = (
+const reducedSources = (
   value: FrontmatterValue | undefined,
   path: string,
-): readonly HashedSource[] => {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
-    const cited = citedSourceOf(entry);
-    return cited === undefined ? [] : [[resolvedResource(cited.resource, path), cited.locator]];
-  });
-};
+): readonly HashedSource[] =>
+  citedSourcesOf(value).map((cited) => [resolvedResource(cited.resource, path), cited.locator]);
 
 /**
  * The frontmatter as ADR 0014's hash reads it, written straight as canonical JSON: keys
@@ -98,14 +99,16 @@ export const reducedSources = (
  * Exported for the concept-file agreement's suite alone (ADR 0031), which holds this text —
  * not only the hash over it — to the fixture both tiers read.
  */
-export const canonicalFrontmatter = (frontmatter: Frontmatter, path: string): string => {
+export const canonicalFrontmatter = (frontmatter: Frontmatter, path: string): string =>
+  canonicalOver(frontmatter, reducedSources(frontmatter["sources"], path));
+
+/** The canonical text over a reduction already made, so one reduction serves the hash and the map. */
+const canonicalOver = (frontmatter: Frontmatter, sources: readonly HashedSource[]): string => {
   const pairs = Object.keys(frontmatter)
     .toSorted()
     .filter((key) => !UNHASHED_KEYS.has(key))
     .map((key) => {
-      const value = frontmatter[key];
-      const text =
-        key === "sources" ? JSON.stringify(reducedSources(value, path)) : canonicalText(value);
+      const text = key === "sources" ? JSON.stringify(sources) : canonicalText(frontmatter[key]);
       return `${JSON.stringify(key)}:${text}`;
     });
   return `{${pairs.join(",")}}`;
@@ -149,9 +152,22 @@ const canonicalText = (value: FrontmatterValue | undefined): string =>
  * against it.
  */
 export const contentHashOf = (frontmatter: Frontmatter, body: string, path: string): string =>
-  createHash("sha256")
-    .update(`${canonicalFrontmatter(frontmatter, path)}\n${normalisedBody(body)}`, "utf8")
+  hashedFileOf(frontmatter, body, path).contentHash;
+
+/**
+ * The write path's one reading of a file's `sources[]`: the content hash over the file, and
+ * the reduction the hash was made from, for the graph door's lineage edges — reduced once,
+ * here, and handed along, so nothing after this asks what an entry cites a second time (the
+ * boundary's refinement is the one refusal, before the row lands; this is the one reduction
+ * after it). `contentHashOf` above is the same reading for a caller that wants the hash alone.
+ */
+export const hashedFileOf = (frontmatter: Frontmatter, body: string, path: string): HashedFile => {
+  const sources = reducedSources(frontmatter["sources"], path);
+  const contentHash = createHash("sha256")
+    .update(`${canonicalOver(frontmatter, sources)}\n${normalisedBody(body)}`, "utf8")
     .digest("hex");
+  return { contentHash, sources };
+};
 
 /** One `sources[]` entry as YAML: a block of quoted keys under a list dash. */
 const yamlEntry = (entry: FrontmatterSource): string =>

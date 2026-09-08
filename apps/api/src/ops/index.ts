@@ -62,7 +62,10 @@ export type OpsIo = {
    * command that opens a bundle. Absent, it refuses rather than guessing a path.
    */
   readonly gitStoreDir?: string | undefined;
-  /** This one-shot process's Clock (ADR 0040), for `reconcile-watermark`'s replay. */
+  /**
+   * This one-shot process's Clock (ADR 0040): `reconcile-watermark`'s replay reads it for
+   * each landing instant, and `--wait`'s job poller for its deadline.
+   */
   readonly clock: Clock;
 };
 

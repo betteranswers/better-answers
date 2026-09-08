@@ -66,8 +66,8 @@ takes the `Clock` and reads it itself:
 **Scope: only what the app tier decides in code.** The Clock is read at exactly the four
 call-sites above that already existed before this record — `open`'s trust reading, a newly
 published concept's `published_at`, an invitation's `expiresAt`, and the git door's commit
-instant — plus the two Postgres counters' window arithmetic, which read time but decide
-nothing a person is shown. **A row's own timestamp is never the Clock's.** The audit ledger's
+instant — plus the two Postgres counters' window arithmetic and the ops one-shot's job poller
+(`waitForJob`'s deadline), which read time but decide nothing a person is shown. **A row's own timestamp is never the Clock's.** The audit ledger's
 `audit_event` rows, `bundle_commit`'s rows, and the worker's job queue (`job.claimed_at`,
 `job.heartbeat_at`, the finish columns `schema_view.py` names) all keep the database's own
 `now()`, because a row is a fact about when the store committed it, not about when the api

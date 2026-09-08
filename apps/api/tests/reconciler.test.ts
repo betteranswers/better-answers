@@ -28,6 +28,18 @@ const skips = (logs: readonly LogLine[]): readonly LogLine[] =>
 describe("the periodic head check", () => {
   const app = appForSuite();
 
+  /** The head check over this app's own root, which the door never refuses: a throw says if it did. */
+  const running = (logger: Parameters<typeof startReconciler>[0]["logger"]) => {
+    const started = startReconciler({
+      database: app().database.pool,
+      gitStoreDir: app().gitStoreDir,
+      logger,
+      clock: systemClock(),
+    });
+    if (!started.ok) throw new Error(`the app's own root was refused: ${started.error}`);
+    return started.value;
+  };
+
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -38,12 +50,7 @@ describe("the periodic head check", () => {
     const bare = await app().provision();
     await initRepository(openTestGit(app()), held.workspaceId);
     const { logger, logs } = capturingLogger("debug");
-    const reconciler = startReconciler({
-      database: app().database.pool,
-      gitStoreDir: app().gitStoreDir,
-      logger,
-      clock: systemClock(),
-    });
+    const reconciler = running(logger);
 
     // Nothing before the first interval: starting is not a tick.
     expect(ticks(logs)).toEqual([]);
@@ -68,12 +75,7 @@ describe("the periodic head check", () => {
   it("never starts a tick while one is running: it says so and waits for the interval after", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     const { logger, logs } = capturingLogger("debug");
-    const reconciler = startReconciler({
-      database: app().database.pool,
-      gitStoreDir: app().gitStoreDir,
-      logger,
-      clock: systemClock(),
-    });
+    const reconciler = running(logger);
 
     // The first tick is in flight — it is asking Postgres — when the interval fires again.
     vi.advanceTimersByTime(RECONCILER_INTERVAL_MS);
@@ -87,26 +89,19 @@ describe("the periodic head check", () => {
     expect(skips(logs)).toHaveLength(1);
   });
 
-  it("cannot start when the repositories' root names a missing directory, and says so on the way out", async () => {
-    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  it("cannot start when the repositories' root names a missing directory: the boot hears the door's refusal", () => {
     const { logger, logs } = capturingLogger();
-    const exit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
 
-    const reconciler = startReconciler({
+    const refused = startReconciler({
       database: app().database.pool,
       gitStoreDir: `${app().gitStoreDir}/does-not-exist`,
       logger,
       clock: systemClock(),
     });
 
-    expect(exit).toHaveBeenCalledWith(1);
-    expect(logs[0]).toMatchObject({
-      level: 50,
-      reason: "no-such-root",
-      msg: "the head check cannot start",
-    });
-
-    exit.mockRestore();
-    await reconciler.stop();
+    // The refusal is the door's own word, handed back as a value for `main.ts` to exit on;
+    // nothing was started, so there is nothing to stop and nothing was logged here.
+    expect(refused).toEqual({ ok: false, error: "no-such-root" });
+    expect(logs).toEqual([]);
   });
 });

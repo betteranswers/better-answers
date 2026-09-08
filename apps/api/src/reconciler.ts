@@ -6,8 +6,8 @@ import {
   reconcileEveryWorkspace,
   type WorkspaceReconciled,
 } from "@better-answers/core/concepts";
-import { attempt, type Clock } from "@better-answers/core/kernel";
-import { openGit } from "@better-answers/core/store/git";
+import { attempt, err, ok, type Clock, type Result } from "@better-answers/core/kernel";
+import { openGit, type GitRootRefusal } from "@better-answers/core/store/git";
 import { openPostgres } from "@better-answers/core/store/postgres";
 
 import { logger as tierLogger } from "./logger.ts";
@@ -80,19 +80,17 @@ const summaryOf = (outcomes: readonly WorkspaceReconciled[]) => {
   return { workspaces: outcomes.length, replayed, already_landed: alreadyLanded, stopped, refused };
 };
 
-export const startReconciler = (dependencies: ReconcilerDependencies): Reconciler => {
+/**
+ * Start the head check, or answer the git door's refusal of the repositories' root: the
+ * refusal is a value the process's entry point turns into its exit (`main.ts`, the shape
+ * `requireBootstrap` exits in), so nothing here ever runs over a root the door refused.
+ */
+export const startReconciler = (
+  dependencies: ReconcilerDependencies,
+): Result<Reconciler, GitRootRefusal> => {
   const logger = dependencies.logger ?? tierLogger;
   const git = openGit(dependencies.gitStoreDir);
-  if (!git.ok) {
-    // The same shape `requireBootstrap` refuses in (`config.ts`'s `orExit`): one line saying
-    // why, then a non-zero exit — never a silent warn-and-continue over a root that names
-    // nothing the door can open.
-    logger.error(
-      { reason: git.error, git_store_dir: dependencies.gitStoreDir },
-      "the head check cannot start",
-    );
-    process.exit(1);
-  }
+  if (!git.ok) return err(git.error);
   const doors = {
     git: git.value,
     postgres: openPostgres(dependencies.database),
@@ -137,10 +135,10 @@ export const startReconciler = (dependencies: ReconcilerDependencies): Reconcile
   }, dependencies.intervalMs ?? RECONCILER_INTERVAL_MS);
   timer.unref();
 
-  return {
+  return ok({
     stop: async () => {
       clearInterval(timer);
       await inFlight;
     },
-  };
+  });
 };

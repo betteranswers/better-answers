@@ -302,13 +302,10 @@ const utcMidnight = (year: number, month: number, day: number): number | undefin
   // fields, so there is no time-of-day left to zero once it has run.
   const at = new Date(0);
   at.setUTCFullYear(year, month - 1, day);
-  // Relaxing any one clause alone rarely flips this verdict: JS's own rollover of an
-  // invalid year/month/day tends to move more than one of the three fields at once — a
-  // month of 13 changes the year too, and a day of 0 or 32 changes the month and, where
-  // it crosses one, the year — so a different clause is usually still there to catch
-  // what one relaxed clause alone would let through. Not proven for every calendar
-  // combination, only tried against representative ones; still real cases exist where
-  // relaxing the whole condition's shape (rather than one clause) changes the answer.
+  // All three fields are compared, though JS's rollover of an impossible date usually moves
+  // more than one at once (a month of 13 changes the year; a day of 32 changes the month):
+  // the three together are the statement that the calendar has this day, and one clause
+  // alone would be a claim about which field a rollover happens to move.
   const same =
     at.getUTCFullYear() === year && at.getUTCMonth() === month - 1 && at.getUTCDate() === day;
   return same ? at.getTime() : undefined;

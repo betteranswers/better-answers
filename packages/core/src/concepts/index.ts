@@ -34,7 +34,7 @@ import {
   type GitDoor,
 } from "../store/git/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
-import { contentHashOf, renderConceptFile, type Frontmatter } from "./file.ts";
+import { hashedFileOf, renderConceptFile, type Frontmatter } from "./file.ts";
 import {
   payloadFor,
   returnToProposer,
@@ -404,7 +404,7 @@ export const writeConcept = async (
   // (ADR 0002); one that names a concept is held below to a concept that already exists.
   const iri = input.iri ?? conceptIriOf(ulid());
   const frontmatter = fileFrontmatterOf(input, iri);
-  const contentHash = contentHashOf(frontmatter, input.body, input.path);
+  const { contentHash, sources } = hashedFileOf(frontmatter, input.body, input.path);
   const mergeKey = boundarySchemas.conceptIdentity.insert.shape.mergeKey.safeParse(input.mergeKey);
   // Evidence goes through the boundary too, and before the commit: a locator the boundary
   // would refuse is one this act should never have made a commit for (ADR 0028).
@@ -595,6 +595,7 @@ export const writeConcept = async (
           commit: committed.value,
           actor: actorIdOf(fresh),
           auditEventId,
+          sources,
           evidence: evidence.data,
           restsAlsoOn: [],
           acceptance,

@@ -1,7 +1,7 @@
 import {
   CONCEPT_DEPRECATED_STATUS,
   CONCEPT_NODE_LABEL,
-  citedSourceOf,
+  citedSourcesOf,
   type CitedSource,
   type conceptFrontmatter,
   DERIVED_FROM_LABEL,
@@ -68,7 +68,12 @@ type EdgeSource = {
   readonly kind: string;
   readonly path: string;
   readonly body: string;
-  /** `sources[]` already reduced to the pairs `citedSourceOf` validated (T-103). */
+  /**
+   * `sources[]` already reduced to the pairs the boundary's reader answers (T-103): the
+   * write path hands the reduction its content hash was made from, resources resolved; the
+   * backfill below reduces a stored row's frontmatter as written. `targetOf` resolves either
+   * spelling to the one concept, so the two roads derive the same edge.
+   */
   readonly sources: readonly CitedSource[];
   readonly publishedAt: Date | null;
   readonly sensitivity: string;
@@ -79,24 +84,10 @@ type EdgeSource = {
 /**
  * A `concept_index` row as Postgres holds it, frontmatter unparsed — what the inbound
  * backfill below reads directly, since it names concepts nobody just wrote and so has no
- * write-path caller to have parsed their `sources[]` already.
+ * write-path caller to have reduced their `sources[]` already.
  */
 type ConceptIndexRow = Omit<EdgeSource, "sources"> & {
   readonly frontmatter: Frontmatter;
-};
-
-/**
- * One concept's `sources[]` reduced to the `CitedSource` pairs `citedSourceOf` validates —
- * called once per entry, here, so a caller builds `EdgeSource.sources` from a frontmatter
- * it already has instead of the door asking `citedSourceOf` the same question again for
- * every reference it resolves.
- */
-export const citedSourcesOf = (frontmatter: Frontmatter): readonly CitedSource[] => {
-  const sources = frontmatter["sources"];
-  return (Array.isArray(sources) ? sources : []).flatMap((entry) => {
-    const cited = citedSourceOf(entry);
-    return cited === undefined ? [] : [cited];
-  });
 };
 
 /**
@@ -395,9 +386,9 @@ const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {
     ];
   });
 
-  // Already the pairs `citedSourceOf` validated (T-103): a `sources[]` entry naming no
-  // resource never reaches an `EdgeSource`, because whoever built this one asked that
-  // question once, before handing it here.
+  // Already the pairs the boundary's reader answered (T-103): a `sources[]` entry naming no
+  // resource never reaches an `EdgeSource`, because whoever built this one reduced the list
+  // once, before handing it here.
   const lineage = concept.sources.flatMap((cited, ordinal) => {
     const target = targetOf(cited.resource, concept.path);
     if (target === undefined) return [];
@@ -671,9 +662,12 @@ export const writeConceptDelta = async (
     [workspaceId, delta.iri, namePattern(delta.path.split("/").at(-1) ?? delta.path)],
   );
   // Not the write path: this reads another concept's already-landed row directly, so its
-  // `sources[]` is parsed here, once, the same way `citedSourcesOf` always parses one.
+  // `sources[]` is reduced here, once per row, by the boundary's own reader.
   for (const { frontmatter, ...row } of naming.rows) {
-    await replaceOutgoingEdges(gen, tx, { ...row, sources: citedSourcesOf(frontmatter) });
+    await replaceOutgoingEdges(gen, tx, {
+      ...row,
+      sources: citedSourcesOf(frontmatter["sources"]),
+    });
   }
 };
 

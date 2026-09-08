@@ -20,9 +20,9 @@ import {
 import type { ActorId, Principal } from "../kernel/index.ts";
 import type { Committed } from "../store/git/index.ts";
 import { recomputeCompositionsIncluding } from "../guides/index.ts";
-import { citedSourcesOf, writeConceptDelta } from "../store/graph/index.ts";
+import { writeConceptDelta } from "../store/graph/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
-import type { Frontmatter } from "./file.ts";
+import type { Frontmatter, HashedSource } from "./file.ts";
 import { markDeciding } from "./inbox.ts";
 import type { Acceptance } from "./index.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
@@ -265,6 +265,12 @@ type Landing = z.infer<typeof conceptRow> & {
   readonly actor: ActorId;
   readonly auditEventId: string;
   /**
+   * The file's `sources[]` as the content hash reduced it — the one reduction the write path
+   * makes (`hashedFileOf`), handed on so the graph derives lineage from the same pairs the
+   * hash was made from, never from a second reading of the frontmatter.
+   */
+  readonly sources: readonly HashedSource[];
+  /**
    * The evidence the act was handed — the whole of what the concept cites after this act,
    * an empty list clearing its citations — or `undefined` for a road that recovers none:
    * the reconciler's replay, whose commit carries no document id, leaves the citations as
@@ -386,7 +392,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
     kind: index.kind,
     path: index.path,
     body: index.body,
-    sources: citedSourcesOf(index.frontmatter ?? {}),
+    sources: index.sources.map(([resource, locator]) => ({ resource, locator })),
     publishedAt: index.publishedAt ?? null,
     ...visibility,
     status: index.status,

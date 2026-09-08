@@ -374,9 +374,11 @@ const refuse = (
   credentialIssuedAtMs: number,
 ): Result<ResolvedMember, PrincipalRefusal> => {
   if (row === undefined) return err("not-a-member");
-  // `member_role_check` (`identity-tables.ts`) refuses this row a role outside the three
-  // before it can ever be written, so this is a second, database-backed line of defence
-  // rather than a path any seed or migration can currently reach.
+  // The one place the row's `role` — text, as the query returns it — becomes a `Role`: the
+  // narrowing the Principal's type needs, made once, here, and carried out on the value
+  // this returns. It is not a second refusal of what `member_role_check`
+  // (`identity-tables.ts`) already keeps out of the column, and no row the database
+  // accepted can reach the arm; the word is what a reader of a broken row would hear.
   if (!isRole(row.role)) return err("role-unknown");
   // Either instant refuses, with the one word: revoked everywhere, or revoked here.
   for (const revokedAt of [row.person_revoked_at, row.membership_revoked_at]) {

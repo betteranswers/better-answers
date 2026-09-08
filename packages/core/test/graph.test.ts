@@ -1,10 +1,9 @@
-import { conceptIriOf, ulid } from "@better-answers/schema";
+import { citedSourcesOf, conceptIriOf, ulid } from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
 import type { QueryResultRow } from "pg";
 
 import {
-  citedSourcesOf,
   GRAPH_WALK_DEPTH,
   GRAPH_WALK_ROW_LIMIT,
   walkFrom,
@@ -302,7 +301,7 @@ const deltaOf = (row: IndexRow, overrides: Partial<ConceptDelta> = {}): ConceptD
     kind: row.kind,
     path: row.path,
     body: row.body,
-    sources: citedSourcesOf(row.frontmatter),
+    sources: citedSourcesOf(row.frontmatter["sources"]),
     publishedAt: row.publishedAt,
     sensitivity: row.sensitivity,
     audience: row.audience,

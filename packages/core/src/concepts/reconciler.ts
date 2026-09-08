@@ -30,13 +30,7 @@ import {
   type Tx,
 } from "../store/postgres/index.ts";
 import { workspaceIds } from "../workspaces/index.ts";
-import {
-  contentHashOf,
-  parseConceptFile,
-  reducedSources,
-  type Frontmatter,
-  type HashedSource,
-} from "./file.ts";
+import { hashedFileOf, parseConceptFile, type Frontmatter, type HashedSource } from "./file.ts";
 import { payloadFor, targetOfMergeKey } from "./inbox.ts";
 import type { Acceptance } from "./index.ts";
 import { heldByIri, indexRowOf, landRows, WRITE_CONSTRAINTS } from "./landing.ts";
@@ -214,11 +208,13 @@ const derivedMergeKey = async (
  * each reduced to the `(resource, locator)` pairs the content hash reduces them to, resolved
  * against the file's path, and compared as sets. The file carries no document id, so this is
  * the one reading of "did this commit change what the concept cites" a replay can make.
+ * `cited` is the file's side, as the hash already reduced it — handed in, not reduced again.
  */
 const fileCitesTheStandingEvidence = async (
   platform: PlatformPrincipal,
   tx: Tx,
   facts: CommitFacts,
+  cited: readonly HashedSource[],
 ): Promise<boolean> => {
   const standing = await tx.query<{ resource: string; locator: string }>(
     `SELECT e.resource, ce.locator
@@ -230,11 +226,11 @@ const fileCitesTheStandingEvidence = async (
   );
   const pairs = (sources: readonly HashedSource[]) =>
     new Set(sources.map((pair) => JSON.stringify(pair)));
-  const cited = pairs(reducedSources(facts.frontmatter["sources"], facts.path));
+  const filed = pairs(cited);
   const held = pairs(
     standing.rows.map((row) => [resolvedResource(row.resource, facts.path), row.locator]),
   );
-  return cited.size === held.size && [...cited].every((pair) => held.has(pair));
+  return filed.size === held.size && [...filed].every((pair) => held.has(pair));
 };
 
 /** The last commit the rows know about, or nothing — the watermark the scan starts after. */
@@ -313,7 +309,7 @@ const replayCommit = async (
         const kind = stringIn(facts.frontmatter, "type") ?? held?.kind;
         const title = stringIn(facts.frontmatter, "title") ?? held?.title;
         if (kind === undefined || title === undefined) return err("unreadable-commit");
-        const contentHash = contentHashOf(facts.frontmatter, facts.body, facts.path);
+        const { contentHash, sources } = hashedFileOf(facts.frontmatter, facts.body, facts.path);
         // Read fresh per replayed commit (ADR 0040) — the ambient read this replaces was
         // one reading per `indexRowOf` invocation too, and a batch replaying several
         // commits recovers each at its own landing instant, not one shared guess.
@@ -339,7 +335,7 @@ const replayCommit = async (
           payload?.mergeKey ??
           held?.mergeKey ??
           (await derivedMergeKey(platform, tx, row.iri, row.kind, row.title));
-        const evidenceAgrees = await fileCitesTheStandingEvidence(platform, tx, facts);
+        const evidenceAgrees = await fileCitesTheStandingEvidence(platform, tx, facts, sources);
 
         // The door is called bare (ADR 0014 rule 4): its rejection aborts this transaction.
         await record(platform, tx, {
@@ -355,6 +351,7 @@ const replayCommit = async (
           commit: { sha: facts.sha, parent: facts.parent },
           actor: facts.actor,
           auditEventId: facts.auditEventId,
+          sources,
           // Not recovered — the file's `sources[]` carries no document id — so the
           // citations stand as they are and the class is re-derived from them, never
           // widened by a recovery that cleared them.
