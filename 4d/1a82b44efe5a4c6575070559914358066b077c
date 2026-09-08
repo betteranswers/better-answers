@@ -1,0 +1,19 @@
+packages/core/test/access-requests.test.ts
+  s_f78075158d44fe::t_230e3ac4f6d2bb 602-618
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "4d1a82b44efe5a4c6575070559914358066b077c",
+  "prompts": {},
+  "sessions": {
+    "s_f78075158d44fe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "044b601b-e3f7-47db-9231-c1a12dc65a5b",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
