@@ -209,6 +209,11 @@ export const find = async (
  *
  * An imported check carries no hash and so never reads *Changed since checked*; it carries
  * the *imported* rider instead, which never moves the tier.
+ *
+ * **Only a *stable* or a *deprecated* concept reaches this.** The read this projects is
+ * `conceptByIri`, whose predicate takes only rows with a `published_at`, and the index table
+ * holds `published_at IS NOT NULL` and a published status to be the same fact — so *draft*
+ * and *removed* are statuses no projection here can be handed, and there is no arm for them.
  */
 const trustOf = (concept: OpenedConcept, now: Date): Trust => {
   const { check } = concept;
@@ -222,18 +227,16 @@ const trustOf = (concept: OpenedConcept, now: Date): Trust => {
   const rider: TrustRider | null = check?.contentHash === null ? "imported" : null;
   const moved = check?.contentHash != null && check.contentHash !== concept.contentHash;
   const status: TrustStatus =
-    concept.status === "deprecated" || concept.status === "removed"
+    concept.status === "deprecated"
       ? "deprecated"
-      : concept.status === "draft"
-        ? "draft"
-        : // *Out of date* comes from `stale_after` **alone** and absence means no shelf life
-          // (ADR 0019) — the reader is told the fact has expired before they are told the
-          // text moved, because a shelf life is a statement about the fact itself.
-          pastShelfLife(concept.frontmatter["stale_after"], now)
-          ? "out-of-date"
-          : moved
-            ? "changed-since-checked"
-            : "current";
+      : // *Out of date* comes from `stale_after` **alone** and absence means no shelf life
+        // (ADR 0019) — the reader is told the fact has expired before they are told the
+        // text moved, because a shelf life is a statement about the fact itself.
+        pastShelfLife(concept.frontmatter["stale_after"], now)
+        ? "out-of-date"
+        : moved
+          ? "changed-since-checked"
+          : "current";
   return { tier, status, checkedBy: check?.actor ?? null, checkedAt, rider };
 };
 

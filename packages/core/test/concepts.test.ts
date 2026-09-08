@@ -11,7 +11,7 @@ import {
   writeConcept,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
-import type { TrustStatus } from "../src/answering/index.ts";
+import type { FrontmatterValue, TrustStatus } from "../src/answering/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/core/store/git";
 import { walkFrom } from "@better-answers/core/store/graph";
@@ -1244,13 +1244,101 @@ describe("opening a concept by IRI", () => {
     );
   });
 
+  it("shows a deprecated concept to every reader, and says that is what it is", async () => {
+    const scenario = await arrange();
+    // *Deprecated* is a trust word a reader is shown, never a way of hiding a concept from
+    // them (ADR 0019), which is why the status is published and reaches the read at all.
+    const written = await landed(scenario, writeFor({ status: "deprecated" }));
+
+    const opened = await reading(scenario.viewer, (principal, tx) =>
+      open(principal, tx, { iri: written.iri }),
+    );
+
+    expect(opened.ok && opened.value.found && opened.value.concept?.trust.status).toBe(
+      "deprecated",
+    );
+  });
+
+  it("names a check the platform made without naming a person, and an imported one by its rider", async () => {
+    const scenario = await arrange();
+    const written = await landed(scenario, writeFor({ status: "stable" }));
+    const client = await db().pool.connect();
+    try {
+      // An imported check is the one kind that carries no content hash, which the table
+      // holds both ways — so it can never read *Changed since checked* and says *imported*.
+      await testData(client).conceptVerification({
+        workspaceId: scenario.workspaceId,
+        iri: written.iri,
+        actor: "process:better-answers-importer",
+        origin: "imported",
+        contentHash: null,
+        checkedAt: new Date("2026-03-03T09:00:00.000Z"),
+      });
+    } finally {
+      client.release();
+    }
+
+    const opened = await reading(scenario.viewer, (principal, tx) =>
+      open(principal, tx, { iri: written.iri }),
+    );
+
+    expect(opened.ok && opened.value.found && opened.value.concept?.trust).toEqual({
+      tier: "machine-confirmed",
+      status: "current",
+      checkedBy: "process:better-answers-importer",
+      checkedAt: "2026-03-03T09:00:00.000Z",
+      rider: "imported",
+    });
+  });
+
+  it("shows every source a concept cites by the name a reader recognises, and none where it cites none", async () => {
+    const scenario = await arrange();
+    const citing = await landed(
+      scenario,
+      writeFor({
+        status: "stable",
+        frontmatter: {
+          title: "Expenses",
+          type: "Policy",
+          sources: [
+            { resource: "/sources/handbook.pdf", title: "Handbook", locator: "p.4" },
+            // A blank title is no title: the resource is the only thing left that names
+            // what was cited, and a reader is shown that rather than an empty line.
+            { resource: "/sources/travel.pdf", title: "", locator: "p.9" },
+            { resource: "/sources/rates.csv" },
+          ],
+        },
+      }),
+    );
+    const bare = await landed(
+      scenario,
+      writeFor({
+        status: "stable",
+        frontmatter: { title: "Travel", type: "Policy" },
+        expects: { head: citing.sha },
+      }),
+    );
+
+    const [cited, uncited] = await Promise.all([
+      reading(scenario.viewer, (principal, tx) => open(principal, tx, { iri: citing.iri })),
+      reading(scenario.viewer, (principal, tx) => open(principal, tx, { iri: bare.iri })),
+    ]);
+
+    expect(cited.ok && cited.value.found && cited.value.concept?.evidence).toEqual([
+      { locator: "p.4", source: "Handbook" },
+      { locator: "p.9", source: "/sources/travel.pdf" },
+      { locator: "", source: "/sources/rates.csv" },
+    ]);
+    expect(uncited.ok && uncited.value.found && uncited.value.concept?.evidence).toEqual([]);
+  });
+
   /**
    * `stale_after` is the whole of *Out of date* and absence means no shelf life (ADR 0019), so
    * a reader is told exactly what any other consumer of the same file would derive — and told
    * nothing at all from a value that is not one of the two forms the ADR names. The far-future
    * dates keep these cases true for the next thousand years rather than the next few.
    */
-  const SHELF_LIVES: readonly (readonly [string, string | undefined, TrustStatus])[] = [
+  const SHELF_LIVES: readonly (readonly [string, FrontmatterValue | undefined, TrustStatus])[] = [
     ["no shelf life at all", undefined, "current"],
     ["a date long past", "2020-01-01", "out-of-date"],
     // The boundary of the date-only form: a shelf life lasts *through* the day it names, so a
@@ -1259,12 +1347,25 @@ describe("opening a concept by IRI", () => {
     ["a date far ahead", "3000-01-01", "current"],
     ["an offset datetime long past", "2020-01-01T00:00:00Z", "out-of-date"],
     ["an offset datetime far ahead", "3000-01-01T00:00:00+01:00", "current"],
+    // Both halves of the datetime form the grammar has to read for itself: an explicit
+    // offset, sign and all, and the fractional seconds a producer may write.
+    ["an explicit offset long past", "2020-01-01T00:00:00+01:00", "out-of-date"],
+    ["fractions of a second long past", "2020-01-01T00:00:00.123Z", "out-of-date"],
     // Outside the grammar: an impossible calendar day, an offsetless datetime `Date` would
     // read as local time, and a sentence. None of them is a shelf life.
     ["an impossible calendar day", "2026-02-30", "current"],
+    // The same day with an offset, which `Date` would roll forward into March rather than
+    // refuse — the calendar check is what stops a shelf life nobody wrote from expiring.
+    ["an impossible calendar day with an offset", "2026-02-30T00:00:00Z", "current"],
+    ["a month the calendar has not got", "2020-13-01", "current"],
     ["a datetime with no offset", "2020-01-01T00:00:00", "current"],
     ["a two-digit year `Date` would remap", "0020-01-01", "out-of-date"],
     ["something that is not a date", "when the contract ends", "current"],
+    // The grammar is anchored at both ends, so a date buried in a sentence is not one.
+    ["a past date behind a prefix", "not-a-date2020-01-01", "current"],
+    // Not a string at all: a list a file wrote where a date belongs carries no shelf life,
+    // which is the same answer as absence.
+    ["a list where a date belongs", ["2020-01-01"], "current"],
   ];
 
   it.each(SHELF_LIVES)("reads %s as %s", async (_why, staleAfter, expected) => {
@@ -1291,17 +1392,19 @@ describe("opening a concept by IRI", () => {
     const input = writeFor({ sensitivity: "Restricted", status: "stable" });
     const written = await landed(scenario, input);
 
+    const unminted = iriFor();
     const withheld = await reading(scenario.viewer, (principal, tx) =>
       open(principal, tx, { iri: written.iri }),
     );
     const absent = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: iriFor() }),
+      open(principal, tx, { iri: unminted }),
     );
 
     // Indistinguishable, which is the whole requirement: the same shape, and neither says
-    // anything a caller could probe with (user story 13).
+    // anything a caller could probe with (user story 13). Both are asserted whole, because
+    // a read that *failed* also has no concept in it and must never read as this.
     expect(withheld).toEqual({ ok: true, value: { found: false, iri: written.iri } });
-    expect(absent.ok && absent.value.found).toBe(false);
+    expect(absent).toEqual({ ok: true, value: { found: false, iri: unminted } });
     // The Admin, who may see it, is the proof the concept is really there.
     const seen = await reading(scenario.admin, (principal, tx) =>
       open(principal, tx, { iri: written.iri }),
