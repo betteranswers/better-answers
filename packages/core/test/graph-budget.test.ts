@@ -4,13 +4,16 @@ import { GRAPH_WALK_ROW_LIMIT, walkFrom } from "@better-answers/core/store/graph
 
 import { writeConcept, type WriteConceptInput } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
+import { enqueueJob } from "../src/runs/index.ts";
 import { readingAs } from "./suite-postgres.ts";
+import { runWorkerOnce } from "./worker-process.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 /**
- * **The measured budgets** (T-006 spec, *Ops and the budget*; T-058). Two costs the estate
- * promises and this file turns into facts: what a traversal costs while the box is busy
- * answering other traversals, and what landing a whole map costs. Ordinary members of the
+ * **The measured budgets** (T-006 spec, *Ops and the budget*; T-058). Three costs the estate
+ * promises and this file turns into facts, over one dense map: what a traversal costs while
+ * the box is busy answering other traversals, what landing the map act by act costs, and
+ * what the worker's full rebuild of it costs as a real process. Ordinary members of the
  * suite — no skip, no `it.concurrent`, nothing that would let a budget fail unnoticed.
  *
  * **Where the numbers came from.** Derived by running this file on **8 September 2026** on
@@ -28,7 +31,7 @@ import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundl
  * moved.
  */
 
-const { db, arrange } = suiteWithBundles();
+const { db, bundles, arrange } = suiteWithBundles();
 
 /**
  * The map: thirty concepts, each linking to the six written before it. Dense enough that the
@@ -100,17 +103,27 @@ const PER_WRITE_BUDGET_MS = 8_000;
 const LINEARITY_FACTOR = 2.5;
 
 /**
- * **Neither number is the rebuild, and the rebuild half of the criterion waits on the
- * worker.** ADR 0032 promises a full rebuild of a workspace's map in ≤2 minutes; the rebuild
- * is the worker's (T-057), it reads the bundle once and writes a whole generation without a
- * commit per concept, and `packages/core/test/rebuild-equivalence.test.ts` is where it runs
- * as a real process. What is measured here is the other cost over the same map — landing it
- * act by act through the governed write, each act a commit to the bare repository and one
- * transaction carrying the index row, the ledger row and the graph delta. It is a heavier
- * shape than the rebuild and an upper bound on nothing the rebuild does, so it is stated as
- * the app-side cost it is rather than reported as the rebuild's. When the worker's rebuild
- * lands, its own measurement re-derives the promise and this comment says so.
+ * **Neither number above is the rebuild.** They are the app's write path — a git commit and
+ * one transaction per concept — which is a much heavier shape than the rebuild, and an upper
+ * bound on nothing the rebuild does. They are budgeted apart, and neither is ever quoted as
+ * the other.
+ *
+ * **The rebuild: 120,000 ms**, which is ADR 0032's two-minute per-workspace promise held
+ * against the real thing rather than assumed (T-007 is void). The rebuild is the worker's: a
+ * real process, `uv run --frozen better-answers-worker --once`, claiming the job this test
+ * queues and reading the bundle once to write a whole generation. Measured **467 ms** for
+ * this thirty-concept map, and that is the whole hop — `uv run`, the interpreter, the claim,
+ * the rebuild and the finish — because the job's row cannot say how long the rebuild itself
+ * took: `claimed_at` and `finished_at` are both `now()`, the transaction's start, and the
+ * worker's claim, work and finish share one transaction, so a finished row carries the same
+ * instant in both columns.
+ *
+ * The budget is the promise itself rather than a multiple of the measurement, because the
+ * promise is the number the estate made and the one an operator will hold it to; the room
+ * between them — two hundred and fifty-fold at this size, on an over-counted span — is what
+ * says the promise holds for a map far larger than this one.
  */
+const REBUILD_BUDGET_MS = 120_000;
 
 /** The body of concept `at`: a link to each of the six concepts written before it. */
 const bodyOf = (at: number): string => {
@@ -237,5 +250,55 @@ describe("the graph under concurrent read load", () => {
       [map.scenario.workspaceId],
     );
     expect(rows.rows[0]).toEqual({ nodes: String(CONCEPTS), edges: String(EDGES) });
+  });
+
+  it("rebuilds the whole map in the worker, as a real process, inside the two-minute promise", async () => {
+    const workspaceId = map.scenario.workspaceId;
+    const queued = await enqueueJob(map.scenario.admin, map.scenario.postgres, {
+      workspaceId,
+      kind: "full-rebuild",
+      // The reason the promise is about: the restore drill's rebuild is what ADR 0032's
+      // two minutes were written for, and `pnpm ops graph-rebuild` defaults to this word.
+      reason: "drill",
+    });
+    if (!queued.ok) throw new Error(`the rebuild was not queued: ${String(queued.error)}`);
+
+    const started = performance.now();
+    await runWorkerOnce(db().connectionUri, bundles().root, "graph-budget");
+    const wallClockMs = performance.now() - started;
+
+    // The budgeted span is the wall clock of the whole hop — `uv run`, a Python
+    // interpreter starting, the claim, the rebuild and the finish — which over-counts the
+    // rebuild by everything the estate's long-running worker pays once at boot and never
+    // per job. Over-counting is the safe direction for a promise, so it is what is held.
+    //
+    // The job's own row cannot supply the number: `claimed_at` and `finished_at` are both
+    // `now()`, which is the transaction's start, and the worker's claim, work and finish
+    // share one Postgres transaction — so a finished row carries the same instant in both
+    // columns and reads as a rebuild that took no time at all.
+    const job = await db().pool.query<{ status: string }>(
+      "SELECT status FROM job WHERE workspace_id = $1 AND id = $2",
+      [workspaceId, queued.value.jobId],
+    );
+    expect(job.rows[0]?.status, "the rebuild's own row").toBe("done");
+    expect(wallClockMs, "the worker's whole run, in milliseconds").toBeLessThan(REBUILD_BUDGET_MS);
+
+    // A rebuild that produced an empty generation would pass a timing budget beautifully,
+    // so the map it made is counted: the same thirty concepts and 159 edges, in the
+    // generation the flip made live.
+    const rebuilt = await db().pool.query<{ live_gen: number; nodes: string; edges: string }>(
+      `SELECT g.live_gen,
+              (SELECT count(*) FROM graph_node n
+                WHERE n.workspace_id = $1 AND n.gen = g.live_gen) AS nodes,
+              (SELECT count(*) FROM graph_edge e
+                WHERE e.workspace_id = $1 AND e.gen = g.live_gen) AS edges
+         FROM graph_generation g WHERE g.workspace_id = $1`,
+      [workspaceId],
+    );
+    expect(rebuilt.rows[0]).toEqual({
+      live_gen: 2,
+      nodes: String(CONCEPTS),
+      edges: String(EDGES),
+    });
   });
 });

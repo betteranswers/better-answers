@@ -1,7 +1,3 @@
-import { execFile } from "node:child_process";
-import path from "node:path";
-import { promisify } from "node:util";
-
 import { describe, expect, it } from "vitest";
 
 import { conceptIriOf, ulid } from "@better-answers/schema";
@@ -20,6 +16,7 @@ import type { UserPrincipal } from "../src/kernel/index.ts";
 import { enqueueJob } from "../src/runs/index.ts";
 import { narrowBinding } from "../src/sources/index.ts";
 import { readingAs } from "./suite-postgres.ts";
+import { runWorkerOnce } from "./worker-process.ts";
 import { bindingHolding, groupNamed } from "./sourced-concept.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -47,58 +44,11 @@ import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundl
  * so the sentence is cut rather than copied.
  */
 
-const run = promisify(execFile);
-
 const { db, bundles, arrange } = suiteWithBundles();
 
-const workerDirectory = path.resolve(import.meta.dirname, "../../../apps/worker");
-
-/**
- * The worker's own DSN over this test's database: the superuser's connection with the
- * worker's role taken at session start. Both runtime roles are NOLOGIN (migration 0000),
- * so this is how a process takes one — the same trick `migratedPostgresOver` uses for
- * `app_rt`, and the reason it is a startup option is that a connection which cannot take
- * the role is refused by Postgres rather than handed out as the superuser.
- *
- * `WORKER_DATABASE_URL`'s production shape is a DSN that logs in as `worker_rt` directly
- * (`deploy/platform.compose.yaml`), so nothing here assumes the option is present: the
- * worker reads one string out of its environment and connects, whichever of the two it is.
- */
-const workerDsn = (): string => {
-  const uri = new URL(db().connectionUri);
-  // Written into `search` rather than through `searchParams`, which form-encodes a space
-  // as `+` — and libpq reads `+` literally, so the option arrives as `+role` and the
-  // connection is refused before the worker has done anything wrong.
-  uri.search = "options=-c%20role%3Dworker_rt";
-  return uri.toString();
-};
-
-/**
- * Run the worker once, over every workspace, and fail loudly if it is not runnable.
- *
- * `[CHECK2]`: a suite that can run nothing fails. If `uv` is missing this test says so
- * rather than skipping — a cross-tier fence that quietly stops crossing is worse than no
- * fence, because the suite still reports green.
- */
-const runWorkerOnce = async (): Promise<void> => {
-  const outcome = await run("uv", ["run", "--frozen", "better-answers-worker", "--once"], {
-    cwd: workerDirectory,
-    env: {
-      ...process.env,
-      DATABASE_URL: workerDsn(),
-      GIT_STORE_DIR: bundles().root,
-      WORKER_ID: "rebuild-equivalence",
-    },
-  }).catch((cause: unknown) => {
-    const failure = cause as { stderr?: string; stdout?: string; message?: string };
-    throw new Error(
-      `the worker did not run: ${failure.message ?? ""}\n${failure.stderr ?? ""}\n${failure.stdout ?? ""}`,
-    );
-  });
-  // The loop logs JSON to stdout; a failed job is a line, never a non-zero exit, so the
-  // outcome rows below are what a failure is read off.
-  expect(outcome.stderr).not.toMatch(/Traceback/);
-};
+/** The worker as this suite runs it: a real process, over this database and this bundle root. */
+const runTheWorker = (): Promise<void> =>
+  runWorkerOnce(db().connectionUri, bundles().root, "rebuild-equivalence");
 
 let sequence = 0;
 
@@ -335,8 +285,8 @@ describe("the worker's rebuild against the app's own map", () => {
     expect(audit.ok).toBe(true);
 
     // One pass claims one job per workspace, so two passes run both.
-    await runWorkerOnce();
-    await runWorkerOnce();
+    await runTheWorker();
+    await runTheWorker();
 
     expect(await liveGenerationOf(scenario.workspaceId)).toBe(2);
     expect(await nodesAt(scenario.workspaceId, 2)).toEqual(liveNodes);
@@ -370,7 +320,7 @@ describe("the worker's rebuild against the app's own map", () => {
       kind: "nightly-audit",
     });
     expect(audit.ok).toBe(true);
-    await runWorkerOnce();
+    await runTheWorker();
 
     const outcome = await db().pool.query<{
       outcome: {
