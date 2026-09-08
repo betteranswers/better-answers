@@ -214,6 +214,11 @@ export const find = async (
  * `conceptByIri`, whose predicate takes only rows with a `published_at`, and the index table
  * holds `published_at IS NOT NULL` and a published status to be the same fact — so *draft*
  * and *removed* are statuses no projection here can be handed, and there is no arm for them.
+ *
+ * **The word outlives the arm.** *Draft* stays a `TrustStatus` and `trustWords` still renders
+ * it: the union is the reader's trust vocabulary (`CONTEXT.md`, *these words and no others*),
+ * which the MCP entry's `trust.status` publishes, and not a list of what this one projection
+ * emits. Narrowing it here would be a change to what the wire may say, decided at the wire.
  */
 const trustOf = (concept: OpenedConcept, now: Date): Trust => {
   const { check } = concept;
