@@ -750,9 +750,9 @@ export const graphEdgeUpdate = createUpdateSchema(graphEdge, graphEdgeRefinement
  * What a **job's outcome** may hold: counts, and the ids and paths the counts were taken at
  * — a scalar, a list of scalars, or a list of flat objects, which is the auditor's
  * `{path, expected, actual}` triple and nothing deeper. The shape is the narrowing: an
- * email, a person's name, a prompt or a concept's body has no nested place to hide in one
- * (`[LOG1]`, `[AUDIT5]`), and an outcome that held one would have to be rewritten on
- * erasure. JSON `null` stays accepted because the column accepts it.
+ * email, a person's name, a prompt or a concept's body has no nested place to hide in one,
+ * and an outcome that held one would have to be rewritten on erasure — which a record of
+ * what a run found never is. JSON `null` stays accepted because the column accepts it.
  */
 const outcomeScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 const outcome = z.union([

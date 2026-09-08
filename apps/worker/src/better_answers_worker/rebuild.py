@@ -27,11 +27,12 @@ The whole thing is one transaction, so a rebuild that dies halfway leaves the li
 generation exactly where it was.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import psycopg
 
+from .audit import ParseFindings
 from .bundle import NoSuchBundleError, concepts_at_head
 from .concept_file import MalformedConceptFileError, content_hash_of, parse_concept_file
 from .links import CONCEPT_NODE_LABEL, LINKS_TO_LABEL, ResolvedTarget, outgoing_edges
@@ -54,27 +55,24 @@ class ConceptRecord:
     content_hash: str
 
 
-@dataclass(slots=True)
-class RebuildOutcome:
-    """What the rebuild wrote, and what it noticed on the way."""
+@dataclass
+class RebuildOutcome(ParseFindings):
+    """What the rebuild wrote, and what it noticed on the way.
+
+    The findings are the audit's own, because a rebuild reads the same files and can
+    disagree with the index the same four ways; what it adds is what it built.
+    """
 
     generation: int = 0
     nodes: int = 0
     edges: int = 0
-    mismatched: list[dict[str, str]] = field(default_factory=list)
-    unparsed: list[str] = field(default_factory=list)
-    missing_row: list[str] = field(default_factory=list)
-    missing_file: list[str] = field(default_factory=list)
 
     def as_row(self) -> dict[str, Any]:
         return {
+            **super().as_row(),
             "generation": self.generation,
             "nodes": self.nodes,
             "edges": self.edges,
-            "mismatched": self.mismatched,
-            "unparsed": self.unparsed,
-            "missing_row": self.missing_row,
-            "missing_file": self.missing_file,
         }
 
 
@@ -180,14 +178,12 @@ def run_rebuild(
         except MalformedConceptFileError:
             outcome.unparsed.append(record.path)
             continue
-        if content_hash_of(frontmatter, body, record.path) != record.content_hash:
-            outcome.mismatched.append(
-                {
-                    "path": record.path,
-                    "expected": record.content_hash,
-                    "actual": content_hash_of(frontmatter, body, record.path),
-                }
-            )
+        outcome.checked += 1
+        actual = content_hash_of(frontmatter, body, record.path)
+        if actual != record.content_hash:
+            # A mismatch stamps anyway (ADR 0023): the file is what the map is derived
+            # from, and refusing would leave the workspace with no way forward.
+            outcome.note_mismatch(record.path, record.content_hash, actual)
 
         for edge in outgoing_edges(
             iri=record.iri,

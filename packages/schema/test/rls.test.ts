@@ -68,6 +68,30 @@ const countedRows = async (
   return rows;
 };
 
+/** A statement that must be refused, the reason a reader wants beside it, and its parameters. */
+type Refusal = readonly [statement: string, why: string, parameters?: readonly unknown[]];
+
+/**
+ * Every statement in turn, each inside its own savepoint, each asserted with its reason
+ * beside it — so a grant that stops refusing names the sentence it broke rather than
+ * reporting that a query succeeded. Written once because three grants below are asked the
+ * same question, and a copy per suite is three chances to forget the savepoint.
+ */
+const refusesEach = async (client: pg.PoolClient, refusals: readonly Refusal[]): Promise<void> => {
+  for (const [statement, why, parameters = []] of refusals) {
+    await client.query("SAVEPOINT refusal_probe");
+    const outcome = await client
+      .query(statement, [...parameters])
+      .then(() => "allowed")
+      .catch((cause: unknown) => (cause as { message: string }).message);
+    expect({ why, outcome }).toEqual({
+      why,
+      outcome: expect.stringMatching(/permission denied/),
+    });
+    await client.query("ROLLBACK TO SAVEPOINT refusal_probe");
+  }
+};
+
 const rlsFlags = async (qualified: string) => {
   const [schema, table] = qualified.split(".");
   const flags = await db.pool.query(
@@ -810,7 +834,7 @@ describe("the concept write path under app_rt", () => {
         { table: "concept_index", rows: 1 },
       ]);
 
-      const refused: readonly [string, string][] = [
+      await refusesEach(client, [
         [
           "UPDATE concept_index SET title = 'renamed'",
           "the row is derived from a commit the app made, and the worker makes no commits",
@@ -823,19 +847,7 @@ describe("the concept write path under app_rt", () => {
           "DELETE FROM concept_index",
           "a concept leaves the bundle by an act, never by a reader of it",
         ],
-      ];
-      for (const [statement, why] of refused) {
-        await client.query("SAVEPOINT index_probe");
-        const outcome = await client
-          .query(statement)
-          .then(() => "allowed")
-          .catch((cause: unknown) => (cause as { message: string }).message);
-        expect({ why, outcome }).toEqual({
-          why,
-          outcome: expect.stringMatching(/permission denied/),
-        });
-        await client.query("ROLLBACK TO SAVEPOINT index_probe");
-      }
+      ]);
     });
   });
 
@@ -1036,37 +1048,22 @@ describe("the graph tables under app_rt", () => {
       );
       expect(flipped.rows).toEqual([{ live_gen: next }]);
 
-      const refused: readonly [string, readonly unknown[], string][] = [
+      await refusesEach(client, [
         [
           "UPDATE graph_node SET kind = 'Product'",
-          [],
           "a rebuild that could edit a node could edit the live generation's",
         ],
-        ["DELETE FROM graph_node", [], "sweeping a retired generation is the app's, not this"],
+        ["DELETE FROM graph_node", "sweeping a retired generation is the app's, not this"],
         [
           "UPDATE graph_edge SET section = 'elsewhere'",
-          [],
           "the same for an edge, whose section and sentence are a concept's own content",
         ],
-        ["DELETE FROM graph_edge", [], "and the same for the sweep"],
+        ["DELETE FROM graph_edge", "and the same for the sweep"],
         [
           "DELETE FROM graph_generation",
-          [],
           "the row that says which generation is live is flipped, never removed",
         ],
-      ];
-      for (const [statement, parameters, why] of refused) {
-        await client.query("SAVEPOINT graph_probe");
-        const outcome = await client
-          .query(statement, [...parameters])
-          .then(() => "allowed")
-          .catch((cause: unknown) => (cause as { message: string }).message);
-        expect({ why, outcome }).toEqual({
-          why,
-          outcome: expect.stringMatching(/permission denied/),
-        });
-        await client.query("ROLLBACK TO SAVEPOINT graph_probe");
-      }
+      ]);
     });
   });
 
@@ -2292,7 +2289,7 @@ describe("the migration stamp under worker_rt", () => {
       );
       expect(stamped.rowCount).toBe(1);
 
-      const refused: readonly [string, string][] = [
+      await refusesEach(client, [
         [
           "INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ('x', 1)",
           "the app is the only migration owner, so a worker that could stamp one could tell itself the schema had moved",
@@ -2305,19 +2302,7 @@ describe("the migration stamp under worker_rt", () => {
           "DELETE FROM drizzle.__drizzle_migrations",
           "a journal a reader can empty is a check that stops asking",
         ],
-      ];
-      for (const [statement, why] of refused) {
-        await client.query("SAVEPOINT stamp_probe");
-        const outcome = await client
-          .query(statement)
-          .then(() => "allowed")
-          .catch((cause: unknown) => (cause as { message: string }).message);
-        expect({ why, outcome }).toEqual({
-          why,
-          outcome: expect.stringMatching(/permission denied/),
-        });
-        await client.query("ROLLBACK TO SAVEPOINT stamp_probe");
-      }
+      ]);
     });
   });
 });

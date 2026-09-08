@@ -15,7 +15,7 @@ ALTER TABLE "job" FORCE ROW LEVEL SECURITY;
 -- the caller's own role and inside the caller's own transaction, so RLS does the tenant
 -- fencing on every row they touch and the workspace scope is the one the caller already set
 -- (`app.workspace_id`). A definer function would have to guard its arguments against that
--- scope by hand (`[SEC3]`), and there is nothing here it could do that the policy does not
+-- scope by hand, and there is nothing here it could do that the policy does not
 -- already do — so none is written. What the functions add is the *transition*: the claim is
 -- one statement no two workers can both win, and the three that follow are refusals a
 -- client cannot forget to make.

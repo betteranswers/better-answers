@@ -21,7 +21,8 @@ const journalSchema = z.object({
  * One journal entry as everything here reads one: the tag, which names the file, and
  * `when`, which is the value drizzle's migrator writes into `created_at` on the stamp row.
  * The tag never reaches that table, so `when` is the only fact the two halves share — which
- * is why the worker's schema stamp is checked against it (`[WRK1]`).
+ * is why the worker's schema stamp, the thing it refuses to claim without, is checked
+ * against it.
  */
 export type JournalEntry = { readonly tag: string; readonly when: number };
 
@@ -39,5 +40,3 @@ export const lastMigration = (): JournalEntry => {
   if (last === undefined) throw new Error("the journal is empty");
   return last;
 };
-
-export const lastMigrationTag = (): string => lastMigration().tag;

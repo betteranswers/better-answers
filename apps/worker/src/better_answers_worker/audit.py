@@ -19,8 +19,8 @@ metric and no table of its own.
 
 What an outcome may hold is hashes, counts and paths. A hash is not content, and a path
 is the name of a file in a company's own bundle; a body, a title, an address or a name
-would be content in a record that would then have to be rewritten on erasure
-(`[AUDIT5]`, `[LOG1]`), so none of them is here.
+would be content in a record that would then have to be rewritten on erasure, and a
+record of what a run found is never rewritten. So none of them is here.
 """
 
 from dataclasses import dataclass, field
@@ -41,9 +41,15 @@ class IndexedConcept:
     content_hash: str
 
 
-@dataclass(slots=True)
-class AuditOutcome:
-    """What the audit found, in the shape the job row carries it."""
+@dataclass
+class ParseFindings:
+    """What a pass over one workspace's bundle noticed about the two parsers.
+
+    The audit's whole outcome, and the part of a rebuild's that says the same things: a
+    rebuild reads every file the audit reads and can disagree with the index in the
+    same four ways, so it counts them the same way and an operator reads one shape from
+    either job (ADR 0023: a mismatch stamps anyway and raises bundle health as a state).
+    """
 
     checked: int = 0
     mismatched: list[dict[str, str]] = field(default_factory=list)
@@ -52,6 +58,7 @@ class AuditOutcome:
     missing_file: list[str] = field(default_factory=list)
 
     def as_row(self) -> dict[str, Any]:
+        """The findings as the job row carries them: counts, hashes and paths."""
         return {
             "checked": self.checked,
             "mismatched": self.mismatched,
@@ -59,6 +66,17 @@ class AuditOutcome:
             "missing_row": self.missing_row,
             "missing_file": self.missing_file,
         }
+
+    def note_mismatch(self, path: str, expected: str, actual: str) -> None:
+        """A file whose hash is not the row's; a hash is not content, so it is kept."""
+        found = {"path": path, "expected": expected, "actual": actual}
+        self.mismatched.append(found)
+
+
+@dataclass
+class AuditOutcome(ParseFindings):
+    """What the nightly audit found, which is the findings and nothing else: the audit
+    exists to look, so looking is all it reports."""
 
 
 def indexed_concepts(cursor: psycopg.Cursor) -> list[IndexedConcept]:
@@ -105,9 +123,7 @@ def run_audit(
         outcome.checked += 1
         actual = content_hash_of(frontmatter, body, path)
         if actual != row.content_hash:
-            outcome.mismatched.append(
-                {"path": path, "expected": row.content_hash, "actual": actual}
-            )
+            outcome.note_mismatch(path, row.content_hash, actual)
 
     for path in rows:
         if path not in files:

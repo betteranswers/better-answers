@@ -5,7 +5,7 @@ workspace: claim, run, heartbeat while running, finish or fail with an outcome. 
 job kinds are T-006's own obligations — the nightly parser audit and the full rebuild —
 and B7 adds kinds to this loop rather than building one.
 
-**The schema stamp comes before everything** (`[WRK1]`). The worker never migrates and
+**The schema stamp comes before everything.** The worker never migrates and
 holds a generated, committed view of the app's schema; if the migration that view was
 generated from is not the migration the database was last stamped with, the deploy order
 has slipped and every read this loop is about to make is against a shape that has moved.
@@ -21,7 +21,7 @@ the audit is a property of the loop running at all, and a worker that is up is a
 workspace that is checked.
 
 One structlog line per claim and one per outcome, and neither carries content, an
-address or a name — an outcome is counts and paths (`[LOG1]`).
+address or a name — an outcome is counts and paths.
 """
 
 import argparse

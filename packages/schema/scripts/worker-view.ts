@@ -76,7 +76,7 @@ export const assertNoUndeclaredTables = (rows: readonly ColumnRow[]): void => {
  * journal's `when` for that same migration, which is what drizzle's migrator writes into
  * `drizzle.__drizzle_migrations.created_at`. The tag never reaches that table — it holds a
  * hash and an instant — so `when` is the only fact the worker's stamp check can compare
- * against the database it is about to claim from (`[WRK1]`).
+ * against the database it is about to claim from before it claims anything.
  */
 export const renderWorkerSchemaView = (
   rows: readonly ColumnRow[],

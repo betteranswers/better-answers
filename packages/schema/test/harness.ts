@@ -28,6 +28,15 @@ export type MigratedPostgres = {
   readonly pool: pg.Pool;
   /** The runtime role — what the app connects as; RLS applies. */
   readonly runtimePool: pg.Pool;
+  /**
+   * Where this database is, as a connection string. For the one test that has to hand it
+   * to **another process**: T-057's rebuild-equivalence test runs the worker as a real
+   * process against this very database, and a pool is not something a process can be
+   * given. Both runtime roles are NOLOGIN (migration 0000), so a caller doing that appends
+   * `options=-c role=<role>` and connects as the superuser, exactly as `runtimePool` below
+   * takes `app_rt`.
+   */
+  readonly connectionUri: string;
   readonly stop: () => Promise<void>;
 };
 
@@ -59,6 +68,7 @@ export const migratedPostgresOver = (
   return {
     pool,
     runtimePool,
+    connectionUri,
     stop: async () => {
       await runtimePool.end();
       await pool.end();

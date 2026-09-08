@@ -59,9 +59,6 @@ export const JOB_STATUSES = ["queued", "claimed", "done", "failed", "poisoned"] 
 /** What a job is born at: waiting for the worker that claims it. */
 export const JOB_QUEUED_STATUS = "queued" satisfies (typeof JOB_STATUSES)[number];
 
-/** Held by a worker under a lease, and the one status a heartbeat may refresh. */
-export const JOB_CLAIMED_STATUS = "claimed" satisfies (typeof JOB_STATUSES)[number];
-
 /** The statuses a job never leaves — the two finishes and the reaper's verdict. */
 export const JOB_TERMINAL_STATUSES = ["done", "failed", "poisoned"] as const;
 
@@ -81,12 +78,13 @@ export const JOB_MAX_ATTEMPTS = 3;
  * stops answering.
  *
  * `outcome` is what the job **found** — counts, and the ids or paths it counted them at.
- * Never content, never an address and never a person's name (`[LOG1]`, `[AUDIT5]`): a job's
- * outcome is a record the platform keeps and would have to be rewritten on erasure if it
- * held one.
+ * Never content, never an address and never a person's name: a job's outcome is a record
+ * the platform keeps, and one that held any of those would have to be rewritten on erasure,
+ * which is a thing the platform does to files and never to a record of what a run found.
  *
- * A job is not an *audit event* and never becomes one (`[AUDIT8]`): runs are their own
- * record. There is no ledger row for enqueueing, claiming or finishing one.
+ * A job is not an *audit event* and never becomes one: runs are their own record, as the
+ * audit slice's own vocabulary says. There is no ledger row for enqueueing, claiming or
+ * finishing one.
  */
 export const job = withRLS(
   "job",

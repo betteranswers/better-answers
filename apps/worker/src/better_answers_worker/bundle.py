@@ -3,7 +3,7 @@
 The bundle is a bare repository per workspace at ``<GIT_STORE_DIR>/<workspace>.git``, on
 one branch, ``refs/heads/main`` (ADR 0024; the git door in
 `packages/core/src/store/git/index.ts`). This tier **reads** it and never writes it: the
-app is the only OKF writer (`[WRK1]`), the mount is read-only, and nothing here holds a
+app is the only OKF writer, the mount is read-only, and nothing here holds a
 git credential because there is nothing to push to.
 
 It is read through **dulwich**, a pure-Python git implementation, rather than by
