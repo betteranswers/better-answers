@@ -1,4 +1,9 @@
-import { type MigratedPostgres, openMigratedPostgres } from "@better-answers/schema/testing";
+import {
+  openMigratedPostgres,
+  testData,
+  type MigratedPostgres,
+  type TestData,
+} from "@better-answers/schema/testing";
 import type pg from "pg";
 import { afterAll, beforeAll } from "vitest";
 
@@ -40,6 +45,24 @@ export const postgresForSuite = (): (() => MigratedPostgres) => {
 };
 
 /**
+ * Build rows through the factory, as the superuser, on one connection given back at the
+ * end — the arrange every suite that seeds a map opens with. Beside `readingAs` for the
+ * same reason: which pool a seed goes through is one fact here, not a copy per suite, and
+ * the copy gate said so the second time it was written.
+ */
+export const seedingWith = async <T>(
+  pool: pg.Pool,
+  work: (seed: TestData) => Promise<T>,
+): Promise<T> => {
+  const client = await pool.connect();
+  try {
+    return await work(testData(client));
+  } finally {
+    client.release();
+  }
+};
+
+/**
  * Run a read as this person, inside one transaction, the way a transport would — resolve
  * the Principal at the boundary and hand `work` the transaction it was resolved in. Shared
  * by every suite that reads as somebody, so which door a read goes through is one fact
@@ -63,10 +86,13 @@ export const readingAs = async <T>(
  * Wait for a condition the database reports, polling rather than sleeping: a slow machine
  * takes more turns to see the same state instead of failing a stopwatch. The cap is a
  * runaway guard, not a timing assumption — a test fails on it only if the state never
- * arrives at all.
+ * arrives at all. Forty-five seconds, because the root `check` runs every workspace's suite
+ * at once (CI too) and under that load a governed write took more than the five seconds an
+ * earlier cap allowed to reach the row it parks on; the file's own 60 s test timeout is what
+ * this must stay inside.
  */
 export const until = async (condition: () => Promise<boolean>): Promise<void> => {
-  for (let turn = 0; turn < 200; turn += 1) {
+  for (let turn = 0; turn < 1_800; turn += 1) {
     if (await condition()) return;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
@@ -123,6 +149,58 @@ export const abortTheTransaction = async (tx: Tx): Promise<void> => {
     // aborted and answers every later statement on it with that, which is what an act is
     // about to meet.
   }
+};
+
+/**
+ * Run `work` while every act's first write to `table` **parks** — held inside its own
+ * transaction, holding every lock it took on the way there — until `work` calls `release`.
+ * The seam a two-connection test needs to reach a window *inside* an act that exposes none,
+ * and to hold a second act against it: a trigger that waits on an advisory lock this holds,
+ * so the act's own statements decide where it stops and the test decides when it goes on. A
+ * test using this names the table it is stopping at and why, as `holdingTable` does.
+ *
+ * `pool` is the superuser's, because the trigger is DDL. The act parks on **its** connection,
+ * so a suite doing this holds one pool connection per parked act until `release`.
+ */
+export const whileActsWaitAt = async <T>(
+  pool: pg.Pool,
+  table: string,
+  event: "INSERT" | "UPDATE",
+  work: (release: () => Promise<void>) => Promise<T>,
+): Promise<T> => {
+  const holder = await pool.connect();
+  const key = "hashtext('test-acts-wait-at')";
+  let released = false;
+  const release = async (): Promise<void> => {
+    if (released) return;
+    released = true;
+    await holder.query(`SELECT pg_advisory_unlock(${key}, ${key})`);
+  };
+  await holder.query(`SELECT pg_advisory_lock(${key}, ${key})`);
+  await pool.query(
+    `CREATE OR REPLACE FUNCTION test_acts_wait_at() RETURNS trigger LANGUAGE plpgsql AS $$
+     BEGIN PERFORM pg_advisory_xact_lock(${key}, ${key}); RETURN NEW; END $$`,
+  );
+  await pool.query(
+    `CREATE TRIGGER test_acts_wait_at BEFORE ${event} ON "${table}"
+     FOR EACH ROW EXECUTE FUNCTION test_acts_wait_at()`,
+  );
+  try {
+    return await work(release);
+  } finally {
+    await release();
+    holder.release();
+    await pool.query(`DROP TRIGGER test_acts_wait_at ON "${table}"`);
+    await pool.query("DROP FUNCTION test_acts_wait_at()");
+  }
+};
+
+/** How many other connections to this database are waiting on a lock right now. */
+export const countWaitingOnLocks = async (pool: pg.Pool): Promise<number> => {
+  const found = await pool.query<{ waiting: string }>(
+    "SELECT count(*) AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'",
+  );
+  return Number(found.rows[0]?.waiting ?? 0);
 };
 
 /**

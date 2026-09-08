@@ -1,5 +1,5 @@
 import { conceptIriOf, ulid } from "@better-answers/schema";
-import { testData, type TestData } from "@better-answers/schema/testing";
+import type { TestData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
 import type { QueryResultRow } from "pg";
 
@@ -12,7 +12,7 @@ import {
   type ConceptDelta,
   type WalkStep,
 } from "@better-answers/core/store/graph";
-import { postgresForSuite, readingAs } from "./suite-postgres.ts";
+import { postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
 
 /**
  * The graph door through its interface (`[TEST1]`), over factory-seeded rows on real
@@ -39,14 +39,8 @@ type MapScenario = {
   readonly viewer: { readonly workspaceId: string; readonly userId: string };
 };
 
-const seeded = async <T>(work: (seed: TestData) => Promise<T>): Promise<T> => {
-  const client = await db().pool.connect();
-  try {
-    return await work(testData(client));
-  } finally {
-    client.release();
-  }
-};
+const seeded = <T>(work: (seed: TestData) => Promise<T>): Promise<T> =>
+  seedingWith(db().pool, work);
 
 const arrange = (): Promise<MapScenario> =>
   seeded(async (seed) => {
@@ -302,6 +296,7 @@ const deltaOf = (row: IndexRow, overrides: Partial<ConceptDelta> = {}): ConceptD
   // reads instead of a fallback that would derive edges from a frontmatter nobody wrote.
   if (row.frontmatter === null) throw new Error("the seeded concept carries no frontmatter");
   return {
+    workspaceId: row.workspaceId,
     iri: row.iri,
     kind: row.kind,
     path: row.path,
@@ -310,6 +305,7 @@ const deltaOf = (row: IndexRow, overrides: Partial<ConceptDelta> = {}): ConceptD
     publishedAt: row.publishedAt,
     sensitivity: row.sensitivity,
     audience: row.audience,
+    audienceGroups: row.audienceGroups,
     status: row.status,
     ...overrides,
   };

@@ -1,24 +1,12 @@
-import { createHash } from "node:crypto";
-
 import {
-  AUDIENCE_EVERYONE,
   boundarySchemas,
-  citedSourceOf,
-  CONCEPT_DRAFT_STATUS,
   conceptIriOf,
-  PUBLISHED_STATUSES,
-  resolvedResource,
-  SENSITIVITY_DEFAULT,
-  SUGGESTION_ACCEPTED_STATUS,
   SUGGESTION_EDIT_KIND,
-  SUGGESTION_REPAIR_KIND,
   SUGGESTION_SET_MAX,
-  SUGGESTION_WAITING_STATUS,
-  VERIFICATION_REPAIR_ORIGIN,
 } from "@better-answers/schema";
 import { z } from "zod";
 
-import { readableClause, readableParameter } from "../access/index.ts";
+import { readableClause, readableParameters, widens } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
 import {
   actorIdOf,
@@ -42,13 +30,11 @@ import {
   withRepositoryLock,
   type CommitAuthor,
   type CommitRefusal,
-  type Committed,
   type GitDoor,
 } from "../store/git/index.ts";
-import { writeConceptDelta } from "../store/graph/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import { contentHashOf, renderConceptFile, type Frontmatter } from "./file.ts";
 import {
-  markDeciding,
   payloadFor,
   returnToProposer,
   suggestionIsWaiting,
@@ -56,7 +42,37 @@ import {
   type SuggestionKind,
   type SuggestionPayload,
 } from "./inbox.ts";
+import {
+  foldKind,
+  heldByIri,
+  heldVisibilityOf,
+  indexRowOf,
+  landRows,
+  WRITE_CONSTRAINTS,
+} from "./landing.ts";
+import { conceptVisibilityFrom } from "./visibility.ts";
 
+export {
+  contentHashOf,
+  parseConceptFile,
+  renderConceptFile,
+  type Frontmatter,
+  type FrontmatterSource,
+  type FrontmatterValue,
+} from "./file.ts";
+export { foldKind } from "./landing.ts";
+export {
+  RECONCILER,
+  reconcile,
+  reconcileEveryWorkspace,
+  reconcilerHits,
+  type ReconcileRefusal,
+  type Reconciled,
+  type ReconcilerHit,
+  type ReconcilerPrincipal,
+  type ReplayRefusal,
+  type WorkspaceReconciled,
+} from "./reconciler.ts";
 export {
   declineSuggestion,
   submitSuggestionSet,
@@ -72,6 +88,25 @@ export {
   type SuggestionStatus,
   type SuggestionSummaryItem,
 } from "./inbox.ts";
+export {
+  evidencePaneOf,
+  overrideConceptClass,
+  openingACascadeOverHeldGroups,
+  recomputeVisibilitySourcedFrom,
+  type ConceptClassOverridden,
+  type EvidencePane,
+  type OverrideConceptClassInput,
+  type OverrideConceptClassRefusal,
+  type ReadableEvidence,
+} from "./visibility.ts";
+export {
+  GRAPH_MAINTENANCE,
+  graphCounts,
+  sweepGraph,
+  type GraphMaintenancePrincipal,
+  type GraphMaintenanceRefusal,
+} from "./graph-maintenance.ts";
+export type { GraphCounts, SweptGeneration } from "../store/graph/index.ts";
 
 /**
  * Slice: **concepts** — the concept write path. Suggestions, the inbox, minting and
@@ -116,7 +151,11 @@ export {
  * **The inbox** — submitting a set, opening one, declining, returning — is `inbox.ts`,
  * because none of it makes a commit. The acceptance is here, because an acceptance *is* a
  * governed write: one act, one commit, one transaction, with the suggestion decided inside
- * the same transaction as the rows.
+ * the same transaction as the rows. The file's grammar — render, parse, hash — is `file.ts`;
+ * what the index holds, the row a write builds and the routine that lands it is
+ * `landing.ts`, which the live act and the replay both land through; the reconciler's replay
+ * is `reconciler.ts`; the class and audience a concept lands with is `visibility.ts`. This
+ * module re-exports all of it, so the slice has one face.
  */
 
 /**
@@ -144,55 +183,6 @@ const CONCEPT_ACTS = declareActs("knowledge", {
     setId: "id",
   }),
 });
-
-/**
- * One `sources[]` entry (`docs/okf-v02.md`): OKF's provenance object — `resource` required,
- * `id`, `title`, `author`, `usage_count`, `last_modified` — and the platform's `locator`
- * beside them — one of the two keys the platform may add to a concept file at all (ADR 0002).
- */
-export type FrontmatterSource = Readonly<Record<string, string | number | boolean | null>>;
-
-/**
- * An OKF frontmatter value: scalars, string lists, and the one list of objects the spec
- * defines. One level of nesting and no more, which is what the boundary narrows to.
- */
-export type FrontmatterValue =
-  | string
-  | number
-  | boolean
-  | null
-  | readonly string[]
-  | readonly FrontmatterSource[];
-
-export type Frontmatter = Readonly<Record<string, FrontmatterValue>>;
-
-/**
- * A kind, folded for **case and plural only** (ADR 0012's 2026-08-30 amendment, ADR 0026): an
- * unknown kind is the ordinary case, so `policy`, `Policy` and `Policies` are one kind and the
- * type vocabulary counts them once.
- *
- * The fold reaches the **row** and never the file: `type` is not a code-owned key, and ADR
- * 0019 keeps every key the platform does not own verbatim in the bundle. So a person's
- * spelling survives export while the index groups by one word.
- *
- * The plural rule is the conservative English one and says so: `-ies` → `-y`, `-ses`/`-xes`/
- * `-zes`/`-ches`/`-shes` → drop `-es`, a trailing `-s` dropped unless the word ends `-ss`,
- * `-us` or `-is`. Irregulars (`Analyses`) fold wrongly and are folded consistently, which is
- * what matters for grouping; a kind vocabulary that ever needs more is a ticket, not a guess.
- *
- * **Case and plural, and nothing else** — the amendment's word is *only*. Whatever separates
- * the words of a kind is left exactly as it was written, because collapsing it would be a
- * third fold nobody decided: `Rate  Card` and `Rate Card` stay two kinds, and the day they
- * should not is a rule to write down first. The boundary trims the ends.
- */
-export const foldKind = (kind: string): string =>
-  kind.replaceAll(/\S+/g, (word) => {
-    const cased = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    if (cased.endsWith("ies")) return `${cased.slice(0, -3)}y`;
-    if (/(s|x|z|ch|sh)es$/.test(cased)) return cased.slice(0, -2);
-    if (/(ss|us|is)$/.test(cased) || !cased.endsWith("s")) return cased;
-    return cased.slice(0, -1);
-  });
 
 /** One piece of evidence recorded at commit time (`CONTEXT.md`, *evidence*). */
 export type EvidenceInput = {
@@ -290,8 +280,12 @@ export type ConceptWritten = {
  * Why a governed write was refused. `stale-precondition` is the one a person is shown — the
  * content moved under them, whichever form the precondition took (ADR 0012) — and the two
  * `-taken` words are a bundle that already holds this path or this merge key under another
- * IRI. `rename-refused` and `reclassification-refused` are the two moves this act never
- * makes, and `no-such-concept` is a write naming an IRI this workspace never minted, which
+ * IRI. `rename-refused` and `reclassification-refused` are two moves this act never makes,
+ * and `widening-refused` the third: a re-write whose new citations would derive a class or
+ * an audience wider than the concept holds, which is an Admin's recorded act
+ * (`overrideConceptClass`) and never a re-write's. `no-such-concept` is a write naming an IRI
+ * this workspace never minted — **or one the read predicate withholds from the writer**,
+ * answered in the same word so a re-write is no oracle for what a person may not see — which
  * ADR 0002 refuses because the key is never a caller's to choose. `already-decided` is an
  * acceptance of a suggestion somebody decided first, and `resolution-moved` one whose named
  * target no longer answers to the merge key it was proposed under. The principal refusals
@@ -310,39 +304,10 @@ export type WriteConceptRefusal =
   | "merge-key-taken"
   | "rename-refused"
   | "reclassification-refused"
+  | "widening-refused"
   | "no-such-concept"
   | "already-decided"
   | "resolution-moved";
-
-/**
- * The frontmatter keys ADR 0014's content hash leaves out: the trust the platform derives
- * and the identity it minted. Hashing them would make a check of its own recording move the
- * hash and turn *Checked* into *Changed since checked* on the next read.
- */
-const UNHASHED_KEYS: ReadonlySet<string> = new Set([
-  "generated",
-  "verified",
-  "stale_after",
-  "status",
-  "iri",
-]);
-
-/** The body as ADR 0014 normalises it: `\r\n` to `\n`, no trailing whitespace, one final newline. */
-const normalisedBody = (body: string): string =>
-  `${body
-    .replaceAll("\r\n", "\n")
-    .split("\n")
-    .map((line) => line.replace(/[ \t]+$/, ""))
-    .join("\n")
-    .replace(/\n+$/, "")}\n`;
-
-// `resolvedResource` — the hash's path resolution — is the boundary's (`@better-answers/schema`),
-// beside `citedSourceOf` and for the same reason: the graph door's delta resolves the same
-// references, and two resolutions would be two chances to disagree about which concept a
-// file names (ADR 0019).
-
-/** One `sources[]` entry as the hash carries it: the resolved resource, then the locator. */
-type HashedSource = readonly [string, string | null];
 
 /**
  * One `sources[]` entry, read whichever way a file writes it — **the boundary's own reader**
@@ -352,157 +317,31 @@ type HashedSource = readonly [string, string | null];
  */
 export { citedSourceOf as citedSource } from "@better-answers/schema";
 
-/**
- * `sources[]` **reduced to ordered `(resource, locator)` pairs** with paths resolved — ADR
- * 0019's own reduction, and what makes a source-title fix or a `usage_count` update leave a
- * check standing while a swapped source un-checks it.
- */
-const reducedSources = (
-  value: FrontmatterValue | undefined,
-  path: string,
-): readonly HashedSource[] => {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
-    const cited = citedSourceOf(entry);
-    return cited === undefined ? [] : [[resolvedResource(cited.resource, path), cited.locator]];
-  });
-};
-
-/**
- * The frontmatter as ADR 0014's hash reads it, written straight as canonical JSON: keys
- * sorted, the trust and identity keys dropped, `sources[]` reduced. A string rather than an
- * object, because the object was never anything but a step on the way to these bytes.
- */
-const canonicalFrontmatter = (frontmatter: Frontmatter, path: string): string => {
-  const pairs = Object.keys(frontmatter)
-    .toSorted()
-    .filter((key) => !UNHASHED_KEYS.has(key))
-    .map((key) => {
-      const value = frontmatter[key];
-      const reduced = key === "sources" ? reducedSources(value, path) : value;
-      return `${JSON.stringify(key)}:${JSON.stringify(reduced)}`;
-    });
-  return `{${pairs.join(",")}}`;
-};
-
-/**
- * The content hash a check confirms (ADR 0014, ADR 0019): SHA-256 over the canonical JSON of
- * the frontmatter — trust and identity keys removed, `sources[]` reduced to its ordered
- * `(resource, locator)` pairs — and the normalised body.
- *
- * RFC 8785's canonicalisation is *sorted keys, no insignificant whitespace*, which is what
- * this produces for the one shape a concept's frontmatter can hold: scalars, string lists and
- * `sources[]`'s objects, whose own keys never reach the hash because the reduction replaces
- * them with a pair. The concept's own path is an argument because the reduction resolves a
- * relative `resource` against it.
- */
-export const contentHashOf = (frontmatter: Frontmatter, body: string, path: string): string =>
-  createHash("sha256")
-    .update(`${canonicalFrontmatter(frontmatter, path)}\n${normalisedBody(body)}`, "utf8")
-    .digest("hex");
-
-/** One `sources[]` entry as YAML: a block of quoted keys under a list dash. */
-const yamlEntry = (entry: FrontmatterSource): string =>
-  Object.entries(entry)
-    .map(
-      ([key, value], index) =>
-        `${index === 0 ? "  - " : "    "}${JSON.stringify(key)}: ${JSON.stringify(value)}`,
-    )
-    .join("\n");
-
-/** One frontmatter value as YAML: a list over lines, everything else as JSON, which YAML reads. */
-const yamlValue = (value: FrontmatterValue): string => {
-  if (!Array.isArray(value)) return ` ${JSON.stringify(value)}`;
-  if (value.length === 0) return " []";
-  return `\n${value
-    .map((item) =>
-      typeof item === "object" && item !== null ? yamlEntry(item) : `  - ${JSON.stringify(item)}`,
-    )
-    .join("\n")}`;
-};
-
-/**
- * The file as it lands in the bundle: YAML frontmatter between `---` fences, then the body.
- * Keys keep the order they were given, because that is the order a person wrote them and
- * the file is the thing a company keeps; the content hash above is what needs an order
- * nobody chose, and it sorts its own.
- *
- * **Every key is quoted**, not only every value. A concept's frontmatter is open — OKF's keys
- * plus whatever else the file carried, preserved verbatim (ADR 0019) — so a key holding a
- * colon, a `#` or a leading `-` would otherwise write YAML that parses as something else.
- * JSON is a subset of YAML 1.2, so quoting is all that is needed and any YAML parser reads
- * the result back, which is what "readable by any OKF tool" (ADR 0012) has to mean for a file
- * this tier writes and the Python tier parses.
- */
-export const renderConceptFile = (frontmatter: Frontmatter, body: string): string => {
-  const lines = Object.entries(frontmatter).map(
-    ([key, value]) => `${JSON.stringify(key)}:${yamlValue(value)}`,
-  );
-  return `---\n${lines.join("\n")}\n---\n\n${normalisedBody(body)}`;
-};
-
 /** The two roles that may change the bundle: an Editor and an Admin, never a Viewer. */
 const mayWrite = (principal: UserPrincipal): boolean => principal.role !== "Viewer";
 
 /**
- * The index row's columns less the commit's sha, which does not exist yet when this parse
- * runs: everything a caller supplies is checked at the boundary **before** the commit, so a
- * row the boundary would refuse never becomes a commit nobody can record. The sha comes from
- * the git door, which answers a git object name or a refusal and nothing else.
+ * The file's frontmatter as the act writes it: what the caller gave, the `type` and the
+ * `title` the act was told where the file names neither, the `status` it names, and the IRI
+ * the platform minted — OKF's own keys and ADR 0002's one platform key, nothing else. The
+ * row is built from the same facts, so the file says what the row says: the bundle is the
+ * truth and the row is derived from it (ADR 0012), and the reconciler's replay of this
+ * commit reads all four back off the file rather than off a row that was lost — a creation
+ * whose file carried no title would be a commit the replay could not land. A caller's own
+ * `type`, `title` and `status` keys stand as written (ADR 0019 keeps every key verbatim).
+ *
+ * **The content hash is taken over this, the frontmatter the file carries**, never over
+ * what the caller gave: `type` and `title` are hashed keys, so a row hashed before they
+ * were written in would carry a number the nightly audit's parse of the file could never
+ * reproduce, and every such concept would read as mismatched.
  */
-const conceptRow = boundarySchemas.conceptIndex.insert.omit({ commitSha: true });
-
-/** The constraints this act refuses over; every other violation stays the store's Error. */
-const WRITE_CONSTRAINTS = {
-  concept_index_workspace_id_path_uidx: "path-taken",
-  concept_identity_merge_key_uidx: "merge-key-taken",
-} as const;
-
-/** What the index already holds for this IRI — the facts a re-write keeps or may not move. */
-type Held = {
-  readonly path: string;
-  readonly sensitivity: string;
-  readonly status: string;
-  /** What the concept says now — what an acceptance's payload was written against. */
-  readonly contentHash: string;
-  /** When it first became readable; kept across a re-write, so publishing happens once. */
-  readonly publishedAt: Date | null;
-};
-
-type HeldRow = {
-  readonly path: string;
-  readonly sensitivity: string;
-  readonly status: string;
-  readonly content_hash: string;
-  readonly published_at: Date | null;
-};
-
-/**
- * The Principal first, as every function here that reaches tenant data takes it: the
- * workspace this reads in is the one the caller is acting in, and never a string a call site
- * chose (ADR 0029). RLS scopes the statement already; naming the pair says so where a reader
- * of the SQL can see it.
- */
-const heldByIri = async (
-  principal: UserPrincipal,
-  tx: Tx,
-  iri: string,
-): Promise<Held | undefined> => {
-  const found = await tx.query<HeldRow>(
-    `SELECT path, sensitivity, status, content_hash, published_at
-       FROM concept_index WHERE workspace_id = $1 AND iri = $2`,
-    [principal.workspaceId, iri],
-  );
-  const row = found.rows[0];
-  return row === undefined
-    ? undefined
-    : {
-        path: row.path,
-        sensitivity: row.sensitivity,
-        status: row.status,
-        contentHash: row.content_hash,
-        publishedAt: row.published_at,
-      };
+const fileFrontmatterOf = (input: WriteConceptInput, iri: string) => {
+  const named = { ...input.frontmatter };
+  if (typeof named["type"] !== "string") named["type"] = input.kind;
+  if (typeof named["title"] !== "string") named["title"] = input.title;
+  if (input.status !== undefined) named["status"] = input.status;
+  named["iri"] = iri;
+  return named;
 };
 
 /**
@@ -528,9 +367,18 @@ const heldByIri = async (
  * concept's class is **kept** when the write names none, and **refused** when it names a
  * different one; a differing path is refused the same way.
  *
- * Both are decided by the read this act makes **before it commits**, so a refused re-write
- * leaves no commit at all: a rename that refused after committing would leave a file at a
- * path no row names, and a replay that refuses for ever.
+ * **Nor may a re-write widen the class by swapping its evidence.** What lands is the
+ * derivation over the new citations, not the word the write names, so the act derives what
+ * the new evidence *would* land — the same derivation the landing runs, over the documents
+ * about to be cited — and refuses when that is wider on any term than what the concept
+ * holds: a narrowing is what evidence does, a widening is an Admin's recorded act (ADR 0023,
+ * ADR 0039). And the concept has to be one the writer may see: the read at step 3 applies
+ * the predicate's class and audience arms, so a withheld concept is refused as one nobody
+ * minted.
+ *
+ * All of it is decided by the read this act makes **before it commits**, so a refused
+ * re-write leaves no commit at all: a rename that refused after committing would leave a
+ * file at a path no row names, and a replay that refuses for ever.
  */
 export const writeConcept = async (
   principal: UserPrincipal,
@@ -551,12 +399,11 @@ export const writeConcept = async (
     if (!("base" in input.expects)) return err("malformed");
   }
 
-  const contentHash = contentHashOf(input.frontmatter, input.body, input.path);
   // A write that names no concept is a creation, and mints the one form an IRI has
   // (ADR 0002); one that names a concept is held below to a concept that already exists.
   const iri = input.iri ?? conceptIriOf(ulid());
-  // The file carries its own IRI (ADR 0002's platform key), whatever the caller passed.
-  const frontmatter = { ...input.frontmatter, iri } satisfies Frontmatter;
+  const frontmatter = fileFrontmatterOf(input, iri);
+  const contentHash = contentHashOf(frontmatter, input.body, input.path);
   const mergeKey = boundarySchemas.conceptIdentity.insert.shape.mergeKey.safeParse(input.mergeKey);
   // Evidence goes through the boundary too, and before the commit: a locator the boundary
   // would refuse is one this act should never have made a commit for (ADR 0028).
@@ -583,19 +430,34 @@ export const writeConcept = async (
     // is what makes each of these refusals cost **no commit** — the difference between a
     // caller being told no and a commit nobody can record.
     const existing = await attempt(() =>
-      withMembership(principal, doors.postgres, async (fresh, tx) => ({
-        held: await heldByIri(fresh, tx, iri),
-        // The merge key's resolution, read here rather than beside the act, so an
-        // acceptance resolves identity *at acceptance* and inside the lock that holds it.
-        resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
-        waiting:
-          input.acceptance === undefined ||
-          (await suggestionIsWaiting(fresh, tx, input.acceptance.suggestionId)),
-      })),
+      withMembership(principal, doors.postgres, async (fresh, tx) => {
+        const held = await heldByIri(fresh, tx, iri);
+        return {
+          held,
+          // What the new citations would derive for a concept that exists — asked of the
+          // same derivation the landing runs, so the widening check and the landing cannot
+          // disagree about what the evidence says.
+          derived:
+            held === undefined
+              ? undefined
+              : await conceptVisibilityFrom(fresh, tx, {
+                  iri,
+                  kind: foldKind(input.kind),
+                  fallback: heldVisibilityOf(held),
+                  citing: evidence.data.map((piece) => piece.sourceDocumentId),
+                }),
+          // The merge key's resolution, read here rather than beside the act, so an
+          // acceptance resolves identity *at acceptance* and inside the lock that holds it.
+          resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
+          waiting:
+            input.acceptance === undefined ||
+            (await suggestionIsWaiting(fresh, tx, input.acceptance.suggestionId)),
+        };
+      }),
     );
     if (!existing.ok) return err(existing.error);
     if (!existing.value.ok) return err(existing.value.error);
-    const { held, resolved, waiting } = existing.value.value;
+    const { held, derived, resolved, waiting } = existing.value.value;
 
     // ADR 0002: the key is never caller-settable. A creation minted its own above; a write
     // that named one has to name a concept this workspace already holds, or it would mint
@@ -635,33 +497,33 @@ export const writeConcept = async (
     ) {
       return err("reclassification-refused");
     }
+    // The class the new evidence derives, against the class the concept holds: wider on
+    // any term — a looser class, everyone where groups were named, a group the list did not
+    // hold — is the un-narrowing only an Admin's recorded override may make. A standing
+    // override is what the derivation answers and what the row holds, so it never reads as
+    // a widening here.
+    if (held !== undefined && derived !== undefined && widens(heldVisibilityOf(held), derived)) {
+      return err("widening-refused");
+    }
 
-    // A status the write does not name is the one the concept already holds, exactly as its
-    // class is: the draft default is what a concept is *born* at, and applying it to a
-    // re-write would un-publish a stable concept nobody asked to un-publish.
-    const status = input.status ?? held?.status ?? CONCEPT_DRAFT_STATUS;
     // Everything the rows will hold, parsed at the boundary before anything is committed: a
     // commit whose rows the boundary would refuse is the head-ahead state provoked on
     // purpose, and there is no reason to make one.
-    const parsed = conceptRow.safeParse({
-      workspaceId: principal.workspaceId,
-      iri,
-      path: input.path,
-      kind: foldKind(input.kind),
-      title: input.title,
-      frontmatter,
-      body: input.body,
-      contentHash,
-      status,
-      // Published once and kept: a concept that reaches a readable status carries the instant
-      // it first did, and one that leaves those statuses loses it, so the predicate's first
-      // arm is a fact about the concept rather than a stamp every write renews.
-      publishedAt: PUBLISHED_STATUSES.some((published) => published === status)
-        ? (held?.publishedAt ?? new Date())
-        : null,
-      sensitivity: held?.sensitivity ?? input.sensitivity ?? SENSITIVITY_DEFAULT,
-      audience: AUDIENCE_EVERYONE,
-    });
+    const parsed = indexRowOf(
+      {
+        workspaceId: principal.workspaceId,
+        iri,
+        path: input.path,
+        kind: input.kind,
+        title: input.title,
+        frontmatter,
+        body: input.body,
+        contentHash,
+        status: input.status,
+        sensitivity: input.sensitivity,
+      },
+      held,
+    );
     if (!parsed.success) return err("malformed");
     const row = parsed.data;
 
@@ -725,6 +587,7 @@ export const writeConcept = async (
           actor: actorIdOf(fresh),
           auditEventId,
           evidence: evidence.data,
+          restsAlsoOn: [],
           acceptance,
         });
       }),
@@ -740,137 +603,6 @@ export const writeConcept = async (
 
     return ok({ iri: row.iri, sha: committed.value.sha, auditEventId, contentHash });
   });
-};
-
-/**
- * Everything the act's transaction writes beside its ledger row: the index row the boundary
- * parsed, and the facts the act itself supplies. The row's columns are named once — by
- * the boundary — rather than restated here and again at the call site.
- */
-type Landing = z.infer<typeof conceptRow> & {
-  readonly mergeKey: string;
-  readonly commit: Committed;
-  readonly actor: ActorId;
-  readonly auditEventId: string;
-  readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[];
-  /** The suggestion this act decided, when it was an acceptance; absent otherwise. */
-  readonly acceptance: Acceptance | undefined;
-};
-
-/** The rows the act writes, in one place so the order they are written in is one fact. */
-const landRows = async (principal: UserPrincipal, tx: Tx, index: Landing): Promise<void> => {
-  // The identity first: the index row's composite key points at it, and a merge key that
-  // moved is upkeep on the row that already exists rather than a second identity.
-  await tx.query(
-    `INSERT INTO concept_identity (workspace_id, iri, merge_key) VALUES ($1, $2, $3)
-     ON CONFLICT (workspace_id, iri) DO UPDATE SET merge_key = EXCLUDED.merge_key`,
-    [index.workspaceId, index.iri, index.mergeKey],
-  );
-  await tx.query(
-    `INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter, body,
-                                content_hash, commit_sha, status, published_at, sensitivity,
-                                audience)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-     ON CONFLICT (workspace_id, iri) DO UPDATE
-        SET path = EXCLUDED.path, kind = EXCLUDED.kind, title = EXCLUDED.title,
-            frontmatter = EXCLUDED.frontmatter, body = EXCLUDED.body,
-            content_hash = EXCLUDED.content_hash, commit_sha = EXCLUDED.commit_sha,
-            status = EXCLUDED.status, published_at = EXCLUDED.published_at,
-            sensitivity = EXCLUDED.sensitivity, audience = EXCLUDED.audience,
-            updated_at = now()`,
-    [
-      index.workspaceId,
-      index.iri,
-      index.path,
-      index.kind,
-      index.title,
-      index.frontmatter,
-      index.body,
-      index.contentHash,
-      index.commit.sha,
-      index.status,
-      index.publishedAt,
-      index.sensitivity,
-      index.audience,
-    ],
-  );
-  await tx.query(
-    `INSERT INTO bundle_commit (workspace_id, sha, parent_sha, audit_event_id, actor)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [index.workspaceId, index.commit.sha, index.commit.parent, index.auditEventId, index.actor],
-  );
-  for (const piece of index.evidence) {
-    await tx.query(
-      `INSERT INTO evidence (workspace_id, source_document_id, locator, resource, content_version)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (workspace_id, source_document_id, locator) DO UPDATE
-          SET resource = EXCLUDED.resource, content_version = EXCLUDED.content_version`,
-      [
-        piece.workspaceId,
-        piece.sourceDocumentId,
-        piece.locator,
-        piece.resource,
-        piece.contentVersion ?? null,
-      ],
-    );
-  }
-  // The bundle-and-record graph delta, last of the bundle's rows: it resolves link targets
-  // against the index this transaction just wrote, and it lands or rolls back with
-  // everything above — which is what "the map is never behind for an edit" means (ADR 0023,
-  // ADR 0032). An acceptance writes it too: the decision below is one act with these rows.
-  await writeConceptDelta(principal, tx, {
-    iri: index.iri,
-    kind: index.kind,
-    path: index.path,
-    body: index.body,
-    frontmatter: index.frontmatter ?? {},
-    publishedAt: index.publishedAt ?? null,
-    sensitivity: index.sensitivity,
-    audience: index.audience,
-    status: index.status,
-  });
-  if (index.acceptance === undefined) return;
-
-  // The suggestion's decision, in the same transaction as the rows its acceptance wrote:
-  // a suggestion is never accepted without its concept, or the other way about. `status`
-  // is in the WHERE, so a suggestion two people decide at once is decided once — and the
-  // loser aborts here rather than committing a decision that never happened.
-  //
-  // The marker first, because the row's trigger refuses a decision from a transaction that
-  // has not said it is making one (migration 0018): an acceptance is the one road that may
-  // decide by accepting, and this is where it says so.
-  await markDeciding(tx, index.acceptance.suggestionId);
-  const decided = await tx.query<{ id: string }>(
-    `UPDATE suggestion
-        SET status = $3, decider = $4, decided_at = now(), target_iri = $5
-      WHERE workspace_id = $1 AND id = $2 AND status = $6
-    RETURNING id`,
-    [
-      index.workspaceId,
-      index.acceptance.suggestionId,
-      SUGGESTION_ACCEPTED_STATUS,
-      index.actor,
-      index.iri,
-      SUGGESTION_WAITING_STATUS,
-    ],
-  );
-  if (decided.rows.length === 0) {
-    throw new Error("the suggestion was decided by somebody else while this act was in flight");
-  }
-  if (index.acceptance.kind !== SUGGESTION_REPAIR_KIND) return;
-
-  // **The repair re-hash** (T-006 spec, *Evidence, verification and repair*). Repairing a
-  // locator moves the content hash, so every standing check on this concept would read
-  // *Changed since checked* the moment this act commits — for a change nobody made to the
-  // fact. The checks are re-pointed at what the repair wrote, in this act's own
-  // transaction, and marked as hashes a routine moved: the actor and the instant stand, so
-  // *Checked by Ada* stays *Checked by Ada* and the cadence still reads the real date.
-  // An imported check carries no hash and is left exactly alone (ADR 0019).
-  await tx.query(
-    `UPDATE concept_verification SET content_hash = $3, origin = $4
-      WHERE workspace_id = $1 AND iri = $2 AND content_hash IS NOT NULL`,
-    [index.workspaceId, index.iri, index.contentHash, VERIFICATION_REPAIR_ORIGIN],
-  );
 };
 
 /**
@@ -1138,6 +870,38 @@ type ConceptRow = {
 };
 
 /**
+ * The one SELECT every read of a concept shares — `open`'s by IRI and `find`'s by query —
+ * with the read predicate on the row and the latest check beside it: two statements that
+ * projected a concept differently would be two chances to leak a column one of them
+ * withholds. `$1` is the read's own term; the predicate's two parameters follow it.
+ */
+const CONCEPT_SELECT = `SELECT c.iri, c.path, c.kind, c.title, c.frontmatter, c.body, c.status,
+              c.content_hash, c.commit_sha,
+              v.actor AS checked_by, v.checked_at, v.content_hash AS checked_hash
+         FROM concept_index c
+         LEFT JOIN LATERAL (
+                SELECT actor, checked_at, content_hash
+                  FROM concept_verification
+                 WHERE workspace_id = c.workspace_id AND iri = c.iri
+                 ORDER BY checked_at DESC, id DESC
+                 LIMIT 1
+              ) v ON true
+        WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}`;
+
+const openedOf = (row: ConceptRow): OpenedConcept => ({
+  iri: row.iri,
+  path: row.path,
+  kind: row.kind,
+  title: row.title,
+  frontmatter: row.frontmatter,
+  body: row.body,
+  status: row.status,
+  contentHash: row.content_hash,
+  commitSha: row.commit_sha,
+  check: checkOf(row),
+});
+
+/**
  * One concept by its IRI, or nothing — the read `open` serves (ADR 0018).
  *
  * **A concept this caller may not see and a concept nobody minted answer the same way**:
@@ -1155,38 +919,52 @@ export const conceptByIri = async (
   iri: string,
 ): Promise<Result<OpenedConcept | undefined, Error>> => {
   const found = await attempt(() =>
-    tx.query<ConceptRow>(
-      `SELECT c.iri, c.path, c.kind, c.title, c.frontmatter, c.body, c.status,
-              c.content_hash, c.commit_sha,
-              v.actor AS checked_by, v.checked_at, v.content_hash AS checked_hash
-         FROM concept_index c
-         LEFT JOIN LATERAL (
-                SELECT actor, checked_at, content_hash
-                  FROM concept_verification
-                 WHERE workspace_id = c.workspace_id AND iri = c.iri
-                 ORDER BY checked_at DESC, id DESC
-                 LIMIT 1
-              ) v ON true
-        WHERE c.iri = $1 AND ${readableClause("c", 2)}`,
-      [iri, readableParameter(principal)],
-    ),
+    tx.query<ConceptRow>(`${CONCEPT_SELECT} AND c.iri = $4`, [
+      principal.workspaceId,
+      ...readableParameters(principal),
+      iri,
+    ]),
   );
   if (!found.ok) return err(found.error);
   const row = found.value.rows[0];
-  if (row === undefined) return ok(undefined);
+  return ok(row === undefined ? undefined : openedOf(row));
+};
 
-  return ok({
-    iri: row.iri,
-    path: row.path,
-    kind: row.kind,
-    title: row.title,
-    frontmatter: row.frontmatter,
-    body: row.body,
-    status: row.status,
-    contentHash: row.content_hash,
-    commitSha: row.commit_sha,
-    check: checkOf(row),
-  });
+/** The three characters `LIKE` reads as pattern, escaped, so a query is only ever text. */
+const likeEscaped = (text: string): string => text.replaceAll(/[\\%_]/g, String.raw`\$&`);
+
+/**
+ * The concepts whose title or body holds the query, as this caller may see them — `find`'s
+ * first real read over `concept_index` (T-055), through the same SELECT and the same
+ * predicate as `open`, so a hit is exactly a concept the caller could open. **A withheld
+ * concept is not a hit, not a count and not a hint** (ADR 0016): the predicate is in the
+ * WHERE clause, and the list is what came back.
+ *
+ * Matching is a substring, case-folded, by title first — ranking is B9's, and this read
+ * exists to be predicate-true over real rows rather than product-complete. A query with
+ * nothing in it matches nothing rather than everything.
+ */
+export const findConcepts = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: { readonly query: string; readonly limit: number },
+): Promise<Result<readonly OpenedConcept[], Error>> => {
+  const query = input.query.trim();
+  if (query === "" || input.limit < 1) return ok([]);
+  const found = await attempt(() =>
+    tx.query<ConceptRow>(
+      `${CONCEPT_SELECT} AND (c.title ILIKE $4 OR c.body ILIKE $4)
+        ORDER BY c.title, c.iri LIMIT $5`,
+      [
+        principal.workspaceId,
+        ...readableParameters(principal),
+        `%${likeEscaped(query)}%`,
+        input.limit,
+      ],
+    ),
+  );
+  if (!found.ok) return err(found.error);
+  return ok(found.value.rows.map(openedOf));
 };
 
 /**

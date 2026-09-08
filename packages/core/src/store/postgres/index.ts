@@ -5,6 +5,7 @@ import { err, ok, type Result } from "../../kernel/index.ts";
 import type {
   Claims,
   PlatformPrincipal,
+  Principal,
   PrincipalRefusal,
   Role,
   UserId,
@@ -37,6 +38,22 @@ export type PostgresDoor = {
 };
 
 export const openPostgres = (pool: pg.Pool): PostgresDoor => ({ pool });
+
+/**
+ * How a statement names the workspace a Principal of **either kind** acts in — the one idiom,
+ * in one place, for every tenant read or write that takes a `Principal` rather than a
+ * `UserPrincipal`. A user principal's workspace is named outright, so a disagreement with
+ * the transaction's scope is refused by the policy rather than read; the platform principal
+ * carries none, so the scope alone says which workspace the statement reaches, and an
+ * unscoped transaction resolves to the NULL the policy refuses. `scopeClause(at)` renders
+ * the term over the placeholder `$at`, which `scopeParameter` fills — a pair, like
+ * `readableClause` and `readableParameters`, because the two have to move together.
+ */
+export const scopeClause = (at: number): string =>
+  `COALESCE($${at}::text, (select current_workspace_id()))`;
+
+export const scopeParameter = (principal: Principal): string | null =>
+  principal.kind === "user" ? principal.workspaceId : null;
 
 /**
  * One transaction's client. Narrow on purpose: a slice runs statements on it and

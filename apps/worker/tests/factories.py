@@ -8,11 +8,14 @@ scope the cursor currently holds — seeding as the superuser and asserting as
 
 import re
 import secrets
-import time
 from typing import Any
 
 from psycopg import Cursor
 
+# The tier's own minter, imported rather than copied: the conformance suite holds this
+# very function to `contracts/id-shape/cases.json`, and a second implementation here
+# would prove the copy instead of the code the nightly audit's self-scheduling uses.
+from better_answers_worker.ids import ulid
 from pg_harness import REPO_ROOT
 
 # The vector width (`[DEPS2]`) — the one packages/schema/src/index-tables.ts exports,
@@ -34,25 +37,6 @@ def embedding_dimensions() -> int:
 
 
 EMBEDDING_DIMENSIONS = embedding_dimensions()
-
-_ULID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-
-
-def ulid() -> str:
-    """One id in the shape both tiers agreed (``contracts/id-shape``, ADR 0035).
-
-    Ten characters of milliseconds then sixteen of randomness, so an id seeded here
-    sorts by when it was made and parses at the other tier's boundary — the same
-    promise ``packages/schema/src/ulid.ts`` makes. This tier mints no id in
-    production; the helper exists so a seeded row is indistinguishable from one the
-    app wrote, and so the conformance suite has something of its own to hold to the
-    fixture.
-    """
-    milliseconds = time.time_ns() // 1_000_000
-    stamp = "".join(
-        _ULID_ALPHABET[(milliseconds >> shift) & 0b11111] for shift in range(45, -1, -5)
-    )
-    return stamp + "".join(secrets.choice(_ULID_ALPHABET) for _ in range(16))
 
 
 def _returning_row(cursor: Cursor[Any]) -> dict[str, Any]:
@@ -149,5 +133,53 @@ def seed_concept_index(
         " VALUES (%s, %s, %s, 'Policy', 'Expenses', '{}'::jsonb, 'body', %s, %s,"
         " 'stable', now(), 'Internal', 'everyone') RETURNING *",
         (workspace_id, iri, path, content_hash, sha),
+    )
+    return _returning_row(cursor)
+
+
+def seed_job(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    job_id: str | None = None,
+    kind: str = "nightly-audit",
+    reason: str | None = None,
+    status: str = "queued",
+    attempts: int = 0,
+    max_attempts: int = 3,
+    enqueued_ago_seconds: int = 0,
+    claimed_by: str | None = None,
+    lease_expires_in_seconds: int | None = None,
+) -> dict[str, Any]:
+    """One job on the worker's queue, at whatever point of its life a caller needs.
+
+    The two instants are given as offsets in seconds and become absolute here, so a
+    suite can arrange a lapsed lease or an old enqueue without waiting for either to
+    happen. A job that names a claimant is given a claim instant and a heartbeat too,
+    because the row's own CHECK ties `claimed_by` to `claimed_at`.
+    """
+    held = None if claimed_by is None else "now() - interval '1 second'"
+    lease = (
+        "NULL"
+        if lease_expires_in_seconds is None
+        else f"now() + interval '{lease_expires_in_seconds} seconds'"
+    )
+    cursor.execute(
+        "INSERT INTO job (workspace_id, id, kind, reason, status, attempts,"
+        " max_attempts, enqueued_at, claimed_by, claimed_at, lease_expires_at,"
+        " heartbeat_at)"
+        f" VALUES (%s, %s, %s, %s, %s, %s, %s,"
+        f" now() - interval '{enqueued_ago_seconds} seconds', %s,"
+        f" {held or 'NULL'}, {lease}, {held or 'NULL'}) RETURNING *",
+        (
+            workspace_id,
+            job_id or ulid(),
+            kind,
+            reason,
+            status,
+            attempts,
+            max_attempts,
+            claimed_by,
+        ),
     )
     return _returning_row(cursor)

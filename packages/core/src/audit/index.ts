@@ -1,8 +1,9 @@
 import { boundarySchemas } from "@better-answers/schema";
+import type { z } from "zod";
 
 import { actorIdOf } from "../kernel/index.ts";
 import type { ActorId, AuditEventId, PlatformPrincipal, Principal } from "../kernel/index.ts";
-import type { Tx } from "../store/postgres/index.ts";
+import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import {
   type Act,
   DETAIL_KINDS,
@@ -26,6 +27,9 @@ import {
  * - `recordFor` takes the platform principal **and an explicit actor**, for the one act a
  *   person performs while holding no membership and so no Principal: the *access request*
  *   (T-061). Typed so a user principal cannot reach it.
+ *
+ * And one read, `eventsOfAct`: the rows of one act in one workspace, which is what a
+ * *signal* over the ledger is (ADR 0025) — the reconciler's hits, first (T-056).
  *
  * **Both run inside the caller's transaction and reject on any failure.** That is the
  * one place a `core` function is designed to reject rather than return a `Result`
@@ -74,6 +78,38 @@ export type Recorded = {
   readonly actorId: ActorId;
 };
 
+/** A row as the ledger holds it — the boundary's own shape, family and subject kind derived. */
+export type LedgerRow = z.infer<typeof boundarySchemas.auditEvent.select>;
+
+/**
+ * The one read: every row of one act in the caller's workspace, oldest first, from an
+ * instant when the caller names one. A signal is a query over rows the platform already
+ * keeps and never a counter (ADR 0025), and this is that query over the ledger: the
+ * reconciler's hits are it over `platform.reconciler.replayed`. Inside the caller's
+ * transaction and under its scope — a user principal's own workspace, written so a
+ * disagreement with the scope reads nothing; the platform's, the scope alone. A read
+ * writes no row.
+ */
+export const eventsOfAct = async (
+  principal: Principal,
+  tx: Tx,
+  act: Act,
+  since?: Date,
+): Promise<readonly LedgerRow[]> => {
+  const found = await tx.query(
+    `SELECT id, workspace_id AS "workspaceId", act, family, actor, subject_kind AS "subjectKind",
+            subject_id AS "subjectId", at, detail, batch_id AS "batchId"
+       FROM audit_event
+      WHERE workspace_id = ${scopeClause(1)}
+        AND act = $2
+        AND ($3::timestamptz IS NULL OR at >= $3)
+      ORDER BY at, id`,
+    [scopeParameter(principal), act.name, since ?? null],
+  );
+  // Parsed at the boundary rather than asserted (ADR 0028): the row is the schema's shape.
+  return found.rows.map((row) => boundarySchemas.auditEvent.select.parse(row));
+};
+
 /**
  * The row's own columns, parsed through the boundary less the workspace: the transaction's
  * scope supplies that, below, because the platform principal carries no workspace id.
@@ -119,7 +155,7 @@ const write = async <A extends Act>(
   // an unscoped transaction lands nothing, because the policy refuses the NULL it resolves to.
   const inserted = await tx.query<{ id: string }>(
     `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail, batch_id)
-     VALUES ($1, COALESCE($2::text, (select current_workspace_id())), $3, $4, $5, $6, $7)
+     VALUES ($1, ${scopeClause(2)}, $3, $4, $5, $6, $7)
      RETURNING id`,
     [
       row.data.id,
@@ -145,8 +181,7 @@ export const record = <A extends Act>(
   principal: Principal,
   tx: Tx,
   event: AuditEvent<A>,
-): Promise<Recorded> =>
-  write(tx, principal.kind === "user" ? principal.workspaceId : null, actorIdOf(principal), event);
+): Promise<Recorded> => write(tx, scopeParameter(principal), actorIdOf(principal), event);
 
 /**
  * The second door: write one event as the platform, booked to an actor the platform

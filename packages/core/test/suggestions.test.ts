@@ -21,16 +21,15 @@ import {
 } from "../src/concepts/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
-import { bundleHistory, bundlesForSuite, commitFacts } from "./bundle.ts";
+import { bundleHistory, commitFacts } from "./bundle.ts";
 import {
   abortTheTransaction,
   holdingTable,
   isBlockedOnTable,
-  postgresForSuite,
   readingAs,
   until,
 } from "./suite-postgres.ts";
-import { arrangeWorkspace, type Scenario } from "./workspace-with-bundle.ts";
+import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 /**
  * Suggestions, the inbox and identity, through the concepts slice's entry point
@@ -43,13 +42,7 @@ import { arrangeWorkspace, type Scenario } from "./workspace-with-bundle.ts";
  * repaired, so a repair never turns *Checked* into *Changed since checked*.
  */
 
-const db = postgresForSuite();
-const bundles = bundlesForSuite();
-
-const arrange = (): Promise<Scenario> => arrangeWorkspace(db(), bundles());
-
-/** Both doors, as every act in this slice takes them — a decision holds the bundle's lock. */
-const doorsOf = (scenario: Scenario) => ({ git: scenario.git, postgres: scenario.postgres });
+const { db, arrange } = suiteWithBundles();
 
 let proposed = 0;
 

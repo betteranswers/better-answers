@@ -61,6 +61,14 @@ ops() {
   if [ "${rc}" -eq "${NOT_BUILT}" ]; then aside "  -> not built yet: 'pnpm ops $1' found no tables for its slice (recorded, not failed)"; return 0; fi
   return "${rc}"
 }
+# prod_query <sql> — one read of production over the SSH hop, the answer on stdout as `psql -At`
+# writes it. The SQL travels on stdin: an argument would be re-split by the shell on the far side
+# of the hop. A hop or psql failure is refused through `aside` — never `say`, whose stdout a
+# caller's `$(…)` would capture as the answer — and the caller stops the drill on the status.
+prod_query() {
+  if printf '%s' "$1" | ${PROD_PSQL} -At; then return 0; fi
+  aside "REFUSED: production could not be read for the counts diff — the SSH hop or psql failed"; return 1
+}
 wipe_staging() {
   platform down --remove-orphans || true; stores down --remove-orphans || true
   # NOT "${WORK}": step 0 wipes too, and the report being written lives there — the work
@@ -127,24 +135,48 @@ for ws in $(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d /
   age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${WORK}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
   sudo -u '#1000' git clone --quiet --bare "${WORK}/${ws}.bundle" "/data/git/${ws}.git"
 done
-# `api` alone: naming a service on the command line auto-enables its profile, and `worker` is
-# behind the `pipeline` profile until T-006's work loop exists (platform.compose.yaml).
-platform up -d --wait api
+# Both, and named rather than left to `up`: the drill measures the recovery order below,
+# and the graph rebuild in it is a job the worker claims — a stack without a worker would
+# wait for a rebuild nothing was going to run.
+platform up -d --wait api worker
 say "api up — RTO so far $(( ( $(date +%s) - T0 ) / 60 )) min"
 
 say "## 5 recovery order 2–5: watermark, graph rebuild, pipeline state (LMDBs empty → reprocess), orphans"
 ops reconcile-watermark --workspace "${DRILL_WORKSPACE}"
 t0=$(date +%s); ops graph-rebuild --workspace "${DRILL_WORKSPACE}" --wait
 say "graph rebuilt in $(( $(date +%s) - t0 )) s (promise: ≤ 120 s)"
-ops graph-sweep --workspace "${DRILL_WORKSPACE}" --wait
+# One transaction, so there is nothing to wait for: the sweep answers when it has swept.
+ops graph-sweep --workspace "${DRILL_WORKSPACE}"
 ops object-store-orphans --workspace "${DRILL_WORKSPACE}" --list >> "${REPORT}"
 
 say "## 6 counts diff against production's stamped run (ADR 0023) — production read over SSH, no open port (ticket 79 A12)"
-if ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts"; then
-  # The SQL travels on stdin: an argument would be re-split by the shell on the far side of the SSH hop.
-  printf '%s' "select counts_json from graph_sync_run where workspace_id = '${DRILL_WORKSPACE}' and outcome = 'ok' order by finished_at desc limit 1" \
-    | ${PROD_PSQL} -At > "${WORK}/prod.counts" 2>/dev/null || echo '{}' > "${WORK}/prod.counts"
-  if [ -s "${WORK}/staging.counts" ] && diff <(jq -S . "${WORK}/prod.counts") <(jq -S . "${WORK}/staging.counts") >> "${REPORT}"; then say "counts match"; elif [ -s "${WORK}/staging.counts" ]; then say "COUNTS DIFFER"; exit 1; fi
+# An empty staging file is `graph-counts` answering `not built` (exit 3, which `ops` turns
+# into a recorded 0): there is nothing to diff and nothing to report.
+if ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts" && [ -s "${WORK}/staging.counts" ]; then
+  cat "${WORK}/staging.counts" >> "${REPORT}"
+  # Production is read in two steps, so a hop that fails is never mistaken for a run that was
+  # never stamped: first whether the stamped-run table exists there at all, then the latest
+  # good run's counts. An SSH or psql failure stops the drill — a report that said "no stamped
+  # run" over a connection that never answered would be the diff quietly skipped — and only an
+  # absent table or an empty answer is the baseline being absent.
+  if ! stamped=$(prod_query "select to_regclass('public.graph_sync_run') is not null"); then exit 1; fi
+  if [ "${stamped}" = "t" ]; then
+    if ! prod_query "select counts_json from graph_sync_run where workspace_id = '${DRILL_WORKSPACE}' and outcome = 'ok' order by finished_at desc limit 1" > "${WORK}/prod.counts"; then
+      exit 1
+    fi
+  else
+    : > "${WORK}/prod.counts"
+  fi
+  if [ ! -s "${WORK}/prod.counts" ]; then
+    # `graph_sync_run` is the worker's stamped record of a sync and no task has built it yet,
+    # so production has nothing to diff against. The staging counts stand in the report as
+    # the fact they are: recorded, and never read as a match.
+    say "no stamped run on production to diff against — staging counts recorded, not matched"
+  elif diff <(jq -S . "${WORK}/prod.counts") <(jq -S . "${WORK}/staging.counts") >> "${REPORT}"; then
+    say "counts match"
+  else
+    say "COUNTS DIFFER"; exit 1
+  fi
 fi
 
 say "## 7 smoke through the interface: health, discovery, the shell; find · a guide read · ask as the slices land"

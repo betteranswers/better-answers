@@ -329,6 +329,36 @@ export const removeFromGroup = async (
 };
 
 /**
+ * Whether every id named is a group this workspace holds — what an act that writes an
+ * audience asks before it names one (ADR 0039): a narrowing or an override naming a group
+ * nobody minted would be an audience no caller could ever be in, and the act answers a
+ * word for that rather than landing a row the predicate reads as *nobody*. A read of the
+ * slice's own table, in the caller's transaction; the ids are the boundary's shape already,
+ * or the caller would not hold a `GroupId`. Empty is vacuously true: *everyone* names none.
+ *
+ * **An Admin's question, refused to anyone else before the table is read**: its callers are
+ * the Admin acts that write an audience, and which groups a workspace holds is what an
+ * audience is written against — the same reason `listGroups` is an Admin's — so an Editor
+ * reaching this would have an existence oracle over the group table that no verb of this
+ * slice grants them.
+ */
+export const holdsEveryGroup = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  groupIds: readonly GroupId[],
+): Promise<Result<boolean, RoleRefusal>> => {
+  const admin = requireAdmin(principal);
+  if (!admin.ok) return err(admin.error);
+  const distinct = [...new Set(groupIds)];
+  if (distinct.length === 0) return ok(true);
+  const found = await tx.query<{ held: number }>(
+    `SELECT count(*)::int AS held FROM "group" WHERE workspace_id = $1 AND id = ANY($2::text[])`,
+    [admin.value.workspaceId, distinct],
+  );
+  return ok(found.rows[0]?.held === distinct.length);
+};
+
+/**
  * The workspace's groups with their member counts, by name — the Groups screen's rows.
  * A read, so it writes no ledger row; Admin-only like every other verb here, because who
  * is in which group is what an audience is written against.

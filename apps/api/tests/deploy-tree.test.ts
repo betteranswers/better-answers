@@ -134,6 +134,23 @@ describe("the deploy tree (T-005)", () => {
     expect(read("apps/docs-site/operations/RUNBOOK.md")).toContain("restore-production.sh");
   });
 
+  it("runs the four graph commands the way each of them answers, and records counts it has nothing to diff", () => {
+    const drill = read("deploy/restore-drill.sh");
+
+    // The rebuild is the one that waits, because it is the one that enqueues; the sweep is
+    // one transaction and answers when it has swept.
+    expect(drill).toContain('ops graph-rebuild --workspace "${DRILL_WORKSPACE}" --wait');
+    expect(drill).toContain('ops graph-sweep --workspace "${DRILL_WORKSPACE}"\n');
+    expect(drill).not.toContain('graph-sweep --workspace "${DRILL_WORKSPACE}" --wait');
+    expect(drill).toContain('ops reconcile-watermark --workspace "${DRILL_WORKSPACE}"');
+    // `graph-counts` is done over an empty map, so its one line of JSON now reaches the
+    // diff on every drill. Production's side is the worker's stamped run, which no task has
+    // built: nothing to diff against is recorded and never read as a match, and only two
+    // counts that really disagree stop the drill.
+    expect(drill).toContain("no stamped run on production to diff against");
+    expect(drill).toContain("COUNTS DIFFER");
+  });
+
   it("wipes staging without a graph special case: the graph is plain tables in `public` (ADR 0032)", () => {
     const drill = read("deploy/restore-drill.sh");
     expect(drill).not.toMatch(/ag_catalog|drop_graph|\bAGE\b/);

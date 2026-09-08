@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { lastMigrationTag } from "../src/journal.ts";
+import { lastMigration } from "../src/journal.ts";
 import { startMigratedPostgres } from "../test/harness.ts";
 import { assertNoUndeclaredTables, introspect, renderWorkerSchemaView } from "./worker-view.ts";
 
@@ -19,13 +19,13 @@ const viewPath = path.resolve(
   "../../../apps/worker/src/better_answers_worker/schema_view.py",
 );
 
-const migrationId = lastMigrationTag();
+const migration = lastMigration();
 
 const db = await startMigratedPostgres();
 try {
   const rows = await introspect(db.pool);
   assertNoUndeclaredTables(rows);
-  writeFileSync(viewPath, renderWorkerSchemaView(rows, migrationId));
+  writeFileSync(viewPath, renderWorkerSchemaView(rows, migration));
 } finally {
   await db.stop();
 }

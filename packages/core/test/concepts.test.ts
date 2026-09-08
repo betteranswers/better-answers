@@ -9,6 +9,7 @@ import {
   contentHashOf,
   conceptByIri,
   foldKind,
+  parseConceptFile,
   renderConceptFile,
   writeConcept,
   type Frontmatter,
@@ -220,6 +221,53 @@ describe("a governed write", () => {
     );
   });
 
+  it("hashes the frontmatter the file carries — the type and the title the act wrote in — so the row's hash is what a parse of the file reproduces", async () => {
+    const scenario = await arrange();
+    // A caller that names the kind and the title to the act and puts neither in the file:
+    // the act writes both in, and both are hashed keys.
+    const input = writeFor({ frontmatter: { tags: ["finance"] } });
+
+    const written = await landed(scenario, input);
+
+    const file = await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path);
+    const read = parseConceptFile(file);
+    expect(read.ok && read.value.frontmatter).toMatchObject({
+      type: "Policy",
+      title: "Expenses",
+      tags: ["finance"],
+    });
+    // The nightly audit's whole check, made here once: the file's own parse hashes to the
+    // number the row carries, which it could not if the row were hashed before the act
+    // finished writing the file's keys.
+    expect(read.ok && contentHashOf(read.value.frontmatter, read.value.body, input.path)).toBe(
+      written.contentHash,
+    );
+    const row = await db().pool.query<{ content_hash: string }>(
+      "SELECT content_hash FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+      [scenario.workspaceId, written.iri],
+    );
+    expect(row.rows[0]?.content_hash).toBe(written.contentHash);
+  });
+
+  it("takes the status the file names when the act names none, so a file that says stable is not indexed as a draft", async () => {
+    const scenario = await arrange();
+    // `writeFor` names no status of its own; the file is the only thing that says one.
+    const input = writeFor({
+      frontmatter: { title: "Expenses", type: "Policy", status: "stable" },
+    });
+
+    const written = await landed(scenario, input);
+
+    const row = await db().pool.query<{ status: string; published: boolean }>(
+      "SELECT status, published_at IS NOT NULL AS published FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+      [scenario.workspaceId, written.iri],
+    );
+    expect(row.rows).toEqual([{ status: "stable", published: true }]);
+    // And the file says the same, so a replay lands the row the act did.
+    const file = await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path);
+    expect(file).toContain('"status": "stable"');
+  });
+
   it("records the concept, its identity, the commit and its evidence in one transaction", async () => {
     const scenario = await arrange();
     const input = writeFor({
@@ -380,12 +428,14 @@ describe("a governed write", () => {
 });
 
 /**
- * The content hash and the rendered file, asserted against **values written down here**.
+ * The content hash and the rendered file, asserted against **values written down**.
  *
  * Both are cross-tier contracts — the hash is the canonical form ADR 0014 fixes and the file
  * is "readable by any OKF tool" (ADR 0012) — so an expectation computed by calling the same
- * function would agree with a canonicalisation the Python tier could not read. The literals
- * are the agreement; the code either produces them or it has moved the contract.
+ * function would agree with a canonicalisation the Python tier could not read. The hash's
+ * literals are the concept-file agreement's (`contracts/concept-file/cases.json`, held in
+ * `concept-file.contract.test.ts` and the worker's twin); what stays here is what the hash
+ * leaves out and what it reduces, and the rendered file's literals.
  */
 describe("what a concept hashes and what it renders", () => {
   const HASHED_PATH = "knowledge/policies/expenses.md";
@@ -416,11 +466,9 @@ describe("what a concept hashes and what it renders", () => {
     // spaces and tabs, and a run of blank lines at the end.
     const body = "First line   \r\nsecond line\t\r\n\r\n\r\n";
 
-    expect(contentHashOf(frontmatter, body, HASHED_PATH)).toBe(
-      "db4fdd1329189f0ee7d4c0e9c3c736cb811c1cad0f2e433841046e13d8bdda7e",
-    );
     // The same hash with every trust key and the identity moved: hashing them would make a
     // check of its own recording move the hash and read *Changed since checked* at once.
+    // The number itself is the concept-file agreement's first case.
     expect(
       contentHashOf(
         {
@@ -434,7 +482,46 @@ describe("what a concept hashes and what it renders", () => {
         body,
         HASHED_PATH,
       ),
-    ).toBe("db4fdd1329189f0ee7d4c0e9c3c736cb811c1cad0f2e433841046e13d8bdda7e");
+    ).toBe(contentHashOf(frontmatter, body, HASHED_PATH));
+  });
+
+  it("hashes a list of objects under any other key the same whichever order their keys were written in", () => {
+    const body = "Expenses are claimed within thirty days.";
+    // A vendor's list, preserved verbatim in the file (ADR 0019) and canonicalised for the
+    // hash (RFC 8785): the order a producer wrote an object's keys in is not content.
+    const written = contentHashOf(
+      {
+        reviewers: [
+          { name: "Ada", role: "finance" },
+          { role: "legal", name: "Blake" },
+        ],
+      },
+      body,
+      HASHED_PATH,
+    );
+    const reordered = contentHashOf(
+      {
+        reviewers: [
+          { role: "finance", name: "Ada" },
+          { name: "Blake", role: "legal" },
+        ],
+      },
+      body,
+      HASHED_PATH,
+    );
+    const changed = contentHashOf(
+      {
+        reviewers: [
+          { name: "Ada", role: "finance" },
+          { role: "legal", name: "Casey" },
+        ],
+      },
+      body,
+      HASHED_PATH,
+    );
+
+    expect(reordered).toBe(written);
+    expect(changed).not.toBe(written);
   });
 
   it("hashes a `sources` that is no list, and an entry citing nothing, as citing nothing", () => {
@@ -929,6 +1016,21 @@ describe("what a governed write refuses", () => {
     expect(await head(scenario.editor, scenario.git)).toBeNull();
   });
 
+  it("refuses an entry with no keys in a list of objects, and makes no commit", async () => {
+    const scenario = await arrange();
+    // The renderer writes an entry as its keys' lines under a list dash, so an empty one has
+    // no line to be written as: it would come back off the file as nothing, which the parser
+    // refuses, and a replay would stop at the commit. Refused here instead, before any.
+    const refused = await write(
+      scenario,
+      scenario.editor,
+      writeFor({ frontmatter: { title: "Expenses", type: "Policy", reviewers: [{}] } }),
+    );
+
+    expect(refused).toEqual({ ok: false, error: "malformed" });
+    expect(await head(scenario.editor, scenario.git)).toBeNull();
+  });
+
   it("refuses a trailer value carrying a newline, whatever its type promised", async () => {
     const scenario = await arrange();
 
@@ -1014,14 +1116,16 @@ describe("what a governed write refuses", () => {
  * decided before any commit is made.
  */
 describe("what a re-write of an existing concept may not move", () => {
-  it("refuses an Editor's widening of an existing concept's class, and makes no commit", async () => {
+  it("refuses a named widening of an existing concept's class, and makes no commit", async () => {
     const scenario = await arrange();
     const input = writeFor({ sensitivity: "Restricted" });
     const first = await landed(scenario, input);
 
+    // The Admin, who may see a Restricted concept: an Editor is refused a step earlier, as
+    // for a concept nobody minted (`visibility.test.ts`), and never reaches this word.
     const widened = await write(
       scenario,
-      scenario.editor,
+      scenario.admin,
       rewriteOf(input, first, { sensitivity: "Public" }),
     );
 
@@ -1462,7 +1566,9 @@ describe("opening a concept by IRI", () => {
     if (!opened.ok || !opened.value.found) return;
     expect(opened.value.concept).toEqual({
       iri: written.iri,
-      frontmatter: { ...input.frontmatter, iri: written.iri },
+      // The file carries the status the act named beside its IRI, so the row and the
+      // reconciler's replay of the commit read the same thing off it (T-056).
+      frontmatter: { ...input.frontmatter, status: "stable", iri: written.iri },
       body: input.body,
       relations: [],
       trust: {

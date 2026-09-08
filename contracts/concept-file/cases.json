@@ -1,0 +1,107 @@
+{
+  "description": "concept-file (ADR 0014, ADR 0019, ADR 0031): the content hash a check confirms is one number whichever tier computed it — the app's `contentHashOf` at every write and replay, the worker's `content_hash_of` on every nightly audit — so the canonical text it hashes is an agreement, not either tier's reading of RFC 8785. Each entry of `cases` is a frontmatter as a file carries it, the concept's own `path` the `sources[]` reduction resolves against, the `body` as written, and what both tiers must produce: `canonical`, the frontmatter as the hash reads it (keys sorted by UTF-16 code unit — so an integer-like key sorts as the text it is, never first — the trust and identity keys dropped, `sources[]` reduced to `[resource, locator]` pairs, every number written as ECMAScript's `Number::toString` writes it, no insignificant whitespace), and `sha256`, the hex digest over that text, a newline and the normalised body. Each entry of `numbers` is a number as a file may carry it and the one text both tiers write for it under the key `n`.",
+  "cases": [
+    {
+      "why": "the trust and identity keys are left out, a relative and a dotted resource resolve against the concept's path, a numeric locator is kept as the text it meant and an absent one as null, and the body is normalised — CRLF to LF, trailing whitespace off, one final newline",
+      "path": "knowledge/policies/expenses.md",
+      "frontmatter": {
+        "title": "Expenses",
+        "type": "Policy",
+        "tags": ["travel", "receipts"],
+        "reviewers": [],
+        "usage_count": 4,
+        "approved": true,
+        "owner": null,
+        "sources": [
+          { "resource": "./handbook.md", "title": "Handbook", "locator": 4 },
+          { "resource": "/knowledge/policies/../rules.md", "locator": null }
+        ],
+        "generated": "2026-01-01",
+        "verified": "yes",
+        "stale_after": "3000-01-01",
+        "status": "stable",
+        "iri": "https://better-answers.com/c/01JZZZZZZZZZZZZZZZZZZZZZZZ"
+      },
+      "body": "First line   \r\nsecond line\t\r\n\r\n\r\n",
+      "canonical": "{\"approved\":true,\"owner\":null,\"reviewers\":[],\"sources\":[[\"/knowledge/policies/handbook.md\",\"4\"],[\"/knowledge/rules.md\",null]],\"tags\":[\"travel\",\"receipts\"],\"title\":\"Expenses\",\"type\":\"Policy\",\"usage_count\":4}",
+      "sha256": "db4fdd1329189f0ee7d4c0e9c3c736cb811c1cad0f2e433841046e13d8bdda7e"
+    },
+    {
+      "why": "a list of objects under any key but sources is preserved and its keys sorted, so the order a producer wrote them in is not content",
+      "path": "knowledge/policies/expenses.md",
+      "frontmatter": {
+        "reviewers": [
+          { "name": "Ada", "role": "finance" },
+          { "role": "legal", "name": "Blake" }
+        ]
+      },
+      "body": "Expenses are claimed within thirty days.",
+      "canonical": "{\"reviewers\":[{\"name\":\"Ada\",\"role\":\"finance\"},{\"name\":\"Blake\",\"role\":\"legal\"}]}",
+      "sha256": "39d526207876ae89b4473f7f3a46bf95f320a954f98c0183a6d08d22ceedce47"
+    },
+    {
+      "why": "an object's integer-like keys sort as the text they are — \"10\" before \"2\" before \"a\" — never hoisted first in numeric order the way a JavaScript object enumerates them",
+      "path": "knowledge/policies/expenses.md",
+      "frontmatter": {
+        "title": "Expenses",
+        "reviewers": [{ "b": true, "10": "ten", "2": "two", "a": "x" }]
+      },
+      "body": "Expenses are claimed within thirty days.",
+      "canonical": "{\"reviewers\":[{\"10\":\"ten\",\"2\":\"two\",\"a\":\"x\",\"b\":true}],\"title\":\"Expenses\"}",
+      "sha256": "204b76de2bbfaf54d3a1af01e6b3a55cd13a8362bdd807232d100d283fd25642"
+    },
+    {
+      "why": "every number shape a file may carry, as a value and as a locator: the exponent forms at both thresholds, a fraction, an integer past 2^53 read as the nearest double, and one exactly at it",
+      "path": "knowledge/policies/expenses.md",
+      "frontmatter": {
+        "count": 1e21,
+        "ratio": 1e-7,
+        "tiny": 0.000001,
+        "half": 0.5,
+        "big": 12345678901234567890,
+        "exact": 9007199254740992,
+        "sources": [{ "resource": "/a.md", "locator": 1e21 }]
+      },
+      "body": "Expenses are claimed within thirty days.",
+      "canonical": "{\"big\":12345678901234567000,\"count\":1e+21,\"exact\":9007199254740992,\"half\":0.5,\"ratio\":1e-7,\"sources\":[[\"/a.md\",\"1e+21\"]],\"tiny\":0.000001}",
+      "sha256": "33dce930674c2fd989f1c8ab9507a7ece82a60a7f0e7b23ee5b3ec548dbfdf70"
+    },
+    {
+      "why": "the numbers the two languages write differently by default: a tenth, 1e21 and 1e300 in exponent form with the sign on the exponent, 1e-7 with no zero padding, negative zero as 0, an integral float as an integer, one past 2^53 rounded to the double it is read as, and a numeric locator as its text",
+      "path": "knowledge/policies/expenses.md",
+      "frontmatter": {
+        "tenth": 0.1,
+        "big": 1e21,
+        "tiny": 1e-7,
+        "negative_zero": -0.0,
+        "hundred": 100.0,
+        "past_exact": 9007199254740993,
+        "huge": 1e300,
+        "sources": [{ "resource": "./receipts.md", "locator": 4.0 }]
+      },
+      "body": "Expenses are claimed within thirty days.",
+      "canonical": "{\"big\":1e+21,\"huge\":1e+300,\"hundred\":100,\"negative_zero\":0,\"past_exact\":9007199254740992,\"sources\":[[\"/knowledge/policies/receipts.md\",\"4\"]],\"tenth\":0.1,\"tiny\":1e-7}",
+      "sha256": "8f1932c7d986f01baeaac903ffbcc24fcc7b7004bbae917fc5590dc70a1fcc84"
+    }
+  ],
+  "numbers": [
+    { "value": 1e21, "text": "1e+21" },
+    { "value": 1e-7, "text": "1e-7" },
+    { "value": 0.000001, "text": "0.000001" },
+    { "value": 0.00001, "text": "0.00001" },
+    { "value": 5e-7, "text": "5e-7" },
+    { "value": 0.1, "text": "0.1" },
+    { "value": -0.0, "text": "0" },
+    { "value": 100.0, "text": "100" },
+    { "value": 123.456, "text": "123.456" },
+    { "value": 1e16, "text": "10000000000000000" },
+    { "value": 1.5e300, "text": "1.5e+300" },
+    { "value": -1.5e-10, "text": "-1.5e-10" },
+    { "value": 4, "text": "4" },
+    { "value": -42, "text": "-42" },
+    { "value": 9007199254740992, "text": "9007199254740992" },
+    { "value": 9007199254740993, "text": "9007199254740992" },
+    { "value": 12345678901234567890, "text": "12345678901234567000" },
+    { "value": 123456789012345680000, "text": "123456789012345680000" }
+  ]
+}

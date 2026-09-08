@@ -69,8 +69,20 @@ export const assertNoUndeclaredTables = (rows: readonly ColumnRow[]): void => {
   }
 };
 
-/** Renders the committed Python module — ruff-format-stable by construction. */
-export const renderWorkerSchemaView = (rows: readonly ColumnRow[], migrationId: string): string => {
+/**
+ * Renders the committed Python module — ruff-format-stable by construction.
+ *
+ * Two stamps, not one. `MIGRATION_ID` is the tag a person reads; `MIGRATION_WHEN` is the
+ * journal's `when` for that same migration, which is what drizzle's migrator writes into
+ * `drizzle.__drizzle_migrations.created_at`. The tag never reaches that table — it holds a
+ * hash and an instant — so `when` is the only fact the worker's stamp check can compare
+ * against the database it is about to claim from before it claims anything.
+ */
+export const renderWorkerSchemaView = (
+  rows: readonly ColumnRow[],
+  migration: { readonly tag: string; readonly when: number },
+): string => {
+  const { tag: migrationId, when: migrationWhen } = migration;
   const byTable = new Map<string, ColumnRow[]>();
   for (const row of rows) {
     const key = `${row.schema}.${row.table}`;
@@ -84,9 +96,12 @@ export const renderWorkerSchemaView = (rows: readonly ColumnRow[], migrationId: 
     "the drift test fails CI when this file and the journal disagree in either",
     "direction. The worker never migrates; this module is its read-only",
     "knowledge of what the app's journal built, stamped with the migration id it was",
-    'generated from."""',
+    "generated from and with that migration's journal instant, which is what the",
+    'migrator writes into `drizzle.__drizzle_migrations.created_at`."""',
     "",
     `MIGRATION_ID = "${migrationId}"`,
+    "",
+    `MIGRATION_WHEN = ${migrationWhen}`,
     "",
     "TABLES: dict[str, dict[str, str]] = {",
   ];

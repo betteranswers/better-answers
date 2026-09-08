@@ -4,7 +4,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { err, ok, type ActorId, type Result, type UserPrincipal } from "../../kernel/index.ts";
+import {
+  err,
+  ok,
+  type ActorId,
+  type PlatformPrincipal,
+  type Result,
+  type UserPrincipal,
+} from "../../kernel/index.ts";
 
 /**
  * The git door: the governed write to the per-workspace bare repository (ADR 0024).
@@ -18,7 +25,12 @@ import { err, ok, type ActorId, type Result, type UserPrincipal } from "../../ke
  * caller's string, and no call site can name one workspace's bundle while acting as another's
  * member.
  *
- * `initRepository` is the exception and says why where it stands.
+ * `initRepository` is the exception and says why where it stands. The **platform's** entries —
+ * the reconciler's, which replays a bundle's commits under `process:better-answers-reconciler`
+ * (ADR 0012's 2026-09-06 amendment) — take the platform principal and the workspace it acts
+ * in beside it, `withScope`'s shape in the Postgres door: a platform principal carries no
+ * workspace (`CONTEXT.md`, *platform principal*), so the pair is what names the repository,
+ * and the repository is still this module's arithmetic and never a caller's path.
  *
  * **git is a binary we consume, never code we write** (ADR 0005), so this module is the
  * plumbing commands and nothing else: `hash-object`, `read-tree`, `update-index`,
@@ -125,7 +137,12 @@ const bundleOf = (door: GitDoor, principal: UserPrincipal): string =>
 const git = async (
   gitDir: string,
   arguments_: readonly string[],
-  options: { readonly input?: string; readonly env?: Readonly<Record<string, string>> } = {},
+  options: {
+    readonly input?: string;
+    readonly env?: Readonly<Record<string, string>>;
+    /** Keep the output's own whitespace — a blob's bytes are the file, trailing newline and all. */
+    readonly raw?: boolean;
+  } = {},
 ): Promise<string> => {
   const child = run("git", ["--git-dir", gitDir, ...arguments_], {
     // The parent's environment handed to a child process, not configuration read at a call
@@ -144,7 +161,7 @@ const git = async (
     child.child.stdin?.end(options.input);
   }
   const { stdout } = await child;
-  return stdout.trim();
+  return options.raw === true ? stdout : stdout.trim();
 };
 
 /**
@@ -164,13 +181,12 @@ export const initRepository = async (door: GitDoor, workspaceId: string): Promis
 };
 
 /** What this workspace's bundle ref holds now; `null` when the repository has no commits yet. */
-export const head = async (principal: UserPrincipal, door: GitDoor): Promise<string | null> => {
+export const head = (principal: UserPrincipal, door: GitDoor): Promise<string | null> =>
+  headOf(bundleOf(door, principal));
+
+const headOf = async (gitDir: string): Promise<string | null> => {
   try {
-    return await git(bundleOf(door, principal), [
-      "rev-parse",
-      "--verify",
-      `${BUNDLE_REF}^{commit}`,
-    ]);
+    return await git(gitDir, ["rev-parse", "--verify", `${BUNDLE_REF}^{commit}`]);
   } catch {
     // An unborn branch is not a failure: a bundle with no commits is where every bundle
     // starts, and `rev-parse --verify` has no way of saying so but a non-zero exit.
@@ -228,6 +244,14 @@ const messageWith = (message: string, lines: readonly string[]): string =>
 const isBundlePath = (candidate: string): boolean =>
   candidate.length > 0 &&
   !candidate.startsWith("/") &&
+  // No control character: a tab or a newline in a path is a name no OKF tool reads back and
+  // a line git's own listings would have to quote — and the reader below takes NUL-delimited
+  // listings for exactly the characters git does quote, so this is what keeps the two
+  // ends of the door agreeing on what a path can be.
+  !candidate.split("").some((character) => {
+    const code = character.charCodeAt(0);
+    return code < 0x20 || code === 0x7f;
+  }) &&
   !candidate.split("/").some((segment) => segment === "" || segment === "." || segment === "..");
 
 /**
@@ -336,12 +360,26 @@ export const commit = async (
  */
 const locks = new Map<string, Promise<unknown>>();
 
-export const withRepositoryLock = async <T>(
+export const withRepositoryLock = <T>(
   principal: UserPrincipal,
   door: GitDoor,
   work: () => Promise<T>,
-): Promise<T> => {
-  const key = bundleOf(door, principal);
+): Promise<T> => lockedRepository(bundleOf(door, principal), work);
+
+/**
+ * The same lock, taken by the platform on a workspace it names — the reconciler's, so a
+ * replay and a live write on one bundle are one after the other, and a second replay of
+ * the same bundle waits behind the first rather than running beside it. One registry and
+ * one body for both entries, because two locks over one repository would be no lock.
+ */
+export const withRepositoryLockAs = <T>(
+  platform: PlatformPrincipal,
+  door: GitDoor,
+  workspaceId: string,
+  work: () => Promise<T>,
+): Promise<T> => lockedRepository(repositoryPath(door, workspaceId), work);
+
+const lockedRepository = async <T>(key: string, work: () => Promise<T>): Promise<T> => {
   const ahead = locks.get(key) ?? Promise.resolve();
   const mine = ahead.then(work, work);
   // The chain the next waiter joins never rejects, so one act's failure does not become
@@ -356,4 +394,139 @@ export const withRepositoryLock = async <T>(
     // workspace for the life of the process.
     if (locks.get(key) === chained) locks.delete(key);
   }
+};
+
+/**
+ * What the reconciler's scan answers (ADR 0012's 2026-09-06 amendment): the bundle's head,
+ * and the commits after the last one the rows know about — **oldest first**, which is the
+ * order they must be replayed in, because each commit's row names its parent's.
+ *
+ * A **watermark scan and never a hole scan**: `since` is the last recorded commit, and the
+ * prefix invariant — `bundle_commit` history is a prefix of git history, which the lock
+ * buys — means everything after it is missing and nothing before it is. So the one thing
+ * checked about `since` is that it *is* a prefix: a recorded commit the ref's history does
+ * not contain (or does not hold at all) is a repository and a database that disagree about
+ * the past, and no replay can make that right — `history-diverged` is the word, and the
+ * caller stops.
+ *
+ * `null` for `since` is a bundle whose rows know no commit yet: every commit is missed.
+ */
+export const commitsAfter = async (
+  platform: PlatformPrincipal,
+  door: GitDoor,
+  workspaceId: string,
+  since: string | null,
+): Promise<
+  Result<
+    { readonly head: string | null; readonly missed: readonly string[] },
+    "no-such-repository" | "history-diverged"
+  >
+> => {
+  const gitDir = repositoryPath(door, workspaceId);
+  try {
+    await run("git", ["--git-dir", gitDir, "rev-parse", "--git-dir"]);
+  } catch {
+    // Not there, or not a repository: the reconciler cannot replay a bundle it cannot open,
+    // and the restore path hears the one word for both.
+    return err("no-such-repository");
+  }
+  const head = await headOf(gitDir);
+  if (head === null) return since === null ? ok({ head, missed: [] }) : err("history-diverged");
+  if (since !== null) {
+    try {
+      await git(gitDir, ["merge-base", "--is-ancestor", since, BUNDLE_REF]);
+    } catch {
+      // A non-zero exit is git's whole answer: not an ancestor, or not a commit this
+      // repository holds — both are the recorded history disagreeing with the ref's.
+      return err("history-diverged");
+    }
+  }
+  const listed = await git(gitDir, [
+    "rev-list",
+    "--reverse",
+    since === null ? BUNDLE_REF : `${since}..${BUNDLE_REF}`,
+  ]);
+  return ok({ head, missed: listed.split("\n").filter((sha) => sha !== "") });
+};
+
+/**
+ * One commit as the reconciler reads it back: its parent, the trailers the act wrote, and
+ * the one file the act changed with its content at that commit. `change` is absent for a
+ * commit that changed no file or more than one — not a shape the governed write makes, so
+ * not one the replay can land.
+ */
+export type CommitRead = {
+  readonly sha: string;
+  readonly parent: string | null;
+  /** The trailers by key, in ADR 0012's names — `Actor`, `Audit`, `Run`, `Suggestion`, `Projection`. */
+  readonly trailers: Readonly<Record<string, string>>;
+  readonly change: { readonly path: string; readonly content: string } | undefined;
+};
+
+/** A trailer line as this door writes them: `Key: value`, the key a word in letters and hyphens. */
+const TRAILER_LINE = /^([A-Za-z][A-Za-z-]*): (.+)$/;
+
+/**
+ * The trailers off a commit's message: the block **after the message's last blank line**, read
+ * the way the door wrote it (`messageWith`). The subject is held to one line at the door, so
+ * no forged `Audit:` can sit in the subject and be read first — but the reader still takes
+ * the last paragraph and never the first match, so this half keeps the promise the other
+ * half made.
+ */
+const trailersOf = (message: string) => {
+  const block = message.trimEnd().split("\n\n").at(-1) ?? "";
+  return Object.fromEntries(
+    block.split("\n").flatMap((line) => {
+      const match = TRAILER_LINE.exec(line);
+      return match?.[1] !== undefined && match[2] !== undefined
+        ? [[match[1], match[2]] as const]
+        : [];
+    }),
+  );
+};
+
+export const readCommit = async (
+  platform: PlatformPrincipal,
+  door: GitDoor,
+  workspaceId: string,
+  sha: string,
+): Promise<CommitRead> => {
+  const gitDir = repositoryPath(door, workspaceId);
+  // NUL between the fields, because the message is the one field that holds newlines.
+  const shown = await git(gitDir, ["show", "-s", "--format=%H%x00%P%x00%B", sha]);
+  const [id = "", parents = "", ...message] = shown.split("\0");
+  const parentList = parents.split(" ").filter((parent) => parent !== "");
+  // `--root` so a bundle's first commit lists its files against the empty tree rather
+  // than against nothing; `-r` so a file under a directory is one line and not a tree; `-z`
+  // so the listing is NUL-delimited and **never quoted** — with a line-shaped listing git
+  // quotes and octal-escapes any path outside ASCII (`core.quotePath`), and a concept whose
+  // filename carries an accent would come back as a name the repository does not hold.
+  const changed = await git(gitDir, [
+    "diff-tree",
+    "--root",
+    "--no-commit-id",
+    "--name-status",
+    "-r",
+    "-z",
+    sha,
+  ]);
+  const fields = changed.split("\0");
+  const files: string[] = [];
+  for (let at = 0; at + 1 < fields.length; at += 2) {
+    const [status, file] = [fields[at], fields[at + 1]];
+    // Added or modified, and nothing else: a deletion has no content to land, and a
+    // rename or a copy is not a change this door's `commit` makes.
+    if ((status === "A" || status === "M") && file !== undefined && file !== "") files.push(file);
+  }
+  const file = files[0];
+  const change =
+    files.length === 1 && file !== undefined
+      ? { path: file, content: await git(gitDir, ["show", `${sha}:${file}`], { raw: true }) }
+      : undefined;
+  return {
+    sha: id,
+    parent: parentList.length === 1 ? (parentList[0] ?? null) : null,
+    trailers: trailersOf(message.join("\0")),
+    change,
+  };
 };

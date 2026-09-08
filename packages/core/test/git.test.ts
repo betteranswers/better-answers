@@ -89,6 +89,10 @@ describe("what the git door will put a file at", () => {
     ["carries an empty segment", "knowledge//expenses.md"],
     ["carries a bare current-directory segment", "knowledge/./expenses.md"],
     ["is empty", ""],
+    // A control character is a name no OKF tool reads back and a line git's own listings
+    // would quote; the reader takes NUL-delimited listings and the door admits none.
+    ["carries a tab", "knowledge/ex\tpenses.md"],
+    ["carries a newline", "knowledge/ex\npenses.md"],
   ])(
     "refuses a path that %s, and leaves the bundle without a commit",
     async (_shape, candidate) => {

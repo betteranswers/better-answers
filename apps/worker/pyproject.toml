@@ -4,18 +4,29 @@ version = "0.1.0"
 description = "Better Answers — the Python knowledge worker (ADR 0005)"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    # The bare repositories the worker reads at a commit (ADR 0024), in-process: the
+    # runtime image is python:3.13-slim and carries no git binary, so a pure-Python git
+    # implementation is one pinned library rather than a second toolchain to patch.
+    # Version read from PyPI's dulwich release metadata on 08/09/2026; Apache-2.0 under
+    # its dual licence, which is the arm this repository takes (ADR 0027).
+    "dulwich==1.2.14",
+    # The claim protocol and every read the two job kinds make. It was in the dev group
+    # while nothing in `src` opened a connection; the work loop opens one on every tick,
+    # so it belongs to what the image ships.
+    "psycopg[binary]==3.3.5",
     "structlog>=26.1.0",
 ]
 
 [project.scripts]
 # The gate the root `check` runs: `uv run --frozen check` (AGENTS.md).
 check = "better_answers_worker.check:main"
+# The work loop — the image's default command, and what a test runs with `--once`.
+better-answers-worker = "better_answers_worker.loop:main"
 
 [dependency-groups]
 dev = [
     "mutmut>=3.7.0",
     "mypy>=2.3.1",
-    "psycopg[binary]==3.3.5",
     "pytest>=9.1.1",
     "ruff>=0.16.5",
     "testcontainers==4.15.0",

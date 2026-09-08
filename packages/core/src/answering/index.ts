@@ -1,5 +1,5 @@
 import type { Frontmatter, FrontmatterValue } from "../concepts/index.ts";
-import { citedSource, conceptByIri, type OpenedConcept } from "../concepts/index.ts";
+import { citedSource, conceptByIri, findConcepts, type OpenedConcept } from "../concepts/index.ts";
 import { err, isPersonActor, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
@@ -14,8 +14,9 @@ import type { Tx } from "../store/postgres/index.ts";
  * contract, verdict first). The bodies are B9's, with one exception: **`open` by IRI
  * reads the concept index** (T-052), through the concepts slice's own read — a slice
  * reaches another only through its `index.ts` (ADR 0029 rule 4), and `concept_index` is
- * the concepts slice's table. `find` answers no hits, `open` by *locator* not found —
- * a passage needs the source catalogue, which is B7's — `ask` a refuse verdict, and
+ * the concepts slice's table. `find` previews the concepts the reader may see (T-055),
+ * `open` by *locator* answers not found — a passage needs the source catalogue, which is
+ * B7's — `ask` a refuse verdict naming the concepts its terms resolve to, and
  * `giveFeedback` a receipt. Every function takes the Principal first and runs on the
  * transaction that resolved it.
  */
@@ -189,16 +190,48 @@ export type FeedbackReceipt = {
 };
 
 /**
- * The four acts answer a `Result` (the kernel's result convention, `kernel/result.ts`)
- * with `never` for its error: B9's bodies read no store yet, so there is nothing that
- * can fail and no refusal word to name. The shape is the one the bodies will keep —
- * when the concept index arrives the union widens and no caller is reshaped.
+ * The four acts answer a `Result` (the kernel's result convention, `kernel/result.ts`).
+ * `giveFeedback` still declares `never` for its error: B9's body reads no store yet, so there
+ * is nothing that can fail and no refusal word to name. `find`, `open` and `ask` read the
+ * concept index now, so their unions carry the store's own Error — the shape the
+ * convention's rule 3 promised would not change when a body arrived, and did not.
+ */
+
+/** The bundle a concept's path sits in: its root directory, `knowledge/` today (ADR 0002). */
+const bundleOf = (path: string): string => path.split("/")[0] ?? path;
+
+/** A concept's `tags` as OKF's list of strings; anything else is no tags. */
+const tagsOf = (frontmatter: Frontmatter): readonly string[] => {
+  const tags = frontmatter["tags"];
+  return Array.isArray(tags) ? tags.filter((tag) => typeof tag === "string") : [];
+};
+
+/**
+ * The preview (ADR 0018): the concepts matching the query that this caller may see, each
+ * as a hit — kind, title, trust — through the concepts slice's own read, which shares
+ * `open`'s SELECT and its predicate. **A withheld concept is not a hit, not a count and
+ * not a hint** (ADR 0016); ranking is B9's.
  */
 export const find = async (
-  _principal: UserPrincipal,
-  _tx: Tx,
+  principal: UserPrincipal,
+  tx: Tx,
   input: { readonly query: string; readonly limit: number },
-): Promise<Result<FindResult, never>> => ok({ query: input.query, hits: [] });
+): Promise<Result<FindResult, Error>> => {
+  const found = await findConcepts(principal, tx, input);
+  if (!found.ok) return err(found.error);
+  const now = new Date();
+  return ok({
+    query: input.query,
+    hits: found.value.map((concept) => ({
+      iri: concept.iri,
+      kind: concept.kind,
+      title: concept.title,
+      trust: trustOf(concept, now),
+      bundle: bundleOf(concept.path),
+      tags: tagsOf(concept.frontmatter),
+    })),
+  });
+};
 
 /**
  * The trust a concept's row and its latest check project to (ADR 0019): a check by a person
@@ -301,9 +334,11 @@ const pastShelfLife = (staleAfter: FrontmatterValue | undefined, now: Date): boo
 
 /**
  * What a concept's `sources[]` frontmatter entry projects to in a view (`CONTEXT.md`,
- * *evidence*). **The file's own list is the citation record until T-055**: the `evidence`
- * table is keyed by document and locator and is shared across the concepts that cite one, so
- * which concept cites which is a relation the graph derives and this read does not have.
+ * *evidence*). **The file's own list is what `open` shows**: it is the concept's own
+ * projection of what it rests on, readable by anyone who may read the concept. Which of
+ * that evidence the reader may *open* is the evidence pane's question, answered by the
+ * concepts slice's `evidencePaneOf` through the predicate on each binding (T-055), and
+ * not restated here.
  */
 const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
   const sources = concept.frontmatter["sources"];
@@ -362,20 +397,56 @@ export const open = async (
   });
 };
 
+/**
+ * The words of a question worth asking the index about: four letters or more, case-folded,
+ * each once, and no more than a handful — a resolution, not a ranking (B9's).
+ */
+const termsOf = (question: string): readonly string[] =>
+  [...new Set(question.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}'-]{3,}/gu) ?? [])].slice(
+    0,
+    ASK_TERMS_AT_MOST,
+  );
+
+const ASK_TERMS_AT_MOST = 8;
+const ASK_HITS_PER_TERM = 5;
+
+/**
+ * The question answered as far as the knowledge layer reaches today (ADR 0016: verdict
+ * first): **a refusal, naming the concepts it would rest on**. Nothing drafts an answer until
+ * B9, so the verdict is *refuse* and the text the one sentence — but the question's terms are
+ * resolved over `concept_index` through the same read `find` makes, with the read predicate
+ * in its WHERE clause, and each concept found is a citation: the IRI, and the IRI again for
+ * the URL, since a concept's IRI is a URL on the apex (ADR 0002) and the app's own page for a
+ * concept is B9's to name. So *invisible through `ask`* is a fact about a real read: a
+ * withheld concept is no citation, no count and no hint, and the refusal a Viewer hears is
+ * the refusal an unrelated question gets.
+ */
 export const ask = async (
-  _principal: UserPrincipal,
-  _tx: Tx,
-  _input: { readonly question: string },
-): Promise<Result<AnswerResult, never>> =>
-  ok({
+  principal: UserPrincipal,
+  tx: Tx,
+  input: { readonly question: string },
+): Promise<Result<AnswerResult, Error>> => {
+  const named = new Map<string, OpenedConcept>();
+  for (const term of termsOf(input.question)) {
+    const found = await findConcepts(principal, tx, { query: term, limit: ASK_HITS_PER_TERM });
+    if (!found.ok) return err(found.error);
+    for (const concept of found.value) named.set(concept.iri, concept);
+  }
+  const citations = [...named.values()]
+    .toSorted(
+      (one, other) => one.title.localeCompare(other.title) || one.iri.localeCompare(other.iri),
+    )
+    .map((concept) => ({ iri: concept.iri, url: concept.iri }));
+  return ok({
     verdict: "refuse",
     text: NOT_ANSWERED,
-    citations: [],
+    citations,
     conflicts: [],
     coverage: { asked: 1, answered: 0 },
     unmappedPassages: [],
     map: { state: "live" },
   });
+};
 
 export const giveFeedback = async (
   _principal: UserPrincipal,

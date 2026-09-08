@@ -1,0 +1,281 @@
+{
+  "description": "queue (ADR 0031, ADR 0005): the worker's control plane is rows, and the claim protocol is four SQL functions both tiers call — claim_job, heartbeat_job, finish_job, fail_job — all SECURITY INVOKER, so the caller's own role and the transaction's workspace scope are what fence every row they touch. Each suite seeds `workspaces` and `jobs` as the container's superuser (an `enqueued_ago_seconds` and a `lease_expires_in_seconds` are written as instants relative to now, which is how the fixture advances time without waiting), then runs each entry of `claims` as its `role` in its `workspace_id` scope ('' = no scope) and asserts the ids `claim_job` returned, in that order — an empty list meaning zero rows. Every entry of `calls` is then run in the same way and must answer exactly `expect`, and `expect_final` is read back per job as the superuser, `attempts` and `status` together, so a poisoning or a lost lease is visible as the row it left behind. A lease that has lapsed revokes its claimant: the heartbeat, the finish and the failure all answer false to the worker that let it lapse, whether or not anybody has claimed the job since, because from that instant the job is the queue's to hand out again.",
+  "lease_seconds": 60,
+  "workspaces": [
+    { "id": "01J6AAAAAAAAAAAAAAAAAAAAAA", "name": "Workspace A" },
+    { "id": "01J6BBBBBBBBBBBBBBBBBBBBBB", "name": "Workspace B" }
+  ],
+  "jobs": [
+    {
+      "why": "the oldest queued job in workspace A, so the claim order has something to be older than",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "id": "01J6J1AAAAAAAAAAAAAAAAAAAA",
+      "kind": "nightly-audit",
+      "reason": null,
+      "status": "queued",
+      "attempts": 0,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 400,
+      "claimed_by": null,
+      "lease_expires_in_seconds": null
+    },
+    {
+      "why": "claimed by a worker that stopped answering: the lease lapsed, so this job is claimable again and never lost",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "id": "01J6J2AAAAAAAAAAAAAAAAAAAA",
+      "kind": "full-rebuild",
+      "reason": "reconciler",
+      "status": "claimed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 300,
+      "claimed_by": "worker-gone",
+      "lease_expires_in_seconds": -30
+    },
+    {
+      "why": "claimed by a worker that is still answering: its lease has not lapsed, so nothing else may take it",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "id": "01J6J3AAAAAAAAAAAAAAAAAAAA",
+      "kind": "nightly-audit",
+      "reason": null,
+      "status": "claimed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 200,
+      "claimed_by": "worker-alive",
+      "lease_expires_in_seconds": 120
+    },
+    {
+      "why": "claimed as many times as it may be and lost again: the next claim poisons it rather than spending a fourth attempt on it",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "id": "01J6J4AAAAAAAAAAAAAAAAAAAA",
+      "kind": "full-rebuild",
+      "reason": "drill",
+      "status": "claimed",
+      "attempts": 3,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 500,
+      "claimed_by": "worker-gone",
+      "lease_expires_in_seconds": -30
+    },
+    {
+      "why": "another tenant's queued job, which the scope is what keeps out of every claim above",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6J5BBBBBBBBBBBBBBBBBBBB",
+      "kind": "nightly-audit",
+      "reason": null,
+      "status": "queued",
+      "attempts": 0,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 600,
+      "claimed_by": null,
+      "lease_expires_in_seconds": null
+    },
+    {
+      "why": "claimed by a worker that let its lease lapse and nobody has claimed since: the lease's lapsing alone revokes that worker, so its late heartbeat and its late finish are both refused",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6J6BBBBBBBBBBBBBBBBBBBB",
+      "kind": "nightly-audit",
+      "reason": null,
+      "status": "claimed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 100,
+      "claimed_by": "worker-slow",
+      "lease_expires_in_seconds": -30
+    }
+  ],
+  "claims": [
+    {
+      "why": "the oldest claimable job goes first — which is not the oldest job, because the oldest has spent its attempts and is poisoned by this very claim rather than handed out again",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "worker_id": "worker-1",
+      "expect_ids": ["01J6J1AAAAAAAAAAAAAAAAAAAA"]
+    },
+    {
+      "why": "then the next oldest, which is the job whose lease lapsed: a run whose worker died is handed back for another claim rather than lost",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "worker_id": "worker-1",
+      "expect_ids": ["01J6J2AAAAAAAAAAAAAAAAAAAA"]
+    },
+    {
+      "why": "and then nothing: a lease somebody is keeping alive is not a job going spare",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "worker_id": "worker-1",
+      "expect_ids": []
+    },
+    {
+      "why": "the app may claim too — the ops command that runs a rebuild in the foreground is a claimant like any other — and in workspace B it takes that tenant's own job",
+      "role": "app_rt",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "worker_id": "ops-1",
+      "expect_ids": ["01J6J5BBBBBBBBBBBBBBBBBBBB"]
+    },
+    {
+      "why": "a transaction scoped to no workspace claims nothing at all, which is why none of the four functions needs a workspace argument to guard",
+      "role": "worker_rt",
+      "workspace_id": "",
+      "worker_id": "worker-1",
+      "expect_ids": []
+    }
+  ],
+  "calls": [
+    {
+      "why": "the claimant's heartbeat keeps its lease",
+      "function": "heartbeat_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "job_id": "01J6J2AAAAAAAAAAAAAAAAAAAA",
+      "worker_id": "worker-1",
+      "expect": true
+    },
+    {
+      "why": "a stranger's heartbeat is refused, so a worker whose lease lapsed cannot push out the lease of whoever replaced it",
+      "function": "heartbeat_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "job_id": "01J6J2AAAAAAAAAAAAAAAAAAAA",
+      "worker_id": "worker-gone",
+      "expect": false
+    },
+    {
+      "why": "a stranger's finish is refused too — a run's outcome is written by the run that made it",
+      "function": "finish_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "job_id": "01J6J2AAAAAAAAAAAAAAAAAAAA",
+      "worker_id": "worker-gone",
+      "expect": false
+    },
+    {
+      "why": "and a heartbeat from the right worker in the wrong scope reaches no row, because the policy is what the function sees through",
+      "function": "heartbeat_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "job_id": "01J6J2AAAAAAAAAAAAAAAAAAAA",
+      "worker_id": "worker-1",
+      "expect": false
+    },
+    {
+      "why": "the claimant finishes its own job and says what it found",
+      "function": "finish_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "job_id": "01J6J2AAAAAAAAAAAAAAAAAAAA",
+      "worker_id": "worker-1",
+      "outcome": { "checked": 2, "mismatched": [] },
+      "expect": true
+    },
+    {
+      "why": "a job is finished once: the second call finds no claimed row to finish",
+      "function": "finish_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "job_id": "01J6J2AAAAAAAAAAAAAAAAAAAA",
+      "worker_id": "worker-1",
+      "outcome": { "checked": 2, "mismatched": [] },
+      "expect": false
+    },
+    {
+      "why": "a failure is the claimant's to record, with what went wrong as counts and paths",
+      "function": "fail_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "job_id": "01J6J1AAAAAAAAAAAAAAAAAAAA",
+      "worker_id": "worker-1",
+      "outcome": { "unparsed": ["knowledge/expenses.md"] },
+      "expect": true
+    },
+    {
+      "why": "and a heartbeat after the end is refused, because the lease ended with the job",
+      "function": "heartbeat_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "job_id": "01J6J1AAAAAAAAAAAAAAAAAAAA",
+      "worker_id": "worker-1",
+      "expect": false
+    },
+    {
+      "why": "a heartbeat after the lease lapsed is refused, even though nobody has claimed the job since — the lapse itself revoked the claimant, and pushing the lease out again would race whichever claim was about to win it",
+      "function": "heartbeat_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "job_id": "01J6J6BBBBBBBBBBBBBBBBBBBB",
+      "worker_id": "worker-slow",
+      "expect": false
+    },
+    {
+      "why": "a finish after the lease lapsed is refused the same way: the run that let its lease go does not get to stamp done over a job the queue is about to hand out again",
+      "function": "finish_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "job_id": "01J6J6BBBBBBBBBBBBBBBBBBBB",
+      "worker_id": "worker-slow",
+      "outcome": { "checked": 1, "mismatched": [] },
+      "expect": false
+    },
+    {
+      "why": "and a failure after the lease lapsed too, because a terminal verdict from a revoked claimant would bury the next claim's own outcome",
+      "function": "fail_job",
+      "role": "worker_rt",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "job_id": "01J6J6BBBBBBBBBBBBBBBBBBBB",
+      "worker_id": "worker-slow",
+      "outcome": { "error": "TimeoutError" },
+      "expect": false
+    }
+  ],
+  "expect_final": [
+    {
+      "why": "failed by its claimant after one claim",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "id": "01J6J1AAAAAAAAAAAAAAAAAAAA",
+      "status": "failed",
+      "attempts": 1,
+      "claimed_by": "worker-1"
+    },
+    {
+      "why": "the lapsed lease was claimed again — never lost — and finished by its new claimant on its second attempt",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "id": "01J6J2AAAAAAAAAAAAAAAAAAAA",
+      "status": "done",
+      "attempts": 2,
+      "claimed_by": "worker-1"
+    },
+    {
+      "why": "the live lease was never touched: still claimed by the worker that is keeping it, on the attempt it was claimed with",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "id": "01J6J3AAAAAAAAAAAAAAAAAAAA",
+      "status": "claimed",
+      "attempts": 1,
+      "claimed_by": "worker-alive"
+    },
+    {
+      "why": "poisoned at claim time and never claimed again, so its attempts stand where the last claim left them",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "id": "01J6J4AAAAAAAAAAAAAAAAAAAA",
+      "status": "poisoned",
+      "attempts": 3,
+      "claimed_by": "worker-gone"
+    },
+    {
+      "why": "the other tenant's job was claimed only from its own scope, and by the app",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6J5BBBBBBBBBBBBBBBBBBBB",
+      "status": "claimed",
+      "attempts": 1,
+      "claimed_by": "ops-1"
+    },
+    {
+      "why": "still claimed by the worker that let its lease lapse, untouched by its refused calls, on the attempt it was claimed with — the next claim in this workspace takes it",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6J6BBBBBBBBBBBBBBBBBBBB",
+      "status": "claimed",
+      "attempts": 1,
+      "claimed_by": "worker-slow"
+    }
+  ]
+}

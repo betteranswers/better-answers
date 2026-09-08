@@ -14,6 +14,9 @@ import {
   CREATOR_ROLE,
   CURATED_ORIGIN,
   EMBEDDING_DIMENSIONS,
+  JOB_MAX_ATTEMPTS,
+  JOB_QUEUED_STATUS,
+  NIGHTLY_AUDIT_KIND,
   SUGGESTION_EDIT_KIND,
   SUGGESTION_WAITING_STATUS,
   ulid,
@@ -136,6 +139,44 @@ export type TestData = {
   conceptWriteRequest(
     overrides?: Partial<InsertInput<"conceptWriteRequest">>,
   ): Promise<Row<"conceptWriteRequest">>;
+  /**
+   * A source binding; creates its own workspace unless one is named. Published, Internal
+   * and open to everyone, so a seeded binding is one whose evidence a reader can reach; a
+   * suite testing what is withheld names `sensitivity: "Restricted"` or an audience of groups.
+   */
+  sourceBinding(overrides?: Partial<InsertInput<"sourceBinding">>): Promise<Row<"sourceBinding">>;
+  /** A source document; creates the binding it was yielded by unless one is named. */
+  sourceDocument(
+    overrides?: Partial<InsertInput<"sourceDocument">>,
+  ): Promise<Row<"sourceDocument">>;
+  /**
+   * A concept's citation of one piece of evidence; creates its own workspace and identity
+   * unless the IRI is named, and the evidence row the key names unless both halves of that
+   * key are given — a citation of evidence nobody recorded is what the key refuses.
+   */
+  conceptEvidence(
+    overrides?: Partial<InsertInput<"conceptEvidence">>,
+  ): Promise<Row<"conceptEvidence">>;
+  /**
+   * A recorded override of a concept's class; creates its own workspace and identity unless
+   * the IRI is named. Booked to a process actor, so a seeded override never reads as
+   * somebody's decision; a suite about the evidence pane names the Admin.
+   */
+  conceptClassOverride(
+    overrides?: Partial<InsertInput<"conceptClassOverride">>,
+  ): Promise<Row<"conceptClassOverride">>;
+  /**
+   * A queued job; creates its own workspace unless one is named. A nightly audit by
+   * default, because that kind carries no reason and is the one the worker schedules
+   * itself; a suite about a rebuild names `kind` and its `reason`.
+   */
+  job(overrides?: Partial<InsertInput<"job">>): Promise<Row<"job">>;
+  /** A composition; creates its own workspace unless one is named. Published, Internal, everyone. */
+  composition(overrides?: Partial<InsertInput<"composition">>): Promise<Row<"composition">>;
+  /** An include; creates the composition and the concept's identity unless either is named. */
+  compositionInclude(
+    overrides?: Partial<InsertInput<"compositionInclude">>,
+  ): Promise<Row<"compositionInclude">>;
 };
 
 /** A hash of `length` hex characters, in shape and unique per call: a stand-in, never a real digest. */
@@ -306,7 +347,8 @@ export const testData = (client: pg.PoolClient): TestData => {
       embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0),
       embeddingRouteId: `route-${ulid()}`,
       sensitivity: "Internal",
-      audience: "Everyone",
+      audience: AUDIENCE_EVERYONE,
+      audienceGroups: null,
       bindingId: `binding-${ulid()}`,
       ...overrides,
       workspaceId,
@@ -416,6 +458,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       publishedAt: new Date(),
       sensitivity: "Internal",
       audience: AUDIENCE_EVERYONE,
+      audienceGroups: null,
       ...overrides,
       workspaceId,
       iri,
@@ -493,6 +536,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       publishedAt: new Date(),
       sensitivity: "Internal",
       audience: AUDIENCE_EVERYONE,
+      audienceGroups: null,
       ...overrides,
       gen,
       workspaceId,
@@ -521,12 +565,36 @@ export const testData = (client: pg.PoolClient): TestData => {
       publishedAt: new Date(),
       sensitivity: "Internal",
       audience: AUDIENCE_EVERYONE,
+      audienceGroups: null,
       ...link,
       ...overrides,
       label,
       fromUid,
       toUid,
       gen,
+      workspaceId,
+    });
+  };
+
+  const job: TestData["job"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    // Written out rather than left to the column's defaults, so a factory-made job reads
+    // as what it is: queued, claimed by nobody, no attempt spent on it yet and nothing
+    // found — which is every one of the claim protocol's columns at its starting value.
+    return insertRow(client, "job", {
+      id: ulid(),
+      kind: NIGHTLY_AUDIT_KIND,
+      reason: null,
+      status: JOB_QUEUED_STATUS,
+      attempts: 0,
+      maxAttempts: JOB_MAX_ATTEMPTS,
+      claimedBy: null,
+      claimedAt: null,
+      leaseExpiresAt: null,
+      heartbeatAt: null,
+      finishedAt: null,
+      outcome: null,
+      ...overrides,
       workspaceId,
     });
   };
@@ -567,6 +635,90 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const sourceBinding: TestData["sourceBinding"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "sourceBinding", {
+      id: ulid(),
+      publishedAt: new Date(),
+      sensitivity: "Internal",
+      audience: AUDIENCE_EVERYONE,
+      audienceGroups: null,
+      ...overrides,
+      workspaceId,
+    });
+  };
+
+  const sourceDocument: TestData["sourceDocument"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const bindingId = overrides.bindingId ?? (await sourceBinding({ workspaceId })).id;
+    return insertRow(client, "sourceDocument", {
+      id: ulid(),
+      ...overrides,
+      workspaceId,
+      bindingId,
+    });
+  };
+
+  const conceptEvidence: TestData["conceptEvidence"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
+    const cited =
+      overrides.sourceDocumentId !== undefined && overrides.locator !== undefined
+        ? { sourceDocumentId: overrides.sourceDocumentId, locator: overrides.locator }
+        : await evidence({ workspaceId, sourceDocumentId: overrides.sourceDocumentId ?? ulid() });
+    return insertRow(client, "conceptEvidence", {
+      ...overrides,
+      workspaceId,
+      iri,
+      sourceDocumentId: cited.sourceDocumentId,
+      locator: cited.locator,
+    });
+  };
+
+  const conceptClassOverride: TestData["conceptClassOverride"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
+    return insertRow(client, "conceptClassOverride", {
+      sensitivity: "Internal",
+      audience: AUDIENCE_EVERYONE,
+      audienceGroups: null,
+      actor: "process:better-answers-test",
+      auditEventId: ulid(),
+      ...overrides,
+      workspaceId,
+      iri,
+    });
+  };
+
+  const composition: TestData["composition"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    return insertRow(client, "composition", {
+      id: ulid(),
+      publishedAt: new Date(),
+      sensitivity: "Internal",
+      audience: AUDIENCE_EVERYONE,
+      audienceGroups: null,
+      ...overrides,
+      workspaceId,
+    });
+  };
+
+  const compositionInclude: TestData["compositionInclude"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const compositionId = overrides.compositionId ?? (await composition({ workspaceId })).id;
+    const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
+    return insertRow(client, "compositionInclude", {
+      // The label a citation marker carries (`[^i…]`, ADR 0015), unique per call so two
+      // seeded includes of one composition never collide on the key.
+      id: `i${ulid().toLowerCase()}`,
+      ordinal: 0,
+      ...overrides,
+      workspaceId,
+      compositionId,
+      iri,
+    });
+  };
+
   return {
     workspace,
     user,
@@ -590,7 +742,14 @@ export const testData = (client: pg.PoolClient): TestData => {
     graphGeneration,
     graphNode,
     graphEdge,
+    job,
     suggestion,
     conceptWriteRequest,
+    sourceBinding,
+    sourceDocument,
+    conceptEvidence,
+    conceptClassOverride,
+    composition,
+    compositionInclude,
   };
 };

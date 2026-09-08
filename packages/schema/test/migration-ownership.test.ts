@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  AUDIENCE_CHECK,
   CONCEPT_FRONTMATTER_MAX,
   SUGGESTION_KINDS_FROM_A_RUN,
   SUGGESTION_KINDS_FROM_THE_APP,
@@ -98,5 +99,24 @@ describe("what the inbox substrate copies from the schema package", () => {
     expect(sql).toContain(`between one and ${SUGGESTION_SET_MAX} requests`);
     expect(sql).toContain(`> ${CONCEPT_FRONTMATTER_MAX}`);
     expect(sql).toContain(`of at most ${CONCEPT_FRONTMATTER_MAX} characters`);
+  });
+});
+
+/**
+ * The audience substrate copies one more fact (ADR 0039): the CHECK tying the audience word
+ * to its group-id array is written once in `concept-tables.ts` and read by every generated
+ * table's declaration, but the chunk and graph tables are hand-written DDL, so the migration
+ * that adds the pair to them states the CHECK in its own text. Read back here, once per
+ * table, so the three copies can never drift from the one the generated tables carry.
+ */
+describe("what the audience substrate copies from the schema package", () => {
+  it("ties the word to the array on the chunk and graph tables with the one CHECK the declarations carry", () => {
+    const file = journalMigrationFiles().find((name) => name.endsWith("audience-substrate.sql"));
+    if (file === undefined) throw new Error("the audience substrate is not in the journal");
+    const sql = readFileSync(file, "utf8");
+
+    for (const table of ["chunk", "graph_node", "graph_edge"]) {
+      expect(sql).toContain(`"${table}_audience_check" CHECK (${AUDIENCE_CHECK})`);
+    }
   });
 });
