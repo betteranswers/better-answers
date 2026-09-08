@@ -1,7 +1,8 @@
 import {
   CONCEPT_DEPRECATED_STATUS,
   CONCEPT_NODE_LABEL,
-  citedSourceOf,
+  citedSourcesOf,
+  type CitedSource,
   type conceptFrontmatter,
   DERIVED_FROM_LABEL,
   IRI,
@@ -67,11 +68,26 @@ type EdgeSource = {
   readonly kind: string;
   readonly path: string;
   readonly body: string;
-  readonly frontmatter: Frontmatter;
+  /**
+   * `sources[]` already reduced to the pairs the boundary's reader answers (T-103): the
+   * write path hands the reduction its content hash was made from, resources resolved; the
+   * backfill below reduces a stored row's frontmatter as written. `targetOf` resolves either
+   * spelling to the one concept, so the two roads derive the same edge.
+   */
+  readonly sources: readonly CitedSource[];
   readonly publishedAt: Date | null;
   readonly sensitivity: string;
   readonly audience: string;
   readonly audienceGroups: readonly string[] | null;
+};
+
+/**
+ * A `concept_index` row as Postgres holds it, frontmatter unparsed — what the inbound
+ * backfill below reads directly, since it names concepts nobody just wrote and so has no
+ * write-path caller to have reduced their `sources[]` already.
+ */
+type ConceptIndexRow = Omit<EdgeSource, "sources"> & {
+  readonly frontmatter: Frontmatter;
 };
 
 /**
@@ -193,11 +209,19 @@ const blankedSpans = (body: string): string => {
 
   const pieces: string[] = [];
   let cursor = 0;
+  // `noUncheckedIndexedAccess` types every index below as possibly `undefined`; the
+  // pairing invariant above is what actually rules it out. `at` never runs past
+  // `runs.length` observably — one extra out-of-bounds turn ends the loop with `opener`
+  // undefined and does nothing else — `opener` is `runs[at]` inside that same bound, and
+  // `queued` was seeded for every length `runs` holds before this loop ever reads one, so
+  // its fallback here is never the value the type says it might be.
   for (let at = 0; at < runs.length; at += 1) {
     const opener = runs[at];
     if (opener === undefined) continue;
     const queue = queued.get(opener[0].length) ?? [];
     let head = heads.get(opener[0].length) ?? 0;
+    // Same reasoning as the outer bound: one extra out-of-bounds turn reads `position` as
+    // undefined and breaks, so the loop never observably runs past `queue.length`.
     while (head < queue.length) {
       const position = queue[head];
       if (position === undefined || position > at) break;
@@ -226,6 +250,8 @@ const normalisedLabel = (label: string): string =>
 const definitionsOf = (body: string): ReadonlyMap<string, string> => {
   const definitions = new Map<string, string>();
   for (const match of body.matchAll(LINK_DEFINITION)) {
+    // LINK_DEFINITION's two capture groups are `+`-quantified — never optional, so never
+    // undefined once the regex has matched at all; the `?? ""` fallbacks are for the type.
     const label = normalisedLabel(match[1] ?? "");
     if (!definitions.has(label)) {
       definitions.set(label, (match[2] ?? "").replace(/^</, "").replace(/>$/, ""));
@@ -246,6 +272,8 @@ const linkTargetOf = (
   const reference = /^\[([^\]]*)\]\[([^\]]*)\]$/.exec(text);
   if (reference !== null) {
     // The collapsed form `[label][]` names itself; the full form names its second pair.
+    // Both groups are always captured (possibly "") once this regex matches, so the
+    // `?? ""` below is for the type, never for a real undefined.
     return definitions.get(
       normalisedLabel((reference[2] === "" ? reference[1] : reference[2]) ?? ""),
     );
@@ -281,6 +309,7 @@ type OutgoingRef = {
 
 /** A target as written, read as the concept it names: its IRI, its resolved path, or nothing. */
 const targetOf = (raw: string, from: string): OutgoingRef["target"] | undefined => {
+  // String.split always returns at least one element, so `[0]` is never undefined here.
   const bare = raw.split("#")[0] ?? "";
   if (bare === "") return undefined;
   if (IRI.test(bare)) return { iri: bare };
@@ -294,6 +323,9 @@ const targetOf = (raw: string, from: string): OutgoingRef["target"] | undefined 
 const sectionAt = (body: string, index: number): string | null => {
   const lines = body.slice(0, index).split("\n");
   for (let at = lines.length - 1; at >= 0; at -= 1) {
+    // `at` stays within `lines`'s own bounds by the loop above, and `(.*)` always
+    // captures (possibly "") once the heading regex matches — both `?? ""` are for the
+    // type, never for a real undefined.
     const heading = /^#{1,6}\s+(.*)$/.exec(lines[at] ?? "");
     if (heading !== null) return (heading[1] ?? "").trim();
   }
@@ -354,10 +386,11 @@ const referencesOf = (concept: EdgeSource): readonly OutgoingRef[] => {
     ];
   });
 
-  const sources = concept.frontmatter["sources"];
-  const lineage = (Array.isArray(sources) ? sources : []).flatMap((entry, ordinal) => {
-    const cited = citedSourceOf(entry);
-    const target = cited === undefined ? undefined : targetOf(cited.resource, concept.path);
+  // Already the pairs the boundary's reader answered (T-103): a `sources[]` entry naming no
+  // resource never reaches an `EdgeSource`, because whoever built this one reduced the list
+  // once, before handing it here.
+  const lineage = concept.sources.flatMap((cited, ordinal) => {
+    const target = targetOf(cited.resource, concept.path);
     if (target === undefined) return [];
     return [{ relation: "lineage" as const, ordinal, target, section: null, sentence: null }];
   });
@@ -402,6 +435,8 @@ const resolveOutgoing = async (tx: Tx, concept: EdgeSource): Promise<readonly Ou
   ];
 
   const byPath = new Map<string, ResolvedTarget>();
+  // A cost-only guard: an empty `ANY($2::text[])` is a legal query that returns zero rows
+  // regardless, so skipping it changes what this statement costs, never what it resolves.
   if (paths.length > 0) {
     const found = await tx.query<ResolvedRow>(
       "SELECT iri, kind, status, path FROM concept_index WHERE workspace_id = $1 AND path = ANY($2::text[])",
@@ -412,6 +447,8 @@ const resolveOutgoing = async (tx: Tx, concept: EdgeSource): Promise<readonly Ou
     }
   }
   const byIri = new Map<string, ResolvedTarget>();
+  // Cost-only, the same way as the path lookup above: an empty id list still resolves
+  // correctly without the query, just by never finding a row.
   if (iris.length > 0) {
     const found = await tx.query<ResolvedRow>(
       "SELECT iri, kind, status, path FROM concept_index WHERE workspace_id = $1 AND iri = ANY($2::text[])",
@@ -527,6 +564,8 @@ const liveGeneration = async (workspaceId: string, tx: Tx): Promise<number> => {
      RETURNING live_gen`,
     [workspaceId],
   );
+  // An insert-or-update RETURNING always yields exactly one row over a NOT NULL column;
+  // Postgres guarantees it, not the type — pg's row array is what still says "maybe none".
   const liveGen = row.rows[0]?.live_gen;
   if (liveGen === undefined) throw new Error("the live generation could not be read");
   return liveGen;
@@ -608,10 +647,13 @@ export const writeConceptDelta = async (
   );
   await replaceOutgoingEdges(gen, tx, delta);
 
+  // Bypassing this guard would only cost more, never land a different edge: the backfill
+  // below is idempotent (`replaceOutgoingEdges` deletes and re-derives), so re-running it
+  // for a concept that was already mapped repeats work rather than changing its outcome.
   if (!isNew) return;
   // The concepts whose files name the landed one, by its filename in link-target
   // position: each is re-derived whole, through the same one derivation as its own write.
-  const naming = await tx.query<EdgeSource>(
+  const naming = await tx.query<ConceptIndexRow>(
     `SELECT workspace_id AS "workspaceId", iri, kind, path, body, frontmatter,
             published_at AS "publishedAt", sensitivity, audience,
             audience_groups AS "audienceGroups"
@@ -619,7 +661,14 @@ export const writeConceptDelta = async (
       WHERE workspace_id = $1 AND iri <> $2 AND (body ~ $3 OR frontmatter::text ~ $3)`,
     [workspaceId, delta.iri, namePattern(delta.path.split("/").at(-1) ?? delta.path)],
   );
-  for (const row of naming.rows) await replaceOutgoingEdges(gen, tx, row);
+  // Not the write path: this reads another concept's already-landed row directly, so its
+  // `sources[]` is reduced here, once per row, by the boundary's own reader.
+  for (const { frontmatter, ...row } of naming.rows) {
+    await replaceOutgoingEdges(gen, tx, {
+      ...row,
+      sources: citedSourcesOf(frontmatter["sources"]),
+    });
+  }
 };
 
 /** One concept's visibility as the map copies it: the node's, and its outgoing edges'. */

@@ -35,7 +35,12 @@ export const bundlesForSuite = (): (() => GitDoor) => {
     // Reached only from a test body, which runs after `beforeAll`; the throw is what a
     // caller gets instead of `undefined` if that ever stops being true.
     if (root === undefined) throw new Error("the suite's bundle root was read before it existed");
-    return openGit(root);
+    const opened = openGit(root);
+    // `mkdtemp` above always hands back an absolute, existing directory, so a refusal here
+    // means the door's own check regressed — the throw is what a test sees instead of a
+    // `GitDoor` built from a root nobody validated.
+    if (!opened.ok) throw new Error(`the suite's bundle root was refused: ${opened.error}`);
+    return opened.value;
   };
 };
 

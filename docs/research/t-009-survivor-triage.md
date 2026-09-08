@@ -195,6 +195,16 @@ File: `packages/core/src/answering/index.ts`. Covering tests: `packages/core/tes
 | index.ts:451 | Survived | StringLiteral | `""` | must-kill | "incomplete" reason word untested |
 | index.ts:452 | Survived | StringLiteral | `""` | must-kill | "should not have been shown" reason word untested |
 
+### Settled by T-103 (2026-09-08)
+
+- index.ts:225 ("removed" arm, "likely") and index.ts:227-228 ("draft" arm) — already resolved: `trustOf`'s status derivation on the current tree (`answering/index.ts`, `trustOf`, ~256-279) has no "removed" or "draft" case at all, only `deprecated` / `out-of-date` / `changed-since-checked` / `current`. The dead arms these rows named were removed by an earlier change; nothing left to remove or prove.
+- index.ts:259 (`setUTCMinutes`/`setUTCHours(0,0,0,0)` on `new Date(0)`) — removed: the epoch's UTC time is already midnight and `setUTCFullYear` never touches the time-of-day fields, so the call was a no-op. Deleted from `utcMidnight` (~297-312), with a one-line comment in its place.
+- index.ts:283 (the offset-datetime impossible-day guard, "not fully certain") — reclassified must-kill, and already killed: `new Date("2026-02-30T00:00:00Z")` does not go Invalid in this runtime, it rolls forward to 2 March — checked directly against Node's Date parser — so the guard is load-bearing, not masked by anything. `concepts.test.ts`'s `SHELF_LIVES` table already carries "an impossible calendar day with an offset" (`2026-02-30T00:00:00Z` expecting `"current"`), added after this report's baseline run; the original hedge is resolved and the row is not a survivor against the suite as it stands. A corrective comment sits beside the guard in `pastShelfLife` (~328-339).
+- index.ts:291 (`midnight !== undefined`) — proved in a comment, not removed: unlike 283, this branch has no second, more lenient parse to fall through to, so dropping the check would still answer `false` by `NaN` propagation (`undefined + ONE_DAY_MS` is `NaN`, and every comparison with `NaN` is `false`). Kept as the clearer form; comment beside it in `pastShelfLife` (~344-348).
+- index.ts:311 (`typeof entry === "string"`) — proved in a comment: a string entry has no `"title"` property either way, so the two branches of the ternary agree; the check exists for the type (`entry["title"]`'s object-shaped access), not because the branches ever differ. Comment in `evidenceOf` (~367-372).
+- index.ts:65 and 65-66 (`"current"`, the trust switch's terminal case) — equivalent by construction, no code to touch: `"current"` is the last case and the switch's fall-through answers the same word, so emptying the label or dropping the case changes no answer. Recorded, not commented: the switch's shape is the proof and a comment would restate it (review round, 2026-09-09).
+- index.ts:261 (the year/month/day force-true cluster, "couldn't hand-construct a distinguishing input") — proved in a comment, hedged rather than overclaimed: JS's own calendar rollover of an invalid year/month/day usually moves more than one of `utcMidnight`'s three checks at once (a month of 13 changes the year too; a day of 0 or 32 changes the month and sometimes the year), so relaxing one clause alone rarely flips the verdict. Not proven for every calendar combination, only tried against representative ones — the comment says so plainly rather than claiming a proof this ticket did not do. In `utcMidnight` (~302-308).
+
 ---
 
 # store — survivor triage
@@ -400,6 +410,24 @@ A caveat before the detail: `packages/core/src/store/git/index.ts` was edited by
 | `src/store/postgres/index.ts:472` | NoCoverage | ArrayDeclaration | `[]` | worth-killing | tablesPresent has no test anywhere in packages/core (only apps/api/src/ops/index.ts calls it) — deserves at least one direct test of the pass-through query, unless it's already covered at the apps/api layer (not checked here) |
 | `src/store/postgres/index.ts:474` | NoCoverage | ArrowFunction | `() => undefined` | worth-killing | tablesPresent has no test anywhere in packages/core (only apps/api/src/ops/index.ts calls it) — deserves at least one direct test of the pass-through query, unless it's already covered at the apps/api layer (not checked here) |
 
+### Settled by T-103 (2026-09-08)
+
+`src/store/graph/index.ts`:
+- 184/186/187/189 (`blankedSpans`'s loop bounds, `opener`, the `queued.get` fallback) — proved in comments, not removed: `noUncheckedIndexedAccess` types every index as possibly undefined; the pairing invariant the function's own opening comment already describes is what actually rules it out, and restructuring the loop to let the type see that would change the algorithm (the loop reassigns its own index to skip ahead). Comments at ~221-226 (the outer bound, `opener`, `queued.get`) and ~232-233 (the inner `while` bound).
+- 217/219 (`definitionsOf`'s `match[1]`/`match[2]`) and 238 (`linkTargetOf`'s `reference[1]`/`reference[2]`) — proved in comments: `LINK_DEFINITION`'s two groups are `+`-quantified, never optional, and the reference regex's groups always participate (possibly capturing "") once the regex matches at all — so the `?? ""` fallbacks are for the type, never a real undefined. Comments at ~262-263 and ~284-285.
+- 272 (`targetOf`'s `raw.split("#")[0]`) — proved in a comment: `String.split` always returns at least one element (~321).
+- 285/286 (`sectionAt`'s `lines[at]`, `heading[1]`) — proved in a comment: `at` stays inside the loop's own bound, and the heading regex's capture group always participates once it matches (~335-337).
+- 346 (the `sources[]` fallback "filtered by citedSourceOf immediately after") — this is the ticket's named reshape, and it is done: `EdgeSource` now carries `sources: readonly CitedSource[]` instead of raw `frontmatter` (~65-82), and `referencesOf`'s own `cited === undefined` arm is gone — it reads `concept.sources` directly (~377-408). The write path reduces `sources[]` **once**, in `concepts/file.ts`'s `hashedFileOf`, the reduction the content hash is made from, and hands the same pairs through `landRows` to the delta; the loop that skips an entry naming no resource lives beside the reader in the boundary package (`citedSourcesOf`, `packages/schema/src/concept-tables.ts`), outside this report's scope, so no arm of it stands in `packages/core`. The inbound backfill (`writeConceptDelta`'s `naming` query) reads other concepts' already-landed rows and reduces each with the same boundary reader, once per row (review round, 2026-09-09).
+- 284 (`sectionAt`'s starting index) — proved by the same comment as 285/286 (~335-337): the loop's own bound keeps `at` inside `lines`, so the two extra out-of-bounds starts the mutant adds read `""` and fall through to the same first heading.
+- 504 (`namePattern`, the backfill's pre-filter) — left as it stands, cost-only by its own docblock ("precision here is cost, never edges"): the backfill re-derives every candidate whole, so a looser pattern re-derives more rows to the same edges (review round, 2026-09-09).
+- 397/407 (the empty-path/-iri list guards in `resolveOutgoing`) — left as guards, proved cost-only in comments, per the ticket's instruction: an empty `ANY($2::text[])` is a legal query that returns nothing anyway (~447-448, ~459-460).
+- 518/519 (`liveGeneration`'s `RETURNING live_gen`) — proved in a comment: an insert-or-update `RETURNING` always yields exactly one row over a `NOT NULL` column; Postgres guarantees it, not the type (~576-577).
+- 553/592 (the inbound backfill's `isNew` guard) — left as a guard, proved cost-only in a comment, per the ticket's instruction: bypassing it would only re-run the idempotent backfill for an already-mapped concept (~659-661).
+
+`src/store/postgres/index.ts`:
+- 236/282/318 (the `?? ""` role fallback)/332 (`row?.role` / `row?.group_ids` after `refuse` already returned undefined-or-not) and 319-322/357 (the second `isRole` check) — removed, by the ticket's named reshape (`CODING_RULES.md`'s one-guard-per-condition rule and its worked example): `refuse` (~372-388) now returns `Result<ResolvedMember, PrincipalRefusal>` — `ResolvedMember = MembershipRow & { role: Role }` (~363) — instead of `PrincipalRefusal | undefined`. Both callers (`withPrincipal` ~243-259, `withMembership` ~286-305) and `resolveScoped` (~314-355) read the role and group ids off that narrowed value instead of re-deriving them from the raw row, so the second `isRole` check, the `row?.role ?? ""`, and the `row?.group_ids ?? []` are all gone — `CODING_RULES.md`'s worked example is updated to say so. The one remaining `isRole` call, inside `refuse` itself (~380), is proved in a comment rather than removed: `member_role_check` (`identity-tables.ts`) refuses a member row a role outside the three at the database, before this code can ever see one, confirmed by reading the table definition — so a live-Postgres test seeding "a member row holding an unknown role" is not constructible without dropping that constraint, which this ticket does not do. The test the ticket suggested adding to `principal.test.ts` is therefore not added; this is the one deviation from the ticket's notes, and the reasoning is recorded here and in T-103's own report.
+- 414/441 (`counted.rows[0]?.count ?? 1`) — proved in comments at both call sites (`consumeIngress` ~437-438, `consumeCall` ~466): an upsert's `RETURNING` always yields exactly one row.
+
 ---
 
 # workspaces + audit + kernel — survivor triage
@@ -516,6 +544,15 @@ Counts: must-kill 53 · worth-killing 9 · noise 2 · equivalent 4 (of 68)
 | constraint.ts:25 | Survived | LogicalOperator | `"constraint" in error \|\| …` | worth-killing | differs only for the same contrived non-string-`.constraint` case; untested edge |
 | constraint.ts:25 | Survived | ConditionalExpression | `true` | worth-killing | duplicate AST-level mutant of the same untested edge case |
 | constraint.ts:25 | Survived | StringLiteral | `"Stryker was here!"` | equivalent | the exact fallback placeholder string doesn't matter — neither `""` nor `"Stryker was here!"` will ever equal a real Postgres constraint name, so the substring-search fallback behaves identically either way |
+
+### Settled by T-103 (2026-09-08)
+
+`src/audit/index.ts`:
+- 88 (the "missing field" check masked by the next line's `DETAIL_KINDS` check) — proved in a comment, not removed: every `DETAIL_KINDS` predicate opens with a `typeof` check that a `value` of `undefined` never passes, so a missing field is still refused one line down — but under the less specific message "is not a kind" rather than "is missing the field". Kept for the sharper message a developer reads back off a thrown audit error; comment at ~125-128.
+- 133/134 (`inserted.rows[0]?.id` and its throw) — proved in a comment: a plain `INSERT … RETURNING` with no `ON CONFLICT` always yields exactly one row (~174-175). `docs/agents/mutation-triage.md`'s warning that `audit/index.ts:89`'s verdict was later found wrong is about a different, already-resolved row: `record()` no longer holds the tenancy-scope ternary inline (it now delegates to `scopeParameter`, `store/postgres/index.ts`), so that historical finding is confirmed moot for the rows this ticket settles, not relied on.
+
+`src/kernel/constraint.ts`:
+- 25 (the fallback placeholder string) — proved in a comment: neither `""` nor any other placeholder ever equals a real Postgres constraint name, so the lookup answers the same `undefined` either way, whichever placeholder stands there (~24-26).
 
 ---
 
@@ -736,3 +773,11 @@ Grouped by file, in the order mutants were listed. `cov` is `coveredBy`.
 | requests.ts:65 | Survived | StringLiteral | `""` | noise | `REQUEST_ACTS.approved` name string; same |
 | requests.ts:65 | Survived | StringLiteral | `""` | noise | duplicate node on the same declaration; same |
 | requests.ts:70 | Survived | StringLiteral | `""` | noise | `REQUEST_ACTS.declined` name string; same |
+
+### Settled by T-103 (2026-09-08)
+
+`src/concepts/index.ts`:
+- 135 (the `CONCEPT_ACTS` family and act-name strings, "`declareActs` validates the family/name pairing at import time") — equivalent by construction, no code to touch: a blanked family or name fails `declareActs`'s own check the moment the module loads, before any test runs, so the suite cannot see the mutant as anything but a load failure — the same reading as `groups.ts`'s and `requests.ts`'s act-name rows below (review round, 2026-09-09).
+
+`src/members/groups.ts`:
+- 277 (`row?.holds_group` after `SELECT EXISTS(...), EXISTS(...)` with no `FROM`) — proved in a comment, not removed: a `SELECT` of two constant `EXISTS` expressions with no `FROM` clause always answers exactly one row, so `row` is never undefined there; the `?.` is for the type, not a real absent row. Comment at ~276-277.

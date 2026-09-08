@@ -417,7 +417,7 @@ describe("what the slice's four acts answer", () => {
     const reader = await arrange();
 
     const found = await acting(reader, (principal, tx) =>
-      find(principal, tx, { query: "expenses", limit: 10 }),
+      find(principal, tx, { query: "expenses", limit: 10 }, new Date()),
     );
 
     expect(found).toEqual({ ok: true, value: { query: "expenses", hits: [] } });
@@ -461,7 +461,9 @@ describe("what the slice's four acts answer", () => {
   it("answers a passage by locator as not found, until the source catalogue exists", async () => {
     const reader = await arrange();
 
-    const opened = await acting(reader, (principal, tx) => open(principal, tx, { locator: "p.4" }));
+    const opened = await acting(reader, (principal, tx) =>
+      open(principal, tx, { locator: "p.4" }, new Date()),
+    );
 
     expect(opened).toEqual({ ok: true, value: { found: false, locator: "p.4" } });
   });
@@ -477,7 +479,12 @@ describe("what the slice's four acts answer", () => {
     await expect(
       acting(reader, async (principal, tx) => {
         await tx.query("SELECT 1 / 0").catch(() => undefined);
-        answered = await open(principal, tx, { iri: "https://better-answers.com/c/01A" });
+        answered = await open(
+          principal,
+          tx,
+          { iri: "https://better-answers.com/c/01A" },
+          new Date(),
+        );
       }),
     ).rejects.toThrow("the transaction did not commit");
 

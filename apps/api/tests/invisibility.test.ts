@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { writeConcept } from "@better-answers/core/concepts";
-import type { UserPrincipal } from "@better-answers/core/kernel";
-import { initRepository, openGit } from "@better-answers/core/store/git";
+import { systemClock, type UserPrincipal } from "@better-answers/core/kernel";
+import { initRepository } from "@better-answers/core/store/git";
 import { openPostgres, withPrincipal } from "@better-answers/core/store/postgres";
 import { testData } from "@better-answers/schema/testing";
 
 import { connectAsHost } from "./flow.ts";
-import { startApp, type TestApp, type TestClient } from "./harness.ts";
+import { openTestGit, startApp, type TestApp, type TestClient } from "./harness.ts";
 
 /**
  * The invisibility criterion through the highest surface that exists (T-055; T-006 spec,
@@ -109,11 +109,11 @@ const restrictedSourcedConcept = async () => {
   } finally {
     client.release();
   }
-  const git = openGit(app.gitStoreDir);
+  const git = openTestGit(app);
   await initRepository(git, workspace.workspaceId);
   const written = await writeConcept(
     await principalFor(workspace.workspaceId, workspace.admin.id),
-    { git, postgres: openPostgres(app.database.pool) },
+    { git, postgres: openPostgres(app.database.pool), clock: systemClock() },
     {
       mergeKey: "note:board-remuneration",
       path: "knowledge/board-remuneration.md",

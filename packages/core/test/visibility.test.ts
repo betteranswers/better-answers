@@ -153,7 +153,7 @@ describe("what a governed write derives from the bindings of what it cites", () 
     );
     // Nobody's: the HR Viewer passes neither the class nor an audience that is not there.
     const seen = await reading(scenario.viewer, (viewer, tx) =>
-      open(viewer, tx, { iri: written.iri }),
+      open(viewer, tx, { iri: written.iri }, new Date()),
     );
     expect(seen.ok && seen.value.found).toBe(false);
   });
@@ -462,7 +462,7 @@ describe("narrowing a binding", () => {
     ).toEqual(named);
     const [viewer, editor] = await Promise.all(
       [scenario.viewer, scenario.editor].map((person) =>
-        reading(person, (reader, tx) => open(reader, tx, { iri: written.iri })),
+        reading(person, (reader, tx) => open(reader, tx, { iri: written.iri }, new Date())),
       ),
     );
     expect(viewer?.ok && viewer.value.found).toBe(false);
@@ -907,7 +907,7 @@ describe("an Admin's recorded override", () => {
     ]);
     // The Viewer now sees the concept — and its class is derived from nothing they could read.
     const seen = await reading(scenario.viewer, (viewer, tx) =>
-      open(viewer, tx, { iri: person.iri }),
+      open(viewer, tx, { iri: person.iri }, new Date()),
     );
     expect(seen.ok && seen.value.found).toBe(true);
   });
@@ -1158,10 +1158,10 @@ describe("find", () => {
     });
 
     const viewer = await reading(scenario.viewer, (reader, tx) =>
-      find(reader, tx, { query: "expenses", limit: 5 }),
+      find(reader, tx, { query: "expenses", limit: 5 }, new Date()),
     );
     const admin = await reading(scenario.admin, (reader, tx) =>
-      find(reader, tx, { query: "EXPENSES", limit: 5 }),
+      find(reader, tx, { query: "EXPENSES", limit: 5 }, new Date()),
     );
 
     expect(viewer).toEqual({
@@ -1234,7 +1234,9 @@ describe("find", () => {
         { query: "note", limit: 2 },
         { query: "%", limit: 5 },
         { query: "   ", limit: 5 },
-      ].map((input) => reading(scenario.viewer, (reader, tx) => find(reader, tx, input))),
+      ].map((input) =>
+        reading(scenario.viewer, (reader, tx) => find(reader, tx, input, new Date())),
+      ),
     );
 
     expect(limited?.ok && limited.value.hits.map((hit) => hit.title)).toEqual([

@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Pool } from "pg";
 import type { Logger } from "pino";
 
-import { attempt } from "@better-answers/core/kernel";
+import { attempt, type Clock } from "@better-answers/core/kernel";
 import { openPostgres } from "@better-answers/core/store/postgres";
 
 import { createClientMetadataFetcher } from "../lifts/better-auth-cimd-node/index.ts";
@@ -47,6 +47,8 @@ export type ServerDependencies = {
   readonly serverVersion?: string;
   /** Where `apps/web`'s static build was written; absent means this process serves no SPA. */
   readonly webRoot?: string | undefined;
+  /** This process's Clock (ADR 0040), handed on to every route that reads time. */
+  readonly clock: Clock;
 };
 
 /**
@@ -127,7 +129,14 @@ export function createServer(dependencies: ServerDependencies): Hono {
 
   server.route(
     "/",
-    createAuthRoutes({ auth, door, publicUrl: dependencies.publicUrl, mcpUrl, logger }),
+    createAuthRoutes({
+      auth,
+      door,
+      publicUrl: dependencies.publicUrl,
+      mcpUrl,
+      logger,
+      clock: dependencies.clock,
+    }),
   );
 
   const mcp = createMcpSurface({
@@ -141,13 +150,14 @@ export function createServer(dependencies: ServerDependencies): Hono {
     mcpUrl,
     logger,
     serverVersion: dependencies.serverVersion ?? "0.1.0",
+    clock: dependencies.clock,
   });
   // The seam ADR 0030 names: `(Request, { authInfo }) => Response`, authentication
   // resolved inside `mcp` before the handler sees the request.
   server.all("/mcp", (context) => mcp(context.req.raw));
 
   // The product's own transport, on the origin the SPA is served from (ADR 0008).
-  server.route("/", createTrpcRoutes({ auth, door }));
+  server.route("/", createTrpcRoutes({ auth, door, clock: dependencies.clock }));
 
   // The files the SPA's build holds, on `app.` (ADR 0006, amended 2026-09-02) — the
   // hashed bundles and the shell at `/`. A file lookup claims nothing it does not hold, so

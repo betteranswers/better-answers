@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { statSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -47,7 +48,32 @@ export type GitDoor = {
   readonly root: string;
 };
 
-export const openGit = (root: string): GitDoor => ({ root });
+/** Why `openGit` refuses the root it was given — checked once, before a `GitDoor` exists. */
+export type GitRootRefusal = "root-not-absolute" | "no-such-root";
+
+/**
+ * The door's one constructor, and the one place a root is ever checked (ADR 0024's
+ * 2026-09-08 amendment): absolute, and an existing directory, or refused before a `GitDoor`
+ * can be built from it. Every entry below trusts `door.root` rather than checking it again —
+ * one guard, at the boundary — because before this guard existed, a root that arrived empty
+ * or relative was joined against it anyway, which is how a mutation once wrote a bare
+ * repository at `packages/core/undefined/`, beside whatever the process's own cwd was.
+ *
+ * Synchronous on purpose: this runs once, at boot, against a filesystem the process already
+ * has open, so there is nothing worth awaiting — and an async opener would ripple into every
+ * test and call site that holds a `GitDoor`.
+ */
+export const openGit = (root: string): Result<GitDoor, GitRootRefusal> => {
+  if (!path.isAbsolute(root)) return err("root-not-absolute");
+  try {
+    if (!statSync(root).isDirectory()) return err("no-such-root");
+  } catch {
+    // Nothing at `root` to stat — the same refusal as a root that resolves to a file: either
+    // way there is no directory here for a workspace's repository to live under.
+    return err("no-such-root");
+  }
+  return ok({ root });
+};
 
 /**
  * The ref every bundle's history hangs off. One branch per repository and no other: the
@@ -104,8 +130,12 @@ export type CommitRequest = {
    * bundle has no commits yet"; a sha that is not what the ref holds refuses the write.
    */
   readonly expectedHead: string | null;
-  /** When the commit was made; the author and committer dates alike. */
-  readonly at?: Date;
+  /**
+   * When the commit was made; the author and committer dates alike. The caller's own
+   * Clock, read once (ADR 0040) — required, because a default here would be this door
+   * reading the ambient clock on a caller's behalf.
+   */
+  readonly at: Date;
 };
 
 export type Committed = {
@@ -173,6 +203,9 @@ const git = async (
  *
  * The governed write never calls this, so a commit against a workspace with no repository is
  * a refusal a caller can read rather than a repository nobody asked for.
+ *
+ * `door.root` is trusted, not re-checked: `openGit` is the door's one constructor, and the
+ * root it holds was already proved absolute and present there (ADR 0024).
  */
 export const initRepository = async (door: GitDoor, workspaceId: string): Promise<string> => {
   const gitDir = repositoryPath(door, workspaceId);
@@ -299,7 +332,7 @@ export const commit = async (
     });
     const tree = await git(gitDir, ["write-tree"], { env });
 
-    const at = (request.at ?? new Date()).toISOString();
+    const at = request.at.toISOString();
     const sha = await git(
       gitDir,
       [

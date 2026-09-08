@@ -195,6 +195,31 @@ export const citedSourceOf = (
   };
 };
 
+/** What a frontmatter's `sources` key may hold: the list, or a scalar that is no list at all. */
+type SourcesValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly string[]
+  | readonly Readonly<Record<string, string | number | boolean | null>>[]
+  | undefined;
+
+/**
+ * Every entry of `sources[]` the reader can read, in the file's order — **the one loop over
+ * the list**, beside the one reader of an entry, so a caller in either tier's application
+ * code takes the pairs and never asks the question per entry again: the content hash's
+ * reduction and the graph door's lineage both consume what this answers (ADR 0019). An entry
+ * naming no resource is skipped here and refused by the boundary's own refinement, which
+ * asks `citedSourceOf` the same question — one refusal, at the boundary, and one reduction
+ * after it. A scalar under `sources` is no list and cites nothing.
+ */
+export const citedSourcesOf = (value: SourcesValue): readonly CitedSource[] =>
+  (Array.isArray(value) ? value : []).flatMap((entry) => {
+    const cited = citedSourceOf(entry);
+    return cited === undefined ? [] : [cited];
+  });
+
 /**
  * A resource or a link target as ADR 0019 resolves it: **paths resolved to `/abs.md`**. A
  * file may name one concept four ways — `/abs.md`, an absolute spelling with dot segments,

@@ -6,8 +6,8 @@ import {
   reconcileEveryWorkspace,
   type WorkspaceReconciled,
 } from "@better-answers/core/concepts";
-import { attempt } from "@better-answers/core/kernel";
-import { openGit } from "@better-answers/core/store/git";
+import { attempt, err, ok, type Clock, type Result } from "@better-answers/core/kernel";
+import { openGit, type GitRootRefusal } from "@better-answers/core/store/git";
 import { openPostgres } from "@better-answers/core/store/postgres";
 
 import { logger as tierLogger } from "./logger.ts";
@@ -47,6 +47,8 @@ export type ReconcilerDependencies = {
   readonly gitStoreDir: string;
   readonly intervalMs?: number | undefined;
   readonly logger?: Logger | undefined;
+  /** This process's Clock (ADR 0040), for the replay's landing instant on each tick. */
+  readonly clock: Clock;
 };
 
 export type Reconciler = {
@@ -78,11 +80,21 @@ const summaryOf = (outcomes: readonly WorkspaceReconciled[]) => {
   return { workspaces: outcomes.length, replayed, already_landed: alreadyLanded, stopped, refused };
 };
 
-export const startReconciler = (dependencies: ReconcilerDependencies): Reconciler => {
+/**
+ * Start the head check, or answer the git door's refusal of the repositories' root: the
+ * refusal is a value the process's entry point turns into its exit (`main.ts`, the shape
+ * `requireBootstrap` exits in), so nothing here ever runs over a root the door refused.
+ */
+export const startReconciler = (
+  dependencies: ReconcilerDependencies,
+): Result<Reconciler, GitRootRefusal> => {
   const logger = dependencies.logger ?? tierLogger;
+  const git = openGit(dependencies.gitStoreDir);
+  if (!git.ok) return err(git.error);
   const doors = {
-    git: openGit(dependencies.gitStoreDir),
+    git: git.value,
     postgres: openPostgres(dependencies.database),
+    clock: dependencies.clock,
   };
 
   const tick = async (): Promise<void> => {
@@ -123,10 +135,10 @@ export const startReconciler = (dependencies: ReconcilerDependencies): Reconcile
   }, dependencies.intervalMs ?? RECONCILER_INTERVAL_MS);
   timer.unref();
 
-  return {
+  return ok({
     stop: async () => {
       clearInterval(timer);
       await inFlight;
     },
-  };
+  });
 };

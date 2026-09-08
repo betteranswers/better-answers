@@ -19,6 +19,7 @@ import {
   requireAdmin,
   ulid,
   type ActorId,
+  type Clock,
   type PrincipalRefusal,
   type Result,
   type RoleRefusal,
@@ -33,7 +34,7 @@ import {
   type GitDoor,
 } from "../store/git/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
-import { contentHashOf, renderConceptFile, type Frontmatter } from "./file.ts";
+import { hashedFileOf, renderConceptFile, type Frontmatter } from "./file.ts";
 import {
   payloadFor,
   returnToProposer,
@@ -382,7 +383,7 @@ const fileFrontmatterOf = (input: WriteConceptInput, iri: string) => {
  */
 export const writeConcept = async (
   principal: UserPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
+  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
   input: WriteConceptInput,
 ): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
   if (!mayWrite(principal)) return err("role-forbids");
@@ -403,7 +404,7 @@ export const writeConcept = async (
   // (ADR 0002); one that names a concept is held below to a concept that already exists.
   const iri = input.iri ?? conceptIriOf(ulid());
   const frontmatter = fileFrontmatterOf(input, iri);
-  const contentHash = contentHashOf(frontmatter, input.body, input.path);
+  const { contentHash, sources } = hashedFileOf(frontmatter, input.body, input.path);
   const mergeKey = boundarySchemas.conceptIdentity.insert.shape.mergeKey.safeParse(input.mergeKey);
   // Evidence goes through the boundary too, and before the commit: a locator the boundary
   // would refuse is one this act should never have made a commit for (ADR 0028).
@@ -509,6 +510,12 @@ export const writeConcept = async (
     // Everything the rows will hold, parsed at the boundary before anything is committed: a
     // commit whose rows the boundary would refuse is the head-ahead state provoked on
     // purpose, and there is no reason to make one.
+    //
+    // One instant for both the row and the commit (ADR 0040): read once from the door's
+    // Clock, never from inside `indexRowOf` or `commitToBundle`, so a concept's first
+    // `published_at` and its commit's author/committer dates never disagree about when
+    // this act happened.
+    const now = doors.clock.now();
     const parsed = indexRowOf(
       {
         workspaceId: principal.workspaceId,
@@ -523,6 +530,7 @@ export const writeConcept = async (
         sensitivity: input.sensitivity,
       },
       held,
+      now,
     );
     if (!parsed.success) return err("malformed");
     const row = parsed.data;
@@ -542,6 +550,7 @@ export const writeConcept = async (
       // A person's edit names the head it was written against; an acceptance takes the ref
       // as it stands, because its own precondition is the base and this act holds the lock.
       expectedHead: "head" in input.expects ? input.expects.head : await head(principal, doors.git),
+      at: now,
     });
     if (!committed.ok) return err(committed.error);
 
@@ -586,6 +595,7 @@ export const writeConcept = async (
           commit: committed.value,
           actor: actorIdOf(fresh),
           auditEventId,
+          sources,
           evidence: evidence.data,
           restsAlsoOn: [],
           acceptance,
@@ -731,7 +741,7 @@ const acceptanceMessage = (title: string): string =>
  */
 export const acceptSuggestions = async (
   principal: UserPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
+  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
   input: { readonly decisions: readonly AcceptanceDecision[] },
 ): Promise<
   Result<readonly AcceptanceOutcome[], RoleRefusal | PrincipalRefusal | "malformed" | Error>
@@ -759,7 +769,7 @@ export const acceptSuggestions = async (
 /** One suggestion's acceptance: the read that decides it, then the governed write. */
 const acceptOne = async (
   principal: UserPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
+  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
   decision: AcceptanceDecision,
   batchId: string | undefined,
 ): Promise<AcceptanceOutcome> => {

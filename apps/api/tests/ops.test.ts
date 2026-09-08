@@ -3,13 +3,14 @@ import { serve } from "@hono/node-server";
 import { describe, expect, it } from "vitest";
 
 import { writeConcept } from "@better-answers/core/concepts";
-import { head, initRepository, openGit } from "@better-answers/core/store/git";
+import { systemClock } from "@better-answers/core/kernel";
+import { head, initRepository } from "@better-answers/core/store/git";
 import { openPostgres, withPrincipal } from "@better-answers/core/store/postgres";
 import { testData } from "@better-answers/schema/testing";
 
 import { fetchHonouringHost } from "../src/ops/http-fetch.ts";
 import { NOT_BUILT, parseSince, runOps, type OpsIo } from "../src/ops/index.ts";
-import { APP_HOSTNAME, PUBLIC_URL, type TestApp } from "./harness.ts";
+import { APP_HOSTNAME, openTestGit, PUBLIC_URL, type TestApp } from "./harness.ts";
 import { servedApp } from "./suite-app.ts";
 
 /**
@@ -33,6 +34,7 @@ const ioFor = (app: TestApp, stdin = ""): OpsIo & { readonly lines: string[] } =
     },
     appHostname: APP_HOSTNAME,
     gitStoreDir: app.gitStoreDir,
+    clock: systemClock(),
   };
 };
 
@@ -381,6 +383,25 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(io.lines.join("\n")).toContain("GIT_STORE_DIR");
     });
 
+    it("refuses a repositories' root that names a missing directory, the same as an absent one", async () => {
+      const { workspaceId } = await app().provision();
+      const io: OpsIo & { readonly lines: string[] } = {
+        ...ioFor(app()),
+        gitStoreDir: `${app().gitStoreDir}/does-not-exist`,
+      };
+
+      const exitCode = await runOps(
+        ["reconcile-watermark", "--workspace", workspaceId],
+        app().database.superuser,
+        io,
+      );
+
+      expect(exitCode).toBe(1);
+      expect(io.lines).toEqual([
+        `reconcile-watermark: REFUSED — the repositories' root is no-such-root (GIT_STORE_DIR=${app().gitStoreDir}/does-not-exist)`,
+      ]);
+    });
+
     it("answers usage to a workspace that is not an id, before it opens anything", async () => {
       const run = await ops(app(), ["reconcile-watermark", "--workspace", "ws_synthetic"]);
 
@@ -398,7 +419,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("is done — exit 0 — once the rows and the bundle agree, and says what the run found", async () => {
       const { workspaceId } = await app().provision();
-      await initRepository(openGit(app().gitStoreDir), workspaceId);
+      await initRepository(openTestGit(app()), workspaceId);
 
       const run = await ops(app(), ["reconcile-watermark", "--workspace", workspaceId]);
 
@@ -410,7 +431,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("is done — exit 0 — after replaying the commit a bundle's rows missed, and the concept's row has landed", async () => {
       const { workspaceId, admin } = await app().provision();
-      const git = openGit(app().gitStoreDir);
+      const git = openTestGit(app());
       await initRepository(git, workspaceId);
       const principal = await withPrincipal(
         openPostgres(app().database.pool),
@@ -431,7 +452,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       try {
         const lost = await writeConcept(
           principal.value,
-          { git, postgres: openPostgres(app().database.pool) },
+          { git, postgres: openPostgres(app().database.pool), clock: systemClock() },
           {
             mergeKey: "note:restore-drill",
             path: "knowledge/restore-drill.md",

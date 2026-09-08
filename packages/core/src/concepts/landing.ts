@@ -22,7 +22,7 @@ import type { Committed } from "../store/git/index.ts";
 import { recomputeCompositionsIncluding } from "../guides/index.ts";
 import { writeConceptDelta } from "../store/graph/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
-import type { Frontmatter } from "./file.ts";
+import type { Frontmatter, HashedSource } from "./file.ts";
 import { markDeciding } from "./inbox.ts";
 import type { Acceptance } from "./index.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
@@ -223,8 +223,12 @@ type RowFacts = {
  * a creation, and on anything else what the row holds now — the audience included, so a
  * re-write that drops its citations never widens a named-group audience back to everyone.
  * What the row lands with is what the derivation says, not this.
+ *
+ * `now` is the platform's instant for a first publish (ADR 0040): the caller's own Clock,
+ * read once and handed in — never read here — so a held concept's `publishedAt` is the
+ * platform's instant, never the transaction's, and a test can pin it to a literal.
  */
-export const indexRowOf = (facts: RowFacts, held: Held | undefined) => {
+export const indexRowOf = (facts: RowFacts, held: Held | undefined, now: Date) => {
   const fileStatus = facts.frontmatter["status"];
   const status =
     facts.status ??
@@ -242,7 +246,7 @@ export const indexRowOf = (facts: RowFacts, held: Held | undefined) => {
     contentHash: facts.contentHash,
     status,
     publishedAt: PUBLISHED_STATUSES.some((published) => published === status)
-      ? (held?.publishedAt ?? new Date())
+      ? (held?.publishedAt ?? now)
       : null,
     sensitivity: held?.sensitivity ?? facts.sensitivity ?? SENSITIVITY_DEFAULT,
     audience: held?.audience ?? AUDIENCE_EVERYONE,
@@ -260,6 +264,12 @@ type Landing = z.infer<typeof conceptRow> & {
   readonly commit: Committed;
   readonly actor: ActorId;
   readonly auditEventId: string;
+  /**
+   * The file's `sources[]` as the content hash reduced it — the one reduction the write path
+   * makes (`hashedFileOf`), handed on so the graph derives lineage from the same pairs the
+   * hash was made from, never from a second reading of the frontmatter.
+   */
+  readonly sources: readonly HashedSource[];
   /**
    * The evidence the act was handed — the whole of what the concept cites after this act,
    * an empty list clearing its citations — or `undefined` for a road that recovers none:
@@ -382,7 +392,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
     kind: index.kind,
     path: index.path,
     body: index.body,
-    frontmatter: index.frontmatter ?? {},
+    sources: index.sources.map(([resource, locator]) => ({ resource, locator })),
     publishedAt: index.publishedAt ?? null,
     ...visibility,
     status: index.status,

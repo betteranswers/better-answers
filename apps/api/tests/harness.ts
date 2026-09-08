@@ -7,7 +7,8 @@ import type { Hono } from "hono";
 import type { Pool } from "pg";
 import { pino } from "pino";
 
-import type { PlatformPrincipal } from "@better-answers/core/kernel";
+import { systemClock, type Clock, type PlatformPrincipal } from "@better-answers/core/kernel";
+import { openGit, type GitDoor } from "@better-answers/core/store/git";
 import { openPostgres } from "@better-answers/core/store/postgres";
 import {
   provisionWorkspace,
@@ -201,7 +202,19 @@ export const serverFor = (pool: Pool): Hono =>
     sendEmail: async () => {},
     fetchClientMetadataResource: cimdFixture,
     logger: pino({ level: "silent" }),
+    clock: systemClock(),
   });
+
+/**
+ * The app's own git door, opened fresh: `TestApp.gitStoreDir` is always the directory
+ * `startApp` just created, so the only way this refuses is the door's own check regressing —
+ * the throw is what a test sees instead of a `GitDoor` built from a root nobody validated.
+ */
+export const openTestGit = (app: TestApp): GitDoor => {
+  const opened = openGit(app.gitStoreDir);
+  if (!opened.ok) throw new Error(`the test app's git store was refused: ${opened.error}`);
+  return opened.value;
+};
 
 /**
  * What a suite may vary about the app it starts. The defaults are the ones every suite
@@ -224,6 +237,8 @@ export type TestAppOptions = {
    * code from here, never from the app's logger, which `[LOG1]` forbids from holding one.
    */
   readonly onEmail?: ((message: EmailMessage) => void) | undefined;
+  /** This app's Clock (ADR 0040); a real one unless a test pins its own. */
+  readonly clock?: Clock | undefined;
 };
 
 export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> => {
@@ -260,6 +275,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     },
     logger,
     webRoot: options.webRoot,
+    clock: options.clock ?? systemClock(),
   });
   const door = openPostgres(database.pool);
 

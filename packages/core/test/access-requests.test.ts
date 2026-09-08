@@ -4,7 +4,7 @@ import { testData } from "@better-answers/schema/testing";
 import pg from "pg";
 import { describe, expect, it } from "vitest";
 
-import { INVITATION_EXPIRY_SECONDS, ulid } from "@better-answers/schema";
+import { ulid } from "@better-answers/schema";
 
 import { attempt, type Result, type Role, type UserPrincipal } from "../src/kernel/index.ts";
 import {
@@ -270,10 +270,11 @@ describe("asking to join a workspace", () => {
 describe("approving a request", () => {
   it("mints the invitation to the requester's address at the role the Admin chose, and records it", async () => {
     const { workspace, requester, requestId } = await withOneWaitingRequest("Approve");
-    const before = Date.now();
+    // The platform's instant, pinned (ADR 0040), so the expiry below is a date written down.
+    const decidedAt = new Date("2031-06-15T09:30:00.000Z");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
-      approveRequest(principal, tx, { requestId, role: "Editor" }),
+      approveRequest(principal, tx, { requestId, role: "Editor" }, decidedAt),
     );
 
     expect(approved).toEqual({
@@ -318,8 +319,9 @@ describe("approving a request", () => {
       inviter_id: workspace.adminUserId,
       workspace_id: workspace.id,
     });
-    const expiresAt = invitation.rows[0]?.expires_at.getTime() ?? 0;
-    expect(expiresAt).toBeGreaterThanOrEqual(before + INVITATION_EXPIRY_SECONDS * 1000);
+    // Forty-eight hours after the decision — the plugin's default, spelled as the date it
+    // makes rather than derived from the constant the act reads.
+    expect(invitation.rows[0]?.expires_at).toEqual(new Date("2031-06-17T09:30:00.000Z"));
 
     expect(await eventsAbout(requestId)).toEqual([
       {
@@ -345,7 +347,7 @@ describe("approving a request", () => {
     const { workspace, requestId } = await withOneWaitingRequest("Default");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
-      approveRequest(principal, tx, { requestId }),
+      approveRequest(principal, tx, { requestId }, new Date()),
     );
 
     expect(approved).toMatchObject({ ok: true, value: { role: REQUEST_ROLE_DEFAULT } });
@@ -356,7 +358,7 @@ describe("approving a request", () => {
     const { workspace, requestId } = await withOneWaitingRequest("Foreign");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
-      approveRequest(principal, tx, { requestId, role: "owner" }),
+      approveRequest(principal, tx, { requestId, role: "owner" }, new Date()),
     );
 
     expect(approved).toEqual({ ok: false, error: "no-such-role" });
@@ -371,7 +373,7 @@ describe("approving a request", () => {
     const { workspace, requestId } = await withOneWaitingRequest("Twice");
     const approve = () =>
       as(workspace.id, workspace.adminUserId, (principal, tx) =>
-        approveRequest(principal, tx, { requestId }),
+        approveRequest(principal, tx, { requestId }, new Date()),
       );
 
     expect((await approve()).ok).toBe(true);
@@ -386,7 +388,7 @@ describe("approving a request", () => {
     const workspace = await provision("Missing");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
-      approveRequest(principal, tx, { requestId: ulid() }),
+      approveRequest(principal, tx, { requestId: ulid() }, new Date()),
     );
 
     expect(approved).toEqual({ ok: false, error: "no-such-request" });
@@ -399,7 +401,7 @@ describe("approving a request", () => {
     await expect(
       whileWritesAreRefused(db().pool, "invitation", () =>
         as(workspace.id, workspace.adminUserId, async (principal, tx) => {
-          approved = await approveRequest(principal, tx, { requestId });
+          approved = await approveRequest(principal, tx, { requestId }, new Date());
         }),
       ),
     ).rejects.toThrow(/did not commit/);
@@ -424,7 +426,10 @@ describe("what a decision refuses and what it passes on", () => {
   ) => Promise<Result<unknown, string | Error>>;
 
   const DECISIONS: readonly (readonly [string, Decision])[] = [
-    ["approving", (principal, tx, requestId) => approveRequest(principal, tx, { requestId })],
+    [
+      "approving",
+      (principal, tx, requestId) => approveRequest(principal, tx, { requestId }, new Date()),
+    ],
     ["declining", (principal, tx, requestId) => declineRequest(principal, tx, { requestId })],
   ];
 
@@ -632,7 +637,10 @@ describe("who may decide", () => {
   ) => Promise<Result<unknown, unknown>>;
 
   const verbs: readonly [string, Verb][] = [
-    ["approve", (principal, tx, requestId) => approveRequest(principal, tx, { requestId })],
+    [
+      "approve",
+      (principal, tx, requestId) => approveRequest(principal, tx, { requestId }, new Date()),
+    ],
     ["decline", (principal, tx, requestId) => declineRequest(principal, tx, { requestId })],
     ["list", (principal, tx) => listWaitingRequests(principal, tx)],
   ];

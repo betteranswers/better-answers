@@ -4,7 +4,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { Logger } from "pino";
 import { z } from "zod";
 
-import { attempt } from "@better-answers/core/kernel";
+import { attempt, type Clock } from "@better-answers/core/kernel";
 import {
   consumeIngress,
   withPrincipal,
@@ -39,6 +39,8 @@ export type AuthRoutesDependencies = {
   readonly publicUrl: string;
   readonly mcpUrl: string;
   readonly logger: Logger;
+  /** This process's Clock (ADR 0040), for the per-IP and per-email counters. */
+  readonly clock: Clock;
 };
 
 /**
@@ -171,7 +173,7 @@ const codeRequest = z.object({ email: z.string().trim().min(1) });
  * The body is read from a clone, so the request Better Auth's handler receives further
  * down is still unread.
  */
-const limitCodesByEmail = (door: PostgresDoor): MiddlewareHandler => {
+const limitCodesByEmail = (door: PostgresDoor, clock: Clock): MiddlewareHandler => {
   return async (context, next) => {
     const read = await attempt(() => context.req.raw.clone().json());
     const asked = read.ok ? codeRequest.safeParse(read.value) : undefined;
@@ -186,6 +188,7 @@ const limitCodesByEmail = (door: PostgresDoor): MiddlewareHandler => {
       "email",
       emailKey(asked.data.email),
       EMAIL_CODE_EMAIL_RULE,
+      clock.now(),
     );
     if (!throttle.allowed) {
       return tooManyRequests(
@@ -230,7 +233,7 @@ const clientShape = z.object({ client_name: z.string().nullish(), name: z.string
 
 export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   const routes = new Hono();
-  const { auth, door, publicUrl } = deps;
+  const { auth, door, publicUrl, clock } = deps;
 
   // ---------------------------------------------------------------- discovery
   // The MCP server is the protected resource; Better Auth is the authorization server.
@@ -243,9 +246,9 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     bearer_methods_supported: ["header"],
     resource_documentation: `${publicUrl}/`,
   };
-  routes.use("/.well-known/*", limitByIp(door, OAUTH_IP_RULE));
-  routes.use("/oauth2/*", limitByIp(door, OAUTH_IP_RULE));
-  routes.use("/jwks", limitByIp(door, OAUTH_IP_RULE));
+  routes.use("/.well-known/*", limitByIp(door, OAUTH_IP_RULE, clock));
+  routes.use("/oauth2/*", limitByIp(door, OAUTH_IP_RULE, clock));
+  routes.use("/jwks", limitByIp(door, OAUTH_IP_RULE, clock));
   for (const path of [
     "/.well-known/oauth-protected-resource",
     "/.well-known/oauth-protected-resource/mcp",
@@ -254,10 +257,10 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   }
 
   // ------------------------------------------------------------- sign-in code
-  routes.use(SEND_EMAIL_CODE_PATH, limitCodesByEmail(door));
+  routes.use(SEND_EMAIL_CODE_PATH, limitCodesByEmail(door, clock));
 
   // ---------------------------------------------------------------- consent
-  routes.use("/consent", limitByIp(door, PAGE_IP_RULE));
+  routes.use("/consent", limitByIp(door, PAGE_IP_RULE, clock));
   routes.use("/consent", sameOriginOnly(publicUrl));
   routes.use("/consent", navigationOnly);
   // No other site may frame it: a framed consent form still posts with this origin and

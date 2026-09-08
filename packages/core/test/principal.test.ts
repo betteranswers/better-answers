@@ -487,9 +487,10 @@ describe("the counters", () => {
     const rule = { windowMs: 10_000, max: 1 };
     const key = `203.0.113.${Math.floor(Math.random() * 200)}-${ulid()}`;
 
-    const first = await consumeIngress(door, "ip", key, rule);
-    const second = await consumeIngress(door, "ip", key, rule);
-    const otherScope = await consumeIngress(door, "email", key, rule);
+    const now = new Date();
+    const first = await consumeIngress(door, "ip", key, rule, now);
+    const second = await consumeIngress(door, "ip", key, rule, now);
+    const otherScope = await consumeIngress(door, "email", key, rule, now);
 
     expect([first.allowed, second.allowed, otherScope.allowed]).toEqual([true, false, true]);
   });

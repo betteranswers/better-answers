@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { initRepository, openGit } from "@better-answers/core/store/git";
+import { systemClock } from "@better-answers/core/kernel";
+import { initRepository } from "@better-answers/core/store/git";
 
 import { RECONCILER_INTERVAL_MS, startReconciler } from "../src/reconciler.ts";
-import { capturingLogger, type LogLine } from "./harness.ts";
+import { capturingLogger, openTestGit, type LogLine } from "./harness.ts";
 import { appForSuite } from "./suite-app.ts";
 
 /**
@@ -27,6 +28,18 @@ const skips = (logs: readonly LogLine[]): readonly LogLine[] =>
 describe("the periodic head check", () => {
   const app = appForSuite();
 
+  /** The head check over this app's own root, which the door never refuses: a throw says if it did. */
+  const running = (logger: Parameters<typeof startReconciler>[0]["logger"]) => {
+    const started = startReconciler({
+      database: app().database.pool,
+      gitStoreDir: app().gitStoreDir,
+      logger,
+      clock: systemClock(),
+    });
+    if (!started.ok) throw new Error(`the app's own root was refused: ${started.error}`);
+    return started.value;
+  };
+
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -35,13 +48,9 @@ describe("the periodic head check", () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     const held = await app().provision();
     const bare = await app().provision();
-    await initRepository(openGit(app().gitStoreDir), held.workspaceId);
+    await initRepository(openTestGit(app()), held.workspaceId);
     const { logger, logs } = capturingLogger("debug");
-    const reconciler = startReconciler({
-      database: app().database.pool,
-      gitStoreDir: app().gitStoreDir,
-      logger,
-    });
+    const reconciler = running(logger);
 
     // Nothing before the first interval: starting is not a tick.
     expect(ticks(logs)).toEqual([]);
@@ -66,11 +75,7 @@ describe("the periodic head check", () => {
   it("never starts a tick while one is running: it says so and waits for the interval after", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     const { logger, logs } = capturingLogger("debug");
-    const reconciler = startReconciler({
-      database: app().database.pool,
-      gitStoreDir: app().gitStoreDir,
-      logger,
-    });
+    const reconciler = running(logger);
 
     // The first tick is in flight — it is asking Postgres — when the interval fires again.
     vi.advanceTimersByTime(RECONCILER_INTERVAL_MS);
@@ -82,5 +87,21 @@ describe("the periodic head check", () => {
 
     expect(ticks(logs)).toHaveLength(1);
     expect(skips(logs)).toHaveLength(1);
+  });
+
+  it("cannot start when the repositories' root names a missing directory: the boot hears the door's refusal", () => {
+    const { logger, logs } = capturingLogger();
+
+    const refused = startReconciler({
+      database: app().database.pool,
+      gitStoreDir: `${app().gitStoreDir}/does-not-exist`,
+      logger,
+      clock: systemClock(),
+    });
+
+    // The refusal is the door's own word, handed back as a value for `main.ts` to exit on;
+    // nothing was started, so there is nothing to stop and nothing was logged here.
+    expect(refused).toEqual({ ok: false, error: "no-such-root" });
+    expect(logs).toEqual([]);
   });
 });

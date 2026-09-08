@@ -791,6 +791,7 @@ describe("a commit the rows cannot take", () => {
       author: { name: "Grace Editor", email: "grace@acme.invalid" },
       trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
       expectedHead: written.sha,
+      at: new Date(),
     });
     expect(moved.ok).toBe(true);
 
@@ -817,6 +818,7 @@ describe("a commit the rows cannot take", () => {
       author: { name: "Grace Editor", email: "grace@acme.invalid" },
       trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
       expectedHead: null,
+      at: new Date(),
     });
     expect(made.ok).toBe(true);
 

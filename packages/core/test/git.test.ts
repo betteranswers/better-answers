@@ -1,4 +1,5 @@
 import { writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { boundarySchemas, ulid } from "@better-answers/schema";
@@ -8,6 +9,7 @@ import {
   commit,
   head,
   initRepository,
+  openGit,
   withRepositoryLock,
   type CommitRequest,
   type GitDoor,
@@ -66,6 +68,7 @@ const requestFor = (overrides: Partial<CommitRequest> = {}): CommitRequest => ({
   author: AUTHOR,
   trailers: { actor: `human:${ulid()}` satisfies ActorId, audit: ulid() },
   expectedHead: null,
+  at: new Date(),
   ...overrides,
 });
 
@@ -74,6 +77,27 @@ const shaOf = (committed: Awaited<ReturnType<typeof commit>>): string => {
   if (!committed.ok) throw new Error(`the commit was refused: ${String(committed.error)}`);
   return committed.value.sha;
 };
+
+/**
+ * `openGit` is the door's one constructor, and where a root is checked (ADR 0024): each shape
+ * below is its own case because each is its own clause of the guard, the way the bundle-path
+ * guard's shapes are below.
+ */
+describe("opening the git door", () => {
+  it("refuses an empty root at open", () => {
+    expect(openGit("")).toEqual({ ok: false, error: "root-not-absolute" });
+  });
+
+  it("refuses a relative root at open", () => {
+    expect(openGit("relative/git-store")).toEqual({ ok: false, error: "root-not-absolute" });
+  });
+
+  it("refuses a root that does not exist as a directory", () => {
+    const absent = path.join(tmpdir(), `better-answers-no-such-root-${ulid()}`);
+
+    expect(openGit(absent)).toEqual({ ok: false, error: "no-such-root" });
+  });
+});
 
 /**
  * The path is what decides where a governed write lands in the bundle's object graph, and it

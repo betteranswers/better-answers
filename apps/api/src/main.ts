@@ -2,6 +2,8 @@ import { serve } from "@hono/node-server";
 import { createTransport } from "nodemailer";
 import { Pool } from "pg";
 
+import { systemClock } from "@better-answers/core/kernel";
+
 import { requireBootstrap, requireIdentityBootstrap } from "./config.ts";
 import { logger } from "./logger.ts";
 import { RECONCILER_INTERVAL_MS, startReconciler } from "./reconciler.ts";
@@ -10,6 +12,9 @@ import { createServer } from "./server.ts";
 const bootstrap = requireBootstrap("the app");
 const identity = requireIdentityBootstrap("the app");
 const database = new Pool({ connectionString: bootstrap.databaseUrl });
+// The one Clock this process holds, constructed once at boot and handed on explicitly to
+// every act that reads time (ADR 0040) — never read ambiently past this line.
+const clock = systemClock();
 
 type EmailMessage = { readonly to: string; readonly subject: string; readonly text: string };
 
@@ -53,6 +58,7 @@ serve(
       authSecret: identity.authSecret,
       sendEmail,
       webRoot: bootstrap.webRoot,
+      clock,
     }).fetch,
     port: bootstrap.port,
   },
@@ -67,6 +73,17 @@ serve(
 if (bootstrap.gitStoreDir === undefined) {
   logger.warn("no repositories' root is configured (GIT_STORE_DIR): the head check is not running");
 } else {
-  startReconciler({ database, gitStoreDir: bootstrap.gitStoreDir });
+  const reconciler = startReconciler({ database, gitStoreDir: bootstrap.gitStoreDir, clock });
+  if (!reconciler.ok) {
+    // An absent key, above, is a deployment with no bundles to check and is said as such; a
+    // key that names a root the git door refuses — not absolute, or no such directory — is
+    // a misconfiguration, and a misconfiguration is a boot failure in `requireBootstrap`'s
+    // own shape: one line saying why, then a non-zero exit (ADR 0024).
+    logger.error(
+      { reason: reconciler.error, git_store_dir: bootstrap.gitStoreDir },
+      "the app cannot start: the head check's repositories' root was refused",
+    );
+    process.exit(1);
+  }
   logger.info({ interval_ms: RECONCILER_INTERVAL_MS }, "head check running");
 }

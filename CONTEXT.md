@@ -491,6 +491,9 @@ to it by IRI and never restates it (ADR 0014).
 - **forge** — the same thing named from the outside: the bare git repository per workspace that the
   app writes and the worker reads at a commit. **No forge *service* runs** — no UI, no SSH server,
   no user model, no second schema (ADR 0024). _Avoid_: Forgejo (as a component).
+- **root refusal** — `openGit`'s refusal of a root that is not an absolute path or not an existing
+  directory: checked once, at open, so nothing downstream — `initRepository` included — trusts a
+  root nobody validated (ADR 0024).
 - **deploy unit** — **what one release changes**: the platform stack — `migrate`, `app`, `worker` —
   deployed by image digest. The stores stack and the database resource are **not** in it: they change
   on their own upgrade drill, not on a release. Use the phrase in this sense only; a document that

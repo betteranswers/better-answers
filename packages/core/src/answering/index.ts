@@ -211,15 +211,18 @@ const tagsOf = (frontmatter: Frontmatter): readonly string[] => {
  * as a hit — kind, title, trust — through the concepts slice's own read, which shares
  * `open`'s SELECT and its predicate. **A withheld concept is not a hit, not a count and
  * not a hint** (ADR 0016); ranking is B9's.
+ *
+ * `now` is the platform's instant for every hit's trust reading (ADR 0040) — one read,
+ * shared across the batch, from the caller's own Clock; never read here.
  */
 export const find = async (
   principal: UserPrincipal,
   tx: Tx,
   input: { readonly query: string; readonly limit: number },
+  now: Date,
 ): Promise<Result<FindResult, Error>> => {
   const found = await findConcepts(principal, tx, input);
   if (!found.ok) return err(found.error);
-  const now = new Date();
   return ok({
     query: input.query,
     hits: found.value.map((concept) => ({
@@ -295,9 +298,14 @@ const OFFSET_DATETIME = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+
  * takes the year as written.
  */
 const utcMidnight = (year: number, month: number, day: number): number | undefined => {
+  // Epoch UTC time is already 00:00:00.000, and setUTCFullYear touches only the calendar
+  // fields, so there is no time-of-day left to zero once it has run.
   const at = new Date(0);
   at.setUTCFullYear(year, month - 1, day);
-  at.setUTCHours(0, 0, 0, 0);
+  // All three fields are compared, though JS's rollover of an impossible date usually moves
+  // more than one at once (a month of 13 changes the year; a day of 32 changes the month):
+  // the three together are the statement that the calendar has this day, and one clause
+  // alone would be a claim about which field a rollover happens to move.
   const same =
     at.getUTCFullYear() === year && at.getUTCMonth() === month - 1 && at.getUTCDate() === day;
   return same ? at.getTime() : undefined;
@@ -320,6 +328,11 @@ const pastShelfLife = (staleAfter: FrontmatterValue | undefined, now: Date): boo
   const datetime = OFFSET_DATETIME.exec(staleAfter);
   if (datetime !== null) {
     // The grammar holds the shape and the calendar holds the day; only then is it parsed.
+    // This guard is load-bearing, not a sibling's echo: `new Date` does not reject every
+    // impossible calendar day in this position the way it rejects an out-of-range month —
+    // `new Date("2026-02-30T00:00:00Z")` parses as 2 March, it does not throw or go
+    // Invalid — so without `utcMidnight`'s own check first, a stale-after date that never
+    // existed would be silently read as a different, real one.
     const day = utcMidnight(Number(datetime[1]), Number(datetime[2]), Number(datetime[3]));
     if (day === undefined) return false;
     const instant = new Date(staleAfter);
@@ -329,6 +342,9 @@ const pastShelfLife = (staleAfter: FrontmatterValue | undefined, now: Date): boo
   const date = CALENDAR_DATE.exec(staleAfter);
   if (date === null) return false;
   const midnight = utcMidnight(Number(date[1]), Number(date[2]), Number(date[3]));
+  // Unlike the offset-datetime branch above, there is no second parse to fall back to
+  // here: even without this check, `undefined + ONE_DAY_MS` is `NaN`, and every
+  // comparison with `NaN` is `false` — the same answer this guard gives directly.
   return midnight !== undefined && midnight + ONE_DAY_MS <= now.getTime();
 };
 
@@ -351,6 +367,8 @@ const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
   return sources.flatMap((entry) => {
     const cited = citedSource(entry);
     if (cited === undefined) return [];
+    // A string entry has no "title" property either way — the check exists for the type
+    // (an object entry's `["title"]` access), not because the two branches ever differ.
     const title = typeof entry === "string" ? undefined : entry["title"];
     return [
       {
@@ -367,11 +385,17 @@ const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
  * nobody minted does** — `found: false` with the IRI echoed back — because the predicate is
  * in the statement's WHERE clause and a withheld row is not a row that came back (user
  * story 13). A locator answers not found until the source catalogue exists (B7).
+ *
+ * `now` is the platform's instant for the trust reading below (ADR 0040): the caller's
+ * own Clock, read once and handed in, never read here — which is what lets a test move
+ * the shelf-life comparison to either side of a fixed `stale_after` without racing the
+ * real clock.
  */
 export const open = async (
   principal: UserPrincipal,
   tx: Tx,
   input: OpenInput,
+  now: Date,
 ): Promise<Result<OpenResult, Error>> => {
   if (input.iri === undefined) return ok({ found: false, locator: input.locator });
 
@@ -391,7 +415,7 @@ export const open = async (
       // is the answering slice's own later work (B9), so this stays empty rather than
       // half-read.
       relations: [],
-      trust: trustOf(found, new Date()),
+      trust: trustOf(found, now),
       evidence: evidenceOf(found),
     },
   });
