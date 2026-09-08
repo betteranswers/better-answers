@@ -13,8 +13,9 @@ per-mutant reasoning — read that document for the verdicts; read this one for 
 
 461 live mutants then, 501 now. That is **not** 40 rows of churn — it is 3 resolved and 43
 new: **42 of the new live mutants are in `concepts`**, which is T-089's ticket, and one is
-`kernel/actor.ts:81`, T-088's, where one row also resolved. Every other module's live set is
-byte-identical to what the triage walked.
+`kernel/actor.ts:81`, T-088's, where one row also resolved. The other two resolved rows are
+`store`'s (T-087's, 163 → 161). Every module but those three has a live set byte-identical to
+what the triage walked.
 
 | module | old total | new total | old live | new live | Δ live | owner |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
