@@ -10,6 +10,8 @@ export default defineConfig({
     globalSetup: ["@better-answers/schema/testing/warm-postgres"],
     // A cold run pulls the Postgres image before the first test.
     testTimeout: 60_000,
-    hookTimeout: 300_000,
+    // A runaway guard, not a budget: the room is for the opener's cold fallback, which pays a
+    // container start where the warm path pays a template copy. `image.test.ts` sets its own.
+    hookTimeout: 120_000,
   },
 });

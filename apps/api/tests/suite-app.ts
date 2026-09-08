@@ -9,9 +9,8 @@ import { startApp, type TestApp, type TestAppOptions } from "./harness.ts";
  *
  * Every suite that drives the real server over a real Postgres wants the same three things —
  * start it before the first test, stop it after the last, and read it in between — and each
- * was writing them out. The generous start timeout is part of the fact: the first suite in a
- * run pays for pulling and migrating a container, and a suite that inherited the default
- * would fail on a cold machine and pass on a warm one.
+ * was writing them out. The start allowance is the tier's, in `vitest.config.ts`; a second
+ * number here would only be a second place to read.
  *
  * It hands back a getter rather than the app, because the app does not exist until vitest
  * runs `beforeAll`: a suite that held the value at module scope would hold `undefined`.
@@ -22,7 +21,7 @@ export const appForSuite = (options: TestAppOptions = {}): (() => TestApp) => {
 
   beforeAll(async () => {
     started = await startApp(options);
-  }, 180_000);
+  });
 
   afterAll(async () => {
     await started?.stop();

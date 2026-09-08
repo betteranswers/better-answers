@@ -36,6 +36,8 @@ permissions:
 jobs:
   stryker:
     runs-on: ubuntu-latest
+    # Twice the longest full leg either workspace has run. The week that restores nothing is
+    # what this has to cover, and the hardening tickets ahead lengthen both suites.
     timeout-minutes: 120
     strategy:
       fail-fast: false
@@ -57,14 +59,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # Last week's mutant results — or, after an overrun, the cancelled leg's own — so a file
-      # nobody touched is not re-tested. Since `T-085` a mutant costs its covering tests' runtime
-      # rather than a Postgres container start, so this is no longer what makes the leg finishable;
-      # it is what makes an unchanged week cheap, and what carries a cancelled leg forward.
+      # nobody touched is not re-tested.
       # A cache entry is written once and never overwritten, so a fixed key would pin the first
       # week's results forever: the run id makes the key new every time — so the entry is always
-      # saved — and the prefix restores the newest one this workspace has. The run attempt is on
-      # the key beside it because a re-run keeps the run id: without it, attempt 2 reserves
-      # attempt 1's immutable entry, is refused, and discards everything the attempt proved.
+      # saved — and the prefix restores the newest one this workspace has. The attempt number is
+      # on the key too, because a re-run keeps the run id and would reserve its own first
+      # attempt's entry, be refused, and discard what it proved.
       # A week where nothing restores (a first run, or GitHub evicting an entry it has not seen
       # read for seven days, which a weekly schedule sits exactly on) is a full run: slower,
       # never wrong, and `timeout-minutes` above is sized for exactly that week.

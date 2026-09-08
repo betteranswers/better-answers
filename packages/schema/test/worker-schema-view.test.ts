@@ -23,9 +23,8 @@ const viewPath = path.resolve(
 );
 let db: MigratedPostgres;
 
-// Still the container start's 120 seconds, though what this hook does now is one
-// `CREATE DATABASE … TEMPLATE`. An unused ceiling costs a passing run nothing, and the
-// honest number wants the warm hook measured on CI hardware, not guessed at locally.
+// A runaway guard, not a budget for the copy: the room is for the opener's cold fallback,
+// which pays a container start wherever nothing provided a warm one.
 beforeAll(async () => {
   db = await openMigratedPostgres();
 }, 120_000);
