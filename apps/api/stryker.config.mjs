@@ -22,6 +22,9 @@ export default {
   // while a hybrid mutant — static plus per-test coverage — still runs against its covering
   // tests. Read from @stryker-mutator/core 10.0.0, `dist/src/mutants/mutant-test-planner.js`
   // lines 71–99 (`planMutant`: the `isStatic` / `ignoreStatic` decision), on 08/09/2026.
+  // The cost is the exclusion itself: a module-scope constant only an import exercises is
+  // no longer run at all, so the schedule's summary shows each leg's Ignored count beside
+  // its score (T-090) and a row that matters is probed by hand, `scripts/mutant-probe.mjs`.
   ignoreStatic: true,
 
   // Stryker's sandbox copies the workspace to a temp directory and rewrites `extends` in the

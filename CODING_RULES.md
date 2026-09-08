@@ -54,6 +54,10 @@ Where a list names members (the migration journal and its directory), a generate
 
 Postgres aborts the transaction whatever the work does with the caught rejection, so a test that swallows a statement failure and asserts only a returned value can pin a rolled-back transaction as success. The store's openers refuse to report a `COMMIT` Postgres answered with `ROLLBACK`; the test that provokes the abort asserts that rejection — or the rows — before any value.
 
+### [TEST9] A test writes its expected value down
+
+The expected value is a literal, a worked example or the spec's own figure, never the code under test called a second time: an oracle that derives its expectation from the subject agrees with every implementation, including a wrong one, and a mutation report shows it as a survivor the test could never have caught. Two kills from the T-009 wave are the shape. `NOT_ANSWERED`'s refusal sentence was pinned by a test that interpolated the constant into its own expectation, so blanking the constant changed both sides at once; it died against the hardcoded sentence. The content hash's suites asserted against a second call to `canonicalFrontmatter` and the hash function, so `UNHASHED_KEYS`, the canonical form and the digest could all drift together — and the hash is a cross-tier contract, so the Python tier could drift with them; they died against literal frontmatter and literal hashes computed out-of-band. A constant the test needs is spelled in the test; a value too long to spell is a fixture read from a file, never a call.
+
 ## CHECK
 
 ### [CHECK1] Every gate is run, not remembered
@@ -71,6 +75,10 @@ A test script never passes for having found no tests, and a browser spec left fo
 ### [CHECK3] One run of `check` names every failure
 
 A workspace's `check` runs every step it has — lint, types, tests, and the browser suite where there is one — even when an earlier step fails, and reports the failures together. `&&` between steps is banned: it names the first problem and hides the rest, so a session fixes one thing per run. Each tier has one runner, and a manifest's steps are named in that manifest and nowhere else; the root `check` is the same shape over its own steps, so a gate is added by naming it. `apps/api/tests/check-scripts.test.ts` reads each manifest for this, and the runner is proved by a test that runs it over a throwaway manifest.
+
+### [CHECK9] A branch narrows its tests, never its gates
+
+A branch may run only the suites it touches — four worktrees consolidating cannot each run every Postgres suite, and a test that cannot be affected by an edit proves nothing about it. The gates that need no Postgres are never narrowed: they are the root `check` line's own steps, the ones named ahead of `check:workspaces` in the root `package.json` — read there, not restated here, so this rule cannot drift from the script — and each touched workspace's `typecheck`. Every one runs on the branch before its report is written, whatever else was skipped; the copy gate in particular is global and zero-threshold, and skipping the root `check` is what skipped it in the T-009 wave. The root `check` runs once, in full, before a PR is opened. `apps/api/tests/check-scripts.test.ts` holds the reading: the steps ahead of `check:workspaces` are tools over the whole tree, and the two tier steps come after them.
 
 ## COMMENT
 

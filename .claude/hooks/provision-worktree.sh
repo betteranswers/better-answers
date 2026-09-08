@@ -8,11 +8,20 @@ set -euo pipefail
 # .claude/hooks/worktree-create-hook.sh for every worktree Claude Code creates; runnable
 # by hand after `git worktree add`, which fires no hook.
 #
-# Three stages, each reporting on its own line and none stopping the next:
+# Four stages, each reporting on its own line and none stopping the next:
+#   upstream      — the branch tracks nothing until someone says so
 #   pnpm install  — the TypeScript workspaces
 #   uv sync       — the Python worker
 #   skills        — .claude/hooks/provision-skills.sh: the installed, ignored agent
 #                   tooling (`.agents/`, `.claude/skills/*`, `tasks/AGENTS.md`)
+#
+# `git worktree add -b <branch> <path> origin/main` sets the new branch to track
+# `origin/main`, silently: a bare `git push` from the worktree then aims at `main`, and
+# the remove hook measures "work" against that upstream rather than against `main`.
+# `push.default` is unset here, so git's `simple` refuses the mismatched push — the
+# tracking is surprising rather than harmful — and the stage unsets it so the branch's
+# upstream is set on its first `git push -u`, by the session that means it. Here and
+# not in the create hook, because a worktree made by hand fires no hook and runs this.
 #
 # `node_modules` and `.venv` are installed, never symlinked or copied from the primary
 # checkout. pnpm and uv both install by hard link from a global store (seconds), and
@@ -45,6 +54,21 @@ fi
 
 echo "provision-worktree: $WORKTREE_PATH" >&2
 STATUS=0
+
+# --- upstream: the worktree's branch tracks nothing until someone says so ---
+BRANCH="$(git -C "$WORKTREE_PATH" branch --show-current 2>/dev/null || true)"
+if [ -z "$BRANCH" ]; then
+  echo "  upstream: detached HEAD — nothing to unset" >&2
+elif UPSTREAM="$(git -C "$WORKTREE_PATH" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"; then
+  if git -C "$WORKTREE_PATH" branch --unset-upstream >&2 2>&1; then
+    echo "  upstream: unset — $BRANCH tracked $UPSTREAM" >&2
+  else
+    echo "  upstream: FAILED to unset $UPSTREAM from $BRANCH — run git branch --unset-upstream by hand" >&2
+    STATUS=1
+  fi
+else
+  echo "  upstream: none — $BRANCH tracks nothing" >&2
+fi
 
 # --- pnpm: the TypeScript workspaces ---
 if command -v pnpm >/dev/null 2>&1; then
