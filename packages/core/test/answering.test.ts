@@ -160,12 +160,12 @@ describe("open's and feedback's renderings", () => {
 
 describe("what the slice's four acts answer", () => {
   it("hands every caller an outcome to read, never one to catch", () => {
-    // `open` (T-052) and `find` (T-055) read a store now, so their unions have widened to
-    // carry the store's own Error — the shape the convention's rule 3 promised would not
+    // `open` (T-052), `find` and `ask` (T-055) read a store now, so their unions have widened
+    // to carry the store's own Error — the shape the convention's rule 3 promised would not
     // change when a body arrived, and did not.
     expectTypeOf(find).returns.resolves.toEqualTypeOf<Result<FindResult, Error>>();
     expectTypeOf(open).returns.resolves.toEqualTypeOf<Result<OpenResult, Error>>();
-    expectTypeOf(ask).returns.resolves.toEqualTypeOf<Result<AnswerResult, never>>();
+    expectTypeOf(ask).returns.resolves.toEqualTypeOf<Result<AnswerResult, Error>>();
     expectTypeOf(giveFeedback).returns.resolves.toEqualTypeOf<Result<FeedbackReceipt, never>>();
   });
 });

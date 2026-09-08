@@ -4,7 +4,7 @@ import { conceptIriOf, ulid } from "@better-answers/schema";
 
 import { head } from "@better-answers/core/store/git";
 
-import { find, open } from "../src/answering/index.ts";
+import { ask, find, open } from "../src/answering/index.ts";
 import {
   evidencePaneOf,
   overrideConceptClass,
@@ -976,6 +976,43 @@ describe("find", () => {
     expect(admin.ok && admin.value.hits.map((hit) => hit.iri).toSorted()).toEqual(
       [visible.iri, withheld.iri].toSorted(),
     );
+  });
+
+  it("lets ask name the concepts the reader may see that its question's terms resolve to, and never a withheld one — as a refusal, since nothing drafts yet", async () => {
+    const scenario = await arrange();
+    const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
+    const visible = await conceptCiting(scenario, scenario.editor, [internal.documentId], {
+      title: "Expenses policy",
+    });
+    const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
+      title: "Expenses of the board",
+    });
+    const question = { question: "How are expenses claimed?" };
+
+    const [viewer, admin, unrelated] = await Promise.all([
+      reading(scenario.viewer, (reader, tx) => ask(reader, tx, question)),
+      reading(scenario.admin, (reader, tx) => ask(reader, tx, question)),
+      reading(scenario.viewer, (reader, tx) => ask(reader, tx, { question: "Is the sky blue?" })),
+    ]);
+
+    // Verdict first (ADR 0016), the one sentence, and the concepts it would rest on named
+    // by IRI — the Viewer's answer naming only what the Viewer could open.
+    expect(viewer).toEqual({
+      ok: true,
+      value: {
+        verdict: "refuse",
+        text: "Not answered from the company's knowledge.",
+        citations: [{ iri: visible.iri, url: visible.iri }],
+        conflicts: [],
+        coverage: { asked: 1, answered: 0 },
+        unmappedPassages: [],
+        map: { state: "live" },
+      },
+    });
+    expect(admin?.ok && admin.value.citations.map((citation) => citation.iri).toSorted()).toEqual(
+      [visible.iri, withheld.iri].toSorted(),
+    );
+    expect(unrelated?.ok && unrelated.value.citations).toEqual([]);
   });
 
   it("keeps the limit, reads the query as text and never as a pattern, and answers nothing to nothing", async () => {

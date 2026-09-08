@@ -14,8 +14,9 @@ import type { Tx } from "../store/postgres/index.ts";
  * contract, verdict first). The bodies are B9's, with one exception: **`open` by IRI
  * reads the concept index** (T-052), through the concepts slice's own read — a slice
  * reaches another only through its `index.ts` (ADR 0029 rule 4), and `concept_index` is
- * the concepts slice's table. `find` answers no hits, `open` by *locator* not found —
- * a passage needs the source catalogue, which is B7's — `ask` a refuse verdict, and
+ * the concepts slice's table. `find` previews the concepts the reader may see (T-055),
+ * `open` by *locator* answers not found — a passage needs the source catalogue, which is
+ * B7's — `ask` a refuse verdict naming the concepts its terms resolve to, and
  * `giveFeedback` a receipt. Every function takes the Principal first and runs on the
  * transaction that resolved it.
  */
@@ -190,10 +191,10 @@ export type FeedbackReceipt = {
 
 /**
  * The four acts answer a `Result` (the kernel's result convention, `kernel/result.ts`).
- * `ask` and `giveFeedback` still declare `never` for their error: B9's bodies read no
- * store yet, so there is nothing that can fail and no refusal word to name. `find` and
- * `open` read the concept index now, so their unions carry the store's own Error — the
- * shape the convention's rule 3 promised would not change when a body arrived, and did not.
+ * `giveFeedback` still declares `never` for its error: B9's body reads no store yet, so there
+ * is nothing that can fail and no refusal word to name. `find`, `open` and `ask` read the
+ * concept index now, so their unions carry the store's own Error — the shape the
+ * convention's rule 3 promised would not change when a body arrived, and did not.
  */
 
 /** The bundle a concept's path sits in: its root directory, `knowledge/` today (ADR 0002). */
@@ -388,20 +389,56 @@ export const open = async (
   });
 };
 
+/**
+ * The words of a question worth asking the index about: four letters or more, case-folded,
+ * each once, and no more than a handful — a resolution, not a ranking (B9's).
+ */
+const termsOf = (question: string): readonly string[] =>
+  [...new Set(question.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}'-]{3,}/gu) ?? [])].slice(
+    0,
+    ASK_TERMS_AT_MOST,
+  );
+
+const ASK_TERMS_AT_MOST = 8;
+const ASK_HITS_PER_TERM = 5;
+
+/**
+ * The question answered as far as the knowledge layer reaches today (ADR 0016: verdict
+ * first): **a refusal, naming the concepts it would rest on**. Nothing drafts an answer until
+ * B9, so the verdict is *refuse* and the text the one sentence — but the question's terms are
+ * resolved over `concept_index` through the same read `find` makes, with the read predicate
+ * in its WHERE clause, and each concept found is a citation: the IRI, and the IRI again for
+ * the URL, since a concept's IRI is a URL on the apex (ADR 0002) and the app's own page for a
+ * concept is B9's to name. So *invisible through `ask`* is a fact about a real read: a
+ * withheld concept is no citation, no count and no hint, and the refusal a Viewer hears is
+ * the refusal an unrelated question gets.
+ */
 export const ask = async (
-  _principal: UserPrincipal,
-  _tx: Tx,
-  _input: { readonly question: string },
-): Promise<Result<AnswerResult, never>> =>
-  ok({
+  principal: UserPrincipal,
+  tx: Tx,
+  input: { readonly question: string },
+): Promise<Result<AnswerResult, Error>> => {
+  const named = new Map<string, OpenedConcept>();
+  for (const term of termsOf(input.question)) {
+    const found = await findConcepts(principal, tx, { query: term, limit: ASK_HITS_PER_TERM });
+    if (!found.ok) return err(found.error);
+    for (const concept of found.value) named.set(concept.iri, concept);
+  }
+  const citations = [...named.values()]
+    .toSorted(
+      (one, other) => one.title.localeCompare(other.title) || one.iri.localeCompare(other.iri),
+    )
+    .map((concept) => ({ iri: concept.iri, url: concept.iri }));
+  return ok({
     verdict: "refuse",
     text: NOT_ANSWERED,
-    citations: [],
+    citations,
     conflicts: [],
     coverage: { asked: 1, answered: 0 },
     unmappedPassages: [],
     map: { state: "live" },
   });
+};
 
 export const giveFeedback = async (
   _principal: UserPrincipal,

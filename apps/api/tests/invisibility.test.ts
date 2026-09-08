@@ -146,20 +146,29 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
     expect((structured(seen)["hits"] as Rpc[]).map((hit) => hit["iri"])).toEqual([iri]);
   });
 
-  it("reaches no answer through ask — no citation, no passage, no word of it", async () => {
-    const { viewer } = await restrictedSourcedConcept();
+  it("reaches no answer through ask — no citation, no passage, no word of it, and nothing an unrelated question would not also get — while the Admin's token is told which concept it rests on", async () => {
+    const { iri, viewer, admin } = await restrictedSourcedConcept();
+    const question = { question: "How is the board's remuneration reviewed?" };
 
-    const asked = await called(viewer.client, viewer.token, "ask", {
-      question: "How is the board's remuneration reviewed?",
+    const asked = await called(viewer.client, viewer.token, "ask", question);
+    const unrelated = await called(viewer.client, viewer.token, "ask", {
+      question: "Is the sky blue?",
     });
+    const seen = await called(admin.client, admin.token, "ask", question);
 
     expect(structured(asked)).toMatchObject({
       verdict: "refuse",
       citations: [],
       unmappedPassages: [],
     });
+    expect(structured(asked)).toEqual(structured(unrelated));
+    expect(rendered(asked)).toBe(rendered(unrelated));
     expect(JSON.stringify(asked)).not.toContain("remuneration is reviewed");
     expect(JSON.stringify(asked)).not.toContain("better-answers.com/c/");
+    // The positive control: the concept is there, and a reader who may see it is told so —
+    // a refusal still, since nothing drafts an answer yet (B9), naming what it would rest on.
+    expect(structured(seen)).toMatchObject({ verdict: "refuse", citations: [{ iri }] });
+    expect(rendered(seen)).toContain(iri);
   });
 
   it("opens exactly as an IRI nobody minted — the same shape, the same words — while the Admin's token opens it", async () => {
