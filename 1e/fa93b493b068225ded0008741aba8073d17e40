@@ -1,0 +1,9 @@
+docs/agents/code-review.md
+  ai_agent 15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1efa93b493b068225ded0008741aba8073d17e40",
+  "prompts": {}
+}
