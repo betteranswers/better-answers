@@ -101,6 +101,22 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **governed write** — the platform's only way of changing a bundle: an actor, a precondition on
   what it expects to find, one commit, one audit entry. Every bundle commit is one.
 - **bundle commit** — one change to a bundle, by whatever path; what the sync derives from.
+- **watermark** — the last commit a workspace's rows know about: its newest *bundle commit*, or
+  none for a bundle whose rows know no commit yet. The governed write holds the per-repository lock
+  through its Postgres COMMIT, so recorded history is a prefix of git history: everything after the
+  watermark is missed and nothing before it is. A watermark the ref's history does not contain is
+  *history diverged*, which no replay can put right (ADR 0012, amended 2026-09-06). _Avoid_: cursor,
+  checkpoint (a connector run's per-batch mark).
+- **head check** — the reconciler's periodic pass in the api process: every workspace's bundle head
+  read against its *watermark*, and the commits between replayed oldest-first through the live
+  handler under the reconciler's platform principal. Every thirty seconds, one tick at a time,
+  quiet when it finds nothing; `pnpm ops reconcile-watermark` is the same pass on demand, the
+  restore path (ADR 0012). _Avoid_: poll, sync (for this pass).
+- **reconciler hit** — one commit the reconciler replayed: the ledger row
+  `platform.reconciler.replayed`, written under the commit's own `Audit:` id, a bulk replay's rows
+  sharing one batch id. The *signal* ADR 0012 names, in ADR 0025's sense — a query over those rows,
+  never a metric. A hit is a crash window that was recovered, so a run of them is a fact worth
+  reading. _Avoid_: reconciliation event, replay count.
 - **concept index** — the platform's derived row for every concept, written when the concept's
   commit is made, checked by the sync, never edited. The only "both" of the minting rule.
 - **merge key** — what a concept is recognised by when its IRI is not yet known: the words a
@@ -193,6 +209,14 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **connector run** — one execution of a binding by the scheduler (enumerate, index, extract, prune
   or reindex): claimed under a lease, keyed by its run key, checkpointed per batch, one per binding
   at a time, parked after repeated failure; its outcome rows record what changed per document.
+- **job** — one unit of the worker's work, as a row on the queue: what to do (its *kind* — the
+  nightly audit or the full rebuild in v0.1; B7 adds kinds to a loop that exists), for which
+  workspace, and the facts the claim protocol needs. Queued until a *claimant* takes it under a
+  *lease*; ends *done* or *failed* with an *outcome*, or *poisoned* after its last lost claim. The
+  app enqueues and the worker claims, both through the queue's SQL functions (ADR 0031's `queue`
+  agreement; ADR 0005: the control plane is rows). A job is its own record and never an *audit
+  event*. A *run* is a job being done: a *connector run* or a *graph sync run* is one job's
+  execution. _Avoid_: task, ticket.
 - **lease** — the scheduler's grip on a claimed run: held only while the worker keeps confirming it
   is alive, expiring otherwise, so a run whose worker died is handed back for another claim rather
   than lost. _Avoid_: lock (nothing waits on it).
@@ -229,6 +253,11 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   every composition including one of those concepts — two levels, the second reading what the first
   wrote, never a third — so a guide never reaches a reader its includes would not. _Avoid_:
   recompute (one level's work, not the whole), propagation.
+- **class override** — an Admin's recorded act that sets a concept's class — sensitivity and
+  audience — whatever its evidence and its kind's floor derive: one row per concept, the latest
+  standing, one audit event, and the *cascade* run inside the same act. The one act that may widen
+  a class; where it widens past the evidence, a reader is in the *shared beyond its evidence* state
+  and the *evidence pane* names the Admin (ADR 0039). _Avoid_: exception, exemption, allow-list.
 - **group** — a named set of members of one workspace: the one grouping concept, and the unit an
   *audience* names when a binding is not for everyone. Groups are flat, and a person may belong to
   several. A group may represent a team ("HR team", "Sales executives") — that is its name, not a
@@ -287,6 +316,12 @@ is gone since the check; the check stands; the reason is on the row). No other r
   access ("Based on your current access, the evidence isn't included"), always names the Admin
   whose override created the state, and never dead-ends (Liam, 05/09/2026 — exact copy polished
   at spec time; the fixed rule is the routing, not the sentence).
+- **evidence pane** — what a reader sees of a concept's cited evidence: one of three states off two
+  counts — *included*, *partly included* or *not included* in their access. It leads with the
+  reader's access, lists only the evidence they may open, names the Admin whose *class override*
+  put them in *shared beyond its evidence* where one has, and always says where to go next, so it is
+  never a dead end (ADR 0023; Liam, 05/09/2026). Never a trust signal. _Avoid_: sources panel,
+  citations list.
 
 ## Guides and answers
 
