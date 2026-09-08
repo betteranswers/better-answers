@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import { boundarySchemas, FAMILIES, ulid } from "@better-answers/schema";
+import { FAMILIES, ulid } from "@better-answers/schema";
 
 import {
   act,
@@ -14,9 +14,9 @@ import {
   record,
   recordFor,
 } from "../src/audit/index.ts";
-import type { ActorId, UserPrincipal } from "../src/kernel/index.ts";
+import type { ActorId } from "../src/kernel/index.ts";
 import { withPrincipal, withScope } from "../src/store/postgres/index.ts";
-import { bootstrap, provisionedWorkspace } from "./platform.ts";
+import { bootstrap, principalOf, provisionedWorkspace } from "./platform.ts";
 import { coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
@@ -109,6 +109,29 @@ describe("the declared-acts walk", () => {
       expect(inTree.size).toBeGreaterThan(0);
     },
   );
+
+  it("answers the act it was handed — its name and the shape of the detail every row carries", () => {
+    // The acceptance path of the vocabulary's own constructor: the refusals below say what
+    // may not be declared, and this says what a declaration is when nothing refuses it.
+    expect(act("platform.probe.shaped", { adminUserId: "id", confirmed: "flag" })).toEqual({
+      name: "platform.probe.shaped",
+      detail: { adminUserId: "id", confirmed: "flag" },
+    });
+  });
+
+  it("registers exactly the acts it was given, and hands them back to the slice", () => {
+    const registered = declareActs("platform", {
+      accepted: act("platform.probe.accepted", { confirmed: "flag" }),
+    });
+
+    expect(registered).toEqual({
+      accepted: { name: "platform.probe.accepted", detail: { confirmed: "flag" } },
+    });
+    expect(declarations()).toContainEqual({
+      family: "platform",
+      acts: ["platform.probe.accepted"],
+    });
+  });
 
   it("refuses an act declared under a family that is not its first word", () => {
     expect(() =>
@@ -297,6 +320,37 @@ describe("the first door — record, the actor derived from the Principal", () =
     expect(await rowById(id)).toBeUndefined();
   });
 
+  it("writes the person's own workspace on the row, so a transaction scoped elsewhere is refused", async () => {
+    const here = await provisioned();
+    const there = await provisionedWorkspace(db(), "Elsewhere");
+    // The other workspace's Admin, holding a Principal for it: the session a cross-tenant
+    // write would arrive under.
+    const theirs = principalOf(there.workspaceId, there.adminUserId, "Admin");
+    const refused = ulid();
+    const landed = ulid();
+    const noteAs = (scope: string, id: string) =>
+      withScope(bootstrap, here.door, scope, (tx) =>
+        record(theirs, tx, {
+          id,
+          act: PROBE.noted,
+          subjectId: there.workspaceId,
+          detail: { confirmed: true },
+        }),
+      );
+
+    // The explicit workspace id is what the policy refuses the disagreement over; passing
+    // none would let the row fall into whichever workspace the transaction is scoped to.
+    await expect(noteAs(here.workspaceId, refused)).rejects.toThrow(/row-level security/);
+    expect(await rowById(refused)).toBeUndefined();
+
+    // And in the scope it agrees with, the row lands in the Principal's own workspace.
+    await noteAs(there.workspaceId, landed);
+    expect(await rowById(landed)).toMatchObject({
+      workspace_id: there.workspaceId,
+      actor: `human:${there.adminUserId}`,
+    });
+  });
+
   it("rejects a detail that names a field the act does not, before any row exists", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const id = ulid();
@@ -315,7 +369,7 @@ describe("the first door — record, the actor derived from the Principal", () =
     expect(await rowById(id)).toBeUndefined();
   });
 
-  it("rejects an id-kind field holding an email, an act nobody declared, and an id not the minter's", async () => {
+  it("rejects an id-kind field holding an email, a detail short of a field, an act nobody declared, and an id not the minter's", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const write = (event: Parameters<typeof record>[2]) =>
       withScope(bootstrap, door, workspaceId, (tx) => record(bootstrap, tx, event));
@@ -331,11 +385,23 @@ describe("the first door — record, the actor derived from the Principal", () =
     await expect(
       write({
         id: ulid(),
+        act: PROBE.written,
+        subjectId: adminUserId,
+        // The act names three fields and this detail brings two; a field that is missing
+        // is its own word, not the kind check's.
+        detail: { adminUserId, role: "Admin" },
+      }),
+    ).rejects.toThrow(/detail is missing the field confirmed/);
+    await expect(
+      write({
+        id: ulid(),
         act: act("platform.probe.undeclared", {}),
         subjectId: adminUserId,
         detail: {},
       }),
     ).rejects.toThrow(/never declared/);
+    // The boundary's own refusal keeps the cause it refused over, so a caller reading the
+    // Error is told which field and why rather than only that something was wrong.
     await expect(
       write({
         id: "audit-1",
@@ -343,7 +409,10 @@ describe("the first door — record, the actor derived from the Principal", () =
         subjectId: adminUserId,
         detail: { confirmed: true },
       }),
-    ).rejects.toThrow(/refused at the boundary/);
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("refused at the boundary"),
+      cause: expect.objectContaining({ issues: expect.any(Array) }),
+    });
   });
 });
 
@@ -371,15 +440,7 @@ describe("the second door — recordFor, the platform naming the actor", () => {
 
   it("is not reachable from a user principal, in the type and at runtime", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
-    // The ids come through the boundary, so the brands are earned rather than asserted.
-    const admin: UserPrincipal = {
-      kind: "user",
-      workspaceId: boundarySchemas.workspace.select.shape.id.parse(workspaceId),
-      userId: boundarySchemas.user.select.shape.id.parse(adminUserId),
-      role: "Admin",
-      groups: [],
-      credentialIssuedAtMs: Date.now(),
-    };
+    const admin = principalOf(workspaceId, adminUserId, "Admin");
     const id = ulid();
 
     await expect(
