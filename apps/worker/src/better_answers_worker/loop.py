@@ -5,14 +5,13 @@ workspace: claim, run, heartbeat while running, finish or fail with an outcome. 
 job kinds are T-006's own obligations — the nightly parser audit and the full rebuild —
 and B7 adds kinds to this loop rather than building one.
 
-**The schema stamp comes before everything.** The worker never migrates and
-holds a generated, committed view of the app's schema; if the migration that view was
-generated from is not the migration the database was last stamped with, the deploy order
-has slipped and every read this loop is about to make is against a shape that has moved.
-It logs once and claims nothing — it does not exit. A worker that exited would be
-restarted by the deploy unit into the same mismatch, and a restart storm reads as an
-outage rather than as the ordinary few seconds between `migrate` and `worker` on a
-release.
+**The schema stamp comes before everything.** The worker never migrates and holds a
+generated, committed view of the app's schema; if the migration that view was generated
+from is not the migration the database was last stamped with, the deploy order has
+slipped and every read this loop is about to make is against a shape that has moved. It
+logs once and claims nothing — it does not exit. A worker that exited would be restarted
+by the deploy unit into the same mismatch, and a restart storm reads as an outage rather
+than as the ordinary few seconds between `migrate` and `worker` on a release.
 
 **The nightly audit schedules itself.** There is no scheduler here and no cron in the
 image: when a workspace has nothing to claim, the loop asks when its last
@@ -91,18 +90,18 @@ def _run_claimed(
     bootstrap: Bootstrap,
     job: queue.ClaimedJob,
 ) -> dict[str, Any]:
-    """Do the work the job names, in its own transaction, heartbeating as it goes.
+    """Do the work the job names, in one transaction, a heartbeat running beside it.
 
-    The heartbeat is a **per-step call rather than a background thread**: both job kinds
-    are a bounded walk over one workspace's concepts, so there is a natural place to say
-    "still here" between one concept and the next, and a thread would need a connection
-    of its own and a way to be sure it had stopped. The heartbeat runs on the same
-    connection inside the same transaction, which is also what makes it honest: a
-    transaction that has stalled cannot heartbeat, and that is exactly the run whose
-    lease should lapse.
+    **One transaction, because a rebuild's whole point is that it lands or does not**:
+    the generation it writes and the flip that makes it live are one act. The heartbeat
+    therefore cannot share that transaction — nothing it wrote there would be readable
+    by another worker until the job committed — so it runs on a connection of its own
+    (`queue.keeping_alive`), which is what makes a lease survive a long rebuild.
     """
-    with queue.scoped(connection, job.workspace_id) as cursor:
-        queue.heartbeat(cursor, job.id, bootstrap.worker_id)
+    with (
+        queue.keeping_alive(bootstrap.database_url, job, bootstrap.worker_id),
+        queue.scoped(connection, job.workspace_id) as cursor,
+    ):
         if job.kind == "nightly-audit":
             return run_audit(cursor, bootstrap.git_store_dir, job.workspace_id).as_row()
         return run_rebuild(cursor, bootstrap.git_store_dir, job.workspace_id).as_row()

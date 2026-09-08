@@ -13,6 +13,7 @@ finish, and the refusals around them.
 """
 
 import json
+import time
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -20,7 +21,7 @@ from typing import Any
 import psycopg
 import pytest
 
-from better_answers_worker import health, loop
+from better_answers_worker import health, loop, queue
 from better_answers_worker.audit import run_audit
 from better_answers_worker.concept_file import content_hash_of, parse_concept_file
 from better_answers_worker.config import Bootstrap
@@ -30,7 +31,7 @@ from better_answers_worker.rebuild import run_rebuild
 from better_answers_worker.schema_view import MIGRATION_WHEN
 from bundles import render_concept_file, write_bundle
 from factories import seed_concept_identity, seed_workspace
-from pg_harness import migrated_postgres
+from pg_harness import migrated_postgres_at
 
 WORKER = "worker-under-test"
 IRI = "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM"
@@ -39,8 +40,15 @@ OTHER_IRI = "https://better-answers.com/c/01J6NNNNNNNNNNNNNNNNNNNNNN"
 
 @pytest.fixture(name="database")
 def a_migrated_database() -> Iterator[psycopg.Connection]:
-    with migrated_postgres() as connection:
+    with migrated_postgres_at() as (connection, conninfo):
+        _WHERE[connection] = conninfo
         yield connection
+
+
+#: Where a test's database is, for the one case that opens a second connection to it.
+#: `Connection` gives its conninfo back without the password, so the address is kept
+#: here rather than asked of the connection.
+_WHERE: dict[psycopg.Connection, str] = {}
 
 
 def seed_concept(
@@ -93,7 +101,7 @@ def seed_concept(
 
 def bootstrap_for(database: psycopg.Connection, git_store: Path) -> Bootstrap:
     return Bootstrap(
-        database_url=database.info.dsn,
+        database_url=_WHERE[database],
         git_store_dir=str(git_store),
         worker_id=WORKER,
     )
@@ -322,3 +330,51 @@ def test_a_worker_holding_a_fresh_lease_is_healthy_and_a_queue_left_waiting_is_n
     # And once the lease lapses, the job is claimable, older than a lease and unclaimed:
     # this worker has stopped working, which is what the check is for.
     assert health.is_healthy(database, WORKER) is False
+
+
+def test_a_long_run_keeps_its_lease_from_a_connection_of_its_own(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    """A heartbeat on the job's own connection would be invisible until the job
+    committed, and a lease that lapsed halfway through a long rebuild would be handed
+    to a second worker while the first was still building it. So the heartbeat has a
+    connection of its own — and what proves it is a *third* connection reading the
+    row while the job's transaction is still open.
+    """
+    workspace = seed_workspace(database.cursor())["id"]
+    database.commit()
+
+    with scoped(database, workspace) as cursor:
+        cursor.execute(
+            "INSERT INTO job (workspace_id, id, kind) VALUES (%s, %s, 'nightly-audit')",
+            (workspace, ulid()),
+        )
+    with scoped(database, workspace) as cursor:
+        claimed = queue.claim(cursor, workspace, WORKER)
+    assert claimed is not None
+
+    dsn = _WHERE[database]
+    with psycopg.connect(dsn) as onlooker:
+        with scoped(onlooker, workspace) as cursor:
+            cursor.execute("SELECT heartbeat_at, lease_expires_at FROM job")
+            before = cursor.fetchone()
+        assert before is not None
+
+        # The job's own transaction, held open for as long as the run would hold it.
+        with (
+            queue.keeping_alive(dsn, claimed, WORKER, every_seconds=0.05),
+            scoped(database, workspace) as job_cursor,
+        ):
+            job_cursor.execute("SELECT 1 FROM concept_index")
+            after = None
+            for _ in range(200):
+                time.sleep(0.05)
+                with scoped(onlooker, workspace) as cursor:
+                    cursor.execute("SELECT heartbeat_at, lease_expires_at FROM job")
+                    read = cursor.fetchone()
+                if read is not None and read[0] > before[0]:
+                    after = read
+                    break
+
+    assert after is not None, "the heartbeat never reached a reader outside the job"
+    assert after[1] > before[1], "and the lease moved with it"

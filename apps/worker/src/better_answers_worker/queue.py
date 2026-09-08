@@ -18,12 +18,15 @@ tenant data, and iterating it is how one worker serves every workspace on a 4 GB
 """
 
 import json
+import threading
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
 import psycopg
+
+from .log import logger
 
 #: How long a claim holds its job before another worker may take it. Long enough that a
 #: heartbeat can be missed once without losing the run, short enough that a worker
@@ -104,6 +107,53 @@ def heartbeat(cursor: psycopg.Cursor, job_id: str, worker_id: str) -> bool:
     )
     row = cursor.fetchone()
     return bool(row and row[0])
+
+
+@contextmanager
+def keeping_alive(
+    database_url: str,
+    job: ClaimedJob,
+    worker_id: str,
+    every_seconds: float = HEARTBEAT_SECONDS,
+) -> Iterator[None]:
+    """Say this worker is alive, on a connection of its own, while a job runs.
+
+    **A heartbeat needs its own connection, and that is the whole reason this exists.**
+    A job runs in one transaction, so its rows land or roll back together — which means
+    a heartbeat written on that connection is invisible to every other worker until the
+    job commits, and a lease that lapsed halfway through a long rebuild would be handed
+    out while the first worker was still building it. A heartbeat that nobody can read
+    is not a heartbeat, so this one commits on its own.
+
+    The thread is a daemon and stops with the block, so a job that raises takes its
+    heartbeat down with it and the lease lapses in its own time — which is exactly what
+    should happen to a run that died.
+
+    It stops early the moment the database says the lease is somebody else's: pushing a
+    lease out after losing it would be this worker taking back a job another one is
+    already running.
+    """
+    stop = threading.Event()
+
+    def beat() -> None:
+        try:
+            with psycopg.connect(database_url) as connection:
+                while not stop.wait(every_seconds):
+                    with scoped(connection, job.workspace_id) as cursor:
+                        if not heartbeat(cursor, job.id, worker_id):
+                            return
+        except psycopg.Error:
+            # The lease lapses on its own and the job is claimed again; there is nothing
+            # here worth ending the run for, and the line is what an operator reads.
+            logger.warning("the heartbeat stopped", job_id=job.id, worker_id=worker_id)
+
+    thread = threading.Thread(target=beat, name="heartbeat", daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        thread.join(timeout=every_seconds)
 
 
 def finish(
