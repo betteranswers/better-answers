@@ -11,6 +11,7 @@ import { openGit } from "@better-answers/core/store/git";
 import { openPostgres } from "@better-answers/core/store/postgres";
 
 import { logger as tierLogger } from "./logger.ts";
+import { reasonOf } from "./ops/index.ts";
 
 /**
  * The periodic head check — the reconciler's trigger in the api process (ADR 0012, amended
@@ -52,10 +53,6 @@ export type Reconciler = {
   /** No tick starts after this; the one in flight, if any, is awaited. */
   stop(): Promise<void>;
 };
-
-/** A refusal's word, or a store's own failure, as a log line says it. */
-const reasonOf = (reason: string | Error): string =>
-  typeof reason === "string" ? reason : reason.message;
 
 /** One pass over every workspace, as one line: counts, and the two lists an operator reads. */
 const summaryOf = (outcomes: readonly WorkspaceReconciled[]) => {

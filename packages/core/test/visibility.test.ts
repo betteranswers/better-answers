@@ -927,18 +927,27 @@ describe("the evidence pane", () => {
   });
 });
 
+/**
+ * Two concepts about expenses — one an Internal-sourced Policy the Viewer may see, one
+ * Restricted-sourced and withheld from them — which is what both reads are asked about.
+ */
+const expensesNotes = async (scenario: Scenario) => {
+  const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
+  const visible = await conceptCiting(scenario, scenario.editor, [internal.documentId], {
+    title: "Expenses policy",
+    frontmatter: { title: "Expenses policy", type: "Policy", tags: ["finance"] },
+    kind: "Policy",
+  });
+  const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
+    title: "Expenses of the board",
+  });
+  return { visible, withheld, internal };
+};
+
 describe("find", () => {
   it("previews the concepts the reader may see whose title or body holds the query, and never a withheld one", async () => {
     const scenario = await arrange();
-    const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
-    const visible = await conceptCiting(scenario, scenario.editor, [internal.documentId], {
-      title: "Expenses policy",
-      frontmatter: { title: "Expenses policy", type: "Policy", tags: ["finance"] },
-      kind: "Policy",
-    });
-    const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
-      title: "Expenses of the board",
-    });
+    const { visible, withheld, internal } = await expensesNotes(scenario);
     await conceptCiting(scenario, scenario.editor, [internal.documentId], {
       title: "Unrelated",
       body: "Nothing about the matter.",
@@ -980,13 +989,7 @@ describe("find", () => {
 
   it("lets ask name the concepts the reader may see that its question's terms resolve to, and never a withheld one — as a refusal, since nothing drafts yet", async () => {
     const scenario = await arrange();
-    const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
-    const visible = await conceptCiting(scenario, scenario.editor, [internal.documentId], {
-      title: "Expenses policy",
-    });
-    const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
-      title: "Expenses of the board",
-    });
+    const { visible, withheld } = await expensesNotes(scenario);
     const question = { question: "How are expenses claimed?" };
 
     const [viewer, admin, unrelated] = await Promise.all([

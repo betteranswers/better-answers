@@ -87,14 +87,15 @@ export const RESTRICTED_TO_ADMINS: Visibility = { sensitivity: RESTRICTED, ...EV
  *   it narrows an Internal unit's members: fewer readers on every term, never more.
  *
  * Rendered rather than composed from strings by the caller, so the three clauses exist in
- * one place. `at` is the caller's own placeholder number for the first of the **two**
- * parameters the clause reads — the role at `$at`, the group ids at `$at + 1` — because a
- * role or a group id interpolated into SQL would be the injection this repository never
- * writes; `readableParameters` is what fills them, in that order.
+ * one place. `roleParameter` is the caller's own placeholder number for the first of the
+ * **two** parameters the clause reads — the role at `$roleParameter`, the group ids at
+ * `$roleParameter + 1` — because a role or a group id interpolated into SQL would be the
+ * injection this repository never writes; `readableParameters` is what fills them, in that
+ * order.
  */
-export const readableClause = (alias: string, at: number): string =>
+export const readableClause = (alias: string, roleParameter: number): string =>
   `${alias}.published_at IS NOT NULL
-     AND ${sensitivityAndAudienceClause(alias, at)}`;
+     AND ${sensitivityAndAudienceClause(alias, roleParameter)}`;
 
 /**
  * The predicate's last two clauses alone — the class and the audience, **who a unit is for**
@@ -106,9 +107,9 @@ export const readableClause = (alias: string, at: number): string =>
  * check. Rendered from the same words as `readableClause`, so the two cannot drift; the
  * placeholders are the same two, filled by `readableParameters`.
  */
-export const sensitivityAndAudienceClause = (alias: string, at: number): string =>
-  `(${alias}.sensitivity <> '${RESTRICTED}' OR $${at} = 'Admin')
-     AND (${alias}.audience = '${AUDIENCE_EVERYONE}' OR ${alias}.audience_groups && $${at + 1}::text[])`;
+export const sensitivityAndAudienceClause = (alias: string, roleParameter: number): string =>
+  `(${alias}.sensitivity <> '${RESTRICTED}' OR $${roleParameter} = 'Admin')
+     AND (${alias}.audience = '${AUDIENCE_EVERYONE}' OR ${alias}.audience_groups && $${roleParameter + 1}::text[])`;
 
 /**
  * What the clause's two placeholders are filled with, in the order the clause reads them:

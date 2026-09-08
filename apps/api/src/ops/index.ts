@@ -263,8 +263,11 @@ const sliceCommand = async (
   return REFUSED;
 };
 
-/** A refusal's word, or a store's own failure, as one line says it. */
-const reasonOf = (reason: string | Error): string =>
+/**
+ * A refusal's word, or a store's own failure, as one line says it — the ops commands' and
+ * the reconciler tick's alike, so the two say a slice's refusal the same way.
+ */
+export const reasonOf = (reason: string | Error): string =>
   typeof reason === "string" ? reason : reason.message;
 
 /**

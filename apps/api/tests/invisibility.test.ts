@@ -1,7 +1,3 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
-
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { writeConcept } from "@better-answers/core/concepts";
@@ -25,19 +21,27 @@ import { startApp, type TestApp, type TestClient } from "./harness.ts";
  */
 
 let app: TestApp;
-let bundleRoot: string;
 
 beforeAll(async () => {
   app = await startApp();
-  bundleRoot = await mkdtemp(path.join(tmpdir(), "better-answers-invisibility-"));
 }, 180_000);
 
 afterAll(async () => {
   await app.stop();
-  await rm(bundleRoot, { recursive: true, force: true });
 });
 
 type Rpc = Readonly<Record<string, unknown>>;
+
+/** A JSON value narrowed to an object with string keys — the shape every frame and field here is read as. */
+const isRpc = (value: unknown): value is Rpc =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** The value as an object, or an empty one: a missing field reads as nothing rather than throwing. */
+const rpcOf = (value: unknown): Rpc => (isRpc(value) ? value : {});
+
+/** The value's object items, or none. */
+const rpcListOf = (value: unknown): readonly Rpc[] =>
+  Array.isArray(value) ? value.filter(isRpc) : [];
 
 /**
  * One tool call as a host makes it, and its result — the last frame of a streamed answer,
@@ -57,16 +61,17 @@ const called = async (client: TestClient, token: string, name: string, args: Rpc
   });
   const text = await response.text();
   const streamed = [...text.matchAll(/^data:(.*)$/gm)].at(-1)?.[1];
-  const body = JSON.parse(streamed ?? text) as Rpc;
+  const parsed: unknown = JSON.parse(streamed ?? text);
+  const body = rpcOf(parsed);
   expect(body["error"]).toBeUndefined();
-  const result = (body["result"] ?? {}) as Rpc;
+  const result = rpcOf(body["result"]);
   expect(result["isError"]).toBeFalsy();
   return result;
 };
 
-const structured = (result: Rpc): Rpc => (result["structuredContent"] ?? {}) as Rpc;
+const structured = (result: Rpc): Rpc => rpcOf(result["structuredContent"]);
 
-const rendered = (result: Rpc): string => String(((result["content"] as Rpc[])[0] ?? {})["text"]);
+const rendered = (result: Rpc): string => String(rpcOf(rpcListOf(result["content"])[0])["text"]);
 
 /** The Principal a transport would resolve for this person, for the act that needs one held. */
 const principalFor = async (workspaceId: string, userId: string): Promise<UserPrincipal> => {
@@ -104,7 +109,7 @@ const restrictedSourcedConcept = async () => {
   } finally {
     client.release();
   }
-  const git = openGit(bundleRoot);
+  const git = openGit(app.gitStoreDir);
   await initRepository(git, workspace.workspaceId);
   const written = await writeConcept(
     await principalFor(workspace.workspaceId, workspace.admin.id),
@@ -143,7 +148,7 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
 
     expect(structured(found)).toEqual({ query: "remuneration", hits: [] });
     expect(rendered(found)).toBe("Nothing in the company's knowledge matches that.");
-    expect((structured(seen)["hits"] as Rpc[]).map((hit) => hit["iri"])).toEqual([iri]);
+    expect(rpcListOf(structured(seen)["hits"]).map((hit) => hit["iri"])).toEqual([iri]);
   });
 
   it("reaches no answer through ask — no citation, no passage, no word of it, and nothing an unrelated question would not also get — while the Admin's token is told which concept it rests on", async () => {
