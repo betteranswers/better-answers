@@ -2,10 +2,9 @@ import { testData, type MigratedPostgres } from "@better-answers/schema/testing"
 
 import { initRepository, type GitDoor } from "@better-answers/core/store/git";
 
-import type { Role, UserPrincipal } from "../src/kernel/index.ts";
+import { systemClock, ulid, type Role, type UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres, withPrincipal, type PostgresDoor } from "../src/store/postgres/index.ts";
 import { provisionWorkspace } from "../src/workspaces/index.ts";
-import { ulid } from "../src/kernel/index.ts";
 import { bundlesForSuite } from "./bundle.ts";
 import { bootstrap, seedPerson } from "./platform.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
@@ -35,7 +34,11 @@ export type Scenario = {
  * replay each hold the bundle's lock and open the rows' transaction. One helper for the
  * suites that hand a scenario to an act, so the pair is one fact and not a copy per suite.
  */
-export const doorsOf = (scenario: Scenario) => ({ git: scenario.git, postgres: scenario.postgres });
+export const doorsOf = (scenario: Scenario) => ({
+  git: scenario.git,
+  postgres: scenario.postgres,
+  clock: systemClock(),
+});
 
 /**
  * A suite's whole footing on one line: the migrated Postgres, the bundle root, and the

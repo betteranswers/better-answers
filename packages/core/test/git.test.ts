@@ -68,6 +68,7 @@ const requestFor = (overrides: Partial<CommitRequest> = {}): CommitRequest => ({
   author: AUTHOR,
   trailers: { actor: `human:${ulid()}` satisfies ActorId, audit: ulid() },
   expectedHead: null,
+  at: new Date(),
   ...overrides,
 });
 

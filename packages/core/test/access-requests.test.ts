@@ -273,7 +273,7 @@ describe("approving a request", () => {
     const before = Date.now();
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
-      approveRequest(principal, tx, { requestId, role: "Editor" }),
+      approveRequest(principal, tx, { requestId, role: "Editor" }, new Date(before)),
     );
 
     expect(approved).toEqual({
@@ -345,7 +345,7 @@ describe("approving a request", () => {
     const { workspace, requestId } = await withOneWaitingRequest("Default");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
-      approveRequest(principal, tx, { requestId }),
+      approveRequest(principal, tx, { requestId }, new Date()),
     );
 
     expect(approved).toMatchObject({ ok: true, value: { role: REQUEST_ROLE_DEFAULT } });
@@ -356,7 +356,7 @@ describe("approving a request", () => {
     const { workspace, requestId } = await withOneWaitingRequest("Foreign");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
-      approveRequest(principal, tx, { requestId, role: "owner" }),
+      approveRequest(principal, tx, { requestId, role: "owner" }, new Date()),
     );
 
     expect(approved).toEqual({ ok: false, error: "no-such-role" });
@@ -371,7 +371,7 @@ describe("approving a request", () => {
     const { workspace, requestId } = await withOneWaitingRequest("Twice");
     const approve = () =>
       as(workspace.id, workspace.adminUserId, (principal, tx) =>
-        approveRequest(principal, tx, { requestId }),
+        approveRequest(principal, tx, { requestId }, new Date()),
       );
 
     expect((await approve()).ok).toBe(true);
@@ -386,7 +386,7 @@ describe("approving a request", () => {
     const workspace = await provision("Missing");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
-      approveRequest(principal, tx, { requestId: ulid() }),
+      approveRequest(principal, tx, { requestId: ulid() }, new Date()),
     );
 
     expect(approved).toEqual({ ok: false, error: "no-such-request" });
@@ -399,7 +399,7 @@ describe("approving a request", () => {
     await expect(
       whileWritesAreRefused(db().pool, "invitation", () =>
         as(workspace.id, workspace.adminUserId, async (principal, tx) => {
-          approved = await approveRequest(principal, tx, { requestId });
+          approved = await approveRequest(principal, tx, { requestId }, new Date());
         }),
       ),
     ).rejects.toThrow(/did not commit/);
@@ -424,7 +424,10 @@ describe("what a decision refuses and what it passes on", () => {
   ) => Promise<Result<unknown, string | Error>>;
 
   const DECISIONS: readonly (readonly [string, Decision])[] = [
-    ["approving", (principal, tx, requestId) => approveRequest(principal, tx, { requestId })],
+    [
+      "approving",
+      (principal, tx, requestId) => approveRequest(principal, tx, { requestId }, new Date()),
+    ],
     ["declining", (principal, tx, requestId) => declineRequest(principal, tx, { requestId })],
   ];
 
@@ -632,7 +635,10 @@ describe("who may decide", () => {
   ) => Promise<Result<unknown, unknown>>;
 
   const verbs: readonly [string, Verb][] = [
-    ["approve", (principal, tx, requestId) => approveRequest(principal, tx, { requestId })],
+    [
+      "approve",
+      (principal, tx, requestId) => approveRequest(principal, tx, { requestId }, new Date()),
+    ],
     ["decline", (principal, tx, requestId) => declineRequest(principal, tx, { requestId })],
     ["list", (principal, tx) => listWaitingRequests(principal, tx)],
   ];

@@ -35,7 +35,7 @@ import {
   readingAs,
   until,
 } from "./suite-postgres.ts";
-import { arrangeWorkspace, principalFor, type Scenario } from "./workspace-with-bundle.ts";
+import { arrangeWorkspace, doorsOf, principalFor, type Scenario } from "./workspace-with-bundle.ts";
 
 /**
  * The governed write through the concepts slice's entry point (`[TEST1]`), against real
@@ -103,7 +103,7 @@ const rewriteOf = (
 });
 
 const write = (scenario: Scenario, principal: UserPrincipal, input: WriteConceptInput) =>
-  writeConcept(principal, { git: scenario.git, postgres: scenario.postgres }, input);
+  writeConcept(principal, doorsOf(scenario), input);
 
 /**
  * The Editor's write, and what it landed. A test that is about the commit, the rows or the
@@ -1044,6 +1044,7 @@ describe("what a governed write refuses", () => {
       author: { name: "Ada Editor", email: "ada@acme.invalid" },
       trailers: { actor: `human:${scenario.editor.userId}`, audit: `${ulid()}\nRun: forged` },
       expectedHead: null,
+      at: new Date(),
     });
 
     expect(forged).toEqual({ ok: false, error: "malformed-message" });
@@ -1081,7 +1082,7 @@ describe("what a governed write refuses", () => {
 
     const refused = await writeConcept(
       scenario.editor,
-      { git: scenario.git, postgres: openPostgres(gone) },
+      { ...doorsOf(scenario), postgres: openPostgres(gone) },
       writeFor(),
     );
 
@@ -1177,6 +1178,27 @@ describe("what a re-write of an existing concept may not move", () => {
     );
     expect(held.rows[0]?.status).toBe("stable");
     expect(held.rows[0]?.published_at).toBeInstanceOf(Date);
+  });
+
+  it("lands a newly published concept's publishedAt as the platform's instant, never the transaction's", async () => {
+    const scenario = await arrange();
+    const input = writeFor({ status: "stable" });
+    // Deliberately not "now": if the row's `published_at` came from the transaction's own
+    // `now()` rather than this Clock, it would land within milliseconds of the real time
+    // this test runs at, and could never equal a literal decades away (ADR 0040).
+    const pinned = new Date("2031-06-15T09:30:00.000Z");
+    const written = await writeConcept(
+      scenario.editor,
+      { git: scenario.git, postgres: scenario.postgres, clock: { now: () => pinned } },
+      input,
+    );
+    if (!written.ok) throw new Error(`the write was refused: ${String(written.error)}`);
+
+    const held = await db().pool.query<{ published_at: Date | null }>(
+      "SELECT published_at FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+      [scenario.workspaceId, written.value.iri],
+    );
+    expect(held.rows[0]?.published_at).toEqual(pinned);
   });
 
   it("refuses moving an existing concept to another path, and makes no commit", async () => {
@@ -1559,7 +1581,7 @@ describe("opening a concept by IRI", () => {
     const written = await landed(scenario, input);
 
     const opened = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }),
+      open(principal, tx, { iri: written.iri }, new Date()),
     );
 
     expect(opened.ok).toBe(true);
@@ -1591,7 +1613,7 @@ describe("opening a concept by IRI", () => {
 
     const seen = await Promise.all(
       [scenario.viewer, scenario.editor, scenario.admin].map((principal) =>
-        reading(principal, (resolved, tx) => open(resolved, tx, { iri: written.iri })),
+        reading(principal, (resolved, tx) => open(resolved, tx, { iri: written.iri }, new Date())),
       ),
     );
 
@@ -1624,7 +1646,7 @@ describe("opening a concept by IRI", () => {
     );
     expect(checked).toMatchObject({ ok: true });
     const opened = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }),
+      open(principal, tx, { iri: written.iri }, new Date()),
     );
     expect(opened.ok && opened.value.found && opened.value.concept?.trust).toMatchObject({
       tier: "human-reviewed",
@@ -1639,7 +1661,7 @@ describe("opening a concept by IRI", () => {
       rewriteOf(input, written, { body: "Expenses are claimed within sixty days." }),
     );
     const moved = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }),
+      open(principal, tx, { iri: written.iri }, new Date()),
     );
     expect(moved.ok && moved.value.found && moved.value.concept?.trust.status).toBe(
       "changed-since-checked",
@@ -1653,7 +1675,7 @@ describe("opening a concept by IRI", () => {
     const written = await landed(scenario, writeFor({ status: "deprecated" }));
 
     const opened = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }),
+      open(principal, tx, { iri: written.iri }, new Date()),
     );
 
     expect(opened.ok && opened.value.found && opened.value.concept?.trust.status).toBe(
@@ -1681,7 +1703,7 @@ describe("opening a concept by IRI", () => {
     }
 
     const opened = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }),
+      open(principal, tx, { iri: written.iri }, new Date()),
     );
 
     expect(opened.ok && opened.value.found && opened.value.concept?.trust).toEqual({
@@ -1722,8 +1744,12 @@ describe("opening a concept by IRI", () => {
     );
 
     const [cited, uncited] = await Promise.all([
-      reading(scenario.viewer, (principal, tx) => open(principal, tx, { iri: citing.iri })),
-      reading(scenario.viewer, (principal, tx) => open(principal, tx, { iri: bare.iri })),
+      reading(scenario.viewer, (principal, tx) =>
+        open(principal, tx, { iri: citing.iri }, new Date()),
+      ),
+      reading(scenario.viewer, (principal, tx) =>
+        open(principal, tx, { iri: bare.iri }, new Date()),
+      ),
     ]);
 
     expect(cited.ok && cited.value.found && cited.value.concept?.evidence).toEqual([
@@ -1783,10 +1809,78 @@ describe("opening a concept by IRI", () => {
     const written = await landed(scenario, input);
 
     const read = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }),
+      open(principal, tx, { iri: written.iri }, new Date()),
     );
 
     expect(read.ok && read.value.found && read.value.concept?.trust.status).toBe(expected);
+  });
+
+  /**
+   * The two exact-boundary comparisons `pastShelfLife` makes, pinned on both sides of each
+   * (ADR 0040): the real clock can only ever land on one side of an instant by accident, so
+   * these move `now` to a literal a millisecond either side of the boundary instead of
+   * waiting for the clock to get there. `open`'s own `now` parameter is what makes the move
+   * possible — before ADR 0040 the comparison read `new Date()` from inside `trustOf`, and
+   * no test could hold it still.
+   */
+  it("is out of date exactly at the end of a date-only shelf life's day, and current a moment before", async () => {
+    const scenario = await arrange();
+    const written = await landed(
+      scenario,
+      writeFor({
+        status: "stable",
+        frontmatter: { title: "Expenses", type: "Policy", stale_after: "2026-03-01" },
+      }),
+    );
+
+    // Midnight UTC the day after `stale_after`: the date-only form lasts *through* the day
+    // it names, so this instant and no earlier one is where it becomes out of date.
+    const boundary = new Date("2026-03-02T00:00:00.000Z");
+    const atTheBoundary = await reading(scenario.viewer, (principal, tx) =>
+      open(principal, tx, { iri: written.iri }, boundary),
+    );
+    const aMillisecondBefore = await reading(scenario.viewer, (principal, tx) =>
+      open(principal, tx, { iri: written.iri }, new Date(boundary.getTime() - 1)),
+    );
+
+    expect(
+      atTheBoundary.ok && atTheBoundary.value.found && atTheBoundary.value.concept?.trust.status,
+    ).toBe("out-of-date");
+    expect(
+      aMillisecondBefore.ok &&
+        aMillisecondBefore.value.found &&
+        aMillisecondBefore.value.concept?.trust.status,
+    ).toBe("current");
+  });
+
+  it("is still current at the exact instant an offset-datetime shelf life names, and out of date a moment after", async () => {
+    const scenario = await arrange();
+    const written = await landed(
+      scenario,
+      writeFor({
+        status: "stable",
+        frontmatter: { title: "Expenses", type: "Policy", stale_after: "2026-03-01T12:00:00Z" },
+      }),
+    );
+
+    // The datetime form names the instant itself: not yet past at that instant, only
+    // strictly after it.
+    const instant = new Date("2026-03-01T12:00:00.000Z");
+    const atTheInstant = await reading(scenario.viewer, (principal, tx) =>
+      open(principal, tx, { iri: written.iri }, instant),
+    );
+    const aMillisecondAfter = await reading(scenario.viewer, (principal, tx) =>
+      open(principal, tx, { iri: written.iri }, new Date(instant.getTime() + 1)),
+    );
+
+    expect(
+      atTheInstant.ok && atTheInstant.value.found && atTheInstant.value.concept?.trust.status,
+    ).toBe("current");
+    expect(
+      aMillisecondAfter.ok &&
+        aMillisecondAfter.value.found &&
+        aMillisecondAfter.value.concept?.trust.status,
+    ).toBe("out-of-date");
   });
 
   it("withholds a Restricted concept from a Viewer exactly as it answers an IRI nobody minted", async () => {
@@ -1796,10 +1890,10 @@ describe("opening a concept by IRI", () => {
 
     const unminted = iriFor();
     const withheld = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }),
+      open(principal, tx, { iri: written.iri }, new Date()),
     );
     const absent = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: unminted }),
+      open(principal, tx, { iri: unminted }, new Date()),
     );
 
     // Indistinguishable, which is the whole requirement: the same shape, and neither says
@@ -1809,7 +1903,7 @@ describe("opening a concept by IRI", () => {
     expect(absent).toEqual({ ok: true, value: { found: false, iri: unminted } });
     // The Admin, who may see it, is the proof the concept is really there.
     const seen = await reading(scenario.admin, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }),
+      open(principal, tx, { iri: written.iri }, new Date()),
     );
     expect(seen.ok && seen.value.found).toBe(true);
   });

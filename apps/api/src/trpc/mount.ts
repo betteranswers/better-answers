@@ -1,6 +1,7 @@
 import { trpcServer } from "@hono/trpc-server";
 import { Hono } from "hono";
 
+import type { Clock } from "@better-answers/core/kernel";
 import type { PostgresDoor } from "@better-answers/core/store/postgres";
 
 import type { Auth } from "../auth/index.ts";
@@ -24,13 +25,14 @@ export const TRPC_ENDPOINT = "/trpc";
 type TrpcRoutesDependencies = {
   readonly auth: Auth;
   readonly door: PostgresDoor;
+  readonly clock: Clock;
 };
 
 export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
   const routes = new Hono();
   // The ceiling stands in front of the session lookup: an unauthenticated flood is
   // refused before it can spend a database round trip per request.
-  routes.use(`${TRPC_ENDPOINT}/*`, limitByIp(deps.door, TRPC_IP_RULE));
+  routes.use(`${TRPC_ENDPOINT}/*`, limitByIp(deps.door, TRPC_IP_RULE, deps.clock));
   routes.use(
     `${TRPC_ENDPOINT}/*`,
     trpcServer({

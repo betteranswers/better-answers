@@ -6,7 +6,7 @@ import {
   reconcileEveryWorkspace,
   type WorkspaceReconciled,
 } from "@better-answers/core/concepts";
-import { attempt } from "@better-answers/core/kernel";
+import { attempt, type Clock } from "@better-answers/core/kernel";
 import { openGit } from "@better-answers/core/store/git";
 import { openPostgres } from "@better-answers/core/store/postgres";
 
@@ -47,6 +47,8 @@ export type ReconcilerDependencies = {
   readonly gitStoreDir: string;
   readonly intervalMs?: number | undefined;
   readonly logger?: Logger | undefined;
+  /** This process's Clock (ADR 0040), for the replay's landing instant on each tick. */
+  readonly clock: Clock;
 };
 
 export type Reconciler = {
@@ -91,7 +93,11 @@ export const startReconciler = (dependencies: ReconcilerDependencies): Reconcile
     );
     process.exit(1);
   }
-  const doors = { git: git.value, postgres: openPostgres(dependencies.database) };
+  const doors = {
+    git: git.value,
+    postgres: openPostgres(dependencies.database),
+    clock: dependencies.clock,
+  };
 
   const tick = async (): Promise<void> => {
     const pass = await attempt(() => reconcileEveryWorkspace(RECONCILER, doors));

@@ -414,13 +414,16 @@ const outcome = (count: number, rule: CounterRule, start: Date, now: Date): Coun
  * One statement on the pre-authentication counter: upsert `(scope, key, window)` with
  * `count + 1` and read the count back. Global table, no scope needed — there is no
  * workspace before authentication.
+ *
+ * `now` has no default (ADR 0040): a default here would be this door reading the ambient
+ * clock on a caller's behalf, so every caller passes the api's own Clock's reading.
  */
 export const consumeIngress = async (
   door: PostgresDoor,
   scope: "ip" | "email",
   key: string,
   rule: CounterRule,
-  now: Date = new Date(),
+  now: Date,
 ): Promise<CounterOutcome> => {
   const start = windowStart(rule, now);
   // One statement: the key's expired windows go as its current one is counted, so the
@@ -443,13 +446,15 @@ export const consumeIngress = async (
  * One statement on the per-token counter, inside the tool call's own transaction
  * (ADR 0018: a Postgres counter per `(token, window)`). The row carries the
  * workspace id, so RLS keeps one workspace's tokens from ever reading another's.
+ *
+ * `now` has no default (ADR 0040), for the same reason `consumeIngress`'s does not.
  */
 export const consumeCall = async (
   principal: UserPrincipal,
   tx: Tx,
   tokenId: string,
   rule: CounterRule,
-  now: Date = new Date(),
+  now: Date,
 ): Promise<CounterOutcome> => {
   const start = windowStart(rule, now);
   // The token's expired windows go as its current one is counted, so a workspace holds

@@ -223,8 +223,12 @@ type RowFacts = {
  * a creation, and on anything else what the row holds now — the audience included, so a
  * re-write that drops its citations never widens a named-group audience back to everyone.
  * What the row lands with is what the derivation says, not this.
+ *
+ * `now` is the platform's instant for a first publish (ADR 0040): the caller's own Clock,
+ * read once and handed in — never read here — so a held concept's `publishedAt` is the
+ * platform's instant, never the transaction's, and a test can pin it to a literal.
  */
-export const indexRowOf = (facts: RowFacts, held: Held | undefined) => {
+export const indexRowOf = (facts: RowFacts, held: Held | undefined, now: Date) => {
   const fileStatus = facts.frontmatter["status"];
   const status =
     facts.status ??
@@ -242,7 +246,7 @@ export const indexRowOf = (facts: RowFacts, held: Held | undefined) => {
     contentHash: facts.contentHash,
     status,
     publishedAt: PUBLISHED_STATUSES.some((published) => published === status)
-      ? (held?.publishedAt ?? new Date())
+      ? (held?.publishedAt ?? now)
       : null,
     sensitivity: held?.sensitivity ?? facts.sensitivity ?? SENSITIVITY_DEFAULT,
     audience: held?.audience ?? AUDIENCE_EVERYONE,

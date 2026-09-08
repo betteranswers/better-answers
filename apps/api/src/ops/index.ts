@@ -7,6 +7,7 @@ import {
   reconcile,
   sweepGraph,
 } from "@better-answers/core/concepts";
+import type { Clock } from "@better-answers/core/kernel";
 import { enqueueJob, JOB_IS_OVER, jobById, type RebuildReason } from "@better-answers/core/runs";
 import { openGit } from "@better-answers/core/store/git";
 import {
@@ -61,6 +62,8 @@ export type OpsIo = {
    * command that opens a bundle. Absent, it refuses rather than guessing a path.
    */
   readonly gitStoreDir?: string | undefined;
+  /** This one-shot process's Clock (ADR 0040), for `reconcile-watermark`'s replay. */
+  readonly clock: Clock;
 };
 
 /** `pg-20260903T020500Z` (a dump stamp) or any ISO 8601 instant, as a Date. */
@@ -384,11 +387,11 @@ const waitForJob = async (
   seconds: number,
   io: OpsIo,
 ): Promise<number> => {
-  const deadline = Date.now() + seconds * 1_000;
+  const deadline = io.clock.now().getTime() + seconds * 1_000;
   const pollMs = Math.min(WAIT_POLL_MS, seconds * 1_000);
   let job = await jobById(GRAPH_MAINTENANCE, door, { workspaceId, jobId });
-  while (job.ok && !JOB_IS_OVER.includes(job.value.status) && Date.now() < deadline) {
-    await after(Math.min(pollMs, Math.max(deadline - Date.now(), 0)));
+  while (job.ok && !JOB_IS_OVER.includes(job.value.status) && io.clock.now().getTime() < deadline) {
+    await after(Math.min(pollMs, Math.max(deadline - io.clock.now().getTime(), 0)));
     job = await jobById(GRAPH_MAINTENANCE, door, { workspaceId, jobId });
   }
   if (!job.ok) return refused("graph-rebuild", workspaceId, job.error, io);
@@ -495,7 +498,7 @@ const reconcileWatermark = async (pool: Pool, workspaceId: string, io: OpsIo): P
     );
     return REFUSED;
   }
-  const doors = { git: git.value, postgres: openPostgres(pool) };
+  const doors = { git: git.value, postgres: openPostgres(pool), clock: io.clock };
   const run = await reconcile(RECONCILER, doors, { workspaceId });
   if (!run.ok) return refused("reconcile-watermark", workspaceId, run.error, io);
   const { head, watermark, replayed, skipped, stopped } = run.value;

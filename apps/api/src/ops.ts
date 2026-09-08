@@ -1,5 +1,7 @@
 import { Pool } from "pg";
 
+import { systemClock } from "@better-answers/core/kernel";
+
 import { readIdentityBootstrap, requireBootstrap } from "./config.ts";
 import { fetchHonouringHost } from "./ops/http-fetch.ts";
 import { runOps } from "./ops/index.ts";
@@ -30,6 +32,9 @@ const exitCode = await runOps(process.argv.slice(2), pool, {
   },
   appHostname: identity.ok ? identity.value.hostnames.app : undefined,
   gitStoreDir: bootstrap.gitStoreDir,
+  // A one-shot process's own Clock (ADR 0040): constructed once here, since this is a
+  // separate process from the long-running server and cannot share its.
+  clock: systemClock(),
 }).finally(() => pool.end());
 
 process.exit(exitCode);
