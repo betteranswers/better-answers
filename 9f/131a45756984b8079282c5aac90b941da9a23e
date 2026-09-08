@@ -1,0 +1,43 @@
+packages/core/test/workspaces.test.ts
+  s_9735fc29ef62df::t_b2168e7e7f4f71 376-385
+  s_9735fc29ef62df::t_d3a2620fa3b8b9 45-67
+  s_9735fc29ef62df::t_971bc9049f5fc0 348,352-354
+  s_9735fc29ef62df::t_c72e202fe9eb6f 479
+  s_9735fc29ef62df::t_03fc9c6587d5bc 525-549
+  s_9735fc29ef62df::t_a199916e222f6d 103-110
+  s_9735fc29ef62df::t_4b537decf6f933 754-806
+  s_9735fc29ef62df::t_5b452aaf2a1b12 408-413,415-478,480-490,492-496
+  s_9735fc29ef62df::t_41c31ee05cc4cf 8-14,22,25
+  s_9735fc29ef62df::t_c5a0301b32ee5a 269
+  s_9735fc29ef62df::t_d96333b8a7d6e7 316-328
+packages/core/test/kernel.test.ts
+  s_9735fc29ef62df::t_fd7f54509c4235 7,17-19
+  s_9735fc29ef62df::t_385da38a0d4865 77-131
+packages/core/test/audit.test.ts
+  s_9735fc29ef62df::t_3fe8a769c8e1b9 390-391
+  s_9735fc29ef62df::t_427bc36a17867d 19
+  s_9735fc29ef62df::t_9bda662d50f8ae 372,385-389,392-394,403-404,412-415
+  s_9735fc29ef62df::t_9db77c6a7c2b24 323-353
+  s_9735fc29ef62df::t_34e05e00bbcb3e 443
+  s_9735fc29ef62df::t_d1a7533f45e0c1 113-135
+packages/core/test/platform.ts
+  s_9735fc29ef62df::t_10cefa9c03b2f0 1,5,20-39
+  s_9735fc29ef62df::t_3292d2b365a7c4 58,60
+  s_9735fc29ef62df::t_00e7e350675907 73-83,86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9f131a45756984b8079282c5aac90b941da9a23e",
+  "prompts": {},
+  "sessions": {
+    "s_9735fc29ef62df": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "947d5c06-ba2f-479f-a6b2-58726b109426",
+        "model": "claude-opus-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
