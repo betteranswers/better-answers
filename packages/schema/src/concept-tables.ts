@@ -7,8 +7,10 @@ import {
   primaryKey,
   text,
   uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
+import { ACTOR_ID_PATTERN } from "./actor-id.ts";
 import { listed, stamp } from "./column-helpers.ts";
 import { ULID_CHARACTERS } from "./ulid.ts";
 import { withRLS } from "./with-rls.ts";
@@ -53,20 +55,40 @@ export const CONCEPT_DEPRECATED_STATUS = "deprecated" satisfies (typeof CONCEPT_
 export const SENSITIVITIES = ["Restricted", "Internal", "Public"] as const;
 
 /**
- * What a concept is written at when the act names no class: the most restrictive of the
- * three, because a class is *derived from the evidence a concept cites* (ADR 0023) and this
- * task derives nothing — an unclassified concept that defaulted to *Internal* would be a
- * widening nobody decided. T-055's derivation is what moves it.
+ * What a concept is written at when nothing decides its class: the most restrictive of the
+ * three, because a class is *derived from the evidence a concept cites* (ADR 0023), and a
+ * concept whose evidence resolves to no binding has nothing to derive from — an unclassified
+ * concept that defaulted to *Internal* would be a widening nobody decided.
  */
 export const SENSITIVITY_DEFAULT = "Restricted" satisfies (typeof SENSITIVITIES)[number];
 
 /**
- * The audience every unit this task writes carries: everybody in the workspace. The closed
- * pair (`everyone` · `groups`), the `audience_groups` array and the CHECK tying them are
- * T-055's, and until a binding-management surface exists there is nothing to name in a
- * group list (T-006 spec, *Visibility derivation and audience*).
+ * The two words an audience is (`CONTEXT.md`, *audience*; ADR 0039): everybody in the
+ * workspace, or the named groups whose ids `audience_groups` carries beside it. The closed
+ * pair the boundary narrows to, as `SENSITIVITIES` is for the class, and the one
+ * representation every readable unit shares — `concept_index`, `composition`, every
+ * `index.chunk` row and the graph tables — so the read predicate's third arm has the same two
+ * columns to test wherever it is applied.
  */
-export const AUDIENCE_EVERYONE = "everyone";
+export const AUDIENCES = ["everyone", "groups"] as const;
+
+/** The audience that means everybody in the workspace — what a unit is born with. */
+export const AUDIENCE_EVERYONE = "everyone" satisfies (typeof AUDIENCES)[number];
+
+/** The audience that is the named groups in `audience_groups`, and nobody else. */
+export const AUDIENCE_GROUPS = "groups" satisfies (typeof AUDIENCES)[number];
+
+/**
+ * The CHECK that ties the word to the array (ADR 0039), written once: every readable unit's
+ * declaration reads it, and the hand-written DDL of the graph and chunk tables copies it —
+ * which the migration-ownership test reads back, so the copy cannot drift. *everyone*
+ * carries no array at all and *groups* carries a non-empty one with no NULL element, so an
+ * empty intersection is never stored (the derivation forces the unit Restricted instead) and
+ * a row can never say *groups* while naming none. `IS NOT NULL` is spelled out before the
+ * cardinality because a CHECK passes on NULL: `cardinality(NULL) > 0` is NULL, and a row that
+ * said *groups* over no array would otherwise slip through.
+ */
+export const AUDIENCE_CHECK = `(audience = '${AUDIENCE_EVERYONE}' AND audience_groups IS NULL) OR (audience = '${AUDIENCE_GROUPS}' AND audience_groups IS NOT NULL AND cardinality(audience_groups) > 0 AND array_position(audience_groups, NULL) IS NULL)`;
 
 /**
  * Where a check came from (ADR 0019, ADR 0020, T-006 spec): the platform's own, one carried
@@ -288,6 +310,55 @@ export const conceptIdentity = withRLS(
 );
 
 /**
+ * The composite key to the identity every record about a concept carries, cascading: a
+ * concept that has left the bundle takes its index row, its checks, its citations and its
+ * override with it. Written once, so four tables cannot disagree about which pair a
+ * concept is keyed by.
+ */
+const identityKey = (
+  table: { readonly workspaceId: AnyPgColumn; readonly iri: AnyPgColumn },
+  name: string,
+) =>
+  foreignKey({
+    columns: [table.workspaceId, table.iri],
+    foreignColumns: [conceptIdentity.workspaceId, conceptIdentity.iri],
+    name,
+  }).onDelete("cascade");
+
+/**
+ * The visibility columns a readable unit **born with fail-closed defaults** carries — a
+ * binding, a composition: unpublished, Restricted, everyone — and the two checks that hold
+ * them, written once (ADR 0023, ADR 0039). The concept index declares its own copy, because
+ * its audience carries no default: the governed write derives the pair before it lands the
+ * row, and a default there would be a value nobody decided.
+ */
+export const readableUnitColumns = () => ({
+  publishedAt: stamp("published_at"),
+  sensitivity: text("sensitivity").notNull().default(SENSITIVITY_DEFAULT),
+  audience: text("audience").notNull().default(AUDIENCE_EVERYONE),
+  audienceGroups: text("audience_groups").array(),
+});
+
+export const readableUnitChecks = (tableName: string) => [
+  check(`${tableName}_sensitivity_check`, sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
+  check(`${tableName}_audience_check`, sql.raw(AUDIENCE_CHECK)),
+];
+
+/**
+ * A readable **record** of the platform's own — a binding, a composition — keyed by the
+ * pair, born with the fail-closed visibility above, and stamped when it was made. The
+ * columns the two tables share, written once; each adds its own beside them.
+ */
+export const readableRecordColumns = () => ({
+  workspaceId: text("workspace_id")
+    .notNull()
+    .references(() => workspace.id, { onDelete: "cascade" }),
+  id: text("id").notNull(),
+  ...readableUnitColumns(),
+  createdAt: stamp("created_at").notNull().defaultNow(),
+});
+
+/**
  * A **bundle commit** (`CONTEXT.md`): one change to a bundle, recorded in the same
  * transaction as the rows it produced. Its `audit_event_id` is the id the act minted
  * *before* the commit and the commit carries in its `Audit:` trailer, which is what makes
@@ -356,20 +427,19 @@ export const conceptIndex = withRLS(
     contentHash: text("content_hash").notNull(),
     commitSha: text("commit_sha").notNull(),
     status: text("status").notNull().default(CONCEPT_DRAFT_STATUS),
-    // The three visibility columns (ADR 0023), as `index.chunk` carries them.
+    // The three visibility columns (ADR 0023), as `index.chunk` carries them — the audience
+    // as its word and its group-id array (ADR 0039).
     publishedAt: stamp("published_at"),
     sensitivity: text("sensitivity").notNull().default(SENSITIVITY_DEFAULT),
     audience: text("audience").notNull(),
+    audienceGroups: text("audience_groups").array(),
     updatedAt: stamp("updated_at").notNull().defaultNow(),
   },
   "workspaceId",
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.iri] }),
-    foreignKey({
-      columns: [table.workspaceId, table.iri],
-      foreignColumns: [conceptIdentity.workspaceId, conceptIdentity.iri],
-      name: "concept_index_identity_fk",
-    }).onDelete("cascade"),
+    identityKey(table, "concept_index_identity_fk"),
+    check("concept_index_audience_check", sql.raw(AUDIENCE_CHECK)),
     // One concept per path: the format identity is a key too, and two rows claiming one
     // file would be a bundle the index could not be checked against.
     uniqueIndex("concept_index_workspace_id_path_uidx").on(table.workspaceId, table.path),
@@ -452,11 +522,7 @@ export const conceptVerification = withRLS(
     // a given check. The minter makes the id unique on its own; the pair is what makes that
     // uniqueness unaskable from outside the workspace.
     primaryKey({ columns: [table.workspaceId, table.id] }),
-    foreignKey({
-      columns: [table.workspaceId, table.iri],
-      foreignColumns: [conceptIdentity.workspaceId, conceptIdentity.iri],
-      name: "concept_verification_identity_fk",
-    }).onDelete("cascade"),
+    identityKey(table, "concept_verification_identity_fk"),
     // The trust projection's read: this concept's checks, latest first.
     index("concept_verification_workspace_id_iri_checked_at_idx").on(
       table.workspaceId,
@@ -476,5 +542,80 @@ export const conceptVerification = withRLS(
       "concept_verification_imported_check",
       sql.raw(`(origin = '${VERIFICATION_IMPORTED_ORIGIN}') = (content_hash IS NULL)`),
     ),
+  ],
+);
+
+/**
+ * **Which evidence a concept cites** — the relation the class derivation reads (ADR 0023: a
+ * concept's class is the most restrictive among the bindings of the evidence it cites; ADR
+ * 0039). `evidence` is keyed by document and locator and shared across every concept that
+ * cites one, so which concept cites which is this row and not a column on the evidence.
+ * Replaced whole by the governed write on every commit, in the same transaction as the
+ * index row, from the evidence the act was handed.
+ *
+ * The key to `evidence` is deliberately **not** a cascade: *cited evidence outlives its
+ * source* (ADR 0013), and a row that could be deleted while a citation still named it would
+ * be the leak that rule closes. The key to the identity cascades, because a concept that
+ * has left the bundle cites nothing.
+ */
+export const conceptEvidence = withRLS(
+  "concept_evidence",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    iri: text("iri").notNull(),
+    sourceDocumentId: text("source_document_id").notNull(),
+    locator: text("locator").notNull(),
+  },
+  "workspaceId",
+  (table) => [
+    primaryKey({
+      columns: [table.workspaceId, table.iri, table.sourceDocumentId, table.locator],
+    }),
+    identityKey(table, "concept_evidence_identity_fk"),
+    foreignKey({
+      columns: [table.workspaceId, table.sourceDocumentId, table.locator],
+      foreignColumns: [evidence.workspaceId, evidence.sourceDocumentId, evidence.locator],
+      name: "concept_evidence_evidence_fk",
+    }),
+    // The cascade's read: every concept citing evidence from one binding's documents.
+    index("concept_evidence_workspace_id_source_document_id_idx").on(
+      table.workspaceId,
+      table.sourceDocumentId,
+    ),
+  ],
+);
+
+/**
+ * **A recorded Admin override** of a concept's derived class (ADR 0023: only a recorded
+ * override may widen past what the evidence and the per-kind floor derive; ADR 0039). One
+ * standing override per concept — a later one replaces it — carrying the class and audience
+ * the Admin decided, the Admin in the ledger's actor form, and the ledger row's id, so the
+ * override is *an audit event and a row* and the evidence pane can name who created the
+ * *shared beyond its evidence* state (`CONTEXT.md`). Never a rider and never a trust signal:
+ * nothing here touches a check or a tier.
+ */
+export const conceptClassOverride = withRLS(
+  "concept_class_override",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    iri: text("iri").notNull(),
+    sensitivity: text("sensitivity").notNull(),
+    audience: text("audience").notNull(),
+    audienceGroups: text("audience_groups").array(),
+    /** The overriding Admin, as `human:<person id>` — what the evidence pane names. */
+    actor: text("actor").notNull(),
+    auditEventId: text("audit_event_id").notNull(),
+    recordedAt: stamp("recorded_at").notNull().defaultNow(),
+  },
+  "workspaceId",
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.iri] }),
+    identityKey(table, "concept_class_override_identity_fk"),
+    check(
+      "concept_class_override_sensitivity_check",
+      sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`),
+    ),
+    check("concept_class_override_audience_check", sql.raw(AUDIENCE_CHECK)),
+    check("concept_class_override_actor_check", sql.raw(`actor ~ '^${ACTOR_ID_PATTERN}$'`)),
   ],
 );

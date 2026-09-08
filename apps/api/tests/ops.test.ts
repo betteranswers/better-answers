@@ -2,6 +2,8 @@ import { serve } from "@hono/node-server";
 
 import { describe, expect, it } from "vitest";
 
+import { initRepository, openGit } from "@better-answers/core/store/git";
+
 import { fetchHonouringHost } from "../src/ops/http-fetch.ts";
 import { NOT_BUILT, parseSince, runOps, type OpsIo } from "../src/ops/index.ts";
 import { APP_HOSTNAME, PUBLIC_URL, type TestApp } from "./harness.ts";
@@ -27,6 +29,7 @@ const ioFor = (app: TestApp, stdin = ""): OpsIo & { readonly lines: string[] } =
       lines.push(line);
     },
     appHostname: APP_HOSTNAME,
+    gitStoreDir: app.gitStoreDir,
   };
 };
 
@@ -88,7 +91,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   describe("the slice-owned commands", () => {
-    it.each(["object-store-orphans", "erasure-rehearsal"])(
+    it.each(["erasure-rehearsal"])(
       "%s says `not built` — exit 3 — while its slice's tables are absent",
       async (command) => {
         const run = await ops(app(), [command, "--workspace", "ws_synthetic", "--wait", "--list"]);
@@ -98,20 +101,64 @@ describe("pnpm ops — the restore scripts' commands", () => {
       },
     );
 
-    it.each(["reconcile-watermark", "graph-rebuild", "graph-sweep", "graph-counts"])(
+    it.each(["graph-rebuild", "graph-sweep", "graph-counts", "object-store-orphans"])(
       "%s refuses — exit 1 — now its tables are there and the implementation is not",
       async (command) => {
-        // T-052 landed `concept_index` and `bundle_commit`, and T-053 the graph tables, so
-        // *not built* has stopped being true for these commands; the reconciler is T-056's
-        // and the graph ops are T-058's. That is exactly the state the third answer is
-        // for: the tables exist and this image has no implementation, which is a refusal a
-        // restore must stop on rather than a silence.
+        // T-053 landed the graph tables and T-055 `source_document`, so *not built* has
+        // stopped being true for these commands; the graph ops are T-058's and the orphan
+        // sweep the sources slice's. That is exactly the state the third answer is for: the
+        // tables exist and this image has no implementation, which is a refusal a restore
+        // must stop on rather than a silence.
         const run = await ops(app(), [command, "--workspace", "ws_synthetic", "--wait"]);
 
         expect(run.exitCode).toBe(1);
         expect(run.lines.join("\n")).toContain("REFUSED");
       },
     );
+  });
+
+  describe("reconcile-watermark — the reconciler on demand, which is the restore path", () => {
+    it("refuses without a repositories' root, because a bundle it cannot open is nothing to reconcile against", async () => {
+      const { workspaceId } = await app().provision();
+      const io: OpsIo & { readonly lines: string[] } = { ...ioFor(app()), gitStoreDir: undefined };
+
+      const exitCode = await runOps(
+        ["reconcile-watermark", "--workspace", workspaceId],
+        app().database.superuser,
+        io,
+      );
+
+      expect(exitCode).toBe(1);
+      expect(io.lines.join("\n")).toContain("REFUSED");
+      expect(io.lines.join("\n")).toContain("GIT_STORE_DIR");
+    });
+
+    it("answers usage to a workspace that is not an id, before it opens anything", async () => {
+      const run = await ops(app(), ["reconcile-watermark", "--workspace", "ws_synthetic"]);
+
+      expect(run.exitCode).toBe(2);
+    });
+
+    it("refuses a workspace whose repository is not there, which on a restore is a store that was not restored", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await ops(app(), ["reconcile-watermark", "--workspace", workspaceId]);
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual(["reconcile-watermark: REFUSED — no-such-repository"]);
+    });
+
+    it("is done — exit 0 — once the rows and the bundle agree, and says what the run found", async () => {
+      const { workspaceId } = await app().provision();
+      await initRepository(openGit(app().gitStoreDir), workspaceId);
+
+      const run = await ops(app(), ["reconcile-watermark", "--workspace", workspaceId]);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual([
+        "reconcile-watermark: done — head none, watermark none, replayed 0, already landed 0",
+      ]);
+    });
   });
 
   describe("smoke — the platform answers through its interface", () => {

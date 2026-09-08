@@ -1166,7 +1166,9 @@ describe("opening a concept by IRI", () => {
     if (!opened.ok || !opened.value.found) return;
     expect(opened.value.concept).toEqual({
       iri: written.iri,
-      frontmatter: { ...input.frontmatter, iri: written.iri },
+      // The file carries the status the act named beside its IRI, so the row and the
+      // reconciler's replay of the commit read the same thing off it (T-056).
+      frontmatter: { ...input.frontmatter, status: "stable", iri: written.iri },
       body: input.body,
       relations: [],
       trust: {

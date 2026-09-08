@@ -119,6 +119,23 @@ export const TABLE_OWNERS = {
   // definer function that serves it is granted to the app's role alone.
   "public.suggestion": "concepts",
   "public.concept_write_request": "concepts",
+
+  // The visibility derivation's ground (ADR 0013, ADR 0023, ADR 0039): a binding carries the
+  // three permission fields a concept's class is derived from, and the document row is the
+  // platform-held fact that ties a piece of evidence to the binding that yielded it. Both are
+  // the sources slice's; the rest of a binding and of the catalogue is B7's, on these tables.
+  "public.source_binding": "sources",
+  "public.source_document": "sources",
+  // Which evidence a concept cites, and a recorded Admin override of its derived class:
+  // both written in the concepts slice's own transactions, the first by the governed write
+  // and the second by the override act.
+  "public.concept_evidence": "concepts",
+  "public.concept_class_override": "concepts",
+  // A composition and the concepts it includes (ADRs 0004, 0015): the guides slice's, whose
+  // recompute derives one's class from its includes and whose footnote read withholds an
+  // include through the concept's own predicate. The composition as a product is B8's.
+  "public.composition": "guides",
+  "public.composition_include": "guides",
 } satisfies Record<string, string>;
 
 /** A table the schema package declares: every key of the map, and nothing else. */
@@ -272,5 +289,26 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "read",
     reason:
       "The delta builder resolves a link's target to a concept and reads its kind off the index inside the act's own transaction, and a newly landed concept's linkers are found there — the map is derived from the rows the same transaction just wrote (ADR 0023).",
+  },
+  {
+    table: "public.source_document",
+    by: "concepts",
+    access: "read",
+    reason:
+      "The class derivation joins a concept's citations to the documents they locate, to reach the binding each was yielded by — the platform-held fact a producer's citation cannot supply (ADR 0023, ADR 0039).",
+  },
+  {
+    table: "public.source_binding",
+    by: "concepts",
+    access: "read",
+    reason:
+      "A concept's class is the most restrictive among the bindings of the evidence it cites and its audience their intersection (ADR 0023, ADR 0039); the evidence pane applies the reader's predicate to the same rows to say which cited evidence they may reach.",
+  },
+  {
+    table: "public.concept_index",
+    by: "guides",
+    access: "read",
+    reason:
+      "A composition's class is the most restrictive among its includes (ADR 0023), read off the concepts' rows; the footnote read applies the concept's own predicate to every include, so a composition's citation is never a side door to a concept its reader may not see.",
   },
 ] as const satisfies readonly CrossOwnerAccess[];

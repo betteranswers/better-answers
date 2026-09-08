@@ -47,6 +47,24 @@ describe("the bootstrap configuration", () => {
     expect(read.ok).toBe(false);
   });
 
+  it("gives the app the bare repositories' root, so the head check has bundles to open", () => {
+    const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x", GIT_STORE_DIR: "/data/git" });
+
+    expect(read.ok && read.value.gitStoreDir).toBe("/data/git");
+  });
+
+  it("starts without a repositories' root, because `migrate` shares this shape and opens no bundle", () => {
+    const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x" });
+
+    expect(read.ok && read.value.gitStoreDir).toBe(undefined);
+  });
+
+  it("refuses an empty repositories' root, which would open every bundle relative to the working directory", () => {
+    const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x", GIT_STORE_DIR: "" });
+
+    expect(read.ok).toBe(false);
+  });
+
   it("defaults the SPA's build to this repository's own, so the dev loop needs no setting", () => {
     // The app serves the build on `app.` (ADR 0006, amended 2026-09-02); an image that
     // lays it down elsewhere sets WEB_ROOT, and everything else is already right.

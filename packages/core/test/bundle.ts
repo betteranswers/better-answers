@@ -39,13 +39,42 @@ export const bundlesForSuite = (): (() => GitDoor) => {
   };
 };
 
-const git = async (door: GitDoor, workspaceId: string, arguments_: readonly string[]) => {
-  const { stdout } = await run("git", [
-    "--git-dir",
-    path.join(door.root, `${workspaceId}.git`),
-    ...arguments_,
-  ]);
+const git = async (
+  door: GitDoor,
+  workspaceId: string,
+  arguments_: readonly string[],
+  env: Readonly<Record<string, string>> = {},
+) => {
+  const { stdout } = await run(
+    "git",
+    ["--git-dir", path.join(door.root, `${workspaceId}.git`), ...arguments_],
+    // The parent's environment plus what a caller adds, never a bare object: `env` replaces
+    // rather than extends, and the binary still has to be found on a PATH.
+    { env: { ...process.env, ...env } },
+  );
   return stdout;
+};
+
+/** The empty tree, which git holds in every repository without writing an object for it. */
+const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+/**
+ * Point the bundle's ref at a root commit that shares nothing with its history — the shape
+ * of a repository and a database that disagree about the past, which no replay may paper
+ * over. Made through the binary rather than the door, because the door refuses exactly this.
+ */
+export const divergeHistory = async (door: GitDoor, workspaceId: string): Promise<string> => {
+  const nobody = {
+    GIT_AUTHOR_NAME: "Nobody",
+    GIT_AUTHOR_EMAIL: "nobody@acme.invalid",
+    GIT_COMMITTER_NAME: "Nobody",
+    GIT_COMMITTER_EMAIL: "nobody@acme.invalid",
+  };
+  const root = (
+    await git(door, workspaceId, ["commit-tree", EMPTY_TREE, "-m", "elsewhere"], nobody)
+  ).trim();
+  await git(door, workspaceId, ["update-ref", "refs/heads/main", root]);
+  return root;
 };
 
 /** One commit as git itself reports it — every field a governed write's tests assert on. */

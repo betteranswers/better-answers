@@ -39,6 +39,13 @@ const bootstrapSchema = z.object({
     .string()
     .min(1)
     .default(fileURLToPath(new URL("../../web/dist", import.meta.url))),
+  // Where the workspaces' bare repositories are — `<root>/<workspace>.git`, written through
+  // the git binary (ADR 0024; `/data/git` in the estate). Optional, because `migrate` shares
+  // this shape and has no bundle to open; the app starts its periodic head check — the
+  // reconciler's trigger (ADR 0012, amended 2026-09-06) — only when it is set, and says so
+  // either way. `.min(1)` for `WEB_ROOT`'s reason: an empty root would open every
+  // repository relative to the working directory.
+  GIT_STORE_DIR: z.string().min(1).optional(),
 });
 
 /** An https origin and nothing else: no path, query or fragment, so every URL derived from it agrees with the root-mounted routes. */
@@ -117,6 +124,8 @@ export type Bootstrap = {
   readonly databaseUrl: string;
   readonly port: number;
   readonly webRoot: string;
+  /** The bare repositories' root; absent, nothing in this process opens a bundle. */
+  readonly gitStoreDir: string | undefined;
 };
 
 export type IdentityBootstrap = {
@@ -140,6 +149,7 @@ export function readBootstrap(
     databaseUrl: parsed.data.DATABASE_URL,
     port: parsed.data.PORT,
     webRoot: parsed.data.WEB_ROOT,
+    gitStoreDir: parsed.data.GIT_STORE_DIR,
   });
 }
 

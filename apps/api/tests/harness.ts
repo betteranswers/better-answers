@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { Writable } from "node:stream";
 
 import type { Hono } from "hono";
@@ -75,11 +78,34 @@ const CLAUDE_METADATA_DOCUMENT = {
 export const LOOKALIKE_CLIENT_ID = "https://claude-ai.example/oauth/mcp-oauth-client-metadata";
 const LOOKALIKE_REDIRECT_URI = "https://claude-ai.example/api/mcp/auth_callback";
 
-type LogLine = Readonly<Record<string, unknown>>;
+export type LogLine = Readonly<Record<string, unknown>>;
+
+/**
+ * A logger whose every line is kept, parsed — how a test reads what a process said. One
+ * structured logger writing JSON (`[LOG1]`) is what makes a line a fact a test can assert
+ * on rather than text it has to match. The level is `info` unless a test wants what a
+ * process says only when asked, as the head check's quiet ticks are.
+ */
+export const capturingLogger = (level: "debug" | "info" = "info") => {
+  const logs: LogLine[] = [];
+  const sink = new Writable({
+    write(chunk: Buffer, _encoding, callback) {
+      for (const line of chunk.toString("utf8").split("\n")) {
+        if (line.trim() === "") continue;
+        // SAFETY: pino writes one JSON object per line; a line is an object by construction.
+        logs.push(JSON.parse(line) as LogLine);
+      }
+      callback();
+    },
+  });
+  return { logger: pino({ level }, sink), logs };
+};
 
 export type TestApp = {
   readonly server: Hono;
   readonly database: TestDatabase;
+  /** The bare repositories' root for this app — `<root>/<workspace>.git` (ADR 0024) — empty until a test initialises one. */
+  readonly gitStoreDir: string;
   /** Every email the app tried to send, in order. */
   readonly emails: EmailMessage[];
   /** Every client-ID URL the app asked the CIMD transport for, in order. */
@@ -212,20 +238,12 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     );
   }
   const database = await startTestDatabase();
+  // The git half of the four stores (ADR 0024): one root per app, the way one database is,
+  // so a suite's bundles are its own and go when it stops.
+  const gitStoreDir = await mkdtemp(path.join(tmpdir(), "better-answers-git-"));
   const emails: EmailMessage[] = [];
   const metadataFetches: string[] = [];
-  const logs: LogLine[] = [];
-  const sink = new Writable({
-    write(chunk: Buffer, _encoding, callback) {
-      for (const line of chunk.toString("utf8").split("\n")) {
-        if (line.trim() === "") continue;
-        // SAFETY: pino writes one JSON object per line; a line is an object by construction.
-        logs.push(JSON.parse(line) as LogLine);
-      }
-      callback();
-    },
-  });
-  const logger = pino({ level: "info" }, sink);
+  const { logger, logs } = capturingLogger();
 
   const server = createServer({
     database: database.pool,
@@ -398,6 +416,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
   return {
     server,
     database,
+    gitStoreDir,
     emails,
     metadataFetches,
     logs,
@@ -411,6 +430,9 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     removeMember,
     setWorkspaceConfig,
     client,
-    stop: () => database.stop(),
+    stop: async () => {
+      await database.stop();
+      await rm(gitStoreDir, { recursive: true, force: true });
+    },
   };
 };

@@ -46,10 +46,13 @@ export const chunk = indexSchema.table("chunk", {
   content: text("content").notNull(),
   embedding: embeddingVector("embedding").notNull(),
   embeddingRouteId: text("embedding_route_id").notNull(),
-  // The three visibility columns every readable unit carries (ADR 0023).
+  // The three visibility columns every readable unit carries (ADR 0023) — the audience as
+  // its word and its group-id array (ADR 0039), tied by the CHECK the hand-written DDL
+  // copies from `AUDIENCE_CHECK`.
   publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
   sensitivity: text("sensitivity").notNull(),
   audience: text("audience").notNull(),
+  audienceGroups: text("audience_groups").array(),
   // On every chunk row: a chunk is always source-derived (ADR 0023 puts `binding_id`
   // on source-derived rows; canonical entities, which carry none, have no chunks).
   bindingId: text("binding_id").notNull(),
