@@ -46,40 +46,10 @@ export const applyJournal = async (pool: pg.Pool): Promise<void> => {
 };
 
 /**
- * A pool ended, and every connection it held **gone from the server**. `pool.end()` alone
- * resolves the moment its last idle client has been told to end — the Terminate is on the
- * wire, the socket is still open, and the backend has not yet read it. A `release` that
- * drops the database `WITH (FORCE)` inside that window has the server terminate the
- * backend first, and the FATAL it sends (`57P01`) lands on a client the pool has already
- * let go of and nothing listens to: an unhandled error, and the file's run red on a
- * teardown that did its job (CI run 34256124903, `delete-user.test.ts`). pg-pool announces
- * `remove` for a client only once its socket has closed, which the server does after it
- * has processed the Terminate and let the backend exit — so counting those in is what
- * makes the drop after it find nothing of ours to force.
- */
-const endedAndGone = async (pool: pg.Pool): Promise<void> => {
-  let remaining = pool.totalCount;
-  const gone = new Promise<void>((resolve) => {
-    if (remaining === 0) {
-      resolve();
-      return;
-    }
-    pool.on("remove", () => {
-      remaining -= 1;
-      if (remaining === 0) resolve();
-    });
-  });
-  await pool.end();
-  await gone;
-};
-
-/**
  * The pair of pools a caller receives over a migrated database, and the `stop` that closes
  * them before `release` disposes of whatever holds it — a container on the cold path, one
  * copied database on the warm one. Written once here so neither path grows pool settings
- * of its own, or its own way of taking `app_rt`. The pools are not merely ended but seen
- * off the server before `release` runs (`endedAndGone`), because the warm path's release
- * is a forced drop.
+ * of its own, or its own way of taking `app_rt`.
  */
 export const migratedPostgresOver = (
   connectionUri: string,
@@ -100,8 +70,8 @@ export const migratedPostgresOver = (
     runtimePool,
     connectionUri,
     stop: async () => {
-      await endedAndGone(runtimePool);
-      await endedAndGone(pool);
+      await runtimePool.end();
+      await pool.end();
       await release();
     },
   };
