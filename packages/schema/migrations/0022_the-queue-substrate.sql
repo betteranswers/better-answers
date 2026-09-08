@@ -38,6 +38,13 @@ ALTER TABLE "job" FORCE ROW LEVEL SECURITY;
 --
 -- The poison arm takes its rows through `ORDER BY … FOR UPDATE SKIP LOCKED` too, so two
 -- workers arriving together cannot take the same rows in different orders and deadlock.
+--
+-- Every stamp a job carries — `claimed_at`, `heartbeat_at`, `lease_expires_at`,
+-- `finished_at` — is `clock_timestamp()`, the instant the statement ran, and never `now()`,
+-- the instant its transaction began: a rebuild's finish is stamped when it finished, not
+-- when its transaction opened, so the row can say how long a job took. The lease
+-- *comparisons* keep `now()`, one instant for the whole claim. `enqueued_at` is the row's
+-- default and stays `now()`.
 CREATE FUNCTION public.claim_job(p_worker_id text, p_lease interval)
 RETURNS SETOF public.job
 LANGUAGE sql
@@ -50,7 +57,7 @@ AS $$
      ORDER BY j.enqueued_at, j.id
      FOR UPDATE SKIP LOCKED
   ), poisoned AS (
-    UPDATE public.job j SET status = 'poisoned', finished_at = now()
+    UPDATE public.job j SET status = 'poisoned', finished_at = clock_timestamp()
       FROM spent s
      WHERE j.workspace_id = s.workspace_id AND j.id = s.id
     RETURNING j.id
@@ -65,9 +72,9 @@ AS $$
   UPDATE public.job j
      SET status = 'claimed',
          claimed_by = p_worker_id,
-         claimed_at = now(),
-         lease_expires_at = now() + p_lease,
-         heartbeat_at = now(),
+         claimed_at = clock_timestamp(),
+         lease_expires_at = clock_timestamp() + p_lease,
+         heartbeat_at = clock_timestamp(),
          attempts = j.attempts + 1
     FROM candidate c
    WHERE j.workspace_id = c.workspace_id AND j.id = c.id
@@ -93,7 +100,7 @@ SET search_path = pg_catalog, pg_temp
 AS $$
   WITH refreshed AS (
     UPDATE public.job j
-       SET lease_expires_at = now() + p_lease, heartbeat_at = now()
+       SET lease_expires_at = clock_timestamp() + p_lease, heartbeat_at = clock_timestamp()
      WHERE j.id = p_id AND j.claimed_by = p_worker_id AND j.status = 'claimed'
     RETURNING j.id
   )
@@ -121,7 +128,7 @@ SET search_path = pg_catalog, pg_temp
 AS $$
   WITH finished AS (
     UPDATE public.job j
-       SET status = 'done', finished_at = now(), outcome = p_outcome
+       SET status = 'done', finished_at = clock_timestamp(), outcome = p_outcome
      WHERE j.id = p_id AND j.claimed_by = p_worker_id AND j.status = 'claimed'
     RETURNING j.id
   )
@@ -139,7 +146,7 @@ SET search_path = pg_catalog, pg_temp
 AS $$
   WITH failed AS (
     UPDATE public.job j
-       SET status = 'failed', finished_at = now(), outcome = p_outcome
+       SET status = 'failed', finished_at = clock_timestamp(), outcome = p_outcome
      WHERE j.id = p_id AND j.claimed_by = p_worker_id AND j.status = 'claimed'
     RETURNING j.id
   )

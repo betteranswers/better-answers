@@ -37,7 +37,7 @@ import sys
 import psycopg
 
 from .config import read_bootstrap
-from .queue import HEARTBEAT_SECONDS, LEASE_SECONDS, scoped, workspace_ids
+from .queue import HEARTBEAT_SECONDS, LEASE_SECONDS, connected, scoped, workspace_ids
 
 #: How stale a claimant's heartbeat may be before its worker is not answering. Two
 #: intervals, so one missed beat is jitter and two is a run that has stopped.
@@ -82,7 +82,7 @@ def is_healthy(connection: psycopg.Connection, worker_id: str) -> bool:
 
 def main() -> int:
     bootstrap = read_bootstrap()
-    with psycopg.connect(bootstrap.database_url) as connection:
+    with connected(bootstrap.database_url) as connection:
         return 0 if is_healthy(connection, bootstrap.worker_id) else 1
 
 

@@ -89,6 +89,7 @@ def _run_claimed(
     connection: psycopg.Connection,
     bootstrap: Bootstrap,
     job: queue.ClaimedJob,
+    heartbeat_every_seconds: float,
 ) -> dict[str, Any]:
     """Do the work the job names, in one transaction, a heartbeat running beside it.
 
@@ -99,7 +100,12 @@ def _run_claimed(
     (`queue.keeping_alive`), which is what makes a lease survive a long rebuild.
     """
     with (
-        queue.keeping_alive(bootstrap.database_url, job, bootstrap.worker_id),
+        queue.keeping_alive(
+            bootstrap.database_url,
+            job,
+            bootstrap.worker_id,
+            every_seconds=heartbeat_every_seconds,
+        ),
         queue.scoped(connection, job.workspace_id) as cursor,
     ):
         if job.kind == "nightly-audit":
@@ -108,7 +114,10 @@ def _run_claimed(
 
 
 def _serve_workspace(
-    connection: psycopg.Connection, bootstrap: Bootstrap, workspace_id: str
+    connection: psycopg.Connection,
+    bootstrap: Bootstrap,
+    workspace_id: str,
+    heartbeat_every_seconds: float,
 ) -> bool:
     """One workspace's turn: claim and run one job, or schedule the audit that is due.
 
@@ -136,7 +145,7 @@ def _serve_workspace(
     )
 
     try:
-        outcome = _run_claimed(connection, bootstrap, claimed)
+        outcome = _run_claimed(connection, bootstrap, claimed, heartbeat_every_seconds)
     except Exception as failure:
         # One job's failure is that job's fact and never a reason to leave the other
         # workspaces behind. The message is the exception's type and its text, which is
@@ -186,30 +195,25 @@ def outcome_counts(outcome: dict[str, Any]) -> dict[str, int]:
     }
 
 
-def tick(connection: psycopg.Connection, bootstrap: Bootstrap) -> bool:
-    """One pass over every workspace. Answers whether any work was done."""
+def tick(
+    connection: psycopg.Connection,
+    bootstrap: Bootstrap,
+    *,
+    heartbeat_every_seconds: float = queue.HEARTBEAT_SECONDS,
+) -> bool:
+    """One pass over every workspace. Answers whether any work was done.
+
+    The heartbeat's interval is an argument so a test can drive a job that outlives it
+    through this pass — the image's own cadence never has a job run twenty seconds in a
+    suite, and a heartbeat nobody has seen beat is a heartbeat nobody has proved.
+    """
     worked = False
     for workspace_id in queue.workspace_ids(connection):
-        worked = _serve_workspace(connection, bootstrap, workspace_id) or worked
+        served = _serve_workspace(
+            connection, bootstrap, workspace_id, heartbeat_every_seconds
+        )
+        worked = served or worked
     return worked
-
-
-def connected(database_url: str) -> psycopg.Connection:
-    """The loop's connection, **in autocommit** — so each `queue.scoped` block is a
-    transaction of its own, begun and committed where the block says.
-
-    psycopg opens a transaction on the first statement of a connection that is not in
-    autocommit, and every `transaction()` block entered after that is a savepoint inside
-    it, released and never committed. The loop reads the schema stamp and the workspace
-    list before its first scoped block, so on a plain connection it claimed, ran and
-    finished every job inside one transaction nobody committed until the process exited:
-    no other connection saw a claim, a finish or a self-scheduled audit while the worker
-    lived — a `--wait` polling from the app would never have seen the row move — and
-    `now()` stamped `claimed_at` and `finished_at` with one frozen instant. `--once`
-    hid it, because leaving the connection's block commits. The heartbeat's connection
-    never met this: `scoped` is its first statement, so its blocks were transactions.
-    """
-    return psycopg.connect(database_url, autocommit=True)
 
 
 def main() -> int:
@@ -223,7 +227,10 @@ def main() -> int:
     once = parser.parse_args().once
 
     bootstrap = read_bootstrap()
-    with connected(bootstrap.database_url) as connection:
+    # In autocommit (`queue.connected`): the stamp read and the workspace list below are
+    # bare statements, and on a plain connection the first of them would have opened a
+    # transaction that turned every scoped block of every tick into a savepoint.
+    with queue.connected(bootstrap.database_url) as connection:
         stamped = False
         while True:
             if not schema_stamp_matches(connection):

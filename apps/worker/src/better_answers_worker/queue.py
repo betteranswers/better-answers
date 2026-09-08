@@ -67,6 +67,29 @@ def scoped(
         yield cursor
 
 
+def connected(database_url: str) -> psycopg.Connection:
+    """A connection for this tier's processes, **in autocommit** — so each `scoped`
+    block is a transaction of its own, begun and committed where the block says, and a
+    bare statement outside one commits on its own.
+
+    psycopg opens a transaction on the first statement of a connection that is not in
+    autocommit, and every `transaction()` block entered after that is a savepoint inside
+    it, released and never committed. The loop reads the schema stamp and the workspace
+    list before its first scoped block, so on a plain connection it claimed, ran and
+    finished every job inside one transaction nobody committed until the process exited:
+    no other connection saw a claim, a finish or a self-scheduled audit while the worker
+    lived — a `--wait` polling from the app would never have seen the row move; the
+    heartbeat, on its connection of its own, found no *claimed* row to refresh and
+    stopped after one beat; a crash mid-tick rolled the claim back with the work, so
+    `attempts` never rose and poison never fired; and `now()` stamped `claimed_at` and
+    `finished_at` with one frozen instant. `--once` hid all of it, because leaving the
+    connection's block commits. The heartbeat's own connection never met this — `scoped`
+    is its first statement — and the healthcheck's only reads, but both open the same
+    way so the shape is one.
+    """
+    return psycopg.connect(database_url, autocommit=True)
+
+
 def workspace_ids(connection: psycopg.Connection) -> list[str]:
     """Every workspace the platform holds, oldest id first — the loop's own round."""
     with connection.cursor() as cursor:

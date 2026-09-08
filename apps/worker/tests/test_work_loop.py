@@ -13,8 +13,9 @@ finish, and the refusals around them.
 """
 
 import json
+import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -156,7 +157,7 @@ def test_a_job_commits_as_it_goes_and_another_connection_sees_it_finish_after_th
     database.commit()
     bootstrap = bootstrap_for(database, tmp_path)
 
-    with loop.connected(bootstrap.database_url) as worker:
+    with queue.connected(bootstrap.database_url) as worker:
         assert loop.tick(worker, bootstrap) is False  # schedules the audit
         assert loop.tick(worker, bootstrap) is True  # claims, runs and finishes it
         # Read from this suite's own connection while the worker's is still open: what
@@ -168,6 +169,69 @@ def test_a_job_commits_as_it_goes_and_another_connection_sees_it_finish_after_th
                 (workspace,),
             )
             assert cursor.fetchall() == [("done", True)]
+
+
+def test_a_claim_is_visible_and_the_lease_moves_while_a_job_runs_through_the_loop(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    """Through the loop's own connection shape — not a claim this suite committed — a
+    second connection sees the row *claimed* while the job runs, sees its lease pushed
+    out by the heartbeat beside the work, and afterwards sees it finished later than it
+    was claimed. The job is a rebuild held at its first write by a lock this suite
+    holds, because no job in this suite runs a heartbeat interval on its own.
+    """
+    workspace = seed_workspace(database.cursor())["id"]
+    database.commit()
+    with scoped(database, workspace) as cursor:
+        cursor.execute(
+            "INSERT INTO job (workspace_id, id, kind, reason)"
+            " VALUES (%s, %s, 'full-rebuild', 'drill')",
+            (workspace, ulid()),
+        )
+    bootstrap = bootstrap_for(database, tmp_path)
+    dsn = _WHERE[database]
+
+    def row() -> tuple[Any, ...] | None:
+        with scoped(database, workspace) as cursor:
+            cursor.execute(
+                "SELECT status, lease_expires_at, finished_at > claimed_at FROM job"
+            )
+            return cursor.fetchone()
+
+    def until(seen: Callable[[tuple[Any, ...] | None], bool]) -> tuple[Any, ...] | None:
+        for _ in range(200):
+            read = row()
+            if seen(read):
+                return read
+            time.sleep(0.05)
+        return None
+
+    passes: list[bool] = []
+    with psycopg.connect(dsn) as blocker, queue.connected(dsn) as worker:
+        # The rebuild's first write is its generation row; this lock holds it there.
+        blocker.execute("LOCK TABLE graph_generation IN EXCLUSIVE MODE")
+        pass_ = threading.Thread(
+            target=lambda: passes.append(
+                loop.tick(worker, bootstrap, heartbeat_every_seconds=0.05)
+            )
+        )
+        pass_.start()
+        try:
+            claimed = until(lambda read: read is not None and read[0] == "claimed")
+            assert claimed is not None, "the claim never reached a second connection"
+            moved = until(lambda read: read is not None and read[1] > claimed[1])
+            assert moved is not None, "the heartbeat never moved the lease"
+            assert moved[0] == "claimed"
+        finally:
+            blocker.rollback()
+            pass_.join(timeout=30)
+
+    assert passes == [True]
+    # Finished, and finished *after* it was claimed: two statements' clocks, not one
+    # transaction's `now()`.
+    finished = row()
+    assert finished is not None
+    assert (finished[0], finished[2]) == ("done", True)
 
 
 def test_the_audit_reports_a_mismatch_as_a_state_and_never_as_a_refusal(
