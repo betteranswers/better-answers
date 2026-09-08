@@ -1,0 +1,20 @@
+packages/core/test/graph.test.ts
+  s_9735fc29ef62df::t_8ac3c72c3d3994 666-667
+  s_9735fc29ef62df::t_4bf536ed80721e 656
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "fcdc754216049e21ed5eeec8292568fbd98145ec",
+  "prompts": {},
+  "sessions": {
+    "s_9735fc29ef62df": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "947d5c06-ba2f-479f-a6b2-58726b109426",
+        "model": "claude-opus-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
