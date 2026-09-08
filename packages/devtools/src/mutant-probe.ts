@@ -3,6 +3,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import { flagValues } from "./flags.ts";
+
 /**
  * One hand-applied mutation, run against a suite, restored whatever happened.
  *
@@ -46,15 +48,8 @@ const GRACE_MS = 2_000;
 type Parsed = { readonly mutation: Mutation } | { readonly refused: string };
 
 const parseArgv = (argv: readonly string[]): Parsed => {
-  const values = new Map<string, string>();
-  for (let index = 0; index < argv.length; index += 2) {
-    const flag = argv[index];
-    const value = argv[index + 1];
-    if (flag === undefined || !flag.startsWith("--") || value === undefined) {
-      return { refused: USAGE };
-    }
-    values.set(flag.slice(2), value);
-  }
+  const values = flagValues(argv);
+  if (values === undefined) return { refused: USAGE };
   const file = values.get("file");
   const line = Number(values.get("line"));
   const from = values.get("from");

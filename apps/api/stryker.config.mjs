@@ -1,12 +1,23 @@
 /**
- * Mutation testing for this tier, run weekly by .github/workflows/mutation.yml.
+ * Mutation testing for this tier, run nightly by .github/workflows/mutation.yml.
  *
  * @type {import("@stryker-mutator/api/core").PartialStrykerOptions}
  */
 export default {
   testRunner: "vitest",
   plugins: ["@stryker-mutator/vitest-runner"],
-  vitest: { configFile: "vitest.config.ts" },
+  // `related` off: with it on, the runner runs every mutant with vitest's `related` filter
+  // set to the mutated file (@stryker-mutator/vitest-runner 10.0.0,
+  // `dist/src/vitest-test-runner.js` lines 129–132 and 139–142, read 08/09/2026), so the
+  // test files that run are those which statically import that file. A module reached only
+  // through a re-export or a dynamic import — this tier's `mcp/entries/index.ts` — matches
+  // no test file, runs nothing, and is reported `Survived` with `testsCompleted: 0`: 9 such
+  // rows here in run 34168928594. Off, a covered mutant still runs only the test files its
+  // covering tests name (the per-test filter names them, lines 143–150), and a static mutant
+  // runs the whole suite, which is what the plan for it says. Cost measured per mutant, job
+  // time over mutants tested: 1.7 s in run 34168928594 with the option on; the run with it
+  // off is recorded in T-107's Progress.
+  vitest: { configFile: "vitest.config.ts", related: false },
 
   // `main.ts` and `migrate.ts` are the tier's entry points, not its behaviour: they read the
   // bootstrap and hand off, and nothing crosses a seam a test could reach.
@@ -34,7 +45,7 @@ export default {
   inPlace: true,
   tempDirName: "reports/mutation/.stryker-tmp",
 
-  // Incremental mode: each mutant's result is stored and reused next week for every file
+  // Incremental mode: each mutant's result is stored and reused the next night for every file
   // whose source and covering tests are unchanged. Without it this leg pays a Postgres
   // container start for every mutant in the tier, changed or not, which is the cost that
   // bounds it. The workflow restores and saves the file with actions/cache, and nothing

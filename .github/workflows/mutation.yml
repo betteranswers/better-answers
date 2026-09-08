@@ -1,8 +1,11 @@
 # Mutation testing on a schedule: Stryker for apps/api and packages/core.
-# WEEKLY, Sundays 02:17 UTC, on hosted runners. The cadence is a choice and not a budget — the
+# NIGHTLY, 02:17 UTC, on hosted runners. The cadence is a choice and not a budget — the
 # repository is public, so hosted standard runners carry no minute cap, and both legs finish
 # inside an hour — and the coding rules' mutation-schedule rule is where the choice is made and
-# where it changes (nightly is sequenced behind T-090's summary, T-106).
+# where it changes. Nightly rather than weekly because the summary below names what newly
+# survived since the previous run (T-090), which is the one thing a reader needs from a run
+# that happens while they sleep; a nightly score with nothing to compare against was a number
+# nobody read, and weekly was the wait for that summary (T-106).
 # A falling score is an ordna task, not a failed build — the job posts the numbers, it does not gate.
 # Stryker does not exit non-zero on a survivor here (thresholds.break is null in both configs), so a red
 # job means the harness itself broke, which is worth seeing.
@@ -29,8 +32,18 @@ name: mutation
 
 on:
   schedule:
-    - cron: "17 2 * * 0"   # Sundays 02:17 UTC
+    - cron: "17 2 * * *"   # nightly, 02:17 UTC
   workflow_dispatch:
+    inputs:
+      # Stryker's `--force`: every mutant is run again, the restored incremental file
+      # ignored for reuse. The incremental differ reuses a mutant's result when its source
+      # and its covering tests are unchanged, and a change to how the runner runs a mutant —
+      # `vitest.related`, `ignoreStatic` — is neither, so a run meant to measure that change
+      # has to be told to re-test what it would otherwise reuse (T-107's proof run).
+      force:
+        description: "Re-test every mutant (stryker --force); off reuses the previous run's results"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -38,7 +51,7 @@ permissions:
 jobs:
   stryker:
     runs-on: ubuntu-latest
-    # A leg that restores nothing is the week this has to cover, and both finish inside an
+    # A leg that restores nothing is the night this has to cover, and both finish inside an
     # hour; the rest is room for the hardening tickets ahead lengthening both suites.
     timeout-minutes: 120
     strategy:
@@ -60,21 +73,22 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Last week's mutant results — or, after an overrun, the cancelled leg's own — so a file
-      # nobody touched is not re-tested.
+      # The previous run's mutant results — or, after an overrun, the cancelled leg's own — so
+      # a file nobody touched is not re-tested.
       # A cache entry is written once and never overwritten, so a fixed key would pin the first
-      # week's results forever: the run id makes the key new every time — so the entry is always
+      # run's results forever: the run id makes the key new every time — so the entry is always
       # saved — and the prefix restores the newest one this workspace has. The attempt number is
       # on the key too, because a re-run keeps the run id and would reserve its own first
       # attempt's entry, be refused, and discard what it proved.
-      # A week where nothing restores (a first run, or GitHub evicting an entry it has not seen
-      # read for seven days, which a weekly schedule sits exactly on) is a full run: slower,
-      # never wrong, and `timeout-minutes` above is sized for exactly that week.
+      # A night where nothing restores (a first run, or GitHub evicting an entry it has not seen
+      # read for seven days — which a nightly schedule reads every night, so eviction now takes
+      # a week of the workflow not running at all) is a full run: slower, never wrong, and
+      # `timeout-minutes` above is sized for exactly that night.
       # Restore and save are separate steps because the combined action saves in a post step
       # conditioned on success, which discards the checkpoint of the one run that needed to keep
       # it — a leg cancelled at the job timeout. Split, the save below carries `always()` and an
-      # overrunning leg becomes next Sunday's starting point instead of next Sunday's full run.
-      - name: last week's mutant results
+      # overrunning leg becomes the next night's starting point instead of the next night's full run.
+      - name: the previous run's mutant results
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           # The path is the workspace's `incrementalFile`, which is where the reason for it
@@ -82,6 +96,16 @@ jobs:
           path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
           key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: stryker-incremental-${{ matrix.name }}-
+      # The restored file is the previous run's whole report — the same shape the JSON
+      # reporter writes, every mutant with its status — and Stryker overwrites it when this
+      # run ends. Copied aside first, it is the baseline the summary below names new survivors
+      # against. Nothing restored means no baseline, and the summary says so. After an overrun
+      # the baseline is the cancelled leg's partial report, and a mutant it never reached
+      # reads as "not in the baseline" in the next summary — true, and gone the night after.
+      - name: the previous run's report, kept as the summary's baseline
+        run: |
+          f=${{ matrix.path }}/reports/mutation/stryker-incremental.json
+          if [ -f "$f" ]; then cp "$f" "${{ matrix.path }}/reports/mutation/baseline.json"; fi
       # Cancellation signals the step's entry process and nothing under it, and a shell waiting
       # on a child forwards no signal: behind `pnpm run mutation`, with a pnpm and an sh in
       # between, Stryker was never signalled and never wrote the partial incremental report it
@@ -91,7 +115,7 @@ jobs:
       # interposes the shell; `stryker.config.mjs` holds the run's settings either way.
       - name: mutation
         working-directory: ${{ matrix.path }}
-        run: exec node_modules/.bin/stryker run
+        run: exec node_modules/.bin/stryker run ${{ inputs.force && '--force' || '' }}
       # First of the `always()` steps because a cancelled job has about five minutes before the
       # runner kills everything, and the checkpoint is the one artefact the next run needs.
       - name: this run's mutant results, whether or not it finished
@@ -100,24 +124,17 @@ jobs:
         with:
           path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
           key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: score to the job summary
+      # The score, the mutants that survive here and did not in the baseline, and the rows the
+      # runner never tested — written by `scripts/mutation-summary.mjs`, whose reading of the
+      # two reports is proved in packages/devtools' suite. The script exits zero whatever the
+      # reports hold, so the job's conclusion never turns on a survivor count; a red step here
+      # is the script failing to run, which is the harness and worth seeing.
+      - name: score and new survivors to the job summary
         if: always()
         run: |
-          f=${{ matrix.path }}/reports/mutation/mutation.json
-          if [ -f "$f" ]; then
-            # The report holds one entry per mutant, not a score; the score is the share of
-            # mutants a test caught, which is what a reader of the summary wants.
-            jq -r --arg w "${{ matrix.name }}" '
-              [.files[].mutants[].status] as $s
-              | ($s | map(select(. == "Killed" or . == "Timeout")) | length) as $killed
-              | ($s | map(select(. == "Killed" or . == "Timeout" or . == "Survived" or . == "NoCoverage")) | length) as $total
-              | if $total == 0
-                then "### \($w) mutation score: no mutants"
-                else "### \($w) mutation score: \(($killed * 1000 / $total | round) / 10)% (\($killed)/\($total) mutants killed)"
-                end' "$f" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "### ${{ matrix.name }} mutation score: no report" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          node scripts/mutation-summary.mjs --leg ${{ matrix.name }} \
+            --report ${{ matrix.path }}/reports/mutation/mutation.json \
+            --baseline ${{ matrix.path }}/reports/mutation/baseline.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:

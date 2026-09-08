@@ -24,7 +24,7 @@ export const asSliceRelative = (files: readonly string[]): readonly string[] =>
   files.map((file) => path.relative(CORE_SRC, file));
 
 /**
- * The mark Stryker's instrumenter leaves in a file it has rewritten. The weekly mutation
+ * The mark Stryker's instrumenter leaves in a file it has rewritten. The nightly mutation
  * run works in place — `stryker.config.mjs` says why — so while one is running the bytes
  * under `src` are the instrumenter's, not the ones this repository wrote.
  *

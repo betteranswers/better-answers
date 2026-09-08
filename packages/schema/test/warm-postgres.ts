@@ -22,7 +22,7 @@ import {
  * What it buys is the container start leaving the per-file path. Vitest initialises a
  * `globalSetup` once per project instance and tears it down only when the instance
  * closes, while a file's `beforeAll` re-runs on every mutant Stryker activates inside
- * that same instance — so under the weekly mutation run the container is started once a
+ * that same instance — so under the nightly mutation run the container is started once a
  * worker rather than once a mutant (`docs/research/t-009-mutation-testing.md` §1.2–1.3).
  * A file still gets a fully migrated, empty database of its own, because all seeding is
  * per-test through the factory (`[TEST4]`) and a template copy is the migrated database

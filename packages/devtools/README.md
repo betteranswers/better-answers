@@ -4,7 +4,7 @@ The repository's own gate tooling. **It is imported and never deployed** — `pa
 is imported, `apps/` is what deploys (ADR 0029) — so nothing under `apps/` copies this
 directory into an image, and every dependency here is a development dependency.
 
-Four things live here.
+Five things live here.
 
 ## `src/throwaway-tree.ts` — the runner
 
@@ -64,6 +64,16 @@ diff-stat against `HEAD`. It exists because two triage sessions restored on the 
 alone and left a mutant in `src` with the suite green. Its suite spawns the script over a
 throwaway git repository and interrupts it mid-run; `docs/agents/mutation-triage.md` is
 where the method that uses it is written.
+
+`src/mutation-summary.ts` is the mutation run's job summary behind
+`scripts/mutation-summary.mjs` (`--leg … --report … [--baseline …]`), which
+`.github/workflows/mutation.yml` appends to each leg's summary: the score, the mutants that
+survive in this run's report and did not in the previous run's — matched by the mutated text
+rather than the line number, so a file that gained lines above a survivor does not report it
+as new — and the rows the runner never tested, named as a runner fault rather than counted
+as survivors (`[TEST6]`). A first run says "no baseline"; the script exits zero whatever the
+reports hold, so the summary never gates. Its suite asserts the prose a reader sees, line by
+line, and runs the script over files.
 
 ## `lint-rules/` — the `better-answers` oxlint plugin
 

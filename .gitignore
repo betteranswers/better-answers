@@ -13,7 +13,7 @@ coverage/
 # `apps/api/reports/` and `packages/core/reports/` tracked. Every workspace on the mutation
 # schedule writes its report and its incremental result file under its own `reports/`, so the
 # pattern has to match at any depth — and the incremental file is git-ignored on purpose:
-# actions/cache is what carries it from week to week.
+# actions/cache is what carries it from night to night.
 reports/
 
 # Mutation testing leftovers: mutmut copies the tier into `apps/worker/mutants/`, and
