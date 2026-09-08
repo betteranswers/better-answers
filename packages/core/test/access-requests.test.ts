@@ -18,7 +18,7 @@ import { openPostgres, type Tx, withPrincipal } from "../src/store/postgres/inde
 import { provisionWorkspace } from "../src/workspaces/index.ts";
 import { bootstrap, seedPerson } from "./platform.ts";
 import { asSliceRelative, coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
-import { postgresForSuite } from "./suite-postgres.ts";
+import { abortTheTransaction, postgresForSuite, whileWritesAreRefused } from "./suite-postgres.ts";
 
 /**
  * The *access request* through the members slice's entry point (`[TEST1]`), against real
@@ -239,6 +239,32 @@ describe("asking to join a workspace", () => {
     if (asked.ok) return;
     expect(asked.error).toBeInstanceOf(Error);
   });
+
+  it("hands a caller the store's own failure from the insert, rather than the acknowledgement", async () => {
+    const workspace = await provision("Unsaved");
+    const requester = await outsider();
+
+    // The slug resolved, the person is no member and the ledger row went in — and the
+    // request row itself is what the store refuses. The acknowledgement covers the four
+    // cases ADR 0038 names and this is none of them: answering it here would tell somebody
+    // they were all set for a request nobody kept.
+    const asked = await whileWritesAreRefused(db().pool, "access_request", () =>
+      requestAccess(bootstrap, door(), {
+        slug: workspace.slug,
+        requesterId: requester,
+        reason: "I have joined the bids team and need the answer library.",
+      }),
+    );
+
+    expect(asked).toEqual({ ok: false, error: expect.any(Error) });
+    expect(await requestRows(workspace.id)).toEqual([]);
+    // The ledger row is written first inside the transaction, so its absence is what proves
+    // the act rolled back rather than never having reached the row (`[AUDIT1]`).
+    const events = await db().pool.query("SELECT 1 FROM audit_event WHERE actor = $1", [
+      `human:${requester}`,
+    ]);
+    expect(events.rowCount).toBe(0);
+  });
 });
 
 describe("approving a request", () => {
@@ -365,6 +391,80 @@ describe("approving a request", () => {
 
     expect(approved).toEqual({ ok: false, error: "no-such-request" });
   });
+
+  it("hands the Admin the store's own failure when the invitation cannot be minted", async () => {
+    const { workspace, requestId } = await withOneWaitingRequest("Unminted");
+    let approved: unknown;
+
+    await expect(
+      whileWritesAreRefused(db().pool, "invitation", () =>
+        as(workspace.id, workspace.adminUserId, async (principal, tx) => {
+          approved = await approveRequest(principal, tx, { requestId });
+        }),
+      ),
+    ).rejects.toThrow(/did not commit/);
+
+    // An approved request never exists without the invitation it names, so the store
+    // refusing the invitation leaves the request exactly where it was.
+    expect(approved).toEqual({ ok: false, error: expect.any(Error) });
+    expect(await requestRows(workspace.id)).toMatchObject([{ status: "waiting" }]);
+  });
+});
+
+/**
+ * The one refusal each decision reads out of its argument alone, and the two failures the
+ * store can hand it. Neither is a fact about the workspace, and neither may arrive as one.
+ */
+describe("what a decision refuses and what it passes on", () => {
+  /** Each decision as one call; every act's error is a refusal word or the store's Error. */
+  type Decision = (
+    principal: UserPrincipal,
+    tx: Tx,
+    requestId: string,
+  ) => Promise<Result<unknown, string | Error>>;
+
+  const DECISIONS: readonly (readonly [string, Decision])[] = [
+    ["approving", (principal, tx, requestId) => approveRequest(principal, tx, { requestId })],
+    ["declining", (principal, tx, requestId) => declineRequest(principal, tx, { requestId })],
+  ];
+
+  it.each(DECISIONS)("refuses %s a request id of no known form", async (verb, decide) => {
+    const { workspace } = await withOneWaitingRequest(`Shapeless${verb}`);
+
+    const refused = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
+      decide(principal, tx, "' OR true --"),
+    );
+
+    // `no-such-request` is a fact about this workspace; a string of no known form is a fact
+    // about the request, and the two are not interchangeable — nor is either a string this
+    // act hands to a statement as if the platform had minted it.
+    expect(refused).toEqual({ ok: false, error: "malformed" });
+    expect(await requestRows(workspace.id)).toMatchObject([{ status: "waiting" }]);
+  });
+
+  it.each(DECISIONS)(
+    "hands the Admin the store's own failure when %s cannot be landed",
+    async (verb, decide) => {
+      const { workspace, requestId } = await withOneWaitingRequest(`Unlandable${verb}`);
+      let decided: unknown;
+
+      // The row is claimed and held, the event is written, and the update that lands the
+      // decision is what the store refuses — the arm no failing read reaches.
+      await expect(
+        whileWritesAreRefused(db().pool, "access_request", () =>
+          as(workspace.id, workspace.adminUserId, async (principal, tx) => {
+            decided = await decide(principal, tx, requestId);
+          }),
+        ),
+      ).rejects.toThrow(/did not commit/);
+
+      expect(decided).toEqual({ ok: false, error: expect.any(Error) });
+      expect(await requestRows(workspace.id)).toMatchObject([{ status: "waiting" }]);
+      expect((await eventsAbout(requestId)).map((event) => event.act)).toEqual([
+        "people.request.asked",
+      ]);
+    },
+  );
 });
 
 describe("declining a request", () => {
@@ -477,6 +577,27 @@ describe("the Admin's queue", () => {
         },
       ],
     });
+  });
+
+  it("hands the Admin the store's own failure rather than a queue with nobody in it", async () => {
+    const { workspace } = await withOneWaitingRequest("Unqueued");
+    let listed: Result<unknown, unknown> | undefined;
+
+    // An empty queue is what an Admin acts on — nobody is waiting — so a read that met the
+    // store failing and answered one would have the Admin close a screen full of people.
+    await expect(
+      as(workspace.id, workspace.adminUserId, async (principal, tx) => {
+        await abortTheTransaction(tx);
+        listed = await listWaitingRequests(principal, tx);
+      }),
+    ).rejects.toThrow(/did not commit/);
+
+    // In the store's own words, and not in a failure of the reading after it: a caller
+    // shown the second would look for the defect in the platform rather than the database.
+    expect(listed).toEqual({ ok: false, error: expect.any(Error) });
+    expect(listed?.ok === false ? String(listed.error) : "").toContain(
+      "current transaction is aborted",
+    );
   });
 });
 
