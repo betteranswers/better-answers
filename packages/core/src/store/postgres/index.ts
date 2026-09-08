@@ -247,10 +247,12 @@ export const withPrincipal = async <T>(
     credentialIssuedAtMs,
     (row) => {
       const refusal = refuse(row, credentialIssuedAtMs);
-      if (refusal !== undefined) return refusal;
+      if (!refusal.ok) return refusal;
       // The boundary's own extra: a credential that names a role the row disagrees with.
       // The act's door has no claims to disagree with, which is why this arm is here.
-      return claims.role === undefined || claims.role === row?.role ? undefined : "role-disagrees";
+      return claims.role === undefined || claims.role === refusal.value.role
+        ? refusal
+        : err("role-disagrees");
     },
     work,
   );
@@ -292,11 +294,11 @@ export const withMembership = async <T>(
     principal.userId,
     principal.credentialIssuedAtMs,
     (row) => {
-      const revoked = refuse(row, principal.credentialIssuedAtMs);
-      if (revoked !== undefined) return revoked;
+      const refusal = refuse(row, principal.credentialIssuedAtMs);
+      if (!refusal.ok) return refusal;
       // The role the act was authorised at, against the role the row holds now. Checked
       // after the shared refusals, so a revoked person hears one word and not two.
-      return row?.role === principal.role ? undefined : "role-disagrees";
+      return refusal.value.role === principal.role ? refusal : err("role-disagrees");
     },
     work,
     MEMBERSHIP_QUERY_HELD,
@@ -314,7 +316,7 @@ const resolveScoped = async <T>(
   workspaceId: WorkspaceId,
   userId: UserId,
   credentialIssuedAtMs: number,
-  refusalFor: (row: MembershipRow | undefined) => PrincipalRefusal | undefined,
+  refusalFor: (row: MembershipRow | undefined) => Result<ResolvedMember, PrincipalRefusal>,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
   query: string = MEMBERSHIP_QUERY,
 ): Promise<Result<T, PrincipalRefusal>> => {
@@ -324,29 +326,21 @@ const resolveScoped = async <T>(
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
 
     const membership = await client.query<MembershipRow>(query, [workspaceId, userId]);
-    const row = membership.rows[0];
-    const refusal = refusalFor(row);
-    if (refusal !== undefined) {
+    const resolved = refusalFor(membership.rows[0]);
+    if (!resolved.ok) {
       await rollbackQuietly(client);
-      return err(refusal);
-    }
-    // The callback returned nothing, so the row exists and its role is one of the three;
-    // the narrowing is repeated here because TypeScript cannot carry it across the call.
-    const role = row?.role ?? "";
-    if (!isRole(role)) {
-      await rollbackQuietly(client);
-      return err("role-unknown");
+      return err(resolved.error);
     }
 
     const principal: UserPrincipal = {
       kind: "user",
       workspaceId,
       userId,
-      role,
+      role: resolved.value.role,
       // Parsed at the boundary rather than asserted (ADR 0028): the column is a foreign
       // key to a group the platform minted, so a value of another shape is a broken
       // database and the throw the caller sees is the truthful answer to it.
-      groups: (row?.group_ids ?? []).map((id) => boundarySchemas.group.select.shape.id.parse(id)),
+      groups: resolved.value.group_ids.map((id) => boundarySchemas.group.select.shape.id.parse(id)),
       credentialIssuedAtMs,
     };
     const value = await work(principal, client);
@@ -361,24 +355,36 @@ const resolveScoped = async <T>(
 };
 
 /**
+ * A membership row once its role has been read as one of the three: what `refuse` hands
+ * back instead of the raw row, so a caller's own extra refusal, and `resolveScoped` after
+ * it, both read the narrowed role — never a second `isRole` asking a question `refuse`
+ * already answered, because the type crosses the callback that the narrowing could not.
+ */
+type ResolvedMember = MembershipRow & { readonly role: Role };
+
+/**
  * The refusals a membership row decides for **any** caller, from the row and the instant the
  * credential was issued at. Both doors make them: at the request boundary against the claims'
  * instant, and inside an act's own transaction against the same instant carried on the
- * Principal, so a revocation is judged the same way wherever it is met.
+ * Principal, so a revocation is judged the same way wherever it is met. The row it hands
+ * back on success carries its role narrowed to `Role`, so nothing downstream re-asks `isRole`.
  */
 const refuse = (
   row: MembershipRow | undefined,
   credentialIssuedAtMs: number,
-): PrincipalRefusal | undefined => {
-  if (row === undefined) return "not-a-member";
-  if (!isRole(row.role)) return "role-unknown";
+): Result<ResolvedMember, PrincipalRefusal> => {
+  if (row === undefined) return err("not-a-member");
+  // `member_role_check` (`identity-tables.ts`) refuses this row a role outside the three
+  // before it can ever be written, so this is a second, database-backed line of defence
+  // rather than a path any seed or migration can currently reach.
+  if (!isRole(row.role)) return err("role-unknown");
   // Either instant refuses, with the one word: revoked everywhere, or revoked here.
   for (const revokedAt of [row.person_revoked_at, row.membership_revoked_at]) {
     if (revokedAt !== null && credentialIssuedAtMs < revokedAt.getTime()) {
-      return "credentials-revoked";
+      return err("credentials-revoked");
     }
   }
-  return undefined;
+  return ok({ ...row, role: row.role });
 };
 
 /** A fixed-window rule: at most `max` events per `windowMs`. */
@@ -428,6 +434,8 @@ export const consumeIngress = async (
      RETURNING count`,
     [scope, key, start],
   );
+  // An upsert's RETURNING always yields exactly one row; Postgres guarantees it, not the
+  // type, so `?? 1` is a fallback the type asks for and this statement never reaches.
   return outcome(counted.rows[0]?.count ?? 1, rule, start, now);
 };
 
@@ -455,6 +463,7 @@ export const consumeCall = async (
      RETURNING count`,
     [principal.workspaceId, tokenId, start],
   );
+  // Same guarantee as `consumeIngress`'s upsert above: RETURNING always yields one row.
   return outcome(counted.rows[0]?.count ?? 1, rule, start, now);
 };
 
