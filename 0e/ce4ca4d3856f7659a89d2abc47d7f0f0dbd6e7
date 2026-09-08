@@ -1,0 +1,29 @@
+packages/devtools/src/mutant-probe.ts
+  s_5cc55f18f6b9e2::t_0df69e3e57f1ac 256-262
+  s_5cc55f18f6b9e2::t_fb41ac8632cbf1 103-112
+  s_5cc55f18f6b9e2::t_4d9a42fd5137af 163-164
+  s_5cc55f18f6b9e2::t_bdc4792be4d5b3 336
+  s_5cc55f18f6b9e2::t_ec15a04ce31107 201
+  s_5cc55f18f6b9e2::t_7e13ac6c1dafa3 300-302
+packages/devtools/test/mutant-probe.test.ts
+  s_5cc55f18f6b9e2::t_fb09390d71dee6 43-45
+  s_5cc55f18f6b9e2::t_e216bb550f6e5e 94,96-97
+  s_5cc55f18f6b9e2::t_40648b4acd30d2 245-259
+  s_5cc55f18f6b9e2::t_2dfb71a700a2ea 73-75,77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0ece4ca4d3856f7659a89d2abc47d7f0f0dbd6e7",
+  "prompts": {},
+  "sessions": {
+    "s_5cc55f18f6b9e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "494d3590-8e7e-4928-8a08-4aa57b92c7f0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
