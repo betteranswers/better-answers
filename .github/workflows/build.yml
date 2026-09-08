@@ -69,15 +69,15 @@ jobs:
             context: apps/worker
             dockerfile: apps/worker/Dockerfile
             # This tier is a uv workspace and not a pnpm one, so its probe is a pytest file
-            # in its own suite and its toolchain is uv (`T-084`).
+            # in its own suite and its toolchain is uv.
             probe: uv run --frozen --directory apps/worker pytest tests/test_image.py
             probe-toolchain: python
           - tier: backup
             context: deploy
             dockerfile: deploy/backup.Dockerfile
             # A tool image rather than a tier, with no suite of its own, so its probe lives
-            # in the api's — beside the text half of the same claim, which
-            # `apps/api/tests/deploy-tree.test.ts` already held (`T-084`).
+            # in the api's, beside the text half of the same claim in
+            # `apps/api/tests/deploy-tree.test.ts`.
             probe: pnpm --filter @better-answers/api exec vitest run tests/backup-image.test.ts
             probe-toolchain: node
     steps:
@@ -101,9 +101,9 @@ jobs:
             type=raw,value=main
       # The toolchain a probe command runs on, installed for the legs that declare it and
       # for no others. The condition is `matrix.probe-toolchain` and never `matrix.tier`:
-      # a step that named an image would turn this job back into a list of images, which is
-      # the shape `T-043` deliberately did not write and `T-084` then relied on not being
-      # there. `apps/api/tests/image.test.ts` holds both halves — a probe whose toolchain
+      # a step that named an image would turn this job back into a list of images, and a
+      # fourth image would then join by editing steps rather than by declaring a probe.
+      # `apps/api/tests/image-job.test.ts` holds both halves — a probe whose toolchain
       # nothing installs, and a toolchain installed for a leg with no probe.
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         if: matrix.probe-toolchain == 'node'
@@ -164,12 +164,10 @@ jobs:
             exit 1
           fi
           ${PROBE}
-      # Every leg pushes on these terms, and they were chosen before every leg was probed.
-      # No image here gains anything from a provenance attestation nothing verifies, and
-      # each loses something to it: an attestation makes the tag point at an index, so the
-      # digest a person promotes out of the summary is a wrapper around the image rather
-      # than the image. Because the terms were already these, `T-084` gave the worker and
-      # the backup a probe apiece without touching what they push under.
+      # Every leg pushes on these terms, probed or not. No image here gains anything from a
+      # provenance attestation nothing verifies, and each loses something to it: an
+      # attestation makes the tag point at an index, so the digest a person promotes out of
+      # the summary is a wrapper around the image rather than the image.
       - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         id: build
         with:
