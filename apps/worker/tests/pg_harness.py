@@ -5,8 +5,17 @@ way the app's migrator does — every ``.sql`` file the journal lists, in order,
 split on drizzle's ``--> statement-breakpoint`` marker — against a throwaway Postgres
 on the same pinned image the estate runs. RLS assertions run ``SET LOCAL ROLE app_rt``
 inside a transaction, because the container's superuser bypasses RLS by design.
+
+**The stamp is applied too**, in the migrator's own shape: the ``drizzle`` schema, its
+``__drizzle_migrations`` table and one row per migration carrying the file's SHA-256 and
+the journal's ``when``. Two reasons, and the second is the one that matters: a
+migration may grant on that table (0022 does, for `[WRK1]`'s check), and the check
+itself compares the committed schema view's ``MIGRATION_WHEN`` against the last row
+here — a harness that skipped the stamp could not test the one thing standing between
+the worker and a schema that has moved under it.
 """
 
+import hashlib
 import json
 import re
 from collections.abc import Iterator
@@ -33,19 +42,43 @@ def pinned_postgres_image() -> str:
     return str(matches[0])
 
 
-def journal_migrations() -> list[Path]:
+def journal_entries() -> list[dict[str, object]]:
     journal = json.loads((MIGRATIONS_DIR / "meta" / "_journal.json").read_text("utf-8"))
-    return [MIGRATIONS_DIR / f"{entry['tag']}.sql" for entry in journal["entries"]]
+    return [dict(entry) for entry in journal["entries"]]
+
+
+def journal_migrations() -> list[Path]:
+    return [MIGRATIONS_DIR / f"{entry['tag']}.sql" for entry in journal_entries()]
+
+
+#: The migrator's own stamp table, written out because the migrator is TypeScript and
+#: this is the Python half of the same journal (drizzle-orm's `PgDialect.migrate`).
+_STAMP_TABLE = """
+CREATE SCHEMA IF NOT EXISTS "drizzle";
+CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (
+    id SERIAL PRIMARY KEY,
+    hash text NOT NULL,
+    created_at bigint
+)
+"""
 
 
 def apply_journal(conninfo: str) -> None:
     with psycopg.connect(conninfo) as connection:
-        for migration in journal_migrations():
-            for statement in migration.read_text("utf-8").split(
-                "--> statement-breakpoint"
-            ):
+        for statement in _STAMP_TABLE.split(";"):
+            if statement.strip():
+                connection.execute(statement)
+        for entry in journal_entries():
+            migration = MIGRATIONS_DIR / f"{entry['tag']}.sql"
+            sql = migration.read_text("utf-8")
+            for statement in sql.split("--> statement-breakpoint"):
                 if statement.strip():
                     connection.execute(statement)
+            connection.execute(
+                'INSERT INTO "drizzle"."__drizzle_migrations" ("hash", "created_at")'
+                " VALUES (%s, %s)",
+                (hashlib.sha256(sql.encode("utf-8")).hexdigest(), entry["when"]),
+            )
         connection.commit()
 
 

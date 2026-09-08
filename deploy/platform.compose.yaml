@@ -109,35 +109,33 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
 
-  # NOT STARTED BY DEFAULT — it is behind the `pipeline` profile, so `docker compose up`
-  # brings up migrate and api and leaves this service declared and stopped. It joins the
-  # stack when `T-006`'s work loop exists: `docker compose --profile pipeline up`.
+  # Started by default, because it now has work to do: the loop claims jobs, runs the
+  # nightly parser audit and the full rebuild, and keeps its lease alive while it does.
   #
-  # No `command:` here on purpose: the image's own is the deploy contract, and today it is a
-  # refusal. Nothing in this tier claims a job yet — the claim/lease/heartbeat functions are
-  # the app's to migrate (`T-006`) — so `apps/worker/Dockerfile` ships a default command that
-  # says so and exits rather than idling and reporting health it does not have. Started by
-  # default, that refusal plus `restart: unless-stopped` is a restart storm the deploy unit
-  # would report as an unhealthy stack and `T-005`'s alerting would page on; a service that
-  # exists only to fail is not one to start. The image, its dependencies, its non-root user
-  # and its healthcheck are what `T-018` delivers, and the profile is the one line `T-006`
-  # deletes.
+  # No `command:` here on purpose: the image's own is the deploy contract, and it is the
+  # loop. The safety against a deploy whose order slipped is inside the process rather than
+  # in this file — the worker compares its committed schema view against the migrator's
+  # stamp and claims nothing until they agree, logging once instead of exiting, so
+  # `restart: unless-stopped` cannot turn the seconds between `migrate` and `worker` into a
+  # restart storm.
   worker:
-    profiles: ["pipeline"]
     image: ghcr.io/betteranswers/worker@${WORKER_IMAGE_DIGEST:?set by the release workflow}
     <<: [*restart, *logging]
     environment:
       <<: *bootstrap
       DATABASE_URL: ${WORKER_DATABASE_URL:?}   # the workspace-scoped worker role, never the owner
+      GIT_STORE_DIR: /data/git                # the bare repositories, read at a head; mounted :ro below
       HF_HOME: /data/worker/hf-cache
       HF_HUB_OFFLINE: "1"                     # after first warm
       MAX_CONCURRENT_RUNS: "1"                # one index at a time on a 4 GB box (ADR 0024); ticket 42 measures whether it can rise
       LMDB_MAX_BYTES_PER_BINDING: "4294967296" # 4 GB cap; over it the binding's LMDB is wiped and reprocessed — it is disposable (ADR 0036)
     healthcheck:
-      # Why a process-level probe and not an HTTP one: `apps/worker/Dockerfile` § HEALTHCHECK.
-      # The command is the same one the image carries; the settings are repeated here because
-      # a healthcheck declared in compose replaces the image's outright.
-      test: ["CMD", "python", "-c", "import better_answers_worker"]
+      # Why a process-level probe and not an HTTP one, and why idle counts as healthy:
+      # `apps/worker/Dockerfile` § HEALTHCHECK. The command is the same one the image
+      # carries; the settings are repeated here because a healthcheck declared in compose
+      # replaces the image's outright. Eight retries at fifteen seconds is longer than one
+      # lease, so a claimant that goes quiet is given the lease's own grace first.
+      test: ["CMD", "python", "-m", "better_answers_worker.health"]
       interval: 15s
       timeout: 3s
       retries: 8

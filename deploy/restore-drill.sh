@@ -127,9 +127,10 @@ for ws in $(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d /
   age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${WORK}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
   sudo -u '#1000' git clone --quiet --bare "${WORK}/${ws}.bundle" "/data/git/${ws}.git"
 done
-# `api` alone: naming a service on the command line auto-enables its profile, and `worker` is
-# behind the `pipeline` profile until T-006's work loop exists (platform.compose.yaml).
-platform up -d --wait api
+# Both, and named rather than left to `up`: the drill measures the recovery order below,
+# and the graph rebuild in it is a job the worker claims — a stack without a worker would
+# wait for a rebuild nothing was going to run.
+platform up -d --wait api worker
 say "api up — RTO so far $(( ( $(date +%s) - T0 ) / 60 )) min"
 
 say "## 5 recovery order 2–5: watermark, graph rebuild, pipeline state (LMDBs empty → reprocess), orphans"

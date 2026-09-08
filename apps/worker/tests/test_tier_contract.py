@@ -17,7 +17,7 @@ from typing import Any, cast
 import pytest
 from psycopg import Cursor
 
-SPOKEN_CONTRACT_VERSION = 2
+SPOKEN_CONTRACT_VERSION = 3
 SPOKEN_AGREEMENTS = {
     "concept-inbox": "sql-function",
     "cost-ledger": "generated",
@@ -127,7 +127,9 @@ def test_the_id_shape_accepts_and_refuses_exactly_what_the_fixture_says() -> Non
 
 
 def test_an_id_minted_in_this_tier_matches_the_shape_the_other_tier_parses() -> None:
-    from factories import ulid
+    # The tier's own minter, not the factory's re-export: this is the function the
+    # nightly audit's self-scheduling names a job with, and it is the one held here.
+    from better_answers_worker.ids import ulid
 
     pattern = re.compile(read_id_shape()["pattern"])
 
@@ -299,4 +301,125 @@ def test_the_inbox_refuses_every_road_the_fixture_says_is_closed() -> None:
             finally:
                 cursor.execute("ROLLBACK TO SAVEPOINT probe")
                 cursor.execute("RESET ROLE")
+        connection.rollback()
+
+
+# --- queue: the claim protocol both tiers call (ADR 0031, ADR 0005) -------------------
+#
+# The fixture is the contract: seed its workspaces and jobs as the superuser (the two
+# relative instants become absolute, which is how time is advanced without waiting), run
+# every `claims` entry as its own role in its own scope and expect exactly the ids it
+# names, then every `calls` entry and expect exactly the boolean it names, then read
+# every
+# job back and hold it to `expect_final`. The TypeScript half runs the same cases in
+# packages/core/test/queue.contract.test.ts.
+#
+# This tier is the one that claims in production, so what the fixture pins is what the
+# work
+# loop is allowed to assume: the oldest claimable job first, a lapsed lease claimable
+# again,
+# a heartbeat that is the claimant's alone, and poison at the ceiling.
+
+
+def read_queue() -> dict[str, Any]:
+    raw = (CONTRACTS_DIR / "queue" / "cases.json").read_text(encoding="utf-8")
+    return cast("dict[str, Any]", json.loads(raw))
+
+
+def _seed_queue_fixture(cursor: Cursor[Any], fixture: dict[str, Any]) -> None:
+    from factories import seed_job, seed_workspace
+
+    for workspace in fixture["workspaces"]:
+        seed_workspace(cursor, workspace_id=workspace["id"], name=workspace["name"])
+    for seeded in fixture["jobs"]:
+        seed_job(
+            cursor,
+            workspace_id=seeded["workspace_id"],
+            job_id=seeded["id"],
+            kind=seeded["kind"],
+            reason=seeded["reason"],
+            status=seeded["status"],
+            attempts=seeded["attempts"],
+            max_attempts=seeded["max_attempts"],
+            enqueued_ago_seconds=seeded["enqueued_ago_seconds"],
+            claimed_by=seeded["claimed_by"],
+            lease_expires_in_seconds=seeded["lease_expires_in_seconds"],
+        )
+
+
+def _as_role_in_scope(cursor: Cursor[Any], where: dict[str, Any]) -> None:
+    cursor.execute(f"SET LOCAL ROLE {where['role']}")
+    cursor.execute(
+        "SELECT set_config('app.workspace_id', %s, true)", (where["workspace_id"],)
+    )
+
+
+def test_the_queue_hands_out_every_job_the_fixture_says_and_answers_every_call() -> (
+    None
+):
+    from pg_harness import migrated_postgres
+
+    fixture = read_queue()
+    lease = f"{fixture['lease_seconds']} seconds"
+
+    with migrated_postgres() as connection, connection.cursor() as cursor:
+        _seed_queue_fixture(cursor, fixture)
+
+        # The claims in order and the whole list at once: the agreement is about which
+        # job
+        # goes next, so asserting one at a time would let a claim nobody made pass.
+        claimed: list[dict[str, Any]] = []
+        for claim in fixture["claims"]:
+            _as_role_in_scope(cursor, claim)
+            cursor.execute(
+                "SELECT id FROM claim_job(%s, %s::interval)",
+                (claim["worker_id"], lease),
+            )
+            claimed.append(
+                {"why": claim["why"], "ids": [row[0] for row in cursor.fetchall()]}
+            )
+            cursor.execute("RESET ROLE")
+        assert claimed == [
+            {"why": claim["why"], "ids": claim["expect_ids"]}
+            for claim in fixture["claims"]
+        ]
+
+        answered: list[dict[str, Any]] = []
+        for call in fixture["calls"]:
+            _as_role_in_scope(cursor, call)
+            if call["function"] == "heartbeat_job":
+                statement = "SELECT heartbeat_job(%s, %s, %s::interval)"
+                third: str | None = lease
+            else:
+                statement = f"SELECT {call['function']}(%s, %s, %s::jsonb)"
+                third = (
+                    None if call.get("outcome") is None else json.dumps(call["outcome"])
+                )
+            cursor.execute(statement, (call["job_id"], call["worker_id"], third))
+            row = cursor.fetchone()
+            answered.append({"why": call["why"], "answer": bool(row and row[0])})
+            cursor.execute("RESET ROLE")
+        assert answered == [
+            {"why": call["why"], "answer": call["expect"]} for call in fixture["calls"]
+        ]
+
+        # What every job was left as: a poisoning and a lapsed lease are facts about a
+        # row, and the row is where the fixture says to look.
+        cursor.execute(
+            "SELECT workspace_id, id, status, attempts, claimed_by FROM job"
+            " ORDER BY workspace_id, id"
+        )
+        assert cursor.fetchall() == [
+            (
+                expected["workspace_id"],
+                expected["id"],
+                expected["status"],
+                expected["attempts"],
+                expected["claimed_by"],
+            )
+            for expected in sorted(
+                fixture["expect_final"],
+                key=lambda job: (job["workspace_id"], job["id"]),
+            )
+        ]
         connection.rollback()
