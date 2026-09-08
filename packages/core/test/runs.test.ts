@@ -29,6 +29,18 @@ const graphMaintenance: PlatformPrincipal = {
 
 const { db, arrange } = suiteWithBundles();
 
+/** The nightly audit as cron queues it — the platform's road — and the id a person reads back. */
+const auditQueuedByCron = async (
+  scenario: Awaited<ReturnType<typeof arrange>>,
+): Promise<string> => {
+  const cron = await enqueueJob(graphMaintenance, scenario.postgres, {
+    workspaceId: scenario.workspaceId,
+    kind: "nightly-audit",
+  });
+  if (!cron.ok) throw new Error(`the job was not queued: ${String(cron.error)}`);
+  return cron.value.jobId;
+};
+
 /** What the worker would have written when it finished an audit, as the app sees it. */
 const finishedAudit = async (
   workspaceId: string,
@@ -225,19 +237,15 @@ describe("waiting on a job somebody queued", () => {
     // workspace's own Admin reads that job back through their membership. A `--wait` on the
     // ops command and a person asking after the same job are one read, not two.
     const scenario = await arrange();
-    const cron = await enqueueJob(graphMaintenance, scenario.postgres, {
-      workspaceId: scenario.workspaceId,
-      kind: "nightly-audit",
-    });
-    if (!cron.ok) throw new Error(`the job was not queued: ${String(cron.error)}`);
+    const jobId = await auditQueuedByCron(scenario);
 
     const asked = await jobById(scenario.admin, scenario.postgres, {
       workspaceId: scenario.workspaceId,
-      jobId: cron.value.jobId,
+      jobId,
     });
 
     expect(asked.ok && asked.value).toEqual({
-      jobId: cron.value.jobId,
+      jobId,
       kind: "nightly-audit",
       reason: null,
       status: "queued",
@@ -252,12 +260,7 @@ describe("waiting on a job somebody queued", () => {
     // member below Admin the shape of the bundle. Scope does not decide it — every member of
     // the workspace passes the policy — so the role is checked in front of the read.
     const scenario = await arrange();
-    const cron = await enqueueJob(graphMaintenance, scenario.postgres, {
-      workspaceId: scenario.workspaceId,
-      kind: "nightly-audit",
-    });
-    if (!cron.ok) throw new Error(`the job was not queued: ${String(cron.error)}`);
-    const asking = { workspaceId: scenario.workspaceId, jobId: cron.value.jobId };
+    const asking = { workspaceId: scenario.workspaceId, jobId: await auditQueuedByCron(scenario) };
 
     for (const person of [scenario.viewer, scenario.editor]) {
       const asked = await jobById(person, scenario.postgres, asking);

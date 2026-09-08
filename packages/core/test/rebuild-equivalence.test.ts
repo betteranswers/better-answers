@@ -257,59 +257,74 @@ const buildTheMap = async (scenario: Scenario) => {
   return { linker, group };
 };
 
+/**
+ * This one case measured 30.8 s alone on 8 September 2026 (Apple M4 Pro, warm Testcontainers
+ * Postgres): the map is ten governed writes at ~850 ms each, then two `uv run` passes of the
+ * worker as a real process, each carrying the interpreter's start. Under the root `check`,
+ * with every other workspace's suite on the same machine, it overran the config's 60 s
+ * `testTimeout`. So it carries its own allowance of about 4× the quiet measurement — a
+ * runaway guard, not a budget: the two-minute promise is `graph-budget.test.ts`'s to hold,
+ * and this case proves equivalence, not speed.
+ */
+const EQUIVALENCE_ALLOWANCE_MS = 120_000;
+
 describe("the worker's rebuild against the app's own map", () => {
-  it("reproduces the live generation exactly, column by column, from the bundle and the records", async () => {
-    const scenario = await arrange();
-    const { linker, group } = await buildTheMap(scenario);
+  it(
+    "reproduces the live generation exactly, column by column, from the bundle and the records",
+    async () => {
+      const scenario = await arrange();
+      const { linker, group } = await buildTheMap(scenario);
 
-    const live = await liveGenerationOf(scenario.workspaceId);
-    expect(live, "the app's acts wrote a live generation").toBe(1);
-    const liveNodes = await nodesAt(scenario.workspaceId, 1);
-    const liveEdges = await edgesAt(scenario.workspaceId, 1);
-    // The map is worth comparing: every derivation branch left something behind.
-    expect(liveNodes.length).toBeGreaterThan(4);
-    expect(liveEdges.length).toBeGreaterThan(6);
+      const live = await liveGenerationOf(scenario.workspaceId);
+      expect(live, "the app's acts wrote a live generation").toBe(1);
+      const liveNodes = await nodesAt(scenario.workspaceId, 1);
+      const liveEdges = await edgesAt(scenario.workspaceId, 1);
+      // The map is worth comparing: every derivation branch left something behind.
+      expect(liveNodes.length).toBeGreaterThan(4);
+      expect(liveEdges.length).toBeGreaterThan(6);
 
-    const queued = await enqueueJob(scenario.admin, scenario.postgres, {
-      workspaceId: scenario.workspaceId,
-      kind: "full-rebuild",
-      reason: "drill",
-    });
-    expect(queued.ok, "the rebuild was queued through the runs slice").toBe(true);
-    // A second job, so the same two passes also prove the two parsers agree over the very
-    // bundle these acts wrote — which is the nightly audit's whole claim.
-    const audit = await enqueueJob(scenario.admin, scenario.postgres, {
-      workspaceId: scenario.workspaceId,
-      kind: "nightly-audit",
-    });
-    expect(audit.ok).toBe(true);
+      const queued = await enqueueJob(scenario.admin, scenario.postgres, {
+        workspaceId: scenario.workspaceId,
+        kind: "full-rebuild",
+        reason: "drill",
+      });
+      expect(queued.ok, "the rebuild was queued through the runs slice").toBe(true);
+      // A second job, so the same two passes also prove the two parsers agree over the very
+      // bundle these acts wrote — which is the nightly audit's whole claim.
+      const audit = await enqueueJob(scenario.admin, scenario.postgres, {
+        workspaceId: scenario.workspaceId,
+        kind: "nightly-audit",
+      });
+      expect(audit.ok).toBe(true);
 
-    // One pass claims one job per workspace, so two passes run both.
-    await runTheWorker();
-    await runTheWorker();
+      // One pass claims one job per workspace, so two passes run both.
+      await runTheWorker();
+      await runTheWorker();
 
-    expect(await liveGenerationOf(scenario.workspaceId)).toBe(2);
-    expect(await nodesAt(scenario.workspaceId, 2)).toEqual(liveNodes);
-    expect(await edgesAt(scenario.workspaceId, 2)).toEqual(liveEdges);
+      expect(await liveGenerationOf(scenario.workspaceId)).toBe(2);
+      expect(await nodesAt(scenario.workspaceId, 2)).toEqual(liveNodes);
+      expect(await edgesAt(scenario.workspaceId, 2)).toEqual(liveEdges);
 
-    // And the branches are there to be compared: the audience the narrowing moved, the
-    // section a heading named, the sentence a paragraph was cut to, and both lineage
-    // labels — so a rebuild that reproduced an empty map could not pass this.
-    const linkerEdges = liveEdges.filter((edge) => edge["from_uid"] === linker.iri);
-    // Seven links resolve — inline, full, collapsed, shortcut, autolink, the dangling IRI
-    // and the path that landed afterwards — and the two lineage citations wear one label
-    // each, the deprecated same-kind concept's having been relabelled by its own
-    // deprecation and not by any edit to this file.
-    expect(linkerEdges.map((edge) => edge["label"]).toSorted()).toEqual([
-      "DERIVED_FROM",
-      ...Array.from({ length: 7 }, () => "LINKS_TO"),
-      "SUPERSEDES",
-    ]);
-    const linked = linkerEdges.find((edge) => edge["label"] === "LINKS_TO");
-    expect(linked?.["section"]).toBe("Details");
-    expect(linked?.["sentence"]).toMatch(/^It names an inline link and/u);
-    expect(linked?.["audience_groups"]).toEqual([group]);
-  });
+      // And the branches are there to be compared: the audience the narrowing moved, the
+      // section a heading named, the sentence a paragraph was cut to, and both lineage
+      // labels — so a rebuild that reproduced an empty map could not pass this.
+      const linkerEdges = liveEdges.filter((edge) => edge["from_uid"] === linker.iri);
+      // Seven links resolve — inline, full, collapsed, shortcut, autolink, the dangling IRI
+      // and the path that landed afterwards — and the two lineage citations wear one label
+      // each, the deprecated same-kind concept's having been relabelled by its own
+      // deprecation and not by any edit to this file.
+      expect(linkerEdges.map((edge) => edge["label"]).toSorted()).toEqual([
+        "DERIVED_FROM",
+        ...Array.from({ length: 7 }, () => "LINKS_TO"),
+        "SUPERSEDES",
+      ]);
+      const linked = linkerEdges.find((edge) => edge["label"] === "LINKS_TO");
+      expect(linked?.["section"]).toBe("Details");
+      expect(linked?.["sentence"]).toMatch(/^It names an inline link and/u);
+      expect(linked?.["audience_groups"]).toEqual([group]);
+    },
+    EQUIVALENCE_ALLOWANCE_MS,
+  );
 
   it("finds no mismatch between the two parsers over the bundle those acts wrote", async () => {
     const scenario = await arrange();

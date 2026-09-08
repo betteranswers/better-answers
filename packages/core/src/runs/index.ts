@@ -150,6 +150,27 @@ const inWorkspace = async <T>(
 };
 
 /**
+ * The person's gate on both roads of this slice: an Admin, acting in the workspace their
+ * credential names. The platform passes — it has no role to check and no workspace of its own
+ * to hold it to; the argument beside it is the workspace it acts in.
+ *
+ * The word for a foreign workspace is the caller's, because the two roads mean different
+ * things by it: an enqueue that named another tenant is a `malformed` request, while a poll
+ * for a job in one is a job this workspace never held.
+ */
+const adminInOwnWorkspace = <Elsewhere extends string>(
+  principal: Principal,
+  workspaceId: string,
+  elsewhere: Elsewhere,
+): Result<undefined, RoleRefusal | Elsewhere> => {
+  if (principal.kind === "platform") return ok(undefined);
+  const admin = requireAdmin(principal);
+  if (!admin.ok) return err(admin.error);
+  if (workspaceId !== principal.workspaceId) return err(elsewhere);
+  return ok(undefined);
+};
+
+/**
  * Put a job on a workspace's queue, and answer the id it was given.
  *
  * **A person's enqueue is an Admin's**, by the same reasoning as every other act over the
@@ -172,14 +193,11 @@ export const enqueueJob = async (
   door: PostgresDoor,
   input: EnqueueJobInput,
 ): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal | PrincipalRefusal | Error>> => {
-  if (principal.kind === "user") {
-    const admin = requireAdmin(principal);
-    if (!admin.ok) return err(admin.error);
-    // A person acts in the workspace their credential names, and nowhere else. Refused
-    // rather than silently corrected: a caller that named another tenant is a caller with
-    // the wrong idea, and handing it a job in its own workspace would bury that.
-    if (input.workspaceId !== principal.workspaceId) return err("malformed");
-  }
+  // A person acts in the workspace their credential names, and nowhere else. Refused
+  // rather than silently corrected: a caller that named another tenant is a caller with
+  // the wrong idea, and handing it a job in its own workspace would bury that.
+  const admitted = adminInOwnWorkspace(principal, input.workspaceId, "malformed");
+  if (!admitted.ok) return err(admitted.error);
 
   // The pair the row's CHECK ties together, checked here too: a rebuild says why it is
   // happening and nothing else carries a reason. The type says so already, but a transport
@@ -239,11 +257,8 @@ export const jobById = async (
   door: PostgresDoor,
   input: { readonly workspaceId: string; readonly jobId: string },
 ): Promise<Result<JobState, "no-such-job" | RoleRefusal | PrincipalRefusal | Error>> => {
-  if (principal.kind === "user") {
-    const admin = requireAdmin(principal);
-    if (!admin.ok) return err(admin.error);
-    if (input.workspaceId !== principal.workspaceId) return err("no-such-job");
-  }
+  const admitted = adminInOwnWorkspace(principal, input.workspaceId, "no-such-job");
+  if (!admitted.ok) return err(admitted.error);
   const read = await inWorkspace(principal, door, input.workspaceId, (tx) =>
     tx.query<JobRow>(
       "SELECT id, kind, reason, status, attempts, outcome FROM job WHERE workspace_id = $1 AND id = $2",
