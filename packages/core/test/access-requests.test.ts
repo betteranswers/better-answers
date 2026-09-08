@@ -599,6 +599,23 @@ describe("the Admin's queue", () => {
       "current transaction is aborted",
     );
   });
+
+  it("hands the Admin a row the boundary cannot read rather than a queue that omits it", async () => {
+    const { workspace, requestId } = await withOneWaitingRequest("Unreadable");
+    // `access_request.id` is text with no CHECK, so only the read's own parse holds a row
+    // to the ULID the boundary promises; a row that fails it must reach the Admin as the
+    // failure it is, not as a shorter queue.
+    await db().pool.query("UPDATE access_request SET id = $2 WHERE id = $1", [
+      requestId,
+      "not-a-ulid",
+    ]);
+
+    const listed = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
+      listWaitingRequests(principal, tx),
+    );
+
+    expect(listed).toEqual({ ok: false, error: expect.any(Error) });
+  });
 });
 
 /**
