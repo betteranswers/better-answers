@@ -348,15 +348,29 @@ const withRoleOutsideTheThree = async (
   work: () => Promise<void>,
 ): Promise<void> => {
   const pool = db().pool;
+  const key = [seeded.workspaceId, seeded.userId];
+  // Read the role back rather than assuming which one the arrange chose, so the restore puts
+  // this row where it was and touches no other: the constraint goes back on over a table this
+  // helper corrupted in exactly one place.
+  const before = await pool.query<{ role: string }>(
+    "SELECT role FROM member WHERE workspace_id = $1 AND user_id = $2",
+    key,
+  );
+  const role = before.rows[0]?.role;
+  if (role === undefined) throw new Error("the membership to corrupt was not seeded");
+
   await pool.query("ALTER TABLE member DROP CONSTRAINT member_role_check");
   try {
-    await pool.query("UPDATE member SET role = 'Owner' WHERE workspace_id = $1 AND user_id = $2", [
-      seeded.workspaceId,
-      seeded.userId,
-    ]);
+    await pool.query(
+      "UPDATE member SET role = 'Owner' WHERE workspace_id = $1 AND user_id = $2",
+      key,
+    );
     await work();
   } finally {
-    await pool.query("UPDATE member SET role = 'Viewer' WHERE role NOT IN ('Admin', 'Editor')");
+    await pool.query("UPDATE member SET role = $3 WHERE workspace_id = $1 AND user_id = $2", [
+      ...key,
+      role,
+    ]);
     await pool.query(
       "ALTER TABLE member ADD CONSTRAINT member_role_check CHECK (role IN ('Admin', 'Editor', 'Viewer'))",
     );

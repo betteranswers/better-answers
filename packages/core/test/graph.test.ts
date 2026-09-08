@@ -346,15 +346,29 @@ const edgesFrom = async (scenario: MapScenario, fromUid: string): Promise<readon
   return rows.rows;
 };
 
+/**
+ * A Product and a Policy whose body links to it, both in the index and **neither yet on the
+ * map** — the footing the tests about a *second* delta open with, because each of them has to
+ * move one of the pair between two deltas and watch what the re-derive does.
+ */
+const linkedPair = async (): Promise<{
+  readonly scenario: MapScenario;
+  readonly product: IndexRow;
+  readonly policy: IndexRow;
+}> => {
+  const scenario = await arrange();
+  const product = await conceptIn(scenario, { path: "knowledge/product.md", kind: "Product" });
+  const policy = await conceptIn(scenario, {
+    path: "knowledge/policy.md",
+    kind: "Policy",
+    body: "See [the product](./product.md) for tiers.",
+  });
+  return { scenario, product, policy };
+};
+
 describe("the delta a second commit runs", () => {
   it("takes a link the edit removed off the map, rather than leaving a phantom edge", async () => {
-    const scenario = await arrange();
-    const product = await conceptIn(scenario, { path: "knowledge/product.md", kind: "Product" });
-    const policy = await conceptIn(scenario, {
-      path: "knowledge/policy.md",
-      kind: "Policy",
-      body: "See [the product](./product.md) for tiers.",
-    });
+    const { scenario, product, policy } = await linkedPair();
     await land(scenario, deltaOf(policy));
     expect(await edgesFrom(scenario, policy.iri)).toEqual([
       { label: "LINKS_TO", to_uid: product.iri, to_kind: "Product" },
@@ -368,13 +382,7 @@ describe("the delta a second commit runs", () => {
   });
 
   it("keeps an inbound link's denormalised kind in step when the target's own kind moves", async () => {
-    const scenario = await arrange();
-    const product = await conceptIn(scenario, { path: "knowledge/product.md", kind: "Product" });
-    const policy = await conceptIn(scenario, {
-      path: "knowledge/policy.md",
-      kind: "Policy",
-      body: "See [the product](./product.md) for tiers.",
-    });
+    const { scenario, product, policy } = await linkedPair();
     // The target lands on the map first: a concept newly mapped re-derives every file that
     // names it, and that re-derive would carry the new kind whether or not the sync ran.
     await land(scenario, deltaOf(product));
@@ -459,16 +467,40 @@ const authorOf = (scenario: MapScenario, body: string, path = "knowledge/policy.
   conceptIn(scenario, { path, kind: "Policy", body });
 
 /**
+ * One body, derived: the concepts it could reach, the author's own file, and the delta that
+ * maps it. Every test below varies the markdown and the concepts around it and nothing else,
+ * so this is their whole arrange and act — what each one *says* is the body it writes and the
+ * edges it expects, which is the only part that differs.
+ *
+ * The first path is the concept a link is meant to land on and comes back as `target`; any
+ * after it are decoys, seeded so that a mutation which wrongly resolved to one would have
+ * somewhere to land rather than failing for want of a row.
+ */
+const derived = async (
+  body: string,
+  paths: readonly [string, ...string[]] = ["knowledge/product.md"],
+): Promise<{ readonly target: IndexRow; readonly links: readonly LinkFacts[] }> => {
+  const scenario = await arrange();
+  const [wanted, ...decoys] = paths;
+  const target = await conceptIn(scenario, { path: wanted, kind: "Product" });
+  for (const path of decoys) await conceptIn(scenario, { path, kind: "Product" });
+  const policy = await authorOf(scenario, body);
+  await land(scenario, deltaOf(policy));
+  return { target, links: await linksFrom(scenario, policy.iri) };
+};
+
+/** The uids a body linked to, for the tests whose whole claim is which concept it reached. */
+const reached = (links: readonly LinkFacts[]): readonly string[] =>
+  links.map((edge) => edge.to_uid);
+
+/**
  * The derivation rule read off a file (ADR 0023, ADR 0026), through the delta rather than
  * through the parser: which markdown makes an edge, which target is a concept and which is
  * somebody else's resource, and what a made edge quotes of the file around it.
  */
 describe("what a body's markdown makes an edge of", () => {
   it("quotes the sentence around the link, cut from its own paragraph at the terminators either side", async () => {
-    const scenario = await arrange();
-    const product = await conceptIn(scenario, { path: "knowledge/product.md", kind: "Product" });
-    const policy = await authorOf(
-      scenario,
+    const { target, links } = await derived(
       [
         "# Expenses",
         "",
@@ -478,45 +510,31 @@ describe("what a body's markdown makes an edge of", () => {
       ].join("\n"),
     );
 
-    await land(scenario, deltaOf(policy));
-
-    expect(await linksFrom(scenario, policy.iri)).toEqual([
-      { to_uid: product.iri, section: "Expenses", sentence: "See the product for tiers." },
+    expect(links).toEqual([
+      { to_uid: target.iri, section: "Expenses", sentence: "See the product for tiers." },
     ]);
   });
 
   it("reads a link in the file's first paragraph, which has no blank line above it", async () => {
-    const scenario = await arrange();
-    const product = await conceptIn(scenario, { path: "knowledge/product.md", kind: "Product" });
-    const policy = await authorOf(scenario, "See [the product](./product.md) for tiers.");
+    const { target, links } = await derived("See [the product](./product.md) for tiers.");
 
-    await land(scenario, deltaOf(policy));
-
-    expect(await linksFrom(scenario, policy.iri)).toEqual([
-      { to_uid: product.iri, section: null, sentence: "See the product for tiers." },
+    expect(links).toEqual([
+      { to_uid: target.iri, section: null, sentence: "See the product for tiers." },
     ]);
   });
 
   it("ends a sentence with no terminator at its own paragraph, never at the next one's", async () => {
-    const scenario = await arrange();
-    const product = await conceptIn(scenario, { path: "knowledge/product.md", kind: "Product" });
-    const policy = await authorOf(
-      scenario,
+    const { target, links } = await derived(
       "See [the product](./product.md) for tiers\n\nReceipts are kept for six years.",
     );
 
-    await land(scenario, deltaOf(policy));
-
-    expect(await linksFrom(scenario, policy.iri)).toEqual([
-      { to_uid: product.iri, section: null, sentence: "See the product for tiers" },
+    expect(links).toEqual([
+      { to_uid: target.iri, section: null, sentence: "See the product for tiers" },
     ]);
   });
 
   it("names the nearest heading above the link its section, at any level and trimmed", async () => {
-    const scenario = await arrange();
-    const product = await conceptIn(scenario, { path: "knowledge/product.md", kind: "Product" });
-    const policy = await authorOf(
-      scenario,
+    const { target, links } = await derived(
       [
         "# Expenses",
         "",
@@ -534,21 +552,15 @@ describe("what a body's markdown makes an edge of", () => {
       ].join("\n"),
     );
 
-    await land(scenario, deltaOf(policy));
-
     // The third-level heading above it — not the first-level one further up, not the
     // second-level one below it, and not the `#` sitting mid-line in the prose between.
-    expect(await linksFrom(scenario, policy.iri)).toEqual([
-      { to_uid: product.iri, section: "Tiers", sentence: "See the product for tiers." },
+    expect(links).toEqual([
+      { to_uid: target.iri, section: "Tiers", sentence: "See the product for tiers." },
     ]);
   });
 
   it("derives nothing from a link inside quoted code, and keeps the prose around it where it was", async () => {
-    const scenario = await arrange();
-    const product = await conceptIn(scenario, { path: "knowledge/product.md", kind: "Product" });
-    await conceptIn(scenario, { path: "knowledge/other.md", kind: "Product" });
-    const policy = await authorOf(
-      scenario,
+    const { target, links } = await derived(
       [
         "# Expenses",
         "",
@@ -558,23 +570,18 @@ describe("what a body's markdown makes an edge of", () => {
         "",
         "Use `[a decoy](./other.md)` sparingly. See [the product](./product.md) for tiers.",
       ].join("\n"),
+      ["knowledge/product.md", "knowledge/other.md"],
     );
-
-    await land(scenario, deltaOf(policy));
 
     // Code is quotation, not assertion: neither decoy makes an edge, and blanking them left
     // the one real link's own offsets alone, which is what the section and sentence read off.
-    expect(await linksFrom(scenario, policy.iri)).toEqual([
-      { to_uid: product.iri, section: "Expenses", sentence: "See the product for tiers." },
+    expect(links).toEqual([
+      { to_uid: target.iri, section: "Expenses", sentence: "See the product for tiers." },
     ]);
   });
 
   it("closes a fence at its own closing line, and at no line that merely holds one", async () => {
-    const scenario = await arrange();
-    const product = await conceptIn(scenario, { path: "knowledge/product.md", kind: "Product" });
-    await conceptIn(scenario, { path: "knowledge/other.md", kind: "Product" });
-    const policy = await authorOf(
-      scenario,
+    const { target, links } = await derived(
       [
         "# Expenses",
         "",
@@ -585,23 +592,19 @@ describe("what a body's markdown makes an edge of", () => {
         "```   ",
         "See [the product](./product.md) for tiers.",
       ].join("\n"),
+      ["knowledge/product.md", "knowledge/other.md"],
     );
-
-    await land(scenario, deltaOf(policy));
 
     // A closing fence is a line of its own — its own character, at least the opener's
     // length, nothing but whitespace after it. A fence that closed early would make prose
     // of the decoy; one that never closed would swallow the real link below it.
-    expect(await linksFrom(scenario, policy.iri)).toEqual([
-      { to_uid: product.iri, section: "Expenses", sentence: "See the product for tiers." },
+    expect(links).toEqual([
+      { to_uid: target.iri, section: "Expenses", sentence: "See the product for tiers." },
     ]);
   });
 
   it("leaves an unpaired backtick run as the literal text it is", async () => {
-    const scenario = await arrange();
-    const product = await conceptIn(scenario, { path: "knowledge/product.md", kind: "Product" });
-    const policy = await authorOf(
-      scenario,
+    const { target, links } = await derived(
       [
         "A ` stray tick is literal text.",
         "",
@@ -611,21 +614,15 @@ describe("what a body's markdown makes an edge of", () => {
       ].join("\n"),
     );
 
-    await land(scenario, deltaOf(policy));
-
     // The pair closes, the stray tick does not, and a two-backtick run opening a line is a
     // span rather than a fence — so the quoted phrase leaves the sentence and nothing else does.
-    expect(await linksFrom(scenario, policy.iri)).toEqual([
-      { to_uid: product.iri, section: null, sentence: "and see the product for tiers." },
+    expect(links).toEqual([
+      { to_uid: target.iri, section: null, sentence: "and see the product for tiers." },
     ]);
   });
 
   it("takes a definition from a line of its own, however it spaces the colon, and from nowhere else", async () => {
-    const scenario = await arrange();
-    const product = await conceptIn(scenario, { path: "knowledge/product.md", kind: "Product" });
-    await conceptIn(scenario, { path: "knowledge/decoy.md", kind: "Product" });
-    const policy = await authorOf(
-      scenario,
+    const { target, links } = await derived(
       [
         "Details in [tight] and nothing in [aside].",
         "",
@@ -633,25 +630,17 @@ describe("what a body's markdown makes an edge of", () => {
         "",
         "[tight]:./product.md",
       ].join("\n"),
+      ["knowledge/product.md", "knowledge/decoy.md"],
     );
-
-    await land(scenario, deltaOf(policy));
 
     // `[tight]:./product.md` puts no space after its colon and still defines; the fragment
     // in the middle of a sentence puts one there and does not, because a definition is a
     // line of its own — so the shortcut `[aside]` above stays the plain text it looks like.
-    expect((await linksFrom(scenario, policy.iri)).map((edge) => edge.to_uid)).toEqual([
-      product.iri,
-    ]);
+    expect(reached(links)).toEqual([target.iri]);
   });
 
   it("resolves a full reference through a definition whose label differs by case and spacing", async () => {
-    const scenario = await arrange();
-    const product = await conceptIn(scenario, { path: "knowledge/product.md", kind: "Product" });
-    await conceptIn(scenario, { path: "knowledge/other.md", kind: "Product" });
-    await conceptIn(scenario, { path: "knowledge/decoy.md", kind: "Product" });
-    const policy = await authorOf(
-      scenario,
+    const { target, links } = await derived(
       [
         "Details in [the product][  Price  Book  ].",
         "",
@@ -659,22 +648,16 @@ describe("what a body's markdown makes an edge of", () => {
         "[price book]: <./product.md>",
         "[price book]: ./decoy.md",
       ].join("\n"),
+      ["knowledge/product.md", "knowledge/other.md", "knowledge/decoy.md"],
     );
-
-    await land(scenario, deltaOf(policy));
 
     // One label, four ways it could go wrong: padding around it, a neighbouring label that
     // differs only by a space, a second definition of the same label, and a bracketed target.
-    expect((await linksFrom(scenario, policy.iri)).map((edge) => edge.to_uid)).toEqual([
-      product.iri,
-    ]);
+    expect(reached(links)).toEqual([target.iri]);
   });
 
   it("reads a collapsed reference as naming itself, and makes nothing of an empty target", async () => {
-    const scenario = await arrange();
-    const product = await conceptIn(scenario, { path: "knowledge/product.md", kind: "Product" });
-    const policy = await authorOf(
-      scenario,
+    const { target, links } = await derived(
       [
         "Collapsed: [price book][].",
         "",
@@ -684,26 +667,18 @@ describe("what a body's markdown makes an edge of", () => {
       ].join("\n"),
     );
 
-    await land(scenario, deltaOf(policy));
-
-    expect((await linksFrom(scenario, policy.iri)).map((edge) => edge.to_uid)).toEqual([
-      product.iri,
-    ]);
+    expect(reached(links)).toEqual([target.iri]);
   });
 
   it("reads a colon inside a filename as part of the path, never as a scheme", async () => {
-    const scenario = await arrange();
     // What makes a target external is a scheme **at its start**; a colon further along is a
     // character in a filename, and a concept named by one is still a concept.
-    const named = await conceptIn(scenario, { path: "knowledge/a:b.md", kind: "Product" });
-    const policy = await authorOf(
-      scenario,
+    const { target, links } = await derived(
       "Hosted at [the vendor](//example.test/product), and detailed in [the annexe](./a:b.md).",
+      ["knowledge/a:b.md"],
     );
 
-    await land(scenario, deltaOf(policy));
-
-    expect((await linksFrom(scenario, policy.iri)).map((edge) => edge.to_uid)).toEqual([named.iri]);
+    expect(reached(links)).toEqual([target.iri]);
   });
 
   it("makes one lineage edge per cited concept, and none for a citation that names no concept", async () => {
