@@ -5,8 +5,13 @@ import { describe, expect, it } from "vitest";
 import { boundarySchemas, ulid } from "@better-answers/schema";
 
 import { attempt, type Claims, type UserPrincipal } from "../src/kernel/index.ts";
-import { bootstrap, seedPerson } from "./platform.ts";
-import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
+import { bootstrap, principalOf, provisionedWorkspace, seedPerson } from "./platform.ts";
+import {
+  openPostgres,
+  type PostgresDoor,
+  withPrincipal,
+  withScope,
+} from "../src/store/postgres/index.ts";
 import {
   provisionWorkspace,
   readMembership,
@@ -14,9 +19,10 @@ import {
   revokeWorkspaceTokens,
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
+  workspaceIdBySlug,
   workspacesHeldBy,
 } from "../src/workspaces/index.ts";
-import { postgresForSuite } from "./suite-postgres.ts";
+import { postgresForSuite, readingAs } from "./suite-postgres.ts";
 
 /**
  * Workspace provisioning through its interface: one act, one transaction, under a
@@ -34,6 +40,29 @@ const partitionExists = async (workspaceId: string): Promise<boolean> => {
     [`chunk_${workspaceId}`],
   );
   return found.rowCount === 1;
+};
+
+/**
+ * A door onto a pool that has been closed. Every statement through it fails, so it says two
+ * things at once: what an act answers when the store is unreachable, and — for an argument
+ * the boundary refuses — that the refusal was made before any statement was reached for.
+ */
+const unreachableDoor = async (): Promise<PostgresDoor> => {
+  const gone = new pg.Pool(db().runtimePool.options);
+  await gone.end();
+  return openPostgres(gone);
+};
+
+/** Which of a person's tokens in one table are revoked, by the id each was minted with. */
+const tokenState = async (
+  table: "oauth_refresh_token" | "oauth_access_token",
+  userId: string,
+): Promise<readonly { id: string; revoked: boolean }[]> => {
+  const rows = await db().pool.query<{ id: string; revoked: boolean }>(
+    `SELECT id, revoked IS NOT NULL AS revoked FROM ${table} WHERE user_id = $1 ORDER BY id`,
+    [userId],
+  );
+  return rows.rows;
 };
 
 describe("provisioning a workspace", () => {
@@ -71,6 +100,14 @@ describe("provisioning a workspace", () => {
       ok: true,
       value: { role: "Admin", ttl: String(TOOLS_LIST_TTL_MS_DEFAULT) },
     });
+    // The key by its written-down name rather than through the constant that wrote it: the
+    // MCP transport looks the row up by the real string, and a lookup that reads the key
+    // back through the same constant would agree with any name at all.
+    const written = await db().pool.query<{ key: string }>(
+      "SELECT key FROM workspace_config WHERE workspace_id = $1",
+      [id],
+    );
+    expect(written.rows).toEqual([{ key: "mcp.tools_list_ttl_ms" }]);
   });
 
   it("writes the first act on the ledger beside the rows it describes — the platform's, in the workspace it created", async () => {
@@ -229,10 +266,7 @@ describe("provisioning a workspace", () => {
     // A failure the act names no word for: the pool is gone, so nothing about it is a
     // refusal a caller can do anything with. The seam still answers a value — the
     // kernel's result convention — and the value carries the store's Error.
-    const gone = new pg.Pool(db().runtimePool.options);
-    await gone.end();
-
-    const provisioned = await provisionWorkspace(bootstrap, openPostgres(gone), {
+    const provisioned = await provisionWorkspace(bootstrap, await unreachableDoor(), {
       id: ulid(),
       name: "Unreachable",
       slug: `unreachable-${ulid().toLowerCase()}`,
@@ -279,6 +313,19 @@ describe("revoking a person's credentials", () => {
         "INSERT INTO oauth_refresh_token (id, token, client_id, user_id, expires_at, created_at, scopes) VALUES ('r-new', 'r-new-t', 'https://c.example/x', $1, now(), $2, ARRAY['knowledge:read'])",
         [adminUserId, new Date("2026-09-02T13:00:00Z")],
       );
+      // And the access tokens the refresh tokens mint: a stolen one outliving the
+      // revocation is the window the whole act exists to close.
+      for (const [tokenId, createdAt] of [
+        ["a-old", new Date("2026-09-02T11:00:00Z")],
+        ["a-new", new Date("2026-09-02T13:00:00Z")],
+      ] as const) {
+        await testData(superuser).oauthAccessToken({
+          id: tokenId,
+          clientId: "https://c.example/x",
+          userId: adminUserId,
+          createdAt,
+        });
+      }
     } finally {
       superuser.release();
     }
@@ -298,13 +345,13 @@ describe("revoking a person's credentials", () => {
       [adminUserId],
     );
     expect(sessions.rows).toEqual([{ id: "s-new" }]);
-    const tokens = await db().pool.query(
-      "SELECT id, revoked IS NOT NULL AS revoked FROM oauth_refresh_token WHERE user_id = $1 ORDER BY id",
-      [adminUserId],
-    );
-    expect(tokens.rows).toEqual([
+    expect(await tokenState("oauth_refresh_token", adminUserId)).toEqual([
       { id: "r-new", revoked: false },
       { id: "r-old", revoked: true },
+    ]);
+    expect(await tokenState("oauth_access_token", adminUserId)).toEqual([
+      { id: "a-new", revoked: false },
+      { id: "a-old", revoked: true },
     ]);
 
     // A later revocation with an earlier instant never moves the instant backwards.
@@ -326,6 +373,16 @@ describe("revoking a person's credentials", () => {
       at: new Date(),
     });
     expect(revoked).toEqual({ ok: false, error: "no-such-user" });
+
+    // An id the boundary accepts and nobody holds reaches the statement, which matches no
+    // row: the same word back, never a revocation reported over a person who is not there.
+    const nobody = ulid();
+    expect(await revokeCredentials(bootstrap, door, { userId: nobody, at: new Date() })).toEqual({
+      ok: false,
+      error: "no-such-user",
+    });
+    const person = await db().pool.query('SELECT 1 FROM "user" WHERE id = $1', [nobody]);
+    expect(person.rowCount).toBe(0);
   });
 
   it("is not reachable from a workspace Admin's own principal", () => {
@@ -348,7 +405,95 @@ describe("revoking a person's credentials", () => {
   });
 });
 
+/**
+ * The shell's own read (T-037, user stories 9 and 10): who the person is, where they are
+ * and at what role. It reads by the Principal's ids and by nothing else — there is no
+ * argument to ask about anybody else with — so the seam is the resolver's own transaction
+ * against real Postgres, where the workspace and person rows either exist or are gone.
+ */
 describe("reading the current membership", () => {
+  it("answers the workspace the Principal names, the person it names, and the role it carries", async () => {
+    const here = await provisionedWorkspace(db(), "Acme", {
+      name: "Priya Shah",
+      email: "priya@example.invalid",
+    });
+    // The same person in a second workspace, at a role the first does not give them.
+    const there = await provisionedWorkspace(db(), "Beta");
+    const client = await db().pool.connect();
+    try {
+      await testData(client).member({
+        workspaceId: there.workspaceId,
+        userId: here.adminUserId,
+        role: "Viewer",
+      });
+    } finally {
+      client.release();
+    }
+    const readIn = (workspaceId: string) =>
+      readingAs(db().runtimePool, { workspaceId, userId: here.adminUserId }, readMembership);
+
+    // Each workspace's own name and the role that workspace gives them, and never the
+    // other's: the Principal is the whole argument list.
+    expect(await readIn(here.workspaceId)).toEqual({
+      ok: true,
+      value: {
+        workspace: { id: here.workspaceId, name: "Acme" },
+        person: { id: here.adminUserId, name: "Priya Shah", email: "priya@example.invalid" },
+        role: "Admin",
+      },
+    });
+    expect(await readIn(there.workspaceId)).toEqual({
+      ok: true,
+      value: {
+        workspace: { id: there.workspaceId, name: "Beta" },
+        person: { id: here.adminUserId, name: "Priya Shah", email: "priya@example.invalid" },
+        role: "Viewer",
+      },
+    });
+  });
+
+  it("refuses a session pointing at a workspace or a person whose row is gone", async () => {
+    const { door, workspaceId, adminUserId } = await provisionedWorkspace(db(), "Stale");
+    // Minted, so each is an id in shape; neither is anybody's.
+    const gone = ulid();
+    const readAs = (principal: UserPrincipal) =>
+      withScope(bootstrap, door, workspaceId, (tx) => readMembership(principal, tx));
+
+    expect(await readAs(principalOf(gone, adminUserId, "Admin"))).toEqual({
+      ok: false,
+      error: "no-such-workspace",
+    });
+    expect(await readAs(principalOf(workspaceId, gone, "Admin"))).toEqual({
+      ok: false,
+      error: "no-such-person",
+    });
+  });
+
+  it("reads the role off the Principal rather than the member row, which the resolver already held", async () => {
+    // A person who holds no membership here cannot reach this read at all — `withPrincipal`
+    // refuses them before it runs (`principal.test.ts`). So the role is not read a second
+    // time, and a Principal built by hand is answered at the role it carries: two reads of
+    // one fact would be two answers where the platform has one.
+    const { door, workspaceId } = await provisionedWorkspace(db(), "Trusted");
+    const stranger = await seedPerson(db().pool, {
+      name: "Sam Okoro",
+      email: "stranger@example.invalid",
+    });
+
+    const read = await withScope(bootstrap, door, workspaceId, (tx) =>
+      readMembership(principalOf(workspaceId, stranger, "Editor"), tx),
+    );
+
+    expect(read).toEqual({
+      ok: true,
+      value: {
+        workspace: { id: workspaceId, name: "Trusted" },
+        person: { id: stranger, name: "Sam Okoro", email: "stranger@example.invalid" },
+        role: "Editor",
+      },
+    });
+  });
+
   it("hands a caller a store failure to read, and the aborted transaction never commits", async () => {
     const adminUserId = await seedUser();
     const door = openPostgres(db().runtimePool);
@@ -374,6 +519,31 @@ describe("reading the current membership", () => {
         read = await readMembership(principal, tx);
       }),
     ).rejects.toThrow(/did not commit/);
+
+    expect(read).toMatchObject({ ok: false, error: expect.any(Error) });
+  });
+
+  it("reads a failure of the person's row as the store's, never as a person who is not there", async () => {
+    // The two reads fail differently and must not answer alike: `no-such-person` is a
+    // session pointing at a row that is gone, and a caller shows a person the door over it.
+    const { door, workspaceId, adminUserId } = await provisionedWorkspace(db(), "Held");
+    const holder = await db().pool.connect();
+    let read: Awaited<ReturnType<typeof readMembership>> | undefined;
+
+    try {
+      // The workspace row still reads; the person's is behind a lock this transaction
+      // refuses to wait for, so the second statement is the one that fails.
+      await holder.query('BEGIN; LOCK TABLE "user" IN ACCESS EXCLUSIVE MODE');
+      await expect(
+        withScope(bootstrap, door, workspaceId, async (tx) => {
+          await tx.query("SET LOCAL lock_timeout = '200ms'");
+          read = await readMembership(principalOf(workspaceId, adminUserId, "Admin"), tx);
+        }),
+      ).rejects.toThrow(/did not commit/);
+    } finally {
+      await holder.query("ROLLBACK");
+      holder.release();
+    }
 
     expect(read).toMatchObject({ ok: false, error: expect.any(Error) });
   });
@@ -579,5 +749,58 @@ describe("the workspaces a person holds", () => {
       ok: false,
       error: "malformed",
     });
+  });
+});
+
+/**
+ * The result convention at each of the slice's seams (`kernel/result.ts`): a failure none of
+ * these acts has a word for comes back as the store's own Error — never a refusal word, an
+ * empty answer or a partial one, each of which a caller would read as a fact about the
+ * person. A closed pool is that failure, and it is also where "refused before any statement"
+ * becomes visible: an act that answers its own word through it never reached for one.
+ */
+describe("what the slice answers when the store cannot be reached", () => {
+  const at = new Date("2026-09-05T12:00:00Z");
+
+  it("hands back the store's Error from every act, rather than a word or a partial answer", async () => {
+    const door = await unreachableDoor();
+    const userId = ulid();
+    const answers: readonly (readonly [string, unknown])[] = [
+      ["revokeCredentials", await revokeCredentials(bootstrap, door, { userId, at })],
+      [
+        "revokeWorkspaceTokens",
+        await revokeWorkspaceTokens(bootstrap, door, { workspaceId: ulid(), userId, at }),
+      ],
+      ["workspacesHeldBy", await workspacesHeldBy(bootstrap, door, userId)],
+      ["workspaceIdBySlug", await workspaceIdBySlug(bootstrap, door, "acme")],
+    ];
+
+    for (const [name, answered] of answers) {
+      expect({ name, answered }).toEqual({
+        name,
+        answered: { ok: false, error: expect.any(Error) },
+      });
+    }
+  });
+
+  it("refuses an argument the boundary will not accept before it reaches for a statement", async () => {
+    const door = await unreachableDoor();
+
+    // Each answer is the act's own rather than the closed pool's, which is what says the
+    // refusal was made on the argument and no statement was ever opened for it.
+    expect(await revokeCredentials(bootstrap, door, { userId: "not-a-ulid", at })).toEqual({
+      ok: false,
+      error: "no-such-user",
+    });
+    expect(
+      await revokeWorkspaceTokens(bootstrap, door, { workspaceId: "not-a-ulid", userId: "x", at }),
+    ).toEqual({ ok: false, error: "malformed" });
+    expect(await workspacesHeldBy(bootstrap, door, "' OR true --")).toEqual({
+      ok: false,
+      error: "malformed",
+    });
+    // A slug the boundary will not accept answers `undefined` and never says why: the
+    // access request has to read the same either way (ADR 0038's neutral acknowledgement).
+    expect(await workspaceIdBySlug(bootstrap, door, "   ")).toEqual({ ok: true, value: undefined });
   });
 });

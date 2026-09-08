@@ -1,8 +1,8 @@
-import { ulid } from "@better-answers/schema";
+import { boundarySchemas, ulid } from "@better-answers/schema";
 import { type MigratedPostgres, testData } from "@better-answers/schema/testing";
 import type pg from "pg";
 
-import type { PlatformPrincipal } from "../src/kernel/index.ts";
+import type { PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres, type PostgresDoor } from "../src/store/postgres/index.ts";
 import { provisionWorkspace } from "../src/workspaces/index.ts";
 
@@ -16,6 +16,27 @@ export const bootstrap: PlatformPrincipal = {
   kind: "platform",
   actorId: "process:better-answers-bootstrap",
 };
+
+/**
+ * A Principal a credential would carry, for the cases the resolver cannot build one for:
+ * a workspace the transaction is not scoped to, or a workspace or person whose row is
+ * gone. Every suite that reaches for one names it here, so the shape is one fact.
+ *
+ * The ids come through the boundary, so the brands are earned rather than asserted — an
+ * id of another shape throws here, in the arrangement, rather than reaching the act.
+ */
+export const principalOf = (
+  workspaceId: string,
+  userId: string,
+  role: UserPrincipal["role"],
+): UserPrincipal => ({
+  kind: "user",
+  workspaceId: boundarySchemas.workspace.select.shape.id.parse(workspaceId),
+  userId: boundarySchemas.user.select.shape.id.parse(userId),
+  role,
+  groups: [],
+  credentialIssuedAtMs: Date.now(),
+});
 
 /** A workspace that exists, the door it was made through, and the Admin it was made for. */
 export type ProvisionedWorkspace = {
@@ -34,8 +55,9 @@ export type ProvisionedWorkspace = {
 export const provisionedWorkspace = async (
   db: MigratedPostgres,
   name: string,
+  admin?: PersonOverrides,
 ): Promise<ProvisionedWorkspace> => {
-  const adminUserId = await seedPerson(db.pool);
+  const adminUserId = await seedPerson(db.pool, admin);
   const door = openPostgres(db.runtimePool);
   const workspaceId = ulid();
   const made = await provisionWorkspace(bootstrap, door, {
@@ -48,11 +70,20 @@ export const provisionedWorkspace = async (
   return { door, workspaceId, adminUserId };
 };
 
-/** A person on the identity set, seeded as the superuser through the factory; their id. */
-export const seedPerson = async (pool: pg.Pool): Promise<string> => {
+/**
+ * What a suite may name about the person it seeds — the factory's own overrides, read off
+ * it rather than restated, so a column the factory gains is one this type gains too.
+ */
+export type PersonOverrides = Parameters<ReturnType<typeof testData>["user"]>[0];
+
+/**
+ * A person on the identity set, seeded as the superuser through the factory; their id.
+ * A suite names the fields it is going to assert on and leaves the rest to the factory.
+ */
+export const seedPerson = async (pool: pg.Pool, overrides?: PersonOverrides): Promise<string> => {
   const client = await pool.connect();
   try {
-    return (await testData(client).user()).id;
+    return (await testData(client).user(overrides)).id;
   } finally {
     client.release();
   }
