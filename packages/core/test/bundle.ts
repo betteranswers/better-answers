@@ -114,6 +114,15 @@ export const bundleHistory = async (
   return listed.split("\n").filter((sha) => sha !== "");
 };
 
+/**
+ * What the repository's *own* index holds — empty for every bundle the door has written,
+ * because a governed write stages in an index of its own and never the repository's.
+ */
+export const staged = async (door: GitDoor, workspaceId: string): Promise<readonly string[]> => {
+  const listed = await git(door, workspaceId, ["ls-files"]);
+  return listed.split("\n").filter((file) => file !== "");
+};
+
 /** Take a workspace's bundle away, for the tests about a repository that is not there. */
 export const removeRepository = (door: GitDoor, workspaceId: string): Promise<void> =>
   rm(path.join(door.root, `${workspaceId}.git`), { recursive: true, force: true });
