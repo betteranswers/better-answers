@@ -19,8 +19,8 @@ import { flagValues } from "./flags.ts";
  * file mutated the same way — two `""` mutants on two `"user"` literals — are told apart by
  * order, which is the one limitation, and the summary text says so.
  *
- * A `Survived` row with `testsCompleted: 0` is not a survivor: the runner resolved no test
- * file for it and ran nothing, which the coding rules' mutation-schedule rule calls a runner
+ * A `Survived` row with `testsCompleted: 0` is not a survivor: the runner ran no test
+ * against it, which the coding rules' mutation-schedule rule calls a runner
  * fault to fix where the runner failed (T-107). Those rows are named under their own
  * heading, and a baseline row of that shape is not a survivor either, so a mutant that ran
  * for the first time and survived is news — marked as one the baseline held no verdict on,
@@ -220,7 +220,7 @@ const ranNoTestLines = (leg: string, report: Report): readonly string[] => {
     .sort(byPlace);
   if (rows.length === 0) return [`### ${leg} mutants that ran no test: none`];
   return [
-    `### ${leg} mutants that ran no test: ${String(rows.length)} — the runner resolved no test file for them, which is a runner fault to fix (\`vitest.related\`, T-107), never a survivor to triage`,
+    `### ${leg} mutants that ran no test: ${String(rows.length)} — the runner resolved no test file for them, which is a runner fault to fix (the vitest-runner patch under \`patches/\`, T-107), never a survivor to triage`,
     ...rows.map((placed) => row(placed)),
   ];
 };

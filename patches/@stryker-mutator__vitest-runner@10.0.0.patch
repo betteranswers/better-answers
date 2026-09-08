@@ -1,0 +1,42 @@
+diff --git a/dist/src/vitest-test-runner.js b/dist/src/vitest-test-runner.js
+index 84f1ca026503b8e92b7adc952ec6c6a401943656..7d2f7d179e02d97b1af93fbf0a47748d64575c72 100644
+--- a/dist/src/vitest-test-runner.js
++++ b/dist/src/vitest-test-runner.js
+@@ -7,8 +7,10 @@ import { commonTokens, tokens, } from '@stryker-mutator/api/plugin';
+ import { DryRunStatus, toMutantRunResult, determineHitLimitReached, TestStatus, } from '@stryker-mutator/api/test-runner';
+ import { errorToString, escapeRegExp, normalizeFileName, notEmpty, testFilesProvided, } from '@stryker-mutator/util';
+ import { vitestWrapper } from './vitest-wrapper.js';
+-import { convertTestToTestResult, fromTestId, collectTestsFromSuite, normalizeCoverage, isErrorCodeError, VITEST_ERROR_CODES, } from './vitest-helpers.js';
++import { convertTestToTestResult, fromTestId, collectTestsFromSuite, normalizeCoverage, normalizeTestId, isErrorCodeError, VITEST_ERROR_CODES, } from './vitest-helpers.js';
+ const STRYKER_SETUP = fileURLToPath(new URL('./stryker-setup.js', import.meta.url));
++/** The name the patch above gives a test file's own failure to load (better-answers). */
++const FILE_FAILED_TO_LOAD = 'the test file failed to load';
+ export class VitestTestRunner {
+     log;
+     globalNamespace;
+@@ -177,6 +179,25 @@ export class VitestTestRunner {
+             failure ||= testResult.status === TestStatus.Failed;
+             return testResult;
+         });
++        // PATCHED (better-answers): a test file that failed before any of its tests ran — a
++        // module it imports threw while loading — has no test tasks, so the loop above reads
++        // it as nothing ran and the mutant that broke the import is reported as survived with
++        // testsCompleted: 0. Every test in that file would have failed; the file's own failure
++        // is one failed test here, named for the file, so the mutant is killed with the error
++        // it caused. The dry run reads it the same way and refuses to start.
++        for (const file of this.ctx.state.getFiles()) {
++            if (file.result?.state === 'fail' && collectTestsFromSuite(file).length === 0) {
++                failure = true;
++                testResults.push({
++                    id: normalizeTestId(`${file.filepath}#${FILE_FAILED_TO_LOAD}`),
++                    name: FILE_FAILED_TO_LOAD,
++                    timeSpentMs: file.result.duration ?? 0,
++                    fileName: path.resolve(file.filepath),
++                    status: TestStatus.Failed,
++                    failureMessage: file.result.errors?.[0]?.message ?? 'StrykerJS: the test file failed to load',
++                });
++            }
++        }
+         if (!failure && this.ctx.state.errorsSet.size > 0) {
+             const errorText = [...this.ctx.state.errorsSet]
+                 .map(errorToString)

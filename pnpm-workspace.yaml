@@ -22,3 +22,12 @@ allowBuilds:
 # current version deliberately, read from the registry on the day.
 minimumReleaseAgeExclude:
   - zod@4.5.4
+
+# A patch is a liability at every upgrade, so each one carries its reason here and the
+# ticket that would retire it. @stryker-mutator/vitest-runner: a test file that failed to
+# load — a mutant threw while a module it imports was loading — is read by 10.0.0 as no
+# tests run, and the mutant that broke the import is reported as survived with
+# testsCompleted: 0; the patch counts the file's failure as one failed test named for it
+# (T-107; both stryker.config.mjs files say more). Retired when the fix is upstream.
+patchedDependencies:
+  '@stryker-mutator/vitest-runner@10.0.0': patches/@stryker-mutator__vitest-runner@10.0.0.patch

@@ -7,7 +7,6 @@
   "exports": {
     "./jscpd": "./src/jscpd.ts",
     "./mutant-probe": "./src/mutant-probe.ts",
-    "./mutation-suite": "./src/mutation-suite.ts",
     "./mutation-summary": "./src/mutation-summary.ts",
     "./oxlint-config": "./src/oxlint-config.ts",
     "./throwaway-tree": "./src/throwaway-tree.ts"
@@ -21,6 +20,8 @@
   "devDependencies": {
     "@better-answers/devtools": "workspace:*",
     "@oxlint/plugins": "1.80.0",
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
     "@types/node": "24.13.3",
     "jscpd": "5.1.2",
     "knip": "6.34.0",

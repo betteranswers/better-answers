@@ -10,19 +10,20 @@
  *
  * @type {import("@stryker-mutator/api/core").PartialStrykerOptions}
  */
+// @ts-nocheck
+
 export default {
   testRunner: "vitest",
   plugins: ["@stryker-mutator/vitest-runner"],
-  // `related` off, for the reason recorded in full in apps/api/stryker.config.mjs (the
-  // runner's `related` filter, `vitest-test-runner.js` lines 129–132 and 139–142). This is
-  // the package where the lookup found nothing most: the declared-acts walk reaches every
-  // slice through `await import(/* @vite-ignore */ file)` (`test/audit.test.ts`), which the
-  // filter cannot see, so a module no other test imports statically ran no test — 30 rows
-  // `Survived` with `testsCompleted: 0` in run 34168928594, 192 in run 34263846345. Cost per
-  // mutant, job time over mutants tested: 1.3 s in run 34168928594 with the option on; the
-  // run with it off is recorded in T-107's Progress. The suite is the one
-  // `vitest.mutation.config.ts` shapes: every test file that reaches `src`.
-  vitest: { configFile: "vitest.mutation.config.ts", related: false },
+  // The runner is patched, for the reason recorded in full in apps/api/stryker.config.mjs:
+  // a mutant that throws while its module loads — `declareActs("")`, a family emptied — is
+  // read by the unpatched runner as a run of no tests and reported `Survived` with
+  // `testsCompleted: 0`; thirty rows here in run 34168928594, every one of that shape. The
+  // patch reports the file's failure to load as the kill it is. `vitest.related` stays on:
+  // vitest relates twelve test files to `store/graph/index.ts` and `audit/vocabulary.ts`
+  // (`vitest related`, run 09/09/2026), and the declared-acts walk's dynamic import is the
+  // one reach it cannot see, which the static importers cover.
+  vitest: { configFile: "vitest.config.ts" },
 
   // Everything under `src` is behaviour. Unlike a tier, this package has no process entry
   // point to leave out: nothing here starts a server or reads a bootstrap, which is what
@@ -33,9 +34,10 @@ export default {
   // `ignoreStatic` stays off, for the reason recorded in full in apps/api/stryker.config.mjs.
   // This package is where the option did the most harm: every module-scope mutant here is
   // covered by exactly one test, the declared-acts walk, which reaches every slice through a
-  // dynamic import vitest's `related` lookup cannot see — so with the option on, 192 mutants
-  // ran no test and read as survivors, most of them kills the whole suite had made a run
-  // earlier (run 34263846345 against 34168928594).
+  // dynamic import vitest's `related` lookup cannot see — so with the option on, the run for
+  // a hybrid mutant named that test and `related` dropped its file: 192 mutants ran no test
+  // and read as survivors, most of them kills the whole suite had made a run earlier (run
+  // 34263846345 against 34168928594).
 
   // In place rather than in Stryker's sandbox, for the reason recorded in full in
   // apps/api/stryker.config.mjs: the sandbox rewrites `extends` in the copied tsconfig

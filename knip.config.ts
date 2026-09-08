@@ -27,9 +27,6 @@ const config: KnipConfig = {
 
   workspaces: {
     "apps/api": {
-      // The mutation run's vitest config, named by `stryker.config.mjs`'s `vitest.configFile`
-      // — a string in a Stryker config, which knip's Stryker plugin does not follow.
-      entry: ["vitest.mutation.config.ts"],
       ignore: [
         // A verbatim third-party snapshot (ADR 0027): edited upstream and never here, which
         // is why it also sits outside this repository's linter, formatter and compiler.
@@ -56,8 +53,6 @@ const config: KnipConfig = {
     },
 
     "packages/core": {
-      // As under `apps/api`: named by `stryker.config.mjs`, an edge knip cannot see.
-      entry: ["vitest.mutation.config.ts"],
       ignore: [
         // The object-store door (ADR 0029): a module whose invariant is written down and
         // whose implementation has not landed. It is not exported from the store barrel,
@@ -77,7 +72,15 @@ const config: KnipConfig = {
       // jscpd is here because the runner finds its binary through the module graph from
       // this package (`executable: { package: "jscpd" }` in `src/jscpd.ts`), an edge knip
       // has no plugin to see; oxlint and knip are the same shape but each has a plugin.
-      ignoreDependencies: ["@better-answers/devtools", "jscpd"],
+      // Stryker and its vitest runner are here for the suite that runs the runner's patch
+      // (`patches/`) over a throwaway workspace by linking the two packages into it: reached
+      // by a symlink and a spawned binary, which is no edge in a module graph.
+      ignoreDependencies: [
+        "@better-answers/devtools",
+        "@stryker-mutator/core",
+        "@stryker-mutator/vitest-runner",
+        "jscpd",
+      ],
     },
   },
 };

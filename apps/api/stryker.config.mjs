@@ -6,20 +6,21 @@
 export default {
   testRunner: "vitest",
   plugins: ["@stryker-mutator/vitest-runner"],
-  // `related` off: with it on, the runner runs every mutant with vitest's `related` filter
-  // set to the mutated file (@stryker-mutator/vitest-runner 10.0.0,
-  // `dist/src/vitest-test-runner.js` lines 129–132 and 139–142, read 08/09/2026), so the
-  // test files that run are those which statically import that file. A module reached only
-  // through a re-export or a dynamic import — this tier's `mcp/entries/index.ts` — matches
-  // no test file, runs nothing, and is reported `Survived` with `testsCompleted: 0`: 9 such
-  // rows here in run 34168928594. Off, a covered mutant still runs only the test files its
-  // covering tests name (the per-test filter names them, lines 143–150), and a static mutant
-  // runs the whole suite, which is what the plan for it says — the suite as
-  // `vitest.mutation.config.ts` shapes it, without the test files that reach no `src`, since
-  // a docker build per static mutant is cost for a verdict it cannot give. Cost measured per
-  // mutant, job time over mutants tested: 1.7 s in run 34168928594 with the option on; the
-  // run with it off is recorded in T-107's Progress.
-  vitest: { configFile: "vitest.mutation.config.ts", related: false },
+  // A mutant that throws while its module loads — an emptied MCP entry name here, an
+  // emptied act family in packages/core — makes every test file importing it fail before
+  // one test runs, and @stryker-mutator/vitest-runner 10.0.0 reads a file with no test tasks
+  // as nothing ran (`dist/src/vitest-test-runner.js` lines 171–179, read 09/09/2026): the
+  // mutant is reported `Survived` with `testsCompleted: 0`, though every test would have
+  // failed. Nine such rows here and thirty in packages/core in run 34168928594, all of that
+  // shape (T-107). `patches/@stryker-mutator__vitest-runner@10.0.0.patch` — applied by pnpm
+  // through `pnpm-workspace.yaml` — counts a test file that failed to load as one failed
+  // test named for the file, so the mutant is killed with the error it caused and a dry run
+  // with such a file refuses to start. Per-mutant cost is unchanged: the same tests run.
+  // `vitest.related` stays on (the default): T-097 read it as the cause, and it is not —
+  // vitest relates fourteen test files to `mcp/entries/index.ts` (`vitest related`, run
+  // 09/09/2026) — and off, a static mutant pays every test file's setup (both legs past
+  // the two-hour timeout in run 34286280490).
+  vitest: { configFile: "vitest.config.ts" },
 
   // `main.ts` and `migrate.ts` are the tier's entry points, not its behaviour: they read the
   // bootstrap and hand off, and nothing crosses a seam a test could reach.
@@ -35,9 +36,8 @@ export default {
   // one with per-test coverage runs only its covering tests (lines 71–80) — so a mutant a
   // dynamic import made hybrid ran nothing at all. Run 34263846345 measured it: those 304
   // kills gone here, and 192 phantom survivors in packages/core where the run before had 30. The rows that motivated
-  // the option — `Survived` with `testsCompleted: 0` — are the vitest runner's `related`
-  // lookup finding no test file for a module only a re-export or a dynamic import reaches,
-  // and that is fixed where it lives, not by skipping the mutant (T-097's Progress).
+  // the option — `Survived` with `testsCompleted: 0` — are the runner reading a test file
+  // that failed to load as no tests run (the patch above), not a mutant to skip.
 
   // Stryker's sandbox copies the workspace to a temp directory and rewrites `extends` in the
   // copied tsconfig — but that rewrite calls `ts.parseConfigFileTextToJson`, which TypeScript 7
