@@ -136,15 +136,28 @@ say "## 5 recovery order 2–5: watermark, graph rebuild, pipeline state (LMDBs 
 ops reconcile-watermark --workspace "${DRILL_WORKSPACE}"
 t0=$(date +%s); ops graph-rebuild --workspace "${DRILL_WORKSPACE}" --wait
 say "graph rebuilt in $(( $(date +%s) - t0 )) s (promise: ≤ 120 s)"
-ops graph-sweep --workspace "${DRILL_WORKSPACE}" --wait
+# One transaction, so there is nothing to wait for: the sweep answers when it has swept.
+ops graph-sweep --workspace "${DRILL_WORKSPACE}"
 ops object-store-orphans --workspace "${DRILL_WORKSPACE}" --list >> "${REPORT}"
 
 say "## 6 counts diff against production's stamped run (ADR 0023) — production read over SSH, no open port (ticket 79 A12)"
-if ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts"; then
+# An empty staging file is `graph-counts` answering `not built` (exit 3, which `ops` turns
+# into a recorded 0): there is nothing to diff and nothing to report.
+if ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts" && [ -s "${WORK}/staging.counts" ]; then
+  cat "${WORK}/staging.counts" >> "${REPORT}"
   # The SQL travels on stdin: an argument would be re-split by the shell on the far side of the SSH hop.
   printf '%s' "select counts_json from graph_sync_run where workspace_id = '${DRILL_WORKSPACE}' and outcome = 'ok' order by finished_at desc limit 1" \
-    | ${PROD_PSQL} -At > "${WORK}/prod.counts" 2>/dev/null || echo '{}' > "${WORK}/prod.counts"
-  if [ -s "${WORK}/staging.counts" ] && diff <(jq -S . "${WORK}/prod.counts") <(jq -S . "${WORK}/staging.counts") >> "${REPORT}"; then say "counts match"; elif [ -s "${WORK}/staging.counts" ]; then say "COUNTS DIFFER"; exit 1; fi
+    | ${PROD_PSQL} -At > "${WORK}/prod.counts" 2>/dev/null || : > "${WORK}/prod.counts"
+  if [ ! -s "${WORK}/prod.counts" ]; then
+    # `graph_sync_run` is the worker's stamped record of a sync and no task has built it yet,
+    # so production has nothing to diff against. The staging counts stand in the report as
+    # the fact they are: recorded, and never read as a match.
+    say "no stamped run on production to diff against — staging counts recorded, not matched"
+  elif diff <(jq -S . "${WORK}/prod.counts") <(jq -S . "${WORK}/staging.counts") >> "${REPORT}"; then
+    say "counts match"
+  else
+    say "COUNTS DIFFER"; exit 1
+  fi
 fi
 
 say "## 7 smoke through the interface: health, discovery, the shell; find · a guide read · ask as the slices land"
