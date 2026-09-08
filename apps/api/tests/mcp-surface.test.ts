@@ -22,7 +22,7 @@ let app: TestApp;
 
 beforeAll(async () => {
   app = await startApp();
-}, 180_000);
+});
 
 afterAll(async () => {
   await app.stop();

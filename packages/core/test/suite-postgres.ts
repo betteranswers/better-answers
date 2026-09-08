@@ -23,14 +23,9 @@ import { openPostgres, withPrincipal, type Tx } from "../src/store/postgres/inde
 export const postgresForSuite = (): (() => MigratedPostgres) => {
   let db: MigratedPostgres | undefined;
 
-  // The allowance is a runaway guard, not a budget for the copy: it decides how long a
-  // wedged cluster hangs before Vitest calls it, and a healthy hook never approaches it.
-  // It stays at the container-start size because the opener still falls back to a container
-  // of its own wherever nothing provided a warm one, and that fallback is what needs the
-  // room — a first run on a machine with no image pulls it here.
   beforeAll(async () => {
     db = await openMigratedPostgres();
-  }, 120_000);
+  });
 
   afterAll(async () => {
     await db?.stop();
