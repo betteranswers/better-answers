@@ -1,0 +1,74 @@
+apps/api/tests/reconciler.test.ts
+  s_f34fe14b1ea788::t_30a989bfd03fc7 31-42,53,78
+  s_f34fe14b1ea788::t_a47c0bf39e1517 92,95,102-105
+packages/schema/src/concept-tables.ts
+  s_f34fe14b1ea788::t_52e07739a18c81 198-222
+apps/api/src/main.ts
+  s_f34fe14b1ea788::t_dae577ccf81267 76-77,82-87
+  s_f34fe14b1ea788::t_d915cd4d9e2ff9 78-81
+packages/core/src/concepts/index.ts
+  s_f34fe14b1ea788::t_c0c00d20b7baa8 407
+  s_f34fe14b1ea788::t_5f3139fda1addb 37
+  s_f34fe14b1ea788::t_f2788557ed6a34 598
+packages/core/src/concepts/landing.ts
+  s_f34fe14b1ea788::t_cdae4421298f85 395
+  s_f34fe14b1ea788::t_ba2b52c4dc5f2a 268-272
+  s_f34fe14b1ea788::t_63628aaeff84db 23,25
+apps/api/src/ops/index.ts
+  s_f34fe14b1ea788::t_930fba13e0f80b 65-68
+packages/core/src/answering/index.ts
+  s_f34fe14b1ea788::t_4d3bdcff9ede09 305-308
+docs/adr/0040-the-clock-is-a-kernel-value-the-api-constructs-once-at-boot-and-hands-to-every-act-that-reads-time-a-rows-own-timestamp-stays-the-databases-now-and-the-worker-is-handed-no-clock.md
+  s_f34fe14b1ea788::t_4b166ea835cb5a 69-70
+packages/core/test/access-requests.test.ts
+  s_f34fe14b1ea788::t_932f5a394b520a 7
+  s_f34fe14b1ea788::t_56785344ae87ab 273-274,277
+  s_f34fe14b1ea788::t_1cf555645b1d34 322-324
+packages/core/src/store/graph/index.ts
+  s_f34fe14b1ea788::t_d0cf51855a44b9 71-76,87
+  s_f34fe14b1ea788::t_360419a5b0b016 665,667-670
+  s_f34fe14b1ea788::t_1f07596a0488ee 389-391
+  s_f34fe14b1ea788::t_b20e6216d43f97 4
+apps/api/src/reconciler.ts
+  s_f34fe14b1ea788::t_2f1275060107f7 9-10
+  s_f34fe14b1ea788::t_825aa8af978328 83-90,93
+  s_f34fe14b1ea788::t_0ec1e1810ac982 138,143
+packages/core/src/concepts/reconciler.ts
+  s_f34fe14b1ea788::t_40fac7dee3bc23 312
+  s_f34fe14b1ea788::t_b3c73d0772eb31 338
+  s_f34fe14b1ea788::t_43c2554adc602a 354
+  s_f34fe14b1ea788::t_884e46398cbe63 229,233
+  s_f34fe14b1ea788::t_59dfce9237c914 33
+  s_f34fe14b1ea788::t_e9c3c4c3267101 211,217
+packages/core/src/store/postgres/index.ts
+  s_f34fe14b1ea788::t_7eed2cf4c8115c 377-381
+packages/core/test/graph.test.ts
+  s_f34fe14b1ea788::t_a0a1bbc8eba1d3 1
+  s_f34fe14b1ea788::t_ef9a0bf8e3f28d 304
+docs/research/t-009-survivor-triage.md
+  s_f34fe14b1ea788::t_3b3a41e8d29dcf 779-781
+  s_f34fe14b1ea788::t_b1fc5c4506cea0 420-422
+  s_f34fe14b1ea788::t_ce4b3b21780bb2 205
+packages/core/src/concepts/file.ts
+  s_f34fe14b1ea788::t_bc45a4140808ba 3
+  s_f34fe14b1ea788::t_36d6c36195a502 105
+  s_f34fe14b1ea788::t_666ffed956c7dd 149-165,167-168
+  s_f34fe14b1ea788::t_0017da6aac3c3c 86-87,96-100
+  s_f34fe14b1ea788::t_5e18584d617dde 83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "60a3aa58906e0ba5a99cb112c733502fb99263ff",
+  "prompts": {},
+  "sessions": {
+    "s_f34fe14b1ea788": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e15aef24-178a-41a4-8fe6-f8657414f765",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
