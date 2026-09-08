@@ -488,7 +488,14 @@ const reconcileWatermark = async (pool: Pool, workspaceId: string, io: OpsIo): P
     );
     return REFUSED;
   }
-  const doors = { git: openGit(io.gitStoreDir), postgres: openPostgres(pool) };
+  const git = openGit(io.gitStoreDir);
+  if (!git.ok) {
+    io.say(
+      `reconcile-watermark: REFUSED — the repositories' root is ${git.error} (GIT_STORE_DIR=${io.gitStoreDir})`,
+    );
+    return REFUSED;
+  }
+  const doors = { git: git.value, postgres: openPostgres(pool) };
   const run = await reconcile(RECONCILER, doors, { workspaceId });
   if (!run.ok) return refused("reconcile-watermark", workspaceId, run.error, io);
   const { head, watermark, replayed, skipped, stopped } = run.value;
