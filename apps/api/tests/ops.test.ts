@@ -2,7 +2,9 @@ import { serve } from "@hono/node-server";
 
 import { describe, expect, it } from "vitest";
 
-import { initRepository, openGit } from "@better-answers/core/store/git";
+import { writeConcept } from "@better-answers/core/concepts";
+import { head, initRepository, openGit } from "@better-answers/core/store/git";
+import { openPostgres, withPrincipal } from "@better-answers/core/store/postgres";
 import { testData } from "@better-answers/schema/testing";
 
 import { fetchHonouringHost } from "../src/ops/http-fetch.ts";
@@ -248,6 +250,63 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         "reconcile-watermark: done — head none, watermark none, replayed 0, already landed 0",
       ]);
+    });
+
+    it("is done — exit 0 — after replaying the commit a bundle's rows missed, and the concept's row has landed", async () => {
+      const { workspaceId, admin } = await app().provision();
+      const git = openGit(app().gitStoreDir);
+      await initRepository(git, workspaceId);
+      const principal = await withPrincipal(
+        openPostgres(app().database.pool),
+        { workspaceId, userId: admin.id, issuedAt: new Date() },
+        async (resolved) => resolved,
+      );
+      if (!principal.ok) throw new Error(`the principal did not resolve: ${principal.error}`);
+      // The crash window, as `packages/core/test/reconciler.test.ts` opens it: while the
+      // trigger stands, the act's commit lands and its rows do not — the restore path's shape.
+      const superuser = app().database.superuser;
+      await superuser.query(
+        `CREATE FUNCTION crash_in_the_window() RETURNS trigger LANGUAGE plpgsql AS $$
+           BEGIN RAISE EXCEPTION 'the process died between the commit and its rows'; END $$`,
+      );
+      await superuser.query(
+        "CREATE TRIGGER crash_in_the_window BEFORE INSERT ON bundle_commit FOR EACH ROW EXECUTE FUNCTION crash_in_the_window()",
+      );
+      try {
+        const lost = await writeConcept(
+          principal.value,
+          { git, postgres: openPostgres(app().database.pool) },
+          {
+            mergeKey: "note:restore-drill",
+            path: "knowledge/restore-drill.md",
+            kind: "Note",
+            title: "Restore drill",
+            frontmatter: { title: "Restore drill", type: "Note" },
+            body: "The rows are behind the bundle until the reconciler runs.",
+            message: "Record the restore drill note",
+            author: { name: admin.name, email: admin.email },
+            expects: { head: null },
+            status: "stable",
+          },
+        );
+        expect(lost.ok).toBe(false);
+      } finally {
+        await superuser.query("DROP TRIGGER crash_in_the_window ON bundle_commit");
+        await superuser.query("DROP FUNCTION crash_in_the_window()");
+      }
+      const sha = await head(principal.value, git);
+
+      const run = await ops(app(), ["reconcile-watermark", "--workspace", workspaceId]);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual([
+        `reconcile-watermark: done — head ${sha}, watermark none, replayed 1, already landed 0`,
+      ]);
+      const landed = await superuser.query<{ path: string; commit_sha: string }>(
+        "SELECT path, commit_sha FROM concept_index WHERE workspace_id = $1",
+        [workspaceId],
+      );
+      expect(landed.rows).toEqual([{ path: "knowledge/restore-drill.md", commit_sha: sha }]);
     });
   });
 
