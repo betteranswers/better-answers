@@ -4,6 +4,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   type ActorId,
   actorIdOf,
+  attempt,
   type PlatformPrincipal,
   refusalFor,
   requireAdmin,
@@ -13,8 +14,9 @@ import {
 /**
  * The kernel's vocabulary through the interface every slice reads it by
  * (`@better-answers/core/kernel`, `[TEST1]`): the actor a record names, the word a
- * role-guarded act refuses with, and the reading of a store's constraint names into a
- * slice's own words. All pure — no store, no container.
+ * role-guarded act refuses with, the one `try`/`catch` every slice entry point wraps its
+ * external library in, and the reading of a store's constraint names into a slice's own
+ * words. All pure — no store, no container.
  */
 
 /** The ids come through the boundary, so the brands are earned rather than asserted. */
@@ -69,6 +71,61 @@ describe("the guard on an act only an Admin may perform", () => {
 
   it("refuses a Viewer with that same word, so the two read alike to a caller", () => {
     expect(requireAdmin(person("Viewer"))).toEqual({ ok: false, error: "role-forbids" });
+  });
+});
+
+/**
+ * `attempt` is the one `try`/`catch` in the repository, so what a driver or an SDK raises
+ * has to come back as an Error whatever shape it was thrown in — a caller reads `.message`
+ * off the value it is handed and has nowhere else to look.
+ */
+describe("the one try/catch every slice entry point wraps its library in", () => {
+  /** The two fields a caller reads off the normalised Error, and whether it is one at all. */
+  const errorOfThrown = async (
+    thrown: unknown,
+  ): Promise<{ isError: boolean; message: string; cause: unknown }> => {
+    const answered = await attempt(async () => {
+      throw thrown;
+    });
+    if (answered.ok) throw new Error("attempt answered a value where the operation threw");
+    return {
+      isError: answered.error instanceof Error,
+      message: answered.error.message,
+      cause: answered.error.cause,
+    };
+  };
+
+  it("hands back the driver's own Error, so the class and the fields it carries survive", async () => {
+    // `refusalFor` reads `.constraint` off this very object, so the Error a slice sees has
+    // to be the one the driver threw and never a copy of its message.
+    const thrown = Object.assign(new TypeError("deadlock detected"), {
+      constraint: "member_pkey",
+    });
+
+    const answered = await attempt(async () => {
+      throw thrown;
+    });
+
+    expect(answered.ok).toBe(false);
+    expect(answered.ok ? undefined : answered.error).toBe(thrown);
+  });
+
+  it("turns a thrown string into an Error carrying it as the message", async () => {
+    expect(await errorOfThrown("the socket hung up")).toEqual({
+      isError: true,
+      message: "the socket hung up",
+      cause: undefined,
+    });
+  });
+
+  it("names what was thrown when it is neither an Error nor a string, and keeps it as the cause", async () => {
+    const thrown = { code: 42 };
+
+    expect(await errorOfThrown(thrown)).toEqual({
+      isError: true,
+      message: "non-Error thrown: [object Object]",
+      cause: thrown,
+    });
   });
 });
 
