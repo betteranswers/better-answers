@@ -167,6 +167,32 @@ describe("one run of check names every failure (T-068)", () => {
 });
 
 /**
+ * The gates a branch never narrows (`[CHECK9]`) are read off the root `check` line rather
+ * than listed in the rule: every step named ahead of `check:workspaces`. That reading only
+ * holds while the line keeps its shape — the whole-tree tools first, then the two tier
+ * steps — so the shape is what this pins, and the rule stays true the day a gate is added.
+ */
+describe("the gates a branch never narrows (T-099)", () => {
+  it("are the root check's own steps ahead of check:workspaces, each a tool over the whole tree", () => {
+    const scripts = scriptsOf(".");
+    const steps = stepsOf(scripts["check"] ?? "");
+    const tiers = steps.indexOf("check:workspaces");
+    const gates = steps.slice(0, tiers);
+
+    expect(gates.length, "the root check names no gate ahead of the tiers").toBeGreaterThan(0);
+    // A gate here runs one tool over the tree from the root: it recurses into no workspace
+    // and starts no Postgres, which is what lets a branch run it whatever suites it skips.
+    for (const gate of gates) {
+      expect(
+        scripts[gate],
+        `${gate} recurses into the workspaces, so it is not a root gate`,
+      ).not.toMatch(/pnpm -r|--filter|uv run/);
+    }
+    expect(steps.slice(tiers)).toEqual(["check:workspaces", "check:worker"]);
+  });
+});
+
+/**
  * The runner itself, over a throwaway manifest. Reading the manifests says the steps are
  * named; only running the runner says a failing step does not take the rest with it, and
  * that the command a person or CI waits on ends non-zero when any step failed — the

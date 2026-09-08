@@ -21,6 +21,13 @@ export default {
   mutate: ["src/**/*.ts"],
   coverageAnalysis: "perTest",
 
+  // A static mutant with no per-test coverage is `Ignored` rather than run against the whole
+  // suite and reported `Survived` with `testsCompleted: 0`, for the reason recorded in full in
+  // apps/api/stryker.config.mjs, read from @stryker-mutator/core 10.0.0's
+  // `dist/src/mutants/mutant-test-planner.js` lines 71–99 on 08/09/2026. The rows this
+  // package lost to that hole were its `declareActs` strings.
+  ignoreStatic: true,
+
   // In place rather than in Stryker's sandbox, for the reason recorded in full in
   // apps/api/stryker.config.mjs: the sandbox rewrites `extends` in the copied tsconfig
   // through a TypeScript 7 API that no longer exists, and without it Vite cannot resolve

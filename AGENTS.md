@@ -59,6 +59,10 @@ The five canonical roles, unrenamed — `needs-triage`, `needs-info`, `ready-for
 
 Single-context: one root `CONTEXT.md` and one `docs/adr/`. See `docs/agents/domain.md`.
 
+### Mutation triage
+
+A survivor is a hypothesis until a probe answers it: controls both ways, the whole suite, one waiter on a long run, staging by path. The method is `docs/agents/mutation-triage.md` — read it before touching a mutation report or a `src` file a report names.
+
 ### Code review
 
 Cubic reviews every PR and its findings are triaged through the `cubic` MCP on the PR threads, one commit per round, three rounds at most; GitNexus gates every edit and commit; the wiki orients and never decides. The loop is `docs/agents/code-review.md` — read it before opening a PR.

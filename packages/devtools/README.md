@@ -22,6 +22,11 @@ each with a built form that reads its reporter: `oxlintOver`, which the lint-rul
 `knipOver`, which reads knip's JSON report as a list of findings, and `jscpdOver`, from the
 module beside it. Imported through `@better-answers/devtools/throwaway-tree`.
 
+Beside the runner, for the tools whose subject is a git repository rather than a flat tree —
+the worktree provisioning stage, the mutant probe — `throwawayRepository`, `gitIn` and
+`writeUnder` make one, run git in it and write under it; the suite that uses them builds the
+commits, links and worktrees its case needs and keeps the runner's two fences by hand.
+
 A tool's binary is found through the module graph, and a package that withholds its own
 manifest from its `exports` map — knip does — is reached through its entry instead, so the
 resolution never becomes a guessed path. Every tool run this way is a devDependency of this
@@ -50,6 +55,15 @@ all, for the three suites that run oxlint over a throwaway tree under the *real*
 rather than a restatement of it. It is one reader rather than three because the
 comment-stripping is the part that would have gone wrong quietly. Imported through
 `@better-answers/devtools/oxlint-config`.
+
+`src/mutant-probe.ts` is the mutant probe behind `scripts/mutant-probe.mjs` (`pnpm
+mutant-probe --file … --line … --from … --to … [--suite …]`): one hand-applied mutation,
+pinned to the text on the line it names, run against the file's workspace suite, restored in
+a `finally` that an interrupt, a crashed suite and a thrown error all reach, then the `src`
+diff-stat against `HEAD`. It exists because two triage sessions restored on the happy path
+alone and left a mutant in `src` with the suite green. Its suite spawns the script over a
+throwaway git repository and interrupts it mid-run; `docs/agents/mutation-triage.md` is
+where the method that uses it is written.
 
 ## `lint-rules/` — the `better-answers` oxlint plugin
 
