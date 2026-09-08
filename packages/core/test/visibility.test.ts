@@ -11,6 +11,7 @@ import {
   writeConcept,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
+import { footnotesOf } from "../src/guides/index.ts";
 import { attempt, type UserPrincipal } from "../src/kernel/index.ts";
 import { narrowBinding } from "../src/sources/index.ts";
 import { bundleHistory } from "./bundle.ts";
@@ -283,6 +284,36 @@ describe("what a re-write may not do to the class a concept holds", () => {
     expect(byAudience).toEqual({ ok: false, error: "no-such-concept" });
     expect(byAdmin.ok).toBe(true);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(before.length + 1);
+  });
+
+  it("a re-write that narrows a concept takes its compositions with it, on the write road as on the narrowing's", async () => {
+    const scenario = await arrange();
+    const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
+    const composition = await compositionIncluding(scenario.workspaceId, [written.iri]);
+    const footnotes = () =>
+      reading(scenario.viewer, (viewer, tx) => footnotesOf(viewer, tx, composition));
+    expect(await footnotes()).toEqual({
+      ok: true,
+      value: [{ label: expect.any(String), iri: written.iri, title: written.title }],
+    });
+
+    const narrowed = await rewriteCiting(scenario, scenario.editor, written, [
+      restricted.documentId,
+    ]);
+
+    expect(narrowed.ok).toBe(true);
+    // The second level of the cascade ran in the write's own transaction: the composition's
+    // columns are its include's, and the Viewer loses the page as they do after a narrowing
+    // of the binding — nothing, not an empty list.
+    expect(await heldRow(scenario.workspaceId, written.iri)).toEqual({
+      sensitivity: "Restricted",
+      ...EVERYONE,
+    });
+    expect(
+      await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
+    ).toEqual({ sensitivity: "Restricted", ...EVERYONE });
+    expect(await footnotes()).toEqual({ ok: true, value: undefined });
   });
 });
 

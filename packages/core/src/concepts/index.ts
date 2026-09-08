@@ -26,6 +26,7 @@ import {
   sensitivityAndAudienceClause,
   visibilityOf,
   widens,
+  type Visibility,
 } from "../access/index.ts";
 import { act, declareActs, eventsOfAct, record } from "../audit/index.ts";
 import {
@@ -60,6 +61,7 @@ import {
   type Committed,
   type GitDoor,
 } from "../store/git/index.ts";
+import { recomputeCompositionsIncluding } from "../guides/index.ts";
 import { writeConceptDelta } from "../store/graph/index.ts";
 import { withMembership, withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { workspaceIds } from "../workspaces/index.ts";
@@ -706,6 +708,12 @@ const heldByIri = async (principal: Principal, tx: Tx, iri: string): Promise<Hel
       };
 };
 
+/** Whether two visibilities are one: the same class, the same word, the same groups in the same order. */
+const sameVisibility = (one: Visibility, other: Visibility): boolean =>
+  one.sensitivity === other.sensitivity &&
+  one.audience === other.audience &&
+  (one.audienceGroups ?? []).join(" ") === (other.audienceGroups ?? []).join(" ");
+
 /** The pair a concept holds, read as a `Visibility` — the fallback a re-write's derivation rests on. */
 const heldVisibilityOf = (held: Held) =>
   visibilityOf({
@@ -1061,7 +1069,11 @@ type Landing = z.infer<typeof conceptRow> & {
  * audience are derived from the bindings of what the concept cites (`visibility.ts`; ADR
  * 0023, ADR 0039): the parsed row's pair is the fallback, and what lands is the derivation
  * — on the index row and on the map's copies of it alike, in this one transaction, so a
- * concept is never readable for an instant at a class its evidence does not allow.
+ * concept is never readable for an instant at a class its evidence does not allow. And
+ * when the derivation moves the pair off what the row held, the cascade's second level runs
+ * here as it runs inside a narrowing: every composition including this concept is
+ * re-derived in the same transaction, so a re-write that narrows a concept never leaves a
+ * guide page wider than what it includes.
  */
 const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<void> => {
   // The identity first: the index row's composite key points at it, and a merge key that
@@ -1089,15 +1101,16 @@ const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<v
   if (index.evidence !== undefined) {
     await replaceCitations(tx, index.workspaceId, index.iri, index.evidence);
   }
+  const held = visibilityOf({
+    sensitivity: index.sensitivity,
+    audience: index.audience,
+    audience_groups: index.audienceGroups ?? null,
+  });
   const visibility = await conceptVisibilityFrom(tx, {
     workspaceId: index.workspaceId,
     iri: index.iri,
     kind: index.kind,
-    fallback: visibilityOf({
-      sensitivity: index.sensitivity,
-      audience: index.audience,
-      audience_groups: index.audienceGroups ?? null,
-    }),
+    fallback: held,
   });
   await tx.query(
     `INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter, body,
@@ -1149,6 +1162,15 @@ const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<v
     ...visibility,
     status: index.status,
   });
+  // The cascade's second level, when the pair moved: a composition's columns are the most
+  // restrictive of its includes, and an include that just narrowed narrows it now, in this
+  // transaction — the same rule the narrowing act runs (ADR 0023, ADR 0039).
+  if (!sameVisibility(held, visibility)) {
+    await recomputeCompositionsIncluding(principal, tx, {
+      workspaceId: index.workspaceId,
+      iris: [index.iri],
+    });
+  }
   if (index.acceptance === undefined) return;
 
   // The suggestion's decision, in the same transaction as the rows its acceptance wrote:
