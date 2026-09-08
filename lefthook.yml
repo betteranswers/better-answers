@@ -31,28 +31,10 @@ pre-commit:
   parallel: true
 
   commands:
-    # One branch per task. The hook holds the rule so memory does not have to.
-    refuse-main:
-      run: |
-        if [ "$(git symbolic-ref --short HEAD)" = "main" ]; then
-          echo "refusing: commit on main. Branch for the task, then commit."
-          echo "If you truly mean it: LEFTHOOK_EXCLUDE=refuse-main git commit …"
-          exit 1
-        fi
-
     # The formatter writes, and `stage_fixed` puts what it wrote into the commit — so a
     # formatting-only CI failure cannot happen and no second commit is needed to fix it.
     #
-    # No glob on purpose. oxfmt reaches further than JavaScript and TypeScript — css, json,
-    # markdown and yaml are all in its hands — and `.oxfmtrc.json` is where this repository
-    # says which of those it wants. A glob here would be a second answer to that question,
-    # free to drift from the one `pnpm format:check` uses in CI; that drift is how a commit
-    # passes the hook and fails the run.
-    #
     # `--no-error-on-unmatched-pattern` is what makes handing over the whole staged set safe.
-    # Without it oxfmt exits 2 on "all matched files were excluded by ignore rules", so a
-    # commit of nothing but markdown, Python or yaml — a docs commit, a worker commit — would
-    # be refused by the formatter for having nothing to format.
     oxfmt:
       run: pnpm exec oxfmt --no-error-on-unmatched-pattern {staged_files}
       stage_fixed: true

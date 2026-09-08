@@ -71,25 +71,22 @@ const declaredBinary = (packageName: string): string => {
  *
  * - `npm` — a package this repository declares, resolved through the module graph;
  * - `uv` — reached through the worker's runner, which the shell must be able to find;
- * - `guarded` — not ours to install, so what is proved is the skip, not the binary;
- * - `shell` — no tool at all, just git and the shell.
+ * - `guarded` — not ours to install, so what is proved is the skip, not the binary.
  */
 type Proof =
   | { readonly kind: "npm"; readonly package: string }
   | { readonly kind: "uv" }
-  | { readonly kind: "guarded"; readonly binary: string }
-  | { readonly kind: "shell" };
+  | { readonly kind: "guarded"; readonly binary: string };
 
 /**
  * Every command the hook runs, its glob and how its tool is proved — one fact in one place.
- * The keys are checked against the file both ways, so a seventh command cannot arrive
+ * The keys are checked against the file both ways, so a sixth command cannot arrive
  * without a line here, and a line here cannot outlive the command it describes
  * (`[TEST7]`, in the small). `glob: undefined` is a claim like any other: oxfmt takes the
- * whole staged set on purpose, and refuse-main is about the branch, not the files.
+ * whole staged set on purpose.
  */
 const HOOK: Readonly<Record<string, { readonly glob: string | undefined; readonly proof: Proof }>> =
   {
-    "refuse-main": { glob: undefined, proof: { kind: "shell" } },
     oxfmt: { glob: undefined, proof: { kind: "npm", package: "oxfmt" } },
     oxlint: { glob: "*.{ts,tsx}", proof: { kind: "npm", package: "oxlint" } },
     "ruff-format": { glob: "*.py", proof: { kind: "uv" } },
@@ -119,9 +116,6 @@ const guardedCommands = (): readonly (readonly [string, string])[] =>
     proof.kind === "guarded" ? [[name, proof.binary] as const] : [],
   );
 
-const shellCommands = (): readonly string[] =>
-  Object.entries(HOOK).flatMap(([name, { proof }]) => (proof.kind === "shell" ? [name] : []));
-
 describe("the pre-commit hook (T-070)", () => {
   it("runs exactly the commands this test knows how to prove", () => {
     expect(Object.keys(commands()).sort()).toEqual(Object.keys(HOOK).sort());
@@ -129,13 +123,6 @@ describe("the pre-commit hook (T-070)", () => {
 
   it("runs its commands in parallel, so the slowest one sets the wait", () => {
     expect(preCommit().parallel).toBe(true);
-  });
-
-  it("refuses a commit on main, the one-branch-per-task rule held by the hook", () => {
-    const run = runOf("refuse-main");
-    expect(run).toContain("git symbolic-ref --short HEAD");
-    expect(run).toContain("main");
-    expect(run).toContain("exit 1");
   });
 
   it.each(Object.keys(HOOK))("runs `%s` over the files it says it does", (command) => {
@@ -154,22 +141,6 @@ describe("the pre-commit hook (T-070)", () => {
   it("lets oxfmt take the whole staged set, and pass when none of it is its to format", () => {
     expect(existsSync(path.join(repositoryRoot, ".oxfmtrc.json"))).toBe(true);
     expect(runOf("oxfmt")).toContain("--no-error-on-unmatched-pattern");
-  });
-
-  /**
-   * The branch guard has to hold on a machine where nothing else is installed yet — a clone
-   * whose `pnpm install` has not finished is exactly when someone commits to main by mistake.
-   */
-  it.each(shellCommands())("needs nothing but git and the shell to run `%s`", (command) => {
-    const run = runOf(command);
-    expect(run).toContain("git ");
-    for (const tool of ["pnpm", "uv", "node", "npx"]) {
-      expect({ command, tool, named: run.includes(tool) }).toEqual({
-        command,
-        tool,
-        named: false,
-      });
-    }
   });
 
   it.each(npmCommands())(
