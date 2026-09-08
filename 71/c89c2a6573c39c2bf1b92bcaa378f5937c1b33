@@ -1,0 +1,25 @@
+CODING_RULES.md
+  s_4f5bb836dc20b6::t_e80f90dcf501f2 55
+packages/devtools/test/mutation-suite.test.ts
+  s_4f5bb836dc20b6::t_e80f90dcf501f2 5,7,70-85
+packages/devtools/src/mutation-summary.ts
+  s_4f5bb836dc20b6::t_e80f90dcf501f2 193,197
+.github/workflows/mutation.yml
+  s_4f5bb836dc20b6::t_e80f90dcf501f2 77-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "71c89c2a6573c39c2bf1b92bcaa378f5937c1b33",
+  "prompts": {},
+  "sessions": {
+    "s_4f5bb836dc20b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f4edcf7d-f3b0-4034-8352-9ad561fda719",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
