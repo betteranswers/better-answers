@@ -12,7 +12,7 @@ Three tools touch review here. Each has one job; the loop below is how a build s
 
 Cubic reads `cubic.yaml` from `main` only, so the PR that changes it is reviewed under the old config.
 
-1. **Before pushing** — `cubic review -b` on the branch. It is a faster, shallower pass than the PR review; fix what it finds so the PR review starts from a cleaner diff.
+1. **Before pushing** — `cubic review -b` on the branch. **[Skip until further notice: the CLI answers `Subscription expired`; record the step as skipped in the PR body.]** It is a faster, shallower pass than the PR review; fix what it finds so the PR review starts from a cleaner diff.
 2. **Push, open the PR, wait** for Cubic's first review. Then `get_pr_issues` — never read the findings from the GitHub comments by hand.
 3. **Triage every finding in one pass**, then fix in **one commit**. Each finding gets exactly one `update_pr_issue_status`:
    - `resolved` after the fix is pushed;
