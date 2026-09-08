@@ -221,7 +221,8 @@ export const enqueueJob = async (
   // happening and nothing else carries a reason. The type says so already, but a transport
   // parses a request into this input and a refusal is a word a caller can act on, where the
   // row's constraint is an aborted transaction somebody has to read the SQL to understand.
-  if ((input.kind === FULL_REBUILD_KIND) !== ("reason" in input && input.reason !== undefined)) {
+  const saysWhy = "reason" in input;
+  if ((input.kind === FULL_REBUILD_KIND) !== saysWhy) {
     return err("malformed");
   }
 

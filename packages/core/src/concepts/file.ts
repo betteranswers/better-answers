@@ -251,7 +251,9 @@ const listItemsOf = (
       continue;
     }
     const entry: Record<string, string | number | boolean | null> = {};
-    while (field !== undefined) {
+    // The loop leaves by `break` at the end of the item or by `return` on a malformed pair; a
+    // `field` that could be undefined here would be a guard the branch above already made.
+    for (;;) {
       const value = field.rest === undefined ? undefined : scalarOf(field.rest);
       if (value === undefined) return undefined;
       entry[field.key] = value;
