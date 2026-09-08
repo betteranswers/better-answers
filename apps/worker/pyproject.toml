@@ -69,6 +69,12 @@ xfail_strict = true
 # leg rejoins the schedule with it.
 # `check.py` is the check runner script, not tier behaviour — the same reason `apps/api`
 # leaves `main.ts` and `migrate.ts` out of Stryker's `mutate`.
+# One thing to settle before the leg rejoins the schedule: `tests/` below selects the whole
+# suite for every mutant, and `tests/test_image.py` builds the worker image. The TypeScript
+# side has the same hazard and escapes it because Stryker filters a static mutant to the
+# tests that cover something and an image probe covers nothing (`apps/api/tests/image-probe.ts`);
+# mutmut has no such filter, so this selection needs `--deselect tests/test_image.py`, or
+# the image probe wants a marker mutmut's selection excludes.
 [tool.mutmut]
 source_paths = ["src/better_answers_worker"]
 do_not_mutate = ["src/better_answers_worker/check.py"]

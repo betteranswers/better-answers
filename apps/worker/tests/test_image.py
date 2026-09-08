@@ -41,6 +41,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKSPACE = REPO_ROOT / "apps" / "worker"
 BUILD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "build.yml"
+CHECK_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "check.yml"
 STORES_COMPOSE = REPO_ROOT / "deploy" / "stores.compose.yaml"
 
 #: Where ``COPY src src`` puts this tier's source, and the one directory beside it that
@@ -88,7 +89,8 @@ DAEMON_IS_REQUIRED = os.environ.get("CI", "") != ""
 # would build the image a second time on a second runner to learn what the first already
 # knows. Exactly ``"true"`` and nothing looser: a value nobody meant to set leaves the
 # probe running, which is the direction a mistake here has to fail in.
-PROBE_RUNS_IN_THE_JOB_THAT_PUSHES = os.environ.get("IMAGE_PROBE_DEFERRED") == "true"
+PROBE_DEFERRAL_VARIABLE = "IMAGE_PROBE_DEFERRED"
+PROBE_RUNS_IN_THE_JOB_THAT_PUSHES = os.environ.get(PROBE_DEFERRAL_VARIABLE) == "true"
 
 #: The name the image id arrives under, shared with the api's and the backup's probes so
 #: `build.yml`'s probe step can hand every leg its id without naming a tier.
@@ -146,10 +148,31 @@ def matrix_leg(tier: str) -> dict[str, str]:
     raise RuntimeError(message)
 
 
-def _pyproject() -> dict[str, Any]:
+def _pyproject_at(*path: str) -> object:
+    """The value at a path in ``pyproject.toml``, unnarrowed.
+
+    ``tomllib`` answers ``dict[str, Any]`` and can answer nothing narrower, so this
+    claims nothing about what it found. Its callers narrow with ``isinstance`` and
+    refuse what they cannot use, which is § TYPES (Python)'s review question answered
+    rather than an ``Any`` handed on.
+    """
     with (WORKSPACE / "pyproject.toml").open("rb") as handle:
-        loaded: dict[str, Any] = tomllib.load(handle)
-    return loaded
+        found: object = tomllib.load(handle)
+    for step in path:
+        if not isinstance(found, dict):
+            message = f"pyproject.toml has no table at {'.'.join(path)}"
+            raise RuntimeError(message)
+        found = found[step]
+    return found
+
+
+def _requirements(*path: str) -> list[str]:
+    """A requirement list out of ``pyproject.toml``, refusing anything that is not."""
+    found = _pyproject_at(*path)
+    if not isinstance(found, list):
+        message = f"pyproject.toml's {'.'.join(path)} is not a list of requirements"
+        raise RuntimeError(message)
+    return [str(each) for each in found]
 
 
 def _distribution_name(requirement: str) -> str:
@@ -169,11 +192,12 @@ def development_only_distributions() -> list[str]:
     runtime one: a name under both is in the image on purpose, and asserting its absence
     would be asserting a bug.
     """
-    project = _pyproject()
     development = {
-        _distribution_name(each) for each in project["dependency-groups"]["dev"]
+        _distribution_name(each) for each in _requirements("dependency-groups", "dev")
     }
-    runtime = {_distribution_name(each) for each in project["project"]["dependencies"]}
+    runtime = {
+        _distribution_name(each) for each in _requirements("project", "dependencies")
+    }
     return sorted(development - runtime)
 
 
@@ -186,7 +210,8 @@ def pinned_python_version() -> tuple[int, int]:
 
 def required_python_floor() -> tuple[int, int]:
     """The version ``requires-python``'s lower bound names."""
-    floor = re.search(r">=\s*(\d+)\.(\d+)", _pyproject()["project"]["requires-python"])
+    declared = _pyproject_at("project", "requires-python")
+    floor = re.search(r">=\s*(\d+)\.(\d+)", str(declared))
     if floor is None:
         message = "pyproject.toml's requires-python has no lower bound this can read"
         raise RuntimeError(message)
@@ -238,9 +263,11 @@ def chowned_worker_uid() -> int:
 
 
 # Read inside the container by the image's own interpreter, so every answer means what
-# it means to the process the deploy unit starts. A distribution rather than an import
-# is what is asked of the development list: `uv sync` installs distributions, and a name
-# that imports under something else would still be bytes nobody patches.
+# it means to the process the deploy unit starts. The development list is asked both
+# ways and a name counts as present under either: the criterion is what the app could
+# *import*, and `uv sync` installs *distributions* — a distribution whose module is
+# named something else is still bytes nobody patches, and a module importable without a
+# distribution record is still an install that stopped being production-only.
 PROBE = """
 import importlib, json, os, sys
 from importlib import metadata
@@ -261,7 +288,9 @@ def imports(name):
 
 sys.stdout.write(json.dumps({
     "development": [
-        n for n in json.loads(os.environ["PROBE_DEVELOPMENT"]) if installed(n)
+        n
+        for n in json.loads(os.environ["PROBE_DEVELOPMENT"])
+        if installed(n) or imports(n)
     ],
     "version": list(sys.version_info[:3]),
     "base_prefix": sys.base_prefix,
@@ -285,6 +314,9 @@ class ImageContents:
 
 
 def _read_contents(stdout: str) -> ImageContents:
+    # The container's answer, narrowed on the very next statement and never held as
+    # `Any` past it: what a subprocess wrote to stdout has no type until this reads one
+    # out of it (§ TYPES (Python)).
     answered: dict[str, Any] = json.loads(stdout)
     major, minor, patch = answered["version"]
     return ImageContents(
@@ -420,6 +452,31 @@ def test_the_image_leaves_this_tiers_tests_out_of_the_runtime(
     contents: ImageContents,
 ) -> None:
     assert contents.has_tests is False
+
+
+def test_this_tier_reads_the_names_the_workflows_actually_hand_it() -> None:
+    """The two variables above are the app tier's to define and this tier's to obey.
+
+    This tier shares four stores with that one and never code (ADR 0005), so no import
+    can hold the two spellings together and each is a second pin. They are held against
+    the workflows that supply them instead, which is the shape `[DEPS2]` names and the
+    one ``pg_harness.py`` uses for ``POSTGRES_IMAGE``. Without this, renaming either
+    variable leaves this file building an image of its own and calling it the shipped
+    one, green.
+    """
+    handed = [
+        line
+        for line in BUILD_WORKFLOW.read_text("utf-8").splitlines()
+        if re.search(rf"\b{IMAGE_ID_VARIABLE}:.*outputs\.imageid", line)
+    ]
+    deferred = [
+        line
+        for line in CHECK_WORKFLOW.read_text("utf-8").splitlines()
+        if f"{PROBE_DEFERRAL_VARIABLE}:" in line
+    ]
+
+    assert len(handed) == 1, BUILD_WORKFLOW
+    assert len(deferred) == 1, CHECK_WORKFLOW
 
 
 def test_the_worker_leg_of_the_image_job_names_this_file_as_its_probe() -> None:

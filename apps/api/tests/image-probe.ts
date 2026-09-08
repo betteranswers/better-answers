@@ -39,6 +39,9 @@ const dockerIsAvailable = async (): Promise<boolean> => {
     await run("docker", ["info", "--format", "{{.ServerVersion}}"], { timeout: 20_000 });
     return true;
   } catch {
+    // Every way of not having a daemon arrives here as one rejection — no binary, no
+    // socket, a daemon still starting — and the difference between them changes nothing
+    // downstream: the next question is whether `CI` is set, not which of the three it was.
     return false;
   }
 };
@@ -95,11 +98,24 @@ export interface ContainerRun {
   readonly environment?: Readonly<Record<string, string>>;
 }
 
+/** A cold build of the largest image here, with room for a base-image pull. */
+const BUILD_ALLOWANCE = 900_000;
+/** One container, started and read. */
+const CONTAINER_ALLOWANCE = 120_000;
+
+/**
+ * What a probe's `beforeAll` needs: a build, a container and the removal of an untagged
+ * image. Named here because it is the sum of the two above, and `apps/api`'s global
+ * `hookTimeout` is a runaway guard for hooks that open a database — it cannot cover this
+ * and a probe that leaned on it would be timed out by somebody else's budget.
+ */
+export const IMAGE_PROBE_ALLOWANCE = BUILD_ALLOWANCE + CONTAINER_ALLOWANCE;
+
 const buildTheImage = async (image: ImageUnderTest): Promise<string> => {
   const built = await run(
     "docker",
     ["build", "--quiet", "--file", image.dockerfile, image.context],
-    { cwd: repositoryRoot, timeout: 900_000, maxBuffer: 64 * 1024 * 1024 },
+    { cwd: repositoryRoot, timeout: BUILD_ALLOWANCE, maxBuffer: 64 * 1024 * 1024 },
   );
   return built.stdout.trim();
 };
@@ -143,7 +159,7 @@ export const readTheImage = async (
         builtHere ?? supplied,
         ...container.command,
       ],
-      { timeout: 120_000, env: { ...process.env, ...environment } },
+      { timeout: CONTAINER_ALLOWANCE, env: { ...process.env, ...environment } },
     );
     return stdout;
   } finally {
@@ -151,7 +167,7 @@ export const readTheImage = async (
     // run whose source differed from the last. Failure to remove it is not a failure of
     // the suite: another run may hold the same id.
     if (builtHere !== undefined) {
-      await run("docker", ["rmi", "--force", builtHere], { timeout: 120_000 }).catch(
+      await run("docker", ["rmi", "--force", builtHere], { timeout: CONTAINER_ALLOWANCE }).catch(
         () => undefined,
       );
     }
@@ -204,7 +220,15 @@ const buildWorkflowSchema = z.object({
   }),
 });
 
-export const buildWorkflow = () => readWorkflow("build.yml", buildWorkflowSchema);
+/**
+ * Parsed once per process. The four readers below are four questions about one file, and
+ * `build.yml` cannot change under a single `vitest` run; re-reading it per question made
+ * `legFor`'s own failure message parse it a second time to say what the matrix does have.
+ */
+let parsed: z.infer<typeof buildWorkflowSchema> | undefined;
+
+export const buildWorkflow = (): z.infer<typeof buildWorkflowSchema> =>
+  (parsed ??= readWorkflow("build.yml", buildWorkflowSchema));
 export const imageJob = () => buildWorkflow().jobs.image;
 export const matrixLegs = (): readonly MatrixLeg[] => imageJob().strategy.matrix.include;
 

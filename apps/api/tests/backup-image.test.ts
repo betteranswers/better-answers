@@ -8,6 +8,7 @@ import { POSTGRES_IMAGE } from "@better-answers/schema";
 
 import {
   fileFromTheWorkspace,
+  IMAGE_PROBE_ALLOWANCE,
   legFor,
   nothingToProbeHere,
   readTheImage,
@@ -25,14 +26,13 @@ import {
  * for a reader who relies on it. So the text half stays there and the built half is here,
  * and each names the other.
  *
- * **Why it is probed rather than declined.** `T-084` offered the decline as a real option
- * on the grounds that this is the least cacheable build in the repository — `apt-get
- * update`, an rclone zip from downloads.rclone.org and an age tarball from GitHub
- * releases, all over the network — and that on a laptop with no cache that is minutes.
- * Measured on 08/09/2026 (Docker 29.4.0, arm64, `--no-cache`) it is **16.9 seconds**, and
- * its base image is `POSTGRES_IMAGE` itself: the one image every Testcontainers test in
- * this repository already pulls, so no machine that has run `check` once pays for it
- * twice. The premise the decline rested on is not true, so the image is read.
+ * **What probing it costs, since that is the argument against.** This is the least
+ * cacheable build in the repository: `apt-get update`, an rclone zip from
+ * downloads.rclone.org and an age tarball from GitHub releases, all over the network at
+ * build time. Cold and uncached it measured 16.9s on a laptop (08/09/2026, Docker 29.4.0,
+ * arm64), and its base image is `POSTGRES_IMAGE` — the one image every Testcontainers test
+ * already pulls, so a machine that has run `check` once pays no pull for it. That is what
+ * `check` pays to hold the two claims below; T-084's Progress carries the measurement.
  *
  * **What it catches that the build does not.** Most of this image arrives through commands
  * that fail loudly — a missing apt package, a zip whose glob matches nothing, a tar member
@@ -111,8 +111,13 @@ type ImageContents = z.infer<typeof contentsSchema>;
  * Read by the image's own shell. Tab-separated lines rather than JSON: the container has
  * no interpreter that builds JSON without one of the tools under test, and a probe that
  * asked `jq` to report whether `jq` is there would answer its own question.
+ *
+ * `String.raw` so that `\t` and `\n` reach `printf` as the two characters it interprets.
+ * A plain template literal turns them into a real tab and a real newline before `sh` ever
+ * sees them, and the format string then only survives because the newline happens to fall
+ * inside a single-quoted word — a property of this text rather than of the code.
  */
-const probe = `
+const probe = String.raw`
 printf 'pgDump\t%s\n' "$(pg_dump --version 2>&1)"
 for tool in ${REQUIRED_TOOLS.join(" ")}; do
   printf 'resolved\t%s\t%s\n' "$tool" "$(command -v "$tool" || echo '')"
@@ -158,10 +163,7 @@ describe.skipIf(nothingToProbeHere)("the backup image", () => {
         { command: ["sh", "-c", probe], environment: { PROBE_SCRIPT: scriptPath() } },
       ),
     );
-    // The build's own allowance plus the container's, in one hook: this image downloads
-    // two releases at build time and `apps/api`'s global `hookTimeout` is a runaway guard
-    // for hooks that open a database.
-  }, 1_020_000);
+  }, IMAGE_PROBE_ALLOWANCE);
 
   it("answers with a `pg_dump` of the database's own major version, so a restore is never refused", () => {
     // The failure this exists for is silent until the day of a restore: `pg_dump` refuses
@@ -185,6 +187,9 @@ describe.skipIf(nothingToProbeHere)("the backup image", () => {
     // beside it would be half an image (`deploy/backup.Dockerfile`, ADR 0022).
     expect(contents.scriptIsThere).toBe(true);
     expect(contents.scriptIsExecutable).toBe(true);
+    // `every` over nothing is true, and an image with no cron file at all would otherwise
+    // satisfy the line below rather than fail it.
+    expect(contents.cronEntries.length).toBeGreaterThan(0);
     expect(contents.cronEntries.every((entry) => entry.includes(scriptPath()))).toBe(true);
   });
 
