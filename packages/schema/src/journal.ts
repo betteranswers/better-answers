@@ -14,10 +14,18 @@ const migrationsFolder = fileURLToPath(new URL("../migrations", import.meta.url)
  */
 
 const journalSchema = z.object({
-  entries: z.array(z.object({ tag: z.string() })),
+  entries: z.array(z.object({ tag: z.string(), when: z.number().int() })),
 });
 
-export const journalEntries = (): readonly { readonly tag: string }[] =>
+/**
+ * One journal entry as everything here reads one: the tag, which names the file, and
+ * `when`, which is the value drizzle's migrator writes into `created_at` on the stamp row.
+ * The tag never reaches that table, so `when` is the only fact the two halves share — which
+ * is why the worker's schema stamp is checked against it (`[WRK1]`).
+ */
+export type JournalEntry = { readonly tag: string; readonly when: number };
+
+export const journalEntries = (): readonly JournalEntry[] =>
   journalSchema.parse(
     JSON.parse(readFileSync(path.join(migrationsFolder, "meta", "_journal.json"), "utf8")),
   ).entries;
@@ -25,8 +33,11 @@ export const journalEntries = (): readonly { readonly tag: string }[] =>
 export const journalMigrationFiles = (): readonly string[] =>
   journalEntries().map((entry) => path.join(migrationsFolder, `${entry.tag}.sql`));
 
-export const lastMigrationTag = (): string => {
+/** The migration the database is stamped with once the whole journal has been applied. */
+export const lastMigration = (): JournalEntry => {
   const last = journalEntries().at(-1);
   if (last === undefined) throw new Error("the journal is empty");
-  return last.tag;
+  return last;
 };
+
+export const lastMigrationTag = (): string => lastMigration().tag;

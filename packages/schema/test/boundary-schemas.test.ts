@@ -391,6 +391,28 @@ const acceptedRows = {
       audience: "everyone",
     },
   ],
+  // A queued audit, which carries no reason, and a rebuild that ran and reported what it
+  // found — the two ends of a job's life, so the fixture proves the boundary accepts one
+  // before anything has claimed it and after it has finished, outcome and all.
+  job: [
+    { workspaceId: WS_ID, id: "01J6J1AAAAAAAAAAAAAAAAAAAA", kind: "nightly-audit" },
+    {
+      workspaceId: WS_ID,
+      id: "01J6J2AAAAAAAAAAAAAAAAAAAA",
+      kind: "full-rebuild",
+      reason: "drill",
+      status: "done",
+      attempts: 1,
+      claimedBy: "worker-7c2f",
+      claimedAt: NOW,
+      leaseExpiresAt: NOW,
+      heartbeatAt: NOW,
+      finishedAt: NOW,
+      // Counts, and the paths the counts were taken at: the whole of what an outcome may
+      // hold, in the auditor's own shape.
+      outcome: { checked: 2, mismatched: [{ path: "knowledge/expenses.md" }], unparsed: [] },
+    },
+  ],
   // One waiting and one accepted: the decision CHECK's two whole shapes, so the fixture
   // proves the boundary accepts a suggestion before its decision and after it.
   suggestion: [
@@ -564,6 +586,8 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "graphGeneration",
         "graphNode",
         "graphEdge",
+        // A job names only its workspace, so it needs nothing but that row.
+        "job",
         // The suggestion before its payload, which names it by the composite key, and
         // after the identity its accepted row resolved to.
         "suggestion",

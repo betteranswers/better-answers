@@ -46,13 +46,20 @@
 export const IDENTITY_PROVIDER = "apps/api/src/auth";
 export const POSTGRES_DOOR = "packages/core/src/store/postgres";
 export const GRAPH_DOOR = "packages/core/src/store/graph";
+/**
+ * The **knowledge worker** (ADR 0005): the other tier, which shares these stores and no
+ * code. It owns no table — the app is the only migration owner (ADR 0007) — and it is
+ * named here because a tier that writes a table it does not own is exactly the fact this
+ * map exists to record, and no import-direction rule can see across a process boundary.
+ */
+export const WORKER = "apps/worker";
 
 /**
  * The owners that are not a directory name under `packages/core/src/` and so are written
  * as paths. The owner test admits exactly these and holds each to a directory that
  * exists; every other owner it holds to a directory under `packages/core/src/`.
  */
-export const OWNERS_OUTSIDE_CORE = [IDENTITY_PROVIDER, POSTGRES_DOOR, GRAPH_DOOR] as const;
+export const OWNERS_OUTSIDE_CORE = [IDENTITY_PROVIDER, POSTGRES_DOOR, GRAPH_DOOR, WORKER] as const;
 
 /**
  * The owner of every table `src/` declares — written out rather than derived, so a
@@ -104,6 +111,12 @@ export const TABLE_OWNERS = {
   "public.bundle_commit": "concepts",
   "public.evidence": "concepts",
   "public.concept_verification": "concepts",
+
+  // The worker's queue (ADR 0005: the control plane is rows, never HTTP). The runs slice
+  // is the app's side of it — enqueue and the views over what a job found — and the claim
+  // protocol itself is SQL functions both tiers call, so the worker writes this table
+  // without owning it; the entry below records that.
+  "public.job": "runs",
 
   // The graph (ADR 0023, ADR 0032): the concepts slice's, because the governed write's
   // transaction is where the bundle-and-record delta lands — the act that owns the
@@ -303,6 +316,41 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "read",
     reason:
       "A concept's class is the most restrictive among the bindings of the evidence it cites and its audience their intersection (ADR 0023, ADR 0039); the evidence pane applies the reader's predicate to the same rows to say which cited evidence they may reach.",
+  },
+  {
+    table: "public.job",
+    by: WORKER,
+    access: "read and write",
+    reason:
+      "The worker claims a job, keeps its lease alive and writes what the job found — through the claim/lease/heartbeat SQL functions, which are SECURITY INVOKER, so the worker's own privileges and the transaction's workspace scope are what reach the row (ADR 0005, ADR 0031).",
+  },
+  {
+    table: "public.concept_index",
+    by: WORKER,
+    access: "read",
+    reason:
+      "The nightly audit compares its own parse of each file against the row's content hash, and the full rebuild copies the row's identity, kind, status and visibility columns onto the generation it writes rather than re-deriving them (ADR 0023, ADR 0031). The worker never writes this table.",
+  },
+  {
+    table: "public.graph_generation",
+    by: WORKER,
+    access: "read and write",
+    reason:
+      "A full rebuild reads the live generation, writes the next one beside it and flips it with one row update at the end — the one write that makes a rebuilt map visible (ADR 0023).",
+  },
+  {
+    table: "public.graph_node",
+    by: WORKER,
+    access: "read and write",
+    reason:
+      "A full rebuild inserts the next generation's nodes. It may not update or delete one, so it can never edit the live generation; sweeping a retired generation is the app's (`graph-sweep`, T-058).",
+  },
+  {
+    table: "public.graph_edge",
+    by: WORKER,
+    access: "read and write",
+    reason:
+      "The same, for the edges the rebuild derives from each concept's file — insert only, in the generation it is building.",
   },
   {
     table: "public.concept_index",

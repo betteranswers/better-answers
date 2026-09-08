@@ -4,9 +4,12 @@ Regenerate with `pnpm --filter @better-answers/schema run generate:worker-view`;
 the drift test fails CI when this file and the journal disagree in either
 direction. The worker never migrates; this module is its read-only
 knowledge of what the app's journal built, stamped with the migration id it was
-generated from."""
+generated from and with that migration's journal instant, which is what the
+migrator writes into `drizzle.__drizzle_migrations.created_at`."""
 
-MIGRATION_ID = "0020_audience-substrate"
+MIGRATION_ID = "0022_the-queue-substrate"
+
+MIGRATION_WHEN = 1788867619838
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -210,6 +213,22 @@ TABLES: dict[str, dict[str, str]] = {
         "expires_at": "timestamp with time zone NOT NULL",
         "created_at": "timestamp with time zone NOT NULL",
         "inviter_id": "text NOT NULL",
+    },
+    "public.job": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "kind": "text NOT NULL",
+        "reason": "text",
+        "status": "text NOT NULL",
+        "attempts": "integer NOT NULL",
+        "max_attempts": "integer NOT NULL",
+        "enqueued_at": "timestamp with time zone NOT NULL",
+        "claimed_by": "text",
+        "claimed_at": "timestamp with time zone",
+        "lease_expires_at": "timestamp with time zone",
+        "heartbeat_at": "timestamp with time zone",
+        "finished_at": "timestamp with time zone",
+        "outcome": "jsonb",
     },
     "public.jwks": {
         "id": "text NOT NULL",

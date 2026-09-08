@@ -7,7 +7,7 @@ import {
   introspect,
   renderWorkerSchemaView,
 } from "../scripts/worker-view.ts";
-import { lastMigrationTag } from "../src/journal.ts";
+import { lastMigration } from "../src/journal.ts";
 import type { MigratedPostgres } from "./harness.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
@@ -49,10 +49,25 @@ describe("the worker's schema view", () => {
   });
 
   it("is byte-identical to a regeneration and carries the journal's last migration id", async () => {
-    const migrationId = lastMigrationTag();
+    const migration = lastMigration();
 
-    const regenerated = renderWorkerSchemaView(await introspect(db.pool), migrationId);
+    const regenerated = renderWorkerSchemaView(await introspect(db.pool), migration);
     expect(readFileSync(viewPath, "utf8")).toBe(regenerated);
-    expect(regenerated).toContain(`MIGRATION_ID = "${migrationId}"`);
+    expect(regenerated).toContain(`MIGRATION_ID = "${migration.tag}"`);
+  });
+
+  it("stamps the instant the migrator wrote, so the worker's stamp check has something to compare", async () => {
+    // The pair the worker's `[WRK1]` check joins on, held both ways: the committed view
+    // carries the journal's `when` for the migration it names, and that is the value the
+    // migrator actually stamped the database with. One direction finds a view regenerated
+    // from a journal nobody applied; only the other finds a `when` the migrator ignores,
+    // which would leave the worker comparing a number the database never writes.
+    const migration = lastMigration();
+    const stamped = await db.pool.query<{ created_at: string }>(
+      "SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY created_at DESC LIMIT 1",
+    );
+
+    expect(readFileSync(viewPath, "utf8")).toContain(`MIGRATION_WHEN = ${migration.when}`);
+    expect(Number(stamped.rows[0]?.created_at)).toBe(migration.when);
   });
 });

@@ -763,7 +763,15 @@ describe("the concept write path under app_rt", () => {
     });
   });
 
-  it("refuses the worker role on all five tables, reading and writing alike (migration 0015)", async () => {
+  it("refuses the worker role on four of the five, reading and writing alike (migrations 0015, 0022)", async () => {
+    // Migration 0015 revoked ALL on all five; migration 0022 gives the index row's *read*
+    // back, and nothing else, because both of the worker's job kinds read it — the audit
+    // compares its own parse against `content_hash`, the rebuild copies the derived
+    // visibility columns onto the generation it writes. The other four stay out of reach,
+    // and the index row stays unwritable, which is the half that matters: the records'
+    // derived visibility is the app's, and a worker that could write it would be a second
+    // opinion about who may read a concept.
+    const OUT_OF_REACH = CONCEPT_TABLES.filter((table) => table !== "concept_index");
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.conceptIndex({ workspaceId: WS_A });
@@ -773,7 +781,7 @@ describe("the concept write path under app_rt", () => {
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      for (const table of CONCEPT_TABLES) {
+      for (const table of OUT_OF_REACH) {
         await client.query("SAVEPOINT concept");
         await expect(client.query(`SELECT 1 FROM "${table}" LIMIT 1`)).rejects.toThrow(
           /permission denied/,
@@ -781,6 +789,52 @@ describe("the concept write path under app_rt", () => {
         await client.query("ROLLBACK TO SAVEPOINT concept");
         await expect(client.query(`DELETE FROM "${table}"`)).rejects.toThrow(/permission denied/);
         await client.query("ROLLBACK TO SAVEPOINT concept");
+      }
+    });
+  });
+
+  it("lets the worker read the concept index in its scope and never write it (migration 0022)", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      for (const workspaceId of [WS_A, WS_B]) await seed.conceptIndex({ workspaceId });
+      await client.query("SET LOCAL ROLE worker_rt");
+
+      // The grant is a table privilege; the policy is still what says which rows. Unscoped
+      // is zero rows, and a scope is this tenant's alone — the same guarantee the app's
+      // role reads under, because the read predicate is not what a grant does.
+      expect(await countedRows(client, ["concept_index"])).toEqual([
+        { table: "concept_index", rows: 0 },
+      ]);
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      expect(await countedRows(client, ["concept_index"])).toEqual([
+        { table: "concept_index", rows: 1 },
+      ]);
+
+      const refused: readonly [string, string][] = [
+        [
+          "UPDATE concept_index SET title = 'renamed'",
+          "the row is derived from a commit the app made, and the worker makes no commits",
+        ],
+        [
+          "UPDATE concept_index SET sensitivity = 'Public'",
+          "the derived visibility is the app's; a worker that could write it would be a second opinion about who may read a concept",
+        ],
+        [
+          "DELETE FROM concept_index",
+          "a concept leaves the bundle by an act, never by a reader of it",
+        ],
+      ];
+      for (const [statement, why] of refused) {
+        await client.query("SAVEPOINT index_probe");
+        const outcome = await client
+          .query(statement)
+          .then(() => "allowed")
+          .catch((cause: unknown) => (cause as { message: string }).message);
+        expect({ why, outcome }).toEqual({
+          why,
+          outcome: expect.stringMatching(/permission denied/),
+        });
+        await client.query("ROLLBACK TO SAVEPOINT index_probe");
       }
     });
   });
@@ -946,20 +1000,71 @@ describe("the graph tables under app_rt", () => {
     });
   });
 
-  it("refuses the worker role on all three graph tables, reading and writing alike (migration 0016)", async () => {
+  it("lets the worker build a generation beside the live one and flip it, and refuses it every edit to a node or an edge (migration 0022)", async () => {
+    // Migration 0016 revoked ALL on all three and said the grants would land with the job
+    // that uses them; migration 0022 is that job, and this is the shape it grants. The
+    // worker may only ever *add* rows — to the generation it is building — and flip the
+    // one row that says which generation is live. It can neither edit nor remove a row of
+    // the live generation, which is what makes a rebuild invisible until the flip; and
+    // sweeping a retired generation is the app's (T-058), so DELETE is nobody's here.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
-      await seed.graphNode({ workspaceId: WS_A });
+      const live = await seed.graphNode({ workspaceId: WS_A });
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      for (const table of GRAPH_TABLES) {
+      const generation = await client.query<{ live_gen: number }>(
+        "SELECT live_gen FROM graph_generation WHERE workspace_id = $1",
+        [WS_A],
+      );
+      const next = (generation.rows[0]?.live_gen ?? 0) + 1;
+      await client.query(
+        "INSERT INTO graph_node (workspace_id, gen, uid, label, kind) VALUES ($1, $2, $3, 'Concept', 'Policy')",
+        [WS_A, next, live.uid],
+      );
+      await client.query(
+        "INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid) VALUES ($1, $2, $3, 'DERIVED_FROM', $4, $4)",
+        [WS_A, next, `lineage:${live.uid}:0`, live.uid],
+      );
+      await client.query("UPDATE graph_generation SET live_gen = $2 WHERE workspace_id = $1", [
+        WS_A,
+        next,
+      ]);
+      const flipped = await client.query<{ live_gen: number }>(
+        "SELECT live_gen FROM graph_generation WHERE workspace_id = $1",
+        [WS_A],
+      );
+      expect(flipped.rows).toEqual([{ live_gen: next }]);
+
+      const refused: readonly [string, readonly unknown[], string][] = [
+        [
+          "UPDATE graph_node SET kind = 'Product'",
+          [],
+          "a rebuild that could edit a node could edit the live generation's",
+        ],
+        ["DELETE FROM graph_node", [], "sweeping a retired generation is the app's, not this"],
+        [
+          "UPDATE graph_edge SET section = 'elsewhere'",
+          [],
+          "the same for an edge, whose section and sentence are a concept's own content",
+        ],
+        ["DELETE FROM graph_edge", [], "and the same for the sweep"],
+        [
+          "DELETE FROM graph_generation",
+          [],
+          "the row that says which generation is live is flipped, never removed",
+        ],
+      ];
+      for (const [statement, parameters, why] of refused) {
         await client.query("SAVEPOINT graph_probe");
-        await expect(client.query(`SELECT 1 FROM "${table}" LIMIT 1`)).rejects.toThrow(
-          /permission denied/,
-        );
-        await client.query("ROLLBACK TO SAVEPOINT graph_probe");
-        await expect(client.query(`DELETE FROM "${table}"`)).rejects.toThrow(/permission denied/);
+        const outcome = await client
+          .query(statement, [...parameters])
+          .then(() => "allowed")
+          .catch((cause: unknown) => (cause as { message: string }).message);
+        expect({ why, outcome }).toEqual({
+          why,
+          outcome: expect.stringMatching(/permission denied/),
+        });
         await client.query("ROLLBACK TO SAVEPOINT graph_probe");
       }
     });
@@ -2086,6 +2191,133 @@ describe("the derivation's tables under app_rt", () => {
         { table: "concept_class_override", rows: 0 },
         { table: "composition_include", rows: 0 },
       ]);
+    });
+  });
+});
+
+/**
+ * The queue (ADR 0005's control plane of rows; ADR 0031's queue agreement). The claim
+ * protocol's own behaviour — the order, the lapsed lease, the poison — is the fixture's, in
+ * `contracts/queue/cases.json`, and both tiers' conformance suites read it. What is proved
+ * here is what a *role* and a *scope* reach: the table's zero-rows guarantee, and the fact
+ * that the four functions are SECURITY INVOKER, so a caller in the wrong scope claims
+ * nothing rather than claiming somebody else's work.
+ */
+describe("the queue under both runtime roles", () => {
+  it("returns zero rows on a missing scope and only the scoped tenant's jobs otherwise", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      for (const workspaceId of [WS_A, WS_B]) await seed.job({ workspaceId });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      expect(await countedRows(client, ["job"])).toEqual([{ table: "job", rows: 0 }]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      expect(await countedRows(client, ["job"])).toEqual([{ table: "job", rows: 1 }]);
+    });
+  });
+
+  it("claims nothing for a caller whose transaction names no workspace, and never another tenant's job", async () => {
+    // The functions take no workspace argument at all, so there is nothing to guard: the
+    // policy is what decides which rows they can see, and an unscoped transaction sees
+    // none. This is the whole reason none of the four is a definer function.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const theirs = await seed.job({ workspaceId: WS_B });
+      await client.query("SET LOCAL ROLE worker_rt");
+
+      await client.query("SELECT set_config('app.workspace_id', '', true)");
+      const unscoped = await client.query("SELECT id FROM claim_job($1, $2::interval)", [
+        "worker-1",
+        "60 seconds",
+      ]);
+      expect(unscoped.rows).toEqual([]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const elsewhere = await client.query("SELECT id FROM claim_job($1, $2::interval)", [
+        "worker-1",
+        "60 seconds",
+      ]);
+      expect(elsewhere.rows).toEqual([]);
+
+      // And the other tenant's job is untouched — still queued, still unclaimed. Read from
+      // its own scope, because that is the only scope it exists in.
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
+      const untouched = await client.query<{ status: string; claimed_by: string | null }>(
+        "SELECT status, claimed_by FROM job WHERE id = $1",
+        [theirs.id],
+      );
+      expect(untouched.rows).toEqual([{ status: "queued", claimed_by: null }]);
+    });
+  });
+
+  it("refuses every caller but the two runtime roles the migration grants (migration 0022)", async () => {
+    // EXECUTE is revoked from PUBLIC on all four, so a role nobody granted — a person's
+    // ad-hoc session, a role a later migration adds — reaches none of them.
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      await client.query("CREATE ROLE queue_probe NOLOGIN");
+      await client.query("GRANT USAGE ON SCHEMA public TO queue_probe");
+      await client.query("SET LOCAL ROLE queue_probe");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const refused: readonly [string, readonly unknown[]][] = [
+        ["SELECT id FROM claim_job($1, $2::interval)", ["worker-1", "60 seconds"]],
+        ["SELECT heartbeat_job($1, $2, $3::interval)", ["01J6J1AAAAAAAAAAAAAAAAAAAA", "w", "60 s"]],
+        ["SELECT finish_job($1, $2, NULL)", ["01J6J1AAAAAAAAAAAAAAAAAAAA", "w"]],
+        ["SELECT fail_job($1, $2, NULL)", ["01J6J1AAAAAAAAAAAAAAAAAAAA", "w"]],
+      ];
+      for (const [statement, parameters] of refused) {
+        await client.query("SAVEPOINT queue_probe");
+        await expect(client.query(statement, [...parameters])).rejects.toThrow(/permission denied/);
+        await client.query("ROLLBACK TO SAVEPOINT queue_probe");
+      }
+    });
+  });
+});
+
+/**
+ * The migration stamp (`[WRK1]`): the worker refuses to claim a job when the schema view it
+ * carries and the database it would claim from disagree about which migration ran last. The
+ * grant that makes the check possible lands in the same migration as the check (migration
+ * 0022, closing PR #5's finding), and it is one SELECT and nothing else.
+ */
+describe("the migration stamp under worker_rt", () => {
+  it("lets the worker read the stamp, and refuses it every other road to the migrator's own table", async () => {
+    await withRollback(db.pool, async (client) => {
+      await client.query("SET LOCAL ROLE worker_rt");
+
+      const stamped = await client.query<{ created_at: string }>(
+        "SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY created_at DESC LIMIT 1",
+      );
+      expect(stamped.rowCount).toBe(1);
+
+      const refused: readonly [string, string][] = [
+        [
+          "INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ('x', 1)",
+          "the app is the only migration owner, so a worker that could stamp one could tell itself the schema had moved",
+        ],
+        [
+          "UPDATE drizzle.__drizzle_migrations SET created_at = 1",
+          "and one that could move the stamp could make its own check pass",
+        ],
+        [
+          "DELETE FROM drizzle.__drizzle_migrations",
+          "a journal a reader can empty is a check that stops asking",
+        ],
+      ];
+      for (const [statement, why] of refused) {
+        await client.query("SAVEPOINT stamp_probe");
+        const outcome = await client
+          .query(statement)
+          .then(() => "allowed")
+          .catch((cause: unknown) => (cause as { message: string }).message);
+        expect({ why, outcome }).toEqual({
+          why,
+          outcome: expect.stringMatching(/permission denied/),
+        });
+        await client.query("ROLLBACK TO SAVEPOINT stamp_probe");
+      }
     });
   });
 });

@@ -39,6 +39,7 @@ import {
   SOURCE_ENTITY_LABEL_PREFIX,
 } from "./graph-tables.ts";
 import { group, GROUP_ORIGINS, groupMember } from "./group-tables.ts";
+import { job, JOB_KINDS, JOB_STATUSES, REBUILD_REASONS } from "./job-tables.ts";
 import {
   account,
   invitation,
@@ -746,6 +747,46 @@ export const graphEdgeInsert = createInsertSchema(graphEdge, graphEdgeRefinement
 export const graphEdgeUpdate = createUpdateSchema(graphEdge, graphEdgeRefinements);
 
 /**
+ * What a **job's outcome** may hold: counts, and the ids and paths the counts were taken at
+ * — a scalar, a list of scalars, or a list of flat objects, which is the auditor's
+ * `{path, expected, actual}` triple and nothing deeper. The shape is the narrowing: an
+ * email, a person's name, a prompt or a concept's body has no nested place to hide in one
+ * (`[LOG1]`, `[AUDIT5]`), and an outcome that held one would have to be rewritten on
+ * erasure. JSON `null` stays accepted because the column accepts it.
+ */
+const outcomeScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const outcome = z.union([
+  z.record(
+    z.string(),
+    z.union([outcomeScalar, z.array(outcomeScalar), z.array(z.record(z.string(), outcomeScalar))]),
+  ),
+  z.null(),
+]);
+
+/**
+ * A **job** on the worker's queue (ADR 0005's control plane of rows): the id is the
+ * minter's shape, the three closed word sets are the boundary's to narrow, and the counts
+ * are whole numbers. `claimed_by` is a worker id — the container's hostname by default —
+ * so it is held to being non-empty and nothing more: what a deploy unit calls its worker is
+ * not this boundary's business.
+ */
+const jobRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  kind: (schema: z.ZodString) => schema.pipe(z.enum(JOB_KINDS)),
+  reason: (schema: z.ZodString) => schema.pipe(z.enum(REBUILD_REASONS)),
+  status: (schema: z.ZodString) => schema.pipe(z.enum(JOB_STATUSES)),
+  attempts: (schema: z.ZodNumber) => schema.int().nonnegative(),
+  maxAttempts: (schema: z.ZodNumber) => schema.int().positive(),
+  claimedBy: (schema: z.ZodString) => schema.trim().min(1),
+  outcome: (schema: z.ZodType) => schema.pipe(outcome),
+};
+
+export const jobSelect = createSelectSchema(job, jobRefinements);
+export const jobInsert = createInsertSchema(job, jobRefinements);
+export const jobUpdate = createUpdateSchema(job, jobRefinements);
+
+/**
  * A **suggestion** (ADR 0012): the two actors are the ledger's own actor shape, so a
  * proposer and a decider read the same way wherever they appear; the target is a concept
  * IRI, because a resolved target is a concept and never a path; and the reason is bounded,
@@ -922,6 +963,7 @@ export const boundarySchemas = {
     insert: graphEdgeInsert,
     update: graphEdgeUpdate,
   },
+  job: { table: job, select: jobSelect, insert: jobInsert, update: jobUpdate },
   suggestion: {
     table: suggestion,
     select: suggestionSelect,

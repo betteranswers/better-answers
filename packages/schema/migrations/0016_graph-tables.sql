@@ -94,9 +94,15 @@ ALTER TABLE "graph_edge" FORCE ROW LEVEL SECURITY;
 -- makes the worker a writer of new generations is T-057's — its grants land in the same
 -- migration as the job that uses them rather than standing here unused, exactly as
 -- migration 0015 reasoned for the concept tables.
--- Proved by "refuses the worker role on all three graph tables, reading and writing alike
--- (migration 0016)" in packages/schema/test/rls.test.ts, beside the served path the app's
--- role keeps.
+-- **Migration 0022 is that job.** It grants the worker SELECT and INSERT on the two row
+-- tables and SELECT, INSERT and UPDATE on the generation row — enough to build a generation
+-- beside the live one and flip it, and nothing more: no UPDATE and no DELETE on a node or
+-- an edge, so a rebuild can never edit the live generation, and the sweep of a retired one
+-- stays the app's (T-058). What this REVOKE now takes away is the DML that migration 0000's
+-- default privileges would have granted; 0022 gives back only that shape.
+-- Proved by "lets the worker build a generation beside the live one and flip it, and refuses
+-- it every edit to a node or an edge (migration 0022)" in packages/schema/test/rls.test.ts,
+-- beside the served path the app's role keeps.
 REVOKE ALL ON "graph_generation" FROM worker_rt;
 --> statement-breakpoint
 REVOKE ALL ON "graph_node" FROM worker_rt;

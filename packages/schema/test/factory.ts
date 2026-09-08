@@ -14,6 +14,9 @@ import {
   CREATOR_ROLE,
   CURATED_ORIGIN,
   EMBEDDING_DIMENSIONS,
+  JOB_MAX_ATTEMPTS,
+  JOB_QUEUED_STATUS,
+  NIGHTLY_AUDIT_KIND,
   SUGGESTION_EDIT_KIND,
   SUGGESTION_WAITING_STATUS,
   ulid,
@@ -162,6 +165,12 @@ export type TestData = {
   conceptClassOverride(
     overrides?: Partial<InsertInput<"conceptClassOverride">>,
   ): Promise<Row<"conceptClassOverride">>;
+  /**
+   * A queued job; creates its own workspace unless one is named. A nightly audit by
+   * default, because that kind carries no reason and is the one the worker schedules
+   * itself; a suite about a rebuild names `kind` and its `reason`.
+   */
+  job(overrides?: Partial<InsertInput<"job">>): Promise<Row<"job">>;
   /** A composition; creates its own workspace unless one is named. Published, Internal, everyone. */
   composition(overrides?: Partial<InsertInput<"composition">>): Promise<Row<"composition">>;
   /** An include; creates the composition and the concept's identity unless either is named. */
@@ -567,6 +576,29 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const job: TestData["job"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    // Written out rather than left to the column's defaults, so a factory-made job reads
+    // as what it is: queued, claimed by nobody, no attempt spent on it yet and nothing
+    // found — which is every one of the claim protocol's columns at its starting value.
+    return insertRow(client, "job", {
+      id: ulid(),
+      kind: NIGHTLY_AUDIT_KIND,
+      reason: null,
+      status: JOB_QUEUED_STATUS,
+      attempts: 0,
+      maxAttempts: JOB_MAX_ATTEMPTS,
+      claimedBy: null,
+      claimedAt: null,
+      leaseExpiresAt: null,
+      heartbeatAt: null,
+      finishedAt: null,
+      outcome: null,
+      ...overrides,
+      workspaceId,
+    });
+  };
+
   const suggestion: TestData["suggestion"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     return insertRow(client, "suggestion", {
@@ -710,6 +742,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     graphGeneration,
     graphNode,
     graphEdge,
+    job,
     suggestion,
     conceptWriteRequest,
     sourceBinding,
