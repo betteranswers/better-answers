@@ -91,16 +91,12 @@ const acceptAll = async (
   principal: UserPrincipal = scenario.admin,
 ): Promise<readonly AcceptanceOutcome[]> => {
   const summary = await summaryOf(scenario, setId);
-  const accepted = await acceptSuggestions(
-    principal,
-    { git: scenario.git, postgres: scenario.postgres },
-    {
-      decisions: summary.map((item) => ({
-        suggestionId: item.suggestionId,
-        expectedTarget: item.target,
-      })),
-    },
-  );
+  const accepted = await acceptSuggestions(principal, doorsOf(scenario), {
+    decisions: summary.map((item) => ({
+      suggestionId: item.suggestionId,
+      expectedTarget: item.target,
+    })),
+  });
   if (!accepted.ok) throw new Error(`the acceptance was refused: ${String(accepted.error)}`);
   return accepted.value;
 };
@@ -179,11 +175,7 @@ const editorWrote = async (scenario: Scenario, overrides: Partial<WriteConceptIn
     sensitivity: "Internal",
     ...overrides,
   };
-  const written = await writeConcept(
-    scenario.editor,
-    { git: scenario.git, postgres: scenario.postgres },
-    input,
-  );
+  const written = await writeConcept(scenario.editor, doorsOf(scenario), input);
   if (!written.ok) throw new Error(`the write was refused: ${String(written.error)}`);
   return { input, written: written.value };
 };
@@ -209,6 +201,23 @@ const proposedAgainst = async (
   ]);
   return { input, written, set };
 };
+
+/**
+ * Re-write the concept a payload was proposed against, out from under it — the one step
+ * both "an acceptance whose ground moved" refusals share, whichever ground moves.
+ */
+const rewrittenAgainst = (
+  scenario: Scenario,
+  input: WriteConceptInput,
+  written: ConceptWritten,
+  overrides: Partial<WriteConceptInput>,
+) =>
+  writeConcept(scenario.editor, doorsOf(scenario), {
+    ...input,
+    iri: written.iri,
+    expects: { head: written.sha },
+    ...overrides,
+  });
 
 /**
  * A waiting suggestion seeded as the row that raised it would be written, kind and proposer
@@ -272,7 +281,7 @@ const checkedBy = async (
 /** The trust a reader is shown for one concept, through the read the surface will make. */
 const trustOf = async (scenario: Scenario, iri: string) => {
   const read = await readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
-    open(principal, tx, { iri }),
+    open(principal, tx, { iri }, new Date()),
   );
   return read.ok && read.value.found ? read.value.concept?.trust : undefined;
 };
@@ -589,11 +598,9 @@ describe("accepting a suggestion", () => {
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
 
     for (const principal of [scenario.viewer, scenario.editor]) {
-      const refused = await acceptSuggestions(
-        principal,
-        { git: scenario.git, postgres: scenario.postgres },
-        { decisions: [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }] },
-      );
+      const refused = await acceptSuggestions(principal, doorsOf(scenario), {
+        decisions: [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }],
+      });
       expect(refused).toEqual({ ok: false, error: "role-forbids" });
     }
 
@@ -606,16 +613,12 @@ describe("accepting a suggestion", () => {
     const there = await arrange();
     const theirs = await submitted(there, there.editor, "edit", [requestFor()]);
 
-    const reached = await acceptSuggestions(
-      here.admin,
-      { git: here.git, postgres: here.postgres },
-      {
-        decisions: [
-          { suggestionId: theirs.suggestionIds[0] ?? "", expectedTarget: null },
-          { suggestionId: ulid(), expectedTarget: null },
-        ],
-      },
-    );
+    const reached = await acceptSuggestions(here.admin, doorsOf(here), {
+      decisions: [
+        { suggestionId: theirs.suggestionIds[0] ?? "", expectedTarget: null },
+        { suggestionId: ulid(), expectedTarget: null },
+      ],
+    });
 
     expect(reached.ok && reached.value.map(refusalOf)).toEqual([
       "no-such-suggestion",
@@ -636,11 +639,9 @@ describe("an acceptance whose ground moved", () => {
     // And then somebody wrote the concept that merge key names.
     await editorWrote(scenario, { mergeKey: request.mergeKey, path: request.path });
 
-    const accepted = await acceptSuggestions(
-      scenario.admin,
-      { git: scenario.git, postgres: scenario.postgres },
-      { decisions: [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }] },
-    );
+    const accepted = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
+      decisions: [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }],
+    });
 
     // Refused, with no commit of its own — and back with whoever prepared it, which is
     // what ADR 0012's "fails loudly and returns to the proposer" means as a state.
@@ -661,16 +662,9 @@ describe("an acceptance whose ground moved", () => {
     const { input, written, set } = await proposedAgainst(scenario, "edit");
     // The concept moves under the payload: the base hash it was written against is no
     // longer what the concept says.
-    const moved = await writeConcept(
-      scenario.editor,
-      { git: scenario.git, postgres: scenario.postgres },
-      {
-        ...input,
-        iri: written.iri,
-        body: "Expenses are claimed within ninety days.",
-        expects: { head: written.sha },
-      },
-    );
+    const moved = await rewrittenAgainst(scenario, input, written, {
+      body: "Expenses are claimed within ninety days.",
+    });
     expect(moved.ok).toBe(true);
     const opened = await summaryOf(scenario, set.setId);
     expect(opened.map((item) => item.baseMoved)).toEqual([true]);
@@ -1216,7 +1210,7 @@ describe("what an acceptance answers when it cannot be prepared", () => {
 
     const accepted = await acceptSuggestions(
       scenario.admin,
-      { git: scenario.git, postgres: openPostgres(gone) },
+      { ...doorsOf(scenario), postgres: openPostgres(gone) },
       { decisions: [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }] },
     );
 
@@ -1349,22 +1343,18 @@ describe("what a write may not do with an IRI", () => {
   it("refuses a write naming an IRI this workspace never minted, and makes no commit", async () => {
     const scenario = await arrange();
 
-    const refused = await writeConcept(
-      scenario.editor,
-      { git: scenario.git, postgres: scenario.postgres },
-      {
-        iri: conceptIriOf(ulid()),
-        mergeKey: "policy:invented",
-        path: "knowledge/invented.md",
-        kind: "Policy",
-        title: "Invented",
-        frontmatter: { title: "Invented" },
-        body: "A concept whose key its author chose.",
-        message: "Record a concept nobody minted",
-        author: { name: "Ada Editor", email: "ada@acme.invalid" },
-        expects: { head: null },
-      },
-    );
+    const refused = await writeConcept(scenario.editor, doorsOf(scenario), {
+      iri: conceptIriOf(ulid()),
+      mergeKey: "policy:invented",
+      path: "knowledge/invented.md",
+      kind: "Policy",
+      title: "Invented",
+      frontmatter: { title: "Invented" },
+      body: "A concept whose key its author chose.",
+      message: "Record a concept nobody minted",
+      author: { name: "Ada Editor", email: "ada@acme.invalid" },
+      expects: { head: null },
+    });
 
     // ADR 0002: the key is never caller-settable, and the refusal costs no commit.
     expect(refused).toEqual({ ok: false, error: "no-such-concept" });
@@ -1464,11 +1454,8 @@ describe("an acceptance reached straight through the write path", () => {
     // was written against — so the base precondition still holds and the *only* thing that
     // moved is the resolution. Accepting here would put the old key back on the concept and
     // undo a move nobody asked to undo.
-    const moved = await writeConcept(scenario.editor, doorsOf(scenario), {
-      ...input,
-      iri: written.iri,
+    const moved = await rewrittenAgainst(scenario, input, written, {
       mergeKey: `${input.mergeKey}-renamed`,
-      expects: { head: written.sha },
     });
     expect(moved.ok).toBe(true);
 

@@ -10,6 +10,7 @@ import {
   refusalFor,
   ulid,
   type ActorId,
+  type Clock,
   type PlatformPrincipal,
   type Result,
   type WorkspaceId,
@@ -274,7 +275,7 @@ const lastRecordedCommit = async (platform: PlatformPrincipal, tx: Tx): Promise<
  */
 const replayCommit = async (
   platform: ReconcilerPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
+  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
   workspaceId: WorkspaceId,
   sha: string,
   batchId: string | undefined,
@@ -313,6 +314,9 @@ const replayCommit = async (
         const title = stringIn(facts.frontmatter, "title") ?? held?.title;
         if (kind === undefined || title === undefined) return err("unreadable-commit");
         const contentHash = contentHashOf(facts.frontmatter, facts.body, facts.path);
+        // Read fresh per replayed commit (ADR 0040) — the ambient read this replaces was
+        // one reading per `indexRowOf` invocation too, and a batch replaying several
+        // commits recovers each at its own landing instant, not one shared guess.
         const parsed = indexRowOf(
           {
             workspaceId,
@@ -327,6 +331,7 @@ const replayCommit = async (
             sensitivity: undefined,
           },
           held,
+          doors.clock.now(),
         );
         if (!parsed.success) return err("unreadable-commit");
         const row = parsed.data;
@@ -389,7 +394,7 @@ const replayCommit = async (
  */
 export const reconcile = async (
   platform: ReconcilerPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
+  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
   input: { readonly workspaceId: string },
 ): Promise<Result<Reconciled, ReconcileRefusal | Error>> => {
   const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
@@ -480,7 +485,7 @@ export type WorkspaceReconciled = {
  */
 export const reconcileEveryWorkspace = async (
   platform: ReconcilerPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
+  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
 ): Promise<Result<readonly WorkspaceReconciled[], Error>> => {
   const held = await workspaceIds(platform, doors.postgres);
   if (!held.ok) return err(held.error);

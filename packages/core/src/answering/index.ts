@@ -211,15 +211,18 @@ const tagsOf = (frontmatter: Frontmatter): readonly string[] => {
  * as a hit — kind, title, trust — through the concepts slice's own read, which shares
  * `open`'s SELECT and its predicate. **A withheld concept is not a hit, not a count and
  * not a hint** (ADR 0016); ranking is B9's.
+ *
+ * `now` is the platform's instant for every hit's trust reading (ADR 0040) — one read,
+ * shared across the batch, from the caller's own Clock; never read here.
  */
 export const find = async (
   principal: UserPrincipal,
   tx: Tx,
   input: { readonly query: string; readonly limit: number },
+  now: Date,
 ): Promise<Result<FindResult, Error>> => {
   const found = await findConcepts(principal, tx, input);
   if (!found.ok) return err(found.error);
-  const now = new Date();
   return ok({
     query: input.query,
     hits: found.value.map((concept) => ({
@@ -367,11 +370,17 @@ const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
  * nobody minted does** — `found: false` with the IRI echoed back — because the predicate is
  * in the statement's WHERE clause and a withheld row is not a row that came back (user
  * story 13). A locator answers not found until the source catalogue exists (B7).
+ *
+ * `now` is the platform's instant for the trust reading below (ADR 0040): the caller's
+ * own Clock, read once and handed in, never read here — which is what lets a test move
+ * the shelf-life comparison to either side of a fixed `stale_after` without racing the
+ * real clock.
  */
 export const open = async (
   principal: UserPrincipal,
   tx: Tx,
   input: OpenInput,
+  now: Date,
 ): Promise<Result<OpenResult, Error>> => {
   if (input.iri === undefined) return ok({ found: false, locator: input.locator });
 
@@ -391,7 +400,7 @@ export const open = async (
       // is the answering slice's own later work (B9), so this stays empty rather than
       // half-read.
       relations: [],
-      trust: trustOf(found, new Date()),
+      trust: trustOf(found, now),
       evidence: evidenceOf(found),
     },
   });

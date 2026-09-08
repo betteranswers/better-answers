@@ -32,8 +32,13 @@
  * - `ulid` — the platform's one minter, re-exported from the boundary package where its
  *   body sits beside the pattern it mints to. Every id the platform writes for itself
  *   comes from here, and Better Auth is handed the same function. T-074, ADR 0035.
+ * - `Clock` and `systemClock` — the platform's one reading of the wall clock, constructed
+ *   once by the api at boot and handed on explicitly to every act that needs it; not a
+ *   door, and not a defaulted parameter (ADR 0040). T-104.
  */
 export { ulid } from "@better-answers/schema";
+export { systemClock } from "./clock.ts";
+export type { Clock } from "./clock.ts";
 export { refusalFor } from "./constraint.ts";
 export { attempt, err, normalizeError, ok } from "./result.ts";
 export type { Result } from "./result.ts";

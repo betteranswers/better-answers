@@ -322,11 +322,15 @@ export type Approved = {
  * without the ledger row that says who let this person in. The role is checked after the
  * claim and before anything is written, so an Editor asking for a role that does not exist
  * still hears the refusal their role earns rather than the one their argument would.
+ *
+ * `now` is the platform's instant the invitation's expiry counts from (ADR 0040): the
+ * caller's own Clock, read once and handed in, never read here.
  */
 export const approveRequest = async (
   principal: UserPrincipal,
   tx: Tx,
   input: ApproveRequestInput,
+  now: Date,
 ): Promise<Result<Approved, ApproveRefusal | Error>> => {
   const claimed = await claimForDecision(principal, tx, input.requestId);
   if (!claimed.ok) return err(claimed.error);
@@ -344,7 +348,7 @@ export const approveRequest = async (
     role: role.data,
     // The library's own default, read off the installed plugin rather than remembered;
     // `status` is left to the column's default, which is the plugin's own too.
-    expiresAt: new Date(Date.now() + INVITATION_EXPIRY_SECONDS * 1000),
+    expiresAt: new Date(now.getTime() + INVITATION_EXPIRY_SECONDS * 1000),
     inviterId: admin.userId,
   });
   if (!invitation.success) return err("malformed");

@@ -104,8 +104,12 @@ export type CommitRequest = {
    * bundle has no commits yet"; a sha that is not what the ref holds refuses the write.
    */
   readonly expectedHead: string | null;
-  /** When the commit was made; the author and committer dates alike. */
-  readonly at?: Date;
+  /**
+   * When the commit was made; the author and committer dates alike. The caller's own
+   * Clock, read once (ADR 0040) — required, because a default here would be this door
+   * reading the ambient clock on a caller's behalf.
+   */
+  readonly at: Date;
 };
 
 export type Committed = {
@@ -299,7 +303,7 @@ export const commit = async (
     });
     const tree = await git(gitDir, ["write-tree"], { env });
 
-    const at = (request.at ?? new Date()).toISOString();
+    const at = request.at.toISOString();
     const sha = await git(
       gitDir,
       [
