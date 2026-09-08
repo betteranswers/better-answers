@@ -1,0 +1,22 @@
+CONTEXT.md
+  s_ab39f633b089ef::t_c45146f7d5e9a0 319-324
+  s_ab39f633b089ef::t_b9f5b63683f303 212-219
+  s_ab39f633b089ef::t_a46dedeb38b166 256-260
+  s_ab39f633b089ef::t_632e55692b5e41 104-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "4e43042d95450f99f91ce2fdb683988b881d0a36",
+  "prompts": {},
+  "sessions": {
+    "s_ab39f633b089ef": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a96f8026-e962-4701-9fc2-3116e30f5681",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
