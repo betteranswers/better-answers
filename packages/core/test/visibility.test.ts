@@ -566,15 +566,17 @@ describe("narrowing a binding", () => {
     ]);
   });
 
-  it("holds a write landing beside it until it has committed, so the write derives from the narrowed binding and never lands wider", async () => {
-    const scenario = await arrange();
-    const binding = await bindingHolding(db(), scenario.workspaceId);
-    const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
-
-    // The narrowing on a second connection, held open across the write: READ COMMITTED
-    // would let a plain read of the binding see the row before the narrowing and derive
-    // Internal, then commit after it — a concept citing a Restricted binding at Internal
-    // until the next recompute. The write has to wait on the binding row instead.
+  /**
+   * A binding narrowed to Restricted on a second connection and **held open** across a write:
+   * the write is started, seen from the database itself to be waiting on a row the narrowing
+   * holds — "still pending after a pause" would also be true of a write that was merely slow
+   * to reach it — then the narrowing commits and the write is expected to land.
+   */
+  const writeBesideAnOpenNarrowing = async (
+    scenario: Scenario,
+    bindingId: string,
+    write: () => Promise<Awaited<ReturnType<typeof rewriteCiting>>>,
+  ) => {
     const narrowing = await db().runtimePool.connect();
     try {
       await narrowing.query("BEGIN");
@@ -582,32 +584,41 @@ describe("narrowing a binding", () => {
         scenario.workspaceId,
       ]);
       const narrowed = await narrowBinding(scenario.admin, narrowing, {
-        bindingId: binding.bindingId,
+        bindingId,
         sensitivity: "Restricted",
         audience: "everyone",
       });
       expect(narrowed.ok).toBe(true);
 
       let settled = false;
-      const write = rewriteCiting(scenario, scenario.editor, written, [binding.documentId]).then(
-        (outcome) => {
-          settled = true;
-          return outcome;
-        },
-      );
-      // The write is queued on a row the narrowing holds — seen from the database itself,
-      // because "still pending after a pause" would also be true of a write that was merely
-      // slow to reach it.
+      const landing = write().then((outcome) => {
+        settled = true;
+        return outcome;
+      });
       expect(await someoneWaitsOnALock()).toBe(true);
       expect(settled).toBe(false);
 
       await narrowing.query("COMMIT");
-      expect(await write).toMatchObject({ ok: true });
+      expect(await landing).toMatchObject({ ok: true });
     } finally {
       // A no-op after the COMMIT; what frees the write if an assertion above failed first.
       await attempt(() => narrowing.query("ROLLBACK"));
       narrowing.release();
     }
+  };
+
+  it("holds a write landing beside it until it has committed, so the write derives from the narrowed binding and never lands wider", async () => {
+    const scenario = await arrange();
+    const binding = await bindingHolding(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
+
+    // READ COMMITTED would let a plain read of the binding see the row before the narrowing
+    // and derive Internal, then commit after it — a concept citing a Restricted binding at
+    // Internal until the next recompute. The write has to wait on the binding row instead.
+    await writeBesideAnOpenNarrowing(scenario, binding.bindingId, () =>
+      rewriteCiting(scenario, scenario.editor, written, [binding.documentId]),
+    );
+
     expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
       bothAt({ sensitivity: "Restricted", ...EVERYONE }),
     );
@@ -619,42 +630,17 @@ describe("narrowing a binding", () => {
     const other = await bindingHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [cited.documentId]);
 
-    // The narrowing of the binding the concept cites *today*, on a second connection and
-    // held open. Its cascade has moved the concept's row to Restricted, uncommitted. The
-    // re-write below cites the other binding — Internal — so its pre-commit check reads the
-    // row as it stands committed (Internal) and derives Internal from the new citations:
-    // no widening, and a commit is made. The landing derives Internal from the new binding
-    // too, which nothing it read FOR SHARE would stop; only the row itself, read again in
-    // the landing's own transaction, says the concept has since narrowed.
-    const narrowing = await db().runtimePool.connect();
-    try {
-      await narrowing.query("BEGIN");
-      await narrowing.query("SELECT set_config('app.workspace_id', $1, true)", [
-        scenario.workspaceId,
-      ]);
-      const narrowed = await narrowBinding(scenario.admin, narrowing, {
-        bindingId: cited.bindingId,
-        sensitivity: "Restricted",
-        audience: "everyone",
-      });
-      expect(narrowed.ok).toBe(true);
+    // The narrowing is of the binding the concept cites *today*, and its cascade has moved
+    // the concept's row to Restricted, uncommitted. The re-write cites the other binding —
+    // Internal — so its pre-commit check reads the row as it stands committed (Internal) and
+    // derives Internal from the new citations: no widening, and a commit is made. The landing
+    // derives Internal from the new binding too, which nothing it read FOR SHARE would stop;
+    // only the row itself, read again in the landing's own transaction, says the concept has
+    // since narrowed.
+    await writeBesideAnOpenNarrowing(scenario, cited.bindingId, () =>
+      rewriteCiting(scenario, scenario.editor, written, [other.documentId]),
+    );
 
-      let settled = false;
-      const write = rewriteCiting(scenario, scenario.editor, written, [other.documentId]).then(
-        (outcome) => {
-          settled = true;
-          return outcome;
-        },
-      );
-      expect(await someoneWaitsOnALock()).toBe(true);
-      expect(settled).toBe(false);
-
-      await narrowing.query("COMMIT");
-      expect(await write).toMatchObject({ ok: true });
-    } finally {
-      await attempt(() => narrowing.query("ROLLBACK"));
-      narrowing.release();
-    }
     // Restricted — what the row held when the rows landed — and not the Internal the new
     // citations derive: a re-write never widens a concept, whichever instant the widening
     // would have slipped through at.
