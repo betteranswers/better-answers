@@ -1,0 +1,50 @@
+docs/agents/mutation-triage.md
+  s_4f5bb836dc20b6::t_b65aa7596e514b 22
+.gitignore
+  s_4f5bb836dc20b6::t_b65aa7596e514b 16
+packages/devtools/package.json
+  s_4f5bb836dc20b6::t_cf8ce7c507cf26 10
+packages/devtools/src/mutant-probe.ts
+  s_4f5bb836dc20b6::t_fd96827fb00b97 6-7
+  s_4f5bb836dc20b6::t_3d4ade1a4cdbd9 51-52
+packages/devtools/README.md
+  s_4f5bb836dc20b6::t_b65aa7596e514b 7,68-76
+packages/core/stryker.config.mjs
+  s_4f5bb836dc20b6::t_d9de0aeccb44ac 16-24
+  s_4f5bb836dc20b6::t_b65aa7596e514b 47
+  s_4f5bb836dc20b6::t_da15292c8b19bf 2
+scripts/mutation-summary.mjs
+  s_4f5bb836dc20b6::t_cf8ce7c507cf26 1-15
+packages/devtools/test/mutation-summary.test.ts
+  s_4f5bb836dc20b6::t_1a3d1ad023f7f4 1-5,10-238,247-258,262-269
+  s_4f5bb836dc20b6::t_5c2b6c706c01c2 6-9,239-246,259-261
+packages/core/test/source-tree.ts
+  s_4f5bb836dc20b6::t_b65aa7596e514b 27
+packages/devtools/src/flags.ts
+  s_4f5bb836dc20b6::t_7b7bb5d24bcc64 1-20
+apps/api/stryker.config.mjs
+  s_4f5bb836dc20b6::t_89a1e5cf8c1cad 2,9-20
+  s_4f5bb836dc20b6::t_b65aa7596e514b 48
+.github/workflows/mutation.yml
+  s_4f5bb836dc20b6::t_f71c55d3bb403b 2,5-8,35,37-46,54,76-77,79,83-86,90-91,99-108,118,127-132,135-137
+CODING_RULES.md
+  s_4f5bb836dc20b6::t_b65aa7596e514b 55
+packages/schema/test/warm-postgres.ts
+  s_4f5bb836dc20b6::t_b65aa7596e514b 25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7824e2cd0897853b015a81b97baba9b49254f0a5",
+  "prompts": {},
+  "sessions": {
+    "s_4f5bb836dc20b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f4edcf7d-f3b0-4034-8352-9ad561fda719",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
