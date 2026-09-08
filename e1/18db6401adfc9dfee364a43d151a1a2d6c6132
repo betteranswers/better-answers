@@ -1,0 +1,89 @@
+apps/api/src/main.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 5-6,15-17,61,76
+packages/core/test/concepts.test.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 38,106,1047,1085,1183-1203,1584,1616,1649,1664,1678,1706,1747-1752,1812,1818-1885,1893,1896,1906
+apps/api/src/reconciler.ts
+  ai_agent 9,50-51,96-100
+apps/api/src/mcp/entries/index.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 85,180,186
+apps/api/src/ops.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 3-4,35-37
+packages/core/test/answering.test.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 420,464-466,482-487
+packages/core/test/reconciler.test.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 794,821
+packages/core/src/concepts/landing.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 226-229,231,249
+apps/api/tests/ops.test.ts
+  ai_agent 6,37,455
+packages/core/src/answering/index.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 214-216,222,391-395,401,421
+packages/core/src/kernel/clock.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 1-29
+packages/core/src/members/requests.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 325-327,333,351
+apps/api/src/server.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 5,50-51,132-139,153,160
+packages/core/test/access-requests.test.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 276,348,359,374,389,402,427-430,638-641
+packages/core/src/kernel/index.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 35-37,40-41
+packages/core/test/git.test.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 71
+apps/api/tests/no-ambient-clock.test.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 1-89
+docs/adr/README.md
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 48
+apps/api/src/mcp/entries/define.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 22-24,51
+packages/core/test/suggestions.test.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 94-99,178,205-221,284,601-603,616-621,642-644,665-667,1213,1346-1357,1457
+apps/api/src/auth/routes.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 7,42-43,176,191,236,249-251,260,263
+packages/core/src/store/git/index.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 133-138,335
+apps/api/tests/reconciler.test.ts
+  ai_agent 3,45,75,99
+packages/core/test/principal.test.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 490-493
+apps/api/tests/invisibility.test.ts
+  ai_agent 4,116
+packages/core/src/concepts/index.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 22,386,513-518,533,553,743,771
+packages/core/src/concepts/reconciler.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 13,278,317-319,334,397,488
+packages/core/src/store/postgres/index.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 417-419,426,449-450,457
+packages/core/test/visibility.test.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 156,465,910,1161,1164,1237-1239
+apps/api/src/trpc/mount.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 4,28,35
+apps/api/src/ops/index.ts
+  ai_agent 10,65-66,390,393-394,501
+apps/api/src/ingress/limits.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 5,59-63,65-71
+apps/api/src/mcp/surface.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 14,64-65,117,149,183
+docs/adr/0040-the-clock-is-a-kernel-value-the-api-constructs-once-at-boot-and-hands-to-every-act-that-reads-time-a-rows-own-timestamp-stays-the-databases-now-and-the-worker-is-handed-no-clock.md
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 1-174
+packages/core/test/workspace-with-bundle.ts
+  s_f34fe14b1ea788::t_bf77902e6dd1d8 5,37-41
+apps/api/tests/harness.ts
+  ai_agent 10,205,240-241,278
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e118db6401adfc9dfee364a43d151a1a2d6c6132",
+  "prompts": {},
+  "sessions": {
+    "s_f34fe14b1ea788": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e15aef24-178a-41a4-8fe6-f8657414f765",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
