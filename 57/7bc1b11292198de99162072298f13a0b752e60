@@ -1,0 +1,39 @@
+packages/core/test/principal.test.ts
+  s_9735fc29ef62df::t_6005c93bbc4252 262-296
+  s_9735fc29ef62df::t_e35425f75ecc34 340-409
+  s_9735fc29ef62df::t_437150418392ab 11
+packages/core/test/git.test.ts
+  s_9735fc29ef62df::t_0bf221cbbd0fca 1-3,5-37,41-101,103-178,180-268
+  s_9735fc29ef62df::t_d20245c44f0cc9 4
+  s_9735fc29ef62df::t_ec83229275d554 38-40
+packages/core/test/bundle.ts
+  s_9735fc29ef62df::t_5eb9d09cc48aa7 117-120,122-125
+packages/core/test/graph.test.ts
+  s_9735fc29ef62df::t_9d048acb798970 1
+  s_9735fc29ef62df::t_04aff5c0f1701f 572-608,611-622
+  s_9735fc29ef62df::t_a09df1bb35ffe0 725-726
+  s_9735fc29ef62df::t_b2d7be536f77a4 623-647
+  s_9735fc29ef62df::t_0cffe454bed5b0 291-298,316-337,339-340,342-441
+  s_9735fc29ef62df::t_ce44d99c588de1 299-315
+  s_9735fc29ef62df::t_4a376a7d017ebe 609-610
+  s_9735fc29ef62df::t_9bb9e316e321f2 10-11,17-21,24-29
+  s_9735fc29ef62df::t_628eb64d5f0f71 442-448,450-571,648-682,685-693,695,698-700,702-708,710-724,727-734,737-759
+  s_9735fc29ef62df::t_8c84dd3d3f549d 709
+  s_9735fc29ef62df::t_b7f8ca34d3c917 694,696-697,701
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "577bc1b11292198de99162072298f13a0b752e60",
+  "prompts": {},
+  "sessions": {
+    "s_9735fc29ef62df": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "947d5c06-ba2f-479f-a6b2-58726b109426",
+        "model": "claude-opus-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
