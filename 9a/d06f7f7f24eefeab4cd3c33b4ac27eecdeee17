@@ -1,0 +1,20 @@
+apps/api/tests/provision-worktree.test.ts
+  s_5cc55f18f6b9e2::t_57dfc8e863012a 23,26
+  s_5cc55f18f6b9e2::t_d22c9a131e7db4 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9ad06f7f7f24eefeab4cd3c33b4ac27eecdeee17",
+  "prompts": {},
+  "sessions": {
+    "s_5cc55f18f6b9e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "494d3590-8e7e-4928-8a08-4aa57b92c7f0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
