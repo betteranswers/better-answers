@@ -1,6 +1,7 @@
 import { conceptIriOf, ulid } from "@better-answers/schema";
 import { testData, type TestData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
+import type { QueryResultRow } from "pg";
 
 import {
   GRAPH_WALK_DEPTH,
@@ -338,13 +339,21 @@ type EdgeFacts = {
   readonly to_kind: string | null;
 };
 
-const edgesFrom = async (scenario: MapScenario, fromUid: string): Promise<readonly EdgeFacts[]> => {
-  const rows = await db().pool.query<EdgeFacts>(
-    "SELECT label, to_uid, to_kind FROM graph_edge WHERE workspace_id = $1 AND from_uid = $2 ORDER BY uid",
+/** The `graph_edge` rows leaving one node, projected to the columns a test asserts on. */
+const edgeRowsFrom = async <Row extends QueryResultRow>(
+  scenario: MapScenario,
+  fromUid: string,
+  columns: string,
+): Promise<readonly Row[]> => {
+  const rows = await db().pool.query<Row>(
+    `SELECT ${columns} FROM graph_edge WHERE workspace_id = $1 AND from_uid = $2 ORDER BY uid`,
     [scenario.workspaceId, fromUid],
   );
   return rows.rows;
 };
+
+const edgesFrom = (scenario: MapScenario, fromUid: string): Promise<readonly EdgeFacts[]> =>
+  edgeRowsFrom<EdgeFacts>(scenario, fromUid, "label, to_uid, to_kind");
 
 /**
  * A Product and a Policy whose body links to it, both in the index and **neither yet on the
@@ -454,13 +463,8 @@ type LinkFacts = {
   readonly sentence: string | null;
 };
 
-const linksFrom = async (scenario: MapScenario, fromUid: string): Promise<readonly LinkFacts[]> => {
-  const rows = await db().pool.query<LinkFacts>(
-    "SELECT to_uid, section, sentence FROM graph_edge WHERE workspace_id = $1 AND from_uid = $2 ORDER BY uid",
-    [scenario.workspaceId, fromUid],
-  );
-  return rows.rows;
-};
+const linksFrom = (scenario: MapScenario, fromUid: string): Promise<readonly LinkFacts[]> =>
+  edgeRowsFrom<LinkFacts>(scenario, fromUid, "to_uid, section, sentence");
 
 /** A concept whose body is the thing under test, at the bundle path every fixture links from. */
 const authorOf = (scenario: MapScenario, body: string, path = "knowledge/policy.md") =>

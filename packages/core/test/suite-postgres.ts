@@ -149,5 +149,6 @@ export const whileWritesAreRefused = async <T>(
     return await work();
   } finally {
     await pool.query(`DROP TRIGGER test_refuse_write ON "${table}"`);
+    await pool.query("DROP FUNCTION test_refuse_write()");
   }
 };

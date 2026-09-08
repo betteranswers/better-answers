@@ -341,7 +341,8 @@ describe("the Principal resolver", () => {
  * `member.role` is held to the three by a CHECK constraint, so a row outside them is a
  * database that has stopped agreeing with the code — which is the only thing `role-unknown`
  * is for. Dropping the constraint for the length of the test is how that database is
- * reached; the copy this suite runs against is its own, and the constraint goes back on.
+ * reached; the copy this suite runs against is its own, and the constraint goes back on
+ * from the definition the database held, so the three roles are never written here.
  */
 const withRoleOutsideTheThree = async (
   seeded: Seeded,
@@ -359,6 +360,13 @@ const withRoleOutsideTheThree = async (
   const role = before.rows[0]?.role;
   if (role === undefined) throw new Error("the membership to corrupt was not seeded");
 
+  const held = await pool.query<{ definition: string }>(
+    `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+      WHERE conrelid = 'member'::regclass AND conname = 'member_role_check'`,
+  );
+  const definition = held.rows[0]?.definition;
+  if (definition === undefined) throw new Error("member_role_check is not on the table");
+
   await pool.query("ALTER TABLE member DROP CONSTRAINT member_role_check");
   try {
     await pool.query(
@@ -371,9 +379,7 @@ const withRoleOutsideTheThree = async (
       ...key,
       role,
     ]);
-    await pool.query(
-      "ALTER TABLE member ADD CONSTRAINT member_role_check CHECK (role IN ('Admin', 'Editor', 'Viewer'))",
-    );
+    await pool.query(`ALTER TABLE member ADD CONSTRAINT member_role_check ${definition}`);
   }
 };
 
