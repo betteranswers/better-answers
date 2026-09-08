@@ -1,0 +1,26 @@
+apps/web/test/api-client.test.tsx
+  s_5cc55f18f6b9e2::t_d53b872f7ed9ed 42
+packages/core/test/concepts.test.ts
+  s_5cc55f18f6b9e2::t_6e4969962661ea 1428-1429
+apps/web/test/failed-screen.test.tsx
+  s_5cc55f18f6b9e2::t_555c52e48b6b4e 114
+apps/api/tests/revocation-fields.test.ts
+  s_5cc55f18f6b9e2::t_37618176972f62 37
+  s_5cc55f18f6b9e2::t_185ba049ec5902 54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b25308a18385a4a6a1d04725a0725abc80e98810",
+  "prompts": {},
+  "sessions": {
+    "s_5cc55f18f6b9e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "494d3590-8e7e-4928-8a08-4aa57b92c7f0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
