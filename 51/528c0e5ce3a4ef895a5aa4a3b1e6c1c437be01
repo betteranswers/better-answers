@@ -1,0 +1,22 @@
+packages/schema/test/warm-postgres.ts
+  s_5cc55f18f6b9e2::t_91a35fadb5cc11 97-100,103-104,107-111
+  s_5cc55f18f6b9e2::t_cb3205cbb0e2a5 130-132
+packages/schema/test/warm-postgres.test.ts
+  s_5cc55f18f6b9e2::t_3ccdfea00d5128 148-150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "51528c0e5ce3a4ef895a5aa4a3b1e6c1c437be01",
+  "prompts": {},
+  "sessions": {
+    "s_5cc55f18f6b9e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "494d3590-8e7e-4928-8a08-4aa57b92c7f0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
