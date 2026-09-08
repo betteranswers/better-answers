@@ -16,8 +16,8 @@ export default {
   // A mutant no test covers per test — a module-level declaration, run once when the file
   // loads — is "static" to the planner. With this off the planner runs the whole suite for
   // it; when that run completes no test, the report says `Survived` with `testsCompleted: 0`,
-  // a mutant nothing tested counted as one everything failed to kill (31 such rows across
-  // T-088 and T-089's reports, all on `declareActs` strings). With it on, a static mutant with
+  // a mutant nothing tested counted as one everything failed to kill (the rows T-088 found
+  // were module-level `declareActs` strings). With it on, a static mutant with
   // no per-test coverage is `Ignored` under Stryker's own reason string and leaves the score,
   // while a hybrid mutant — static plus per-test coverage — still runs against its covering
   // tests. Read from @stryker-mutator/core 10.0.0, `dist/src/mutants/mutant-test-planner.js`
