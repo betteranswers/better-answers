@@ -1,0 +1,27 @@
+packages/core/stryker.config.mjs
+  s_5cc55f18f6b9e2::t_9d2219459ae98e 28-29
+  s_5cc55f18f6b9e2::t_630bca17287ae2 24-27
+CODING_RULES.md
+  s_5cc55f18f6b9e2::t_630bca17287ae2 55
+apps/api/stryker.config.mjs
+  s_5cc55f18f6b9e2::t_9d2219459ae98e 24
+  s_5cc55f18f6b9e2::t_630bca17287ae2 16-23,25-27
+docs/agents/mutation-triage.md
+  s_5cc55f18f6b9e2::t_630bca17287ae2 22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "6acade86c4c4f5675154f39b4f22376252a28098",
+  "prompts": {},
+  "sessions": {
+    "s_5cc55f18f6b9e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "494d3590-8e7e-4928-8a08-4aa57b92c7f0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
