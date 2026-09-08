@@ -2,7 +2,8 @@ import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { describe, expect, it } from "vitest";
+import pg from "pg";
+import { describe, expect, inject, it } from "vitest";
 
 import { testData } from "./factory.ts";
 import type { MigratedPostgres } from "./harness.ts";
@@ -50,6 +51,16 @@ const databaseNameOf = async (db: MigratedPostgres): Promise<string> => {
   const named = await db.pool.query<{ name: string }>("SELECT current_database() AS name");
   return named.rows[0]?.name ?? "";
 };
+
+/** Whether a database by this name still exists on the cluster, read from another one. */
+const isLeftBehind = async (db: MigratedPostgres, name: string): Promise<boolean> => {
+  const found = await db.pool.query("SELECT 1 FROM pg_database WHERE datname = $1", [name]);
+  return (found.rowCount ?? 0) > 0;
+};
+
+/** The SQLSTATE an error carries, or its message when it is not Postgres's. */
+const codeOf = (error: Error): string =>
+  "code" in error && typeof error.code === "string" ? error.code : error.message;
 
 describe("the warm harness", () => {
   it("gives each file a database of its own — a route written through one is not there through the other", async () => {
@@ -119,15 +130,45 @@ describe("the warm harness", () => {
 
     const next = await openMigratedPostgres("after-the-stop");
     try {
-      const leftBehind = await next.pool.query("SELECT 1 FROM pg_database WHERE datname = $1", [
-        name,
-      ]);
-      expect({ leftBehind: leftBehind.rowCount, served: await routesIn(next) }).toEqual({
-        leftBehind: 0,
+      expect({ leftBehind: await isLeftBehind(next, name), served: await routesIn(next) }).toEqual({
+        leftBehind: false,
         served: 0,
       });
     } finally {
       await next.stop();
+    }
+  });
+
+  it("still drops a file's database when a session it does not own stays on it", async () => {
+    // `stop()` waits for the file's own sessions to leave before it drops, and that wait is
+    // bounded: a session nobody ends must not hold a teardown open. The stray is this test's,
+    // on the file's database by the facts the run provides every file, and it keeps an
+    // `error` listener the harness's pools have no need of, because the termination it is
+    // about to receive is this test's outcome and not a throw. Kept, not `once`: pg raises a
+    // second `error` for the socket closing under a client that never called `end()`, and
+    // only the first — the termination's own code — is the answer.
+    const warm = inject("warmPostgres");
+    if (warm === undefined) throw new Error("this run provided no warm cluster");
+    const held = await openMigratedPostgres("held-open");
+    const name = await databaseNameOf(held);
+    const strayUri = new URL(warm.connectionUri);
+    strayUri.pathname = `/${name}`;
+    const stray = new pg.Client({ connectionString: strayUri.toString() });
+    await stray.connect();
+    const terminated = new Promise<string>((resolve) => {
+      stray.on("error", (error) => resolve(codeOf(error)));
+    });
+
+    await held.stop();
+
+    const next = await openMigratedPostgres("after-held-open");
+    try {
+      expect({ leftBehind: await isLeftBehind(next, name), stray: await terminated }).toEqual({
+        leftBehind: false,
+        stray: "57P01",
+      });
+    } finally {
+      await Promise.all([next.stop(), stray.end()]);
     }
   });
 

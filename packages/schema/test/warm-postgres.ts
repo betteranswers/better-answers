@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import pg from "pg";
@@ -93,6 +94,52 @@ const withAdmin = async <T>(
 };
 
 /**
+ * How long `stop()` waits for a file's own sessions to leave its database before dropping it
+ * anyway, and how often it looks. A backend that has read its Terminate is gone within a
+ * millisecond or so; the allowance is a runaway guard for one that never reads it, so a
+ * wedged session cannot hold a teardown open to the hook allowance.
+ */
+const SESSIONS_GONE_TIMEOUT_MS = 5_000;
+const SESSIONS_GONE_POLL_MS = 20;
+
+/** The sessions still open on a database — a file's own, once its pools have been told to end. */
+const sessionsOn = async (admin: pg.Client, database: string): Promise<number> => {
+  const counted = await admin.query<{ n: number }>(
+    "SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = $1 AND backend_type = 'client backend'",
+    [database],
+  );
+  return counted.rows[0]?.n ?? 0;
+};
+
+/**
+ * Wait until no session is left on `database`, for at most the allowance above.
+ *
+ * Needed because `pool.end()` resolves before the pool's sockets have closed. pg-pool 3.14.0
+ * fires the end callback as soon as its client list is empty (`index.js:140-143`), and
+ * `_remove` empties that list synchronously *before* calling the client's own `end`
+ * (`index.js:179-181`), which is what writes the Terminate message and half-closes the
+ * socket (pg 8.23.0 `lib/connection.js:210-219`). So when `stop()` reaches the drop, every
+ * backend has been told to leave and may not yet have read it. A `DROP DATABASE … WITH
+ * (FORCE)` that lands first sends that backend SIGTERM; it answers on the still-open socket
+ * with FATAL 57P01, which pg raises as `error` on the client (`lib/client.js:416-423`)
+ * whatever its `_ending` says, the client's one listener hands it to the pool (pg-pool
+ * `index.js:52-62`), and a pool with no `error` listener throws it — an unhandled error
+ * blamed on whichever test file was tearing down.
+ *
+ * Waiting is chosen over giving the pools an `error` listener for the teardown window,
+ * because a listener would keep the race and hide its symptom: the backend would still be
+ * killed mid-goodbye, and any real error surfacing during a file's teardown would vanish
+ * with it. Waiting removes the race — the `FORCE` reaches nothing of ours. It is bounded so
+ * that a session which never leaves is dropped as it always was.
+ */
+const untilSessionsGone = async (admin: pg.Client, database: string): Promise<void> => {
+  const deadline = Date.now() + SESSIONS_GONE_TIMEOUT_MS;
+  while ((await sessionsOn(admin, database)) > 0 && Date.now() < deadline) {
+    await sleep(SESSIONS_GONE_POLL_MS);
+  }
+};
+
+/**
  * The Vitest `globalSetup`: one container, one migrated template, and the facts a file
  * needs to copy it. The migration pool is closed before anything is provided, because
  * Postgres refuses `CREATE DATABASE … TEMPLATE` while the template has a live connection —
@@ -182,8 +229,8 @@ const runningTestFile = (): string => {
  * the same line works under Playwright's served app, under the local loop and under a
  * plain `node` script.
  *
- * `stop()` closes this file's two pools and drops its database; the container outlives it,
- * and is stopped only when the Vitest instance closes.
+ * `stop()` closes this file's two pools, waits for their sessions to leave, and drops its
+ * database; the container outlives it, and is stopped only when the Vitest instance closes.
  *
  * @param databaseKey what the database is named after. Defaults to the running test file,
  *   which is what a caller wants: one database per file, the same one on a re-run. A test
@@ -205,6 +252,8 @@ export const openMigratedPostgres = async (databaseKey?: string): Promise<Migrat
   });
   return migratedPostgresOver(uriForDatabase(warm.connectionUri, database), async () => {
     await withAdmin(warm.connectionUri, async (admin) => {
+      await untilSessionsGone(admin, database);
+      // Still `FORCE`: a session that outstayed the wait is dropped with the database.
       await admin.query(`DROP DATABASE IF EXISTS ${quoted(database)} WITH (FORCE)`);
     });
   });
