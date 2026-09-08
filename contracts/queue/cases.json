@@ -2,14 +2,8 @@
   "description": "queue (ADR 0031, ADR 0005): the worker's control plane is rows, and the claim protocol is four SQL functions both tiers call — claim_job, heartbeat_job, finish_job, fail_job — all SECURITY INVOKER, so the caller's own role and the transaction's workspace scope are what fence every row they touch. Each suite seeds `workspaces` and `jobs` as the container's superuser (an `enqueued_ago_seconds` and a `lease_expires_in_seconds` are written as instants relative to now, which is how the fixture advances time without waiting), then runs each entry of `claims` as its `role` in its `workspace_id` scope ('' = no scope) and asserts the ids `claim_job` returned, in that order — an empty list meaning zero rows. Every entry of `calls` is then run in the same way and must answer exactly `expect`, and `expect_final` is read back per job as the superuser, `attempts` and `status` together, so a poisoning or a lost lease is visible as the row it left behind. A lease that has lapsed revokes its claimant: the heartbeat, the finish and the failure all answer false to the worker that let it lapse, whether or not anybody has claimed the job since, because from that instant the job is the queue's to hand out again.",
   "lease_seconds": 60,
   "workspaces": [
-    {
-      "id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
-      "name": "Workspace A"
-    },
-    {
-      "id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
-      "name": "Workspace B"
-    }
+    { "id": "01J6AAAAAAAAAAAAAAAAAAAAAA", "name": "Workspace A" },
+    { "id": "01J6BBBBBBBBBBBBBBBBBBBBBB", "name": "Workspace B" }
   ],
   "jobs": [
     {
@@ -172,10 +166,7 @@
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "job_id": "01J6J2AAAAAAAAAAAAAAAAAAAA",
       "worker_id": "worker-1",
-      "outcome": {
-        "checked": 2,
-        "mismatched": []
-      },
+      "outcome": { "checked": 2, "mismatched": [] },
       "expect": true
     },
     {
@@ -185,10 +176,7 @@
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "job_id": "01J6J2AAAAAAAAAAAAAAAAAAAA",
       "worker_id": "worker-1",
-      "outcome": {
-        "checked": 2,
-        "mismatched": []
-      },
+      "outcome": { "checked": 2, "mismatched": [] },
       "expect": false
     },
     {
@@ -198,9 +186,7 @@
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "job_id": "01J6J1AAAAAAAAAAAAAAAAAAAA",
       "worker_id": "worker-1",
-      "outcome": {
-        "unparsed": ["knowledge/expenses.md"]
-      },
+      "outcome": { "unparsed": ["knowledge/expenses.md"] },
       "expect": true
     },
     {
@@ -228,10 +214,7 @@
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "job_id": "01J6J6BBBBBBBBBBBBBBBBBBBB",
       "worker_id": "worker-slow",
-      "outcome": {
-        "checked": 1,
-        "mismatched": []
-      },
+      "outcome": { "checked": 1, "mismatched": [] },
       "expect": false
     },
     {
@@ -241,9 +224,7 @@
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "job_id": "01J6J6BBBBBBBBBBBBBBBBBBBB",
       "worker_id": "worker-slow",
-      "outcome": {
-        "error": "TimeoutError"
-      },
+      "outcome": { "error": "TimeoutError" },
       "expect": false
     }
   ],

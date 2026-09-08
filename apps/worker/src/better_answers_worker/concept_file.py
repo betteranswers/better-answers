@@ -30,7 +30,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import Any
+from typing import Any, NoReturn
 
 #: A frontmatter value, in the shapes the renderer writes: a scalar, a list of strings,
 #: or OKF's one list of objects (``sources[]``). Written as `Sequence` and `Mapping`
@@ -64,7 +64,7 @@ _FRONTMATTER_LINE = re.compile(r'^("(?:[^"\\]|\\.)*"):(?: (.*))?$')
 UNHASHED_KEYS = frozenset({"generated", "verified", "stale_after", "status", "iri"})
 
 
-def _not_a_number(constant: str) -> Scalar:
+def _not_a_number(constant: str) -> NoReturn:
     """`NaN`, `Infinity` and `-Infinity` refused: JSON has no such values and the app's
     parser (`JSON.parse`) answers `malformed` to the text, so accepting them here would
     be reading a file the app never wrote and could never read back.

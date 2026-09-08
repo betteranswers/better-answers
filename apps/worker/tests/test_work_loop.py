@@ -309,6 +309,7 @@ def test_a_rebuild_holds_the_generation_row_before_it_reads_so_a_write_beside_it
     workspace = seed_workspace(database.cursor())["id"]
     with database.cursor() as cursor:
         expenses = seed_expenses(cursor, workspace)
+        # Raw, against `[TEST4]`: this suite's factories have none for graph_generation.
         cursor.execute(
             "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, 1)",
             (workspace,),
@@ -455,6 +456,7 @@ def test_a_rebuild_writes_the_next_generation_beside_the_live_one_and_flips_it(
             body="Receipts are kept for six years.",
             kind="Evidence",
         )
+        # Raw, against `[TEST4]`: this suite's factories have none for graph_generation.
         cursor.execute(
             "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, 1)",
             (workspace,),

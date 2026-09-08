@@ -4,6 +4,7 @@ import {
   readableParameters,
   RESTRICTED_TO_ADMINS,
   visibilityOf,
+  type Visibility,
   type VisibilityRow,
 } from "../access/index.ts";
 import {
@@ -46,6 +47,20 @@ type IncludeRow = {
   readonly audience: string | null;
   readonly audience_groups: readonly string[] | null;
 };
+
+/**
+ * What one include contributes to the derivation: the concept's own pair, or Restricted to
+ * Admins where the concept has no row — the most restrictive visibility there is, standing
+ * in for a class nobody can yet say (the rule the recompute's docblock states).
+ */
+const visibilityOfInclude = (include: IncludeRow): Visibility =>
+  include.sensitivity === null || include.audience === null
+    ? RESTRICTED_TO_ADMINS
+    : visibilityOf({
+        sensitivity: include.sensitivity,
+        audience: include.audience,
+        audience_groups: include.audience_groups,
+      });
 
 /**
  * The cascade's second level, in the caller's transaction: every composition including one
@@ -102,15 +117,7 @@ export const recomputeCompositionsIncluding = async (
       [composition.workspace_id, composition.id],
     );
     const derived = derivedVisibility({
-      from: includes.rows.map((include) =>
-        include.sensitivity === null || include.audience === null
-          ? RESTRICTED_TO_ADMINS
-          : visibilityOf({
-              sensitivity: include.sensitivity,
-              audience: include.audience,
-              audience_groups: include.audience_groups,
-            }),
-      ),
+      from: includes.rows.map(visibilityOfInclude),
       fallback: visibilityOf(composition),
     });
     await tx.query(

@@ -4,9 +4,11 @@ point).
 What is asserted here is what this tier can know on its own: that the grammar the app's
 renderer writes round-trips, that a file outside that grammar is refused rather than
 guessed at, and that the hash carries exactly what ADR 0014 says it carries. That the
-two tiers agree on a *number* is not something either tier can assert alone — it is the
-nightly audit reporting zero mismatches over a bundle the app itself wrote, which is
-`test_work_loop.py` here and the cross-tier rebuild-equivalence test in `packages/core`.
+two tiers agree on a *number* is the concept-file agreement's (ADR 0031): the fixture in
+`contracts/concept-file/` holds both canonicalisers to one text and one hash, in
+`test_tier_contract.py` here — and the nightly audit reporting zero mismatches over a
+bundle the app itself wrote is `test_work_loop.py` and the cross-tier
+rebuild-equivalence test in `packages/core`.
 """
 
 import pytest
@@ -143,70 +145,11 @@ def test_writes_a_numeric_locator_the_way_the_other_tier_writes_it() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    ("value", "javascript"),
-    [
-        # Read from `JSON.stringify` in Node 24 on 8 September 2026 — the other tier's
-        # number rule, which this one reproduces rather than guesses at.
-        (1e21, "1e+21"),
-        (1e-7, "1e-7"),
-        (0.000001, "0.000001"),
-        (0.00001, "0.00001"),
-        (0.5e-6, "5e-7"),
-        (0.1, "0.1"),
-        (-0.0, "0"),
-        (100.0, "100"),
-        (123.456, "123.456"),
-        (1e16, "10000000000000000"),
-        (1.5e300, "1.5e+300"),
-        (-1.5e-10, "-1.5e-10"),
-        (4, "4"),
-        (-42, "-42"),
-        (2**53, "9007199254740992"),
-        (12345678901234567890, "12345678901234567000"),
-        (123456789012345680000, "123456789012345680000"),
-    ],
-)
-def test_writes_every_number_the_way_javascript_writes_it(
-    value: float, javascript: str
-) -> None:
-    # Python's own repr and JavaScript's Number::toString choose the same shortest
-    # digits and then lay them out differently — `1e-07` against `1e-7`, a twenty-two-
-    # digit integer against `1e+21` — and an integer past 2^53 is a double over there.
-    # Each is a false mismatch the nightly audit would report over a file the app wrote.
-    cited: list[SourceEntry] = [{"resource": "/a.md", "locator": value}]
-    numeric: Frontmatter = {"n": value, "sources": cited}
-
-    assert canonical_frontmatter(numeric, "knowledge/x.md") == (
-        f'{{"n":{javascript},"sources":[["/a.md","{javascript}"]]}}'
-    )
-
-
-def test_hashes_what_the_other_tier_hashes_over_every_number_shape() -> None:
-    # The number the app's own `contentHashOf` produced for this frontmatter, written
-    # down (the `contentHashOf` probe of 8 September 2026): a disagreement here is the
-    # nightly audit reporting a mismatch over a file the app wrote.
-    page: list[SourceEntry] = [{"resource": "/a.md", "locator": 1e21}]
-    frontmatter: Frontmatter = {
-        "count": 1e21,
-        "ratio": 1e-7,
-        "tiny": 0.000001,
-        "half": 0.5,
-        "big": 12345678901234567890,
-        "exact": 9007199254740992,
-        "sources": page,
-    }
-    body = "Expenses are claimed within thirty days."
-
-    assert content_hash_of(frontmatter, body, "knowledge/policies/expenses.md") == (
-        "33dce930674c2fd989f1c8ab9507a7ece82a60a7f0e7b23ee5b3ec548dbfdf70"
-    )
-
-
 def test_hashes_a_list_of_objects_whichever_order_their_keys_came_in() -> None:
     # A vendor's list, preserved verbatim in the file and canonicalised for the hash
     # (RFC 8785): the order a producer wrote an object's keys in is not content. The
-    # number is the app's own `contentHashOf` over the same file, written down.
+    # number itself, and every number shape, are the concept-file agreement's
+    # (`contracts/concept-file/cases.json`, held in `test_tier_contract.py`).
     body = "Expenses are claimed within thirty days."
     as_written: list[SourceEntry] = [
         {"name": "Ada", "role": "finance"},
@@ -219,9 +162,6 @@ def test_hashes_a_list_of_objects_whichever_order_their_keys_came_in() -> None:
     written: Frontmatter = {"reviewers": as_written}
     reordered: Frontmatter = {"reviewers": as_reordered}
 
-    assert content_hash_of(written, body, "knowledge/policies/expenses.md") == (
-        "39d526207876ae89b4473f7f3a46bf95f320a954f98c0183a6d08d22ceedce47"
-    )
     assert content_hash_of(reordered, body, "knowledge/policies/expenses.md") == (
         content_hash_of(written, body, "knowledge/policies/expenses.md")
     )

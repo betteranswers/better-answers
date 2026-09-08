@@ -95,35 +95,46 @@ export const reducedSources = (
  * The frontmatter as ADR 0014's hash reads it, written straight as canonical JSON: keys
  * sorted, the trust and identity keys dropped, `sources[]` reduced. A string rather than an
  * object, because the object was never anything but a step on the way to these bytes.
+ * Exported for the concept-file agreement's suite alone (ADR 0031), which holds this text —
+ * not only the hash over it — to the fixture both tiers read.
  */
-const canonicalFrontmatter = (frontmatter: Frontmatter, path: string): string => {
+export const canonicalFrontmatter = (frontmatter: Frontmatter, path: string): string => {
   const pairs = Object.keys(frontmatter)
     .toSorted()
     .filter((key) => !UNHASHED_KEYS.has(key))
     .map((key) => {
       const value = frontmatter[key];
-      const reduced = key === "sources" ? reducedSources(value, path) : canonicalValue(value);
-      return `${JSON.stringify(key)}:${JSON.stringify(reduced)}`;
+      const text =
+        key === "sources" ? JSON.stringify(reducedSources(value, path)) : canonicalText(value);
+      return `${JSON.stringify(key)}:${text}`;
     });
   return `{${pairs.join(",")}}`;
 };
 
 /**
- * A value as the hash reads it: a list of objects under any key but `sources` — a vendor's,
- * a future spec's, preserved verbatim (ADR 0019) — has each object's keys sorted, so the hash
- * is the same whichever order a producer wrote them in (RFC 8785). `sources[]` never reaches
- * here: the reduction replaces its objects with pairs.
+ * A value as the hash reads it, written straight as text: a list of objects under any key
+ * but `sources` — a vendor's, a future spec's, preserved verbatim (ADR 0019) — has each
+ * object's pairs written in sorted key order, so the hash is the same whichever order a
+ * producer wrote them in (RFC 8785). Written by hand rather than through a rebuilt object,
+ * because `JSON.stringify` writes an object's integer-like keys first, in numeric order,
+ * whatever order they were inserted in — `{"2":…,"10":…,"a":…}` where RFC 8785 and the
+ * worker's port write `{"10":…,"2":…,"a":…}` (the concept-file agreement, ADR 0031). The
+ * comparison is `<` on strings — UTF-16 code units, the order the port sorts in too.
+ * `sources[]` never reaches here: the reduction replaces its objects with pairs.
  */
-const canonicalValue = (value: FrontmatterValue | undefined): FrontmatterValue | undefined =>
+const canonicalText = (value: FrontmatterValue | undefined): string =>
   Array.isArray(value)
-    ? value.map((item) =>
-        typeof item === "object" && item !== null
-          ? Object.fromEntries(
-              Object.entries(item).toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
-            )
-          : item,
-      )
-    : value;
+    ? `[${value
+        .map((item) =>
+          typeof item === "object" && item !== null
+            ? `{${Object.keys(item)
+                .toSorted((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+                .map((key) => `${JSON.stringify(key)}:${JSON.stringify(item[key])}`)
+                .join(",")}}`
+            : JSON.stringify(item),
+        )
+        .join(",")}]`
+    : JSON.stringify(value);
 
 /**
  * The content hash a check confirms (ADR 0014, ADR 0019): SHA-256 over the canonical JSON of

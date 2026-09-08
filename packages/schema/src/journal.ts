@@ -27,33 +27,61 @@ const journalSchema = z.object({
 export type JournalEntry = { readonly tag: string; readonly when: number };
 
 /**
+ * Why a journal was refused: an entry whose instant does not follow the one before it. The
+ * two entries are the refusal, so a caller can say which pair rather than that a check failed.
+ */
+export type JournalRefusal = { readonly earlier: JournalEntry; readonly later: JournalEntry };
+
+/**
+ * The kernel's `Result` shape, written here because this package sits below `packages/core`
+ * and cannot import it (the import direction, ADR 0029); the shape is the rule's, not a second
+ * convention.
+ */
+type Result<T, E> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly error: E };
+
+/**
  * The journal's entries as one document holds them — **refusing two migrations at one
  * instant**. The worker's stamp check compares `when` alone, so two entries sharing one would
  * make a database stopped after the earlier of them read as stamped with the later: the
  * worker would claim against a schema one migration short of the view it was generated from.
  * drizzle-kit mints `when` from its own clock and never repeats one in practice; this is what
  * turns "in practice" into a fact the generator and the drift test hold, and a hand-edited
- * journal cannot get past.
+ * journal cannot get past. The shape is zod's to refuse (the boundary's parse throws, as it
+ * does everywhere); the order is this function's, and it answers a `Result`.
  */
 type JournalDocument = z.input<typeof journalSchema>;
 
-export const journalEntriesOf = (document: JournalDocument): readonly JournalEntry[] => {
+export const journalEntriesOf = (
+  document: JournalDocument,
+): Result<readonly JournalEntry[], JournalRefusal> => {
   const { entries } = journalSchema.parse(document);
-  for (const [position, entry] of entries.entries()) {
+  for (const [position, later] of entries.entries()) {
     const earlier = entries[position - 1];
-    if (earlier !== undefined && entry.when <= earlier.when) {
-      throw new Error(
-        `the journal's instants must strictly increase, but ${entry.tag} (${entry.when}) does not follow ${earlier.tag} (${earlier.when}): the worker's stamp check could not tell the two apart`,
-      );
+    if (earlier !== undefined && later.when <= earlier.when) {
+      return { ok: false, error: { earlier, later } };
     }
   }
-  return entries;
+  return { ok: true, value: entries };
 };
 
-export const journalEntries = (): readonly JournalEntry[] =>
-  journalEntriesOf(
+/**
+ * The tracked journal's entries. A refusal here is a defect in a committed file, found by the
+ * generator or the drift test before any view is rendered, so it is thrown in the refusal's
+ * own words — the same class of stop as `lastMigration`'s empty journal — rather than handed
+ * to a script that has nothing to do with it but exit.
+ */
+export const journalEntries = (): readonly JournalEntry[] => {
+  const read = journalEntriesOf(
     JSON.parse(readFileSync(path.join(migrationsFolder, "meta", "_journal.json"), "utf8")),
   );
+  if (read.ok) return read.value;
+  const { earlier, later } = read.error;
+  throw new Error(
+    `the journal's instants must strictly increase, but ${later.tag} (${later.when}) does not follow ${earlier.tag} (${earlier.when}): the worker's stamp check could not tell the two apart`,
+  );
+};
 
 export const journalMigrationFiles = (): readonly string[] =>
   journalEntries().map((entry) => path.join(migrationsFolder, `${entry.tag}.sql`));

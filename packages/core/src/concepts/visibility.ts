@@ -243,12 +243,16 @@ const serialisingCascades = async (principal: Principal, tx: Tx): Promise<void> 
 };
 
 /**
- * The head every act that writes an audience shares: the workspace's cascade lock, then
- * whether the workspace holds every group the act names (`holdsEveryGroup`, an Admin's
- * question). Answered as one `Result` so the two acts read one gate and not two copies of
- * it; what each then reads of its own rows — the binding, the concept — is its own.
+ * The head every act that writes an audience shares, and **what it answers is
+ * `holdsEveryGroup`'s question**: whether the workspace holds every group the act names —
+ * `true` when it does, `false` when the audience names a group nobody minted — asked only
+ * once the workspace's cascade lock is held (`serialisingCascades`). Answered as one `Result`
+ * so the two acts read one gate and not two copies of it; what each then reads of its own
+ * rows — the binding, the concept — is its own. `holdsEveryGroup` asks `requireAdmin` of a
+ * principal this signature already narrowed: that check is the members door's own contract,
+ * refused to anyone else and tested there, and it is a role comparison, not a read.
  */
-export const openingACascade = async (
+export const openingACascadeOverHeldGroups = async (
   admin: AdminUserPrincipal,
   tx: Tx,
   groupIds: readonly GroupId[],
@@ -388,7 +392,11 @@ export const overrideConceptClass = async (
 
   // At the head, before any row is read: an override cascades, and cascades in one
   // workspace run one after the other (`serialisingCascades`).
-  const groups = await openingACascade(admin.value, tx, visibility.audienceGroups ?? []);
+  const groups = await openingACascadeOverHeldGroups(
+    admin.value,
+    tx,
+    visibility.audienceGroups ?? [],
+  );
   if (!groups.ok) return err(groups.error);
   const known = await attempt(() =>
     tx.query("SELECT 1 FROM concept_identity WHERE workspace_id = $1 AND iri = $2", [

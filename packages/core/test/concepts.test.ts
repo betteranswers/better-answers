@@ -428,12 +428,14 @@ describe("a governed write", () => {
 });
 
 /**
- * The content hash and the rendered file, asserted against **values written down here**.
+ * The content hash and the rendered file, asserted against **values written down**.
  *
  * Both are cross-tier contracts — the hash is the canonical form ADR 0014 fixes and the file
  * is "readable by any OKF tool" (ADR 0012) — so an expectation computed by calling the same
- * function would agree with a canonicalisation the Python tier could not read. The literals
- * are the agreement; the code either produces them or it has moved the contract.
+ * function would agree with a canonicalisation the Python tier could not read. The hash's
+ * literals are the concept-file agreement's (`contracts/concept-file/cases.json`, held in
+ * `concept-file.contract.test.ts` and the worker's twin); what stays here is what the hash
+ * leaves out and what it reduces, and the rendered file's literals.
  */
 describe("what a concept hashes and what it renders", () => {
   const HASHED_PATH = "knowledge/policies/expenses.md";
@@ -464,11 +466,9 @@ describe("what a concept hashes and what it renders", () => {
     // spaces and tabs, and a run of blank lines at the end.
     const body = "First line   \r\nsecond line\t\r\n\r\n\r\n";
 
-    expect(contentHashOf(frontmatter, body, HASHED_PATH)).toBe(
-      "db4fdd1329189f0ee7d4c0e9c3c736cb811c1cad0f2e433841046e13d8bdda7e",
-    );
     // The same hash with every trust key and the identity moved: hashing them would make a
     // check of its own recording move the hash and read *Changed since checked* at once.
+    // The number itself is the concept-file agreement's first case.
     expect(
       contentHashOf(
         {
@@ -482,7 +482,7 @@ describe("what a concept hashes and what it renders", () => {
         body,
         HASHED_PATH,
       ),
-    ).toBe("db4fdd1329189f0ee7d4c0e9c3c736cb811c1cad0f2e433841046e13d8bdda7e");
+    ).toBe(contentHashOf(frontmatter, body, HASHED_PATH));
   });
 
   it("hashes a list of objects under any other key the same whichever order their keys were written in", () => {
@@ -522,8 +522,6 @@ describe("what a concept hashes and what it renders", () => {
 
     expect(reordered).toBe(written);
     expect(changed).not.toBe(written);
-    // Written down, because the Python tier holds the same number to the same file.
-    expect(written).toBe("39d526207876ae89b4473f7f3a46bf95f320a954f98c0183a6d08d22ceedce47");
   });
 
   it("hashes a `sources` that is no list, and an entry citing nothing, as citing nothing", () => {

@@ -12,7 +12,10 @@ import {
   type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { openingACascade, recomputeVisibilitySourcedFrom } from "../concepts/index.ts";
+import {
+  openingACascadeOverHeldGroups,
+  recomputeVisibilitySourcedFrom,
+} from "../concepts/index.ts";
 import { recomputeCompositionsIncluding } from "../guides/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
@@ -102,7 +105,7 @@ type BindingRow = {
  * narrowing from committing a class the narrowed binding no longer allows.
  *
  * **Before that, at the very head of the transaction, the workspace's cascade lock**
- * (`openingACascade`, over `serialisingCascades`): two narrowings of two bindings one concept cites would otherwise
+ * (`openingACascadeOverHeldGroups`, over `serialisingCascades`): two narrowings of two bindings one concept cites would otherwise
  * each hold its own binding and want the other `FOR SHARE` through that concept — a deadlock
  * Postgres ends by aborting one Admin's act with a store failure. Narrowings in one workspace
  * run one after the other instead, which is what "synchronous, in the act's own transaction"
@@ -120,7 +123,7 @@ export const narrowBinding = async (
   if (!bindingId.success || next === undefined) return err("malformed");
   const { workspaceId } = admin.value;
 
-  const groups = await openingACascade(admin.value, tx, next.audienceGroups ?? []);
+  const groups = await openingACascadeOverHeldGroups(admin.value, tx, next.audienceGroups ?? []);
   if (!groups.ok) return err(groups.error);
   const known = await attempt(() =>
     tx.query<BindingRow>(

@@ -91,7 +91,7 @@ export {
 export {
   evidencePaneOf,
   overrideConceptClass,
-  openingACascade,
+  openingACascadeOverHeldGroups,
   recomputeVisibilitySourcedFrom,
   type ConceptClassOverridden,
   type EvidencePane,

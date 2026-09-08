@@ -16,10 +16,15 @@ ADR 0029 named the app↔worker contract as the risk that outlives it: six cross
 | llm-routing | SQL function | one route per workspace per purpose, resolved by the database, never twice in code |
 | cost-ledger | generated | the `llm_call` row type from the schema (ADR 0028); golden rows fixture its meaning (ADR 0025) |
 | id-shape | fixtured | the one shape every id either tier mints has (ADR 0035); added 05/09/2026, see below |
+| concept-file | fixtured | the canonical text and content hash a concept file has whichever tier read it (ADR 0014, ADR 0019); added 08/09/2026, see below |
 
 ## Amendment, 05/09/2026 — the set is seven: id-shape joins it
 
 ADR 0035 gives the platform one minter and one id shape, and the shape is cross-tier by construction: the worker seeds and reads ids the app minted, and the app parses ids the worker wrote at a boundary that now narrows to the pattern (ADR 0028). That is exactly an agreement in this ADR's sense, and its form is *fixtured* — the pattern, the ids that must parse and the ids that must not, in `contracts/id-shape/cases.json`, with each tier holding it against its own minter and its own boundary rather than against a written-out copy. **The six of the title become seven**; nothing about the three forms, the two thin runners or the directory's place changes, and `contract_version` bumps to 1 for the first time, which is the mechanism this ADR built working as designed (T-074).
+
+## Amendment, 08/09/2026 — the set is eight: concept-file joins it
+
+ADR 0014's content hash is computed twice: by the app at every write and replay, and by the worker on every nightly audit, which reports a concept *mismatched* when its number differs. Two parsers holding one number is an agreement in this ADR's sense, and its form is *fixtured* — `contracts/concept-file/cases.json`, a frontmatter in and the canonical text and SHA-256 out, with the cases the two languages disagree on by default: an object's integer-like keys (which a JavaScript object enumerates first, in numeric order, and RFC 8785 sorts as the text they are), every number shape `Number::toString` and Python's `repr` lay out differently, the `sources[]` reduction and the trust keys left out. Each tier holds its own canonicaliser and hash to the fixture rather than to a hash literal copied from the other tier's probe, which is what the two suites did until PR #51's second review round found the sort disagreeing. **The seven become eight**; the three forms, the two thin runners and the directory's place stand, and `contract_version` bumps to 5.
 
 ## The read predicate leaves the contract
 

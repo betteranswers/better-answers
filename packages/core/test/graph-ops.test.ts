@@ -164,7 +164,9 @@ describe("sweeping a workspace's map", () => {
     await mapWithLeftovers(workspace);
     // A second rebuild's generation beside the first's, flipped live as a rebuild flips it
     // — the database admits a row only in the live generation or the next (migration
-    // 0022) — so the leftovers are the two generations before it.
+    // 0022) — so the leftovers are the two generations before it. The flips are raw
+    // statements: `seed.graphGeneration` inserts a workspace's row, which the map above
+    // already has, and the flip is the worker's act, which no door of this tier performs.
     await seeded(async (seed) => {
       await db().pool.query("UPDATE graph_generation SET live_gen = 2 WHERE workspace_id = $1", [
         workspace.workspaceId,

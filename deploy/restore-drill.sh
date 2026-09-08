@@ -61,6 +61,14 @@ ops() {
   if [ "${rc}" -eq "${NOT_BUILT}" ]; then aside "  -> not built yet: 'pnpm ops $1' found no tables for its slice (recorded, not failed)"; return 0; fi
   return "${rc}"
 }
+# prod_query <sql> — one read of production over the SSH hop, the answer on stdout as `psql -At`
+# writes it. The SQL travels on stdin: an argument would be re-split by the shell on the far side
+# of the hop. A hop or psql failure is refused through `aside` — never `say`, whose stdout a
+# caller's `$(…)` would capture as the answer — and the caller stops the drill on the status.
+prod_query() {
+  if printf '%s' "$1" | ${PROD_PSQL} -At; then return 0; fi
+  aside "REFUSED: production could not be read for the counts diff — the SSH hop or psql failed"; return 1
+}
 wipe_staging() {
   platform down --remove-orphans || true; stores down --remove-orphans || true
   # NOT "${WORK}": step 0 wipes too, and the report being written lives there — the work
@@ -146,19 +154,15 @@ say "## 6 counts diff against production's stamped run (ADR 0023) — production
 # into a recorded 0): there is nothing to diff and nothing to report.
 if ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts" && [ -s "${WORK}/staging.counts" ]; then
   cat "${WORK}/staging.counts" >> "${REPORT}"
-  # The SQL travels on stdin: an argument would be re-split by the shell on the far side of the SSH hop.
   # Production is read in two steps, so a hop that fails is never mistaken for a run that was
   # never stamped: first whether the stamped-run table exists there at all, then the latest
   # good run's counts. An SSH or psql failure stops the drill — a report that said "no stamped
   # run" over a connection that never answered would be the diff quietly skipped — and only an
   # absent table or an empty answer is the baseline being absent.
-  if ! stamped=$(printf '%s' "select to_regclass('public.graph_sync_run') is not null" | ${PROD_PSQL} -At); then
-    say "REFUSED: production could not be read for the counts diff — the SSH hop or psql failed"; exit 1
-  fi
+  if ! stamped=$(prod_query "select to_regclass('public.graph_sync_run') is not null"); then exit 1; fi
   if [ "${stamped}" = "t" ]; then
-    if ! printf '%s' "select counts_json from graph_sync_run where workspace_id = '${DRILL_WORKSPACE}' and outcome = 'ok' order by finished_at desc limit 1" \
-      | ${PROD_PSQL} -At > "${WORK}/prod.counts"; then
-      say "REFUSED: production could not be read for the counts diff — the SSH hop or psql failed"; exit 1
+    if ! prod_query "select counts_json from graph_sync_run where workspace_id = '${DRILL_WORKSPACE}' and outcome = 'ok' order by finished_at desc limit 1" > "${WORK}/prod.counts"; then
+      exit 1
     fi
   else
     : > "${WORK}/prod.counts"

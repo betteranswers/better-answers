@@ -17,8 +17,9 @@ from typing import Any, cast
 import pytest
 from psycopg import Cursor
 
-SPOKEN_CONTRACT_VERSION = 4
+SPOKEN_CONTRACT_VERSION = 5
 SPOKEN_AGREEMENTS = {
+    "concept-file": "fixtured",
     "concept-inbox": "sql-function",
     "cost-ledger": "generated",
     "id-shape": "fixtured",
@@ -431,3 +432,54 @@ def test_the_queue_hands_out_every_job_the_fixture_says_and_answers_every_call()
             )
         ]
         connection.rollback()
+
+
+# --- concept-file: one canonical text and one hash, whichever tier read the file ------
+# (ADR 0031, ADR 0014, ADR 0019)
+#
+# The fixture is the contract: a frontmatter in, and the canonical text and the SHA-256
+# both tiers must produce — for the cases the two languages disagree on by default, an
+# object's integer-like keys and every number shape among them. This tier hashes on
+# every nightly audit and reports a concept mismatched when its number differs from the
+# app's, so what the fixture pins is what a *mismatch* is allowed to mean: the file
+# changed, never the two canonicalisers disagreeing. The TypeScript half runs the same
+# cases in packages/core/test/concept-file.contract.test.ts.
+
+
+def read_concept_file() -> dict[str, Any]:
+    raw = (CONTRACTS_DIR / "concept-file" / "cases.json").read_text(encoding="utf-8")
+    return cast("dict[str, Any]", json.loads(raw))
+
+
+def test_the_concept_file_canonical_text_and_hash_are_the_fixtures_for_every_case() -> (
+    None
+):
+    from better_answers_worker.concept_file import (
+        Frontmatter,
+        canonical_frontmatter,
+        content_hash_of,
+    )
+
+    for case in read_concept_file()["cases"]:
+        frontmatter = cast("Frontmatter", case["frontmatter"])
+        produced = {
+            "why": case["why"],
+            "canonical": canonical_frontmatter(frontmatter, case["path"]),
+            "sha256": content_hash_of(frontmatter, case["body"], case["path"]),
+        }
+        assert produced == {
+            "why": case["why"],
+            "canonical": case["canonical"],
+            "sha256": case["sha256"],
+        }
+
+
+def test_every_number_the_fixture_names_is_written_as_the_text_both_tiers_write() -> (
+    None
+):
+    from better_answers_worker.concept_file import canonical_frontmatter
+
+    for entry in read_concept_file()["numbers"]:
+        assert canonical_frontmatter({"n": entry["value"]}, "knowledge/x.md") == (
+            f'{{"n":{entry["text"]}}}'
+        ), entry

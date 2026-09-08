@@ -83,10 +83,10 @@ describe("the worker's schema view", () => {
     expect(new Set(entries.map((entry) => entry.when)).size).toBe(entries.length);
 
     const last = entries.at(-1);
-    expect(() =>
-      journalEntriesOf({
-        entries: [...entries, { tag: "9999_a-second-at-the-same-instant", when: last?.when ?? 0 }],
-      }),
-    ).toThrow(/strictly increase/);
+    const later = { tag: "9999_a-second-at-the-same-instant", when: last?.when ?? 0 };
+    expect(journalEntriesOf({ entries: [...entries, later] })).toEqual({
+      ok: false,
+      error: { earlier: last, later },
+    });
   });
 });

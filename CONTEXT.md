@@ -196,6 +196,12 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **lease** — the scheduler's grip on a claimed run: held only while the worker keeps confirming it
   is alive, expiring otherwise, so a run whose worker died is handed back for another claim rather
   than lost. _Avoid_: lock (nothing waits on it).
+- **claimant** — the worker holding a job's claim: the only one that may keep its lease alive,
+  finish it or fail it — and no longer the claimant once the lease has lapsed, whether or not the
+  job has been claimed again since. _Avoid_: owner (a job has none), holder.
+- **outcome** — what a run found, written once at its end by its claimant: counts, and the ids or
+  paths it counted them at, or the name of what went wrong — never content, never a person's name,
+  so a record of what a run did is kept as it was written. A job that never ran has none.
 - **extraction plan** — the priced scope of extraction for one binding, accepted once by an Admin at
   review: the documents, the template per kind and the route, with hours and pounds from measured
   rates. Once accepted, every run extracts as it indexes; a run that would reprocess more than a set
@@ -218,6 +224,11 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   if needed, named individuals). Set on the binding, carried with sensitivity onto every chunk and
   source entity, and applied with *published* on every read and traversal hop. Distinct from
   sensitivity (how confidential) and from trust (how reliable).
+- **cascade** — the re-derivation an Admin's narrowing of a binding, or override of a concept's
+  class, sets off inside the same act: first every concept citing the binding's evidence, then
+  every composition including one of those concepts — two levels, the second reading what the first
+  wrote, never a third — so a guide never reaches a reader its includes would not. _Avoid_:
+  recompute (one level's work, not the whole), propagation.
 - **group** — a named set of members of one workspace: the one grouping concept, and the unit an
   *audience* names when a binding is not for everyone. Groups are flat, and a person may belong to
   several. A group may represent a team ("HR team", "Sales executives") — that is its name, not a
