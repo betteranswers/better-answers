@@ -1216,10 +1216,10 @@ describe("find", () => {
         map: { state: "live" },
       },
     });
-    expect(admin?.ok && admin.value.citations.map((citation) => citation.iri).toSorted()).toEqual(
+    expect(admin.ok && admin.value.citations.map((citation) => citation.iri).toSorted()).toEqual(
       [visible.iri, withheld.iri].toSorted(),
     );
-    expect(unrelated?.ok && unrelated.value.citations).toEqual([]);
+    expect(unrelated.ok && unrelated.value.citations).toEqual([]);
   });
 
   it("keeps the limit, reads the query as text and never as a pattern, and answers nothing to nothing", async () => {
