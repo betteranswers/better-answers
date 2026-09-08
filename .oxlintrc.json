@@ -28,9 +28,10 @@
   // The mode reaches further than the floating-promise rule below: oxlint files a family of
   // type-aware rules under `correctness`, and the category holds every one of them the `rules`
   // block does not name. So a type-aware rule is switched *off* by having a line here and
-  // adopted by losing it, which reads backwards from the rest of this file. Two below are
+  // adopted by losing it, which reads backwards from the rest of this file. Three below are
   // named anyway: the floating-promise rule, because it carries options the category cannot
-  // give it, and the sort rule, because it is the one declined.
+  // give it; the sort rule, because it is the one declined; and the unnecessary-condition
+  // rule, because oxlint files it under `nursery`, which no category here holds.
   "options": {
     "typeAware": true
   },
@@ -56,6 +57,16 @@
     // so the deliberate case is a word a reader can see rather than an absence they cannot.
     // Type-aware: it needs the checker to know a call returns a promise (see `options` above).
     "typescript/no-floating-promises": ["error", { "ignoreVoid": true }],
+    // A guard the type already makes unreachable — a `=== undefined` on a value typed
+    // `T | null`, a `?? ""` behind a string, a literal compared with itself — refuses a value
+    // the boundary refused, and it is worse than dead: a fault behind it stays green, because
+    // the branch reads as cover and covers nothing. One guard per condition, at the boundary
+    // ([DESIGN4]); the fix is the guard removed or the type corrected, never a disable at the
+    // site. Type-aware, and outside `correctness` — oxlint files it under `nursery`, which no
+    // category in this file holds — so it is named. It sees the guard the *type* excludes; the
+    // guard a sibling runtime check masks is the scheduled mutation report's to find. The one
+    // zone it does not run over is the registry source, in that override with its reason.
+    "typescript/no-unnecessary-condition": "error",
     // The one rule of that family this tree does not carry. Sorting without a comparator
     // orders by each element's string form, which is the wrong order for anything but strings
     // — and the rule ignores arrays of strings for exactly that reason, so what it objects to
@@ -449,6 +460,11 @@
       // the part that is theirs; leaving them on would mean rewriting an upstream carousel's
       // effects on every registry update and calling the result reviewed.
       //
+      // The unnecessary-condition rule is the fifth, for the same reason: an upstream
+      // carousel's `api?.off` inside the effect that already refused a missing `api` is how
+      // its author wrote it, and it comes back with the next registry update. The zone's
+      // relaxation is proved beside the rule's own cases in apps/api/tests/lint-rules.test.ts.
+      //
       // What is *not* relaxed: every import rule above, `no-console`, the anti-slop rules
       // that catch a widened type, and `[A11Y1]` itself — a screen carries the WCAG 2.2 AA
       // line and is tested with a keyboard and a screen reader whatever a primitive does.
@@ -459,7 +475,8 @@
         "react/set-state-in-effect": "off",
         "react-doctor/effect-needs-cleanup": "off",
         "jsx-a11y/prefer-tag-over-role": "off",
-        "anti-slop/require-safety-comment-for-type-assertion": "off"
+        "anti-slop/require-safety-comment-for-type-assertion": "off",
+        "typescript/no-unnecessary-condition": "off"
       }
     },
     {

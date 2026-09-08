@@ -16,6 +16,14 @@ Tests cross the same seam callers do. Wanting to test past the interface means t
 
 Introduce a seam only where something already varies across it (a second store, a second provider). Accept dependencies as parameters; return results instead of producing side effects.
 
+### [DESIGN4] One guard per condition, at the boundary
+
+A value is refused once, where it enters — by the type at the seam, by the boundary schema, by the one check the door makes — and a value the boundary refused is not refused again inside. A second refusal is not defence in depth: it can never fire, so a fault in the first stays green under the suite, and it teaches the next reader that the boundary is not to be trusted. The fix is the unreachable guard removed, or the type corrected so the boundary's refusal reaches the site, never the lint disabled there.
+
+The worked example is the Postgres door's Principal resolver, which refuses an unknown role twice: `refuse` answers `role-unknown` from the member row, and `resolveScoped` checks `isRole` again on the row that refusal passed, because the narrowing does not cross the callback. T-087's probe replaced the first refusal with `return "" as never` and the suite stayed green — the second check caught what the first no longer did, and a real fault there would hide the same way. The pair stands on `main` as this rule is written; T-103's sweep reshapes the callback to carry the narrowed row, so the type is the one guard.
+
+Two detectors, one per half. `typescript/no-unnecessary-condition` (`.oxlintrc.json`, type-aware) is the mechanical half: it refuses the guard the *type* excludes — a null check on a value that cannot be null, a literal compared with itself, a default behind a value that is never missing. The guard a sibling *runtime* check masks is invisible to any type, and the scheduled mutation report (`[TEST6]`, T-090) is its detector: a mutant that survives inside a guard is a guard something else already made.
+
 ## TEST
 
 ### [TEST1] Functional tests through the interface
