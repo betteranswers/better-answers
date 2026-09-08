@@ -71,25 +71,46 @@ const WALK_P50_BUDGET_MS = 1_000;
 const WALK_MAX_BUDGET_MS = 2_000;
 
 /**
- * **Landing the whole map: 150 s**, over a map of thirty concepts. Measured 25.2 s — and
- * **840 ms per governed write**, which is the number that carries: the same measurement at
- * ten, thirty and sixty concepts gives 833, 840 and 872 ms per write, so the cost is linear
- * in concepts and ADR 0032's two minutes buys about 140 concepts through this path on this
- * machine. The budget is 6× the measurement, because the same thirty writes took five times
- * as long each on a machine that was busy.
+ * **Landing a concept: 8,000 ms each.** Measured **840–856 ms per governed write**, and linear
+ * in concepts — the same measurement at ten, thirty and sixty gives 833, 840 and 872 ms —
+ * so ADR 0032's two minutes buys about 140 concepts through this path on this machine.
  *
- * **This is not the rebuild, and the rebuild half of the criterion waits on the worker.**
- * ADR 0032 promises a full rebuild of a workspace's map in ≤2 minutes; the rebuild is the
- * worker's (T-057), it reads the bundle once and writes a whole generation without a commit
- * per concept, and `packages/core/test/rebuild-equivalence.test.ts` is where it runs as a
- * real process. What is measured here is the other cost over the same map — landing it act
- * by act through the governed write, each act a commit to the bare repository and one
+ * The ceiling is a round 9× the measurement, and that is deliberately loose, because a
+ * wall-clock budget over twenty-five seconds of work is a measurement of the machine before
+ * it is a measurement of the code: the same thirty writes took five times as long each on a
+ * developer's machine running a second agent's suite, and an earlier 150 s total budget
+ * failed there while passing everywhere else. What this ceiling catches is a write path that
+ * has become an order of magnitude dearer. What catches a regression in *shape* is the
+ * second assertion below, which no machine can move.
+ */
+const PER_WRITE_BUDGET_MS = 8_000;
+
+/**
+ * **The cost per write does not grow with the size of the map.** The second half of the map
+ * is landed onto a bundle and an index that already hold the first half, so if any part of
+ * the write path were quadratic — the linker re-derive scanning every row, an index that
+ * stopped being used — the later writes would cost visibly more than the earlier ones. At
+ * thirty concepts a quadratic path would put the halves about 3× apart; the measurement is
+ * 0.88× — the later half is fractionally the cheaper, on warm caches — and 2.5 is the line
+ * between them.
+ *
+ * This is the assertion that carries, because it is a ratio of two measurements taken on the
+ * same machine seconds apart: a slow box slows both halves and moves it not at all.
+ */
+const LINEARITY_FACTOR = 2.5;
+
+/**
+ * **Neither number is the rebuild, and the rebuild half of the criterion waits on the
+ * worker.** ADR 0032 promises a full rebuild of a workspace's map in ≤2 minutes; the rebuild
+ * is the worker's (T-057), it reads the bundle once and writes a whole generation without a
+ * commit per concept, and `packages/core/test/rebuild-equivalence.test.ts` is where it runs
+ * as a real process. What is measured here is the other cost over the same map — landing it
+ * act by act through the governed write, each act a commit to the bare repository and one
  * transaction carrying the index row, the ledger row and the graph delta. It is a heavier
  * shape than the rebuild and an upper bound on nothing the rebuild does, so it is stated as
  * the app-side cost it is rather than reported as the rebuild's. When the worker's rebuild
  * lands, its own measurement re-derives the promise and this comment says so.
  */
-const MAP_LANDED_BUDGET_MS = 150_000;
 
 /** The body of concept `at`: a link to each of the six concepts written before it. */
 const bodyOf = (at: number): string => {
@@ -116,15 +137,22 @@ const writeOf = (at: number, head: string | null): WriteConceptInput => ({
   sensitivity: "Internal",
 });
 
-/** The map, the concept every walk enters at, and what landing the whole of it cost. */
+/**
+ * The map, the concept every walk enters at, and what landing it cost — per write, and per
+ * write in each half of the map, which is what says the cost does not grow with the map.
+ */
 type DenseMap = {
   readonly scenario: Scenario;
   readonly entry: string;
-  readonly landedMs: number;
+  readonly perWriteMs: number;
+  readonly firstHalfPerWriteMs: number;
+  readonly secondHalfPerWriteMs: number;
 };
 
 const landDenseMap = async (scenario: Scenario): Promise<DenseMap> => {
   const started = performance.now();
+  const half = CONCEPTS / 2;
+  let halfway = started;
   let head: string | null = null;
   let entry = "";
   for (let at = 0; at < CONCEPTS; at += 1) {
@@ -132,8 +160,16 @@ const landDenseMap = async (scenario: Scenario): Promise<DenseMap> => {
     if (!written.ok) throw new Error(`the map did not land: ${String(written.error)}`);
     head = written.value.sha;
     entry = written.value.iri;
+    if (at === half - 1) halfway = performance.now();
   }
-  return { scenario, entry, landedMs: performance.now() - started };
+  const finished = performance.now();
+  return {
+    scenario,
+    entry,
+    perWriteMs: (finished - started) / CONCEPTS,
+    firstHalfPerWriteMs: (halfway - started) / half,
+    secondHalfPerWriteMs: (finished - halfway) / half,
+  };
 };
 
 /** One walk, timed the way a caller experiences it: the connection, the resolve, the walk. */
@@ -184,10 +220,14 @@ describe("the graph under concurrent read load", () => {
     expect(worst, "the slowest walk, in milliseconds").toBeLessThan(WALK_MAX_BUDGET_MS);
   });
 
-  it("lands a thirty-concept map, its commits and its whole delta inside the write path's budget", async () => {
-    expect(map.landedMs, "the whole map landed, in milliseconds").toBeLessThan(
-      MAP_LANDED_BUDGET_MS,
-    );
+  it("lands each concept, its commit and its whole delta at a cost the size of the map does not move", async () => {
+    expect(map.perWriteMs, "one governed write, in milliseconds").toBeLessThan(PER_WRITE_BUDGET_MS);
+    // The shape, not the speed: the halves are two measurements of the same machine seconds
+    // apart, so a slow box moves both and this ratio not at all.
+    expect(
+      map.secondHalfPerWriteMs / map.firstHalfPerWriteMs,
+      "the later half of the map, per write, against the earlier half",
+    ).toBeLessThan(LINEARITY_FACTOR);
     // The map is really there, and it is the dense one: thirty concepts, and the 159 edges
     // the six-link rule derives — six from each concept but the first six, which have
     // fewer written before them to link to.
