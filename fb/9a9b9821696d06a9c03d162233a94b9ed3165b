@@ -1,0 +1,17 @@
+docs/research/t-009-survivor-triage.md
+  ai_agent 198-206,412-427,545-553,773-777
+packages/core/src/audit/index.ts
+  ai_agent 125-128,174-175
+packages/core/src/kernel/constraint.ts
+  ai_agent 24-26
+packages/core/src/members/groups.ts
+  ai_agent 276-277
+packages/core/src/answering/index.ts
+  ai_agent 298-299,302-308,331-335,345-347,370-371
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "fb9a9b9821696d06a9c03d162233a94b9ed3165b",
+  "prompts": {}
+}
