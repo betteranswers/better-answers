@@ -1,0 +1,21 @@
+packages/core/src/store/graph/index.ts
+  s_5cc55f18f6b9e2::t_b042a2596a0bff 170-176,180
+packages/core/test/graph.test.ts
+  s_5cc55f18f6b9e2::t_4d1050a9be89a1 628-637
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "798209b8104110d1dd9fa149d3b9a3609117448c",
+  "prompts": {},
+  "sessions": {
+    "s_5cc55f18f6b9e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "494d3590-8e7e-4928-8a08-4aa57b92c7f0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
