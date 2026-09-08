@@ -299,6 +299,8 @@ describe("a commit whose rows were lost", () => {
             "# Leave\n\nBook through the platform, and claim within a month.",
             "knowledge/guidelines/leave-2.md",
           ),
+          // The file cites nothing and the rows hold no citation: the two agree.
+          evidenceAgrees: true,
         },
       },
     ]);
@@ -387,7 +389,7 @@ describe("a commit whose rows were lost", () => {
 });
 
 describe("a re-write whose rows were lost", () => {
-  it("keeps the concept's identity, class and status, and lands the new content at the commit", async () => {
+  it("keeps the concept's identity, class and status, and lands the new content at the commit, while the file's sources and the standing citations agree", async () => {
     const scenario = await arrange();
     const input = guideline("Parking");
     const first = await landed(scenario, scenario.editor, input);
@@ -403,7 +405,8 @@ describe("a re-write whose rows were lost", () => {
 
     expect(run).toMatchObject({ watermark: first.sha, replayed: [history[1]] });
     // The merge key and the class are the concept's own — read off the row the creation
-    // landed, never derived again — and the content is the commit's.
+    // landed, and re-derived from citations the file agrees with (none, here) — and the
+    // content is the commit's.
     expect(await conceptRow(scenario.workspaceId, first.iri)).toEqual({
       path: input.path,
       kind: "Guideline",
@@ -421,6 +424,61 @@ describe("a re-write whose rows were lost", () => {
       [scenario.workspaceId],
     );
     expect(counted.rows).toEqual([{ concepts: "1", identities: "1" }]);
+  });
+
+  it("lands Restricted, and says so on the ledger, when the file's sources are not the standing citations — a lost commit that added a citation never replays at the class the citations it lost derived", async () => {
+    const scenario = await arrange();
+    const internal = await bindingHolding(db(), scenario.workspaceId);
+    const restricted = await bindingHolding(db(), scenario.workspaceId, {
+      sensitivity: "Restricted",
+    });
+    const handbook = { resource: "/sources/handbook.pdf", locator: "p.1" };
+    const minutes = { resource: "/sources/board-minutes.pdf", locator: "p.2" };
+    const input = guideline("Allowances", {
+      frontmatter: { title: "Allowances", type: "Guideline", sources: [handbook] },
+      evidence: [{ sourceDocumentId: internal.documentId, ...handbook }],
+    });
+    const first = await landed(scenario, scenario.editor, input);
+    expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
+      sensitivity: "Internal",
+    });
+    // Two commits lost in one window: a re-write whose sources stand as they were, then one
+    // that adds a citation to a document under the Restricted binding.
+    const [, unchanged = null] = await writeInTheWindow(scenario, scenario.editor, {
+      ...input,
+      iri: first.iri,
+      body: "# Allowances\n\nThe same sources, other words.",
+      expects: { head: first.sha },
+    });
+    const history = await writeInTheWindow(scenario, scenario.editor, {
+      ...input,
+      iri: first.iri,
+      frontmatter: { title: "Allowances", type: "Guideline", sources: [handbook, minutes] },
+      evidence: [
+        { sourceDocumentId: internal.documentId, ...handbook },
+        { sourceDocumentId: restricted.documentId, ...minutes },
+      ],
+      body: "# Allowances\n\nWhat the board minuted.",
+      expects: { head: unchanged },
+    });
+
+    const run = await reconciled(scenario);
+
+    // The first replays at the class its citations derive; the second's file cites what its
+    // rows do not, so the evidence rows the commit lost cannot be recovered and the class the
+    // standing citations derive is the wider one — fail-closed is Restricted, and the ledger
+    // row says which of the two each commit was.
+    expect(run).toMatchObject({ replayed: history.slice(1), stopped: undefined });
+    expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
+      commit_sha: history[2],
+      sensitivity: "Restricted",
+      audience: "everyone",
+    });
+    const events = await replayedEvents(scenario.workspaceId);
+    expect(events.map((event) => event["subject_id"])).toEqual(history.slice(1));
+    expect(
+      events.map((event) => (event["detail"] as Record<string, unknown>)["evidenceAgrees"]),
+    ).toEqual([true, false]);
   });
 
   it("is replayed even once its author may no longer read the concept, because the replay is the platform's and never a second judgement", async () => {

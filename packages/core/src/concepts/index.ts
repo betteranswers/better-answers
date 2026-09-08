@@ -23,6 +23,7 @@ import { z } from "zod";
 import {
   readableClause,
   readableParameters,
+  RESTRICTED_TO_ADMINS,
   sensitivityAndAudienceClause,
   visibilityOf,
   widens,
@@ -1024,6 +1025,7 @@ export const writeConcept = async (
           actor: actorIdOf(fresh),
           auditEventId,
           evidence: evidence.data,
+          restsAlsoOn: [],
           acceptance,
         });
       }),
@@ -1058,6 +1060,13 @@ type Landing = z.infer<typeof conceptRow> & {
    * they stand rather than clearing them and widening a derived audience by recovery.
    */
   readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[] | undefined;
+  /**
+   * Units the concept rests on beside the bindings of its citations: nothing for the live
+   * act, and for a replay whose file cites what the standing citations do not, the most
+   * restrictive visibility there is — so a recovery that cannot recover the evidence lands
+   * the concept Restricted rather than at the class the citations it lost derived.
+   */
+  readonly restsAlsoOn: readonly Visibility[];
   /** The suggestion this act decided, when it was an acceptance; absent otherwise. */
   readonly acceptance: Acceptance | undefined;
 };
@@ -1113,6 +1122,7 @@ const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<v
     iri: index.iri,
     kind: index.kind,
     fallback: held,
+    alsoOn: index.restsAlsoOn,
   });
   await tx.query(
     `INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter, body,
@@ -1629,8 +1639,11 @@ export const RECONCILER: ReconcilerPrincipal = { kind: "platform", actorId: RECO
  * The reconciler's one act on the ledger. Its row takes the **commit's own `Audit:` id**, so
  * `bundle_commit.audit_event_id` joins the ledger on one id whichever road landed the rows
  * (ADR 0014 rule 4) — the person's act live, the reconciler's replay after a crash — and the
- * subject is the commit replayed. The detail says what the commit put in the bundle; who
- * acted is on the commit and on `bundle_commit.actor`, as the `Actor:` trailer wrote it.
+ * subject is the commit replayed. The detail says what the commit put in the bundle — and
+ * whether the file's `sources[]` agreed with the standing citations, which is what decided
+ * whether the class landed was the citations' or Restricted, so an operator reading the
+ * ledger sees why a replayed concept came back Restricted. Who acted is on the commit and
+ * on `bundle_commit.actor`, as the `Actor:` trailer wrote it.
  *
  * *Reconciler hits* are a query over these rows (ADR 0025) and never a counter.
  */
@@ -1639,6 +1652,7 @@ const RECONCILER_ACTS = declareActs("platform", {
     iri: "iri",
     commitSha: "gitSha",
     contentHash: "contentHash",
+    evidenceAgrees: "flag",
   }),
 });
 
@@ -1755,6 +1769,35 @@ const derivedMergeKey = async (
   return holder === undefined || holder === iri ? derived : iri;
 };
 
+/**
+ * Whether a replayed file's `sources[]` is the concept's standing citations — the file's
+ * entries and the citations' projection (`concept_evidence` joined to its `evidence` rows)
+ * each reduced to the `(resource, locator)` pairs the content hash reduces them to, resolved
+ * against the file's path, and compared as sets. The file carries no document id, so this is
+ * the one reading of "did this commit change what the concept cites" a replay can make.
+ */
+const fileCitesTheStandingEvidence = async (
+  tx: Tx,
+  workspaceId: string,
+  facts: CommitFacts,
+): Promise<boolean> => {
+  const standing = await tx.query<{ resource: string; locator: string }>(
+    `SELECT e.resource, ce.locator
+       FROM concept_evidence ce
+       JOIN evidence e ON e.workspace_id = ce.workspace_id
+                      AND e.source_document_id = ce.source_document_id AND e.locator = ce.locator
+      WHERE ce.workspace_id = $1 AND ce.iri = $2`,
+    [workspaceId, facts.iri],
+  );
+  const pairs = (sources: readonly HashedSource[]) =>
+    new Set(sources.map((pair) => JSON.stringify(pair)));
+  const cited = pairs(reducedSources(facts.frontmatter["sources"], facts.path));
+  const held = pairs(
+    standing.rows.map((row) => [resolvedResource(row.resource, facts.path), row.locator]),
+  );
+  return cited.size === held.size && [...cited].every((pair) => held.has(pair));
+};
+
 /** The last commit the rows know about, or nothing — the watermark the scan starts after. */
 const lastRecordedCommit = async (tx: Tx, workspaceId: string): Promise<string | null> => {
   const found = await tx.query<{ sha: string }>(
@@ -1781,10 +1824,14 @@ const lastRecordedCommit = async (tx: Tx, workspaceId: string): Promise<string |
  * recovery's guess); the status and kind are the file's, or the concept's; evidence rows
  * are not recovered, because the file's `sources[]` is a projection and the document id is
  * not in it, so the concept's standing citations are left as they are and its class is
- * re-derived from them. An acceptance — the `Suggestion:` trailer — decides its suggestion through the
- * same rows and the same marker as the live act, from the payload the decision was made
- * from; a suggestion decided in the meantime has no payload left to read, and the commit
- * lands as the commit it is, its decision left with whoever made it.
+ * re-derived from them — **when the file cites them**. A file whose `sources[]` is not the
+ * standing citations' projection is a lost commit that changed what the concept cites, and
+ * the citations it lost may well be the narrower ones, so the replay lands the concept
+ * Restricted (as a creation whose commit carries no evidence lands) and its ledger row says
+ * the evidence did not agree. An acceptance — the `Suggestion:` trailer — decides its
+ * suggestion through the same rows and the same marker as the live act, from the payload
+ * the decision was made from; a suggestion decided in the meantime has no payload left to
+ * read, and the commit lands as the commit it is, its decision left with whoever made it.
  */
 const replayCommit = async (
   platform: ReconcilerPrincipal,
@@ -1848,6 +1895,7 @@ const replayCommit = async (
           payload?.mergeKey ??
           held?.mergeKey ??
           (await derivedMergeKey(platform, tx, row.iri, row.kind, row.title));
+        const evidenceAgrees = await fileCitesTheStandingEvidence(tx, workspaceId, facts);
 
         // The door is called bare (ADR 0014 rule 4): its rejection aborts this transaction.
         await record(platform, tx, {
@@ -1855,7 +1903,7 @@ const replayCommit = async (
           act: RECONCILER_ACTS.replayed,
           subjectId: facts.sha,
           batchId,
-          detail: { iri: row.iri, commitSha: facts.sha, contentHash },
+          detail: { iri: row.iri, commitSha: facts.sha, contentHash, evidenceAgrees },
         });
         await landRows(platform, tx, {
           ...row,
@@ -1867,6 +1915,9 @@ const replayCommit = async (
           // citations stand as they are and the class is re-derived from them, never
           // widened by a recovery that cleared them.
           evidence: undefined,
+          // And where the file does not cite them, from the most restrictive visibility
+          // there is beside them: the citations the commit lost may be the narrower ones.
+          restsAlsoOn: evidenceAgrees ? [] : [RESTRICTED_TO_ADMINS],
           acceptance,
         });
         return ok("landed");

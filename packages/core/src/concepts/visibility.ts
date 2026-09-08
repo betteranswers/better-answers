@@ -148,6 +148,12 @@ export const conceptVisibilityFrom = async (
     readonly fallback: Visibility;
     /** The document ids to derive from instead of the standing citations, when a write asks ahead. */
     readonly citing?: readonly string[] | undefined;
+    /**
+     * Units the concept rests on beside its bindings — the replay's fail-closed answer when
+     * the file's sources are not the standing citations (`RESTRICTED_TO_ADMINS`), combined by
+     * the one rule so a recorded override still outranks it and the floor still applies.
+     */
+    readonly alsoOn?: readonly Visibility[] | undefined;
   },
 ): Promise<Visibility> => {
   const bindings =
@@ -172,7 +178,7 @@ export const conceptVisibilityFrom = async (
   const override = await overrideOf(tx, concept.workspaceId, concept.iri);
   return derivedVisibility({
     kind: concept.kind,
-    from: bindings.rows.map(visibilityOf),
+    from: [...bindings.rows.map(visibilityOf), ...(concept.alsoOn ?? [])],
     fallback: concept.fallback,
     override: override === undefined ? undefined : visibilityOf(override),
   });
