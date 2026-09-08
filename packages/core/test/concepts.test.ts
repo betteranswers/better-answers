@@ -1,5 +1,5 @@
 import { testData } from "@better-answers/schema/testing";
-import type pg from "pg";
+import pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import { conceptIriOf, ulid } from "@better-answers/schema";
@@ -8,14 +8,17 @@ import { open } from "../src/answering/index.ts";
 import {
   contentHashOf,
   conceptByIri,
+  foldKind,
+  renderConceptFile,
   writeConcept,
+  type Frontmatter,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import type { TrustStatus } from "../src/answering/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/core/store/git";
 import { walkFrom } from "@better-answers/core/store/graph";
-import { type Tx, withMembership } from "../src/store/postgres/index.ts";
+import { openPostgres, type Tx, withMembership } from "../src/store/postgres/index.ts";
 import {
   bundleHistory,
   bundlesForSuite,
@@ -23,7 +26,14 @@ import {
   fileAtCommit,
   removeRepository,
 } from "./bundle.ts";
-import { postgresForSuite, readingAs } from "./suite-postgres.ts";
+import {
+  abortTheTransaction,
+  holdingTable,
+  isBlockedOnTable,
+  postgresForSuite,
+  readingAs,
+  until,
+} from "./suite-postgres.ts";
 import { arrangeWorkspace, principalFor, type Scenario } from "./workspace-with-bundle.ts";
 
 /**
@@ -202,8 +212,12 @@ describe("a governed write", () => {
       ].join("\n"),
     );
     // The hash on the row is the content's, not the file's: the trust keys and the IRI are
-    // left out of it (ADR 0014), so recording a check never moves it.
-    expect(written.contentHash).toBe(contentHashOf(input.frontmatter, input.body, input.path));
+    // left out of it (ADR 0014), so recording a check never moves it. Written down rather
+    // than computed here — an expectation this act's own hash produced would agree with
+    // any canonicalisation at all, the Python tier's included.
+    expect(written.contentHash).toBe(
+      "16f6c6993084b35862434bc90dece1fb2c2669cbddc21c910bdcd95bef0dcecc",
+    );
   });
 
   it("records the concept, its identity, the commit and its evidence in one transaction", async () => {
@@ -246,6 +260,31 @@ describe("a governed write", () => {
         audience: "everyone",
       },
     ]);
+  });
+
+  it("keeps the version its evidence was recorded against", async () => {
+    const scenario = await arrange();
+    // The version is what a later re-read compares against, so a piece of evidence that
+    // lost it would be one nobody could tell had moved.
+    await landed(
+      scenario,
+      writeFor({
+        evidence: [
+          {
+            sourceDocumentId: ulid(),
+            locator: "p.4",
+            resource: "Handbook (2026)",
+            contentVersion: "2026-03-01",
+          },
+        ],
+      }),
+    );
+
+    const stored = await db().pool.query<{ content_version: string | null }>(
+      "SELECT content_version FROM evidence WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(stored.rows).toEqual([{ content_version: "2026-03-01" }]);
   });
 
   it("folds the row's kind for case and plural, and leaves the file's own spelling alone", async () => {
@@ -337,6 +376,150 @@ describe("a governed write", () => {
       [scenario.workspaceId],
     );
     expect(parents.rows.map((row) => row.parent_sha)).toEqual([null, shas[0], shas[1]]);
+  });
+});
+
+/**
+ * The content hash and the rendered file, asserted against **values written down here**.
+ *
+ * Both are cross-tier contracts — the hash is the canonical form ADR 0014 fixes and the file
+ * is "readable by any OKF tool" (ADR 0012) — so an expectation computed by calling the same
+ * function would agree with a canonicalisation the Python tier could not read. The literals
+ * are the agreement; the code either produces them or it has moved the contract.
+ */
+describe("what a concept hashes and what it renders", () => {
+  const HASHED_PATH = "knowledge/policies/expenses.md";
+
+  it("hashes the sorted canonical JSON of everything but the trust keys and the identity", () => {
+    const frontmatter: Frontmatter = {
+      title: "Expenses",
+      type: "Policy",
+      tags: ["travel", "receipts"],
+      reviewers: [],
+      usage_count: 4,
+      approved: true,
+      owner: null,
+      // Two spellings of a path, one locator carried as a number and one absent: the
+      // reduction resolves both against the concept's own path and keeps the locator as
+      // the string the file meant, whichever scalar carried it (ADR 0019).
+      sources: [
+        { resource: "./handbook.md", title: "Handbook", locator: 4 },
+        { resource: "/knowledge/policies/../rules.md", locator: null },
+      ],
+      generated: "2026-01-01",
+      verified: "yes",
+      stale_after: "3000-01-01",
+      status: "stable",
+      iri: "https://better-answers.com/c/01JZZZZZZZZZZZZZZZZZZZZZZZ",
+    };
+    // A body carrying every normalisation ADR 0014 names: CRLF line endings, trailing
+    // spaces and tabs, and a run of blank lines at the end.
+    const body = "First line   \r\nsecond line\t\r\n\r\n\r\n";
+
+    expect(contentHashOf(frontmatter, body, HASHED_PATH)).toBe(
+      "db4fdd1329189f0ee7d4c0e9c3c736cb811c1cad0f2e433841046e13d8bdda7e",
+    );
+    // The same hash with every trust key and the identity moved: hashing them would make a
+    // check of its own recording move the hash and read *Changed since checked* at once.
+    expect(
+      contentHashOf(
+        {
+          ...frontmatter,
+          generated: "2027-06-30",
+          verified: "no",
+          stale_after: "2020-01-01",
+          status: "draft",
+          iri: "https://better-answers.com/c/01KAAAAAAAAAAAAAAAAAAAAAAA",
+        },
+        body,
+        HASHED_PATH,
+      ),
+    ).toBe("db4fdd1329189f0ee7d4c0e9c3c736cb811c1cad0f2e433841046e13d8bdda7e");
+  });
+
+  it("hashes a `sources` that is no list, and an entry citing nothing, as citing nothing", () => {
+    const body = "Expenses are claimed within thirty days.";
+
+    // Neither is a shape the boundary would store, and both are shapes a bundle a company
+    // brought with it can hold: what matters is that each reduces to a citation this
+    // concept does not make, rather than throwing where a hash was expected.
+    expect(contentHashOf({ title: "Expenses", sources: "handbook.pdf" }, body, HASHED_PATH)).toBe(
+      "71916fee7a5014777a4db734dffbe46b9c7f710bf699bb6092a15202953b78e5",
+    );
+    expect(
+      contentHashOf(
+        {
+          sources: [{ note: "a comment, not a citation" }, { resource: "/knowledge/handbook.md" }],
+        },
+        body,
+        HASHED_PATH,
+      ),
+    ).toBe("d135b04bcf88ef64e2dc07dbf14991ce75090677a2aada11804fa8014b7151e8");
+  });
+
+  it("renders every key quoted, an empty list inline and a list of any length over lines", () => {
+    const file = renderConceptFile(
+      {
+        title: "Expenses",
+        tags: ["travel", "receipts"],
+        reviewers: [],
+        usage_count: 4,
+        approved: true,
+        owner: null,
+        sources: [
+          { resource: "/sources/handbook.pdf", title: "Handbook", locator: "p.4" },
+          { resource: "/sources/rules.pdf", locator: "p.9" },
+        ],
+      },
+      "First line   \r\nsecond line\r\n\r\n",
+    );
+
+    expect(file).toBe(
+      [
+        "---",
+        '"title": "Expenses"',
+        '"tags":',
+        '  - "travel"',
+        '  - "receipts"',
+        '"reviewers": []',
+        '"usage_count": 4',
+        '"approved": true',
+        '"owner": null',
+        '"sources":',
+        '  - "resource": "/sources/handbook.pdf"',
+        '    "title": "Handbook"',
+        '    "locator": "p.4"',
+        '  - "resource": "/sources/rules.pdf"',
+        '    "locator": "p.9"',
+        "---",
+        "",
+        "First line",
+        "second line",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  /**
+   * Case and plural, and nothing else (ADR 0012's 2026-08-30 amendment). The plural rule is
+   * the conservative English one, and each row here is one arm of it — including the words
+   * it deliberately leaves alone, which is where an unanchored pattern would show.
+   */
+  it.each([
+    ["policy", "Policy"],
+    ["Policies", "Policy"],
+    ["POLICY", "Policy"],
+    ["Boxes", "Box"],
+    ["Standards", "Standard"],
+    ["Assessments", "Assessment"],
+    // Ends in no plural at all, but carries `ses` in the middle of the word.
+    ["Assessment", "Assessment"],
+    ["Business", "Business"],
+    ["Bonus", "Bonus"],
+    ["Analysis", "Analysis"],
+    ["Rate  card", "Rate  Card"],
+  ])("folds the kind %s to %s", (kind, folded) => {
+    expect(foldKind(kind)).toBe(folded);
   });
 });
 
@@ -765,6 +948,49 @@ describe("what a governed write refuses", () => {
     expect(await head(scenario.editor, scenario.git)).toBeNull();
   });
 
+  /**
+   * The boundary this act runs **before** any commit exists (ADR 0028): a merge key or a
+   * piece of evidence the row would refuse is refused while there is still nothing to
+   * reconcile. Each half of the guard is asserted on its own, because a guard that only
+   * fired when both were wrong would let either through alone.
+   */
+  it.each([
+    ["a merge key of no shape", { mergeKey: "   " }],
+    [
+      "an evidence locator of no shape",
+      { evidence: [{ sourceDocumentId: ulid(), locator: "   ", resource: "Handbook" }] },
+    ],
+  ] satisfies readonly (readonly [string, Partial<WriteConceptInput>])[])(
+    "refuses %s, and makes no commit",
+    async (_why, invalid) => {
+      const scenario = await arrange();
+
+      const refused = await write(scenario, scenario.editor, writeFor(invalid));
+
+      expect(refused).toEqual({ ok: false, error: "malformed" });
+      expect(await head(scenario.editor, scenario.git)).toBeNull();
+    },
+  );
+
+  it("hands a caller the store's own failure from the read it makes before it commits", async () => {
+    const scenario = await arrange();
+    const gone = new pg.Pool(db().runtimePool.options);
+    await gone.end();
+
+    const refused = await writeConcept(
+      scenario.editor,
+      { git: scenario.git, postgres: openPostgres(gone) },
+      writeFor(),
+    );
+
+    // The store failing is not a refusal a caller can act on, and it arrives as itself. The
+    // read that met it is the act's first transaction, so there is no commit to reconcile.
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+    expect(refused.error).toBeInstanceOf(Error);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
+  });
+
   it("refuses a message carrying a newline, so a forged trailer never reaches a commit", async () => {
     const scenario = await arrange();
 
@@ -928,20 +1154,6 @@ const isBlockedOnALock = async (pid: number): Promise<boolean> => {
   return (found.rowCount ?? 0) > 0;
 };
 
-/**
- * Wait for a condition the database reports, polling rather than sleeping: a slow machine
- * takes more turns to see the same state instead of failing a stopwatch. The cap is a
- * runaway guard, not a timing assumption — the test fails on it only if the state never
- * arrives at all.
- */
-const until = async (condition: () => Promise<boolean>): Promise<void> => {
-  for (let turn = 0; turn < 200; turn += 1) {
-    if (await condition()) return;
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-  throw new Error("the condition never held");
-};
-
 /** What a refused act leaves behind: no rows of its own, and every commit it made still there. */
 const expectCommitsWithoutRows = async (scenario: Scenario, commits: number): Promise<void> => {
   expect(await rowsFor(scenario.workspaceId)).toMatchObject({ concepts: "0", commits: "0" });
@@ -1055,6 +1267,46 @@ describe("authority that moved while the act was in flight", () => {
       await expectCommitsWithoutRows(scenario, 0);
     },
   );
+
+  it("refuses the rows when the revocation lands in the window the act cannot see", async () => {
+    const scenario = await arrange();
+    // The window ADR 0012's docblock names: between the read that authorised the commit and
+    // the transaction that writes the rows. It is entered by **queueing** the revocation
+    // rather than by timing it. The act's first transaction is parked on `concept_index`
+    // while it already holds the shared lock on its own membership, so a revocation asked
+    // for now waits behind it and Postgres grants it the instant that transaction commits —
+    // which is before the act's git commit, let alone the transaction after it.
+    const revoker = await db().pool.connect();
+    let acting: Promise<Result<unknown, unknown>> | undefined;
+    let revoking: Promise<unknown> = Promise.resolve();
+    try {
+      await holdingTable(db().pool, "concept_index", async () => {
+        acting = write(scenario, scenario.editor, writeFor());
+        await until(() => isBlockedOnTable(db().pool, "concept_index"));
+
+        const pid = await backendPidOf(revoker);
+        revoking = revoke(revoker, scenario, "here");
+        await until(() => isBlockedOnALock(pid));
+      });
+      await revoking;
+    } finally {
+      revoker.release();
+    }
+
+    const landed = await acting;
+
+    expect(landed).toEqual({ ok: false, error: "credentials-revoked" });
+    // And the state that leaves, which is the reconciler's whole definition: the commit is
+    // real, and no row of this act's — not the ledger's, not the bundle's — records it.
+    const history = await bundleHistory(scenario.git, scenario.workspaceId);
+    expect(history).toHaveLength(1);
+    expect(await recordedCommits(scenario.workspaceId)).toEqual([]);
+    expect(await rowsFor(scenario.workspaceId)).toMatchObject({
+      concepts: "0",
+      commits: "0",
+      identities: "0",
+    });
+  });
 });
 
 /**
@@ -1178,6 +1430,42 @@ describe("opening a concept by IRI", () => {
       },
       evidence: [{ locator: "p.4", source: "Handbook" }],
     });
+  });
+
+  it("reads no check at all off a concept nobody has checked", async () => {
+    const scenario = await arrange();
+    const written = await landed(scenario, writeFor({ status: "stable" }));
+
+    const opened = await reading(scenario.viewer, (principal, tx) =>
+      conceptByIri(principal, tx, written.iri),
+    );
+
+    // Fail-closed on the platform's own trust signal: a concept with no verification row
+    // answers *no check*, never a check whose reviewer and instant are both nothing —
+    // which the trust projection would have to guess at.
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    expect(opened.value?.check).toBeUndefined();
+    expect(opened.value?.contentHash).toBe(written.contentHash);
+  });
+
+  it("hands a reader the store's own failure rather than a concept nobody minted", async () => {
+    const scenario = await arrange();
+    const written = await landed(scenario, writeFor({ status: "stable" }));
+    let read: Result<unknown, unknown> | undefined;
+
+    // `[TEST8]`: the transaction is aborted before the read, so the read meets the store
+    // failing and the transaction's own outcome is asserted before the value.
+    await expect(
+      reading(scenario.viewer, async (principal, tx) => {
+        await abortTheTransaction(tx);
+        read = await conceptByIri(principal, tx, written.iri);
+      }),
+    ).rejects.toThrow(/did not commit/);
+
+    // A concept withheld and a concept nobody minted both answer `undefined`, so a store
+    // that failed answering as either would be a read a caller could not tell from a miss.
+    expect(read).toEqual({ ok: false, error: expect.any(Error) });
   });
 
   it("withholds a draft concept from every reader, whatever their role", async () => {

@@ -1,4 +1,5 @@
 import { testData } from "@better-answers/schema/testing";
+import pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import { conceptIriOf, ulid } from "@better-answers/schema";
@@ -17,9 +18,17 @@ import {
   type SuggestionRequest,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
-import type { UserPrincipal } from "../src/kernel/index.ts";
+import type { Result, UserPrincipal } from "../src/kernel/index.ts";
+import { openPostgres } from "../src/store/postgres/index.ts";
 import { bundleHistory, bundlesForSuite, commitFacts } from "./bundle.ts";
-import { postgresForSuite, readingAs } from "./suite-postgres.ts";
+import {
+  abortTheTransaction,
+  holdingTable,
+  isBlockedOnTable,
+  postgresForSuite,
+  readingAs,
+  until,
+} from "./suite-postgres.ts";
 import { arrangeWorkspace, type Scenario } from "./workspace-with-bundle.ts";
 
 /**
@@ -308,6 +317,75 @@ describe("a suggestion set", () => {
     // And the payload's own precondition, read the same way: this one was written against
     // no concept at all, so it has not moved — it has been overtaken.
     expect(after.map((item) => item.baseMoved)).toEqual([false]);
+  });
+
+  it("renders an item's kind, its status and who decided it, as the rows hold them", async () => {
+    const scenario = await arrange();
+    const request = requestFor();
+    const set = await submitted(scenario, scenario.editor, "edit", [request]);
+    const suggestionId = set.suggestionIds[0] ?? "";
+    const item = {
+      suggestionId,
+      kind: "edit",
+      mergeKey: request.mergeKey,
+      title: request.title,
+      path: request.path,
+      proposer: `human:${scenario.editor.userId}`,
+      target: null,
+      baseMoved: false,
+    };
+
+    expect(await summaryOf(scenario, set.setId)).toEqual([
+      { ...item, status: "waiting", decider: null, reason: null },
+    ]);
+
+    const declined = await declineSuggestion(scenario.admin, doorsOf(scenario), {
+      suggestionId,
+      reason: "not the company's word on this",
+    });
+
+    // A decided item still renders, and the summary is where the queue's own history is
+    // read: what it was, who decided it, and the words the proposer was given.
+    expect(declined.ok).toBe(true);
+    expect(await summaryOf(scenario, set.setId)).toEqual([
+      {
+        ...item,
+        status: "declined",
+        decider: `human:${scenario.admin.userId}`,
+        reason: "not the company's word on this",
+      },
+    ]);
+  });
+
+  it("shows a member a set nobody minted as an empty one rather than a refusal", async () => {
+    const scenario = await arrange();
+
+    const read = await readingAs(db().runtimePool, scenario.editor, (principal, tx) =>
+      suggestionSetSummary(principal, tx, ulid()),
+    );
+
+    // An id that resolved to nothing tells a prober nothing either way, which it would stop
+    // doing the moment an empty set answered the refusal a stranger's set answers.
+    expect(read).toEqual({ ok: true, value: [] });
+  });
+
+  it("hands a caller the store's own failure rather than a set with no items in it", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
+    let read: Result<unknown, unknown> | undefined;
+
+    // Read as the proposer rather than as an Admin, because the gate on the rows is the
+    // caller after this one: a store failure the read passed on would reach it as rows that
+    // are not there. `[TEST8]`: the transaction is aborted before the read, so what the read
+    // meets is the store failing, and the transaction's outcome is asserted before the value.
+    await expect(
+      readingAs(db().runtimePool, scenario.editor, async (principal, tx) => {
+        await abortTheTransaction(tx);
+        read = await suggestionSetSummary(principal, tx, set.setId);
+      }),
+    ).rejects.toThrow(/did not commit/);
+
+    expect(read).toEqual({ ok: false, error: expect.any(Error) });
   });
 
   it("is invisible to another workspace, whoever asks for it", async () => {
@@ -677,6 +755,75 @@ describe("declining a suggestion", () => {
     expect(await suggestionRow(suggestionId)).toMatchObject({ status: "waiting" });
   });
 
+  it("refuses a reason the column would hold as nothing, which is not a reason at all", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
+    const suggestionId = set.suggestionIds[0] ?? "";
+
+    const nothing = await declineSuggestion(scenario.admin, doorsOf(scenario), {
+      suggestionId,
+      // @ts-expect-error — the column is nullable and the boundary mirrors it, so JSON's
+      // null parses; a decline with no reason is the one thing this act may not record.
+      reason: null,
+    });
+
+    expect(nothing).toEqual({ ok: false, error: "malformed" });
+    expect(await suggestionRow(suggestionId)).toMatchObject({ status: "waiting" });
+  });
+
+  it("refuses a suggestion nobody minted, rather than deciding a row that is not there", async () => {
+    const scenario = await arrange();
+
+    const declined = await declineSuggestion(scenario.admin, doorsOf(scenario), {
+      suggestionId: ulid(),
+      reason: "not the company's word on this",
+    });
+
+    expect(declined).toEqual({ ok: false, error: "no-such-suggestion" });
+    expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.declined")).toEqual([]);
+  });
+
+  it.each([
+    [
+      "the store failing under it",
+      async (scenario: Scenario, suggestionId: string) => {
+        const gone = new pg.Pool(db().runtimePool.options);
+        await gone.end();
+        return declineSuggestion(
+          scenario.admin,
+          { git: scenario.git, postgres: openPostgres(gone) },
+          { suggestionId, reason: "not the company's word on this" },
+        );
+      },
+      expect.any(Error) as unknown,
+    ],
+    [
+      "the decider's credentials ending first",
+      async (scenario: Scenario, suggestionId: string) => {
+        await db().pool.query(
+          "UPDATE member SET credentials_revoked_at = $3 WHERE workspace_id = $1 AND user_id = $2",
+          [scenario.workspaceId, scenario.admin.userId, new Date()],
+        );
+        return declineSuggestion(scenario.admin, doorsOf(scenario), {
+          suggestionId,
+          reason: "not the company's word on this",
+        });
+      },
+      "credentials-revoked",
+    ],
+  ])("answers %s as itself, and decides nothing", async (_why, decide, expected) => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
+    const suggestionId = set.suggestionIds[0] ?? "";
+
+    const refused = await decide(scenario, suggestionId);
+
+    // Two different things a caller can act on, and neither is a decision: the store's own
+    // failure arrives as itself, and authority is judged in the transaction that writes.
+    expect(refused).toEqual({ ok: false, error: expected });
+    expect(await suggestionRow(suggestionId)).toMatchObject({ status: "waiting" });
+  });
+
   it("refuses a reason longer than the row will carry, before it opens a transaction at all", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
@@ -920,6 +1067,217 @@ describe("two acts over one suggestion", () => {
   });
 });
 
+/**
+ * **The ground an acceptance stands on moves between the read that prepared it and the act's
+ * own read under the lock.** That window is real — the preparing read is outside the lock on
+ * purpose (`acceptSuggestions`' docblock) — and nothing in the act exposes a seam to enter
+ * it, so these tests park the act on the one table its next statement needs and move the
+ * world while it waits. Every one of them ends the same way: the change goes back to whoever
+ * prepared it, with the words that sent it.
+ */
+describe("an acceptance whose ground moved under its own lock", () => {
+  const MOVED = "the concept this suggestion resolves to moved after the set was opened";
+
+  /** The decisions an acceptance of a whole set would carry, at the targets it renders now. */
+  const decisionsFor = async (scenario: Scenario, setId: string) =>
+    (await summaryOf(scenario, setId)).map((item) => ({
+      suggestionId: item.suggestionId,
+      expectedTarget: item.target,
+    }));
+
+  it("returns the item to its proposer when the merge key is taken while it commits", async () => {
+    const scenario = await arrange();
+    const request = requestFor();
+    const set = await submitted(scenario, scenario.editor, "edit", [request]);
+    const decisions = await decisionsFor(scenario, set.setId);
+    let accepting: ReturnType<typeof acceptSuggestions> | undefined;
+
+    // The act reads the key as free, mints an IRI and commits — and only then reaches the
+    // transaction that writes the rows, which is where another act's identity is waiting.
+    // Parked on `audit_event`, which that transaction writes before any row of its own.
+    await holdingTable(db().pool, "audit_event", async () => {
+      accepting = acceptSuggestions(scenario.admin, doorsOf(scenario), { decisions });
+      await until(() => isBlockedOnTable(db().pool, "audit_event"));
+      const client = await db().pool.connect();
+      try {
+        await testData(client).conceptIdentity({
+          workspaceId: scenario.workspaceId,
+          mergeKey: request.mergeKey,
+        });
+      } finally {
+        client.release();
+      }
+    });
+    const accepted = await accepting;
+
+    expect(accepted?.ok === true && accepted.value.map(refusalOf)).toEqual(["resolution-moved"]);
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({
+      status: "returned",
+      reason: MOVED,
+    });
+    // The commit is real and no row records it — the reconciler's own shape, which is what
+    // a refusal *after* the commit costs and why every other one is read before it.
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
+    expect(await countOf("concept_index", scenario.workspaceId)).toBe("0");
+  });
+
+  it("returns the item to its proposer when its target leaves the merge key first", async () => {
+    const scenario = await arrange();
+    const { input, written, set } = await proposedAgainst(scenario, "edit");
+    const decisions = await decisionsFor(scenario, set.setId);
+    let accepting: ReturnType<typeof acceptSuggestions> | undefined;
+
+    // The summary rendered this concept as the target and the act read the same thing; the
+    // move lands between that read and the act's own, under the lock. Parked on
+    // `concept_index`, which the act's first transaction reads and the preparing read
+    // never touches.
+    await holdingTable(db().pool, "concept_index", async () => {
+      accepting = acceptSuggestions(scenario.admin, doorsOf(scenario), { decisions });
+      await until(() => isBlockedOnTable(db().pool, "concept_index"));
+      await db().pool.query(
+        "UPDATE concept_identity SET merge_key = $3 WHERE workspace_id = $1 AND iri = $2",
+        [scenario.workspaceId, written.iri, `${input.mergeKey}-renamed`],
+      );
+    });
+    const accepted = await accepting;
+
+    // Landing it would put the old key back on the concept and undo a move nobody asked to
+    // undo — so it is refused before the commit, and this one costs none.
+    expect(accepted?.ok === true && accepted.value.map(refusalOf)).toEqual(["resolution-moved"]);
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({
+      status: "returned",
+      reason: MOVED,
+    });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
+  });
+
+  it("throws rather than commits a decision that a second act had already made", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
+    const suggestionId = set.suggestionIds[0] ?? "";
+    const decisions = await decisionsFor(scenario, set.setId);
+    let accepting: ReturnType<typeof acceptSuggestions> | undefined;
+
+    // The per-repository lock is in-process and one api process (ADR 0024's estate), so the
+    // decision this transaction is about to write can still be taken by a second process —
+    // which is exactly what `status` in the UPDATE's WHERE clause is there to catch. Written
+    // as that second process would write it: the marker the row's trigger demands, then the
+    // decision.
+    await holdingTable(db().pool, "audit_event", async () => {
+      accepting = acceptSuggestions(scenario.admin, doorsOf(scenario), { decisions });
+      await until(() => isBlockedOnTable(db().pool, "audit_event"));
+      const elsewhere = await db().pool.connect();
+      try {
+        await elsewhere.query("BEGIN");
+        await elsewhere.query("SELECT set_config('app.deciding_suggestion', $1, true)", [
+          suggestionId,
+        ]);
+        await elsewhere.query(
+          `UPDATE suggestion SET status = 'declined', decider = $2, decided_at = now(),
+                                 reason = 'decided by another process'
+            WHERE id = $1`,
+          [suggestionId, `human:${scenario.admin.userId}`],
+        );
+        await elsewhere.query("COMMIT");
+      } finally {
+        elsewhere.release();
+      }
+    });
+    const accepted = await accepting;
+
+    // The ledger row is already written by then, so a *value* here would commit an event for
+    // a decision that never happened: the act throws, its transaction rolls back, and the
+    // caller hears the store's own failure with the sentence that names why.
+    const outcome = accepted?.ok === true ? accepted.value[0]?.outcome : undefined;
+    expect(outcome).toEqual({ ok: false, error: expect.any(Error) });
+    expect(outcome?.ok === false && String(outcome.error)).toContain(
+      "decided by somebody else while this act was in flight",
+    );
+    expect(await suggestionRow(suggestionId)).toMatchObject({ status: "declined" });
+    expect(await countOf("concept_index", scenario.workspaceId)).toBe("0");
+    expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.accepted")).toEqual([]);
+  });
+});
+
+describe("what an acceptance answers when it cannot be prepared", () => {
+  it("hands the item the store's own failure rather than a suggestion nobody minted", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
+    const gone = new pg.Pool(db().runtimePool.options);
+    await gone.end();
+
+    const accepted = await acceptSuggestions(
+      scenario.admin,
+      { git: scenario.git, postgres: openPostgres(gone) },
+      { decisions: [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }] },
+    );
+
+    // `no-such-suggestion` is a fact about the queue; a pool that has gone is not, and a
+    // caller told the first would decide the item is somebody else's to chase.
+    expect(accepted.ok === true && accepted.value.map(refusalOf)).toEqual([expect.any(Error)]);
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
+  });
+
+  it("refuses an Admin whose credentials ended, rather than reading the queue as empty", async () => {
+    const scenario = await arrange();
+    const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
+    await db().pool.query(
+      "UPDATE member SET credentials_revoked_at = $3 WHERE workspace_id = $1 AND user_id = $2",
+      [scenario.workspaceId, scenario.admin.userId, new Date()],
+    );
+
+    const accepted = await acceptSuggestions(scenario.admin, doorsOf(scenario), {
+      decisions: [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }],
+    });
+
+    expect(accepted.ok === true && accepted.value.map(refusalOf)).toEqual(["credentials-revoked"]);
+    expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
+  });
+
+  it("commits the accepting Admin as author for a candidate a person proposed", async () => {
+    const scenario = await arrange();
+    const admin = await db().pool.query<{ name: string; email: string }>(
+      'SELECT name, email FROM "user" WHERE id = $1',
+      [scenario.admin.userId],
+    );
+    const editor = await db().pool.query<{ email: string }>(
+      'SELECT email FROM "user" WHERE id = $1',
+      [scenario.editor.userId],
+    );
+    // ADR 0012's amendment gives the author line to the proposer for the *edit* kind and to
+    // nobody else: a candidate is a run's output whoever the row names as having raised it,
+    // so naming its proposer would put a person's address on a commit they never made.
+    const raised = await seededSuggestion(scenario, requestFor(), {
+      kind: "candidate",
+      proposer: `human:${scenario.editor.userId}`,
+    });
+
+    const [outcome] = await acceptAll(scenario, raised.setId);
+
+    const facts = await commitFacts(
+      scenario.git,
+      scenario.workspaceId,
+      acceptedOf(outcome)?.sha ?? "",
+    );
+    expect(facts.author).toBe(`${admin.rows[0]?.name} <${admin.rows[0]?.email}>`);
+    expect(facts.author).not.toContain(editor.rows[0]?.email ?? "no address");
+  });
+
+  it("writes one subject line however the payload's title was spaced", async () => {
+    const scenario = await arrange();
+    // A title is open text and the git door refuses a subject carrying a newline — which is
+    // the whole reason the run of whitespace is folded to one space rather than kept.
+    const set = await submitted(scenario, scenario.editor, "edit", [
+      requestFor({ title: "  Expenses \n\t policy  " }),
+    ]);
+
+    const accepted = await acceptedOne(scenario, set.setId);
+
+    const facts = await commitFacts(scenario.git, scenario.workspaceId, accepted.sha);
+    expect(facts.subject).toBe("Accept the suggested change to Expenses policy");
+  });
+});
+
 describe("who may open a suggestion set", () => {
   it("shows an Admin any set, shows a proposer their own, and refuses everyone else", async () => {
     const scenario = await arrange();
@@ -1075,6 +1433,21 @@ describe("an acceptance reached straight through the write path", () => {
     await leftWaiting(scenario, set, 1);
   });
 
+  it("refuses one naming a suggestion nobody minted, and makes no commit", async () => {
+    const scenario = await arrange();
+    const { input, written, set } = await proposedAgainst(scenario, "edit");
+
+    const refused = await writeConcept(scenario.admin, doorsOf(scenario), {
+      ...acceptanceOf(input, written, set),
+      acceptance: { suggestionId: ulid(), setId: set.setId, kind: "edit" },
+    });
+
+    // A suggestion nobody minted is not waiting, which is the same answer a decided one
+    // gets: read before the commit, so an acceptance of a row that is not there costs none.
+    expect(refused).toEqual({ ok: false, error: "already-decided" });
+    await leftWaiting(scenario, set, 1);
+  });
+
   it("refuses one whose named target no longer answers to the merge key it was proposed under", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
@@ -1168,6 +1541,42 @@ describe("what the inbox refuses before it does any work", () => {
       { ok: false, error: "kind-forbids" },
       { ok: false, error: "kind-forbids" },
     ]);
+  });
+
+  it("hands a submitter the store's own failure rather than a set with no ids in it", async () => {
+    const scenario = await arrange();
+    const gone = new pg.Pool(db().runtimePool.options);
+    await gone.end();
+
+    const set = await submitSuggestionSet(
+      scenario.editor,
+      { postgres: openPostgres(gone) },
+      { kind: "edit", requests: [requestFor()] },
+    );
+
+    // A set that answered `ok` with nothing in it would be a producer told its candidates
+    // were queued when the store never took them.
+    expect(set).toEqual({ ok: false, error: expect.any(Error) });
+  });
+
+  it("refuses a submitter whose credentials ended, and queues nothing", async () => {
+    const scenario = await arrange();
+    await db().pool.query(
+      "UPDATE member SET credentials_revoked_at = $3 WHERE workspace_id = $1 AND user_id = $2",
+      [scenario.workspaceId, scenario.editor.userId, new Date()],
+    );
+
+    const set = await submitSuggestionSet(
+      scenario.editor,
+      { postgres: scenario.postgres },
+      { kind: "edit", requests: [requestFor()] },
+    );
+
+    expect(set).toEqual({ ok: false, error: "credentials-revoked" });
+    const queued = await db().pool.query("SELECT 1 FROM suggestion WHERE workspace_id = $1", [
+      scenario.workspaceId,
+    ]);
+    expect(queued.rowCount).toBe(0);
   });
 
   it("refuses an acceptance asked for in ids of no known form, and decides nothing", async () => {
