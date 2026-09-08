@@ -1,0 +1,36 @@
+.github/workflows/mutation.yml
+  s_0c3bfea64667cc::t_bddc7035ac0b48 62,65-67
+  s_0c3bfea64667cc::t_36deec131d05c2 39-40
+packages/schema/test/rls.test.ts
+  ai_agent 36-37
+apps/api/tests/suite-app.ts
+  ai_agent 12-13,24
+packages/core/stryker.config.mjs
+  ai_agent 49-55
+apps/api/vitest.config.ts
+  ai_agent 13-15
+packages/schema/test/boundary-schemas.test.ts
+  ai_agent 460-461
+packages/schema/test/worker-schema-view.test.ts
+  ai_agent 26-27
+apps/api/stryker.config.mjs
+  ai_agent 43-49
+packages/core/test/suite-postgres.ts
+  ai_agent 26-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a5b568e848b4a9fe0471b18bca9b07aa56d0b857",
+  "prompts": {},
+  "sessions": {
+    "s_0c3bfea64667cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9d3ba688-6883-4a0b-bfd6-2d1c408628e5",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}
