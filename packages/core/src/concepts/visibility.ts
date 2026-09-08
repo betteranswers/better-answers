@@ -138,6 +138,18 @@ const overrideOf = async (
  * for a narrowing in flight, and holds the narrowing's own `FOR UPDATE` read
  * (`sources.narrowBinding`) behind a derivation in flight, so the two orders are the only
  * two: the write derives from the narrowed binding, or the cascade recomputes the write.
+ *
+ * That share lock covers the bindings the concept cites **after** the act. A re-write that
+ * swaps its evidence is a third order: a narrowing of the binding its *old* citations rested
+ * on can cascade to the concept's row between the write's pre-commit check — which read the
+ * row wider, and refused no widening — and its landing, whose derivation over the new
+ * bindings never touches the narrowed one. So a landing asks for the row too (`onTheRow`):
+ * the pair `concept_index` holds at that instant, read `FOR UPDATE` after the bindings so a
+ * narrowing in flight is waited for and never deadlocked with, and combined as one more unit
+ * the concept rests on — the class the most restrictive, the audience the intersection — by
+ * the same rule, so a recorded override still outranks it and the floor still applies. A
+ * re-write thus never lands wider than the row it re-writes, at whichever instant the
+ * widening would have slipped through; a creation has no row and rests on nothing here.
  */
 export const conceptVisibilityFrom = async (
   principal: Principal,
@@ -154,6 +166,12 @@ export const conceptVisibilityFrom = async (
      * the one rule so a recorded override still outranks it and the floor still applies.
      */
     readonly alsoOn?: readonly Visibility[] | undefined;
+    /**
+     * Rest on the pair the concept's own row holds at this instant too, read and held
+     * `FOR UPDATE` in this transaction — the landing's clamp against a cascade that narrowed
+     * the row between an act's check and its rows.
+     */
+    readonly onTheRow?: boolean | undefined;
   },
 ): Promise<Visibility> => {
   const bindings =
@@ -176,9 +194,23 @@ export const conceptVisibilityFrom = async (
           [scopeParameter(principal), [...new Set(concept.citing)]],
         );
   const override = await overrideOf(principal, tx, concept.iri);
+  // After the bindings, never before: a narrowing holds its binding and then wants this row,
+  // and taking the row first would be the one order that deadlocks with it.
+  const row =
+    concept.onTheRow === true
+      ? await tx.query<VisibilityRow>(
+          `SELECT sensitivity, audience, audience_groups FROM concept_index
+            WHERE workspace_id = ${scopeClause(1)} AND iri = $2 FOR UPDATE`,
+          [scopeParameter(principal), concept.iri],
+        )
+      : undefined;
   return derivedVisibility({
     kind: concept.kind,
-    from: [...bindings.rows.map(visibilityOf), ...(concept.alsoOn ?? [])],
+    from: [
+      ...bindings.rows.map(visibilityOf),
+      ...(concept.alsoOn ?? []),
+      ...(row?.rows ?? []).map(visibilityOf),
+    ],
     fallback: concept.fallback,
     override: override === undefined ? undefined : visibilityOf(override),
   });

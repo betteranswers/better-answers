@@ -274,7 +274,9 @@ type Landing = z.infer<typeof conceptRow> & {
  * audience are derived from the bindings of what the concept cites (`visibility.ts`; ADR
  * 0023, ADR 0039): the parsed row's pair is the fallback, and what lands is the derivation
  * — on the index row and on the map's copies of it alike, in this one transaction, so a
- * concept is never readable for an instant at a class its evidence does not allow. And
+ * concept is never readable for an instant at a class its evidence does not allow. The
+ * derivation rests on the row's own pair at that instant too, so a re-write never lands
+ * wider than the row it re-writes, whatever narrowed it since the act's check. And
  * when the derivation moves the pair off what the row held, the cascade's second level runs
  * here as it runs inside a narrowing: every composition including this concept is
  * re-derived in the same transaction, so a re-write that narrows a concept never leaves a
@@ -311,11 +313,16 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
     audience: index.audience,
     audience_groups: index.audienceGroups ?? null,
   });
+  // And on the row as it stands *now*, not as the act read it before its commit: a
+  // narrowing's cascade may have moved the row between the two, and a re-write that swapped
+  // its evidence would otherwise land what its new citations derive over a row that had
+  // already narrowed — the widening the pre-commit check refuses, a moment late.
   const visibility = await conceptVisibilityFrom(principal, tx, {
     iri: index.iri,
     kind: index.kind,
     fallback: held,
     alsoOn: index.restsAlsoOn,
+    onTheRow: true,
   });
   await tx.query(
     `INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter, body,
