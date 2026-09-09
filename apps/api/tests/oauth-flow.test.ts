@@ -176,6 +176,40 @@ describe("the flow, as claude.ai drives it", () => {
     expect(`${resumed.origin}${resumed.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
   });
 
+  it("sets the active workspace on a session that predates the person's one membership, moving its updated_at (T-109, ADR 0040)", async () => {
+    const person = await app.person();
+    const client = app.client();
+    // A session with no membership at all, so the session-create hook has nothing to set.
+    await driveToPage(app, client, person);
+    const beforeUpdatedAt =
+      (
+        await app.database.superuser.query<{ updated_at: Date }>(
+          "SELECT updated_at FROM session WHERE user_id = $1",
+          [person.id],
+        )
+      ).rows[0]?.updated_at.getTime() ?? 0;
+
+    // The membership arrives after the session did — `shouldRedirect`'s raw-SQL fallback
+    // is the only thing that can still set it.
+    const solo = await app.provision({ name: "Solo" });
+    await app.addMember(solo.workspaceId, person.id, "Viewer");
+
+    const { challenge } = pkce();
+    const resumed = await client.fetch(
+      `${PUBLIC_URL}${authorizeUrl({ challenge, scope: "knowledge:read" })}`,
+      { redirect: "manual" },
+    );
+
+    // `shouldRedirect` returned false: past the picker, straight to consent.
+    expect(resumed.headers.get("location")).toContain("/consent");
+    const after = await app.database.superuser.query<{
+      active_workspace_id: string | null;
+      updated_at: Date;
+    }>("SELECT active_workspace_id, updated_at FROM session WHERE user_id = $1", [person.id]);
+    expect(after.rows[0]?.active_workspace_id).toBe(solo.workspaceId);
+    expect(after.rows[0]?.updated_at.getTime() ?? 0).toBeGreaterThan(beforeUpdatedAt);
+  });
+
   it("redirects an authorize request for a scope the surface does not offer back to the host with iss (§9 23)", async () => {
     const { challenge } = pkce();
 

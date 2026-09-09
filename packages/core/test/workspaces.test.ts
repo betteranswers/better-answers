@@ -330,16 +330,25 @@ describe("revoking a person's credentials", () => {
       superuser.release();
     }
 
+    // Before the act, so the platform's own write to `updated_at` (ADR 0040's 2026-09-09
+    // amendment: `updated_at = now()`, the database's instant) has something to move past.
+    const beforeUpdatedAt =
+      (
+        await db().pool.query('SELECT updated_at FROM "user" WHERE id = $1', [adminUserId])
+      ).rows[0]?.updated_at.getTime() ?? 0;
+
     const revoked = await revokeCredentials(bootstrap, door, { userId: adminUserId, at });
 
     expect(revoked).toEqual({
       ok: true,
       value: { userId: adminUserId, actorId: "process:better-answers-bootstrap" },
     });
-    const after = await db().pool.query('SELECT credentials_revoked_at FROM "user" WHERE id = $1', [
-      adminUserId,
-    ]);
+    const after = await db().pool.query(
+      'SELECT credentials_revoked_at, updated_at FROM "user" WHERE id = $1',
+      [adminUserId],
+    );
     expect(after.rows[0]?.credentials_revoked_at).toEqual(at);
+    expect(after.rows[0]?.updated_at.getTime() ?? 0).toBeGreaterThan(beforeUpdatedAt);
     const sessions = await db().pool.query(
       "SELECT id FROM session WHERE user_id = $1 ORDER BY id",
       [adminUserId],
