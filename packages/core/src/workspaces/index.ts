@@ -155,8 +155,10 @@ export const revokeCredentials = async (
     withIdentityWrite(platform, door, async (tx) => {
       // The instant never moves backwards: two revocations out of order keep the later
       // one, and the sessions and tokens are ended against that effective instant.
+      // `updated_at = now()`: the database's instant, ADR 0040's own shape for a row's
+      // timestamp — this platform write moves it the way a library write does.
       const person = await tx.query<{ at: Date }>(
-        'UPDATE "user" SET credentials_revoked_at = GREATEST(COALESCE(credentials_revoked_at, $2), $2) WHERE id = $1 RETURNING credentials_revoked_at AS at',
+        'UPDATE "user" SET credentials_revoked_at = GREATEST(COALESCE(credentials_revoked_at, $2), $2), updated_at = now() WHERE id = $1 RETURNING credentials_revoked_at AS at',
         [userId.data, input.at],
       );
       const at = person.rows[0]?.at;

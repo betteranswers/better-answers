@@ -44,10 +44,10 @@ export const user = pgTable("user", {
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
   createdAt: stamp("created_at").defaultNow().notNull(),
-  updatedAt: stamp("updated_at")
-    .defaultNow()
-    .$onUpdate(() => new Date())
-    .notNull(),
+  // Better Auth stamps this on every insert and update it makes (its own field-level
+  // `onUpdate`, ADR 0009) before the row reaches Drizzle, so this builder carries no
+  // `$onUpdate` of its own — ADR 0040's 2026-09-09 amendment.
+  updatedAt: stamp("updated_at").defaultNow().notNull(),
   // ADR 0018: a credential minted before this instant is refused on every call. Set by
   // the platform (Better Auth's `input: false`), never by the person.
   credentialsRevokedAt: stamp("credentials_revoked_at"),
@@ -60,9 +60,8 @@ export const session = pgTable(
     expiresAt: stamp("expires_at").notNull(),
     token: text("token").notNull().unique(),
     createdAt: stamp("created_at").defaultNow().notNull(),
-    updatedAt: stamp("updated_at")
-      .$onUpdate(() => new Date())
-      .notNull(),
+    // Better Auth's own write, not this builder's (ADR 0040's 2026-09-09 amendment).
+    updatedAt: stamp("updated_at").notNull(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
     userId: text("user_id")
@@ -92,9 +91,8 @@ export const account = pgTable(
     scope: text("scope"),
     password: text("password"),
     createdAt: stamp("created_at").defaultNow().notNull(),
-    updatedAt: stamp("updated_at")
-      .$onUpdate(() => new Date())
-      .notNull(),
+    // Better Auth's own write, not this builder's (ADR 0040's 2026-09-09 amendment).
+    updatedAt: stamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex("account_issuer_account_id_uidx").on(table.issuer, table.accountId),
@@ -110,10 +108,8 @@ export const verification = pgTable(
     value: text("value").notNull(),
     expiresAt: stamp("expires_at").notNull(),
     createdAt: stamp("created_at").defaultNow().notNull(),
-    updatedAt: stamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
+    // Better Auth's own write, not this builder's (ADR 0040's 2026-09-09 amendment).
+    updatedAt: stamp("updated_at").defaultNow().notNull(),
   },
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );

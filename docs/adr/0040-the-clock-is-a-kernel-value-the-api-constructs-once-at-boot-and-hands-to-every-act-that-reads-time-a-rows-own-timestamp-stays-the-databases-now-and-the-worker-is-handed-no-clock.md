@@ -96,16 +96,18 @@ exact boundary each of the two shelf-life comparisons makes — the calendar-dat
 either side of the instant that decides them, which a real clock can only ever be on one side of
 by accident.
 
-**The gate.** `packages/core/src` and `apps/api/src` carry no `new Date()` or `Date.now()`
-outside `kernel/clock.ts`. The natural rule — an oxlint `no-restricted-syntax` override on
+**The gate.** ~~`packages/core/src` and `apps/api/src` carry no `new Date()` or `Date.now()`
+outside `kernel/clock.ts`.~~ Three roots and two exemptions since 2026-09-09 (amendment
+below). The natural rule — an oxlint `no-restricted-syntax` override on
 `NewExpression[callee.name="Date"][arguments.length=0]` and
 `CallExpression[callee.object.name="Date"][callee.property.name="now"]` — is not this
 repository's, because oxlint 1.80.0, the version pinned here, ships no `no-restricted-syntax`
 rule at all (absent from `node_modules/oxlint/configuration_schema.json`, checked
 2026-09-08). `apps/api/tests/no-ambient-clock.test.ts` is the named fallback: a scan over both
 patterns with its own positive and negative cases, proved on the scanner itself before it is
-trusted over the real tree, then run over every `.ts` file under both directories except the
-kernel's own constructor.
+trusted over the real tree, then run over ~~every `.ts` file under both directories except the
+kernel's own constructor~~ every `.ts` file under all three roots except the two named
+exemptions (2026-09-09 amendment).
 
 We decided this because a value every slice may already import is where the kernel's own rule
 says shared vocabulary goes (ADR 0029 rule 1), and a clock is exactly that; because the
@@ -172,3 +174,43 @@ blur.
   those entries stands unedited.
 - Cites ADR 0029 (the kernel's import rule, the doors this is not a fifth of) and ADR 0019 (the
   shelf-life comparison the gate now lets a test hold still); reopens nothing in ADRs 0001–0039.
+
+## Amendment — 2026-09-09, the identity set's four hooks were the CLI generator's mirror of Better Auth's own write and are gone; the gate covers `packages/schema/src`, the ULID minter its one exemption there (T-109)
+
+T-109 found `packages/schema/src/identity-tables.ts` breaking this record's own rule four
+times: `user`, `session`, `account` and `verification`'s `updated_at` columns each carried a
+Drizzle `$onUpdate(() => new Date())`, a hook this ADR's gate could not see because it scanned
+`packages/core/src` and `apps/api/src` alone. **The identity set's row timestamps were never
+this record's to move.** ADR 0009 makes Better Auth's schema the contract: the library
+declares `onUpdate: () => new Date()` on those same four fields in its own field definitions
+(`@better-auth/core` 1.7.2) and its adapter factory applies it before a row ever reaches
+Drizzle, so `updatedAt` is always present in the `set` Drizzle receives and a Drizzle-level
+default or hook never fires — on either write path. The platform's own two writes to the
+identity set — `revokeCredentials` (`packages/core/src/workspaces/index.ts`,
+`user.credentials_revoked_at`) and the sole-membership `shouldRedirect` fallback
+(`apps/api/src/auth/auth.ts`, `session.active_workspace_id`) — are raw SQL through the pg
+client, which no Drizzle hook can reach either. The four hooks were dead code the CLI
+generator's own output carried in (T-004, 2026-09-02), never a site this codebase wrote a
+decision into, and they are deleted; the columns' DDL is unchanged, because Better Auth
+supplies `updatedAt` on every insert and update it makes and no `NOT NULL` column is left
+unset. **No trigger and no migration**: this is not the columns moving to the database's
+`now()`, which this record already refuses for a row's timestamp generally when the api would
+be the one deciding to write it — it is the opposite finding, that these four were never the
+api's clock to begin with, so there is nothing here for the api to hand a `now()` to.
+
+**The gate now covers `packages/schema/src`, as a third root.** The scan
+(`apps/api/tests/no-ambient-clock.test.ts`) walks `packages/core/src`, `apps/api/src` and
+`packages/schema/src`, and carries two named exemptions rather than one: the kernel's own
+constructor, as before, and the ULID minter (`packages/schema/src/ulid.ts`), whose one
+`Date.now()` — the worker's one clock-shaped read, named earlier in this record — orders an id
+and decides nothing, the same reason repeated for the same function now that the scan reaches
+the file it lives in. `[TEST7]` holds the pair both ways for both exemptions: the scan finds no
+ambient read outside them, and each named file is proved to still read the clock, so a future
+edit that quietly removed the minter's own reading would fail the gate rather than pass it by
+accident.
+
+**The two raw-SQL writes named above now set `updated_at = now()`** alongside the column each
+already wrote — the database's own instant, this record's shape for a row's timestamp — so a
+platform write to an identity row moves its timestamp the same way a library write does. This
+is not the columns' DDL changing and not a trigger: it is the two sites that already write to
+these rows writing one column more, in the same statement, under the same transaction.

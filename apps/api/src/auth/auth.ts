@@ -538,10 +538,12 @@ export const createAuth = (deps: AuthDependencies) => {
             const only = soleOf(held);
             if (only !== undefined) {
               await withIdentityWrite(PLATFORM_PRINCIPAL, deps.door, (tx) =>
-                tx.query("UPDATE session SET active_workspace_id = $1 WHERE id = $2", [
-                  only,
-                  session.id,
-                ]),
+                // `updated_at = now()`: the database's instant, ADR 0040's own shape for a
+                // row's timestamp — this platform write moves it the way a library write does.
+                tx.query(
+                  "UPDATE session SET active_workspace_id = $1, updated_at = now() WHERE id = $2",
+                  [only, session.id],
+                ),
               );
               return false;
             }

@@ -5,10 +5,21 @@ import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
 import { describe, expect, it } from "vitest";
 
 /**
- * The gate ADR 0040 names: no ambient wall-clock read in either tier's application code
- * outside the kernel's own constructor (`packages/core/src/kernel/clock.ts`) — a `Clock`
- * is constructed once by the api at boot and handed on explicitly to every act that reads
- * time, never reached for again inside one.
+ * The gate ADR 0040 names: no ambient wall-clock read in the application code under three
+ * roots — `packages/core/src`, `apps/api/src` and `packages/schema/src` — outside two named
+ * exemptions. A `Clock` is constructed once by the api at boot and handed on explicitly to
+ * every act that reads time, never reached for again inside one.
+ *
+ * **Three roots.** `packages/schema/src` joined the scan in T-109 (2026-09-09, ADR 0040's
+ * dated amendment): it writes the identity set's tables, which is where four dead
+ * `$onUpdate(() => new Date())` hooks were found and removed.
+ *
+ * **Two exemptions, each the one place a reading is handed out from rather than decided
+ * on.** The kernel's own constructor (`packages/core/src/kernel/clock.ts`), which every
+ * other site's `Clock` comes from, is one; the ULID minter (`packages/schema/src/ulid.ts`)
+ * is the other, because its one `Date.now()` orders an id and decides nothing — the reason
+ * ADR 0040 already gives for the worker's one clock-shaped read, which is this same
+ * function, re-exported.
  *
  * **Why this is a scan and not an oxlint rule.** `[CHECK1]` asks for a lint rule with a
  * throwaway-tree test wherever one is possible; the natural rule is `no-restricted-syntax`
@@ -62,17 +73,26 @@ const tsFilesUnder = (root: string): readonly string[] =>
     .map((entry) => path.relative(repositoryRoot, path.join(entry.parentPath, entry.name)));
 
 /**
- * The kernel's own constructor: the one file ADR 0040 permits to read the ambient clock,
- * because it is the thing that hands every other reading out.
+ * The kernel's own constructor: the one file ADR 0040 permits to read the ambient clock in
+ * `packages/core/src` or `apps/api/src`, because it is the thing that hands every other
+ * reading out.
  */
 const CLOCK_CONSTRUCTOR = "packages/core/src/kernel/clock.ts";
 
-describe("no ambient clock read outside the kernel's own constructor (ADR 0040)", () => {
-  it("finds none in packages/core/src or apps/api/src", () => {
+/**
+ * The ULID minter: the one file ADR 0040 permits to read the ambient clock in
+ * `packages/schema/src`, because its one `Date.now()` orders an id and decides nothing
+ * (T-109, 2026-09-09).
+ */
+const ULID_MINTER = "packages/schema/src/ulid.ts";
+
+describe("no ambient clock read outside its two named exemptions (ADR 0040)", () => {
+  it("finds none in packages/core/src, apps/api/src or packages/schema/src", () => {
     const files = [
       ...tsFilesUnder(path.join(repositoryRoot, "packages/core/src")),
       ...tsFilesUnder(path.join(repositoryRoot, "apps/api/src")),
-    ].filter((file) => file !== CLOCK_CONSTRUCTOR);
+      ...tsFilesUnder(path.join(repositoryRoot, "packages/schema/src")),
+    ].filter((file) => file !== CLOCK_CONSTRUCTOR && file !== ULID_MINTER);
 
     const findings = files.flatMap((file) => {
       const source = readFileSync(path.join(repositoryRoot, file), "utf8");
@@ -82,8 +102,13 @@ describe("no ambient clock read outside the kernel's own constructor (ADR 0040)"
     expect(findings).toEqual([]);
   });
 
-  it("the kernel's constructor is the one file this scan does not cover, and it is the one that reads the clock", () => {
+  it("the kernel's constructor is one of the two files this scan does not cover, and it is the one that reads the clock", () => {
     const source = readFileSync(path.join(repositoryRoot, CLOCK_CONSTRUCTOR), "utf8");
     expect(ambientClockReadsIn(source)).toEqual(["new Date()"]);
+  });
+
+  it("the ULID minter is the other file this scan does not cover, and it is the one that reads the clock", () => {
+    const source = readFileSync(path.join(repositoryRoot, ULID_MINTER), "utf8");
+    expect(ambientClockReadsIn(source)).toEqual(["Date.now()"]);
   });
 });
