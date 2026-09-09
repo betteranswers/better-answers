@@ -1,0 +1,28 @@
+packages/devtools/src/mutation-summary.ts
+  s_da38681efa8bf4::t_b830d0839cca66 207
+  s_da38681efa8bf4::t_82961c5ef88ffd 110-116,125
+packages/core/src/answering/index.ts
+  s_da38681efa8bf4::t_06e6a8e3574137 305-312
+packages/devtools/test/mutation-summary.test.ts
+  s_da38681efa8bf4::t_1020b888cbfd06 139-154
+  s_da38681efa8bf4::t_b830d0839cca66 98,198,262
+  s_da38681efa8bf4::t_6d99f94e22cbc2 70-76
+docs/research/t-009-survivor-triage.md
+  s_da38681efa8bf4::t_7a48985c250ff9 207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1f03ff763676d83be4dc9852e3650253257a0e22",
+  "prompts": {},
+  "sessions": {
+    "s_da38681efa8bf4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec1cae18-a199-4985-90ef-0ed1154fa706",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
