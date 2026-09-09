@@ -14,7 +14,7 @@ amends: 0005, 0007
 
 **Shared.** The landing checkpoint, grace and run signals: cocoindex reports them, the worker records them.
 
-**What is never relied on.** Undocumented API — `use_state` — is never called. `use_mount` never fans documents onto the critical path; `mount_each` does the isolating.
+**What is never relied on.** ~~Undocumented API — `use_state` — is never called.~~ (struck 2026-09-10 — the amendment below: public but undocumented, and never called.) `use_mount` never fans documents onto the critical path; `mount_each` does the isolating.
 
 **The exit stays cheap.** cocoindex types never cross a module seam; the catalogue and the run rows are the durable truth; every LMDB is disposable — never backed up, wiped and reprocessed on erasure (ADR 0005). Every cocoindex target is `managed_by="user"` and the app owns all DDL (ADR 0007, 2026-08-27 amendment): the engine's default `managed_by="system"` would let one binding's deletion drop the shared `index.chunk` and its index under every other binding.
 
@@ -29,3 +29,7 @@ amends: 0005, 0007
 - `[PIPE1]` is two sentences — cocoindex types never cross a module seam; every target is `managed_by="user"` and the app owns all DDL — with this ADR as the pointer for the line itself.
 - The first task that adds cocoindex to `apps/worker` reads this record before its first `Environment`, and the table above is what its review checks against.
 - Reopening condition: cocoindex documenting a block for anything under *ours*, or removing one under *theirs* — then the line moves, here.
+
+## Amendment — 2026-09-10, a wipe is paired with the deletion of the binding's rows, the memo holds only redacted text, and the seam has a name (T-113)
+
+Measured against the library at `aee7b27d`, the *ours / shared / theirs* line above cuts where it says and `managed_by="user"` does what this record relies on. Three consequences it did not state are stated now. **A wipe is paired with the deletion of the binding's derived rows**, because the LMDB *is* the target-state tracking: wipe it and the next update upserts the documents that still exist and issues no delete for those that went away meanwhile, so "wiped and reprocessed" would leave a withdrawn document's chunks standing — the one thing ADR 0020's erasure promises does not happen. The wipe is one act in order: the binding's `index.chunk` rows deleted in the app's transaction, the directory removed, an `index` job enqueued; chunk ids are minted from `(source_document_id, ordinal)` so the reprocess upserts. **The memo holds only redacted text**: conversion and ADR 0020's detector sit inside one memoised function whose return value is already redacted, versioned by rule version and detector pin with the applicable suppressions as an argument, and nothing beneath it is memoised — a separately memoised conversion would put the raw text in the store ADR 0020 says holds none. **The seam has a name**: `[PIPE1]`'s first sentence is kept by one module, `pipeline/`, whose interface takes and returns plain types and whose implementation alone imports `cocoindex`, refused elsewhere by the ruff rule the worker already uses for `unittest.mock`. `use_state` is exported and public, undocumented on the site only; the intent stands and the reason is reworded above. Everything else stands.

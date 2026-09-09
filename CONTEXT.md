@@ -213,7 +213,9 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   at a time, parked after repeated failure; its outcome rows record what changed per document.
 - **job** — one unit of background work, as a row on the queue: what to do (its *kind* — the
   nightly audit or the full rebuild today; the route's S1 adds kinds to a loop that exists), for
-  which workspace, and the facts the claim protocol needs. Queued until a *claimant* takes it under
+  which workspace, **about which subject** — the binding an index job is for, the concept a catch-up
+  job is for, named on the row by a typed column a kind's CHECK requires (T-113, 10/09/2026) — and
+  the facts the claim protocol needs. Queued until a *claimant* takes it under
   a *lease*; ends *done* or *failed* with an *outcome*, or *poisoned* after its last lost claim.
   The app enqueues; a job's kind names the tier that claims it — the worker for every kind but the
   ones only the app can run (a foreground rebuild from `pnpm ops`; the question-set job, whose
