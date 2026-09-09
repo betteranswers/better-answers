@@ -1,0 +1,89 @@
+apps/api/.claude/skills/openapi/SKILL.md
+  ai_agent 1-300
+apps/worker/.claude/skills/coolify-compose/examples/multi-service/notes.md
+  ai_agent 1-98
+apps/api/.claude/skills/validators/SKILL.md
+  ai_agent 1-228
+apps/worker/.claude/skills/coolify-compose/references/official-docs.md
+  ai_agent 1-104
+apps/api/.claude/skills/react-query-classic-migration/SKILL.md
+  ai_agent 1-198
+apps/api/.claude/skills/react-query-setup/SKILL.md
+  ai_agent 1-347
+apps/api/.claude/skills/adapter-standalone/SKILL.md
+  ai_agent 1-198
+apps/web/.claude/skills/better-auth-best-practices/SKILL.md
+  ai_agent 1-182
+apps/api/.claude/skills/caching/SKILL.md
+  ai_agent 1-205
+apps/web/.claude/skills/create-auth/SKILL.md
+  ai_agent 1-390
+apps/worker/.claude/skills/coolify-compose/examples/multi-service/after.yml
+  ai_agent 1-84
+apps/worker/.claude/skills/coolify-compose/examples/multi-service/before.yml
+  ai_agent 1-43
+apps/worker/.claude/skills/coolify-compose/examples/with-database/notes.md
+  ai_agent 1-58
+apps/api/.claude/skills/client-setup/SKILL.md
+  ai_agent 1-317
+apps/api/.claude/skills/error-handling/SKILL.md
+  ai_agent 1-253
+apps/worker/.claude/skills/coolify-deploy/SKILL.md
+  ai_agent 1-176
+apps/worker/.claude/skills/coolify-compose/SKILL.md
+  ai_agent 1-389
+apps/api/.claude/skills/middlewares/SKILL.md
+  ai_agent 1-242
+apps/web/.claude/skills/organization-best-practices/SKILL.md
+  ai_agent 1-479
+apps/worker/.claude/skills/coolify-compose/references/categories.md
+  ai_agent 1-49
+apps/api/.claude/skills/non-json-content-types/SKILL.md
+  ai_agent 1-265
+apps/api/.claude/skills/server-setup/SKILL.md
+  ai_agent 1-378
+apps/worker/.claude/skills/coolify-compose/examples/simple/before.yml
+  ai_agent 1-11
+apps/worker/.claude/skills/coolify-compose/references/magic-variables.md
+  ai_agent 1-142
+apps/api/.claude/skills/service-oriented-architecture/SKILL.md
+  ai_agent 1-247
+apps/api/.claude/skills/auth/SKILL.md
+  ai_agent 1-342
+apps/api/.claude/skills/links/references/link-options.md
+  ai_agent 1-248
+apps/api/.claude/skills/subscriptions/SKILL.md
+  ai_agent 1-406
+apps/worker/.claude/skills/coolify-compose/examples/README.md
+  ai_agent 1-37
+apps/worker/.claude/skills/coolify-compose/examples/simple/after.yml
+  ai_agent 1-22
+apps/api/.claude/skills/trpc-router/SKILL.md
+  ai_agent 1-151
+apps/worker/.claude/skills/coolify-compose/examples/simple/notes.md
+  ai_agent 1-25
+apps/worker/.claude/skills/coolify-compose/examples/with-database/after.yml
+  ai_agent 1-47
+apps/web/.claude/skills/email-and-password-best-practices/SKILL.md
+  ai_agent 1-212
+apps/api/.claude/skills/superjson/SKILL.md
+  ai_agent 1-273
+apps/web/.claude/skills/better-auth-security-best-practices/SKILL.md
+  ai_agent 1-432
+apps/web/.claude/skills/two-factor-authentication-best-practices/SKILL.md
+  ai_agent 1-331
+apps/api/.claude/skills/adapter-fetch/SKILL.md
+  ai_agent 1-199
+apps/worker/.claude/skills/coolify-compose/examples/with-database/before.yml
+  ai_agent 1-29
+apps/api/.claude/skills/server-side-calls/SKILL.md
+  ai_agent 1-249
+apps/api/.claude/skills/links/SKILL.md
+  ai_agent 1-301
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f0e74370de4d97de90237f50c32a9b49374c4a2b",
+  "prompts": {}
+}
