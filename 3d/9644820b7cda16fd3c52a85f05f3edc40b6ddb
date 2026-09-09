@@ -1,0 +1,23 @@
+CONTEXT.md
+  s_10981eb2359774::t_266ed5e90e3301 671-689
+apps/docs-site/specs/v01-route.md
+  s_10981eb2359774::t_c5e06b6ab5ac7b 1-416
+docs/agents/issue-tracker.md
+  s_10981eb2359774::t_57230212b6b300 1,3,7,9,13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3d9644820b7cda16fd3c52a85f05f3edc40b6ddb",
+  "prompts": {},
+  "sessions": {
+    "s_10981eb2359774": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "50b71b8d-577f-4bfc-893f-52a0fd5eaa8e",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
