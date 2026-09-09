@@ -67,6 +67,13 @@ const OTHER = { line: 3, start: 22, end: 29 };
 
 const shifted = (span: Span): Span => ({ ...span, line: span.line + 1 });
 
+/** One literal twice, so two mutants share a file, a mutator, a replacement and a text. */
+const SOURCE_TWICE = `export const first = "user";
+export const second = "user";
+`;
+const FIRST_USER = { line: 1, start: 22, end: 28 };
+const SECOND_USER = { line: 2, start: 23, end: 29 };
+
 const report = (source: string, mutants: readonly ReportMutant[]): Report => ({
   files: { "src/answer.ts": { source, mutants } },
 });
@@ -88,7 +95,7 @@ describe("the mutation summary (T-090)", () => {
       [
         "### api mutation score: 33.3% (1/3 mutants killed)",
         "### api new survivors: 1",
-        "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by order.",
+        "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by their order in the file.",
         '- `src/answer.ts:2` — StringLiteral — `""`',
         "### api mutants that ran no test: none",
         "",
@@ -127,6 +134,22 @@ describe("the mutation summary (T-090)", () => {
         "",
       ].join("\n"),
     );
+  });
+
+  it("pairs two identical spans by where they sit, whatever order the report lists them in", () => {
+    // Stryker does not keep a file's mutant order stable between runs: the same two
+    // `"user"` literals came out swapped in consecutive nightly reports, and a survivor
+    // paired with the other occurrence's kill read as a lost kill (T-107's residue).
+    const baseline = report(SOURCE_TWICE, [
+      mutant("StringLiteral", '""', FIRST_USER, "Killed", 1),
+      mutant("StringLiteral", '""', SECOND_USER, "Survived", 1),
+    ]);
+    const current = report(SOURCE_TWICE, [
+      mutant("StringLiteral", '""', SECOND_USER, "Survived", 1),
+      mutant("StringLiteral", '""', FIRST_USER, "Killed", 1),
+    ]);
+
+    expect(mutationSummary("api", current, baseline)).toContain("### api new survivors: none\n");
   });
 
   it("matches a mutant by its text when the file gained lines above it", () => {
@@ -172,7 +195,7 @@ describe("the mutation summary (T-090)", () => {
       [
         "### core mutation score: 0% (0/2 mutants killed)",
         "### core new survivors: 1",
-        "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by order.",
+        "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by their order in the file.",
         '- `src/answer.ts:3` — StringLiteral — `""` (no verdict in the baseline)',
         "### core mutants that ran no test: 1 — the runner resolved no test file for them, which is a runner fault to fix (the vitest-runner patch under `patches/`, T-107), never a survivor to triage",
         '- `src/answer.ts:2` — StringLiteral — `""`',
@@ -236,7 +259,7 @@ describe("the mutation summary script over files (T-090)", () => {
       [
         "### api mutation score: 50% (1/2 mutants killed)",
         "### api new survivors: 1",
-        "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by order.",
+        "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by their order in the file.",
         '- `src/answer.ts:2` — StringLiteral — `""` (not in the baseline)',
         "### api mutants that ran no test: none",
         "",

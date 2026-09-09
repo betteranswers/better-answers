@@ -107,7 +107,13 @@ const placedIn = (report: Report): readonly Placed[] =>
     })),
   );
 
-/** The report's mutants grouped by identity, in file order, so a duplicate pairs by order. */
+/**
+ * The report's mutants grouped by identity, each group in position order, so a duplicate
+ * pairs with the same occurrence run after run. Stryker does not keep a file's mutant order
+ * stable between runs — two `"auth.consent"` literals came out swapped in consecutive
+ * reports, and a survivor paired with the other occurrence's kill read as a lost kill
+ * (T-107's residue) — so the report's own order is never the pairing order.
+ */
 const byIdentity = (report: Report): ReadonlyMap<string, readonly Placed[]> => {
   const groups = new Map<string, Placed[]>();
   for (const placed of placedIn(report)) {
@@ -116,6 +122,7 @@ const byIdentity = (report: Report): ReadonlyMap<string, readonly Placed[]> => {
     if (group === undefined) groups.set(key, [placed]);
     else group.push(placed);
   }
+  for (const group of groups.values()) group.sort(byPlace);
   return groups;
 };
 
@@ -197,7 +204,7 @@ const NOTE = {
 } as const satisfies Record<NewSurvivor["before"], string>;
 
 const MATCHING =
-  "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by order.";
+  "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by their order in the file.";
 
 const newSurvivorLines = (
   leg: string,

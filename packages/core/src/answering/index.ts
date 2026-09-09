@@ -302,10 +302,14 @@ const utcMidnight = (year: number, month: number, day: number): number | undefin
   // fields, so there is no time-of-day left to zero once it has run.
   const at = new Date(0);
   at.setUTCFullYear(year, month - 1, day);
-  // All three fields are compared, though JS's rollover of an impossible date usually moves
-  // more than one at once (a month of 13 changes the year; a day of 32 changes the month):
-  // the three together are the statement that the calendar has this day, and one clause
-  // alone would be a claim about which field a rollover happens to move.
+  // The three clauses are one statement — the calendar has this day — and, with the two
+  // grammars above the only callers, no single clause can be the only one to fail: `month`
+  // and `day` arrive as two-digit integers, so a month outside 1–12 moves the year as well
+  // as the month, and a day the month does not have moves the month as well as the day (a
+  // day of at most 99 never rolls a whole year on its own). Forcing any one clause, or
+  // turning an `&&` into `||`, therefore changes no answer: the survivors Stryker reports
+  // on this line are equivalent by that argument, not untested
+  // (docs/research/t-107-lost-kills.md), and no test is owed to them.
   const same =
     at.getUTCFullYear() === year && at.getUTCMonth() === month - 1 && at.getUTCDate() === day;
   return same ? at.getTime() : undefined;
