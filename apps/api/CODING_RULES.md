@@ -36,3 +36,14 @@ Every directory under `lifts/` carries a `THIRD_PARTY_NOTICES.md` naming its ups
 repository and commit, the snapshot's digest, its licence and notice text, what was cut, who
 audited it and when, and the test a refresh must pass (ADR 0027 names the file, ADR 0005 the
 practice). The test lives in `tests/` beside our own and fails the build, not a report.
+
+## [APP5] Transport work follows the tier's own tRPC skills
+
+`apps/api/.claude/skills/` holds the tRPC skills this tier is written against — router and
+procedure shape, validators, links, non-JSON content types, error handling, subscriptions,
+caching, the fetch adapter. Before a procedure, a link or an adapter is written or changed, the
+skill that covers it is read, and a block spec's seam sketch that touches this tier names the
+skill it follows (the route spec's fourth rule). Where a skill and this file disagree, this file
+wins and the disagreement is recorded here. An upload is the `non-json-content-types` skill's
+shape — a mutation taking `octetInputParser` or `FormData`, reached through `splitLink` on
+`isNonJsonSerializable` — never a second HTTP route beside tRPC.

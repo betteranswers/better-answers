@@ -33,7 +33,7 @@ Commands, versions and scripts are read from each workspace's `package.json` or 
 
 ## Skills
 
-`/to-spec` before a block's build and `/to-tickets` after; `/grilling` and `/domain-modeling` for any design conversation; `/codebase-design` when shaping a module; `/tdd` for red–green work; `/writing-for-agents` when editing any file; `/diagnosing-bugs` for anything broken or slow; `/browser-suite` — this repository's own, tracked at `.claude/skills/browser-suite/` — for any Playwright spec under `apps/web/e2e/`; `/better-answers-design` — ours too, linked from `.claude/skills/` into `packages/design-system/` — for anything a person will look at.
+`/to-spec` before a block's build and `/to-tickets` after; `/grilling` and `/domain-modeling` for any design conversation; `/codebase-design` when shaping a module; `/tdd` for red–green work; `/writing-for-agents` when editing any file; `/diagnosing-bugs` for anything broken or slow; `/browser-suite` — this repository's own, tracked at `.claude/skills/browser-suite/` — for any Playwright spec under `apps/web/e2e/`; `/better-answers-design` — ours too, linked from `.claude/skills/` into `packages/design-system/` — for anything a person will look at; the api's tRPC skills under `apps/api/.claude/skills/` for any procedure, link or adapter in `apps/api/` (the transport rule in `apps/api/CODING_RULES.md`); `/c4-architecture` when an architecture review has moved the shape and the diagrams must say so.
 
 ## Agent skills
 

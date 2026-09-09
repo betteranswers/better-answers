@@ -122,7 +122,6 @@ const isAllowedLocation = (file: string): boolean =>
  * here that has no citation fails it too — the list is exact in both directions.
  */
 const CITED_NOWHERE_ELSE: Readonly<Record<string, string>> = {
-  APP2: "one server, one logger, one config module is the tier's shape; a reviewer reads it off the tree, and no test or ADR needs to name it",
   AUDIT2:
     "the declared-acts walk and the vocabulary's tests hold it without naming the tag; it binds review alone",
   AUDIT6:

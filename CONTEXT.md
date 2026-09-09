@@ -118,7 +118,9 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   never a metric. A hit is a crash window that was recovered, so a run of them is a fact worth
   reading. _Avoid_: reconciliation event, replay count.
 - **concept index** — the platform's derived row for every concept, written when the concept's
-  commit is made, checked by the sync, never edited. The only "both" of the minting rule.
+  commit is made, checked by the sync, never edited. The only "both" of the minting rule. Carries
+  the text `find` and `ask` match against, so a concept is searchable at its commit (ADR 0016,
+  amended 09/09/2026).
 - **merge key** — what a concept is recognised by when its IRI is not yet known: the words a
   suggestion's payload carries about the concept it means, which an acceptance resolves the
   target from at the moment it commits, never before. One concept per merge key in a
@@ -209,20 +211,23 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **connector run** — one execution of a binding by the scheduler (enumerate, index, extract, prune
   or reindex): claimed under a lease, keyed by its run key, checkpointed per batch, one per binding
   at a time, parked after repeated failure; its outcome rows record what changed per document.
-- **job** — one unit of the worker's work, as a row on the queue: what to do (its *kind* — the
-  nightly audit or the full rebuild in v0.1; B7 adds kinds to a loop that exists), for which
-  workspace, and the facts the claim protocol needs. Queued until a *claimant* takes it under a
-  *lease*; ends *done* or *failed* with an *outcome*, or *poisoned* after its last lost claim. The
-  app enqueues and the worker claims, both through the queue's SQL functions (ADR 0031's `queue`
-  agreement; ADR 0005: the control plane is rows). A job is its own record and never an *audit
-  event*. A *run* is a job being done: a *connector run* or a *graph sync run* is one job's
-  execution. _Avoid_: task, ticket.
-- **lease** — the scheduler's grip on a claimed run: held only while the worker keeps confirming it
-  is alive, expiring otherwise, so a run whose worker died is handed back for another claim rather
-  than lost. _Avoid_: lock (nothing waits on it).
-- **claimant** — the worker holding a job's claim: the only one that may keep its lease alive,
-  finish it or fail it — and no longer the claimant once the lease has lapsed, whether or not the
-  job has been claimed again since. _Avoid_: owner (a job has none), holder.
+- **job** — one unit of background work, as a row on the queue: what to do (its *kind* — the
+  nightly audit or the full rebuild today; the route's S1 adds kinds to a loop that exists), for
+  which workspace, and the facts the claim protocol needs. Queued until a *claimant* takes it under
+  a *lease*; ends *done* or *failed* with an *outcome*, or *poisoned* after its last lost claim.
+  The app enqueues; a job's kind names the tier that claims it — the worker for every kind but the
+  ones only the app can run (a foreground rebuild from `pnpm ops`; the question-set job, whose
+  answer path is the app's) — both through the same queue SQL functions (ADR 0031's `queue`
+  agreement, which already admits the app as a claimant; ADR 0005: the control plane is rows;
+  09/09/2026). A job is its own record and never an *audit event*. A *run* is a job being done:
+  a *connector run* or a *graph sync run* is one job's execution. _Avoid_: task, ticket.
+- **lease** — the scheduler's grip on a claimed run: held only while its claimant keeps confirming
+  it is alive, expiring otherwise, so a run whose claimant died is handed back for another claim
+  rather than lost. _Avoid_: lock (nothing waits on it).
+- **claimant** — the process holding a job's claim — the worker, or the api for a kind only it can
+  run: the only one that may keep its lease alive, finish it or fail it — and no longer the
+  claimant once the lease has lapsed, whether or not the job has been claimed again since.
+  _Avoid_: owner (a job has none), holder.
 - **outcome** — what a run found, written once at its end by its claimant: counts, and the ids or
   paths it counted them at, or the name of what went wrong — never content, never a person's name,
   so a record of what a run did is kept as it was written. A job that never ran has none.
@@ -683,6 +688,11 @@ How the work from the foundation to a finished v0.1 is cut and ordered (T-112, 0
   edges, a seam sketch. Taken to `/to-spec` before its build and to `/to-tickets` after; its
   tracer bullets are ordna tasks and the block itself never is. Each block lands its own screen.
   _Avoid_: phase, milestone, epic; slice (a block's tracer bullet, or a `packages/core` capability).
+- **strand** — one chain of blocks the route spec orders by their edges, worked in parallel with the
+  other: the *knowledge strand* (a document to a passage, an answer, the producer) and the
+  *records strand* (guides, suggestions). A block belongs to one strand; a cross-strand edge is
+  stated on the block. Not a *lane*, which is a queue the tracker keeps (`docs/agents/issue-tracker.md`).
+  _Avoid_: lane, track, path (the write path, the answer path).
 - **hygiene lane** — where a finding from a gate, a mutation run or a review goes: one ordna task
   tagged `hygiene`, with no map, no spec and no grilling, picked when a route block is blocked or
   a session is short. Off the route, so it never charts a map. _Avoid_: tech debt, chores,
