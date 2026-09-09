@@ -19,7 +19,9 @@ export default {
   // a mutant that throws while its module loads — `declareActs("")`, a family emptied — is
   // read by the unpatched runner as a run of no tests and reported `Survived` with
   // `testsCompleted: 0`; thirty rows here in run 34168928594, every one of that shape. The
-  // patch reports the file's failure to load as the kill it is. `vitest.related` stays on:
+  // patch reports the file's failure to load as the kill it is; per-mutant cost is unchanged
+  // by it (1.3 s a mutant in 34168928594, 2.1 s in the forced run 34292833221 at two workers
+  // over 56% more mutants and a suite that runs the worker). `vitest.related` stays on:
   // vitest relates twelve test files to `store/graph/index.ts` and `audit/vocabulary.ts`
   // (`vitest related`, run 09/09/2026), and the declared-acts walk's dynamic import is the
   // one reach it cannot see, which the static importers cover.

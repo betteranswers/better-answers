@@ -15,7 +15,10 @@ export default {
   // shape (T-107). `patches/@stryker-mutator__vitest-runner@10.0.0.patch` — applied by pnpm
   // through `pnpm-workspace.yaml` — counts a test file that failed to load as one failed
   // test named for the file, so the mutant is killed with the error it caused and a dry run
-  // with such a file refuses to start. Per-mutant cost is unchanged: the same tests run.
+  // with such a file refuses to start. Per-mutant cost is unchanged by the patch — the same
+  // tests run: 1.7 s a mutant in 34168928594 and 3.6 s in the forced run 34292833221 at two
+  // workers, the difference being the health test's false kill no longer cutting a static
+  // mutant's run short after three tests (`tests/health.test.ts`), not the runner.
   // `vitest.related` stays on (the default): T-097 read it as the cause, and it is not —
   // vitest relates fourteen test files to `mcp/entries/index.ts` (`vitest related`, run
   // 09/09/2026) — and off, a static mutant pays every test file's setup (both legs past
