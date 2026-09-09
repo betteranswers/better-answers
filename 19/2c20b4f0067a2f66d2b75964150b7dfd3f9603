@@ -1,0 +1,21 @@
+apps/api/stryker.config.mjs
+  s_4f5bb836dc20b6::t_011bce0be1eedb 18-21
+packages/core/stryker.config.mjs
+  s_4f5bb836dc20b6::t_011bce0be1eedb 22-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "192c20b4f0067a2f66d2b75964150b7dfd3f9603",
+  "prompts": {},
+  "sessions": {
+    "s_4f5bb836dc20b6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f4edcf7d-f3b0-4034-8352-9ad561fda719",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
