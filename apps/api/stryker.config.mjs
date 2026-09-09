@@ -74,7 +74,12 @@ export default {
   // and every mutant after it pays a container start again.
   maxTestRunnerReuse: 0,
 
-  // Each test runner process owns a Postgres container. Two is what a 2-vCPU hosted runner can
-  // hold without the containers starving each other (`runs-on` in the workflow).
-  concurrency: 2,
+  // Each test runner process owns a Postgres container, so this is also the container count.
+  // Four because the hosted `ubuntu-latest` runner a public repository gets has four vCPUs
+  // and 16 GB (https://docs.github.com/en/actions/reference/runners/github-hosted-runners,
+  // read 09/09/2026; a private repository's has two, which is where two came from). At two,
+  // a forced full run of this leg reached 84% of its mutants at the two-hour timeout (run
+  // 34292833221): a static mutant here boots the app for every related test file, and the
+  // false kills that once cut those runs short (`tests/health.test.ts`) are gone.
+  concurrency: 4,
 };

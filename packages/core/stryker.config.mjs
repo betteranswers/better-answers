@@ -72,7 +72,9 @@ export default {
   // and every mutant after it pays a container start again.
   maxTestRunnerReuse: 0,
 
-  // Each test runner process owns a Postgres container. Two is what a 2-vCPU hosted runner
-  // can hold without the containers starving each other (`runs-on` in the workflow).
-  concurrency: 2,
+  // Each test runner process owns a Postgres container, so this is also the container count.
+  // Four for the reason recorded in apps/api/stryker.config.mjs: the public repository's
+  // hosted runner has four vCPUs, and at two a forced full run reached 88% of this
+  // package's 3,574 mutants at the two-hour timeout (run 34292833221).
+  concurrency: 4,
 };
