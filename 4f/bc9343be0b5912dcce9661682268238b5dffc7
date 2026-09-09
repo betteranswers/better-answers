@@ -1,0 +1,35 @@
+packages/core/src/workspaces/index.ts
+  s_0994b166d3f767::t_511c39dac3cdb5 158-159,161
+apps/api/src/auth/auth.ts
+  s_0994b166d3f767::t_511c39dac3cdb5 541-546
+docs/adr/README.md
+  s_0994b166d3f767::t_511c39dac3cdb5 48
+apps/api/tests/no-ambient-clock.test.ts
+  s_0994b166d3f767::t_511c39dac3cdb5 8-11,13-22,76-78,82-87,89-90,94-95,105,109-112
+  s_0994b166d3f767::t_7e44083bf4220e 12
+  s_0994b166d3f767::t_a54bc803f8ed6e 88
+docs/adr/0040-the-clock-is-a-kernel-value-the-api-constructs-once-at-boot-and-hands-to-every-act-that-reads-time-a-rows-own-timestamp-stays-the-databases-now-and-the-worker-is-handed-no-clock.md
+  s_0994b166d3f767::t_511c39dac3cdb5 99-101,108-110,177-216
+apps/api/tests/oauth-flow.test.ts
+  s_0994b166d3f767::t_511c39dac3cdb5 179-207,209-212
+packages/schema/src/identity-tables.ts
+  s_0994b166d3f767::t_511c39dac3cdb5 47-50,63-64,94-95,111-112
+packages/core/test/workspaces.test.ts
+  s_0994b166d3f767::t_511c39dac3cdb5 333-339,346-349,351
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "4fbc9343be0b5912dcce9661682268238b5dffc7",
+  "prompts": {},
+  "sessions": {
+    "s_0994b166d3f767": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c68713d-8bff-43ea-9740-4b6b903ea70f",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
