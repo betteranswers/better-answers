@@ -1,0 +1,41 @@
+apps/docs-site/specs/v01-route.md
+  s_4d396c4ff61c74::t_74e70215dc9a22 419-420
+  s_4d396c4ff61c74::t_7777c3e9a7e08e 248
+  s_4d396c4ff61c74::t_4a64af431938ff 302
+  s_4d396c4ff61c74::t_ad706d94c3c304 194-196
+  s_4d396c4ff61c74::t_fc38098732ef31 446
+  s_4d396c4ff61c74::t_c93493f1d0dc1f 338
+  s_4d396c4ff61c74::t_da15d1febeba32 152,154-156
+  s_4d396c4ff61c74::t_a97c03bc321487 174-176
+  s_4d396c4ff61c74::t_eebc4a336406a4 386
+  s_4d396c4ff61c74::t_f6a76118230f4f 134
+  s_4d396c4ff61c74::t_3e90dff6632de2 432-435
+CONTEXT.md
+  s_4d396c4ff61c74::t_0627603f5b325e 216-218
+docs/adr/0014-records-attach-by-iri-versioned-where-edited-audited-in-one-ledger.md
+  s_4d396c4ff61c74::t_e45ebba4c5ef09 60-63
+docs/adr/README.md
+  s_4d396c4ff61c74::t_3ad459d74b5325 44
+  s_4d396c4ff61c74::t_65c73119515b0b 22
+  s_4d396c4ff61c74::t_fb48032cb121f3 31
+docs/adr/0036-the-worker-composes-cocoindexs-building-blocks-and-writes-only-what-the-engine-has-no-block-for.md
+  s_4d396c4ff61c74::t_e45ebba4c5ef09 17,32-35
+docs/adr/0023-the-graph-is-apache-age-inside-the-platform-postgres.md
+  s_4d396c4ff61c74::t_e45ebba4c5ef09 23,86-89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0beeddcdd1a5404e2337ff842c6fa72f9ab76a65",
+  "prompts": {},
+  "sessions": {
+    "s_4d396c4ff61c74": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46632645-16cc-4739-9600-d9bf872647fb",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
