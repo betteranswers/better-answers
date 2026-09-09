@@ -1,9 +1,10 @@
 # AGENTS.md
 
-A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers — **sources** (evidence) → **bundles** (OKF concepts, the map) → **graph** (derived) — and **records** (guides, compositions, usage, bindings, audit) the platform keeps over them, citing concepts. The destination this repo builds towards: `docs/vision.md`. Two runtime tiers sharing four stores — Postgres, an object store, a git repository per workspace, a derived graph — and never code. The map that gets us to v0.1: `.scratch/v01-spec/map.md`.
+A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers — **sources** (evidence) → **bundles** (OKF concepts: the curated map) → **graph** (derived) — and **records** (guides, compositions, usage, bindings, audit) the platform keeps over them, citing concepts. The destination this repo builds towards: `docs/vision.md`. Two runtime tiers sharing four stores — Postgres, an object store, a git repository per workspace, and the graph as Postgres tables under RLS (ADR 0032) — and never code. The way to v0.1 is the **route spec**, `apps/docs-site/specs/v01-route.md`; the map it was cut from (`.scratch/v01-spec/map.md`) is resolved and closed.
 
 ## Read first
 
+- `apps/docs-site/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block; a block goes to `/to-spec` before its build and `/to-tickets` after; a Wayfinder map is charted only for a destination the route does not hold.
 - `CONTEXT.md` — the glossary. Name things in code, tests, docs and commits with its words; a new domain word is settled there *before* it appears in code.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open and where each lands here; read before adding a key, convention or feature that relates to the knowledge layer.
 - `CODING_RULES.md` — the constitution: every rule that binds work in this repo. A workspace's own rules live in `apps/api/CODING_RULES.md`, `apps/web/CODING_RULES.md` and `apps/worker/CODING_RULES.md`.
@@ -15,15 +16,15 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers �
 
 | Path | What it is |
 | --- | --- |
-| `apps/api/` | The one TypeScript deployable — Hono on Node 24. Transports only: tRPC, MCP, OpenAPI, `/agent/v1`, the worker control plane's HTTP face |
-| `apps/web/` | Vite React single-page app; talks to `apps/api/` over tRPC only |
-| `apps/worker/` | Python 3.13 knowledge worker (uv): connectors, conversion, indexing, graph derive-and-sync, enrichment, ontology tooling |
+| `apps/api/` | The one TypeScript deployable — Hono on Node 24. Transports only: tRPC, the MCP surface, the authorization server and the SPA's static build on one origin (ADR 0034), the `pnpm ops` commands and the reconciler's tick. No app↔worker HTTP — the control plane is rows (ADR 0005). OpenAPI is generated and unmounted (T-014); `/agent/v1` is unbuilt |
+| `apps/web/` | Vite React single-page app; talks to `apps/api/` over tRPC only — the one exception, invitation-accept on the Better Auth client, arrives with the route's P1 |
+| `apps/worker/` | Python 3.13 knowledge worker (uv): the work loop, the nightly parser audit and the full rebuild. Connectors, conversion, indexing and extraction arrive with the route's S1 onward, composing cocoindex (ADR 0036) |
 | `packages/core/` | The business logic `apps/api` calls — capability slices over four store doors. Transport-agnostic, and lint-enforced as such |
-| `packages/devtools/` | The repository's own gate tooling — the throwaway-tree runner every gate's test runs its tool through, the `better-answers` oxlint plugin and the anti-slop lift. Imported, never deployed |
+| `packages/devtools/` | The repository's own gate tooling — the throwaway-tree runner every gate's test runs its tool through, the lint rules, the anti-slop lift, the mutation probe and summary; its README lists them. Imported, never deployed |
 | `packages/` | The rest of the shared TypeScript: `schema`, `design-system` |
 | `contracts/` | The tier contract's language-neutral fixtures — both tiers' suites read it, nothing imports it (ADR 0031) |
 | `docs/adr/` | Architecture decision records |
-| `apps/docs-site/` | Astro + Starlight documentation site and its docs skills; `apps/docs-site/specs/<ticket>.md` is where a ticket's spec lives |
+| `apps/docs-site/` | Markdown only, no site built: `specs/<ticket>.md` is a ticket's spec and `specs/v01-route.md` the route; `operations/` the ops documents; the pre-build gate |
 | ordna | The work queue — tasks as git namespace refs (`refs/ordna/tasks/<id>`), not files |
 | `deploy/` | Compose files and deployment configuration |
 | `.cubic/wiki/` | Cubic's generated wiki: orientation only, never authority (`docs/agents/code-review.md`) |
@@ -32,13 +33,13 @@ Commands, versions and scripts are read from each workspace's `package.json` or 
 
 ## Skills
 
-`/grilling` and `/domain-modeling` for any design conversation; `/codebase-design` when shaping a module; `/tdd` for red–green work; `/writing-for-agents` when editing any file; `/diagnosing-bugs` for anything broken or slow; `/browser-suite` — this repository's own, tracked at `.claude/skills/browser-suite/` — for any Playwright spec under `apps/web/e2e/`; `/better-answers-design` — ours too, linked from `.claude/skills/` into `packages/design-system/` — for anything a person will look at.
+`/to-spec` before a block's build and `/to-tickets` after; `/grilling` and `/domain-modeling` for any design conversation; `/codebase-design` when shaping a module; `/tdd` for red–green work; `/writing-for-agents` when editing any file; `/diagnosing-bugs` for anything broken or slow; `/browser-suite` — this repository's own, tracked at `.claude/skills/browser-suite/` — for any Playwright spec under `apps/web/e2e/`; `/better-answers-design` — ours too, linked from `.claude/skills/` into `packages/design-system/` — for anything a person will look at.
 
 ## Agent skills
 
 ### Issue tracker
 
-Build tasks live in **ordna** (`storage: namespace` — git blobs at `refs/ordna/tasks/<id>`, no files on disk; use the `ordna` CLI); wayfinding maps and their tickets live as markdown under `.scratch/<effort>/`; GitHub Issues is the public inbound surface, not the work queue. A body edit or a new task is pushed to **origin first**, then set locally: an open board auto-fetches every minute and reverts a local-only ref. Procedure in `docs/agents/issue-tracker.md`.
+Three lanes. Build tasks live in **ordna** (`storage: namespace` — git blobs at `refs/ordna/tasks/<id>`, no files on disk; use the `ordna` CLI), cut from a block of the route spec; wayfinding maps and their tickets live as markdown under `.scratch/<effort>/`; a finding from a gate, a mutation run or a review is one ordna task tagged `hygiene` — no map, no spec, no grilling, picked when a block is blocked or a session is short. GitHub Issues is the public inbound surface, not the work queue. A body edit or a new task is pushed to **origin first**, then set locally: an open board auto-fetches every minute and reverts a local-only ref. Procedure in `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
