@@ -42,6 +42,9 @@ FROM base AS manifests
 # reads the chain at build time. Node needs none of it: type stripping reads no tsconfig,
 # which is why the runtime stage below inherits from `base` and not from here.
 COPY pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+# The patches `pnpm-workspace.yaml` names (`patchedDependencies`): an install refuses to
+# start without the files, frozen lockfile or not, so they travel with the manifests.
+COPY patches/ patches/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY packages/core/package.json packages/core/
@@ -95,6 +98,9 @@ ENV NODE_ENV=production \
 # installing; this image has no lockfile, no registry credential and no writable /app, so
 # that repair can only fail. The tree was built at image build time and is the artefact.
 COPY pnpm-workspace.yaml ./
+# The patch files that workspace file names, so no pnpm command reads a reference to a
+# path that is not there. Nothing installs here; the tree above already carries the patch.
+COPY patches/ patches/
 RUN printf '\n# Set by apps/api/Dockerfile: an image never installs.\nverifyDepsBeforeRun: false\n' >> pnpm-workspace.yaml
 
 COPY --from=prod-deps /app/node_modules ./node_modules
