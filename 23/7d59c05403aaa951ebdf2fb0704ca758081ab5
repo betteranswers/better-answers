@@ -1,0 +1,67 @@
+CONTEXT.md
+  s_184c46912ae7fa::t_98c9ce20b4876f 121-123
+  s_184c46912ae7fa::t_afd49cd04085e3 214-230
+  s_184c46912ae7fa::t_1345e21e2b2824 691-695
+apps/docs-site/specs/v01-route.md
+  s_184c46912ae7fa::t_bf3f85c6773f24 13
+  s_184c46912ae7fa::t_bb3511916855c0 188
+  s_184c46912ae7fa::t_0205d7c33055bd 414-415
+  s_184c46912ae7fa::t_6c77300da13392 150
+  s_184c46912ae7fa::t_887b23a11f8e42 170
+  s_184c46912ae7fa::t_af0dd97ef667cd 413
+  s_184c46912ae7fa::t_bfe2ab54decbb1 242
+  s_184c46912ae7fa::t_25e4a2500a099f 146
+  s_184c46912ae7fa::t_d2701501a1a9ee 190,194
+  s_184c46912ae7fa::t_c8db56c28d41fc 206
+  s_184c46912ae7fa::t_e0acf44b2dd828 422-440
+  s_184c46912ae7fa::t_4407b581f5138d 164
+  s_184c46912ae7fa::t_49593c886f68f3 270-287
+  s_184c46912ae7fa::t_3fed14c31a8c9a 352
+  s_184c46912ae7fa::t_3cc49f127e2267 104-106
+  s_184c46912ae7fa::t_4a9710f9bf2b95 148
+  s_184c46912ae7fa::t_a2716f09822658 294,296
+  s_184c46912ae7fa::t_daec5678ab110b 166
+  s_184c46912ae7fa::t_7aaec4d4cfe626 118
+  s_184c46912ae7fa::t_f25a51067d780f 172,176,178
+  s_184c46912ae7fa::t_c5f4f47ff9b54c 368,370
+  s_184c46912ae7fa::t_b17c37a7db8ae0 397
+  s_184c46912ae7fa::t_0fbce62b27bbba 39
+  s_184c46912ae7fa::t_968a617d7a4423 98
+  s_184c46912ae7fa::t_62f4eb0d34d2ab 332,334
+  s_184c46912ae7fa::t_d2b57ea2472b16 56
+  s_184c46912ae7fa::t_8035c24e6f1220 3
+  s_184c46912ae7fa::t_b9d5524e839df3 406
+  s_184c46912ae7fa::t_6ecb4ca09b7d2a 152,154,156,158
+  s_184c46912ae7fa::t_d3a6cc554806df 112
+  s_184c46912ae7fa::t_1eed61e4c950c3 121-122
+  s_184c46912ae7fa::t_b0c32415427469 182
+  s_184c46912ae7fa::t_2518267f00c6eb 136
+  s_184c46912ae7fa::t_d4d94d7860dc12 326
+AGENTS.md
+  s_184c46912ae7fa::t_359053257fb18a 36
+docs/adr/0016-an-answer-asserts-concepts-only-found-by-traversal-and-served-as-one-contract.md
+  s_184c46912ae7fa::t_4fd7a2b2541d83 46-49
+apps/api/CODING_RULES.md
+  s_184c46912ae7fa::t_3fa320e4045f57 39-49
+docs/adr/README.md
+  s_184c46912ae7fa::t_5b3a58e22576ab 24
+  s_184c46912ae7fa::t_f08cd4b04f4dcd 28
+docs/adr/0020-personal-data-is-withheld-at-the-seam-before-any-store-and-erased-from-every-copy-by-routine.md
+  s_184c46912ae7fa::t_3fa320e4045f57 73-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "237d59c05403aaa951ebdf2fb0704ca758081ab5",
+  "prompts": {},
+  "sessions": {
+    "s_184c46912ae7fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bf5e576-700f-49f5-9baf-808e2fe2e344",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
