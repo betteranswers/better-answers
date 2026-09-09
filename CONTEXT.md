@@ -668,3 +668,22 @@ to it by IRI and never restates it (ADR 0014).
 - **canonical entity** — the node an entity merge produces: keyed by the rule, carrying no
   binding, with every contribution hanging off it under its own binding, class and audience; never
   shown when no contribution is visible to the reader; never a concept (ADR 0023).
+
+## The route
+
+How the work from the foundation to a finished v0.1 is cut and ordered (T-112, 09/09/2026).
+
+- **route spec** — the one document that holds the way to a finished v0.1: the `/to-spec` head
+  over the vision's v0.1 row, then the *blocks* in order, each with its edges and the obligations
+  it carries, and a status table that is the product frontier every session reads first. Never
+  ticketed; each block is specced and ticketed from it. A Wayfinder map is charted only for a
+  destination the route spec does not already hold. _Avoid_: roadmap, plan, master spec.
+- **block** — one section of the route spec: a destination a session can pick, about a page — the
+  ADRs and words it rests on, what in the tree it builds on, what it must carry, its blocking
+  edges, a seam sketch. Taken to `/to-spec` before its build and to `/to-tickets` after; its
+  tracer bullets are ordna tasks and the block itself never is. Each block lands its own screen.
+  _Avoid_: phase, milestone, epic; slice (a block's tracer bullet, or a `packages/core` capability).
+- **hygiene lane** — where a finding from a gate, a mutation run or a review goes: one ordna task
+  tagged `hygiene`, with no map, no spec and no grilling, picked when a route block is blocked or
+  a session is short. Off the route, so it never charts a map. _Avoid_: tech debt, chores,
+  follow-ups.

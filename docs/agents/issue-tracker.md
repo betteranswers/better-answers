@@ -1,13 +1,16 @@
-# Issue tracker: ordna, with a discovery lane in `.scratch/`
+# Issue tracker: ordna, with a discovery lane in `.scratch/` and a hygiene lane off the route
 
-This repo runs **two lanes**, and a skill must know which one it is in.
+This repo runs **three lanes**, and a skill must know which one it is in.
 
 | Lane | Where | What lives there | Who writes it |
 | --- | --- | --- | --- |
-| **Build queue** | ordna — git blobs at `refs/ordna/tasks/<id>` | Tasks that produce code: `T-001`, `T-002`, … | `/to-tickets`, `/triage`, humans |
+| **Build queue** | ordna — git blobs at `refs/ordna/tasks/<id>` | Tasks that produce code: `T-001`, `T-002`, … — cut from a *block* of the route spec (`apps/docs-site/specs/v01-route.md`) | `/to-tickets`, `/triage`, humans |
 | **Discovery** | `.scratch/<effort>/` markdown | The wayfinder map and its research · prototype · grilling tickets | `/wayfinder`, `/research`, `/prototype` |
+| **Hygiene** | ordna — tasks tagged `hygiene` | A finding from a gate, a mutation run or a review: one task each, no map, no spec, no grilling | The gate that found it, `/triage`, humans |
 
 A discovery ticket asks *what should we build*. An ordna task says *build this*. Discovery output becomes a spec; a spec becomes ordna tasks. Never the reverse.
+
+**The hygiene lane is off the route.** A hygiene task is picked when a route block is blocked or a session is short; it never charts a map and never becomes a spec round. The route spec's status table is the only frontier a product session reads, and a Wayfinder map is charted only for a destination the route spec does not already hold (`CONTEXT.md`, *hygiene lane*, *route spec*).
 
 GitHub Issues on `betteranswers/better-answers` is **not** the work queue. It is the inbound surface from the public and from bots (Renovate, Dependabot). An inbound issue worth doing is copied into ordna and the GitHub issue is closed with a pointer.
 
