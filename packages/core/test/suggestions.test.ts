@@ -278,10 +278,14 @@ const checkedBy = async (
   }
 };
 
+/** A literal the test writes down (`[TEST9]`), never the wall clock (ADR 0040): nothing
+ * `trustOf` reads turns on which instant it is. */
+const now = new Date("2026-09-08T12:00:00.000Z");
+
 /** The trust a reader is shown for one concept, through the read the surface will make. */
 const trustOf = async (scenario: Scenario, iri: string) => {
   const read = await readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
-    open(principal, tx, { iri }, new Date()),
+    open(principal, tx, { iri }, now),
   );
   return read.ok && read.value.found ? read.value.concept?.trust : undefined;
 };

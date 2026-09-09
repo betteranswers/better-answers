@@ -403,6 +403,10 @@ describe("open's and feedback's renderings", () => {
 });
 
 describe("what the slice's four acts answer", () => {
+  /** A literal the test writes down (`[TEST9]`), never the wall clock (ADR 0040): nothing
+   * these reads turn on which instant it is. */
+  const now = new Date("2026-09-08T12:00:00.000Z");
+
   it("hands every caller an outcome to read, never one to catch", () => {
     // `open` (T-052), `find` and `ask` (T-055) read a store now, so their unions have widened
     // to carry the store's own Error — the shape the convention's rule 3 promised would not
@@ -417,7 +421,7 @@ describe("what the slice's four acts answer", () => {
     const reader = await arrange();
 
     const found = await acting(reader, (principal, tx) =>
-      find(principal, tx, { query: "expenses", limit: 10 }, new Date()),
+      find(principal, tx, { query: "expenses", limit: 10 }, now),
     );
 
     expect(found).toEqual({ ok: true, value: { query: "expenses", hits: [] } });
@@ -462,7 +466,7 @@ describe("what the slice's four acts answer", () => {
     const reader = await arrange();
 
     const opened = await acting(reader, (principal, tx) =>
-      open(principal, tx, { locator: "p.4" }, new Date()),
+      open(principal, tx, { locator: "p.4" }, now),
     );
 
     expect(opened).toEqual({ ok: true, value: { found: false, locator: "p.4" } });
@@ -479,12 +483,7 @@ describe("what the slice's four acts answer", () => {
     await expect(
       acting(reader, async (principal, tx) => {
         await tx.query("SELECT 1 / 0").catch(() => undefined);
-        answered = await open(
-          principal,
-          tx,
-          { iri: "https://better-answers.com/c/01A" },
-          new Date(),
-        );
+        answered = await open(principal, tx, { iri: "https://better-answers.com/c/01A" }, now);
       }),
     ).rejects.toThrow("the transaction did not commit");
 

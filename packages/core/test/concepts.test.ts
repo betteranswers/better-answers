@@ -1575,13 +1575,22 @@ describe("the per-repository lock", () => {
 });
 
 describe("opening a concept by IRI", () => {
+  /**
+   * The instant this block's reads are taken at — a literal the test writes down
+   * (`[TEST9]`), never the wall clock (ADR 0040, "how a test pins it"). Which instant it is
+   * matters to one row below, the shelf-life table's "the Clock's day" row, chosen to fall
+   * inside the day that row names; every other read here answers the same whichever instant
+   * it is handed.
+   */
+  const now = new Date("2026-09-08T12:00:00.000Z");
+
   it("hands the reader the concept the write committed, unchecked until somebody checks it", async () => {
     const scenario = await arrange();
     const input = writeFor({ status: "stable" });
     const written = await landed(scenario, input);
 
     const opened = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }, new Date()),
+      open(principal, tx, { iri: written.iri }, now),
     );
 
     expect(opened.ok).toBe(true);
@@ -1613,7 +1622,7 @@ describe("opening a concept by IRI", () => {
 
     const seen = await Promise.all(
       [scenario.viewer, scenario.editor, scenario.admin].map((principal) =>
-        reading(principal, (resolved, tx) => open(resolved, tx, { iri: written.iri }, new Date())),
+        reading(principal, (resolved, tx) => open(resolved, tx, { iri: written.iri }, now)),
       ),
     );
 
@@ -1646,7 +1655,7 @@ describe("opening a concept by IRI", () => {
     );
     expect(checked).toMatchObject({ ok: true });
     const opened = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }, new Date()),
+      open(principal, tx, { iri: written.iri }, now),
     );
     expect(opened.ok && opened.value.found && opened.value.concept?.trust).toMatchObject({
       tier: "human-reviewed",
@@ -1661,7 +1670,7 @@ describe("opening a concept by IRI", () => {
       rewriteOf(input, written, { body: "Expenses are claimed within sixty days." }),
     );
     const moved = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }, new Date()),
+      open(principal, tx, { iri: written.iri }, now),
     );
     expect(moved.ok && moved.value.found && moved.value.concept?.trust.status).toBe(
       "changed-since-checked",
@@ -1675,7 +1684,7 @@ describe("opening a concept by IRI", () => {
     const written = await landed(scenario, writeFor({ status: "deprecated" }));
 
     const opened = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }, new Date()),
+      open(principal, tx, { iri: written.iri }, now),
     );
 
     expect(opened.ok && opened.value.found && opened.value.concept?.trust.status).toBe(
@@ -1703,7 +1712,7 @@ describe("opening a concept by IRI", () => {
     }
 
     const opened = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }, new Date()),
+      open(principal, tx, { iri: written.iri }, now),
     );
 
     expect(opened.ok && opened.value.found && opened.value.concept?.trust).toEqual({
@@ -1744,12 +1753,8 @@ describe("opening a concept by IRI", () => {
     );
 
     const [cited, uncited] = await Promise.all([
-      reading(scenario.viewer, (principal, tx) =>
-        open(principal, tx, { iri: citing.iri }, new Date()),
-      ),
-      reading(scenario.viewer, (principal, tx) =>
-        open(principal, tx, { iri: bare.iri }, new Date()),
-      ),
+      reading(scenario.viewer, (principal, tx) => open(principal, tx, { iri: citing.iri }, now)),
+      reading(scenario.viewer, (principal, tx) => open(principal, tx, { iri: bare.iri }, now)),
     ]);
 
     expect(cited.ok && cited.value.found && cited.value.concept?.evidence).toEqual([
@@ -1771,7 +1776,7 @@ describe("opening a concept by IRI", () => {
     ["a date long past", "2020-01-01", "out-of-date"],
     // The boundary of the date-only form: a shelf life lasts *through* the day it names, so a
     // date that has not ended yet is not past — and one that ended is.
-    ["today, which the concept lasts through", new Date().toISOString().slice(0, 10), "current"],
+    ["the Clock's day, which the concept lasts through", "2026-09-08", "current"],
     ["a date far ahead", "3000-01-01", "current"],
     ["an offset datetime long past", "2020-01-01T00:00:00Z", "out-of-date"],
     ["an offset datetime far ahead", "3000-01-01T00:00:00+01:00", "current"],
@@ -1809,7 +1814,7 @@ describe("opening a concept by IRI", () => {
     const written = await landed(scenario, input);
 
     const read = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }, new Date()),
+      open(principal, tx, { iri: written.iri }, now),
     );
 
     expect(read.ok && read.value.found && read.value.concept?.trust.status).toBe(expected);
@@ -1890,10 +1895,10 @@ describe("opening a concept by IRI", () => {
 
     const unminted = iriFor();
     const withheld = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }, new Date()),
+      open(principal, tx, { iri: written.iri }, now),
     );
     const absent = await reading(scenario.viewer, (principal, tx) =>
-      open(principal, tx, { iri: unminted }, new Date()),
+      open(principal, tx, { iri: unminted }, now),
     );
 
     // Indistinguishable, which is the whole requirement: the same shape, and neither says
@@ -1903,7 +1908,7 @@ describe("opening a concept by IRI", () => {
     expect(absent).toEqual({ ok: true, value: { found: false, iri: unminted } });
     // The Admin, who may see it, is the proof the concept is really there.
     const seen = await reading(scenario.admin, (principal, tx) =>
-      open(principal, tx, { iri: written.iri }, new Date()),
+      open(principal, tx, { iri: written.iri }, now),
     );
     expect(seen.ok && seen.value.found).toBe(true);
   });
