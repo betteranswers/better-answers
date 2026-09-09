@@ -1,0 +1,25 @@
+AGENTS.md
+  s_10981eb2359774::t_1765976869dd89 3,7
+  s_10981eb2359774::t_d035bc804ca177 19,21
+  s_10981eb2359774::t_4c5eaabc0c307d 27
+  s_10981eb2359774::t_69bbe5922bbaf6 20
+  s_10981eb2359774::t_89d2ab956b9467 23
+  s_10981eb2359774::t_dbeaa529194094 36
+  s_10981eb2359774::t_3a6f0ad6a2f6eb 42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f9b2e406e597394a68e799dcbf69b6ab893a712d",
+  "prompts": {},
+  "sessions": {
+    "s_10981eb2359774": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "50b71b8d-577f-4bfc-893f-52a0fd5eaa8e",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
