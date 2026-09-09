@@ -46,6 +46,10 @@ const { db, arrange, reading } = visibilitySuite();
 
 const RESTRICTED = { sensitivity: "Restricted" } as const;
 
+/** A literal the test writes down (`[TEST9]`), never the wall clock (ADR 0040): nothing
+ * `open` or `find` reads below turns on which instant it is. */
+const now = new Date("2026-09-08T12:00:00.000Z");
+
 /** The concept's row alone, as the superuser reads it. */
 const heldRow = (workspaceId: string, iri: string) =>
   visibilityHeld(db().pool, "concept_index", workspaceId, iri);
@@ -153,7 +157,7 @@ describe("what a governed write derives from the bindings of what it cites", () 
     );
     // Nobody's: the HR Viewer passes neither the class nor an audience that is not there.
     const seen = await reading(scenario.viewer, (viewer, tx) =>
-      open(viewer, tx, { iri: written.iri }, new Date()),
+      open(viewer, tx, { iri: written.iri }, now),
     );
     expect(seen.ok && seen.value.found).toBe(false);
   });
@@ -462,7 +466,7 @@ describe("narrowing a binding", () => {
     ).toEqual(named);
     const [viewer, editor] = await Promise.all(
       [scenario.viewer, scenario.editor].map((person) =>
-        reading(person, (reader, tx) => open(reader, tx, { iri: written.iri }, new Date())),
+        reading(person, (reader, tx) => open(reader, tx, { iri: written.iri }, now)),
       ),
     );
     expect(viewer?.ok && viewer.value.found).toBe(false);
@@ -907,7 +911,7 @@ describe("an Admin's recorded override", () => {
     ]);
     // The Viewer now sees the concept — and its class is derived from nothing they could read.
     const seen = await reading(scenario.viewer, (viewer, tx) =>
-      open(viewer, tx, { iri: person.iri }, new Date()),
+      open(viewer, tx, { iri: person.iri }, now),
     );
     expect(seen.ok && seen.value.found).toBe(true);
   });
@@ -1158,10 +1162,10 @@ describe("find", () => {
     });
 
     const viewer = await reading(scenario.viewer, (reader, tx) =>
-      find(reader, tx, { query: "expenses", limit: 5 }, new Date()),
+      find(reader, tx, { query: "expenses", limit: 5 }, now),
     );
     const admin = await reading(scenario.admin, (reader, tx) =>
-      find(reader, tx, { query: "EXPENSES", limit: 5 }, new Date()),
+      find(reader, tx, { query: "EXPENSES", limit: 5 }, now),
     );
 
     expect(viewer).toEqual({
@@ -1234,9 +1238,7 @@ describe("find", () => {
         { query: "note", limit: 2 },
         { query: "%", limit: 5 },
         { query: "   ", limit: 5 },
-      ].map((input) =>
-        reading(scenario.viewer, (reader, tx) => find(reader, tx, input, new Date())),
-      ),
+      ].map((input) => reading(scenario.viewer, (reader, tx) => find(reader, tx, input, now))),
     );
 
     expect(limited?.ok && limited.value.hits.map((hit) => hit.title)).toEqual([
