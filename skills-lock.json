@@ -43,6 +43,12 @@
       "skillPath": "packages/server/skills/auth/SKILL.md",
       "computedHash": "fef9f9dcb1631490a3a273f1a6b89aa234260ed8087a97de5a1c75f769ea26fe"
     },
+    "ban-type-assertions": {
+      "source": "whamp/skills",
+      "sourceType": "github",
+      "skillPath": "engineering/ban-type-assertions/SKILL.md",
+      "computedHash": "de04a4a73910b9ff960f4759b05f828507b16ab72fea6122f843c01f64ac4e84"
+    },
     "better-auth-best-practices": {
       "source": "better-auth/skills",
       "sourceType": "github",
@@ -90,6 +96,12 @@
       "sourceType": "github",
       "skillPath": "packages/server/skills/error-handling/SKILL.md",
       "computedHash": "5816a0b5e2e7a33b2bf5b130201bba4251b0865688f4c647a780f39af277c6b8"
+    },
+    "first-principles": {
+      "source": "whamp/skills",
+      "sourceType": "github",
+      "skillPath": "productivity/first-principles/SKILL.md",
+      "computedHash": "5bf4f6d786d9d247378cac66694227c6ba85431ab47b732d21ecd060b74b03a1"
     },
     "hono": {
       "source": "yusukebe/hono-skill",

@@ -65,3 +65,5 @@ apps/worker/.claude/skills/*
 
 # A person's own Claude Code overrides (permissions, skill toggles); the project's hooks live in .claude/settings.json.
 .claude/settings.local.json
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
