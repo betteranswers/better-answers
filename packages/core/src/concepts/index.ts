@@ -54,6 +54,7 @@ import {
 import { conceptVisibilityFrom } from "./visibility.ts";
 
 export {
+  canonicalFrontmatter,
   contentHashOf,
   parseConceptFile,
   renderConceptFile,

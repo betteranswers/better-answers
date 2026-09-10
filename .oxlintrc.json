@@ -165,18 +165,45 @@
       }
     },
     {
-      // ADR 0029 rule 5 — nothing in `packages/core` imports a transport or a transport's
+      // Two of ADR 0029's import-direction rules, in one override because a second override
+      // over the same files would replace this one's `no-restricted-imports` rather than add
+      // to it (the drizzle-zod restatement below is the same fact from the other side).
+      //
+      // Rule 4 — a slice reaches a sibling slice, a store door or a layer only through its
+      // `index.ts`, never an internal. Expressed as the shape a glob can read: a relative
+      // import that leaves its directory is banned unless it ends at one of the faces the
+      // tree has — a sibling's, one level up; a door's, under `store/`; `kernel`'s or
+      // `access`'s, two up from a door; and the same faces under `src/` from a test in
+      // `packages/core/test/`, which reaches a slice the way the constitution's interface
+      // rule asks — through its face. The faces are named by shape rather than lifted for
+      // every `index.ts`, so a slice that grows a subdirectory with a face of its own is still
+      // reached only through the slice's. A same-directory import is untouched; every slice
+      // is flat today, and a file in a subdirectory reaching its parent's internals with
+      // `../` would be refused — the moment to ask whether that subdirectory is a module.
+      // Rule 5 — nothing in `packages/core` imports a transport or a transport's
       // dependency. `core` is a library with five callers, four of which have no notion of an
       // HTTP status code; a transport import here is how that boundary erodes. A package
       // boundary cannot enforce this on its own, which is why it is a lint rule.
       // Verified against oxlint 1.80.0: a per-glob override fires inside its glob and stays
-      // silent outside it.
+      // silent outside it, and a `!`-prefixed pattern in a group lifts the ban for the paths
+      // it names.
       "files": ["packages/core/**"],
       "rules": {
         "no-restricted-imports": [
           "error",
           {
             "patterns": [
+              {
+                "group": [
+                  "../**",
+                  "!../*/index.ts",
+                  "!../../*/index.ts",
+                  "!../store/*/index.ts",
+                  "!../src/*/index.ts",
+                  "!../src/store/*/index.ts"
+                ],
+                "message": "A slice reaches a sibling slice, a store door or a layer only through its index.ts (ADR 0029 rule 4). Export what you need from that directory's face and import it from there."
+              },
               {
                 "group": [
                   "hono",

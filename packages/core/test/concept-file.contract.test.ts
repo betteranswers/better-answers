@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { canonicalFrontmatter, contentHashOf } from "../src/concepts/file.ts";
+import { canonicalFrontmatter, contentHashOf } from "../src/concepts/index.ts";
 import { contractFixture } from "./contract-fixture.ts";
 
 /**

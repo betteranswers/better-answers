@@ -1,11 +1,14 @@
-import { oxlintOverrideFor } from "@better-answers/devtools/oxlint-config";
+import { oxlintOverrideFor, readOxlintConfig } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
 /**
- * ADR 0029 rule 5 — nothing in `packages/core` imports a transport or a transport's
- * dependency — is held by a per-glob `no-restricted-imports` override in the root oxlint
- * config. A rule nobody has run is a convention, so this test runs it (`[CHECK1]`).
+ * Two of ADR 0029's import-direction rules are held by one per-glob `no-restricted-imports`
+ * override in the root oxlint config: rule 5 — nothing in `packages/core` imports a transport
+ * or a transport's dependency — and rule 4 — a slice reaches a sibling slice, a store door or
+ * a layer only through its `index.ts`, never an internal file. A rule nobody has run is a
+ * convention, so this test runs both, each where it fires and where it stays silent
+ * (`[CHECK1]`, `[TEST7]`).
  *
  * The override is read out of the real `.oxlintrc.json` rather than restated here: a
  * restatement would pass while the repository's own config was broken. It is then applied
@@ -53,5 +56,81 @@ describe("the transport ban over packages/core", () => {
     "node:http",
   ])("bans %s too, not hono alone", (specifier) => {
     expect(lintFixture(specifier)).toContain("packages/core/probe.ts");
+  });
+});
+
+/**
+ * Rule 4's subject is a relative import, so the probe sits where a slice file sits. Three
+ * positions: a slice file, one directory below `src/`; a store door's face, two below, which
+ * reaches `kernel` and `access` through `../../`; and a test under `packages/core/test/`,
+ * which reaches a slice through `../src/` and is held to the same face. The pattern lifts
+ * the ban for the faces the tree has and not for every `index.ts`, which the nested-face
+ * case below is there to prove.
+ */
+const SLICE_FILE = "packages/core/src/concepts/landing.ts";
+const DOOR_FILE = "packages/core/src/store/graph/index.ts";
+const TEST_FILE = "packages/core/test/concepts.test.ts";
+
+const relativeImportAt = (
+  file: string,
+  importSpecifier: string,
+): Readonly<Record<string, string>> => ({
+  [file]: `import * as sibling from "${importSpecifier}";\nexport const probe = sibling;\n`,
+});
+
+describe("the index.ts rule over packages/core's slices", () => {
+  it("fires on a sibling slice's internal file", () => {
+    const output = lint.output(relativeImportAt(SLICE_FILE, "../guides/renderer.ts"));
+
+    expect(output).toContain(SLICE_FILE);
+    expect(output).toContain("no-restricted-imports");
+  });
+
+  it.each([
+    [SLICE_FILE, "../store/postgres/handle.ts"],
+    [SLICE_FILE, "../concepts/../guides/renderer.ts"],
+    [DOOR_FILE, "../../kernel/actor.ts"],
+    [DOOR_FILE, "../../access/predicate.ts"],
+    [SLICE_FILE, "../guides/internal/index.ts"],
+    [TEST_FILE, "../src/concepts/file.ts"],
+  ])("fires from %s on %s", (file, specifier) => {
+    expect(lint.flagged(relativeImportAt(file, specifier))).toEqual([file]);
+  });
+
+  it.each([
+    [SLICE_FILE, "../guides/index.ts"],
+    [SLICE_FILE, "../store/postgres/index.ts"],
+    [SLICE_FILE, "./inbox.ts"],
+    [DOOR_FILE, "../../kernel/index.ts"],
+    [DOOR_FILE, "../../access/index.ts"],
+    [TEST_FILE, "../src/concepts/index.ts"],
+    [TEST_FILE, "../src/store/postgres/index.ts"],
+    [TEST_FILE, "./suite-postgres.ts"],
+  ])("stays silent from %s on %s", (file, specifier) => {
+    expect(lint.flagged(relativeImportAt(file, specifier))).toEqual([]);
+  });
+
+  it("stays silent outside packages/core for the same import", () => {
+    expect(
+      lint.flagged(relativeImportAt("apps/api/src/routers/probe.ts", "../auth/claims.ts")),
+    ).toEqual([]);
+  });
+
+  // The runner above carries the one override alone, so it cannot see a later override in
+  // the real config re-setting `no-restricted-imports` over a core file — oxlint replaces a
+  // rule's options per override rather than merging them, and the test-file overrides come
+  // after this one. So the shape is asserted instead: after the core override, no override
+  // whose glob can reach packages/core sets the rule again.
+  it("is the last override in the config to set no-restricted-imports over packages/core", () => {
+    const { overrides } = readOxlintConfig();
+    const core = overrides.findIndex((override) => override.files?.includes("packages/core/**"));
+    const later = overrides
+      .slice(core + 1)
+      .filter((override) => override.rules?.["no-restricted-imports"] !== undefined)
+      .flatMap((override) => override.files ?? [])
+      .filter((glob) => glob.startsWith("**") || glob.startsWith("packages/core"));
+
+    expect(core).toBeGreaterThanOrEqual(0);
+    expect(later).toEqual([]);
   });
 });
