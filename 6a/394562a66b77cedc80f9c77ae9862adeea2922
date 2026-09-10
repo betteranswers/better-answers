@@ -1,0 +1,22 @@
+apps/api/tests/coding-rules-tags.test.ts
+  s_27734c51da9186::t_c8b6feafc7c319 126-127
+  s_27734c51da9186::t_608dbe52d7bf01 128-129,131
+apps/api/tests/serve.ts
+  s_27734c51da9186::t_bc518391abef50 16-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "6a394562a66b77cedc80f9c77ae9862adeea2922",
+  "prompts": {},
+  "sessions": {
+    "s_27734c51da9186": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "934749af-2178-4484-b738-097ddb3fafa2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
