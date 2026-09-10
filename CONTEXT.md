@@ -477,8 +477,11 @@ to it by IRI and never restates it (ADR 0014).
   request, that `human:<email>` becomes across that workspace's files and history on a valid
   erasure request. Never the person id, so two workspaces' rewritten histories cannot be joined
   on one person.
-- **subject request** — a person's access or erasure request: the same per-store finder, the
-  one-month clock; access answers from the normalised text.
+- **subject request** — a person's access or erasure request — a member's, or one recorded on
+  behalf of a person the company's files name who never signed in (10/09/2026): the same
+  per-store finder over the request's identifier set, the one-month clock from its start;
+  access answers with where the platform holds the person and under which categories, never
+  a passage.
 - **suppression** — the entry that keeps a person's data out of every derived store when a
   document is reprocessed; applied per document, linked to its erasure request.
 - **version (of a record)** — one state of a composition or a guide definition, kept for good with

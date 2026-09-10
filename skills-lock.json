@@ -109,6 +109,12 @@
       "skillPath": "skills/hono/SKILL.md",
       "computedHash": "220e5e1b12bbaeec49ec362b6e2262d77632d0536e9758bba9acbbc323fef990"
     },
+    "implementing-gdpr-data-subject-access-request": {
+      "source": "mukul975/anthropic-cybersecurity-skills",
+      "sourceType": "github",
+      "skillPath": "skills/implementing-gdpr-data-subject-access-request/SKILL.md",
+      "computedHash": "146286ad6fd6ce797afbbcbadd373d8c57438015bdf073a8b20dfdc2e8bce8f1"
+    },
     "links": {
       "source": "trpc/trpc",
       "sourceType": "github",
@@ -156,6 +162,18 @@
       "sourceType": "github",
       "skillPath": "better-auth/organization/SKILL.md",
       "computedHash": "27627eb3a13bd44eff3a5d890f96e7db052b623db90e01684f759abe3e7fe56b"
+    },
+    "pii-detection-pipeline": {
+      "source": "mukul975/privacy-data-protection-skills",
+      "sourceType": "github",
+      "skillPath": "skills/privacy/pii-detection-pipeline/SKILL.md",
+      "computedHash": "c6eaeb455726a3275109a23bb001d8a9e0a393682ec7dbb0dbbf3ccfe761b5cf"
+    },
+    "pii-in-unstructured": {
+      "source": "mukul975/privacy-data-protection-skills",
+      "sourceType": "github",
+      "skillPath": "skills/privacy/pii-in-unstructured/SKILL.md",
+      "computedHash": "4328046f7a49dd913c72fa515ee803554e95032edd1116cdf67b48a0a4cacf61"
     },
     "react-query-classic-migration": {
       "source": "trpc/trpc",
