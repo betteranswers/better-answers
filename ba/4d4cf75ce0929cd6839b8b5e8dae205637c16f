@@ -1,0 +1,48 @@
+docs/specs/s0-redaction-seam-and-erasure.md
+  s_0e693d7022ba0e::t_6dd839b8ccc9f5 119
+  s_0e693d7022ba0e::t_543ac9954bbab3 213-214
+  s_0e693d7022ba0e::t_3bc9db9ed0b979 167
+  s_0e693d7022ba0e::t_bff6acad944c5d 94
+  s_0e693d7022ba0e::t_eee3bac64ab14a 130
+  s_0e693d7022ba0e::t_323d4b51d65048 218
+  s_0e693d7022ba0e::t_85810ce2866f10 159
+  s_0e693d7022ba0e::t_5421b16e4a13eb 111
+  s_0e693d7022ba0e::t_73f58964e604ed 168
+  s_0e693d7022ba0e::t_53a6c31c31fe3f 134
+  s_0e693d7022ba0e::t_b9aaa1f29784bf 138
+docs/specs/s1-one-uploaded-document-to-a-cited-passage.md
+  s_0e693d7022ba0e::t_f4fb3249d5718f 194
+  s_0e693d7022ba0e::t_1260e2ad9c9ae9 87
+  s_0e693d7022ba0e::t_facb2b3962cf27 105
+  s_0e693d7022ba0e::t_5494956afdc160 248
+  s_0e693d7022ba0e::t_a490a741efcdbc 249
+  s_0e693d7022ba0e::t_51b6f582a91632 127
+  s_0e693d7022ba0e::t_9cf21e6e43398d 164
+  s_0e693d7022ba0e::t_6edcc9e223fc17 116
+  s_0e693d7022ba0e::t_08fe81ab4b06b4 254
+  s_0e693d7022ba0e::t_77590fb72e5f8f 173
+skills-lock.json
+  ai_agent 112-117,166-176
+docs/specs/v01-route.md
+  s_0e693d7022ba0e::t_e7139a0d04da49 423
+  s_0e693d7022ba0e::t_75b3c7a6e2305a 268
+  s_0e693d7022ba0e::t_88af3d387267ee 176-177
+CONTEXT.md
+  s_0e693d7022ba0e::t_b3c83a7ba09f63 480-484
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ba4d4cf75ce0929cd6839b8b5e8dae205637c16f",
+  "prompts": {},
+  "sessions": {
+    "s_0e693d7022ba0e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "adb3b4d5-0710-4aa1-b8ae-ffa915acbe0e",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
