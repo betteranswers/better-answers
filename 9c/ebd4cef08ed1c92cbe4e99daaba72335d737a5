@@ -1,0 +1,27 @@
+docs/specs/s0-redaction-seam-and-erasure.md
+  s_807ae94c832040::t_78d57729bb2b4f 134
+docs/architecture/c4-components-worker.md
+  s_807ae94c832040::t_f81b9f0b0b645c 34
+docs/architecture/c4-dynamic-document-to-passage.md
+  s_807ae94c832040::t_5af89b1f9f0a57 53
+  s_807ae94c832040::t_7cf8653e405994 31-43
+  s_807ae94c832040::t_aee41f1a8cddac 14
+docs/architecture/c4-components-core.md
+  s_807ae94c832040::t_570464a539e610 99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9cebd4cef08ed1c92cbe4e99daaba72335d737a5",
+  "prompts": {},
+  "sessions": {
+    "s_807ae94c832040": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b7a6f2cc-5b3b-4231-85ec-31e6853ecf5c",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
