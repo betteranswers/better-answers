@@ -1,0 +1,19 @@
+.scratch/v01-route/probes/FINDINGS.md
+  s_5e30eb78510b3f::t_85bda8aea8e42f 140-182
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "25d0c5387a31f888958d9e93a03baa169facd4d0",
+  "prompts": {},
+  "sessions": {
+    "s_5e30eb78510b3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c8b8d957-d17b-46c2-a10b-91aa6176841b",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
