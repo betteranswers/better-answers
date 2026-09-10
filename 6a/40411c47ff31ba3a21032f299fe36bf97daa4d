@@ -1,0 +1,22 @@
+CONTEXT.md
+  s_f3ee63bcbb1a0b::t_b8378110040ede 297-299
+  s_f3ee63bcbb1a0b::t_829e6c7f5fb29c 490-495
+docs/specs/v01-route.md
+  s_f3ee63bcbb1a0b::t_1a3464211146de 435
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "6a40411c47ff31ba3a21032f299fe36bf97daa4d",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
