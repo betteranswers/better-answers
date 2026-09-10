@@ -1,6 +1,6 @@
 # AGENTS.md
 
-A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers — **sources** (evidence) → **bundles** (OKF concepts: the curated map) → **graph** (derived) — and **records** (guides, compositions, usage, bindings, audit) the platform keeps over them, citing concepts. The destination this repo builds towards: `docs/vision.md`. Two runtime tiers sharing four stores — Postgres, an object store, a git repository per workspace, and the graph as Postgres tables under RLS (ADR 0032) — and never code. The way to v0.1 is the **route spec**, `apps/docs-site/specs/v01-route.md`; the map it was cut from (`.scratch/v01-spec/map.md`) is resolved and closed.
+A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers — **sources** (evidence) → **bundles** (OKF concepts: the curated map) → **graph** (derived) — and **records** (guides, compositions, usage, bindings, audit) the platform keeps over them, citing concepts. The destination this repo builds towards: `docs/vision.md`. Two runtime tiers sharing four stores — Postgres, an object store, a git repository per workspace, and the graph as Postgres tables under RLS — and never code. The way to v0.1 is the **route spec**, `apps/docs-site/specs/v01-route.md`; the map it was cut from (`.scratch/v01-spec/map.md`) is resolved and closed.
 
 ## Read first
 
@@ -12,7 +12,7 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers �
 
 ## Layout
 
-`apps/` is what deploys; `packages/` is what is imported (ADR 0029).
+`apps/` is what deploys; `packages/` is what is imported.
 
 | Path | What it is |
 | --- | --- |
@@ -24,7 +24,9 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers �
 | `packages/` | The rest of the shared TypeScript: `schema`, `design-system` |
 | `contracts/` | The tier contract's language-neutral fixtures — both tiers' suites read it, nothing imports it (ADR 0031) |
 | `docs/adr/` | Architecture decision records |
-| `apps/docs-site/` | Markdown only, no site built: `specs/<ticket>.md` is a ticket's spec and `specs/v01-route.md` the route; `operations/` the ops documents; the pre-build gate |
+| `docs/architecture/` | The C4 diagrams — context, containers, three component views, deployment, three flows — a reading of the tree, redrawn by `/c4-architecture` after any review that moves the shape; its README maps each route block to the containers and components it touches |
+| `docs/specs/` | `<ticket>.md` is a ticket's spec and `v01-route.md` the route |
+| `docs/operations/` | Public-facing ops documents; non-public facing documents are under `.planning/estate/` |
 | ordna | The work queue — tasks as git namespace refs (`refs/ordna/tasks/<id>`), not files |
 | `deploy/` | Compose files and deployment configuration |
 | `.cubic/wiki/` | Cubic's generated wiki: orientation only, never authority (`docs/agents/code-review.md`) |
@@ -33,17 +35,17 @@ Commands, versions and scripts are read from each workspace's `package.json` or 
 
 ## Skills
 
-`/to-spec` before a block's build and `/to-tickets` after; `/grilling` and `/domain-modeling` for any design conversation; `/codebase-design` when shaping a module; `/tdd` for red–green work; `/writing-for-agents` when editing any file; `/diagnosing-bugs` for anything broken or slow; `/browser-suite` — this repository's own, tracked at `.claude/skills/browser-suite/` — for any Playwright spec under `apps/web/e2e/`; `/better-answers-design` — ours too, linked from `.claude/skills/` into `packages/design-system/` — for anything a person will look at; the api's tRPC skills under `apps/api/.claude/skills/` for any procedure, link or adapter in `apps/api/` (the transport rule in `apps/api/CODING_RULES.md`); `/c4-architecture` when an architecture review has moved the shape and the diagrams must say so.
+`/to-spec` before a block's build and `/to-tickets` after; `/grilling` and `/domain-modeling` for any design conversation; `/codebase-design` when shaping a module; `/tdd` for red–green work; `/writing-for-agents` when editing any file; `/diagnosing-bugs` for anything broken or slow; `/browser-suite` for any Playwright spec under `apps/web/e2e/`; `/better-answers-design` for anything a person will look at; the api's tRPC skills under `apps/api/.claude/skills/` for any procedure, link or adapter in `apps/api/` (the transport rule in `apps/api/CODING_RULES.md`); `/c4-architecture` when an architecture review has moved the shape and the diagrams must say so. Other skills are available, co-located where they are most often utilised e.g., `apps/worker/.claude/skills/`, `apps/web/.claude/skills/`. If a task has a skill associated to it, use it to ensure best practice e.g., coolify and Hono skills for deployment, cocoindex for pipeline, better-auth for authentication etc.
 
 ## Agent skills
 
 ### Issue tracker
 
-Three lanes. Build tasks live in **ordna** (`storage: namespace` — git blobs at `refs/ordna/tasks/<id>`, no files on disk; use the `ordna` CLI), cut from a block of the route spec; wayfinding maps and their tickets live as markdown under `.scratch/<effort>/`; a finding from a gate, a mutation run or a review is one ordna task tagged `hygiene` — no map, no spec, no grilling, picked when a block is blocked or a session is short. GitHub Issues is the public inbound surface, not the work queue. A body edit or a new task is pushed to **origin first**, then set locally: an open board auto-fetches every minute and reverts a local-only ref. Procedure in `docs/agents/issue-tracker.md`.
+Three lanes. Build tasks live in **ordna** (`storage: namespace` — git blobs at `refs/ordna/tasks/<id>`, no files on disk; use the `ordna` CLI), cut from a block of the route spec; wayfinding maps and their tickets live as markdown under `.scratch/<effort>/`; a finding from a gate, a mutation run or a review is one ordna task tagged `hygiene` — no map, no spec, no grilling, picked when a block is blocked or a session is short. A body edit or a new task is pushed to **origin first**, then set locally: an open board auto-fetches every minute and reverts a local-only ref. Procedure in `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-The five canonical roles, unrenamed — `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix` — applied as ordna **tags**, since ordna has no label field. See `docs/agents/triage-labels.md`.
+The five canonical roles — `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix` — applied as ordna **tags**. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
