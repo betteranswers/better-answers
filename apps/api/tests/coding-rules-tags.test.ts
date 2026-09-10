@@ -122,13 +122,13 @@ const isAllowedLocation = (file: string): boolean =>
  * here that has no citation fails it too — the list is exact in both directions.
  */
 const CITED_NOWHERE_ELSE: Readonly<Record<string, string>> = {
-  AUDIT2:
-    "the declared-acts walk and the vocabulary's tests hold it without naming the tag; it binds review alone",
   AUDIT6:
-    "as AUDIT2 — the migration that creates audit_event and its refusal tests are the schema package's",
-  AUDIT7: "as AUDIT2 — the caller-minted id test is its slice's",
-  AUDIT8: "as AUDIT2 — held by the declared-acts walk",
+    "the migration that creates audit_event and its refusal tests are the schema package's; they hold the rule without naming the tag",
+  AUDIT7: "the caller-minted id test is its slice's, and holds the rule without naming the tag",
+  AUDIT8:
+    "the declared-acts walk refuses an act whose subject names one of these records, and holds the rule without naming the tag",
   WRK2: "one logger, one config module is the worker's shape; a reviewer reads it off the tree, and no test or ADR needs to name it",
+  WRK4: "mypy strict over src and tests, and ruff's ANN rules, hold it on every run; what enforces it is the workspace's own configuration, where a tag may not be written",
 };
 
 type Citation = { readonly file: string; readonly line: number; readonly tag: string };

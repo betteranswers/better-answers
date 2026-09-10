@@ -13,7 +13,9 @@ import { startApp } from "./harness.ts";
  *
  * It is the same app every endpoint test drives: the server factory over a Testcontainers
  * Postgres, with the email transport capturing codes and the CIMD document served in
- * process (`[TEST3]`). Nothing here builds a second version of it.
+ * process (`[TEST3]`). Nothing here builds a second version of it: `[APP2]` keeps
+ * `createServer` the tier's one server, and a suite that wanted its own would be building
+ * a second app to prove the first.
  *
  * The port is an argument rather than an environment variable, because the caller that
  * needs it is the one that must choose it, and `[SEC1]` keeps `src/config.ts` the tier's
