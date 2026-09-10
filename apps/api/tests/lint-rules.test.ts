@@ -14,8 +14,9 @@ import { describe, expect, it } from "vitest";
  * runners.
  *
  * The rules T-004 adds, each an override or a plugin rule: ADR 0009's better-auth ban, ADR
- * 0030's MCP-type ban over `packages/core` (the existing core override, extended here to the
- * v2 package name), and the two `better-answers` plugin rules — every entry carries
+ * 0030's MCP-type ban over `packages/core` (since T-117 the transport list of the
+ * `better-answers/import-direction` rule, which keys on a manifest naming the core package,
+ * so that case's tree carries one), and the two MCP plugin rules — every entry carries
  * `annotations`, no entry takes a workspace argument.
  *
  * The three rules T-069 adds, each a line in the base `rules` block: no two tests in one
@@ -50,11 +51,7 @@ const { output: lint } = oxlintOver(
     rules: Object.fromEntries(
       Object.entries(config.rules).filter(([name]) => name.startsWith("better-answers/")),
     ),
-    overrides: [
-      oxlintOverrideFor("**/*.ts"),
-      oxlintOverrideFor("apps/api/src/auth/**"),
-      oxlintOverrideFor("packages/core/**"),
-    ],
+    overrides: [oxlintOverrideFor("**/*.ts"), oxlintOverrideFor("apps/api/src/auth/**")],
   }),
   {
     // The identity ban's own subject, under the glob it fires in and the one it does not.
@@ -472,11 +469,14 @@ describe("ADR 0009 — the identity provider stays behind its seam", () => {
 describe("ADR 0030 — no MCP library type crosses into packages/core", () => {
   it("refuses @modelcontextprotocol/server inside packages/core and allows it in apps/api", () => {
     const output = lint({
+      // The import-direction rule keys on the manifest's name, never the path (ADR 0029).
+      "packages/core/package.json": JSON.stringify({ name: "@better-answers/core" }),
       "packages/core/src/probe.ts": probe("@modelcontextprotocol/server"),
       "apps/api/src/mcp/probe.ts": probe("@modelcontextprotocol/server"),
     });
 
     expect(output).toContain("packages/core/src/probe.ts");
+    expect(output).toContain("import-direction");
     expect(output).not.toContain("apps/api/src/mcp/probe.ts");
   });
 });

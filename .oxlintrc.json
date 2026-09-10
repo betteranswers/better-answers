@@ -41,8 +41,8 @@
   "rules": {
     "no-console": "error",
     // ADR 0029 rule 4 — the slice graph is acyclic. Repo-wide because a cycle is a
-    // design failure anywhere, and oxlint 1.80 has no `import/no-restricted-paths`
-    // to express the direction rules more precisely.
+    // design failure anywhere; the direction rules themselves are the plugin rule below,
+    // which sees both import forms as this one does.
     "import/no-cycle": "error",
     // An empty block says nothing about why it is empty, and an empty `catch` says nothing
     // about why the error was swallowed. `allowEmptyCatch` stays off so a swallow is always
@@ -100,16 +100,24 @@
     // T-004 (ADR 0018, [SEC2]): every MCP entry carries its annotations, and none takes
     // a workspace, bundle or tenant argument.
     "better-answers/mcp-entry-annotations": "error",
-    "better-answers/mcp-entry-no-workspace-argument": "error"
+    "better-answers/mcp-entry-no-workspace-argument": "error",
+    // ADR 0029's five import-direction rules over packages/core, in one rule (T-117); what it
+    // refuses is written in packages/devtools/lint-rules/rules/import-direction.ts. It sits
+    // in this block rather than in a packages/core override because it keys on the package's
+    // manifest and is silent everywhere else — and because a `no-restricted-imports` override
+    // over core would replace the base override's drizzle-zod and better-auth bans for those
+    // files, which is what the override this rule replaced had to restate.
+    "better-answers/import-direction": "error"
   },
   "overrides": [
     {
       // ADR 0028 — drizzle-zod is imported through one module, so the drizzle-orm v1
       // move to `drizzle-orm/zod` is one edit. Everything else imports the boundary
       // schemas from @better-answers/schema. First in this list on purpose: a later
-      // override that sets `no-restricted-imports` (packages/core's transport ban)
-      // replaces this config for its files, so that override carries the drizzle-zod
-      // pattern too.
+      // override that sets `no-restricted-imports` (the SPA's zones below) replaces this
+      // config for its files, so every such override restates the drizzle-zod pattern.
+      // packages/core carries no override of its own — its import rules are the plugin rule
+      // in the base block — so these bans reach it unrestated.
       "files": ["**/*.ts", "**/*.tsx"],
       "rules": {
         "no-restricted-imports": [
@@ -158,73 +166,6 @@
               {
                 "group": ["drizzle-zod"],
                 "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema."
-              }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      // Two of ADR 0029's import-direction rules, in one override because a second override
-      // over the same files would replace this one's `no-restricted-imports` rather than add
-      // to it (the drizzle-zod restatement below is the same fact from the other side).
-      //
-      // Rule 4 — a slice reaches a sibling slice, a store door or a layer only through its
-      // `index.ts`, never an internal. Expressed as the shape a glob can read: a relative
-      // import that leaves its directory is banned unless it ends at one of the faces the
-      // tree has — a sibling's, one level up; a door's, under `store/`; `kernel`'s or
-      // `access`'s, two up from a door; and the same faces under `src/` from a test in
-      // `packages/core/test/`, which reaches a slice the way the constitution's interface
-      // rule asks — through its face. The faces are named by shape rather than lifted for
-      // every `index.ts`, so a slice that grows a subdirectory with a face of its own is still
-      // reached only through the slice's. A same-directory import is untouched; every slice
-      // is flat today, and a file in a subdirectory reaching its parent's internals with
-      // `../` would be refused — the moment to ask whether that subdirectory is a module.
-      // Rule 5 — nothing in `packages/core` imports a transport or a transport's
-      // dependency. `core` is a library with five callers, four of which have no notion of an
-      // HTTP status code; a transport import here is how that boundary erodes. A package
-      // boundary cannot enforce this on its own, which is why it is a lint rule.
-      // Verified against oxlint 1.80.0: a per-glob override fires inside its glob and stays
-      // silent outside it, and a `!`-prefixed pattern in a group lifts the ban for the paths
-      // it names.
-      "files": ["packages/core/**"],
-      "rules": {
-        "no-restricted-imports": [
-          "error",
-          {
-            "patterns": [
-              {
-                "group": [
-                  "../**",
-                  "!../*/index.ts",
-                  "!../../*/index.ts",
-                  "!../store/*/index.ts",
-                  "!../src/*/index.ts",
-                  "!../src/store/*/index.ts"
-                ],
-                "message": "A slice reaches a sibling slice, a store door or a layer only through its index.ts (ADR 0029 rule 4). Export what you need from that directory's face and import it from there."
-              },
-              {
-                "group": [
-                  "hono",
-                  "hono/*",
-                  "@hono/*",
-                  "@trpc/*",
-                  "@modelcontextprotocol/*",
-                  "better-auth",
-                  "better-auth/*",
-                  "better-auth/*/*",
-                  "@better-auth/*",
-                  "@better-auth/*/*",
-                  "node:http",
-                  "node:http2",
-                  "node:https"
-                ],
-                "message": "packages/core is transport-agnostic (ADR 0029 rule 5). A status code, a Request or a Response belongs in apps/api; export a function and a typed error instead."
-              },
-              {
-                "group": ["drizzle-zod"],
-                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts (ADR 0028); import the boundary schemas from @better-answers/schema. Restated here because this override replaces the repo-wide no-restricted-imports config for packages/core."
               }
             ]
           }

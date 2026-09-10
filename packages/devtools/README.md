@@ -82,6 +82,13 @@ than a generic hygiene pattern. Loaded by `.oxlintrc.json` as a `jsPlugins` spec
 rule carries its rule line in the message it prints and lands with a functional test through
 the runner (`[CHECK1]`).
 
+Three rules today. The two MCP entry rules hold ADR 0018's line at the declaration and are
+run by `apps/api/tests/lint-rules.test.ts`. `import-direction` holds all five of ADR 0029's
+import-direction rules over `packages/core` as one rule, by placing both ends of an import in
+a zone from their position under the package whose manifest names `@better-answers/core`;
+the rule file says what it refuses, and `packages/core/test/import-direction.test.ts` runs it
+both ways and over the committed tree.
+
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted
 
 A verbatim third-party snapshot under ADR 0027, with its provenance, licence and notice text

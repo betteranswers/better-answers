@@ -73,7 +73,7 @@ The stores themselves are on `c4-containers.md`; each door reaches exactly one. 
 | `erasure` | every slice's interface | — nothing imports erasure |
 | a transport | a slice's `index.ts` | a door, a `*.store.ts` |
 
-Enforced by per-glob `no-restricted-imports` and `import/no-cycle` under oxlint; the failure no linter sees — one slice writing SQL against another's tables — is caught by `packages/schema/src/table-ownership.ts`, the checked-in slice-to-tables map with its cross-owner exceptions, reviewed like an export list. ADR 0029 rule 4 as a lint is a hygiene task (T-113, stub-slices F10).
+Enforced by one plugin rule, `better-answers/import-direction`, which places both ends of an import in a zone by their position under `packages/core` and applies the table above with the rule number in its message, and by `import/no-cycle` for the acyclic clause (ADR 0029; T-113's finding F10, landed by T-114 and T-117); the failure no linter sees — one slice writing SQL against another's tables — is caught by `packages/schema/src/table-ownership.ts`, the checked-in slice-to-tables map with its cross-owner exceptions, reviewed like an export list.
 
 ## Who owns which tables
 
