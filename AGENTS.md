@@ -43,6 +43,10 @@ Commands, versions and scripts are read from each workspace's `package.json` or 
 
 Three lanes. Build tasks live in **ordna** (`storage: namespace` — git blobs at `refs/ordna/tasks/<id>`, no files on disk; use the `ordna` CLI), cut from a block of the route spec; wayfinding maps and their tickets live as markdown under `.scratch/<effort>/`; a finding from a gate, a mutation run or a review is one ordna task tagged `hygiene` — no map, no spec, no grilling, picked when a block is blocked or a session is short. A body edit or a new task is pushed to **origin first**, then set locally: an open board auto-fetches every minute and reverts a local-only ref. Procedure in `docs/agents/issue-tracker.md`.
 
+### Build loop
+
+A block's tickets are built by agents: the session orchestrates, `ralph` runs one ticket as a work → test loop over fresh `implementor` children, the `verifier` signs it off against the ordna acceptance criteria, and the ticket lands on the block branch — one worktree per ticket, one PR per block, migrations serialised. The rules, the brief and the gates are `docs/agents/build-loop.md`; the agent files under `.claude/agents/` point there and carry nothing of their own.
+
 ### Triage labels
 
 The five canonical roles — `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix` — applied as ordna **tags**. See `docs/agents/triage-labels.md`.
@@ -57,7 +61,7 @@ A survivor is a hypothesis until a probe answers it: controls both ways, the who
 
 ### Code review
 
-Cubic reviews every PR and its findings are triaged through the `cubic` MCP on the PR threads, one commit per round, three rounds at most; GitNexus gates every edit and commit; the wiki orients and never decides. The loop is `docs/agents/code-review.md` — read it before opening a PR.
+Cubic reviews every PR and its findings are triaged through the `cubic` MCP on the PR threads, one commit per round, three rounds at most — **paused since 10/09/2026** at the plan's limit, the substitute being `docs/agents/build-loop.md`'s review section; GitNexus gates every edit and commit; the wiki orients and never decides. The loop is `docs/agents/code-review.md` — read it before opening a PR.
 
 ## Code Exploration Policy
 
