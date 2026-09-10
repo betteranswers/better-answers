@@ -1,0 +1,23 @@
+packages/schema/migrations/meta/0024_snapshot.json
+  s_f3ee63bcbb1a0b::t_5a298bcab0464b 1-4664
+packages/schema/migrations/meta/_journal.json
+  s_f3ee63bcbb1a0b::t_5a298bcab0464b 176
+apps/worker/src/better_answers_worker/schema_view.py
+  s_f3ee63bcbb1a0b::t_8eb9b4ee2e7faf 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a6d8aa0a42be4d82c6cf82bb3b05f14578f1ed9f",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
