@@ -1,10 +1,10 @@
 # AGENTS.md
 
-A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers — **sources** (evidence) → **bundles** (OKF concepts: the curated map) → **graph** (derived) — and **records** (guides, compositions, usage, bindings, audit) the platform keeps over them, citing concepts. The destination this repo builds towards: `docs/vision.md`. Two runtime tiers sharing four stores — Postgres, an object store, a git repository per workspace, and the graph as Postgres tables under RLS — and never code. The way to v0.1 is the **route spec**, `apps/docs-site/specs/v01-route.md`; the map it was cut from (`.scratch/v01-spec/map.md`) is resolved and closed.
+A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers — **sources** (evidence) → **bundles** (OKF concepts: the curated map) → **graph** (derived) — and **records** (guides, compositions, usage, bindings, audit) the platform keeps over them, citing concepts. The destination this repo builds towards: `docs/vision.md`. Two runtime tiers sharing four stores — Postgres, an object store, a git repository per workspace, and the graph as Postgres tables under RLS — and never code. The way to v0.1 is the **route spec**, `docs/specs/v01-route.md`; the map it was cut from (`.scratch/v01-spec/map.md`) is resolved and closed.
 
 ## Read first
 
-- `apps/docs-site/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block; a block goes to `/to-spec` before its build and `/to-tickets` after; a Wayfinder map is charted only for a destination the route does not hold.
+- `docs/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block; a block goes to `/to-spec` before its build and `/to-tickets` after; a Wayfinder map is charted only for a destination the route does not hold.
 - `CONTEXT.md` — the glossary. Name things in code, tests, docs and commits with its words; a new domain word is settled there *before* it appears in code.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open and where each lands here; read before adding a key, convention or feature that relates to the knowledge layer.
 - `CODING_RULES.md` — the constitution: every rule that binds work in this repo. A workspace's own rules live in `apps/api/CODING_RULES.md`, `apps/web/CODING_RULES.md` and `apps/worker/CODING_RULES.md`.
