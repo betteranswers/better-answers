@@ -1,0 +1,42 @@
+docs/architecture/c4-containers.md
+  s_f7a6bdb184cac9::t_caf86bb2a3dc84 1-76
+docs/architecture/c4-dynamic-document-to-passage.md
+  s_f7a6bdb184cac9::t_dace0bca9ee7ff 1-57
+AGENTS.md
+  s_f7a6bdb184cac9::t_3f7ae0836d83c7 27
+docs/architecture/c4-components-worker.md
+  s_f7a6bdb184cac9::t_e31ea5bed8a08d 1-70
+docs/architecture/c4-dynamic-governed-write.md
+  s_f7a6bdb184cac9::t_05fc1482c67bbc 1-48
+docs/architecture/README.md
+  s_f7a6bdb184cac9::t_e59b58fb047735 1-48
+docs/architecture/c4-deployment.md
+  s_f7a6bdb184cac9::t_05fc1482c67bbc 1-56,58-85
+  s_f7a6bdb184cac9::t_5a14a5738579ad 57
+docs/architecture/c4-dynamic-ask.md
+  s_f7a6bdb184cac9::t_dace0bca9ee7ff 1-49
+docs/architecture/c4-components-api.md
+  s_f7a6bdb184cac9::t_e31ea5bed8a08d 1-66
+docs/architecture/c4-components-core.md
+  s_f7a6bdb184cac9::t_710bf6fa03d299 62
+  s_f7a6bdb184cac9::t_5a14a5738579ad 24
+  s_f7a6bdb184cac9::t_e31ea5bed8a08d 1-23,25-61,63-100
+docs/architecture/c4-context.md
+  s_f7a6bdb184cac9::t_caf86bb2a3dc84 1-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "529e824180d999be570297a8ef2873939b7dcdde",
+  "prompts": {},
+  "sessions": {
+    "s_f7a6bdb184cac9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5bdc055c-b899-4042-86b2-ae50a3947452",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
