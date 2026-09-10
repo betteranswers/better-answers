@@ -50,6 +50,55 @@ export const appRouter = router({
       return listed.value;
     }),
   }),
+  // PROBE — THROWAWAY (T-113, probe 2 of 4). An async-generator subscription under
+  // `workspaceProcedure`: the generator body runs after the resolver returned, so the `tx`
+  // it closes over is the client `withPrincipal` already committed and released.
+  probe: router({
+    stream: workspaceProcedure.subscription(async function* ({ ctx }) {
+      const pool = ctx.door.pool;
+      const observe = async (at: string) => {
+        try {
+          const seen = await ctx.tx.query<Record<string, unknown>>(
+            `SELECT pg_backend_pid() AS pid, current_workspace_id() AS ws, current_user AS role,
+                    (SELECT xact_start < query_start FROM pg_stat_activity WHERE pid = pg_backend_pid()) AS in_block,
+                    (SELECT count(*)::int FROM member) AS members_visible,
+                    (SELECT count(*)::int FROM member WHERE workspace_id = current_workspace_id()) AS members_in_scope`,
+          );
+          return { at, ok: true, ...seen.rows[0], idle: pool.idleCount, total: pool.totalCount };
+        } catch (error) {
+          return {
+            at,
+            ok: false,
+            error: String(error),
+            idle: pool.idleCount,
+            total: pool.totalCount,
+          };
+        }
+      };
+      yield await observe("first-yield");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      yield await observe("second-yield");
+    }),
+    // The shape the split implies: a plain async resolver that does its planning *inside*
+    // the resolving transaction and returns an async iterable that holds no `tx`.
+    planned: workspaceProcedure.subscription(async ({ ctx }) => {
+      const seen = await ctx.tx.query<Record<string, unknown>>(
+        `SELECT pg_backend_pid() AS pid, current_workspace_id() AS ws, current_user AS role,
+                (SELECT xact_start < query_start FROM pg_stat_activity WHERE pid = pg_backend_pid()) AS in_block`,
+      );
+      const plan = { at: "resolver", ok: true, ...seen.rows[0] };
+      const door = ctx.door;
+      const principal = ctx.principal;
+      return (async function* () {
+        yield plan;
+        // The record step: a second, short transaction of its own, as the principal.
+        const recorded = await door.pool.query<Record<string, unknown>>(
+          "SELECT pg_backend_pid() AS pid, current_workspace_id() AS ws, (SELECT xact_start < query_start FROM pg_stat_activity WHERE pid = pg_backend_pid()) AS in_block",
+        );
+        yield { at: "generator", principal: principal.workspaceId, ...recorded.rows[0] };
+      })();
+    }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
