@@ -29,6 +29,7 @@ export * from "./access-request-tables.ts";
 export * from "./concept-tables.ts";
 export * from "./suggestion-tables.ts";
 export * from "./source-tables.ts";
+export * from "./finding-tables.ts";
 export * from "./composition-tables.ts";
 export * from "./job-tables.ts";
 

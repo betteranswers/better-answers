@@ -2304,6 +2304,158 @@ describe("the derivation's tables under app_rt", () => {
 });
 
 /**
+ * The **finding** (`CONTEXT.md`; ADR 0020, the S0 spec's tier boundary): what the seam found
+ * in one source document, written by the worker and reviewed by the app. A tenant table like
+ * any other, so the zero-rows proof is stated here in its words — and the grant is the whole
+ * of the boundary between the two tiers (`[SEC3]`): the worker's role holds INSERT alone, so
+ * a compromised worker can record what it withheld and can never read a workspace's findings
+ * back, stamp a review, or take away the record of a span.
+ *
+ * The table never holds the value it found — offsets, a category and a score, and nothing a
+ * personal detail could sit in. `boundary-schemas.test.ts` writes that column set down.
+ */
+describe("the finding under both runtime roles", () => {
+  it("returns zero rows on a missing scope and only the scoped tenant's findings otherwise", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      for (const workspaceId of [WS_A, WS_B]) await seed.finding({ workspaceId });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      expect(await countedRows(client, ["finding"])).toEqual([{ table: "finding", rows: 0 }]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      expect(await countedRows(client, ["finding"])).toEqual([{ table: "finding", rows: 1 }]);
+    });
+  });
+
+  it("lets the worker record a finding and refuses it every road back to one (migration 0023)", async () => {
+    // Migration 0000 hands both runtime roles the DML on every new `public` table by default
+    // privilege, so the substrate revokes and grants INSERT back alone. The served path is
+    // written without RETURNING on purpose: INSERT is the whole of what the worker holds, and
+    // a statement that read its own row back would want the SELECT this grant withholds.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const document = await seed.sourceDocument({ workspaceId: WS_A });
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      await client.query(
+        `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
+                              char_start, char_end, score, rule_version, detector_pin)
+         VALUES ($1, $2, $3, 'sort-code', 'always', 'sort-code-with-account-number',
+                 12, 20, 0.85, 'r1', 'd1')`,
+        [WS_A, ulid(), document.id],
+      );
+
+      await refusesEach(client, [
+        [
+          "SELECT 1 FROM finding LIMIT 1",
+          "the worker never reviews a finding, so it never reads one back",
+        ],
+        [
+          "UPDATE finding SET review_state = 'narrowed'",
+          "the review is an Admin's act, and a worker that could stamp one could mark a special-category span reviewed",
+        ],
+        [
+          "DELETE FROM finding",
+          "a finding is the record of what was withheld, and nothing the worker holds takes one away",
+        ],
+      ]);
+
+      // The row the worker wrote, read back under the role that may read it — unreviewed,
+      // which is what a finding is born as.
+      await client.query("RESET ROLE");
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const recorded = await client.query<{ document_id: string; review_state: string }>(
+        "SELECT document_id, review_state FROM finding",
+      );
+      expect(recorded.rows).toEqual([{ document_id: document.id, review_state: "unreviewed" }]);
+    });
+  });
+
+  it("refuses a finding naming another tenant's document, at its key", async () => {
+    // The key names the workspace beside the document id, as every cross-table key in this
+    // package does: a foreign-key check runs outside row-level security, so a key on the id
+    // alone would confirm that some other tenant holds a given document.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const theirs = await seed.sourceDocument({ workspaceId: WS_B });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await expect(
+        client.query(
+          `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
+                                char_start, char_end, score, rule_version, detector_pin)
+           VALUES ($1, $2, $3, 'home-address', 'default-on', 'uk-address', 0, 9, 0.6, 'r1', 'd1')`,
+          [WS_A, ulid(), theirs.id],
+        ),
+      ).rejects.toThrow(/finding_document_fk/);
+    });
+  });
+
+  it("refuses a review, a restore and a tier the finding's own sentences do not admit", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const always = await seed.finding({ workspaceId: WS_A });
+      const defaultOn = await seed.finding({
+        workspaceId: WS_A,
+        documentId: always.documentId,
+        tier: "default-on",
+        category: "home-address",
+      });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const rows: readonly [string, readonly unknown[], string][] = [
+        // A fourth tier and a fourth review state: both word sets are closed, and the
+        // seam's three tiers are the glossary's.
+        ["UPDATE finding SET tier = 'sometimes' WHERE id = $1", [always.id], "finding_tier_check"],
+        // A fourth review state, with a whole review beside it so that only the state's own
+        // CHECK can be what refuses the row.
+        [
+          `UPDATE finding SET review_state = 'dismissed', reviewed_at = now(),
+                              reviewed_by = 'process:better-answers-test'
+             WHERE id = $1`,
+          [always.id],
+          "finding_review_state_check",
+        ],
+        // Half a review: a state that moved with no Admin and no instant beside it would be
+        // a reviewed span the screen cannot say who reviewed.
+        [
+          "UPDATE finding SET review_state = 'narrowed' WHERE id = $1",
+          [always.id],
+          "finding_review_check",
+        ],
+        // Half a restore, and a restore of a span no binding could switch off: the always
+        // set is the only tier a restore applies to, which is the act's refusal made the
+        // database's.
+        [
+          "UPDATE finding SET restored_at = now() WHERE id = $1",
+          [always.id],
+          "finding_restore_check",
+        ],
+        [
+          `UPDATE finding SET restored_at = now(), restored_by = 'human:${WS_B}',
+                              restore_reason = 'the client asked for the officer block back'
+             WHERE id = $1`,
+          [defaultOn.id],
+          "finding_restore_check",
+        ],
+      ];
+      for (const [statement, parameters, constraint] of rows) {
+        await client.query("SAVEPOINT finding_row");
+        await expect(client.query(statement, [...parameters])).rejects.toThrow(
+          new RegExp(constraint),
+        );
+        await client.query("ROLLBACK TO SAVEPOINT finding_row");
+      }
+    });
+  });
+});
+
+/**
  * The queue (ADR 0005's control plane of rows; ADR 0031's queue agreement). The claim
  * protocol's own behaviour — the order, the lapsed lease, the poison — is the fixture's, in
  * `contracts/queue/cases.json`, and both tiers' conformance suites read it. What is proved

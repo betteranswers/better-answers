@@ -31,6 +31,12 @@ import {
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import {
+  finding,
+  FINDING_REASON_MAX,
+  FINDING_REVIEW_STATES,
+  REDACTION_TIERS,
+} from "./finding-tables.ts";
+import {
   GRAPH_EDGE_LABELS,
   GRAPH_NODE_LABELS,
   graphEdge,
@@ -618,6 +624,40 @@ export const sourceDocumentSelect = createSelectSchema(sourceDocument, sourceDoc
 export const sourceDocumentInsert = createInsertSchema(sourceDocument, sourceDocumentRefinements);
 export const sourceDocumentUpdate = createUpdateSchema(sourceDocument, sourceDocumentRefinements);
 
+/**
+ * A **finding** (ADR 0020): a span the seam withheld, located and never quoted. The document
+ * is narrowed exactly as `evidence.source_document_id` is; the two closed word sets are the
+ * boundary's to narrow; the offsets are whole numbers and the score is the detector's own
+ * range; and the two actors are the ledger's own actor shape, so whoever reviewed and
+ * whoever restored read here as they do on the audit row that records the act.
+ *
+ * The category is held to being non-empty and nothing more, on purpose: which categories
+ * exist is the `redaction` agreement's, which nothing imports (ADR 0031), and a second copy
+ * of the list here would be a second thing to bump when a rule lands.
+ */
+const findingRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  documentId: (schema: z.ZodString) => schema.trim().min(1),
+  category: (schema: z.ZodString) => schema.trim().min(1),
+  tier: (schema: z.ZodString) => schema.pipe(z.enum(REDACTION_TIERS)),
+  ruleId: (schema: z.ZodString) => schema.trim().min(1),
+  charStart: (schema: z.ZodNumber) => schema.int().nonnegative(),
+  charEnd: (schema: z.ZodNumber) => schema.int().positive(),
+  score: (schema: z.ZodNumber) => schema.min(0).max(1),
+  ruleVersion: (schema: z.ZodString) => schema.trim().min(1),
+  detectorPin: (schema: z.ZodString) => schema.trim().min(1),
+  reviewState: (schema: z.ZodString) => schema.pipe(z.enum(FINDING_REVIEW_STATES)),
+  reviewedBy: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
+  reviewReason: (schema: z.ZodString) => schema.trim().min(1).max(FINDING_REASON_MAX),
+  restoredBy: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
+  restoreReason: (schema: z.ZodString) => schema.trim().min(1).max(FINDING_REASON_MAX),
+};
+
+export const findingSelect = createSelectSchema(finding, findingRefinements);
+export const findingInsert = createInsertSchema(finding, findingRefinements);
+export const findingUpdate = createUpdateSchema(finding, findingRefinements);
+
 /** A composition (ADR 0004, ADR 0015): a readable unit, its id the minter's shape. */
 const compositionRefinements = {
   workspaceId,
@@ -1006,6 +1046,12 @@ export const boundarySchemas = {
     select: sourceDocumentSelect,
     insert: sourceDocumentInsert,
     update: sourceDocumentUpdate,
+  },
+  finding: {
+    table: finding,
+    select: findingSelect,
+    insert: findingInsert,
+    update: findingUpdate,
   },
   composition: {
     table: composition,

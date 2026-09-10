@@ -14,9 +14,11 @@ import {
   CREATOR_ROLE,
   CURATED_ORIGIN,
   EMBEDDING_DIMENSIONS,
+  FINDING_UNREVIEWED_STATE,
   JOB_MAX_ATTEMPTS,
   JOB_QUEUED_STATUS,
   NIGHTLY_AUDIT_KIND,
+  REDACTION_ALWAYS_TIER,
   SUGGESTION_EDIT_KIND,
   SUGGESTION_WAITING_STATUS,
   ulid,
@@ -149,6 +151,12 @@ export type TestData = {
   sourceDocument(
     overrides?: Partial<InsertInput<"sourceDocument">>,
   ): Promise<Row<"sourceDocument">>;
+  /**
+   * A finding; creates the document the span sits in unless one is named. An unreviewed
+   * always-set span, because that is the tier a restore applies to and the state every
+   * finding is born at; a suite about the two defaults names `tier` and its `category`.
+   */
+  finding(overrides?: Partial<InsertInput<"finding">>): Promise<Row<"finding">>;
   /**
    * A concept's citation of one piece of evidence; creates its own workspace and identity
    * unless the IRI is named, and the evidence row the key names unless both halves of that
@@ -659,6 +667,35 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const finding: TestData["finding"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const documentId = overrides.documentId ?? (await sourceDocument({ workspaceId })).id;
+    return insertRow(client, "finding", {
+      id: ulid(),
+      category: "sort-code",
+      tier: REDACTION_ALWAYS_TIER,
+      ruleId: "sort-code-with-account-number",
+      charStart: 0,
+      charEnd: 8,
+      score: 0.85,
+      ruleVersion: "1",
+      detectorPin: "presidio-test",
+      // Unreviewed and unrestored, which is what the seam writes: the six columns the two
+      // acts fill are stated as null rather than left off, as `sourceBinding`'s audience
+      // pair is, so the seeded row is the whole shape a reviewer would open.
+      reviewState: FINDING_UNREVIEWED_STATE,
+      reviewedBy: null,
+      reviewedAt: null,
+      reviewReason: null,
+      restoredAt: null,
+      restoredBy: null,
+      restoreReason: null,
+      ...overrides,
+      workspaceId,
+      documentId,
+    });
+  };
+
   const conceptEvidence: TestData["conceptEvidence"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
@@ -747,6 +784,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     conceptWriteRequest,
     sourceBinding,
     sourceDocument,
+    finding,
     conceptEvidence,
     conceptClassOverride,
     composition,

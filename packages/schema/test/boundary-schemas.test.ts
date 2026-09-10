@@ -10,6 +10,7 @@ import {
   CONCEPT_FRONTMATTER_MAX,
   conceptFrontmatter,
   EMBEDDING_DIMENSIONS,
+  FINDING_REASON_MAX,
   SUGGESTION_BODY_MAX,
   SUGGESTION_REASON_MAX,
 } from "../src/index.ts";
@@ -45,6 +46,8 @@ const BINDING_ID = "01J6VVVVVVVVVVVVVVVVVVVVVV";
 // The document the evidence row below locates into, catalogued under the binding above.
 const DOCUMENT_ID = "01J6NNNNNNNNNNNNNNNNNNNNNN";
 const COMPOSITION_ID = "01J6WWWWWWWWWWWWWWWWWWWWWW";
+// A span the seam withheld in the document above.
+const FINDING_ID = "01J6XXXXXXXXXXXXXXXXXXXXXX";
 
 /** Rows each refined insert schema accepts — assertion 4's input. */
 const acceptedRows = {
@@ -233,6 +236,57 @@ const acceptedRows = {
     },
   ],
   sourceDocument: [{ workspaceId: WS_ID, id: DOCUMENT_ID, bindingId: BINDING_ID }],
+  // Three findings in the document above: one as the seam wrote it, one an Admin narrowed
+  // the document on, and one always-set span an Admin restored with a reason — the three
+  // whole shapes the review and restore CHECKs admit.
+  finding: [
+    {
+      workspaceId: WS_ID,
+      id: FINDING_ID,
+      documentId: DOCUMENT_ID,
+      category: "sort-code",
+      tier: "always",
+      ruleId: "sort-code-with-account-number",
+      charStart: 12,
+      charEnd: 20,
+      score: 0.85,
+      ruleVersion: "1",
+      detectorPin: "presidio-2.2.364",
+    },
+    {
+      workspaceId: WS_ID,
+      id: "01J6XXXXXXXXXXXXXXXXXXXXX2",
+      documentId: DOCUMENT_ID,
+      category: "health-cue",
+      tier: "always",
+      ruleId: "health-cue-list",
+      charStart: 40,
+      charEnd: 64,
+      score: 0.6,
+      ruleVersion: "1",
+      detectorPin: "presidio-2.2.364",
+      reviewState: "narrowed",
+      reviewedBy: `human:${USER_ID}`,
+      reviewedAt: NOW,
+      reviewReason: "a health cue in a case study, so the document is Restricted",
+    },
+    {
+      workspaceId: WS_ID,
+      id: "01J6XXXXXXXXXXXXXXXXXXXXX3",
+      documentId: DOCUMENT_ID,
+      category: "person-name",
+      tier: "always",
+      ruleId: "officer-block",
+      charStart: 80,
+      charEnd: 92,
+      score: 0.9,
+      ruleVersion: "1",
+      detectorPin: "presidio-2.2.364",
+      restoredAt: NOW,
+      restoredBy: `human:${USER_ID}`,
+      restoreReason: "the officer block is on the company's own filing",
+    },
+  ],
   // The citation: the concept above, the evidence row above by its own key.
   conceptEvidence: [
     { workspaceId: WS_ID, iri: CONCEPT_IRI, sourceDocumentId: DOCUMENT_ID, locator: "p.4#para-2" },
@@ -592,11 +646,13 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         // after the identity its accepted row resolved to.
         "suggestion",
         "conceptWriteRequest",
-        // The binding before the document it yielded; the citation after the identity and
-        // the evidence row its key names; the override after the identity; the composition
-        // before the include that names it and the concept it includes.
+        // The binding before the document it yielded, and the findings after the document
+        // whose spans they locate; the citation after the identity and the evidence row its
+        // key names; the override after the identity; the composition before the include
+        // that names it and the concept it includes.
         "sourceBinding",
         "sourceDocument",
+        "finding",
         "conceptEvidence",
         "conceptClassOverride",
         "composition",
@@ -710,6 +766,21 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.suggestion[0], proposer: "ada@acme.invalid" },
       { ...acceptedRows.suggestion[0], reason: "x".repeat(SUGGESTION_REASON_MAX + 1) },
     ],
+    // The finding's refusals: a fourth tier and a fourth review state, both word sets being
+    // closed; an offset that is not a whole number and a span of no length; a score outside
+    // the detector's range; a category that is only whitespace; an Admin named by address
+    // rather than by person id; and a reason longer than the column carries.
+    finding: [
+      { ...acceptedRows.finding[0], tier: "sometimes" },
+      { ...acceptedRows.finding[1], reviewState: "dismissed" },
+      { ...acceptedRows.finding[0], charStart: 1.5 },
+      { ...acceptedRows.finding[0], charEnd: 0 },
+      { ...acceptedRows.finding[0], score: 1.1 },
+      { ...acceptedRows.finding[0], category: "   " },
+      { ...acceptedRows.finding[1], reviewedBy: "priya@example.invalid" },
+      { ...acceptedRows.finding[1], reviewReason: "x".repeat(FINDING_REASON_MAX + 1) },
+      { ...acceptedRows.finding[2], restoreReason: "x".repeat(FINDING_REASON_MAX + 1) },
+    ],
     // The payload's refusals: the bundle's manifest, which is not a concept file — and the
     // two columns a producer fills at a size of its own choosing, each held to its bound,
     // so a compromised one cannot fill a tenant's storage a suggestion at a time.
@@ -730,6 +801,44 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       }
     });
   }
+});
+
+/**
+ * The claim the `finding` table is built on (ADR 0020): **it never holds the value**. A
+ * category, a tier, a rule id, two offsets and a score locate a span; they do not quote it.
+ * That is what makes a finding safe to keep for as long as the document lives, safe to put
+ * on a review screen, and nothing an erasure has to rewrite.
+ *
+ * The whole column set is written down here as a literal (`[TEST9]`) rather than asserted by
+ * a rule about names, because there is no rule that could tell a column holding a postcode
+ * from one holding a rule id. A column that could carry a value has to be added to this list
+ * by hand, in the same diff — which is the review the claim actually needs.
+ */
+describe("what a finding may hold", () => {
+  it("has exactly these columns, and not one a personal detail could sit in", () => {
+    expect(Object.keys(boundarySchemas.finding.select.shape).toSorted()).toEqual(
+      [
+        "workspaceId",
+        "id",
+        "documentId",
+        "category",
+        "tier",
+        "ruleId",
+        "charStart",
+        "charEnd",
+        "score",
+        "ruleVersion",
+        "detectorPin",
+        "reviewState",
+        "reviewedBy",
+        "reviewedAt",
+        "reviewReason",
+        "restoredAt",
+        "restoredBy",
+        "restoreReason",
+      ].toSorted(),
+    );
+  });
 });
 
 describe("the frontmatter bound's unit", () => {

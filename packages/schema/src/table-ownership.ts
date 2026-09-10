@@ -139,6 +139,11 @@ export const TABLE_OWNERS = {
   // the sources slice's; the rest of a binding and of the catalogue is B7's, on these tables.
   "public.source_binding": "sources",
   "public.source_document": "sources",
+  // What the redaction seam withheld in one document (ADR 0020): the sources slice's,
+  // because the acts over these rows — the review of a finding and the restore of an
+  // always-set span — are the slice's own, and the counts a publish dialog reads come off
+  // them. The worker inserts them and owns nothing here; the entry below records that.
+  "public.finding": "sources",
   // Which evidence a concept cites, and a recorded Admin override of its derived class:
   // both written in the concepts slice's own transactions, the first by the governed write
   // and the second by the override act.
@@ -330,6 +335,13 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "read",
     reason:
       "The nightly audit compares its own parse of each file against the row's content hash, and the full rebuild copies the row's identity, kind, status and visibility columns onto the generation it writes rather than re-deriving them (ADR 0023, ADR 0031). The worker never writes this table.",
+  },
+  {
+    table: "public.finding",
+    by: WORKER,
+    access: "write",
+    reason:
+      "The detector runs in the worker and the review of what it found is an Admin's act, so the worker records a span it withheld and holds INSERT alone — no SELECT, no UPDATE, no DELETE, each refusal a test of its own (ADR 0020). A worker that could read this table would hold a workspace's map of where its personal data sits; one that could update it could mark a special-category span reviewed. No lint sees across a process boundary, which is why the grant and this entry are both written down.",
   },
   {
     table: "public.graph_generation",

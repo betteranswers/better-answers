@@ -7,9 +7,9 @@ knowledge of what the app's journal built, stamped with the migration id it was
 generated from and with that migration's journal instant, which is what the
 migrator writes into `drizzle.__drizzle_migrations.created_at`."""
 
-MIGRATION_ID = "0022_the-queue-substrate"
+MIGRATION_ID = "0024_the-finding-substrate"
 
-MIGRATION_WHEN = 1788883705941
+MIGRATION_WHEN = 1789080575371
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -153,6 +153,26 @@ TABLES: dict[str, dict[str, str]] = {
         "resource": "text NOT NULL",
         "content_version": "text",
         "recorded_at": "timestamp with time zone NOT NULL",
+    },
+    "public.finding": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "document_id": "text NOT NULL",
+        "category": "text NOT NULL",
+        "tier": "text NOT NULL",
+        "rule_id": "text NOT NULL",
+        "char_start": "integer NOT NULL",
+        "char_end": "integer NOT NULL",
+        "score": "double precision NOT NULL",
+        "rule_version": "text NOT NULL",
+        "detector_pin": "text NOT NULL",
+        "review_state": "text NOT NULL",
+        "reviewed_by": "text",
+        "reviewed_at": "timestamp with time zone",
+        "review_reason": "text",
+        "restored_at": "timestamp with time zone",
+        "restored_by": "text",
+        "restore_reason": "text",
     },
     "public.graph_edge": {
         "workspace_id": "text NOT NULL",
