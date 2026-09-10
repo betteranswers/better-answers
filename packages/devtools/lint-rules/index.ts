@@ -1,5 +1,6 @@
 import { eslintCompatPlugin } from "@oxlint/plugins";
 
+import { importDirectionRule } from "./rules/import-direction.ts";
 import { mcpEntryAnnotationsRule } from "./rules/mcp-entry-annotations.ts";
 import { mcpEntryNoWorkspaceArgumentRule } from "./rules/mcp-entry-no-workspace-argument.ts";
 
@@ -12,6 +13,7 @@ import { mcpEntryNoWorkspaceArgumentRule } from "./rules/mcp-entry-no-workspace-
 const betterAnswersPlugin = eslintCompatPlugin({
   meta: { name: "better-answers" },
   rules: {
+    "import-direction": importDirectionRule,
     "mcp-entry-annotations": mcpEntryAnnotationsRule,
     "mcp-entry-no-workspace-argument": mcpEntryNoWorkspaceArgumentRule,
   },
