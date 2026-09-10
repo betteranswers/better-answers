@@ -115,7 +115,7 @@ One document holds the route: this spec. Its head is the vision's v0.1 row expan
 
 ### Placement rules
 
-- **Every open product task is in exactly one block**: T-082 in S1; T-029 in S8 (moved from S1 on 09/09/2026, when embedding left v0.1); T-023 and T-108 in S5; T-027 and T-047 in P1; T-028 in P2. T-014, T-017, T-110 and the T-106/T-107 remainder are hygiene.
+- **Every open product task is in exactly one block**: T-082 in S1; T-029 in S8 (moved from S1 on 09/09/2026, when embedding left v0.1); T-023 and T-108 in S5; T-027 and T-047 in P1; T-028 in P2. T-014, T-017, T-110, T-116, T-118 and the T-106/T-107 remainder are hygiene.
 - **The addendum's two obligations**: the edge-projection rule is S2's; the concept-owner record is S3's.
 - **The mutation findings** (§2 of the 9 September file) are placed by section: S2 carries §2.2 entire; S3 carries §2.6; S5 carries §2.5; P1 and P2 carry §2.1 and §2.3; S0 and S1 carry nothing, having no seam there yet. §2.4's five rows the handoff did not place are placed here: the audit-outcome and `jti` row with P1 beside §2.1; the platform-actor-id row with P2 beside the identity-set ledger; the failed-tRPC-procedure row with P1, the first screen whose acts go over tRPC; the api reconciler's operator line with S5 beside T-108 and §2.5; the `pnpm ops smoke` row with O1 **(placed here)**. §1's open items, §3.2, §3.3, §3.6 and §4 are hygiene; §3.1 is S5's; §3.4 is P1's.
 - **Two strands run in parallel** (`CONTEXT.md`, *strand*; the tracker's *lanes* are queues, not orderings). The knowledge strand is S0 → S1 → S4 → S7 → S5 → S6 → C1, with S2 beside it — its entry step, walk, reuse, draft and model client blocked by nothing, its `open` by locator and unmapped passages by S1 (ADR 0016, amended 2026-09-09). The records strand is S3, blocked by nothing on the route (B5 stands), then S5 with the knowledge strand. P1 → P2, O1 and V1 hang off the strands where their edges say. **S8 is a reserve block** on the knowledge strand: held on the route, picked only when S2's recall measure, read in the client's workspace at C1, falls below its threshold.
@@ -383,7 +383,7 @@ One document holds the route: this spec. Its head is the vision's v0.1 row expan
 
 ### The hygiene lane
 
-Off the route, one ordna task each, tagged `hygiene`: T-014, T-017, T-110; the T-106/T-107 remainder (nightlies 2 and 3; the summary's pairing fix and one clean nightly); the probe script's timed-out-versus-failed verdict (findings §1); the dead-guard clusters, each with whichever block next touches the file (§3.2); the `parseSince` docblock against its anchor (§3.3); the `blankedSpans` complexity property named (§3.6); the four self-referential oracles (§4); ADR 0029 rule 4 as a lint — a per-slice `no-restricted-imports` pattern banning a sibling's non-`index.ts` files (T-113, stub-slices F10; the review's C12). T-109 and T-111 are done.
+Off the route, one ordna task each, tagged `hygiene`: T-014, T-017, T-110; the T-106/T-107 remainder (nightlies 2 and 3; the summary's pairing fix and one clean nightly); the probe script's timed-out-versus-failed verdict (findings §1); the dead-guard clusters, each with whichever block next touches the file (§3.2); the `parseSince` docblock against its anchor (§3.3); the `blankedSpans` complexity property named (§3.6); the four self-referential oracles (§4); the deploy-tree test reading the operations documents at their old path (T-116); the empty store face and the five face exports nothing imports (T-118). T-109, T-111, T-114, T-115 and T-117 are done: T-113's C12 asked for ADR 0029 rule 4 as a lint, and T-117 holds all five import-direction rules in one plugin rule, `better-answers/import-direction` (ADR 0029, amendment of 10/09/2026).
 
 ## Testing Decisions
 
@@ -443,4 +443,4 @@ Two third-party doubles on the route: a fetch-shaped fake at the model client's 
 | **O1** | ops | Signals, seven of System's cards, `backup_run`, `platform_event` | S0 | — | yes | unspecced | — |
 | **V1** | records | Verification requests, cadence, shelf life, conflicts resolved | S2, S3 | — | yes | unspecced | — |
 | **C1** | client | First-client onboarding; the real answer tests | S5, S6, P1, P2 (provisioning), O1, S0 | — | yes | unspecced | — |
-| Hygiene | — | Off the route | — | T-014, T-017, T-110, T-106/T-107 remainder, the ADR 0029 rule 4 lint | no | open | — |
+| Hygiene | — | Off the route | — | T-014, T-017, T-110, T-116, T-118, T-106/T-107 remainder | no | open | — |
