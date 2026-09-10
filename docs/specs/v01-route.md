@@ -383,7 +383,7 @@ One document holds the route: this spec. Its head is the vision's v0.1 row expan
 
 ### The hygiene lane
 
-Off the route, one ordna task each, tagged `hygiene`: T-014, T-017, T-110; the T-106/T-107 remainder (nightlies 2 and 3; the summary's pairing fix and one clean nightly); the probe script's timed-out-versus-failed verdict (findings §1); the dead-guard clusters, each with whichever block next touches the file (§3.2); the `parseSince` docblock against its anchor (§3.3); the `blankedSpans` complexity property named (§3.6); the four self-referential oracles (§4); the deploy-tree test reading the operations documents at their old path (T-116); the empty store face and the five face exports nothing imports (T-118). T-109, T-111, T-114, T-115 and T-117 are done: T-113's C12 asked for ADR 0029 rule 4 as a lint, and T-117 holds all five import-direction rules in one plugin rule, `better-answers/import-direction` (ADR 0029, amendment of 10/09/2026).
+Off the route, one ordna task each, tagged `hygiene`: T-014, T-017, T-110; the T-106/T-107 remainder (nightlies 2 and 3; the summary's pairing fix and one clean nightly); the probe script's timed-out-versus-failed verdict (findings §1); the dead-guard clusters, each with whichever block next touches the file (§3.2); the `parseSince` docblock against its anchor (§3.3); the `blankedSpans` complexity property named (§3.6); the four self-referential oracles (§4); the empty store face and the five face exports nothing imports (T-118); the docs-site path that survives the 529e824 move in the specs references, two ADR sentences and the tag test's allowlist (T-119, cut from T-116's review). T-109, T-111, T-114, T-115, T-116 and T-117 are done: T-113's C12 asked for ADR 0029 rule 4 as a lint, and T-117 holds all five import-direction rules in one plugin rule, `better-answers/import-direction` (ADR 0029, amendment of 10/09/2026).
 
 ## Testing Decisions
 
@@ -443,4 +443,4 @@ Two third-party doubles on the route: a fetch-shaped fake at the model client's 
 | **O1** | ops | Signals, seven of System's cards, `backup_run`, `platform_event` | S0 | — | yes | unspecced | — |
 | **V1** | records | Verification requests, cadence, shelf life, conflicts resolved | S2, S3 | — | yes | unspecced | — |
 | **C1** | client | First-client onboarding; the real answer tests | S5, S6, P1, P2 (provisioning), O1, S0 | — | yes | unspecced | — |
-| Hygiene | — | Off the route | — | T-014, T-017, T-110, T-116, T-118, T-106/T-107 remainder | no | open | — |
+| Hygiene | — | Off the route | — | T-014, T-017, T-110, T-118, T-119, T-106/T-107 remainder | no | open | — |

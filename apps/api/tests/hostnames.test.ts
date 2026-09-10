@@ -11,10 +11,9 @@ import { AGENT_HOSTNAME, APEX_HOSTNAME, APP_HOSTNAME, startApp, type TestApp } f
 /**
  * The in-process hostname fence (T-030, PR #7's deferral D1), re-cut to one origin by
  * T-045 (ADR 0034). The tunnel's ingress rules are the first fence (ADR 0022,
- * `apps/docs-site/operations/coolify.md` § Ingress); this is the second, in the app,
- * because Better Auth's
- * handler answers the wildcard on every hostname and a tunnel rule is one console edit
- * from being wrong.
+ * `docs/operations/coolify.md` § Ingress); this is the second, in the app, because
+ * Better Auth's handler answers the wildcard on every hostname and a tunnel rule is one
+ * console edit from being wrong.
  *
  * Since T-045 everything a browser or a host reaches is on `app.`, so most of what the
  * fence does is keep `agent.`, the apex and an unnamed hostname away from it. Every test

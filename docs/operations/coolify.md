@@ -1,6 +1,6 @@
 # Coolify — the deployment shape
 
-**Operational reference, not a page of the docs site.** This file lives in `apps/docs-site/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
+**Operational reference, not a page of the docs site.** This file lives in `docs/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
 
 **This is the public half.** It states *what shape* the deployment has — which boxes, which resources, which ingress pattern and which probes are owed — without the estate's own values. Addresses, firewall rules, per-hostname edge policy, bucket and vault names, the orchestrator's URL and its recorded probe results are **not published**: they are `.planning/estate/coolify.md`, outside the repository (ADR 0027, ticket 79 Q10; ticket 77's acceptance line). Nothing a reader needs to stand up their own deployment is missing — the recipe is `deploy/wizard-41.sh`, which asks for every value and stores none.
 

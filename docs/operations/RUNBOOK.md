@@ -1,6 +1,6 @@
 # Runbook — nine pages and two procedures
 
-**Operational reference, not a page of the docs site.** This file lives in `apps/docs-site/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
+**Operational reference, not a page of the docs site.** This file lives in `docs/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
 
 Each entry: the check that fires, what to do, the rows to attach, who to escalate to, the drill that rehearses it.
 

@@ -114,7 +114,7 @@ services:
   #     init: { condition: service_completed_successfully }
 
   # The only way in. Ingress (three hostnames, ADR 0034, + the catch-all http_status:404) is configured on
-  # the tunnel in Cloudflare (coolify.md § Ingress, under apps/docs-site/operations/); every hostname → api:3000 on the
+  # the tunnel in Cloudflare (docs/operations/coolify.md § Ingress); every hostname → api:3000 on the
   # platform stack, which the tunnel reaches over the shared network. Lives in the stores stack
   # so a release never drops the tunnel.
   cloudflared:

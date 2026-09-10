@@ -1,6 +1,6 @@
 # Deployment — two boxes, two stacks, one tunnel
 
-The estate ADRs 0022 and 0024 fix: two IONOS boxes of 4 vCPU · 4 GB · 120 GB NVMe, production on one, Coolify and the mirror on the other, every image deployed by digest, every irreplaceable byte encrypted off-host. The files are `deploy/stores.compose.yaml` and `deploy/platform.compose.yaml`; the operations documents are under `apps/docs-site/operations/`.
+The estate ADRs 0022 and 0024 fix: two IONOS boxes of 4 vCPU · 4 GB · 120 GB NVMe, production on one, Coolify and the mirror on the other, every image deployed by digest, every irreplaceable byte encrypted off-host. The files are `deploy/stores.compose.yaml` and `deploy/platform.compose.yaml`; the operations documents are under `docs/operations/`.
 
 ```mermaid
 C4Deployment

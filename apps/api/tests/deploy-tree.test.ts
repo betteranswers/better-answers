@@ -22,6 +22,9 @@ import { POSTGRES_IMAGE } from "@better-answers/schema";
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");
+// Where AGENTS.md places the public-facing operations documents. The one name a move edits:
+// 529e824 moved them out of a docs-site tree and four assertions here read the old path.
+const operationsDocuments = "docs/operations";
 
 const deployScripts = (): readonly string[] =>
   readdirSync(path.join(repositoryRoot, "deploy"))
@@ -131,7 +134,7 @@ describe("the deploy tree (T-005)", () => {
     expect(script.indexOf("replay-erasures")).toBeLessThan(
       script.indexOf("platform up -d --wait api"),
     );
-    expect(read("apps/docs-site/operations/RUNBOOK.md")).toContain("restore-production.sh");
+    expect(read(`${operationsDocuments}/RUNBOOK.md`)).toContain("restore-production.sh");
   });
 
   it("runs the four graph commands the way each of them answers, and records counts it has nothing to diff", () => {
@@ -186,7 +189,7 @@ describe("the deploy tree (T-005)", () => {
     expect(release).toContain("deploy/RELEASES.md");
     expect(release).toContain("CLIENT_DATA_ON_BOX");
     expect(read("deploy/RELEASES.md")).toContain("| When (UTC) | By | api | worker | Rode on |");
-    expect(read("apps/docs-site/operations/RUNBOOK.md")).toContain("RELEASES.md");
+    expect(read(`${operationsDocuments}/RUNBOOK.md`)).toContain("RELEASES.md");
   });
 
   it("has no staging job in build.yml: staging is brought up by the drill procedure", () => {
@@ -196,7 +199,7 @@ describe("the deploy tree (T-005)", () => {
   });
 
   it("names the app's own fence beside the tunnel's rules, one rule per hostname role, and the two uptime paths", () => {
-    const coolify = read("apps/docs-site/operations/coolify.md");
+    const coolify = read(`${operationsDocuments}/coolify.md`);
     expect(coolify).toContain("apps/api/src/ingress/hostnames.ts");
     const unnamedRoles = ["app", "agent", "apex"].filter(
       (role) => !new RegExp(`\\b${role}\\b`).test(coolify),
@@ -210,8 +213,8 @@ describe("the deploy tree (T-005)", () => {
 
   it("says where the backup identity lives and what a VPC 2 compromise means, in both files", () => {
     const silent = [
-      "apps/docs-site/operations/SECRETS.md",
-      "apps/docs-site/operations/RUNBOOK.md",
+      `${operationsDocuments}/SECRETS.md`,
+      `${operationsDocuments}/RUNBOOK.md`,
     ].filter(
       (file) =>
         !(/VPC 2.*root-only|root-only.*VPC 2/s.test(read(file)) && /plaintext/.test(read(file))),
