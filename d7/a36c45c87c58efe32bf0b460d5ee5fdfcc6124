@@ -1,0 +1,46 @@
+docs/specs/v01-route.md
+  s_a9b313a0dd896b::t_94ca45cb1d0e15 386,446
+.env.example
+  s_a9b313a0dd896b::t_43bd57664eb36c 2
+apps/api/tests/deploy-tree.test.ts
+  s_a9b313a0dd896b::t_43bd57664eb36c 25-27,137,192,202,216-217
+deploy/stores.compose.yaml
+  s_a9b313a0dd896b::t_43bd57664eb36c 117
+docs/operations/coolify.md
+  s_a9b313a0dd896b::t_3af293f8726939 3
+docs/architecture/c4-deployment.md
+  s_a9b313a0dd896b::t_f81c0266e2e9dd 3
+docs/operations/RUNBOOK.md
+  s_a9b313a0dd896b::t_3af293f8726939 3
+.gitignore
+  s_a9b313a0dd896b::t_43bd57664eb36c 28
+apps/api/tests/hostnames.test.ts
+  s_a9b313a0dd896b::t_43bd57664eb36c 14-16
+docs/operations/BACKUPS.md
+  s_a9b313a0dd896b::t_3af293f8726939 3
+deploy/platform.compose.yaml
+  s_a9b313a0dd896b::t_43bd57664eb36c 91-92
+  s_a9b313a0dd896b::t_f81c0266e2e9dd 85
+apps/api/src/ingress/hostnames.ts
+  s_a9b313a0dd896b::t_43bd57664eb36c 13-17
+deploy/backup.sh
+  s_a9b313a0dd896b::t_43bd57664eb36c 2
+docs/operations/SECRETS.md
+  s_a9b313a0dd896b::t_3af293f8726939 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d7a36c45c87c58efe32bf0b460d5ee5fdfcc6124",
+  "prompts": {},
+  "sessions": {
+    "s_a9b313a0dd896b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ddd1dcd-9c83-4a0e-abbc-fe52c578a1e0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
