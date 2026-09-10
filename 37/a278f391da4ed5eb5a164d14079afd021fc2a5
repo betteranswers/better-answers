@@ -1,0 +1,24 @@
+docs/specs/s0-redaction-seam-and-erasure.md
+  s_3bf2feb94a2551::t_8d0aa4b6a3fbcb 213
+  s_3bf2feb94a2551::t_5b71e2f87e300b 216
+docs/specs/v01-route.md
+  s_3bf2feb94a2551::t_337e8b35482e72 118
+  s_3bf2feb94a2551::t_9917dafb0f820f 386
+  s_3bf2feb94a2551::t_d13912a2e8ea95 446
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "37a278f391da4ed5eb5a164d14079afd021fc2a5",
+  "prompts": {},
+  "sessions": {
+    "s_3bf2feb94a2551": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8902de7d-07b6-408d-a4c7-ed928d738c03",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
