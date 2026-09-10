@@ -37,6 +37,7 @@ import {
   SUBJECT_IDENTIFIERS_MAX,
   SUBJECT_REQUEST_KINDS,
   subjectRequest,
+  suppression,
 } from "./erasure-tables.ts";
 import {
   finding,
@@ -758,6 +759,23 @@ export const erasureRequestSelect = createSelectSchema(erasureRequest, erasureRe
 export const erasureRequestInsert = createInsertSchema(erasureRequest, erasureRequestRefinements);
 export const erasureRequestUpdate = createUpdateSchema(erasureRequest, erasureRequestRefinements);
 
+/**
+ * A **suppression** (ADR 0020): the routine it was written by and the document it stands over
+ * are the minter's shape and the document's own, and the identifiers are the request's set —
+ * the same bounded shape, because this row is a copy of it and a second narrowing would be a
+ * second thing the reprocess could disagree with.
+ */
+const suppressionRefinements = {
+  workspaceId,
+  erasureRequestId: (schema: z.ZodString) => schema.regex(ULID),
+  documentId: (schema: z.ZodString) => schema.trim().min(1),
+  identifiers: (schema: z.ZodType) => schema.pipe(subjectIdentifiers),
+};
+
+export const suppressionSelect = createSelectSchema(suppression, suppressionRefinements);
+export const suppressionInsert = createInsertSchema(suppression, suppressionRefinements);
+export const suppressionUpdate = createUpdateSchema(suppression, suppressionRefinements);
+
 /** A composition (ADR 0004, ADR 0015): a readable unit, its id the minter's shape. */
 const compositionRefinements = {
   workspaceId,
@@ -1164,6 +1182,12 @@ export const boundarySchemas = {
     select: erasureRequestSelect,
     insert: erasureRequestInsert,
     update: erasureRequestUpdate,
+  },
+  suppression: {
+    table: suppression,
+    select: suppressionSelect,
+    insert: suppressionInsert,
+    update: suppressionUpdate,
   },
   composition: {
     table: composition,

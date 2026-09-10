@@ -2771,6 +2771,110 @@ describe("the erasure request under both runtime roles", () => {
 });
 
 /**
+ * The **suppression** (`CONTEXT.md`; ADR 0020): what keeps a person's data out of every
+ * derived store the next time one document is reprocessed — one row per document per erasure
+ * request, carrying the identifiers to keep out. Restricted personal data itself, which is
+ * why the worker holds nothing here either: the reprocess that reads a suppression is the
+ * app's act, and S1's worker is handed what to keep out rather than reading the table.
+ */
+describe("the suppression under both runtime roles", () => {
+  it("returns zero rows on a missing scope and only the scoped tenant's suppressions otherwise", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      for (const workspaceId of [WS_A, WS_B]) await seed.suppression({ workspaceId });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      expect(await countedRows(client, ["suppression"])).toEqual([
+        { table: "suppression", rows: 0 },
+      ]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      expect(await countedRows(client, ["suppression"])).toEqual([
+        { table: "suppression", rows: 1 },
+      ]);
+    });
+  });
+
+  it("refuses the worker every road to a suppression", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const suppression = await seed.suppression({ workspaceId: WS_A });
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await refusesEach(client, [
+        [
+          "SELECT 1 FROM suppression LIMIT 1",
+          "a suppression is the identifiers of an erased person, so a worker that could read one would hold what the erasure was for",
+        ],
+        [
+          `INSERT INTO suppression (workspace_id, erasure_request_id, document_id, identifiers)
+           VALUES ($1, $2, $3, '{"emails": ["x@y.invalid"], "names": [], "other": []}'::jsonb)`,
+          "the routine writes suppressions under the platform principal, so a worker that could insert one could suppress a document nobody asked about",
+          [WS_A, suppression.erasureRequestId, suppression.documentId],
+        ],
+        [
+          `UPDATE suppression SET identifiers = '{"emails": [], "names": [], "other": []}'::jsonb`,
+          "and one that could edit the set could empty it, which is an erasure quietly undone at the next reprocess",
+        ],
+        [
+          "DELETE FROM suppression",
+          "a suppression a tier can remove is a person's data back in the derived stores the next time the document is converted",
+        ],
+      ]);
+
+      // The row all four reached for, read back under the role that may read it: still there,
+      // still carrying the identifiers the routine wrote from the request's set.
+      await client.query("RESET ROLE");
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const standing = await client.query<{ identifiers: unknown }>(
+        "SELECT identifiers FROM suppression",
+      );
+      expect(standing.rows).toEqual([{ identifiers: suppression.identifiers }]);
+    });
+  });
+
+  it("refuses a suppression that keeps nothing out, and one naming another tenant's rows", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const mine = await seed.suppression({ workspaceId: WS_A });
+      const theirDocument = await seed.sourceDocument({ workspaceId: WS_B });
+      const theirRoutine = await seed.erasureRequest({ workspaceId: WS_B });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const insert = `INSERT INTO suppression (workspace_id, erasure_request_id, document_id, identifiers)
+                      VALUES ($1, $2, $3, $4::jsonb)`;
+      const set = '{"emails": ["priya@client.invalid"], "names": [], "other": []}';
+      const empty = '{"emails": [], "names": [], "other": []}';
+
+      const rows: readonly [string, readonly unknown[], string][] = [
+        // A suppression keeps something out or it is not one: an empty set is a row the
+        // reprocess would read and act on by doing nothing at all.
+        [
+          `UPDATE suppression SET identifiers = '${empty}'::jsonb WHERE document_id = $1`,
+          [mine.documentId],
+          "suppression_identifiers_check",
+        ],
+        // Both keys name the workspace beside the id, as every cross-table key in this
+        // package does: a foreign-key check runs outside row-level security.
+        [insert, [WS_A, mine.erasureRequestId, theirDocument.id, set], "suppression_document_fk"],
+        [insert, [WS_A, theirRoutine.id, mine.documentId, set], "suppression_erasure_request_fk"],
+      ];
+      for (const [statement, parameters, constraint] of rows) {
+        await client.query("SAVEPOINT suppression_row");
+        await expect(client.query(statement, [...parameters])).rejects.toThrow(
+          new RegExp(constraint),
+        );
+        await client.query("ROLLBACK TO SAVEPOINT suppression_row");
+      }
+    });
+  });
+});
+
+/**
  * The queue (ADR 0005's control plane of rows; ADR 0031's queue agreement). The claim
  * protocol's own behaviour — the order, the lapsed lease, the poison — is the fixture's, in
  * `contracts/queue/cases.json`, and both tiers' conformance suites read it. What is proved

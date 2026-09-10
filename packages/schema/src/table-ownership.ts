@@ -153,6 +153,10 @@ export const TABLE_OWNERS = {
   // 2026-09-05): the same slice's, written by the routine under the platform principal and
   // read by the replay a restore runs before the app serves anything.
   "public.erasure_request": "erasure",
+  // What one document must keep out the next time it is reprocessed (ADR 0020): the same
+  // slice's, written by the routine's step 6. S1's reprocess is handed what to keep out by
+  // the app; the worker reads no suppression, which is why there is no entry below.
+  "public.suppression": "erasure",
   // Which evidence a concept cites, and a recorded Admin override of its derived class:
   // both written in the concepts slice's own transactions, the first by the governed write
   // and the second by the override act.

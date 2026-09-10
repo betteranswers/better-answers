@@ -1,8 +1,17 @@
 import { sql } from "drizzle-orm";
-import { check, foreignKey, jsonb, primaryKey, text, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  check,
+  foreignKey,
+  index,
+  jsonb,
+  primaryKey,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 import { listed, stamp } from "./column-helpers.ts";
 import { user } from "./identity-tables.ts";
+import { sourceDocument } from "./source-tables.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -41,6 +50,35 @@ export const SUBJECT_IDENTIFIER_KINDS = ["emails", "names", "other"] as const;
  */
 export const SUBJECT_IDENTIFIER_MAX = 320;
 export const SUBJECT_IDENTIFIERS_MAX = 50;
+
+/**
+ * The identifier set as two SQL fragments, written from the closed list so the constant, the
+ * boundary's schema and every CHECK over the column say one thing. Both tables below carry
+ * the set — the request holds what the subject gave, the suppression the copy the reprocess
+ * keeps out — and a second copy of these expressions would be a second place to change.
+ *
+ * The shape test is null-safe on purpose: `->` on a key that is not there is SQL NULL,
+ * `jsonb_typeof(NULL)` is NULL, and a CHECK whose value is NULL **passes**. Written with `=`,
+ * a set missing two of its three kinds would have been taken by the database and then found
+ * by a finder that expected three lists. The object test is what refuses a set written as the
+ * JSON `null`, which `jsonb NOT NULL` accepts — it refuses SQL NULL, not the JSON value.
+ */
+const identifierSetIsShaped = [
+  `jsonb_typeof(identifiers) = 'object'`,
+  ...SUBJECT_IDENTIFIER_KINDS.map(
+    (kind) => `jsonb_typeof(identifiers -> '${kind}') IS NOT DISTINCT FROM 'array'`,
+  ),
+].join("\n         AND ");
+
+/**
+ * How many identifiers the set holds across its three kinds. It needs no null guard of its
+ * own: the shape check above has already refused any row whose three kinds are not lists, and
+ * a row is stored only when no check on it is false, so by the time this arithmetic matters
+ * the three lists are there.
+ */
+const identifierSetSize = SUBJECT_IDENTIFIER_KINDS.map(
+  (kind) => `jsonb_array_length(identifiers -> '${kind}')`,
+).join(" + ");
 
 /**
  * A **subject request** (`CONTEXT.md`; the S0 spec, *The record families*): a person's
@@ -99,39 +137,15 @@ export const subjectRequest = withRLS(
     check("subject_request_kind_check", sql.raw(`kind IN (${listed(SUBJECT_REQUEST_KINDS)})`)),
     // The set's three kinds, held here as well as at the boundary, because this column is
     // what every finder walks and a `jsonb` the database does not hold to a shape is a
-    // finder that discovers its argument is a string at the moment it runs. `jsonb NOT NULL`
-    // refuses SQL NULL and not the JSON value, so the object test is the clause that refuses
-    // a set written as `null`.
-    //
-    // Null-safe on purpose: `->` on a key that is not there is SQL NULL, `jsonb_typeof(NULL)`
-    // is NULL, and a CHECK whose value is NULL **passes**. Written with `=`, a set missing
-    // two of its three kinds would have been taken by the database and found by a finder.
-    check(
-      "subject_request_identifiers_check",
-      sql.raw(
-        [
-          `jsonb_typeof(identifiers) = 'object'`,
-          ...SUBJECT_IDENTIFIER_KINDS.map(
-            (kind) => `jsonb_typeof(identifiers -> '${kind}') IS NOT DISTINCT FROM 'array'`,
-          ),
-        ].join("\n         AND "),
-      ),
-    ),
+    // finder that discovers its argument is a string at the moment it runs.
+    check("subject_request_identifiers_check", sql.raw(identifierSetIsShaped)),
     // A request names somebody: a person id, or at least one identifier. A row with neither
     // is a request no finder could run, no suppression could be written from and no answer
     // could reach — and the erasure map it produced would be empty for a reason nobody could
     // see. The sentence the identifier set exists for, made the database's.
-    //
-    // The lengths need no null guard of their own: the check above has already refused any
-    // row whose three kinds are not lists, and a row is stored only when no check on it is
-    // false, so by the time this one's arithmetic matters the three lists are there.
     check(
       "subject_request_subject_check",
-      sql.raw(
-        `person_id IS NOT NULL OR ${SUBJECT_IDENTIFIER_KINDS.map(
-          (kind) => `jsonb_array_length(identifiers -> '${kind}')`,
-        ).join(" + ")} > 0`,
-      ),
+      sql.raw(`person_id IS NOT NULL OR ${identifierSetSize} > 0`),
     ),
     // The month, in order: it starts at receipt or later, it runs forward, and an extension
     // moves the date out. A row that said otherwise would be a deadline the platform had
@@ -241,5 +255,60 @@ export const erasureRequest = withRLS(
     // A completion is the stamp and the report together: a stamp alone is a routine that
     // finished without saying what it did, and a report alone one that never finished.
     check("erasure_request_completion_check", sql.raw("(completed_at IS NULL) = (report IS NULL)")),
+  ],
+);
+
+/**
+ * A **suppression** (`CONTEXT.md`; ADR 0020): the entry that keeps a person's data out of
+ * every derived store when one document is reprocessed. One row per document per erasure
+ * request — which is what the key says, rather than an id with a unique index beside it — and
+ * it carries the identifiers to keep out, copied from the request's set.
+ *
+ * **Per document, never binding-wide** (the S0 spec): the routine writes one for every
+ * document the erasure map found, so a reprocess of a document nobody's request named
+ * suppresses nothing, and a binding whose other documents mention nobody is untouched.
+ *
+ * **The object store is not reached.** A company document that mentions a person is
+ * suppressed on reprocess rather than deleted, and a document that never reached git is a
+ * suppression rather than a rewrite — which is why this table is the erasure for a subject
+ * with no user row and no history, and why it is restricted personal data itself: a list of
+ * what an erased person is called, in a workspace's own words.
+ */
+export const suppression = withRLS(
+  "suppression",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    erasureRequestId: text("erasure_request_id").notNull(),
+    documentId: text("document_id").notNull(),
+    /** The identifiers to keep out — the request's set, as it stood when the routine ran. */
+    identifiers: jsonb("identifiers").notNull(),
+  },
+  "workspaceId",
+  (table) => [
+    // One row per document per erasure request, said by the key itself.
+    primaryKey({ columns: [table.workspaceId, table.erasureRequestId, table.documentId] }),
+    // Both keys name the workspace beside the id, as every cross-table key in this package
+    // does: a foreign-key check runs outside row-level security, so a key on the id alone
+    // would confirm that some other tenant holds a given document or a given routine.
+    foreignKey({
+      columns: [table.workspaceId, table.erasureRequestId],
+      foreignColumns: [erasureRequest.workspaceId, erasureRequest.id],
+      name: "suppression_erasure_request_fk",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.workspaceId, table.documentId],
+      foreignColumns: [sourceDocument.workspaceId, sourceDocument.id],
+      name: "suppression_document_fk",
+    }).onDelete("cascade"),
+    // The reprocess's own read — every suppression standing over one document, which is what
+    // S1 gathers before it converts one — and the index the document cascade above scans.
+    index("suppression_workspace_id_document_id_idx").on(table.workspaceId, table.documentId),
+    // The set's shape, as the request's is, and then the sentence that makes this row a
+    // suppression: it keeps something out. An empty set is a row the reprocess would read and
+    // act on by doing nothing, which is an erasure quietly undone at the next conversion.
+    check(
+      "suppression_identifiers_check",
+      sql.raw(`${identifierSetIsShaped}\n         AND ${identifierSetSize} > 0`),
+    ),
   ],
 );

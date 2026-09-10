@@ -7,9 +7,9 @@ knowledge of what the app's journal built, stamped with the migration id it was
 generated from and with that migration's journal instant, which is what the
 migrator writes into `drizzle.__drizzle_migrations.created_at`."""
 
-MIGRATION_ID = "0028_the-erasure-request-substrate"
+MIGRATION_ID = "0030_the-suppression-substrate"
 
-MIGRATION_WHEN = 1789083936500
+MIGRATION_WHEN = 1789084198087
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -466,6 +466,12 @@ TABLES: dict[str, dict[str, str]] = {
         "reason": "text",
         "proposed_at": "timestamp with time zone NOT NULL",
         "decided_at": "timestamp with time zone",
+    },
+    "public.suppression": {
+        "workspace_id": "text NOT NULL",
+        "erasure_request_id": "text NOT NULL",
+        "document_id": "text NOT NULL",
+        "identifiers": "jsonb NOT NULL",
     },
     "public.user": {
         "id": "text NOT NULL",

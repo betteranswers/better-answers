@@ -386,6 +386,16 @@ const acceptedRows = {
       report: "Backup copies taken before 2026-09-01 are beyond use.",
     },
   ],
+  // One suppression, in the document the finding above located a span in: what the reprocess
+  // must keep out of every derived store next time that document is converted.
+  suppression: [
+    {
+      workspaceId: WS_ID,
+      erasureRequestId: ERASURE_REQUEST_ID,
+      documentId: DOCUMENT_ID,
+      identifiers: { emails: ["person@example.invalid"], names: ["A person"], other: [] },
+    },
+  ],
   // The citation: the concept above, the evidence row above by its own key.
   conceptEvidence: [
     { workspaceId: WS_ID, iri: CONCEPT_IRI, sourceDocumentId: DOCUMENT_ID, locator: "p.4#para-2" },
@@ -757,6 +767,8 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         // request by the pair, so it comes after.
         "subjectRequest",
         "erasureRequest",
+        // The suppression names both the routine above and the document above it.
+        "suppression",
         "conceptEvidence",
         "conceptClassOverride",
         "composition",
@@ -947,6 +959,18 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       {
         ...acceptedRows.erasureRequest[1],
         actions: { git: { rewritten: { commits: ["abc123"] } } },
+      },
+    ],
+    // The suppression carries the same identifier set as the request it was written from, so
+    // it is refused the same ways: a fourth kind of identifier, and an entry over the bound.
+    suppression: [
+      {
+        ...acceptedRows.suppression[0],
+        identifiers: { emails: [], names: [], other: [], phones: ["07700 900123"] },
+      },
+      {
+        ...acceptedRows.suppression[0],
+        identifiers: { emails: ["x".repeat(SUBJECT_IDENTIFIER_MAX + 1)], names: [], other: [] },
       },
     ],
     // The payload's refusals: the bundle's manifest, which is not a concept file — and the

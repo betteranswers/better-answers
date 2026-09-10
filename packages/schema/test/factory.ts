@@ -177,6 +177,12 @@ export type TestData = {
     overrides?: Partial<InsertInput<"erasureRequest">>,
   ): Promise<Row<"erasureRequest">>;
   /**
+   * A suppression; creates the routine that wrote it and the document it stands over unless
+   * either is named. It keeps one email out, because a suppression that kept nothing out is
+   * the row its own CHECK refuses.
+   */
+  suppression(overrides?: Partial<InsertInput<"suppression">>): Promise<Row<"suppression">>;
+  /**
    * A concept's citation of one piece of evidence; creates its own workspace and identity
    * unless the IRI is named, and the evidence row the key names unless both halves of that
    * key are given — a citation of evidence nobody recorded is what the key refuses.
@@ -773,6 +779,20 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const suppression: TestData["suppression"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const erasureRequestId =
+      overrides.erasureRequestId ?? (await erasureRequest({ workspaceId })).id;
+    const documentId = overrides.documentId ?? (await sourceDocument({ workspaceId })).id;
+    return insertRow(client, "suppression", {
+      identifiers: { emails: ["subject@example.invalid"], names: [], other: [] },
+      ...overrides,
+      workspaceId,
+      erasureRequestId,
+      documentId,
+    });
+  };
+
   const conceptEvidence: TestData["conceptEvidence"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
@@ -864,6 +884,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     finding,
     subjectRequest,
     erasureRequest,
+    suppression,
     conceptEvidence,
     conceptClassOverride,
     composition,
