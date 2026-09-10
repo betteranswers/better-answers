@@ -1,6 +1,6 @@
 # Architecture — the C4 diagrams
 
-The shape of Better Answers as the tree holds it on 10 September 2026, after T-113's four verdicts were folded into the route spec (`apps/docs-site/specs/v01-route.md`, Further Notes). Drawn from the tree, the compose files under `deploy/`, `CONTEXT.md` and the ADR index (`docs/adr/README.md`); where a diagram shows something the route has not built yet, the element says which block lands it.
+The shape of Better Answers as the tree holds it on 10 September 2026, after T-113's four verdicts were folded into the route spec (`docs/specs/v01-route.md`, Further Notes). Drawn from the tree, the compose files under `deploy/`, `CONTEXT.md` and the ADR index (`docs/adr/README.md`); where a diagram shows something the route has not built yet, the element says which block lands it.
 
 **Authority.** These diagrams are a reading of the tree, never a source: the ADR index wins over a diagram, the ADR body over the index, `CONTEXT.md` over both for a word, and the tree over every document (the route spec's authority order). A diagram that disagrees with the tree is wrong and is redrawn — a `/c4-architecture` pass after any architecture review that moves the shape (`AGENTS.md`, *Skills*).
 

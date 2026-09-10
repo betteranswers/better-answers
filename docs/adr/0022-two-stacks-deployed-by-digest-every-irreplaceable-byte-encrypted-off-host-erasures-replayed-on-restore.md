@@ -82,3 +82,7 @@ Four of ticket 79's applied items and answers land in this ADR's territory and a
 - **The drill reads production over SSH** (A12) and **writes its one `backup_run` row to production** (A13), because staging is wiped minutes later. `restore-production.sh` is the production restore — no wipe, no exit trap, the replay mandatory — and `RUNBOOK.md` grows pages 6–9 (a release went wrong · a backup check is red · a client reports wrong or lingering content · both boxes lost). The `pnpm ops` commands the scripts call exist under one contract (`apps/api/src/ops/index.ts`): done · refused · not built, the third an exit code the drill records rather than a silence.
 
 Everything else stands, including the first drill before the first client's data.
+
+## Amendment — 2026-09-10, the ops documents moved to `docs/operations/` (T-119)
+
+A correction of wording, no change of decision. "The ops documents' public halves live unrendered in the docs-site source" (above) named the tree as it stood on 2026-09-03; 529e824 moved them, and they live at `docs/operations/` now, still unrendered — `pnpm-workspace.yaml` keeps `docs-site/` deferred, not gone. Everything else stands.

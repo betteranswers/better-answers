@@ -85,8 +85,8 @@ const isTest = (file: string): boolean =>
 
 /**
  * A document a reader follows to the rule, as `[COMMENT2]` lists them: the glossary, a note
- * under `docs/` or `apps/docs-site/` (research, operations, the gate record), a package's
- * readme, a notices file. Not every markdown file — a `.md` beside source is source's.
+ * under `docs/` (research, operations, the gate record), a package's readme, a notices file.
+ * Not every markdown file — a `.md` beside source is source's.
  *
  * A tracked `SKILL.md` is one of them, added by T-071: a skill this repository writes and
  * carries is read by the next session exactly the way a note under `docs/` is, and a tag in
@@ -95,7 +95,7 @@ const isTest = (file: string): boolean =>
  */
 const isDocument = (file: string): boolean =>
   file === "CONTEXT.md" ||
-  (file.endsWith(".md") && (file.startsWith("docs/") || file.startsWith("apps/docs-site/"))) ||
+  (file.endsWith(".md") && file.startsWith("docs/")) ||
   /(^|\/)(readme\.md|SKILL\.md|THIRD_PARTY_NOTICES\.md)$/i.test(file);
 
 /**
@@ -109,7 +109,7 @@ const isDocument = (file: string): boolean =>
 const isAllowedLocation = (file: string): boolean =>
   isRulesFile(file) ||
   file.startsWith("docs/adr/") ||
-  file.startsWith("apps/docs-site/specs/") ||
+  file.startsWith("docs/specs/") ||
   file === "cubic.yaml" ||
   file === ".oxlintrc.json" ||
   file.startsWith("packages/devtools/lint-rules/") ||

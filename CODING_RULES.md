@@ -96,7 +96,7 @@ A comment carries the reason a reader cannot infer from the code: a constraint, 
 
 ### [COMMENT2] A rule tag is cited where rules are made, kept, reviewed or proved
 
-A tag such as `[SEC2]` appears in the rules files, an ADR, a spec or a ticket, `cubic.yaml`, a lint rule's line or message, a test — and in a document a reader follows to the rule: the glossary, a note under `docs/` or `apps/docs-site/`, a package readme, a notices file. It never appears in source, a deploy file, a Dockerfile, a CI workflow or a workspace's config: a comment there carries the constraint, the trade-off or the gotcha in words (`[COMMENT1]`) or is deleted, and is never replaced tag-for-sentence. `apps/api/tests/coding-rules-tags.test.ts` holds this both ways (`[TEST7]`): every tag cited in the tree is defined in a rules file and sits in one of those places, and every defined tag is cited outside its own file or is named in the test with the reason it is not. A tag struck in an ADR's body (`~~…~~`, the index's convention for a superseded sentence) is history, not a citation.
+A tag such as `[SEC2]` appears in the rules files, an ADR, a spec or a ticket, `cubic.yaml`, a lint rule's line or message, a test — and in a document a reader follows to the rule: the glossary, a note under `docs/`, a package readme, a notices file. It never appears in source, a deploy file, a Dockerfile, a CI workflow or a workspace's config: a comment there carries the constraint, the trade-off or the gotcha in words (`[COMMENT1]`) or is deleted, and is never replaced tag-for-sentence. `apps/api/tests/coding-rules-tags.test.ts` holds this both ways (`[TEST7]`): every tag cited in the tree is defined in a rules file and sits in one of those places, and every defined tag is cited outside its own file or is named in the test with the reason it is not. A tag struck in an ADR's body (`~~…~~`, the index's convention for a superseded sentence) is history, not a citation.
 
 ## GLOSSARY
 
@@ -140,7 +140,7 @@ Every tenant table is created `withRLS()` and ships with its zero-rows test — 
 
 ## AUDIT
 
-The one append-only *ledger* (`audit_event`) and the audit slice that writes it. These are the checkable sentences; the shape — the columns, the two doors, the typed vocabulary — stays in ADR 0014, ADR 0035 and the T-048 and T-063 specs (`apps/docs-site/specs/`), and is not restated here.
+The one append-only *ledger* (`audit_event`) and the audit slice that writes it. These are the checkable sentences; the shape — the columns, the two doors, the typed vocabulary — stays in ADR 0014, ADR 0035 and the T-048 and T-063 specs (`docs/specs/`), and is not restated here.
 
 ### [AUDIT1] An act and its audit event land in one transaction
 

@@ -43,7 +43,6 @@
 
 # Not runtime, not build input
 .github
-apps/docs-site
 apps/worker
 contracts
 deploy

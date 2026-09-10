@@ -167,3 +167,7 @@ own condition: **before the first client credential exists, the zone is on Pro**
 the wizard's Cloudflare stage passes on Free against the operator's confirmation that no client
 credential exists or is imminent, and the two uptime paths are probed from VPC 2
 (`deploy/uptime-probe.sh`) instead of Pro's Health Checks. Everything else stands.
+
+## Amendment — 2026-09-10, the ops documents moved to `docs/operations/` (T-119)
+
+A correction of wording, no change of decision. "The ops documents' public halves live in the docs-site source, unrendered" (above) named the tree as it stood on 2026-09-03; 529e824 moved them, and they live at `docs/operations/` now, still unrendered. Everything else stands.

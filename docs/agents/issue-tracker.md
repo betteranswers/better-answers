@@ -4,7 +4,7 @@ This repo runs **three lanes**, and a skill must know which one it is in.
 
 | Lane | Where | What lives there | Who writes it |
 | --- | --- | --- | --- |
-| **Build queue** | ordna — git blobs at `refs/ordna/tasks/<id>` | Tasks that produce code: `T-001`, `T-002`, … — cut from a *block* of the route spec (`apps/docs-site/specs/v01-route.md`) | `/to-tickets`, `/triage`, humans |
+| **Build queue** | ordna — git blobs at `refs/ordna/tasks/<id>` | Tasks that produce code: `T-001`, `T-002`, … — cut from a *block* of the route spec (`docs/specs/v01-route.md`) | `/to-tickets`, `/triage`, humans |
 | **Discovery** | `.scratch/<effort>/` markdown | The wayfinder map and its research · prototype · grilling tickets | `/wayfinder`, `/research`, `/prototype` |
 | **Hygiene** | ordna — tasks tagged `hygiene` | A finding from a gate, a mutation run or a review: one task each, no map, no spec, no grilling | The gate that found it, `/triage`, humans |
 

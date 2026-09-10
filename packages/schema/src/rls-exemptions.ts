@@ -3,7 +3,7 @@ import { IDENTITY_SET } from "./identity-tables.ts";
 
 /**
  * The one place a reviewer looks to see which tables are outside the tenant guarantee,
- * and why each one is (T-015's spec, `apps/docs-site/specs/T-015.md`). A tenant
+ * and why each one is (T-015's spec, `docs/specs/T-015.md`). A tenant
  * table is every table `src/` declares minus these; adding an entry is a visible diff
  * carrying a reason, and no pattern ever matches a new table quietly.
  *
