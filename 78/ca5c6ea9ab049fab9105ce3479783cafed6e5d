@@ -1,0 +1,67 @@
+packages/schema/src/table-ownership.ts
+  s_f3ee63bcbb1a0b::t_ec57cbe771eb49 147-151
+packages/schema/src/boundary-schemas.ts
+  s_f3ee63bcbb1a0b::t_efe6f42cec1947 34-39
+  s_f3ee63bcbb1a0b::t_ae4b33ab19d812 680-685,689,693-699
+  s_f3ee63bcbb1a0b::t_6cfa90f2e68fc9 1119-1124
+  s_f3ee63bcbb1a0b::t_12ef718115c9b6 690-692
+  s_f3ee63bcbb1a0b::t_786d4dfc805783 668-679,686-688,700-723
+packages/schema/src/schema.ts
+  s_f3ee63bcbb1a0b::t_e03aaf9eff37e3 33
+apps/worker/src/better_answers_worker/schema_view.py
+  s_f3ee63bcbb1a0b::t_43b6db76243b8e 12
+  s_f3ee63bcbb1a0b::t_dec265b25b1460 10,429-440
+packages/schema/migrations/0026_the-subject-request-substrate.sql
+  s_f3ee63bcbb1a0b::t_6a29650405d99a 1-23
+packages/schema/migrations/meta/0025_snapshot.json
+  s_f3ee63bcbb1a0b::t_eae8ccfdf8b30e 2,4357
+  s_f3ee63bcbb1a0b::t_9d0028e16ccbf9 325
+  s_f3ee63bcbb1a0b::t_4476d5dff68bc5 1,3-324,326-4356,4358-4809
+  s_f3ee63bcbb1a0b::t_cb36005d1c037b 4810
+packages/schema/test/rls.test.ts
+  s_f3ee63bcbb1a0b::t_8654a02292e4aa 2560-2561,2564-2570
+  s_f3ee63bcbb1a0b::t_da4ff4bd20ad2f 2459-2519,2531-2559,2562-2563,2571-2615
+  s_f3ee63bcbb1a0b::t_ce7fdcd2e2f2b2 2520-2530
+packages/schema/migrations/meta/_journal.json
+  s_f3ee63bcbb1a0b::t_eae8ccfdf8b30e 179-192
+packages/schema/test/boundary-schemas.test.ts
+  ai_agent 867-870
+  s_f3ee63bcbb1a0b::t_6271f7730ed5bf 299-331
+  s_f3ee63bcbb1a0b::t_1621d55ae7d674 940-969
+  s_f3ee63bcbb1a0b::t_bfcd657897fe12 829-866,871-874,879
+  s_f3ee63bcbb1a0b::t_79644dc738032c 14-15
+  s_f3ee63bcbb1a0b::t_cf56ca8876086d 875-878
+  s_f3ee63bcbb1a0b::t_99655d6e735328 53-59
+  s_f3ee63bcbb1a0b::t_e79c99ec9f92a4 698-700
+packages/schema/test/factory.ts
+  s_f3ee63bcbb1a0b::t_9b37a698b4dc27 828
+  s_f3ee63bcbb1a0b::t_a9c96b03acb8db 161-169
+  s_f3ee63bcbb1a0b::t_48e8c27795f9a4 709-738
+packages/schema/migrations/meta/0026_snapshot.json
+  s_f3ee63bcbb1a0b::t_9d0028e16ccbf9 325
+  s_f3ee63bcbb1a0b::t_34ce63ec07556c 1,4-324,326-4356,4358-4810
+  s_f3ee63bcbb1a0b::t_eae8ccfdf8b30e 2-3,4357
+packages/schema/migrations/0025_the-subject-request.sql
+  s_f3ee63bcbb1a0b::t_4476d5dff68bc5 1-14,19-29
+  s_f3ee63bcbb1a0b::t_eae8ccfdf8b30e 15-18
+packages/schema/src/erasure-tables.ts
+  s_f3ee63bcbb1a0b::t_bc54540208616e 1-101,109-111,118-123,128-152
+  s_f3ee63bcbb1a0b::t_a5c6555f7dfc22 124-127
+  s_f3ee63bcbb1a0b::t_7b08bd9109b9a2 102-108,112-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "78ca5c6ea9ab049fab9105ce3479783cafed6e5d",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
