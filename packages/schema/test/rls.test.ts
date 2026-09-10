@@ -2614,6 +2614,163 @@ describe("the subject request under both runtime roles", () => {
 });
 
 /**
+ * The **erasure request** (`CONTEXT.md`; ADR 0020, amended 2026-09-05): what the routine did
+ * in every store for one subject request — the *erasure pseudonym* it minted, the instant it
+ * took the lock, the per-store actions, the anchor with its four beyond-use dates, and the
+ * report. The worker holds nothing here for the reason it holds nothing on the request: the
+ * routine is the app tier's, under the platform principal, and this row is the record a
+ * restore replays from.
+ */
+describe("the erasure request under both runtime roles", () => {
+  it("returns zero rows on a missing scope and only the scoped tenant's routines otherwise", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      for (const workspaceId of [WS_A, WS_B]) await seed.erasureRequest({ workspaceId });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      expect(await countedRows(client, ["erasure_request"])).toEqual([
+        { table: "erasure_request", rows: 0 },
+      ]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      expect(await countedRows(client, ["erasure_request"])).toEqual([
+        { table: "erasure_request", rows: 1 },
+      ]);
+    });
+  });
+
+  it("refuses the worker every road to an erasure request", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const request = await seed.erasureRequest({ workspaceId: WS_A });
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await refusesEach(client, [
+        [
+          "SELECT 1 FROM erasure_request LIMIT 1",
+          "the pseudonym is what a rewritten history was rewritten to, and a worker that could read it could join the history back to the request that caused it",
+        ],
+        [
+          `INSERT INTO erasure_request (workspace_id, id, subject_request_id, pseudonym,
+                                        locked_at, anchored_at, beyond_use_hourly_at,
+                                        beyond_use_daily_at, beyond_use_weekly_at,
+                                        beyond_use_monthly_at)
+           VALUES ($1, $2, $3, $4, now(), now(), now() + interval '2 days',
+                   now() + interval '30 days', now() + interval '8 weeks',
+                   now() + interval '6 months')`,
+          "the routine runs under the platform principal in the app tier, so a worker that could insert one could claim an erasure that never ran",
+          [WS_A, ulid(), request.subjectRequestId, ulid()],
+        ],
+        [
+          "UPDATE erasure_request SET completed_at = now(), report = 'done'",
+          "and one that could complete a request could close a routine that had touched no store",
+        ],
+        [
+          "DELETE FROM erasure_request",
+          "this row is what a restore replays from, so a tier that could remove one could make an erasure un-replayable",
+        ],
+      ]);
+
+      // The row all four reached for, read back under the role that may read it: still there,
+      // still unfinished, and still carrying the pseudonym the routine minted.
+      await client.query("RESET ROLE");
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const standing = await client.query<{ pseudonym: string; completed_at: Date | null }>(
+        "SELECT pseudonym, completed_at FROM erasure_request",
+      );
+      expect(standing.rows).toEqual([{ pseudonym: request.pseudonym, completed_at: null }]);
+    });
+  });
+
+  it("refuses a completion, a pseudonym and a set of dates the routine's own sentences do not admit", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const request = await seed.erasureRequest({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const rows: readonly [string, readonly unknown[], string][] = [
+        // Half a completion, either way: a stamp with no report is a routine that finished
+        // without saying what it did, and a report with no stamp is one that never finished.
+        [
+          "UPDATE erasure_request SET completed_at = now() WHERE id = $1",
+          [request.id],
+          "erasure_request_completion_check",
+        ],
+        [
+          "UPDATE erasure_request SET report = 'done' WHERE id = $1",
+          [request.id],
+          "erasure_request_completion_check",
+        ],
+        // The four dates run out from the anchor in order — 48 hours, 30 days, 8 weeks, six
+        // months — because that is what the report promises about each backup tier. A weekly
+        // date inside the daily one would be a promise the lifecycle rule cannot keep.
+        [
+          "UPDATE erasure_request SET beyond_use_weekly_at = beyond_use_daily_at WHERE id = $1",
+          [request.id],
+          "erasure_request_beyond_use_check",
+        ],
+        [
+          "UPDATE erasure_request SET beyond_use_hourly_at = anchored_at WHERE id = $1",
+          [request.id],
+          "erasure_request_beyond_use_check",
+        ],
+        // The actions are one flat object per store family; a `null` or a string would be a
+        // record of what was done that no report could be written from.
+        [
+          `UPDATE erasure_request SET actions = 'null'::jsonb WHERE id = $1`,
+          [request.id],
+          "erasure_request_actions_check",
+        ],
+      ];
+      for (const [statement, parameters, constraint] of rows) {
+        await client.query("SAVEPOINT erasure_request_row");
+        await expect(client.query(statement, [...parameters])).rejects.toThrow(
+          new RegExp(constraint),
+        );
+        await client.query("ROLLBACK TO SAVEPOINT erasure_request_row");
+      }
+    });
+  });
+
+  it("refuses a second routine over one subject request, and one naming another tenant's", async () => {
+    // One erasure per subject request: the replay re-runs the routine and finds the same
+    // pseudonym on the same row, which is what makes it idempotent. A second row would be a
+    // second pseudonym for one person, and a history rewritten twice to two opaque ids.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const mine = await seed.erasureRequest({ workspaceId: WS_A });
+      const theirs = await seed.subjectRequest({ workspaceId: WS_B, kind: "erasure" });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const insert = `INSERT INTO erasure_request (workspace_id, id, subject_request_id, pseudonym,
+                                                   locked_at, anchored_at, beyond_use_hourly_at,
+                                                   beyond_use_daily_at, beyond_use_weekly_at,
+                                                   beyond_use_monthly_at)
+                      VALUES ($1, $2, $3, $4, now(), now(), now() + interval '2 days',
+                              now() + interval '30 days', now() + interval '8 weeks',
+                              now() + interval '6 months')`;
+
+      await client.query("SAVEPOINT second_routine");
+      await expect(
+        client.query(insert, [WS_A, ulid(), mine.subjectRequestId, ulid()]),
+      ).rejects.toThrow(/erasure_request_subject_request_uidx/);
+      await client.query("ROLLBACK TO SAVEPOINT second_routine");
+
+      // And the key names the workspace beside the request id, as every cross-table key in
+      // this package does: a foreign-key check runs outside row-level security.
+      await expect(client.query(insert, [WS_A, ulid(), theirs.id, ulid()])).rejects.toThrow(
+        /erasure_request_subject_request_fk/,
+      );
+    });
+  });
+});
+
+/**
  * The queue (ADR 0005's control plane of rows; ADR 0031's queue agreement). The claim
  * protocol's own behaviour — the order, the lapsed lease, the poison — is the fixture's, in
  * `contracts/queue/cases.json`, and both tiers' conformance suites read it. What is proved

@@ -31,6 +31,7 @@ import {
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import {
+  erasureRequest,
   SUBJECT_IDENTIFIER_KINDS,
   SUBJECT_IDENTIFIER_MAX,
   SUBJECT_IDENTIFIERS_MAX,
@@ -721,6 +722,42 @@ export const subjectRequestSelect = createSelectSchema(subjectRequest, subjectRe
 export const subjectRequestInsert = createInsertSchema(subjectRequest, subjectRequestRefinements);
 export const subjectRequestUpdate = createUpdateSchema(subjectRequest, subjectRequestRefinements);
 
+/**
+ * What an **erasure request's actions** may hold: one flat object per store family — what
+ * was done there and how it went. The narrowing is `outcome`'s and so is the reason: this is
+ * a record of what the routine did about a person, and a shape with nowhere nested to hide
+ * would have to be rewritten by the next erasure if a name could reach it. The family names
+ * are the erasure map's, held to being strings and nothing more, because the typed union
+ * that lists them is the slice's and a second copy here would be a second place to change.
+ *
+ * JSON `null` stays accepted for the reason `detail`'s does; the table's own CHECK is what
+ * refuses it, since a routine's record written as `null` is no record at all.
+ */
+const erasureAction = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const erasureActions = z.union([
+  z.record(z.string(), z.record(z.string(), erasureAction)),
+  z.null(),
+]);
+
+/**
+ * An **erasure request** (ADR 0020, ADR 0035): the id and the subject request it answers are
+ * the minter's shape, and so is the *erasure pseudonym* — the one value a rewritten history
+ * is joined on, which a hand-composed id would make un-undoable. The report is held to being
+ * non-empty and nothing more: it is a document in fixed words, not a field.
+ */
+const erasureRequestRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  subjectRequestId: (schema: z.ZodString) => schema.regex(ULID),
+  pseudonym: (schema: z.ZodString) => schema.regex(ULID),
+  actions: (schema: z.ZodType) => schema.pipe(erasureActions),
+  report: (schema: z.ZodString) => schema.trim().min(1),
+};
+
+export const erasureRequestSelect = createSelectSchema(erasureRequest, erasureRequestRefinements);
+export const erasureRequestInsert = createInsertSchema(erasureRequest, erasureRequestRefinements);
+export const erasureRequestUpdate = createUpdateSchema(erasureRequest, erasureRequestRefinements);
+
 /** A composition (ADR 0004, ADR 0015): a readable unit, its id the minter's shape. */
 const compositionRefinements = {
   workspaceId,
@@ -1121,6 +1158,12 @@ export const boundarySchemas = {
     select: subjectRequestSelect,
     insert: subjectRequestInsert,
     update: subjectRequestUpdate,
+  },
+  erasureRequest: {
+    table: erasureRequest,
+    select: erasureRequestSelect,
+    insert: erasureRequestInsert,
+    update: erasureRequestUpdate,
   },
   composition: {
     table: composition,

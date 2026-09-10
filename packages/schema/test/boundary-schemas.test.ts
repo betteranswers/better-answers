@@ -54,9 +54,21 @@ const FINDING_ID = "01J6XXXXXXXXXXXXXXXXXXXXXX";
 // the company's files name who never signed in.
 const SUBJECT_REQUEST_ID = "01J6YYYYYYYYYYYYYYYYYYYYYY";
 const STRANGER_REQUEST_ID = "01J6YYYYYYYYYYYYYYYYYYYYY2";
+// A third: the member's erasure request, which the running routine below belongs to.
+const MEMBER_ERASURE_ID = "01J6YYYYYYYYYYYYYYYYYYYYY3";
 // The month the clock runs, and the two further months an Article 12 extension may add.
 const DUE = new Date("2026-10-01T00:00:00Z");
 const EXTENDED = new Date("2026-12-01T00:00:00Z");
+// The two routines below, and the opaque id the first of them rewrote a history to.
+const ERASURE_REQUEST_ID = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
+const ERASURE_PSEUDONYM = "01J6ZZZZZZZZZZZZZZZZZZZZZ2";
+// The four tiers' beyond-use dates, out from the anchor: 48 hours, 30 days, 8 weeks, 6 months.
+const BEYOND_USE = {
+  hourly: new Date("2026-09-03T00:00:00Z"),
+  daily: new Date("2026-10-01T00:00:00Z"),
+  weekly: new Date("2026-10-27T00:00:00Z"),
+  monthly: new Date("2027-03-01T00:00:00Z"),
+};
 
 /** Rows each refined insert schema accepts — assertion 4's input. */
 const acceptedRows = {
@@ -327,6 +339,51 @@ const acceptedRows = {
       extendedTo: EXTENDED,
       answeredAt: new Date("2026-09-20T00:00:00Z"),
       answer: "The platform holds this person in the concept files and the git history.",
+    },
+    {
+      workspaceId: WS_ID,
+      id: MEMBER_ERASURE_ID,
+      kind: "erasure",
+      personId: USER_ID,
+      identifiers: { emails: ["person@example.invalid"], names: [], other: [] },
+      receivedAt: NOW,
+      clockStartedAt: NOW,
+      dueAt: DUE,
+    },
+  ],
+  // Two routines: one still running — the lock taken, the dates computed, no store touched
+  // and no report — and one that finished, with what each store family did and the words the
+  // report was written in.
+  erasureRequest: [
+    {
+      workspaceId: WS_ID,
+      id: ERASURE_REQUEST_ID,
+      subjectRequestId: MEMBER_ERASURE_ID,
+      pseudonym: ERASURE_PSEUDONYM,
+      lockedAt: NOW,
+      anchoredAt: NOW,
+      beyondUseHourlyAt: BEYOND_USE.hourly,
+      beyondUseDailyAt: BEYOND_USE.daily,
+      beyondUseWeeklyAt: BEYOND_USE.weekly,
+      beyondUseMonthlyAt: BEYOND_USE.monthly,
+    },
+    {
+      workspaceId: WS_ID,
+      id: "01J6ZZZZZZZZZZZZZZZZZZZZZ3",
+      subjectRequestId: STRANGER_REQUEST_ID,
+      pseudonym: "01J6ZZZZZZZZZZZZZZZZZZZZZ4",
+      lockedAt: NOW,
+      anchoredAt: NOW,
+      actions: {
+        git: { rewritten: true, commits: 12 },
+        "identity-set": { pseudonymised: false, reason: "no user row" },
+      },
+      beyondUseHourlyAt: BEYOND_USE.hourly,
+      beyondUseDailyAt: BEYOND_USE.daily,
+      beyondUseWeeklyAt: BEYOND_USE.weekly,
+      beyondUseMonthlyAt: BEYOND_USE.monthly,
+      completedAt: new Date("2026-09-02T00:00:00Z"),
+      report: "Backup copies taken before 2026-09-01 are beyond use.",
     },
   ],
   // The citation: the concept above, the evidence row above by its own key.
@@ -696,8 +753,10 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "sourceDocument",
         "finding",
         // The subject request names a person id where the subject has one, so it needs the
-        // identity row above and nothing else.
+        // identity row above and nothing else; the erasure request keys to the subject
+        // request by the pair, so it comes after.
         "subjectRequest",
+        "erasureRequest",
         "conceptEvidence",
         "conceptClassOverride",
         "composition",
@@ -876,6 +935,19 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       // not the JSON value, so the generated column schema takes it and assertion 3 holds
       // the refinement to that. It is refused one layer down, by the table's own CHECK, and
       // `rls.test.ts` is where that refusal is written.
+    ],
+    // The erasure request's refusals: a pseudonym that is not the minter's shape — the one
+    // thing a rewritten history is joined on, so a hand-composed one would be a rewrite
+    // nobody could undo — an empty report, and a store's actions nested deeper than the flat
+    // object per family, which is the shape that keeps a person's name out of the record of
+    // what was done about them.
+    erasureRequest: [
+      { ...acceptedRows.erasureRequest[0], pseudonym: `erasure-${USER_ID}` },
+      { ...acceptedRows.erasureRequest[1], report: "   " },
+      {
+        ...acceptedRows.erasureRequest[1],
+        actions: { git: { rewritten: { commits: ["abc123"] } } },
+      },
     ],
     // The payload's refusals: the bundle's manifest, which is not a concept file — and the
     // two columns a producer fills at a size of its own choosing, each held to its bound,

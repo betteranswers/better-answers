@@ -7,9 +7,9 @@ knowledge of what the app's journal built, stamped with the migration id it was
 generated from and with that migration's journal instant, which is what the
 migrator writes into `drizzle.__drizzle_migrations.created_at`."""
 
-MIGRATION_ID = "0026_the-subject-request-substrate"
+MIGRATION_ID = "0028_the-erasure-request-substrate"
 
-MIGRATION_WHEN = 1789083598555
+MIGRATION_WHEN = 1789083936500
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -145,6 +145,21 @@ TABLES: dict[str, dict[str, str]] = {
         "frontmatter": "jsonb NOT NULL",
         "body": "text NOT NULL",
         "base_content_hash": "text",
+    },
+    "public.erasure_request": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "subject_request_id": "text NOT NULL",
+        "pseudonym": "text NOT NULL",
+        "locked_at": "timestamp with time zone NOT NULL",
+        "actions": "jsonb NOT NULL",
+        "anchored_at": "timestamp with time zone NOT NULL",
+        "beyond_use_hourly_at": "timestamp with time zone NOT NULL",
+        "beyond_use_daily_at": "timestamp with time zone NOT NULL",
+        "beyond_use_weekly_at": "timestamp with time zone NOT NULL",
+        "beyond_use_monthly_at": "timestamp with time zone NOT NULL",
+        "completed_at": "timestamp with time zone",
+        "report": "text",
     },
     "public.evidence": {
         "workspace_id": "text NOT NULL",

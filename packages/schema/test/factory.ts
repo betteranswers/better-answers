@@ -168,6 +168,15 @@ export type TestData = {
     overrides?: Partial<InsertInput<"subjectRequest">>,
   ): Promise<Row<"subjectRequest">>;
   /**
+   * An erasure request; creates the subject request it answers — of kind *erasure* — unless
+   * one is named. A routine that has taken the lock and computed its four dates and touched
+   * no store yet: unfinished, because a suite about the replay names `completedAt` and its
+   * `report`.
+   */
+  erasureRequest(
+    overrides?: Partial<InsertInput<"erasureRequest">>,
+  ): Promise<Row<"erasureRequest">>;
+  /**
    * A concept's citation of one piece of evidence; creates its own workspace and identity
    * unless the IRI is named, and the evidence row the key names unless both halves of that
    * key are given — a citation of evidence nobody recorded is what the key refuses.
@@ -736,6 +745,34 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const erasureRequest: TestData["erasureRequest"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const subjectRequestId =
+      overrides.subjectRequestId ?? (await subjectRequest({ workspaceId, kind: "erasure" })).id;
+    const anchoredAt = overrides.anchoredAt ?? new Date();
+    // The four tiers the operations document names, out from the anchor in order.
+    const outFrom = (milliseconds: number) => new Date(anchoredAt.getTime() + milliseconds);
+    const hour = 60 * 60 * 1000;
+    return insertRow(client, "erasureRequest", {
+      id: ulid(),
+      pseudonym: ulid(),
+      lockedAt: anchoredAt,
+      beyondUseHourlyAt: outFrom(48 * hour),
+      beyondUseDailyAt: outFrom(30 * 24 * hour),
+      beyondUseWeeklyAt: outFrom(8 * 7 * 24 * hour),
+      beyondUseMonthlyAt: outFrom(183 * 24 * hour),
+      // No store touched yet, and the two columns the last step writes stated as null rather
+      // than left off, so the seeded row is the whole shape a replay would open.
+      actions: {},
+      completedAt: null,
+      report: null,
+      ...overrides,
+      workspaceId,
+      subjectRequestId,
+      anchoredAt,
+    });
+  };
+
   const conceptEvidence: TestData["conceptEvidence"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
@@ -826,6 +863,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     sourceDocument,
     finding,
     subjectRequest,
+    erasureRequest,
     conceptEvidence,
     conceptClassOverride,
     composition,

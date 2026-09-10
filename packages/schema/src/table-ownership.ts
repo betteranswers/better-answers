@@ -149,6 +149,10 @@ export const TABLE_OWNERS = {
   // (ADR 0029 rule 4) and is the only writer — the request is recorded by an act, the map is
   // computed from the set, and the routine writes the answer back on the same row.
   "public.subject_request": "erasure",
+  // What the routine did in every store for one of those requests (ADR 0020, amended
+  // 2026-09-05): the same slice's, written by the routine under the platform principal and
+  // read by the replay a restore runs before the app serves anything.
+  "public.erasure_request": "erasure",
   // Which evidence a concept cites, and a recorded Admin override of its derived class:
   // both written in the concepts slice's own transactions, the first by the governed write
   // and the second by the override act.

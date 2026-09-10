@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, jsonb, primaryKey, text } from "drizzle-orm/pg-core";
+import { check, foreignKey, jsonb, primaryKey, text, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { listed, stamp } from "./column-helpers.ts";
 import { user } from "./identity-tables.ts";
@@ -148,5 +148,98 @@ export const subjectRequest = withRLS(
     // answer the screen cannot date, and an instant with no words a request closed on
     // nothing.
     check("subject_request_answer_check", sql.raw("(answered_at IS NULL) = (answer IS NULL)")),
+  ],
+);
+
+/**
+ * An **erasure request** (`CONTEXT.md`; ADR 0020, amended 2026-09-05): what the routine did
+ * in every store for one subject request of kind *erasure* — what was done, when, and when
+ * the backups are beyond use.
+ *
+ * **Keyed to its subject request**, by the pair, and to exactly one: the replay re-runs the
+ * routine over the same request and must find the same *erasure pseudonym* on the same row,
+ * which is the whole of what makes the routine idempotent. Two rows would be two pseudonyms
+ * for one person and a history rewritten twice to two opaque ids. The person id is not
+ * copied here — it sits on the subject request the key names, so the pseudonym stands beside
+ * it without a second column to keep in step.
+ *
+ * **The pseudonym** is the minter's own shape and never the person id (ADR 0035's rejected
+ * fourth option): `human:<email>` becomes `human:<pseudonym>` across this workspace's files,
+ * history and author lines, and because the id is per workspace two workspaces' rewritten
+ * histories cannot be joined on one person. Unique within the workspace, so no two erasures
+ * here ever rewrite to the same id.
+ *
+ * **The anchor and the four dates.** `anchored_at` is the instant the report's beyond-use
+ * paragraph counts from — today the instant the routine took `pg_advisory_lock(41)`, since
+ * the last dump precedes it and dates from it are therefore upper bounds on every copy's
+ * expiry; when O1 lands `backup_run` it becomes the last dump's stamp, and the report says in
+ * its own words which it used. The four are the four backup tiers the operations document
+ * names — 48 hours, 30 days, 8 weeks, six months — and they are columns rather than
+ * arithmetic over the anchor because the report has already promised them to a person.
+ */
+export const erasureRequest = withRLS(
+  "erasure_request",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    id: text("id").notNull(),
+    subjectRequestId: text("subject_request_id").notNull(),
+    /** The opaque id this workspace's `human:<email>` became. Never the person id. */
+    pseudonym: text("pseudonym").notNull(),
+    /** When `pg_advisory_lock(41)` was taken, so no dump was taken while the routine ran. */
+    lockedAt: stamp("locked_at").notNull(),
+    /**
+     * What each store family did and how it went — one flat object per family. The family
+     * names are the erasure map's, which is a typed union in the slice: a second copy of the
+     * list here would be a second place to change when a store is added.
+     */
+    actions: jsonb("actions").notNull().default({}),
+    anchoredAt: stamp("anchored_at").notNull(),
+    beyondUseHourlyAt: stamp("beyond_use_hourly_at").notNull(),
+    beyondUseDailyAt: stamp("beyond_use_daily_at").notNull(),
+    beyondUseWeeklyAt: stamp("beyond_use_weekly_at").notNull(),
+    beyondUseMonthlyAt: stamp("beyond_use_monthly_at").notNull(),
+    /** The two columns the routine's last step writes, both null while it runs. */
+    completedAt: stamp("completed_at"),
+    report: text("report"),
+  },
+  "workspaceId",
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.id] }),
+    // Keyed by the pair, as every cross-table key in this package is: a foreign-key check
+    // runs outside row-level security, so a key on the request id alone would confirm that
+    // some other tenant holds a given subject request.
+    foreignKey({
+      columns: [table.workspaceId, table.subjectRequestId],
+      foreignColumns: [subjectRequest.workspaceId, subjectRequest.id],
+      name: "erasure_request_subject_request_fk",
+    }).onDelete("cascade"),
+    // One routine per request, which is what the replay relies on.
+    uniqueIndex("erasure_request_subject_request_uidx").on(
+      table.workspaceId,
+      table.subjectRequestId,
+    ),
+    // One pseudonym per workspace: the id a history was rewritten to, never reused.
+    uniqueIndex("erasure_request_pseudonym_uidx").on(table.workspaceId, table.pseudonym),
+    // The record of what was done is an object per store family. A `null` or a string would
+    // be a routine whose report could not be written from its own row.
+    check("erasure_request_actions_check", sql.raw("jsonb_typeof(actions) = 'object'")),
+    // The four dates run out from the anchor in order, because that is what the report
+    // promises about each backup tier: the hourly copies go first and every copy is gone by
+    // the sixth month. A date inside the tier before it would be a promise the object-store
+    // lifecycle rule cannot keep, and the report is the document a regulator reads.
+    check(
+      "erasure_request_beyond_use_check",
+      sql.raw(
+        `beyond_use_hourly_at > anchored_at
+         AND beyond_use_daily_at > beyond_use_hourly_at
+         AND beyond_use_weekly_at > beyond_use_daily_at
+         AND beyond_use_monthly_at > beyond_use_weekly_at`,
+      ),
+    ),
+    // A completion is the stamp and the report together: a stamp alone is a routine that
+    // finished without saying what it did, and a report alone one that never finished.
+    check("erasure_request_completion_check", sql.raw("(completed_at IS NULL) = (report IS NULL)")),
   ],
 );
