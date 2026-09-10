@@ -1,0 +1,53 @@
+packages/schema/test/boundary-schemas.test.ts
+  s_f3ee63bcbb1a0b::t_ac299a233052ab 343-387
+  s_f3ee63bcbb1a0b::t_036ffa93d95b3c 756-757,759
+  s_f3ee63bcbb1a0b::t_ec643dc6e464ea 57-58,62-71
+  s_f3ee63bcbb1a0b::t_fe45a5408f4ab5 939-951
+packages/schema/migrations/meta/0028_snapshot.json
+  s_f3ee63bcbb1a0b::t_063b808c828b01 1-5006
+packages/schema/migrations/0028_the-erasure-request-substrate.sql
+  s_f3ee63bcbb1a0b::t_69c522196633f1 1-23
+packages/schema/test/factory.ts
+  s_f3ee63bcbb1a0b::t_cdeb1b4cacbeec 866
+  s_f3ee63bcbb1a0b::t_3507e73bf3b16a 764-766
+  s_f3ee63bcbb1a0b::t_d45a1d288e0700 748-763,767-775
+  s_f3ee63bcbb1a0b::t_53695df57d26af 171-178
+packages/schema/src/erasure-tables.ts
+  s_f3ee63bcbb1a0b::t_d42d1e6987063a 153-220,222-242,244-245
+  s_f3ee63bcbb1a0b::t_98ba5a0c755080 2
+packages/schema/src/table-ownership.ts
+  s_f3ee63bcbb1a0b::t_cb6be921b37f07 152-155
+apps/worker/src/better_answers_worker/schema_view.py
+  s_f3ee63bcbb1a0b::t_5c1237c66a2609 10,12,149-162
+packages/schema/migrations/0027_the-erasure-request.sql
+  s_f3ee63bcbb1a0b::t_633ccbc0b85258 1-29
+packages/schema/src/boundary-schemas.ts
+  s_f3ee63bcbb1a0b::t_02f04f3f8e4e02 725-760
+  s_f3ee63bcbb1a0b::t_efb9e658f30408 1162-1167
+  s_f3ee63bcbb1a0b::t_0ee032d2b1ac27 34
+packages/schema/test/rls.test.ts
+  s_f3ee63bcbb1a0b::t_6b3fb30c5ce68c 2617-2674,2685-2772
+  s_f3ee63bcbb1a0b::t_f90c9c77bc13ff 2675-2684
+packages/schema/migrations/meta/_journal.json
+  s_f3ee63bcbb1a0b::t_063b808c828b01 200-206
+  s_f3ee63bcbb1a0b::t_633ccbc0b85258 193-199
+packages/schema/migrations/meta/0027_snapshot.json
+  s_f3ee63bcbb1a0b::t_633ccbc0b85258 1-324,326-5006
+  s_f3ee63bcbb1a0b::t_063b808c828b01 325
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "be75c55e430585b29ef2dcdecb7d01c6861a2e70",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
