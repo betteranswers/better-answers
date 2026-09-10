@@ -1,0 +1,21 @@
+packages/schema/migrations/meta/_journal.json
+  s_f3ee63bcbb1a0b::t_5a298bcab0464b 176
+packages/schema/migrations/meta/0024_snapshot.json
+  s_f3ee63bcbb1a0b::t_5a298bcab0464b 1-4664
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "81bd35aeaff4b4a995c76a3e9b4725b2ff0bcb6c",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
