@@ -1,0 +1,110 @@
+{
+  "concepts": 3000,
+  "citing": 300,
+  "entries": 40,
+  "machine": "darwin arm64 node v24.19.0",
+  "at": "2026-09-10T08:45:36.999Z",
+  "seed": {
+    "totalMs": 2829330,
+    "p50WriteMsByCount": [
+      {
+        "at": 250,
+        "ms": 893.6
+      },
+      {
+        "at": 500,
+        "ms": 893.3
+      },
+      {
+        "at": 750,
+        "ms": 910.2
+      },
+      {
+        "at": 1000,
+        "ms": 962.3
+      },
+      {
+        "at": 1250,
+        "ms": 938.6
+      },
+      {
+        "at": 1500,
+        "ms": 916.5
+      },
+      {
+        "at": 1750,
+        "ms": 942.9
+      },
+      {
+        "at": 2000,
+        "ms": 940.7
+      },
+      {
+        "at": 2250,
+        "ms": 934.5
+      },
+      {
+        "at": 2500,
+        "ms": 941.9
+      },
+      {
+        "at": 2750,
+        "ms": 936.6
+      },
+      {
+        "at": 3000,
+        "ms": 959.6
+      }
+    ]
+  },
+  "creation": {
+    "atN": 3000,
+    "wholeWriteMs": 963,
+    "backfillScanMs": [
+      42,
+      32.2,
+      32.5,
+      30.9,
+      30.6
+    ],
+    "conceptIndexRows": 3001,
+    "conceptIndexSize": "3784 kB"
+  },
+  "walk": {
+    "entries": 40,
+    "fortyWalksOneTx": {
+      "p50Ms": 423.2,
+      "maxMs": 475,
+      "rows": [
+        40000,
+        40000,
+        40000,
+        40000,
+        40000,
+        40000
+      ]
+    },
+    "oneSetWalk": {
+      "p50Ms": 14.6,
+      "maxMs": 15,
+      "rows": [
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000
+      ]
+    },
+    "oneWalkP50Ms": 47.6
+  },
+  "narrowing": {
+    "conceptsCitingTheBinding": 300,
+    "conceptsMoved": 300,
+    "compositionsMoved": 0,
+    "firstMs": 995,
+    "secondMs": 3,
+    "secondOutcome": "malformed",
+    "msPerConcept": 3.32
+  }
+}

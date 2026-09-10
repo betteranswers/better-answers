@@ -1,0 +1,10 @@
+
+ RUN  v4.1.11 /Users/liamj/Documents/development/better-answers/packages/core
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  09:45:34
+   Duration  2838.99s (transform 189ms, setup 0ms, import 678ms, tests 2836.23s, environment 0ms)
+
+exit 0

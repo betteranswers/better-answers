@@ -137,4 +137,46 @@ environment only; an `Environment` built by hand takes a `context_provider` inst
 
 ## Probe 3 — a 3,000-concept map through seam 1
 
-_(pending: the seed is running; the numbers land here when it finishes.)_
+**Verdict: two of the three claims are smaller than the review feared, one is as feared.**
+3,000 concepts landed through `writeConcept` (each ~1.5 KB of prose, six links to the six
+before it, the first 300 citing one document of one binding), then three things timed
+through the core interface with a Viewer and an Admin principal. Raw numbers in
+`results/probe-3.json`; the whole seed took 2,829 s.
+
+**(1) The creation (write-path F3).** The p50 governed write is **flat from 250 to 3,000
+concepts — 894 ms at 250, 960 ms at 3,000** — and the regex backfill scan the review called
+"dominant at three thousand" costs **31–42 ms at 3,000 rows** (`concept_index` at 3.8 MB):
+about 3 % of a write. It is linear in the corpus, so the unresolved-reference row (owner D2)
+stays right for S7 and beyond, but it is not S3's dominant cost and need not gate S3's build.
+What *is* the cost is the write itself: ~0.9 s per governed write on this machine, not
+growing with N — the git commit and the rows. S3's typing, S7's minting and C1's import of
+232 concepts price from that figure (C1: about four minutes), and it belongs in S3's spec as
+the number to keep or to beat.
+
+**(2) The forty-entry walk (write-path F1; owner D1).**
+
+| walk | p50 | rows returned |
+| --- | --- | --- |
+| one `walkFrom` (today) | 48 ms | 1,000 (the cap) |
+| forty `walkFrom` in one transaction (what `ask` would do today) | **423 ms** | 40,000 |
+| one set-seeded walk, `n.uid = ANY($2::text[])`, one shared cap | **15 ms** | 1,000 |
+
+The set walk is 29× cheaper than forty walks and 3× cheaper than one, because forty seeds fill
+the 1,000-row cap within a hop or two. That is the shape D1 chose and its consequence
+measured: **one shared cap across forty entries is ~25 rows per entry**, so the walk barely
+leaves its seeds, and the *cut recorded* line (F2 — the reached set and the depth the cap fell
+at, on the answer audit) is what makes the answer honest rather than the cap what makes it
+wide. S2's spec should set the cap's figure knowing this, or size it by the entry count.
+
+**(3) The narrowing (write-path F6; S1's measured cascade ceiling).** `narrowBinding` over a
+binding whose one document 300 concepts cite: **995 ms, 300 concepts moved, 3.3 ms per
+concept**, inside the per-workspace advisory lock. Linear: a binding backing 3,000 citing
+concepts holds the lock about ten seconds. That is the number S4's "before bindings are
+large" is measured against, and O1's signal line has its threshold. (A second narrowing in
+the probe returned `malformed` — an empty `audienceGroups` with `audience: "groups"` — the
+probe's input, not a finding.)
+
+**For the specs.** S1: the cascade ceiling is 3.3 ms per citing concept, measured. S2: the
+set-seeded walk with one shared cap is cheap and its reach is shallow — record the cut. S3:
+the backfill scan is 3 % of a write at the first client's size; the write's own ~0.9 s is
+the figure that matters.
