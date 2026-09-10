@@ -144,6 +144,11 @@ export const TABLE_OWNERS = {
   // always-set span — are the slice's own, and the counts a publish dialog reads come off
   // them. The worker inserts them and owns nothing here; the entry below records that.
   "public.finding": "sources",
+  // A person's access or erasure request, with the identifier set it is about and the clock
+  // it runs on (ADR 0020): the erasure slice's, which sits at the top of the slice graph
+  // (ADR 0029 rule 4) and is the only writer — the request is recorded by an act, the map is
+  // computed from the set, and the routine writes the answer back on the same row.
+  "public.subject_request": "erasure",
   // Which evidence a concept cites, and a recorded Admin override of its derived class:
   // both written in the concepts slice's own transactions, the first by the governed write
   // and the second by the override act.

@@ -158,6 +158,16 @@ export type TestData = {
    */
   finding(overrides?: Partial<InsertInput<"finding">>): Promise<Row<"finding">>;
   /**
+   * A subject request; creates the person it is about unless one is named, and their
+   * membership with them, because a request is recorded in the workspace the person belongs
+   * to. An access request received today, its clock started at receipt and unanswered — the
+   * row an Admin has just written; a suite about the person who never signed in names
+   * `personId: null` and its own `identifiers`.
+   */
+  subjectRequest(
+    overrides?: Partial<InsertInput<"subjectRequest">>,
+  ): Promise<Row<"subjectRequest">>;
+  /**
    * A concept's citation of one piece of evidence; creates its own workspace and identity
    * unless the IRI is named, and the evidence row the key names unless both halves of that
    * key are given — a citation of evidence nobody recorded is what the key refuses.
@@ -696,6 +706,36 @@ export const testData = (client: pg.PoolClient): TestData => {
     });
   };
 
+  const subjectRequest: TestData["subjectRequest"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    // `null` is a whole answer here and not an absence — the person who never signed in —
+    // so the person is only minted when the caller said nothing at all.
+    const personId = overrides.personId === undefined ? (await user()).id : overrides.personId;
+    const receivedAt = overrides.receivedAt ?? new Date();
+    const clockStartedAt = overrides.clockStartedAt ?? receivedAt;
+    const dueAt = new Date(clockStartedAt);
+    dueAt.setUTCMonth(dueAt.getUTCMonth() + 1);
+    return insertRow(client, "subjectRequest", {
+      id: ulid(),
+      kind: "access",
+      // An identifier set that names somebody, so a suite naming `personId: null` still gets
+      // a request the subject CHECK admits.
+      identifiers: { emails: ["subject@example.invalid"], names: [], other: [] },
+      dueAt,
+      // Unextended and unanswered, which is what an Admin has just written: the three columns
+      // the extension and the answer fill are stated as null rather than left off, as the
+      // finding's six are, so the seeded row is the whole shape a screen would open.
+      extendedTo: null,
+      answeredAt: null,
+      answer: null,
+      ...overrides,
+      workspaceId,
+      personId,
+      receivedAt,
+      clockStartedAt,
+    });
+  };
+
   const conceptEvidence: TestData["conceptEvidence"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const iri = overrides.iri ?? (await conceptIdentity({ workspaceId })).iri;
@@ -785,6 +825,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     sourceBinding,
     sourceDocument,
     finding,
+    subjectRequest,
     conceptEvidence,
     conceptClassOverride,
     composition,

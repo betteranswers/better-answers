@@ -11,6 +11,8 @@ import {
   conceptFrontmatter,
   EMBEDDING_DIMENSIONS,
   FINDING_REASON_MAX,
+  SUBJECT_IDENTIFIER_MAX,
+  SUBJECT_IDENTIFIERS_MAX,
   SUGGESTION_BODY_MAX,
   SUGGESTION_REASON_MAX,
 } from "../src/index.ts";
@@ -48,6 +50,13 @@ const DOCUMENT_ID = "01J6NNNNNNNNNNNNNNNNNNNNNN";
 const COMPOSITION_ID = "01J6WWWWWWWWWWWWWWWWWWWWWW";
 // A span the seam withheld in the document above.
 const FINDING_ID = "01J6XXXXXXXXXXXXXXXXXXXXXX";
+// The two subject requests below: the member's, and the one recorded on behalf of a person
+// the company's files name who never signed in.
+const SUBJECT_REQUEST_ID = "01J6YYYYYYYYYYYYYYYYYYYYYY";
+const STRANGER_REQUEST_ID = "01J6YYYYYYYYYYYYYYYYYYYYY2";
+// The month the clock runs, and the two further months an Article 12 extension may add.
+const DUE = new Date("2026-10-01T00:00:00Z");
+const EXTENDED = new Date("2026-12-01T00:00:00Z");
 
 /** Rows each refined insert schema accepts — assertion 4's input. */
 const acceptedRows = {
@@ -285,6 +294,39 @@ const acceptedRows = {
       restoredAt: NOW,
       restoredBy: `human:${USER_ID}`,
       restoreReason: "the officer block is on the company's own filing",
+    },
+  ],
+  // Two subject requests: a member's access request, answered inside the month, and an
+  // erasure request recorded on behalf of a person the company's files name who never signed
+  // in — no person id, the identifier set alone, the clock started when the Admin confirmed
+  // identity rather than at receipt, and the month extended by two.
+  subjectRequest: [
+    {
+      workspaceId: WS_ID,
+      id: SUBJECT_REQUEST_ID,
+      kind: "access",
+      personId: USER_ID,
+      identifiers: { emails: ["person@example.invalid"], names: ["A person"], other: [] },
+      receivedAt: NOW,
+      clockStartedAt: NOW,
+      dueAt: DUE,
+    },
+    {
+      workspaceId: WS_ID,
+      id: STRANGER_REQUEST_ID,
+      kind: "erasure",
+      personId: null,
+      identifiers: {
+        emails: ["priya@client.invalid"],
+        names: ["Priya Nair"],
+        other: ["07700 900123"],
+      },
+      receivedAt: NOW,
+      clockStartedAt: new Date("2026-09-08T00:00:00Z"),
+      dueAt: DUE,
+      extendedTo: EXTENDED,
+      answeredAt: new Date("2026-09-20T00:00:00Z"),
+      answer: "The platform holds this person in the concept files and the git history.",
     },
   ],
   // The citation: the concept above, the evidence row above by its own key.
@@ -653,6 +695,9 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "sourceBinding",
         "sourceDocument",
         "finding",
+        // The subject request names a person id where the subject has one, so it needs the
+        // identity row above and nothing else.
+        "subjectRequest",
         "conceptEvidence",
         "conceptClassOverride",
         "composition",
@@ -781,6 +826,57 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.finding[1], reviewReason: "x".repeat(FINDING_REASON_MAX + 1) },
       { ...acceptedRows.finding[2], restoreReason: "x".repeat(FINDING_REASON_MAX + 1) },
     ],
+    // The subject request's refusals. A third kind — the pair is closed, so the day the
+    // platform answers a portability request it adds the word to `SUBJECT_REQUEST_KINDS` and
+    // nowhere else — a person named by address rather than by the one person id (ADR 0035),
+    // and an answer that is only whitespace.
+    //
+    // Then the identifier set, every way its bounded shape can be broken: a fourth kind of
+    // identifier, one of the three missing, a kind that is a string rather than a list of
+    // them, an entry that is an object, an entry that is only whitespace, an entry longer
+    // than the bound, more entries than the bound, and the set absent altogether. The bound
+    // matters because this is the one column of the erasure slice a person's own words fill
+    // — an Admin types what the subject gave — and the set is copied into the replay copy,
+    // every suppression and every finder's argument, so an unbounded one is storage chosen
+    // by whoever asks.
+    subjectRequest: [
+      { ...acceptedRows.subjectRequest[0], kind: "portability" },
+      { ...acceptedRows.subjectRequest[0], personId: "priya@example.invalid" },
+      { ...acceptedRows.subjectRequest[1], answer: "   " },
+      {
+        ...acceptedRows.subjectRequest[0],
+        identifiers: { emails: [], names: [], other: [], phones: ["07700 900123"] },
+      },
+      { ...acceptedRows.subjectRequest[0], identifiers: { emails: [], names: [] } },
+      {
+        ...acceptedRows.subjectRequest[0],
+        identifiers: { emails: "person@example.invalid", names: [], other: [] },
+      },
+      {
+        ...acceptedRows.subjectRequest[0],
+        identifiers: { emails: [{ address: "person@example.invalid" }], names: [], other: [] },
+      },
+      { ...acceptedRows.subjectRequest[0], identifiers: { emails: ["   "], names: [], other: [] } },
+      {
+        ...acceptedRows.subjectRequest[0],
+        identifiers: { emails: ["x".repeat(SUBJECT_IDENTIFIER_MAX + 1)], names: [], other: [] },
+      },
+      {
+        ...acceptedRows.subjectRequest[0],
+        identifiers: {
+          emails: Array.from(
+            { length: SUBJECT_IDENTIFIERS_MAX + 1 },
+            (_, at) => `p${at}@x.invalid`,
+          ),
+          names: [],
+          other: [],
+        },
+      },
+      // A set written as the JSON `null` is not here: `jsonb NOT NULL` refuses SQL NULL and
+      // not the JSON value, so the generated column schema takes it and assertion 3 holds
+      // the refinement to that. It is refused one layer down, by the table's own CHECK, and
+      // `rls.test.ts` is where that refusal is written.
+    ],
     // The payload's refusals: the bundle's manifest, which is not a concept file — and the
     // two columns a producer fills at a size of its own choosing, each held to its bound,
     // so a compromised one cannot fill a tenant's storage a suggestion at a time.
@@ -838,6 +934,36 @@ describe("what a finding may hold", () => {
         "restoreReason",
       ].toSorted(),
     );
+  });
+});
+
+/**
+ * Who a subject request is about (the architecture pass of 10/09/2026, candidate 2): **the
+ * subject is an identifier set, not only a person id**. A member has both; a person the
+ * company's files name who never signed in has the set alone, and the boundary has to take
+ * that row or the platform can only answer the people who happen to hold a login.
+ *
+ * Absent and null are asserted apart because they are different sentences from a caller —
+ * the act that omits the column and the act that writes the subject's absence down — and a
+ * refinement that narrowed the column to a string would take one and refuse the other.
+ */
+describe("who a subject request is about", () => {
+  const stranger = acceptedRows.subjectRequest[1];
+
+  it("takes a request whose subject never signed in, written either way", () => {
+    expect(boundarySchemas.subjectRequest.insert.safeParse(stranger).success).toBe(true);
+
+    const { personId: _absent, ...omitted } = { ...stranger };
+    expect(boundarySchemas.subjectRequest.insert.safeParse(omitted).success).toBe(true);
+  });
+
+  it("keeps the identifier set's three kinds, so every finder reads its own arm", () => {
+    const parsed = boundarySchemas.subjectRequest.insert.parse(stranger);
+    expect(parsed.identifiers).toEqual({
+      emails: ["priya@client.invalid"],
+      names: ["Priya Nair"],
+      other: ["07700 900123"],
+    });
   });
 });
 

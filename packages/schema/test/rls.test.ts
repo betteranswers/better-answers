@@ -2456,6 +2456,164 @@ describe("the finding under both runtime roles", () => {
 });
 
 /**
+ * The **subject request** (`CONTEXT.md`; ADR 0020, the S0 spec's record families): a person's
+ * access or erasure request as an Admin recorded it, with the subject and the clock. A tenant
+ * table like any other, so the zero-rows proof is stated here in its words.
+ *
+ * **The worker holds nothing here**, and that is the whole of its relation to this table
+ * (`[SEC3]`). Migration 0000's default privileges would have handed it the four, as they did
+ * on `finding`, so the substrate revokes and grants none back: the identifier set is
+ * restricted personal data — the names and addresses a subject gave, in a workspace's own
+ * words — and a tier whose only job is to run a detector over a document has no road to it.
+ * A worker that could read this table would hold the platform's list of who has asked to be
+ * erased; one that could write it could start a clock nobody set or answer a request nobody
+ * answered.
+ */
+describe("the subject request under both runtime roles", () => {
+  it("returns zero rows on a missing scope and only the scoped tenant's requests otherwise", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      for (const workspaceId of [WS_A, WS_B]) await seed.subjectRequest({ workspaceId });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      expect(await countedRows(client, ["subject_request"])).toEqual([
+        { table: "subject_request", rows: 0 },
+      ]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      expect(await countedRows(client, ["subject_request"])).toEqual([
+        { table: "subject_request", rows: 1 },
+      ]);
+    });
+  });
+
+  it("refuses the worker every road to a subject request", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.subjectRequest({ workspaceId: WS_A });
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await refusesEach(client, [
+        [
+          "SELECT 1 FROM subject_request LIMIT 1",
+          "the identifier set is restricted personal data, and a worker that could read it would hold the platform's list of who has asked to be erased",
+        ],
+        [
+          `INSERT INTO subject_request (workspace_id, id, kind, identifiers, received_at,
+                                        clock_started_at, due_at)
+           VALUES ($1, $2, 'erasure', '{"emails": [], "names": [], "other": []}'::jsonb,
+                   now(), now(), now() + interval '1 month')`,
+          "recording a request is an Admin's act, so a worker that could insert one could start a clock nobody set",
+          [WS_A, ulid()],
+        ],
+        [
+          "UPDATE subject_request SET answered_at = now(), answer = 'nothing found'",
+          "and one that could stamp an answer could close a request nobody answered",
+        ],
+        [
+          "DELETE FROM subject_request",
+          "a request a tier can remove is a clock that stops without a record",
+        ],
+      ]);
+
+      // The row every one of those statements reached for, read back under the role that may
+      // read it: still there, still unanswered. The refusals above are privileges rather than
+      // policies, so this is what says the four were refused before the row and not after it.
+      await client.query("RESET ROLE");
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const standing = await client.query<{ answered_at: Date | null }>(
+        "SELECT answered_at FROM subject_request",
+      );
+      expect(standing.rows).toEqual([{ answered_at: null }]);
+    });
+  });
+
+  it("refuses a subject, a clock and an identifier set the request's own sentences do not admit", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const request = await seed.subjectRequest({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const rows: readonly [string, readonly unknown[], string][] = [
+        // A third kind: the pair is closed, as the glossary's *subject request* is.
+        [
+          "UPDATE subject_request SET kind = 'portability' WHERE id = $1",
+          [request.id],
+          "subject_request_kind_check",
+        ],
+        // A request naming nobody. The subject is a person id or the identifier set, and a
+        // row with neither is a request no finder could run and no answer could reach.
+        [
+          `UPDATE subject_request
+              SET person_id = NULL,
+                  identifiers = '{"emails": [], "names": [], "other": []}'::jsonb
+            WHERE id = $1`,
+          [request.id],
+          "subject_request_subject_check",
+        ],
+        // The set's three kinds, held by the database as well as the boundary: the finders
+        // read one arm each, and an arm that is not a list is a finder with nothing to walk.
+        // Two of the three missing is the case a `=` comparison would have taken, because
+        // `->` on an absent key is SQL NULL and a CHECK worth NULL passes.
+        [
+          `UPDATE subject_request SET identifiers = '{"emails": []}'::jsonb WHERE id = $1`,
+          [request.id],
+          "subject_request_identifiers_check",
+        ],
+        // The one way off the shape the boundary does not refuse: `jsonb NOT NULL` takes the
+        // JSON `null`, so this is the layer that refuses a set naming nobody at all.
+        [
+          `UPDATE subject_request SET identifiers = 'null'::jsonb WHERE id = $1`,
+          [request.id],
+          "subject_request_identifiers_check",
+        ],
+        // The clock, in the order the ICO's guidance sets it: the month runs from the start,
+        // which is receipt or the later instant identity was confirmed, never before receipt.
+        [
+          "UPDATE subject_request SET clock_started_at = received_at - interval '1 day' WHERE id = $1",
+          [request.id],
+          "subject_request_clock_check",
+        ],
+        [
+          "UPDATE subject_request SET due_at = clock_started_at WHERE id = $1",
+          [request.id],
+          "subject_request_clock_check",
+        ],
+        // An extension that does not extend. Article 12's two further months move the date
+        // out; a date inside the month would be the platform shortening its own deadline.
+        [
+          "UPDATE subject_request SET extended_to = due_at WHERE id = $1",
+          [request.id],
+          "subject_request_clock_check",
+        ],
+        // Half an answer, either way: an instant with no words, and words with no instant.
+        [
+          "UPDATE subject_request SET answered_at = now() WHERE id = $1",
+          [request.id],
+          "subject_request_answer_check",
+        ],
+        [
+          "UPDATE subject_request SET answer = 'nothing found' WHERE id = $1",
+          [request.id],
+          "subject_request_answer_check",
+        ],
+      ];
+      for (const [statement, parameters, constraint] of rows) {
+        await client.query("SAVEPOINT subject_request_row");
+        await expect(client.query(statement, [...parameters])).rejects.toThrow(
+          new RegExp(constraint),
+        );
+        await client.query("ROLLBACK TO SAVEPOINT subject_request_row");
+      }
+    });
+  });
+});
+
+/**
  * The queue (ADR 0005's control plane of rows; ADR 0031's queue agreement). The claim
  * protocol's own behaviour — the order, the lapsed lease, the poison — is the fixture's, in
  * `contracts/queue/cases.json`, and both tiers' conformance suites read it. What is proved

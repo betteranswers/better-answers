@@ -176,6 +176,20 @@
       "when": 1789082892528,
       "tag": "0024_the-finding-substrate",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1789083597650,
+      "tag": "0025_the-subject-request",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1789083598555,
+      "tag": "0026_the-subject-request-substrate",
+      "breakpoints": true
     }
   ]
 }

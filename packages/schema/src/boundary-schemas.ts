@@ -31,6 +31,13 @@ import {
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import {
+  SUBJECT_IDENTIFIER_KINDS,
+  SUBJECT_IDENTIFIER_MAX,
+  SUBJECT_IDENTIFIERS_MAX,
+  SUBJECT_REQUEST_KINDS,
+  subjectRequest,
+} from "./erasure-tables.ts";
+import {
   finding,
   FINDING_REASON_MAX,
   FINDING_REVIEW_STATES,
@@ -658,6 +665,62 @@ export const findingSelect = createSelectSchema(finding, findingRefinements);
 export const findingInsert = createInsertSchema(finding, findingRefinements);
 export const findingUpdate = createUpdateSchema(finding, findingRefinements);
 
+/**
+ * What a **subject request's identifier set** may hold: three lists of identifiers, one per
+ * kind, and nothing else. The shape is the narrowing, exactly as `outcome`'s is — but the
+ * reason is the other way round. An outcome is bounded so a person's details cannot get in;
+ * this column is where a person's details are the point, so it is bounded so that the words
+ * a subject gave cannot arrive as a shape no finder can walk and no bound can measure.
+ *
+ * Strict, so a fourth kind of identifier is a word added to `SUBJECT_IDENTIFIER_KINDS` and a
+ * finder written for it, never a key that arrives in somebody's `jsonb` and is silently
+ * never searched. All three kinds are required for the same reason: a finder reads its own
+ * arm without asking whether it is there. The keys are read off the constant so the closed
+ * list, the CHECK the table carries and this schema cannot drift apart.
+ *
+ * JSON `null` stays accepted for the same reason `detail`'s does — `jsonb NOT NULL` refuses
+ * SQL NULL, not the JSON value, and the parity suite holds a refinement to the column's own
+ * nullability. It is the one way off the shape this schema does not refuse, and the table's
+ * `subject_request_identifiers_check` refuses it there instead, because a request whose
+ * identifier set is the JSON null names nobody.
+ */
+const subjectIdentifier = z.string().trim().min(1).max(SUBJECT_IDENTIFIER_MAX);
+const subjectIdentifierList = z.array(subjectIdentifier).max(SUBJECT_IDENTIFIERS_MAX);
+const subjectIdentifiers = z.union([
+  // SAFETY: the entries are built by mapping `SUBJECT_IDENTIFIER_KINDS` itself, so the keys
+  // are exactly that tuple's members and each value is the one list schema above;
+  // `Object.fromEntries` is what loses that on the way out, not the code that feeds it.
+  z.strictObject(
+    Object.fromEntries(
+      SUBJECT_IDENTIFIER_KINDS.map((kind) => [kind, subjectIdentifierList]),
+    ) as Record<(typeof SUBJECT_IDENTIFIER_KINDS)[number], typeof subjectIdentifierList>,
+  ),
+  z.null(),
+]);
+
+/**
+ * A **subject request** (ADR 0020, ADR 0035): the id is the minter's shape, the kind is the
+ * closed pair, and the person id — where the subject has one — is the one person id and
+ * never an address. The identifier set is the bounded shape above.
+ *
+ * `person_id` is narrowed and stays nullable, which is the whole of candidate 2 of the
+ * architecture pass: a member is named by id, and a person the company's files name who
+ * never signed in is named by the set alone. The answer is held to being non-empty and
+ * nothing more — it is the platform's own document, not a stranger's field.
+ */
+const subjectRequestRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  kind: (schema: z.ZodString) => schema.pipe(z.enum(SUBJECT_REQUEST_KINDS)),
+  personId: (schema: z.ZodString) => schema.regex(ULID),
+  identifiers: (schema: z.ZodType) => schema.pipe(subjectIdentifiers),
+  answer: (schema: z.ZodString) => schema.trim().min(1),
+};
+
+export const subjectRequestSelect = createSelectSchema(subjectRequest, subjectRequestRefinements);
+export const subjectRequestInsert = createInsertSchema(subjectRequest, subjectRequestRefinements);
+export const subjectRequestUpdate = createUpdateSchema(subjectRequest, subjectRequestRefinements);
+
 /** A composition (ADR 0004, ADR 0015): a readable unit, its id the minter's shape. */
 const compositionRefinements = {
   workspaceId,
@@ -1052,6 +1115,12 @@ export const boundarySchemas = {
     select: findingSelect,
     insert: findingInsert,
     update: findingUpdate,
+  },
+  subjectRequest: {
+    table: subjectRequest,
+    select: subjectRequestSelect,
+    insert: subjectRequestInsert,
+    update: subjectRequestUpdate,
   },
   composition: {
     table: composition,
