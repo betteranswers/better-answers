@@ -1,0 +1,40 @@
+.claude/agents/implementor.md
+  s_57bd2b166cb176::t_5eeba9c3304997 28
+  s_57bd2b166cb176::t_90f9ea9ce3d7c6 3-5,7,12,14,16-27,29
+AGENTS.md
+  s_57bd2b166cb176::t_feeb4f712f7cbd 64
+  s_57bd2b166cb176::t_7ea4d37c63f2e4 46-49
+.claude/agents/verifier.md
+  s_57bd2b166cb176::t_bbdb92b2a78e74 39
+  s_57bd2b166cb176::t_6be53d5059da39 3-4,7,12,14,16-20,22,24-25,27-28,30-31,33-34,36-38,40-42,44-45,47,49,51-54,56,58,60,62
+docs/agents/build-loop.md
+  s_57bd2b166cb176::t_35a09c7d34f71f 1-10,12-73,75-79,81-97
+  s_57bd2b166cb176::t_2ae008ea9c0ffe 11
+  s_57bd2b166cb176::t_f2acdb4c56920e 80
+  s_57bd2b166cb176::t_ea8504e93186d3 74
+docs/agents/code-review.md
+  s_57bd2b166cb176::t_bfb73870b9bec4 3-4
+.claude/agents/ui-designer.md
+  s_57bd2b166cb176::t_8081ff81e71721 3-4,10,12,14,16-19,21,23-28,30,32-35,37,39
+.claude/agents/pr-reviewer.md
+  s_57bd2b166cb176::t_46071c7e81e784 3-4,10-33
+.claude/agents/ralph.md
+  s_57bd2b166cb176::t_21cd07de61e7ce 3,7,10,12,14,16,18-22,24,26,28-30,32,34-37,39,41-45,47,49
+  s_57bd2b166cb176::t_eff7a1e03b2b05 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "4c77c1d97c8d0d3db863919ed07ccba1e05643fe",
+  "prompts": {},
+  "sessions": {
+    "s_57bd2b166cb176": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b046341e-ceac-4305-bed1-6dcc9476655c",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
