@@ -294,6 +294,9 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   enrichment, answering, judging, embedding), local or hosted; one route per purpose. The
   embedding route is **fixed** — the word a reader sees on it — and never changes once vectors
   exist (ADR 0020).
+- **DPIA input** — what one binding contributes to a data protection impact assessment, as a
+  document and its hash: the personal data categories its rules in force can raise, its scope,
+  class, routes, *retention class* and audience. The hash rides on the publish audit row.
 
 ## Trust words the reader sees
 
@@ -484,6 +487,12 @@ to it by IRI and never restates it (ADR 0014).
   a passage.
 - **suppression** — the entry that keeps a person's data out of every derived store when a
   document is reprocessed; applied per document, linked to its erasure request.
+- **erasure map** — the per-store finder's answer for one *subject request*: every store family
+  the platform holds and what in each of them names the person, found over the request's
+  identifier set. The *suppression* entries and the report are written from it.
+- **replay copy** — the completed *erasure request*'s copy in the object store — the request, its
+  *erasure pseudonym*, the identifier set and the *erasure map* — that a restore reads to run the
+  erasure again over a dump older than the request. Restricted personal data, as a *suppression* is.
 - **version (of a record)** — one state of a composition or a guide definition, kept for good with
   who changed it and why; the current state is the latest version. Concepts have git instead.
 
