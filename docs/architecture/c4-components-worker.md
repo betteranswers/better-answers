@@ -31,7 +31,7 @@ C4Component
   Rel(queue, postgres, "Calls the queue functions of", "psycopg")
   Rel(loop, kinds, "Dispatches a claimed job to; planned S1")
   Rel(kinds, rebuild, "Runs the full-rebuild kind")
-  Rel(kinds, pipeline, "Runs index, reindex and prune; planned S1")
+  Rel(kinds, pipeline, "Runs index, with a reason; planned S1. bind and prune are S4's kinds")
   Rel(loop, audit, "Schedules when due")
   Rel(rebuild, bundle, "Reads every concept through")
   Rel(audit, bundle, "Parses every file through")
