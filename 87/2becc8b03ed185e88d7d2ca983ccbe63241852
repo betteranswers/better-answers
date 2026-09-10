@@ -1,0 +1,21 @@
+docs/specs/s1-one-uploaded-document-to-a-cited-passage.md
+  s_807ae94c832040::t_af7465ab2959a3 1-253
+docs/specs/v01-route.md
+  s_807ae94c832040::t_b504f074583a37 432-433
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "872becc8b03ed185e88d7d2ca983ccbe63241852",
+  "prompts": {},
+  "sessions": {
+    "s_807ae94c832040": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b7a6f2cc-5b3b-4231-85ec-31e6853ecf5c",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
