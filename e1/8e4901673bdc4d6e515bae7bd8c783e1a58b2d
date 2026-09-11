@@ -1,0 +1,28 @@
+apps/worker/tests/test_cocoindex_ban.py
+  s_f3ee63bcbb1a0b::t_47c80e0c26592c 11-20,25,39,42-45
+  s_f3ee63bcbb1a0b::t_e60102496f8914 40-41,124-125
+  s_f3ee63bcbb1a0b::t_e4553fdfff5ae3 103-123,126
+apps/worker/pyproject.toml
+  s_f3ee63bcbb1a0b::t_479409b7fdd13a 44-65
+  s_f3ee63bcbb1a0b::t_14512c5e8c825d 130-136
+apps/worker/tests/test_image.py
+  s_f3ee63bcbb1a0b::t_e517d1d7e8fd9c 122-137
+  s_f3ee63bcbb1a0b::t_f6f57630dffb16 886-889,893-897
+  s_f3ee63bcbb1a0b::t_e60102496f8914 890-892
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e18e4901673bdc4d6e515bae7bd8c783e1a58b2d",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
