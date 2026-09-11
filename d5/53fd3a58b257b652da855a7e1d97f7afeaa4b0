@@ -1,0 +1,68 @@
+packages/core/src/store/git/index.ts
+  s_96a66f19ddb6be::t_3e6e58b365bfe6 11
+  s_96a66f19ddb6be::t_cd5c66a098609b 201-207,212,216-219,223-225
+  s_96a66f19ddb6be::t_21b40140a0dff9 208-211,213-215,220-222
+  s_96a66f19ddb6be::t_82f53a5c8d89c0 530-542,562
+  s_96a66f19ddb6be::t_31f0de19950fe2 559-561
+  s_96a66f19ddb6be::t_d3c2688211c350 698-710,720,722-726
+packages/core/test/erasure-routine.test.ts
+  s_96a66f19ddb6be::t_5138383529e8c0 172-173
+  s_96a66f19ddb6be::t_524d1ffea0e6fd 951,166,170,205,953-970,972,974-978,980-981,984-999,1001,1003,1005-1009
+  s_96a66f19ddb6be::t_dcd39a5a38fb63 1184-1207,952,971,973,982-983,1002,1004,1010
+  s_96a66f19ddb6be::t_b527125e28c17e 167-169,171,175,181,187-194,203-204,206-207
+  s_96a66f19ddb6be::t_0c6274de4bd83f 257-258
+  s_96a66f19ddb6be::t_3dbfd8c746dd3c 979,1000,1233-1234,1236-1242,1244-1249,1251,1257-1266,1269
+packages/core/test/findings.test.ts
+  s_96a66f19ddb6be::t_960d4dddfa2270 212-238
+packages/core/src/concepts/landing.ts
+  s_96a66f19ddb6be::t_a909bdc00cf20a 569-573
+packages/core/src/erasure/rehearsal.ts
+  s_96a66f19ddb6be::t_4ba85338d43018 356-364
+packages/core/test/git.test.ts
+  s_96a66f19ddb6be::t_8a9a58cdf67dc5 10,21-28
+  s_96a66f19ddb6be::t_d43637098a4b32 369-400,403-410,413-414,416
+  s_96a66f19ddb6be::t_71fecc9c1872e6 411-412,415
+packages/core/src/erasure/routine.ts
+  s_96a66f19ddb6be::t_86c26d92e69361 438,503,439-468,470-476,478-479,481-501
+  s_96a66f19ddb6be::t_1116890303c2f6 706-708,714
+  s_96a66f19ddb6be::t_e2b411ef5cfa23 14-19
+  s_96a66f19ddb6be::t_02d6ac795900ce 115-126
+  s_96a66f19ddb6be::t_86df8334e3a629 469,477,480,502,569-578,582-594
+  s_96a66f19ddb6be::t_2e5515f1c3f23d 603
+  s_96a66f19ddb6be::t_4e463f87583699 627-628,633
+apps/worker/tests/test_redaction.py
+  s_96a66f19ddb6be::t_c3ccbc6c98723f 24-39
+deploy/restore-drill.sh
+  s_96a66f19ddb6be::t_880e158788dc6d 227-241
+packages/core/src/erasure/identity.ts
+  s_96a66f19ddb6be::t_322f87a7b7bc5f 88-95
+  s_96a66f19ddb6be::t_78dcab83a608e4 111-117,120-121,133-136,142-144
+apps/api/tests/deploy-tree.test.ts
+  s_96a66f19ddb6be::t_b11df0985fa443 341-356,361-405
+  s_96a66f19ddb6be::t_aa4473e5412b98 357-360
+packages/core/src/erasure/replay-erasures.ts
+  s_96a66f19ddb6be::t_63a2fcce8c446e 331-350
+packages/core/test/bundle.ts
+  s_96a66f19ddb6be::t_0163593ab011a8 63-84
+packages/core/test/erasure-replay.test.ts
+  s_96a66f19ddb6be::t_166d00eea30bae 17
+  s_96a66f19ddb6be::t_6d88ec68239212 94-96
+  s_96a66f19ddb6be::t_7250ac0405283d 528-573,465
+  s_96a66f19ddb6be::t_3ce0a594ba066e 458-464,473,480-483,485-488
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d553fd3a58b257b652da855a7e1d97f7afeaa4b0",
+  "prompts": {},
+  "sessions": {
+    "s_96a66f19ddb6be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1940d59b-7323-446c-9724-222dda88e9e0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
