@@ -195,7 +195,9 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **source binding** — an Admin's connection of one source to the workspace: its connector,
   credential, scope, domain, sensitivity, audience, cadence, destination and retention class; the
   unit the scheduler runs and the unit that is published. One domain per binding — a website is
-  bound per URL prefix (ADR 0013). _Avoid_: connection, integration.
+  bound per URL prefix (ADR 0013). A binding wears one state word: **landed** (its documents are in
+  the object store), **indexing** (a run is turning them into chunks), **indexed** (the run has
+  finished and there is something to review) and **published**. _Avoid_: connection, integration.
 - **connector** — the lifted or written code that reaches one kind of source system and yields its
   documents: upload, website, SharePoint, HubSpot, Asana, the share agent's file share, the
   referenced read tool. A binding names one connector; a connector serves many bindings.
@@ -211,6 +213,17 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   locator, title, author, `last_modified` (recorded absent when the source has none), content hash,
   first and last seen, `gone_at`, sensitivity, and the references to its original and normalised
   copies. The catalogue every run reconciles. _Avoid_: ingest trace (the draft's word).
+- **landed copy** — a source document's bytes as the platform holds them in the object store: the
+  original and the normalised redacted text, under one document key.
+- **chunk** — one unit of a source document's normalised redacted text that the chunk index holds,
+  keyed by its document and its ordinal, carrying its binding's visibility — its sensitivity, its
+  audience and whether it is published. Never the original text.
+- **locator** — the address of a passage inside a source document: a span, `chars:<start>-<end>`,
+  its offsets counted in Unicode code points into the document's normalised redacted text and
+  versioned by the redaction string that text carries. The one string a citation's evidence and a
+  chunk both carry, so a citation and a passage are one address.
+- **passage** — the text a locator resolves to, served with its source document's title and its
+  sensitivity word: the unit `open` returns and a hit marked *Not company knowledge* previews.
 - **connector run** — one execution of a binding by the scheduler (enumerate, index, extract, prune
   or reindex): claimed under a lease, keyed by its run key, checkpointed per batch, one per binding
   at a time, parked after repeated failure; its outcome rows record what changed per document.
