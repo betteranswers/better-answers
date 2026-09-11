@@ -3,12 +3,25 @@ import { describe, expect, it } from "vitest";
 
 import { commit, type GitDoor } from "@better-answers/core/store/git";
 
-import { RECONCILER, reconcile } from "../src/concepts/index.ts";
+import { open } from "../src/answering/index.ts";
+import {
+  contentHashOf,
+  RECONCILER,
+  reconcile,
+  renderConceptFile,
+  type Frontmatter,
+} from "../src/concepts/index.ts";
 import { ERASURE, runErasure, type ErasureRefusal, type ErasureRun } from "../src/erasure/index.ts";
 import { actorIdOfPerson, type Result } from "../src/kernel/index.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
-import { countWaitingOnLocks, seedingWith, until, whileActsWaitAt } from "./suite-postgres.ts";
+import {
+  countWaitingOnLocks,
+  readingAs,
+  seedingWith,
+  until,
+  whileActsWaitAt,
+} from "./suite-postgres.ts";
 import { doorsOf, principalFor, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 /**
@@ -49,6 +62,24 @@ const BEYOND_USE = {
   daily: "2026-07-01T12:00:00.000Z",
   weekly: "2026-07-27T12:00:00.000Z",
   monthly: "2026-12-01T12:00:00.000Z",
+} as const;
+
+/**
+ * A second anchor, on a day that tells a day count from a calendar interval. `deploy/backup.sh`
+ * writes each dump's `backup_run.expires_at` as `now() + interval '6 months'`, and Postgres
+ * lands a month on the same day of the month or on that month's last day — so the 31st of
+ * August is beyond use on the **28th of February**, February 2027 having no 31st and no 29th.
+ * A report counting 183 days would say the 2nd of March and disagree with the platform's own
+ * row for the same copy by two days.
+ */
+const ANCHORED_ON_A_31ST = new Date("2026-08-31T12:00:00.000Z");
+
+/** The four dates from that anchor, worked out by hand as Postgres computes each interval. */
+const BEYOND_USE_FROM_THE_31ST = {
+  hourly: "2026-09-02T12:00:00.000Z",
+  daily: "2026-09-30T12:00:00.000Z",
+  weekly: "2026-10-26T12:00:00.000Z",
+  monthly: "2027-02-28T12:00:00.000Z",
 } as const;
 
 /** The advisory lock ADR 0022 fixes, which `deploy/backup.sh` try-locks before every dump. */
@@ -131,26 +162,63 @@ const workspaceWithAnErasureRequest = async () => {
 };
 
 /**
+ * The two concept files the bundle carries, both naming the person and **only one of them in
+ * the text a content hash is taken over**.
+ *
+ * That difference is the whole of step 4. ADR 0019 keeps `generated` and `verified` out of the
+ * content hash — a check must not move its own file's hash — so the ordinary way a bundle names
+ * a person is a way a rewrite cannot disturb, and every check over the travel policy stands
+ * exactly as it was. The expenses policy quotes the same actor id in its **body**, which is
+ * hashed: once the rewrite lands, that file's canonical text is different text, and without
+ * step 4 every standing check over it would read *Changed since checked* for a change nobody
+ * made to the fact.
+ */
+const filesNaming = (
+  email: string,
+): readonly {
+  readonly path: string;
+  readonly frontmatter: Frontmatter;
+  readonly body: string;
+}[] => [
+  {
+    path: "knowledge/expenses.md",
+    frontmatter: { title: "Expenses", type: "Policy", generated: `human:${email}` },
+    body: `Expenses are claimed within thirty days. Approved by human:${email}.`,
+  },
+  {
+    path: "knowledge/travel.md",
+    frontmatter: {
+      title: "Travel",
+      type: "Policy",
+      generated: `human:${email}`,
+      verified: [{ by: `human:${email}`, at: "2026-04-03" }],
+    },
+    body: "Travel is booked through the agent.",
+  },
+];
+
+/**
  * The arrangement the git step is proved against: a bundle whose **whole** history names the
  * person, so every commit's hash moves and the claim about pre-rewrite hashes is a claim
  * about all of them rather than about the tail. Two commits, both written by Priya and both
  * carrying `human:<address>` in the file, with the `bundle_commit` rows a governed write
- * would have landed beside them — the second naming the first as its parent — and a
- * `concept_index` row on the head, because that row's key into `bundle_commit` has to travel
- * with the rewrite or the routine's own transaction cannot commit.
+ * would have landed beside them — the second naming the first as its parent — and, for each
+ * file, the `concept_index` row a landing would have written with the file's real hash and a
+ * check over exactly that hash. Those rows' keys into `bundle_commit` have to travel with the
+ * rewrite or the routine's own transaction cannot commit.
  */
 const bundleNamingThePerson = async () => {
   const { scenario, email, person, subjectRequestId } = await workspaceWithAnErasureRequest();
   const principal = await principalFor(db(), scenario.workspaceId, person.id);
   const author = { name: "Priya Anand", email };
-  const path = "knowledge/expenses.md";
+  const files = filesNaming(email);
 
   const shas: string[] = [];
-  for (const [at, body] of ["claimed within thirty days", "claimed within sixty days"].entries()) {
+  for (const [at, file] of files.entries()) {
     const written = await commit(principal, scenario.git, {
-      path,
-      content: `---\ngenerated:\n  by: human:${email}\nverified:\n  - by: human:${email}\n---\n\nExpenses are ${body}.\n`,
-      message: `Record the expenses policy (${at + 1})`,
+      path: file.path,
+      content: renderConceptFile(file.frontmatter, file.body),
+      message: `Record a policy (${at + 1})`,
       author,
       trailers: { actor: actorIdOfPerson(principal.userId), audit: ulid() },
       expectedHead: shas[at - 1] ?? null,
@@ -160,7 +228,7 @@ const bundleNamingThePerson = async () => {
     shas.push(written.value.sha);
   }
 
-  const iri = await seedingWith(db().pool, async (seed) => {
+  const landed = await seedingWith(db().pool, async (seed) => {
     for (const [at, sha] of shas.entries()) {
       await seed.bundleCommit({
         workspaceId: scenario.workspaceId,
@@ -170,14 +238,78 @@ const bundleNamingThePerson = async () => {
         committedAt: new Date(`2026-04-0${at + 2}T11:00:00.000Z`),
       });
     }
-    const indexed = await seed.conceptIndex({
-      workspaceId: scenario.workspaceId,
-      path,
-      commitSha: shas.at(-1) ?? "",
-    });
-    return indexed.iri;
+    const rows: { readonly path: string; readonly iri: string }[] = [];
+    for (const [at, file] of files.entries()) {
+      const indexed = await seed.conceptIndex({
+        workspaceId: scenario.workspaceId,
+        path: file.path,
+        commitSha: shas[at] ?? "",
+        frontmatter: file.frontmatter,
+        body: file.body,
+        contentHash: contentHashOf(file.frontmatter, file.body, file.path),
+      });
+      // A check over exactly what the commit wrote, by the person the request is about: the
+      // record keeps `human:<person id>` and is never rewritten (ADR 0035), so what step 4
+      // moves is the hash and nothing else.
+      await seed.conceptVerification({
+        workspaceId: scenario.workspaceId,
+        iri: indexed.iri,
+        actor: actorIdOfPerson(principal.userId),
+        contentHash: indexed.contentHash,
+        checkedAt: new Date("2026-04-05T09:00:00.000Z"),
+      });
+      rows.push({ path: file.path, iri: indexed.iri });
+    }
+    return rows;
   });
-  return { scenario, email, person, iri, before: shas, subjectRequestId };
+  const [hashed, steady] = landed;
+  return {
+    scenario,
+    email,
+    person,
+    /** The concept whose body quoted the actor id: the one file whose hash the rewrite moves. */
+    iri: hashed?.iri ?? "",
+    /** The concept named only in the keys ADR 0019 leaves unhashed: its hash cannot move. */
+    steadyIri: steady?.iri ?? "",
+    before: shas,
+    subjectRequestId,
+  };
+};
+
+/** Every check in a workspace, as the superuser: the columns the trust projection reads. */
+const checksIn = async (workspaceId: string) => {
+  const read = await db().pool.query<{
+    iri: string;
+    actor: string;
+    checked_at: Date;
+    content_hash: string | null;
+    origin: string;
+  }>(
+    `SELECT iri, actor, checked_at, content_hash, origin
+       FROM concept_verification WHERE workspace_id = $1 ORDER BY iri`,
+    [workspaceId],
+  );
+  return read.rows;
+};
+
+/** What each concept's index row says its file is, by IRI: the hash a check is read against. */
+const indexedIn = async (workspaceId: string) => {
+  const read = await db().pool.query<{ iri: string; content_hash: string; body: string }>(
+    "SELECT iri, content_hash, body FROM concept_index WHERE workspace_id = $1 ORDER BY iri",
+    [workspaceId],
+  );
+  return read.rows;
+};
+
+/** A literal instant (`[TEST9]`, ADR 0040): nothing the trust projection reads turns on today. */
+const READ_AT = new Date("2026-06-02T09:00:00.000Z");
+
+/** The trust a reader is shown for one concept, through the read the surface will make. */
+const trustOf = async (scenario: Scenario, iri: string) => {
+  const read = await readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
+    open(principal, tx, { iri }, READ_AT),
+  );
+  return read.ok && read.value.found ? read.value.concept?.trust : undefined;
 };
 
 /** The `bundle_commit` rows of a workspace, oldest first: the chain the reconciler reads. */
@@ -214,6 +346,12 @@ const rewritingTheBundleOnce = async () => {
   const arranged = await bundleNamingThePerson();
   const { scenario, subjectRequestId } = arranged;
   const before = await readingTheBundle(scenario.workspaceId, scenario.git);
+  const checksBefore = await checksIn(scenario.workspaceId);
+  const indexedBefore = await indexedIn(scenario.workspaceId);
+  const trustBefore = [
+    await trustOf(scenario, arranged.iri),
+    await trustOf(scenario, arranged.steadyIri),
+  ];
 
   const done = await completing(scenario, subjectRequestId);
 
@@ -224,6 +362,15 @@ const rewritingTheBundleOnce = async () => {
     before,
     after,
     done,
+    checksBefore,
+    checksAfter: await checksIn(scenario.workspaceId),
+    indexedBefore,
+    indexedAfter: await indexedIn(scenario.workspaceId),
+    trustBefore,
+    trustAfter: [
+      await trustOf(scenario, arranged.iri),
+      await trustOf(scenario, arranged.steadyIri),
+    ],
     pseudonym: row?.pseudonym ?? "",
     actions: row?.actions ?? {},
     stillPresent: await Promise.all(
@@ -281,6 +428,93 @@ const rowTextIn = async (table: string, workspaceId: string) => {
     [workspaceId],
   );
   return read.rows;
+};
+
+/**
+ * Sessions, linked accounts and verification codes are Better Auth's own writes, so the test
+ * factory holds none — `erasure-map.test.ts` and `workspaces.test.ts` seed them the same way.
+ * Everything else in this suite is built through the factory (`[TEST4]`).
+ */
+const identityRowsFor = async (userId: string, email: string): Promise<void> => {
+  const superuser = await db().pool.connect();
+  try {
+    const id = ulid();
+    await superuser.query(
+      `INSERT INTO session (id, expires_at, token, created_at, updated_at, ip_address, user_agent, user_id)
+       VALUES ($1, now(), $2, now(), now(), '203.0.113.7', 'Mozilla/5.0', $3)`,
+      [`s-${id}`, `token-${id}`, userId],
+    );
+    await superuser.query(
+      `INSERT INTO account (id, issuer, account_id, provider_id, user_id, created_at, updated_at)
+       VALUES ($1, 'https://accounts.example.invalid', $2, 'google', $3, now(), now())`,
+      [`a-${id}`, `google-${id}`, userId],
+    );
+    await superuser.query(
+      `INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at)
+       VALUES ($1, $2, 'code', now(), now(), now())`,
+      [`v-${id}`, email],
+    );
+  } finally {
+    superuser.release();
+  }
+};
+
+/** The four identity families the routine's step 5 prunes, counted where it would find them. */
+const identityRowCountsFor = async (workspaceId: string, userId: string, email: string) => {
+  const read = await db().pool.query<{
+    sessions: string;
+    accounts: string;
+    verifications: string;
+    invitations: string;
+  }>(
+    `SELECT (SELECT count(*) FROM session WHERE user_id = $1) AS sessions,
+            (SELECT count(*) FROM account WHERE user_id = $1) AS accounts,
+            (SELECT count(*) FROM verification WHERE lower(identifier) = $2) AS verifications,
+            (SELECT count(*) FROM invitation WHERE workspace_id = $3 AND lower(email) = $2)
+              AS invitations`,
+    [userId, email.toLowerCase(), workspaceId],
+  );
+  const row = read.rows[0];
+  return {
+    sessions: Number(row?.sessions ?? -1),
+    accounts: Number(row?.accounts ?? -1),
+    verifications: Number(row?.verifications ?? -1),
+    invitations: Number(row?.invitations ?? -1),
+  };
+};
+
+/** The user row as the identity set holds it, whatever a routine has done to it. */
+const userRowOf = async (userId: string) => {
+  const read = await db().pool.query<{
+    id: string;
+    name: string;
+    email: string;
+    email_verified: boolean;
+    image: string | null;
+  }>(`SELECT id, name, email, email_verified, image FROM "user" WHERE id = $1`, [userId]);
+  return read.rows[0];
+};
+
+/** Which workspaces this person is a member of, so an ended membership is visible as one. */
+const workspacesMemberOf = async (userId: string): Promise<readonly string[]> => {
+  const read = await db().pool.query<{ workspace_id: string }>(
+    "SELECT workspace_id FROM member WHERE user_id = $1 ORDER BY workspace_id",
+    [userId],
+  );
+  return read.rows.map((row) => row.workspace_id);
+};
+
+/**
+ * The person a ledger row's actor resolves to — the join `[AUDIT3]` exists to keep working, and
+ * the whole reason the user row's id survives its pseudonymisation.
+ */
+const personNamedBy = async (workspaceId: string, auditEventId: string) => {
+  const read = await db().pool.query<{ id: string }>(
+    `SELECT u.id FROM audit_event a JOIN "user" u ON a.actor = 'human:' || u.id
+      WHERE a.workspace_id = $1 AND a.id = $2`,
+    [workspaceId, auditEventId],
+  );
+  return read.rows[0]?.id;
 };
 
 /**
@@ -391,6 +625,32 @@ describe("the report", () => {
       weekly: BEYOND_USE.weekly,
       monthly: BEYOND_USE.monthly,
     });
+  });
+
+  it("dates the beyond-use copies one interval on as Postgres does, never a count of days", async () => {
+    const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
+
+    const done = await completing(scenario, subjectRequestId, ANCHORED_ON_A_31ST);
+
+    const [row] = await erasureRowsIn(scenario.workspaceId);
+    expect({
+      hourly: row?.beyond_use_hourly_at.toISOString(),
+      daily: row?.beyond_use_daily_at.toISOString(),
+      weekly: row?.beyond_use_weekly_at.toISOString(),
+      monthly: row?.beyond_use_monthly_at.toISOString(),
+    }).toEqual({
+      hourly: BEYOND_USE_FROM_THE_31ST.hourly,
+      daily: BEYOND_USE_FROM_THE_31ST.daily,
+      weekly: BEYOND_USE_FROM_THE_31ST.weekly,
+      // 183 days on is the 2nd of March: a day count fails here and nowhere else, which is
+      // why this case is anchored on a 31st rather than on the suite's usual first of June.
+      monthly: BEYOND_USE_FROM_THE_31ST.monthly,
+    });
+    // And the document a person is handed quotes the row it was written from.
+    expect(done.report).toContain(
+      `${BEYOND_USE_FROM_THE_31ST.hourly} · ${BEYOND_USE_FROM_THE_31ST.daily} · ` +
+        `${BEYOND_USE_FROM_THE_31ST.weekly} · ${BEYOND_USE_FROM_THE_31ST.monthly}.`,
+    );
   });
 
   it("names which anchor it used, so the reader is never left to guess between the lock and the last dump", async () => {
@@ -576,7 +836,8 @@ describe("the bundle_commit rows the rewrite moves", () => {
     // The chain moved with the rows: a parent naming a hash the repository no longer holds
     // would be a prefix invariant the database still believed and git had forgotten.
     expect(after.rows.map((row) => row.parent_sha)).toEqual([null, after.history[0]]);
-    expect(commitOfTheConcept).toEqual(after.history[1]);
+    // The expenses policy was the first of the two commits, and its index row names it still.
+    expect(commitOfTheConcept).toEqual(after.history[0]);
   });
 
   it("leaves the reconciler nothing to replay, because the head and the watermark agree", async () => {
@@ -604,6 +865,175 @@ describe("the bundle_commit rows the rewrite moves", () => {
     });
     // The spine's own line for each family stands beside what this step added.
     expect(actions["concept-file"]).toHaveProperty("found");
+  });
+});
+
+describe("the checks the rewrite moved", () => {
+  it("carries each one onto the new hash under origin erasure-rewrite, and the trust reading is unchanged", async () => {
+    const {
+      email,
+      iri,
+      checksBefore,
+      checksAfter,
+      indexedBefore,
+      indexedAfter,
+      trustBefore,
+      trustAfter,
+    } = await theBundleRewritten();
+    const before = checksBefore.find((check) => check.iri === iri);
+    const indexBefore = indexedBefore.find((row) => row.iri === iri);
+    // The arrangement is only worth its assertions if the check really confirmed the file.
+    expect(before?.content_hash).toEqual(indexBefore?.content_hash);
+    expect(before?.origin).toEqual("platform");
+
+    const after = checksAfter.find((check) => check.iri === iri);
+    const indexAfter = indexedAfter.find((row) => row.iri === iri);
+    // The hash moved, because the body it is taken over no longer names the address — and the
+    // index row moved with it, a row still holding the address being the erasure missing a
+    // store rather than a check left behind.
+    expect(indexBefore?.body).toContain(email);
+    expect(indexAfter?.content_hash).not.toEqual(indexBefore?.content_hash);
+    expect(indexAfter?.body).not.toContain(email);
+    expect({
+      hash: after?.content_hash,
+      origin: after?.origin,
+      actor: after?.actor,
+      at: after?.checked_at.toISOString(),
+    }).toEqual({
+      hash: indexAfter?.content_hash,
+      // The one origin ADR 0019 declares for this, and the reason the row can still be read
+      // as a check: who checked and when stand, and the row says a routine moved its hash.
+      origin: "erasure-rewrite",
+      actor: before?.actor,
+      at: before?.checked_at.toISOString(),
+    });
+
+    // The whole point of the step, read the way a person reads it: *Checked by Priya* before,
+    // *Checked by Priya* after — never *Changed since checked* because of an erasure.
+    expect(trustAfter[0]).toEqual(trustBefore[0]);
+    expect(trustAfter[0]).toMatchObject({ status: "current", tier: "human-reviewed" });
+  });
+
+  it("leaves a check alone when the rewrite touched only the keys ADR 0019 keeps out of the hash", async () => {
+    const { steadyIri, checksBefore, checksAfter, trustBefore, trustAfter } =
+      await theBundleRewritten();
+
+    // `generated` and `verified` are where a bundle names a person, and neither reaches the
+    // content hash — so the ordinary erasure moves no hash at all and marks no check. A step
+    // that re-hashed every file it touched would have written `erasure-rewrite` here too, and
+    // the row would say a routine moved a hash that never moved.
+    expect(checksAfter.find((check) => check.iri === steadyIri)).toEqual(
+      checksBefore.find((check) => check.iri === steadyIri),
+    );
+    expect(trustAfter[1]).toEqual(trustBefore[1]);
+  });
+
+  it("records what it moved in the report's actions, rather than reshaping them", async () => {
+    const { actions } = await theBundleRewritten();
+
+    expect(actions).toMatchObject({
+      "concept-file": { reindexed: 1 },
+      "concept-verification": { rehashed: 1 },
+    });
+  });
+});
+
+describe("the identity set on the person's last membership", () => {
+  it("pseudonymises the user row with its id kept, so every ledger row still resolves to it", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const acted = await seedingWith(db().pool, (seed) =>
+      seed.auditEvent({
+        workspaceId: scenario.workspaceId,
+        actor: actorIdOfPerson(person.id),
+        subjectId: ulid(),
+      }),
+    );
+
+    await completing(scenario, subjectRequestId);
+
+    const [row] = await erasureRowsIn(scenario.workspaceId);
+    const after = await userRowOf(person.id);
+    expect({ id: after?.id, name: after?.name, image: after?.image }).toEqual({
+      // The id stands, because the ledger names it and a ledger an erasure rewrote would be a
+      // record nobody could rely on (`[AUDIT3]`).
+      id: person.id,
+      name: "",
+      image: null,
+    });
+    // The address is the pseudonym's own, which is unique by construction — `user.email` is
+    // unique, so a constant tombstone would refuse the second erasure this platform ran.
+    expect(after?.email).toEqual(`${row?.pseudonym}@erased.better-answers.invalid`);
+    expect(after?.email_verified).toBe(false);
+    expect(await personNamedBy(scenario.workspaceId, acted.id)).toEqual(person.id);
+  });
+
+  it("deletes the person's sessions, verification rows, invitations and linked accounts", async () => {
+    const { scenario, person, email, subjectRequestId } = await workspaceWithAnErasureRequest();
+    await identityRowsFor(person.id, email);
+    await seedingWith(db().pool, (seed) =>
+      seed.invitation({ workspaceId: scenario.workspaceId, email }),
+    );
+    expect(await identityRowCountsFor(scenario.workspaceId, person.id, email)).toEqual({
+      sessions: 1,
+      accounts: 1,
+      verifications: 1,
+      invitations: 1,
+    });
+
+    await completing(scenario, subjectRequestId);
+
+    expect(await identityRowCountsFor(scenario.workspaceId, person.id, email)).toEqual({
+      sessions: 0,
+      accounts: 0,
+      verifications: 0,
+      invitations: 0,
+    });
+  });
+
+  it("ends this workspace's membership alone when the person holds another, and leaves the identity set standing", async () => {
+    const scenario = await arrange();
+    const elsewhere = await arrange();
+    const email = addressOf("priya");
+    const person = await memberOf(scenario.workspaceId, email);
+    await seedingWith(db().pool, (seed) =>
+      seed.member({ workspaceId: elsewhere.workspaceId, userId: person.id, role: "Editor" }),
+    );
+    await identityRowsFor(person.id, email);
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email);
+
+    await completing(scenario, subjectRequestId);
+
+    // The other company's records still name this person, and one controller's request is not
+    // a reason to end their access to another's.
+    const after = await userRowOf(person.id);
+    expect({ email: after?.email, name: after?.name }).toEqual({ email, name: "Priya Anand" });
+    expect(await identityRowCountsFor(scenario.workspaceId, person.id, email)).toMatchObject({
+      sessions: 1,
+      accounts: 1,
+    });
+    // What did end is the membership here — and nothing about the membership there.
+    expect(await workspacesMemberOf(person.id)).toEqual([elsewhere.workspaceId]);
+  });
+
+  it("says which arm ran in the report, and never how many memberships it counted", async () => {
+    const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const elsewhere = await arrange();
+    const email = addressOf("nadia");
+    const other = await memberOf(scenario.workspaceId, email);
+    await seedingWith(db().pool, (seed) =>
+      seed.member({ workspaceId: elsewhere.workspaceId, userId: other.id, role: "Editor" }),
+    );
+    const theirs = await erasureRequestAbout(scenario.workspaceId, other.id, email);
+
+    const last = await completing(scenario, subjectRequestId);
+    const held = await completing(scenario, theirs);
+
+    expect(last.report).toContain("identity-user: arm last-membership");
+    expect(held.report).toContain("identity-user: arm membership-ended");
+    // Which arm ran, and not a word about the other tenant: a document this workspace is
+    // handed is not where a judgement about another company's memberships is published
+    // (ADR 0035's rejected oracle).
+    expect(held.report).not.toContain(elsewhere.workspaceId);
   });
 });
 

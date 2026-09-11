@@ -92,11 +92,36 @@ export type ReadSubjectRequestRefusal = RoleRefusal | "malformed" | "no-such-req
 const REQUEST_ID = boundarySchemas.subjectRequest.select.shape.id;
 
 /**
- * The deadline the clock starts on: the same day of the month one month on, or the target
- * month's last day where that month has no such day. A clock started on the 31st of January
- * is due on the 28th of February — the 29th in a leap year — because a day a short month does
- * not have lands in the month after it, and a statutory deadline moved later is one the
- * platform has already missed.
+ * **A month, as Postgres adds one**: the same instant that many months on, landing on the same
+ * day of the month or on the target month's last day where that month has no such day. The
+ * 31st of January one month on is the 28th of February — the 29th in a leap year — because a
+ * day a short month does not have lands in the month after it.
+ *
+ * It is one function because the platform states this rule in two documents a person is handed
+ * and they must agree: the subject request's deadline below, and the erasure routine's
+ * beyond-use dates, which are `now() + interval '<life>'` on a `backup_run` row and so are
+ * Postgres's own month arithmetic whether or not the report agrees with it. A count of days
+ * would be two to three days out for every six-month copy.
+ */
+export const monthsOn = (from: Date, months: number): Date => {
+  const dayAsked = from.getUTCDate();
+  const landed = new Date(from);
+  // Onto the first, which every month has, before the month moves — so the month arrives
+  // where it was asked for, and the day is put back under the length of the month it landed
+  // in. Day zero of the month after is that month's last day, leap years included.
+  landed.setUTCDate(1);
+  landed.setUTCMonth(landed.getUTCMonth() + months);
+  const lastDayOfTheMonth = new Date(
+    Date.UTC(landed.getUTCFullYear(), landed.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  landed.setUTCDate(Math.min(dayAsked, lastDayOfTheMonth));
+  return landed;
+};
+
+/**
+ * The deadline the clock starts on: one month on, by the rule above. A statutory deadline
+ * moved later is one the platform has already missed, which is why the short-month arm runs
+ * back rather than over.
  *
  * Its pair is the schema factory's `subjectRequest` seed (`packages/schema/test/factory.ts`),
  * which states the same rule in its own line because the schema's tests cannot import this
@@ -104,20 +129,7 @@ const REQUEST_ID = boundarySchemas.subjectRequest.select.shape.id;
  * `subject_request_clock_check` only holds the answer to running forward, never to being the
  * right day.
  */
-export const dueDateOf = (clockStartedAt: Date): Date => {
-  const dayAsked = clockStartedAt.getUTCDate();
-  const due = new Date(clockStartedAt);
-  // Onto the first, which every month has, before the month moves — so the month arrives
-  // where it was asked for, and the day is put back under the length of the month it landed
-  // in. Day zero of the month after is that month's last day, leap years included.
-  due.setUTCDate(1);
-  due.setUTCMonth(due.getUTCMonth() + 1);
-  const lastDayOfTheMonth = new Date(
-    Date.UTC(due.getUTCFullYear(), due.getUTCMonth() + 1, 0),
-  ).getUTCDate();
-  due.setUTCDate(Math.min(dayAsked, lastDayOfTheMonth));
-  return due;
-};
+export const dueDateOf = (clockStartedAt: Date): Date => monthsOn(clockStartedAt, 1);
 
 /**
  * The date the platform must answer by: the month, or the extension where Article 12's

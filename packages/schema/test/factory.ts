@@ -778,9 +778,25 @@ export const testData = (client: pg.PoolClient): TestData => {
     const subjectRequestId =
       overrides.subjectRequestId ?? (await subjectRequest({ workspaceId, kind: "erasure" })).id;
     const anchoredAt = overrides.anchoredAt ?? new Date();
-    // The four tiers the operations document names, out from the anchor in order.
+    // The four tiers the operations document names, out from the anchor in order, each
+    // computed as Postgres computes that interval — which is what `deploy/backup.sh` writes
+    // onto every dump's `backup_run.expires_at`, so a seeded row promises what a real one
+    // would. The first three are exact durations; six months is calendar arithmetic, landing
+    // on the same day of the month or on that month's last day, so the 31st of August is
+    // beyond use on the 28th of February. Its pair is `beyondUseFrom` in
+    // `packages/core/src/erasure/routine.ts`, over `monthsOn` in the same slice, which states
+    // the same rule in its own line because these tests cannot import that package; change one
+    // and change the other in the same commit.
     const outFrom = (milliseconds: number) => new Date(anchoredAt.getTime() + milliseconds);
     const hour = 60 * 60 * 1000;
+    const dayAsked = anchoredAt.getUTCDate();
+    const sixMonthsOn = new Date(anchoredAt);
+    sixMonthsOn.setUTCDate(1);
+    sixMonthsOn.setUTCMonth(sixMonthsOn.getUTCMonth() + 6);
+    const lastDayOfThatMonth = new Date(
+      Date.UTC(sixMonthsOn.getUTCFullYear(), sixMonthsOn.getUTCMonth() + 1, 0),
+    ).getUTCDate();
+    sixMonthsOn.setUTCDate(Math.min(dayAsked, lastDayOfThatMonth));
     return insertRow(client, "erasureRequest", {
       id: ulid(),
       pseudonym: ulid(),
@@ -788,7 +804,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       beyondUseHourlyAt: outFrom(48 * hour),
       beyondUseDailyAt: outFrom(30 * 24 * hour),
       beyondUseWeeklyAt: outFrom(8 * 7 * 24 * hour),
-      beyondUseMonthlyAt: outFrom(183 * 24 * hour),
+      beyondUseMonthlyAt: sixMonthsOn,
       // No store touched yet, and the two columns the last step writes stated as null rather
       // than left off, so the seeded row is the whole shape a replay would open.
       actions: {},

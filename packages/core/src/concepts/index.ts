@@ -62,7 +62,12 @@ export {
   type FrontmatterSource,
   type FrontmatterValue,
 } from "./file.ts";
-export { foldKind, moveBundleCommits } from "./landing.ts";
+export {
+  carryChecksOntoRewrite,
+  foldKind,
+  moveBundleCommits,
+  type ChecksCarried,
+} from "./landing.ts";
 export {
   RECONCILER,
   reconcile,

@@ -10,9 +10,10 @@ import {
   type PlatformPrincipal,
   type Result,
 } from "../kernel/index.ts";
-import { moveBundleCommits } from "../concepts/index.ts";
+import { carryChecksOntoRewrite, moveBundleCommits } from "../concepts/index.ts";
 import { rewriteHistory, withRepositoryLockAs, type GitDoor } from "../store/git/index.ts";
 import { withScope, withSessionLock, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import { eraseFromTheIdentitySet, type IdentitySwept } from "./identity.ts";
 import { erasureMapOf, type ErasureFamily, type ErasureMap } from "./map.ts";
 import {
   erasureReportOf,
@@ -20,7 +21,7 @@ import {
   type ErasureActions,
   type ErasureRecord,
 } from "./report.ts";
-import type { SubjectRequest } from "./requests.ts";
+import { monthsOn, type SubjectRequest } from "./requests.ts";
 
 /**
  * The **erasure routine** (ADR 0020; ADR 0022; the S0 spec, *The routine — the erasure slice,
@@ -113,27 +114,36 @@ export type ErasureRun = {
   readonly auditEventId: string;
 };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
 
 /**
  * The four tiers of `docs/operations/BACKUPS.md`'s retention schedule, out from the anchor in
  * order: the hourly copies within 48 hours, the daily within 30 days, the weekly within 8
  * weeks and every copy within six months.
  *
- * Counted in days, six months included, because the thing that actually deletes a copy is the
- * object store's lifecycle rule and a lifecycle rule counts days — it has no notion of a
- * calendar month, so a report promising a calendar date would be promising something the
- * store cannot keep. Its pair is `erasureRequest` in `packages/schema/test/factory.ts`, which
- * states the same four numbers because the schema's tests cannot import this package; change
- * one and change the other in the same commit.
+ * **Computed as Postgres computes an interval, months included**, because the date this report
+ * promises is a promise the platform's own row already made: `deploy/backup.sh` writes each
+ * dump's `backup_run.expires_at` as `now() + interval '<life>'` with these four lifetimes
+ * spelled out, so six months is a calendar six months and a report counting 183 days would
+ * disagree with the row for the same copy by up to three days — and the day O1 anchors the
+ * report on `backup_run`, it would print a date that is not the row's. The report's date is
+ * the row's promise; the bucket's lifecycle rule, which is set by hand in days and knows
+ * nothing of a calendar, is configured **no shorter than it**.
+ *
+ * Its pair is `erasureRequest` in `packages/schema/test/factory.ts`, which states the same
+ * four lifetimes and the same month rule in its own lines because the schema's tests cannot
+ * import this package; change one and change the other in the same commit.
  */
-const BEYOND_USE_DAYS = { hourly: 2, daily: 30, weekly: 56, monthly: 183 } as const;
+const BEYOND_USE = { hourlyHours: 48, dailyDays: 30, weeklyWeeks: 8, monthlyMonths: 6 } as const;
 
 const beyondUseFrom = (anchoredAt: Date) => ({
-  hourly: new Date(anchoredAt.getTime() + BEYOND_USE_DAYS.hourly * DAY_MS),
-  daily: new Date(anchoredAt.getTime() + BEYOND_USE_DAYS.daily * DAY_MS),
-  weekly: new Date(anchoredAt.getTime() + BEYOND_USE_DAYS.weekly * DAY_MS),
-  monthly: new Date(anchoredAt.getTime() + BEYOND_USE_DAYS.monthly * DAY_MS),
+  hourly: new Date(anchoredAt.getTime() + BEYOND_USE.hourlyHours * HOUR_MS),
+  daily: new Date(anchoredAt.getTime() + BEYOND_USE.dailyDays * DAY_MS),
+  weekly: new Date(anchoredAt.getTime() + BEYOND_USE.weeklyWeeks * 7 * DAY_MS),
+  // The one tier a count of days gets wrong: the same day of the month six months on, or that
+  // month's last day, which is the rule `monthsOn` states and the platform's one copy of it.
+  monthly: monthsOn(anchoredAt, BEYOND_USE.monthlyMonths),
 });
 
 /** The row as the routine reads it back, whichever run wrote it. */
@@ -240,6 +250,21 @@ const openTheRoutine = async (
 const CONCEPT_FILE: ErasureFamily = "concept-file";
 
 /**
+ * The files in the bundle that name this person, by path. A concept-file location is
+ * `<commit>:<path>` for a blob and a bare sha for an author line; only the first names a file,
+ * and one path may be named at several commits, so the set is what a reader of the rows wants.
+ * Two steps ask this — the report's list of IRIs and the re-hash of the checks that moved — so
+ * it is read off the map once rather than parsed twice.
+ */
+const pathsNaming = (map: ErasureMap): readonly string[] => [
+  ...new Set(
+    (map.find((entry) => entry.family === CONCEPT_FILE)?.locations ?? [])
+      .filter((location) => location.includes(":"))
+      .map((location) => location.slice(location.indexOf(":") + 1)),
+  ),
+];
+
+/**
  * The concepts whose body names this person, by IRI — what the report lists for the owner to
  * edit. The map's concept-file locations are `<commit>:<path>` for a file and a bare sha for
  * an author line; only the first names a file, and `concept_index` holds one row per path, so
@@ -250,14 +275,7 @@ const conceptsNaming = async (
   workspaceId: string,
   map: ErasureMap,
 ): Promise<readonly string[]> => {
-  const inFiles = map.find((entry) => entry.family === CONCEPT_FILE)?.locations ?? [];
-  const paths = [
-    ...new Set(
-      inFiles
-        .filter((location) => location.includes(":"))
-        .map((location) => location.slice(location.indexOf(":") + 1)),
-    ),
-  ];
+  const paths = pathsNaming(map);
   if (paths.length === 0) return [];
   const found = await tx.query<{ iri: string }>(
     "SELECT DISTINCT iri FROM concept_index WHERE workspace_id = $1 AND path = ANY($2)",
@@ -294,6 +312,57 @@ const withTheGitStep = (
   [CONCEPT_FILE]: { ...actions[CONCEPT_FILE], rewritten: step.rewritten },
   [BUNDLE_COMMIT]: { ...actions[BUNDLE_COMMIT], moved: step.moved },
 });
+
+const CONCEPT_VERIFICATION: ErasureFamily = "concept-verification";
+
+/**
+ * Step 4's two lines. `reindexed` is the index rows carried onto what their file now says and
+ * `rehashed` the checks re-pointed at them — both usually **zero**, because a bundle names a
+ * person in the two frontmatter keys ADR 0019 keeps out of the content hash, and a rewrite that
+ * moved no hash left every check reading exactly what it read before. That is the step working,
+ * and a report that said nothing at all about it could not tell it from a step that never ran.
+ */
+const withTheChecksMoved = (
+  actions: ErasureActions,
+  carried: { readonly concepts: number; readonly checks: number },
+): ErasureActions => ({
+  ...actions,
+  [CONCEPT_FILE]: { ...actions[CONCEPT_FILE], reindexed: carried.concepts },
+  [CONCEPT_VERIFICATION]: { ...actions[CONCEPT_VERIFICATION], rehashed: carried.checks },
+});
+
+/**
+ * Step 5's five lines, one per identity family the map walks. **The arm is on the user row's
+ * line**, which is what makes the report say which of the two ran — and it says only that:
+ * never a count of memberships, and never that another workspace holds one, because a document
+ * this workspace is handed is not where a judgement about another tenant is published
+ * (ADR 0035's rejected oracle).
+ */
+const withTheIdentityStep = (actions: ErasureActions, swept: IdentitySwept): ErasureActions => ({
+  ...actions,
+  "identity-user": {
+    ...actions["identity-user"],
+    arm: swept.arm,
+    pseudonymised: swept.pseudonymised,
+    membershipsEnded: swept.membershipsEnded,
+  },
+  "identity-session": { ...actions["identity-session"], deleted: swept.sessions },
+  "identity-verification": { ...actions["identity-verification"], deleted: swept.verifications },
+  "identity-invitation": { ...actions["identity-invitation"], deleted: swept.invitations },
+  "identity-account": { ...actions["identity-account"], deleted: swept.accounts },
+});
+
+const IDENTITY_USER: ErasureFamily = "identity-user";
+
+/**
+ * The person step 5 acts on: the one the **map** found, which is not always the one the request
+ * names. A request may carry no person id and still be about somebody the identity set holds,
+ * because the map resolves a subject by address as well as by id — and a request that names a
+ * person this workspace holds no membership for finds none, which is the fence that keeps one
+ * workspace's erasure off another's person.
+ */
+const personTheMapFound = (map: ErasureMap): string | null =>
+  map.find((entry) => entry.family === IDENTITY_USER)?.locations[0] ?? null;
 
 const detailOf = (request: SubjectRequest, map: ErasureMap): CompletedDetail => {
   const locations = map.reduce((total, entry) => total + entry.locations.length, 0);
@@ -365,15 +434,42 @@ export const runErasure = async (
         // One transaction for both tables, because `concept_index`'s key into `bundle_commit`
         // is deferred to its end (migration 0015): the two are inconsistent inside it, which
         // is the only way to move a primary key that another table points at.
-        const rows = await withScope(platform, doors.postgres, workspaceId, (tx) =>
-          moveBundleCommits(platform, tx, moved),
-        );
-        return { rewritten: moved.length, moved: rows };
+        //
+        // Step 4 rides in the same transaction and under the same lock, because it reads each
+        // file back at the commit its index row names and that hash has only just moved: a
+        // step that ran after the commit would be reading rows another tick could have moved
+        // under it, and one that ran before would be reading the history the rewrite replaced.
+        const rows = await withScope(platform, doors.postgres, workspaceId, async (tx) => ({
+          moved: await moveBundleCommits(platform, tx, moved),
+          carried: await carryChecksOntoRewrite(platform, tx, doors.git, {
+            workspaceId,
+            paths: pathsNaming(map),
+          }),
+        }));
+        return { rewritten: moved.length, moved: rows.moved, carried: rows.carried };
       }),
     );
     if (!rewritten.ok) return err(rewritten.error);
 
-    const actions = withTheGitStep(foundPerFamily(map), rewritten.value);
+    // Step 5, in its own unscoped transaction, because the identity set carries no
+    // `workspace_id` and a scoped transaction reaches none of it (ADR 0009).
+    const identity = await attempt(() =>
+      eraseFromTheIdentitySet(platform, doors.postgres, {
+        workspaceId,
+        personId: personTheMapFound(map),
+        emails: (request.identifiers?.emails ?? []).map((email) => email.trim().toLowerCase()),
+        pseudonym,
+      }),
+    );
+    if (!identity.ok) return err(identity.error);
+
+    const actions = withTheIdentityStep(
+      withTheChecksMoved(
+        withTheGitStep(foundPerFamily(map), rewritten.value),
+        rewritten.value.carried,
+      ),
+      identity.value,
+    );
     const report = erasureReportOf({ request, erasure, actions, map, concepts });
     const completedAt = doors.clock.now();
 

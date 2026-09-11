@@ -119,6 +119,18 @@ export const VERIFICATION_IMPORTED_ORIGIN =
 export const VERIFICATION_REPAIR_ORIGIN = "repair" satisfies (typeof VERIFICATION_ORIGINS)[number];
 
 /**
+ * A check whose **hash the erasure routine moved** (ADR 0019; ADR 0020; the S0 spec, step 4)
+ * — the repair's twin above, for the same reason and with the same effect on the reader. A
+ * concept whose body or whose cited resource named a person by their actor id has different
+ * canonical text once that identifier is rewritten, so every standing check over it would read
+ * *Changed since checked* for a change nobody made to the fact. The routine re-points those
+ * checks at what the rewritten file says and marks them with this origin, so *Checked by Ada*
+ * stays *Checked by Ada* and the row says that a routine moved its hash.
+ */
+export const VERIFICATION_ERASURE_ORIGIN =
+  "erasure-rewrite" satisfies (typeof VERIFICATION_ORIGINS)[number];
+
+/**
  * Where every concept IRI lives, and the whole of it (ADR 0002): the IRI is **opaque** —
  * `https://better-answers.com/c/<ulid>` — never derived from the path, the bundle or the
  * tenant, so it leaks no name wherever it appears.

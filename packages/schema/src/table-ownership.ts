@@ -238,6 +238,48 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     reason: "The same two scopes, so a live access token cannot outlive its refresh row.",
   },
   {
+    table: "public.user",
+    by: "erasure",
+    access: "read and write",
+    reason:
+      "The routine's step 5 pseudonymises the row on the person's last membership — the address to a tombstone the erasure pseudonym names, the name cleared, the id kept because every ledger row names it (ADR 0020, ADR 0035) — and reads the address off it first, because the two rows deleted below are keyed by address and not by person.",
+  },
+  {
+    table: "public.member",
+    by: "erasure",
+    access: "write",
+    reason:
+      "Every erasure request ends this workspace's membership, which is the whole of what the arm for a person who holds another does; the judgement between the two arms is the platform's and is never shown to an Admin (ADR 0035's rejected oracle). The read that makes it is `workspacesHeldBy` through the workspaces slice, recorded above.",
+  },
+  {
+    table: "public.session",
+    by: "erasure",
+    access: "write",
+    reason:
+      "A sign-in carries the address it came from and the agent that made it, so the person's sessions go with the identity set on the last membership (ADR 0020).",
+  },
+  {
+    table: "public.verification",
+    by: "erasure",
+    access: "write",
+    reason:
+      "A verification row is keyed by the address a code was sent to rather than by person, so it is deleted by the identifier set's addresses and the one the user row still carries — the erasure map's own predicate, which is why it runs before the address is taken away.",
+  },
+  {
+    table: "public.invitation",
+    by: "erasure",
+    access: "write",
+    reason:
+      "An invitation names the address it was sent to. Deleted inside the requesting workspace and no other: an invitation another company sent is that company's record to answer for, and the map is fenced the same way.",
+  },
+  {
+    table: "public.account",
+    by: "erasure",
+    access: "write",
+    reason:
+      "A linked account is the external identity a sign-in came through — a name for this person at another provider — so it goes with the identity set on the last membership (ADR 0020).",
+  },
+  {
     table: "public.member",
     by: POSTGRES_DOOR,
     access: "read",

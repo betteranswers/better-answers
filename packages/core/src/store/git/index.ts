@@ -661,6 +661,36 @@ export const readCommit = async (
 };
 
 /**
+ * **One file's bytes at one commit** — `git show <commit>:<path>`, the read a routine makes
+ * when it already knows which commit to ask: a `concept_index` row names its own commit and
+ * its own path, so this is how the platform reads back the file that row describes without
+ * walking a history for it.
+ *
+ * `null` for a path that commit's tree does not hold, and for a path outside the bundle: a
+ * caller asking about a file that is not there is asking a fair question, and the answer is
+ * that there is nothing there — not a failure. Raw, so what comes back is the file's bytes
+ * with their own trailing newline, which is what a content hash is taken over.
+ */
+export const fileAt = async (
+  platform: PlatformPrincipal,
+  door: GitDoor,
+  workspaceId: string,
+  sha: string,
+  filePath: string,
+): Promise<string | null> => {
+  if (!isBundlePath(filePath)) return null;
+  try {
+    return await git(repositoryPath(door, workspaceId), ["show", `${sha}:${filePath}`], {
+      raw: true,
+    });
+  } catch {
+    // A path the tree does not hold, or a commit this repository does not: `git show` has no
+    // way of saying either but a non-zero exit, and neither is something a caller can act on.
+    return null;
+  }
+};
+
+/**
  * The **history rewrite** — the erasure routine's git step (ADR 0020; ADR 0012; the S0 spec,
  * step 3).
  *
@@ -716,8 +746,12 @@ const NOTHING_MOVED: HistoryRewritten = { moved: [] };
  * Where a rewritten author line points. `.invalid` is reserved and resolves nowhere (RFC
  * 2606), as the platform bot's address above is: an author line has to carry *an* address, and
  * the one it carries after an erasure must not be a mailbox anybody can reach.
+ *
+ * Exported because the identity set's tombstone is the same address (the S0 spec, step 5): one
+ * person erased in one workspace is one address wherever the platform had written theirs, and
+ * two domains for one idea would be two things to keep in step.
  */
-const ERASED_DOMAIN = "erased.better-answers.invalid";
+export const ERASED_DOMAIN = "erased.better-answers.invalid";
 
 /**
  * The characters Python's own `re.escape` escapes, which is the dialect `filter-repo` compiles

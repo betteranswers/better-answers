@@ -10,9 +10,11 @@
  * per-store finder over an exhaustive union of every family that holds text about a person,
  * with the access answer read back off it (`map.ts`) — and the **routine** itself
  * (`routine.ts`), which runs one erasure request end to end under the platform's own
- * principal and `pg_advisory_lock(41)`, with the report it writes (`report.ts`).
+ * principal and `pg_advisory_lock(41)`, with the report it writes (`report.ts`) and the
+ * identity set it pseudonymises on a person's last membership (`identity.ts`).
  */
 
+export type { ErasureSubject, IdentityArm, IdentitySwept } from "./identity.ts";
 export { accessAnswerOf, ERASURE_FAMILIES, erasureMapOf } from "./map.ts";
 export type { AccessAnswer, ErasureFamily, ErasureFamilyDescriptor, ErasureMap } from "./map.ts";
 export { erasureReportOf } from "./report.ts";
