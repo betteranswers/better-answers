@@ -56,6 +56,13 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # The redaction detector's model weights are fetched on first use and land here
+      # rather than in the runner's home directory, so the cache step below has one path to
+      # name and the worker's suite finds them warm. The worker reads this from the
+      # process, never from a file: the location is the deploy unit's to decide, and the
+      # compose file sets the same variable for the running container.
+      HF_HOME: ${{ github.workspace }}/.cache/huggingface
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -76,6 +83,16 @@ jobs:
           hook="$(git rev-parse --git-path hooks)/pre-commit"
           test -x "$hook" || { echo "no executable pre-commit hook at $hook"; exit 1; }
           grep -q lefthook "$hook" || { echo "$hook is not lefthook's"; exit 1; }
+      # Hundreds of megabytes of detector weights, fetched once and restored on every run
+      # after it. The key hashes the module the versions and the model id are declared in,
+      # so a model or a package the weights answer to moving is a miss and a fresh
+      # download — a key that named only the operating system would serve the old weights
+      # to the new pin and nobody would see it happen.
+      - name: the redaction detector's weights, keyed on the pins that name them
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/.cache/huggingface
+          key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
       - run: uv sync --frozen
         working-directory: apps/worker
       # The SPA's `check` ends in a browser suite over the served build; the

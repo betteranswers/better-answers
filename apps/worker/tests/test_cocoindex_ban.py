@@ -1,15 +1,15 @@
 """The cocoindex ban, proved by running the tier's ruff rather than reading its config.
 
 A ban nobody has run is a convention, not a rule — the reading
-``tests/test_monkeypatch_guard.py`` takes of the `unittest.mock` ban beside it — so this
-suite runs the tier's own configuration over a file that makes the import and over one
-that makes an import the tier really makes.
+``tests/test_monkeypatch_guard.py`` takes of the `unittest.mock` ban beside it — so
+this suite runs the tier's own configuration over a file that makes the import and
+over one that makes an import the tier really makes.
 
-The redaction seam takes plain types and returns plain types (`[PIPE1]`), so a cocoindex
-type reaching into it would make it a function only cocoindex could call. The ban is the
-whole tier's, which is what forces the one module allowed to compose the engine to
-declare itself: it lifts the ban for its own directory by a per-file ignore when it
-lands (ADR 0036).
+The redaction seam takes plain types and returns plain types (`[PIPE1]`), so a
+cocoindex type reaching into it would make it a function only cocoindex could call.
+The ban is the whole tier's, which is what forces the one module allowed to compose
+the engine to declare itself: it lifts the ban for its own directory by a per-file
+ignore when it lands (ADR 0036).
 
 Both readings are held (`[TEST7]`): the import is refused wherever in the tier it is
 written, and an import the tier really makes is left alone — a ban that refused
@@ -35,8 +35,8 @@ AN_IMPORT_THE_TIER_MAKES = "import structlog\n\nlogger = structlog.get_logger()\
 def rules_fired_over(source: str, filename: str) -> list[str]:
     """Every rule the tier's ruff reports over one file's text, read as ruff's own JSON.
 
-    The text arrives on stdin under the name it would have on disk, because where a file
-    sits is what decides which per-file ignore reaches it.
+    The text arrives on stdin under the name it would have on disk, because where a
+    file sits is what decides which per-file ignore reaches it.
     """
     completed = subprocess.run(
         (
