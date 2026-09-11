@@ -268,6 +268,13 @@ if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
     # 7 — and gone from git. `git cat-file -e` on each pre-rewrite commit must fail: after
     # `git filter-repo` and the prune the old objects are not merely unreferenced, they are not
     # there to read. This is the check that proves "gone from every copy" rather than assuming it.
+    #
+    # An empty set is a failure and not a pass. The seed writes one concept file and commits it, so
+    # there is always a commit to look for; nothing here means the repository could not be read —
+    # a wrong path, a wrong owner — and a loop over nothing would report a step that never ran.
+    if [ -z "${seeded_commits}" ]; then
+      say "REHEARSAL FAILED: the seed added no commit to ${ws_repo} — step 7 would prove nothing"; exit 1
+    fi
     for hash in ${seeded_commits}; do
       if ws_git cat-file -e "${hash}^{commit}" 2>/dev/null; then
         say "REHEARSAL FAILED: pre-rewrite commit ${hash} is still readable in ${ws_repo}"; exit 1

@@ -332,6 +332,9 @@ describe("the deploy tree (T-005)", () => {
     // else stops the drill. The allow-list tolerates the schema prefix `pg_dump` writes.
     expect(drill).toContain("grep -v -E ' of table ([a-z_]+\\.)?(subject_request|suppression)$'");
     expect(drill).toContain("keep the identifier set BY DESIGN");
+    // And step 7 over an empty set of hashes is a failure, not a pass: a loop over nothing would
+    // report a step that never ran, which is the one way this rehearsal could lie.
+    expect(drill).toContain("the seed added no commit");
   });
 
   /**
