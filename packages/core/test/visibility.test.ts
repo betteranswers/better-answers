@@ -61,6 +61,23 @@ const overriddenTo = (scenario: Scenario, iri: string, sensitivity: string) =>
   );
 const EVERYONE = { audience: "everyone", audience_groups: null } as const;
 
+/**
+ * What a refused write would have landed, counted as the superuser so no policy hides a
+ * survivor: the concept at the path it asked for, and any evidence naming the document it
+ * cited.
+ */
+const landedFor = async (workspaceId: string, path: string, documentId: string) => {
+  const concepts = await db().pool.query(
+    "SELECT 1 FROM concept_index WHERE workspace_id = $1 AND path = $2",
+    [workspaceId, path],
+  );
+  const cited = await db().pool.query(
+    "SELECT 1 FROM evidence WHERE workspace_id = $1 AND source_document_id = $2",
+    [workspaceId, documentId],
+  );
+  return { concepts: concepts.rowCount ?? 0, evidence: cited.rowCount ?? 0 };
+};
+
 /** The concept's row and its node, which the derivation must keep in step. */
 const rowAndNode = async (workspaceId: string, iri: string) => ({
   row: await visibilityHeld(db().pool, "concept_index", workspaceId, iri),
@@ -182,10 +199,38 @@ describe("what a governed write derives from the bindings of what it cites", () 
     });
   });
 
-  it("keeps the writer's word when nothing it cites resolves to a catalogued document", async () => {
+  it("refuses a citation of an uncatalogued document by name and lands nothing", async () => {
+    const scenario = await arrange();
+    const uncatalogued = ulid();
+    const path = "knowledge/cites-an-uncatalogued-document.md";
+    const before = await bundleHistory(scenario.git, scenario.workspaceId);
+
+    const refused = await writeConcept(scenario.editor, doorsOf(scenario), {
+      mergeKey: "note:cites-an-uncatalogued-document",
+      path,
+      kind: "Note",
+      title: "A note on a document nobody catalogued",
+      frontmatter: { title: "A note on a document nobody catalogued", type: "Note" },
+      body: "It cites a document the catalogue does not hold.",
+      message: "Record a note citing an uncatalogued document",
+      author: { name: "Ada Editor", email: "ada@acme.invalid" },
+      expects: { head: await head(scenario.editor, scenario.git) },
+      sensitivity: "Internal",
+      evidence: [{ sourceDocumentId: uncatalogued, locator: "p.1", resource: "Document 1" }],
+    });
+
+    expect(refused).toEqual({ ok: false, error: "no-such-document" });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
+    expect(await landedFor(scenario.workspaceId, path, uncatalogued)).toEqual({
+      concepts: 0,
+      evidence: 0,
+    });
+  });
+
+  it("keeps the writer's word for a concept citing no source-derived evidence at all", async () => {
     const scenario = await arrange();
 
-    const written = await conceptCiting(scenario, scenario.editor, [ulid()], {
+    const written = await conceptCiting(scenario, scenario.editor, [], {
       sensitivity: "Internal",
     });
 
@@ -1113,17 +1158,12 @@ describe("the evidence pane", () => {
     });
   });
 
-  it("withholds evidence whose binding is unpublished or whose document is uncatalogued, naming no Admin", async () => {
+  it("withholds evidence whose binding is unpublished, naming no Admin", async () => {
     const scenario = await arrange();
     const unpublished = await bindingHolding(db(), scenario.workspaceId, { publishedAt: null });
-    const written = await conceptCiting(
-      scenario,
-      scenario.editor,
-      [unpublished.documentId, ulid()],
-      {
-        sensitivity: "Internal",
-      },
-    );
+    const written = await conceptCiting(scenario, scenario.editor, [unpublished.documentId], {
+      sensitivity: "Internal",
+    });
 
     const pane = await paneFor(scenario.admin, written.iri);
 
