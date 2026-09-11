@@ -48,7 +48,8 @@ GLINER_MODEL_ID = "urchade/gliner_multi_pii-v1"
 #: measures it against the pin on the fixture's own page and never runs it, so it is in
 #: no version string and no finding. Read from Hugging Face on 11 September 2026. It is
 #: a constant of its own rather than a string in the Dockerfile because a model id is a
-#: pinned value and `[DEPS2]` gives each of those one place to live.
+#: pinned value, and every pinned value this tier depends on is declared once here as an
+#: exported constant rather than spelled again wherever it is read.
 GLINER_MODEL_ID_MEASURED = "knowledgator/gliner-pii-base-v1.0"
 
 #: This repository's own half of the version string. A rule, the category table or a

@@ -21,8 +21,8 @@ lemmas from. That one is a pinned wheel in ``uv.lock`` rather than an entry unde
 ``HF_HOME``, so ``uv sync`` has already installed it and there is nothing here to fetch;
 loading it anyway is how the build finds out, at build, that it cannot.
 
-This module reads no environment variable. ``config.py`` is the only module in the tier
-that reads one (`[WRK2]`), and it has no business knowing about a cache the image bakes:
+This module reads no environment variable. ``config.py`` is the only module in this tier
+allowed to read one, and it has no business knowing about a cache the image bakes:
 ``HF_HOME`` is set by the Dockerfile for this process and by the image for the
 container's, and it is ``huggingface_hub`` that reads it, never anything of ours.
 """
