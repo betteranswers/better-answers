@@ -1,0 +1,27 @@
+packages/core/src/sources/passages.ts
+  s_f3ee63bcbb1a0b::t_d0cd0ed1048bc6 3-18
+  s_f3ee63bcbb1a0b::t_e27216e23390ea 299-396
+packages/core/test/passages.test.ts
+  s_f3ee63bcbb1a0b::t_f7474dae587e41 7-13
+  s_f3ee63bcbb1a0b::t_a40fb1df8af421 49-54
+  s_f3ee63bcbb1a0b::t_a11c51bb0bd5fe 476-719
+packages/core/src/sources/index.ts
+  s_f3ee63bcbb1a0b::t_7d6d49111d601c 84,87
+  s_f3ee63bcbb1a0b::t_16ac02687443ef 47-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e752e4ef05553a9a511c3d0b7b967268930f7904",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
