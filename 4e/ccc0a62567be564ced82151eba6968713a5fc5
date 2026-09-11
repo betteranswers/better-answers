@@ -1,0 +1,36 @@
+packages/schema/src/index-tables.ts
+  s_f3ee63bcbb1a0b::t_fcfcd5cd2a4833 74-78
+packages/core/src/sources/passages.ts
+  s_f3ee63bcbb1a0b::t_db29d109918e8a 232
+  s_f3ee63bcbb1a0b::t_0dc14334dedfbf 154-231,233-284
+packages/core/src/sources/index.ts
+  s_f3ee63bcbb1a0b::t_73e4255dbc633e 76-82
+  s_f3ee63bcbb1a0b::t_ae457cf51ea192 44-47
+packages/core/test/passages.test.ts
+  s_f3ee63bcbb1a0b::t_d824414979a3cd 37-42
+  s_f3ee63bcbb1a0b::t_b37d2cead10a35 6-7
+  s_f3ee63bcbb1a0b::t_d23866e3915943 120-126,134-137,141-145,148,150,166,168
+  s_f3ee63bcbb1a0b::t_e57c9daa5630c4 177-218
+  s_f3ee63bcbb1a0b::t_8dab998177538e 9-15
+  s_f3ee63bcbb1a0b::t_2b3584ee303ea3 382-383,385-408,411-418,420-430,433-450,452-463
+  s_f3ee63bcbb1a0b::t_9e779c59f6d11a 384
+  s_f3ee63bcbb1a0b::t_4d495e044ffe1b 409-410,419,431-432,451
+CONTEXT.md
+  s_f3ee63bcbb1a0b::t_a753fbd11b24dc 222-226
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "4eccc0a62567be564ced82151eba6968713a5fc5",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
