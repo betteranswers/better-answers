@@ -26,6 +26,17 @@ Kingdom shape a bid library is full of and none of them shipped by anybody:
   address, and the span is the whole of it, from the street number to the end of the
   postcode, because that is what the placeholder stands in for.
 
+**The email built-in is wrapped rather than registered**, which is less a rule of its
+own than a narrowing of the first sentence above. A standard decides the shape of an
+address and says nothing about whose mailbox is behind it, and whose it is is the whole
+of what the default-on tier turns on: a supplier's owner writes from a provider anybody
+may open an account with, and the same supplier's bid team writes from the company.
+Registered bare, the built-in withholds both, and a reader entitled to the supplier's
+own contact details loses them to a rule meant to protect a person. So the wrapper
+keeps the answers whose domain is on the consumer-domain list and drops the rest. The
+list is part of what the seam withholds and is bumped with the rule version exactly as
+a pattern here is.
+
 The **officer block** is the fifth rule and is not a recogniser: it is a post-pass over
 whatever the others found, and what it decides is a tier rather than a span. A name
 inside a persons-with-significant-control, officers, directors or signatories block is
@@ -42,7 +53,9 @@ from collections.abc import Iterator, Sequence
 
 from presidio_analyzer import AnalysisExplanation, LocalRecognizer, RecognizerResult
 from presidio_analyzer.nlp_engine import NlpArtifacts
+from presidio_analyzer.predefined_recognizers import EmailRecognizer
 
+from .consumer_domains import is_a_consumer_address
 from .descriptors import CategoryDescriptor
 
 #: A sort code and an account number close enough together to be one instruction: six
@@ -214,6 +227,31 @@ class HomeAddressRecogniser(SeamRecogniser):
             streets = list(A_STREET_LINE.finditer(text, opened, postcode.start()))
             if streets:
                 yield streets[-1].start(), postcode.end(), A_PROMOTED_POSTCODE
+
+
+class ConsumerEmailRecogniser(SeamRecogniser):
+    """An address Presidio matched, kept only where its domain is a consumer provider's.
+
+    The built-in is held rather than subclassed because what is wanted of it is its
+    answers and not its pattern. Each answer it keeps is re-made through this rule's
+    own result-builder so that the context enhancer can match it back to a recogniser
+    the registry actually holds — the built-in, wrapped, is in no registry, and an
+    enhancer that cannot find the rule behind a result leaves every score where it was.
+    Nothing is lost in the re-making: Presidio scores an address it has validated at its
+    maximum, so there is no score left for a context word to lift.
+    """
+
+    def __init__(self, descriptor: CategoryDescriptor, entity: str) -> None:
+        super().__init__(descriptor, entity)
+        self.built_in = EmailRecognizer(context=list(descriptor.context))
+
+    def spans(
+        self, text: str, nlp_artifacts: NlpArtifacts | None
+    ) -> Iterator[tuple[int, int, float]]:
+        for found in self.built_in.analyze(text, [self.entity], nlp_artifacts):
+            start, end = int(found.start), int(found.end)
+            if is_a_consumer_address(text[start:end]):
+                yield start, end, float(found.score)
 
 
 def sentence_around(text: str, at: int) -> tuple[int, int]:

@@ -16,11 +16,17 @@ which is what makes "one record and one bump" a rule rather than a habit.
 
 import hashlib
 import json
+import re
 import tomllib
 from importlib.metadata import version as installed_version
 from pathlib import Path
 from typing import Any
 
+from better_answers_worker.redaction.consumer_domains import (
+    CONSUMER_DOMAINS,
+    READ_ON,
+    SOURCE,
+)
 from better_answers_worker.redaction.descriptors import (
     CATEGORY_BY_ENTITY,
     DESCRIPTORS,
@@ -75,24 +81,34 @@ def pinned_by_the_installer() -> dict[str, str]:
 
 
 def descriptor_digest() -> str:
-    """A digest of the whole descriptor table, computed here and never by the module.
+    """A digest of everything a rule version stands for, computed here, never by it.
 
     The rendering is this suite's own, so the literal below cannot drift with a change
     to how the worker spells a descriptor: only a change to what one *says* moves it.
+
+    The consumer-domain list is in the digest because it is part of the rule and not a
+    reference table the rule happens to read. Which domains count decides which
+    addresses are withheld exactly as a threshold or a placeholder does, so a domain
+    added or dropped without a bump of ``RULE_VERSION`` would leave findings written
+    under two different rules claiming the same version. Sorted rather than taken in
+    the order the module spells them, because a ``frozenset`` has no order to hash.
     """
     canonical = json.dumps(
-        [
-            {
-                "category": descriptor.category,
-                "tier": descriptor.tier,
-                "raised_by": list(descriptor.raised_by),
-                "threshold": descriptor.threshold,
-                "context": list(descriptor.context),
-                "placeholder": descriptor.placeholder,
-                "narrows_to": descriptor.narrows_to,
-            }
-            for descriptor in DESCRIPTORS
-        ],
+        {
+            "categories": [
+                {
+                    "category": descriptor.category,
+                    "tier": descriptor.tier,
+                    "raised_by": list(descriptor.raised_by),
+                    "threshold": descriptor.threshold,
+                    "context": list(descriptor.context),
+                    "placeholder": descriptor.placeholder,
+                    "narrows_to": descriptor.narrows_to,
+                }
+                for descriptor in DESCRIPTORS
+            ],
+            "consumer_domains": sorted(CONSUMER_DOMAINS),
+        },
         sort_keys=True,
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -160,30 +176,48 @@ def test_the_version_string_is_the_rule_version_and_the_detector_pin() -> None:
     written = VERSION_STRING
 
     assert written == (
-        "1:presidio-2.2.364+gliner-0.2.29+torch-2.14.0"
+        "2:presidio-2.2.364+gliner-0.2.29+torch-2.14.0"
         "+spacy-3.8.16+en-core-web-sm-3.8.0+gliner-multi-pii-v1"
     )
-    assert RULE_VERSION == "1"
+    assert RULE_VERSION == "2"
     assert VERSION_STRING.count(":") == 1
     assert VERSION_STRING.split(":") == [RULE_VERSION, DETECTOR_PIN]
 
 
 def test_the_version_string_is_written_the_way_the_agreement_says() -> None:
-    import re
-
     pattern = re.compile(agreement()["version_string"]["pattern"])
 
     assert pattern.fullmatch(VERSION_STRING) is not None
 
 
 def test_the_rule_version_is_bumped_with_the_table_it_stands_for() -> None:
-    # `rule_version` is one constant bumped whenever a rule, the category table or a
-    # recogniser changes. Edit a descriptor without bumping it and this literal stops
-    # matching: the two are changed together or the suite is red.
-    digest = "e848b085ba25fd3bd9760414856e938e393a4b30e9cf1476472335c7bef25ed0"
+    # `rule_version` is one constant bumped whenever a rule, the category table, the
+    # consumer-domain list or a recogniser changes. Edit a descriptor or a domain
+    # without bumping it and this literal stops matching: they are changed together or
+    # the suite is red.
+    digest = "4aa310ea6ac1671c693d411c9f2dd5c8bf1b8a1c70dd1e361689dd66a6d94cb0"
 
     assert descriptor_digest() == digest
-    assert RULE_VERSION == "1"
+    assert RULE_VERSION == "2"
+
+
+def test_the_consumer_domain_list_carries_its_date_and_its_source() -> None:
+    # What acceptance asks of a list that decides what is withheld: it is a tracked
+    # file, it says when it was settled, and it says where each domain on it was read.
+    # Membership is asserted both ways (`[TEST7]`) — a domain with no source line is a
+    # rule nobody can check, and a source line naming a domain that is not on the list
+    # is a citation for a rule that is not there.
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", READ_ON) is not None
+    assert CONSUMER_DOMAINS
+
+    cited = {
+        word.strip(",:")
+        for line in SOURCE
+        for word in line.split()
+        if "." in word and not word.startswith("http")
+    }
+
+    assert cited == set(CONSUMER_DOMAINS)
 
 
 def test_every_pin_is_the_version_the_installer_pins() -> None:

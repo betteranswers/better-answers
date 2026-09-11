@@ -178,6 +178,9 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **redaction rule** — one of three tiers of what the seam withholds: **always** (policy no
   binding switches off; a span restorable with a reason), **default on** per binding, **default
   off** per binding. The officer-block rule always wins.
+- **consumer-domain list** — the email domains this repository judges a consumer provider's,
+  dated and sourced. An address on one is a person's own and is personal contact; an address on
+  any other domain is a company's and stays in the text. A judgement, never a complete register.
 - **withheld** — the placeholder word: `[withheld]` for the always set, `[home address withheld]`
   and the like for the rest, `[person A]` for a pseudonymised name.
 - **relation** — a link from one concept to another as the map holds it: the two kinds, the

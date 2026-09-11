@@ -94,17 +94,24 @@ ONE_NAME_SUPPRESSED: Sequence[Mapping[str, Sequence[str]]] = (
     {"emails": (), "names": ("Rosalind Petheridge",), "other": ()},
 )
 
+#: The page's two email addresses, which are the pair the consumer-domain rule is read
+#: through: an invented mailbox at a real consumer provider, and an invented mailbox on
+#: the invented company's own domain. Only the domain differs in kind — both local parts
+#: are a person's name — so what either assertion below can be about is the domain.
+A_CONSUMER_ADDRESS = "rosalind.petheridge@hotmail.co.uk"
+A_COMPANY_ADDRESS = "callum.whitcombe@meridianfenland.co.uk"
+
 #: Every span the recall set is made of, as the category it must be raised under and
 #: the literal the fixture planted. Written out here rather than read back from the
 #: seam, so a recogniser that moved a boundary by one character fails rather than
-#: agrees with itself.
+#: agrees with itself. The company address is deliberately absent: it is on no consumer
+#: domain, so it is not personal contact and the page keeps it.
 PLANTED_SPANS: tuple[tuple[str, str], ...] = (
     ("date-of-birth", "3 February 1978"),
     ("home-address", "14 Marlbrook Rise, Hensworth, NN12 3AB"),
     ("home-address", "7 Pinfold Gate, Ashdale, YO41 9ZZ"),
     ("bank-details", "00-00-00, account number 12345678"),
-    ("personal-contact", "rosalind.petheridge@example.com"),
-    ("personal-contact", "callum.whitcombe@example.org"),
+    ("personal-contact", A_CONSUMER_ADDRESS),
     ("personal-contact", "07700 900123"),
     ("government-identifier", "999 000 0018"),
     (
@@ -201,14 +208,15 @@ def test_every_span_is_cut_back_out_of_the_text_by_the_offsets_it_came_with(
 
 def test_the_recall_set_is_found_in_full(on_a_plain_binding: Redaction) -> None:
     # The eight flagged spans and the health note, counted by the category each is
-    # raised under: two home addresses, three pieces of personal contact, and one each
-    # of the rest.
+    # raised under: two home addresses, two pieces of personal contact, and one each of
+    # the rest. Personal contact is two and not three because the page's third address
+    # is the company's own, which no consumer-domain rule raises.
     counts = on_a_plain_binding.counts
 
     assert counts["date-of-birth"] == 1
     assert counts["home-address"] == 2
     assert counts["bank-details"] == 2
-    assert counts["personal-contact"] == 3
+    assert counts["personal-contact"] == 2
     assert counts["government-identifier"] == 1
     assert counts["special-category"] == 1
 
@@ -255,7 +263,7 @@ def test_a_switchable_tier_that_is_off_leaves_its_spans_in_the_text(
 
     assert "3 February 1978" in redacted
     assert "14 Marlbrook Rise, Hensworth, NN12 3AB" in redacted
-    assert "rosalind.petheridge@example.com" in redacted
+    assert A_CONSUMER_ADDRESS in redacted
 
 
 def test_the_default_on_tier_writes_its_own_word_in_place_of_each_span(
@@ -268,8 +276,8 @@ def test_the_default_on_tier_writes_its_own_word_in_place_of_each_span(
 
     assert "[date of birth withheld]" in redacted
     assert redacted.count("[home address withheld]") == 2
-    assert redacted.count("[personal contact withheld]") == 3
-    assert "rosalind.petheridge@example.com" not in redacted
+    assert redacted.count("[personal contact withheld]") == 2
+    assert A_CONSUMER_ADDRESS not in redacted
 
 
 def test_a_bare_date_is_not_a_finding_and_a_date_beside_date_of_birth_is(
@@ -284,6 +292,63 @@ def test_a_bare_date_is_not_a_finding_and_a_date_beside_date_of_birth_is(
     for bare in BARE_DATES:
         assert bare not in dates
         assert bare in on_a_plain_binding.text
+
+
+def test_an_email_on_a_consumer_domain_is_personal_contact_and_a_company_one_is_not(
+    on_a_plain_binding: Redaction, page: str
+) -> None:
+    # The pair this rule is, both ways (`[TEST7]`), and the reason both local parts on
+    # the page are a person's name: the only thing that differs between the two is the
+    # domain, so the only thing either half can be about is the domain. The positive
+    # half is the span cut back out of the page by the offsets the finding carried; the
+    # negative half is asserted over the same offsets rather than over a list of
+    # strings, because a finding that claimed part of the company address would be a
+    # placeholder written across it whatever the whole address matched.
+    contact = spans_under(on_a_plain_binding, page, "personal-contact")
+
+    assert A_CONSUMER_ADDRESS in contact
+
+    opened = page.index(A_COMPANY_ADDRESS)
+    closed = opened + len(A_COMPANY_ADDRESS)
+
+    assert [
+        finding
+        for finding in on_a_plain_binding.findings
+        if finding.start < closed and opened < finding.end
+    ] == []
+    # The other half of the negative direction, and a different string: the offsets
+    # above are into the text the seam was given, and what a reader is handed is the
+    # text it returns, whose length differs by every placeholder written.
+    assert A_COMPANY_ADDRESS in on_a_plain_binding.text
+
+
+def test_the_telephone_number_is_personal_contact_whatever_the_domain_rule_does(
+    on_a_plain_binding: Redaction, page: str
+) -> None:
+    # The regression a domain rule is most likely to cause. Personal contact is raised
+    # by two entities and only one of them is an email, so a rule that filtered the
+    # category rather than the one recogniser would take the number out with it — and
+    # a number has no domain to be on a list.
+    assert "07700 900123" in spans_under(on_a_plain_binding, page, "personal-contact")
+    assert "07700 900123" not in on_a_plain_binding.text
+
+
+def test_a_shouted_consumer_domain_is_still_the_same_domain() -> None:
+    # A domain is case-insensitive by the standard that defines it, so a document that
+    # shouted one names the same provider. Both halves are literals (`[TEST9]`): the
+    # address withheld and the address kept are written down here rather than derived
+    # from the list the rule reads.
+    found = redact(
+        "Her own address is R.PETHERIDGE@GMAIL.COM and the office takes enquiries at"
+        " enquiries@meridianfenland.co.uk.",
+        THE_SAFE_SET,
+        NO_SUPPRESSIONS,
+        SEED,
+    )
+
+    assert "R.PETHERIDGE@GMAIL.COM" not in found.text
+    assert found.text.count("[personal contact withheld]") == 1
+    assert "enquiries@meridianfenland.co.uk" in found.text
 
 
 def test_a_health_cue_withholds_its_sentence_and_narrows_the_document(

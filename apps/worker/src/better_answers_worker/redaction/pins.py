@@ -52,10 +52,13 @@ GLINER_MODEL_ID = "urchade/gliner_multi_pii-v1"
 #: exported constant rather than spelled again wherever it is read.
 GLINER_MODEL_ID_MEASURED = "knowledgator/gliner-pii-base-v1.0"
 
-#: This repository's own half of the version string. A rule, the category table or a
-#: recogniser changing is one edit and this bump; the suite holds a digest of the
-#: table beside it, so the two cannot move apart.
-RULE_VERSION = "1"
+#: This repository's own half of the version string. A rule, the category table, the
+#: consumer-domain list or a recogniser changing is one edit and this bump; the suite
+#: holds a digest of the table and the list beside it, so the three cannot move apart.
+#: Version 2 is the consumer-domain list: before it, every email address the built-in
+#: matched was personal contact, so a supplier's own corporate address was withheld
+#: from readers entitled to it.
+RULE_VERSION = "2"
 
 #: Two spellings, one name: a pin is written in the hyphens a package name uses,
 #: because a slash would read as a path and an underscore as a second spelling of one

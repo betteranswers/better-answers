@@ -49,7 +49,6 @@ from presidio_analyzer import (
 )
 from presidio_analyzer.nlp_engine import NlpArtifacts, NlpEngineProvider
 from presidio_analyzer.predefined_recognizers import (
-    EmailRecognizer,
     GLiNERRecognizer,
     NhsRecognizer,
     PhoneRecognizer,
@@ -59,6 +58,7 @@ from presidio_analyzer.predefined_recognizers import (
 from .descriptors import CATEGORY_BY_ENTITY, DESCRIPTORS, CategoryDescriptor
 from .pins import GLINER_MODEL_ID, SPACY_MODEL
 from .recognisers import (
+    ConsumerEmailRecogniser,
     DateInContextRecogniser,
     HealthCueRecogniser,
     HomeAddressRecogniser,
@@ -116,11 +116,15 @@ TIER_PRECEDENCE: Mapping[str, int] = MappingProxyType(
 
 #: One factory per entity a recogniser of ours or a built-in answers for. The rest of
 #: the table is the model's, and an entity in neither is a declaration nobody can act
-#: on.
+#: on. An email address is the one entry that is both: the built-in finds the address
+#: and a rule of ours decides whether the domain it sits at is a person's own provider,
+#: because the shape of an address is all a standard settles and whose mailbox it is is
+#: what the tier is about. This entry is the whole of that surface — the model is never
+#: asked for an email — so the list is reached from here and from nowhere else.
 RECOGNISERS: Mapping[str, Callable[[CategoryDescriptor], EntityRecognizer]] = (
     MappingProxyType(
         {
-            "EMAIL_ADDRESS": lambda it: EmailRecognizer(context=list(it.context)),
+            "EMAIL_ADDRESS": lambda it: ConsumerEmailRecogniser(it, "EMAIL_ADDRESS"),
             "PHONE_NUMBER": lambda it: PhoneRecognizer(
                 supported_regions=PHONE_REGIONS,
                 leniency=PHONE_LENIENCY,

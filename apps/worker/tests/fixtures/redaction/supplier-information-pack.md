@@ -3,9 +3,10 @@
 Every name, number and address on this page is invented and belongs to nobody, because
 this repository is public. The telephone number is from Ofcom's drama range, the
 patient identifier is from the range published for test data, and the sort code and
-account number are issued to no bank. The page is shaped after the eight spans a real
-supplier pack was flagged for, and after one sentence prototype 52 kept; none of that
-document's text, names or numbers is here.
+account number are issued to no bank. Both email addresses are invented mailboxes, one
+at a real consumer email service and one on this invented company's own domain. The
+page is shaped after the eight spans a real supplier pack was flagged for, and after
+one sentence prototype 52 kept; none of that document's text, names or numbers is here.
 
 It is a Markdown file rather than a Python string so that the worker image's own test
 can put the same page through the same conversion the pipeline will use.
@@ -35,10 +36,10 @@ Payments under this framework are made by BACS to the project account, sort code
 ## Contacts
 
 The nominated bid contact is Rosalind Petheridge, whose personal email is
-rosalind.petheridge@example.com. Callum Whitcombe stays on as our site manager and
-answers out of hours at callum.whitcombe@example.org. Data protection enquiries go to
-Imogen Sarkar, our Data Protection Officer, who takes them on her personal mobile,
-07700 900123.
+rosalind.petheridge@hotmail.co.uk. Callum Whitcombe stays on as our site manager and
+answers on our own company address, callum.whitcombe@meridianfenland.co.uk. Data
+protection enquiries go to Imogen Sarkar, our Data Protection Officer, who takes them
+on her personal mobile, 07700 900123.
 
 ## Workforce
 

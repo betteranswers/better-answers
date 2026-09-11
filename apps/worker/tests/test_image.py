@@ -142,13 +142,16 @@ SEED = "b0f3a1d2c4e5"
 #: out as literals rather than read back from the container (`[TEST9]`): what is being
 #: proved is that the image's seam answers what this repository's seam answers, and a
 #: container asked to grade its own work proves nothing.
+#:
+#: The page's second email address is deliberately not here. It sits on the invented
+#: company's own domain rather than on a consumer provider's, so the seam leaves it in
+#: the text and a line asserting it gone would be asserting the opposite of the rule.
 PLANTED_SPANS = (
     "3 February 1978",
     "14 Marlbrook Rise, Hensworth, NN12 3AB",
     "7 Pinfold Gate, Ashdale, YO41 9ZZ",
     "00-00-00, account number 12345678",
-    "rosalind.petheridge@example.com",
-    "callum.whitcombe@example.org",
+    "rosalind.petheridge@hotmail.co.uk",
     "07700 900123",
     "999 000 0018",
     "One of our supervisors was on long-term sick leave following a cancer "
@@ -163,7 +166,7 @@ FINDINGS_BY_CATEGORY: Mapping[str, int] = {
     "date-of-birth": 1,
     "home-address": 2,
     "bank-details": 2,
-    "personal-contact": 3,
+    "personal-contact": 2,
     "government-identifier": 1,
     "special-category": 1,
 }
@@ -171,7 +174,7 @@ PLACEHOLDERS_IN_THE_TEXT: Mapping[str, int] = {
     "[withheld]": 6,
     "[date of birth withheld]": 1,
     "[home address withheld]": 2,
-    "[personal contact withheld]": 3,
+    "[personal contact withheld]": 2,
 }
 
 #: The sensitivity the health sentence narrows the document to.
