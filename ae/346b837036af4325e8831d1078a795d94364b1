@@ -1,0 +1,39 @@
+packages/core/src/erasure/suppressions.ts
+  s_f3ee63bcbb1a0b::t_c6995dcaeb4b82 1-102
+packages/core/src/erasure/routine.ts
+  s_f3ee63bcbb1a0b::t_d5f09c8c775a2f 513-548,550
+  s_f3ee63bcbb1a0b::t_fd7623de155ad3 173-178
+  s_f3ee63bcbb1a0b::t_192da7a764e303 215-216
+  s_f3ee63bcbb1a0b::t_6d6ab40d3edd3e 458
+  s_f3ee63bcbb1a0b::t_229c4901855b85 18,26
+  s_f3ee63bcbb1a0b::t_a247c528182e67 264-269
+  s_f3ee63bcbb1a0b::t_86c1cc865a7ef5 191
+  s_f3ee63bcbb1a0b::t_459f341f806763 377-401
+  s_f3ee63bcbb1a0b::t_97db9d65db0387 49-58
+packages/core/src/erasure/rederive.ts
+  s_f3ee63bcbb1a0b::t_56a80850196c96 1-108
+packages/core/test/erasure-routine.test.ts
+  s_f3ee63bcbb1a0b::t_c8ac607445bab9 1050-1294
+  s_f3ee63bcbb1a0b::t_bb7a924225b5e6 15-24
+  s_f3ee63bcbb1a0b::t_a021019d111197 5
+packages/core/src/erasure/index.ts
+  s_f3ee63bcbb1a0b::t_56c91c58cf6605 13-16
+  s_f3ee63bcbb1a0b::t_b521d51ca4e51f 29-30
+  s_f3ee63bcbb1a0b::t_19307cf241de63 22-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ae346b837036af4325e8831d1078a795d94364b1",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
