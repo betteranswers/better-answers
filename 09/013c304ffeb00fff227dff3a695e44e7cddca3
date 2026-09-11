@@ -1,0 +1,24 @@
+knip.config.ts
+  s_96a66f19ddb6be::t_9fe23ecb892256 23-29
+packages/devtools/test/knip.test.ts
+  s_96a66f19ddb6be::t_30a0a23253fbc0 9-10,24-31
+  s_96a66f19ddb6be::t_b39c095f466264 137-192
+package.json
+  s_96a66f19ddb6be::t_be43abd7fcf49b 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "09013c304ffeb00fff227dff3a695e44e7cddca3",
+  "prompts": {},
+  "sessions": {
+    "s_96a66f19ddb6be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1940d59b-7323-446c-9724-222dda88e9e0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
