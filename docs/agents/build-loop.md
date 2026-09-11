@@ -7,7 +7,7 @@ How a block of the route (`docs/specs/v01-route.md`) is built by agents to this 
 | Orchestrator | the session | — | Picks from the frontier, briefs ralph, approves the plan, lands the ticket, moves the ordna task, opens the block PR |
 | Ralph | `ralph` | opus, xhigh | Phase 1 turns the ticket into a plan with test commands; Phase 2 loops implementor → tester → evaluate until green |
 | Implementor | `implementor` | opus, high (the brief may say sonnet for a small ticket) | Builds one iteration's focus inside the gates below; commits on the worktree branch |
-| Tester | `implementor` on sonnet | sonnet | Runs the plan's test commands and reports the output; changes nothing |
+| Tester | `implementor` on sonnet, or ralph itself | sonnet | Runs the plan's test commands and reports the output; changes nothing. Ralph may run the commands in its own foreground instead of spawning a tester — the commands are the arbiter either way, and it saves a child (T-120, 11/09/2026) |
 | UI designer | `ui-designer` | opus, xhigh | The implementor for a ticket that lands a screen (T-136): the same gates, plus `/better-answers-design` and `/browser-suite` |
 | Verifier | `verifier` | opus, xhigh | Evidence-driven pass over the ordna acceptance criteria and the gates; approves or lists what is missing |
 | Reviewer | `pr-reviewer` | opus, xhigh | The block PR's review on two axes, standards and spec, while Cubic is paused |
@@ -15,7 +15,8 @@ How a block of the route (`docs/specs/v01-route.md`) is built by agents to this 
 ## The shape
 
 - **A block is one PR.** The block branch is named for the block — `s0`, `s1` — and cut from `main`. Tickets land on it as commits; the PR opens when the block's last ticket lands and the owner merges it. The route's status row flips to *building* in the block branch's first commit and to *done* in the PR's last.
-- **A ticket is one worktree.** Ralph is spawned with `isolation: "worktree"` while the main checkout sits on the block branch, so the worktree is cut from the block's tip. The hooks provision it (`pnpm install`, the skills, the tracker guide). Nothing is committed in the main checkout during a ticket except landings.
+- **A ticket is one worktree.** Ralph is spawned with `isolation: "worktree"` while the main checkout sits on the block branch, so the worktree is cut from the block's tip. The hooks provision it (`pnpm install`, the skills, the tracker guide). Nothing is committed in the main checkout during a ticket except landings and a rules-page correction between tickets.
+- **Ralph stays awake by its own watcher.** A subagent is not resumed when its child finishes (T-120 stalled twice on this, 10/09/2026), so ralph never ends its turn with a child running: it arms a background shell task on the worktree that exits when the branch has moved and gone quiet — that exit re-invokes ralph — or it runs the test commands itself. The orchestrator keeps a backstop watch and nudges a silent ralph by message; a message to a running ralph answers *already running*, which is the liveness check.
 - **The frontier** is every `todo` task in the block whose `depends_on` are all `done` — `ordna list -s todo`, then `ordna show` on each. Tickets on the frontier may run in parallel in separate worktrees, with one exception below.
 - **Migrations serialise.** A ticket that adds a migration or bumps `contract_version` runs alone until it lands; the drizzle journal and the contracts manifest do not merge. In S0 and S1 that is T-120, then T-127 and T-128 one after the other.
 - **S1's branch is cut from `s0`** after T-120 lands, so S1's tickets that edge S0's can proceed while S0's PR waits; when S0 merges, `s1` rebases onto `main` and its PR follows.
@@ -49,7 +50,7 @@ The named suites are the loop's arbiter. Root `check` runs once at the end of th
 
 - **Read first**: the ordna task (`ordna show`), the spec sections it names, `CODING_RULES.md` and the workspace's own rules file, the ADRs the task's Notes name. `CONTEXT.md`'s word for a thing is the name in code.
 - **Navigation is jCodeMunch** (`AGENTS.md`, *Code Exploration Policy*): `resolve_repo` on the worktree, `index_folder` if it is not indexed; `Read` a file only to edit it.
-- **GitNexus**: `node .gitnexus/run.cjs analyze` once in the worktree, then `impact` before editing any symbol and `detect_changes` before every commit. HIGH or CRITICAL risk is reported to ralph before the edit, never absorbed.
+- **GitNexus**: the index lives in the main checkout only (`.gitnexus/` is excluded per checkout and the runner is absent from a worktree), so `analyze` is the orchestrator's, at every landing. From a worktree the MCP tools read that index, which is at the block's tip: `impact` before editing any symbol that exists there — a symbol the ticket creates has no caller to report — and `detect_changes` before every commit with the worktree's absolute path passed explicitly. HIGH or CRITICAL risk is reported to ralph before the edit, never absorbed.
 - **Words before code, records with code** (`[GLOSSARY1]`): a new domain word lands in `CONTEXT.md` before code names it; an ADR amendment and its `docs/adr/README.md` row land in the same commit as the code they record; a contract fixture lands with its manifest entry and `contract_version`.
 - **Tests as the constitution says** (`[TEST1]` to `[TEST9]`): real Postgres, our own code never mocked, factories, pairs both ways, expected values as literals. `/mattpocock-skills:tdd` at the seams the ticket names; `/mattpocock-skills:implement` is the process.
 - **The tier's skills**: `apps/api/.claude/skills/` for any tRPC procedure, link or adapter; `/hono`; `/cocoindex` for the pipeline; `/browser-suite` for a spec under `apps/web/e2e/`; `/better-answers-design` for anything a person looks at; `/writing-react-effects` and `/react-hook-form-writer` in the web; the privacy skills for the seam.
@@ -70,7 +71,7 @@ Ticket: T-nnn (ordna show T-nnn). Block: s0. Block branch tip: <sha>.
 Spec: docs/specs/<block>.md — the sections the ticket names.
 Edges done: T-… (what each landed, one line).
 Rules: docs/agents/build-loop.md.
-Models: implementor opus | sonnet; tester sonnet.
+Models: implementor opus | sonnet; tester sonnet | ralph itself.
 Task note: /abs/path/to/main-checkout/.scratch/build/T-nnn.md (the main checkout's, absolute — the worktree is removed at landing).
 Anything the orchestrator already knows the loop will hit: <one line each>.
 ```
