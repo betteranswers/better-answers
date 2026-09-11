@@ -737,8 +737,21 @@ export const testData = (client: pg.PoolClient): TestData => {
     const personId = overrides.personId === undefined ? (await user()).id : overrides.personId;
     const receivedAt = overrides.receivedAt ?? new Date();
     const clockStartedAt = overrides.clockStartedAt ?? receivedAt;
+    // The deadline the clock starts on: the same day of the month one month on, or the target
+    // month's last day where that month has no such day — the 31st of January is due on the
+    // 28th of February, the 29th in a leap year, because a day a short month does not have
+    // lands in the month after it. Its pair is `dueDateOf` in
+    // `packages/core/src/erasure/requests.ts`, which states the same rule in its own line
+    // because these tests cannot import that package; change one and change the other in the
+    // same commit.
+    const dayAsked = clockStartedAt.getUTCDate();
     const dueAt = new Date(clockStartedAt);
+    dueAt.setUTCDate(1);
     dueAt.setUTCMonth(dueAt.getUTCMonth() + 1);
+    const lastDayOfTheMonth = new Date(
+      Date.UTC(dueAt.getUTCFullYear(), dueAt.getUTCMonth() + 1, 0),
+    ).getUTCDate();
+    dueAt.setUTCDate(Math.min(dayAsked, lastDayOfTheMonth));
     return insertRow(client, "subjectRequest", {
       id: ulid(),
       kind: "access",

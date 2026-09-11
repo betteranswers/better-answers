@@ -92,14 +92,30 @@ export type ReadSubjectRequestRefusal = RoleRefusal | "malformed" | "no-such-req
 const REQUEST_ID = boundarySchemas.subjectRequest.select.shape.id;
 
 /**
- * The deadline the clock starts on: one month from its start. Written once here because two
- * places computing a month would be two months — the schema's factory seeds a row with the
- * same arithmetic, and the table's CHECK holds whatever either of them produced to running
- * forward.
+ * The deadline the clock starts on: the same day of the month one month on, or the target
+ * month's last day where that month has no such day. A clock started on the 31st of January
+ * is due on the 28th of February — the 29th in a leap year — because a day a short month does
+ * not have lands in the month after it, and a statutory deadline moved later is one the
+ * platform has already missed.
+ *
+ * Its pair is the schema factory's `subjectRequest` seed (`packages/schema/test/factory.ts`),
+ * which states the same rule in its own line because the schema's tests cannot import this
+ * package. Change one and change the other in the same commit; the table's
+ * `subject_request_clock_check` only holds the answer to running forward, never to being the
+ * right day.
  */
 export const dueDateOf = (clockStartedAt: Date): Date => {
+  const dayAsked = clockStartedAt.getUTCDate();
   const due = new Date(clockStartedAt);
+  // Onto the first, which every month has, before the month moves — so the month arrives
+  // where it was asked for, and the day is put back under the length of the month it landed
+  // in. Day zero of the month after is that month's last day, leap years included.
+  due.setUTCDate(1);
   due.setUTCMonth(due.getUTCMonth() + 1);
+  const lastDayOfTheMonth = new Date(
+    Date.UTC(due.getUTCFullYear(), due.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  due.setUTCDate(Math.min(dayAsked, lastDayOfTheMonth));
   return due;
 };
 

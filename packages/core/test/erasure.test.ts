@@ -206,6 +206,30 @@ describe("the clock", () => {
     );
   });
 
+  it("answers the target month's last day where that month has no such day", () => {
+    // A day February does not have would otherwise land in March — three days late on a
+    // statutory deadline, in the one direction the clock must never move.
+    expect(dueDateOf(new Date("2026-01-31T09:00:00.000Z"))).toEqual(
+      new Date("2026-02-28T09:00:00.000Z"),
+    );
+    expect(dueDateOf(new Date("2026-01-30T09:00:00.000Z"))).toEqual(
+      new Date("2026-02-28T09:00:00.000Z"),
+    );
+    // A 31st into a 30-day month, so the rule is not read as being about February.
+    expect(dueDateOf(new Date("2026-08-31T09:00:00.000Z"))).toEqual(
+      new Date("2026-09-30T09:00:00.000Z"),
+    );
+  });
+
+  it("answers the 29th in a leap February, which a clamp written against 28 would miss", () => {
+    expect(dueDateOf(new Date("2028-01-31T09:00:00.000Z"))).toEqual(
+      new Date("2028-02-29T09:00:00.000Z"),
+    );
+    expect(dueDateOf(new Date("2028-01-30T09:00:00.000Z"))).toEqual(
+      new Date("2028-02-29T09:00:00.000Z"),
+    );
+  });
+
   it("answers the month until an extension is taken, and the extension once it is", async () => {
     const scenario = await arrange();
     const extended = new Date("2026-07-02T11:00:00.000Z");
