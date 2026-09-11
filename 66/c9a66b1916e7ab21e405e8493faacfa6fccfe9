@@ -1,0 +1,23 @@
+packages/schema/test/factory.ts
+  s_f3ee63bcbb1a0b::t_30c0aacee44949 740-747,749,751-754
+packages/core/test/erasure.test.ts
+  s_f3ee63bcbb1a0b::t_15005188651c57 209-232
+packages/core/src/erasure/requests.ts
+  s_f3ee63bcbb1a0b::t_a89e1406807221 95-105,108,110-113,115-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "66c9a66b1916e7ab21e405e8493faacfa6fccfe9",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
