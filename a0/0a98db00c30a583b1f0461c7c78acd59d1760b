@@ -1,0 +1,26 @@
+packages/core/test/erasure-map.test.ts
+  s_f3ee63bcbb1a0b::t_9cb85716415bdd 402-406
+  s_f3ee63bcbb1a0b::t_3fab88f01c19a5 363-401,407-437
+  s_f3ee63bcbb1a0b::t_43633352f20739 7,11
+packages/core/src/erasure/index.ts
+  s_f3ee63bcbb1a0b::t_9cb85716415bdd 15
+  s_f3ee63bcbb1a0b::t_6d6f2ec33f5b06 11,14
+packages/core/src/erasure/map.ts
+  s_f3ee63bcbb1a0b::t_5d72ebbee13ff2 319-367
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a00a98db00c30a583b1f0461c7c78acd59d1760b",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
