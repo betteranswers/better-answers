@@ -1,0 +1,21 @@
+deploy/restore-drill.sh
+  s_f3ee63bcbb1a0b::t_a70adea1e456ad 271-277
+apps/api/tests/deploy-tree.test.ts
+  s_f3ee63bcbb1a0b::t_691e9bb09bcc73 335-337
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b70250a50cb719fc5144cd6ea9dc2a4810b0b379",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
