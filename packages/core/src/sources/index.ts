@@ -37,7 +37,11 @@ import type { Tx } from "../store/postgres/index.ts";
  * hash. Both are the sources slice's because the finding and the binding are its records.
  *
  * Beside the act, the slice's address arithmetic: a chunk's derived id, the wire locator's
- * parse and the span it cuts, all pure and all held to the document-chunk agreement.
+ * parse and the span it cuts, all pure and all held to the document-chunk agreement. And over
+ * that arithmetic the read it exists for (`passages.ts`): **`passageAt`** resolves a wire
+ * locator to the chunk rows covering its span, under the reader's predicate applied once in
+ * the same statement, and answers the passage — or the one word *not found*, whether the
+ * address was wrong, the text does not run that far or a covering row is withheld.
  */
 
 export {
@@ -66,6 +70,7 @@ export {
   type Locator,
   type LocatorRefusal,
 } from "./chunk-address.ts";
+export { passageAt, type Passage } from "./passages.ts";
 
 /**
  * The narrowing act. Its subject is the binding and its detail what the Admin decided, in

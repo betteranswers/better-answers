@@ -86,7 +86,7 @@ const chunkOf = async (
       bindingId: document.bindingId,
       sourceDocumentId: document.documentId,
       content: "The handbook's holiday policy.",
-      locator: "chars:0-30",
+      locator: `${document.documentId}/chars:0-30`,
       ordinal: 0,
       charStart: 0,
       charEnd: 30,
