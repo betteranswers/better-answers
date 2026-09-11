@@ -82,6 +82,13 @@ LETTERS_UNDER_ANOTHER_SEED: Mapping[str, str] = {
     "Imogen Sarkar": "X",
 }
 
+#: One erasure request's identifier set, naming one of the page's three people and
+#: neither of the other two. It is the shape the `subject_request` row holds, and the
+#: name is given under the kind a requester would give it under.
+ONE_NAME_SUPPRESSED: Sequence[Mapping[str, Sequence[str]]] = (
+    {"emails": (), "names": ("Rosalind Petheridge",), "other": ()},
+)
+
 #: Every span the recall set is made of, as the category it must be raised under and
 #: the literal the fixture planted. Written out here rather than read back from the
 #: seam, so a recogniser that moved a boundary by one character fails rather than
@@ -139,6 +146,11 @@ def on_an_hr_shaped_binding(page: str) -> Redaction:
 @pytest.fixture(scope="module")
 def under_another_seed(page: str) -> Redaction:
     return redact(page, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, ANOTHER_SEED)
+
+
+@pytest.fixture(scope="module")
+def with_one_name_suppressed(page: str) -> Redaction:
+    return redact(page, AN_HR_SHAPED_BINDING, ONE_NAME_SUPPRESSED, SEED)
 
 
 def spans_under(found: Redaction, page: str, category: str) -> list[str]:
@@ -390,3 +402,54 @@ def test_the_same_name_outside_the_block_is_still_its_own_tier(
         "always",
         "default-off",
     }
+
+
+def test_a_suppressed_name_is_withheld_and_every_other_name_is_untouched(
+    on_an_hr_shaped_binding: Redaction, with_one_name_suppressed: Redaction
+) -> None:
+    # What a suppression does to a span: the always tier and its one neutral word, the
+    # officer block's own mechanism. `[person U]` would still mark where she is, how
+    # often she is mentioned and which paragraphs are about her, and marking where she
+    # is is what a suppression exists to prevent. Both directions (`[TEST7]`): her
+    # letter goes and the other two stay, letter for letter and count for count, on a
+    # binding whose only difference from the control is the request.
+    assert "[person U]" in on_an_hr_shaped_binding.text
+    assert "[person U]" not in with_one_name_suppressed.text
+
+    for letter in ("E", "Y"):
+        assert with_one_name_suppressed.text.count(
+            f"[person {letter}]"
+        ) == on_an_hr_shaped_binding.text.count(f"[person {letter}]")
+
+
+def test_a_suppression_raises_the_named_person_to_the_always_tier(
+    on_a_plain_binding: Redaction, with_one_name_suppressed: Redaction, page: str
+) -> None:
+    # The finding row is what an Admin reviews and what the erasure map is read from, so
+    # the tier has to move on the row and not only in the text. Without the request the
+    # same name is raised at two tiers, the officers block deciding one of them; with
+    # it, both are the always tier, and the two people the request does not name are
+    # where they were.
+    assert tiers_of(on_a_plain_binding, page, "Rosalind Petheridge") == {
+        "always",
+        "default-off",
+    }
+    assert tiers_of(with_one_name_suppressed, page, "Rosalind Petheridge") == {"always"}
+    assert tiers_of(with_one_name_suppressed, page, "Imogen Sarkar") == {"default-off"}
+
+
+def test_the_same_inputs_twice_give_identical_output(
+    on_an_hr_shaped_binding: Redaction, page: str
+) -> None:
+    # The seam holds no answer between calls, so a second run does the whole of the work
+    # again and has to arrive in the same place: the permutation is drawn from the seed
+    # rather than from anything the process carries, the letters are handed out in
+    # reading order, and nothing here is sampled. All five of what the seam answers,
+    # because a text that agreed while the counts drifted would be the harder bug.
+    again = redact(page, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED)
+
+    assert again.text == on_an_hr_shaped_binding.text
+    assert again.findings == on_an_hr_shaped_binding.findings
+    assert again.counts == on_an_hr_shaped_binding.counts
+    assert again.verdict == on_an_hr_shaped_binding.verdict
+    assert again.version == on_an_hr_shaped_binding.version

@@ -32,6 +32,7 @@ from .engine import ALWAYS_TIER, DESCRIPTOR_BY_CATEGORY, Finding, detect
 from .officers import raised_by_the_block_rule
 from .pins import VERSION_STRING
 from .pseudonyms import normalised, pseudonyms_for, written_as
+from .suppressions import raised_by_a_suppression
 
 #: Each tier a binding can switch, as the key it is switched by on `source_binding` and
 #: what an unconfigured binding does with it. The always tier is not here because it is
@@ -85,7 +86,15 @@ def redact(
 
     Plain types in and plain types out, and nothing read that was not passed in.
     """
-    findings = raised_by_the_block_rule(detect(text), text)
+    # Two post-passes over one detection, each of which only ever raises a tier, so the
+    # order they run in cannot change the answer. The letters are drawn afterwards and
+    # over every name the document holds, whatever tier it ended at: a name that gives
+    # up its place in the queue when it is withheld would move everybody met after it
+    # onto a different letter, and a suppression has to change the output for the person
+    # it names and for nobody else.
+    findings = raised_by_a_suppression(
+        raised_by_the_block_rule(detect(text), text), text, suppressions
+    )
     letters = pseudonyms_for(_names_in(text, findings), seed)
     withheld = tuple(
         finding for finding in findings if _in_force(finding.tier, rules_in_force)
