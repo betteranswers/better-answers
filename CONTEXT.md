@@ -219,10 +219,11 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **chunk** — one unit of a source document's normalised redacted text that the chunk index holds,
   keyed by its document and its ordinal, carrying its binding's visibility — its sensitivity, its
   audience and whether it is published. Never the original text.
-- **locator** — the address of a passage inside a source document: a span, `chars:<start>-<end>`,
-  its offsets counted in Unicode code points into the document's normalised redacted text and
-  versioned by the redaction string that text carries. The one string a citation's evidence and a
-  chunk both carry, so a citation and a passage are one address.
+- **locator** — the address of a passage inside a source document, written whole as
+  `<source document id>/chars:<start>-<end>`: the document it is in, then the span, whose offsets
+  are counted in Unicode code points into the document's normalised redacted text and versioned by
+  the redaction string that text carries. The one string a citation's evidence and a chunk both
+  carry, so a citation and a passage are one address.
 - **passage** — the text a locator resolves to, served with its source document's title and its
   sensitivity word: the unit `open` returns and a hit marked *Not company knowledge* previews.
 - **connector run** — one execution of a binding by the scheduler (enumerate, index, extract, prune

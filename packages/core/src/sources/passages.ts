@@ -151,3 +151,134 @@ export const passageAt = async (
     ),
   });
 };
+
+/**
+ * One hit of a search: the document a matching chunk belongs to, what that document is
+ * catalogued under, the address the chunk opens at and the class the reader is being offered
+ * it under. No excerpt — the text is what `passageAt` hands over once the reader asks for the
+ * address — and no layer word, because the union across the three knowledge layers and the
+ * marker on what is not company knowledge belong to the entry that composes them (T-134).
+ */
+export type PassageHit = {
+  readonly sourceDocumentId: string;
+  readonly title: string;
+  readonly locator: string;
+  readonly sensitivity: Sensitivity;
+};
+
+/**
+ * The most hits one search ever hands back, whatever the caller asks for.
+ *
+ * A ceiling rather than a page: there is no total, no cursor and no *more where that came
+ * from* anywhere in this platform's reads (ADR 0016), so the number is what a person can read
+ * at once rather than the first slice of something longer.
+ */
+export const MAX_PASSAGE_HITS = 20;
+
+/** The caller's limit held between nothing and the ceiling — `LIMIT -1` is an error, not a read. */
+const hitsAsked = (limit: number): number =>
+  Math.min(Math.max(Math.trunc(limit), 0), MAX_PASSAGE_HITS);
+
+/**
+ * The wire address of one chunk row, composed from the three columns the splitter wrote rather
+ * than read out of the row's own `locator` column. The column and the composition are one
+ * address (ADR 0031) and `passages.test.ts` holds them to it, so composing costs nothing and
+ * keeps a hit honest about where it sits even if a row's text column were ever wrong.
+ */
+const wireLocatorOf = (row: {
+  readonly source_document_id: string;
+  readonly char_start: number;
+  readonly char_end: number;
+}): string => `${row.source_document_id}/chars:${row.char_start}-${row.char_end}`;
+
+/**
+ * The chunk rows a reader's words match, ranked, with the documents a concept they may see
+ * already covers left out.
+ *
+ * `websearch_to_tsquery` and never `to_tsquery`: a caller's words are prose, and the other
+ * parser raises a syntax error on two words with a space between them rather than reading
+ * them. The match is against the generated `search` column, so the per-partition GIN index is
+ * what answers it, and the predicate sits in the same WHERE as the match — before the ranking,
+ * so nothing this reader may not see is ever ranked, let alone counted.
+ *
+ * The exclusion is one `NOT EXISTS` in this same statement and never a second read, which
+ * would be a second round trip and a race against a concept landing between the two. What it
+ * asks is only *is this document already covered by something this reader may see* — ADR 0016's
+ * *a document or a section stands alone only when no concept covers it* — and the concept arm
+ * of a search is the concepts slice's own read, not this one. Its predicate comes from the
+ * same builder as the chunk's, which is what the ADR's 2026-08-28 amendment requires: the same
+ * predicate, once, from the same builder.
+ *
+ * The parameters are positional and their order is the order the clauses read them: the
+ * workspace, the caller's words, the two the chunk's predicate reads (the role and the group
+ * ids), the same two again for the concept's, and the limit. Four placeholders for one
+ * predicate used twice, and a number out of step is a wrong answer rather than an error, so
+ * the suite is what holds the count.
+ */
+const MATCHING_ROWS = `SELECT c.source_document_id, c.char_start, c.char_end, c.sensitivity, d.title
+     FROM "index".chunk c
+     JOIN source_document d ON d.workspace_id = c.workspace_id AND d.id = c.source_document_id
+    CROSS JOIN websearch_to_tsquery('english', $2) AS q
+    WHERE c.workspace_id = $1
+      AND c.search @@ q
+      AND c.char_start IS NOT NULL
+      AND c.char_end IS NOT NULL
+      AND ${readableClause("c", 3)}
+      AND NOT EXISTS (SELECT 1
+                        FROM concept_evidence ce
+                        JOIN concept_index ci ON ci.workspace_id = ce.workspace_id AND ci.iri = ce.iri
+                       WHERE ce.workspace_id = c.workspace_id
+                         AND ce.source_document_id = c.source_document_id
+                         AND ${readableClause("ci", 5)})
+    ORDER BY ts_rank(c.search, q) DESC, c.source_document_id, c.char_start
+    LIMIT $7`;
+
+type HitRow = {
+  readonly source_document_id: string;
+  readonly char_start: number;
+  readonly char_end: number;
+  readonly sensitivity: Sensitivity;
+  readonly title: string;
+};
+
+/**
+ * The passages a reader's words find, best first — and nothing else.
+ *
+ * A list and only a list: no total, no count and no *some results were withheld*, because each
+ * of those tells a reader outside an audience that there was something to be outside of. A
+ * reader who may see none of what matched gets the empty list, which is the same answer a
+ * workspace holding nothing gives.
+ *
+ * **A document a concept covers is not offered on its own.** Where a concept this reader may
+ * see already cites the document, the concept is what they should be reading and the raw
+ * passage is left out; where they may not see that concept, the document stands alone and is
+ * offered. The same row answers two ways for two readers, and the difference is one predicate
+ * inside one statement.
+ *
+ * Each hit carries the address rather than the text: the caller opens it with `passageAt` when
+ * the reader asks, which is the one door the class and audience arms are applied at twice.
+ */
+export const findPassages = (
+  principal: UserPrincipal,
+  tx: Tx,
+  query: string,
+  limit: number,
+): Promise<Result<readonly PassageHit[], Error>> => {
+  const parameters = readableParameters(principal);
+  return attempt(async () => {
+    const read = await tx.query<HitRow>(MATCHING_ROWS, [
+      principal.workspaceId,
+      query,
+      ...parameters,
+      ...parameters,
+      hitsAsked(limit),
+    ]);
+    // The word and the column disagreeing is a broken database, not a guess to make.
+    return read.rows.map((row) => ({
+      sourceDocumentId: row.source_document_id,
+      title: row.title,
+      locator: wireLocatorOf(row),
+      sensitivity: CHUNK_SENSITIVITY.parse(row.sensitivity),
+    }));
+  });
+};
