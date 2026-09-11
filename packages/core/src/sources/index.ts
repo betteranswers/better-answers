@@ -24,12 +24,14 @@ import type { Tx } from "../store/postgres/index.ts";
  * retention classes (ADR 0013).
  *
  * A slice is the capability that owns a set of tables and the invariants over them — the
- * write path, not a screen (ADR 0029). What lands here is the one act the visibility
- * cascade needs (T-055): **narrowing a binding**, an Admin's, recorded on the ledger, which
- * recomputes every concept citing that binding's documents and then every composition
- * including those concepts — synchronously, inside this act's own transaction, two levels
- * (ADR 0023, ADR 0039). Binding a source, publishing it and widening its class are B7's
- * management surfaces and are not here.
+ * write path, not a screen (ADR 0029). The act the visibility cascade needs (T-055) is here:
+ * **narrowing a binding**, an Admin's, recorded on the ledger, which recomputes every concept
+ * citing that binding's documents and then every composition including those concepts —
+ * synchronously, inside this act's own transaction, two levels (ADR 0023, ADR 0039).
+ *
+ * Beside it is the act that makes a binding in the first place: **the bind** (`binding.ts`),
+ * an Admin's own file put in the object store and then landed as a binding, a document, a
+ * ledger row and the run that will index it. Widening a binding's class stays B7's.
  *
  * Beside it, S0's two: the **finding** restore (`findings.ts`), an Admin letting one span of
  * the always set back into a document with a reason, and the **DPIA input** (`dpia.ts`), a
@@ -51,6 +53,14 @@ import type { Tx } from "../store/postgres/index.ts";
  * else reaches them by any road at all.
  */
 
+export {
+  bindUpload,
+  UPLOAD_BYTE_CAP,
+  UPLOAD_MEDIA_TYPES,
+  type BindUploadInput,
+  type BindUploadRefusal,
+  type UploadBound,
+} from "./binding.ts";
 export {
   restoreFinding,
   type FindingRestored,
