@@ -1,0 +1,28 @@
+packages/core/src/sources/findings.ts
+  s_f3ee63bcbb1a0b::t_0389932e75722f 108-110
+  s_f3ee63bcbb1a0b::t_f7e55a36841ef4 1-42,48,50-107,111-148
+  s_f3ee63bcbb1a0b::t_f59b1f49168a5a 43-47,49
+packages/core/src/sources/index.ts
+  s_f3ee63bcbb1a0b::t_6804a601141e80 33-37,40-45
+packages/core/test/findings.test.ts
+  s_f3ee63bcbb1a0b::t_c55224b7da8a60 247
+  s_f3ee63bcbb1a0b::t_7c0a003e3a9d55 39,46,49
+  s_f3ee63bcbb1a0b::t_9457d63be1e9f9 98,134-135,192,204,215,226,245
+  s_f3ee63bcbb1a0b::t_46797c78c5fcf4 1-38,40-45,47-48,50-97,99-133,136-187,189-191,193-196,198-203,205-214,216-225,227-244,246,248-251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3b8f7ec1c2b7cca166d19c3c952d2d0f48ec99a5",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
