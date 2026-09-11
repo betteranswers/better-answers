@@ -42,3 +42,4 @@ Your brief opens with **Plan** or **Evaluate**. Do that mode and nothing of the 
 3. **The named suites are the arbiter.** A subjective concern is a line in your answer, never a `NEXT`.
 4. **Scope is the ticket.** A finding outside it is one line in your answer for the orchestrator's hygiene lane.
 5. **The count is not yours to reset.** The orchestrator holds the cap; you record.
+6. **Every wait is in your foreground.** A subagent is not woken by its own background task, so a turn ended with a waiter or a check running is a step that never finishes: the `until` loop and the check each run inside one Bash call with a ten-minute `timeout`, repeated, and your turn ends only on the sigil (11/09/2026, T-129's evaluator).
