@@ -156,6 +156,12 @@ module = [
     # ours. The package ships no marker saying so, which is an error under strict mode
     # before a line of ours is read.
     "asyncpg.*",
+    # This tier's own object store client, which ships no marker either. The client's
+    # answers are read on the statement after they arrive — the body of a get is taken
+    # out of the response and bound to `bytes` there — so nothing untyped travels
+    # further than the adapter that made the call. The typed distribution beside it is
+    # a second package to pin and to keep in step with the client for two method calls.
+    "boto3.*",
 ]
 ignore_missing_imports = true
 

@@ -277,7 +277,15 @@ class Host:
             )
         return opened
 
-    def _config(self, run: IndexRun) -> coco.AppConfig:
+    def app_config(self, run: IndexRun) -> coco.AppConfig:
+        """How an app of this package's runs in this binding's store.
+
+        Public to the package and to nothing outside it: a module that has its own main
+        function builds its own app around this, rather than this class growing a method
+        per kind of work and learning what a document or a chunk is. The engine's own
+        type is named here and that is the whole point of the line — a caller outside
+        this directory never sees it (ADR 0036).
+        """
         return coco.AppConfig(
             name=APP_NAME,
             environment=self._environment(run),
@@ -296,7 +304,7 @@ class Host:
         its Environment was given.
         """
         declared = tuple(rows)
-        app = coco.App(self._config(run), declare_rows, table, declared)
+        app = coco.App(self.app_config(run), declare_rows, table, declared)
         landed = app.update_blocking()
         return int(landed) if isinstance(landed, int) else len(declared)
 
@@ -308,7 +316,7 @@ class Host:
         chunk rows are deleted by the app, in its own transaction, before the job that
         removes this store is ever enqueued.
         """
-        coco.App(self._config(run), declare_nothing).drop_blocking()
+        coco.App(self.app_config(run), declare_nothing).drop_blocking()
 
     def close(self) -> None:
         """Let every store go and close every pool, on the loop that opened them."""
