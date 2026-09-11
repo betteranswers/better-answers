@@ -1,0 +1,40 @@
+apps/worker/tests/test_config.py
+  s_96a66f19ddb6be::t_dec39ff4ed1c30 20
+  s_96a66f19ddb6be::t_5bf947652ed306 125
+apps/worker/tests/test_image.py
+  s_96a66f19ddb6be::t_c04f9cd8d6584a 83-84
+apps/worker/tests/test_work_loop.py
+  s_96a66f19ddb6be::t_dc9afcb3feea67 199-200,205-207
+  s_96a66f19ddb6be::t_bbb6aabf739385 198,201-204,208-224
+apps/worker/tests/deploy_unit.py
+  s_96a66f19ddb6be::t_74bdbefcfaa3cd 11-12
+  s_96a66f19ddb6be::t_e9e3133122a07c 1-10,13-41
+docs/architecture/c4-components-worker.md
+  s_96a66f19ddb6be::t_7c58045aa60d6c 59
+apps/worker/tests/test_pipeline_index.py
+  s_96a66f19ddb6be::t_81a0c3afa0549c 219-233,247
+  s_96a66f19ddb6be::t_cc5bb95aa73681 273
+apps/worker/src/better_answers_worker/pipeline/host.py
+  s_96a66f19ddb6be::t_f657508f7b144c 26-29
+  s_96a66f19ddb6be::t_e8b0d19d9db9cd 30-32
+apps/worker/tests/test_pipeline_host.py
+  s_96a66f19ddb6be::t_2f813b0f799abf 29
+  s_96a66f19ddb6be::t_1b8055d2939358 55-56,64,69,72,74-75
+  s_96a66f19ddb6be::t_63fbd3896f9c52 57-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3c61c68ea2643e1734797c0848cecafe60974ab8",
+  "prompts": {},
+  "sessions": {
+    "s_96a66f19ddb6be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1940d59b-7323-446c-9724-222dda88e9e0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
