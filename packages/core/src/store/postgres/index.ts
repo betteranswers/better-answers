@@ -61,6 +61,13 @@ export const scopeParameter = (principal: Principal): string | null =>
  */
 export type Tx = Pick<pg.PoolClient, "query">;
 
+/**
+ * What a read through a `Tx` may be typed as: the driver's own constraint on a result row.
+ * It lives here because pg lives here — a slice that reads rows generically says what shape
+ * it expects in the driver's terms, and never by spelling a dictionary of its own.
+ */
+export type TxRow = pg.QueryResultRow;
+
 const rollbackQuietly = async (client: pg.PoolClient): Promise<void> => {
   try {
     await client.query("ROLLBACK");
