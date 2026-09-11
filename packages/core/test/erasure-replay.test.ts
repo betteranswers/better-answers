@@ -454,6 +454,15 @@ describe("an object store a restore cannot read", () => {
   });
 });
 
+/**
+ * **The sentence `recordTheReplay`'s docblock rests on** (S0's review, round 3). That row is
+ * written in a transaction of its own, after the routine has committed and released
+ * `pg_advisory_lock(41)`, so a run that dies between the two leaves an erasure re-applied with
+ * nothing in the ledger saying the estate re-applied it. What makes that the cheaper failure —
+ * and the only one available, there being no transaction left open to fold the row into — is
+ * that the operator's recovery is to run the same command again, and a second run **re-applies
+ * nothing**. This is where that claim is held rather than asserted.
+ */
 describe("a second replay of the same request", () => {
   it("changes nothing but the ledger", async () => {
     const scenario = await arrange();
@@ -461,13 +470,22 @@ describe("a second replay of the same request", () => {
 
     const first = await replaying(scenario, TWICE_AT, TWICE_SINCE);
     const after = await erasureRowsIn(scenario.workspaceId);
+    const subjects = await subjectRowsIn(scenario.workspaceId);
     const second = await replaying(scenario, TWICE_AT, TWICE_SINCE);
 
     expect(second.map((one) => one.erasureRequestId)).toEqual([erased.erasureRequestId]);
     // The row the first replay left, unmoved: the same pseudonym, the same completion, the same
     // report — which is what makes a restore that is run twice a restore run once.
     expect(await erasureRowsIn(scenario.workspaceId)).toEqual(after);
+    // And the request itself, which is the row a replay from a copy *writes*: a second pass
+    // re-creates nothing and moves no clock, so an operator who reran the command after a
+    // failure has re-applied an erasure that was already applied and changed no row doing it.
+    expect(await subjectRowsIn(scenario.workspaceId)).toEqual(subjects);
     const ledger = await ledgerRowsOf(db().pool, scenario.workspaceId, REPLAYED);
+    // One row per run and never one per request: two restores of one workspace are two
+    // occasions on which the estate re-applied an erasure, and a ledger that recorded the
+    // second as already known would record what the platform believes and not what it did.
+    // It is also what repairs the gap above — the run that lost its row lands one here.
     expect(ledger.map((row) => row.subject_id)).toEqual([
       erased.erasureRequestId,
       erased.erasureRequestId,

@@ -338,6 +338,72 @@ describe("the deploy tree (T-005)", () => {
   });
 
   /**
+   * The rehearsal's seed, read for its **status** — the one place in step 10 where a failure
+   * could be mistaken for a step that is not built yet.
+   *
+   * `apps/api/src/ops.ts` exits 3, and 3 alone, for *the store this needs has no tables in this
+   * schema*; the drill's own `ops()` helper reads that number and no other. The seed is not run
+   * through `ops()`, because its answer is the subject's tokens and `ops()` swallows the
+   * distinction the next six steps turn on, so it reads the status itself and must read it the
+   * same way. A guard that caught every non-zero would record *not built yet* over a mistyped
+   * `DRILL_WORKSPACE` or a refused seed, skip the proof and exit the drill green.
+   *
+   * So this runs the drill's **own five lines**, lifted between the markers they carry, against
+   * a seed that exits 0, 3 and 1 in turn. Nothing else here executes a deploy script; this one
+   * does because the claim is about what a status does and not about what a file says.
+   */
+  it("fails the drill when the rehearsal's seed exits anything but the 3 that means not built", () => {
+    const drill = read("deploy/restore-drill.sh");
+    // From the end of the opening marker's own line to the start of the closing one's, so the
+    // rest of each marker comment stays a comment and never a line this runs.
+    const opened = drill.split(">>> seed status")[1];
+    const guard = opened?.slice(opened.indexOf("\n") + 1).split("# <<< seed status")[0];
+    expect({ markers: guard !== undefined }).toEqual({ markers: true });
+
+    // The names the lifted lines stand on, and a seed whose status the case chooses. `platform`
+    // prints the tokens the real one prints before it exits, so the pipeline into `tail` is the
+    // drill's own and `pipefail` is what carries a failing seed's status through it.
+    const ran = (status: number): { readonly code: number; readonly output: string } => {
+      const script = [
+        "set -euo pipefail",
+        "NOT_BUILT=3",
+        'DRILL_WORKSPACE="a-workspace"',
+        'say() { printf "%s\\n" "$*"; }',
+        `platform() { printf 'priya@example.invalid,1 High St,Priya Anand\\n'; return ${String(status)}; }`,
+        guard ?? "",
+        'say "the proof ran, subject=${subject}"',
+      ].join("\n");
+      try {
+        return { code: 0, output: execFileSync("bash", ["-c", script], { encoding: "utf8" }) };
+      } catch (thrown) {
+        const failed: { status?: number; stdout?: string } = thrown ?? {};
+        return { code: failed.status ?? -1, output: failed.stdout ?? "" };
+      }
+    };
+
+    const seeded = ran(0);
+    expect({ code: seeded.code, proved: seeded.output.includes("the proof ran") }).toEqual({
+      code: 0,
+      proved: true,
+    });
+
+    // 3 is recorded and carried: the drill goes on to its own `else`, which says so.
+    const notBuilt = ran(3);
+    expect({ code: notBuilt.code, failed: notBuilt.output.includes("REHEARSAL FAILED") }).toEqual({
+      code: 0,
+      failed: false,
+    });
+
+    // And every other status stops the drill, rather than being written down as a slice that
+    // has no tables and leaving the six steps that prove the erasure unrun.
+    const refused = ran(1);
+    expect({ code: refused.code, failed: refused.output.includes("REHEARSAL FAILED") }).toEqual({
+      code: 1,
+      failed: true,
+    });
+  });
+
+  /**
    * ADR 0020's "gc on both copies" on the mirror's side, which until T-125 nothing performed: the
    * nightly `git push --mirror` replaces the mirror's refs after an erasure rewrote a history, and
    * the objects it replaced stay readable on VPC 2 through the reflog `git-receive-pack` writes.

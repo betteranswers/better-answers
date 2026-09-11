@@ -60,6 +60,28 @@ const git = async (
   return stdout;
 };
 
+/**
+ * Take one object out of the repository's store and leave every reference to it standing: what
+ * a half-written or corrupted object looks like to a reader that walks the history to it.
+ *
+ * It is here rather than in a suite because the failure it arranges is a store's and not an
+ * act's, and because it is the only way to see the one exit that matters: `git grep` meets an
+ * object it cannot read, writes `error: … unable to read …` to stderr and exits **1** — the
+ * same status a needle nobody's file carries exits with — so a door that reads 1 as *nothing
+ * matched* tells an erasure that no file names the person by the one store that could not look.
+ */
+export const objectRemovedFrom = async (
+  door: GitDoor,
+  workspaceId: string,
+  revision: string,
+): Promise<string> => {
+  const id = (await git(door, workspaceId, ["rev-parse", revision])).trim();
+  // Loose, because every object these suites write is written one at a time and nothing packs
+  // them; a packed object would have to be removed with its pack and is not what this arranges.
+  await rm(path.join(door.root, `${workspaceId}.git`, "objects", id.slice(0, 2), id.slice(2)));
+  return id;
+};
+
 /** The empty tree, which git holds in every repository without writing an object for it. */
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 

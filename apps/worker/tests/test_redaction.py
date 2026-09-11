@@ -21,6 +21,22 @@ rule say *not when the span is inside a fence*, is a later rule and lands only i
 first client's documents show the class is worth the risk of suppressing a true
 positive. Until then the reviewer sees it and keeps it in text.
 
+**The second known false-positive class, and the more expensive one: an ordinary
+sentence carrying a health *word*.** `HealthCueRecogniser` reads the special-category
+descriptor's `context` tuple as its cue list and raises **the whole sentence** around
+any token whose lemma is one of them, and two of the five — `health` and `condition` —
+are ordinary words of a bid library. So *Our Health and Safety policy is reviewed
+annually* and *this condition of contract* are each withheld entire as `[withheld]`,
+and because the category narrows, the document they sit in lands **Restricted**
+whatever its binding's class. That is the always tier, which no binding switches off,
+so it is the one false positive an Admin cannot undo by changing a rule: the reviewer's
+only road back is the per-span restore, story 4's act. The cost is stated here rather
+than answered here — the cues, the thresholds and every answer this suite reads are
+exactly what they were — because narrowing a cue is a recall decision about
+special-category data and is **T-179's**, which is the ticket that removes this class.
+Until it lands, a bid library on the always-on tier loses its health and safety policy
+to a word.
+
 **Why the first name on the page is not `[person A]`.** The letters are a permutation
 the binding's seed draws, and a name takes the letter at the index its first appearance
 falls on — so `[person A]` is the shape every pseudonym is written in rather than a

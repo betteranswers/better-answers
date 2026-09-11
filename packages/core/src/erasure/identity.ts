@@ -85,7 +85,14 @@ export type ErasureSubject = {
    * suppressions and this step describing one person.
    */
   readonly personId: string | null;
-  /** Every address the identifier set names, lowered — what the map's own finders matched on. */
+  /**
+   * **The subject's own addresses**, lowered: every email the user rows this request resolves
+   * to carry, less any that is already an erased one. Never the identifier set — that is the
+   * list an Admin typed, and every write below either runs platform-wide or reaches a table no
+   * policy fences, so an address in it that belongs to nobody the request is about would be a
+   * third party's rows deleted at one company's word (S0's review, rounds 2 and 3). The routine
+   * resolves it once, before step 3, and hands the same set to the git step's own wider one.
+   */
   readonly emails: readonly string[];
   /** The erasure pseudonym, which the tombstone is built from so one erasure is one string. */
   readonly pseudonym: string;
@@ -101,21 +108,17 @@ const rowsOf = (result: { readonly rowCount: number | null }): number => result.
  * reaching it — which is what lets the invitation delete cross the workspace it was asked in.
  */
 const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) => {
+  // **The subject's own addresses, and no others** — the field's own paragraph says where they
+  // come from and why. Both deletes below are keyed by an **address** rather than by a person,
+  // and both reach past every fence this platform has: `verification` carries no
+  // `workspace_id`, no policy and nothing row-level security reaches, and the invitation delete
+  // deliberately crosses workspaces. So the one question each of them turns on is whose address
+  // it is, and the answer is settled before the routine reaches this file rather than taken
+  // from the list an Admin typed into the request.
   const emails = [...subject.emails];
-  // Keyed by an identifier and not by a person, which is why it reads the address off the row it
-  // is about to change — the map's own `identity-verification` predicate, matched here and for
-  // the same reason it gives.
-  //
-  // **The identifier set is not matched.** This DELETE runs platform-wide, as the platform
-  // principal and past row-level security, so an address in the set that belongs to nobody the
-  // map found would be a stranger's live codes deleted at one company's word. The set is how an
-  // Admin says who the request is about, and the map has already answered that question; what is
-  // erased here is what the person it named holds. The invitation delete below does match the
-  // set, and the paragraph on it says what makes that different.
   const verifications = await tx.query(
-    `DELETE FROM verification
-      WHERE lower(identifier) = (SELECT lower(email) FROM "user" WHERE id = $1)`,
-    [subject.personId],
+    "DELETE FROM verification WHERE lower(identifier) = ANY($1)",
+    [emails],
   );
   // **Every workspace, because this is the arm on which the person leaves the platform.** An
   // invitation is the one row of the identity set keyed by the address rather than by the
@@ -127,17 +130,18 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
   // where the person stays somebody else's member and their address is still theirs to be
   // invited by — nothing in this function runs at all.
   //
+  // Crossing the workspace is what makes whose-address-is-it load-bearing here rather than
+  // merely careful: an appended address that is nobody's of the subject's used to take a third
+  // party's live invitation out of a company that had never heard of this request.
+  //
   // The **map's** invitation finder stays fenced to this workspace, and deliberately: the map
   // is what an access answer is written from, and a document handed to one company is not
   // where another's records are listed (ADR 0035's rejected oracle). So the count found here
   // and the count deleted can differ on this arm, which is the difference between what this
   // workspace may be told and what the platform owes the person.
-  const invitations = await tx.query(
-    `DELETE FROM invitation
-      WHERE lower(email) = ANY($2)
-         OR lower(email) = (SELECT lower(email) FROM "user" WHERE id = $1)`,
-    [subject.personId, emails],
-  );
+  const invitations = await tx.query("DELETE FROM invitation WHERE lower(email) = ANY($1)", [
+    emails,
+  ]);
   const sessions = await tx.query("DELETE FROM session WHERE user_id = $1", [subject.personId]);
   const accounts = await tx.query("DELETE FROM account WHERE user_id = $1", [subject.personId]);
   // The id stands and everything a person is recognised by goes. The address is the pseudonym's

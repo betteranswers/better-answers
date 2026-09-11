@@ -353,7 +353,15 @@ export const seedSyntheticSubject = async (
   return concept.ok ? ok(subject) : err(concept.error);
 };
 
-/** The rehearsal's ledger row, in the workspace the drill named, bare (ADR 0014 rule 4). */
+/**
+ * The rehearsal's ledger row, in the workspace the drill named, bare (ADR 0014 rule 4).
+ *
+ * After the routine and in a transaction of its own, for the reason `recordTheReplay`'s own
+ * paragraph gives and with less at stake: a rehearsal records its **own** subject request, so a
+ * run that dies before this row leaves a request and a completion the next rehearsal does not
+ * reuse, and the drill that lost the row fails on the status rather than recording a step it
+ * never proved.
+ */
 const recordTheRehearsal = async (
   platform: ErasurePrincipal,
   door: PostgresDoor,

@@ -328,6 +328,26 @@ const detailOf = (erasure: ReplayableErasure): ReplayedDetail => ({
  * this row records is a different fact from any of them — that the **estate**, restoring itself,
  * ran that routine again — and it is written only after the routine reported it done, so a row
  * here never claims a replay that did not happen. The door is called bare (ADR 0014 rule 4).
+ *
+ * **The other direction is real, and is the cheaper failure** (recorded here at S0's review,
+ * round 3, where T-125 left it unargued). A run that dies between the routine's last commit and
+ * this row leaves an erasure re-applied with nothing in the ledger saying the estate re-applied
+ * it. There is no transaction to fold this row into to prevent that: `runErasure` takes
+ * `pg_advisory_lock(41)` on a session of its own, commits its own transactions behind it and
+ * releases it before returning, so by the time this function can be called the work it records
+ * is already durable and the only alternative to a second transaction is no row at all.
+ *
+ * What bounds the loss is that **the replay re-applies nothing on a second pass**. The routine
+ * is idempotent by construction — it reads a history that names nobody and leaves it where the
+ * first pass put it, and its completion update matches no row — so the operator's recovery from
+ * any failure here is to run the same command again, which is what `replayErasures` already
+ * tells them where it stops. That run re-applies nothing and lands the row this one lost.
+ *
+ * It is **one row per run and never one per request**, which is the ledger's rule everywhere in
+ * this repository and not an oversight here: `runErasure` mints a fresh event id on every run
+ * for the same reason. Two restores of one workspace are two occasions on which the estate
+ * re-applied an erasure, and a ledger that recorded the second as *already known* would be a
+ * record of what the platform believes rather than of what it did.
  */
 const recordTheReplay = async (
   platform: ErasurePrincipal,

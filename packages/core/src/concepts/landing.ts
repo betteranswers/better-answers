@@ -566,8 +566,11 @@ export const carryChecksOntoRewrite = async (
   let checks = 0;
   for (const row of indexed.rows) {
     const content = await fileAt(platform, door, input.workspaceId, row.commit_sha, row.path);
-    // No file at the commit the row names: the row describes a concept this bundle does not
-    // hold, which is the reconciler's to answer and not an erasure's to guess at.
+    // No file at the commit the row names, and **nothing else**: the door answers `null` only
+    // where it read that commit's tree and the path is not in it, and raises every other
+    // failure — a commit this bundle has never held, an object it could not hand back — so the
+    // rule this function's docblock states is kept at the door rather than guessed at here. The
+    // row describes a concept this bundle does not hold, which is the reconciler's to answer.
     if (content === null) continue;
     const read = parseConceptFile(content);
     if (!read.ok) {

@@ -209,6 +209,33 @@ describe("what the restore act refuses", () => {
     expect(await restoreEventsOf(db().pool, scenario.workspaceId)).toEqual([]);
   });
 
+  /**
+   * The reason's absence, which the **column** admits and this act never has. `restore_reason`
+   * is nullable, because a finding nobody restored carries none, so the insert schema read off
+   * it parses `null` and `undefined` to themselves rather than refusing them — and the act's
+   * own `typeof … !== "string"` is what turns that absence into *malformed*. Round 3's review
+   * read that clause as unreachable; this case is why it stands, and why it is not the
+   * blank-reason case above wearing another value: a blank string is refused by the schema's
+   * own `min(1)` and never reaches the clause at all.
+   *
+   * The value is cast at the call rather than through the act's own input type, because the
+   * type already says `string` — what is being proved is what arrives from a caller the
+   * compiler did not check, which is every caller that parsed somebody's JSON.
+   */
+  it("refuses an absent reason as malformed, which the column's own schema would have admitted", async () => {
+    const scenario = await arrange();
+    const { findingId } = await findingIn(scenario);
+
+    for (const absent of [null, undefined]) {
+      expect(await restoreAs(scenario.admin, findingId, absent as unknown as string)).toEqual({
+        ok: false,
+        error: "malformed",
+      });
+    }
+    expect(await restoreColumnsOf(scenario.workspaceId, findingId)).toEqual(NOTHING_RESTORED);
+    expect(await restoreEventsOf(db().pool, scenario.workspaceId)).toEqual([]);
+  });
+
   it("refuses an id that is not the minter's shape as malformed, before any read", async () => {
     const scenario = await arrange();
 

@@ -224,7 +224,21 @@ if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
 
   # 1 — the seed: a synthetic person, an Admin membership and one concept file naming them, in one
   # commit. Its last line is the subject's tokens (email, address, display name), comma by comma.
-  if subject=$(platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --seed | tail -n1); then
+  #
+  # Its status is read the way `ops()` above reads one, and for the same reason: 3 alone means the
+  # erasure slice has no tables in this schema, which is recorded and carried. The seed cannot go
+  # through `ops()` — that helper answers 0 for both readings and the six steps below turn on the
+  # difference — so it reads the number itself, and reads it as narrowly. A guard that caught every
+  # non-zero would write "not built yet" over a mistyped DRILL_WORKSPACE or a refused seed, skip
+  # the proof that an erasure erases, and exit the drill green.
+  # >>> seed status (apps/api/tests/deploy-tree.test.ts lifts these five lines and runs them both ways)
+  seed_rc=0
+  subject=$(platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --seed | tail -n1) || seed_rc=$?
+  if [ "${seed_rc}" -ne 0 ] && [ "${seed_rc}" -ne "${NOT_BUILT}" ]; then
+    say "REHEARSAL FAILED: the synthetic seed exited ${seed_rc}, which is not the ${NOT_BUILT} that says the erasure slice has no tables"; exit 1
+  fi
+  # <<< seed status
+  if [ "${seed_rc}" -eq 0 ]; then
     # The commits the seed added are the pre-rewrite hashes step 7 expects to be gone. Taken as a
     # difference and not as "every hash in the repository": `git filter-repo` rewrites the commits
     # that name the subject and everything after them, and leaves the rest of the restored history

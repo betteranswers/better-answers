@@ -162,24 +162,38 @@ const completing = async (
  */
 const erasureRequestAbout = async (
   workspaceId: string,
-  personId: string,
-  email: string,
+  /** `null` for the request named by **address alone** — a person this workspace holds no login for. */
+  personId: string | null,
+  /**
+   * The address the Admin wrote down, or `null` for a request that **names the person and no
+   * address at all** — which `subject_request`'s own check admits (`person_id IS NOT NULL OR`
+   * a non-empty set) and which an Admin with a login to point at has no reason not to file.
+   */
+  email: string | null,
   /** Whatever else the Admin typed into the set — an address the subject need not own. */
   alsoNamed: readonly string[] = [],
 ): Promise<string> => {
+  const emails = email === null ? [...alsoNamed] : [email, ...alsoNamed];
   const seeded = await seedingWith(db().pool, (seed) =>
     seed.subjectRequest({
       workspaceId,
       kind: "erasure",
       personId,
-      identifiers: { emails: [email, ...alsoNamed], names: ["Priya Anand"], other: [] },
+      identifiers: { emails, names: emails.length === 0 ? [] : ["Priya Anand"], other: [] },
     }),
   );
   return seeded.id;
 };
 
-/** An erasure request about a person who holds a login and a membership in this workspace. */
-const workspaceWithAnErasureRequest = async () => {
+/**
+ * An erasure request about a person who holds a login and a membership in this workspace.
+ *
+ * `byIdAlone` files the same request with an **empty identifier set**, which is the shape the
+ * git step used to do nothing at all for: it was handed `request.identifiers.emails`, and an
+ * Admin who pointed at the person rather than typing their address got a routine that reported
+ * a completed erasure with `human:<email>` still in every blob and every author line.
+ */
+const workspaceWithAnErasureRequest = async (named: { readonly byIdAlone?: boolean } = {}) => {
   const scenario = await arrange();
   const email = addressOf("priya");
   const person = await memberOf(db().pool, scenario.workspaceId, email);
@@ -187,7 +201,11 @@ const workspaceWithAnErasureRequest = async () => {
     scenario,
     email,
     person,
-    subjectRequestId: await erasureRequestAbout(scenario.workspaceId, person.id, email),
+    subjectRequestId: await erasureRequestAbout(
+      scenario.workspaceId,
+      person.id,
+      named.byIdAlone === true ? null : email,
+    ),
   };
 };
 
@@ -237,8 +255,8 @@ const filesNaming = (
  * check over exactly that hash. Those rows' keys into `bundle_commit` have to travel with the
  * rewrite or the routine's own transaction cannot commit.
  */
-const bundleNamingThePerson = async () => {
-  const { scenario, email, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+const bundleNamingThePerson = async (named: { readonly byIdAlone?: boolean } = {}) => {
+  const { scenario, email, person, subjectRequestId } = await workspaceWithAnErasureRequest(named);
   const principal = await principalFor(db(), scenario.workspaceId, person.id);
   const author = { name: "Priya Anand", email };
   const files = filesNaming(email);
@@ -932,6 +950,76 @@ describe("the git step", () => {
     // row onto a hash it already holds.
     expect(await bundleCommitRowsIn(scenario.workspaceId)).toEqual(rows);
   });
+
+  /**
+   * **The address the step rewrites is the subject's, not the Admin's typing** (S0's review,
+   * round 3). Until this case the step was handed `request.identifiers.emails` and nothing
+   * else, so a request that named the person by their **person id** with an empty set — a shape
+   * `subject_request`'s own check admits, and the natural one for an Admin with a login to
+   * point at — reached `rewriteHistory` with no address, answered `NOTHING_MOVED`, and let the
+   * routine complete, report and book its ledger event with `human:<email>` in every blob and
+   * every author line. The block's own acceptance line failing in silence.
+   *
+   * What it is handed now is the subject's own addresses: every email the user rows this
+   * request resolves to carry, beside the addresses the request itself names. The first of
+   * those is what makes this case pass and the second is what keeps a person the company's
+   * files name but the identity set does not erasable at all.
+   */
+  it("rewrites the address the subject's own user row carries when the request names them by id alone", async () => {
+    const { scenario, email, subjectRequestId } = await bundleNamingThePerson({ byIdAlone: true });
+    const before = await everyObjectOf(scenario.git, scenario.workspaceId);
+    expect(before).toContain(`human:${email}`);
+
+    const done = await completing(scenario, subjectRequestId);
+
+    const [row] = await erasureRowsIn(scenario.workspaceId);
+    expect(await everyObjectOf(scenario.git, scenario.workspaceId)).not.toContain(email);
+    expect(await authorLinesOf(scenario.git, scenario.workspaceId)).toEqual([
+      `human:${row?.pseudonym} <${row?.pseudonym}@erased.better-answers.invalid>`,
+      `human:${row?.pseudonym} <${row?.pseudonym}@erased.better-answers.invalid>`,
+    ]);
+    // And the report says the step acted rather than that it found nothing to act on.
+    expect(done.report).toContain("bundle-commit: found 2, moved 2");
+  });
+
+  /**
+   * The other half of the same sentence: **the history names the person and there is nothing to
+   * rewrite it with, so the routine refuses rather than completing.** The two readings are the
+   * map's `concept-file` locations and the address set, and it is the first of them that decides
+   * — a request about somebody the bundle never mentions is not refused for having nothing to do.
+   *
+   * The arrangement is the one shape that reaches it, and it is not contrived: an erasure has
+   * already run here, so every author line in the bundle signs
+   * `human:<pseudonym> <pseudonym>@erased.better-answers.invalid`, and a second request is filed
+   * naming that address — which is what an Admin reading `git log` would copy down. The map's
+   * author arm finds it, and the address set is empty, because an address in the erased domain
+   * is what an address **becomes** and never one to take away. Without that rule the routine
+   * would shell out to `filter-repo` to replace a pseudonym with itself, which is the second
+   * pass the whole of the replay's idempotence rests on not happening.
+   *
+   * It refuses **before step 3**, the first step that changes a store, so the bundle stands
+   * exactly as the first erasure left it and the second request's row is uncompleted.
+   */
+  it("refuses when the bundle names the person only by an address already erased to", async () => {
+    const { scenario, subjectRequestId } = await bundleNamingThePerson();
+    await completing(scenario, subjectRequestId);
+    const [erased] = await erasureRowsIn(scenario.workspaceId);
+    const rewritten = await bundleHistory(scenario.git, scenario.workspaceId);
+    const tombstone = `${erased?.pseudonym ?? ""}@erased.better-answers.invalid`;
+    const second = await erasureRequestAbout(scenario.workspaceId, null, tombstone);
+
+    const run = await runningTheRoutine(scenario, second, RAN_AGAIN_AT);
+
+    expect(run).toEqual({ ok: false, error: "no-address" });
+    // The history the first erasure left, untouched: no second pass over it, and no object
+    // rewritten to replace a pseudonym with the same pseudonym.
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(rewritten);
+    const standing = await erasureRowsIn(scenario.workspaceId);
+    expect({
+      first: standing.find((row) => row.subject_request_id === subjectRequestId)?.completed_at,
+      second: standing.find((row) => row.subject_request_id === second)?.completed_at,
+    }).toEqual({ first: LOCKED_AT, second: null });
+  });
 });
 
 describe("the bundle_commit rows the rewrite moves", () => {
@@ -1154,27 +1242,43 @@ describe("the identity set on the person's last membership", () => {
     expect(await workspacesMemberOf(person.id)).toEqual([elsewhere.workspaceId]);
   });
 
-  it("deletes the invitations the address holds in every workspace on the last-membership arm", async () => {
-    const leaving = await workspaceWithAnErasureRequest();
+  it("deletes the invitations the address holds in every workspace on the last-membership arm, and never a stranger's", async () => {
+    const scenario = await arrange();
     const elsewhere = await arrange();
-    for (const workspaceId of [leaving.scenario.workspaceId, elsewhere.workspaceId]) {
-      await seedingWith(db().pool, (seed) =>
-        seed.invitation({ workspaceId, email: leaving.email }),
-      );
+    const email = addressOf("priya");
+    const person = await memberOf(db().pool, scenario.workspaceId, email);
+    // An address with no user row, no membership and no workspace behind it, appended to a
+    // request about a genuine member — which is all an Admin has to do to name one.
+    const notTheirs = addressOf("a-client-contact");
+    for (const workspaceId of [scenario.workspaceId, elsewhere.workspaceId]) {
+      await seedingWith(db().pool, (seed) => seed.invitation({ workspaceId, email }));
     }
+    await seedingWith(db().pool, (seed) =>
+      seed.invitation({ workspaceId: elsewhere.workspaceId, email: notTheirs }),
+    );
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email, [
+      notTheirs,
+    ]);
 
-    await completing(leaving.scenario, leaving.subjectRequestId);
+    await completing(scenario, subjectRequestId);
 
     // The person has left the platform on this arm, and an invitation is the one row of the
     // identity set keyed by the address rather than by the person: one left standing in
     // another company's workspace is a live copy of the address the report has just said was
     // rewritten, and opening it would put that address back into a user row.
-    expect(
-      await identityRowCountsFor(leaving.scenario.workspaceId, leaving.person.id, leaving.email),
-    ).toMatchObject({ invitations: 0 });
-    expect(
-      await identityRowCountsFor(elsewhere.workspaceId, leaving.person.id, leaving.email),
-    ).toMatchObject({ invitations: 0 });
+    expect(await identityRowCountsFor(scenario.workspaceId, person.id, email)).toMatchObject({
+      invitations: 0,
+    });
+    expect(await identityRowCountsFor(elsewhere.workspaceId, person.id, email)).toMatchObject({
+      invitations: 0,
+    });
+    // And the delete that reaches every workspace matches the addresses the **subject's own
+    // user row** carries and never the Admin's typing: an appended address that is nobody's of
+    // the subject's would otherwise take a third party's live invitation out of a company that
+    // never asked, as a platform principal past row-level security.
+    expect(await identityRowCountsFor(elsewhere.workspaceId, person.id, notTheirs)).toMatchObject({
+      invitations: 1,
+    });
   });
 
   it("leaves every invitation standing when another membership does, because the address is still theirs to be invited by", async () => {

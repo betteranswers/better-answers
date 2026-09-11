@@ -11,7 +11,12 @@ import {
   type Result,
 } from "../kernel/index.ts";
 import { carryChecksOntoRewrite, moveBundleCommits } from "../concepts/index.ts";
-import { rewriteHistory, withRepositoryLockAs, type GitDoor } from "../store/git/index.ts";
+import {
+  ERASED_DOMAIN,
+  rewriteHistory,
+  withRepositoryLockAs,
+  type GitDoor,
+} from "../store/git/index.ts";
 import type { ObjectDoor } from "../store/objects/index.ts";
 import { withScope, withSessionLock, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { eraseFromTheIdentitySet, type IdentitySwept } from "./identity.ts";
@@ -107,7 +112,21 @@ type CompletedDetail = DetailOf<(typeof ERASURE_ACTS)["completed"]["detail"]>;
  * Article 15 and never erased, and running this over one would rewrite a history nobody asked
  * to have rewritten.
  */
-export type ErasureRefusal = "malformed" | "no-such-request" | "not-an-erasure";
+export type ErasureRefusal =
+  | "malformed"
+  | "no-such-request"
+  | "not-an-erasure"
+  /**
+   * **The history names the person and the routine has nothing to rewrite it with.** The map
+   * found a `concept-file` location — a blob or an author line carrying one of its needles —
+   * and the address set the git step works from came out empty. Completing there would report a
+   * rewrite that could not have happened, which is the failure this whole refusal exists for
+   * and the one the routine used to make in silence (S0's review, round 3).
+   *
+   * It is the map that decides it, not the request: a request naming a person the bundle never
+   * mentions has nothing for the git step to do and is not refused for having nothing to do.
+   */
+  | "no-address";
 
 /** What one run comes to, as the row stands after it. */
 export type ErasureRun = {
@@ -296,6 +315,15 @@ const pathsNaming = (map: ErasureMap): readonly string[] => [
 ];
 
 /**
+ * Whether the bundle names this person **at all** — a blob at some commit or an author line,
+ * which is the whole of what the git step exists to rewrite. `pathsNaming` above keeps only the
+ * blobs, because its two readers act on files; this one counts an author line too, since a
+ * history that names the person only in its signatures is still a history that names them.
+ */
+const namedInTheBundle = (map: ErasureMap): boolean =>
+  (map.find((entry) => entry.family === CONCEPT_FILE)?.locations ?? []).length > 0;
+
+/**
  * The concepts whose body names this person, by IRI — what the report lists for the owner to
  * edit. The map's concept-file locations are `<commit>:<path>` for a file and a bare sha for
  * an author line; only the first names a file, and `concept_index` holds one row per path, so
@@ -421,6 +449,78 @@ const personTheMapFound = (map: ErasureMap): string | null =>
   map.find((entry) => entry.family === IDENTITY_USER)?.locations[0] ?? null;
 
 /**
+ * **The addresses this run is about** — the two sets the routine works from, resolved once, in
+ * step 2's own transaction, so no later step decides for itself whose address it is acting on
+ * (S0's review, round 3).
+ *
+ * Until round 3 both sets were one thing: `request.identifiers.emails`, the list an Admin typed.
+ * That was wrong in both directions at once. A request naming the person by their **person id**
+ * with no address carried no address into the git step, which answered `NOTHING_MOVED` while
+ * `human:<email>` stayed in every blob and every author line — and the routine completed over
+ * it. And an address an Admin **appended** that belongs to nobody the request is about reached a
+ * `DELETE` on `invitation` that runs in every workspace, as the platform principal, past
+ * row-level security: a third party's live invitation removed at one company's word, which is
+ * the road round 2 closed at `verification` and left open here.
+ *
+ * **The two sets are two because the two stores are** (ruled at that review, and the reason is
+ * the ruling's). The git store is the **workspace's own** — one bare repository per workspace,
+ * which no principal but this one reaches — so an address an Admin supplies is one the workspace
+ * may take out of its own history, and that is the routine as the S0 spec writes it.
+ * `inTheBundle` is therefore the union: every address the subject's user rows carry, which is
+ * what answers the request that names a person and no address, and the request's own addresses,
+ * which is what keeps a **former member named by address alone** erasable — their membership is
+ * gone, so `MEMBER_HERE` finds them for no arm, and the union is the only thing left that knows
+ * what to rewrite.
+ *
+ * `ofTheSubject` is the narrow half and is what step 5's two address-keyed deletes match. Round
+ * 2's principle governs there and not here: those rows carry no `workspace_id`, no policy fences
+ * them and the invitation delete crosses every workspace deliberately, so what they act on has
+ * to be the person the platform resolved and never the list an Admin typed.
+ *
+ * **An address in the erased domain is in neither.** It is what an address *becomes*, not one to
+ * take away: it is the tombstone a last-membership erasure wrote, it is what a rewritten author
+ * line already carries, and rewriting a history for it would be a second pass doing work the
+ * first pass's own idempotence depends on it not doing.
+ */
+type SubjectAddresses = {
+  readonly inTheBundle: readonly string[];
+  readonly ofTheSubject: readonly string[];
+};
+
+/**
+ * Read from `"user"` inside the routine's scoped transaction, as `MEMBER_HERE` is: the table
+ * carries no `workspace_id`, and what fences this read is that every id it is given is one the
+ * platform minted for this request — the map's, which the membership this workspace holds
+ * fences, and the request's own column, which is a foreign key into `user`.
+ */
+const ADDRESSES_OF = `SELECT lower(email) AS email FROM "user" WHERE id = ANY($1::text[])`;
+
+const lowered = (addresses: readonly string[]): readonly string[] =>
+  addresses.map((address) => address.trim().toLowerCase()).filter((address) => address !== "");
+
+const addressesOfTheSubject = async (
+  tx: Tx,
+  subject: {
+    readonly personIds: readonly (string | null)[];
+    readonly requested: readonly string[];
+  },
+): Promise<SubjectAddresses> => {
+  const people = [...new Set(subject.personIds.filter((id) => id !== null))];
+  const found =
+    people.length === 0 ? { rows: [] } : await tx.query<{ email: string }>(ADDRESSES_OF, [people]);
+  const erased = (address: string): boolean => address.endsWith(`@${ERASED_DOMAIN}`);
+  const ofTheSubject = [...new Set(lowered(found.rows.map((row) => row.email)))].filter(
+    (address) => !erased(address),
+  );
+  return {
+    ofTheSubject,
+    inTheBundle: [...new Set([...ofTheSubject, ...lowered(subject.requested)])].filter(
+      (address) => !erased(address),
+    ),
+  };
+};
+
+/**
  * The completion event's detail: the request it answers, how many locations the map named, and
  * **the person the routine acted on — the map's, never the request's**.
  *
@@ -486,11 +586,30 @@ export const runErasure = async (
     const searched = await attempt(() =>
       withScope(platform, doors.postgres, workspaceId, async (tx) => {
         const map = await erasureMapOf(platform, tx, doors.git, request);
-        return { map, concepts: await conceptsNaming(tx, workspaceId, map) };
+        return {
+          map,
+          concepts: await conceptsNaming(tx, workspaceId, map),
+          // Resolved here because the map is what names the person, and before step 3 because
+          // step 3 is the first step that changes a store.
+          addresses: await addressesOfTheSubject(tx, {
+            personIds: [personTheMapFound(map), request.personId],
+            requested: request.identifiers?.emails ?? [],
+          }),
+        };
       }),
     );
     if (!searched.ok) return err(searched.error);
-    const { map, concepts } = searched.value;
+    const { map, concepts, addresses } = searched.value;
+
+    // **The history names the person and there is no address to rewrite it with.** The two
+    // readings are taken one line apart and compared here rather than left to step 3, which can
+    // only report having moved nothing and cannot tell that apart from a bundle that named
+    // nobody. Nothing has been rewritten, ended or suppressed at this point; step 1's row
+    // stands, uncompleted, and is the row a later run reuses — so a request refused here is one
+    // an Admin can file an address against and run again, which is what a silent completion
+    // took away. A bundle that names nobody is not refused: a person the files never mention is
+    // a person the git step has nothing to do for, which is a whole answer.
+    if (namedInTheBundle(map) && addresses.inTheBundle.length === 0) return err("no-address");
 
     // Step 3, under the per-repository lock, which is held across **both** halves: the
     // rewrite and the rows that name its commits have to move together, and a reconciler
@@ -499,7 +618,7 @@ export const runErasure = async (
     const rewritten = await attempt(() =>
       withRepositoryLockAs(platform, doors.git, workspaceId, async () => {
         const { moved } = await rewriteHistory(platform, doors.git, workspaceId, {
-          addresses: request.identifiers?.emails ?? [],
+          addresses: addresses.inTheBundle,
           pseudonym,
         });
         // One transaction for both tables, because `concept_index`'s key into `bundle_commit`
@@ -523,12 +642,13 @@ export const runErasure = async (
     if (!rewritten.ok) return err(rewritten.error);
 
     // Step 5, in its own unscoped transaction, because the identity set carries no
-    // `workspace_id` and a scoped transaction reaches none of it (ADR 0009).
+    // `workspace_id` and a scoped transaction reaches none of it (ADR 0009) — which is exactly
+    // why it is handed the narrow set and not the bundle's.
     const identity = await attempt(() =>
       eraseFromTheIdentitySet(platform, doors.postgres, {
         workspaceId,
         personId: personTheMapFound(map),
-        emails: (request.identifiers?.emails ?? []).map((email) => email.trim().toLowerCase()),
+        emails: addresses.ofTheSubject,
         pseudonym,
       }),
     );

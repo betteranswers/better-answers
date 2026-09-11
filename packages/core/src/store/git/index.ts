@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import {
   err,
   isPortablePath,
+  normalizeError,
   ok,
   PERSON_PREFIX,
   type ActorId,
@@ -194,6 +195,32 @@ const git = async (
   }
   const { stdout } = await child;
   return options.raw === true ? stdout : stdout.trim();
+};
+
+/**
+ * The exit status a failed `git` carries, or `null` for a failure that never became one.
+ *
+ * `execFile`'s rejection puts the child's exit status on `code` as a **number** and a failure
+ * to spawn at all — `ENOENT` for a binary off the path, `E2BIG` for an argument list past
+ * `ARG_MAX` — as a **string** in the same field. The two are told apart by type and never by
+ * spelling, and `null` is the honest answer for the second: a call that never ran has no status
+ * to classify, so every caller below treats it as the store failure it is.
+ *
+ * The parameter is named `cause` in both of these because that is the one name
+ * `anti-slop/no-unknown-parameters` allows for a rejection nobody can type — the kernel's own
+ * `normalizeError` says so where it stands — and because that is what it becomes on the Error.
+ */
+const exitStatusOf = (cause: unknown): number | null => {
+  if (typeof cause !== "object" || cause === null || !("code" in cause)) return null;
+  const { code } = cause;
+  return typeof code === "number" ? code : null;
+};
+
+/** What the failed call wrote to stderr, and the empty string where it wrote nothing. */
+const stderrOf = (cause: unknown): string => {
+  if (typeof cause !== "object" || cause === null || !("stderr" in cause)) return "";
+  const { stderr } = cause;
+  return typeof stderr === "string" ? stderr.trim() : "";
 };
 
 /**
@@ -500,10 +527,19 @@ const carries = (line: string, needles: readonly string[]): boolean => {
 };
 
 /**
- * `git grep` exits non-zero when nothing matched, which is an answer and not a failure — so
- * an empty listing is what a needle nobody's file carries comes back as. `core.quotePath`
- * off, because a concept whose filename carries an accent would otherwise come back
- * octal-escaped as a name the repository does not hold; `-I` so no binary blob is read.
+ * `git grep` exits 1 when nothing matched, which is an answer and not a failure — so an empty
+ * listing is what a needle nobody's file carries comes back as. `core.quotePath` off, because a
+ * concept whose filename carries an accent would otherwise come back octal-escaped as a name
+ * the repository does not hold; `-I` so no binary blob is read.
+ *
+ * **Exit 1 is two answers, and only the silent one is *nothing matched*.** `git grep` exits 1
+ * again when it could not read an object, having written `error: '<commit>:<path>': unable to
+ * read <oid>` to stderr and matched nothing; a revision it cannot parse exits 128; an argument
+ * list past `ARG_MAX` never reaches an exit status at all. Every one of those came back as an
+ * empty listing before, so this door told the erasure routine *no file in this bundle names the
+ * person* on behalf of a store that had not looked — and the routine completed, reported and
+ * booked its ledger event over it. So a 1 that said nothing is the no-match and everything else
+ * is this door's failure, raised where a caller's `attempt` turns it into a refusal.
  */
 const blobsNaming = async (
   gitDir: string,
@@ -520,7 +556,10 @@ const blobsNaming = async (
     "-I",
     ...needles.flatMap((needle) => ["-e", needle]),
     ...history,
-  ]).catch(() => "");
+  ]).catch((cause: unknown) => {
+    if (exitStatusOf(cause) === 1 && stderrOf(cause) === "") return "";
+    throw normalizeError(cause);
+  });
   return listed.split("\n").flatMap((entry) => {
     // `<commit>:<path>`, and a commit is a hash, so the first colon is the separator and
     // every later one belongs to the path.
@@ -656,6 +695,19 @@ export const readCommit = async (
  * caller asking about a file that is not there is asking a fair question, and the answer is
  * that there is nothing there — not a failure. Raw, so what comes back is the file's bytes
  * with their own trailing newline, which is what a content hash is taken over.
+ *
+ * **A commit this repository does not hold is a failure and not an absent file**, and telling
+ * the two apart costs a second question. `git show` answers both with the same words and the
+ * same 128 — `fatal: path '<path>' does not exist in '<sha>'`, whether the path is missing from
+ * a tree it read or the whole name resolved to nothing — so there is nothing in the first
+ * answer to classify. `ls-tree` is asked instead, and only when `show` has already failed: it
+ * exits 0 with an empty listing for a path the tree does not hold, 0 naming the path for one it
+ * does, and non-zero for a commit it could not read. So *the tree was read and the path is not
+ * in it* is the one reading that answers `null`; a listing that names the path is an object the
+ * store could not hand back, and a listing that could not be taken is a row naming a commit
+ * this bundle has never held — a repository and a database disagreeing about the past, which is
+ * the reconciler's to answer and which step 4 of the erasure routine would otherwise skip in
+ * silence while reporting the check it did not carry.
  */
 export const fileAt = async (
   platform: PlatformPrincipal,
@@ -665,14 +717,13 @@ export const fileAt = async (
   filePath: string,
 ): Promise<string | null> => {
   if (!isPortablePath(filePath)) return null;
+  const gitDir = repositoryPath(door, workspaceId);
   try {
-    return await git(repositoryPath(door, workspaceId), ["show", `${sha}:${filePath}`], {
-      raw: true,
-    });
-  } catch {
-    // A path the tree does not hold, or a commit this repository does not: `git show` has no
-    // way of saying either but a non-zero exit, and neither is something a caller can act on.
-    return null;
+    return await git(gitDir, ["show", `${sha}:${filePath}`], { raw: true });
+  } catch (thrown) {
+    const listed = await git(gitDir, ["ls-tree", "--name-only", sha, "--", filePath]);
+    if (listed === "") return null;
+    throw normalizeError(thrown);
   }
 };
 
