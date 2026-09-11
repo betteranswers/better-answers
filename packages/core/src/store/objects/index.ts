@@ -6,6 +6,7 @@ import { Upload } from "@aws-sdk/lib-storage";
 
 import {
   err,
+  isPortablePath,
   ok,
   type PlatformPrincipal,
   type Result,
@@ -117,32 +118,21 @@ export type KeyRefusal = "malformed-key";
 export type ReadRefusal = KeyRefusal | "no-such-object";
 
 /**
- * The shape every key inside a prefix has. An S3 key is an opaque string, so `..` cannot
- * escape a prefix the way it escapes a directory — but a key with a dot segment, an empty
- * segment or a leading separator names bytes nothing can list back sensibly, and the nightly
- * mirror that copies this bucket off-host writes it to a filesystem where those segments do
- * mean something. So the door refuses them here rather than storing a name it cannot hand
- * back. The rule is the git door's `isBundlePath`, for the same reasons and in its shape.
- */
-const isKeyShaped = (candidate: string): boolean =>
-  !candidate.startsWith("/") &&
-  !candidate.split("").some((character) => {
-    const code = character.charCodeAt(0);
-    return code < 0x20 || code === 0x7f;
-  }) &&
-  !candidate.split("/").some((segment) => segment === "." || segment === "..");
-
-/** A key names one object, so it is non-empty and has no empty segment. */
-const isObjectKey = (candidate: string): boolean =>
-  candidate !== "" && isKeyShaped(candidate) && !candidate.split("/").includes("");
-
-/**
- * What a listing may be asked for: a key, nothing at all — which names everything under the
- * prefix — or a key with the separator left on, which is how a caller asks for one folder's
- * worth and not the keys whose names merely start the same way.
+ * What a listing may be asked for, which is the one thing about a name this door decides
+ * for itself: a key, nothing at all — which names everything under the prefix — or a key
+ * with the separator left on, which is how a caller asks for one folder's worth and not the
+ * keys whose names merely start the same way.
+ *
+ * The shape of the key itself is `isPortablePath`, the kernel's, which the git door's bundle
+ * paths are held to as well: an S3 key is an opaque string and a bundle path is written into
+ * git's object graph, so in neither store does a dot segment escape anything — but the
+ * nightly mirror copies this bucket onto a filesystem where a dot segment, an empty segment
+ * and a leading separator all mean something, and a name the platform cannot hand back is
+ * one it should not have taken. Two doors, one rule, and it sits in `kernel` because ADR 0029
+ * rule 2 forbids a store file importing another store file.
  */
 const isListingPrefix = (candidate: string): boolean =>
-  candidate === "" || isObjectKey(candidate.endsWith("/") ? candidate.slice(0, -1) : candidate);
+  candidate === "" || isPortablePath(candidate.endsWith("/") ? candidate.slice(0, -1) : candidate);
 
 /**
  * What the SDK throws for a key the bucket does not hold. Read off the error's name rather
@@ -162,7 +152,7 @@ const putInside = async (
   key: string,
   body: ReadableStream<Uint8Array>,
 ): Promise<Result<void, KeyRefusal>> => {
-  if (!isObjectKey(key)) return err("malformed-key");
+  if (!isPortablePath(key)) return err("malformed-key");
   // SAFETY: the two `ReadableStream` types are the same runtime object — Node's global is
   // the one `node:stream/web` declares — and they are declared twice only because the DOM
   // library and Node's own both name it. The assertion is about the declaration, not a
@@ -181,7 +171,7 @@ const getInside = async (
   prefix: string,
   key: string,
 ): Promise<Result<ReadableStream<Uint8Array>, ReadRefusal>> => {
-  if (!isObjectKey(key)) return err("malformed-key");
+  if (!isPortablePath(key)) return err("malformed-key");
   try {
     const answer = await door.client.send(
       new GetObjectCommand({ Bucket: door.bucket, Key: `${prefix}${key}` }),

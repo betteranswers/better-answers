@@ -19,7 +19,12 @@ import { actorIdOfPerson, type UserPrincipal } from "../src/kernel/index.ts";
 import { withScope } from "../src/store/postgres/index.ts";
 import { bootstrap } from "./platform.ts";
 import { readingAs, seedingWith } from "./suite-postgres.ts";
-import { principalFor, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
+import {
+  memberOf,
+  principalFor,
+  suiteWithBundles,
+  type Scenario,
+} from "./workspace-with-bundle.ts";
 
 /**
  * The **erasure map** through the slice's own face (`[TEST1]`), against real Postgres and a
@@ -84,14 +89,6 @@ const identityRowsFor = async (userId: string, email: string) => {
   return { sessionId, accountId, verificationId };
 };
 
-/** A person on the identity set with a membership in this workspace, through the factory. */
-const memberOf = (workspaceId: string, email: string) =>
-  seedingWith(db().pool, async (seed) => {
-    const person = await seed.user({ name: "Priya Anand", email });
-    await seed.member({ workspaceId, userId: person.id, role: "Editor" });
-    return person;
-  });
-
 /** The request as the slice reads it back — the row an Admin recorded, identifier set and all. */
 const requestFor = async (
   scenario: Scenario,
@@ -149,7 +146,7 @@ const locationsOf = (map: ErasureMap): readonly (readonly [ErasureFamily, readon
 const workspaceHoldingAMember = async () => {
   const scenario = await arrange();
   const email = addressOf("priya");
-  const person = await memberOf(scenario.workspaceId, email);
+  const person = await memberOf(db().pool, scenario.workspaceId, email);
   const principal = await principalFor(db(), scenario.workspaceId, person.id);
   const sha = await conceptFileBy(scenario, principal, email, scenario.git);
   const actor = actorIdOfPerson(person.id);
@@ -308,7 +305,7 @@ describe("the erasure map in one workspace's scope", () => {
     const here = await arrange();
     const elsewhere = await arrange();
     const email = addressOf("priya");
-    const person = await memberOf(here.workspaceId, email);
+    const person = await memberOf(db().pool, here.workspaceId, email);
     await seedingWith(db().pool, (seed) =>
       seed.member({ workspaceId: elsewhere.workspaceId, userId: person.id, role: "Editor" }),
     );

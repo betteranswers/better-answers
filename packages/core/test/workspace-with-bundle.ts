@@ -1,4 +1,5 @@
 import { testData, type MigratedPostgres } from "@better-answers/schema/testing";
+import type pg from "pg";
 
 import { initRepository, type GitDoor } from "@better-answers/core/store/git";
 
@@ -7,7 +8,7 @@ import { openPostgres, withPrincipal, type PostgresDoor } from "../src/store/pos
 import { provisionWorkspace } from "../src/workspaces/index.ts";
 import { bundlesForSuite } from "./bundle.ts";
 import { bootstrap, seedPerson } from "./platform.ts";
-import { postgresForSuite } from "./suite-postgres.ts";
+import { postgresForSuite, seedingWith } from "./suite-postgres.ts";
 
 /**
  * A provisioned workspace with its bundle and three people in it — the arrange block every
@@ -70,6 +71,23 @@ export const principalFor = async (
   if (!resolved.ok) throw new Error(`the principal did not resolve: ${resolved.error}`);
   return resolved.value;
 };
+
+/**
+ * One more person in this workspace, named and addressed by the caller: the subject an
+ * erasure suite seeds before it asks what the platform holds about them.
+ *
+ * It takes the address rather than minting one, because `user.email` is unique and the
+ * address is the thing a test's expected values are written from — a helper that made one up
+ * would be handing the assertion a value it could only read back from the arrange
+ * (`[TEST9]`). The name is fixed here: two suites assert on it as a literal, and a name a
+ * helper varied would make those literals unwritable.
+ */
+export const memberOf = (pool: pg.Pool, workspaceId: string, email: string) =>
+  seedingWith(pool, async (seed) => {
+    const person = await seed.user({ name: "Priya Anand", email });
+    await seed.member({ workspaceId, userId: person.id, role: "Editor" });
+    return person;
+  });
 
 export const arrangeWorkspace = async (db: MigratedPostgres, git: GitDoor): Promise<Scenario> => {
   const adminUserId = await seedPerson(db.pool);

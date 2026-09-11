@@ -5,6 +5,7 @@ import {
   type ActorId,
   actorIdOf,
   attempt,
+  isPortablePath,
   type PlatformPrincipal,
   refusalFor,
   requireAdmin,
@@ -164,5 +165,49 @@ describe("reading a store's constraint names into a slice's words", () => {
     );
 
     expect(refusalFor(violation, overlapping)).toBe("the other");
+  });
+});
+
+describe("the shape of a name a store can hand back", () => {
+  it("takes a relative name whose every segment is a plain one", () => {
+    expect(isPortablePath("knowledge/expenses.md")).toBe(true);
+    expect(
+      isPortablePath("erasures/01JQ0000000000000000000WSP/01JQ00000000000000000ERQ.json"),
+    ).toBe(true);
+    // A dot inside a segment is part of a name; only a segment that is nothing but dots is
+    // the thing a filesystem reads as a place rather than a name.
+    expect(isPortablePath(".hidden/..trailing/a..b")).toBe(true);
+  });
+
+  it("refuses a dot segment, wherever in the name it sits", () => {
+    expect(isPortablePath(".")).toBe(false);
+    expect(isPortablePath("..")).toBe(false);
+    expect(isPortablePath("knowledge/./expenses.md")).toBe(false);
+    expect(isPortablePath("knowledge/../expenses.md")).toBe(false);
+    expect(isPortablePath("knowledge/expenses.md/..")).toBe(false);
+  });
+
+  it("refuses a name with nothing to read, an empty segment, or a separator at either end", () => {
+    expect(isPortablePath("")).toBe(false);
+    expect(isPortablePath("/")).toBe(false);
+    expect(isPortablePath("/knowledge/expenses.md")).toBe(false);
+    expect(isPortablePath("knowledge//expenses.md")).toBe(false);
+    expect(isPortablePath("knowledge/expenses.md/")).toBe(false);
+  });
+
+  it("refuses a control character, because a listing would have to quote it", () => {
+    expect(isPortablePath("knowledge/expenses\u0000.md")).toBe(false);
+    expect(isPortablePath("knowledge/expenses\t.md")).toBe(false);
+    expect(isPortablePath("knowledge/expenses\n.md")).toBe(false);
+    expect(isPortablePath("knowledge/expenses\u007f.md")).toBe(false);
+    // The boundary both ways: 0x1f is refused and 0x20 — a space — is an ordinary character in
+    // a name every tool here reads back, so the rule is about control and not about tidiness.
+    expect(isPortablePath("knowledge/expenses\u001f.md")).toBe(false);
+    expect(isPortablePath("knowledge/travel expenses.md")).toBe(true);
+  });
+
+  it("takes a name outside the ASCII range, because a name is text and not bytes", () => {
+    expect(isPortablePath("knowledge/dépenses.md")).toBe(true);
+    expect(isPortablePath("knowledge/\u{1d11e}.md")).toBe(true);
   });
 });

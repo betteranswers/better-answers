@@ -99,6 +99,31 @@ jobs:
       # browser is not in the pnpm store, so it is installed here. Chromium alone: the
       # suite runs one project.
       - run: pnpm --filter @better-answers/web exec playwright install --with-deps chromium
+      # `git-filter-repo` is what the erasure routine's git step shells out to (`T-124`,
+      # ADR 0020), and `ubuntu-latest` does not carry it: without this step `packages/core`'s
+      # erasure suite fails here while every machine it was written on is green. There is no
+      # skip guard in that suite on purpose — a red run on the one step that rewrites a
+      # workspace's history irreversibly is the coverage this workflow exists to provide.
+      #
+      # THE VERSION IS READ OUT OF `apps/api/Dockerfile`, NOT WRITTEN HERE. Do not tidy it
+      # into a literal. A rewrite proved against one version of the tool and run against
+      # another is a rewrite nobody has tested, so the runner and the api image must carry
+      # the same one — and the constitution's dependency rule is that a pinned version is
+      # written down once and read from there, because a second copy ages on its own. An
+      # action cannot import a constant, so reading the pin out of the file that declares it
+      # is the substitute, the way `apps/worker/tests/pg_harness.py` reads the Postgres image
+      # out of the module that declares that. `apps/api/tests/workflow-tools.test.ts` holds
+      # this step to both halves of that.
+      - name: the rewrite tool the erasure suite runs, at the version the api image pins
+        run: |
+          pinned="$(sed -n 's/^ARG GIT_FILTER_REPO_VERSION=//p' apps/api/Dockerfile)"
+          test -n "$pinned" || { echo "apps/api/Dockerfile pins no GIT_FILTER_REPO_VERSION"; exit 1; }
+          uv tool install "git-filter-repo==$pinned"
+          bin="$(uv tool dir --bin)"
+          printf '%s\n' "$bin" >> "$GITHUB_PATH"
+          # Proved here rather than left to the suite, so an install that put the tool
+          # somewhere git cannot reach fails on this line and not three hundred tests later.
+          PATH="$bin:$PATH" git filter-repo --help > /dev/null
       # One command, every workspace — the root `check` runs them all. The image tests read
       # the variable below and stand down when the caller's own job probes what it pushes;
       # a pull request evaluates it to the empty string and probes.

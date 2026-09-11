@@ -31,7 +31,7 @@ import {
 import { actorIdOfPerson, type Result } from "../src/kernel/index.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
-import { objectStoreForSuite } from "./suite-objects.ts";
+import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import {
   countWaitingOnLocks,
   readingAs,
@@ -39,7 +39,13 @@ import {
   until,
   whileActsWaitAt,
 } from "./suite-postgres.ts";
-import { doorsOf, principalFor, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
+import {
+  doorsOf,
+  memberOf,
+  principalFor,
+  suiteWithBundles,
+  type Scenario,
+} from "./workspace-with-bundle.ts";
 
 /**
  * The **erasure routine's spine** through the slice's own face (`[TEST1]`), against real
@@ -122,14 +128,6 @@ const COMPLETED = "people.erasure.completed";
  */
 const addressOf = (person: string): string => `${person}-${ulid().toLowerCase()}@example.invalid`;
 
-/** A person on the identity set with a membership in this workspace, through the factory. */
-const memberOf = (workspaceId: string, email: string) =>
-  seedingWith(db().pool, async (seed) => {
-    const person = await seed.user({ name: "Priya Anand", email });
-    await seed.member({ workspaceId, userId: person.id, role: "Editor" });
-    return person;
-  });
-
 /** The routine as a caller reaches it: the platform's own principal, both doors and a clock. */
 const runningTheRoutine = (
   scenario: Scenario,
@@ -182,7 +180,7 @@ const erasureRequestAbout = async (
 const workspaceWithAnErasureRequest = async () => {
   const scenario = await arrange();
   const email = addressOf("priya");
-  const person = await memberOf(scenario.workspaceId, email);
+  const person = await memberOf(db().pool, scenario.workspaceId, email);
   return {
     scenario,
     email,
@@ -1024,7 +1022,7 @@ describe("the identity set on the person's last membership", () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const email = addressOf("priya");
-    const person = await memberOf(scenario.workspaceId, email);
+    const person = await memberOf(db().pool, scenario.workspaceId, email);
     await seedingWith(db().pool, (seed) =>
       seed.member({ workspaceId: elsewhere.workspaceId, userId: person.id, role: "Editor" }),
     );
@@ -1049,7 +1047,7 @@ describe("the identity set on the person's last membership", () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
     const elsewhere = await arrange();
     const email = addressOf("nadia");
-    const other = await memberOf(scenario.workspaceId, email);
+    const other = await memberOf(db().pool, scenario.workspaceId, email);
     await seedingWith(db().pool, (seed) =>
       seed.member({ workspaceId: elsewhere.workspaceId, userId: other.id, role: "Editor" }),
     );
@@ -1124,12 +1122,26 @@ const documentIn = (workspaceId: string, bindingId: string) =>
 const bindingIn = (workspaceId: string) =>
   seedingWith(db().pool, (seed) => seed.sourceBinding({ workspaceId }));
 
+/**
+ * The footing every case below the suppression arm stands on: a workspace, an erasure with
+ * nothing done to it, and one binding with one document under it that the map will name.
+ *
+ * Arrangement only — it seeds rows and asserts nothing, so what each case claims is still
+ * written out in the case. The binding comes back too because a second document under the
+ * same one is what the first case needs to show the arm writes per document and not per
+ * binding.
+ */
+const anErasureOverOneDocument = async () => {
+  const scenario = await arrange();
+  const erasure = await anOpenErasure(scenario.workspaceId);
+  const binding = await bindingIn(scenario.workspaceId);
+  const named = await documentIn(scenario.workspaceId, binding.id);
+  return { scenario, erasure, binding, named };
+};
+
 describe("the suppression written for every document the map found", () => {
   it("writes one row per document, keyed by workspace, erasure request and document, carrying the request's set", async () => {
-    const scenario = await arrange();
-    const erasure = await anOpenErasure(scenario.workspaceId);
-    const binding = await bindingIn(scenario.workspaceId);
-    const named = await documentIn(scenario.workspaceId, binding.id);
+    const { scenario, erasure, binding, named } = await anErasureOverOneDocument();
     const alsoNamed = await documentIn(scenario.workspaceId, binding.id);
     // A document the map never named: the other direction of the pair (`[TEST7]`).
     const unnamed = await documentIn(scenario.workspaceId, binding.id);
@@ -1161,10 +1173,7 @@ describe("the suppression written for every document the map found", () => {
   });
 
   it("writes nothing for a set that names nobody, because a suppression that keeps nothing out is an erasure undone at the next conversion", async () => {
-    const scenario = await arrange();
-    const erasure = await anOpenErasure(scenario.workspaceId);
-    const binding = await bindingIn(scenario.workspaceId);
-    const named = await documentIn(scenario.workspaceId, binding.id);
+    const { scenario, erasure, named } = await anErasureOverOneDocument();
 
     const emptied = await withScope(ERASURE, scenario.postgres, scenario.workspaceId, (tx) =>
       suppressTheDocuments(ERASURE, tx, {
@@ -1189,10 +1198,7 @@ describe("the suppression written for every document the map found", () => {
   });
 
   it("leaves the rows it already wrote exactly as they are when the arm runs a second time", async () => {
-    const scenario = await arrange();
-    const erasure = await anOpenErasure(scenario.workspaceId);
-    const binding = await bindingIn(scenario.workspaceId);
-    const named = await documentIn(scenario.workspaceId, binding.id);
+    const { scenario, erasure, named } = await anErasureOverOneDocument();
     const input = {
       workspaceId: scenario.workspaceId,
       erasureRequestId: erasure.id,
@@ -1280,20 +1286,30 @@ describe("the full-rebuild the erasure asks for", () => {
   });
 });
 
+/**
+ * The routine run to completion for the person a company's files name and who never signed
+ * in — no user row, so the identifier set is the whole of what the platform knows them by
+ * (`CONTEXT.md`, *subject request*).
+ *
+ * The run is inside the helper because both cases that use it are about what the run *left*:
+ * one reads the report, the other the replay copy. Neither asserts anything here.
+ */
+const completedForASubjectWithNoUserRow = async () => {
+  const scenario = await arrange();
+  const seeded = await seedingWith(db().pool, (seed) =>
+    seed.subjectRequest({
+      workspaceId: scenario.workspaceId,
+      kind: "erasure",
+      personId: null,
+      identifiers: THE_SET,
+    }),
+  );
+  return { scenario, done: await completing(scenario, seeded.id) };
+};
+
 describe("a subject with no user row", () => {
   it("runs with its git and identity arms finding nothing and its suppression arm doing the erasure, and the report says which arms ran", async () => {
-    const scenario = await arrange();
-    const seeded = await seedingWith(db().pool, (seed) =>
-      seed.subjectRequest({
-        workspaceId: scenario.workspaceId,
-        kind: "erasure",
-        // The person the files name who never signed in (`CONTEXT.md`, *subject request*).
-        personId: null,
-        identifiers: THE_SET,
-      }),
-    );
-
-    const done = await completing(scenario, seeded.id);
+    const { scenario, done } = await completedForASubjectWithNoUserRow();
 
     // Every arm ran and said what it found, which is what a person with no login is owed:
     // the stores that hold nothing about them say so rather than staying silent.
@@ -1311,19 +1327,6 @@ describe("a subject with no user row", () => {
     ]);
   });
 });
-
-/** The bytes of a stream, as text — the assertion's side of what the door hands back. */
-const textOf = async (stream: ReadableStream<Uint8Array>): Promise<string> => {
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let text = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    text += decoder.decode(value, { stream: true });
-  }
-  return text + decoder.decode();
-};
 
 /**
  * The replay copy as a restore reaches it: the platform's own prefix and the key spelled out
@@ -1465,17 +1468,7 @@ describe("the replay copy the restore reads", () => {
   });
 
   it("names no person for a subject with no user row, because an absent login is not a null one", async () => {
-    const scenario = await arrange();
-    const seeded = await seedingWith(db().pool, (seed) =>
-      seed.subjectRequest({
-        workspaceId: scenario.workspaceId,
-        kind: "erasure",
-        personId: null,
-        identifiers: THE_SET,
-      }),
-    );
-
-    const done = await completing(scenario, seeded.id);
+    const { scenario, done } = await completedForASubjectWithNoUserRow();
 
     const copy = JSON.parse(
       await replayCopyOf(scenario.workspaceId, done.erasureRequestId),

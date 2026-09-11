@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 
 import {
   err,
+  isPortablePath,
   ok,
   PERSON_PREFIX,
   type ActorId,
@@ -270,25 +271,6 @@ const messageWith = (message: string, lines: readonly string[]): string =>
   `${message}\n\n${lines.join("\n")}\n`;
 
 /**
- * A path inside the bundle and nothing else: relative, no `..` segment, no leading slash.
- * The path reaches `update-index --cacheinfo`, which writes into the repository's object
- * graph rather than the filesystem, so this is not a traversal guard — it is what keeps a
- * bundle's tree readable by any OKF tool (ADR 0012's export promise).
- */
-const isBundlePath = (candidate: string): boolean =>
-  candidate.length > 0 &&
-  !candidate.startsWith("/") &&
-  // No control character: a tab or a newline in a path is a name no OKF tool reads back and
-  // a line git's own listings would have to quote — and the reader below takes NUL-delimited
-  // listings for exactly the characters git does quote, so this is what keeps the two
-  // ends of the door agreeing on what a path can be.
-  !candidate.split("").some((character) => {
-    const code = character.charCodeAt(0);
-    return code < 0x20 || code === 0x7f;
-  }) &&
-  !candidate.split("/").some((segment) => segment === "" || segment === "." || segment === "..");
-
-/**
  * One governed write's commit: the hash precondition, then one commit with the person as
  * author and the platform bot as committer, then the ref moved under the same precondition.
  *
@@ -304,7 +286,11 @@ export const commit = async (
   door: GitDoor,
   request: CommitRequest,
 ): Promise<Result<Committed, CommitRefusal | Error>> => {
-  if (!isBundlePath(request.path)) return err("malformed-path");
+  // A path inside the bundle and nothing else. It reaches `update-index --cacheinfo`, which
+  // writes into the repository's object graph rather than the filesystem, so the refusal is
+  // not a traversal guard: it is what keeps a bundle's tree readable by any OKF tool, which
+  // is ADR 0012's export promise (`kernel/portable-path.ts`).
+  if (!isPortablePath(request.path)) return err("malformed-path");
   const trailers = trailerLines(request.trailers);
   if (!isSubjectLine(request.message) || trailers === undefined) return err("malformed-message");
   const gitDir = bundleOf(door, principal);
@@ -678,7 +664,7 @@ export const fileAt = async (
   sha: string,
   filePath: string,
 ): Promise<string | null> => {
-  if (!isBundlePath(filePath)) return null;
+  if (!isPortablePath(filePath)) return null;
   try {
     return await git(repositoryPath(door, workspaceId), ["show", `${sha}:${filePath}`], {
       raw: true,

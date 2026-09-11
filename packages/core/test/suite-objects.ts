@@ -39,6 +39,28 @@ import {
  * test a long way away.
  */
 
+/**
+ * What a get answered, as text — the reading half of every assertion about the door, which
+ * hands bytes back over a stream and so cannot be compared to a string without one.
+ *
+ * It is here rather than in each suite because it is the door's own shape read back, not a
+ * test's expectation: the decoder is stateful across chunks on purpose, so a multi-byte
+ * character split across two of them still reads as one character, and a copy per suite is a
+ * copy of that decision. What a suite asserts is still the suite's — this only turns the
+ * stream into something to assert on.
+ */
+export const textOf = async (stream: ReadableStream<Uint8Array>): Promise<string> => {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+};
+
 /** What a suite receives: the door, and the facts a failure message needs. */
 export type ObjectStore = {
   readonly door: ObjectDoor;

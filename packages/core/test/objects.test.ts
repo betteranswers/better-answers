@@ -11,7 +11,7 @@ import {
   putPlatformObject,
 } from "../src/store/objects/index.ts";
 import { principalOf } from "./platform.ts";
-import { objectStoreForSuite } from "./suite-objects.ts";
+import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 
 /**
  * The object door against a real Garage — the store the estate runs, not a stand-in, for
@@ -45,19 +45,6 @@ const streamOf = (text: string): ReadableStream<Uint8Array> =>
       controller.close();
     },
   });
-
-/** What a get answered, as text — the assertion's side of `streamOf`. */
-const textOf = async (stream: ReadableStream<Uint8Array>): Promise<string> => {
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let text = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    text += decoder.decode(value, { stream: true });
-  }
-  return text + decoder.decode();
-};
 
 describe("the object door keeps a workspace's bytes", () => {
   it("gives back exactly the bytes that were put, over a stream", async () => {
