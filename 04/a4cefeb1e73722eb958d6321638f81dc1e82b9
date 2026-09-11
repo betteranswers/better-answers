@@ -1,0 +1,42 @@
+packages/core/test/sources.test.ts
+  s_f3ee63bcbb1a0b::t_81d64e3b62c220 4-6,8-9,11
+  s_f3ee63bcbb1a0b::t_12dbec06210aa6 373-531,533-542,544-657,659-759,761-828,830-870,872-883
+packages/core/src/sources/binding.ts
+  s_f3ee63bcbb1a0b::t_bb64ad3fae78ea 526
+  s_f3ee63bcbb1a0b::t_982f54629e5580 3,7,28
+  s_f3ee63bcbb1a0b::t_353f995703f6ea 84-141,149-161
+  s_f3ee63bcbb1a0b::t_1dd6fd92e4b316 377-502,504-516,519-520,527,530-548,550-552
+  s_f3ee63bcbb1a0b::t_ad88f86273474b 549
+  s_f3ee63bcbb1a0b::t_9285be072a77c2 517-518,521-525,528-529
+  s_f3ee63bcbb1a0b::t_7319c5f9fc25d7 503
+packages/schema/src/source-tables.ts
+  s_f3ee63bcbb1a0b::t_fc1ba851fcc4e2 98-104
+packages/schema/src/job-tables.ts
+  s_f3ee63bcbb1a0b::t_92ee7803543b13 158-164
+packages/core/test/sourced-concept.ts
+  s_f3ee63bcbb1a0b::t_d9b79fc1bd68b7 1,14
+  s_f3ee63bcbb1a0b::t_7a996c53039ad8 118-173
+docs/adr/0013-sources-bound-by-origin-reach-and-destination.md
+  s_f3ee63bcbb1a0b::t_897cd36c4bc181 71-73
+docs/adr/README.md
+  s_f3ee63bcbb1a0b::t_402880ee8842be 21
+packages/core/src/sources/index.ts
+  s_f3ee63bcbb1a0b::t_31690d658f15f2 32,34-37
+  s_f3ee63bcbb1a0b::t_1ad26968dcba9e 50,53,56-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "04a4cefeb1e73722eb958d6321638f81dc1e82b9",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
