@@ -1,0 +1,22 @@
+docs/agents/build-loop.md
+  s_f3ee63bcbb1a0b::t_f5fe18f4f6977e 18-19
+  s_f3ee63bcbb1a0b::t_4c902de86e6057 74
+  s_f3ee63bcbb1a0b::t_c40f90a8fcd724 10
+  s_f3ee63bcbb1a0b::t_496d94315775d9 53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1b47b2e4ee9892dcca49dd20087cfd63c9149132",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
