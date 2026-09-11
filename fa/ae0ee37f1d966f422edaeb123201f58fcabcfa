@@ -1,0 +1,43 @@
+packages/core/src/sources/index.ts
+  s_f3ee63bcbb1a0b::t_77c7a4c0343681 60,64,69-70
+  s_f3ee63bcbb1a0b::t_20a8657b4ba07b 1,3-9
+  s_f3ee63bcbb1a0b::t_e455a602864b8b 155-186
+  s_f3ee63bcbb1a0b::t_c8fb08f04144a1 249-261
+  s_f3ee63bcbb1a0b::t_8a7b9d1a541913 193-200
+  s_f3ee63bcbb1a0b::t_9f230e95c24a0c 34-37
+  s_f3ee63bcbb1a0b::t_06b1b5067412ae 44-46
+packages/core/test/visibility.test.ts
+  s_f3ee63bcbb1a0b::t_817b159490e504 23,27
+  s_f3ee63bcbb1a0b::t_801bc3e3e2906f 59-103
+  s_f3ee63bcbb1a0b::t_b1355c378e6c64 470-480
+  s_f3ee63bcbb1a0b::t_da1d86fc5ca430 1026,1030-1037
+  s_f3ee63bcbb1a0b::t_975370f15375f1 1069-1073
+  s_f3ee63bcbb1a0b::t_214e82507e0fe7 545-643
+packages/core/test/sources.test.ts
+  s_f3ee63bcbb1a0b::t_7e3248d5127604 900-991,1006,1008-1025
+  s_f3ee63bcbb1a0b::t_a229650ebe2187 992-1005,1007
+  s_f3ee63bcbb1a0b::t_06c8ffbe9eeb0c 507-516
+  s_f3ee63bcbb1a0b::t_caee41ed242f93 5-12
+packages/core/src/sources/binding.ts
+  s_f3ee63bcbb1a0b::t_6ae847b53ecf7a 553-588,595-622,637-642
+  s_f3ee63bcbb1a0b::t_6a46cb7689113d 25
+  s_f3ee63bcbb1a0b::t_7f75ac5209e1f6 630-636
+  s_f3ee63bcbb1a0b::t_94d12119f8fead 589-594
+  s_f3ee63bcbb1a0b::t_12053ca9fa832b 623-629
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "faae0ee37f1d966f422edaeb123201f58fcabcfa",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
