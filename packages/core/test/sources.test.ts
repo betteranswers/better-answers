@@ -1,11 +1,14 @@
 import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
-import { bindUpload, UPLOAD_BYTE_CAP } from "../src/sources/index.ts";
+import { readableClause, readableParameters } from "../src/access/index.ts";
+import type { UserPrincipal } from "../src/kernel/index.ts";
+import { bindUpload, dpiaInputFor, publishBinding, UPLOAD_BYTE_CAP } from "../src/sources/index.ts";
 import { getObject, listObjects } from "../src/store/objects/index.ts";
-import { ledgerRowsOf, groupNamed } from "./sourced-concept.ts";
+import type { Tx } from "../src/store/postgres/index.ts";
+import { chunkUnder, ledgerRowsOf, groupNamed, seededBy } from "./sourced-concept.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
-import { whileWritesAreRefused } from "./suite-postgres.ts";
+import { readingAs, whileWritesAreRefused } from "./suite-postgres.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 /**
@@ -365,5 +368,516 @@ describe("an Admin binds an upload", () => {
     // per-file cap has to sit under (`deploy/platform.compose.yaml`, `AGENT_MAX_FILE_BYTES`).
     expect(UPLOAD_BYTE_CAP).toEqual(67108864);
     expect(UPLOAD_BYTE_CAP).toBeLessThan(104857600);
+  });
+});
+
+/**
+ * The publish, and what it opens up.
+ *
+ * Three instants, written down rather than read off a clock: when the run the bind queued
+ * finished, when the Admin published, and — for the one case that proves *latest* means
+ * latest — when an earlier run failed. The publish's instant is handed to the act, because
+ * the act takes one and defaults none (ADR 0040).
+ */
+const RUN_FAILED_AT = new Date("2026-09-11T08:00:00.000Z");
+const RUN_FINISHED_AT = new Date("2026-09-11T09:30:00.000Z");
+const PUBLISHED_AT = new Date("2026-09-11T10:00:00.000Z");
+
+/** All three confirmations, as a publish dialog would hand them over. */
+const CONFIRMED = {
+  lawfulBasisRecorded: true,
+  privacyInformationUpdated: true,
+  dpiaReferenced: true,
+} as const;
+
+/** What the seeded chunks hold — the passage a reader asks for once the binding is published. */
+const HOLIDAY = "Holiday is twenty-eight days including bank holidays.";
+const NOTICE = "Notice is one month either way after probation.";
+
+/** Every count field the published act declares, each at nought — the shape a reading starts from. */
+const NO_FINDINGS = {
+  findingsSpecialCategory: 0,
+  findingsBankDetails: 0,
+  findingsGovernmentIdentifier: 0,
+  findingsDateOfBirth: 0,
+  findingsHomeAddress: 0,
+  findingsPersonalContact: 0,
+  findingsPersonName: 0,
+  findingsJobTitle: 0,
+};
+
+/** A 64-character lower-case hex digest — the shape the ledger's content-hash kind admits. */
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+const asAdmin = <T>(scenario: Scenario, work: (admin: UserPrincipal, tx: Tx) => Promise<T>) =>
+  readingAs(db().runtimePool, scenario.admin, work);
+
+/** One bound handbook: the binding, its document and the `index` run the bind queued. */
+const boundHandbook = async (scenario: Scenario, shape: Partial<BindShape> = {}) => {
+  const bound = await bindUpload(scenario.admin, doorsOf(scenario), {
+    name: "The staff handbook",
+    fileName: "handbook.md",
+    mediaType: "text/markdown",
+    byteSize: HANDBOOK_BYTES,
+    body: uploadOf(HANDBOOK).body,
+    ...shape,
+  });
+  if (!bound.ok) throw new Error(`the bind was refused: ${String(bound.error)}`);
+  return bound.value;
+};
+
+type BindShape = {
+  readonly sensitivity: string;
+  readonly audience: string;
+  readonly audienceGroups: readonly string[];
+};
+
+/** What a job row carries beyond its status, per the claim protocol's own CHECKs. */
+const claimColumnsOf = (status: string, at: Date) => {
+  if (status === "queued") return {};
+  const claimed = { attempts: 1, claimedBy: "worker-1", claimedAt: at, heartbeatAt: at };
+  if (status === "claimed") return { ...claimed, leaseExpiresAt: at };
+  if (status === "poisoned") return { ...claimed, attempts: 3, finishedAt: at };
+  return { ...claimed, finishedAt: at, outcome: { chunks: 2 } };
+};
+
+/**
+ * One `index` run over this binding, at the status and instant given — the row the worker
+ * would have left. No act in this package finishes a job, because finishing one is the
+ * worker's; so the arrange stands in for it through the factory, as `runs.test.ts` does for
+ * the nightly audit.
+ */
+const runOver = (workspaceId: string, bindingId: string, status: string, at: Date) =>
+  seededBy(db(), (seed) =>
+    seed.job({
+      workspaceId,
+      kind: "index",
+      subjectId: bindingId,
+      reason: "bound",
+      status,
+      enqueuedAt: at,
+      ...claimColumnsOf(status, at),
+    }),
+  );
+
+/**
+ * The run the bind queued, replaced by one the worker has left at this status: the queued row
+ * goes first, because the queue holds one queued run per binding and a second would be the
+ * row that index refuses.
+ */
+const runEndedAt = async (
+  workspaceId: string,
+  bindingId: string,
+  jobId: string,
+  status: string,
+  at: Date,
+) => {
+  await db().pool.query("DELETE FROM job WHERE workspace_id = $1 AND id = $2", [
+    workspaceId,
+    jobId,
+  ]);
+  await runOver(workspaceId, bindingId, status, at);
+};
+
+/** The binding's two columns a publish writes, read as the superuser. */
+const publishStateOf = async (pool: pg.Pool, workspaceId: string, bindingId: string) => {
+  const read = await pool.query<{ published_at: Date | null; state: string }>(
+    "SELECT published_at, state FROM source_binding WHERE workspace_id = $1 AND id = $2",
+    [workspaceId, bindingId],
+  );
+  return read.rows[0];
+};
+
+/** Every chunk of this binding and the instant it is published at, oldest span first. */
+const chunkStampsOf = async (pool: pg.Pool, workspaceId: string, bindingId: string) => {
+  const read = await pool.query<{ published_at: Date | null }>(
+    `SELECT published_at FROM "index".chunk
+      WHERE workspace_id = $1 AND binding_id = $2 ORDER BY ordinal`,
+    [workspaceId, bindingId],
+  );
+  return read.rows.map((row) => row.published_at);
+};
+
+/**
+ * The chunks of one document this person reaches, under the one predicate every read of a
+ * readable unit appends. T-133's `passageAt` lands beside this ticket rather than under it,
+ * so the suite renders the predicate itself — the same two functions that read will render —
+ * and this row extends rather than moves when it arrives.
+ */
+const passagesReadableBy = (person: UserPrincipal, sourceDocumentId: string) =>
+  readingAs(db().runtimePool, person, async (reader, tx) => {
+    const read = await tx.query<{ content: string }>(
+      `SELECT c.content FROM "index".chunk c
+        WHERE c.workspace_id = $1 AND c.source_document_id = $2 AND ${readableClause("c", 3)}
+        ORDER BY c.ordinal`,
+      [reader.workspaceId, sourceDocumentId, ...readableParameters(reader)],
+    );
+    return read.rows.map((row) => row.content);
+  });
+
+describe("an Admin publishes a binding", () => {
+  it("publishes the binding and every one of its chunk copies from the one instant, and its ledger row carries the confirmations, the totals by category and the DPIA hash", async () => {
+    const scenario = await arrange();
+    const { bindingId, documentId, jobId } = await boundHandbook(scenario);
+    await runEndedAt(scenario.workspaceId, bindingId, jobId, "done", RUN_FINISHED_AT);
+    await chunkUnder(
+      db(),
+      scenario.workspaceId,
+      { bindingId, documentId },
+      {
+        content: HOLIDAY,
+        ordinal: 0,
+        charStart: 0,
+        charEnd: 53,
+      },
+    );
+    await chunkUnder(
+      db(),
+      scenario.workspaceId,
+      { bindingId, documentId },
+      {
+        content: NOTICE,
+        ordinal: 1,
+        charStart: 54,
+        charEnd: 101,
+      },
+    );
+
+    // What the seam found in this document: two names and one set of bank details, which is
+    // what the totals by category on the ledger row have to add up to.
+    await seededBy(db(), async (seed) => {
+      await seed.finding({
+        workspaceId: scenario.workspaceId,
+        documentId,
+        category: "person-name",
+        tier: "default-off",
+        charStart: 0,
+        charEnd: 7,
+      });
+      await seed.finding({
+        workspaceId: scenario.workspaceId,
+        documentId,
+        category: "person-name",
+        tier: "default-off",
+        charStart: 8,
+        charEnd: 15,
+      });
+      await seed.finding({
+        workspaceId: scenario.workspaceId,
+        documentId,
+        category: "bank-details",
+        tier: "always",
+        charStart: 16,
+        charEnd: 24,
+      });
+    });
+
+    const published = await asAdmin(scenario, (admin, tx) =>
+      publishBinding(admin, tx, { bindingId, publishedAt: PUBLISHED_AT, confirmations: CONFIRMED }),
+    );
+    if (!published.ok) throw new Error(`the publish was refused: ${String(published.error)}`);
+
+    // The binding wears the instant it was handed and the one state word this act writes.
+    expect(await publishStateOf(db().pool, scenario.workspaceId, bindingId)).toEqual({
+      published_at: PUBLISHED_AT,
+      state: "published",
+    });
+    // Every chunk copy, from the same instant — not the first, and not most of them.
+    expect(await chunkStampsOf(db().pool, scenario.workspaceId, bindingId)).toEqual([
+      PUBLISHED_AT,
+      PUBLISHED_AT,
+    ]);
+
+    // `[AUDIT5]`: ids, flags and counts. No name, no filename, and no category the agreement
+    // does not carry — a category with nothing found says nought rather than going missing.
+    const rows = await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.published");
+    expect(rows.length).toEqual(1);
+    const row = rows[0];
+    expect(row?.id).toEqual(published.value.auditEventId);
+    expect(row?.actor).toEqual(`human:${scenario.admin.userId}`);
+    expect(row?.subject_id).toEqual(bindingId);
+    expect(row?.detail).toEqual({
+      bindingId,
+      lawfulBasisRecorded: true,
+      privacyInformationUpdated: true,
+      dpiaReferenced: true,
+      ...NO_FINDINGS,
+      findingsPersonName: 2,
+      findingsBankDetails: 1,
+      dpiaHash: row?.detail["dpiaHash"],
+    });
+
+    // The hash is the DPIA input's own, so the assessment a company files and the publication
+    // it covers name one document. Its shape is written down; its value cannot be, because
+    // the document it is taken over carries a binding id minted a moment ago — so the claim
+    // that can be made is that it is *that* function's answer, which is the claim the ADR
+    // makes (ADR 0020).
+    expect(row?.detail["dpiaHash"]).toMatch(SHA256_HEX);
+    const input = await asAdmin(scenario, (admin, tx) => dpiaInputFor(admin, tx, { bindingId }));
+    if (!input.ok) throw new Error(`the DPIA input was refused: ${String(input.error)}`);
+    expect(row?.detail["dpiaHash"]).toEqual(input.value.hash);
+  });
+
+  it("publishes when the latest run is done even though an earlier run over the same binding failed", async () => {
+    const scenario = await arrange();
+    const { bindingId, jobId } = await boundHandbook(scenario);
+    await runEndedAt(scenario.workspaceId, bindingId, jobId, "failed", RUN_FAILED_AT);
+    await runOver(scenario.workspaceId, bindingId, "done", RUN_FINISHED_AT);
+
+    const published = await asAdmin(scenario, (admin, tx) =>
+      publishBinding(admin, tx, { bindingId, publishedAt: PUBLISHED_AT, confirmations: CONFIRMED }),
+    );
+
+    expect(published.ok).toEqual(true);
+    expect(await publishStateOf(db().pool, scenario.workspaceId, bindingId)).toEqual({
+      published_at: PUBLISHED_AT,
+      state: "published",
+    });
+  });
+
+  it.each([
+    ["queued", RUN_FINISHED_AT],
+    ["claimed", RUN_FINISHED_AT],
+    ["failed", RUN_FINISHED_AT],
+    ["poisoned", RUN_FINISHED_AT],
+  ])(
+    "refuses the publish as not-indexed while the binding's latest run is %s, and writes nothing",
+    async (status, at) => {
+      const scenario = await arrange();
+      const { bindingId, documentId, jobId } = await boundHandbook(scenario);
+      await runEndedAt(scenario.workspaceId, bindingId, jobId, status, at);
+      await chunkUnder(
+        db(),
+        scenario.workspaceId,
+        { bindingId, documentId },
+        {
+          content: HOLIDAY,
+          ordinal: 0,
+          charStart: 0,
+          charEnd: 53,
+        },
+      );
+
+      const published = await asAdmin(scenario, (admin, tx) =>
+        publishBinding(admin, tx, {
+          bindingId,
+          publishedAt: PUBLISHED_AT,
+          confirmations: CONFIRMED,
+        }),
+      );
+
+      expect(published).toEqual({ ok: false, error: "not-indexed" });
+      expect(await publishStateOf(db().pool, scenario.workspaceId, bindingId)).toEqual({
+        published_at: null,
+        state: "landed",
+      });
+      expect(await chunkStampsOf(db().pool, scenario.workspaceId, bindingId)).toEqual([null]);
+      expect(
+        await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
+      ).toEqual([]);
+    },
+  );
+
+  it("refuses the publish as not-indexed when no run has ever been queued over the binding", async () => {
+    const scenario = await arrange();
+    const { bindingId, jobId } = await boundHandbook(scenario);
+    await db().pool.query("DELETE FROM job WHERE workspace_id = $1 AND id = $2", [
+      scenario.workspaceId,
+      jobId,
+    ]);
+
+    const published = await asAdmin(scenario, (admin, tx) =>
+      publishBinding(admin, tx, { bindingId, publishedAt: PUBLISHED_AT, confirmations: CONFIRMED }),
+    );
+
+    expect(published).toEqual({ ok: false, error: "not-indexed" });
+  });
+
+  it("refuses a second publish of a binding that is already published, and leaves the first instant standing", async () => {
+    const scenario = await arrange();
+    const { bindingId, jobId } = await boundHandbook(scenario);
+    await runEndedAt(scenario.workspaceId, bindingId, jobId, "done", RUN_FINISHED_AT);
+
+    const first = await asAdmin(scenario, (admin, tx) =>
+      publishBinding(admin, tx, { bindingId, publishedAt: PUBLISHED_AT, confirmations: CONFIRMED }),
+    );
+    expect(first.ok).toEqual(true);
+
+    const again = await asAdmin(scenario, (admin, tx) =>
+      publishBinding(admin, tx, {
+        bindingId,
+        publishedAt: new Date("2026-09-12T10:00:00.000Z"),
+        confirmations: CONFIRMED,
+      }),
+    );
+
+    expect(again).toEqual({ ok: false, error: "already-published" });
+    expect(await publishStateOf(db().pool, scenario.workspaceId, bindingId)).toEqual({
+      published_at: PUBLISHED_AT,
+      state: "published",
+    });
+    expect(
+      await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
+    ).toHaveLength(1);
+  });
+
+  it.each([
+    ["the lawful basis is not recorded", { lawfulBasisRecorded: false }],
+    ["the privacy information has not been updated", { privacyInformationUpdated: false }],
+    ["the DPIA is not referenced", { dpiaReferenced: false }],
+  ])("refuses the publish when %s, and writes nothing", async (_case, override) => {
+    const scenario = await arrange();
+    const { bindingId, jobId } = await boundHandbook(scenario);
+    await runEndedAt(scenario.workspaceId, bindingId, jobId, "done", RUN_FINISHED_AT);
+
+    const published = await asAdmin(scenario, (admin, tx) =>
+      publishBinding(admin, tx, {
+        bindingId,
+        publishedAt: PUBLISHED_AT,
+        confirmations: { ...CONFIRMED, ...override },
+      }),
+    );
+
+    expect(published).toEqual({ ok: false, error: "confirmation-missing" });
+    expect(await publishStateOf(db().pool, scenario.workspaceId, bindingId)).toEqual({
+      published_at: null,
+      state: "landed",
+    });
+    expect(
+      await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
+    ).toEqual([]);
+  });
+
+  it("refuses an Editor the publish", async () => {
+    const scenario = await arrange();
+    const { bindingId, jobId } = await boundHandbook(scenario);
+    await runEndedAt(scenario.workspaceId, bindingId, jobId, "done", RUN_FINISHED_AT);
+
+    const published = await readingAs(db().runtimePool, scenario.editor, (editor, tx) =>
+      publishBinding(editor, tx, {
+        bindingId,
+        publishedAt: PUBLISHED_AT,
+        confirmations: CONFIRMED,
+      }),
+    );
+
+    expect(published).toEqual({ ok: false, error: "role-forbids" });
+    expect(await publishStateOf(db().pool, scenario.workspaceId, bindingId)).toEqual({
+      published_at: null,
+      state: "landed",
+    });
+  });
+
+  it("refuses the publish of a binding this workspace does not hold", async () => {
+    const scenario = await arrange();
+
+    const published = await asAdmin(scenario, (admin, tx) =>
+      publishBinding(admin, tx, {
+        bindingId: "01J6NNNNNNNNNNNNNNNNNNNNN3",
+        publishedAt: PUBLISHED_AT,
+        confirmations: CONFIRMED,
+      }),
+    );
+
+    expect(published).toEqual({ ok: false, error: "no-such-binding" });
+  });
+
+  it("refuses the publish of a binding id that is not one the platform mints", async () => {
+    const scenario = await arrange();
+
+    const published = await asAdmin(scenario, (admin, tx) =>
+      publishBinding(admin, tx, {
+        bindingId: "  ",
+        publishedAt: PUBLISHED_AT,
+        confirmations: CONFIRMED,
+      }),
+    );
+
+    expect(published).toEqual({ ok: false, error: "malformed" });
+  });
+});
+
+describe("a Viewer inside the audience", () => {
+  it("reads nothing of the binding before the publish, and its passages on the next read after it", async () => {
+    const scenario = await arrange();
+    const finance = await groupNamed(db(), scenario, "Finance", [scenario.viewer]);
+    const { bindingId, documentId, jobId } = await boundHandbook(scenario, {
+      sensitivity: "Internal",
+      audience: "groups",
+      audienceGroups: [finance],
+    });
+    await runEndedAt(scenario.workspaceId, bindingId, jobId, "done", RUN_FINISHED_AT);
+
+    // The copies a run lands: the binding's class and audience on the chunk's own columns,
+    // and no published instant, because the binding has not been published.
+    for (const [ordinal, content, charStart, charEnd] of [
+      [0, HOLIDAY, 0, 53],
+      [1, NOTICE, 54, 101],
+    ] as const) {
+      await chunkUnder(
+        db(),
+        scenario.workspaceId,
+        { bindingId, documentId },
+        {
+          content,
+          ordinal,
+          charStart,
+          charEnd,
+          sensitivity: "Internal",
+          audience: "groups",
+          audienceGroups: [finance],
+        },
+      );
+    }
+
+    // Before the publish the predicate's first clause withholds every one of them: a unit
+    // with no published instant has not entered the company's knowledge and is nobody's.
+    expect(await passagesReadableBy(scenario.viewer, documentId)).toEqual([]);
+
+    const published = await asAdmin(scenario, (admin, tx) =>
+      publishBinding(admin, tx, { bindingId, publishedAt: PUBLISHED_AT, confirmations: CONFIRMED }),
+    );
+    if (!published.ok) throw new Error(`the publish was refused: ${String(published.error)}`);
+
+    // And on the next read, both passages, written down here rather than read back off the
+    // arrange (`[TEST9]`).
+    expect(await passagesReadableBy(scenario.viewer, documentId)).toEqual([
+      "Holiday is twenty-eight days including bank holidays.",
+      "Notice is one month either way after probation.",
+    ]);
+  });
+
+  it("reads nothing of a published binding whose audience names a group they are not in", async () => {
+    const scenario = await arrange();
+    const finance = await groupNamed(db(), scenario, "Finance", []);
+    const { bindingId, documentId, jobId } = await boundHandbook(scenario, {
+      sensitivity: "Internal",
+      audience: "groups",
+      audienceGroups: [finance],
+    });
+    await runEndedAt(scenario.workspaceId, bindingId, jobId, "done", RUN_FINISHED_AT);
+    await chunkUnder(
+      db(),
+      scenario.workspaceId,
+      { bindingId, documentId },
+      {
+        content: HOLIDAY,
+        ordinal: 0,
+        charStart: 0,
+        charEnd: 53,
+        sensitivity: "Internal",
+        audience: "groups",
+        audienceGroups: [finance],
+      },
+    );
+
+    const published = await asAdmin(scenario, (admin, tx) =>
+      publishBinding(admin, tx, { bindingId, publishedAt: PUBLISHED_AT, confirmations: CONFIRMED }),
+    );
+    if (!published.ok) throw new Error(`the publish was refused: ${String(published.error)}`);
+
+    // The publish opens the first clause and no other: the audience still names a group this
+    // Viewer is not in, so a publish is not a way in (`[TEST7]`, the pair both ways).
+    expect(await passagesReadableBy(scenario.viewer, documentId)).toEqual([]);
   });
 });

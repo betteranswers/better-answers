@@ -1,8 +1,10 @@
 import {
   AUDIENCE_EVERYONE,
+  BINDING_PUBLISHED_STATE,
   boundarySchemas,
   CONNECTOR_UPLOAD,
   INDEX_KIND,
+  JOB_DONE_STATUS,
   SENSITIVITY_DEFAULT,
 } from "@better-answers/schema";
 
@@ -23,6 +25,7 @@ import { holdsEveryGroup } from "../members/index.ts";
 import { enqueueJobIn } from "../runs/index.ts";
 import { putObject, type ObjectDoor } from "../store/objects/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import { dpiaInputFor, REDACTION_CATEGORIES } from "./dpia.ts";
 
 /**
  * The **bind**: an Admin's own file becomes a source binding, a catalogued document, a ledger
@@ -78,12 +81,84 @@ export const UPLOAD_BYTE_CAP = 64 * 1024 * 1024;
  * reach. The two ids lead to the rows that do carry those names, which is where a reader with
  * a reason to see them goes.
  */
+
+/**
+ * The three things an Admin confirms before a binding's evidence enters the company's
+ * knowledge (ADR 0020): that a lawful basis for holding this source is on record, that the
+ * privacy information people were given covers it, and that the DPIA names it. They are the
+ * act's input and three fields of its ledger row, because the row is what an assessment is
+ * read back from and a confirmation nobody wrote down is a confirmation nobody made.
+ */
+const CONFIRMATIONS = [
+  "lawfulBasisRecorded",
+  "privacyInformationUpdated",
+  "dpiaReferenced",
+] as const;
+
+/** Every redaction category's word, as the agreement spells it. */
+type RedactionCategoryWord = (typeof REDACTION_CATEGORIES)[number]["category"];
+
+/** `date-of-birth` → `DateOfBirth` — the type's half of `countFieldOf`. */
+type Pascal<Word extends string> = Word extends `${infer head}-${infer tail}`
+  ? `${Capitalize<head>}${Pascal<tail>}`
+  : Capitalize<Word>;
+
+/** `bank-details` → `findingsBankDetails`: one detail field per category. */
+type CountField<Word extends string> = `findings${Pascal<Word>}`;
+
+/**
+ * How many spans of each category this binding's documents hold, as the ledger carries them.
+ *
+ * The ledger's detail is flat — a value there is a string, a number or a boolean, and there
+ * is no nested object to put a map in — so the totals are one field per category rather than
+ * one field holding a map. The **fields are derived from the category list**, so a ninth
+ * category is a change to that list alone and never a change there and a second one here that
+ * somebody has to remember; a category with nothing found says nought, because *none of these
+ * were found* is a statement the assessment needs and an absent field is not one.
+ */
+type FindingCounts = { readonly [Word in RedactionCategoryWord as CountField<Word>]: number };
+type FindingCountShape = { readonly [Word in RedactionCategoryWord as CountField<Word>]: "count" };
+
+const countFieldOf = (category: string): string =>
+  `findings${category
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join("")}`;
+
+// SAFETY: the entries are built by mapping `REDACTION_CATEGORIES` itself, so the keys are
+// exactly `countFieldOf` over that list's categories and every value is the one kind;
+// `Object.fromEntries` is what loses that on the way out, not the code that feeds it.
+const FINDING_COUNT_SHAPE = Object.fromEntries(
+  REDACTION_CATEGORIES.map(({ category }) => [countFieldOf(category), "count"]),
+) as FindingCountShape;
+
+/** The same derivation over what a read of `finding` counted, nought where it found none. */
+const countsOf = (found: ReadonlyMap<string, number>): FindingCounts =>
+  // SAFETY: as above — one entry per category, and the value of each is a whole number.
+  Object.fromEntries(
+    REDACTION_CATEGORIES.map(({ category }) => [countFieldOf(category), found.get(category) ?? 0]),
+  ) as FindingCounts;
+
 const BINDING_ACTS = declareActs("sources", {
   bound: act("sources.binding.bound", {
     bindingId: "id",
     documentId: "id",
     sensitivity: "sensitivity",
     audience: "audience",
+  }),
+  /**
+   * The publish. Its subject is the binding; its detail is the three confirmations, the
+   * totals by category and the hash of the DPIA input this publication is covered by — and
+   * no name, no filename and no span's text, because none of those has a place on a row that
+   * is never rewritten.
+   */
+  published: act("sources.binding.published", {
+    bindingId: "id",
+    lawfulBasisRecorded: "flag",
+    privacyInformationUpdated: "flag",
+    dpiaReferenced: "flag",
+    ...FINDING_COUNT_SHAPE,
+    dpiaHash: "contentHash",
   }),
 });
 
@@ -297,5 +372,181 @@ export const bindUpload = async (
       throw new Error(`sources: the index run was refused (${String(queued.error)})`);
     }
     return { bindingId, documentId, jobId: queued.value.jobId, auditEventId, originalKey };
+  });
+};
+
+const BINDING_ID = boundarySchemas.sourceBinding.select.shape.id;
+
+export type PublishBindingInput = {
+  readonly bindingId: string;
+  /**
+   * The instant this publication happened, read by the api's Clock and handed here (ADR
+   * 0040). One reading, stamped on the binding and on every chunk of it, so the two cannot
+   * disagree by however long the transaction took.
+   */
+  readonly publishedAt: Date;
+  readonly confirmations: {
+    readonly lawfulBasisRecorded: boolean;
+    readonly privacyInformationUpdated: boolean;
+    readonly dpiaReferenced: boolean;
+  };
+};
+
+/**
+ * Why a publish was refused, each in one word a caller can act on.
+ *
+ * `not-indexed` is the one this act exists to say: the binding's latest `index` run has not
+ * finished, so there is nothing anybody could have reviewed. `confirmation-missing` is an
+ * Admin who has not made all three statements the act asks for.
+ */
+export type PublishBindingRefusal =
+  | RoleRefusal
+  | "malformed"
+  | "no-such-binding"
+  | "not-indexed"
+  | "already-published"
+  | "confirmation-missing"
+  | Error;
+
+export type BindingPublished = {
+  readonly bindingId: string;
+  readonly auditEventId: string;
+  /** How many chunk copies wore the instant — every chunk of the binding's documents. */
+  readonly chunks: number;
+  /** The hash of the DPIA input this publication is covered by, as the ledger carries it. */
+  readonly dpiaHash: string;
+};
+
+/**
+ * **The gate: the binding's latest `index` run, by subject.** Not the `state` column — the
+ * worker holds `SELECT` alone on `source_binding` (migration 0035), so the run's own row is
+ * the only place the tier doing the work can say where it got to. *Done* alone lets a publish
+ * through: queued and claimed have not finished, and a run that *failed* or was *poisoned*
+ * found nothing for anybody to review, which is what a publish is a statement about (ADR
+ * 0013, amended 2026-09-11). The road out of a failed run is a reprocess, never a publish.
+ *
+ * Latest by when it was enqueued, with the id breaking a tie, because a reprocess queues a
+ * second run over the same binding and it is the newest that says where the binding stands.
+ */
+const LATEST_INDEX_RUN = `SELECT status FROM job
+    WHERE workspace_id = $1 AND kind = $2 AND subject_id = $3
+    ORDER BY enqueued_at DESC, id DESC
+    LIMIT 1`;
+
+/**
+ * How many spans of each category this binding's documents hold. Joined through the catalogue
+ * rather than read off a column, because a finding belongs to a document and a binding is what
+ * the Admin is publishing.
+ */
+const FINDINGS_BY_CATEGORY = `SELECT f.category, count(*)::int AS found
+    FROM finding f
+    JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
+   WHERE f.workspace_id = $1 AND d.binding_id = $2
+   GROUP BY f.category`;
+
+/**
+ * **The publish**: an Admin's statement that this binding's evidence has been reviewed and may
+ * enter the company's knowledge (ADR 0013, ADR 0020). Until it happens, nothing derived from
+ * the binding is readable by anybody — the read predicate's first clause withholds a unit with
+ * no published instant from Admins too — and after it, the class and the audience decide.
+ *
+ * Every refusal is decided before a row is written: the role, the shape of the id, the three
+ * confirmations, the binding's existence, whether it is already published, and the run. The
+ * confirmations go first among the reads because they need none — an Admin who has not made
+ * all three statements is told so without the database being asked anything.
+ *
+ * Then, in the caller's one transaction: the binding's own row, **every chunk of it**, the
+ * DPIA input read as a document and hashed, the totals by category, and the ledger row last
+ * and **bare** (ADR 0014 rule 4). The chunks are reached by their `binding_id`, which every
+ * chunk row carries because a chunk is always source-derived — a join through the catalogue
+ * would find the same rows and say less about why they are the ones to stamp.
+ *
+ * **No run is queued.** The chunks exist from the bind's run and none of their content
+ * changes; what changes is who may read them, and that is the app's to write.
+ *
+ * The state word moves *landed → published* and stops. *Indexing* and *indexed* are never
+ * stored: they are the run's status, rendered between these two by a read.
+ */
+export const publishBinding = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: PublishBindingInput,
+): Promise<Result<BindingPublished, PublishBindingRefusal>> => {
+  const admin = requireAdmin(principal);
+  if (!admin.ok) return err(admin.error);
+  const bindingId = BINDING_ID.safeParse(input.bindingId);
+  if (!bindingId.success) return err("malformed");
+  const { workspaceId } = admin.value;
+
+  if (!CONFIRMATIONS.every((named) => input.confirmations[named] === true)) {
+    return err("confirmation-missing");
+  }
+
+  // `FOR UPDATE`, so two publishes of one binding queue rather than both reading it
+  // unpublished and both writing a ledger row for the one publication.
+  const known = await attempt(() =>
+    tx.query<{ published_at: Date | null }>(
+      "SELECT published_at FROM source_binding WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
+      [workspaceId, bindingId.data],
+    ),
+  );
+  if (!known.ok) return err(known.error);
+  const binding = known.value.rows[0];
+  if (binding === undefined) return err("no-such-binding");
+  if (binding.published_at !== null) return err("already-published");
+
+  const run = await attempt(() =>
+    tx.query<{ status: string }>(LATEST_INDEX_RUN, [workspaceId, INDEX_KIND, bindingId.data]),
+  );
+  if (!run.ok) return err(run.error);
+  // A binding with no run at all is a binding nothing has been over, which is the same answer.
+  if (run.value.rows[0]?.status !== JOB_DONE_STATUS) return err("not-indexed");
+
+  const dpia = await dpiaInputFor(admin.value, tx, { bindingId: bindingId.data });
+  if (!dpia.ok) return err(dpia.error);
+  const counted = await attempt(() =>
+    tx.query<{ category: string; found: number }>(FINDINGS_BY_CATEGORY, [
+      workspaceId,
+      bindingId.data,
+    ]),
+  );
+  if (!counted.ok) return err(counted.error);
+  const found = new Map(counted.value.rows.map((row) => [row.category, row.found]));
+
+  const auditEventId = ulid();
+  const published = await attempt(() =>
+    tx.query(
+      "UPDATE source_binding SET published_at = $3, state = $4 WHERE workspace_id = $1 AND id = $2",
+      [workspaceId, bindingId.data, input.publishedAt, BINDING_PUBLISHED_STATE],
+    ),
+  );
+  if (!published.ok) return err(published.error);
+  const stamped = await attempt(() =>
+    tx.query(
+      `UPDATE "index".chunk SET published_at = $3 WHERE workspace_id = $1 AND binding_id = $2`,
+      [workspaceId, bindingId.data, input.publishedAt],
+    ),
+  );
+  if (!stamped.ok) return err(stamped.error);
+
+  // Bare, after the rows: the door's rejection aborts the transaction they landed in.
+  await record(admin.value, tx, {
+    id: auditEventId,
+    act: BINDING_ACTS.published,
+    subjectId: bindingId.data,
+    detail: {
+      bindingId: bindingId.data,
+      lawfulBasisRecorded: input.confirmations.lawfulBasisRecorded,
+      privacyInformationUpdated: input.confirmations.privacyInformationUpdated,
+      dpiaReferenced: input.confirmations.dpiaReferenced,
+      ...countsOf(found),
+      dpiaHash: dpia.value.hash,
+    },
+  });
+  return ok({
+    bindingId: bindingId.data,
+    auditEventId,
+    chunks: stamped.value.rowCount ?? 0,
+    dpiaHash: dpia.value.hash,
   });
 };

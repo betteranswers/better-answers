@@ -95,6 +95,14 @@ export const BINDING_STATES = ["landed", "indexing", "indexed", "published"] as 
 export const BINDING_LANDED_STATE = "landed" satisfies (typeof BINDING_STATES)[number];
 
 /**
+ * What the publish act writes — the one other word the app puts on this column. *Indexing*
+ * and *indexed* are never stored: the worker holds SELECT alone on this table, so the two
+ * words a run passes through are read off the run itself and rendered between these two
+ * (ADR 0013, amended 2026-09-11).
+ */
+export const BINDING_PUBLISHED_STATE = "published" satisfies (typeof BINDING_STATES)[number];
+
+/**
  * How a run left one document: **converted** — the normalised redacted text is in the object
  * store and its chunks are in the index — or **quarantined**, which is the outcome of a
  * document the converter could not read or gave up on. NULL until a run has been over it, so
