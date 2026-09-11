@@ -1,9 +1,15 @@
 import {
   boundarySchemas,
-  FULL_REBUILD_KIND,
+  JOB_KIND_DESCRIPTORS,
+  JOB_QUEUED_STATUS,
   NIGHTLY_AUDIT_KIND,
+  ROLES,
+  type FULL_REBUILD_KIND,
+  type INDEX_KIND,
+  type INDEX_REASONS,
   type JOB_KINDS,
   type JOB_STATUSES,
+  type JobKindDescriptor,
   type REBUILD_REASONS,
 } from "@better-answers/schema";
 import type { z } from "zod";
@@ -17,6 +23,7 @@ import {
   type Principal,
   type PrincipalRefusal,
   type Result,
+  type Role,
   type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
@@ -49,16 +56,29 @@ import { withMembership, withScope, type PostgresDoor, type Tx } from "../store/
 export type JobKind = (typeof JOB_KINDS)[number];
 export type JobStatus = (typeof JOB_STATUSES)[number];
 export type RebuildReason = (typeof REBUILD_REASONS)[number];
+/** The five things that put a binding back through the seam and into the index. */
+export type IndexReason = (typeof INDEX_REASONS)[number];
 
 /**
- * What is put on the queue: the kind, and — for a rebuild — which of ADR 0023's six
- * reasons it is happening for. The two are one argument rather than two, because a rebuild
- * without a reason and an audit with one are both rows the database refuses, and the type
- * is where a caller should hear that first.
+ * What is put on the queue: the kind, the subject a kind that names one is about, and the
+ * reason a kind that carries one is happening for. The three are one argument rather than
+ * three, because a rebuild without a reason, an audit with one and an index run about
+ * nothing are all rows the database refuses, and the type is where a caller should hear that
+ * first.
+ *
+ * One member per descriptor in `JOB_KIND_DESCRIPTORS`, which is what a reader should check it
+ * against: the descriptor is the declaration and this is the same fact said in types, so a
+ * kind added there without a member here is a kind no caller can name.
  */
 export type EnqueuedJob =
   | { readonly kind: typeof NIGHTLY_AUDIT_KIND }
-  | { readonly kind: typeof FULL_REBUILD_KIND; readonly reason: RebuildReason };
+  | { readonly kind: typeof FULL_REBUILD_KIND; readonly reason: RebuildReason }
+  | {
+      readonly kind: typeof INDEX_KIND;
+      /** The binding this run is over — the queue's *run key*, one queued run per binding. */
+      readonly subjectId: string;
+      readonly reason: IndexReason;
+    };
 
 /** What the platform can say about a workspace's two parsers agreeing (ADR 0025). */
 export type BundleHealth =
@@ -70,8 +90,8 @@ export type BundleHealth =
   | "never-audited";
 
 /**
- * What a caller puts on the queue: the workspace, the kind, and — for a rebuild — which of
- * ADR 0023's six reasons it is happening for.
+ * What a caller puts on the queue: the workspace, and the job — the kind with the subject and
+ * the reason its descriptor calls for.
  *
  * The workspace is **always named**, on both roads. A platform principal carries none
  * (`CONTEXT.md`), so it has to; and a user principal's is checked against it rather than
@@ -168,13 +188,14 @@ const inWorkspace = async <T>(
 };
 
 /**
- * The person's gate on both roads of this slice: an Admin, acting in the workspace their
+ * The person's gate on this slice's **reads**: an Admin, reading in the workspace their
  * credential names. The platform passes — it has no role to check and no workspace of its own
  * to hold it to; the argument beside it is the workspace it acts in.
  *
- * The word for a foreign workspace is the caller's, because the two roads mean different
- * things by it: an enqueue that named another tenant is a `malformed` request, while a poll
- * for a job in one is a job this workspace never held.
+ * The word for a foreign workspace is the caller's, because a read and a write mean different
+ * things by one: a poll for a job in another tenant's workspace is a job this workspace never
+ * held, while the enqueue calls the same caller `malformed` (`admittedToEnqueue`, which is the
+ * write's own gate because the role it requires is the kind's and not this one fixed word).
  */
 const adminInOwnWorkspace = <Elsewhere extends string>(
   principal: Principal,
@@ -188,67 +209,166 @@ const adminInOwnWorkspace = <Elsewhere extends string>(
   return ok(undefined);
 };
 
+/** The declared kind this word names, or nothing at all for a word the queue does not carry. */
+const descriptorOf = (kind: string): JobKindDescriptor | undefined =>
+  JOB_KIND_DESCRIPTORS.find((descriptor) => descriptor.kind === kind);
+
 /**
- * Put a job on a workspace's queue, and answer the id it was given.
+ * Whether a person's role reaches the one a kind's descriptor names. A role is a **level**
+ * (`CONTEXT.md`, *role (of a person)*) and never a set, so a kind an Editor may enqueue is a
+ * kind an Admin may enqueue too — which is what an equality check would get wrong the first
+ * time a descriptor names anything below Admin. `ROLES` is ordered highest first, so reaching
+ * the level is an index at most as large.
+ */
+const reaches = (held: Role, named: Role): boolean => ROLES.indexOf(held) <= ROLES.indexOf(named);
+
+/**
+ * The person's gate on the enqueue: the role **this kind's descriptor names**, in the
+ * workspace their credential names. The platform passes — it has no role to check and no
+ * workspace of its own to hold it to; the argument beside it is the workspace it acts in.
  *
- * **A person's enqueue is an Admin's**, by the same reasoning as every other act over the
- * whole workspace: a rebuild throws the derived map away and makes it again, and an audit is
- * the platform checking itself; neither is a thing an Editor does in the course of writing a
- * concept. The role is re-checked inside the transaction, so a role that moved between the
- * request boundary and the write refuses here.
+ * Read off the record rather than hard-coded, which is the whole point of the record. Every
+ * kind today names Admin, by the same reasoning as every other act over the whole workspace:
+ * a rebuild throws the derived map away and makes it again, an audit is the platform checking
+ * itself, and an index run is the whole of a binding; none is a thing an Editor does in the
+ * course of writing a concept. A kind enqueued at a lower level is a descriptor changed and
+ * not this arm rewritten.
+ */
+const admittedToEnqueue = (
+  principal: Principal,
+  descriptor: JobKindDescriptor,
+  workspaceId: string,
+): Result<undefined, EnqueueJobRefusal> => {
+  if (principal.kind === "platform") return ok(undefined);
+  if (!reaches(principal.role, descriptor.enqueuedBy)) return err("role-forbids");
+  // A person acts in the workspace their credential names, and nowhere else. Refused rather
+  // than silently corrected: a caller that named another tenant is a caller with the wrong
+  // idea, and handing it a job in its own workspace would bury that.
+  if (workspaceId !== principal.workspaceId) return err("malformed");
+  return ok(undefined);
+};
+
+/**
+ * The enqueue's one statement, and the *run key*'s answer.
  *
- * **The platform's has no role to check and no person to name.** `pnpm ops graph-rebuild` runs
- * from cron inside a container with no session to resolve, and work that outlives a session
- * runs under a platform principal, never a live one. So the platform road is the principal's
- * own type: nothing is invented, and the workspace it acts in is the argument beside it.
+ * The insert declines the conflict rather than raising on it, because a binding already
+ * queued is the queue's own rule and not a fault in the act that called this: a bare insert
+ * would abort the caller's transaction on the partial unique index and take the act's own
+ * rows down with it. What comes back is the id the caller waits on — the row this statement
+ * wrote, or the queued row that was already there.
+ *
+ * Exactly one row, which is why the read-back arm is guarded on the insert having done
+ * nothing: the two arms are read from one snapshot and a data-modifying CTE's effects are
+ * not in it, so without the guard a queued row deleted by a transaction that committed after
+ * the snapshot would be answered *beside* the row just written.
+ */
+const ENQUEUE = `WITH inserted AS (
+    INSERT INTO job (workspace_id, id, kind, subject_id, reason)
+    VALUES ($1, $2, $3, $4::text, $5::text)
+    ON CONFLICT (workspace_id, kind, subject_id) WHERE status = '${JOB_QUEUED_STATUS}' DO NOTHING
+    RETURNING id
+  )
+  SELECT id FROM inserted
+  UNION ALL
+  SELECT id FROM job
+   WHERE workspace_id = $1 AND kind = $3 AND subject_id = $4::text
+     AND status = '${JOB_QUEUED_STATUS}' AND NOT EXISTS (SELECT 1 FROM inserted)`;
+
+/**
+ * Put a job on a workspace's queue **inside the caller's transaction**, and answer the id it
+ * was given — the form an act takes when its rows and its job have to land or fail together:
+ * the upload act writing the binding, the document, the ledger row and the `index` job as one
+ * thing, and S0's erasure routine enqueueing inside its own.
+ *
+ * It takes a transaction and never a door for the reason `sweepNonLiveGenerations` does: the
+ * caller owns the transaction, so this joins it rather than opening a second one beside it.
+ * That is also why a store failure here **throws** instead of answering a refusal — the
+ * caller's act is already dead when it happens, and a value it could ignore would be a lie
+ * about rows that are going to be rolled back.
  *
  * The id is minted before the insert, as every id the platform writes for itself is
  * (ADR 0035), and answered so a caller can wait for the job it queued rather than for the next
- * one to appear.
+ * one to appear. A second enqueue for a binding already queued answers the **first** job's id:
+ * the work that job will do covers this caller's reason too.
+ */
+export const enqueueJobIn = async (
+  principal: Principal,
+  tx: Tx,
+  input: EnqueueJobInput,
+): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal>> => {
+  const descriptor = descriptorOf(input.kind);
+  if (descriptor === undefined) return err("malformed");
+
+  const admitted = admittedToEnqueue(principal, descriptor, input.workspaceId);
+  if (!admitted.ok) return err(admitted.error);
+
+  const subjectId = "subjectId" in input ? input.subjectId : null;
+  const reason = "reason" in input ? input.reason : null;
+
+  // The three rules the row's descriptor-derived CHECKs hold, held here as well. The type
+  // says them already, but a transport parses a request into this input, and a refusal is a
+  // word a caller can act on where a CHECK is an aborted transaction that takes the whole act
+  // with it and that somebody has to read the SQL to understand.
+  //
+  // Both biconditionals refuse both ways: an index run about nothing has nowhere to go, and
+  // an audit about a binding claims a scope its handler does not read. The reason is checked
+  // as a *pair* with the kind, because the column's own boundary sees one column and admits
+  // every reason any kind carries — so a rebuild asking for an index reason gets past it.
+  const namesASubject = subjectId !== null && subjectId.trim() !== "";
+  if (descriptor.namesASubject !== namesASubject) return err("malformed");
+  if (descriptor.reasons.length > 0 !== (reason !== null)) return err("malformed");
+  if (reason !== null && !descriptor.reasons.includes(reason)) return err("malformed");
+
+  const jobId = ulid();
+  const parsed = boundarySchemas.job.insert
+    .pick({ workspaceId: true, id: true, kind: true, subjectId: true, reason: true })
+    .safeParse({ workspaceId: input.workspaceId, id: jobId, kind: input.kind, subjectId, reason });
+  // The boundary parses before the statement, so a shape the row would refuse is refused where
+  // the caller can be told rather than by an aborted transaction.
+  if (!parsed.success) return err("malformed");
+
+  const landed = await tx.query<{ id: string }>(ENQUEUE, [
+    parsed.data.workspaceId,
+    parsed.data.id,
+    parsed.data.kind,
+    parsed.data.subjectId ?? null,
+    parsed.data.reason ?? null,
+  ]);
+  const answered = landed.rows[0]?.id;
+  if (answered === undefined) {
+    // One race and no other: another act queued this same binding and committed after this
+    // statement's snapshot was taken, so the conflict fired against a row this statement
+    // cannot read. There is no id to hand back, and telling the caller about a job it cannot
+    // name would be worse than failing the act that lost the race.
+    throw new Error("another act queued this subject while this one was enqueueing it");
+  }
+  return ok({ jobId: answered });
+};
+
+/**
+ * Put a job on a workspace's queue in a transaction of its own, and answer the id it was
+ * given — the form a caller with nothing else to land takes: `pnpm ops graph-rebuild`, the
+ * reconciler, cron's nightly audit.
+ *
+ * It is `enqueueJobIn` inside `inWorkspace` and nothing else, so the role gate, the
+ * descriptor's rules and the run key are one implementation and not two readings of one.
+ *
+ * **A person's road re-checks the role inside the transaction**, so a role that moved between
+ * the request boundary and the write refuses here. **The platform's has no role to check and
+ * no person to name**: `pnpm ops graph-rebuild` runs from cron inside a container with no
+ * session to resolve, and work that outlives a session runs under a platform principal, never
+ * a live one — so the platform road is the principal's own type, nothing is invented, and the
+ * workspace it acts in is the argument beside it.
  */
 export const enqueueJob = async (
   principal: Principal,
   door: PostgresDoor,
   input: EnqueueJobInput,
 ): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal | PrincipalRefusal | Error>> => {
-  // A person acts in the workspace their credential names, and nowhere else. Refused
-  // rather than silently corrected: a caller that named another tenant is a caller with
-  // the wrong idea, and handing it a job in its own workspace would bury that.
-  const admitted = adminInOwnWorkspace(principal, input.workspaceId, "malformed");
-  if (!admitted.ok) return err(admitted.error);
-
-  // The pair the row's CHECK ties together, checked here too: a rebuild says why it is
-  // happening and nothing else carries a reason. The type says so already, but a transport
-  // parses a request into this input and a refusal is a word a caller can act on, where the
-  // row's constraint is an aborted transaction somebody has to read the SQL to understand.
-  const saysWhy = "reason" in input;
-  if ((input.kind === FULL_REBUILD_KIND) !== saysWhy) {
-    return err("malformed");
-  }
-
-  const jobId = ulid();
-  const parsed = boundarySchemas.job.insert
-    .pick({ workspaceId: true, id: true, kind: true, reason: true })
-    .safeParse({
-      workspaceId: input.workspaceId,
-      id: jobId,
-      kind: input.kind,
-      reason: "reason" in input ? input.reason : null,
-    });
-  // The boundary parses before the statement, so a kind or a reason the row would refuse is
-  // refused where the caller can be told rather than by an aborted transaction.
-  if (!parsed.success) return err("malformed");
-
-  const written = await inWorkspace(principal, door, input.workspaceId, async (tx) => {
-    await tx.query("INSERT INTO job (workspace_id, id, kind, reason) VALUES ($1, $2, $3, $4)", [
-      parsed.data.workspaceId,
-      parsed.data.id,
-      parsed.data.kind,
-      parsed.data.reason,
-    ]);
-  });
-  if (!written.ok) return err(written.error);
-  return ok({ jobId });
+  const enqueued = await inWorkspace(principal, door, input.workspaceId, (tx) =>
+    enqueueJobIn(principal, tx, input),
+  );
+  return enqueued.ok ? enqueued.value : err(enqueued.error);
 };
 
 /**

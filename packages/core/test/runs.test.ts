@@ -2,8 +2,10 @@ import { testData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
 
 import type { PlatformPrincipal } from "../src/kernel/index.ts";
-import { bundleHealth, enqueueJob, JOB_IS_OVER, jobById } from "../src/runs/index.ts";
-import { suiteWithBundles } from "./workspace-with-bundle.ts";
+import { bundleHealth, enqueueJob, enqueueJobIn, JOB_IS_OVER, jobById } from "../src/runs/index.ts";
+import { withMembership, withScope, type Tx } from "../src/store/postgres/index.ts";
+import { abortTheTransaction } from "./suite-postgres.ts";
+import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 /**
  * The principal `pnpm ops graph-rebuild` runs under: the platform acting as itself, with no
@@ -214,6 +216,190 @@ describe("what the app puts on the worker's queue", () => {
       scenario.workspaceId,
     ]);
     expect(rows.rowCount).toBe(0);
+  });
+});
+
+/**
+ * The binding an `index` run is about. The queue carries a subject as text and nothing more
+ * — what a kind is about differs by kind, and a binding's existence is `source_binding`'s to
+ * enforce and not the queue's — so a literal here is the whole arrangement.
+ */
+const BINDING = "01K4Q9F3V8YXP7R2M6ZKWC3TDS";
+
+/** A second binding, so the run key can be shown to be one per subject and not one per kind. */
+const ANOTHER_BINDING = "01K4Q9F3V8YXP7R2M6ZKWC3TDT";
+
+/** The upload act's job: this binding through the seam and into the index, because it was bound. */
+const boundJob = (workspaceId: string) =>
+  ({ workspaceId, kind: "index", subjectId: BINDING, reason: "bound" }) as const;
+
+/**
+ * One transaction opened the way an act opens one, with the enqueue riding inside it — the
+ * shape every caller of `enqueueJobIn` has (the upload act, S0's erasure routine) reduced to
+ * the part these tests are about. The platform's road, because the role gate has its own test
+ * below and these are about the transaction.
+ */
+const actOf = <T>(scenario: Scenario, work: (tx: Tx) => Promise<T>): Promise<T> =>
+  withScope(graphMaintenance, scenario.postgres, scenario.workspaceId, (tx) => work(tx));
+
+/** Every job row this workspace holds, in the columns the enqueue decides. */
+const jobsIn = async (workspaceId: string) =>
+  (
+    await db().pool.query(
+      "SELECT id, kind, subject_id, reason, status FROM job WHERE workspace_id = $1 ORDER BY enqueued_at",
+      [workspaceId],
+    )
+  ).rows;
+
+describe("an act that lands its rows and its job in one transaction", () => {
+  it("rolls back with the act it rode in, so nothing is queued for work that never landed", async () => {
+    // `[TEST8]`: the act's transaction is the thing under test, so its outcome is asserted
+    // beside the rows. The enqueue landed its row and the act failed afterwards, which is the
+    // whole reason this form takes a transaction rather than a door.
+    const scenario = await arrange();
+
+    const act = actOf(scenario, async (tx) => {
+      const enqueued = await enqueueJobIn(graphMaintenance, tx, boundJob(scenario.workspaceId));
+      // The act's own next statement fails from here on — an upload whose object write, ledger
+      // row or document row went wrong after the job was queued.
+      await abortTheTransaction(tx);
+      return enqueued;
+    });
+
+    await expect(act).rejects.toThrow("the transaction did not commit");
+    expect(await jobsIn(scenario.workspaceId)).toEqual([]);
+  });
+
+  it("answers the first job's id for a binding already queued, and the act it rides in still commits", async () => {
+    // The run key's answer. A bare INSERT would have raised on the partial unique index and
+    // aborted the caller's transaction, which is the one thing an enqueue riding inside
+    // somebody else's act must never do — so the act goes on after the second enqueue and the
+    // test asserts that it did.
+    const scenario = await arrange();
+    const first = await actOf(scenario, (tx) =>
+      enqueueJobIn(graphMaintenance, tx, boundJob(scenario.workspaceId)),
+    );
+    if (!first.ok) throw new Error(`the job was not queued: ${String(first.error)}`);
+
+    const second = await actOf(scenario, async (tx) => {
+      const answered = await enqueueJobIn(graphMaintenance, tx, {
+        ...boundJob(scenario.workspaceId),
+        reason: "rule-change",
+      });
+      await tx.query("SELECT 1");
+      return answered;
+    });
+
+    expect(second).toEqual({ ok: true, value: { jobId: first.value.jobId } });
+    // One row, still carrying the reason the first enqueue gave it: the second changed nothing.
+    expect(await jobsIn(scenario.workspaceId)).toEqual([
+      {
+        id: first.value.jobId,
+        kind: "index",
+        subject_id: BINDING,
+        reason: "bound",
+        status: "queued",
+      },
+    ]);
+  });
+
+  it("queues a second binding on its own, because the run key is one per subject", async () => {
+    // The other half of the pair above (`[TEST7]`): the rule is one queued run per binding,
+    // never one per kind, so a workspace binding two files queues two jobs.
+    const scenario = await arrange();
+
+    const first = await actOf(scenario, (tx) =>
+      enqueueJobIn(graphMaintenance, tx, boundJob(scenario.workspaceId)),
+    );
+    const other = await actOf(scenario, (tx) =>
+      enqueueJobIn(graphMaintenance, tx, {
+        ...boundJob(scenario.workspaceId),
+        subjectId: ANOTHER_BINDING,
+      }),
+    );
+
+    if (!first.ok || !other.ok) throw new Error("a job was not queued");
+    expect(await jobsIn(scenario.workspaceId)).toEqual([
+      {
+        id: first.value.jobId,
+        kind: "index",
+        subject_id: BINDING,
+        reason: "bound",
+        status: "queued",
+      },
+      {
+        id: other.value.jobId,
+        kind: "index",
+        subject_id: ANOTHER_BINDING,
+        reason: "bound",
+        status: "queued",
+      },
+    ]);
+  });
+
+  it.each([
+    ["an index job with no subject", { kind: "index", reason: "bound" }],
+    ["a nightly audit that names one", { kind: "nightly-audit", subjectId: BINDING }],
+    ["a rebuild with none of its six reasons", { kind: "full-rebuild" }],
+    ["an index reason on a rebuild", { kind: "full-rebuild", reason: "bound" }],
+    ["a rebuild reason on an index job", { kind: "index", subjectId: BINDING, reason: "drill" }],
+    ["a kind the queue does not carry", { kind: "prune", subjectId: BINDING }],
+  ])(
+    "refuses %s with the word malformed, rather than aborting the act with a CHECK",
+    async (_what, asked) => {
+      // Each is a row one of the descriptor-derived CHECKs would refuse. The word is what the
+      // caller can act on; the aborted transaction is what it gets if this arm is missed, and
+      // it would take the act's own rows down with it.
+      const scenario = await arrange();
+
+      const refused = await actOf(scenario, (tx) =>
+        enqueueJobIn(graphMaintenance, tx, {
+          workspaceId: scenario.workspaceId,
+          ...asked,
+        } as Parameters<typeof enqueueJobIn>[2]),
+      );
+
+      expect(refused).toEqual({ ok: false, error: "malformed" });
+      expect(await jobsIn(scenario.workspaceId)).toEqual([]);
+    },
+  );
+
+  it("gates the enqueue on the role the kind's descriptor names", async () => {
+    // Per kind and read off the descriptor, never hard-coded: every kind today names Admin,
+    // and S8's Editor write is a record changed rather than this arm rewritten.
+    const scenario = await arrange();
+
+    const editor = await withMembership(scenario.editor, scenario.postgres, (_fresh, tx) =>
+      enqueueJobIn(scenario.editor, tx, boundJob(scenario.workspaceId)),
+    );
+    const admin = await withMembership(scenario.admin, scenario.postgres, (_fresh, tx) =>
+      enqueueJobIn(scenario.admin, tx, boundJob(scenario.workspaceId)),
+    );
+
+    expect(editor).toEqual({ ok: true, value: { ok: false, error: "role-forbids" } });
+    expect(admin.ok && admin.value.ok).toBe(true);
+    expect((await jobsIn(scenario.workspaceId)).length).toBe(1);
+  });
+
+  it("is what the door form calls, so a job queued through the door lands with its subject", async () => {
+    const scenario = await arrange();
+
+    const queued = await enqueueJob(
+      scenario.admin,
+      scenario.postgres,
+      boundJob(scenario.workspaceId),
+    );
+
+    if (!queued.ok) throw new Error(`the job was not queued: ${String(queued.error)}`);
+    expect(await jobsIn(scenario.workspaceId)).toEqual([
+      {
+        id: queued.value.jobId,
+        kind: "index",
+        subject_id: BINDING,
+        reason: "bound",
+        status: "queued",
+      },
+    ]);
   });
 });
 
