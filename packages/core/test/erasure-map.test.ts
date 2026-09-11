@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 import { commit, type GitDoor } from "@better-answers/core/store/git";
 
 import {
+  accessAnswerOf,
   ERASURE_FAMILIES,
   erasureMapOf,
   subjectRequestFor,
+  type AccessAnswer,
   type ErasureFamily,
   type ErasureFamilyDescriptor,
   type ErasureMap,
@@ -356,5 +358,80 @@ describe("the erasure map in one workspace's scope", () => {
     for (const theirsOwn of [theirs.ledger.sha, theirs.check.id, theirs.invite.id, shaElsewhere]) {
       expect(named).not.toContain(theirsOwn);
     }
+  });
+});
+
+describe("the access answer", () => {
+  it("is the whole of what a reply under Article 15 may say: locations and categories", async () => {
+    const held = await workspaceHoldingAMember();
+    const map = await mapOf(held.scenario, held.request);
+
+    const answer: AccessAnswer = accessAnswerOf(map);
+
+    // The whole answer against one literal (`[TEST9]`), because what this test is for is what
+    // the answer does **not** carry: the file says "Expenses are claimed within thirty days.",
+    // the session came from 203.0.113.7 on Mozilla/5.0 and the person's own address is on the
+    // user row — and none of the three can be here, where every field is written down. A reply
+    // built from this therefore carries no third party's data.
+    //
+    // `document-text` is not in the categories: `source-document` named nothing, and a category
+    // no location evidences is not a category the platform tells the person it holds.
+    expect(answer).toEqual({
+      categories: [
+        "actor-id",
+        "name",
+        "email-address",
+        "sign-in",
+        "ip-address",
+        "device",
+        "linked-account",
+      ],
+      locations: [
+        {
+          family: "concept-file",
+          categories: ["actor-id", "email-address", "name"],
+          location: `${held.sha} (author line)`,
+        },
+        {
+          family: "concept-file",
+          categories: ["actor-id", "email-address", "name"],
+          location: `${held.sha}:${CONCEPT_PATH}`,
+        },
+        { family: "bundle-commit", categories: ["actor-id"], location: held.sha },
+        { family: "concept-verification", categories: ["actor-id"], location: held.check.id },
+        {
+          family: "identity-user",
+          categories: ["name", "email-address"],
+          location: held.person.id,
+        },
+        {
+          family: "identity-session",
+          categories: ["sign-in", "ip-address", "device"],
+          location: held.sessionId,
+        },
+        {
+          family: "identity-verification",
+          categories: ["email-address"],
+          location: held.verificationId,
+        },
+        { family: "identity-invitation", categories: ["email-address"], location: held.invite.id },
+        { family: "identity-account", categories: ["linked-account"], location: held.accountId },
+      ],
+    });
+  });
+
+  it("says nothing at all for a subject the platform holds nothing about", async () => {
+    const scenario = await arrange();
+    const request = await requestFor(scenario, {
+      personId: null,
+      identifiers: identifiersOf(addressOf("a-client-contact")),
+    });
+    const map = await mapOf(scenario, request);
+
+    // The map answered nine families with no locations; the answer is where the platform holds
+    // the person, so nine nothings are one nothing. The person is told the platform holds them
+    // nowhere and under no category — not handed a list of stores they have to read.
+    expect(map).toHaveLength(9);
+    expect(accessAnswerOf(map)).toEqual({ categories: [], locations: [] });
   });
 });

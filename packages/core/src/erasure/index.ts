@@ -8,11 +8,11 @@
  * What is here so far is the *subject request* — the act that records one, the clock it runs
  * on and the Admin-only read of its identifier set (`requests.ts`) — and the *erasure map*,
  * the per-store finder over an exhaustive union of every family that holds text about a
- * person (`map.ts`).
+ * person, with the access answer read back off it (`map.ts`).
  */
 
-export { ERASURE_FAMILIES, erasureMapOf } from "./map.ts";
-export type { ErasureFamily, ErasureFamilyDescriptor, ErasureMap } from "./map.ts";
+export { accessAnswerOf, ERASURE_FAMILIES, erasureMapOf } from "./map.ts";
+export type { AccessAnswer, ErasureFamily, ErasureFamilyDescriptor, ErasureMap } from "./map.ts";
 export { deadlineOf, dueDateOf, recordSubjectRequest, subjectRequestFor } from "./requests.ts";
 export type {
   ReadSubjectRequestRefusal,

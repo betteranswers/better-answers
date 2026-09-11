@@ -316,3 +316,52 @@ export const erasureMapOf = async (
   }
   return entries;
 };
+
+/** One place the platform holds the person, and the categories of personal data it holds there. */
+type AccessAnswerLocation = {
+  readonly family: ErasureFamily;
+  readonly categories: readonly PersonalDataCategory[];
+  readonly location: string;
+};
+
+/**
+ * The **access answer** (`CONTEXT.md`, *subject request*; the S0 spec's `subject_request`
+ * paragraph): where the platform holds the person, and under which categories. Both lists, and
+ * nothing else — a reply under Article 15 is written from this, and a passage's text would be a
+ * third party's data in a document a person is given.
+ */
+export type AccessAnswer = {
+  /**
+   * Every category the platform holds about this person, in the order the categories are
+   * declared — so the answer reads the same however the families were walked, and a category no
+   * location evidences is not one the platform tells the person it holds.
+   */
+  readonly categories: readonly PersonalDataCategory[];
+  readonly locations: readonly AccessAnswerLocation[];
+};
+
+/**
+ * The map read as the answer. **Pure**: a function of the map and nothing else — no principal,
+ * no transaction, no door — because the facts were found under the platform principal in one
+ * workspace's scope and this only reads them back. An Admin reaches them here and never through
+ * `erasureMapOf`.
+ *
+ * **A family that named nothing is not a place.** The map answers every family, empty ones
+ * included, because the routine has to see that each store was searched; the answer is a reply
+ * to a person, where a store holding nothing about them is not somewhere they are held. So the
+ * empty families fall away and a subject the platform holds nothing about is told exactly that.
+ */
+export const accessAnswerOf = (map: ErasureMap): AccessAnswer => {
+  const locations = map.flatMap((entry) =>
+    entry.locations.map((location) => ({
+      family: entry.family,
+      categories: entry.categories,
+      location,
+    })),
+  );
+  const held = new Set(locations.flatMap((named) => named.categories));
+  return {
+    categories: PERSONAL_DATA_CATEGORIES.filter((category) => held.has(category)),
+    locations,
+  };
+};
