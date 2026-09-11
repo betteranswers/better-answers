@@ -6,6 +6,7 @@ scope the cursor currently holds — seeding as the superuser and asserting as
 ``app_rt`` is the suites' pattern, not this module's concern.
 """
 
+import json
 import re
 import secrets
 from typing import Any
@@ -83,6 +84,146 @@ def seed_llm_route(
             provider,
             model,
             dimensions,
+        ),
+    )
+    return _returning_row(cursor)
+
+
+def seed_source_binding(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    binding_id: str | None = None,
+    name: str = "The bid library",
+    connector: str = "upload",
+    sensitivity: str = "Internal",
+    audience: str = "everyone",
+    audience_groups: list[str] | None = None,
+    published_at: str | None = None,
+    rules_in_force: dict[str, bool] | None = None,
+) -> dict[str, Any]:
+    """A binding an Admin made, with the three permission fields a run copies onto rows.
+
+    Internal and unpublished rather than the column's own Restricted default, because
+    the ordinary binding a suite wants is one whose class a document can narrow — a
+    seeded Restricted binding would make every narrowing case a no-op and prove nothing.
+    """
+    cursor.execute(
+        "INSERT INTO source_binding (workspace_id, id, name, connector, sensitivity,"
+        " audience, audience_groups, published_at, rules_in_force)"
+        " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb) RETURNING *",
+        (
+            workspace_id,
+            binding_id or ulid(),
+            name,
+            connector,
+            sensitivity,
+            audience,
+            audience_groups,
+            published_at,
+            json.dumps(
+                {"default_on": True, "default_off": False}
+                if rules_in_force is None
+                else rules_in_force
+            ),
+        ),
+    )
+    return _returning_row(cursor)
+
+
+def seed_source_document(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    binding_id: str,
+    document_id: str | None = None,
+    source_system_id: str | None = None,
+    title: str = "The handbook",
+    media_type: str = "text/markdown",
+    byte_size: int = 1024,
+    original_key: str | None = None,
+    normalised_key: str | None = None,
+    sensitivity: str | None = None,
+) -> dict[str, Any]:
+    """One item the bind act catalogued, before any run has been over it.
+
+    The four columns a run reconciles — the hash, the normalised copy's key, the
+    redaction version and the outcome — are left as the bind act leaves them, which is
+    null, because a suite about the reconcile has to be able to see them move.
+    """
+    identifier = document_id or ulid()
+    cursor.execute(
+        "INSERT INTO source_document (workspace_id, id, binding_id, source_system_id,"
+        " title, media_type, byte_size, original_key, normalised_key, sensitivity)"
+        " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
+        (
+            workspace_id,
+            identifier,
+            binding_id,
+            source_system_id or f"{identifier.lower()}.md",
+            title,
+            media_type,
+            byte_size,
+            original_key or f"documents/{identifier.lower()}/original",
+            normalised_key,
+            sensitivity,
+        ),
+    )
+    return _returning_row(cursor)
+
+
+def seed_suppression(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    document_id: str,
+    identifiers: dict[str, list[str]] | None = None,
+) -> dict[str, Any]:
+    """What one erasure request said this document must keep out.
+
+    The row's two keys are real, so the request the routine ran and the subject request
+    it answers are written first rather than left to a deferral the caller would have to
+    remember — the same shape `seed_concept_index` takes with its bundle commit.
+    """
+    subject_request_id = ulid()
+    erasure_request_id = ulid()
+    cursor.execute(
+        "INSERT INTO subject_request (workspace_id, id, identifiers, kind, received_at,"
+        " clock_started_at, due_at) VALUES (%s, %s, %s::jsonb, 'erasure', now(), now(),"
+        " now() + interval '1 month')",
+        (
+            workspace_id,
+            subject_request_id,
+            json.dumps(
+                {"emails": ["subject@example.invalid"], "names": [], "other": []}
+            ),
+        ),
+    )
+    cursor.execute(
+        "INSERT INTO erasure_request (workspace_id, id, subject_request_id, pseudonym,"
+        " locked_at, anchored_at, beyond_use_hourly_at, beyond_use_daily_at,"
+        " beyond_use_weekly_at, beyond_use_monthly_at)"
+        " VALUES (%s, %s, %s, %s, now(), now(), now() + interval '48 hours',"
+        " now() + interval '30 days', now() + interval '8 weeks',"
+        " now() + interval '6 months')",
+        (workspace_id, erasure_request_id, subject_request_id, ulid()),
+    )
+    cursor.execute(
+        "INSERT INTO suppression (workspace_id, erasure_request_id, document_id,"
+        " identifiers) VALUES (%s, %s, %s, %s::jsonb) RETURNING *",
+        (
+            workspace_id,
+            erasure_request_id,
+            document_id,
+            json.dumps(
+                {
+                    "emails": ["priya.raman@example.test"],
+                    "names": ["Priya Raman"],
+                    "other": [],
+                }
+                if identifiers is None
+                else identifiers
+            ),
         ),
     )
     return _returning_row(cursor)

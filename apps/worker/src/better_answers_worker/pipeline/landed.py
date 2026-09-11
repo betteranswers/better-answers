@@ -36,6 +36,7 @@ its own rather than the run's. The per-document timeout, the quarantine of a doc
 the converter cannot read and the memory measurement rest on that and arrive with T-130.
 """
 
+import hashlib
 import threading
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -47,7 +48,7 @@ from ..redaction import redact
 from ..redaction.engine import Finding
 from ..redaction.pins import VERSION_STRING
 from .chunks import CHUNK_SIZE_BYTES, Chunk, split_into_chunks
-from .host import Host, IndexRun
+from .host import LANDED_APP, Host, IndexRun
 from .objects import LandedCopies
 
 #: What invalidates every memo entry in every binding: this repository's rule version
@@ -121,6 +122,14 @@ class RedactedDocument:
     counts: tuple[tuple[str, int], ...]
     verdict: str | None
     version: str
+    #: The hash of the **normalised text the seam was given**, which is the fact a later
+    #: run compares against to answer *unchanged* — over the text after conversion and
+    #: before redaction, as the catalogue column holds it. It is computed inside the
+    #: memoised body and carried out on this value because that is the only place the
+    #: pre-seam text exists: the caller holds the document's bytes, and the two are the
+    #: same only for the types that pass through. A hash holds no value, so keeping one
+    #: here asks nothing of ADR 0020 that the redacted text does not already ask.
+    content_hash: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,8 +218,9 @@ def landed(
     rules and the detector that decided.
     """
     _READINGS.read_one()
+    normalised = _converted(body, media_type)
     answer = redact(
-        _converted(body, media_type),
+        normalised,
         dict(rules_in_force),
         [suppression.as_set() for suppression in suppressions],
         seed,
@@ -221,6 +231,7 @@ def landed(
         counts=tuple(sorted(answer.counts.items())),
         verdict=answer.verdict,
         version=answer.version,
+        content_hash=hashlib.sha256(normalised.encode(TEXT_ENCODING)).hexdigest(),
     )
 
 
@@ -315,7 +326,7 @@ def redact_landed_copies(
     read: dict[str, ReadDocument] = {}
     before = _READINGS.taken()
     coco.App(
-        host.app_config(run),
+        host.app_config(run, LANDED_APP),
         _every_document,
         with_bytes,
         read,
