@@ -11,9 +11,9 @@
 # uv to a Python base. It puts the exact uv version in this file, where a reader looking for
 # the pin finds it, rather than behind an installer script that resolves "latest" at build
 # time — a version nobody read on the day, which is what pinning exists to stop.
-FROM ghcr.io/astral-sh/uv:0.12.9@sha256:8b940d3a9d65bed080436972241af2e21c84b5e8c9193f7014ed71479ee795ff AS uv
+FROM ghcr.io/astral-sh/uv:0.12.13@sha256:b485bd65cc2cf1c9a93b3554012c9c3778cf7b1b5fd3d3096ce9e1226c97e1e6 AS uv
 
-FROM python:3.13.15-slim-bookworm@sha256:ed86c82274b3c69b52fb5820f358f0bd7df0b603332063cb5c6e32bd220c3e6e AS build
+FROM python:3.14.7-slim-bookworm@sha256:9ab8d9c8514b44f90cf0029dd42fdd7e9e211e639c8b995304cc04568dee900f AS build
 COPY --from=uv /uv /uvx /usr/local/bin/
 # `--no-dev` is what keeps ruff, mypy, pytest, mutmut and testcontainers — the
 # `[dependency-groups] dev` list — out of the image. psycopg and dulwich are not on that
@@ -32,7 +32,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY src src
 RUN uv sync --frozen --no-dev
 
-FROM python:3.13.15-slim-bookworm@sha256:ed86c82274b3c69b52fb5820f358f0bd7df0b603332063cb5c6e32bd220c3e6e AS runtime
+FROM python:3.14.7-slim-bookworm@sha256:9ab8d9c8514b44f90cf0029dd42fdd7e9e211e639c8b995304cc04568dee900f AS runtime
 
 # uid 1000, the uid `init` in `deploy/stores.compose.yaml` chowns /data/worker/{lmdb,trees,hf-cache}
 # to; nothing runs as root to own a volume. The Python base ships no non-root
