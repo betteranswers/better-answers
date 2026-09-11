@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { type AnyPgColumn, check, index, integer, text, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { listed } from "./column-helpers.ts";
-import { AUDIENCE_CHECK, readableUnitColumns, SENSITIVITIES } from "./concept-tables.ts";
+import { AUDIENCE_CHECK, readableUnitColumns, SENSITIVITIES } from "./readable-columns.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 

@@ -1,7 +1,8 @@
 import { sql } from "drizzle-orm";
 import { check, foreignKey, index, integer, primaryKey, text } from "drizzle-orm/pg-core";
 
-import { conceptIdentity, readableRecordColumns, readableUnitChecks } from "./concept-tables.ts";
+import { conceptIdentity } from "./concept-tables.ts";
+import { readableRecordColumns, readableUnitChecks } from "./readable-columns.ts";
 import { withRLS } from "./with-rls.ts";
 
 /**

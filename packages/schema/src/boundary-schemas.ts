@@ -10,7 +10,6 @@ import { ACTOR_ID as ACTOR_ID_REGEX } from "./actor-id.ts";
 import { ACT, auditEvent, FAMILIES } from "./audit-tables.ts";
 import { composition, compositionInclude } from "./composition-tables.ts";
 import {
-  AUDIENCES,
   bundleCommit,
   CONCEPT_FRONTMATTER_MAX,
   CONCEPT_PATH,
@@ -25,7 +24,6 @@ import {
   evidence,
   GIT_SHA,
   IRI,
-  SENSITIVITIES,
   VERIFICATION_ORIGINS,
 } from "./concept-tables.ts";
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
@@ -73,9 +71,19 @@ import {
   verification,
 } from "./identity-tables.ts";
 import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
+import { AUDIENCES, SENSITIVITIES } from "./readable-columns.ts";
 import { ROLES } from "./roles.ts";
 import { llmRoute, workspaceConfig } from "./schema.ts";
-import { RULES_IN_FORCE_KEYS, sourceBinding, sourceDocument } from "./source-tables.ts";
+import {
+  BINDING_STATES,
+  CONNECTORS,
+  DESTINATIONS,
+  DOCUMENT_OUTCOMES,
+  RETENTION_CLASSES,
+  RULES_IN_FORCE_KEYS,
+  sourceBinding,
+  sourceDocument,
+} from "./source-tables.ts";
 import {
   conceptWriteRequest,
   suggestion,
@@ -647,11 +655,24 @@ const rulesInForce = z.union([
  * A source binding as the derivation reads it (ADR 0013, ADR 0039): the three visibility
  * columns narrowed as every readable unit's are, its id the minter's shape, and the rules in
  * force the bounded shape above (ADR 0020).
+ *
+ * The four closed word sets are the boundary's to narrow, as every closed set on a text column
+ * in this file is (ADR 0028) — and the destination is narrowed **as a set**: at least one
+ * word, each one of the three, because a binding feeding nothing is a source the platform can
+ * never answer from. The name is held to being a name and nothing more: what an Admin calls
+ * their source is not this boundary's business, but a binding the Sources screen would list as
+ * a blank line is.
  */
 const sourceBindingRefinements = {
   workspaceId,
   id: bindingId,
   ...readableUnit,
+  name: (schema: z.ZodString) => schema.trim().min(1),
+  connector: (schema: z.ZodString) => schema.pipe(z.enum(CONNECTORS)),
+  destination: (schema: z.ZodArray<z.ZodString>) =>
+    z.array(schema.element.pipe(z.enum(DESTINATIONS))).min(1),
+  retentionClass: (schema: z.ZodString) => schema.pipe(z.enum(RETENTION_CLASSES)),
+  state: (schema: z.ZodString) => schema.pipe(z.enum(BINDING_STATES)),
   rulesInForce: (schema: z.ZodType) => schema.pipe(rulesInForce),
 };
 
@@ -660,13 +681,31 @@ export const sourceBindingInsert = createInsertSchema(sourceBinding, sourceBindi
 export const sourceBindingUpdate = createUpdateSchema(sourceBinding, sourceBindingRefinements);
 
 /**
- * A source document as the derivation reads it: its id is what `evidence` names, narrowed
- * exactly as `evidence.source_document_id` is, and its binding is the minter's shape.
+ * A source document as the derivation reads it and as a run reconciles it: its id is what
+ * `evidence` names, narrowed exactly as `evidence.source_document_id` is, and its binding is
+ * the minter's shape.
+ *
+ * The catalogue's own columns are narrowed to what each is: the two **landed-copy keys** are
+ * object-store keys and held to being non-empty — they are addresses of bytes the platform
+ * put there, never locators, which are spans — the hash is the one digest shape this platform
+ * writes, the size is a whole number of bytes, and the two closed word sets are the boundary's.
+ * The document's own class is the same closed set as a binding's, because it is the same word
+ * meaning the same thing; its nullability is the column's, and null means *the binding's*.
  */
 const sourceDocumentRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.trim().min(1),
   bindingId,
+  sourceSystemId: (schema: z.ZodString) => schema.trim().min(1),
+  title: (schema: z.ZodString) => schema.trim().min(1),
+  mediaType: (schema: z.ZodString) => schema.trim().min(1),
+  byteSize: (schema: z.ZodNumber) => schema.int().nonnegative(),
+  originalKey: (schema: z.ZodString) => schema.trim().min(1),
+  normalisedKey: (schema: z.ZodString) => schema.trim().min(1),
+  contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
+  redactionVersion: (schema: z.ZodString) => schema.trim().min(1),
+  outcome: (schema: z.ZodString) => schema.pipe(z.enum(DOCUMENT_OUTCOMES)),
+  sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
 };
 
 export const sourceDocumentSelect = createSelectSchema(sourceDocument, sourceDocumentRefinements);
@@ -974,10 +1013,17 @@ const outcome = z.union([
  * are whole numbers. `claimed_by` is a worker id — the container's hostname by default —
  * so it is held to being non-empty and nothing more: what a deploy unit calls its worker is
  * not this boundary's business.
+ *
+ * The subject is held to being a subject. Which kinds must name one is the row's rule, because
+ * it is a rule about a pair of columns; that the one a kind names is not whitespace is this
+ * boundary's, and it has to be, because the row's CHECK tests for NULL and a string of spaces
+ * is not NULL. Without it an `index` job could be enqueued about no binding at all and the
+ * worker would claim it and find nothing to index.
  */
 const jobRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.regex(ULID),
+  subjectId: (schema: z.ZodString) => schema.trim().min(1),
   kind: (schema: z.ZodString) => schema.pipe(z.enum(JOB_KINDS)),
   // Every reason any kind may carry. Which kind may carry which is the row's rule, because
   // it is a rule about a pair of columns and a column's boundary sees one column.

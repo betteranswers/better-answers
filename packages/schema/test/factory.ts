@@ -8,21 +8,26 @@ import type { z } from "zod";
 import {
   ACCESS_REQUEST_OPEN_STATUS,
   AUDIENCE_EVERYONE,
+  BINDING_LANDED_STATE,
   boundarySchemas,
   CONCEPT_STABLE_STATUS,
   conceptIriOf,
+  CONNECTOR_UPLOAD,
   CREATOR_ROLE,
   CURATED_ORIGIN,
+  DOCUMENT_CONVERTED_OUTCOME,
   EMBEDDING_DIMENSIONS,
   FINDING_UNREVIEWED_STATE,
   JOB_MAX_ATTEMPTS,
   JOB_QUEUED_STATUS,
   NIGHTLY_AUDIT_KIND,
   REDACTION_ALWAYS_TIER,
+  RETENTION_CLASS_DEFAULT,
   RULES_IN_FORCE_DEFAULT,
   SUGGESTION_EDIT_KIND,
   SUGGESTION_WAITING_STATUS,
   ulid,
+  UPLOAD_DESTINATIONS,
   VERIFICATION_PLATFORM_ORIGIN,
 } from "../src/index.ts";
 
@@ -518,13 +523,18 @@ export const testData = (client: pg.PoolClient): TestData => {
 
   const evidence: TestData["evidence"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    // The key to `source_document` (owner D5) means a piece of evidence can only ever name a
+    // document the platform catalogued, so the factory makes one unless the caller names one —
+    // as a document makes its binding. A bare minted id no longer stands, which is the key.
+    const sourceDocumentId =
+      overrides.sourceDocumentId ?? (await sourceDocument({ workspaceId })).id;
     return insertRow(client, "evidence", {
-      sourceDocumentId: ulid(),
       locator: "p.4#para-2",
       resource: "Expenses policy (2026 edition)",
       contentVersion: null,
       ...overrides,
       workspaceId,
+      sourceDocumentId,
     });
   };
 
@@ -622,6 +632,9 @@ export const testData = (client: pg.PoolClient): TestData => {
     return insertRow(client, "job", {
       id: ulid(),
       kind: NIGHTLY_AUDIT_KIND,
+      // The nightly audit is about the whole workspace and names no subject; a kind whose
+      // descriptor requires one names it, and the row's CHECK is what refuses the pair.
+      subjectId: null,
       reason: null,
       status: JOB_QUEUED_STATUS,
       attempts: 0,
@@ -681,6 +694,15 @@ export const testData = (client: pg.PoolClient): TestData => {
       sensitivity: "Internal",
       audience: AUDIENCE_EVERYONE,
       audienceGroups: null,
+      // An uploaded handbook, which is the binding v0.1 can actually make: the connector, its
+      // destination set, the retention class the platform keeps an upload under and the state
+      // a binding is born at. The three that have a column DEFAULT are written out anyway, as
+      // the rules in force are, so a seeded binding reads whole on the page.
+      name: "The handbook",
+      connector: CONNECTOR_UPLOAD,
+      destination: [...UPLOAD_DESTINATIONS],
+      retentionClass: RETENTION_CLASS_DEFAULT,
+      state: BINDING_LANDED_STATE,
       // The safe set, which is what the column's own DEFAULT writes — stated here because the
       // boundary's insert schema asks for the column, and proved to be the database's own in
       // `rls.test.ts`, where a binding is written with neither this factory nor the boundary.
@@ -695,6 +717,23 @@ export const testData = (client: pg.PoolClient): TestData => {
     const bindingId = overrides.bindingId ?? (await sourceBinding({ workspaceId })).id;
     return insertRow(client, "sourceDocument", {
       id: ulid(),
+      // One markdown file an Admin uploaded, catalogued and converted: the source-system id
+      // is unique per binding, so it is minted rather than fixed, and the run's five columns
+      // are filled as a converted document carries them. A suite about a document nobody has
+      // run over yet names `outcome: null` beside the copy and hash it has no value for.
+      sourceSystemId: `handbook-${ulid().toLowerCase()}.md`,
+      title: "The handbook",
+      mediaType: "text/markdown",
+      byteSize: 1_024,
+      originalKey: `documents/${ulid().toLowerCase()}/original`,
+      normalisedKey: `documents/${ulid().toLowerCase()}/normalised`,
+      contentHash: "c".repeat(64),
+      redactionVersion: "1",
+      lastModified: null,
+      goneAt: null,
+      outcome: DOCUMENT_CONVERTED_OUTCOME,
+      // The binding's class is the document's unless a document is narrowed on its own.
+      sensitivity: null,
       ...overrides,
       workspaceId,
       bindingId,
