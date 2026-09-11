@@ -1,0 +1,134 @@
+{
+  "description": "visibility-columns (ADR 0031, ADR 0023, ADR 0039): the three permission fields as they travel from a binding to every chunk row, said once for both tiers. The read predicate's *logic* is the app's and is not in this file — what crosses the seam is the columns it has to test, because a row landed without them, or with them copied from the wrong place, makes the predicate over- or under-filter silently and nothing fails until a reader sees a passage they should not have. A chunk's copy is not a cache to be refreshed on read: the predicate runs in SQL against the row, so the row carries the answer. **A document may carry a class of its own** — null is the ordinary case and means *the binding's*, a word there is the seam's special-category verdict or an Admin's narrowing, and the fold takes the narrower of the two, so the column can only ever take visibility away. The audience stays the binding's: a document has no audience of its own. **Two writers, one source.** The worker writes these columns on every chunk row a run lands and re-copies them in the run's last statement, inside its own scoped transaction before the job finishes; the app rewrites them on a publish, on a binding's narrowing and on a document's narrowing, in the act's own transaction. Both copy from the same row — the binding, narrowed by the document — so they can disagree only in a race: a run that read the binding before a narrowing committed and upserted after it. The run's last re-copy settles that race, and a narrowing that lands after it finds the rows and rewrites them itself. Neither half of the suite holds the other's literals: the TypeScript half folds the two classes through the app's own `narrower` and parses each row through its own boundary (`packages/core/test/visibility-columns.contract.test.ts`), and the Python half reads the columns out of the generated schema view, which is the shape the worker writes into (`apps/worker/tests/test_visibility_columns_contract.py`).",
+  "binding_fields": ["published_at", "sensitivity", "audience", "audience_groups"],
+  "document_class_column": "sensitivity",
+  "chunk_columns": [
+    "published_at",
+    "sensitivity",
+    "audience",
+    "audience_groups",
+    "binding_id",
+    "source_document_id"
+  ],
+  "sensitivity_rank": {
+    "Restricted": 0,
+    "Internal": 1,
+    "Public": 2
+  },
+  "writers": [
+    {
+      "writer": "the worker",
+      "writes": "every chunk row a run lands, and again in the run's last statement, which re-copies the binding's and the document's current fields onto every row it wrote",
+      "why": "The rows are the run's output, so the run is what puts the fields on them. The re-copy exists for the one race the two writers can have: a run that read the binding before a narrowing committed would otherwise leave rows a narrowing has already passed over."
+    },
+    {
+      "writer": "the app",
+      "writes": "the binding's chunk rows on a publish, on a binding's narrowing and on a document's narrowing, in the act's own transaction",
+      "why": "Each of the three is an Admin's decision taken now, with no run to wait for: the chunk rows already exist, so the act rewrites them rather than enqueueing work and leaving a window where a row says something the Admin has just changed."
+    }
+  ],
+  "cases": [
+    {
+      "case": "a document with no class of its own takes its binding's",
+      "binding": {
+        "published_at": null,
+        "sensitivity": "Internal",
+        "audience": "everyone",
+        "audience_groups": null
+      },
+      "document": { "sensitivity": null },
+      "chunk": {
+        "published_at": null,
+        "sensitivity": "Internal",
+        "audience": "everyone",
+        "audience_groups": null
+      },
+      "why": "The ordinary row. Null on the document is a fact and not a gap: it says the binding decides, which is what lets a binding's narrowing reach every document under it without touching one of them."
+    },
+    {
+      "case": "a document narrower than its binding narrows every chunk of it",
+      "binding": {
+        "published_at": null,
+        "sensitivity": "Internal",
+        "audience": "everyone",
+        "audience_groups": null
+      },
+      "document": { "sensitivity": "Restricted" },
+      "chunk": {
+        "published_at": null,
+        "sensitivity": "Restricted",
+        "audience": "everyone",
+        "audience_groups": null
+      },
+      "why": "The seam's special-category verdict and the Admin's *narrow these documents* both land here. Its sibling under the same binding keeps Internal, which is the whole reason the class sits on the document rather than forcing the binding down."
+    },
+    {
+      "case": "a document's own class never widens its binding's",
+      "binding": {
+        "published_at": null,
+        "sensitivity": "Restricted",
+        "audience": "everyone",
+        "audience_groups": null
+      },
+      "document": { "sensitivity": "Public" },
+      "chunk": {
+        "published_at": null,
+        "sensitivity": "Restricted",
+        "audience": "everyone",
+        "audience_groups": null
+      },
+      "why": "The fold takes the narrower of the two and never the document's word on its own, so a class written on a document can only ever take visibility away. Without this case the column would read as an override."
+    },
+    {
+      "case": "a published binding stamps its chunks with the instant it was published",
+      "binding": {
+        "published_at": "2026-09-11T09:30:00.000Z",
+        "sensitivity": "Internal",
+        "audience": "everyone",
+        "audience_groups": null
+      },
+      "document": { "sensitivity": null },
+      "chunk": {
+        "published_at": "2026-09-11T09:30:00.000Z",
+        "sensitivity": "Internal",
+        "audience": "everyone",
+        "audience_groups": null
+      },
+      "why": "The publish act stamps the binding and rewrites its chunk rows in the same transaction, so the row carries the instant rather than a reference to the binding that holds it. The predicate's first clause reads this column and no other."
+    },
+    {
+      "case": "an audience of named groups rides on the row beside its word",
+      "binding": {
+        "published_at": "2026-09-11T09:30:00.000Z",
+        "sensitivity": "Internal",
+        "audience": "groups",
+        "audience_groups": ["01M2GR0PAAAAAAAAAAAAAAAAAA", "01M2GR0PBBBBBBBBBBBBBBBBBB"]
+      },
+      "document": { "sensitivity": null },
+      "chunk": {
+        "published_at": "2026-09-11T09:30:00.000Z",
+        "sensitivity": "Internal",
+        "audience": "groups",
+        "audience_groups": ["01M2GR0PAAAAAAAAAAAAAAAAAA", "01M2GR0PBBBBBBBBBBBBBBBBBB"]
+      },
+      "why": "An audience is a word and a group-id array together (ADR 0039), so both travel or the predicate's second clause has half an answer. The array is the binding's own and is copied, never intersected with anything at this level."
+    },
+    {
+      "case": "a document narrowed under a binding published to named groups",
+      "binding": {
+        "published_at": "2026-09-11T09:30:00.000Z",
+        "sensitivity": "Internal",
+        "audience": "groups",
+        "audience_groups": ["01M2GR0PAAAAAAAAAAAAAAAAAA"]
+      },
+      "document": { "sensitivity": "Restricted" },
+      "chunk": {
+        "published_at": "2026-09-11T09:30:00.000Z",
+        "sensitivity": "Restricted",
+        "audience": "groups",
+        "audience_groups": ["01M2GR0PAAAAAAAAAAAAAAAAAA"]
+      },
+      "why": "The two halves at once: the class folds down to the document's and the audience stays the binding's, because a document has no audience of its own. A reader in the named group still needs the Admin role to reach a Restricted row."
+    }
+  ]
+}

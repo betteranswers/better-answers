@@ -17,11 +17,12 @@ from typing import Any, cast
 import pytest
 from psycopg import Cursor
 
-SPOKEN_CONTRACT_VERSION = 7
+SPOKEN_CONTRACT_VERSION = 8
 SPOKEN_AGREEMENTS = {
     "concept-file": "fixtured",
     "concept-inbox": "sql-function",
     "cost-ledger": "generated",
+    "document-chunk": "fixtured",
     "id-shape": "fixtured",
     "credential-envelope": "fixtured",
     "llm-routing": "sql-function",

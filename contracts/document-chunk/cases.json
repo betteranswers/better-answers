@@ -1,0 +1,235 @@
+{
+  "description": "document-chunk (ADR 0031, ADR 0036, ADR 0020): one document's normalised redacted text, the chunk rows it is cut into and the passage a locator opens, said once for both tiers. The worker splits the text and writes the rows; the app parses a locator a citation carries, derives the same id from the same address and cuts the same passage back out. Two things make that an agreement rather than two implementations of one sentence. The first is the **id**: a chunk's id is derived from `(source_document_id, ordinal)` and never minted, so a reprocess upserts on the row's own key (ADR 0036's stable id) and either tier can compute a row's id from its address without asking the other. The second is the **offsets**: a locator's `chars:<start>-<end>` are Unicode code points into the normalised redacted text, and the two tiers do not count a string the same way — Python indexes by code point and JavaScript by UTF-16 unit. So the text below carries an astral character before every cited span, and its code-point length and its UTF-16 length are both written down and differ: a tier that counts units returns a passage one character early and one character short, which is a wrong answer that looks like a right one. The chunk rows **partition the text** — the first starts at 0, each one's end is the next one's start and the last one's end is the text's code-point length — so a span straddling two rows has exactly one answer whether it is cut from the whole text or from the rows it covers. `chunk_size` is the size these rows were cut at and not the size the pipeline runs at: the splitter is held to this file by running at the size this file names. Neither half holds the other's literals — the TypeScript half runs its own id derivation, locator parser and span cut (`packages/core/test/document-chunk.contract.test.ts`), and the Python half runs the arithmetic the splitter and the run will use (`apps/worker/tests/test_document_chunk_contract.py`). `passageAt` is held to the same rows when it lands (T-133).",
+  "chunk_id": {
+    "shape": "<source document id>#<ordinal, zero-padded to six digits>",
+    "separator": "#",
+    "ordinal_digits": 6,
+    "pattern": "^[0-9A-HJKMNP-TV-Z]{26}#[0-9]{6}$",
+    "cases": [
+      {
+        "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
+        "ordinal": 0,
+        "id": "01M2Q3R4S5T6V7W8X9YZAB0001#000000",
+        "why": "The splitter counts from zero, so the first chunk of every document is this row."
+      },
+      {
+        "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
+        "ordinal": 1,
+        "id": "01M2Q3R4S5T6V7W8X9YZAB0001#000001",
+        "why": "The padding is not decoration: without it chunk 10 would sort before chunk 2, and a document's rows would read out of the order the splitter cut them."
+      },
+      {
+        "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
+        "ordinal": 7,
+        "id": "01M2Q3R4S5T6V7W8X9YZAB0001#000007",
+        "why": "A single digit is padded to the full width, never left bare."
+      },
+      {
+        "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
+        "ordinal": 142,
+        "id": "01M2Q3R4S5T6V7W8X9YZAB0001#000142",
+        "why": "Three digits padded to six, which is the ordinary case for a long document."
+      },
+      {
+        "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
+        "ordinal": 999999,
+        "id": "01M2Q3R4S5T6V7W8X9YZAB0001#999999",
+        "why": "The widest ordinal the padding holds. A document with a million chunks is orders of magnitude past the bind act's per-file cap, so the width is a ceiling nothing reaches rather than a limit anyone has to think about."
+      },
+      {
+        "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0002",
+        "ordinal": 0,
+        "id": "01M2Q3R4S5T6V7W8X9YZAB0002#000000",
+        "why": "Two documents' first chunks differ only in the document half, which is what makes the id an address and not a name."
+      }
+    ]
+  },
+  "locator": {
+    "shape": "<source document id>/chars:<start>-<end>",
+    "offsets": "Unicode code points into the document's normalised redacted text, the start counted from zero and the end exclusive",
+    "not_found": "not-found",
+    "must_parse": [
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:39-66",
+        "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
+        "char_start": 39,
+        "char_end": 66,
+        "why": "A span inside one chunk row, after the astral character: the ordinary shape a citation carries."
+      },
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:71-122",
+        "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
+        "char_start": 71,
+        "char_end": 122,
+        "why": "A span running from one chunk row into the next. The extraction that writes a locator per claim knows nothing of where the splitter cut, so this is the normal case and not the awkward one."
+      },
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:0-37",
+        "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
+        "char_start": 0,
+        "char_end": 37,
+        "why": "A span with the astral character inside it rather than before it, so the count is wrong in both directions if a tier counts units."
+      },
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:150-200",
+        "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
+        "char_start": 150,
+        "char_end": 200,
+        "why": "A span past the end of this document's text. The shape is right, so the parser reads it; whether any text is there is the read's question and not the parser's."
+      },
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0002/chars:0-5",
+        "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0002",
+        "char_start": 0,
+        "char_end": 5,
+        "why": "A well-formed address into a document this workspace does not hold. The parser has no catalogue and does not pretend to one."
+      }
+    ],
+    "must_not_parse": [
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0001",
+        "why": "A document id alone. A document is not an address inside itself, and a locator without a span would have to mean the whole text, which is not a passage."
+      },
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:39",
+        "why": "One offset. A span has two ends, and a locator that carried one would leave the reader to guess the other."
+      },
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:66-39",
+        "why": "The end before the start. Read either way round it names two different passages, so it names none."
+      },
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:39-39",
+        "why": "An empty span. The end is exclusive, so this addresses no text at all, and a passage of no text is not a passage."
+      },
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:-3-9",
+        "why": "A negative offset. Offsets are counted from the start of the text, so there is nothing before zero to point at."
+      },
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:039-066",
+        "why": "Leading zeros. One span is written one way, or the same passage has two locators and the evidence row's unique key stops meaning what it says."
+      },
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:3.5-9",
+        "why": "A fractional offset. A code point is counted, never measured, so there is no half of one to start at."
+      },
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chunks:0-1",
+        "why": "The chunk ordinal the span replaced (the architecture pass of 10/09/2026). An ordinal is the splitter's artefact and moves whenever the splitter does; a citation that carried one would be re-pointed by a configuration change."
+      },
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0001#000001",
+        "why": "A chunk id. A row's key and an address into the text are different things, and the seam refuses to read one as the other."
+      },
+      {
+        "wire": "01m2q3r4s5t6v7w8x9yzab0001/chars:39-66",
+        "why": "A lower-case document id. Crockford base32 is written upper, and the id-shape agreement is where that is settled."
+      },
+      {
+        "wire": "/chars:39-66",
+        "why": "A span with no document. Offsets into nothing address nothing."
+      },
+      {
+        "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:39-66/chars:71-122",
+        "why": "Two spans. One locator addresses one passage, so a second span is a second locator."
+      },
+      {
+        "wire": "",
+        "why": "Empty."
+      }
+    ]
+  },
+  "document": {
+    "source_document_id": "01M2Q3R4S5T6V7W8X9YZAB0001",
+    "binding_id": "01M2B1ND1NGAAAAAAAAAAAAAAA",
+    "media_type": "text/markdown",
+    "chunk_size": 80,
+    "normalised_text": "Invoice 🧾 2026-041 is due on receipt.\n\nThe sort code is [withheld] and the account number is [withheld].\n\nDelivery follows within ten working days of a signed order.",
+    "code_points": 165,
+    "utf16_units": 166,
+    "astral": {
+      "character": "🧾",
+      "code_point": "U+1F9FE",
+      "at": 8,
+      "utf16_units": 2,
+      "why": "One character outside the basic plane, before every cited span below. It costs one code point and two UTF-16 units, which is the whole of the disagreement: a tier counting units puts every later offset one place late, so a span it cuts starts one character early and ends one character short. The character is a receipt because the document is a bid library's, and the two `[withheld]` words are the redaction seam's placeholders, which is what makes this the *normalised redacted* text a locator is counted in."
+    },
+    "chunks": [
+      {
+        "ordinal": 0,
+        "id": "01M2Q3R4S5T6V7W8X9YZAB0001#000000",
+        "char_start": 0,
+        "char_end": 39,
+        "locator": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:0-39",
+        "content": "Invoice 🧾 2026-041 is due on receipt.\n\n"
+      },
+      {
+        "ordinal": 1,
+        "id": "01M2Q3R4S5T6V7W8X9YZAB0001#000001",
+        "char_start": 39,
+        "char_end": 106,
+        "locator": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:39-106",
+        "content": "The sort code is [withheld] and the account number is [withheld].\n\n"
+      },
+      {
+        "ordinal": 2,
+        "id": "01M2Q3R4S5T6V7W8X9YZAB0001#000002",
+        "char_start": 106,
+        "char_end": 165,
+        "locator": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:106-165",
+        "content": "Delivery follows within ten working days of a signed order."
+      }
+    ]
+  },
+  "open": [
+    {
+      "case": "a span inside one row",
+      "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:39-66",
+      "expect": "passage",
+      "passage": "The sort code is [withheld]",
+      "covers_ordinals": [1],
+      "why": "The ordinary answer: one row covers the span and the passage is cut out of it. The offsets are past the astral character, so a tier counting UTF-16 units would return the newline before this sentence and lose its last bracket."
+    },
+    {
+      "case": "a span straddling two rows",
+      "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:71-122",
+      "expect": "passage",
+      "passage": "the account number is [withheld].\n\nDelivery follows",
+      "covers_ordinals": [1, 2],
+      "why": "Two rows cover the span and the answer is one passage, not two. Because the rows partition the text, cutting the span out of the whole text and joining what the covering rows hold give the same characters — which is the property that lets `passageAt` read rows and a citation name text."
+    },
+    {
+      "case": "a span the astral character sits inside",
+      "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:0-37",
+      "expect": "passage",
+      "passage": "Invoice 🧾 2026-041 is due on receipt.",
+      "covers_ordinals": [0],
+      "why": "The character is inside the span rather than before it, so a tier counting units loses the full stop at the end while still starting in the right place — the failure that is hardest to see by eye."
+    },
+    {
+      "case": "a malformed locator",
+      "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chunks:0-1",
+      "expect": "not-found",
+      "refused_by": "the parser",
+      "because": "malformed",
+      "why": "Refused before anything is read. The answer is the same word a withheld passage gets, so the reader learns nothing from the difference between a locator that is wrong and a passage they may not see."
+    },
+    {
+      "case": "a span past the end of the text",
+      "wire": "01M2Q3R4S5T6V7W8X9YZAB0001/chars:150-200",
+      "expect": "not-found",
+      "refused_by": "the read",
+      "because": "out of range",
+      "why": "The address is well formed, so the parser reads it and the read answers: no row covers the span, and the text is 165 code points long. The parser has no text in front of it and would be guessing."
+    },
+    {
+      "case": "a document the workspace does not hold",
+      "wire": "01M2Q3R4S5T6V7W8X9YZAB0002/chars:0-5",
+      "expect": "not-found",
+      "refused_by": "the read",
+      "because": "unknown",
+      "why": "Also well formed, and also the read's answer — under the reader's predicate, a document another workspace holds and a document nobody holds are the same absence. One word for all three refusals is what stops the seam confirming what exists."
+    }
+  ]
+}
