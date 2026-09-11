@@ -173,6 +173,34 @@ export const heldByIri = async (
       };
 };
 
+/**
+ * Whether every document a write's citations name is one this workspace's catalogue holds —
+ * what the act asks before it makes a commit. `evidence` is keyed to `source_document` by a
+ * foreign key that restricts, so a citation of a document the catalogue never recorded
+ * cannot land at all; without this read the store answers that in the key's own words, at the
+ * end of the landing transaction, with a commit already made for rows nobody can record.
+ * Asked here, the act answers a word a caller can act on and costs no commit, like every
+ * other refusal it reads before the commit.
+ *
+ * A read of the catalogue in the caller's transaction, scoped as every read here is. Empty is
+ * vacuously true: a concept resting on nothing cites no document, and that is the one case
+ * the derivation's fallback to the writer's word still serves (ADR 0023).
+ */
+export const holdsEveryDocument = async (
+  principal: Principal,
+  tx: Tx,
+  documentIds: readonly string[],
+): Promise<boolean> => {
+  const distinct = [...new Set(documentIds)];
+  if (distinct.length === 0) return true;
+  const found = await tx.query<{ held: number }>(
+    `SELECT count(*)::int AS held FROM source_document
+      WHERE workspace_id = ${scopeClause(1)} AND id = ANY($2::text[])`,
+    [scopeParameter(principal), distinct],
+  );
+  return found.rows[0]?.held === distinct.length;
+};
+
 /** Whether two visibilities are one: the same class, the same word, the same groups in the same order. */
 const sameVisibility = (one: Visibility, other: Visibility): boolean =>
   one.sensitivity === other.sensitivity &&

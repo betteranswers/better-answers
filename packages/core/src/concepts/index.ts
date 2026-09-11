@@ -47,6 +47,7 @@ import {
   foldKind,
   heldByIri,
   heldVisibilityOf,
+  holdsEveryDocument,
   indexRowOf,
   landRows,
   WRITE_CONSTRAINTS,
@@ -293,7 +294,10 @@ export type ConceptWritten = {
  * (`overrideConceptClass`) and never a re-write's. `no-such-concept` is a write naming an IRI
  * this workspace never minted — **or one the read predicate withholds from the writer**,
  * answered in the same word so a re-write is no oracle for what a person may not see — which
- * ADR 0002 refuses because the key is never a caller's to choose. `already-decided` is an
+ * ADR 0002 refuses because the key is never a caller's to choose. `no-such-document` is its
+ * sibling for a citation: a write naming a source document the catalogue does not hold, which
+ * the evidence key restricts and this act therefore names rather than letting the store
+ * answer in the key's words. `already-decided` is an
  * acceptance of a suggestion somebody decided first, and `resolution-moved` one whose named
  * target no longer answers to the merge key it was proposed under. The principal refusals
  * are `withMembership`'s, which judges the caller's authority at time-of-act.
@@ -313,6 +317,7 @@ export type WriteConceptRefusal =
   | "reclassification-refused"
   | "widening-refused"
   | "no-such-concept"
+  | "no-such-document"
   | "already-decided"
   | "resolution-moved";
 
@@ -453,6 +458,14 @@ export const writeConcept = async (
                   fallback: heldVisibilityOf(held),
                   citing: evidence.data.map((piece) => piece.sourceDocumentId),
                 }),
+          // Whether the catalogue holds every document this write cites, read inside the
+          // lock with the rest: the evidence key restricts, so a citation of a document
+          // nobody catalogued cannot land, and the act says so in its own word.
+          catalogued: await holdsEveryDocument(
+            fresh,
+            tx,
+            evidence.data.map((piece) => piece.sourceDocumentId),
+          ),
           // The merge key's resolution, read here rather than beside the act, so an
           // acceptance resolves identity *at acceptance* and inside the lock that holds it.
           resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
@@ -464,12 +477,17 @@ export const writeConcept = async (
     );
     if (!existing.ok) return err(existing.error);
     if (!existing.value.ok) return err(existing.value.error);
-    const { held, derived, resolved, waiting } = existing.value.value;
+    const { held, derived, resolved, waiting, catalogued } = existing.value.value;
 
     // ADR 0002: the key is never caller-settable. A creation minted its own above; a write
     // that named one has to name a concept this workspace already holds, or it would mint
     // an identity for a key its caller chose.
     if (input.iri !== undefined && held === undefined) return err("no-such-concept");
+    // And the same answer for a citation naming a document the catalogue does not hold: the
+    // evidence key restricts it (T-128), so the choice is a word before the commit or the
+    // key's own violation after one — and a commit nobody can record is the reconciler's
+    // finding, which is for crashes and never for an act the platform meant to refuse.
+    if (!catalogued) return err("no-such-document");
     // A suggestion somebody decided while this act was being prepared. Refused here and not
     // in the transaction that lands the rows, because a commit whose `Suggestion:` trailer
     // named a declined suggestion is an orphan the reconciler's replay would land.
