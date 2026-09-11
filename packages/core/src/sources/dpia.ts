@@ -2,17 +2,10 @@ import { createHash } from "node:crypto";
 
 import { boundarySchemas, RULES_IN_FORCE_KEYS, type REDACTION_TIERS } from "@better-answers/schema";
 
-import {
-  attempt,
-  err,
-  ok,
-  type Result,
-  type RoleRefusal,
-  type UserPrincipal,
-} from "../kernel/index.ts";
+import { err, ok, type Result, type RoleRefusal, type UserPrincipal } from "../kernel/index.ts";
 import { listRoutes, type LlmPurpose } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { adminOnBinding } from "./admin-binding.ts";
+import { adminOnBinding, bindingNamed } from "./admin-binding.ts";
 
 /**
  * The **DPIA input** (`CONTEXT.md`; ADR 0020; the S0 spec, *The DPIA input*): what one source
@@ -216,17 +209,14 @@ export const dpiaInputFor = async (
   const acting = adminOnBinding(principal, input.bindingId);
   if (!acting.ok) return err(acting.error);
   const { admin, bindingId } = acting.value;
-  const { workspaceId } = admin;
 
-  const known = await attempt(() =>
-    tx.query<BindingRow>(
-      "SELECT sensitivity, audience, rules_in_force FROM source_binding WHERE workspace_id = $1 AND id = $2",
-      [workspaceId, bindingId],
-    ),
-  );
-  if (!known.ok) return err(known.error);
-  const binding = known.value.rows[0];
-  if (binding === undefined) return err("no-such-binding");
+  // A read, so no lock: there is nothing here for a second act to queue behind.
+  const read = await bindingNamed<BindingRow>(tx, acting.value, {
+    columns: "sensitivity, audience, rules_in_force",
+    lock: "none",
+  });
+  if (!read.ok) return err(read.error);
+  const binding = read.value;
 
   const parsed = RULES_IN_FORCE.safeParse(binding.rules_in_force);
   // The column's CHECK refuses both a shape outside the two keys and the JSON null, so a row

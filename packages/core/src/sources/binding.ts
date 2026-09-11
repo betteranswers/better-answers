@@ -25,6 +25,7 @@ import { holdsEveryGroup } from "../members/index.ts";
 import { enqueueJobIn, type IndexReason } from "../runs/index.ts";
 import { putObject, type ObjectDoor } from "../store/objects/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import { adminOnBinding, bindingNamed } from "./admin-binding.ts";
 import { dpiaInputFor, REDACTION_CATEGORIES } from "./dpia.ts";
 
 /**
@@ -375,8 +376,6 @@ export const bindUpload = async (
   });
 };
 
-const BINDING_ID = boundarySchemas.sourceBinding.select.shape.id;
-
 export type PublishBindingInput = {
   readonly bindingId: string;
   /**
@@ -452,8 +451,10 @@ const FINDINGS_BY_CATEGORY = `SELECT f.category, count(*)::int AS found
  *
  * Every refusal is decided before a row is written: the role, the shape of the id, the three
  * confirmations, the binding's existence, whether it is already published, and the run. The
- * confirmations go first among the reads because they need none — an Admin who has not made
- * all three statements is told so without the database being asked anything.
+ * first two are `adminOnBinding`'s, the head every Admin act on a binding it is handed the id
+ * of opens with, and they are decided in that order there for the reason stated there. The
+ * confirmations go next because they need no read — an Admin who has not made all three
+ * statements is told so without the database being asked anything.
  *
  * Then, in the caller's one transaction: the binding's own row, **every chunk of it**, the
  * DPIA input read as a document and hashed, the totals by category, and the ledger row last
@@ -472,11 +473,9 @@ export const publishBinding = async (
   tx: Tx,
   input: PublishBindingInput,
 ): Promise<Result<BindingPublished, PublishBindingRefusal>> => {
-  const admin = requireAdmin(principal);
-  if (!admin.ok) return err(admin.error);
-  const bindingId = BINDING_ID.safeParse(input.bindingId);
-  if (!bindingId.success) return err("malformed");
-  const { workspaceId } = admin.value;
+  const acting = adminOnBinding(principal, input.bindingId);
+  if (!acting.ok) return err(acting.error);
+  const { admin, bindingId, workspaceId } = acting.value;
 
   if (!CONFIRMATIONS.every((named) => input.confirmations[named] === true)) {
     return err("confirmation-missing");
@@ -484,31 +483,24 @@ export const publishBinding = async (
 
   // `FOR UPDATE`, so two publishes of one binding queue rather than both reading it
   // unpublished and both writing a ledger row for the one publication.
-  const known = await attempt(() =>
-    tx.query<{ published_at: Date | null }>(
-      "SELECT published_at FROM source_binding WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
-      [workspaceId, bindingId.data],
-    ),
-  );
-  if (!known.ok) return err(known.error);
-  const binding = known.value.rows[0];
-  if (binding === undefined) return err("no-such-binding");
-  if (binding.published_at !== null) return err("already-published");
+  const binding = await bindingNamed<{ published_at: Date | null }>(tx, acting.value, {
+    columns: "published_at",
+    lock: "for-update",
+  });
+  if (!binding.ok) return err(binding.error);
+  if (binding.value.published_at !== null) return err("already-published");
 
   const run = await attempt(() =>
-    tx.query<{ status: string }>(LATEST_INDEX_RUN, [workspaceId, INDEX_KIND, bindingId.data]),
+    tx.query<{ status: string }>(LATEST_INDEX_RUN, [workspaceId, INDEX_KIND, bindingId]),
   );
   if (!run.ok) return err(run.error);
   // A binding with no run at all is a binding nothing has been over, which is the same answer.
   if (run.value.rows[0]?.status !== JOB_DONE_STATUS) return err("not-indexed");
 
-  const dpia = await dpiaInputFor(admin.value, tx, { bindingId: bindingId.data });
+  const dpia = await dpiaInputFor(admin, tx, { bindingId: bindingId });
   if (!dpia.ok) return err(dpia.error);
   const counted = await attempt(() =>
-    tx.query<{ category: string; found: number }>(FINDINGS_BY_CATEGORY, [
-      workspaceId,
-      bindingId.data,
-    ]),
+    tx.query<{ category: string; found: number }>(FINDINGS_BY_CATEGORY, [workspaceId, bindingId]),
   );
   if (!counted.ok) return err(counted.error);
   const found = new Map(counted.value.rows.map((row) => [row.category, row.found]));
@@ -517,25 +509,25 @@ export const publishBinding = async (
   const published = await attempt(() =>
     tx.query(
       "UPDATE source_binding SET published_at = $3, state = $4 WHERE workspace_id = $1 AND id = $2",
-      [workspaceId, bindingId.data, input.publishedAt, BINDING_PUBLISHED_STATE],
+      [workspaceId, bindingId, input.publishedAt, BINDING_PUBLISHED_STATE],
     ),
   );
   if (!published.ok) return err(published.error);
   const stamped = await attempt(() =>
     tx.query(
       `UPDATE "index".chunk SET published_at = $3 WHERE workspace_id = $1 AND binding_id = $2`,
-      [workspaceId, bindingId.data, input.publishedAt],
+      [workspaceId, bindingId, input.publishedAt],
     ),
   );
   if (!stamped.ok) return err(stamped.error);
 
   // Bare, after the rows: the door's rejection aborts the transaction they landed in.
-  await record(admin.value, tx, {
+  await record(admin, tx, {
     id: auditEventId,
     act: BINDING_ACTS.published,
-    subjectId: bindingId.data,
+    subjectId: bindingId,
     detail: {
-      bindingId: bindingId.data,
+      bindingId: bindingId,
       lawfulBasisRecorded: input.confirmations.lawfulBasisRecorded,
       privacyInformationUpdated: input.confirmations.privacyInformationUpdated,
       dpiaReferenced: input.confirmations.dpiaReferenced,
@@ -544,7 +536,7 @@ export const publishBinding = async (
     },
   });
   return ok({
-    bindingId: bindingId.data,
+    bindingId: bindingId,
     auditEventId,
     chunks: stamped.value.rowCount ?? 0,
     dpiaHash: dpia.value.hash,
@@ -598,44 +590,39 @@ export type BindingReprocessed = {
  * (ADR 0036, amended 2026-09-10). Two tiers, two stores, one order.
  *
  * The binding's row is taken `FOR UPDATE`, so a reprocess and a narrowing of the same binding
- * queue rather than one deleting the rows the other is rewriting.
+ * queue rather than one deleting the rows the other is rewriting. Before any of it, the role
+ * and the id's shape: `adminOnBinding`, the head the publish above opens with too.
  */
 export const reprocessBinding = async (
   principal: UserPrincipal,
   tx: Tx,
   input: ReprocessBindingInput,
 ): Promise<Result<BindingReprocessed, ReprocessBindingRefusal>> => {
-  const admin = requireAdmin(principal);
-  if (!admin.ok) return err(admin.error);
-  const bindingId = BINDING_ID.safeParse(input.bindingId);
-  if (!bindingId.success) return err("malformed");
-  const { workspaceId } = admin.value;
+  const acting = adminOnBinding(principal, input.bindingId);
+  if (!acting.ok) return err(acting.error);
+  const { admin, bindingId, workspaceId } = acting.value;
 
-  const known = await attempt(() =>
-    tx.query("SELECT 1 FROM source_binding WHERE workspace_id = $1 AND id = $2 FOR UPDATE", [
-      workspaceId,
-      bindingId.data,
-    ]),
-  );
-  if (!known.ok) return err(known.error);
-  if (known.value.rowCount === 0) return err("no-such-binding");
+  // No column: what this act needs off the row is that it is there and that it is held until
+  // the transaction ends.
+  const standing = await bindingNamed(tx, acting.value, { columns: "1", lock: "for-update" });
+  if (!standing.ok) return err(standing.error);
 
-  const queued = await enqueueJobIn(admin.value, tx, {
+  const queued = await enqueueJobIn(admin, tx, {
     workspaceId,
     kind: INDEX_KIND,
-    subjectId: bindingId.data,
+    subjectId: bindingId,
     reason: input.reason,
   });
   if (!queued.ok) return err(queued.error);
   const wiped = await attempt(() =>
     tx.query(`DELETE FROM "index".chunk WHERE workspace_id = $1 AND binding_id = $2`, [
       workspaceId,
-      bindingId.data,
+      bindingId,
     ]),
   );
   if (!wiped.ok) return err(wiped.error);
   return ok({
-    bindingId: bindingId.data,
+    bindingId: bindingId,
     jobId: queued.value.jobId,
     chunks: wiped.value.rowCount ?? 0,
   });

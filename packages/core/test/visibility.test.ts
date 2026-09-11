@@ -468,6 +468,19 @@ describe("what a re-write may not do to the class a concept holds", () => {
 });
 
 /**
+ * One workspace, an HR group the Editor is in, and one binding under it at the default pair —
+ * the three lines two of the narrowing cases below open with before they say what they are
+ * about. The arrangement is shared and nothing either case asserts is: what each is about
+ * starts at its next line.
+ */
+const workspaceWithHrBinding = async () => {
+  const scenario = await arrange();
+  const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
+  const binding = await bindingHolding(db(), scenario.workspaceId);
+  return { scenario, hr, binding };
+};
+
+/**
  * The narrowing act and the three levels it rewrites inside one transaction, under the
  * workspace's one cascade lock: the binding's chunk copies first, then every concept citing
  * its documents, then every composition including one of those concepts.
@@ -543,9 +556,7 @@ describe("narrowing a binding", () => {
   });
 
   it("rewrites the chunk copies of every document under it, keeping a document's own narrower class and never taking a wider one", async () => {
-    const scenario = await arrange();
-    const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
-    const binding = await bindingHolding(db(), scenario.workspaceId);
+    const { scenario, hr, binding } = await workspaceWithHrBinding();
     // The three shapes the visibility-columns agreement names: a document with no class of
     // its own, one narrower than its binding, and one whose own word is wider.
     const narrowed = await documentUnder(
@@ -642,9 +653,7 @@ describe("narrowing a binding", () => {
   });
 
   it("narrows an audience to named groups, and the Viewer outside them loses the concept at once", async () => {
-    const scenario = await arrange();
-    const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
-    const binding = await bindingHolding(db(), scenario.workspaceId);
+    const { scenario, hr, binding } = await workspaceWithHrBinding();
     const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
     const composition = await compositionIncluding(scenario.workspaceId, [written.iri]);
 
