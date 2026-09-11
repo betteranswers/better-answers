@@ -41,6 +41,28 @@ dependencies = [
     # CPU wheel index below. Version read from PyPI on 11/09/2026 and resolved out of
     # PyTorch's own CPU channel for Linux, which carries the same release as `+cpu`.
     "torch==2.14.0",
+    # The engine this tier hosts (ADR 0036). One package beneath
+    # `src/better_answers_worker/pipeline/` composes it and nothing else in the tier may
+    # import it — the ban further down is what holds that, and the per-file ignore
+    # beneath it is the single exception. The wheels are abi3 against CPython 3.11, so
+    # one wheel serves this tier's 3.13, and `cp311-abi3` covers manylinux_2_28 on
+    # x86_64 and aarch64 as well as macOS arm64, which is every machine this repository
+    # builds on. Version read from PyPI's release metadata on 11/09/2026; Apache-2.0,
+    # which is the arm this repository takes (ADR 0027).
+    "cocoindex==1.0.22",
+    # The driver the engine's Postgres target acquires its own connections through, and
+    # the one the pipeline's per-workspace pool is built from. It is named here rather
+    # than left to cocoindex's `postgres` extra, whose floor would let the driver move
+    # underneath a pool whose connection init is the only thing keeping row-level
+    # security in force over the rows a flow lands. Read from PyPI on 11/09/2026;
+    # Apache-2.0.
+    "asyncpg==0.31.0",
+    # The object store client the pipeline reads a landed copy with and writes the
+    # normalised copy back through. It is this tier's own rather than the engine's S3
+    # source, because the bytes are addressed by keys the document's catalogue row
+    # already holds and nothing here walks a bucket. Read from PyPI on 11/09/2026;
+    # Apache-2.0.
+    "boto3==1.43.92",
 ]
 
 [project.scripts]
@@ -105,6 +127,13 @@ select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20", 
 # The check runner is a script; it is the one place print-shaped output is allowed,
 # `print` being banned everywhere else in the tier.
 "src/better_answers_worker/check.py" = ["T20"]
+# The pipeline package, and the one place the cocoindex ban above is lifted: everything
+# beneath this directory is the module that composes the engine (ADR 0036), whose public
+# interface takes and answers plain types so no cocoindex type crosses a seam. One
+# pattern, over that rule alone — a second exemption, or a wider pattern, is what
+# `tests/test_cocoindex_ban.py` refuses, because the ban means nothing once more than one
+# directory can lift it.
+"src/better_answers_worker/pipeline/**" = ["TID251"]
 
 [tool.mypy]
 python_version = "3.13"
