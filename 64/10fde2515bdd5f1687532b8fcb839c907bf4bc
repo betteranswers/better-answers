@@ -1,0 +1,19 @@
+docs/adr/README.md
+  s_96a66f19ddb6be::t_02d60b3cd53f41 44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "6410fde2515bdd5f1687532b8fcb839c907bf4bc",
+  "prompts": {},
+  "sessions": {
+    "s_96a66f19ddb6be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1940d59b-7323-446c-9724-222dda88e9e0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
