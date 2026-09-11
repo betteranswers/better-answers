@@ -147,10 +147,15 @@ const DAY_MS = 24 * HOUR_MS;
  * Its pair is `erasureRequest` in `packages/schema/test/factory.ts`, which states the same
  * four lifetimes and the same month rule in its own lines because the schema's tests cannot
  * import this package; change one and change the other in the same commit.
+ *
+ * `beyondUseFrom` is exported for one caller: the restore that re-creates a request's row from
+ * its *replay copy* (`replay-erasures.ts`) and must compute the same four dates from the one
+ * anchor that copy carries. A second arithmetic there would be a second set of promises about
+ * the same backups.
  */
 const BEYOND_USE = { hourlyHours: 48, dailyDays: 30, weeklyWeeks: 8, monthlyMonths: 6 } as const;
 
-const beyondUseFrom = (anchoredAt: Date) => ({
+export const beyondUseFrom = (anchoredAt: Date) => ({
   hourly: new Date(anchoredAt.getTime() + BEYOND_USE.hourlyHours * HOUR_MS),
   daily: new Date(anchoredAt.getTime() + BEYOND_USE.dailyDays * DAY_MS),
   weekly: new Date(anchoredAt.getTime() + BEYOND_USE.weeklyWeeks * 7 * DAY_MS),

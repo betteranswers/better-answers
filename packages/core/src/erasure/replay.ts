@@ -1,6 +1,14 @@
-import type { PlatformPrincipal } from "../kernel/index.ts";
-import { putPlatformObject, type ObjectDoor } from "../store/objects/index.ts";
-import type { ErasureMap } from "./map.ts";
+import { boundarySchemas } from "@better-answers/schema";
+import { z } from "zod";
+
+import { attempt, err, ok, type PlatformPrincipal, type Result } from "../kernel/index.ts";
+import {
+  getPlatformObject,
+  listPlatformObjects,
+  putPlatformObject,
+  type ObjectDoor,
+} from "../store/objects/index.ts";
+import { ERASURE_FAMILIES, PERSONAL_DATA_CATEGORIES, type ErasureMap } from "./map.ts";
 import type { SubjectIdentifiers } from "./requests.ts";
 
 /**
@@ -39,6 +47,12 @@ import type { SubjectIdentifiers } from "./requests.ts";
  * is therefore **restricted personal data of the same class as the `suppression` table**, kept
  * under the platform prefix that no workspace principal can address, and the report's
  * beyond-use dates cover it as they cover every dump.
+ *
+ * **Both halves live here**: the write the routine's step 10 makes, and the read a restore makes
+ * on the other side of it. One module, because the document's shape is one fact — a reader that
+ * stated it a second time would be a second thing to keep in step with the writer, and the one
+ * moment the two must agree is the moment when nothing else in the estate knows an erasure is
+ * owed. What the replay then *does* with a copy is `replay-erasures.ts`.
  */
 
 /**
@@ -128,4 +142,129 @@ export const writeReplayCopy = async (
   if (!written.ok) {
     throw new Error(`erasure: the replay copy's key was refused (${written.error})`);
   }
+};
+
+/**
+ * The copy as a restore reads it back — **parsed, never cast** (ADR 0028). These bytes have been
+ * out of the platform's hands: written months ago by a version that is not this one, mirrored to
+ * a second bucket, and synced back onto a machine that has just been rebuilt. A cast would make
+ * the first sign of a copy that is not one an error deep inside the routine, on a subject
+ * request id that is really a null.
+ *
+ * Every field is held to the shape the column it came from is held to, read off the boundary
+ * rather than restated, so the copy and the rows it re-creates cannot drift apart: the two ids
+ * and the pseudonym are the minter's, the person id is a person id, and the identifier set is
+ * the same bounded three-list shape the `subject_request` column carries. The map is held to the
+ * erasure map's own vocabulary, which is why `map.ts` exports its category list.
+ *
+ * **Unknown keys are dropped rather than refused.** A restore is where forgiveness is worth
+ * something: a copy carrying a field this version has never heard of is still a copy of an
+ * erasure that is owed, and refusing it would leave that erasure un-replayed over a field
+ * nothing here reads. A field this version *needs* and the copy lacks is refused, which is the
+ * direction that matters.
+ */
+const COPY_AS_READ = z.object({
+  workspaceId: boundarySchemas.workspace.select.shape.id,
+  subjectRequestId: boundarySchemas.subjectRequest.select.shape.id,
+  erasureRequestId: boundarySchemas.erasureRequest.select.shape.id,
+  // The person's own id where the subject holds a login: `user.id`'s shape, because that is the
+  // row `subject_request.person_id` points at. Optional and never nullable — the writer leaves
+  // the key out for a subject who never signed in, and a `null` here would be a copy no writer
+  // of ours produced.
+  personId: boundarySchemas.user.select.shape.id.optional(),
+  pseudonym: boundarySchemas.erasureRequest.select.shape.pseudonym,
+  completedAt: z.iso.datetime(),
+  identifiers: boundarySchemas.subjectRequest.select.shape.identifiers,
+  map: z.array(
+    z.object({
+      family: z.enum(ERASURE_FAMILIES),
+      categories: z.array(z.enum(PERSONAL_DATA_CATEGORIES)),
+      locations: z.array(z.string()),
+    }),
+  ),
+});
+
+/**
+ * The document at one key, as the type the rest of the slice reads.
+ *
+ * The person id is put back the way the writer took it off — present or absent, never a `null`
+ * standing in for a person — because that is the distinction every caller downstream reads to
+ * decide whether a re-created request names somebody or names nobody.
+ */
+const copyOf = (parsed: z.infer<typeof COPY_AS_READ>): ReplayCopy => {
+  const named = {
+    workspaceId: parsed.workspaceId,
+    subjectRequestId: parsed.subjectRequestId,
+    erasureRequestId: parsed.erasureRequestId,
+    pseudonym: parsed.pseudonym,
+    completedAt: parsed.completedAt,
+    identifiers: parsed.identifiers,
+    map: parsed.map,
+  };
+  return parsed.personId === undefined ? named : { ...named, personId: parsed.personId };
+};
+
+/**
+ * One copy, read and parsed, or a throw naming the key — which is what an operator can act on.
+ *
+ * The door hands bytes back as a stream and the runtime's own `Response` is what turns one into
+ * text: it decodes UTF-8 across chunk boundaries, which is the one thing a hand-rolled read gets
+ * wrong, and an identifier set is exactly where a person's name arrives with an accent in it.
+ */
+const copyAt = async (
+  platform: PlatformPrincipal,
+  door: ObjectDoor,
+  key: string,
+): Promise<ReplayCopy> => {
+  const got = await getPlatformObject(platform, door, key);
+  if (!got.ok)
+    throw new Error(`erasure: the replay copy at ${key} was not readable (${got.error})`);
+  const parsed = COPY_AS_READ.safeParse(JSON.parse(await new Response(got.value).text()));
+  if (!parsed.success) {
+    throw new Error(`erasure: the replay copy at ${key} is not a replay copy`, {
+      cause: parsed.error,
+    });
+  }
+  return copyOf(parsed.data);
+};
+
+/**
+ * **Every copy in the store for an erasure that completed after `since`**, across every
+ * workspace — the first half of what `replay-erasures` has to run, and the half that survives a
+ * dump taken before the request.
+ *
+ * **A store that will not answer is an error, and never an empty set.** This is the whole
+ * reason the function returns a `Result` at all: an estate whose copies are unreachable knows
+ * nothing about the erasures it owes, and *none* is the one answer it must not give — a restore
+ * would read it as "there was nothing to replay", let `api` turn healthy, and put a person's
+ * data back where an erasure took it from. The caller turns this error into a refusal that
+ * stops the restore (ADR 0022). The same goes for a key the listing named and the get could
+ * not read, and for a document that is not a copy: each names its key, because the operator
+ * reading the refusal has a bucket in front of them.
+ *
+ * `since` is compared against the completion the copy carries, which is the same instant the
+ * `erasure_request` row holds — the routine writes the copy from the one reading of the clock
+ * its last step stamps the row with.
+ */
+export const replayCopiesSince = async (
+  platform: PlatformPrincipal,
+  door: ObjectDoor,
+  since: Date,
+): Promise<Result<readonly ReplayCopy[], Error>> => {
+  const listed = await attempt(() => listPlatformObjects(platform, door, REPLAY_PREFIX));
+  if (!listed.ok) return err(listed.error);
+  if (!listed.value.ok) {
+    return err(new Error(`erasure: the replay prefix was refused (${listed.value.error})`));
+  }
+
+  const copies: ReplayCopy[] = [];
+  for (const key of listed.value.value) {
+    // Sequential rather than in parallel: a restore's whole bucket of copies is read once, on a
+    // machine that is also restoring three other stores, and the order nothing depends on is
+    // not worth the burst of connections.
+    const read = await attempt(() => copyAt(platform, door, key));
+    if (!read.ok) return err(read.error);
+    if (new Date(read.value.completedAt).getTime() > since.getTime()) copies.push(read.value);
+  }
+  return ok(copies);
 };

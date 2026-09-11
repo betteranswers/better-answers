@@ -62,8 +62,12 @@ export type ErasureFamily = (typeof ERASURE_FAMILIES)[number];
  * as *under which categories* (`CONTEXT.md`, *subject request*). They describe the platform's
  * own records rather than a document's contents: what a finding is categorised by is the
  * redaction seam's list and a different question entirely.
+ *
+ * Exported for one reader: the boundary parse of a *replay copy* (`replay.ts`), which holds a
+ * map written by an earlier run to this list rather than to `z.string()` — a copy is parsed and
+ * never cast (ADR 0028), and the word for a category lives here.
  */
-const PERSONAL_DATA_CATEGORIES = [
+export const PERSONAL_DATA_CATEGORIES = [
   "actor-id",
   "name",
   "email-address",
