@@ -44,11 +44,11 @@
     "@stryker-mutator/api": "10.0.0",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
-    "@types/node": "24.13.3",
+    "@types/node": "24.13.4",
     "@types/nodemailer": "8.0.1",
     "@types/pg": "8.23.1",
     "typescript": "7.0.2",
     "vitest": "4.1.11",
-    "yaml": "2.9.0"
+    "yaml": "2.9.1"
   }
 }
