@@ -48,6 +48,10 @@ class ClaimedJob:
     id: str
     kind: str
     reason: str | None
+    #: What the job is about, when its kind is about something: the binding an index run
+    #: indexes. NULL on a kind whose descriptor names no subject, under the row's own
+    #: biconditional CHECK, so a handler that needs one may read it as given.
+    subject_id: str | None
     attempts: int
 
 
@@ -115,7 +119,8 @@ def claim(
     landed.
     """
     cursor.execute(
-        "SELECT id, kind, reason, attempts FROM claim_job(%s, %s::interval, %s)",
+        "SELECT id, kind, reason, subject_id, attempts"
+        " FROM claim_job(%s, %s::interval, %s)",
         (worker_id, f"{LEASE_SECONDS} seconds", list(kinds)),
     )
     row = cursor.fetchone()
@@ -126,7 +131,8 @@ def claim(
         id=str(row[0]),
         kind=str(row[1]),
         reason=None if row[2] is None else str(row[2]),
-        attempts=int(row[3]),
+        subject_id=None if row[3] is None else str(row[3]),
+        attempts=int(row[4]),
     )
 
 

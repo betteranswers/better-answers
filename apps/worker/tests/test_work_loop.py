@@ -30,7 +30,7 @@ from better_answers_worker.bundle import (
     repository_path,
 )
 from better_answers_worker.concept_file import content_hash_of, parse_concept_file
-from better_answers_worker.config import Bootstrap
+from better_answers_worker.config import Bootstrap, Engine, ObjectStore
 from better_answers_worker.ids import ulid
 from better_answers_worker.kinds import KINDS
 from better_answers_worker.queue import scoped
@@ -127,6 +127,17 @@ def bootstrap_for(database: psycopg.Connection, git_store: Path) -> Bootstrap:
         database_url=_WHERE[database],
         git_store_dir=str(git_store),
         worker_id=WORKER,
+        # Neither kind the loop runs today reaches either of these; they are here
+        # because a bootstrap is one class and a partial one would be a shape no
+        # deploy unit hands this process.
+        object_store=ObjectStore(
+            endpoint="http://objectstore:3900",
+            access_key="key-under-test",
+            secret_key="secret-under-test",
+            bucket="better-answers",
+            region="garage",
+        ),
+        engine=Engine(lmdb_dir=str(git_store / "lmdb")),
     )
 
 
@@ -224,6 +235,44 @@ def test_the_loop_claims_no_kind_its_registry_lacks_so_an_index_job_waits(
             ("index", "queued", None, 0),
             ("nightly-audit", "done", WORKER, 1),
         ]
+
+
+def test_a_claim_hands_the_handler_what_the_job_is_about(
+    database: psycopg.Connection,
+) -> None:
+    """A job row names its subject — the binding an index run is for — and the claim
+    carries it, so the handler reads the binding off the job it holds rather than going
+    back to the queue for a row it already has. A kind whose descriptor names no subject
+    carries none, and the claim says so rather than inventing one.
+    """
+    workspace = seed_workspace(database.cursor())["id"]
+    binding_id = ulid()
+    with database.cursor() as cursor:
+        seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="index",
+            reason="bound",
+            subject_id=binding_id,
+            enqueued_ago_seconds=2,
+        )
+        seed_job(cursor, workspace_id=workspace, kind="nightly-audit")
+    database.commit()
+
+    with queue.connected(_WHERE[database]) as worker:
+        with scoped(worker, workspace) as cursor:
+            indexing = queue.claim(cursor, workspace, WORKER, ["index"])
+        with scoped(worker, workspace) as cursor:
+            auditing = queue.claim(cursor, workspace, WORKER, ["nightly-audit"])
+
+    assert indexing is not None
+    assert indexing.kind == "index"
+    assert indexing.reason == "bound"
+    assert indexing.subject_id == binding_id
+
+    assert auditing is not None
+    assert auditing.kind == "nightly-audit"
+    assert auditing.subject_id is None
 
 
 def test_the_loop_claims_runs_and_finishes_a_nightly_audit_it_scheduled_itself(
