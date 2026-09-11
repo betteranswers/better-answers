@@ -16,7 +16,9 @@
  * re-derivation it asks for afterwards (`rederive.ts`) and the **replay copy** it leaves in
  * the object store for a restore to read (`replay.ts`) — and, on the other side of a restore,
  * the **replay** itself (`replay-erasures.ts`): the union of the restored rows and those copies,
- * each run through the routine again under the platform's own principal.
+ * each run through the routine again under the platform's own principal. Beside the replay and
+ * built on the same routine, the **erasure rehearsal** (`rehearsal.ts`): the drill's two phases,
+ * a synthetic subject seeded into a workspace and then erased, with a dump taken between them.
  */
 
 export type { ErasureSubject, IdentityArm, IdentitySwept } from "./identity.ts";
@@ -24,6 +26,13 @@ export { accessAnswerOf, ERASURE_FAMILIES, erasureMapOf } from "./map.ts";
 export type { AccessAnswer, ErasureFamily, ErasureFamilyDescriptor, ErasureMap } from "./map.ts";
 export { rederiveAfterErasure } from "./rederive.ts";
 export type { Rederived } from "./rederive.ts";
+export { rehearseErasure, seedSyntheticSubject } from "./rehearsal.ts";
+export type {
+  ErasureRehearsed,
+  RehearsalDoors,
+  RehearsalRefusal,
+  SyntheticSubject,
+} from "./rehearsal.ts";
 export { replayCopiesSince, replayCopyKeyOf, writeReplayCopy } from "./replay.ts";
 export type { ReplayCopy } from "./replay.ts";
 export {

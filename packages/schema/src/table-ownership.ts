@@ -242,14 +242,14 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "erasure",
     access: "read and write",
     reason:
-      "The routine's step 5 pseudonymises the row on the person's last membership — the address to a tombstone the erasure pseudonym names, the name cleared, the id kept because every ledger row names it (ADR 0020, ADR 0035) — and reads the address off it first, because the two rows deleted below are keyed by address and not by person.",
+      "The routine's step 5 pseudonymises the row on the person's last membership — the address to a tombstone the erasure pseudonym names, the name cleared, the id kept because every ledger row names it (ADR 0020, ADR 0035) — and reads the address off it first, because the two rows deleted below are keyed by address and not by person. The erasure rehearsal's seed writes one row the other way, the synthetic subject a drill erases, under a reserved domain that resolves nowhere (ADR 0022, ADR 0024).",
   },
   {
     table: "public.member",
     by: "erasure",
     access: "write",
     reason:
-      "Every erasure request ends this workspace's membership, which is the whole of what the arm for a person who holds another does; the judgement between the two arms is the platform's and is never shown to an Admin (ADR 0035's rejected oracle). The read that makes it is `workspacesHeldBy` through the workspaces slice, recorded above.",
+      "Every erasure request ends this workspace's membership, which is the whole of what the arm for a person who holds another does; the judgement between the two arms is the platform's and is never shown to an Admin (ADR 0035's rejected oracle). The read that makes it is `workspacesHeldBy` through the workspaces slice, recorded above. The erasure rehearsal's seed writes the one membership it later ends, so the drill's subject is held where a real member is (ADR 0022).",
   },
   {
     table: "public.session",

@@ -58,8 +58,10 @@ import { beyondUseFrom, runErasure, type ErasurePrincipal } from "./routine.ts";
  * dump older than the request from one taken after it. Ids and a flag, and nothing about the
  * person (`[AUDIT5]`): the ledger is the one record an erasure never rewrites.
  *
- * `platform.erasure.rehearsed`, the drill's act, joins this declaration when the rehearsal
- * lands — one slice, one family, and an act is declared once in the tree.
+ * `platform.erasure.rehearsed`, the drill's act, is declared in `rehearsal.ts` beside the
+ * module that writes it rather than here: a rehearsal is not a replay, and the family already
+ * holds a declaration per module that acts in it. An act is declared once in the tree either
+ * way, which is what `declareActs` refuses a second time.
  */
 const REPLAY_ACTS = declareActs("platform", {
   replayed: act("platform.erasure.replayed", {
