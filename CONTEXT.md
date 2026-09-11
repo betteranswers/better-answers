@@ -172,6 +172,9 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **finding** — what the pre-scan found in one source document: a category (bank details, date of
   birth, home address, personal contact, special category, …), offsets into the normalised text,
   the rule and detector version that fired. Counted per category; never a class, never a value.
+- **redaction seam** — the one place a document's text is read for what must be withheld and
+  the placeholders are written in, ahead of chunking, extraction and every model call, so that
+  no derived store and no model ever holds the value.
 - **redaction rule** — one of three tiers of what the seam withholds: **always** (policy no
   binding switches off; a span restorable with a reason), **default on** per binding, **default
   off** per binding. The officer-block rule always wins.
