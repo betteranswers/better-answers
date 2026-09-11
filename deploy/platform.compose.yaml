@@ -125,8 +125,8 @@ services:
       <<: *bootstrap
       DATABASE_URL: ${WORKER_DATABASE_URL:?}   # the workspace-scoped worker role, never the owner
       GIT_STORE_DIR: /data/git                # the bare repositories, read at a head; mounted :ro below
-      HF_HOME: /data/worker/hf-cache
-      HF_HUB_OFFLINE: "1"                     # after first warm
+      HF_HOME: /data/worker/hf-cache          # where the image baked the weights; nothing is mounted over it (see volumes)
+      HF_HUB_OFFLINE: "1"                     # the weights ship in the image, warmed at build — a running worker fetches nothing
       MAX_CONCURRENT_RUNS: "1"                # one index at a time on a 4 GB box (ADR 0024); ticket 42 measures whether it can rise
       LMDB_MAX_BYTES_PER_BINDING: "4294967296" # 4 GB cap; over it the binding's LMDB is wiped and reprocessed — it is disposable (ADR 0036)
     healthcheck:
@@ -146,7 +146,10 @@ services:
     volumes:
       - /data/worker/lmdb:/data/worker/lmdb        # one LMDB per binding — personal data on disk; never backed up
       - /data/worker/trees:/data/worker/trees      # git working trees per workspace — rebuilt
-      - /data/worker/hf-cache:/data/worker/hf-cache
+      # Nothing here for HF_HOME, deliberately (`T-122`): the model weights are in the image,
+      # fetched at build, and a host directory mounted over that path would mask every byte of
+      # them. With HF_HUB_OFFLINE set above that is not a quiet re-download but a worker that
+      # cannot load a model at all. `apps/worker/tests/test_image.py` holds this file to it.
       - /data/git:/data/git:ro                     # read at the run's commit (`bundle_commit` on the run row); never written by the worker (ADR 0024)
     deploy:
       resources:

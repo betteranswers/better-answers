@@ -221,8 +221,17 @@ def raised_to_always(
     )
 
 
-def build_analyzer() -> AnalyzerEngine:
-    """The analyzer, assembled once from the declarations and the pinned model."""
+def build_analyzer(model_id: str = GLINER_MODEL_ID) -> AnalyzerEngine:
+    """The analyzer, assembled once from the declarations and the pinned model.
+
+    The model is a defaulted argument and not a second table: every caller in the tier
+    takes the default, which is the pin, and the two that do not are the image's weight
+    fetch and S0's measurement (`T-122`). Both want the whole analyzer — the same
+    registry, the same recognisers, the same thresholds — with one thing different, and
+    a measurement of two models through two registries would be a measurement of the
+    registries. Nothing downstream of here knows which model answered: `analyzer()`,
+    `detect()` and `redact()` are unchanged, and the version string still names the pin.
+    """
     recognisers: list[EntityRecognizer] = []
     unreachable: list[str] = []
     for entity, descriptor in DESCRIPTOR_BY_ENTITY.items():
@@ -239,7 +248,7 @@ def build_analyzer() -> AnalyzerEngine:
     recognisers.append(
         ModelRecogniser(
             labels=GLINER_LABELS,
-            model_name=GLINER_MODEL_ID,
+            model_name=model_id,
             threshold=min(
                 DESCRIPTOR_BY_ENTITY[entity].threshold
                 for entity in GLINER_LABELS.values()

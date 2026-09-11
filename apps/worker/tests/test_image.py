@@ -12,6 +12,15 @@ the build succeeds, the container starts, and each of them still ships.
   image's ``contracts/`` (``apps/api/tests/image.test.ts``). ``.dockerignore`` excludes
   it too, and two fences are why this is worth asserting rather than assuming: a probe
   is what notices when one of them goes.
+* The detector's **weights** are fetched at build under ``HF_HOME`` and never at run
+  time (`T-122`, ADR 0020). Three ways that goes wrong and nothing else says so: a
+  fetch that snapshots a model repository instead of loading the model leaves the base
+  encoder's tokenizer — a second repository, four megabytes — cold; a deploy unit that
+  mounts a host directory over ``HF_HOME`` masks every byte the image carries, and with
+  ``HF_HUB_OFFLINE`` set beside it the result is a worker that detects nothing at all
+  rather than one that quietly re-downloads; and a copy that lands outside the path the
+  runtime stage reads ships an image whose weights are in the builder alone. The
+  network-refused container below is what catches all three at once.
 
 Everything the image is held to is derived. The development list comes from
 ``pyproject.toml``'s ``[dependency-groups] dev``, the interpreter from
@@ -43,6 +52,9 @@ WORKSPACE = REPO_ROOT / "apps" / "worker"
 BUILD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "build.yml"
 CHECK_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "check.yml"
 STORES_COMPOSE = REPO_ROOT / "deploy" / "stores.compose.yaml"
+PLATFORM_COMPOSE = REPO_ROOT / "deploy" / "platform.compose.yaml"
+PINS = WORKSPACE / "src" / "better_answers_worker" / "redaction" / "pins.py"
+DOCKERFILE = WORKSPACE / "Dockerfile"
 
 #: Where ``COPY src src`` puts this tier's source, and the one directory beside it that
 #: a wider ``COPY`` would bring: the image's ``WORKDIR`` is ``/app``.
@@ -58,6 +70,28 @@ BASE_IMAGE_PREFIX = "/usr/local"
 #: never migrates (ADR 0032) — a file a ``COPY`` could lose without anything else
 #: noticing.
 REQUIRED_IMPORTS = ("better_answers_worker", "better_answers_worker.schema_view")
+
+#: The redaction seam's own libraries (ADR 0020): the frame that runs the recognisers
+#: and writes the placeholders, the model that stands in as the NER and its tensor
+#: runtime, the pipeline the context enhancer reads lemmas from, and the client that
+#: resolves a model id to bytes on disk. `uv sync --frozen --no-dev` installs every one
+#: of them, so this asserts the manifest was honoured rather than that somebody
+#: remembered a list.
+DETECTOR_IMPORTS = (
+    "presidio_analyzer",
+    "presidio_anonymizer",
+    "gliner",
+    "spacy",
+    "torch",
+    "huggingface_hub",
+)
+
+#: What the container is asked to import: the tier's own modules and the detector's.
+PROBED_IMPORTS = REQUIRED_IMPORTS + DETECTOR_IMPORTS
+
+#: The module the build runs to fetch the weights. It is named here and in the
+#: Dockerfile and nowhere else, so the module cannot move without both moving.
+WEIGHTS_MODULE = "better_answers_worker.redaction.weights"
 
 NO_DAEMON = (
     "no Docker daemon answered, so the worker image cannot be read: on CI these tests"
@@ -240,6 +274,80 @@ def base_image_python_version() -> tuple[int, int, int]:
     return major, minor, patch
 
 
+def _pin(name: str) -> str:
+    """One constant's value out of ``redaction/pins.py``, read as text.
+
+    This file imports nothing from ``src/better_answers_worker`` in-process and this is
+    how it keeps that promise for the pins. The constraint is stated in
+    ``pyproject.toml``'s ``[tool.mutmut]``: a mutant of the seam whose stats pass had
+    imported this file would build the worker image, and the same constraint is what
+    ``apps/api/tests/image-probe.ts`` states for Stryker. So a pin reaches this file the
+    way the Dockerfile's Python version and the compose file's uid do — by reading the
+    file that declares it.
+    """
+    found = re.search(rf'^{name} = "([^"]+)"', PINS.read_text("utf-8"), re.M)
+    if found is None:
+        message = f"{PINS} declares no {name} this can read"
+        raise RuntimeError(message)
+    return found.group(1)
+
+
+def pinned_model_ids() -> tuple[str, ...]:
+    """Both GLiNER models the seam pins: the one it runs, and the one S0 measures."""
+    return (_pin("GLINER_MODEL_ID"), _pin("GLINER_MODEL_ID_MEASURED"))
+
+
+def _worker_service() -> str:
+    """The ``worker`` service of ``deploy/platform.compose.yaml``, as its own text.
+
+    Read with a reader rather than a YAML parser, for the reason ``_matrix_legs`` gives:
+    this tier has no YAML dependency, and what is being read is a block of plain
+    ``key: value`` lines. The block runs from the service's own key to the next one at
+    its indentation or to the end of the file.
+    """
+    lines = PLATFORM_COMPOSE.read_text("utf-8").splitlines()
+    starts = [index for index, line in enumerate(lines) if line == "  worker:"]
+    if len(starts) != 1:
+        message = (
+            f"expected one `worker` service in {PLATFORM_COMPOSE}, found {len(starts)}"
+        )
+        raise RuntimeError(message)
+    block: list[str] = []
+    for line in lines[starts[0] + 1 :]:
+        if line.strip() and not line.startswith("    "):
+            break
+        block.append(line)
+    return "\n".join(block)
+
+
+def worker_environment(name: str) -> str:
+    """One value the worker's deploy unit puts in its environment, by that name.
+
+    The location of this tier's caches and stores is the deploy unit's to state — the
+    same reason ``check.yml`` sets ``HF_HOME`` for its own job — so what the image sets
+    is held against this rather than against a literal written here twice.
+    """
+    # `re.findall` answers `list[Any]`, so the value is narrowed on the statement it is
+    # returned from and never carried as `Any` (§ TYPES (Python)).
+    found = re.findall(rf"^\s+{name}:\s+(\S+)", _worker_service(), re.M)
+    if len(found) != 1:
+        message = (
+            f"expected one {name} in the worker service of {PLATFORM_COMPOSE},"
+            f" found {len(found)}"
+        )
+        raise RuntimeError(message)
+    return str(found[0]).strip('"')
+
+
+def worker_mounts_over(path: str) -> list[str]:
+    """Every volume the worker's deploy unit mounts over a path inside the container."""
+    return [
+        line.strip()
+        for line in _worker_service().splitlines()
+        if re.match(rf"\s*- \S+:{re.escape(path)}(:|\s*$)", line)
+    ]
+
+
 def chowned_worker_uid() -> int:
     """The uid ``deploy/stores.compose.yaml``'s ``init`` chowns this tier's volumes to.
 
@@ -286,6 +394,26 @@ def imports(name):
         return False
     return True
 
+def cached(model_id):
+    # `local_files_only` is the whole of the question: it answers a path when the cache
+    # holds the model and raises when it would have to reach the network for it, which
+    # is exactly the difference between a weight the build fetched and one the first
+    # run would.
+    try:
+        from huggingface_hub import snapshot_download
+        snapshot_download(model_id, local_files_only=True)
+    except Exception:
+        return False
+    return True
+
+def pipeline(name):
+    try:
+        import spacy
+        spacy.load(name)
+    except Exception:
+        return False
+    return True
+
 sys.stdout.write(json.dumps({
     "development": [
         n
@@ -297,6 +425,9 @@ sys.stdout.write(json.dumps({
     "uid": os.getuid(),
     "imports": {n: imports(n) for n in json.loads(os.environ["PROBE_IMPORTS"])},
     "has_tests": os.path.isdir(os.environ["PROBE_TESTS"]),
+    "weights": {m: cached(m) for m in json.loads(os.environ["PROBE_MODEL_IDS"])},
+    "spacy_pipeline": pipeline(os.environ["PROBE_SPACY_PIPELINE"]),
+    "hf_home": os.environ.get("HF_HOME", ""),
 }))
 """
 
@@ -311,13 +442,16 @@ class ImageContents:
     uid: int
     imports: Mapping[str, bool]
     has_tests: bool
+    weights: Mapping[str, bool]
+    spacy_pipeline: bool
+    hf_home: str
 
 
 def _read_contents(stdout: str) -> ImageContents:
     # The container's answer, narrowed on the very next statement and never held as
     # `Any` past it: what a subprocess wrote to stdout has no type until this reads one
     # out of it (§ TYPES (Python)).
-    answered: dict[str, Any] = json.loads(stdout)
+    answered = _answered(stdout)
     major, minor, patch = answered["version"]
     return ImageContents(
         development=tuple(str(name) for name in answered["development"]),
@@ -326,6 +460,11 @@ def _read_contents(stdout: str) -> ImageContents:
         uid=int(answered["uid"]),
         imports={str(name): bool(found) for name, found in answered["imports"].items()},
         has_tests=bool(answered["has_tests"]),
+        weights={
+            str(model): bool(found) for model, found in answered["weights"].items()
+        },
+        spacy_pipeline=bool(answered["spacy_pipeline"]),
+        hf_home=str(answered["hf_home"]),
     )
 
 
@@ -342,33 +481,65 @@ def _build_the_image(leg: Mapping[str, str]) -> str:
     return built.stdout.strip()
 
 
-def _run_the_image(image: str, environment: dict[str, str]) -> str:
+def _run_the_image(
+    image: str,
+    environment: dict[str, str],
+    *,
+    probe: str = PROBE,
+    timeout: int = 300,
+) -> str:
+    """One container, one probe, and what it wrote to stdout.
+
+    The probe and the wait are parameters because more than one question is asked of
+    this image and they are not the same size of question: one imports a module and
+    answers, another brings up hundreds of megabytes of weights first.
+    """
     arguments = ["docker", "run", "--rm"]
     # By name and never by value: `docker run --env NAME` takes the value out of this
     # process's environment, so a derived list never reaches another user's `ps`.
     for name in environment:
         arguments += ["--env", name]
-    arguments += [image, "python", "-c", PROBE]
+    arguments += [image, "python", "-c", probe]
     started = subprocess.run(
         arguments,
         check=True,
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=timeout,
         env={**os.environ, **environment},
     )
     return started.stdout
 
 
+def _answered(stdout: str) -> dict[str, Any]:
+    """The JSON object a probe wrote, taken as the last line it wrote.
+
+    A library brought up inside the container may write to stdout before the probe does
+    — a deprecation notice, a download bar that found nothing to draw — and the probe's
+    own answer is one line with no newline in it, written last. Narrowed by its callers
+    on the statement after this (§ TYPES (Python)).
+    """
+    lines = [line for line in stdout.splitlines() if line.strip()]
+    if not lines:
+        message = "the container wrote nothing to stdout"
+        raise RuntimeError(message)
+    answered: dict[str, Any] = json.loads(lines[-1])
+    return answered
+
+
 @pytest.fixture(scope="module")
-def contents() -> Iterator[ImageContents]:
-    """One container, started from the image this repository ships as the worker.
+def image() -> Iterator[str]:
+    """The image this repository ships as the worker, by its id.
 
     Two ways this runs. Given no image id it builds the image and reads what it built,
     which is what a laptop and a pull request do. Given one it reads that image and
     builds nothing: `build.yml`'s image job loads its own build, hands the id here and
     pushes only if these tests pass, so the artefact that ships is the artefact that was
     read (`T-043`).
+
+    It is a fixture of its own so that more than one container can be started from the
+    one image: reading the contents and refusing the network are two runs of two probes,
+    and a build for each would be a second image to say the same thing about.
     """
     if PROBE_RUNS_IN_THE_JOB_THAT_PUSHES:
         pytest.skip(
@@ -387,16 +558,7 @@ def contents() -> Iterator[ImageContents]:
     # same reason.
     built_here = _build_the_image(matrix_leg("worker")) if not supplied else None
     try:
-        yield _read_contents(
-            _run_the_image(
-                built_here or supplied,
-                {
-                    "PROBE_DEVELOPMENT": json.dumps(development_only_distributions()),
-                    "PROBE_IMPORTS": json.dumps(list(REQUIRED_IMPORTS)),
-                    "PROBE_TESTS": TESTS_IN_THE_IMAGE,
-                },
-            )
-        )
+        yield built_here or supplied
     finally:
         # An untagged image left behind is a dangling quarter-gigabyte for every run
         # whose source differed from the last. Failure to remove it is not a failure of
@@ -408,6 +570,23 @@ def contents() -> Iterator[ImageContents]:
                 capture_output=True,
                 timeout=120,
             )
+
+
+@pytest.fixture(scope="module")
+def contents(image: str) -> ImageContents:
+    """One container, started from that image, asked what it is made of."""
+    return _read_contents(
+        _run_the_image(
+            image,
+            {
+                "PROBE_DEVELOPMENT": json.dumps(development_only_distributions()),
+                "PROBE_IMPORTS": json.dumps(list(PROBED_IMPORTS)),
+                "PROBE_TESTS": TESTS_IN_THE_IMAGE,
+                "PROBE_MODEL_IDS": json.dumps(list(pinned_model_ids())),
+                "PROBE_SPACY_PIPELINE": _pin("SPACY_MODEL"),
+            },
+        )
+    )
 
 
 def test_the_image_gives_the_worker_no_development_dependency_it_could_load(
@@ -438,7 +617,73 @@ def test_the_interpreter_is_the_base_images_and_not_one_the_build_fetched(
 def test_the_image_carries_the_tier_and_its_generated_schema_view(
     contents: ImageContents,
 ) -> None:
-    assert dict(contents.imports) == dict.fromkeys(REQUIRED_IMPORTS, True)
+    assert {name: contents.imports[name] for name in REQUIRED_IMPORTS} == dict.fromkeys(
+        REQUIRED_IMPORTS, True
+    )
+
+
+def test_the_image_carries_every_library_the_detector_runs_on(
+    contents: ImageContents,
+) -> None:
+    # Acceptance line 2's first clause. `uv sync --frozen --no-dev` installs these from
+    # the manifest, so what this catches is a manifest, a lockfile or a stage that
+    # stopped agreeing with the seam — none of which the build would fail on, because
+    # nothing in the image imports the seam until a job asks it to.
+    assert {name: contents.imports[name] for name in DETECTOR_IMPORTS} == dict.fromkeys(
+        DETECTOR_IMPORTS, True
+    )
+    # And the container was asked about all of them: a name dropped from the ask would
+    # leave the assertion above passing over a smaller list.
+    assert set(contents.imports) == set(PROBED_IMPORTS)
+
+
+def test_the_image_carries_both_pinned_models_and_the_pinned_pipeline(
+    contents: ImageContents,
+) -> None:
+    # Acceptance line 2's second clause, asked the way a run-time load asks it: the
+    # cache holds the model, offline. Both models, because the pin is chosen by
+    # measuring it against the other one on the image (`T-122`), and the spaCy pipeline
+    # because it is the other half of what the seam loads — a pinned wheel in the venv
+    # rather than an entry under `HF_HOME`, which is why it is asked for by loading it.
+    assert dict(contents.weights) == dict.fromkeys(pinned_model_ids(), True)
+    assert len(pinned_model_ids()) == 2
+    assert contents.spacy_pipeline is True
+
+
+def test_the_image_holds_its_weights_where_the_deploy_unit_says_they_are(
+    contents: ImageContents,
+) -> None:
+    # The image sets `HF_HOME` so that a container started from it is self-sufficient,
+    # and the deploy unit sets it because the location of this tier's caches is the
+    # deploy unit's to state. Two places, one value, or the worker looks somewhere the
+    # weights are not.
+    assert contents.hf_home == worker_environment("HF_HOME")
+    assert contents.hf_home != ""
+
+
+def test_the_deploy_unit_mounts_nothing_over_the_weights_the_image_carries() -> None:
+    """A host directory over ``HF_HOME`` masks every byte the build fetched.
+
+    It is worth a test of its own because no container test can catch it: this file
+    mounts nothing, so the weights are there whatever the compose file says. And the
+    failure it would cause is not a quiet re-download — the worker's environment sets
+    ``HF_HUB_OFFLINE`` beside it, so a masked cache is a worker that cannot load a model
+    at all, on a box whose first job is the one that would have warmed it.
+    """
+    assert worker_mounts_over(worker_environment("HF_HOME")) == []
+
+
+def test_the_build_fetches_the_weights_by_running_the_module_that_names_them(
+    contents: ImageContents,
+) -> None:
+    # Two stages and two paths: the build fetches under a cache mount and copies what it
+    # fetched to the path the runtime stage reads from. The module is named here so it
+    # cannot move without this moving, and the path is the container's own answer rather
+    # than a literal, so a copy that landed elsewhere fails rather than passes.
+    dockerfile = DOCKERFILE.read_text("utf-8")
+
+    assert WEIGHTS_MODULE in dockerfile
+    assert contents.hf_home in dockerfile
 
 
 def test_the_container_runs_as_the_uid_that_owns_this_tiers_volumes(

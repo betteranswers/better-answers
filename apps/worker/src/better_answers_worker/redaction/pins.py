@@ -44,6 +44,13 @@ SPACY_MODEL_VERSION = "3.8.0"
 #: fixture's own page rather than chosen from a benchmark somebody else ran.
 GLINER_MODEL_ID = "urchade/gliner_multi_pii-v1"
 
+#: The alternative the line above names, pinned here because the image fetches it: S0
+#: measures it against the pin on the fixture's own page and never runs it, so it is in
+#: no version string and no finding. Read from Hugging Face on 11 September 2026. It is
+#: a constant of its own rather than a string in the Dockerfile because a model id is a
+#: pinned value and `[DEPS2]` gives each of those one place to live.
+GLINER_MODEL_ID_MEASURED = "knowledgator/gliner-pii-base-v1.0"
+
 #: This repository's own half of the version string. A rule, the category table or a
 #: recogniser changing is one edit and this bump; the suite holds a digest of the
 #: table beside it, so the two cannot move apart.
