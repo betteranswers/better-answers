@@ -1,0 +1,28 @@
+apps/api/tests/image.test.ts
+  s_f3ee63bcbb1a0b::t_b1e485aa2a4ff1 35-39
+  s_f3ee63bcbb1a0b::t_49fc99835ecb42 79-97,103-104
+  s_f3ee63bcbb1a0b::t_c7592340acab87 110-112,116,119-125,133-137
+  s_f3ee63bcbb1a0b::t_794b7cc5fd7ded 182-196
+apps/api/Dockerfile
+  s_f3ee63bcbb1a0b::t_96e90823fc76f4 86-87,90-113,115-119
+docs/adr/0020-personal-data-is-withheld-at-the-seam-before-any-store-and-erased-from-every-copy-by-routine.md
+  s_f3ee63bcbb1a0b::t_504acfc4398577 87-104
+docs/adr/README.md
+  s_f3ee63bcbb1a0b::t_e1eed6543861c8 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0f12c4d91bee52d7b559bc95fd54fdb201b06399",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
