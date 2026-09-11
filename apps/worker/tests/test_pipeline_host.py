@@ -26,11 +26,10 @@ import pytest
 
 from better_answers_worker.config import Bootstrap, Engine, ObjectStore
 from better_answers_worker.pipeline import (
+    CHUNK_TABLE,
     ENVIRONMENTS_HELD,
-    Column,
     Host,
     IndexRun,
-    Table,
     index_binding,
     open_pool,
 )
@@ -44,29 +43,6 @@ from pg_harness import migrated_postgres_at
 WORKER_LOGIN = "worker_login_under_test"
 WORKER_PASSWORD = "worker-login-under-test"
 
-#: The columns of `index`.`chunk` this wave's cases write, with the types the migration
-#: gives them, written down here rather than derived from the schema the code builds
-#: (`[TEST9]`). The chunk row's own derivation — the id, the span, the wire locator and
-#: the visibility copied from the binding — is T-129's later wave; what these cases need
-#: is a real row in the real table.
-CHUNK = Table(
-    schema="index",
-    name="chunk",
-    columns=(
-        Column(name="id", pg_type="text", nullable=False),
-        Column(name="workspace_id", pg_type="text", nullable=False),
-        Column(name="content", pg_type="text", nullable=False),
-        Column(name="sensitivity", pg_type="text", nullable=False),
-        Column(name="audience", pg_type="text", nullable=False),
-        Column(name="binding_id", pg_type="text", nullable=False),
-        Column(name="ordinal", pg_type="integer"),
-        Column(name="char_start", pg_type="integer"),
-        Column(name="char_end", pg_type="integer"),
-        Column(name="locator", pg_type="text"),
-    ),
-    primary_key=("workspace_id", "id"),
-)
-
 
 def chunk_row(
     *,
@@ -76,18 +52,30 @@ def chunk_row(
     content: str = "Expenses are claimed within sixty days.",
     ordinal: int = 0,
 ) -> dict[str, Any]:
-    """One chunk row as the flow declares it — the columns above and nothing else."""
+    """One chunk row, carrying every column `CHUNK_TABLE` declares.
+
+    The table these cases land into is the shipping one, not a description of it
+    written here, because nothing in this suite is about the chunk table's shape. What
+    is under test is the pool's scope, the cache's bound and what a drop leaves behind,
+    and each of those needs a real row in the real table and nothing more. The row's own
+    derivation (`rows.py`'s `chunk_rows`) is held to the `document-chunk` agreement in
+    its own suite, so the values here are only what makes a row legal: a fixture, never
+    an expected value the cases below read back.
+    """
     return {
         "id": chunk_id,
         "workspace_id": workspace_id,
         "content": content,
+        "published_at": None,
         "sensitivity": "Internal",
         "audience": "everyone",
+        "audience_groups": None,
         "binding_id": binding_id,
+        "source_document_id": None,
+        "locator": f"doc-{binding_id}/chars:0-{len(content)}",
         "ordinal": ordinal,
         "char_start": 0,
         "char_end": len(content),
-        "locator": f"doc-{binding_id}/chars:0-{len(content)}",
     }
 
 
@@ -265,7 +253,7 @@ def test_dropping_one_bindings_state_leaves_the_table_its_indexes_and_every_row(
         )
         host.land_rows(
             first,
-            CHUNK,
+            CHUNK_TABLE,
             [
                 chunk_row(
                     workspace_id=workspace_id,
@@ -276,7 +264,7 @@ def test_dropping_one_bindings_state_leaves_the_table_its_indexes_and_every_row(
         )
         host.land_rows(
             second,
-            CHUNK,
+            CHUNK_TABLE,
             [
                 chunk_row(
                     workspace_id=workspace_id,
@@ -368,7 +356,7 @@ def test_a_bindings_lmdb_size_is_readable_after_its_run(
         assert host.lmdb_bytes(run) == 0
         host.land_rows(
             run,
-            CHUNK,
+            CHUNK_TABLE,
             [
                 chunk_row(
                     workspace_id=workspace_id,
