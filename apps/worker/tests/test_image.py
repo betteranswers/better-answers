@@ -97,13 +97,13 @@ from typing import Any
 import pytest
 
 from conftest import DAEMON_SKIP_REASON
+from deploy_unit import PLATFORM_COMPOSE, worker_service
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKSPACE = REPO_ROOT / "apps" / "worker"
 BUILD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "build.yml"
 CHECK_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "check.yml"
 STORES_COMPOSE = REPO_ROOT / "deploy" / "stores.compose.yaml"
-PLATFORM_COMPOSE = REPO_ROOT / "deploy" / "platform.compose.yaml"
 PINS = WORKSPACE / "src" / "better_answers_worker" / "redaction" / "pins.py"
 DOCKERFILE = WORKSPACE / "Dockerfile"
 
@@ -447,29 +447,6 @@ def pinned_model_ids() -> tuple[str, ...]:
     return (_pin("GLINER_MODEL_ID"), _pin("GLINER_MODEL_ID_MEASURED"))
 
 
-def _worker_service() -> str:
-    """The ``worker`` service of ``deploy/platform.compose.yaml``, as its own text.
-
-    Read with a reader rather than a YAML parser, for the reason ``_matrix_legs`` gives:
-    this tier has no YAML dependency, and what is being read is a block of plain
-    ``key: value`` lines. The block runs from the service's own key to the next one at
-    its indentation or to the end of the file.
-    """
-    lines = PLATFORM_COMPOSE.read_text("utf-8").splitlines()
-    starts = [index for index, line in enumerate(lines) if line == "  worker:"]
-    if len(starts) != 1:
-        message = (
-            f"expected one `worker` service in {PLATFORM_COMPOSE}, found {len(starts)}"
-        )
-        raise RuntimeError(message)
-    block: list[str] = []
-    for line in lines[starts[0] + 1 :]:
-        if line.strip() and not line.startswith("    "):
-            break
-        block.append(line)
-    return "\n".join(block)
-
-
 def worker_environment(name: str) -> str:
     """One value the worker's deploy unit puts in its environment, by that name.
 
@@ -479,7 +456,7 @@ def worker_environment(name: str) -> str:
     """
     # `re.findall` answers `list[Any]`, so the value is narrowed on the statement it is
     # returned from and never carried as `Any` (§ TYPES (Python)).
-    found = re.findall(rf"^\s+{name}:\s+(\S+)", _worker_service(), re.M)
+    found = re.findall(rf"^\s+{name}:\s+(\S+)", worker_service(), re.M)
     if len(found) != 1:
         message = (
             f"expected one {name} in the worker service of {PLATFORM_COMPOSE},"
@@ -503,7 +480,7 @@ def worker_mounts_over(path: str) -> list[str]:
     """
     return [
         line.strip()
-        for line in _worker_service().splitlines()
+        for line in worker_service().splitlines()
         if re.match(rf"\s*- \S+:{re.escape(path)}(:\S*)?\s*(#.*)?$", line)
     ]
 
@@ -1145,7 +1122,7 @@ def test_the_lmdb_mount_with_its_trailing_comment_is_caught_and_a_longer_path_is
     # mount over a longer, merely-prefixed path is a different volume and must still
     # not match.
     monkeypatch.setattr(
-        f"{__name__}._worker_service",
+        f"{__name__}.worker_service",
         lambda: "  - /data/worker/lmdb-extra:/data/worker/lmdb-extra",
     )
     assert worker_mounts_over("/data/worker/lmdb") == []

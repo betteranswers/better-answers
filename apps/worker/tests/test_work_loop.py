@@ -195,6 +195,33 @@ def test_the_loop_runs_both_its_kinds_through_the_registry_one_job_at_a_time(
     assert (rows[1][4]["generation"], rows[1][4]["nodes"]) == (2, 1)
 
 
+def an_index_job_older_than_an_audit(database: psycopg.Connection) -> tuple[str, str]:
+    """A workspace with two queued jobs: an index job for a binding, enqueued two
+    seconds before the nightly audit beside it. Answers the workspace and the binding.
+
+    **The age is the arrangement and not a detail.** A claim hands out the oldest row of
+    a kind its caller named, so an index job younger than the audit would be passed over
+    by a claim that filters nothing at all, and both cases below would pass against a
+    queue with no filter in either arm. Shared because both cases need exactly this
+    queue and neither is about how it was built; what each one claims from it, and says
+    it is claiming, stays its own.
+    """
+    workspace = str(seed_workspace(database.cursor())["id"])
+    binding_id = ulid()
+    with database.cursor() as cursor:
+        seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="index",
+            reason="bound",
+            subject_id=binding_id,
+            enqueued_ago_seconds=2,
+        )
+        seed_job(cursor, workspace_id=workspace, kind="nightly-audit")
+    database.commit()
+    return workspace, binding_id
+
+
 def test_a_claim_leaves_a_kind_its_caller_did_not_name_queued_and_unpoisoned(
     database: psycopg.Connection,
 ) -> None:
@@ -209,19 +236,7 @@ def test_a_claim_leaves_a_kind_its_caller_did_not_name_queued_and_unpoisoned(
     filtered only the arm that hands work out would take the older row, find no handler
     and spend one of its attempts on every pass.
     """
-    workspace = seed_workspace(database.cursor())["id"]
-    binding_id = ulid()
-    with database.cursor() as cursor:
-        seed_job(
-            cursor,
-            workspace_id=workspace,
-            kind="index",
-            reason="bound",
-            subject_id=binding_id,
-            enqueued_ago_seconds=2,
-        )
-        seed_job(cursor, workspace_id=workspace, kind="nightly-audit")
-    database.commit()
+    workspace, binding_id = an_index_job_older_than_an_audit(database)
 
     with queue.connected(_WHERE[database]) as worker:
         with scoped(worker, workspace) as cursor:
@@ -252,19 +267,7 @@ def test_a_claim_hands_the_handler_what_the_job_is_about(
     back to the queue for a row it already has. A kind whose descriptor names no subject
     carries none, and the claim says so rather than inventing one.
     """
-    workspace = seed_workspace(database.cursor())["id"]
-    binding_id = ulid()
-    with database.cursor() as cursor:
-        seed_job(
-            cursor,
-            workspace_id=workspace,
-            kind="index",
-            reason="bound",
-            subject_id=binding_id,
-            enqueued_ago_seconds=2,
-        )
-        seed_job(cursor, workspace_id=workspace, kind="nightly-audit")
-    database.commit()
+    workspace, binding_id = an_index_job_older_than_an_audit(database)
 
     with queue.connected(_WHERE[database]) as worker:
         with scoped(worker, workspace) as cursor:

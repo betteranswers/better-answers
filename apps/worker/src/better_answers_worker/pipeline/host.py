@@ -23,9 +23,13 @@ gets submitted.
 workspace on every write, the engine takes its own connections out of the pool and runs
 bare statements on them under a task group with no transaction around them, and this
 tier's other door sets the workspace *transaction-locally*. A transaction-local setting
-would be gone before the engine's statement ran, so the pool's connection init sets it
-for the session. Two connections at most: the default is ten, and ten per workspace
-exhausts Postgres long before the estate has ten busy workspaces.
+would be gone before the engine's statement ran, so the pool sets it for the session, in
+the `setup` hook and never in `init`: asyncpg resets a connection on its way back to the
+pool and that reset is `RESET ALL`, so a scope applied once when the connection opened
+is gone from the second checkout and the row that lands on it is refused by the policy.
+`setup` runs after the reset, which makes it every acquisition; `open_pool` below
+carries the whole of it. Two connections at most: the default is ten, and ten per
+workspace exhausts Postgres long before the estate has ten busy workspaces.
 """
 
 import asyncio

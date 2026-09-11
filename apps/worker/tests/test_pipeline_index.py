@@ -216,6 +216,21 @@ def run_for(workspace_id: str, reason: str = "bound") -> IndexRun:
     return IndexRun(workspace_id=workspace_id, binding_id=BINDING, reason=reason)
 
 
+def by_column(cursor: psycopg.Cursor[Any]) -> list[dict[str, Any]]:
+    """What a cursor just selected, each row keyed by the column it came from.
+
+    The keys are the cursor's own description rather than a list written beside the
+    statement, so a `SELECT` and its reader cannot disagree about which value is which —
+    a column added in the middle of the list would otherwise shift every assertion below
+    it by one and still pass a length check. Each caller keeps its own `SELECT`: the
+    column list is the thing a case is explicit about (`[TEST9]`), and one query serving
+    two tables would take that away.
+    """
+    assert cursor.description is not None
+    names = [column.name for column in cursor.description]
+    return [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
+
+
 def chunk_rows_of(
     connection: psycopg.Connection, workspace_id: str
 ) -> list[dict[str, Any]]:
@@ -229,9 +244,7 @@ def chunk_rows_of(
             " WHERE workspace_id = %s ORDER BY id",
             (workspace_id,),
         )
-        assert cursor.description is not None
-        names = [column.name for column in cursor.description]
-        return [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
+        return by_column(cursor)
 
 
 def finding_rows_of(
@@ -257,9 +270,7 @@ def catalogue_rows_of(
             " WHERE workspace_id = %s ORDER BY id",
             (workspace_id,),
         )
-        assert cursor.description is not None
-        names = [column.name for column in cursor.description]
-        return [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
+        return by_column(cursor)
 
 
 # -- the registry ----------------------------------------------------------------------

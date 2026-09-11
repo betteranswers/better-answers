@@ -6,7 +6,6 @@ with any default, including one that moved by accident.
 """
 
 import re
-from pathlib import Path
 
 import pytest
 
@@ -18,9 +17,7 @@ from better_answers_worker.config import (
     BootstrapError,
     read_bootstrap,
 )
-
-REPO_ROOT = Path(__file__).resolve().parents[3]
-PLATFORM_COMPOSE = REPO_ROOT / "deploy" / "platform.compose.yaml"
+from deploy_unit import worker_service
 
 #: A box with everything the deploy unit owes this process, and nothing optional.
 COMPLETE = {
@@ -125,23 +122,7 @@ def test_the_compose_file_gives_the_worker_the_two_variables_this_wave_reads() -
     the box sets them, and a variable read by a module no box fills is a worker that
     refuses to start on the estate and passes every test here.
     """
-    worker = _worker_service()
+    worker = worker_service()
 
     assert re.search(r"^\s+LMDB_DIR:\s+/data/worker/lmdb\s", worker, re.M) is not None
     assert re.search(r"^\s+RUST_LOG:\s+warn\s", worker, re.M) is not None
-
-
-def _worker_service() -> str:
-    lines = PLATFORM_COMPOSE.read_text("utf-8").splitlines()
-    starts = [index for index, line in enumerate(lines) if line == "  worker:"]
-    if len(starts) != 1:
-        message = (
-            f"expected one worker service in {PLATFORM_COMPOSE}, found {len(starts)}"
-        )
-        raise RuntimeError(message)
-    block: list[str] = []
-    for line in lines[starts[0] + 1 :]:
-        if line.strip() and not line.startswith("    "):
-            break
-        block.append(line)
-    return "\n".join(block)
