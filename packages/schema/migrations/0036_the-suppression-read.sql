@@ -1,0 +1,39 @@
+-- Custom migration (hand-written SQL; ADR 0032).
+-- The one road S1's index run needs through the suppression, and no other.
+--
+-- Hand-written rather than generated because a grant is not a column: `drizzle-kit generate`
+-- writes the DDL its schema file reaches and nothing about who may reach a table afterwards,
+-- so every cross-tier privilege in this package is written here beside the sentence that
+-- explains it — as migrations 0020, 0024, 0030 and 0035 each are.
+
+-- **What the reprocess is handed, and what it now reads.** Migration 0030 revoked everything
+-- on this table from `worker_rt` and granted nothing back, on the reading that "the reprocess
+-- is handed what to suppress via the job payload the app already read". That sentence was
+-- written before S1 was designed and it is **superseded here rather than edited there**: a
+-- landed migration is a record of what ran, and a comment quietly rewritten under it would
+-- leave the estate's journal saying something that was never true of the day it applied.
+--
+-- What S1 actually built is a memoised function whose key covers everything its answer
+-- depends on, and a document's applicable suppressions are one of those things: they are an
+-- **argument** to the function, so one person asking to be erased re-reads the documents that
+-- mention them and leaves the rest of the binding answered out of the store. A set carried on
+-- the job row instead would be the erased person's identifiers written into a queue row that
+-- outlives the run, readable by anything that may read a job — which is the opposite of what
+-- migration 0030 was protecting. The run gathers the sets itself, inside the transaction its
+-- own workspace scope is set in, and holds them no longer than the run.
+--
+-- **SELECT and nothing else.** A run reads the set to keep those identifiers out of the text
+-- it writes; it takes no view about whether a suppression should exist. So the three writing
+-- roads stay shut, each for the reason migration 0030 gave: a tier that could INSERT could
+-- suppress a document nobody asked about; one that could UPDATE could empty a set, which is
+-- an erasure quietly undone at the next conversion; one that could DELETE could put a
+-- person's data back into every derived store the next time the document is converted. The
+-- served road and its three refusals are proved one statement at a time in
+-- `packages/schema/test/rls.test.ts`, and the row-level policy still stands over the read:
+-- an unscoped connection sees zero rows, and a scoped one sees its own tenant's alone.
+--
+-- The worker's read of a table the erasure slice owns is recorded in the table-ownership map
+-- beside this grant (`packages/schema/src/table-ownership.ts`), because no import-direction
+-- rule can see across a process boundary and a grant nobody wrote down is a road nobody
+-- reviews. `finding`'s INSERT grant is migration 0024's and is not re-granted here.
+GRANT SELECT ON "suppression" TO worker_rt;

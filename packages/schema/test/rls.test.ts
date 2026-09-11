@@ -2886,9 +2886,11 @@ describe("the erasure request under both runtime roles", () => {
 /**
  * The **suppression** (`CONTEXT.md`; ADR 0020): what keeps a person's data out of every
  * derived store the next time one document is reprocessed — one row per document per erasure
- * request, carrying the identifiers to keep out. Restricted personal data itself, which is
- * why the worker holds nothing here either: the reprocess that reads a suppression is the
- * app's act, and S1's worker is handed what to keep out rather than reading the table.
+ * request, carrying the identifiers to keep out. Restricted personal data itself, so the one
+ * road the other tier holds is the read its run cannot do without (migration 0036): a
+ * document's applicable sets are an argument to the memoised function S1 converts through,
+ * gathered inside the run's own scoped transaction and held no longer than the run. The three
+ * writing roads stay shut, and the policy still stands over the read that is open.
  */
 describe("the suppression under both runtime roles", () => {
   it("returns zero rows on a missing scope and only the scoped tenant's suppressions otherwise", async () => {
@@ -2908,19 +2910,29 @@ describe("the suppression under both runtime roles", () => {
     });
   });
 
-  it("refuses the worker every road to a suppression", async () => {
+  it("serves the worker the set a run must keep out, and refuses it every road that writes one", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const suppression = await seed.suppression({ workspaceId: WS_A });
+      await seed.suppression({ workspaceId: WS_B });
 
       await client.query("SET LOCAL ROLE worker_rt");
+
+      // The road that is open is still the policy's: a run that has not said which workspace
+      // it is for reads nothing at all, and one that has reads that tenant's set alone.
+      expect(await countedRows(client, ["suppression"])).toEqual([
+        { table: "suppression", rows: 0 },
+      ]);
+
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const gathered = await client.query<{ document_id: string; identifiers: unknown }>(
+        "SELECT document_id, identifiers FROM suppression",
+      );
+      expect(gathered.rows).toEqual([
+        { document_id: suppression.documentId, identifiers: suppression.identifiers },
+      ]);
 
       await refusesEach(client, [
-        [
-          "SELECT 1 FROM suppression LIMIT 1",
-          "a suppression is the identifiers of an erased person, so a worker that could read one would hold what the erasure was for",
-        ],
         [
           `INSERT INTO suppression (workspace_id, erasure_request_id, document_id, identifiers)
            VALUES ($1, $2, $3, '{"emails": ["x@y.invalid"], "names": [], "other": []}'::jsonb)`,
@@ -2937,8 +2949,8 @@ describe("the suppression under both runtime roles", () => {
         ],
       ]);
 
-      // The row all four reached for, read back under the role that may read it: still there,
-      // still carrying the identifiers the routine wrote from the request's set.
+      // The row all three reached for, read back under the role that owns the write: still
+      // there, still carrying the identifiers the routine wrote from the request's set.
       await client.query("RESET ROLE");
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
