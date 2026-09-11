@@ -29,9 +29,12 @@ import type { Tx } from "../store/postgres/index.ts";
  * citing that binding's documents and then every composition including those concepts —
  * synchronously, inside this act's own transaction, two levels (ADR 0023, ADR 0039).
  *
- * Beside it is the act that makes a binding in the first place: **the bind** (`binding.ts`),
+ * Beside it are the two acts at either end of a binding's life (`binding.ts`): **the bind**,
  * an Admin's own file put in the object store and then landed as a binding, a document, a
- * ledger row and the run that will index it. Widening a binding's class stays B7's.
+ * ledger row and the run that will index it; and **the publish**, the Admin's statement that
+ * what the run found has been reviewed, which stamps the binding and every chunk of it from
+ * one instant and carries the three confirmations, the finding totals and the DPIA input's
+ * hash onto the ledger. Widening a binding's class stays B7's.
  *
  * Beside it, S0's two: the **finding** restore (`findings.ts`), an Admin letting one span of
  * the always set back into a document with a reason, and the **DPIA input** (`dpia.ts`), a
@@ -55,10 +58,14 @@ import type { Tx } from "../store/postgres/index.ts";
 
 export {
   bindUpload,
+  publishBinding,
   UPLOAD_BYTE_CAP,
   UPLOAD_MEDIA_TYPES,
+  type BindingPublished,
   type BindUploadInput,
   type BindUploadRefusal,
+  type PublishBindingInput,
+  type PublishBindingRefusal,
   type UploadBound,
 } from "./binding.ts";
 export {

@@ -1,3 +1,4 @@
+import { AUDIENCE_EVERYONE } from "@better-answers/schema";
 import { testData, type MigratedPostgres, type TestData } from "@better-answers/schema/testing";
 import type pg from "pg";
 
@@ -10,6 +11,7 @@ import {
 } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { addToGroup, createGroup } from "../src/members/index.ts";
+import { chunkIdOf } from "../src/sources/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
 import { readingAs } from "./suite-postgres.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
@@ -110,6 +112,63 @@ export const documentUnder = (
       sensitivity,
     });
     return { bindingId, documentId: document.id };
+  });
+
+/**
+ * What one chunk row is seeded at: where the span sits in the document's normalised text, and
+ * the four visibility columns a chunk carries its own copy of (ADR 0023, ADR 0039). The four
+ * default to a chunk nobody may read yet — unpublished and Restricted — because that is what
+ * a run lands under an unpublished binding, and a suite about what a publish opens up has to
+ * start from the closed state rather than assert its way back to it.
+ */
+export type ChunkShape = {
+  readonly content: string;
+  /** The splitter's position, which is also what the row's id is derived from. */
+  readonly ordinal: number;
+  readonly charStart: number;
+  readonly charEnd: number;
+  readonly publishedAt?: Date | null;
+  readonly sensitivity?: string;
+  readonly audience?: string;
+  readonly audienceGroups?: readonly string[] | null;
+};
+
+/**
+ * One chunk of a document, as the run that split it would land the row — the derived id, the
+ * span as both the locator and the pair of offsets, and the visibility columns copied from
+ * the binding.
+ *
+ * **It is a factory and not a writer.** There is no chunk writer in `packages/core/src`: the
+ * worker lands these rows (T-129), and a suite about an app act over chunks that already
+ * exist seeds them here rather than through an act that would have to be invented to run the
+ * test. The id comes from the slice's own derivation, so a seeded row is addressable exactly
+ * as a written one is.
+ */
+export const chunkUnder = (
+  db: MigratedPostgres,
+  workspaceId: string,
+  document: Sourced,
+  shape: ChunkShape,
+): Promise<string> =>
+  seededBy(db, async (seed) => {
+    const row = await seed.chunk({
+      workspaceId,
+      id: chunkIdOf(document.documentId, shape.ordinal),
+      bindingId: document.bindingId,
+      sourceDocumentId: document.documentId,
+      content: shape.content,
+      // The column holds the span alone; the document half of a wire locator is the row's
+      // own `source_document_id` (`CONTEXT.md`, *locator*).
+      locator: `chars:${shape.charStart}-${shape.charEnd}`,
+      ordinal: shape.ordinal,
+      charStart: shape.charStart,
+      charEnd: shape.charEnd,
+      publishedAt: shape.publishedAt ?? null,
+      sensitivity: shape.sensitivity ?? "Restricted",
+      audience: shape.audience ?? AUDIENCE_EVERYONE,
+      audienceGroups: shape.audienceGroups == null ? null : [...shape.audienceGroups],
+    });
+    return row.id;
   });
 
 /**

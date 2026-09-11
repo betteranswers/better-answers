@@ -155,6 +155,13 @@ export const JOB_QUEUED_STATUS = "queued" satisfies (typeof JOB_STATUSES)[number
 /** Held by one worker under a lease it must keep confirming. */
 export const JOB_CLAIMED_STATUS = "claimed" satisfies (typeof JOB_STATUSES)[number];
 
+/**
+ * The one finish that says the run did what it was queued for. It is its own word, apart from
+ * the two sets below, because a gate on *this run succeeded* is a different question from a
+ * gate on *this run is over*: a failed run is over and found nothing to act on.
+ */
+export const JOB_DONE_STATUS = "done" satisfies (typeof JOB_STATUSES)[number];
+
 /** The statuses a job never leaves — the two finishes and the reaper's verdict. */
 export const JOB_TERMINAL_STATUSES = ["done", "failed", "poisoned"] as const;
 
