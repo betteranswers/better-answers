@@ -1,0 +1,48 @@
+packages/core/src/erasure/replay-erasures.ts
+  s_f3ee63bcbb1a0b::t_f61de17122009a 61-64
+packages/schema/src/table-ownership.ts
+  s_f3ee63bcbb1a0b::t_101b636ef76a50 245
+  s_f3ee63bcbb1a0b::t_3f47717f56e41c 252
+packages/core/src/erasure/rehearsal.ts
+  s_f3ee63bcbb1a0b::t_8f9b001e3ac278 261-263,343-348
+  s_f3ee63bcbb1a0b::t_a002f12c8ea016 167-173,178-182
+  s_f3ee63bcbb1a0b::t_ba00965d639853 318,322,327
+  s_f3ee63bcbb1a0b::t_5d238f02232a23 237-239,244-245
+  s_f3ee63bcbb1a0b::t_cceee230ec3aec 1-165,192-236,240-243,246-260,264-317,319-321,323,328-342,349-387,389-391,393,398-456
+  s_f3ee63bcbb1a0b::t_cf0b1f0256ced3 166,174-177,183-191
+  s_f3ee63bcbb1a0b::t_44686df0c2b5fd 388,392,397
+  s_f3ee63bcbb1a0b::t_510149c60c1a31 394-396
+  s_f3ee63bcbb1a0b::t_d2370fd3177c85 324-326
+packages/core/test/erasure-rehearsal.test.ts
+  s_f3ee63bcbb1a0b::t_23a0fcd8b9dc09 191,193
+  s_f3ee63bcbb1a0b::t_dbac06a941d008 142,144-146
+  s_f3ee63bcbb1a0b::t_3070da33b7a119 10
+  s_f3ee63bcbb1a0b::t_b00f73575286ea 216
+  s_f3ee63bcbb1a0b::t_e39a4c65653acd 1-6,8-9,11-93,107-141,143,147-170,172,174-190,192,194-215,217-220,224-230,232-235,237,239,242-250
+  s_f3ee63bcbb1a0b::t_72954f7e45d609 221-223
+  s_f3ee63bcbb1a0b::t_d320b4e6c2bdab 231,236,238,240-241
+  s_f3ee63bcbb1a0b::t_805c649d40496f 94-106
+  s_f3ee63bcbb1a0b::t_64db37435380b6 171,173
+  s_f3ee63bcbb1a0b::t_b5309605a1b604 7
+packages/core/src/erasure/index.ts
+  s_f3ee63bcbb1a0b::t_a6c906cd10c17f 19-21
+  s_f3ee63bcbb1a0b::t_bae1e0838e72c7 29-35
+CONTEXT.md
+  s_f3ee63bcbb1a0b::t_5508770aee0f78 499-505
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d9205de9527500b348c84ace18048cd15911ddec",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
