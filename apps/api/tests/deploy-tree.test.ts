@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { GARAGE_IMAGE } from "@better-answers/core/store/objects";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
 
 /**
@@ -98,6 +99,18 @@ describe("the deploy tree (T-005)", () => {
     expect(read(".github/workflows/build.yml")).toMatch(
       /tier: backup\n\s+context: deploy\n\s+dockerfile: deploy\/backup\.Dockerfile/,
     );
+  });
+
+  it("runs the object store on the one pinned Garage image, so the estate and the harness cannot skew", () => {
+    // The same claim the database image's row above makes, for the other store the tree
+    // pins: the constant lives with the door that opens it
+    // (`packages/core/src/store/objects/garage-image.ts`), the Testcontainers harness in
+    // `packages/core/test/suite-objects.ts` starts that ref, and this is what stops a
+    // version move landing in one place and not the other.
+    const objectstore = composeServices(read("deploy/stores.compose.yaml")).find(
+      (service) => service.name === "objectstore",
+    );
+    expect(objectstore?.body).toContain(`image: ${GARAGE_IMAGE}`);
   });
 
   it("gives Garage its secrets from the environment and names no `*_file` key", () => {

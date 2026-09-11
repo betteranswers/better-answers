@@ -19,7 +19,8 @@
     "./workspaces": "./src/workspaces/index.ts",
     "./store/postgres": "./src/store/postgres/index.ts",
     "./store/git": "./src/store/git/index.ts",
-    "./store/graph": "./src/store/graph/index.ts"
+    "./store/graph": "./src/store/graph/index.ts",
+    "./store/objects": "./src/store/objects/index.ts"
   },
   "scripts": {
     "lint": "oxlint --config ../../.oxlintrc.json .",
@@ -29,6 +30,8 @@
     "check": "node ../../scripts/check.mjs lint typecheck test"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1130.0",
+    "@aws-sdk/lib-storage": "3.1130.0",
     "@better-answers/schema": "workspace:*",
     "pg": "8.23.0",
     "zod": "4.5.4"
@@ -40,6 +43,7 @@
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@types/node": "24.13.3",
     "@types/pg": "8.23.1",
+    "testcontainers": "12.1.0",
     "typescript": "7.0.2",
     "vitest": "4.1.11"
   }
