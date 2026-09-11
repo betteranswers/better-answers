@@ -15,6 +15,7 @@ import { rewriteHistory, withRepositoryLockAs, type GitDoor } from "../store/git
 import { withScope, withSessionLock, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { eraseFromTheIdentitySet, type IdentitySwept } from "./identity.ts";
 import { erasureMapOf, type ErasureFamily, type ErasureMap } from "./map.ts";
+import { rederiveAfterErasure, type Rederived } from "./rederive.ts";
 import {
   erasureReportOf,
   type ErasureAction,
@@ -22,6 +23,7 @@ import {
   type ErasureRecord,
 } from "./report.ts";
 import { monthsOn, type SubjectRequest } from "./requests.ts";
+import { suppressTheDocuments, type Suppressed } from "./suppressions.ts";
 
 /**
  * The **erasure routine** (ADR 0020; ADR 0022; the S0 spec, *The routine — the erasure slice,
@@ -44,9 +46,16 @@ import { monthsOn, type SubjectRequest } from "./requests.ts";
  * **Idempotent by construction, with no branch that says so.** A second run over the same
  * request mints nothing: its insert conflicts with the first run's row and does nothing, so it
  * reads back the same pseudonym and the same anchor, and its completion update names
- * `completed_at IS NULL` and therefore matches no row. What is left is one more ledger event —
- * which is what the routine did, so the ledger is right to record it. The restore's replay
- * runs every completed request through here again and relies on exactly that.
+ * `completed_at IS NULL` and therefore matches no row. Its suppressions conflict on the key
+ * the table already has. What is left is one more ledger event — which is what the routine
+ * did, so the ledger is right to record it. The restore's replay runs every completed request
+ * through here again and relies on exactly that.
+ *
+ * **The one write with no key to conflict on is the rebuild job**, because the queue in S0
+ * carries none. So step 7 is handed the completion the row already stood at when this run
+ * opened it under the lock — the same fact step 11's update names, read once rather than asked
+ * for — and enqueues for the run that completes the request and for no other. It is the only
+ * place the routine looks at what an earlier run did, and it looks because the store cannot.
  */
 
 /** The routine's actor id — the platform principal's one form (`CONTEXT.md`, *actor id*). */
@@ -161,6 +170,12 @@ type ErasureRow = {
   readonly beyond_use_daily_at: Date;
   readonly beyond_use_weekly_at: Date;
   readonly beyond_use_monthly_at: Date;
+  /**
+   * The completion standing on the row when this run opened it — the first run's, and `null`
+   * on the run that is the first. Read under the lock, so it is exact for the whole routine:
+   * it is what tells step 7 whether this run is the one the queue should hear about.
+   */
+  readonly completed_at: Date | null;
 };
 
 const erasureRecordOf = (row: ErasureRow): ErasureRecord => ({
@@ -173,7 +188,7 @@ const erasureRecordOf = (row: ErasureRow): ErasureRecord => ({
 });
 
 const OPENED = `SELECT id, pseudonym, anchored_at, beyond_use_hourly_at, beyond_use_daily_at,
-                       beyond_use_weekly_at, beyond_use_monthly_at
+                       beyond_use_weekly_at, beyond_use_monthly_at, completed_at
                   FROM erasure_request WHERE workspace_id = $1 AND subject_request_id = $2`;
 
 /**
@@ -197,6 +212,8 @@ const openTheRoutine = async (
       readonly erasure: ErasureRecord;
       /** Beside the record rather than in it: the report is never handed this (ADR 0035). */
       readonly pseudonym: string;
+      /** The completion already standing, so a replay can be told from a first run. */
+      readonly completedAt: Date | null;
     },
     ErasureRefusal
   >
@@ -244,7 +261,12 @@ const openTheRoutine = async (
   // The insert either landed a row or found one; a read that answers neither is a database
   // that has just refused a statement it reported as accepted.
   if (erasure === undefined) throw new Error("erasure: the request's routine row did not open");
-  return ok({ request, erasure: erasureRecordOf(erasure), pseudonym: erasure.pseudonym });
+  return ok({
+    request,
+    erasure: erasureRecordOf(erasure),
+    pseudonym: erasure.pseudonym,
+    completedAt: erasure.completed_at,
+  });
 };
 
 const CONCEPT_FILE: ErasureFamily = "concept-file";
@@ -352,6 +374,31 @@ const withTheIdentityStep = (actions: ErasureActions, swept: IdentitySwept): Era
   "identity-account": { ...actions["identity-account"], deleted: swept.accounts },
 });
 
+const SOURCE_DOCUMENT: ErasureFamily = "source-document";
+
+/**
+ * Steps 6 and 7's line, which is the documents family's: the suppressions written for the
+ * documents the map found, and the bindings whose derived copies this erasure invalidates,
+ * which are those same documents' bindings. `found` is already on the line from the spine, so
+ * a report reading `found 1, suppressed 0` is the one shape that says a document was named and
+ * nothing was written for it — the gap, not a silence.
+ *
+ * The rebuild itself has no family and therefore no line here. It is a job on the queue, which
+ * is where a reader of a rebuild looks: the report is what the platform holds about *this
+ * person*, and a rebuild is the whole workspace's derived map made again.
+ */
+const withTheDocumentsStep = (
+  actions: ErasureActions,
+  documents: Suppressed & Pick<Rederived, "bindingsToReprocess">,
+): ErasureActions => ({
+  ...actions,
+  [SOURCE_DOCUMENT]: {
+    ...actions[SOURCE_DOCUMENT],
+    suppressed: documents.suppressed,
+    bindings: documents.bindingsToReprocess.length,
+  },
+});
+
 const IDENTITY_USER: ErasureFamily = "identity-user";
 
 /**
@@ -408,7 +455,7 @@ export const runErasure = async (
     );
     if (!opened.ok) return err(opened.error);
     if (!opened.value.ok) return err(opened.value.error);
-    const { request, erasure, pseudonym } = opened.value.value;
+    const { request, erasure, pseudonym, completedAt: standingCompletion } = opened.value.value;
 
     // Step 2, in its own transaction: the map walks every store family and reads a real
     // repository, which is not work to hold a transaction open across the first step for.
@@ -463,12 +510,44 @@ export const runErasure = async (
     );
     if (!identity.ok) return err(identity.error);
 
-    const actions = withTheIdentityStep(
-      withTheChecksMoved(
-        withTheGitStep(foundPerFamily(map), rewritten.value),
-        rewritten.value.carried,
+    // Step 6, in its own scoped transaction: one suppression per document the map found,
+    // carrying the request's identifier set as it stands now. For a subject with no user row
+    // and no history this is the erasure itself, and not a line beside one.
+    const suppressed = await attempt(() =>
+      withScope(platform, doors.postgres, workspaceId, (tx) =>
+        suppressTheDocuments(platform, tx, {
+          workspaceId,
+          erasureRequestId: erasure.id,
+          identifiers: request.identifiers,
+          map,
+        }),
       ),
-      identity.value,
+    );
+    if (!suppressed.ok) return err(suppressed.error);
+
+    // Step 7: the graph re-derived by a `full-rebuild` job with reason *erasure*, and the
+    // bindings whose derived copies this erasure invalidates listed for the wipe S1 lands.
+    // Step 8 is the sentence the report already carries and a thing this routine does not do:
+    // no step of it reaches the object store, because a company document that mentions a
+    // person is suppressed when it is next reprocessed and never deleted.
+    const rederived = await attempt(() =>
+      rederiveAfterErasure(platform, doors.postgres, {
+        workspaceId,
+        map,
+        completedAt: standingCompletion,
+      }),
+    );
+    if (!rederived.ok) return err(rederived.error);
+
+    const actions = withTheDocumentsStep(
+      withTheIdentityStep(
+        withTheChecksMoved(
+          withTheGitStep(foundPerFamily(map), rewritten.value),
+          rewritten.value.carried,
+        ),
+        identity.value,
+      ),
+      { ...suppressed.value, bindingsToReprocess: rederived.value.bindingsToReprocess },
     );
     const report = erasureReportOf({ request, erasure, actions, map, concepts });
     const completedAt = doors.clock.now();

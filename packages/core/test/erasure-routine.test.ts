@@ -2,6 +2,7 @@ import { ulid } from "@better-answers/schema";
 import { describe, expect, it } from "vitest";
 
 import { commit, type GitDoor } from "@better-answers/core/store/git";
+import { withScope } from "@better-answers/core/store/postgres";
 
 import { open } from "../src/answering/index.ts";
 import {
@@ -11,7 +12,16 @@ import {
   renderConceptFile,
   type Frontmatter,
 } from "../src/concepts/index.ts";
-import { ERASURE, runErasure, type ErasureRefusal, type ErasureRun } from "../src/erasure/index.ts";
+import {
+  ERASURE,
+  ERASURE_FAMILIES,
+  rederiveAfterErasure,
+  runErasure,
+  suppressTheDocuments,
+  type ErasureMap,
+  type ErasureRefusal,
+  type ErasureRun,
+} from "../src/erasure/index.ts";
 import { actorIdOfPerson, type Result } from "../src/kernel/index.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
@@ -1034,6 +1044,251 @@ describe("the identity set on the person's last membership", () => {
     // handed is not where a judgement about another company's memberships is published
     // (ADR 0035's rejected oracle).
     expect(held.report).not.toContain(elsewhere.workspaceId);
+  });
+});
+
+/**
+ * The identifier set every suppression below is written from, spelled here rather than read
+ * off the request the arm was handed (`[TEST9]`).
+ */
+const THE_SET = { emails: ["priya@example.invalid"], names: ["Priya Anand"], other: [] };
+
+/**
+ * An erasure map that names documents — a value of the slice's own published type, built here
+ * rather than read out of a store. `[TEST3]` bans mocking our code; constructing the value a
+ * function takes is not mocking it, and it is the only way to exercise the suppression arm
+ * before S1 writes the finder that fills this family.
+ */
+const mapNaming = (documents: readonly string[]): ErasureMap =>
+  ERASURE_FAMILIES.map((family) => ({
+    family,
+    categories: [],
+    locations: family === "source-document" ? [...documents] : [],
+  }));
+
+/** Every suppression in a workspace, as the superuser: the key and the set it carries. */
+const suppressionsIn = async (workspaceId: string) => {
+  const read = await db().pool.query<{
+    workspace_id: string;
+    erasure_request_id: string;
+    document_id: string;
+    identifiers: Record<string, readonly string[]>;
+  }>(
+    `SELECT workspace_id, erasure_request_id, document_id, identifiers
+       FROM suppression WHERE workspace_id = $1 ORDER BY document_id`,
+    [workspaceId],
+  );
+  return read.rows;
+};
+
+/** The queue of a workspace, as the superuser: what step 7 put on it. */
+const jobsIn = async (workspaceId: string) => {
+  const read = await db().pool.query<{ kind: string; reason: string | null; status: string }>(
+    "SELECT kind, reason, status FROM job WHERE workspace_id = $1 ORDER BY id",
+    [workspaceId],
+  );
+  return read.rows;
+};
+
+/** An erasure request with nothing done to it yet, for the arms proved on their own. */
+const anOpenErasure = (workspaceId: string) =>
+  seedingWith(db().pool, async (seed) => {
+    const request = await seed.subjectRequest({ workspaceId, kind: "erasure" });
+    return seed.erasureRequest({ workspaceId, subjectRequestId: request.id });
+  });
+
+/** One document under a binding the caller holds the id of, so a test can group them. */
+const documentIn = (workspaceId: string, bindingId: string) =>
+  seedingWith(db().pool, (seed) => seed.sourceDocument({ workspaceId, bindingId }));
+
+const bindingIn = (workspaceId: string) =>
+  seedingWith(db().pool, (seed) => seed.sourceBinding({ workspaceId }));
+
+describe("the suppression written for every document the map found", () => {
+  it("writes one row per document, keyed by workspace, erasure request and document, carrying the request's set", async () => {
+    const scenario = await arrange();
+    const erasure = await anOpenErasure(scenario.workspaceId);
+    const binding = await bindingIn(scenario.workspaceId);
+    const named = await documentIn(scenario.workspaceId, binding.id);
+    const alsoNamed = await documentIn(scenario.workspaceId, binding.id);
+    // A document the map never named: the other direction of the pair (`[TEST7]`).
+    const unnamed = await documentIn(scenario.workspaceId, binding.id);
+
+    const written = await withScope(ERASURE, scenario.postgres, scenario.workspaceId, (tx) =>
+      suppressTheDocuments(ERASURE, tx, {
+        workspaceId: scenario.workspaceId,
+        erasureRequestId: erasure.id,
+        identifiers: THE_SET,
+        map: mapNaming([named.id, alsoNamed.id]),
+      }),
+    );
+
+    expect(written).toEqual({ suppressed: 2 });
+    const rows = await suppressionsIn(scenario.workspaceId);
+    expect(rows.map((row) => row.document_id).sort()).toEqual([named.id, alsoNamed.id].sort());
+    expect(rows.map((row) => row.document_id)).not.toContain(unnamed.id);
+    // The key is the triple and the payload is the set, copied and not referenced.
+    expect(rows.map((row) => [row.workspace_id, row.erasure_request_id]).sort()).toEqual(
+      [
+        [scenario.workspaceId, erasure.id],
+        [scenario.workspaceId, erasure.id],
+      ].sort(),
+    );
+    expect(rows.map((row) => row.identifiers)).toEqual([
+      { emails: ["priya@example.invalid"], names: ["Priya Anand"], other: [] },
+      { emails: ["priya@example.invalid"], names: ["Priya Anand"], other: [] },
+    ]);
+  });
+
+  it("writes nothing for a set that names nobody, because a suppression that keeps nothing out is an erasure undone at the next conversion", async () => {
+    const scenario = await arrange();
+    const erasure = await anOpenErasure(scenario.workspaceId);
+    const binding = await bindingIn(scenario.workspaceId);
+    const named = await documentIn(scenario.workspaceId, binding.id);
+
+    const emptied = await withScope(ERASURE, scenario.postgres, scenario.workspaceId, (tx) =>
+      suppressTheDocuments(ERASURE, tx, {
+        workspaceId: scenario.workspaceId,
+        erasureRequestId: erasure.id,
+        identifiers: { emails: [], names: [], other: [] },
+        map: mapNaming([named.id]),
+      }),
+    );
+    const absent = await withScope(ERASURE, scenario.postgres, scenario.workspaceId, (tx) =>
+      suppressTheDocuments(ERASURE, tx, {
+        workspaceId: scenario.workspaceId,
+        erasureRequestId: erasure.id,
+        identifiers: null,
+        map: mapNaming([named.id]),
+      }),
+    );
+
+    // Both answer zero rather than aborting the routine on `suppression_identifiers_check`.
+    expect([emptied, absent]).toEqual([{ suppressed: 0 }, { suppressed: 0 }]);
+    expect(await suppressionsIn(scenario.workspaceId)).toEqual([]);
+  });
+
+  it("leaves the rows it already wrote exactly as they are when the arm runs a second time", async () => {
+    const scenario = await arrange();
+    const erasure = await anOpenErasure(scenario.workspaceId);
+    const binding = await bindingIn(scenario.workspaceId);
+    const named = await documentIn(scenario.workspaceId, binding.id);
+    const input = {
+      workspaceId: scenario.workspaceId,
+      erasureRequestId: erasure.id,
+      identifiers: THE_SET,
+      map: mapNaming([named.id]),
+    };
+
+    const first = await withScope(ERASURE, scenario.postgres, scenario.workspaceId, (tx) =>
+      suppressTheDocuments(ERASURE, tx, input),
+    );
+    const before = await suppressionsIn(scenario.workspaceId);
+    // The second run's set differs, which is what proves the first copy stands: a request
+    // edited after the routine ran does not rewrite what a reprocess was already told.
+    const again = await withScope(ERASURE, scenario.postgres, scenario.workspaceId, (tx) =>
+      suppressTheDocuments(ERASURE, tx, {
+        ...input,
+        identifiers: { emails: ["someone-else@example.invalid"], names: [], other: [] },
+      }),
+    );
+
+    expect([first, again]).toEqual([{ suppressed: 1 }, { suppressed: 1 }]);
+    expect(await suppressionsIn(scenario.workspaceId)).toEqual(before);
+  });
+
+  it("writes none through the routine today, and the report says the documents arm found none", async () => {
+    const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
+    // A document in the workspace the routine could reach, if anything named it.
+    const binding = await bindingIn(scenario.workspaceId);
+    await documentIn(scenario.workspaceId, binding.id);
+
+    const done = await completing(scenario, subjectRequestId);
+
+    // Zero because the map's `source-document` finder is S1's and answers none until then —
+    // said out loud on the report's own line, so the number is a fact about the finder rather
+    // than an arm that does nothing.
+    expect(await suppressionsIn(scenario.workspaceId)).toEqual([]);
+    expect(done.report).toContain("source-document: bindings 0, found 0, suppressed 0");
+  });
+});
+
+describe("the full-rebuild the erasure asks for", () => {
+  it("puts one job on the queue with reason erasure, after the lock is taken and before it is given back", async () => {
+    const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
+
+    await completing(scenario, subjectRequestId);
+
+    expect(await jobsIn(scenario.workspaceId)).toEqual([
+      { kind: "full-rebuild", reason: "erasure", status: "queued" },
+    ]);
+  });
+
+  it("puts no second one on the queue when the request is run again, because a replay writes a ledger event and nothing else", async () => {
+    const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
+
+    await completing(scenario, subjectRequestId);
+    await completing(scenario, subjectRequestId, RAN_AGAIN_AT);
+
+    expect(await jobsIn(scenario.workspaceId)).toEqual([
+      { kind: "full-rebuild", reason: "erasure", status: "queued" },
+    ]);
+  });
+
+  it("names the bindings holding the documents the map found, once each, which is the list S1's reprocess runs over", async () => {
+    const scenario = await arrange();
+    const shared = await bindingIn(scenario.workspaceId);
+    const apart = await bindingIn(scenario.workspaceId);
+    const untouched = await bindingIn(scenario.workspaceId);
+    const one = await documentIn(scenario.workspaceId, shared.id);
+    const another = await documentIn(scenario.workspaceId, shared.id);
+    const third = await documentIn(scenario.workspaceId, apart.id);
+    await documentIn(scenario.workspaceId, untouched.id);
+
+    const rederived = await rederiveAfterErasure(ERASURE, scenario.postgres, {
+      workspaceId: scenario.workspaceId,
+      map: mapNaming([one.id, another.id, third.id]),
+      // Already completed, so the read is the only thing this case exercises.
+      completedAt: LOCKED_AT,
+    });
+
+    // Two bindings for three documents, and the binding nobody's document named is absent:
+    // the wipe is per binding where the suppression is per document.
+    expect(rederived.bindingsToReprocess).toEqual([shared.id, apart.id].sort());
+    expect(rederived.rebuildJobId).toBeNull();
+    expect(await jobsIn(scenario.workspaceId)).toEqual([]);
+  });
+});
+
+describe("a subject with no user row", () => {
+  it("runs with its git and identity arms finding nothing and its suppression arm doing the erasure, and the report says which arms ran", async () => {
+    const scenario = await arrange();
+    const seeded = await seedingWith(db().pool, (seed) =>
+      seed.subjectRequest({
+        workspaceId: scenario.workspaceId,
+        kind: "erasure",
+        // The person the files name who never signed in (`CONTEXT.md`, *subject request*).
+        personId: null,
+        identifiers: THE_SET,
+      }),
+    );
+
+    const done = await completing(scenario, seeded.id);
+
+    // Every arm ran and said what it found, which is what a person with no login is owed:
+    // the stores that hold nothing about them say so rather than staying silent.
+    expect(done.report).toContain("concept-file: found 0, reindexed 0, rewritten 0");
+    expect(done.report).toContain("bundle-commit: found 0, moved 0");
+    expect(done.report).toContain(
+      "identity-user: arm no-person, found 0, membershipsEnded 0, pseudonymised 0",
+    );
+    expect(done.report).toContain("source-document: bindings 0, found 0, suppressed 0");
+    // The request completed rather than refusing for want of a person to act on.
+    const [row] = await erasureRowsIn(scenario.workspaceId);
+    expect(row?.completed_at).not.toBeNull();
+    expect(await jobsIn(scenario.workspaceId)).toEqual([
+      { kind: "full-rebuild", reason: "erasure", status: "queued" },
+    ]);
   });
 });
 
