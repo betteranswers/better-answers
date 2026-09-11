@@ -1,0 +1,22 @@
+apps/worker/src/better_answers_worker/redaction/consumer_domains.py
+  s_96a66f19ddb6be::t_6c9a21d95d4a01 50-52,54
+  s_96a66f19ddb6be::t_f3b3a686a63ec6 80,82-83
+apps/worker/tests/test_redaction_descriptors.py
+  s_96a66f19ddb6be::t_e94e74ae088b82 198
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "df8eac20566a5420d8665313ec7b073322129d78",
+  "prompts": {},
+  "sessions": {
+    "s_96a66f19ddb6be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1940d59b-7323-446c-9724-222dda88e9e0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
