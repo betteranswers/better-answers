@@ -1,0 +1,21 @@
+packages/core/test/redaction.contract.test.ts
+  s_f3ee63bcbb1a0b::t_c09395c4f4d320 175-199
+  s_f3ee63bcbb1a0b::t_57d2e65afc80c4 12
+  s_f3ee63bcbb1a0b::t_b3b615583f154a 26-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1bcdcfb6d6d8aa1cdf4a91c170e6bb8096bbbd5a",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
