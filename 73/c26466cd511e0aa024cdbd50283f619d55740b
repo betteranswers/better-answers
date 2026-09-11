@@ -1,0 +1,36 @@
+packages/core/src/llm/index.ts
+  s_f3ee63bcbb1a0b::t_90fbe8fb5f40ee 73-74
+  s_f3ee63bcbb1a0b::t_45291662517d0b 89
+packages/core/test/llm-routes.test.ts
+  s_f3ee63bcbb1a0b::t_0e473178faefd5 20-27,29,42
+  s_f3ee63bcbb1a0b::t_a18761ff9843ea 94-103,105-125
+  s_f3ee63bcbb1a0b::t_b9e38579efb37c 88
+packages/core/test/dpia.test.ts
+  s_f3ee63bcbb1a0b::t_c071b232ef2c11 1-325,327-334,336-357
+packages/core/src/sources/dpia.ts
+  s_f3ee63bcbb1a0b::t_ea2428fd3f58ee 172-180,186
+  s_f3ee63bcbb1a0b::t_7e4c868c86acb5 96-100
+  s_f3ee63bcbb1a0b::t_f8b3a357bfe90a 1-2,4-95,101-171,181-185,187-256,258-274
+  s_f3ee63bcbb1a0b::t_57845d9b1a304a 257
+  s_f3ee63bcbb1a0b::t_5ad47870412ca8 3
+apps/api/tests/routes-list.test.ts
+  s_f3ee63bcbb1a0b::t_addcdaf4bd02d2 37-39
+packages/schema/test/llm-route-scenario.ts
+  s_f3ee63bcbb1a0b::t_65e8c4cef826f8 27-34,36-51,58-66,74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "73c26466cd511e0aa024cdbd50283f619d55740b",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
