@@ -1,7 +1,7 @@
 """The worker image's contents, read from one container started from it (`T-084`).
 
 The image is asserted through the one interface a deploy unit has on it: a container.
-Three failures are silent everywhere else in this repository — the Dockerfile parses,
+Four failures are silent everywhere else in this repository — the Dockerfile parses,
 the build succeeds, the container starts, and each of them still ships.
 
 * ``uv sync --frozen --no-dev`` is the one thing keeping ruff, mypy, pytest, mutmut,
@@ -92,6 +92,68 @@ PROBED_IMPORTS = REQUIRED_IMPORTS + DETECTOR_IMPORTS
 #: The module the build runs to fetch the weights. It is named here and in the
 #: Dockerfile and nowhere else, so the module cannot move without both moving.
 WEIGHTS_MODULE = "better_answers_worker.redaction.weights"
+
+#: The page the seam is run over inside the image: the fixture
+#: ``tests/test_redaction.py`` runs it over, so the answers below are that file's
+#: answers for the same arguments.
+FIXTURE_PAGE = (
+    WORKSPACE / "tests" / "fixtures" / "redaction" / "supplier-information-pack.md"
+)
+
+#: A binding nobody configured, and one binding's seed — ``THE_SAFE_SET`` and ``SEED``
+#: in ``tests/test_redaction.py``, spelled here as the JSON the probe is handed.
+THE_SAFE_SET = '{"default_on": true, "default_off": false}'
+SEED = "b0f3a1d2c4e5"
+
+#: What the fixture planted, none of which may survive the seam on that binding. Written
+#: out as literals rather than read back from the container (`[TEST9]`): what is being
+#: proved is that the image's seam answers what this repository's seam answers, and a
+#: container asked to grade its own work proves nothing.
+PLANTED_SPANS = (
+    "3 February 1978",
+    "14 Marlbrook Rise, Hensworth, NN12 3AB",
+    "7 Pinfold Gate, Ashdale, YO41 9ZZ",
+    "00-00-00, account number 12345678",
+    "rosalind.petheridge@example.com",
+    "callum.whitcombe@example.org",
+    "07700 900123",
+    "999 000 0018",
+    "One of our supervisors was on long-term sick leave following a cancer "
+    "diagnosis, which is why the programme slipped by six weeks.",
+)
+
+#: The findings by category, and the word each tier writes in place of a span it takes:
+#: one neutral word for the always tier, six spans of it here — the two sort-code pairs,
+#: the NHS number, the health sentence and the two officers the block rule raised — and
+#: a typed placeholder for each span the binding's own tier gave up.
+FINDINGS_BY_CATEGORY: Mapping[str, int] = {
+    "date-of-birth": 1,
+    "home-address": 2,
+    "bank-details": 2,
+    "personal-contact": 3,
+    "government-identifier": 1,
+    "special-category": 1,
+}
+PLACEHOLDERS_IN_THE_TEXT: Mapping[str, int] = {
+    "[withheld]": 6,
+    "[date of birth withheld]": 1,
+    "[home address withheld]": 2,
+    "[personal contact withheld]": 3,
+}
+
+#: The sensitivity the health sentence narrows the document to.
+VERDICT = "Restricted"
+
+#: Every pin whose version the seam's version string carries, by the name `pins.py`
+#: declares it under. The string is assembled there and is not re-assembled here — what
+#: this holds is that the image's is built from the constants this repository declares.
+PINNED_IN_THE_VERSION_STRING = (
+    "PRESIDIO_VERSION",
+    "GLINER_VERSION",
+    "TORCH_VERSION",
+    "SPACY_VERSION",
+    "SPACY_MODEL_VERSION",
+)
 
 NO_DAEMON = (
     "no Docker daemon answered, so the worker image cannot be read: on CI these tests"
@@ -431,6 +493,30 @@ sys.stdout.write(json.dumps({
 }))
 """
 
+# The second container's probe. It takes the page out of its environment by name, runs
+# the seam over it and writes down what the seam answered; it asserts nothing, because
+# the answers it is held to are literals above, read out of `tests/test_redaction.py`.
+# The suppressions are empty here: no erasure request applies to a fixture, and the
+# seam's argument for one is exercised by that file rather than by a container.
+REDACTION_PROBE = """
+import json, os, sys
+
+from better_answers_worker.redaction import redact
+
+found = redact(
+    os.environ["PROBE_PAGE"],
+    json.loads(os.environ["PROBE_RULES"]),
+    (),
+    os.environ["PROBE_SEED"],
+)
+sys.stdout.write(json.dumps({
+    "text": found.text,
+    "counts": dict(found.counts),
+    "verdict": found.verdict,
+    "version": found.version,
+}))
+"""
+
 
 @dataclass(frozen=True)
 class ImageContents:
@@ -486,15 +572,21 @@ def _run_the_image(
     environment: dict[str, str],
     *,
     probe: str = PROBE,
+    network: str | None = None,
     timeout: int = 300,
 ) -> str:
     """One container, one probe, and what it wrote to stdout.
 
     The probe and the wait are parameters because more than one question is asked of
     this image and they are not the same size of question: one imports a module and
-    answers, another brings up hundreds of megabytes of weights first.
+    answers, another brings up hundreds of megabytes of weights first. ``network`` is
+    what turns the second of those into a proof rather than a rehearsal — given
+    ``"none"`` the container has no interface to reach a registry on, so a model it
+    loads is a model the image was carrying.
     """
     arguments = ["docker", "run", "--rm"]
+    if network is not None:
+        arguments += ["--network", network]
     # By name and never by value: `docker run --env NAME` takes the value out of this
     # process's environment, so a derived list never reaches another user's `ps`.
     for name in environment:
@@ -684,6 +776,54 @@ def test_the_build_fetches_the_weights_by_running_the_module_that_names_them(
 
     assert WEIGHTS_MODULE in dockerfile
     assert contents.hf_home in dockerfile
+
+
+def test_the_image_redacts_the_fixture_with_its_network_refused(image: str) -> None:
+    """Acceptance line 1's second half, and the strongest thing this file says.
+
+    Every assertion above is a statement about what is in the image. This one is the
+    statement that what is in it is enough: a container with no network interface loads
+    the seam and redacts a page with it, so every entry the load touches — the model,
+    its configuration, and the base encoder's tokenizer out of a second repository —
+    was already there. It is also the only test here that would fail on the four
+    megabytes of that tokenizer, which is the whole reason the build fetches by loading.
+
+    The page reaches the container by the name of an environment variable and never by
+    its value, the same way the derived lists above do: it is synthetic, but it is
+    PII-shaped, and a value on a command line is a value in somebody else's ``ps``.
+    """
+    found = _answered(
+        _run_the_image(
+            image,
+            {
+                "PROBE_PAGE": FIXTURE_PAGE.read_text("utf-8"),
+                "PROBE_RULES": THE_SAFE_SET,
+                "PROBE_SEED": SEED,
+            },
+            probe=REDACTION_PROBE,
+            network="none",
+            timeout=900,
+        )
+    )
+    redacted = str(found["text"])
+    answered: Mapping[str, Any] = found["counts"]
+    version = str(found["version"])
+
+    for planted in PLANTED_SPANS:
+        assert planted not in redacted, planted
+    for placeholder, written in PLACEHOLDERS_IN_THE_TEXT.items():
+        assert redacted.count(placeholder) == written, placeholder
+    assert {
+        category: int(answered[category]) for category in FINDINGS_BY_CATEGORY
+    } == dict(FINDINGS_BY_CATEGORY)
+    assert found["verdict"] == VERDICT
+    # Both halves of the version string, and the pin that is not in it (`[TEST7]`): the
+    # image runs the model the seam pins, and the second model it carries is one it
+    # measures rather than one it detects with.
+    assert version.startswith(f"{_pin('RULE_VERSION')}:")
+    for pinned in PINNED_IN_THE_VERSION_STRING:
+        assert _pin(pinned) in version, pinned
+    assert _pin("GLINER_MODEL_ID_MEASURED").rsplit("/", 1)[-1] not in version
 
 
 def test_the_container_runs_as_the_uid_that_owns_this_tiers_volumes(
