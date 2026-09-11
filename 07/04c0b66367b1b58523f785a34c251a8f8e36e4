@@ -1,0 +1,61 @@
+packages/schema/test/rls.test.ts
+  s_f3ee63bcbb1a0b::t_49a9dcec3e47e9 1899-1902,1907-1911
+  s_f3ee63bcbb1a0b::t_5853f2268886d3 2228-2241,2244,2248-2252,2254-2297
+  s_f3ee63bcbb1a0b::t_ff52a185a1fd4c 19
+  s_f3ee63bcbb1a0b::t_dbe3ca8cad036b 1882
+packages/schema/src/boundary-schemas.ts
+  s_f3ee63bcbb1a0b::t_a641e75b65e793 209-216,221-224,228-232,235-242
+apps/worker/src/better_answers_worker/schema_view.py
+  s_f3ee63bcbb1a0b::t_402c62d154ed67 10,12,19-20,26-31
+packages/schema/migrations/0035_the-chunk-substrate.sql
+  s_f3ee63bcbb1a0b::t_7d7613bf9e7ccf 3-165
+  s_f3ee63bcbb1a0b::t_7b7ad72d1f902e 1-2
+packages/schema/test/boundary-schemas.test.ts
+  s_f3ee63bcbb1a0b::t_0f5eafc553e820 1239-1250
+  s_f3ee63bcbb1a0b::t_281b7a2c5a703a 1446-1447,1453-1458
+packages/schema/test/chunk-columns.test.ts
+  s_f3ee63bcbb1a0b::t_9917b66b859bb1 275-278
+  s_f3ee63bcbb1a0b::t_434a6f516d2937 90-104
+  s_f3ee63bcbb1a0b::t_7f11cfa70e37a8 341-344,346
+  s_f3ee63bcbb1a0b::t_92ace95437f46c 261
+  s_f3ee63bcbb1a0b::t_34164a96828b76 332,334
+  s_f3ee63bcbb1a0b::t_b0adfde640afaf 379-382,387-391
+  s_f3ee63bcbb1a0b::t_c543e7f08615a8 314-315
+  s_f3ee63bcbb1a0b::t_523f201a766de7 52-62,67
+  s_f3ee63bcbb1a0b::t_a27615963f9280 1-51,63-66,72-89,105-106,108-147,149-199,201-231,233-260,262-270,272-274,279-288,290-297,299-300,305-310,312-313,316-329,331,333,349-358,360-378,383-386,392-416
+  s_f3ee63bcbb1a0b::t_38ff5b192de92c 298,301-304
+  s_f3ee63bcbb1a0b::t_d18ca6307d82ad 107,148,200,232,271,289,311,330,359
+  s_f3ee63bcbb1a0b::t_186b02ce904000 335-340,345,347-348
+  s_f3ee63bcbb1a0b::t_682a6dd9133359 68-71
+packages/schema/src/index-tables.ts
+  s_f3ee63bcbb1a0b::t_4eb9a1887eb36f 1-2
+  s_f3ee63bcbb1a0b::t_ae387b71a80c6a 74-89
+  s_f3ee63bcbb1a0b::t_1d033200e44fc6 39-48,52,59-63
+packages/schema/test/probes.ts
+  s_f3ee63bcbb1a0b::t_6a46bbd80188d2 76-114
+  s_f3ee63bcbb1a0b::t_9ffbf5c4f90a12 41
+packages/schema/migrations/meta/0035_snapshot.json
+  s_f3ee63bcbb1a0b::t_787a94860f11b4 1-5387
+packages/schema/src/table-ownership.ts
+  s_f3ee63bcbb1a0b::t_8ff909f1be025e 362-374
+packages/schema/test/factory.ts
+  s_f3ee63bcbb1a0b::t_0d11cc39420cdf 396-403
+packages/schema/migrations/meta/_journal.json
+  s_f3ee63bcbb1a0b::t_787a94860f11b4 249-255
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0704c0b66367b1b58523f785a34c251a8f8e36e4",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
