@@ -1,0 +1,370 @@
+import { boundarySchemas } from "@better-answers/schema";
+
+import { act, declareActs, record, type DetailOf } from "../audit/index.ts";
+import {
+  attempt,
+  err,
+  ok,
+  ulid,
+  type Clock,
+  type PlatformPrincipal,
+  type Result,
+} from "../kernel/index.ts";
+import type { GitDoor } from "../store/git/index.ts";
+import { withScope, withSessionLock, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import { erasureMapOf, type ErasureFamily, type ErasureMap } from "./map.ts";
+import {
+  erasureReportOf,
+  type ErasureAction,
+  type ErasureActions,
+  type ErasureRecord,
+} from "./report.ts";
+import type { SubjectRequest } from "./requests.ts";
+
+/**
+ * The **erasure routine** (ADR 0020; ADR 0022; the S0 spec, *The routine — the erasure slice,
+ * app tier*): one valid erasure request run end to end under the platform's own principal.
+ *
+ * This file holds the routine's spine — the lock, the pseudonym, the map, the row the four
+ * beyond-use dates are computed onto, the report and the completion. The steps that act on a
+ * store each fill their own family's line in `actions` as they land; none of them changes the
+ * shape of this function or of the report, which is why the spine is built first.
+ *
+ * **It takes the Postgres door and not a `Tx`, and that is the whole reason it exists as a
+ * face rather than as an act.** `pg_advisory_lock(41)` is session-scoped, and the routine is
+ * several transactions: the request is opened in one, the stores are searched in another, the
+ * completion lands in a third. A transaction-scoped lock would be given back at the first
+ * commit, and the hourly dump — which try-locks the same key before it runs
+ * (`deploy/backup.sh`) — could take a copy between two of the routine's steps, of a database
+ * halfway through an erasure. So the lock is held on a session of its own from the first step
+ * to the last, and the door is what lets the routine ask for one.
+ *
+ * **Idempotent by construction, with no branch that says so.** A second run over the same
+ * request mints nothing: its insert conflicts with the first run's row and does nothing, so it
+ * reads back the same pseudonym and the same anchor, and its completion update names
+ * `completed_at IS NULL` and therefore matches no row. What is left is one more ledger event —
+ * which is what the routine did, so the ledger is right to record it. The restore's replay
+ * runs every completed request through here again and relies on exactly that.
+ */
+
+/** The routine's actor id — the platform principal's one form (`CONTEXT.md`, *actor id*). */
+const ERASURE_ACTOR = "process:better-answers-erasure";
+
+/**
+ * The routine's principal, narrowed to its own actor, as the reconciler's is: the type is what
+ * holds "under `process:better-answers-erasure`" at compile time, so no other platform act can
+ * complete an erasure request under its own name.
+ */
+export type ErasurePrincipal = PlatformPrincipal & {
+  readonly actorId: typeof ERASURE_ACTOR;
+};
+
+export const ERASURE: ErasurePrincipal = { kind: "platform", actorId: ERASURE_ACTOR };
+
+/**
+ * The advisory lock ADR 0022 fixes for this routine. The other end of it is in
+ * `deploy/backup.sh`, which try-locks the same key and waits when it is taken, so no dump is
+ * ever of a database part-way through an erasure. One number, two places, and both of them
+ * name the other.
+ */
+const DUMP_LOCK = 41;
+
+/**
+ * The routine's one act on the ledger. Its subject is the erasure request, and its detail is
+ * the request it answers, the person id where the subject holds a login, and how many places
+ * the map named — never one of those places, and never an address or a name, because a detail
+ * carries ids, counts and role words and nothing else. The ledger is the one record an erasure
+ * does not rewrite (ADR 0035), so a detail that held a name here would be a name this routine
+ * had just promised to remove.
+ */
+const ERASURE_ACTS = declareActs("people", {
+  completed: act("people.erasure.completed", {
+    subjectRequestId: "id",
+    personId: "id?",
+    locations: "count",
+  }),
+});
+
+type CompletedDetail = DetailOf<(typeof ERASURE_ACTS)["completed"]["detail"]>;
+
+/**
+ * Why the routine would not run. `not-an-erasure` is an access request: it is answered under
+ * Article 15 and never erased, and running this over one would rewrite a history nobody asked
+ * to have rewritten.
+ */
+export type ErasureRefusal = "malformed" | "no-such-request" | "not-an-erasure";
+
+/** What one run comes to, as the row stands after it. */
+export type ErasureRun = {
+  readonly workspaceId: string;
+  readonly subjectRequestId: string;
+  readonly erasureRequestId: string;
+  /** The instant the four beyond-use dates were computed from — the first run's, always. */
+  readonly anchoredAt: Date;
+  readonly completedAt: Date;
+  readonly report: string;
+  /**
+   * Where this run found the person. A second run's map is that run's own reading of the
+   * stores, while `report` and `completedAt` above are the first run's and stay so.
+   */
+  readonly map: ErasureMap;
+  /** This run's own event, so two runs of one request are two ids and never one. */
+  readonly auditEventId: string;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The four tiers of `docs/operations/BACKUPS.md`'s retention schedule, out from the anchor in
+ * order: the hourly copies within 48 hours, the daily within 30 days, the weekly within 8
+ * weeks and every copy within six months.
+ *
+ * Counted in days, six months included, because the thing that actually deletes a copy is the
+ * object store's lifecycle rule and a lifecycle rule counts days — it has no notion of a
+ * calendar month, so a report promising a calendar date would be promising something the
+ * store cannot keep. Its pair is `erasureRequest` in `packages/schema/test/factory.ts`, which
+ * states the same four numbers because the schema's tests cannot import this package; change
+ * one and change the other in the same commit.
+ */
+const BEYOND_USE_DAYS = { hourly: 2, daily: 30, weekly: 56, monthly: 183 } as const;
+
+const beyondUseFrom = (anchoredAt: Date) => ({
+  hourly: new Date(anchoredAt.getTime() + BEYOND_USE_DAYS.hourly * DAY_MS),
+  daily: new Date(anchoredAt.getTime() + BEYOND_USE_DAYS.daily * DAY_MS),
+  weekly: new Date(anchoredAt.getTime() + BEYOND_USE_DAYS.weekly * DAY_MS),
+  monthly: new Date(anchoredAt.getTime() + BEYOND_USE_DAYS.monthly * DAY_MS),
+});
+
+/** The row as the routine reads it back, whichever run wrote it. */
+type ErasureRow = {
+  readonly id: string;
+  readonly anchored_at: Date;
+  readonly beyond_use_hourly_at: Date;
+  readonly beyond_use_daily_at: Date;
+  readonly beyond_use_weekly_at: Date;
+  readonly beyond_use_monthly_at: Date;
+};
+
+const erasureRecordOf = (row: ErasureRow): ErasureRecord => ({
+  id: row.id,
+  anchoredAt: row.anchored_at,
+  beyondUseHourlyAt: row.beyond_use_hourly_at,
+  beyondUseDailyAt: row.beyond_use_daily_at,
+  beyondUseWeeklyAt: row.beyond_use_weekly_at,
+  beyondUseMonthlyAt: row.beyond_use_monthly_at,
+});
+
+const OPENED = `SELECT id, anchored_at, beyond_use_hourly_at, beyond_use_daily_at,
+                       beyond_use_weekly_at, beyond_use_monthly_at
+                  FROM erasure_request WHERE workspace_id = $1 AND subject_request_id = $2`;
+
+/**
+ * Steps 1 and 2's footing: the request this routine answers, and the row it runs on.
+ *
+ * The pseudonym is minted here and nowhere else, and it is minted **into the insert** rather
+ * than decided before it: the unique key on the request means a second run's insert conflicts
+ * and does nothing, so what comes back from the read below is always the id the history was
+ * rewritten to, first run or fiftieth. That single statement is the whole of what makes the
+ * routine idempotent — there is no "has this run already" to ask.
+ */
+const openTheRoutine = async (
+  tx: Tx,
+  workspaceId: string,
+  subjectRequestId: string,
+  lockedAt: Date,
+): Promise<
+  Result<{ readonly request: SubjectRequest; readonly erasure: ErasureRecord }, ErasureRefusal>
+> => {
+  const found = await tx.query(
+    `SELECT workspace_id AS "workspaceId", id, person_id AS "personId", identifiers, kind,
+            received_at AS "receivedAt", clock_started_at AS "clockStartedAt",
+            due_at AS "dueAt", extended_to AS "extendedTo", answered_at AS "answeredAt", answer
+       FROM subject_request
+      WHERE workspace_id = $1 AND id = $2`,
+    [workspaceId, subjectRequestId],
+  );
+  const row = found.rows[0];
+  if (row === undefined) return err("no-such-request");
+  // Parsed at the boundary rather than asserted (ADR 0028): the row is the schema's shape.
+  const request = boundarySchemas.subjectRequest.select.parse(row);
+  if (request.kind !== "erasure") return err("not-an-erasure");
+
+  const beyondUse = beyondUseFrom(lockedAt);
+  // `locked_at` and `anchored_at` are one instant today, and two columns because the day O1
+  // lands `backup_run` the anchor moves to the last dump's stamp and the lock's instant stays
+  // what it is. The report says which of the two it used.
+  await tx.query(
+    `INSERT INTO erasure_request
+       (workspace_id, id, subject_request_id, pseudonym, locked_at, anchored_at,
+        beyond_use_hourly_at, beyond_use_daily_at, beyond_use_weekly_at, beyond_use_monthly_at)
+     VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9)
+     ON CONFLICT (workspace_id, subject_request_id) DO NOTHING`,
+    [
+      workspaceId,
+      ulid(),
+      request.id,
+      // Never the person id (ADR 0035): the minter's opaque id, so two workspaces that erase
+      // one person hold two values nobody can join their rewritten histories on.
+      ulid(),
+      lockedAt,
+      beyondUse.hourly,
+      beyondUse.daily,
+      beyondUse.weekly,
+      beyondUse.monthly,
+    ],
+  );
+  const opened = await tx.query<ErasureRow>(OPENED, [workspaceId, request.id]);
+  const erasure = opened.rows[0];
+  // The insert either landed a row or found one; a read that answers neither is a database
+  // that has just refused a statement it reported as accepted.
+  if (erasure === undefined) throw new Error("erasure: the request's routine row did not open");
+  return ok({ request, erasure: erasureRecordOf(erasure) });
+};
+
+const CONCEPT_FILE: ErasureFamily = "concept-file";
+
+/**
+ * The concepts whose body names this person, by IRI — what the report lists for the owner to
+ * edit. The map's concept-file locations are `<commit>:<path>` for a file and a bare sha for
+ * an author line; only the first names a file, and `concept_index` holds one row per path, so
+ * a path is the join. An IRI is what an owner can open; a path at a commit is not.
+ */
+const conceptsNaming = async (
+  tx: Tx,
+  workspaceId: string,
+  map: ErasureMap,
+): Promise<readonly string[]> => {
+  const inFiles = map.find((entry) => entry.family === CONCEPT_FILE)?.locations ?? [];
+  const paths = [
+    ...new Set(
+      inFiles
+        .filter((location) => location.includes(":"))
+        .map((location) => location.slice(location.indexOf(":") + 1)),
+    ),
+  ];
+  if (paths.length === 0) return [];
+  const found = await tx.query<{ iri: string }>(
+    "SELECT DISTINCT iri FROM concept_index WHERE workspace_id = $1 AND path = ANY($2)",
+    [workspaceId, paths],
+  );
+  return found.rows.map((row) => row.iri);
+};
+
+/**
+ * What the spine records about each family: how many places the map named there. Each step
+ * that acts on a store writes its own words into its own family's line beside this count, and
+ * the report prints whatever it finds — so a step arrives by filling this record rather than
+ * by reshaping it.
+ */
+const foundPerFamily = (map: ErasureMap): ErasureActions => {
+  const actions: Partial<Record<ErasureFamily, ErasureAction>> = {};
+  for (const entry of map) actions[entry.family] = { found: entry.locations.length };
+  return actions;
+};
+
+const detailOf = (request: SubjectRequest, map: ErasureMap): CompletedDetail => {
+  const locations = map.reduce((total, entry) => total + entry.locations.length, 0);
+  // The person id where the subject holds a login, and the field left out where they hold
+  // none — an absent optional, never a null standing in for a person.
+  return request.personId === null
+    ? { subjectRequestId: request.id, locations }
+    : { subjectRequestId: request.id, personId: request.personId, locations };
+};
+
+/** What the routine's last step reads back: the completion that stands, this run's or the first's. */
+type CompletionRow = { readonly completed_at: Date | null; readonly report: string | null };
+
+/**
+ * Run the erasure routine for one subject request, under `pg_advisory_lock(41)` held from the
+ * first step to the last.
+ *
+ * The steps this iteration builds are 1 (the pseudonym), 2 (the erasure map), 9 (the report)
+ * and 11 (the completion and its ledger event). The git rewrite, the moved checks, the
+ * identity set, the suppressions and the replay copy land on this spine.
+ */
+export const runErasure = async (
+  platform: ErasurePrincipal,
+  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
+  input: { readonly workspaceId: string; readonly subjectRequestId: string },
+): Promise<Result<ErasureRun, ErasureRefusal | Error>> => {
+  const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
+  const requestId = boundarySchemas.subjectRequest.select.shape.id.safeParse(
+    input.subjectRequestId,
+  );
+  if (!workspace.success || !requestId.success) return err("malformed");
+  const workspaceId = workspace.data;
+
+  return withSessionLock(platform, doors.postgres, DUMP_LOCK, async () => {
+    // Read once the lock is held, so the anchor is an instant no dump can have been taken
+    // after: every date computed from it is the latest a copy of this person can expire.
+    const lockedAt = doors.clock.now();
+
+    const opened = await attempt(() =>
+      withScope(platform, doors.postgres, workspaceId, (tx) =>
+        openTheRoutine(tx, workspaceId, requestId.data, lockedAt),
+      ),
+    );
+    if (!opened.ok) return err(opened.error);
+    if (!opened.value.ok) return err(opened.value.error);
+    const { request, erasure } = opened.value.value;
+
+    // Step 2, in its own transaction: the map walks every store family and reads a real
+    // repository, which is not work to hold a transaction open across the first step for.
+    const searched = await attempt(() =>
+      withScope(platform, doors.postgres, workspaceId, async (tx) => {
+        const map = await erasureMapOf(platform, tx, doors.git, request);
+        return { map, concepts: await conceptsNaming(tx, workspaceId, map) };
+      }),
+    );
+    if (!searched.ok) return err(searched.error);
+    const { map, concepts } = searched.value;
+
+    const actions = foundPerFamily(map);
+    const report = erasureReportOf({ request, erasure, actions, map, concepts });
+    const completedAt = doors.clock.now();
+
+    const completed = await attempt(() =>
+      withScope(platform, doors.postgres, workspaceId, async (tx) => {
+        // `completed_at IS NULL` is the idempotence, written as a statement rather than as a
+        // question asked first: a second run's update matches no row, so the completion the
+        // replay reads is always the one the first run wrote.
+        await tx.query(
+          `UPDATE erasure_request
+              SET actions = $3, completed_at = $4, report = $5
+            WHERE workspace_id = $1 AND id = $2 AND completed_at IS NULL`,
+          [workspaceId, erasure.id, actions, completedAt, report],
+        );
+        const standing = await tx.query<CompletionRow>(
+          "SELECT completed_at, report FROM erasure_request WHERE workspace_id = $1 AND id = $2",
+          [workspaceId, erasure.id],
+        );
+        const row = standing.rows[0];
+        if (row?.completed_at == null || row.report === null) {
+          throw new Error("erasure: the routine did not complete the request it opened");
+        }
+        const auditEventId = ulid();
+        // The door is called bare (ADR 0014 rule 4): its rejection aborts this transaction,
+        // so a completion whose event cannot be written is a completion that did not happen.
+        await record(platform, tx, {
+          id: auditEventId,
+          act: ERASURE_ACTS.completed,
+          subjectId: erasure.id,
+          detail: detailOf(request, map),
+        });
+        return { completedAt: row.completed_at, report: row.report, auditEventId };
+      }),
+    );
+    if (!completed.ok) return err(completed.error);
+
+    return ok({
+      workspaceId,
+      subjectRequestId: request.id,
+      erasureRequestId: erasure.id,
+      anchoredAt: erasure.anchoredAt,
+      completedAt: completed.value.completedAt,
+      report: completed.value.report,
+      map,
+      auditEventId: completed.value.auditEventId,
+    });
+  });
+};
