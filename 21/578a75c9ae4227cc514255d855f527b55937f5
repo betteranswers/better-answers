@@ -1,0 +1,43 @@
+packages/core/src/erasure/map.ts
+  s_f3ee63bcbb1a0b::t_6944966074e24c 70
+  s_f3ee63bcbb1a0b::t_ddc59ae4312a04 65-68
+packages/core/src/erasure/replay.ts
+  s_f3ee63bcbb1a0b::t_11eac9b2f1933a 1-11
+  s_f3ee63bcbb1a0b::t_d9de54c5b338f7 231-232
+  s_f3ee63bcbb1a0b::t_b7e43538330c42 146-230,233-281
+  s_f3ee63bcbb1a0b::t_44502a46433304 50-55
+packages/core/test/erasure-replay.test.ts
+  s_f3ee63bcbb1a0b::t_6f8dfbbb06f2e9 505-508
+  s_f3ee63bcbb1a0b::t_c11f69ab48d709 89-92
+  s_f3ee63bcbb1a0b::t_a61ac31f18728c 74-75,77-78,80-81
+  s_f3ee63bcbb1a0b::t_23e05aa7f1bbe9 1-73,76,79,82-88,93-440,442-483
+  s_f3ee63bcbb1a0b::t_648e48b1ec49e7 441
+  s_f3ee63bcbb1a0b::t_1abdc34f8292b3 484-504,509-515
+packages/core/src/erasure/routine.ts
+  s_f3ee63bcbb1a0b::t_af46e094963db7 150-154
+  s_f3ee63bcbb1a0b::t_0b30792f3e86bf 158
+packages/core/src/erasure/index.ts
+  s_f3ee63bcbb1a0b::t_da92890ae4ee2c 17-19
+  s_f3ee63bcbb1a0b::t_782d44bf580a55 27,29-35
+packages/core/src/erasure/replay-erasures.ts
+  s_f3ee63bcbb1a0b::t_fc7f919d43d3b7 4-12
+  s_f3ee63bcbb1a0b::t_7752810ade47b6 1-3,13-132,134-184,186-396
+  s_f3ee63bcbb1a0b::t_039a50e64afdf9 133
+  s_f3ee63bcbb1a0b::t_0a7d34f06d0a9d 185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "21578a75c9ae4227cc514255d855f527b55937f5",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
