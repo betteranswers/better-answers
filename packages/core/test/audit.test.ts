@@ -15,7 +15,7 @@ import {
   recordFor,
 } from "../src/audit/index.ts";
 import type { ActorId, PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
-import { withPrincipal, withScope } from "../src/store/postgres/index.ts";
+import { withPrincipal, withScope, type PostgresDoor } from "../src/store/postgres/index.ts";
 import { bootstrap, principalOf, provisionedWorkspace } from "./platform.ts";
 import { coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
@@ -54,6 +54,15 @@ const actLiteralsIn = (files: readonly string[]): Set<string> =>
 
 /** A provisioned workspace and its Admin, as a user principal's claims. */
 const provisioned = () => provisionedWorkspace(db(), "Ledger");
+
+/**
+ * Write one event as the platform in a provisioned workspace — the shape every case that
+ * hands the door a whole event takes, so a suite of refusals says what it is refusing and
+ * not how a write is opened.
+ */
+const writingIn =
+  (door: PostgresDoor, workspaceId: string) => (event: Parameters<typeof record>[2]) =>
+    withScope(bootstrap, door, workspaceId, (tx) => record(bootstrap, tx, event));
 
 const rowById = async (id: string) => {
   const found = await db().pool.query<{
@@ -241,6 +250,8 @@ describe("the declared-acts walk", () => {
 const PROBE = declareActs("platform", {
   written: act("platform.probe.written", { adminUserId: "id", role: "role", confirmed: "flag" }),
   noted: act("platform.probe.noted", { confirmed: "flag" }),
+  /** An act with a field that may be absent — the `?` kind, which the subject request needs. */
+  optional: act("platform.probe.optional", { adminUserId: "id?", confirmed: "flag" }),
 });
 
 describe("the first door — record, the actor derived from the Principal", () => {
@@ -351,6 +362,59 @@ describe("the first door — record, the actor derived from the Principal", () =
     });
   });
 
+  it("lands a row whose optional field is given, and one the act left it out of", async () => {
+    const { door, workspaceId, adminUserId } = await provisioned();
+    const named = ulid();
+    const left = ulid();
+
+    // Both ways (`[TEST7]`): a `?` kind that refused the absent field would be the required
+    // kind under another name, and one that never checked the given field would be no kind
+    // at all. The row carries the field it was given and nothing where it was not.
+    await withScope(bootstrap, door, workspaceId, (tx) =>
+      record(bootstrap, tx, {
+        id: named,
+        act: PROBE.optional,
+        subjectId: adminUserId,
+        detail: { adminUserId, confirmed: true },
+      }),
+    );
+    await withScope(bootstrap, door, workspaceId, (tx) =>
+      record(bootstrap, tx, {
+        id: left,
+        act: PROBE.optional,
+        subjectId: adminUserId,
+        detail: { confirmed: true },
+      }),
+    );
+
+    expect(await rowById(named)).toMatchObject({ detail: { adminUserId, confirmed: true } });
+    expect(await rowById(left)).toMatchObject({ detail: { confirmed: true } });
+  });
+
+  it("rejects a required field the detail leaves out, and an optional one holding an email", async () => {
+    const { door, workspaceId, adminUserId } = await provisioned();
+    const write = writingIn(door, workspaceId);
+
+    await expect(
+      write({
+        id: ulid(),
+        act: PROBE.optional,
+        subjectId: adminUserId,
+        // The optional field is given and the required one is not: absence is the `?` kind's
+        // alone, and `confirmed` is refused exactly as it was before the kind existed.
+        detail: { adminUserId },
+      }),
+    ).rejects.toThrow(/detail is missing the field confirmed/);
+    await expect(
+      write({
+        id: ulid(),
+        act: PROBE.optional,
+        subjectId: adminUserId,
+        detail: { adminUserId: "priya@example.invalid", confirmed: true },
+      }),
+    ).rejects.toThrow(/adminUserId is not a id\?/);
+  });
+
   it("rejects a detail that names a field the act does not, before any row exists", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const id = ulid();
@@ -371,8 +435,7 @@ describe("the first door — record, the actor derived from the Principal", () =
 
   it("rejects an id-kind field holding an email, a detail short of a field, an act nobody declared, and an id not the minter's", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
-    const write = (event: Parameters<typeof record>[2]) =>
-      withScope(bootstrap, door, workspaceId, (tx) => record(bootstrap, tx, event));
+    const write = writingIn(door, workspaceId);
 
     await expect(
       write({

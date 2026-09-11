@@ -11,6 +11,7 @@ import {
   type DetailShape,
   type DetailValue,
   isDeclared,
+  isOptionalKind,
 } from "./vocabulary.ts";
 
 /**
@@ -116,7 +117,10 @@ export const eventsOfAct = async (
  */
 const eventInsert = boundarySchemas.auditEvent.insert.omit({ workspaceId: true });
 
-const detailRefusal = (shape: DetailShape, detail: Readonly<Record<string, DetailValue>>) => {
+const detailRefusal = (
+  shape: DetailShape,
+  detail: Readonly<Record<string, DetailValue | undefined>>,
+) => {
   for (const field of Object.keys(detail)) {
     if (!Object.hasOwn(shape, field)) return `detail names a field the act does not: ${field}`;
   }
@@ -125,8 +129,13 @@ const detailRefusal = (shape: DetailShape, detail: Readonly<Record<string, Detai
     // Every DETAIL_KINDS predicate starts with a `typeof` check, none of which a
     // `value` of `undefined` ever passes — so a missing field would still be refused
     // one line down. This check stays for the sharper message naming what is missing,
-    // never the fallback "is not a kind" a masked check would settle for.
-    if (value === undefined) return `detail is missing the field ${field}`;
+    // never the fallback "is not a kind" a masked check would settle for. A kind
+    // written with a `?` is the one case where absence is what the act declared, so
+    // the field is skipped rather than refused; present, it is checked as its kind is.
+    if (value === undefined) {
+      if (isOptionalKind(kind)) continue;
+      return `detail is missing the field ${field}`;
+    }
     if (!DETAIL_KINDS[kind](value)) return `detail's ${field} is not a ${kind}`;
   }
   return undefined;
