@@ -119,8 +119,22 @@ DETECTOR_IMPORTS = (
     "huggingface_hub",
 )
 
-#: What the container is asked to import: the tier's own modules and the detector's.
-PROBED_IMPORTS = REQUIRED_IMPORTS + DETECTOR_IMPORTS
+#: What the worker composes as a host (ADR 0036): the engine the pipeline module is the
+#: only importer of, the driver its Postgres target acquires its own connections through
+#: and this tier's per-workspace pool is built from, and the object store client the
+#: pipeline reads a landed copy with. Asserted for the same reason as the detector's
+#: libraries above — `uv sync --frozen --no-dev` installs them from the manifest, and
+#: nothing in the image imports one until a job asks it to, so a manifest, a lockfile or
+#: a stage that stopped agreeing would not fail the build.
+HOST_IMPORTS = (
+    "cocoindex",
+    "asyncpg",
+    "boto3",
+)
+
+#: What the container is asked to import: the tier's own modules, the detector's and the
+#: host's.
+PROBED_IMPORTS = REQUIRED_IMPORTS + DETECTOR_IMPORTS + HOST_IMPORTS
 
 #: The module the build runs to fetch the weights. It is named here and in the
 #: Dockerfile and nowhere else, so the module cannot move without both moving.
@@ -867,6 +881,18 @@ def test_the_image_carries_every_library_the_detector_runs_on(
     # And the container was asked about all of them: a name dropped from the ask would
     # leave the assertion above passing over a smaller list.
     assert set(contents.imports) == set(PROBED_IMPORTS)
+
+
+def test_the_image_carries_every_library_the_host_composes(
+    contents: ImageContents,
+) -> None:
+    # The same reading as the detector's above, for the half of the image the worker
+    # needs to be a host rather than a reader: without these three the tier still
+    # builds, still starts and still claims, and fails the first `index` job it is
+    # handed.
+    assert {name: contents.imports[name] for name in HOST_IMPORTS} == dict.fromkeys(
+        HOST_IMPORTS, True
+    )
 
 
 def test_the_image_carries_both_pinned_models_and_the_pinned_pipeline(
