@@ -9,6 +9,7 @@ import {
   SENSITIVITIES,
 } from "@better-answers/schema";
 
+import { REDACTION_CATEGORIES } from "../src/sources/index.ts";
 import { contractFixture } from "./contract-fixture.ts";
 
 /**
@@ -22,8 +23,10 @@ import { contractFixture } from "./contract-fixture.ts";
  * worker and the review of a finding is an Admin's act (the S0 spec, *The tier boundary*), so
  * what this half can hold the fixture to is what the app stores and shows: the tier word on a
  * `finding` row, the class a special-category finding narrows a document to, the two keys a
- * binding's rules in force carry. T-121's category descriptors are held to the same file from
- * the other side, which is why nothing here derives from a detector that does not exist yet.
+ * binding's rules in force carry — and, since T-126, the category list the app itself declares,
+ * because the DPIA input has to name the categories a binding can raise and no category list
+ * belongs in a migration. T-121's category descriptors are held to the same file from the other
+ * side, which is why nothing here derives from a detector that does not exist yet.
  *
  * Neither half holds the other's literals. This one asserts against this tier's own boundary
  * schemas, the way the id-shape half asserts against `ULID_PATTERN`: a fixture the app cannot
@@ -166,6 +169,31 @@ describe("the redaction agreement's categories", () => {
         narrows_to: special_category ? fixture.narrows_to : null,
       });
     }
+  });
+});
+
+describe("the category list the app declares and the agreement's own", () => {
+  it("declares every category the agreement names, at the tier and the flag the agreement gives it", () => {
+    // The app's list lives in the `sources` slice because nothing imports `contracts/` (ADR
+    // 0031) and no category list belongs in a migration (`packages/schema/src/finding-tables.ts`).
+    // This is the seam that keeps the two from drifting: a rule change lands in the agreement,
+    // and a list the app forgot to grow fails here rather than in a DPIA nobody re-read.
+    for (const { category, tier, special_category } of fixture.categories) {
+      const declared = REDACTION_CATEGORIES.find((entry) => entry.category === category);
+
+      expect({ category, declared: declared ?? null }).toEqual({
+        category,
+        declared: { category, tier, specialCategory: special_category },
+      });
+    }
+  });
+
+  it("declares no category the agreement does not name, so the two lists are one list", () => {
+    // The pair the other way (`[TEST7]`): a category in the app and not in the fixture is a
+    // word no worker raises and no DPIA input should print, and the equality is what says so.
+    expect(REDACTION_CATEGORIES.map((entry) => entry.category).toSorted()).toEqual(
+      fixture.categories.map((entry) => entry.category).toSorted(),
+    );
   });
 });
 
