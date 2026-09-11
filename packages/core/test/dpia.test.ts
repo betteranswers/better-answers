@@ -53,7 +53,7 @@ const routeIn = async (
     readonly purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
     readonly provider: string;
     readonly model: string;
-    readonly retentionTail?: string;
+    readonly retentionTail?: string | null;
   },
 ): Promise<void> => {
   await seedingWith(db().pool, async (seed) => {
@@ -65,6 +65,26 @@ const routeIn = async (
       retentionTail: route.retentionTail ?? null,
     });
   });
+};
+
+/**
+ * The workspace's one answering route beside a binding to read the document for — the
+ * arrangement the two retention-tail tests share, which differ only in whether anyone wrote
+ * the provider's terms down. It arranges and never asserts: each test writes its own expected
+ * route entry out in full (`[TEST9]`), and `null` here is a route seeded without a tail, not
+ * the sentence the document prints for one.
+ */
+const answeringRouteAndBinding = async (
+  scenario: Scenario,
+  retentionTail: string | null,
+): Promise<string> => {
+  await routeIn(scenario, {
+    purpose: "answering",
+    provider: "anthropic",
+    model: "claude-sonnet-5",
+    retentionTail,
+  });
+  return bindingIn(scenario);
 };
 
 /** The document an Admin reads, or a thrown arrangement failure — the refusals have their own tests. */
@@ -178,13 +198,7 @@ describe("the routes a DPIA input lists", () => {
   it("prints the provider's own retention sentence for a route that carries one", async () => {
     const scenario = await arrange();
     const tail = "Prompts and outputs are deleted within 30 days; no training on customer data.";
-    await routeIn(scenario, {
-      purpose: "answering",
-      provider: "anthropic",
-      model: "claude-sonnet-5",
-      retentionTail: tail,
-    });
-    const binding = await bindingIn(scenario);
+    const binding = await answeringRouteAndBinding(scenario, tail);
 
     expect((await documentFor(scenario, binding)).routes).toEqual([
       {
@@ -200,12 +214,7 @@ describe("the routes a DPIA input lists", () => {
 
   it("says not recorded for a route nobody read the provider's terms for", async () => {
     const scenario = await arrange();
-    await routeIn(scenario, {
-      purpose: "answering",
-      provider: "anthropic",
-      model: "claude-sonnet-5",
-    });
-    const binding = await bindingIn(scenario);
+    const binding = await answeringRouteAndBinding(scenario, null);
 
     expect((await documentFor(scenario, binding)).routes).toEqual([
       {
