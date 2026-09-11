@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 
+import { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 
 import { writeConcept } from "@better-answers/core/concepts";
@@ -16,9 +17,9 @@ import { servedApp } from "./suite-app.ts";
 /**
  * The `pnpm ops` commands the estate's restore scripts call (ADR 0022, T-005), run against a
  * real, migrated Postgres and the app itself. What is held is the contract the scripts
- * rely on — `0` did it, `1` stop, `3` not built — on the schema as it stands today, and on
- * the schema as the slices will leave it (tables created here by the superuser, the way
- * the slices' migrations will).
+ * rely on — `0` did it, `1` stop, `3` not built — on the schema as it stands today, and,
+ * for the *not built* answer the journal has now overtaken, on a database of this cluster
+ * the journal has never been applied to (`opsBeforeTheJournal` below).
  */
 
 type Run = { readonly exitCode: number; readonly lines: readonly string[] };
@@ -38,10 +39,38 @@ const ioFor = (app: TestApp, stdin = ""): OpsIo & { readonly lines: string[] } =
   };
 };
 
-const ops = async (app: TestApp, argv: readonly string[], stdin = ""): Promise<Run> => {
+const ops = async (
+  app: TestApp,
+  argv: readonly string[],
+  stdin = "",
+  pool: Pool = app.database.superuser,
+): Promise<Run> => {
   const io = ioFor(app, stdin);
-  const exitCode = await runOps(argv, app.database.superuser, io);
+  const exitCode = await runOps(argv, pool, io);
   return { exitCode, lines: io.lines };
+};
+
+/**
+ * The same run, against the one database on this cluster the journal has never been applied
+ * to — the cluster's own `postgres`, whose `public` holds no table at all.
+ *
+ * Both *absent* answers below — the replay's *nothing was ever recorded here* and a slice
+ * command's *not built* — are decided by a catalogue read, and what they stand for is an
+ * image running a command against a database its migrations have not reached: a restore that
+ * calls the replay mid-journal, or an estate a step behind. T-120 landed the erasure
+ * families, so the migrated database this file otherwise runs against can no longer show
+ * either branch; they are shown here against a real, genuinely empty database rather than
+ * against a table dropped or faked to make the branch reachable.
+ */
+const opsBeforeTheJournal = async (app: TestApp, argv: readonly string[]): Promise<Run> => {
+  const uri = new URL(app.database.connectionUri);
+  uri.pathname = "/postgres";
+  const pool = new Pool({ connectionString: uri.toString(), max: 1 });
+  try {
+    return await ops(app, argv, "", pool);
+  } finally {
+    await pool.end();
+  }
 };
 
 /**
@@ -115,57 +144,70 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   it("reads through the -- separator pnpm forwards, and does not read it as a command", async () => {
-    // `pnpm ops replay-erasures …` arrives as `-- replay-erasures …` (first drill, 04/09/2026)
-    expect(
-      (await ops(app(), ["--", "replay-erasures", "--since", "20260904T000000Z"])).exitCode,
-    ).toBe(0);
+    // `pnpm ops replay-erasures …` arrives as `-- replay-erasures …` (first drill, 04/09/2026).
+    // Run where the replay's own answer is *done*, so what is held here is the parse — the
+    // command ran and said its piece — and not the verdict the two tests below hold.
+    const run = await opsBeforeTheJournal(app(), [
+      "--",
+      "replay-erasures",
+      "--since",
+      "20260904T000000Z",
+    ]);
+
+    expect(run.exitCode).toBe(0);
+    expect(run.lines.join("\n")).toContain("replayed 0 erasures");
     expect((await ops(app(), ["--"])).exitCode).toBe(2); // a bare separator is still no command
   });
 
   describe("replay-erasures — mandatory in every restore, never quietly a no-op", () => {
-    it("proves there is nothing to replay while no erasure has ever been recorded", async () => {
-      const run = await ops(app(), ["replay-erasures", "--since", "20260901T020500Z"]);
+    it("proves there is nothing to replay against a database the journal has not reached", async () => {
+      const run = await opsBeforeTheJournal(app(), [
+        "replay-erasures",
+        "--since",
+        "20260901T020500Z",
+      ]);
 
       expect(run.exitCode).toBe(0);
       expect(run.lines.join("\n")).toContain("replayed 0 erasures");
       expect(run.lines.join("\n")).toContain("no erasure_request table");
     });
 
-    it("refuses — stopping the restore before api starts — once erasures can exist and it cannot replay them", async () => {
-      // Not a fixture: the erasure slice's table does not exist yet, and what is under test is
-      // the command's reading of the catalogue — "a table by this name exists" — not any row.
-      // The one column is the name; the moment the slice lands, its journal replaces this.
-      await app().database.superuser.query(
-        "CREATE TABLE erasure_request (id text primary key, completed_at timestamptz)",
-      );
-      try {
-        const run = await ops(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"]);
+    it("refuses — stopping the restore before api starts — because an erasure can exist here and it cannot replay one", async () => {
+      // `erasure_request` is T-120's own table now, not one this test creates: a migrated
+      // schema can hold an erasure completed after the dump, and the replay the erasure slice
+      // owns (ADR 0020, T-125) is not in this image, so the restore must stop here rather than
+      // turn api healthy over data a subject was told is beyond use.
+      const run = await ops(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"]);
 
-        expect(run.exitCode).toBe(1);
-        expect(run.lines.join("\n")).toContain("REFUSED");
-      } finally {
-        await app().database.superuser.query("DROP TABLE erasure_request");
-      }
+      expect(run.exitCode).toBe(1);
+      expect(run.lines.join("\n")).toContain("REFUSED");
     });
   });
 
   describe("the slice-owned commands", () => {
-    it.each(["erasure-rehearsal"])(
-      "%s says `not built` — exit 3 — while its slice's tables are absent",
+    it.each(["erasure-rehearsal", "object-store-orphans"])(
+      "%s says `not built` — exit 3 — against a schema its slice's tables are absent from",
       async (command) => {
-        const run = await ops(app(), [command, "--workspace", "ws_synthetic", "--wait", "--list"]);
+        const run = await opsBeforeTheJournal(app(), [
+          command,
+          "--workspace",
+          "ws_synthetic",
+          "--wait",
+          "--list",
+        ]);
 
         expect(run.exitCode).toBe(NOT_BUILT);
         expect(run.lines.join("\n")).toContain("not built");
       },
     );
 
-    it.each(["object-store-orphans"])(
+    it.each(["object-store-orphans", "erasure-rehearsal"])(
       "%s refuses — exit 1 — now its tables are there and the implementation is not",
       async (command) => {
-        // T-053 landed the graph tables and T-055 `source_document`, so *not built* has
-        // stopped being true for this command; T-058 filled in the three graph commands
-        // below and the orphan sweep waits on the sources slice. That is exactly the state
+        // T-053 landed the graph tables, T-055 `source_document` and T-120 the erasure
+        // families, so *not built* has stopped being true for either command against a
+        // migrated schema; T-058 filled in the three graph commands below, the orphan sweep
+        // waits on the sources slice and the rehearsal on T-125. That is exactly the state
         // the third answer is for: the tables exist and this image has no implementation,
         // which is a refusal a restore must stop on rather than a silence.
         const run = await ops(app(), [command, "--workspace", "ws_synthetic", "--wait"]);
