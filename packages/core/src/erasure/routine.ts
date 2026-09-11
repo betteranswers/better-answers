@@ -12,10 +12,12 @@ import {
 } from "../kernel/index.ts";
 import { carryChecksOntoRewrite, moveBundleCommits } from "../concepts/index.ts";
 import { rewriteHistory, withRepositoryLockAs, type GitDoor } from "../store/git/index.ts";
+import type { ObjectDoor } from "../store/objects/index.ts";
 import { withScope, withSessionLock, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { eraseFromTheIdentitySet, type IdentitySwept } from "./identity.ts";
 import { erasureMapOf, type ErasureFamily, type ErasureMap } from "./map.ts";
 import { rederiveAfterErasure, type Rederived } from "./rederive.ts";
+import { writeReplayCopy } from "./replay.ts";
 import {
   erasureReportOf,
   type ErasureAction,
@@ -47,9 +49,11 @@ import { suppressTheDocuments, type Suppressed } from "./suppressions.ts";
  * request mints nothing: its insert conflicts with the first run's row and does nothing, so it
  * reads back the same pseudonym and the same anchor, and its completion update names
  * `completed_at IS NULL` and therefore matches no row. Its suppressions conflict on the key
- * the table already has. What is left is one more ledger event — which is what the routine
- * did, so the ledger is right to record it. The restore's replay runs every completed request
- * through here again and relies on exactly that.
+ * the table already has, and its replay copy derives the key the first run's copy is already
+ * at and overwrites it, so the store holds one copy per request rather than one per run. What
+ * is left is one more ledger event — which is what the routine did, so the ledger is right to
+ * record it. The restore's replay runs every completed request through here again and relies
+ * on exactly that.
  *
  * **The one write with no key to conflict on is the rebuild job**, because the queue in S0
  * carries none. So step 7 is handed the completion the row already stood at when this run
@@ -427,13 +431,18 @@ type CompletionRow = { readonly completed_at: Date | null; readonly report: stri
  * Run the erasure routine for one subject request, under `pg_advisory_lock(41)` held from the
  * first step to the last.
  *
- * The steps this iteration builds are 1 (the pseudonym), 2 (the erasure map), 9 (the report)
- * and 11 (the completion and its ledger event). The git rewrite, the moved checks, the
- * identity set, the suppressions and the replay copy land on this spine.
+ * All eleven steps stand on this spine: the pseudonym and the map, the git rewrite, the moved
+ * checks, the identity set, the suppressions, the re-derivation, the report, the replay copy
+ * and the completion with its ledger event.
  */
 export const runErasure = async (
   platform: ErasurePrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
+  doors: {
+    readonly git: GitDoor;
+    readonly postgres: PostgresDoor;
+    readonly objects: ObjectDoor;
+    readonly clock: Clock;
+  },
   input: { readonly workspaceId: string; readonly subjectRequestId: string },
 ): Promise<Result<ErasureRun, ErasureRefusal | Error>> => {
   const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
@@ -551,6 +560,45 @@ export const runErasure = async (
     );
     const report = erasureReportOf({ request, erasure, actions, map, concepts });
     const completedAt = doors.clock.now();
+    // The completion this run leaves standing: the first run's where one already stands, this
+    // run's where none does. **One reading of the clock, used twice** — by the copy below and
+    // by step 11's update — rather than two readings that can disagree about when an erasure
+    // happened. Where a completion already stands the update matches no row, so the standing
+    // instant is what the row will hold and therefore what the copy must carry.
+    const standsAt = standingCompletion ?? completedAt;
+
+    // Step 10 — the replay copy, written **before** the completion commits.
+    //
+    // The spec calls the copy "the routine's last write" and then has step 11 stamp the
+    // `completed_at` the copy carries, which reads like a contradiction until the first
+    // sentence is read as what it is: the last of the routine's writes **to the object
+    // store**, not the last write of the routine overall. The next reader of this file will
+    // otherwise take the order below for a mistake.
+    //
+    // The two failures the order chooses between are not the same size. A run that dies
+    // between this write and that stamp leaves a copy naming a completion that did not land —
+    // and a replay from it re-runs a routine that is idempotent by construction, reaching the
+    // same end the run was interrupted on the way to. A run that dies the other way round
+    // leaves **no copy at all**, and the erasure is then lost to any restore from a dump older
+    // than the request, with nothing anywhere to say it was owed. The second is the failure
+    // this copy exists to prevent, so it is the one the order refuses.
+    //
+    // Writing first also couples the two the right way: an object store that cannot take the
+    // copy fails the routine before it reports a completion, rather than after. The request
+    // stays open, and the operator's re-run is the routine's ordinary second pass.
+    const copied = await attempt(() =>
+      writeReplayCopy(platform, doors.objects, {
+        workspaceId,
+        subjectRequestId: request.id,
+        erasureRequestId: erasure.id,
+        personId: request.personId,
+        pseudonym,
+        completedAt: standsAt,
+        identifiers: request.identifiers,
+        map,
+      }),
+    );
+    if (!copied.ok) return err(copied.error);
 
     const completed = await attempt(() =>
       withScope(platform, doors.postgres, workspaceId, async (tx) => {

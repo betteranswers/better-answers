@@ -12,8 +12,9 @@
  * (`routine.ts`), which runs one erasure request end to end under the platform's own
  * principal and `pg_advisory_lock(41)`, with the report it writes (`report.ts`), the
  * identity set it pseudonymises on a person's last membership (`identity.ts`), the
- * suppressions it writes for the documents the map found (`suppressions.ts`) and the
- * re-derivation it asks for afterwards (`rederive.ts`).
+ * suppressions it writes for the documents the map found (`suppressions.ts`), the
+ * re-derivation it asks for afterwards (`rederive.ts`) and the **replay copy** it leaves in
+ * the object store for a restore to read (`replay.ts`).
  */
 
 export type { ErasureSubject, IdentityArm, IdentitySwept } from "./identity.ts";
@@ -21,6 +22,8 @@ export { accessAnswerOf, ERASURE_FAMILIES, erasureMapOf } from "./map.ts";
 export type { AccessAnswer, ErasureFamily, ErasureFamilyDescriptor, ErasureMap } from "./map.ts";
 export { rederiveAfterErasure } from "./rederive.ts";
 export type { Rederived } from "./rederive.ts";
+export { replayCopyKeyOf, writeReplayCopy } from "./replay.ts";
+export type { ReplayCopy } from "./replay.ts";
 export { erasureReportOf } from "./report.ts";
 export type { ErasureAction, ErasureActions, ErasureRecord, ErasureReportInput } from "./report.ts";
 export { ERASURE, runErasure } from "./routine.ts";

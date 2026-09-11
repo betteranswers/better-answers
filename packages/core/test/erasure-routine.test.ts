@@ -2,6 +2,12 @@ import { ulid } from "@better-answers/schema";
 import { describe, expect, it } from "vitest";
 
 import { commit, type GitDoor } from "@better-answers/core/store/git";
+import {
+  getPlatformObject,
+  listObjects,
+  listPlatformObjects,
+  openObjects,
+} from "@better-answers/core/store/objects";
 import { withScope } from "@better-answers/core/store/postgres";
 
 import { open } from "../src/answering/index.ts";
@@ -25,6 +31,7 @@ import {
 import { actorIdOfPerson, type Result } from "../src/kernel/index.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
+import { objectStoreForSuite } from "./suite-objects.ts";
 import {
   countWaitingOnLocks,
   readingAs,
@@ -50,6 +57,14 @@ import { doorsOf, principalFor, suiteWithBundles, type Scenario } from "./worksp
  */
 
 const { db, arrange } = suiteWithBundles();
+
+/**
+ * A real Garage for this suite, because step 10 writes to the object store and `[TEST3]`
+ * refuses a stand-in for it as it refuses one for Postgres: what the copy has to be is
+ * addressable under the platform's own prefix and readable back by a restore, which is a
+ * claim about an S3 store and not about a map kept in this process.
+ */
+const objects = objectStoreForSuite();
 
 /**
  * The instant the routine's clock hands back, so the anchor and the four dates below are a
@@ -123,7 +138,12 @@ const runningTheRoutine = (
 ): Promise<Result<ErasureRun, ErasureRefusal | Error>> =>
   runErasure(
     ERASURE,
-    { git: scenario.git, postgres: scenario.postgres, clock: { now: () => at } },
+    {
+      git: scenario.git,
+      postgres: scenario.postgres,
+      objects: objects().door,
+      clock: { now: () => at },
+    },
     { workspaceId: scenario.workspaceId, subjectRequestId },
   );
 
@@ -1289,6 +1309,237 @@ describe("a subject with no user row", () => {
     expect(await jobsIn(scenario.workspaceId)).toEqual([
       { kind: "full-rebuild", reason: "erasure", status: "queued" },
     ]);
+  });
+});
+
+/** The bytes of a stream, as text — the assertion's side of what the door hands back. */
+const textOf = async (stream: ReadableStream<Uint8Array>): Promise<string> => {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+};
+
+/**
+ * The replay copy as a restore reaches it: the platform's own prefix and the key spelled out
+ * here rather than read off the module that writes it (`[TEST9]`), because the key is the
+ * whole of what `replay-erasures` has to know to find a copy in a bucket it just synced back.
+ */
+const replayCopyOf = async (workspaceId: string, erasureRequestId: string): Promise<string> => {
+  const got = await getPlatformObject(
+    ERASURE,
+    objects().door,
+    `erasures/${workspaceId}/${erasureRequestId}.json`,
+  );
+  if (!got.ok) throw new Error(`the replay copy was not readable: ${got.error}`);
+  return textOf(got.value);
+};
+
+/**
+ * The copy's shape as a restore reads it, spelled out here rather than imported from the
+ * module that writes it (`[TEST9]`): what this suite holds the writer to is the document
+ * `replay-erasures` will parse, and a suite that read the shape off the writer would agree
+ * with whatever the writer did.
+ */
+type CopyAsRead = {
+  readonly workspaceId: string;
+  readonly subjectRequestId: string;
+  readonly erasureRequestId: string;
+  readonly personId?: string;
+  readonly pseudonym: string;
+  readonly completedAt: string;
+  readonly identifiers: unknown;
+  readonly map: readonly { readonly family: string; readonly locations: readonly string[] }[];
+};
+
+/** Every copy this workspace's erasures have left in the store. */
+const replayCopiesIn = async (workspaceId: string): Promise<readonly string[]> => {
+  const listed = await listPlatformObjects(ERASURE, objects().door, `erasures/${workspaceId}/`);
+  if (!listed.ok) throw new Error(`the platform's prefix refused a listing: ${listed.error}`);
+  return listed.value;
+};
+
+/**
+ * **Step 10 — the replay copy**, the one write of this routine that leaves Postgres and the
+ * one trace of a completed erasure that survives a restore from a dump taken before the
+ * request arrived. A copy the store does not hold is an erasure silently undone by a restore,
+ * which is the failure the whole of ADR 0022's replay exists to prevent.
+ *
+ * Two sentences shape every case below. The copy carries exactly what a **re-run** needs —
+ * the workspace and the two ids, the person where they hold a login, the pseudonym the
+ * history was rewritten to, the completion it stands on, the identifier set the suppressions
+ * were written from and the map — and it carries **nothing else about the person**, which is
+ * asserted in both directions (`[TEST7]`) because it is restricted personal data of the same
+ * class as the `suppression` table and outlives the dump that holds that table.
+ *
+ * It is deliberately not the report's twin: the report is a document handed to a person and
+ * is starved of the identifier set and the pseudonym (ADR 0035), while this is the input to a
+ * routine and carries both. Neither shape is the other's mistake.
+ */
+describe("the replay copy the restore reads", () => {
+  it("lands under the platform's own prefix, where no workspace's principal can address it", async () => {
+    const { scenario, subjectRequestId } = await bundleNamingThePerson();
+
+    const done = await completing(scenario, subjectRequestId);
+
+    expect(await replayCopiesIn(scenario.workspaceId)).toEqual([
+      `erasures/${scenario.workspaceId}/${done.erasureRequestId}.json`,
+    ]);
+    // The other direction: an Admin of the very workspace the erasure ran in reaches nothing,
+    // because the copy is the platform's and a workspace's prefix is all a person's key can
+    // address. A restore reads it as the platform or it does not read it at all.
+    const theirs = await listObjects(scenario.admin, objects().door, "");
+    expect(theirs).toEqual({ ok: true, value: [] });
+  });
+
+  it("carries what a re-run must have: the pseudonym, the identifier set and the map", async () => {
+    const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
+
+    const done = await completing(scenario, subjectRequestId);
+
+    const [row] = await erasureRowsIn(scenario.workspaceId);
+    const copy = JSON.parse(
+      await replayCopyOf(scenario.workspaceId, done.erasureRequestId),
+    ) as CopyAsRead;
+    expect(copy.workspaceId).toEqual(scenario.workspaceId);
+    expect(copy.subjectRequestId).toEqual(subjectRequestId);
+    expect(copy.erasureRequestId).toEqual(done.erasureRequestId);
+    expect(copy.personId).toEqual(person.id);
+    // The pseudonym on the row, which is what `human:<address>` became across the history: a
+    // replay that minted a second one would rewrite a history the first run already rewrote
+    // and leave two ids for one person.
+    expect(copy.pseudonym).toEqual(row?.pseudonym);
+    expect(copy.completedAt).toEqual("2026-06-01T12:00:00.000Z");
+    // The set the suppressions were written from, whole: a restore older than the request has
+    // no `subject_request` row to read it off, so the copy is where it survives.
+    expect(copy.identifiers).toEqual({ emails: [email], names: ["Priya Anand"], other: [] });
+
+    expect(copy.map.map((entry) => entry.family)).toEqual([...ERASURE_FAMILIES]);
+    // The files the person was named in, by path, and the commits their address signed — the
+    // two arms the concept-file family answers with, both carried across (`git.test.ts`).
+    // Every family is answered, so a store that held nothing about the person says so in the
+    // copy as it does in the report.
+    const found = copy.map.find((entry) => entry.family === "concept-file")?.locations ?? [];
+    const paths = found.filter((at) => at.includes(":")).map((at) => at.slice(at.indexOf(":") + 1));
+    expect([...new Set(paths)].sort()).toEqual(["knowledge/expenses.md", "knowledge/travel.md"]);
+    expect(found.filter((at) => at.endsWith("(author line)"))).toHaveLength(2);
+  });
+
+  it("carries nothing a finder does not need — not the report, not the counts, not a value a location names", async () => {
+    const { scenario, email, subjectRequestId } = await bundleNamingThePerson();
+
+    const done = await completing(scenario, subjectRequestId);
+
+    const text = await replayCopyOf(scenario.workspaceId, done.erasureRequestId);
+    const copy = JSON.parse(text) as CopyAsRead;
+    // The whole of it, as a literal: a field added to this copy is a field of a person's data
+    // kept in a bucket that outlives the dump, and it fails here before it is written.
+    expect(Object.keys(copy).sort()).toEqual([
+      "completedAt",
+      "erasureRequestId",
+      "identifiers",
+      "map",
+      "personId",
+      "pseudonym",
+      "subjectRequestId",
+      "workspaceId",
+    ]);
+    // The control for the four absences below: the text really does hold this person, so a
+    // `not.toContain` here is a claim about what was left out and not about an empty file.
+    expect(text).toContain(email);
+    expect(text).toContain(done.erasureRequestId);
+    // Not the report — that document is written for the owner, and a copy of it here would
+    // put ADR 0020's wording where nobody reads it and a person's data where it is not needed.
+    expect(text).not.toContain("Every actor identifier for this person has been rewritten");
+    expect(text).not.toContain("Backup copies taken before");
+    // Not the counts: `actions` is the row's record of what was done and no input to a re-run.
+    expect(text).not.toContain("rehashed");
+    // Not a value the map merely locates. The map names a commit and a path; the sentence at
+    // that path is the thing a location exists to avoid copying (`erasure map`, `CONTEXT.md`).
+    expect(text).not.toContain("Expenses are claimed within thirty days");
+  });
+
+  it("names no person for a subject with no user row, because an absent login is not a null one", async () => {
+    const scenario = await arrange();
+    const seeded = await seedingWith(db().pool, (seed) =>
+      seed.subjectRequest({
+        workspaceId: scenario.workspaceId,
+        kind: "erasure",
+        personId: null,
+        identifiers: THE_SET,
+      }),
+    );
+
+    const done = await completing(scenario, seeded.id);
+
+    const copy = JSON.parse(
+      await replayCopyOf(scenario.workspaceId, done.erasureRequestId),
+    ) as CopyAsRead;
+    expect(Object.keys(copy)).not.toContain("personId");
+    // And the set is still there, because for this subject the set is the whole erasure: it
+    // is what the suppressions were written from and what a re-run would write them from.
+    expect(copy.identifiers).toEqual({
+      emails: ["priya@example.invalid"],
+      names: ["Priya Anand"],
+      other: [],
+    });
+  });
+
+  it("refuses to complete a request whose copy the store would not take, so no completion stands without one", async () => {
+    const { scenario, subjectRequestId } = await bundleNamingThePerson();
+    // A door onto nothing: the settings parse, so the refusal happens where it matters — at
+    // the put — and not at the open. Port 1 refuses a connection rather than hanging on one.
+    const shut = openObjects({
+      endpoint: "http://127.0.0.1:1",
+      region: "garage",
+      bucket: "better-answers",
+      accessKeyId: "unreachable",
+      secretAccessKey: "unreachable",
+    });
+    if (!shut.ok) throw new Error(`the door refused its settings: ${shut.error}`);
+
+    const run = await runErasure(
+      ERASURE,
+      {
+        git: scenario.git,
+        postgres: scenario.postgres,
+        objects: shut.value,
+        clock: { now: () => LOCKED_AT },
+      },
+      { workspaceId: scenario.workspaceId, subjectRequestId },
+    );
+
+    expect(run.ok).toEqual(false);
+    // The whole of the ordering, as a fact rather than as a comment: the request is still
+    // open, so the operator's re-run is the routine's ordinary second pass and no restore can
+    // meet a completed erasure that left nothing behind to replay it from.
+    const [row] = await erasureRowsIn(scenario.workspaceId);
+    expect(row?.completed_at).toBeNull();
+    expect(await replayCopiesIn(scenario.workspaceId)).toEqual([]);
+  });
+
+  it("leaves one copy and not two on a second run, still dated the completion the first run wrote", async () => {
+    const { scenario, subjectRequestId } = await bundleNamingThePerson();
+
+    const first = await completing(scenario, subjectRequestId);
+    const again = await completing(scenario, subjectRequestId, RAN_AGAIN_AT);
+
+    expect(again.erasureRequestId).toEqual(first.erasureRequestId);
+    expect(await replayCopiesIn(scenario.workspaceId)).toEqual([
+      `erasures/${scenario.workspaceId}/${first.erasureRequestId}.json`,
+    ]);
+    const copy = JSON.parse(
+      await replayCopyOf(scenario.workspaceId, first.erasureRequestId),
+    ) as CopyAsRead;
+    // The completion the row stands at, which a second run does not move: a copy re-dated by
+    // a replay would tell the next `replay-erasures --since` that the erasure happened a week
+    // after it did.
+    expect(copy.completedAt).toEqual("2026-06-01T12:00:00.000Z");
   });
 });
 
