@@ -23,18 +23,29 @@ import { postgresForSuite } from "./suite-postgres.ts";
  * claim, and a subject has one job claimed under a live lease and one waiting behind it.
  */
 
+/**
+ * Which job a fixture case is about, and why the case is there: for which workspace, under
+ * which id, what to do — its `kind`, and the `reason` a kind that carries one was enqueued
+ * for — and about which subject (`CONTEXT.md`, *job*). A job the fixture seeds and an enqueue
+ * it expects the queue to refuse name a job the same way, so the fields they share are
+ * declared here once and each array adds only what is its own: the lifecycle a seeded row
+ * starts in, the SQLSTATE a refusal must answer with.
+ */
+const jobCaseSchema = z.object({
+  why: z.string(),
+  workspace_id: z.string(),
+  id: z.string(),
+  kind: z.string(),
+  reason: z.string().nullable(),
+  subject_id: z.string().nullable(),
+});
+
 const fixtureSchema = z.object({
   description: z.string(),
   lease_seconds: z.number().int().positive(),
   workspaces: z.array(z.object({ id: z.string(), name: z.string() })),
   jobs: z.array(
-    z.object({
-      why: z.string(),
-      workspace_id: z.string(),
-      id: z.string(),
-      kind: z.string(),
-      reason: z.string().nullable(),
-      subject_id: z.string().nullable(),
+    jobCaseSchema.extend({
       status: z.string(),
       attempts: z.number().int(),
       max_attempts: z.number().int(),
@@ -43,17 +54,7 @@ const fixtureSchema = z.object({
       lease_expires_in_seconds: z.number().int().nullable(),
     }),
   ),
-  refused_enqueues: z.array(
-    z.object({
-      why: z.string(),
-      workspace_id: z.string(),
-      id: z.string(),
-      kind: z.string(),
-      reason: z.string().nullable(),
-      subject_id: z.string().nullable(),
-      sqlstate: z.string(),
-    }),
-  ),
+  refused_enqueues: z.array(jobCaseSchema.extend({ sqlstate: z.string() })),
   claims: z.array(
     z.object({
       why: z.string(),
