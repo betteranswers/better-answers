@@ -20,9 +20,11 @@ import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
 import {
   bindingForGroups,
   bindingHolding,
+  chunkUnder,
   conceptCiting,
   conceptForGroup,
   conceptOnBoth,
+  documentUnder,
   edgeVisibilityHeld,
   groupNamed,
   ledgerRowsOf,
@@ -53,6 +55,51 @@ const now = new Date("2026-09-08T12:00:00.000Z");
 /** The concept's row alone, as the superuser reads it. */
 const heldRow = (workspaceId: string, iri: string) =>
   visibilityHeld(db().pool, "concept_index", workspaceId, iri);
+
+/**
+ * The three visibility columns of one document's chunk copies, oldest span first, read as the
+ * superuser so no policy hides a row the narrowing should have reached.
+ */
+const chunkCopiesOf = async (workspaceId: string, sourceDocumentId: string) => {
+  const read = await db().pool.query(
+    `SELECT sensitivity, audience, audience_groups FROM "index".chunk
+      WHERE workspace_id = $1 AND source_document_id = $2 ORDER BY ordinal`,
+    [workspaceId, sourceDocumentId],
+  );
+  return read.rows;
+};
+
+/** What a seeded chunk holds — the passage whose copy of the three columns a narrowing rewrites. */
+const HOLIDAY = "Holiday is twenty-eight days including bank holidays.";
+
+/** Postgres's own word for *somebody else holds this row*, which is what the probe below reads. */
+const LOCK_NOT_AVAILABLE = "55P03";
+
+/**
+ * Whether an act in flight already holds this binding's chunk rows: an update on them from
+ * another connection, given a quarter of a second to take the row and told to give up rather
+ * than wait. The update writes what is already there and is rolled back either way, so the
+ * probe changes nothing — what it reports is who holds the row, not what it says.
+ */
+const chunkRowsAreHeld = async (workspaceId: string, bindingId: string): Promise<boolean> => {
+  const probe = await db().pool.connect();
+  try {
+    await probe.query("BEGIN");
+    await probe.query("SET LOCAL lock_timeout = '250ms'");
+    await probe.query(
+      `UPDATE "index".chunk SET content = content WHERE workspace_id = $1 AND binding_id = $2`,
+      [workspaceId, bindingId],
+    );
+    return false;
+  } catch (reason) {
+    const code = reason instanceof Error && "code" in reason ? String(reason.code) : "";
+    if (code !== LOCK_NOT_AVAILABLE) throw reason;
+    return true;
+  } finally {
+    await probe.query("ROLLBACK");
+    probe.release();
+  }
+};
 
 /** The Admin's override of one concept to a class for everyone, through the act. */
 const overriddenTo = (scenario: Scenario, iri: string, sensitivity: string) =>
@@ -420,6 +467,17 @@ describe("what a re-write may not do to the class a concept holds", () => {
   });
 });
 
+/**
+ * The narrowing act and the three levels it rewrites inside one transaction, under the
+ * workspace's one cascade lock: the binding's chunk copies first, then every concept citing
+ * its documents, then every composition including one of those concepts.
+ *
+ * **What the cascade costs: 3.3 ms per citing concept inside the workspace's cascade lock,
+ * probe 3 of 10/09/2026** — 995 ms for one binding 300 concepts cite, linear in the count.
+ * The lock is a workspace's, so that is how long a second Admin's narrowing waits; the figure
+ * is what S4's plan and the operations thresholds are priced from, and it is written down
+ * here because the tests below are where anybody comes to read what this act does.
+ */
 describe("narrowing a binding", () => {
   it("recomputes the concepts citing its documents and the compositions including them, in its own transaction, with its ledger row", async () => {
     const scenario = await arrange();
@@ -482,6 +540,105 @@ describe("narrowing a binding", () => {
         },
       ],
     );
+  });
+
+  it("rewrites the chunk copies of every document under it, keeping a document's own narrower class and never taking a wider one", async () => {
+    const scenario = await arrange();
+    const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
+    const binding = await bindingHolding(db(), scenario.workspaceId);
+    // The three shapes the visibility-columns agreement names: a document with no class of
+    // its own, one narrower than its binding, and one whose own word is wider.
+    const narrowed = await documentUnder(
+      db(),
+      scenario.workspaceId,
+      binding.bindingId,
+      "Restricted",
+    );
+    const wider = await documentUnder(db(), scenario.workspaceId, binding.bindingId, "Public");
+    for (const [document, sensitivity] of [
+      [binding, "Internal"],
+      [narrowed, "Restricted"],
+      [wider, "Internal"],
+    ] as const) {
+      await chunkUnder(db(), scenario.workspaceId, document, {
+        content: HOLIDAY,
+        ordinal: 0,
+        charStart: 0,
+        charEnd: 53,
+        sensitivity,
+        audience: "everyone",
+      });
+    }
+
+    // The audience alone moves: the class the binding holds is the one it keeps, so a copy
+    // rewritten from the binding and nothing else would widen the narrowed document's chunk.
+    const moved = await reading(scenario.admin, (admin, tx) =>
+      narrowBinding(admin, tx, {
+        bindingId: binding.bindingId,
+        sensitivity: "Internal",
+        audience: "groups",
+        audienceGroups: [hr],
+      }),
+    );
+
+    expect(moved.ok).toBe(true);
+    const forHr = { audience: "groups", audience_groups: [hr] };
+    expect(await chunkCopiesOf(scenario.workspaceId, binding.documentId)).toEqual([
+      { sensitivity: "Internal", ...forHr },
+    ]);
+    // The fold takes the narrower of the two, so a class on a document can only ever take
+    // visibility away: Restricted stays, and Public never becomes the chunk's word.
+    expect(await chunkCopiesOf(scenario.workspaceId, narrowed.documentId)).toEqual([
+      { sensitivity: "Restricted", ...forHr },
+    ]);
+    expect(await chunkCopiesOf(scenario.workspaceId, wider.documentId)).toEqual([
+      { sensitivity: "Internal", ...forHr },
+    ]);
+  });
+
+  it("writes the chunk copies before the cascade reaches the first concept, so the levels run outward from the binding", async () => {
+    const scenario = await arrange();
+    const binding = await bindingHolding(db(), scenario.workspaceId);
+    const elsewhere = await bindingHolding(db(), scenario.workspaceId);
+    await conceptCiting(scenario, scenario.editor, [binding.documentId]);
+    for (const document of [binding, elsewhere]) {
+      await chunkUnder(db(), scenario.workspaceId, document, {
+        content: HOLIDAY,
+        ordinal: 0,
+        charStart: 0,
+        charEnd: 53,
+        sensitivity: "Internal",
+        audience: "everyone",
+      });
+    }
+
+    // The narrowing is held at its first concept — its binding taken and, if the order is the
+    // one this act promises, its chunk copies already rewritten — and the rows are asked who
+    // holds them from another connection while it waits there.
+    await whileActsWaitAt(db().pool, "concept_index", "UPDATE", async (release) => {
+      const narrowing = reading(scenario.admin, (admin, tx) =>
+        narrowBinding(admin, tx, {
+          bindingId: binding.bindingId,
+          sensitivity: "Restricted",
+          audience: "everyone",
+        }),
+      );
+      await until(async () => (await countWaitingOnLocks(db().pool)) >= 1);
+
+      // Level zero has run: the binding's chunk rows are the act's until it commits. Were the
+      // copies written after the cascade instead, this probe would take the row and pass.
+      expect(await chunkRowsAreHeld(scenario.workspaceId, binding.bindingId)).toBe(true);
+      // And the pair the other way: a chunk of a binding this act never names is free, so
+      // what the probe read is the act's own rows and not a lock over the whole table.
+      expect(await chunkRowsAreHeld(scenario.workspaceId, elsewhere.bindingId)).toBe(false);
+
+      await release();
+      expect(await narrowing).toMatchObject({ ok: true });
+    });
+
+    expect(await chunkCopiesOf(scenario.workspaceId, binding.documentId)).toEqual([
+      { sensitivity: "Restricted", ...EVERYONE },
+    ]);
   });
 
   it("narrows an audience to named groups, and the Viewer outside them loses the concept at once", async () => {
@@ -866,10 +1023,18 @@ describe("narrowing a binding", () => {
     ).toHaveLength(2);
   });
 
-  it("leaves neither the narrowed row, nor the cascade, nor its ledger row when the transaction fails after it", async () => {
+  it("leaves neither the narrowed row, nor the chunk copies, nor the cascade, nor its ledger row when the transaction fails after it", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
+    await chunkUnder(db(), scenario.workspaceId, binding, {
+      content: HOLIDAY,
+      ordinal: 0,
+      charStart: 0,
+      charEnd: 53,
+      sensitivity: "Internal",
+      audience: "everyone",
+    });
 
     // `[AUDIT1]` and `[TEST8]`: a failure provoked after the act's rows and its ledger row
     // have landed, and the assertion on what the transaction left, before any value.
@@ -901,6 +1066,11 @@ describe("narrowing a binding", () => {
       sensitivity: "Internal",
       ...EVERYONE,
     });
+    // Level zero rolls back with the rest of it: the copies are the act's own statement, in
+    // the act's own transaction, and not a write that outlives the act that made it.
+    expect(await chunkCopiesOf(scenario.workspaceId, binding.documentId)).toEqual([
+      { sensitivity: "Internal", ...EVERYONE },
+    ]);
     expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed")).toEqual(
       [],
     );

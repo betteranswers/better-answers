@@ -22,7 +22,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { holdsEveryGroup } from "../members/index.ts";
-import { enqueueJobIn } from "../runs/index.ts";
+import { enqueueJobIn, type IndexReason } from "../runs/index.ts";
 import { putObject, type ObjectDoor } from "../store/objects/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { dpiaInputFor, REDACTION_CATEGORIES } from "./dpia.ts";
@@ -548,5 +548,95 @@ export const publishBinding = async (
     auditEventId,
     chunks: stamped.value.rowCount ?? 0,
     dpiaHash: dpia.value.hash,
+  });
+};
+
+export type ReprocessBindingInput = {
+  readonly bindingId: string;
+  /**
+   * Why this binding is being indexed again, in the queue's own words for an index run —
+   * the caller's to say, because the caller is the act this one rides in: the erasure
+   * routine's *wiped*, an edit to the rules in force's *rule-change*, a finding restored
+   * into a document's *restored*.
+   */
+  readonly reason: IndexReason;
+};
+
+/**
+ * Why a reprocess was refused. There is no word here for *nothing to do*: a binding whose
+ * chunks are already gone is reprocessed all the same, because what the act promises is the
+ * run that will land them again and not the rows it found.
+ */
+export type ReprocessBindingRefusal = RoleRefusal | "malformed" | "no-such-binding" | Error;
+
+export type BindingReprocessed = {
+  readonly bindingId: string;
+  /** The `index` run that will land the binding's chunks again. */
+  readonly jobId: string;
+  /** How many chunk rows went — what that run has to put back. */
+  readonly chunks: number;
+};
+
+/**
+ * **The reprocess**: a binding's derived rows taken away and the run that will land them again
+ * put on the queue, both **in the caller's transaction** (ADR 0036; the S1 spec, *The sources
+ * slice's acts*). It is half an act rather than a whole one — the wipe's first half for S0's
+ * erasure routine, and an edit to a binding's rules in force — so it writes no ledger row of
+ * its own: what happened is the caller's act, and this is a step inside it. Riding in the
+ * caller's transaction is the whole point: an erasure that rolls back leaves the binding's
+ * passages exactly where it found them, and one that commits leaves none of them behind.
+ *
+ * **The run is queued before the rows go.** What ADR 0036 pairs is the deletion and the run,
+ * not the order of two statements in one transaction — they commit together either way. The
+ * order is for the one path where they do not: the queue is where a reason no index run carries
+ * is answered, and a refusal handed back with the chunks already gone would be a caller's
+ * transaction it has to remember to abort. Read the other way round: no path here takes a
+ * binding's passages away without the work that replaces them already being on the queue.
+ *
+ * **The LMDB directory is not this act's.** The engine's store for this binding sits on the
+ * worker's own volume, and the worker removes it at the head of the `index` run this enqueues
+ * (ADR 0036, amended 2026-09-10). Two tiers, two stores, one order.
+ *
+ * The binding's row is taken `FOR UPDATE`, so a reprocess and a narrowing of the same binding
+ * queue rather than one deleting the rows the other is rewriting.
+ */
+export const reprocessBinding = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: ReprocessBindingInput,
+): Promise<Result<BindingReprocessed, ReprocessBindingRefusal>> => {
+  const admin = requireAdmin(principal);
+  if (!admin.ok) return err(admin.error);
+  const bindingId = BINDING_ID.safeParse(input.bindingId);
+  if (!bindingId.success) return err("malformed");
+  const { workspaceId } = admin.value;
+
+  const known = await attempt(() =>
+    tx.query("SELECT 1 FROM source_binding WHERE workspace_id = $1 AND id = $2 FOR UPDATE", [
+      workspaceId,
+      bindingId.data,
+    ]),
+  );
+  if (!known.ok) return err(known.error);
+  if (known.value.rowCount === 0) return err("no-such-binding");
+
+  const queued = await enqueueJobIn(admin.value, tx, {
+    workspaceId,
+    kind: INDEX_KIND,
+    subjectId: bindingId.data,
+    reason: input.reason,
+  });
+  if (!queued.ok) return err(queued.error);
+  const wiped = await attempt(() =>
+    tx.query(`DELETE FROM "index".chunk WHERE workspace_id = $1 AND binding_id = $2`, [
+      workspaceId,
+      bindingId.data,
+    ]),
+  );
+  if (!wiped.ok) return err(wiped.error);
+  return ok({
+    bindingId: bindingId.data,
+    jobId: queued.value.jobId,
+    chunks: wiped.value.rowCount ?? 0,
   });
 };
