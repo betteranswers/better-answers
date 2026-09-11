@@ -7,9 +7,9 @@ knowledge of what the app's journal built, stamped with the migration id it was
 generated from and with that migration's journal instant, which is what the
 migrator writes into `drizzle.__drizzle_migrations.created_at`."""
 
-MIGRATION_ID = "0034_the-job-subject-and-the-run-key"
+MIGRATION_ID = "0035_the-job-subject-and-the-run-key-substrate"
 
-MIGRATION_WHEN = 1789674602522
+MIGRATION_WHEN = 1789676094986
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {

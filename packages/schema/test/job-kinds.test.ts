@@ -42,11 +42,18 @@ beforeAll(async () => {
 
 const WS = "01J6JJJJJJJJJJJJJJJJJJJJJJ";
 const BINDING = "01J6BNNNNNNNNNNNNNNNNNNNNN";
+const ANOTHER_BINDING = "01J6BMMMMMMMMMMMMMMMMMMMMM";
 
 type ProbeRow = {
   readonly kind: string;
   readonly reason?: string | null;
   readonly subjectId?: string | null;
+  /**
+   * How long ago the job was enqueued. The claim hands out the oldest first, so a test
+   * about *which* job is taken says how old each one is rather than trusting the order two
+   * inserts happened to land in — inside one transaction `now()` does not move.
+   */
+  readonly enqueuedAgoSeconds?: number;
 };
 
 /**
@@ -62,11 +69,77 @@ const everyReason = DESCRIBED.flatMap((descriptor) => [...descriptor.reasons]);
 const insertJob = async (client: pg.PoolClient, row: ProbeRow): Promise<string> => {
   const id = ulid();
   await client.query(
-    `INSERT INTO job (workspace_id, id, kind, reason, subject_id, status)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-    [WS, id, row.kind, row.reason ?? null, row.subjectId ?? null, JOB_QUEUED_STATUS],
+    `INSERT INTO job (workspace_id, id, kind, reason, subject_id, status, enqueued_at)
+       VALUES ($1, $2, $3, $4, $5, $6, now() - ($7 || ' seconds')::interval)`,
+    [
+      WS,
+      id,
+      row.kind,
+      row.reason ?? null,
+      row.subjectId ?? null,
+      JOB_QUEUED_STATUS,
+      String(row.enqueuedAgoSeconds ?? 0),
+    ],
   );
   return id;
+};
+
+/**
+ * A job already claimed over a subject, under a lease that either stands or has gone: the
+ * row the claim's sibling check reads. Written as SQL rather than through a claim, because
+ * what is under test below is what the *next* claim does about it.
+ */
+const claimedJob = async (
+  client: pg.PoolClient,
+  row: ProbeRow,
+  leaseInSeconds: number,
+): Promise<string> => {
+  const id = ulid();
+  await client.query(
+    `INSERT INTO job (workspace_id, id, kind, reason, subject_id, status, attempts,
+                      enqueued_at, claimed_by, claimed_at, lease_expires_at, heartbeat_at)
+       VALUES ($1, $2, $3, $4, $5, 'claimed', 1,
+               now() - ($6 || ' seconds')::interval, 'worker-holding', now(),
+               now() + ($7 || ' seconds')::interval, now())`,
+    [
+      WS,
+      id,
+      row.kind,
+      row.reason ?? null,
+      row.subjectId ?? null,
+      String(row.enqueuedAgoSeconds ?? 0),
+      String(leaseInSeconds),
+    ],
+  );
+  return id;
+};
+
+/**
+ * One claim, under the role and the scope a worker actually claims with — the function is
+ * SECURITY INVOKER, so the policy is what it sees through and a superuser's claim would
+ * prove the filter over rows no worker can reach.
+ */
+const claimed = async (
+  client: pg.PoolClient,
+  kinds: readonly string[],
+): Promise<readonly string[]> => {
+  await client.query("SET LOCAL ROLE worker_rt");
+  await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS]);
+  const answered = await client.query<{ id: string }>(
+    "SELECT id FROM claim_job($1, $2::interval, $3)",
+    ["worker-claiming", "60 seconds", [...kinds]],
+  );
+  await client.query("RESET ROLE");
+  return answered.rows.map((row) => row.id);
+};
+
+/** Take a lease away without waiting for it to lapse. */
+const lapseLeaseOf = async (client: pg.PoolClient, jobId: string) => {
+  await client.query(
+    `UPDATE job SET lease_expires_at = now() - interval '30 seconds'
+       WHERE workspace_id = $1 AND id = $2`,
+    [WS, jobId],
+  );
 };
 
 /**
@@ -323,6 +396,84 @@ describe("the run key", () => {
         "nightly-audit · no reason · no subject",
         "full-rebuild · first-sync · no subject",
       ]);
+    });
+  });
+});
+
+/**
+ * The queued side of *one run per subject* is the run key above; the claimed side is the
+ * claim's own sibling check, and the two together are what stop a binding being indexed by
+ * two runs at once. It lives in the claim rather than in a constraint because the rule is
+ * about a lease that is still standing, which is a fact about an instant and not about a
+ * row, and it ships here with the claim it refuses beside the claim it serves (`[SEC3]`).
+ */
+describe("the claim's sibling check", () => {
+  it("passes over a job whose subject already has a run under a live lease", async () => {
+    await withWorkspace(async (client) => {
+      await claimedJob(
+        client,
+        { kind: "index", reason: "bound", subjectId: BINDING, enqueuedAgoSeconds: 60 },
+        120,
+      );
+      // Older than the job below and still passed over, which is what makes this the
+      // sibling check and not an empty queue: the claim reaches past it for a binding
+      // nothing is running.
+      await insertJob(client, {
+        kind: "index",
+        reason: "restored",
+        subjectId: BINDING,
+        enqueuedAgoSeconds: 45,
+      });
+      const free = await insertJob(client, {
+        kind: "index",
+        reason: "bound",
+        subjectId: ANOTHER_BINDING,
+        enqueuedAgoSeconds: 10,
+      });
+
+      expect(await claimed(client, ["index"])).toEqual([free]);
+      // And now that binding has a run too, so there is nothing left to give out.
+      expect(await claimed(client, ["index"])).toEqual([]);
+    });
+  });
+
+  it("hands a subject's work out again once the lease it was waiting on lapses", async () => {
+    await withWorkspace(async (client) => {
+      const running = await claimedJob(
+        client,
+        { kind: "index", reason: "bound", subjectId: BINDING, enqueuedAgoSeconds: 60 },
+        120,
+      );
+      await insertJob(client, {
+        kind: "index",
+        reason: "rule-change",
+        subjectId: BINDING,
+        enqueuedAgoSeconds: 45,
+      });
+
+      expect(await claimed(client, ["index"])).toEqual([]);
+
+      // The lease is the whole of what was holding the binding: take it away and the
+      // binding's work is claimable again, and it goes to the row that lost it — the older
+      // of the two, and the run that was part-way through.
+      await lapseLeaseOf(client, running);
+      expect(await claimed(client, ["index"])).toEqual([running]);
+
+      // The claim just made is itself a live lease on that binding, so the job waiting
+      // behind it waits: one run per subject holds from either end.
+      expect(await claimed(client, ["index"])).toEqual([]);
+    });
+  });
+
+  it("leaves the subjectless kinds alone, because a NULL subject is nobody's sibling", async () => {
+    await withWorkspace(async (client) => {
+      await claimedJob(client, { kind: "nightly-audit", enqueuedAgoSeconds: 60 }, 120);
+      const second = await insertJob(client, {
+        kind: "nightly-audit",
+        enqueuedAgoSeconds: 45,
+      });
+
+      expect(await claimed(client, ["nightly-audit"])).toEqual([second]);
     });
   });
 });

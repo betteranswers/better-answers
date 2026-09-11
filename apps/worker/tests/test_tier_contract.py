@@ -17,7 +17,7 @@ from typing import Any, cast
 import pytest
 from psycopg import Cursor
 
-SPOKEN_CONTRACT_VERSION = 6
+SPOKEN_CONTRACT_VERSION = 7
 SPOKEN_AGREEMENTS = {
     "concept-file": "fixtured",
     "concept-inbox": "sql-function",
@@ -328,7 +328,11 @@ def test_the_inbox_refuses_every_road_the_fixture_says_is_closed() -> None:
 # work
 # loop is allowed to assume: the oldest claimable job first, a lapsed lease claimable
 # again,
-# a heartbeat that is the claimant's alone, and poison at the ceiling.
+# a heartbeat that is the claimant's alone, and poison at the ceiling. From
+# `contract_version` 7 it pins two more: a claim reaches only the kinds it passes, in
+# the poison arm as well as the candidate one, so a kind this loop's registry lacks is
+# left where it is; and a subject has one job claimed under a live lease and one queued
+# behind it, so a binding is never indexed by two runs at once.
 
 
 def read_queue() -> dict[str, Any]:
@@ -348,6 +352,7 @@ def _seed_queue_fixture(cursor: Cursor[Any], fixture: dict[str, Any]) -> None:
             job_id=seeded["id"],
             kind=seeded["kind"],
             reason=seeded["reason"],
+            subject_id=seeded["subject_id"],
             status=seeded["status"],
             attempts=seeded["attempts"],
             max_attempts=seeded["max_attempts"],
@@ -355,6 +360,47 @@ def _seed_queue_fixture(cursor: Cursor[Any], fixture: dict[str, Any]) -> None:
             claimed_by=seeded["claimed_by"],
             lease_expires_in_seconds=seeded["lease_expires_in_seconds"],
         )
+
+
+def _refused_enqueue(cursor: Cursor[Any], refused: dict[str, Any]) -> str:
+    """One enqueue the queue must refuse, answered with the SQLSTATE that refused it.
+
+    A failed statement aborts the transaction it happened in, so the probe runs against
+    a savepoint it can come back to.
+    """
+    import psycopg
+
+    cursor.execute("SAVEPOINT refused_enqueue")
+    try:
+        cursor.execute(
+            "INSERT INTO job (workspace_id, id, kind, reason, subject_id, status)"
+            " VALUES (%s, %s, %s, %s, %s, 'queued')",
+            (
+                refused["workspace_id"],
+                refused["id"],
+                refused["kind"],
+                refused["reason"],
+                refused["subject_id"],
+            ),
+        )
+    except psycopg.Error as error:
+        cursor.execute("ROLLBACK TO SAVEPOINT refused_enqueue")
+        return str(error.sqlstate)
+    cursor.execute("ROLLBACK TO SAVEPOINT refused_enqueue")
+    return "admitted"
+
+
+def _lapse_leases(cursor: Cursor[Any], job_ids: list[str]) -> None:
+    """Push a lease thirty seconds into the past, as the superuser: how the fixture
+    lapses a lease part-way through a sequence of claims without waiting a minute.
+    """
+    if not job_ids:
+        return
+    cursor.execute(
+        "UPDATE job SET lease_expires_at = now() - interval '30 seconds'"
+        " WHERE id = ANY(%s)",
+        (job_ids,),
+    )
 
 
 def _as_role_in_scope(cursor: Cursor[Any], where: dict[str, Any]) -> None:
@@ -375,15 +421,28 @@ def test_the_queue_hands_out_every_job_the_fixture_says_and_answers_every_call()
     with migrated_postgres() as connection, connection.cursor() as cursor:
         _seed_queue_fixture(cursor, fixture)
 
+        # The run key first, while the jobs it collides with are still queued: a second
+        # queued job for a subject that already has one is the database's refusal, which
+        # is what lets an enqueue read the waiting job's id back and never duplicate it.
+        enqueues = [
+            {"why": refused["why"], "sqlstate": _refused_enqueue(cursor, refused)}
+            for refused in fixture["refused_enqueues"]
+        ]
+        assert enqueues == [
+            {"why": refused["why"], "sqlstate": refused["sqlstate"]}
+            for refused in fixture["refused_enqueues"]
+        ]
+
         # The claims in order and the whole list at once: the agreement is about which
         # job
         # goes next, so asserting one at a time would let a claim nobody made pass.
         claimed: list[dict[str, Any]] = []
         for claim in fixture["claims"]:
+            _lapse_leases(cursor, claim.get("lapse_first", []))
             _as_role_in_scope(cursor, claim)
             cursor.execute(
-                "SELECT id FROM claim_job(%s, %s::interval)",
-                (claim["worker_id"], lease),
+                "SELECT id FROM claim_job(%s, %s::interval, %s)",
+                (claim["worker_id"], lease, claim["kinds"]),
             )
             claimed.append(
                 {"why": claim["why"], "ids": [row[0] for row in cursor.fetchall()]}
