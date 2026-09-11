@@ -1,5 +1,5 @@
 import { ulid } from "@better-answers/schema";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { commit, type GitDoor } from "@better-answers/core/store/git";
 import {
@@ -360,8 +360,14 @@ const bundleCommitRowsIn = async (workspaceId: string) => {
  * identical arrangements. A run of its own is kept for the second-pass case, which is about
  * what a *second* run does and cannot share one.
  *
- * Lazy rather than a `beforeAll`, so a `-t` filter that selects none of these cases pays
- * nothing for them.
+ * Lazy, and primed by a `beforeAll` at the head of each block that reads it. The memo is what
+ * makes the run happen once; the hook is what decides who pays for it. Without the hook the bill
+ * falls on whichever case the runner reaches first, inside that case's own budget — `testTimeout`
+ * is 60 s where `hookTimeout` is 120 s (`vitest.config.ts`), so on a runner slower than this
+ * machine the first reader is the case that times out, for a reason that is nothing to do with
+ * what it asserts. Priming in the hook puts the cost under the larger budget and leaves no test
+ * carrying it. The laziness still earns its keep: a `-t` filter that selects no case in a block
+ * leaves that block's hook unrun, so it pays nothing for a rewrite it never reads.
  */
 const readingTheBundle = async (workspaceId: string, git: GitDoor) => ({
   objects: await everyObjectOf(git, workspaceId),
@@ -615,6 +621,10 @@ describe("the erasure pseudonym", () => {
 });
 
 describe("the report", () => {
+  beforeAll(async () => {
+    await theBundleRewritten();
+  });
+
   it("is ADR 0020's fixed wording, with the four beyond-use dates computed from the lock instant", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
 
@@ -800,6 +810,10 @@ describe("a second run of the routine", () => {
 });
 
 describe("the git step", () => {
+  beforeAll(async () => {
+    await theBundleRewritten();
+  });
+
   it("leaves no object at any commit holding the address the files and the author lines carried", async () => {
     const { email, before, after } = await theBundleRewritten();
     // The arrangement is only worth its assertions if the history really named them first.
@@ -856,6 +870,10 @@ describe("the git step", () => {
 });
 
 describe("the bundle_commit rows the rewrite moves", () => {
+  beforeAll(async () => {
+    await theBundleRewritten();
+  });
+
   it("names the rewritten hashes, parents and all, and carries the index row's key with them", async () => {
     const { before, after, commitOfTheConcept } = await theBundleRewritten();
     expect(before.rows.map((row) => row.sha)).toEqual(before.history);
@@ -897,6 +915,10 @@ describe("the bundle_commit rows the rewrite moves", () => {
 });
 
 describe("the checks the rewrite moved", () => {
+  beforeAll(async () => {
+    await theBundleRewritten();
+  });
+
   it("carries each one onto the new hash under origin erasure-rewrite, and the trust reading is unchanged", async () => {
     const {
       email,
