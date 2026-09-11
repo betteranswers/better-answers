@@ -20,6 +20,13 @@ import type { KnipConfig } from "knip";
  * rather than JSON so those reasons can be sentences.
  */
 const config: KnipConfig = {
+  // A GitNexus index, written under `.gitnexus/` per checkout. It is excluded from git
+  // through `.git/info/exclude` rather than `.gitignore` — machine-local state never
+  // committed to the tree — and knip reads `.gitignore` only, never `.git/info/exclude`. A
+  // checkout that has been analysed therefore names `.gitnexus/run.cjs` as an unused file for
+  // a reason that is not the tree's: the directory not being in the tree at all.
+  ignore: [".gitnexus/**"],
+
   // `uv` is the Python tier's package manager, named by the root `check:worker` step and by
   // the pre-commit hook. It is installed on the machine, never by npm, so there is no
   // manifest for knip to find it in.
