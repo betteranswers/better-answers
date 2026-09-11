@@ -1,0 +1,30 @@
+packages/core/test/git.test.ts
+  s_f3ee63bcbb1a0b::t_15fa78e7ff25c3 298-361
+packages/core/src/store/git/index.ts
+  s_f3ee63bcbb1a0b::t_86ec9193464abe 486-579
+packages/core/src/erasure/index.ts
+  s_f3ee63bcbb1a0b::t_e336bfe3150443 9-11,14-15
+packages/core/test/erasure-map.test.ts
+  s_f3ee63bcbb1a0b::t_63cf91b6fe7afa 1-338,340-360
+packages/core/src/erasure/map.ts
+  s_f3ee63bcbb1a0b::t_0339d13be2629a 3-194,196-248,250-292,299-301,303-305,307-318
+  s_f3ee63bcbb1a0b::t_23d497deca7174 195
+  s_f3ee63bcbb1a0b::t_705a451868e387 249
+  s_f3ee63bcbb1a0b::t_ee94cf1c2cbb60 293-297,302,306
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "8d930a2e957b26924b3345e9344399c46ed43b53",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
