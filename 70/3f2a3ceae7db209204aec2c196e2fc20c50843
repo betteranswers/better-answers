@@ -1,0 +1,37 @@
+packages/core/test/erasure-routine.test.ts
+  s_96a66f19ddb6be::t_dcd39a5a38fb63 1108-1131
+  s_96a66f19ddb6be::t_5138383529e8c0 167-168,175
+packages/core/src/erasure/identity.ts
+  s_96a66f19ddb6be::t_571c737a471916 105-114,117-118
+packages/core/test/erasure-replay.test.ts
+  s_96a66f19ddb6be::t_7250ac0405283d 510-555
+  s_96a66f19ddb6be::t_166d00eea30bae 17
+  s_96a66f19ddb6be::t_6d88ec68239212 94-96
+packages/schema/migrations/0032_the-worker-writes-a-finding-unreviewed.sql
+  s_96a66f19ddb6be::t_5c102b89b439a7 1-37
+packages/core/src/erasure/routine.ts
+  s_96a66f19ddb6be::t_1116890303c2f6 604-606,612
+packages/core/test/erasure-map.test.ts
+  s_96a66f19ddb6be::t_6f2dd7e8d9f868 377-414
+  s_96a66f19ddb6be::t_76dbc948d46431 81-97,100,105
+packages/schema/test/rls.test.ts
+  s_96a66f19ddb6be::t_b7071320ff0025 2442-2464
+packages/core/src/erasure/map.ts
+  s_96a66f19ddb6be::t_d8eb34a7970388 229-240,249
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "703f2a3ceae7db209204aec2c196e2fc20c50843",
+  "prompts": {},
+  "sessions": {
+    "s_96a66f19ddb6be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1940d59b-7323-446c-9724-222dda88e9e0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
