@@ -2,6 +2,7 @@ import type pg from "pg";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { JOB_KINDS } from "@better-answers/schema";
 import { testData, withRollback } from "@better-answers/schema/testing";
 
 import { contractFixture } from "./contract-fixture.ts";
@@ -35,7 +36,7 @@ const jobCaseSchema = z.object({
   why: z.string(),
   workspace_id: z.string(),
   id: z.string(),
-  kind: z.string(),
+  kind: z.enum(JOB_KINDS),
   reason: z.string().nullable(),
   subject_id: z.string().nullable(),
 });
@@ -61,7 +62,7 @@ const fixtureSchema = z.object({
       role: z.string(),
       workspace_id: z.string(),
       worker_id: z.string(),
-      kinds: z.array(z.string()),
+      kinds: z.array(z.enum(JOB_KINDS)),
       lapse_first: z.array(z.string()).optional(),
       expect_ids: z.array(z.string()),
     }),
@@ -260,5 +261,38 @@ describe("the queue agreement", () => {
           })),
       );
     });
+  });
+});
+
+/**
+ * The kinds the fixture exercises, held to the kinds the descriptors declare.
+ *
+ * A kind is declared once — `JOB_KIND_DESCRIPTORS` — and the row's three CHECKs are written
+ * off that list (`packages/schema/test/job-kinds.test.ts`). This agreement is the other half
+ * of the same list: a kind this queue carries is a kind both tiers must have claimed a job
+ * of, so the fixture's kinds and the descriptors are one list and not two. Left apart, a
+ * descriptor could land with no case to exercise it — the seeded rows would satisfy the kind
+ * CHECK by coincidence and nothing would say the agreement had not caught up.
+ *
+ * Held both ways (`[TEST7]`), and between two sources neither of which derives from the
+ * other (`[TEST9]`): the exercised kinds are read off `contracts/queue/cases.json` as it
+ * sits on disk, the declared ones off the schema package. The enum in the fixture schema
+ * refuses an undeclared kind where it is parsed, so a `kind` no descriptor names fails the
+ * file's load; what the assertion below adds is the direction no parse can see, a kind
+ * declared and never put through the claim protocol.
+ */
+describe("the kinds the queue agreement exercises", () => {
+  it("are the kinds the descriptors declare, neither more nor fewer", () => {
+    const exercised = new Set<string>([
+      ...fixture.jobs.map((seeded) => seeded.kind),
+      ...fixture.refused_enqueues.map((refused) => refused.kind),
+      ...fixture.claims.flatMap((claim) => claim.kinds),
+    ]);
+    const declared = new Set<string>(JOB_KINDS);
+
+    expect({
+      declaredButNeverExercised: [...declared].filter((kind) => !exercised.has(kind)).toSorted(),
+      exercisedButNeverDeclared: [...exercised].filter((kind) => !declared.has(kind)).toSorted(),
+    }).toEqual({ declaredButNeverExercised: [], exercisedButNeverDeclared: [] });
   });
 });
