@@ -1,0 +1,41 @@
+packages/core/test/tier-contract.test.ts
+  s_f3ee63bcbb1a0b::t_2fe90fe64ab800 29,38
+apps/worker/tests/test_redaction_contract.py
+  s_f3ee63bcbb1a0b::t_69812302c6cbfb 71-73,101-103,106-108,129-131,146-148
+  s_f3ee63bcbb1a0b::t_033a84e60b6936 1-48,50-57,59-70,74-82,84-100,104-105,109-118,120-128,132,135-145
+  s_f3ee63bcbb1a0b::t_21e3a62319d9ff 49,58,83,119,133-134
+docs/adr/README.md
+  s_f3ee63bcbb1a0b::t_9edc3aad8b5e6e 39
+docs/adr/0031-the-tier-contract-is-six-agreements-in-three-forms-fixtured-in-one-language-neutral-directory-both-suites-read.md
+  s_f3ee63bcbb1a0b::t_cb99b5c3eba632 30-33
+  s_f3ee63bcbb1a0b::t_fcb3c706786990 20
+contracts/redaction/cases.json
+  s_f3ee63bcbb1a0b::t_f5498289ddf58d 1,3-80,82-137
+  s_f3ee63bcbb1a0b::t_1d143f5fe18895 2
+  s_f3ee63bcbb1a0b::t_7993e34543d2b8 81
+apps/worker/tests/test_tier_contract.py
+  s_f3ee63bcbb1a0b::t_59887a4a250de3 20,29
+contracts/manifest.json
+  s_f3ee63bcbb1a0b::t_db1f3bb36cd6ff 2,11-12,19-20
+packages/core/test/redaction.contract.test.ts
+  s_f3ee63bcbb1a0b::t_415572bdaa452d 1-199
+contracts/README.md
+  s_f3ee63bcbb1a0b::t_76355b87bbc666 5
+  s_f3ee63bcbb1a0b::t_a4e2f01c2f0698 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b60ff045347c25bde00d2adac757f13bad8d98f9",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
