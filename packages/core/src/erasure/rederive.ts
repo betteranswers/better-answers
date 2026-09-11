@@ -1,6 +1,6 @@
 import { FULL_REBUILD_KIND } from "@better-answers/schema";
 
-import type { PlatformPrincipal } from "../kernel/index.ts";
+import { normalizeError, type PlatformPrincipal } from "../kernel/index.ts";
 import { enqueueJob, type RebuildReason } from "../runs/index.ts";
 import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import type { ErasureMap } from "./map.ts";
@@ -101,8 +101,6 @@ export const rederiveAfterErasure = async (
   // An erasure whose re-derivation could not be queued is an erasure that left the derived map
   // naming the person: thrown, so the routine's own `attempt` turns it into the refusal a
   // caller hears rather than a completion that quietly skipped a step.
-  if (!queued.ok) {
-    throw queued.error instanceof Error ? queued.error : new Error(String(queued.error));
-  }
+  if (!queued.ok) throw normalizeError(queued.error);
   return { rebuildJobId: queued.value.jobId, bindingsToReprocess };
 };

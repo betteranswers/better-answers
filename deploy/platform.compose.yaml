@@ -33,10 +33,13 @@ x-mem-512: &mem512
 x-bootstrap: &bootstrap
   # Bootstrap class only; every tenant credential is a row under the envelope, never a variable here.
   DATABASE_URL: ${DATABASE_URL:?}
-  # The four the object door is opened from (apps/api/src/config.ts § readObjectStore reads exactly
-  # these names). The endpoint and the region are facts of this estate rather than values an operator
-  # supplies: Garage is reached by service name on the internal network, path-style, and garage.toml
-  # fixes `s3_region = "garage"` — a region written twice is a region that can disagree with itself.
+  # The five the object door is opened from (apps/api/src/config.ts § readObjectStore reads exactly
+  # these names, and defaults none of them). The endpoint and the region are facts of this estate
+  # rather than values an operator supplies: Garage is reached by service name on the internal
+  # network, path-style, and garage.toml fixes `s3_region = "garage"`. The region is therefore
+  # written in exactly two places — there, for the cluster, and here, for the client that signs
+  # against it — and the deploy tree's own test reads both lines and holds them equal, because a
+  # client signing for a region the cluster does not answer to is refused rather than misrouted.
   # The bucket and the key pair come from wizard-41.sh's Garage stage, which creates all three.
   S3_ENDPOINT: http://objectstore:3900   # Garage, path-style, region below (deploy/garage.toml)
   S3_REGION: garage                      # deploy/garage.toml § [s3_api] s3_region

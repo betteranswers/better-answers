@@ -143,6 +143,30 @@ describe("recording a subject request", () => {
     ).toMatchObject([{ detail: { identifierCount: 2 } }]);
   });
 
+  it("writes the identifier set the boundary parsed, so one given with spaces around it is the one every finder matches", async () => {
+    const scenario = await arrange();
+
+    const recorded = await recordingAs(
+      scenario.admin,
+      requestOf({
+        kind: "erasure",
+        identifiers: {
+          emails: ["  priya@example.invalid  "],
+          names: ["\tPriya Anand "],
+          other: [],
+        },
+      }),
+    );
+
+    expect(recorded.ok).toBe(true);
+    // The column and not the answer: the row is what the erasure map's finders match on, what
+    // a suppression is written from and what the replay copy carries into a restore, so an
+    // identifier that kept its spaces here is a subject whose own identifier finds nothing.
+    expect(await requestRowsIn(scenario.workspaceId)).toMatchObject([
+      { identifiers: { emails: ["priya@example.invalid"], names: ["Priya Anand"], other: [] } },
+    ]);
+  });
+
   it("leaves no request when the ledger refuses the act's event", async () => {
     const scenario = await arrange();
 

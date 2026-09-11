@@ -780,6 +780,47 @@ describe("the ledger an erasure never rewrites", () => {
       "subjectRequestId",
     ]);
   });
+
+  it("names in its detail the person the map found, whether or not the request named one", async () => {
+    const named = await workspaceWithAnErasureRequest();
+    const byAddressAlone = await arrange();
+    const email = addressOf("nadia");
+    const person = await memberOf(db().pool, byAddressAlone.workspaceId, email);
+    // The other way a request arrives: an Admin with an address and no login to point at. The
+    // map resolves a subject by address as well as by id, so step 5 acts on this person — and
+    // the one ledger row recording what the routine did about them has to name them too.
+    const anonymous = await seedingWith(db().pool, (seed) =>
+      seed.subjectRequest({
+        workspaceId: byAddressAlone.workspaceId,
+        kind: "erasure",
+        personId: null,
+        identifiers: { emails: [email], names: [], other: [] },
+      }),
+    );
+
+    const forTheNamed = await completing(named.scenario, named.subjectRequestId);
+    const forTheAddress = await completing(byAddressAlone, anonymous.id);
+
+    const [namedRow] = await ledgerRowsOf(db().pool, named.scenario.workspaceId, COMPLETED);
+    const [foundRow] = await ledgerRowsOf(db().pool, byAddressAlone.workspaceId, COMPLETED);
+    expect({ id: namedRow?.id, personId: namedRow?.detail["personId"] }).toEqual({
+      id: forTheNamed.auditEventId,
+      personId: named.person.id,
+    });
+    expect({ id: foundRow?.id, personId: foundRow?.detail["personId"] }).toEqual({
+      id: forTheAddress.auditEventId,
+      personId: person.id,
+    });
+    // Read the other way round, the two rows disagree on purpose: the request's own column is
+    // null, because the Admin had no login to name, and the event names the person the routine
+    // acted on. A detail built from the request would have left this erasure's one ledger row
+    // naming nobody.
+    const request = await db().pool.query<{ person_id: string | null }>(
+      "SELECT person_id FROM subject_request WHERE workspace_id = $1 AND id = $2",
+      [byAddressAlone.workspaceId, anonymous.id],
+    );
+    expect(request.rows[0]?.person_id).toBeNull();
+  });
 });
 
 describe("a second run of the routine", () => {
@@ -1063,6 +1104,54 @@ describe("the identity set on the person's last membership", () => {
     });
     // What did end is the membership here — and nothing about the membership there.
     expect(await workspacesMemberOf(person.id)).toEqual([elsewhere.workspaceId]);
+  });
+
+  it("deletes the invitations the address holds in every workspace on the last-membership arm", async () => {
+    const leaving = await workspaceWithAnErasureRequest();
+    const elsewhere = await arrange();
+    for (const workspaceId of [leaving.scenario.workspaceId, elsewhere.workspaceId]) {
+      await seedingWith(db().pool, (seed) =>
+        seed.invitation({ workspaceId, email: leaving.email }),
+      );
+    }
+
+    await completing(leaving.scenario, leaving.subjectRequestId);
+
+    // The person has left the platform on this arm, and an invitation is the one row of the
+    // identity set keyed by the address rather than by the person: one left standing in
+    // another company's workspace is a live copy of the address the report has just said was
+    // rewritten, and opening it would put that address back into a user row.
+    expect(
+      await identityRowCountsFor(leaving.scenario.workspaceId, leaving.person.id, leaving.email),
+    ).toMatchObject({ invitations: 0 });
+    expect(
+      await identityRowCountsFor(elsewhere.workspaceId, leaving.person.id, leaving.email),
+    ).toMatchObject({ invitations: 0 });
+  });
+
+  it("leaves every invitation standing when another membership does, because the address is still theirs to be invited by", async () => {
+    const staying = await arrange();
+    const elsewhere = await arrange();
+    const email = addressOf("priya");
+    const person = await memberOf(db().pool, staying.workspaceId, email);
+    await seedingWith(db().pool, (seed) =>
+      seed.member({ workspaceId: elsewhere.workspaceId, userId: person.id, role: "Editor" }),
+    );
+    for (const workspaceId of [staying.workspaceId, elsewhere.workspaceId]) {
+      await seedingWith(db().pool, (seed) => seed.invitation({ workspaceId, email }));
+    }
+    const subjectRequestId = await erasureRequestAbout(staying.workspaceId, person.id, email);
+
+    await completing(staying, subjectRequestId);
+
+    // Nothing of the identity set is touched on this arm — this workspace's membership ends
+    // and that is all — so the invitation it sent stands with the other company's.
+    expect(await identityRowCountsFor(staying.workspaceId, person.id, email)).toMatchObject({
+      invitations: 1,
+    });
+    expect(await identityRowCountsFor(elsewhere.workspaceId, person.id, email)).toMatchObject({
+      invitations: 1,
+    });
   });
 
   it("says which arm ran in the report, and never how many memberships it counted", async () => {

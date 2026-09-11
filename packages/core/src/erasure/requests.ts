@@ -184,6 +184,12 @@ export const recordSubjectRequest = async (
   if (!row.success) return err("malformed");
   const { id: requestId, dueAt } = row.data;
 
+  // **Every value written is the parsed one, never the one that arrived.** The boundary does
+  // not only refuse — it trims (ADR 0028; `subjectIdentifier` is `z.string().trim()`), so an
+  // identifier an Admin pasted with a space around it is a different string in the column than
+  // in the parse if the two are allowed to part here. That string is what the erasure map's
+  // finders match on, what a suppression is written from and what the replay copy carries into
+  // a restore, so an untrimmed one is a subject whose own identifier finds nothing.
   const written = await attempt(() =>
     tx.query(
       `INSERT INTO subject_request
@@ -192,8 +198,8 @@ export const recordSubjectRequest = async (
       [
         workspaceId,
         requestId,
-        input.personId,
-        input.identifiers,
+        row.data.personId,
+        row.data.identifiers,
         row.data.kind,
         row.data.receivedAt,
         row.data.clockStartedAt,

@@ -19,12 +19,16 @@ import { logger } from "./logger.ts";
  * environment.
  *
  * The bootstrap class is what the deploy unit must give the process before it can
- * reach anything. Every other credential class — ingestion, acting, agent, LLM
- * provider, repository, object store — is a row under the envelope and never an
- * environment variable, so a key belongs here only once something in this tier reads
- * it. Two shapes, because two processes read it: `migrate` needs the database alone,
- * `app` also needs the one public origin and the authorization server's secret
- * (ADR 0009, ADR 0034).
+ * reach anything, and `docs/operations/SECRETS.md` says what that is: the envelope key,
+ * the auth secret, the database DSNs, the tunnel token, transactional email, **the
+ * object store's root pair** and the dead-man ping URLs. The other credential classes —
+ * ingestion, acting, agent, LLM provider, repository, and a *workspace's own* object
+ * store — are a tenant's rather than the platform's: each is a row under the envelope,
+ * read through a credentials provider no task has built yet, and never an environment
+ * variable. Two shapes for what a process needs to start, because two processes read
+ * one: `migrate` needs the database alone, `app` also needs the one public origin and
+ * the authorization server's secret (ADR 0009, ADR 0034). The object store is a third
+ * reading, below, for the reason given there.
  */
 const bootstrapSchema = z.object({
   DATABASE_URL: z.url(),
@@ -124,20 +128,27 @@ const identityBootstrapSchema = z
 /**
  * The object store, for the two commands that reach it.
  *
- * It is its own reading and not part of the bootstrap class above because a process that
- * cannot reach the object store must still start: `migrate`'s environment is the database
- * alone, and `pnpm ops` runs in the same image as every other command. Only
- * `replay-erasures` and `erasure-rehearsal` open this door — the replay reads the copies a
- * dump predates, the rehearsal runs a routine that writes one — and each refuses on its own
- * behalf when the reading failed, which is the answer a restore has to see rather than a
- * process that would not come up.
+ * **The pair below is bootstrap class**, which is what `docs/operations/SECRETS.md` records
+ * — "the object store's root pair", in the same row as the database DSNs and the envelope
+ * key — and what `deploy/platform.compose.yaml`'s `x-bootstrap` anchor hands over. It is the
+ * platform's own store and not a workspace's: the bucket holds the platform's own records,
+ * among them the replay copy a restore reads before `api` is allowed to turn healthy, so a
+ * credential kept in a row under the envelope would be one the restore needs before there is
+ * a database to read the row from.
  *
- * The names are the estate's, on `deploy/platform.compose.yaml`'s `x-bootstrap` anchor. The
- * region has a default because Garage's `s3_region` is configuration and not a place
- * (`deploy/garage.toml` fixes it as `garage`): an operator on a store that is somewhere real
- * names theirs, and the estate sets nothing. The credentials are the object-store credential
- * class, which ADR 0020 keeps out of the envelope precisely because the process that reads
- * the envelope may be the one being restored.
+ * It is a **reading of its own** all the same, because a process that cannot reach the object
+ * store must still start: `migrate`'s environment is the database alone, and `pnpm ops` runs
+ * in the same image as every other command. Only `replay-erasures` and `erasure-rehearsal`
+ * open this door — the replay reads the copies a dump predates, the rehearsal runs a routine
+ * that writes one — and each refuses on its own behalf when the reading failed, which is the
+ * answer a restore has to see rather than a process that would not come up.
+ *
+ * The names are the estate's, and so is the region: `deploy/garage.toml` fixes
+ * `s3_region = "garage"` for the cluster and the anchor tells the app the same word, the two
+ * lines held against each other by the deploy tree's own test. There is no default here,
+ * because a region is a fact of the estate a process was deployed into and never a fact of
+ * this tier — a third place to write one is a third place for it to disagree, and a client
+ * that signs for a region the cluster does not answer to is refused rather than misrouted.
  */
 const objectStoreSchema = z.object({
   // http or https and nothing else. A URL parser reads `objectstore:3900` as a URL — scheme
@@ -147,7 +158,7 @@ const objectStoreSchema = z.object({
   // because the estate reaches Garage by service name on an internal network (ADR 0024).
   S3_ENDPOINT: z.url({ protocol: /^https?$/ }),
   S3_BUCKET: z.string().min(1),
-  S3_REGION: z.string().min(1).default("garage"),
+  S3_REGION: z.string().min(1),
   S3_ACCESS_KEY: z.string().min(1),
   S3_SECRET_KEY: z.string().min(1),
 });

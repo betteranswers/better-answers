@@ -420,13 +420,23 @@ const IDENTITY_USER: ErasureFamily = "identity-user";
 const personTheMapFound = (map: ErasureMap): string | null =>
   map.find((entry) => entry.family === IDENTITY_USER)?.locations[0] ?? null;
 
+/**
+ * The completion event's detail: the request it answers, how many locations the map named, and
+ * **the person the routine acted on — the map's, never the request's**.
+ *
+ * Step 5 is handed `personTheMapFound`, so a request that names nobody and is about somebody
+ * the identity set holds here still erases that person. A detail built from `request.personId`
+ * would leave the one ledger row that records what the routine did about them naming no person
+ * at all, and the join from the event to the user row — the join the pseudonymisation keeps the
+ * id for — would have nothing to run on. The field is left out where the map found none: an
+ * absent optional, never a null standing in for a person.
+ */
 const detailOf = (request: SubjectRequest, map: ErasureMap): CompletedDetail => {
   const locations = map.reduce((total, entry) => total + entry.locations.length, 0);
-  // The person id where the subject holds a login, and the field left out where they hold
-  // none — an absent optional, never a null standing in for a person.
-  return request.personId === null
+  const personId = personTheMapFound(map);
+  return personId === null
     ? { subjectRequestId: request.id, locations }
-    : { subjectRequestId: request.id, personId: request.personId, locations };
+    : { subjectRequestId: request.id, personId, locations };
 };
 
 /** What the routine's last step reads back: the completion that stands, this run's or the first's. */

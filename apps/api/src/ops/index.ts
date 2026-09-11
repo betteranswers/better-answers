@@ -202,7 +202,7 @@ const erasureDoors = (pool: Pool, io: OpsIo): Result<ErasureDoors, string> => {
   }
   if (io.objects === undefined) {
     return err(
-      "no object store is configured (S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY on the api service), so the replay copies an erasure leaves cannot be read",
+      "no object store is configured (S3_ENDPOINT, S3_BUCKET, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY on the api service), so the replay copies an erasure leaves cannot be read",
     );
   }
   return ok({ git: git.value, postgres: openPostgres(pool), objects: io.objects, clock: io.clock });

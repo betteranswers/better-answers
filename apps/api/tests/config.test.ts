@@ -77,14 +77,15 @@ describe("the bootstrap configuration", () => {
     const read = readObjectStore({
       S3_ENDPOINT: "http://objectstore:3900",
       S3_BUCKET: "better-answers",
+      // The estate's own word, from the anchor that carries it; `deploy/garage.toml` fixes
+      // the same one for the cluster and the deploy tree's test holds the two together.
+      S3_REGION: "garage",
       S3_ACCESS_KEY: "GK31c2f218a2e44f485b94239e",
       S3_SECRET_KEY: "b892c0665f0ada8a4755dae98baa3b133590e11dae3bcc1f9d769d67f16c3835",
     });
 
     expect(read.ok && read.value).toEqual({
       endpoint: "http://objectstore:3900",
-      // Garage's own region name is configuration and not a place (`deploy/garage.toml`),
-      // so the estate never sets it and the default is what the cluster answers for.
       region: "garage",
       bucket: "better-answers",
       accessKeyId: "GK31c2f218a2e44f485b94239e",
@@ -111,12 +112,18 @@ describe("the bootstrap configuration", () => {
     expect(readObjectStore({ DATABASE_URL: "postgresql://x@db/x" }).ok).toBe(false);
   });
 
-  it.each(["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY", "S3_SECRET_KEY"])(
+  // The region is one of the five and no longer defaulted here: a region is a fact of the
+  // estate the process was deployed into, written in `deploy/garage.toml` for the cluster and
+  // on the compose anchor for the app, and a third copy in this tier is a third thing to
+  // disagree. A process given four of the five is a process that would sign for a region
+  // nobody told it about.
+  it.each(["S3_ENDPOINT", "S3_BUCKET", "S3_REGION", "S3_ACCESS_KEY", "S3_SECRET_KEY"])(
     "is refused without %s, because a door opened on a half-set store fails at the first key",
     (name) => {
       const environment: Record<string, string | undefined> = {
         S3_ENDPOINT: "http://objectstore:3900",
         S3_BUCKET: "better-answers",
+        S3_REGION: "garage",
         S3_ACCESS_KEY: "key",
         S3_SECRET_KEY: "secret",
       };
@@ -132,6 +139,7 @@ describe("the bootstrap configuration", () => {
     const read = readObjectStore({
       S3_ENDPOINT: "objectstore:3900",
       S3_BUCKET: "better-answers",
+      S3_REGION: "garage",
       S3_ACCESS_KEY: "key",
       S3_SECRET_KEY: "secret",
     });

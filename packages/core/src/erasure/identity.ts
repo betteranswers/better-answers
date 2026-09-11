@@ -1,7 +1,7 @@
 import { ERASED_DOMAIN } from "../store/git/index.ts";
 import { withIdentityWrite, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { workspacesHeldBy } from "../workspaces/index.ts";
-import type { PlatformPrincipal } from "../kernel/index.ts";
+import { normalizeError, type PlatformPrincipal } from "../kernel/index.ts";
 
 /**
  * **The identity set, on the person's last membership** — the erasure routine's step 5 (ADR
@@ -14,7 +14,9 @@ import type { PlatformPrincipal } from "../kernel/index.ts";
  *   set goes with them: the user row is pseudonymised — the address to a tombstone nobody can
  *   reach, the name cleared, **the id kept, because every ledger row names it** and a ledger an
  *   erasure rewrote would be a record nobody could rely on — and their sessions, verification
- *   rows, invitations and linked accounts are deleted.
+ *   rows, invitations and linked accounts are deleted. The invitations are deleted **wherever
+ *   they were sent**, which is the one write of this step that leaves the erasing workspace;
+ *   the paragraph below it says why.
  * - **It does not.** Another company's records still name this person, and one controller's
  *   erasure request is not a reason to end their access to another's. This workspace's
  *   membership ends and the identity set waits for the request that ends the last one.
@@ -94,6 +96,9 @@ const rowsOf = (result: { readonly rowCount: number | null }): number => result.
 /**
  * The identity rows this person's last membership takes with them, in the order their own
  * predicates require: the two keyed by **address** run before the address is taken away.
+ *
+ * **This runs on the last-membership arm and on no other** — the arm above returns before
+ * reaching it — which is what lets the invitation delete cross the workspace it was asked in.
  */
 const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) => {
   const emails = [...subject.emails];
@@ -105,14 +110,26 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
          OR lower(identifier) = (SELECT lower(email) FROM "user" WHERE id = $1)`,
     [subject.personId, emails],
   );
-  // Inside this workspace and no other: an invitation another company sent to this address is
-  // that company's record to answer for, and the map is fenced the same way.
+  // **Every workspace, because this is the arm on which the person leaves the platform.** An
+  // invitation is the one row of the identity set keyed by the address rather than by the
+  // person, so one left standing in another company's workspace is a live copy of the address
+  // the report has just told the subject was rewritten — and it is a copy that can be opened,
+  // which would put the address back into a user row. There is no membership anywhere to weigh
+  // against that here: the arm was chosen because this workspace held the last one, the write
+  // is made as the platform principal rather than at an Admin's word, and on the other arm —
+  // where the person stays somebody else's member and their address is still theirs to be
+  // invited by — nothing in this function runs at all.
+  //
+  // The **map's** invitation finder stays fenced to this workspace, and deliberately: the map
+  // is what an access answer is written from, and a document handed to one company is not
+  // where another's records are listed (ADR 0035's rejected oracle). So the count found here
+  // and the count deleted can differ on this arm, which is the difference between what this
+  // workspace may be told and what the platform owes the person.
   const invitations = await tx.query(
     `DELETE FROM invitation
-      WHERE workspace_id = $2
-        AND (lower(email) = ANY($3)
-             OR lower(email) = (SELECT lower(email) FROM "user" WHERE id = $1))`,
-    [subject.personId, subject.workspaceId, emails],
+      WHERE lower(email) = ANY($2)
+         OR lower(email) = (SELECT lower(email) FROM "user" WHERE id = $1)`,
+    [subject.personId, emails],
   );
   const sessions = await tx.query("DELETE FROM session WHERE user_id = $1", [subject.personId]);
   const accounts = await tx.query("DELETE FROM account WHERE user_id = $1", [subject.personId]);
@@ -152,7 +169,9 @@ export const eraseFromTheIdentitySet = async (
   const held = await workspacesHeldBy(platform, door, personId);
   // A person the map found by their user row and whose memberships cannot be read is a store
   // failure, not an arm: the routine's own `attempt` turns it into the refusal a caller hears.
-  if (!held.ok) throw held.error instanceof Error ? held.error : new Error(String(held.error));
+  // Through the kernel's `normalizeError`, which is the one way a thrown value becomes an Error
+  // here as everywhere (`CODING_RULES.md` § TYPES).
+  if (!held.ok) throw normalizeError(held.error);
   const elsewhere = held.value.filter((workspaceId) => workspaceId !== subject.workspaceId);
   const arm: IdentityArm = elsewhere.length === 0 ? "last-membership" : "membership-ended";
 
