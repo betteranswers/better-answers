@@ -1,0 +1,27 @@
+.claude/agents/implementor.md
+  s_96a66f19ddb6be::t_e736bb25962df5 16,20,22
+.claude/settings.json
+  s_96a66f19ddb6be::t_8f5bc9712b3721 2
+docs/agents/build-loop.md
+  s_96a66f19ddb6be::t_393d93c6f659f5 7-9,17-20,22,30-37,53,58,66,75-77,80-81,89-106,109
+.claude/agents/ralph.md
+  s_96a66f19ddb6be::t_f8c28d486e1b79 3,7,10,12,14,16-20,22,24-25,27,29-36,40-44
+.claude/agents/verifier.md
+  s_96a66f19ddb6be::t_e736bb25962df5 19,31,62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e37037bd5326cd269048e96fe835906761a46bfe",
+  "prompts": {},
+  "sessions": {
+    "s_96a66f19ddb6be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1940d59b-7323-446c-9724-222dda88e9e0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
