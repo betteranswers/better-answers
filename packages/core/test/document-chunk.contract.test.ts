@@ -4,7 +4,7 @@ import { z } from "zod";
 import { ULID } from "@better-answers/schema";
 
 import { chunkIdOf, parseLocator, spanText } from "../src/sources/index.ts";
-import { contractFixture } from "./contract-fixture.ts";
+import { contractFixture, documentChunkRow } from "./contract-fixture.ts";
 
 /**
  * The document-chunk agreement's TypeScript half (ADR 0031, ADR 0036): the fixture in
@@ -27,15 +27,6 @@ import { contractFixture } from "./contract-fixture.ts";
  * Neither half holds the other's literals (`[TEST9]`): each expected value is the fixture's
  * own, and each tier asserts against its own code.
  */
-
-const chunkRow = z.object({
-  ordinal: z.int().nonnegative(),
-  id: z.string().min(1),
-  char_start: z.int().nonnegative(),
-  char_end: z.int().nonnegative(),
-  locator: z.string().min(1),
-  content: z.string().min(1),
-});
 
 const openCase = z.object({
   case: z.string().min(1),
@@ -94,7 +85,7 @@ const fixtureSchema = z.object({
       utf16_units: z.int().positive(),
       why: z.string().min(1),
     }),
-    chunks: z.array(chunkRow),
+    chunks: z.array(documentChunkRow),
   }),
   open: z.array(openCase),
 });

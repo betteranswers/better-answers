@@ -6,13 +6,13 @@ import {
   attempt,
   err,
   ok,
-  requireAdmin,
   type Result,
   type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { listRoutes, type LlmPurpose } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import { adminOnBinding } from "./admin-binding.ts";
 
 /**
  * The **DPIA input** (`CONTEXT.md`; ADR 0020; the S0 spec, *The DPIA input*): what one source
@@ -148,7 +148,6 @@ export type DpiaInputRead = {
   readonly hash: string;
 };
 
-const BINDING_ID = boundarySchemas.sourceBinding.select.shape.id;
 const RULES_IN_FORCE = boundarySchemas.sourceBinding.select.shape.rulesInForce;
 
 type BindingRow = {
@@ -214,16 +213,15 @@ export const dpiaInputFor = async (
   tx: Tx,
   input: { readonly bindingId: string },
 ): Promise<Result<DpiaInputRead, DpiaInputRefusal>> => {
-  const admin = requireAdmin(principal);
-  if (!admin.ok) return err(admin.error);
-  const bindingId = BINDING_ID.safeParse(input.bindingId);
-  if (!bindingId.success) return err("malformed");
-  const { workspaceId } = admin.value;
+  const acting = adminOnBinding(principal, input.bindingId);
+  if (!acting.ok) return err(acting.error);
+  const { admin, bindingId } = acting.value;
+  const { workspaceId } = admin;
 
   const known = await attempt(() =>
     tx.query<BindingRow>(
       "SELECT sensitivity, audience, rules_in_force FROM source_binding WHERE workspace_id = $1 AND id = $2",
-      [workspaceId, bindingId.data],
+      [workspaceId, bindingId],
     ),
   );
   if (!known.ok) return err(known.error);
@@ -238,11 +236,11 @@ export const dpiaInputFor = async (
   }
   const rulesInForce: Readonly<Record<string, boolean>> = parsed.data;
 
-  const listed = await listRoutes(admin.value, tx);
+  const listed = await listRoutes(admin, tx);
   if (!listed.ok) return err(listed.error);
 
   const document: DpiaInput = {
-    bindingId: bindingId.data,
+    bindingId,
     personalDataCategories: REDACTION_CATEGORIES.filter((entry) =>
       raisedUnder(rulesInForce, entry.tier),
     ).map((entry) => entry.category),
