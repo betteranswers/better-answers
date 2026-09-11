@@ -111,7 +111,6 @@ export const subjectRequest = withRLS(
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade" }),
     id: text("id").notNull(),
-    kind: text("kind").notNull(),
     /**
      * The person the request is about where they hold a login — the one person id (ADR
      * 0035), never an email. No cascade, as `access_request` names none: the platform does
@@ -121,6 +120,7 @@ export const subjectRequest = withRLS(
     personId: text("person_id").references(() => user.id),
     /** The identifier set: `emails`, `names` and `other`, each a list, bounded at the boundary. */
     identifiers: jsonb("identifiers").notNull(),
+    kind: text("kind").notNull(),
     receivedAt: stamp("received_at").notNull(),
     /** Receipt, or the instant identity was confirmed when the Admin had to ask. */
     clockStartedAt: stamp("clock_started_at").notNull(),
