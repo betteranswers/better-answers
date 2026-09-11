@@ -129,6 +129,8 @@ services:
       HF_HUB_OFFLINE: "1"                     # the weights ship in the image, warmed at build — a running worker fetches nothing
       MAX_CONCURRENT_RUNS: "1"                # one index at a time on a 4 GB box (ADR 0024); ticket 42 measures whether it can rise
       LMDB_MAX_BYTES_PER_BINDING: "4294967296" # 4 GB cap; over it the binding's LMDB is wiped and reprocessed — it is disposable (ADR 0036)
+      LMDB_DIR: /data/worker/lmdb             # one store per binding beneath this; the volume below, never backed up
+      RUST_LOG: warn                          # the engine's Rust core prints its own non-JSON shape at info; this is the only thing that quiets it
     healthcheck:
       # Why a process-level probe and not an HTTP one, and why idle counts as healthy:
       # `apps/worker/Dockerfile` § HEALTHCHECK. The command is the same one the image

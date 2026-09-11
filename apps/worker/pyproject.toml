@@ -151,6 +151,11 @@ module = [
     "presidio_anonymizer.*",
     "gliner.*",
     "spacy.*",
+    # The engine's Postgres target is typed against this driver and names its pool in its
+    # own signatures, so the pipeline's pool is the driver's type and not a wrapper of
+    # ours. The package ships no marker saying so, which is an error under strict mode
+    # before a line of ours is read.
+    "asyncpg.*",
 ]
 ignore_missing_imports = true
 

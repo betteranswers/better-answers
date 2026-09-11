@@ -60,6 +60,16 @@ export const runWorkerOnce = async (
       DATABASE_URL: workerDsn(connectionUri),
       GIT_STORE_DIR: bundleRoot,
       WORKER_ID: workerId,
+      // The whole bootstrap class, because the worker reads it whole before it claims
+      // anything: the deploy unit hands the platform's own object store and the store
+      // root to every worker process, so a harness that gave it less would be starting
+      // a process no estate starts. Neither kind this call runs reaches either of them.
+      LMDB_DIR: path.join(bundleRoot, "lmdb"),
+      S3_ENDPOINT: "http://objectstore.invalid:3900",
+      S3_ACCESS_KEY: "key-under-test",
+      S3_SECRET_KEY: "secret-under-test",
+      S3_BUCKET: "better-answers",
+      S3_REGION: "garage",
     },
   }).catch((cause: unknown) => {
     const failure = cause as { stderr?: string; stdout?: string; message?: string };
