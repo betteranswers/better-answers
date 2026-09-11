@@ -43,6 +43,18 @@ export {
   type FindingRestoreRefusal,
   type RestoreFindingInput,
 } from "./findings.ts";
+export {
+  dpiaInputFor,
+  NOT_RECORDED,
+  PLATFORM_HELD_CATEGORIES,
+  REDACTION_CATEGORIES,
+  SPECIAL_CATEGORY_CONDITION,
+  type DpiaInput,
+  type DpiaInputRead,
+  type DpiaInputRefusal,
+  type DpiaRoute,
+  type RedactionCategory,
+} from "./dpia.ts";
 
 /**
  * The narrowing act. Its subject is the binding and its detail what the Admin decided, in

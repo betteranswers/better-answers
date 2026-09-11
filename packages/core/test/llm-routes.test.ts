@@ -17,10 +17,16 @@ const db = postgresForSuite();
 
 type Seeded = { readonly workspaceId: string; readonly userId: string };
 
+type SeededRoute = {
+  readonly purpose: "answering" | "embedding";
+  readonly provider: string;
+  readonly model: string;
+  /** Named only by a test about the retention tail; a route nobody read the terms for has none. */
+  readonly retentionTail?: string;
+};
+
 /** A workspace whose Viewer can read it, with the routes the scenario names. */
-const seedWorkspace = async (
-  routes: readonly { purpose: "answering" | "embedding"; provider: string; model: string }[],
-): Promise<Seeded> => {
+const seedWorkspace = async (routes: readonly SeededRoute[]): Promise<Seeded> => {
   const client = await db().pool.connect();
   try {
     const seed = testData(client);
@@ -33,6 +39,7 @@ const seedWorkspace = async (
         purpose: route.purpose,
         provider: route.provider,
         model: route.model,
+        retentionTail: route.retentionTail ?? null,
       });
     }
     return { workspaceId: workspace.id, userId: user.id };
@@ -78,9 +85,42 @@ describe("a workspace's model routes", () => {
           route.provider === null &&
           route.model === null &&
           route.dimensions === null &&
+          route.retentionTail === null &&
           !route.fixed,
       ),
     ).toBe(true);
+  });
+
+  it("reads back the retention tail a route carries, in the provider's own words", async () => {
+    // The sentence the DPIA input prints for this route (the S0 spec, *The DPIA input*; ADR
+    // 0020 amending ADR 0013's route slot). It is the provider's wording and not a duration,
+    // so the test writes one down rather than deriving it.
+    const tail = "Prompts and outputs are deleted within 30 days; no training on customer data.";
+    const seeded = await seedWorkspace([
+      {
+        purpose: "answering",
+        provider: "anthropic",
+        model: "claude-sonnet-5",
+        retentionTail: tail,
+      },
+    ]);
+
+    expect((await listAs(seeded)).find((route) => route.purpose === "answering")).toMatchObject({
+      retentionTail: tail,
+    });
+  });
+
+  it("says a route nobody read the provider's terms for has no tail, rather than inventing one", async () => {
+    // The other way (`[TEST7]`): a configured route with no tail reads `null`, which is what
+    // lets a DPIA say *not recorded* instead of a sentence nobody wrote.
+    const seeded = await seedWorkspace([
+      { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
+    ]);
+
+    expect((await listAs(seeded)).find((route) => route.purpose === "answering")).toMatchObject({
+      provider: "anthropic",
+      retentionTail: null,
+    });
   });
 
   it("shows a member of one workspace their own routes and never another workspace's", async () => {
