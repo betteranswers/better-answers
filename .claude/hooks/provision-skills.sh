@@ -9,9 +9,12 @@ set -euo pipefail
 # `git worktree add` checks out tracked files only, and the tooling agents run on here is
 # installed and ignored (ADR 0027 — third-party content is never ours to publish):
 # `.agents/skills/` holds the installed skills, `.claude/skills/` a relative symlink per
-# skill into it plus the plugin skills that live there directly, and `tasks/AGENTS.md`
-# is `ordna skill install`'s copy of the ordna guide. Without this stage a worktree is
-# offered only `.claude/skills/browser-suite/`, the one skill this repository wrote.
+# skill into it plus the plugin skills that live there directly, each workspace's own
+# `.claude/skills/` (`apps/api/.claude/skills/` and its siblings — the tier's skills that
+# `docs/agents/build-loop.md` names, kept beside the code they are for) the same two
+# shapes, and `tasks/AGENTS.md` is `ordna skill install`'s copy of the ordna guide.
+# Without this stage a worktree is offered only `.claude/skills/browser-suite/`, the one
+# skill this repository wrote.
 #
 # Copied, never symlinked, from the primary checkout — the working tree beside the
 # directory `git rev-parse --git-common-dir` names. Copying is safe here where it is not
@@ -20,8 +23,17 @@ set -euo pipefail
 # would break the moment the primary's install changed, and a `.claude/skills/*` link
 # is relative, so it must sit inside the tree it points within.
 #
+# The skill directories are found, not listed: every `.claude/skills` under the tree to a
+# workspace's depth, the worktrees and the installs pruned. A workspace that gains one is
+# provisioned without a change here.
+#
 # An entry the checkout already carries is left alone — the tracked skill is never
-# overwritten by the primary's copy — which is also what makes a second run a no-op.
+# overwritten by the primary's copy — which is also what makes a second run a no-op. The
+# entries are the skills, not the directories that hold them: `.agents/skills/*` and each
+# skill directory's `*`, so a skill installed on the primary after a worktree was
+# provisioned is carried by the next run rather than skipped behind a directory already
+# there (11/09/2026: two skills installed that evening left every live worktree's link to
+# them dangling).
 #
 # When the worktree still has no skills after the copy (a primary that is a fresh clone,
 # or the primary is this checkout), they are reinstalled from `skills-lock.json`, the
@@ -46,17 +58,34 @@ say() { echo "  skills: $*" >&2; }
 # A path that is there — including a dangling link, which `-e` alone would miss.
 present() { [ -e "$1" ] || [ -L "$1" ]; }
 has_entries() { [ -d "$1" ] && [ -n "$(ls -A "$1" 2>/dev/null)" ]; }
+# Every `.claude/skills` directory under a tree, relative to it: the root's at depth two
+# and a workspace's at depth four. The worktrees, the installs and the dependency trees
+# are pruned rather than merely excluded, so a large `node_modules` is not walked.
+skill_dirs() {
+  (
+    cd "$1" && find . -maxdepth 4 \
+      \( -path './.claude/worktrees' -o -path './.agents' -o -name node_modules -o -name .venv -o -name .git \) -prune \
+      -o -type d -path '*/.claude/skills' -print \
+      | sed 's|^\./||' | sort
+  )
+}
 
 STATUS=0
 
 # --- copy: every entry the primary has and the worktree does not ---
-# `.claude/skills/*` is expanded per entry so a tracked skill under it is skipped on its
-# own and the rest copied.
+# The installed skills and each skill directory are expanded per entry, so a tracked skill
+# is skipped on its own, the rest copied, and a later install reaches a worktree already
+# provisioned.
 if [ "$PRIMARY_PATH" != "$WORKTREE_PATH" ]; then
-  ENTRIES=(".agents" "skills-lock.json" "tasks/AGENTS.md")
-  for entry in "$PRIMARY_PATH"/.claude/skills/*; do
-    present "$entry" && ENTRIES+=(".claude/skills/$(basename "$entry")")
+  ENTRIES=("skills-lock.json" "tasks/AGENTS.md")
+  for entry in "$PRIMARY_PATH"/.agents/skills/*; do
+    present "$entry" && ENTRIES+=(".agents/skills/$(basename "$entry")")
   done
+  while IFS= read -r dir; do
+    for entry in "$PRIMARY_PATH/$dir"/*; do
+      present "$entry" && ENTRIES+=("$dir/$(basename "$entry")")
+    done
+  done < <(skill_dirs "$PRIMARY_PATH")
   COPIED=0
   for entry in "${ENTRIES[@]}"; do
     src="$PRIMARY_PATH/$entry"
@@ -103,36 +132,38 @@ if [ ! -f "$WORKTREE_PATH/tasks/AGENTS.md" ]; then
   fi
 fi
 
-# --- verify: every .claude/skills link resolves, inside the worktree ---
+# --- verify: every skill link, the root's and each workspace's, resolves inside the worktree ---
 LINKS=0
 BROKEN=0
-for link in "$WORKTREE_PATH"/.claude/skills/*; do
-  [ -L "$link" ] || continue
-  LINKS=$((LINKS + 1))
-  name=".claude/skills/$(basename "$link")"
-  target="$(readlink "$link")"
-  # Resolved physically from the link's own directory, the way a reader of the link will;
-  # the target's parent is entered rather than the target, so a link to a file resolves too.
-  parent="$(cd "$(dirname "$link")" && cd -P "$(dirname "$target")" 2>/dev/null && pwd -P || true)"
-  resolved="$parent/$(basename "$target")"
-  if [ -z "$parent" ] || ! [ -e "$resolved" ]; then
-    say "$name -> $target does not resolve"
-    BROKEN=$((BROKEN + 1))
-    continue
-  fi
-  [ -d "$resolved" ] && resolved="$(cd -P "$resolved" && pwd -P)"
-  if [ "${resolved#"$WORKTREE_PATH"/}" = "$resolved" ]; then
-    say "$name -> $target resolves outside the worktree, at $resolved"
-    BROKEN=$((BROKEN + 1))
-  fi
-done
+while IFS= read -r dir; do
+  for link in "$WORKTREE_PATH/$dir"/*; do
+    [ -L "$link" ] || continue
+    LINKS=$((LINKS + 1))
+    name="$dir/$(basename "$link")"
+    target="$(readlink "$link")"
+    # Resolved physically from the link's own directory, the way a reader of the link will;
+    # the target's parent is entered rather than the target, so a link to a file resolves too.
+    parent="$(cd "$(dirname "$link")" && cd -P "$(dirname "$target")" 2>/dev/null && pwd -P || true)"
+    resolved="$parent/$(basename "$target")"
+    if [ -z "$parent" ] || ! [ -e "$resolved" ]; then
+      say "$name -> $target does not resolve"
+      BROKEN=$((BROKEN + 1))
+      continue
+    fi
+    [ -d "$resolved" ] && resolved="$(cd -P "$resolved" && pwd -P)"
+    if [ "${resolved#"$WORKTREE_PATH"/}" = "$resolved" ]; then
+      say "$name -> $target resolves outside the worktree, at $resolved"
+      BROKEN=$((BROKEN + 1))
+    fi
+  done
+done < <(skill_dirs "$WORKTREE_PATH")
 if [ "$BROKEN" -gt 0 ]; then
-  say "FAILED — $BROKEN of $LINKS links under .claude/skills do not resolve inside the worktree"
+  say "FAILED — $BROKEN of $LINKS skill links do not resolve inside the worktree"
   STATUS=1
 elif [ "$LINKS" -gt 0 ]; then
-  say "all $LINKS links under .claude/skills resolve inside the worktree"
+  say "all $LINKS skill links resolve inside the worktree"
 else
-  say "no links under .claude/skills to verify"
+  say "no skill links to verify"
 fi
 
 exit $STATUS

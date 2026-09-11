@@ -13,7 +13,8 @@ set -euo pipefail
 #   pnpm install  — the TypeScript workspaces
 #   uv sync       — the Python worker
 #   skills        — .claude/hooks/provision-skills.sh: the installed, ignored agent
-#                   tooling (`.agents/`, `.claude/skills/*`, `tasks/AGENTS.md`)
+#                   tooling (`.agents/`, `.claude/skills/*`, each workspace's
+#                   `.claude/skills/*`, `tasks/AGENTS.md`)
 #
 # `git worktree add -b <branch> <path> origin/main` sets the new branch to track
 # `origin/main`, silently: a bare `git push` from the worktree then aims at `main`, and
