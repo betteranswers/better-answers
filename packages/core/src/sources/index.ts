@@ -44,7 +44,11 @@ import type { Tx } from "../store/postgres/index.ts";
  * address was wrong, the text does not run that far or a covering row is withheld. Beside it
  * **`findPassages`** searches those same rows for a reader's words, ranked, leaving out any
  * document a concept they may see already cites (ADR 0016) and answering a list and only a
- * list: an address per hit, no text, and no total.
+ * list: an address per hit, no text, and no total. And beside those two **`previewChunks`**,
+ * the Admin's review list for a binding not yet published — the one read here or anywhere that
+ * leaves the published arm out of its predicate, keeping the class and the audience arms, so
+ * the person deciding whether to publish a binding has its chunks in front of them and nobody
+ * else reaches them by any road at all.
  */
 
 export {
@@ -77,8 +81,10 @@ export {
   findPassages,
   MAX_PASSAGE_HITS,
   passageAt,
+  previewChunks,
   type Passage,
   type PassageHit,
+  type PreviewedChunk,
 } from "./passages.ts";
 
 /**

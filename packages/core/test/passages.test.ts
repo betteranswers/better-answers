@@ -4,7 +4,13 @@ import { z } from "zod";
 import { ulid } from "@better-answers/schema";
 
 import type { UserPrincipal } from "../src/kernel/index.ts";
-import { findPassages, passageAt, type PassageHit } from "../src/sources/index.ts";
+import {
+  findPassages,
+  passageAt,
+  previewChunks,
+  type PassageHit,
+  type PreviewedChunk,
+} from "../src/sources/index.ts";
 import { contractFixture } from "./contract-fixture.ts";
 import {
   bindingHolding,
@@ -40,6 +46,12 @@ import {
  * document stands alone only when nothing covering it does (ADR 0016), and handed to the
  * reader who may not. The answer is a list and only a list: no total, no count and nothing
  * else a reader could learn the shape of the workspace from.
+ *
+ * And last `previewChunks`, the Admin's review list, whose own pair both ways (`[TEST7]`) is
+ * the binding still under review: its rows are there for the preview, which leaves the
+ * published arm out, and not there for the two reads that carry it — for the same Admin, in
+ * the same workspace, on the same arrangement. The arms it keeps are proved too, because a
+ * road that reaches earlier must not also reach wider.
  */
 
 const fixtureSchema = z.object({
@@ -458,6 +470,250 @@ describe("the passages a search finds", () => {
       { role: "Viewer", found: [] },
       { role: "Editor", found: [] },
       { role: "Admin", found: [] },
+    ]);
+  });
+});
+
+/**
+ * The binding the Sources screen reviews and the rows a run landed under it, at ids this suite
+ * writes down rather than mints, so the addresses and the order the preview answers in are
+ * literals (`[TEST9]`) instead of values read back out of the arrangement.
+ */
+const REVIEW_BINDING = "01M2B1ND1NGREV13WAAAAAAAAA";
+const TERMS = "01M2D0CREV13WAAAAAAAAAAAA1";
+const ANNEX = "01M2D0CREV13WAAAAAAAAAAAA2";
+
+/** The second binding, for the two arms the preview keeps; its documents sort in this order. */
+const ARMS_BINDING = "01M2B1ND1NGARMSAAAAAAAAAAA";
+const BOARD_DOC = "01M2D0CARMSAAAAAAAAAAAAAA1";
+const GROUP_DOC = "01M2D0CARMSAAAAAAAAAAAAAA2";
+
+/** One document of a binding under review and the rows the splitter would have written for it. */
+type ReviewedDocument = {
+  readonly id: string;
+  readonly title: string;
+  readonly chunks: readonly {
+    readonly id: string;
+    readonly ordinal: number;
+    readonly charStart: number;
+    readonly charEnd: number;
+    readonly content: string;
+    readonly sensitivity?: string;
+    /** The groups the row is for; absent is *everyone*, which is what most rows carry. */
+    readonly audienceGroups?: readonly string[];
+  }[];
+};
+
+/**
+ * A binding still under review, its documents and their chunk rows.
+ *
+ * `published_at` is null on the binding **and** on every chunk copy, which is the state a
+ * review list exists for: a run writes the binding's three visibility columns onto its chunks
+ * (ADR 0023), so a suite that set the two apart would be arranging something no writer can
+ * produce. Every row names all five address columns, because `seed.chunk` leaves them NULL and
+ * would otherwise mint a binding id of its own.
+ */
+const bindingUnderReview = (
+  workspaceId: string,
+  bindingId: string,
+  documents: readonly ReviewedDocument[],
+): Promise<void> =>
+  seededBy(db(), async (seed) => {
+    const binding = await seed.sourceBinding({
+      workspaceId,
+      id: bindingId,
+      publishedAt: null,
+      sensitivity: "Internal",
+    });
+    for (const held of documents) {
+      await seed.sourceDocument({
+        workspaceId,
+        bindingId: binding.id,
+        id: held.id,
+        title: held.title,
+      });
+      for (const row of held.chunks) {
+        const audience =
+          row.audienceGroups === undefined
+            ? { audience: "everyone", audienceGroups: null }
+            : { audience: "groups", audienceGroups: [...row.audienceGroups] };
+        await seed.chunk({
+          workspaceId,
+          bindingId: binding.id,
+          sourceDocumentId: held.id,
+          id: row.id,
+          ordinal: row.ordinal,
+          charStart: row.charStart,
+          charEnd: row.charEnd,
+          locator: `${held.id}/chars:${row.charStart}-${row.charEnd}`,
+          content: row.content,
+          publishedAt: null,
+          sensitivity: row.sensitivity ?? "Internal",
+          ...audience,
+        });
+      }
+    }
+  });
+
+/**
+ * The binding under review this suite previews: two documents, three rows, every one of them
+ * matching the words `findPassages` is asked with, so the search's empty answer below is the
+ * published arm and never a query that had nothing to match in the first place.
+ */
+const seedTheBindingUnderReview = (workspaceId: string): Promise<void> =>
+  bindingUnderReview(workspaceId, REVIEW_BINDING, [
+    {
+      id: TERMS,
+      title: "The draft terms",
+      chunks: [
+        {
+          id: "01M2D0CREV13WAAAAAAAAAAAA1#000000",
+          ordinal: 0,
+          charStart: 0,
+          charEnd: 33,
+          content: "The holiday policy under review, ",
+        },
+        {
+          id: "01M2D0CREV13WAAAAAAAAAAAA1#000001",
+          ordinal: 1,
+          charStart: 33,
+          charEnd: 54,
+          content: "still to be approved.",
+        },
+      ],
+    },
+    {
+      id: ANNEX,
+      title: "The draft annex",
+      chunks: [
+        {
+          id: "01M2D0CREV13WAAAAAAAAAAAA2#000000",
+          ordinal: 0,
+          charStart: 0,
+          charEnd: 32,
+          content: "The annex to the holiday policy.",
+        },
+      ],
+    },
+  ]);
+
+/** The review list this person is handed, or the one word they were refused with. */
+const previewing = (
+  person: UserPrincipal,
+  bindingId: string,
+): Promise<readonly PreviewedChunk[] | string | Error> =>
+  reading(person, async (reader, tx) => {
+    const read = await previewChunks(reader, tx, { bindingId });
+    return read.ok ? read.value : read.error;
+  });
+
+describe("the review list a binding is previewed with", () => {
+  it("hands an Admin every chunk of a binding still under review, in document and ordinal order, and refuses a Viewer and an Editor", async () => {
+    const scenario = await arrange();
+    await seedTheBindingUnderReview(scenario.workspaceId);
+
+    const admin = await previewing(scenario.admin, REVIEW_BINDING);
+    const viewer = await previewing(scenario.viewer, REVIEW_BINDING);
+    const editor = await previewing(scenario.editor, REVIEW_BINDING);
+
+    // The rows in the order the screen lists them, each with the address it will open at once
+    // the binding is published — composed from the row's three columns, never read out of its
+    // own `locator` column, so the two cannot drift apart unnoticed (ADR 0031).
+    expect(admin).toEqual([
+      {
+        id: "01M2D0CREV13WAAAAAAAAAAAA1#000000",
+        sourceDocumentId: TERMS,
+        locator: "01M2D0CREV13WAAAAAAAAAAAA1/chars:0-33",
+        content: "The holiday policy under review, ",
+      },
+      {
+        id: "01M2D0CREV13WAAAAAAAAAAAA1#000001",
+        sourceDocumentId: TERMS,
+        locator: "01M2D0CREV13WAAAAAAAAAAAA1/chars:33-54",
+        content: "still to be approved.",
+      },
+      {
+        id: "01M2D0CREV13WAAAAAAAAAAAA2#000000",
+        sourceDocumentId: ANNEX,
+        locator: "01M2D0CREV13WAAAAAAAAAAAA2/chars:0-32",
+        content: "The annex to the holiday policy.",
+      },
+    ]);
+    // The role is decided before anything is read, so neither of the other two learns whether
+    // the binding exists, let alone what is under it.
+    expect(viewer).toBe("role-forbids");
+    expect(editor).toBe("role-forbids");
+    // The shape is decided after the role and before the read, as every act on this slice
+    // decides it: an Admin asking with something that is not a binding id gets the other word.
+    expect(await previewing(scenario.admin, "not-a-binding-id")).toBe("malformed");
+  });
+
+  it("is the only road to those rows: the same Admin finds none of them by search and opens none of them by locator", async () => {
+    const scenario = await arrange();
+    await seedTheBindingUnderReview(scenario.workspaceId);
+
+    const previewed = await previewing(scenario.admin, REVIEW_BINDING);
+    const found = await searching(scenario.admin);
+    const opened = await reading(scenario.admin, (admin, tx) =>
+      passageAt(admin, tx, `${TERMS}/chars:0-33`),
+    );
+
+    // The pair both ways (`[TEST7]`) on one arrangement and one person: three rows for the
+    // preview, which leaves the published arm out, and nothing at all for the two reads that
+    // carry it. Were the preview ever to grow that arm the first expectation would fail; were
+    // either read ever to lose it, the other two would.
+    expect(previewed).toHaveLength(3);
+    expect(found).toEqual([]);
+    expect(opened.ok ? opened.value : opened.error).toBe(NOT_FOUND);
+  });
+
+  it("applies the class and the audience arms all the same, so an Admin reaches a Restricted row and not a row for a group they are not in", async () => {
+    const scenario = await arrange();
+    const board = await groupNamed(db(), scenario, "Board", [scenario.editor]);
+    await bindingUnderReview(scenario.workspaceId, ARMS_BINDING, [
+      {
+        id: BOARD_DOC,
+        title: "The board's draft",
+        chunks: [
+          {
+            id: "01M2D0CARMSAAAAAAAAAAAAAA1#000000",
+            ordinal: 0,
+            charStart: 0,
+            charEnd: 32,
+            content: "The board's holiday policy note.",
+            sensitivity: "Restricted",
+          },
+        ],
+      },
+      {
+        id: GROUP_DOC,
+        title: "The Board group's draft",
+        chunks: [
+          {
+            id: "01M2D0CARMSAAAAAAAAAAAAAA2#000000",
+            ordinal: 0,
+            charStart: 0,
+            charEnd: 32,
+            content: "The group's holiday policy note.",
+            audienceGroups: [board],
+          },
+        ],
+      },
+    ]);
+
+    const admin = await previewing(scenario.admin, ARMS_BINDING);
+
+    // The clause reads the role in its class arm alone: `Restricted` has a door for an Admin
+    // and the audience has none, for any role. Dropping the published arm therefore reaches
+    // earlier without reaching wider — an Admin outside a group is still outside it, and the
+    // Editor inside it is who this second row would be shown to were it ever published.
+    expect(admin).toEqual([
+      {
+        id: "01M2D0CARMSAAAAAAAAAAAAAA1#000000",
+        sourceDocumentId: BOARD_DOC,
+        locator: "01M2D0CARMSAAAAAAAAAAAAAA1/chars:0-32",
+        content: "The board's holiday policy note.",
+      },
     ]);
   });
 });
