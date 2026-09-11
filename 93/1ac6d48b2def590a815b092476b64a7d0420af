@@ -1,0 +1,24 @@
+.claude/hooks/provision-worktree.sh
+  s_96a66f19ddb6be::t_97fcfb27aa1bfa 16-17
+apps/api/tests/provision-skills.test.ts
+  s_96a66f19ddb6be::t_683d5f0260cdfe 241-264
+  s_96a66f19ddb6be::t_be2a705bd1d1df 32-37,42-43,61-72,78,85-87,106-108,193-224
+.claude/hooks/provision-skills.sh
+  s_96a66f19ddb6be::t_e0173ad5dc88ec 12-17,26-29,31-36,61-71,84-88,135,138-159,161,164,166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "931ac6d48b2def590a815b092476b64a7d0420af",
+  "prompts": {},
+  "sessions": {
+    "s_96a66f19ddb6be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1940d59b-7323-446c-9724-222dda88e9e0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
