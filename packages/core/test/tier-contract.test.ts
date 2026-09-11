@@ -26,11 +26,12 @@ import { ulid } from "../src/kernel/index.ts";
  * is the mechanism; deduplicating it away would delete the test.
  */
 
-const SPOKEN_CONTRACT_VERSION = 7;
+const SPOKEN_CONTRACT_VERSION = 8;
 const SPOKEN_AGREEMENTS = {
   "concept-file": "fixtured",
   "concept-inbox": "sql-function",
   "cost-ledger": "generated",
+  "document-chunk": "fixtured",
   "id-shape": "fixtured",
   "credential-envelope": "fixtured",
   "llm-routing": "sql-function",

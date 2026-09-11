@@ -35,6 +35,9 @@ import type { Tx } from "../store/postgres/index.ts";
  * the always set back into a document with a reason, and the **DPIA input** (`dpia.ts`), a
  * binding's contribution to a data protection impact assessment as a typed document and its
  * hash. Both are the sources slice's because the finding and the binding are its records.
+ *
+ * Beside the act, the slice's address arithmetic: a chunk's derived id, the wire locator's
+ * parse and the span it cuts, all pure and all held to the document-chunk agreement.
  */
 
 export {
@@ -55,6 +58,14 @@ export {
   type DpiaRoute,
   type RedactionCategory,
 } from "./dpia.ts";
+
+export {
+  chunkIdOf,
+  parseLocator,
+  spanText,
+  type Locator,
+  type LocatorRefusal,
+} from "./chunk-address.ts";
 
 /**
  * The narrowing act. Its subject is the binding and its detail what the Admin decided, in

@@ -1,5 +1,5 @@
 {
-  "contract_version": 7,
+  "contract_version": 8,
   "agreements": {
     "queue": { "form": "sql-function" },
     "concept-inbox": { "form": "sql-function" },
@@ -9,7 +9,8 @@
     "cost-ledger": { "form": "generated" },
     "id-shape": { "form": "fixtured" },
     "concept-file": { "form": "fixtured" },
-    "redaction": { "form": "fixtured" }
+    "redaction": { "form": "fixtured" },
+    "document-chunk": { "form": "fixtured" }
   },
   "fixtures": [
     { "agreement": "llm-routing", "path": "llm-routing/cases.json" },
@@ -17,6 +18,8 @@
     { "agreement": "concept-inbox", "path": "concept-inbox/cases.json" },
     { "agreement": "queue", "path": "queue/cases.json" },
     { "agreement": "concept-file", "path": "concept-file/cases.json" },
-    { "agreement": "redaction", "path": "redaction/cases.json" }
+    { "agreement": "redaction", "path": "redaction/cases.json" },
+    { "agreement": "visibility-columns", "path": "visibility-columns/cases.json" },
+    { "agreement": "document-chunk", "path": "document-chunk/cases.json" }
   ]
 }
