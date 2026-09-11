@@ -41,7 +41,10 @@ import type { Tx } from "../store/postgres/index.ts";
  * that arithmetic the read it exists for (`passages.ts`): **`passageAt`** resolves a wire
  * locator to the chunk rows covering its span, under the reader's predicate applied once in
  * the same statement, and answers the passage — or the one word *not found*, whether the
- * address was wrong, the text does not run that far or a covering row is withheld.
+ * address was wrong, the text does not run that far or a covering row is withheld. Beside it
+ * **`findPassages`** searches those same rows for a reader's words, ranked, leaving out any
+ * document a concept they may see already cites (ADR 0016) and answering a list and only a
+ * list: an address per hit, no text, and no total.
  */
 
 export {
@@ -70,7 +73,13 @@ export {
   type Locator,
   type LocatorRefusal,
 } from "./chunk-address.ts";
-export { passageAt, type Passage } from "./passages.ts";
+export {
+  findPassages,
+  MAX_PASSAGE_HITS,
+  passageAt,
+  type Passage,
+  type PassageHit,
+} from "./passages.ts";
 
 /**
  * The narrowing act. Its subject is the binding and its detail what the Admin decided, in

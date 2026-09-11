@@ -71,10 +71,11 @@ export const chunk = indexSchema.table("chunk", {
   // On every chunk row: a chunk is always source-derived (ADR 0023 puts `binding_id`
   // on source-derived rows; canonical entities, which carry none, have no chunks).
   bindingId: text("binding_id").notNull(),
-  // The document this is a unit of, and the chunk's own locator — a span,
-  // `chars:<start>-<end>` in Unicode code points into that document's normalised redacted
-  // text (`CONTEXT.md`, *locator*). The migration keys the pair to `source_document` and
-  // cascades a document's deletion through it, and holds one row per document and locator.
+  // The document this is a unit of, and the chunk's own locator — the whole wire address a
+  // citation and a passage read both travel as, `<source document id>/chars:<start>-<end>`,
+  // whose second half is the span in Unicode code points into that document's normalised
+  // redacted text (`CONTEXT.md`, *locator*). The migration keys the pair to `source_document`
+  // and cascades a document's deletion through it, and holds one row per document and locator.
   sourceDocumentId: text("source_document_id"),
   locator: text("locator"),
   // The splitter's position, so a passage read never parses a locator it already has the row
