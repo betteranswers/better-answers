@@ -1,0 +1,51 @@
+packages/core/src/erasure/index.ts
+  s_f3ee63bcbb1a0b::t_782d44bf580a55 27,29-35
+  s_f3ee63bcbb1a0b::t_da92890ae4ee2c 17-19
+packages/core/src/erasure/routine.ts
+  s_f3ee63bcbb1a0b::t_0b30792f3e86bf 158
+  s_f3ee63bcbb1a0b::t_af46e094963db7 150-154
+packages/core/test/erasure-replay.test.ts
+  s_f3ee63bcbb1a0b::t_23e05aa7f1bbe9 1-11,13-74,77,80,83-89,94-129,148-154,156,159,161-163,167-184,194-285,287,289-292,294-296,298-302,304-362,364,367-389,393-395,397,399-437,439-456,458,460,462-469,471-472
+  s_f3ee63bcbb1a0b::t_2effca8166577e 130-147,155,157-158,160,164-166,185-193
+  s_f3ee63bcbb1a0b::t_2354f5778c5973 286,288,293,297,303
+  s_f3ee63bcbb1a0b::t_c11f69ab48d709 90-93
+  s_f3ee63bcbb1a0b::t_2316c3c7e3ef5f 12
+  s_f3ee63bcbb1a0b::t_3e7716a54a0065 363,365-366
+  s_f3ee63bcbb1a0b::t_6772d17c38db3b 457,459,461
+  s_f3ee63bcbb1a0b::t_648e48b1ec49e7 438
+  s_f3ee63bcbb1a0b::t_3e1e2931f1ffa0 470
+  s_f3ee63bcbb1a0b::t_1abdc34f8292b3 473-493,498-504
+  s_f3ee63bcbb1a0b::t_11ee1a9ceabcda 390-392,396,398
+  s_f3ee63bcbb1a0b::t_a61ac31f18728c 75-76,78-79,81-82
+  s_f3ee63bcbb1a0b::t_6f8dfbbb06f2e9 494-497
+packages/core/src/erasure/replay.ts
+  s_f3ee63bcbb1a0b::t_b7e43538330c42 146-207,213-219,223-270
+  s_f3ee63bcbb1a0b::t_11eac9b2f1933a 1-11
+  s_f3ee63bcbb1a0b::t_52159ee9799986 208-212,222
+  s_f3ee63bcbb1a0b::t_d9de54c5b338f7 220-221
+  s_f3ee63bcbb1a0b::t_44502a46433304 50-55
+packages/core/src/erasure/replay-erasures.ts
+  s_f3ee63bcbb1a0b::t_7752810ade47b6 1-3,13-132,134-184,186-396
+  s_f3ee63bcbb1a0b::t_0a7d34f06d0a9d 185
+  s_f3ee63bcbb1a0b::t_039a50e64afdf9 133
+  s_f3ee63bcbb1a0b::t_fc7f919d43d3b7 4-12
+packages/core/src/erasure/map.ts
+  s_f3ee63bcbb1a0b::t_6944966074e24c 70
+  s_f3ee63bcbb1a0b::t_ddc59ae4312a04 65-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0fc87f5d7285625309c150543cb6346fed493a72",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
