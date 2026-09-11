@@ -18,13 +18,13 @@
     "mutation": "pnpm -r --if-present run mutation"
   },
   "devDependencies": {
-    "@types/node": "24.13.3",
-    "jscpd": "5.1.2",
-    "knip": "6.34.0",
+    "@types/node": "24.13.4",
+    "jscpd": "5.2.0",
+    "knip": "6.35.1",
     "lefthook": "2.1.12",
-    "oxfmt": "0.65.0",
-    "oxlint": "1.80.0",
-    "oxlint-plugin-react-doctor": "0.9.12",
+    "oxfmt": "0.67.0",
+    "oxlint": "1.82.0",
+    "oxlint-plugin-react-doctor": "0.9.13",
     "oxlint-tsgolint": "7.0.2001",
     "typescript": "7.0.2"
   },
