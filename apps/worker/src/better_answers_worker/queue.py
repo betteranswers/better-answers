@@ -3,9 +3,10 @@
 The app↔worker control plane is rows and never HTTP (ADR 0005), so this module is the
 whole of what "talking to the app" means here: claim a job, keep its lease alive, say
 what it found. Every one of the four calls is a SQL function the app migrated
-(`0022_the-queue-substrate.sql`), and every one is SECURITY INVOKER — so what fences a
-call is this connection's role and the workspace the transaction is scoped to, and there
-is no workspace argument anywhere for a caller to get wrong.
+(`0022_the-queue-substrate.sql`, the claim replaced by
+`0033_the-job-subject-and-the-run-key-substrate.sql`), and every one is SECURITY INVOKER
+— so what fences a call is this connection's role and the workspace the transaction is
+scoped to, and there is no workspace argument anywhere for a caller to get wrong.
 
 **Every statement runs inside a transaction scoped to one workspace.** `scoped` is the
 one place that sets `app.workspace_id`, transaction-local, so the scope cannot outlive
@@ -19,7 +20,7 @@ tenant data, and iterating it is how one worker serves every workspace on a 4 GB
 
 import json
 import threading
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
@@ -98,17 +99,24 @@ def workspace_ids(connection: psycopg.Connection) -> list[str]:
 
 
 def claim(
-    cursor: psycopg.Cursor, workspace_id: str, worker_id: str
+    cursor: psycopg.Cursor, workspace_id: str, worker_id: str, kinds: Sequence[str]
 ) -> ClaimedJob | None:
-    """The oldest claimable job in this scope, or nothing.
+    """The oldest claimable job of a kind this caller runs, in this scope, or nothing.
 
     A job whose attempts are spent is poisoned by this very call rather than handed out
     again; that is the database's rule, not this module's, so there is nothing to
     remember here.
+
+    `kinds` is what the caller can run, and the database filters both arms of the claim
+    by it — so a job of a kind this process has no handler for is neither claimed nor
+    poisoned by it, and stays where it is for whoever does. The caller says which kinds
+    rather than this module knowing them: what a process can run is the process's fact,
+    and a queue helper that answered it would have to be edited every time a handler
+    landed.
     """
     cursor.execute(
-        "SELECT id, kind, reason, attempts FROM claim_job(%s, %s::interval)",
-        (worker_id, f"{LEASE_SECONDS} seconds"),
+        "SELECT id, kind, reason, attempts FROM claim_job(%s, %s::interval, %s)",
+        (worker_id, f"{LEASE_SECONDS} seconds", list(kinds)),
     )
     row = cursor.fetchone()
     if row is None:

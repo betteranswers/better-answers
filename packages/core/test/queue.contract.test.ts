@@ -18,7 +18,9 @@ import { postgresForSuite } from "./suite-postgres.ts";
  *
  * Both tiers claim: the worker on its loop, and the app for the ops command that runs a
  * rebuild in the foreground. That is what makes this an agreement rather than one tier's
- * helper, and it is why the fixture's claims name a role each.
+ * helper, and it is why the fixture's claims name a role each — and, from `contract_version`
+ * 7, a `kinds` array each: a claimant reaches only the kinds it passes, in both arms of the
+ * claim, and a subject has one job claimed under a live lease and one waiting behind it.
  */
 
 const fixtureSchema = z.object({
@@ -32,6 +34,7 @@ const fixtureSchema = z.object({
       id: z.string(),
       kind: z.string(),
       reason: z.string().nullable(),
+      subject_id: z.string().nullable(),
       status: z.string(),
       attempts: z.number().int(),
       max_attempts: z.number().int(),
@@ -40,12 +43,25 @@ const fixtureSchema = z.object({
       lease_expires_in_seconds: z.number().int().nullable(),
     }),
   ),
+  refused_enqueues: z.array(
+    z.object({
+      why: z.string(),
+      workspace_id: z.string(),
+      id: z.string(),
+      kind: z.string(),
+      reason: z.string().nullable(),
+      subject_id: z.string().nullable(),
+      sqlstate: z.string(),
+    }),
+  ),
   claims: z.array(
     z.object({
       why: z.string(),
       role: z.string(),
       workspace_id: z.string(),
       worker_id: z.string(),
+      kinds: z.array(z.string()),
+      lapse_first: z.array(z.string()).optional(),
       expect_ids: z.array(z.string()),
     }),
   ),
@@ -95,6 +111,7 @@ const seedFixture = async (client: pg.PoolClient) => {
       id: seeded.id,
       kind: seeded.kind,
       reason: seeded.reason,
+      subjectId: seeded.subject_id,
       status: seeded.status,
       attempts: seeded.attempts,
       maxAttempts: seeded.max_attempts,
@@ -108,6 +125,44 @@ const seedFixture = async (client: pg.PoolClient) => {
       heartbeatAt: seeded.claimed_by === null ? null : new Date(now - 1000),
     });
   }
+};
+
+/**
+ * One enqueue the queue must refuse, answered with the SQLSTATE that refused it. A failed
+ * statement aborts the transaction it happened in, so the probe runs against a savepoint it
+ * can come back to.
+ */
+const refusedEnqueue = async (
+  client: pg.PoolClient,
+  refused: (typeof fixture.refused_enqueues)[number],
+): Promise<string> => {
+  await client.query("SAVEPOINT refused_enqueue");
+  try {
+    await client.query(
+      `INSERT INTO job (workspace_id, id, kind, reason, subject_id, status)
+         VALUES ($1, $2, $3, $4, $5, 'queued')`,
+      [refused.workspace_id, refused.id, refused.kind, refused.reason, refused.subject_id],
+    );
+  } catch (error) {
+    await client.query("ROLLBACK TO SAVEPOINT refused_enqueue");
+    const code =
+      typeof error === "object" && error !== null && "code" in error ? String(error.code) : "none";
+    return code;
+  }
+  await client.query("ROLLBACK TO SAVEPOINT refused_enqueue");
+  return "admitted";
+};
+
+/**
+ * Push a lease thirty seconds into the past, as the superuser: how the fixture lapses a
+ * lease part-way through a sequence of claims without a suite waiting a minute for one.
+ */
+const lapseLeases = async (client: pg.PoolClient, jobIds: readonly string[]) => {
+  if (jobIds.length === 0) return;
+  await client.query(
+    "UPDATE job SET lease_expires_at = now() - interval '30 seconds' WHERE id = ANY($1)",
+    [[...jobIds]],
+  );
 };
 
 /** Run one statement as the fixture's role, in the fixture's scope ('' = none). */
@@ -124,15 +179,30 @@ describe("the queue agreement", () => {
     await withRollback(db().pool, async (client) => {
       await seedFixture(client);
 
+      // The run key first, while the jobs it collides with are still queued: a second
+      // queued job for a subject that already has one is the database's refusal, which is
+      // what lets an enqueue read the waiting job's id back instead of landing a duplicate.
+      const enqueues: { readonly why: string; readonly sqlstate: string }[] = [];
+      for (const refused of fixture.refused_enqueues) {
+        enqueues.push({ why: refused.why, sqlstate: await refusedEnqueue(client, refused) });
+      }
+      expect(enqueues).toEqual(
+        fixture.refused_enqueues.map((refused) => ({
+          why: refused.why,
+          sqlstate: refused.sqlstate,
+        })),
+      );
+
       // The claims in order and the whole list at once: the agreement is about which job
       // goes next, so asserting one at a time would let a claim the function never made
       // pass unnoticed.
       const claimed: { readonly why: string; readonly ids: readonly string[] }[] = [];
       for (const claim of fixture.claims) {
+        await lapseLeases(client, claim.lapse_first ?? []);
         await asRoleInScope(client, claim);
         const answered = await client.query<{ id: string }>(
-          "SELECT id FROM claim_job($1, $2::interval)",
-          [claim.worker_id, seconds(fixture.lease_seconds)],
+          "SELECT id FROM claim_job($1, $2::interval, $3)",
+          [claim.worker_id, seconds(fixture.lease_seconds), [...claim.kinds]],
         );
         claimed.push({ why: claim.why, ids: answered.rows.map((row) => row.id) });
         await client.query("RESET ROLE");

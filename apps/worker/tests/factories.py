@@ -144,6 +144,7 @@ def seed_job(
     job_id: str | None = None,
     kind: str = "nightly-audit",
     reason: str | None = None,
+    subject_id: str | None = None,
     status: str = "queued",
     attempts: int = 0,
     max_attempts: int = 3,
@@ -157,6 +158,10 @@ def seed_job(
     suite can arrange a lapsed lease or an old enqueue without waiting for either to
     happen. A job that names a claimant is given a claim instant and a heartbeat too,
     because the row's own CHECK ties `claimed_by` to `claimed_at`.
+
+    `subject_id` is what the job is about — the binding an index run is for — under a
+    biconditional CHECK: a kind whose descriptor names a subject must be given one,
+    and a kind whose descriptor names none must not.
     """
     held = None if claimed_by is None else "now() - interval '1 second'"
     lease = (
@@ -165,10 +170,10 @@ def seed_job(
         else f"now() + interval '{lease_expires_in_seconds} seconds'"
     )
     cursor.execute(
-        "INSERT INTO job (workspace_id, id, kind, reason, status, attempts,"
+        "INSERT INTO job (workspace_id, id, kind, reason, subject_id, status, attempts,"
         " max_attempts, enqueued_at, claimed_by, claimed_at, lease_expires_at,"
         " heartbeat_at)"
-        f" VALUES (%s, %s, %s, %s, %s, %s, %s,"
+        f" VALUES (%s, %s, %s, %s, %s, %s, %s, %s,"
         f" now() - interval '{enqueued_ago_seconds} seconds', %s,"
         f" {held or 'NULL'}, {lease}, {held or 'NULL'}) RETURNING *",
         (
@@ -176,6 +181,7 @@ def seed_job(
             job_id or ulid(),
             kind,
             reason,
+            subject_id,
             status,
             attempts,
             max_attempts,

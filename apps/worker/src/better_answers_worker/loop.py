@@ -45,6 +45,12 @@ IDLE_SLEEP_SECONDS = 5
 #: How often a workspace's nightly audit comes round.
 AUDIT_EVERY_SECONDS = 24 * 60 * 60
 
+#: The kinds this loop can run, passed to every claim so the queue never hands it a job
+#: it has no branch for — an `index` job stays queued until the tier that runs it has a
+#: handler. It is written out here beside the dispatch it mirrors, and the two
+#: become one thing when the dispatch becomes a registry.
+KINDS_THIS_LOOP_RUNS = ("nightly-audit", "full-rebuild")
+
 
 def schema_stamp_matches(connection: psycopg.Connection) -> bool:
     """Whether the schema this worker was built against is the schema in front of it.
@@ -132,7 +138,9 @@ def _serve_workspace(
     Answers whether it did any work, which is what tells the loop whether to sleep.
     """
     with queue.scoped(connection, workspace_id) as cursor:
-        claimed = queue.claim(cursor, workspace_id, bootstrap.worker_id)
+        claimed = queue.claim(
+            cursor, workspace_id, bootstrap.worker_id, KINDS_THIS_LOOP_RUNS
+        )
         if claimed is None:
             if _due_for_audit(cursor):
                 queue.enqueue(cursor, ulid(), "nightly-audit")

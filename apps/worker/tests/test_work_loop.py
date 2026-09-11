@@ -542,7 +542,10 @@ def test_a_worker_holding_a_fresh_lease_is_healthy_and_a_queue_left_waiting_is_n
     assert health.is_healthy(database, WORKER) is False
 
     with scoped(database, workspace) as cursor:
-        cursor.execute("SELECT id FROM claim_job(%s, interval '60 seconds')", (WORKER,))
+        cursor.execute(
+            "SELECT id FROM claim_job(%s, interval '60 seconds', %s)",
+            (WORKER, list(loop.KINDS_THIS_LOOP_RUNS)),
+        )
         assert cursor.fetchone() is not None
     # Claimed, with a heartbeat the claim itself wrote: healthy again.
     assert health.is_healthy(database, WORKER) is True
@@ -580,7 +583,7 @@ def test_a_long_run_keeps_its_lease_from_a_connection_of_its_own(
             (workspace, ulid()),
         )
     with scoped(database, workspace) as cursor:
-        claimed = queue.claim(cursor, workspace, WORKER)
+        claimed = queue.claim(cursor, workspace, WORKER, loop.KINDS_THIS_LOOP_RUNS)
     assert claimed is not None
 
     dsn = _WHERE[database]

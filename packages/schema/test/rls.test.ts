@@ -8,6 +8,7 @@ import {
   EXEMPT_TABLE_NAMES,
   FAMILIES,
   IDENTITY_SET,
+  JOB_KINDS,
   RLS_EXEMPTIONS,
   ROLES,
   SUGGESTION_BODY_MAX,
@@ -2960,6 +2961,10 @@ describe("the suppression under both runtime roles", () => {
  * here is what a *role* and a *scope* reach: the table's zero-rows guarantee, and the fact
  * that the four functions are SECURITY INVOKER, so a caller in the wrong scope claims
  * nothing rather than claiming somebody else's work.
+ *
+ * Each claim below passes every declared kind, because what these tests are about is the
+ * role and the scope: which kinds a claimant may pass is the queue agreement's, and a claim
+ * narrowed here would prove the filter and stop proving the policy.
  */
 describe("the queue under both runtime roles", () => {
   it("returns zero rows on a missing scope and only the scoped tenant's jobs otherwise", async () => {
@@ -2985,16 +2990,18 @@ describe("the queue under both runtime roles", () => {
       await client.query("SET LOCAL ROLE worker_rt");
 
       await client.query("SELECT set_config('app.workspace_id', '', true)");
-      const unscoped = await client.query("SELECT id FROM claim_job($1, $2::interval)", [
+      const unscoped = await client.query("SELECT id FROM claim_job($1, $2::interval, $3)", [
         "worker-1",
         "60 seconds",
+        JOB_KINDS,
       ]);
       expect(unscoped.rows).toEqual([]);
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      const elsewhere = await client.query("SELECT id FROM claim_job($1, $2::interval)", [
+      const elsewhere = await client.query("SELECT id FROM claim_job($1, $2::interval, $3)", [
         "worker-1",
         "60 seconds",
+        JOB_KINDS,
       ]);
       expect(elsewhere.rows).toEqual([]);
 
@@ -3027,8 +3034,8 @@ describe("the queue under both runtime roles", () => {
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       const claimed = await client.query<{ id: string }>(
-        "SELECT id FROM claim_job($1, $2::interval)",
-        ["worker-1", "60 seconds"],
+        "SELECT id FROM claim_job($1, $2::interval, $3)",
+        ["worker-1", "60 seconds", JOB_KINDS],
       );
       expect(claimed.rows).toEqual([{ id: job.id }]);
     });
@@ -3045,7 +3052,7 @@ describe("the queue under both runtime roles", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const refused: readonly [string, readonly unknown[]][] = [
-        ["SELECT id FROM claim_job($1, $2::interval)", ["worker-1", "60 seconds"]],
+        ["SELECT id FROM claim_job($1, $2::interval, $3)", ["worker-1", "60 seconds", JOB_KINDS]],
         ["SELECT heartbeat_job($1, $2, $3::interval)", ["01J6J1AAAAAAAAAAAAAAAAAAAA", "w", "60 s"]],
         ["SELECT finish_job($1, $2, NULL)", ["01J6J1AAAAAAAAAAAAAAAAAAAA", "w"]],
         ["SELECT fail_job($1, $2, NULL)", ["01J6J1AAAAAAAAAAAAAAAAAAAA", "w"]],

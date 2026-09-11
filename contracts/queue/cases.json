@@ -1,5 +1,5 @@
 {
-  "description": "queue (ADR 0031, ADR 0005): the worker's control plane is rows, and the claim protocol is four SQL functions both tiers call — claim_job, heartbeat_job, finish_job, fail_job — all SECURITY INVOKER, so the caller's own role and the transaction's workspace scope are what fence every row they touch. Each suite seeds `workspaces` and `jobs` as the container's superuser (an `enqueued_ago_seconds` and a `lease_expires_in_seconds` are written as instants relative to now, which is how the fixture advances time without waiting), then runs each entry of `claims` as its `role` in its `workspace_id` scope ('' = no scope) and asserts the ids `claim_job` returned, in that order — an empty list meaning zero rows. Every entry of `calls` is then run in the same way and must answer exactly `expect`, and `expect_final` is read back per job as the superuser, `attempts` and `status` together, so a poisoning or a lost lease is visible as the row it left behind. A lease that has lapsed revokes its claimant: the heartbeat, the finish and the failure all answer false to the worker that let it lapse, whether or not anybody has claimed the job since, because from that instant the job is the queue's to hand out again.",
+  "description": "queue (ADR 0031, ADR 0005): the worker's control plane is rows, and the claim protocol is four SQL functions both tiers call — claim_job, heartbeat_job, finish_job, fail_job — all SECURITY INVOKER, so the caller's own role and the transaction's workspace scope are what fence every row they touch. Each suite seeds `workspaces` and `jobs` as the container's superuser (an `enqueued_ago_seconds` and a `lease_expires_in_seconds` are written as instants relative to now, which is how the fixture advances time without waiting), runs every entry of `refused_enqueues` as an insert that must fail with the named sqlstate against a savepoint, then runs each entry of `claims` as its `role` in its `workspace_id` scope ('' = no scope), passing its `kinds` array as the claim's third argument, and asserts the ids `claim_job` returned, in that order — an empty list meaning zero rows. A claim carrying `lapse_first` has those jobs' leases pushed thirty seconds into the past, as the superuser, immediately before it runs: that is how a lease lapses mid-sequence without a suite waiting for one. Every entry of `calls` is then run in the same way and must answer exactly `expect`, and `expect_final` is read back per job as the superuser, `attempts` and `status` together, so a poisoning or a lost lease is visible as the row it left behind. A lease that has lapsed revokes its claimant: the heartbeat, the finish and the failure all answer false to the worker that let it lapse, whether or not anybody has claimed the job since, because from that instant the job is the queue's to hand out again. A claimant reaches only the kinds it passes — in both arms, so a job it cannot run is neither claimed nor poisoned by it — and a subject has at most one job claimed under a live lease and at most one queued behind it.",
   "lease_seconds": 60,
   "workspaces": [
     { "id": "01J6AAAAAAAAAAAAAAAAAAAAAA", "name": "Workspace A" },
@@ -12,6 +12,7 @@
       "id": "01J6J1AAAAAAAAAAAAAAAAAAAA",
       "kind": "nightly-audit",
       "reason": null,
+      "subject_id": null,
       "status": "queued",
       "attempts": 0,
       "max_attempts": 3,
@@ -25,6 +26,7 @@
       "id": "01J6J2AAAAAAAAAAAAAAAAAAAA",
       "kind": "full-rebuild",
       "reason": "reconciler",
+      "subject_id": null,
       "status": "claimed",
       "attempts": 1,
       "max_attempts": 3,
@@ -38,6 +40,7 @@
       "id": "01J6J3AAAAAAAAAAAAAAAAAAAA",
       "kind": "nightly-audit",
       "reason": null,
+      "subject_id": null,
       "status": "claimed",
       "attempts": 1,
       "max_attempts": 3,
@@ -51,6 +54,7 @@
       "id": "01J6J4AAAAAAAAAAAAAAAAAAAA",
       "kind": "full-rebuild",
       "reason": "drill",
+      "subject_id": null,
       "status": "claimed",
       "attempts": 3,
       "max_attempts": 3,
@@ -59,11 +63,40 @@
       "lease_expires_in_seconds": -30
     },
     {
-      "why": "another tenant's queued job, which the scope is what keeps out of every claim above",
+      "why": "an index job in workspace A, whose kind no claim here passes: every claim in this workspace steps over it and it is still queued at the end, which is what lets a kind land in the schema before the tier that runs it has a handler for it",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "id": "01J6J8AAAAAAAAAAAAAAAAAAAA",
+      "kind": "index",
+      "reason": "bound",
+      "subject_id": "01J6D1AAAAAAAAAAAAAAAAAAAA",
+      "status": "queued",
+      "attempts": 0,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 450,
+      "claimed_by": null,
+      "lease_expires_in_seconds": null
+    },
+    {
+      "why": "an index job that has spent every attempt and lost its lease — the poison arm would take it, but no claim here passes its kind, so it is still claimed at the end: a claimant that cannot run a kind passes no verdict on it either",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "id": "01J6JEAAAAAAAAAAAAAAAAAAAA",
+      "kind": "index",
+      "reason": "rule-change",
+      "subject_id": "01J6D4AAAAAAAAAAAAAAAAAAAA",
+      "status": "claimed",
+      "attempts": 3,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 480,
+      "claimed_by": "worker-gone",
+      "lease_expires_in_seconds": -30
+    },
+    {
+      "why": "another tenant's queued audit, which the scope is what keeps out of every workspace A claim above, and which the app's own kinds leave alone",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6J5BBBBBBBBBBBBBBBBBBBB",
       "kind": "nightly-audit",
       "reason": null,
+      "subject_id": null,
       "status": "queued",
       "attempts": 0,
       "max_attempts": 3,
@@ -77,20 +110,103 @@
       "id": "01J6J6BBBBBBBBBBBBBBBBBBBB",
       "kind": "nightly-audit",
       "reason": null,
+      "subject_id": null,
       "status": "claimed",
       "attempts": 1,
       "max_attempts": 3,
       "enqueued_ago_seconds": 100,
       "claimed_by": "worker-slow",
       "lease_expires_in_seconds": -30
+    },
+    {
+      "why": "the rebuild the ops command enqueued and then claims in the foreground; it is the oldest job in this workspace, so a claimant that passed every kind would take it first",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6J7BBBBBBBBBBBBBBBBBBBB",
+      "kind": "full-rebuild",
+      "reason": "drill",
+      "subject_id": null,
+      "status": "queued",
+      "attempts": 0,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 650,
+      "claimed_by": null,
+      "lease_expires_in_seconds": null
+    },
+    {
+      "why": "the run in flight over one binding: claimed under a lease that still stands, so nothing may start a second run over the same binding",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6J9BBBBBBBBBBBBBBBBBBBB",
+      "kind": "index",
+      "reason": "bound",
+      "subject_id": "01J6D2BBBBBBBBBBBBBBBBBBBB",
+      "status": "claimed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 350,
+      "claimed_by": "worker-alive",
+      "lease_expires_in_seconds": 120
+    },
+    {
+      "why": "the same binding's next run, enqueued while the first was in flight — which the run key admits, because the row it would collide with is claimed and not queued — and which every claim below passes over for as long as that lease stands",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6JABBBBBBBBBBBBBBBBBBBB",
+      "kind": "index",
+      "reason": "restored",
+      "subject_id": "01J6D2BBBBBBBBBBBBBBBBBBBB",
+      "status": "queued",
+      "attempts": 0,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 340,
+      "claimed_by": null,
+      "lease_expires_in_seconds": null
+    },
+    {
+      "why": "a second binding's run in flight, whose lease the claims below let lapse so the binding's work can be handed out again",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6JBBBBBBBBBBBBBBBBBBBBB",
+      "kind": "index",
+      "reason": "bound",
+      "subject_id": "01J6D3BBBBBBBBBBBBBBBBBBBB",
+      "status": "claimed",
+      "attempts": 1,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 330,
+      "claimed_by": "worker-alive",
+      "lease_expires_in_seconds": 120
+    },
+    {
+      "why": "that binding's next run, waiting behind it: never claimed here, because the binding's own work went back to the row that lost its lease and a binding has one run at a time whichever row carries it",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6JCBBBBBBBBBBBBBBBBBBBB",
+      "kind": "index",
+      "reason": "rule-change",
+      "subject_id": "01J6D3BBBBBBBBBBBBBBBBBBBB",
+      "status": "queued",
+      "attempts": 0,
+      "max_attempts": 3,
+      "enqueued_ago_seconds": 320,
+      "claimed_by": null,
+      "lease_expires_in_seconds": null
+    }
+  ],
+  "refused_enqueues": [
+    {
+      "why": "a second queued job for a binding that already has one waiting is the database's refusal and never a second row — the *run key* over queued rows — so the act that enqueued it reads the waiting job's id back instead of landing a duplicate run",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6JDBBBBBBBBBBBBBBBBBBBB",
+      "kind": "index",
+      "reason": "narrowed",
+      "subject_id": "01J6D2BBBBBBBBBBBBBBBBBBBB",
+      "sqlstate": "23505"
     }
   ],
   "claims": [
     {
-      "why": "the oldest claimable job goes first — which is not the oldest job, because the oldest has spent its attempts and is poisoned by this very claim rather than handed out again",
+      "why": "the oldest claimable job of a kind this worker runs goes first — which is not the oldest job, because the oldest has spent its attempts and is poisoned by this very claim rather than handed out again, and the two index jobs older still are of a kind this claimant does not pass",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "worker_id": "worker-1",
+      "kinds": ["nightly-audit", "full-rebuild"],
       "expect_ids": ["01J6J1AAAAAAAAAAAAAAAAAAAA"]
     },
     {
@@ -98,27 +214,64 @@
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "worker_id": "worker-1",
+      "kinds": ["nightly-audit", "full-rebuild"],
       "expect_ids": ["01J6J2AAAAAAAAAAAAAAAAAAAA"]
     },
     {
-      "why": "and then nothing: a lease somebody is keeping alive is not a job going spare",
+      "why": "and then nothing: a lease somebody is keeping alive is not a job going spare, and the index jobs still waiting are not this claimant's to take",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "worker_id": "worker-1",
+      "kinds": ["nightly-audit", "full-rebuild"],
       "expect_ids": []
     },
     {
-      "why": "the app may claim too — the ops command that runs a rebuild in the foreground is a claimant like any other — and in workspace B it takes that tenant's own job",
+      "why": "the app may claim too — the ops command that runs a rebuild in the foreground is a claimant like any other, passing the rebuild kind alone — and it takes that tenant's rebuild and not the audit sitting beside it. What this case proves is the grant and the policy: ADR 0031's agreement admits the app as a claimant, under its own role and in its own scope. It says nothing about which tier a kind belongs to — every kind's descriptor names the worker today, the full rebuild included, and an api-claimed kind arriving later brings its own descriptor and its own case here",
       "role": "app_rt",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "worker_id": "ops-1",
+      "kinds": ["full-rebuild"],
+      "expect_ids": ["01J6J7BBBBBBBBBBBBBBBBBBBB"]
+    },
+    {
+      "why": "and the worker in the same workspace takes the audit the app's one kind stepped over, on the kinds its own registry holds",
+      "role": "worker_rt",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "worker_id": "worker-2",
+      "kinds": ["nightly-audit", "full-rebuild"],
       "expect_ids": ["01J6J5BBBBBBBBBBBBBBBBBBBB"]
+    },
+    {
+      "why": "a claimant passing the index kind finds nothing, though two index jobs are queued: each one's binding already has a run claimed under a lease that stands, and a binding is indexed by one run at a time",
+      "role": "worker_rt",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "worker_id": "worker-3",
+      "kinds": ["index"],
+      "expect_ids": []
+    },
+    {
+      "why": "let the second binding's run lose its lease and the same claim answers: the binding's work is claimable again the instant nothing holds it, and it goes to the row that lost it, which is the older of that binding's two",
+      "role": "worker_rt",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "worker_id": "worker-3",
+      "kinds": ["index"],
+      "lapse_first": ["01J6JBBBBBBBBBBBBBBBBBBBBB"],
+      "expect_ids": ["01J6JBBBBBBBBBBBBBBBBBBBBB"]
+    },
+    {
+      "why": "and nothing again: the claim just made is itself a live lease on that binding, so the job waiting behind it waits, exactly as the first binding's does",
+      "role": "worker_rt",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "worker_id": "worker-3",
+      "kinds": ["index"],
+      "expect_ids": []
     },
     {
       "why": "a transaction scoped to no workspace claims nothing at all, which is why none of the four functions needs a workspace argument to guard",
       "role": "worker_rt",
       "workspace_id": "",
       "worker_id": "worker-1",
+      "kinds": ["nightly-audit", "full-rebuild"],
       "expect_ids": []
     }
   ],
@@ -262,12 +415,28 @@
       "claimed_by": "worker-gone"
     },
     {
-      "why": "the other tenant's job was claimed only from its own scope, and by the app",
+      "why": "still queued: no claim in this workspace passed its kind, so the queue held it exactly as it found it",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "id": "01J6J8AAAAAAAAAAAAAAAAAAAA",
+      "status": "queued",
+      "attempts": 0,
+      "claimed_by": null
+    },
+    {
+      "why": "still claimed and never poisoned, though every attempt is spent and the lease has gone: the poison arm is filtered by the kinds too, so a claimant that cannot run a kind passes no verdict on it",
+      "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
+      "id": "01J6JEAAAAAAAAAAAAAAAAAAAA",
+      "status": "claimed",
+      "attempts": 3,
+      "claimed_by": "worker-gone"
+    },
+    {
+      "why": "the other tenant's audit was claimed only from its own scope, and by the worker whose kinds hold it",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6J5BBBBBBBBBBBBBBBBBBBB",
       "status": "claimed",
       "attempts": 1,
-      "claimed_by": "ops-1"
+      "claimed_by": "worker-2"
     },
     {
       "why": "still claimed by the worker that let its lease lapse, untouched by its refused calls, on the attempt it was claimed with — the next claim in this workspace takes it",
@@ -276,6 +445,46 @@
       "status": "claimed",
       "attempts": 1,
       "claimed_by": "worker-slow"
+    },
+    {
+      "why": "the rebuild the app claimed in the foreground, on the one kind it passed",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6J7BBBBBBBBBBBBBBBBBBBB",
+      "status": "claimed",
+      "attempts": 1,
+      "claimed_by": "ops-1"
+    },
+    {
+      "why": "the first binding's run kept its lease throughout, so nothing took its binding from it",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6J9BBBBBBBBBBBBBBBBBBBB",
+      "status": "claimed",
+      "attempts": 1,
+      "claimed_by": "worker-alive"
+    },
+    {
+      "why": "and its binding's next run is still queued, passed over by every claim: one run per binding is the queue's rule and not the claimant's manners",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6JABBBBBBBBBBBBBBBBBBBB",
+      "status": "queued",
+      "attempts": 0,
+      "claimed_by": null
+    },
+    {
+      "why": "the second binding's run, handed out again the instant its lease lapsed and now held by the worker that took it, on its second attempt",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6JBBBBBBBBBBBBBBBBBBBBB",
+      "status": "claimed",
+      "attempts": 2,
+      "claimed_by": "worker-3"
+    },
+    {
+      "why": "and the job waiting behind it is still queued, because the binding was taken again before it came up",
+      "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
+      "id": "01J6JCBBBBBBBBBBBBBBBBBBBB",
+      "status": "queued",
+      "attempts": 0,
+      "claimed_by": null
     }
   ]
 }
