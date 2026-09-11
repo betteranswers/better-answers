@@ -1,0 +1,42 @@
+apps/worker/src/better_answers_worker/redaction/__init__.py
+  s_f3ee63bcbb1a0b::t_eed886cea16c03 4-23,25-138
+apps/worker/tests/test_redaction.py
+  s_f3ee63bcbb1a0b::t_fae73ae5885c2d 236-238
+  s_f3ee63bcbb1a0b::t_53c439576d2e7f 1-167,170-235,239-252
+apps/worker/tests/fixtures/redaction/supplier-information-pack.md
+  s_f3ee63bcbb1a0b::t_baa711c09682bb 40-41
+  s_f3ee63bcbb1a0b::t_9cb4abcb664aff 11,23-25,27-28,32-33,45,47,51-52
+  s_f3ee63bcbb1a0b::t_abcdb51fe4f40a 1-2,9-10,12-22,26,29-31,34-39,42-44,46,48-50,53-56
+  s_f3ee63bcbb1a0b::t_bf2560ca64ec54 3-8
+apps/worker/src/better_answers_worker/redaction/recognisers.py
+  s_f3ee63bcbb1a0b::t_cd4c9b1fa6181b 43
+  s_f3ee63bcbb1a0b::t_fe453a922aa9b5 56
+  s_f3ee63bcbb1a0b::t_5c0504dab3706b 1-42,44-55,57-116,118-144,155-158,160-258
+  s_f3ee63bcbb1a0b::t_570b16e0dd5f31 145-152,154
+apps/worker/src/better_answers_worker/redaction/engine.py
+  s_f3ee63bcbb1a0b::t_3761a625f02b08 275-277,282-285
+  s_f3ee63bcbb1a0b::t_6daf2ccf8618c0 44-49
+  s_f3ee63bcbb1a0b::t_11b6c913f02be9 162
+  s_f3ee63bcbb1a0b::t_1b847c2fd2f24b 131
+  s_f3ee63bcbb1a0b::t_cdf3f403a17e27 40,50
+  s_f3ee63bcbb1a0b::t_b94c0290cf883d 215-216
+  s_f3ee63bcbb1a0b::t_c0df280bfb0582 1-39,41-43,51-130,132-136,182-214,217-274,278-281,286-307
+  s_f3ee63bcbb1a0b::t_97d2e8e916674d 137-150,154-161,163-181
+  s_f3ee63bcbb1a0b::t_7592fb06fc59ce 151-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "2f763126c80648b879eb572f7018c17aaec2f700",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
