@@ -62,7 +62,7 @@ export {
   type FrontmatterSource,
   type FrontmatterValue,
 } from "./file.ts";
-export { foldKind } from "./landing.ts";
+export { foldKind, moveBundleCommits } from "./landing.ts";
 export {
   RECONCILER,
   reconcile,

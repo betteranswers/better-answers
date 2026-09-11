@@ -10,7 +10,8 @@ import {
   type PlatformPrincipal,
   type Result,
 } from "../kernel/index.ts";
-import type { GitDoor } from "../store/git/index.ts";
+import { moveBundleCommits } from "../concepts/index.ts";
+import { rewriteHistory, withRepositoryLockAs, type GitDoor } from "../store/git/index.ts";
 import { withScope, withSessionLock, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { erasureMapOf, type ErasureFamily, type ErasureMap } from "./map.ts";
 import {
@@ -138,6 +139,13 @@ const beyondUseFrom = (anchoredAt: Date) => ({
 /** The row as the routine reads it back, whichever run wrote it. */
 type ErasureRow = {
   readonly id: string;
+  /**
+   * The erasure pseudonym, which the report is never handed (ADR 0035) and the git step
+   * cannot run without: it is what `human:<address>` becomes. It is read back here rather
+   * than kept from the insert, because on a second run the insert conflicted and did nothing
+   * and the id the history was rewritten to is the first run's.
+   */
+  readonly pseudonym: string;
   readonly anchored_at: Date;
   readonly beyond_use_hourly_at: Date;
   readonly beyond_use_daily_at: Date;
@@ -154,7 +162,7 @@ const erasureRecordOf = (row: ErasureRow): ErasureRecord => ({
   beyondUseMonthlyAt: row.beyond_use_monthly_at,
 });
 
-const OPENED = `SELECT id, anchored_at, beyond_use_hourly_at, beyond_use_daily_at,
+const OPENED = `SELECT id, pseudonym, anchored_at, beyond_use_hourly_at, beyond_use_daily_at,
                        beyond_use_weekly_at, beyond_use_monthly_at
                   FROM erasure_request WHERE workspace_id = $1 AND subject_request_id = $2`;
 
@@ -173,7 +181,15 @@ const openTheRoutine = async (
   subjectRequestId: string,
   lockedAt: Date,
 ): Promise<
-  Result<{ readonly request: SubjectRequest; readonly erasure: ErasureRecord }, ErasureRefusal>
+  Result<
+    {
+      readonly request: SubjectRequest;
+      readonly erasure: ErasureRecord;
+      /** Beside the record rather than in it: the report is never handed this (ADR 0035). */
+      readonly pseudonym: string;
+    },
+    ErasureRefusal
+  >
 > => {
   const found = await tx.query(
     `SELECT workspace_id AS "workspaceId", id, person_id AS "personId", identifiers, kind,
@@ -218,7 +234,7 @@ const openTheRoutine = async (
   // The insert either landed a row or found one; a read that answers neither is a database
   // that has just refused a statement it reported as accepted.
   if (erasure === undefined) throw new Error("erasure: the request's routine row did not open");
-  return ok({ request, erasure: erasureRecordOf(erasure) });
+  return ok({ request, erasure: erasureRecordOf(erasure), pseudonym: erasure.pseudonym });
 };
 
 const CONCEPT_FILE: ErasureFamily = "concept-file";
@@ -261,6 +277,23 @@ const foundPerFamily = (map: ErasureMap): ErasureActions => {
   for (const entry of map) actions[entry.family] = { found: entry.locations.length };
   return actions;
 };
+
+/** The two families the git step acts on, named once so the lines below cannot drift apart. */
+const BUNDLE_COMMIT: ErasureFamily = "bundle-commit";
+
+/**
+ * Step 3's two lines, written **into** the record the spine built rather than over it: each
+ * family keeps the count of what the map found there and gains what this step did about it.
+ * A step that reshaped the record would be a step every later step had to know about.
+ */
+const withTheGitStep = (
+  actions: ErasureActions,
+  step: { readonly rewritten: number; readonly moved: number },
+): ErasureActions => ({
+  ...actions,
+  [CONCEPT_FILE]: { ...actions[CONCEPT_FILE], rewritten: step.rewritten },
+  [BUNDLE_COMMIT]: { ...actions[BUNDLE_COMMIT], moved: step.moved },
+});
 
 const detailOf = (request: SubjectRequest, map: ErasureMap): CompletedDetail => {
   const locations = map.reduce((total, entry) => total + entry.locations.length, 0);
@@ -306,7 +339,7 @@ export const runErasure = async (
     );
     if (!opened.ok) return err(opened.error);
     if (!opened.value.ok) return err(opened.value.error);
-    const { request, erasure } = opened.value.value;
+    const { request, erasure, pseudonym } = opened.value.value;
 
     // Step 2, in its own transaction: the map walks every store family and reads a real
     // repository, which is not work to hold a transaction open across the first step for.
@@ -319,7 +352,28 @@ export const runErasure = async (
     if (!searched.ok) return err(searched.error);
     const { map, concepts } = searched.value;
 
-    const actions = foundPerFamily(map);
+    // Step 3, under the per-repository lock, which is held across **both** halves: the
+    // rewrite and the rows that name its commits have to move together, and a reconciler
+    // tick that ran between them would meet a head its watermark could not reach and call
+    // the history diverged.
+    const rewritten = await attempt(() =>
+      withRepositoryLockAs(platform, doors.git, workspaceId, async () => {
+        const { moved } = await rewriteHistory(platform, doors.git, workspaceId, {
+          addresses: request.identifiers?.emails ?? [],
+          pseudonym,
+        });
+        // One transaction for both tables, because `concept_index`'s key into `bundle_commit`
+        // is deferred to its end (migration 0015): the two are inconsistent inside it, which
+        // is the only way to move a primary key that another table points at.
+        const rows = await withScope(platform, doors.postgres, workspaceId, (tx) =>
+          moveBundleCommits(platform, tx, moved),
+        );
+        return { rewritten: moved.length, moved: rows };
+      }),
+    );
+    if (!rewritten.ok) return err(rewritten.error);
+
+    const actions = withTheGitStep(foundPerFamily(map), rewritten.value);
     const report = erasureReportOf({ request, erasure, actions, map, concepts });
     const completedAt = doors.clock.now();
 

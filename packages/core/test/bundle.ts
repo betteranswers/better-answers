@@ -160,3 +160,57 @@ export const staged = async (door: GitDoor, workspaceId: string): Promise<readon
 /** Take a workspace's bundle away, for the tests about a repository that is not there. */
 export const removeRepository = (door: GitDoor, workspaceId: string): Promise<void> =>
   rm(path.join(door.root, `${workspaceId}.git`), { recursive: true, force: true });
+
+/**
+ * Every object the bundle's history reaches, as one run of bytes: the commits with their
+ * author lines and messages, the trees, and every blob at every commit. A claim about what a
+ * rewritten repository no longer holds is made against this and never against the head's
+ * tree, because the head is the one place a rewrite is easy to get right by accident.
+ *
+ * `rev-list --objects` names every object reachable from the ref, oldest commit's blobs
+ * included, and `cat-file --batch` prints each one's contents in a single pass.
+ */
+export const everyObjectOf = async (door: GitDoor, workspaceId: string): Promise<string> => {
+  const listed = await git(door, workspaceId, ["rev-list", "--objects", "main"]).catch(() => "");
+  const objects = listed
+    .split("\n")
+    .map((line) => line.split(" ")[0] ?? "")
+    .filter((sha) => sha !== "");
+  if (objects.length === 0) return "";
+  const child = run(
+    "git",
+    ["--git-dir", path.join(door.root, `${workspaceId}.git`), "cat-file", "--batch", "--buffer"],
+    { env: { ...process.env }, maxBuffer: 64 * 1024 * 1024 },
+  );
+  child.child.stdin?.end(`${objects.join("\n")}\n`);
+  const { stdout } = await child;
+  return stdout;
+};
+
+/**
+ * Whether the repository still holds an object under this hash — `git cat-file -e`, whose
+ * whole answer is its exit status. A pre-rewrite commit that answers `true` is a commit the
+ * rewrite left behind for anyone who kept its hash.
+ */
+export const objectPresent = async (
+  door: GitDoor,
+  workspaceId: string,
+  sha: string,
+): Promise<boolean> =>
+  git(door, workspaceId, ["cat-file", "-e", sha])
+    .then(() => true)
+    .catch(() => false);
+
+/** `Name <address>` for every commit on the bundle's ref, oldest first. */
+export const authorLinesOf = async (
+  door: GitDoor,
+  workspaceId: string,
+): Promise<readonly string[]> => {
+  const logged = await git(door, workspaceId, [
+    "log",
+    "--reverse",
+    "--format=%an <%ae>",
+    "main",
+  ]).catch(() => "");
+  return logged.split("\n").filter((line) => line !== "");
+};

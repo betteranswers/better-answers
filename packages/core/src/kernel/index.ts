@@ -42,7 +42,14 @@ export type { Clock } from "./clock.ts";
 export { refusalFor } from "./constraint.ts";
 export { attempt, err, normalizeError, ok } from "./result.ts";
 export type { Result } from "./result.ts";
-export { actorIdOf, actorIdOfPerson, isActorId, isPersonActor, personOfActor } from "./actor.ts";
+export {
+  actorIdOf,
+  actorIdOfPerson,
+  isActorId,
+  isPersonActor,
+  personOfActor,
+  PERSON_PREFIX,
+} from "./actor.ts";
 export type { ActorId, ProcessActorId } from "./actor.ts";
 export { requireAdmin } from "./role.ts";
 export type { AdminUserPrincipal, RoleRefusal } from "./role.ts";

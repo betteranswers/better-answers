@@ -1,13 +1,15 @@
 import { ulid } from "@better-answers/schema";
 import { describe, expect, it } from "vitest";
 
-import { commit } from "@better-answers/core/store/git";
+import { commit, type GitDoor } from "@better-answers/core/store/git";
 
+import { RECONCILER, reconcile } from "../src/concepts/index.ts";
 import { ERASURE, runErasure, type ErasureRefusal, type ErasureRun } from "../src/erasure/index.ts";
 import { actorIdOfPerson, type Result } from "../src/kernel/index.ts";
+import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
 import { countWaitingOnLocks, seedingWith, until, whileActsWaitAt } from "./suite-postgres.ts";
-import { principalFor, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
+import { doorsOf, principalFor, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 /**
  * The **erasure routine's spine** through the slice's own face (`[TEST1]`), against real
@@ -95,20 +97,153 @@ const completing = async (
   return run.value;
 };
 
+/**
+ * The request every arrangement here ends with: an erasure, about a person who holds a login,
+ * naming the one address the bundle and the identity set both know them by.
+ */
+const erasureRequestAbout = async (
+  workspaceId: string,
+  personId: string,
+  email: string,
+): Promise<string> => {
+  const seeded = await seedingWith(db().pool, (seed) =>
+    seed.subjectRequest({
+      workspaceId,
+      kind: "erasure",
+      personId,
+      identifiers: { emails: [email], names: ["Priya Anand"], other: [] },
+    }),
+  );
+  return seeded.id;
+};
+
 /** An erasure request about a person who holds a login and a membership in this workspace. */
 const workspaceWithAnErasureRequest = async () => {
   const scenario = await arrange();
   const email = addressOf("priya");
   const person = await memberOf(scenario.workspaceId, email);
-  const seeded = await seedingWith(db().pool, (seed) =>
-    seed.subjectRequest({
+  return {
+    scenario,
+    email,
+    person,
+    subjectRequestId: await erasureRequestAbout(scenario.workspaceId, person.id, email),
+  };
+};
+
+/**
+ * The arrangement the git step is proved against: a bundle whose **whole** history names the
+ * person, so every commit's hash moves and the claim about pre-rewrite hashes is a claim
+ * about all of them rather than about the tail. Two commits, both written by Priya and both
+ * carrying `human:<address>` in the file, with the `bundle_commit` rows a governed write
+ * would have landed beside them — the second naming the first as its parent — and a
+ * `concept_index` row on the head, because that row's key into `bundle_commit` has to travel
+ * with the rewrite or the routine's own transaction cannot commit.
+ */
+const bundleNamingThePerson = async () => {
+  const { scenario, email, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+  const principal = await principalFor(db(), scenario.workspaceId, person.id);
+  const author = { name: "Priya Anand", email };
+  const path = "knowledge/expenses.md";
+
+  const shas: string[] = [];
+  for (const [at, body] of ["claimed within thirty days", "claimed within sixty days"].entries()) {
+    const written = await commit(principal, scenario.git, {
+      path,
+      content: `---\ngenerated:\n  by: human:${email}\nverified:\n  - by: human:${email}\n---\n\nExpenses are ${body}.\n`,
+      message: `Record the expenses policy (${at + 1})`,
+      author,
+      trailers: { actor: actorIdOfPerson(principal.userId), audit: ulid() },
+      expectedHead: shas[at - 1] ?? null,
+      at: new Date(`2026-04-0${at + 2}T11:00:00.000Z`),
+    });
+    if (!written.ok) throw new Error(`the commit was refused: ${String(written.error)}`);
+    shas.push(written.value.sha);
+  }
+
+  const iri = await seedingWith(db().pool, async (seed) => {
+    for (const [at, sha] of shas.entries()) {
+      await seed.bundleCommit({
+        workspaceId: scenario.workspaceId,
+        sha,
+        parentSha: shas[at - 1] ?? null,
+        actor: actorIdOfPerson(principal.userId),
+        committedAt: new Date(`2026-04-0${at + 2}T11:00:00.000Z`),
+      });
+    }
+    const indexed = await seed.conceptIndex({
       workspaceId: scenario.workspaceId,
-      kind: "erasure",
-      personId: person.id,
-      identifiers: { emails: [email], names: ["Priya Anand"], other: [] },
-    }),
+      path,
+      commitSha: shas.at(-1) ?? "",
+    });
+    return indexed.iri;
+  });
+  return { scenario, email, person, iri, before: shas, subjectRequestId };
+};
+
+/** The `bundle_commit` rows of a workspace, oldest first: the chain the reconciler reads. */
+const bundleCommitRowsIn = async (workspaceId: string) => {
+  const read = await db().pool.query<{ sha: string; parent_sha: string | null }>(
+    `SELECT sha, parent_sha FROM bundle_commit WHERE workspace_id = $1 ORDER BY committed_at, sha`,
+    [workspaceId],
   );
-  return { scenario, email, person, subjectRequestId: seeded.id };
+  return read.rows;
+};
+
+/**
+ * **One rewrite, read from both ends, shared by every claim made about it below.**
+ *
+ * The git step is by a distance the most expensive thing this suite does: it spawns
+ * `filter-repo`, which is a Python process that rewrites and then repacks a real repository.
+ * Every claim in the two blocks below — what the objects hold, what the author lines say, what
+ * the old hashes answer to, where the rows point, what the report recorded — is a claim about
+ * **the same single run**, so it is run once and read once rather than eight times over eight
+ * identical arrangements. A run of its own is kept for the second-pass case, which is about
+ * what a *second* run does and cannot share one.
+ *
+ * Lazy rather than a `beforeAll`, so a `-t` filter that selects none of these cases pays
+ * nothing for them.
+ */
+const readingTheBundle = async (workspaceId: string, git: GitDoor) => ({
+  objects: await everyObjectOf(git, workspaceId),
+  authors: await authorLinesOf(git, workspaceId),
+  history: await bundleHistory(git, workspaceId),
+  rows: await bundleCommitRowsIn(workspaceId),
+});
+
+const rewritingTheBundleOnce = async () => {
+  const arranged = await bundleNamingThePerson();
+  const { scenario, subjectRequestId } = arranged;
+  const before = await readingTheBundle(scenario.workspaceId, scenario.git);
+
+  const done = await completing(scenario, subjectRequestId);
+
+  const after = await readingTheBundle(scenario.workspaceId, scenario.git);
+  const [row] = await erasureRowsIn(scenario.workspaceId);
+  return {
+    ...arranged,
+    before,
+    after,
+    done,
+    pseudonym: row?.pseudonym ?? "",
+    actions: row?.actions ?? {},
+    stillPresent: await Promise.all(
+      arranged.before.map((sha) => objectPresent(scenario.git, scenario.workspaceId, sha)),
+    ),
+    commitOfTheConcept: await commitOfConcept(scenario.workspaceId, arranged.iri),
+  };
+};
+
+let theOneRewrite: ReturnType<typeof rewritingTheBundleOnce> | undefined;
+
+const theBundleRewritten = () => (theOneRewrite ??= rewritingTheBundleOnce());
+
+/** The commit a concept's index row was written at — the key that travels with the rewrite. */
+const commitOfConcept = async (workspaceId: string, iri: string): Promise<string | undefined> => {
+  const read = await db().pool.query<{ commit_sha: string }>(
+    "SELECT commit_sha FROM concept_index WHERE workspace_id = $1 AND iri = $2",
+    [workspaceId, iri],
+  );
+  return read.rows[0]?.commit_sha;
 };
 
 /** Every erasure request in the workspace, as the superuser: the columns the routine writes. */
@@ -285,44 +420,7 @@ describe("the report", () => {
   });
 
   it("lists the concepts whose body names the person by IRI, for the owner to edit", async () => {
-    const scenario = await arrange();
-    const email = addressOf("priya");
-    const person = await memberOf(scenario.workspaceId, email);
-    const principal = await principalFor(db(), scenario.workspaceId, person.id);
-    const path = "knowledge/expenses.md";
-    const written = await commit(principal, scenario.git, {
-      path,
-      content: `---\ngenerated:\n  by: human:${email}\n---\n\nExpenses are claimed within thirty days.\n`,
-      message: "Record the expenses policy",
-      author: { name: "Priya Anand", email },
-      trailers: { actor: actorIdOfPerson(principal.userId), audit: ulid() },
-      expectedHead: null,
-      at: new Date("2026-04-02T11:00:00.000Z"),
-    });
-    if (!written.ok) throw new Error(`the commit was refused: ${String(written.error)}`);
-    const iri = await seedingWith(db().pool, async (seed) => {
-      await seed.bundleCommit({
-        workspaceId: scenario.workspaceId,
-        sha: written.value.sha,
-        actor: actorIdOfPerson(principal.userId),
-      });
-      const indexed = await seed.conceptIndex({
-        workspaceId: scenario.workspaceId,
-        path,
-        commitSha: written.value.sha,
-      });
-      return indexed.iri;
-    });
-    const seeded = await seedingWith(db().pool, (seed) =>
-      seed.subjectRequest({
-        workspaceId: scenario.workspaceId,
-        kind: "erasure",
-        personId: person.id,
-        identifiers: { emails: [email], names: ["Priya Anand"], other: [] },
-      }),
-    );
-
-    const done = await completing(scenario, seeded.id);
+    const { iri, done } = await theBundleRewritten();
 
     expect(done.report).toContain("Names inside concept bodies, for the owner to edit:");
     expect(done.report).toContain(`- ${iri}`);
@@ -410,6 +508,102 @@ describe("a second run of the routine", () => {
       again.auditEventId,
     ]);
     expect(again.auditEventId).not.toEqual(first.auditEventId);
+  });
+});
+
+describe("the git step", () => {
+  it("leaves no object at any commit holding the address the files and the author lines carried", async () => {
+    const { email, before, after } = await theBundleRewritten();
+    // The arrangement is only worth its assertions if the history really named them first.
+    expect(before.objects).toContain(`human:${email}`);
+
+    // Every object the history reaches, not the head's tree: a rewrite that moved the tip and
+    // left an earlier commit's blob behind would pass a check on the head and fail here.
+    expect(after.objects).not.toContain(email);
+    expect(after.objects).toContain("human:");
+  });
+
+  it("mailmaps every author line in the bundle to the erasure pseudonym", async () => {
+    const { email, before, after, pseudonym } = await theBundleRewritten();
+    expect(before.authors).toEqual([`Priya Anand <${email}>`, `Priya Anand <${email}>`]);
+
+    // The name the display line carried is gone with the address, and what stands in its place
+    // is the one id the rewrite named the person by — never the person id (ADR 0035).
+    expect(after.authors).toEqual([
+      `human:${pseudonym} <${pseudonym}@erased.better-answers.invalid>`,
+      `human:${pseudonym} <${pseudonym}@erased.better-answers.invalid>`,
+    ]);
+  });
+
+  it("prunes the pre-rewrite objects, so git cat-file -e fails on every hash the history held", async () => {
+    const { before, after, stillPresent } = await theBundleRewritten();
+    expect(before.history).toHaveLength(2);
+
+    expect(stillPresent).toEqual([false, false]);
+    // And the history is the same length it was: a prune is not a way of losing a commit.
+    expect(after.history).toHaveLength(2);
+  });
+
+  it("finds nothing to replace on a second run and moves the history no further", async () => {
+    const { scenario, subjectRequestId } = await bundleNamingThePerson();
+
+    await completing(scenario, subjectRequestId);
+    const rewritten = await bundleHistory(scenario.git, scenario.workspaceId);
+    const authors = await authorLinesOf(scenario.git, scenario.workspaceId);
+    const rows = await bundleCommitRowsIn(scenario.workspaceId);
+
+    await completing(scenario, subjectRequestId, RAN_AGAIN_AT);
+
+    // The replay runs the routine again over every completed request and has no branch that
+    // says "this one already ran": what makes that safe is that the second pass finds no
+    // address in the history and therefore never rewrites it.
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(rewritten);
+    expect(await authorLinesOf(scenario.git, scenario.workspaceId)).toEqual(authors);
+    // And the rows stay where the first run put them. `filter-repo`'s commit map is
+    // cumulative — a second run would still read the first run's pairs out of it — so a step
+    // that trusted that file without asking what this run started from would try to move a
+    // row onto a hash it already holds.
+    expect(await bundleCommitRowsIn(scenario.workspaceId)).toEqual(rows);
+  });
+});
+
+describe("the bundle_commit rows the rewrite moves", () => {
+  it("names the rewritten hashes, parents and all, and carries the index row's key with them", async () => {
+    const { before, after, commitOfTheConcept } = await theBundleRewritten();
+    expect(before.rows.map((row) => row.sha)).toEqual(before.history);
+
+    expect(after.rows.map((row) => row.sha)).toEqual(after.history);
+    // The chain moved with the rows: a parent naming a hash the repository no longer holds
+    // would be a prefix invariant the database still believed and git had forgotten.
+    expect(after.rows.map((row) => row.parent_sha)).toEqual([null, after.history[0]]);
+    expect(commitOfTheConcept).toEqual(after.history[1]);
+  });
+
+  it("leaves the reconciler nothing to replay, because the head and the watermark agree", async () => {
+    const { scenario } = await theBundleRewritten();
+
+    const swept = await reconcile(RECONCILER, doorsOf(scenario), {
+      workspaceId: scenario.workspaceId,
+    });
+
+    if (!swept.ok) throw new Error(`the reconciler refused: ${String(swept.error)}`);
+    // Nothing replayed and nothing skipped: the rows name the head, so the scan finds no
+    // commit past the watermark at all. A rewrite that left the rows behind would answer
+    // `history-diverged` here, because the watermark would name a commit git had pruned.
+    expect(swept.value.replayed).toEqual([]);
+    expect(swept.value.skipped).toEqual([]);
+    expect(swept.value.watermark).toEqual(swept.value.head);
+  });
+
+  it("records what the two families did in the report's actions, rather than reshaping them", async () => {
+    const { actions } = await theBundleRewritten();
+
+    expect(actions).toMatchObject({
+      "concept-file": { rewritten: 2 },
+      "bundle-commit": { moved: 2 },
+    });
+    // The spine's own line for each family stands beside what this step added.
+    expect(actions["concept-file"]).toHaveProperty("found");
   });
 });
 
