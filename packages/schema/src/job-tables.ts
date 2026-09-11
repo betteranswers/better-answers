@@ -1,7 +1,8 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, jsonb, primaryKey, text } from "drizzle-orm/pg-core";
+import { check, index, integer, jsonb, primaryKey, text, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { listed, stamp } from "./column-helpers.ts";
+import type { ROLES } from "./roles.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -18,20 +19,19 @@ import { workspace } from "./workspace-table.ts";
  * is written there.
  */
 
-/**
- * The two job kinds this queue carries, which are T-006's own obligations: the **nightly
- * parser audit**, where the Python parser cross-checks the app's parse hash-by-hash, and
- * the **full rebuild**, the graph sync run that writes a new generation beside the live one
- * and flips it (`CONTEXT.md`, *graph sync run*; ADR 0023). B7 adds kinds to a loop that
- * exists; it does not add a loop.
- */
-export const JOB_KINDS = ["nightly-audit", "full-rebuild"] as const;
-
 /** The nightly cross-check of the two parsers (ADR 0012, ADR 0023). */
-export const NIGHTLY_AUDIT_KIND = "nightly-audit" satisfies (typeof JOB_KINDS)[number];
+export const NIGHTLY_AUDIT_KIND = "nightly-audit";
 
 /** The whole-graph rebuild, which is the only thing a generation exists for (ADR 0023). */
-export const FULL_REBUILD_KIND = "full-rebuild" satisfies (typeof JOB_KINDS)[number];
+export const FULL_REBUILD_KIND = "full-rebuild";
+
+/**
+ * A binding's documents through the seam and into the index — S1's one new kind. `reindex`
+ * is not a kind of its own: it is this kind carrying a different reason, because what
+ * re-runs is decided by the reason and a second kind would be a second host path for one
+ * flow.
+ */
+export const INDEX_KIND = "index";
 
 /**
  * The six reasons a full rebuild happens, exactly as ADR 0023 names them. A rebuild is
@@ -46,6 +46,99 @@ export const REBUILD_REASONS = [
   "upgrade",
   "drill",
 ] as const;
+
+/**
+ * The five things that put a binding back through the index: the upload act binding it,
+ * a finding an Admin kept in text, the binding's rules in force being edited, the erasure
+ * routine wiping it, and a document narrowed from the review.
+ */
+export const INDEX_REASONS = ["bound", "restored", "rule-change", "wiped", "narrowed"] as const;
+
+/**
+ * Which tier's loop claims a kind. Every kind today is the worker's — the app enqueues a
+ * rebuild from `pnpm ops` and waits for the worker to run it — and the word is on the
+ * record because a later kind is the app's own: a question set's answer path runs where the
+ * answering does (ADR 0005: the control plane is rows, so neither tier calls the other).
+ */
+export type ClaimingTier = "app" | "worker";
+
+/**
+ * What one **kind** of job is, declared in one place: the word on the row, the tier that
+ * claims it, whether the row names the thing the job is about, the reasons it may carry,
+ * and the role a person must hold to enqueue one.
+ *
+ * The kind, subject and reason CHECKs below are written *from this list*, so a kind is
+ * added by adding a record and generating the migration — never by editing three CHECKs
+ * by hand and finding out later that one of them was missed.
+ */
+export type JobKindDescriptor = {
+  /** The word the row's `kind` column carries. */
+  readonly kind: string;
+  /** Whose loop claims it, and therefore which tier's registry must hold a handler. */
+  readonly claimingTier: ClaimingTier;
+  /** Whether the row names a subject — the binding an index job is for, and nothing else yet. */
+  readonly namesASubject: boolean;
+  /** The reasons this kind may carry; empty when it carries none. */
+  readonly reasons: readonly string[];
+  /** The role a person must hold for the enqueue to be theirs to make. */
+  readonly enqueuedBy: (typeof ROLES)[number];
+};
+
+/**
+ * One record per kind. The first two are the queue's own, T-006's obligations: the
+ * **nightly parser audit**, where the Python parser cross-checks the app's parse
+ * hash-by-hash, and the **full rebuild**, the graph sync run that writes a new generation
+ * beside the live one and flips it (`CONTEXT.md`, *graph sync run*; ADR 0023). The third
+ * is S1's: an **index** run over one binding, which is the only kind so far whose row says
+ * what it is about.
+ */
+export const JOB_KIND_DESCRIPTORS = [
+  {
+    kind: NIGHTLY_AUDIT_KIND,
+    claimingTier: "worker",
+    namesASubject: false,
+    reasons: [],
+    enqueuedBy: "Admin",
+  },
+  {
+    kind: FULL_REBUILD_KIND,
+    claimingTier: "worker",
+    namesASubject: false,
+    reasons: REBUILD_REASONS,
+    enqueuedBy: "Admin",
+  },
+  {
+    kind: INDEX_KIND,
+    claimingTier: "worker",
+    namesASubject: true,
+    reasons: INDEX_REASONS,
+    enqueuedBy: "Admin",
+  },
+] as const satisfies readonly JobKindDescriptor[];
+
+/** The kinds this queue carries, which is the descriptor list read down its first column. */
+export const JOB_KINDS = JOB_KIND_DESCRIPTORS.map((descriptor) => descriptor.kind);
+
+/**
+ * Every reason any kind may carry. Which kind may carry which is the row's business — the
+ * reason CHECK holds the *pair* — so this is the vocabulary and never the rule.
+ */
+export const JOB_REASONS = JOB_KIND_DESCRIPTORS.flatMap((descriptor) => [...descriptor.reasons]);
+
+/** The kinds whose descriptor says the row names a subject. */
+const KINDS_NAMING_A_SUBJECT = JOB_KIND_DESCRIPTORS.filter(
+  (descriptor) => descriptor.namesASubject,
+).map((descriptor) => descriptor.kind);
+
+/** The kinds whose descriptor gives them reasons to choose from. */
+const KINDS_CARRYING_A_REASON = JOB_KIND_DESCRIPTORS.filter(
+  (descriptor) => descriptor.reasons.length > 0,
+).map((descriptor) => descriptor.kind);
+
+/** Every `(kind, reason)` the descriptors allow, as SQL row constructors. */
+const KIND_REASON_PAIRS = JOB_KIND_DESCRIPTORS.flatMap((descriptor) =>
+  descriptor.reasons.map((reason) => `('${descriptor.kind}', '${reason}')`),
+).join(", ");
 
 /**
  * What has become of a job. It is **queued** until a worker claims it; a *claimed* job holds
@@ -104,7 +197,14 @@ export const job = withRLS(
       .references(() => workspace.id, { onDelete: "cascade" }),
     id: text("id").notNull(),
     kind: text("kind").notNull(),
-    /** Why a rebuild is happening; NULL on every other kind (ADR 0023's six names). */
+    /**
+     * What the job is **about** — the binding an index run is for. Typed text rather than a
+     * key or a payload field, because the thing a kind is about differs by kind and the
+     * queue is not the place a binding's existence is enforced; NULL on every kind whose
+     * descriptor names no subject.
+     */
+    subjectId: text("subject_id"),
+    /** Why this job is happening; NULL on every kind whose descriptor gives it no reasons. */
     reason: text("reason"),
     status: text("status").notNull().default(JOB_QUEUED_STATUS),
     /** How many times this job has been claimed — incremented by the claim itself. */
@@ -130,16 +230,32 @@ export const job = withRLS(
       table.status,
       table.enqueuedAt,
     ),
+    // One queued job per subject, which is the *run key* the glossary names — held here
+    // rather than as a column, so a second enqueue for a binding already waiting is the
+    // database's refusal and the caller reads the first job's id back. A NULL subject is
+    // distinct from a NULL subject in Postgres, so the two subjectless kinds queue as many
+    // rows as they ever did.
+    uniqueIndex("job_queued_subject_key")
+      .on(table.workspaceId, table.kind, table.subjectId)
+      .where(sql.raw(`status = '${JOB_QUEUED_STATUS}'`)),
     check("job_kind_check", sql.raw(`kind IN (${listed(JOB_KINDS)})`)),
     check("job_status_check", sql.raw(`status IN (${listed(JOB_STATUSES)})`)),
-    // A reason is a rebuild's and a rebuild always has one: the six names are what an
-    // operator reads off a rebuild that happened, so a rebuild with none would be a row
-    // that cannot say why the map was thrown away and made again.
+    // A biconditional, so it refuses both ways: an index job about nothing is a run with
+    // nowhere to go, and a nightly audit about a binding is a row claiming a scope its
+    // handler does not read.
+    check(
+      "job_subject_check",
+      sql.raw(`(subject_id IS NOT NULL) = (kind IN (${listed(KINDS_NAMING_A_SUBJECT)}))`),
+    ),
+    // The rule is the *pair*, never the word: a rebuild's six names are what an operator
+    // reads off a rebuild that happened, so a rebuild with no reason cannot say why the map
+    // was thrown away — and an index reason on a rebuild would be a row whose two halves
+    // describe different runs.
     check(
       "job_reason_check",
       sql.raw(
-        `(reason IS NOT NULL) = (kind = '${FULL_REBUILD_KIND}')
-         AND (reason IS NULL OR reason IN (${listed(REBUILD_REASONS)}))`,
+        `(reason IS NOT NULL) = (kind IN (${listed(KINDS_CARRYING_A_REASON)}))
+         AND (reason IS NULL OR (kind, reason) IN (${KIND_REASON_PAIRS}))`,
       ),
     ),
     // The count never passes its ceiling, because the claim that would pass it poisons the
