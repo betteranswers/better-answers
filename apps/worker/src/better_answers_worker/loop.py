@@ -1,9 +1,11 @@
 """The work loop: what this image runs.
 
 One worker, every workspace in turn, one job at a time. On each tick, for each
-workspace: claim, run, heartbeat while running, finish or fail with an outcome. Its two
-job kinds are T-006's own obligations — the nightly parser audit and the full rebuild —
-and B7 adds kinds to this loop rather than building one.
+workspace: claim, run, heartbeat while running, finish or fail with an outcome. **What
+each kind of job means is not here** — it is `kinds.py`, one record per kind, and this
+module's dispatch is a lookup in that table. So B7 adds kinds to this loop by adding
+records rather than by building a second loop, and the host is not edited for any of
+them.
 
 **The schema stamp comes before everything.** The worker never migrates and holds a
 generated, committed view of the app's schema; if the migration that view was generated
@@ -30,11 +32,10 @@ from typing import Any
 import psycopg
 
 from . import queue
-from .audit import run_audit
 from .config import Bootstrap, read_bootstrap
 from .ids import ulid
+from .kinds import KINDS
 from .log import logger
-from .rebuild import run_rebuild
 from .schema_view import MIGRATION_ID, MIGRATION_WHEN
 
 #: How long the loop sleeps when it has claimed nothing anywhere. Short enough that an
@@ -44,12 +45,6 @@ IDLE_SLEEP_SECONDS = 5
 
 #: How often a workspace's nightly audit comes round.
 AUDIT_EVERY_SECONDS = 24 * 60 * 60
-
-#: The kinds this loop can run, passed to every claim so the queue never hands it a job
-#: it has no branch for — an `index` job stays queued until the tier that runs it has a
-#: handler. It is written out here beside the dispatch it mirrors, and the two
-#: become one thing when the dispatch becomes a registry.
-KINDS_THIS_LOOP_RUNS = ("nightly-audit", "full-rebuild")
 
 
 def schema_stamp_matches(connection: psycopg.Connection) -> bool:
@@ -100,31 +95,30 @@ def _due_for_audit(cursor: psycopg.Cursor) -> bool:
 
 
 def _run_claimed(
-    connection: psycopg.Connection,
     bootstrap: Bootstrap,
     job: queue.ClaimedJob,
     heartbeat_every_seconds: float,
 ) -> dict[str, Any]:
-    """Do the work the job names, in one transaction, a heartbeat running beside it.
+    """Do the work the job names, a heartbeat running beside it.
 
-    **One transaction, because a rebuild's whole point is that it lands or does not**:
-    the generation it writes and the flip that makes it live are one act. The heartbeat
-    therefore cannot share that transaction — nothing it wrote there would be readable
-    by another worker until the job committed — so it runs on a connection of its own
-    (`queue.keeping_alive`), which is what makes a lease survive a long rebuild.
+    The kind is looked up rather than branched on, and the handler it answers opens the
+    stores and the transaction its own kind needs (`kinds.py`) — a rebuild's, for
+    instance, being one transaction because the generation it writes and the flip that
+    makes it live are one act.
+
+    **The heartbeat cannot share that transaction**: nothing it wrote there would be
+    readable by another worker until the job committed, so it runs on a connection of
+    its own (`queue.keeping_alive`), which is what makes a lease survive a long rebuild.
+    It is the host's and not the handler's, because a lease is a fact about the claim
+    rather than about the work.
     """
-    with (
-        queue.keeping_alive(
-            bootstrap.database_url,
-            job,
-            bootstrap.worker_id,
-            every_seconds=heartbeat_every_seconds,
-        ),
-        queue.scoped(connection, job.workspace_id) as cursor,
+    with queue.keeping_alive(
+        bootstrap.database_url,
+        job,
+        bootstrap.worker_id,
+        every_seconds=heartbeat_every_seconds,
     ):
-        if job.kind == "nightly-audit":
-            return run_audit(cursor, bootstrap.git_store_dir, job.workspace_id).as_row()
-        return run_rebuild(cursor, bootstrap.git_store_dir, job.workspace_id).as_row()
+        return KINDS[job.kind](bootstrap, job)
 
 
 def _serve_workspace(
@@ -138,9 +132,9 @@ def _serve_workspace(
     Answers whether it did any work, which is what tells the loop whether to sleep.
     """
     with queue.scoped(connection, workspace_id) as cursor:
-        claimed = queue.claim(
-            cursor, workspace_id, bootstrap.worker_id, KINDS_THIS_LOOP_RUNS
-        )
+        # The registry's own kinds, so the queue never hands this loop a job it has no
+        # handler for: an `index` job stays queued for the process that runs it.
+        claimed = queue.claim(cursor, workspace_id, bootstrap.worker_id, list(KINDS))
         if claimed is None:
             if _due_for_audit(cursor):
                 queue.enqueue(cursor, ulid(), "nightly-audit")
@@ -161,7 +155,7 @@ def _serve_workspace(
     )
 
     try:
-        outcome = _run_claimed(connection, bootstrap, claimed, heartbeat_every_seconds)
+        outcome = _run_claimed(bootstrap, claimed, heartbeat_every_seconds)
     except Exception as failure:
         # One job's failure is that job's fact and never a reason to leave the other
         # workspaces behind. The message is the exception's type and its text, which is

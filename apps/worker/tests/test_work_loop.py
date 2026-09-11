@@ -32,11 +32,12 @@ from better_answers_worker.bundle import (
 from better_answers_worker.concept_file import content_hash_of, parse_concept_file
 from better_answers_worker.config import Bootstrap
 from better_answers_worker.ids import ulid
+from better_answers_worker.kinds import KINDS
 from better_answers_worker.queue import scoped
 from better_answers_worker.rebuild import run_rebuild
 from better_answers_worker.schema_view import MIGRATION_WHEN
 from bundles import render_concept_file, write_bundle
-from factories import seed_concept_identity, seed_workspace
+from factories import seed_concept_identity, seed_job, seed_workspace
 from pg_harness import migrated_postgres_at
 
 WORKER = "worker-under-test"
@@ -127,6 +128,102 @@ def bootstrap_for(database: psycopg.Connection, git_store: Path) -> Bootstrap:
         git_store_dir=str(git_store),
         worker_id=WORKER,
     )
+
+
+def test_the_worker_runs_exactly_the_kinds_its_registry_holds_a_handler_for() -> None:
+    """The dispatch is a table, so what this worker can run is one list in one place —
+    and the two words are written down here rather than read back off that table
+    (`[TEST9]`), so a handler landing or leaving is a change this case sees.
+    """
+    assert tuple(KINDS) == ("nightly-audit", "full-rebuild")
+
+
+def test_the_loop_runs_both_its_kinds_through_the_registry_one_job_at_a_time(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    """Every kind the worker runs goes through the one lookup, and the host around it is
+    unchanged: it claims, stamps the claimant and the heartbeat the claim wrote, and
+    finishes with whatever outcome the handler answered. Two jobs in one workspace take
+    two passes, because the loop's shape is one job at a time.
+    """
+    workspace = seed_workspace(database.cursor())["id"]
+    with database.cursor() as cursor:
+        content = seed_expenses(cursor, workspace)
+        seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="nightly-audit",
+            enqueued_ago_seconds=2,
+        )
+        seed_job(cursor, workspace_id=workspace, kind="full-rebuild", reason="drill")
+    database.commit()
+    write_bundle(tmp_path, workspace, {"knowledge/expenses.md": content})
+
+    bootstrap = bootstrap_for(database, tmp_path)
+    with queue.connected(bootstrap.database_url) as worker:
+        assert loop.tick(worker, bootstrap) is True
+        assert loop.tick(worker, bootstrap) is True
+
+    with database.cursor() as cursor:
+        cursor.execute(
+            "SELECT kind, status, claimed_by, heartbeat_at IS NOT NULL, outcome"
+            " FROM job WHERE workspace_id = %s ORDER BY enqueued_at",
+            (workspace,),
+        )
+        rows = cursor.fetchall()
+    assert [row[:4] for row in rows] == [
+        ("nightly-audit", "done", WORKER, True),
+        ("full-rebuild", "done", WORKER, True),
+    ]
+    # Each row carries the outcome shape of its own kind and not the other's, which is
+    # what says the lookup ran the handler the row named.
+    assert rows[0][4]["checked"] == 1
+    assert "generation" not in rows[0][4]
+    assert (rows[1][4]["generation"], rows[1][4]["nodes"]) == (2, 1)
+
+
+def test_the_loop_claims_no_kind_its_registry_lacks_so_an_index_job_waits(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    """The claim is passed the kinds the registry holds, so a job whose handler has not
+    landed is neither claimed nor poisoned by this worker — it waits, untouched, for the
+    process that can run it. `index` is that kind today: its handler is T-129's, and
+    until it lands an index run sitting at the head of the queue must not stop the
+    kinds this worker does run.
+    """
+    workspace = seed_workspace(database.cursor())["id"]
+    with database.cursor() as cursor:
+        content = seed_expenses(cursor, workspace)
+        # Older than the audit below, so a claim that read the queue without its kinds
+        # would take this one first.
+        seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="index",
+            reason="bound",
+            subject_id=ulid(),
+            enqueued_ago_seconds=2,
+        )
+        seed_job(cursor, workspace_id=workspace, kind="nightly-audit")
+    database.commit()
+    write_bundle(tmp_path, workspace, {"knowledge/expenses.md": content})
+
+    bootstrap = bootstrap_for(database, tmp_path)
+    with queue.connected(bootstrap.database_url) as worker:
+        assert loop.tick(worker, bootstrap) is True
+        # And the pass after it finds nothing to do rather than poisoning what is left.
+        assert loop.tick(worker, bootstrap) is False
+
+    with database.cursor() as cursor:
+        cursor.execute(
+            "SELECT kind, status, claimed_by, attempts FROM job"
+            " WHERE workspace_id = %s ORDER BY enqueued_at",
+            (workspace,),
+        )
+        assert cursor.fetchall() == [
+            ("index", "queued", None, 0),
+            ("nightly-audit", "done", WORKER, 1),
+        ]
 
 
 def test_the_loop_claims_runs_and_finishes_a_nightly_audit_it_scheduled_itself(
@@ -544,7 +641,7 @@ def test_a_worker_holding_a_fresh_lease_is_healthy_and_a_queue_left_waiting_is_n
     with scoped(database, workspace) as cursor:
         cursor.execute(
             "SELECT id FROM claim_job(%s, interval '60 seconds', %s)",
-            (WORKER, list(loop.KINDS_THIS_LOOP_RUNS)),
+            (WORKER, list(KINDS)),
         )
         assert cursor.fetchone() is not None
     # Claimed, with a heartbeat the claim itself wrote: healthy again.
@@ -583,7 +680,7 @@ def test_a_long_run_keeps_its_lease_from_a_connection_of_its_own(
             (workspace, ulid()),
         )
     with scoped(database, workspace) as cursor:
-        claimed = queue.claim(cursor, workspace, WORKER, loop.KINDS_THIS_LOOP_RUNS)
+        claimed = queue.claim(cursor, workspace, WORKER, list(KINDS))
     assert claimed is not None
 
     dsn = _WHERE[database]
