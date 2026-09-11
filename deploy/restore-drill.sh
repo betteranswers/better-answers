@@ -30,6 +30,10 @@ set -euo pipefail
 : "${BACKUP_DUMPS_BUCKET:?}" "${BACKUP_MIRROR_BUCKET:?}"       # rclone remote `dumps:` configured on the host from the READ credential
 : "${BACKUP_AGE_IDENTITY_FILE:?the private half — resident on VPC 2 in a root-only file (SECRETS.md § The backup identity)}"
 : "${STAGING_OBJECTSTORE_ROOT_KEY:?}" "${STAGING_OBJECTSTORE_ROOT_SECRET:?}"   # the staging Garage's keys, for `stagingstore:`
+# The platform's own bucket inside the staging Garage. It must name the same bucket as S3_BUCKET in
+# ${STAGING_ENV_FILE}, which is what the api reads; a drill whose staging env names another one sets
+# this beside it. Defaulted rather than required so a drill.env written before T-125 still runs.
+: "${STAGING_S3_BUCKET:=better-answers}"
 : "${PROD_PSQL:?a command that runs psql against production over SSH — see the drill.env template host-setup.sh writes}"
 : "${DRILL_WORKSPACE:?the workspace whose graph is rebuilt and diffed}"
 : "${HEALTHCHECKS_PING_URL_DRILL:?}" "${HEALTHCHECKS_PING_URL_STAGING_WIPED:?}"
@@ -112,7 +116,7 @@ age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${WORK}/pg.dump" "${WORK}/pg.dump.ag
 pg_restore --no-owner --dbname="${STAGING_DATABASE_URL}" "${WORK}/pg.dump"
 say "restored ${latest} (taken ${dump_at}) — RPO $(( ( $(date +%s) - $(date -d "${dump_at:0:8} ${dump_at:9:2}:${dump_at:11:2}" +%s) ) / 60 )) min"
 
-say "## 2 stores up, migrate, REPLAY ERASURES completed after the dump (ADR 0020 — beyond use, made honest)"
+say "## 2 stores up, the staging Garage keyed and its bucket made, migrate"
 stores up -d
 # A wiped staging Garage holds no keys (step 0 cleared /data/objectstore): import the drill's
 # pair from the env so `stagingstore:` can write, and let it create the buckets the mirror
@@ -120,10 +124,14 @@ stores up -d
 stores exec -T objectstore /garage key import --yes -n drill-root \
   "${STAGING_OBJECTSTORE_ROOT_KEY}" "${STAGING_OBJECTSTORE_ROOT_SECRET}" || true
 stores exec -T objectstore /garage key allow --create-bucket "${STAGING_OBJECTSTORE_ROOT_KEY}"
+# And the platform's own bucket, by name, with the key allowed to read and write it: the mirror
+# sync below recreates whatever buckets the mirror holds, and a drill whose mirror is empty would
+# otherwise leave the api pointed at a bucket that does not exist — the replay at step 5 refuses
+# on exactly that. A create of an existing bucket, and a second grant of a permission already
+# held, both pass. The production half of this is wizard-41.sh's Garage stage.
+stores exec -T objectstore /garage bucket create "${STAGING_S3_BUCKET}" || true
+stores exec -T objectstore /garage bucket allow --read --write "${STAGING_S3_BUCKET}" --key "${STAGING_OBJECTSTORE_ROOT_KEY}"
 platform run --rm migrate
-# Mandatory and never "not built": an erasure the dump predates must be re-applied before the app
-# turns healthy, and a schema that cannot say whether any exists stops the restore (ops.ts).
-platform run --rm migrate pnpm --silent ops replay-erasures --since "${dump_at}" | tee -a "${REPORT}"
 
 say "## 3 object store — mirror back"
 rclone sync "dumps:${BACKUP_MIRROR_BUCKET}/objectstore/" stagingstore:/
@@ -135,13 +143,28 @@ for ws in $(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d /
   age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${WORK}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
   sudo -u '#1000' git clone --quiet --bare "${WORK}/${ws}.bundle" "/data/git/${ws}.git"
 done
+
+say "## 5 REPLAY ERASURES completed after the dump (ADR 0020 — beyond use, made honest)"
+# Mandatory and never "not built": an erasure the dump predates must be re-applied before the app
+# turns healthy, and a schema that cannot say whether any exists stops the drill (ops.ts).
+#
+# After steps 3 and 4 and not beside `migrate` (T-125, 11/09/2026; ADR 0022 amended): the routine
+# the replay re-runs rewrites each workspace's bare repository and reads the replay copy every
+# erasure left in the object store, so both stores must be back before it runs. It still runs
+# before `api` is up, which is what makes the drill the production restore's rehearsal.
+#
+# On `api`, not on `migrate`: the one-shot needs GIT_STORE_DIR with /data/git mounted and the S3
+# endpoint, bucket, region and credentials, and only the `api` service in platform.compose.yaml
+# carries them. --no-deps because `migrate` ran at step 2 and `api` declares it a dependency.
+platform run --rm --no-deps api pnpm --silent ops replay-erasures --since "${dump_at}" | tee -a "${REPORT}"
+
 # Both, and named rather than left to `up`: the drill measures the recovery order below,
 # and the graph rebuild in it is a job the worker claims — a stack without a worker would
 # wait for a rebuild nothing was going to run.
 platform up -d --wait api worker
 say "api up — RTO so far $(( ( $(date +%s) - T0 ) / 60 )) min"
 
-say "## 5 recovery order 2–5: watermark, graph rebuild, pipeline state (LMDBs empty → reprocess), orphans"
+say "## 6 recovery order 2–5: watermark, graph rebuild, pipeline state (LMDBs empty → reprocess), orphans"
 ops reconcile-watermark --workspace "${DRILL_WORKSPACE}"
 t0=$(date +%s); ops graph-rebuild --workspace "${DRILL_WORKSPACE}" --wait
 say "graph rebuilt in $(( $(date +%s) - t0 )) s (promise: ≤ 120 s)"
@@ -149,7 +172,7 @@ say "graph rebuilt in $(( $(date +%s) - t0 )) s (promise: ≤ 120 s)"
 ops graph-sweep --workspace "${DRILL_WORKSPACE}"
 ops object-store-orphans --workspace "${DRILL_WORKSPACE}" --list >> "${REPORT}"
 
-say "## 6 counts diff against production's stamped run (ADR 0023) — production read over SSH, no open port (ticket 79 A12)"
+say "## 7 counts diff against production's stamped run (ADR 0023) — production read over SSH, no open port (ticket 79 A12)"
 # An empty staging file is `graph-counts` answering `not built` (exit 3, which `ops` turns
 # into a recorded 0): there is nothing to diff and nothing to report.
 if ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts" && [ -s "${WORK}/staging.counts" ]; then
@@ -179,14 +202,14 @@ if ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts" 
   fi
 fi
 
-say "## 7 smoke through the interface: health, discovery, the shell; find · a guide read · ask as the slices land"
+say "## 8 smoke through the interface: health, discovery, the shell; find · a guide read · ask as the slices land"
 platform exec -T api pnpm --silent ops smoke --workspace "${DRILL_WORKSPACE}" --url "${STAGING_API_URL}" --find --guide --ask >> "${REPORT}"
 
-say "## 8 bucket listing vs the matrix (tiers live in the bucket lifecycle, never in Coolify's schedule)"
+say "## 9 bucket listing vs the matrix (tiers live in the bucket lifecycle, never in Coolify's schedule)"
 for tier in hourly daily weekly monthly; do printf '%s: %s copies\n' "${tier}" "$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/" | wc -l)" >> "${REPORT}"; done
 
 if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
-  say "## 9 erasure rehearsal on a synthetic subject (ADR 0020, ticket 24)"
+  say "## 10 erasure rehearsal on a synthetic subject (ADR 0020, ticket 24)"
   if subject=$(platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --report /tmp/erasure.md | tail -n1); then
     platform exec -T api cat /tmp/erasure.md >> "${REPORT}"
     # the one check that proves "gone from every copy" rather than assumes it: the pre-erasure dump,

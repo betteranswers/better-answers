@@ -33,7 +33,14 @@ x-mem-512: &mem512
 x-bootstrap: &bootstrap
   # Bootstrap class only; every tenant credential is a row under the envelope, never a variable here.
   DATABASE_URL: ${DATABASE_URL:?}
-  S3_ENDPOINT: http://objectstore:3900   # Garage, path-style, region "garage" (deploy/garage.toml)
+  # The four the object door is opened from (apps/api/src/config.ts § readObjectStore reads exactly
+  # these names). The endpoint and the region are facts of this estate rather than values an operator
+  # supplies: Garage is reached by service name on the internal network, path-style, and garage.toml
+  # fixes `s3_region = "garage"` — a region written twice is a region that can disagree with itself.
+  # The bucket and the key pair come from wizard-41.sh's Garage stage, which creates all three.
+  S3_ENDPOINT: http://objectstore:3900   # Garage, path-style, region below (deploy/garage.toml)
+  S3_REGION: garage                      # deploy/garage.toml § [s3_api] s3_region
+  S3_BUCKET: ${S3_BUCKET:?the platform's bucket — wizard-41.sh § Garage creates it}
   S3_ACCESS_KEY: ${OBJECTSTORE_ROOT_KEY:?}
   S3_SECRET_KEY: ${OBJECTSTORE_ROOT_SECRET:?}
   # Unset in the first estate: no embedding host runs there (client one is on the hosted route —
@@ -44,8 +51,9 @@ x-bootstrap: &bootstrap
 services:
   # One-shot: the tier's Drizzle migrations, including the DDL it owns in `index` and the graph.
   # `exclude_from_hc` stops Coolify reporting the stack as Exited after every deploy (research 68 §2a).
-  # Before `api` turns healthy after a RESTORE, the same image replays every erasure_request
-  # completed after the dump's timestamp (`pnpm ops replay-erasures`) — deploy/restore-drill.sh.
+  # After a RESTORE this runs first and the replay of the erasures the dump undid runs later, on
+  # `api` — `pnpm ops replay-erasures` needs the git store and the object store, and this service
+  # carries neither by design (T-125, 11/09/2026). The restore scripts hold the order.
   migrate:
     image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?set by the release workflow}
     command: ["pnpm", "migrate"]

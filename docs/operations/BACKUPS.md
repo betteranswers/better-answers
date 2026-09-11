@@ -40,11 +40,14 @@ The three dates are computed **from the timestamp of the last dump before the re
 
 ## Recovery order (ADR 0007)
 
-1. Postgres from the latest dump (or the one the incident names); **replay every erasure completed after the dump**.
+0. The stores, in this order and all of them before the app is started: Postgres from the latest dump (or the one the incident names), then the object store from the mirror bucket, then the git store from the nightly bundles.
+1. **Replay every erasure completed after the dump** — after the three stores are back and before `api` is up.
 2. Reconcile the bundle commit watermark against the git store's heads — the head-check reconciler.
 3. Resync the graph from git and records (the estate rebuild).
 4. Reconcile pipeline state: every LMDB is wiped; bindings reprocess from the object store.
 5. Object-store orphans: blobs with no catalogue row are listed, then swept after the grace.
+
+**Why the replay waits for the stores** (11/09/2026, ADR 0022 amended): the routine it re-runs rewrites each workspace's bare repository and reads the replay copy every erasure left in the object store, so a replay that ran beside `migrate` — where both scripts ran it until this date — either found no copy to read or rewrote a repository the git step was about to overwrite from a bundle that still named the subject. It runs on the `api` service rather than `migrate`, because that is the one service in `deploy/platform.compose.yaml` carrying `GIT_STORE_DIR` with `/data/git` mounted and the object store's endpoint, bucket, region and credentials.
 
 `restore-drill.sh` replays exactly this into staging on VPC 2 on the first of every month, records RTO and RPO, and ends by wiping staging. **`restore-production.sh` replays it into production** (`RUNBOOK.md` page 1): the same order, step 1's replay mandatory, no wipe and no trap. Every step that needs a slice not yet built says so through its `pnpm ops` command's exit code (`apps/api/src/ops.ts`), so a drill before the graph exists records "not built" and never a false green. A restore anywhere is an `audit_event` (*restore*: by whom, from which copy) on the System screen.
 
