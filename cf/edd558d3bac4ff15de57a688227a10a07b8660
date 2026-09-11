@@ -1,0 +1,45 @@
+docs/adr/README.md
+  s_f3ee63bcbb1a0b::t_7e73f708c9e38c 30
+deploy/platform.compose.yaml
+  s_f3ee63bcbb1a0b::t_53ee8447f42f0c 54-56
+  s_f3ee63bcbb1a0b::t_9a78e2dbb276af 36-43
+deploy/restore-production.sh
+  s_f3ee63bcbb1a0b::t_b6c6c445902af9 14-19
+  s_f3ee63bcbb1a0b::t_a004d010abd8fb 99
+  s_f3ee63bcbb1a0b::t_d6244d93af1ef4 121-131
+docs/operations/BACKUPS.md
+  s_f3ee63bcbb1a0b::t_32949c2a937e53 43-44,50
+deploy/wizard-41.sh
+  s_f3ee63bcbb1a0b::t_7ee3bc2b61c6b1 194-195
+  s_f3ee63bcbb1a0b::t_1ab5e952405586 334,337-353,355,359,361-362,365
+  s_f3ee63bcbb1a0b::t_2b15f2351cf701 354,356-358,360,363-364
+apps/api/tests/deploy-tree.test.ts
+  s_f3ee63bcbb1a0b::t_4c0a78881e51c7 145-146,151-268
+deploy/host-setup.sh
+  s_f3ee63bcbb1a0b::t_602ae71736f77d 107-109
+docs/operations/RUNBOOK.md
+  s_f3ee63bcbb1a0b::t_cf4591ae7be63b 16
+docs/adr/0022-two-stacks-deployed-by-digest-every-irreplaceable-byte-encrypted-off-host-erasures-replayed-on-restore.md
+  s_f3ee63bcbb1a0b::t_4caaa573f16ab3 89-98
+deploy/restore-drill.sh
+  s_f3ee63bcbb1a0b::t_bba34c0de85dcf 146-160,167
+  s_f3ee63bcbb1a0b::t_4bc05c1ba285b1 119,127-133
+  s_f3ee63bcbb1a0b::t_84a9ce665034d7 33-36
+  s_f3ee63bcbb1a0b::t_3958f599b85e8b 175,205,208,212
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "cfedd558d3bac4ff15de57a688227a10a07b8660",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
