@@ -12,7 +12,9 @@ What a caller reaches for:
 - `Host` — what a process holds between runs: the one event loop, one connection pool
   per workspace and the bounded cache of per-binding stores.
 - `Table`, `Column` — a table the app created, described for the engine to write rows
-  into and never to create, alter or drop.
+  into and never to create, alter or drop; `CHUNK_TABLE` is the one this tier writes.
+- `SENSITIVITY_ORDER` — the class words from the narrowest outwards, which is the order
+  the visibility fold and the run's last statement both read.
 - `redact_landed_copies(...) -> LandedRun` — a binding's landed copies converted,
   redacted through S0's seam inside the one memoised function, and cut into chunks.
 - `split_into_chunks`, `chunk_id_of`, `locator_of` — this tier's half of the
@@ -29,7 +31,7 @@ from .chunks import (
     locator_of,
     split_into_chunks,
 )
-from .host import ENVIRONMENTS_HELD, Host, IndexRun, open_pool
+from .host import CHUNKS_APP, ENVIRONMENTS_HELD, LANDED_APP, Host, IndexRun, open_pool
 from .landed import (
     MEMO_VERSION,
     PASSED_THROUGH,
@@ -42,14 +44,20 @@ from .landed import (
     suppression_of,
 )
 from .objects import Bucket, LandedCopies, object_key_of
-from .run import IndexOutcome, index_binding
+from .rows import CHUNK_TABLE, SENSITIVITY_ORDER, Visibility, chunk_rows, rows_of
+from .run import WIPED_REASON, IndexOutcome, index_binding
 from .tables import Column, Table
 
 __all__ = [
+    "CHUNKS_APP",
     "CHUNK_SIZE_BYTES",
+    "CHUNK_TABLE",
     "ENVIRONMENTS_HELD",
+    "LANDED_APP",
     "MEMO_VERSION",
     "PASSED_THROUGH",
+    "SENSITIVITY_ORDER",
+    "WIPED_REASON",
     "Bucket",
     "Chunk",
     "Column",
@@ -63,12 +71,15 @@ __all__ = [
     "RedactedDocument",
     "Suppression",
     "Table",
+    "Visibility",
     "chunk_id_of",
+    "chunk_rows",
     "index_binding",
     "locator_of",
     "object_key_of",
     "open_pool",
     "redact_landed_copies",
+    "rows_of",
     "split_into_chunks",
     "suppression_of",
 ]

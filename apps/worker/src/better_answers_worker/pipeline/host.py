@@ -59,10 +59,20 @@ ENVIRONMENTS_HELD = 4
 POOL_MIN_SIZE = 0
 POOL_MAX_SIZE = 2
 
-#: The app name every index run takes inside its binding's Environment. One name,
-#: because the Environment is already the binding: an app is identified within it, and a
-#: second name would be a second state record for the same work.
-APP_NAME = "index"
+#: The two apps a run has inside its binding's Environment, and they are **two on
+#: purpose**. An app's name is its state record within the Environment, and a record
+#: holds what its last run declared — both the entries a memoised call left and the rows
+#: a target was told to hold. So a second main function run under one name reverts the
+#: first's: probed on 11/09/2026 against the pinned engine, where reading one document,
+#: running any other main under the same name and reading the document again ran the
+#: detector **twice**, and the same sequence under two names ran it once.
+#:
+#: `landed` is the reading: one component per document, the memoised conversion and seam
+#: beneath it, and no target at all. `chunks` is the writing: the rows of the chunk
+#: index, whose state record is what tells the engine which of a binding's rows have
+#: gone.
+LANDED_APP = "landed"
+CHUNKS_APP = "chunks"
 
 
 @dataclass(frozen=True, slots=True)
@@ -277,7 +287,7 @@ class Host:
             )
         return opened
 
-    def app_config(self, run: IndexRun) -> coco.AppConfig:
+    def app_config(self, run: IndexRun, name: str) -> coco.AppConfig:
         """How an app of this package's runs in this binding's store.
 
         Public to the package and to nothing outside it: a module that has its own main
@@ -285,9 +295,13 @@ class Host:
         per kind of work and learning what a document or a chunk is. The engine's own
         type is named here and that is the whole point of the line — a caller outside
         this directory never sees it (ADR 0036).
+
+        The name is the caller's because it is the caller's state record: two mains
+        under one name revert each other's, so a module with its own main asks for its
+        own name (see `LANDED_APP` and `CHUNKS_APP` above).
         """
         return coco.AppConfig(
-            name=APP_NAME,
+            name=name,
             environment=self._environment(run),
             max_inflight_components=self._engine.max_inflight_components,
         )
@@ -304,7 +318,7 @@ class Host:
         its Environment was given.
         """
         declared = tuple(rows)
-        app = coco.App(self.app_config(run), declare_rows, table, declared)
+        app = coco.App(self.app_config(run, CHUNKS_APP), declare_rows, table, declared)
         landed = app.update_blocking()
         return int(landed) if isinstance(landed, int) else len(declared)
 
@@ -315,8 +329,12 @@ class Host:
         not its indexes and not the rows this binding's own runs landed. The binding's
         chunk rows are deleted by the app, in its own transaction, before the job that
         removes this store is ever enqueued.
+
+        The app dropped is the writing one, because that is the only one with a target
+        state to revert; the reading app's record holds memo entries alone, and what
+        clears those is the wipe removing the directory they live in.
         """
-        coco.App(self.app_config(run), declare_nothing).drop_blocking()
+        coco.App(self.app_config(run, CHUNKS_APP), declare_nothing).drop_blocking()
 
     def close(self) -> None:
         """Let every store go and close every pool, on the loop that opened them."""

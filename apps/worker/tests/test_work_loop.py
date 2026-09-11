@@ -143,10 +143,12 @@ def bootstrap_for(database: psycopg.Connection, git_store: Path) -> Bootstrap:
 
 def test_the_worker_runs_exactly_the_kinds_its_registry_holds_a_handler_for() -> None:
     """The dispatch is a table, so what this worker can run is one list in one place —
-    and the two words are written down here rather than read back off that table
-    (`[TEST9]`), so a handler landing or leaving is a change this case sees.
+    and the three words are written down here rather than read back off that table
+    (`[TEST9]`), so a handler landing or leaving is a change this case sees. The array
+    `claim_job` filters both arms by is this table's keys, so the day a kind joins it is
+    the day a job of that kind stops waiting for a process that can run it.
     """
-    assert tuple(KINDS) == ("nightly-audit", "full-rebuild")
+    assert tuple(KINDS) == ("nightly-audit", "full-rebuild", "index")
 
 
 def test_the_loop_runs_both_its_kinds_through_the_registry_one_job_at_a_time(
@@ -193,48 +195,53 @@ def test_the_loop_runs_both_its_kinds_through_the_registry_one_job_at_a_time(
     assert (rows[1][4]["generation"], rows[1][4]["nodes"]) == (2, 1)
 
 
-def test_the_loop_claims_no_kind_its_registry_lacks_so_an_index_job_waits(
-    database: psycopg.Connection, tmp_path: Path
+def test_a_claim_leaves_a_kind_its_caller_did_not_name_queued_and_unpoisoned(
+    database: psycopg.Connection,
 ) -> None:
-    """The claim is passed the kinds the registry holds, so a job whose handler has not
-    landed is neither claimed nor poisoned by this worker — it waits, untouched, for the
-    process that can run it. `index` is that kind today: its handler is T-129's, and
-    until it lands an index run sitting at the head of the queue must not stop the
-    kinds this worker does run.
+    """The caller says which kinds it can run and the database filters **both arms** of
+    the claim by them, so a job of a kind this process has no handler for is neither
+    handed out nor counted against its attempts — it waits, untouched, for whoever does.
+
+    Every kind the queue declares now has a handler here, so the pair is driven at the
+    claim rather than through the loop (`[TEST7]`): the same index job, older than the
+    audit beside it, is passed over by a claim that names only the audit and taken by
+    one that names it. What the first half protects is the poison counter — a claim that
+    filtered only the arm that hands work out would take the older row, find no handler
+    and spend one of its attempts on every pass.
     """
     workspace = seed_workspace(database.cursor())["id"]
+    binding_id = ulid()
     with database.cursor() as cursor:
-        content = seed_expenses(cursor, workspace)
-        # Older than the audit below, so a claim that read the queue without its kinds
-        # would take this one first.
         seed_job(
             cursor,
             workspace_id=workspace,
             kind="index",
             reason="bound",
-            subject_id=ulid(),
+            subject_id=binding_id,
             enqueued_ago_seconds=2,
         )
         seed_job(cursor, workspace_id=workspace, kind="nightly-audit")
     database.commit()
-    write_bundle(tmp_path, workspace, {"knowledge/expenses.md": content})
 
-    bootstrap = bootstrap_for(database, tmp_path)
-    with queue.connected(bootstrap.database_url) as worker:
-        assert loop.tick(worker, bootstrap) is True
-        # And the pass after it finds nothing to do rather than poisoning what is left.
-        assert loop.tick(worker, bootstrap) is False
+    with queue.connected(_WHERE[database]) as worker:
+        with scoped(worker, workspace) as cursor:
+            auditing = queue.claim(cursor, workspace, WORKER, ["nightly-audit"])
+        with database.cursor() as cursor:
+            cursor.execute(
+                "SELECT status, claimed_by, attempts FROM job"
+                " WHERE workspace_id = %s AND kind = 'index'",
+                (workspace,),
+            )
+            passed_over = cursor.fetchall()
+        with scoped(worker, workspace) as cursor:
+            indexing = queue.claim(cursor, workspace, WORKER, list(KINDS))
 
-    with database.cursor() as cursor:
-        cursor.execute(
-            "SELECT kind, status, claimed_by, attempts FROM job"
-            " WHERE workspace_id = %s ORDER BY enqueued_at",
-            (workspace,),
-        )
-        assert cursor.fetchall() == [
-            ("index", "queued", None, 0),
-            ("nightly-audit", "done", WORKER, 1),
-        ]
+    assert auditing is not None
+    assert auditing.kind == "nightly-audit"
+    assert passed_over == [("queued", None, 0)]
+
+    assert indexing is not None
+    assert (indexing.kind, indexing.subject_id) == ("index", binding_id)
 
 
 def test_a_claim_hands_the_handler_what_the_job_is_about(

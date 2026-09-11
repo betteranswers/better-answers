@@ -102,10 +102,10 @@ def a_migrated_database() -> Iterator[tuple[psycopg.Connection, str]]:
             " IN ROLE worker_rt"
         )
         connection.commit()
-        yield connection, _as_role(conninfo, WORKER_LOGIN, WORKER_PASSWORD)
+        yield connection, as_role(conninfo, WORKER_LOGIN, WORKER_PASSWORD)
 
 
-def _as_role(conninfo: str, role: str, password: str) -> str:
+def as_role(conninfo: str, role: str, password: str) -> str:
     """The same address, reached as another role.
 
     Testcontainers hands back a URL carrying the superuser's own credentials, and a pool

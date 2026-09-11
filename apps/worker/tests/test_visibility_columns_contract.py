@@ -23,9 +23,11 @@ agreement writes down.
 """
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+from better_answers_worker.pipeline import SENSITIVITY_ORDER, Visibility
 from better_answers_worker.schema_view import TABLES
 
 CONTRACTS_DIR = Path(__file__).resolve().parents[3] / "contracts"
@@ -148,3 +150,64 @@ def test_the_two_writers_of_one_source_are_named_in_the_order_a_row_meets_them()
         "the worker",
         "the app",
     ]
+
+
+# -- the fold the code ships ----------------------------------------------------------
+#
+# Everything above reads the agreement and checks it says what it means to say. What
+# follows runs **the fold a run actually applies** over the same six cases, because an
+# agreement both tiers hold and neither runs is an agreement about nothing. It is the
+# shape wave C's splitter cases take in `test_document_chunk_contract.py`, for the same
+# reason: the arithmetic is stated above, and the code that ships is held to it here.
+
+
+def visibility_from(binding: dict[str, Any]) -> Visibility:
+    """One case's binding as the run reads it off the row."""
+    groups = binding["audience_groups"]
+    return Visibility(
+        published_at=(
+            None
+            if binding["published_at"] is None
+            else datetime.fromisoformat(str(binding["published_at"]))
+        ),
+        sensitivity=str(binding["sensitivity"]),
+        audience=str(binding["audience"]),
+        audience_groups=None if groups is None else tuple(str(one) for one in groups),
+    )
+
+
+def test_the_order_the_fold_reads_is_the_rank_the_agreement_writes_down() -> None:
+    """The words in one order, in the one place either fold can be changed: the Python
+    fold indexes this tuple and the run's last statement hands the same list to Postgres
+    as an array. The agreement writes the rank as a mapping of word to place, so the two
+    are held equal here rather than copied and hoped over.
+    """
+    rank = read_visibility_columns()["sensitivity_rank"]
+
+    assert list(SENSITIVITY_ORDER) == sorted(rank, key=lambda word: rank[word])
+
+
+def test_the_fold_a_run_applies_answers_every_case_the_agreement_states() -> None:
+    """The shipping fold over the agreement's six cases, field by field. A case that
+    asked the code to agree with itself would pass whatever the code did; this one asks
+    it to agree with the file the other tier reads.
+    """
+    for case in read_visibility_columns()["cases"]:
+        folded = visibility_from(case["binding"]).narrowed_by(
+            case["document"]["sensitivity"]
+        )
+        columns = dict(folded.as_columns())
+        stamped = columns["published_at"]
+
+        assert columns["sensitivity"] == case["chunk"]["sensitivity"], case["case"]
+        assert columns["audience"] == case["chunk"]["audience"], case["case"]
+        assert columns["audience_groups"] == case["chunk"]["audience_groups"], case[
+            "case"
+        ]
+        # The instants and not their spellings: the agreement writes the stamp with
+        # milliseconds and a column holds an instant, so two strings that differ by a
+        # zero are one moment.
+        expected = case["chunk"]["published_at"]
+        assert stamped == (
+            None if expected is None else datetime.fromisoformat(str(expected))
+        ), case["case"]
