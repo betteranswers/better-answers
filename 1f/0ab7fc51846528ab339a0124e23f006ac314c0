@@ -1,0 +1,91 @@
+packages/schema/src/composition-tables.ts
+  s_f3ee63bcbb1a0b::t_364a9e81a89cf1 4-5
+packages/schema/src/graph-tables.ts
+  s_f3ee63bcbb1a0b::t_364a9e81a89cf1 5
+packages/core/test/concepts.test.ts
+  s_f3ee63bcbb1a0b::t_df613f72699b6d 274-276,279-284,325,331
+  s_f3ee63bcbb1a0b::t_b0bdc3908fa239 30
+packages/schema/test/probes.ts
+  s_f3ee63bcbb1a0b::t_0d62868f8e7026 46-50
+  s_f3ee63bcbb1a0b::t_d240593a32365a 41-45,51
+docs/adr/README.md
+  s_f3ee63bcbb1a0b::t_3087a1d7fe399b 21
+packages/schema/test/source-catalogue.test.ts
+  s_f3ee63bcbb1a0b::t_af64c88b597220 2,14-15,26-27,30,32-35,41-43,45,47-48,55-70,77-79,81,88-96,98,100,102,104,106-113,120,125,130,135,143,165-169,174,178,183,186,192,194,197-198,231,234,240,249-250,269,274,289,291,295-296,298,304,306,311,314,318-319,323-338,342-355,359-365,371,386-390,393,398,401-402,406,417-422,424-426,433-434,436,440,454-460,462-463,476-482,489,491,495
+  s_f3ee63bcbb1a0b::t_75ccdd78fdff33 1,3-13,16-25,28-29,31,36-40,44,46,49-54,71-74,97,99,101,103,105,114-119,121-124,126-129,131-134,136-142,144-146,152-155,161-164,170-173,175-177,179-182,184-185,193,195-196,199-205,216-230,232-233,235-239,241-248,251-268,270-273,275-288,290,292-294,297,299-303,305,307-310,312-313,315-317,320-322,339-341,357,366-370,372-385,391-392,394-397,399-400,403-405,407-416,423,427-432,435,437-439,441-453,461,464,468,470-472,474-475,483-488,490,492-494,496-500
+  s_f3ee63bcbb1a0b::t_80109db46c9394 147-151,156-160,187-191,206-215
+  s_f3ee63bcbb1a0b::t_236e02d2678756 465-467,469,473
+  s_f3ee63bcbb1a0b::t_d240593a32365a 75-76,80,82-87,356,358
+docs/specs/v01-route.md
+  s_f3ee63bcbb1a0b::t_db3c1f1ca8600c 437
+packages/schema/test/job-kinds.test.ts
+  s_f3ee63bcbb1a0b::t_ef9961b4a588d5 13,147-150,153-154
+packages/schema/src/concept-tables.ts
+  s_f3ee63bcbb1a0b::t_a3cd0a7758d96a 424-428,444-451
+  s_f3ee63bcbb1a0b::t_4c94d4d00eabc5 16
+  s_f3ee63bcbb1a0b::t_97f69f40873b45 15
+packages/schema/src/source-tables.ts
+  s_f3ee63bcbb1a0b::t_5aa94b7e45c0e9 2-11,13,18-21,23-25,27-34,37-104,154-164,173-192,205-218,229-276,291-310
+  s_f3ee63bcbb1a0b::t_e719b28a3f4383 14
+  s_f3ee63bcbb1a0b::t_c8492a4ee93ae9 105-107
+packages/core/test/visibility.test.ts
+  s_f3ee63bcbb1a0b::t_45495e8a991f92 841-842
+packages/schema/test/boundary-schemas.test.ts
+  s_f3ee63bcbb1a0b::t_0264f8fcd25162 973-1009
+  s_f3ee63bcbb1a0b::t_c28932fb68cfde 256-260,270-310
+  s_f3ee63bcbb1a0b::t_95027bf0df7df6 802-803
+  s_f3ee63bcbb1a0b::t_8faa94c08a368d 798-801,817-819
+packages/schema/migrations/meta/0034_snapshot.json
+  s_f3ee63bcbb1a0b::t_6062e3a08dbc85 331,5387
+  s_f3ee63bcbb1a0b::t_bb3c221d50c2ca 1,3-330,332-5386
+  s_f3ee63bcbb1a0b::t_2aabfe5943b468 2
+packages/schema/src/table-ownership.ts
+  s_f3ee63bcbb1a0b::t_6a45da88b74a31 141
+  s_f3ee63bcbb1a0b::t_1d92b66d81d1d7 136-140
+docs/adr/0013-sources-bound-by-origin-reach-and-destination.md
+  s_f3ee63bcbb1a0b::t_3087a1d7fe399b 62-75
+CONTEXT.md
+  s_f3ee63bcbb1a0b::t_db3c1f1ca8600c 209-213
+packages/schema/test/rls.test.ts
+  s_f3ee63bcbb1a0b::t_35f56ea7453665 2142-2145,2283-2285
+packages/schema/src/audit-tables.ts
+  s_f3ee63bcbb1a0b::t_95acccbafc4713 2,85-90
+packages/schema/migrations/meta/_journal.json
+  s_f3ee63bcbb1a0b::t_2aabfe5943b468 242-248
+packages/schema/src/readable-columns.ts
+  s_f3ee63bcbb1a0b::t_36bacb5b5317b6 21-22
+  s_f3ee63bcbb1a0b::t_f4f8ee3bb72f15 1-20,23-99
+packages/schema/src/schema.ts
+  s_f3ee63bcbb1a0b::t_9fb22984863502 25-29
+packages/schema/test/factory.ts
+  s_f3ee63bcbb1a0b::t_576d3a540ccd6f 635-637,697-705,720-736
+  s_f3ee63bcbb1a0b::t_2cc59685ccc3f8 526-530,537
+  s_f3ee63bcbb1a0b::t_c8492a4ee93ae9 11,15,18,25,30
+packages/schema/src/boundary-schemas.ts
+  s_f3ee63bcbb1a0b::t_63b27fc5d2e1d9 77-86
+  s_f3ee63bcbb1a0b::t_6c7e7b89284801 658-664,670-671,674-675
+  s_f3ee63bcbb1a0b::t_aed6a06ac40fbf 672-673
+  s_f3ee63bcbb1a0b::t_76b36178ad1734 684-693,699-708
+  s_f3ee63bcbb1a0b::t_1003ba65e36503 1016-1021,1026
+  s_f3ee63bcbb1a0b::t_48ac7ee558eca3 74
+packages/schema/migrations/0034_the-binding-and-the-catalogue.sql
+  s_f3ee63bcbb1a0b::t_2aabfe5943b468 1-31
+apps/worker/src/better_answers_worker/schema_view.py
+  s_f3ee63bcbb1a0b::t_f70623278e3c8e 10,12,441-445,451-464
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1f0ab7fc51846528ab339a0124e23f006ac314c0",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
