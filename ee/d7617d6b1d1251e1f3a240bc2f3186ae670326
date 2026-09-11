@@ -1,0 +1,31 @@
+packages/core/test/sources.test.ts
+  s_f3ee63bcbb1a0b::t_e4d3cf9f1d06ea 1-3,5,7,9-174,185-206,208-238,243,245-308,315,323,329-367
+  s_f3ee63bcbb1a0b::t_b3436882671d4c 175-184
+  s_f3ee63bcbb1a0b::t_eb3d3a2a214c77 239-242,244
+  s_f3ee63bcbb1a0b::t_c25dfef6600642 309-312
+  s_f3ee63bcbb1a0b::t_9e0dc6ae123efe 313-314,316-322,324-328
+  s_f3ee63bcbb1a0b::t_7e3248d5127604 368-369
+packages/core/src/sources/binding.ts
+  s_f3ee63bcbb1a0b::t_8ee1455ac72d36 1-22,24-86,88-299
+  s_f3ee63bcbb1a0b::t_6ae847b53ecf7a 300-301
+packages/core/src/sources/index.ts
+  s_f3ee63bcbb1a0b::t_2fb08b5b3c1682 27,31,33
+  s_f3ee63bcbb1a0b::t_67e001fcfe6a43 57-63
+  s_f3ee63bcbb1a0b::t_e455a602864b8b 153-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "eed7617d6b1d1251e1f3a240bc2f3186ae670326",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
