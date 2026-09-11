@@ -38,7 +38,7 @@ and its key is the version string rather than anything held here (ADR 0036).
 """
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 
 from presidio_analyzer import (
@@ -102,11 +102,16 @@ DESCRIPTOR_BY_ENTITY: Mapping[str, CategoryDescriptor] = MappingProxyType(
 #: else: an entity with no category has no word to be written out as.
 ANALYSED_ENTITIES: tuple[str, ...] = tuple(sorted(CATEGORY_BY_ENTITY))
 
+#: The tier no binding switches off, named once here so that the two post-passes which
+#: raise a finding to it and the rule that reads a placeholder off it cannot spell it
+#: differently from one another.
+ALWAYS_TIER = "always"
+
 #: Which tier outranks which when two spans overlap. The always tier wins because it is
 #: the tier no binding switches off, so a span it claimed must not be written out under
 #: a word a binding could have turned off.
 TIER_PRECEDENCE: Mapping[str, int] = MappingProxyType(
-    {"always": 0, "default-on": 1, "default-off": 2}
+    {ALWAYS_TIER: 0, "default-on": 1, "default-off": 2}
 )
 
 #: One factory per entity a recogniser of ours or a built-in answers for. The rest of
@@ -194,6 +199,26 @@ class Finding:
     start: int
     end: int
     score: float
+
+
+def raised_to_always(
+    findings: Sequence[Finding], outranked: Callable[[Finding], bool]
+) -> tuple[Finding, ...]:
+    """Every finding a post-pass claims, at the tier no binding switches off.
+
+    Two rules outrank the tier a category is ordinarily raised at — a name inside an
+    officers block, and an identifier an erasure request suppressed — and each does the
+    same single thing to a finding, which is why both do it through here: a pass that
+    raised a tier its own way could come to disagree with the other about what the
+    always tier is. Nothing else about the finding moves. The category, the span and the
+    score stay what the recogniser answered, because they are the row an Admin reviews
+    and the evidence the erasure map is read from; what the tier decides is only whether
+    a binding is allowed a say in writing the span out.
+    """
+    return tuple(
+        replace(finding, tier=ALWAYS_TIER) if outranked(finding) else finding
+        for finding in findings
+    )
 
 
 def build_analyzer() -> AnalyzerEngine:

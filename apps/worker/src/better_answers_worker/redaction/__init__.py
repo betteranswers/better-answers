@@ -27,9 +27,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from .descriptors import DESCRIPTORS
-from .engine import DESCRIPTOR_BY_CATEGORY, Finding, detect
+from .descriptors import A_PERSON_NAME, DESCRIPTORS
+from .engine import ALWAYS_TIER, DESCRIPTOR_BY_CATEGORY, Finding, detect
+from .officers import raised_by_the_block_rule
 from .pins import VERSION_STRING
+from .pseudonyms import normalised, pseudonyms_for, written_as
 
 #: Each tier a binding can switch, as the key it is switched by on `source_binding` and
 #: what an unconfigured binding does with it. The always tier is not here because it is
@@ -42,7 +44,7 @@ SWITCHABLE_TIERS: Mapping[str, tuple[str, bool]] = MappingProxyType(
 #: than spelled again here. Every category in that tier declares the same word, and a
 #: table where they did not would be a table that could not keep this promise.
 ALWAYS_PLACEHOLDER = next(
-    iter({item.placeholder for item in DESCRIPTORS if item.tier == "always"})
+    iter({item.placeholder for item in DESCRIPTORS if item.tier == ALWAYS_TIER})
 )
 
 
@@ -83,12 +85,13 @@ def redact(
 
     Plain types in and plain types out, and nothing read that was not passed in.
     """
-    findings = detect(text)
+    findings = raised_by_the_block_rule(detect(text), text)
+    letters = pseudonyms_for(_names_in(text, findings), seed)
     withheld = tuple(
         finding for finding in findings if _in_force(finding.tier, rules_in_force)
     )
     return Redaction(
-        text=_written(text, withheld),
+        text=_written(text, withheld, letters),
         findings=findings,
         counts=_counted(findings),
         verdict=_verdict_of(findings),
@@ -104,20 +107,36 @@ def _in_force(tier: str, rules_in_force: Mapping[str, bool]) -> bool:
     return rules_in_force.get(key, unconfigured)
 
 
-def _placeholder_of(finding: Finding) -> str:
-    if finding.tier == "always":
+def _names_in(text: str, findings: Sequence[Finding]) -> tuple[str, ...]:
+    # Every person-name finding, in reading order and whatever tier it ended up at, so
+    # that the queue a letter is drawn from is the document's and neither the binding's
+    # nor an erasure request's.
+    return tuple(
+        text[finding.start : finding.end]
+        for finding in findings
+        if finding.category == A_PERSON_NAME
+    )
+
+
+def _placeholder_of(finding: Finding, name: str, letters: Mapping[str, str]) -> str:
+    if finding.tier == ALWAYS_TIER:
         return ALWAYS_PLACEHOLDER
-    return DESCRIPTOR_BY_CATEGORY[finding.category].placeholder
+    descriptor = DESCRIPTOR_BY_CATEGORY[finding.category]
+    if descriptor.category != A_PERSON_NAME:
+        return descriptor.placeholder
+    return written_as(letters[normalised(name)], descriptor.placeholder)
 
 
-def _written(text: str, withheld: Sequence[Finding]) -> str:
+def _written(text: str, withheld: Sequence[Finding], letters: Mapping[str, str]) -> str:
     # Right to left, so that every offset still points at the same character when its
-    # span is reached: a replacement changes the length of everything after it.
+    # span is reached: a replacement changes the length of everything after it. The name
+    # a placeholder is chosen by is read out of the text the seam was given, never out
+    # of the text being written, whose spans have already moved.
     redacted = text
     for finding in sorted(withheld, key=lambda it: it.start, reverse=True):
         redacted = (
             redacted[: finding.start]
-            + _placeholder_of(finding)
+            + _placeholder_of(finding, text[finding.start : finding.end], letters)
             + redacted[finding.end :]
         )
     return redacted

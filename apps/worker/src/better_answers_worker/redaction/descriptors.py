@@ -124,6 +124,12 @@ DESCRIPTORS: tuple[CategoryDescriptor, ...] = (
     ),
 )
 
+#: The one category the rules above it speak about by name: the officer-block pass
+#: raises it, a suppression raises it, and it is the only category written out as a
+#: stable letter rather than as its declared word. Named here beside the declarations
+#: rather than spelled in each of those three places.
+A_PERSON_NAME = "person-name"
+
 #: The table an analyzer's answer is read through: the inverse of `raised_by`, derived
 #: rather than declared a second time, because a mapping written by hand beside the
 #: declarations is the copy that stops agreeing with them.

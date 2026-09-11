@@ -54,3 +54,8 @@ the shapes the sections above use:
 ```text
 SORTCODE=00-00-99 ACCOUNT=87654321 AMOUNT=000012500
 ```
+
+## Closing note
+
+Rosalind Petheridge approved this pack before it was sent, and Imogen Sarkar read it
+through once more. Imogen Sarkar keeps the signed copy.

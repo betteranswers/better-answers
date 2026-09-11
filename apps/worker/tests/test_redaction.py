@@ -21,10 +21,13 @@ rule say *not when the span is inside a fence*, is a later rule and lands only i
 first client's documents show the class is worth the risk of suppressing a true
 positive. Until then the reviewer sees it and keeps it in text.
 
-What is asserted here is this iteration's half of the seam: the offsets, the recall set,
-the always tier's one word, the date pair and the health cue's narrowing. The stable
-pseudonyms, the officer block, what a suppression does to a span and the determinism of
-two identical runs are asserted in the iterations that build them.
+**Why the first name on the page is not `[person A]`.** The letters are a permutation
+the binding's seed draws, and a name takes the letter at the index its first appearance
+falls on — so `[person A]` is the shape every pseudonym is written in rather than a
+promise about the first person met. The alternative, handing out A, B, C in appearance
+order, gives the same name the same letter in every binding that holds the document,
+which is the join the agreement's own reason for a per-binding seed exists to prevent.
+The letters two seeds hand out are written down below, derived from the seed alone.
 """
 
 from collections.abc import Mapping, Sequence
@@ -50,9 +53,34 @@ THE_SAFE_SET: Mapping[str, bool] = {"default_on": True, "default_off": False}
 #: off — under which only the always tier is written out of the text.
 NOTHING_SWITCHABLE: Mapping[str, bool] = {"default_on": False, "default_off": False}
 
+#: A meeting-note, support-ticket or HR-shaped binding: the one flip story 6 names, and
+#: the only binding under which a name is written out of the text at all.
+AN_HR_SHAPED_BINDING: Mapping[str, bool] = {"default_on": True, "default_off": True}
+
 #: No erasure request applies to this document, and the seed is one binding's.
 NO_SUPPRESSIONS: Sequence[Mapping[str, Sequence[str]]] = ()
 SEED = "b0f3a1d2c4e5"
+
+#: A second binding's seed. Two seeds are written down rather than one sampled twice,
+#: because what has to hold is that a named person takes a different letter under each
+#: — and "assert the two differ" over a pair nobody wrote down proves nothing on the run
+#: where they happen to agree (`[TEST9]`).
+ANOTHER_SEED = "7c1e9b04af62"
+
+#: The letter each of the page's three people takes under each seed, by the order their
+#: names are first met: Rosalind Petheridge, then Callum Whitcombe, then Imogen Sarkar.
+#: Each is the seeded permutation of the alphabet read at index 0, 1 and 2, derived from
+#: the seed and the alphabet alone and written down here rather than read off the seam.
+LETTERS_UNDER_SEED: Mapping[str, str] = {
+    "Rosalind Petheridge": "U",
+    "Callum Whitcombe": "E",
+    "Imogen Sarkar": "Y",
+}
+LETTERS_UNDER_ANOTHER_SEED: Mapping[str, str] = {
+    "Rosalind Petheridge": "Q",
+    "Callum Whitcombe": "R",
+    "Imogen Sarkar": "X",
+}
 
 #: Every span the recall set is made of, as the category it must be raised under and
 #: the literal the fixture planted. Written out here rather than read back from the
@@ -103,6 +131,16 @@ def with_nothing_switchable_on(page: str) -> Redaction:
     return redact(page, NOTHING_SWITCHABLE, NO_SUPPRESSIONS, SEED)
 
 
+@pytest.fixture(scope="module")
+def on_an_hr_shaped_binding(page: str) -> Redaction:
+    return redact(page, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED)
+
+
+@pytest.fixture(scope="module")
+def under_another_seed(page: str) -> Redaction:
+    return redact(page, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, ANOTHER_SEED)
+
+
 def spans_under(found: Redaction, page: str, category: str) -> list[str]:
     """Every finding of one category, cut back out of the text by its own offsets."""
     return [
@@ -110,6 +148,26 @@ def spans_under(found: Redaction, page: str, category: str) -> list[str]:
         for finding in found.findings
         if finding.category == category
     ]
+
+
+def officers_block(text: str) -> str:
+    """The persons-with-significant-control section of a text, heading to heading."""
+    opened = text.index("## Persons with significant control")
+    return text[opened : text.index("## Finance", opened)]
+
+
+def past_the_officers_block(text: str) -> str:
+    """Everything after that section, which is where the same names are met again."""
+    return text[text.index("## Finance") :]
+
+
+def tiers_of(found: Redaction, page: str, span: str) -> set[str]:
+    """Every tier one literal value was raised at, wherever it sits on the page."""
+    return {
+        finding.tier
+        for finding in found.findings
+        if page[finding.start : finding.end] == span
+    }
 
 
 def test_every_span_is_cut_back_out_of_the_text_by_the_offsets_it_came_with(
@@ -165,8 +223,10 @@ def test_the_always_set_is_withheld_where_every_switchable_rule_is_off(
     assert "00-00-00, account number 12345678" not in redacted
     assert "999 000 0018" not in redacted
     assert "cancer diagnosis" not in redacted
-    # Four spans: the two sort-code pairs, the NHS number and the health sentence.
-    assert redacted.count("[withheld]") == 4
+    # Six spans: the two sort-code pairs, the NHS number, the health sentence and the
+    # two officers the block rule raised to this tier out of the one a binding could
+    # have switched off.
+    assert redacted.count("[withheld]") == 6
 
 
 def test_a_switchable_tier_that_is_off_leaves_its_spans_in_the_text(
@@ -250,3 +310,83 @@ def test_the_redaction_carries_the_version_string_every_finding_rides_on(
     on_a_plain_binding: Redaction,
 ) -> None:
     assert on_a_plain_binding.version == VERSION_STRING
+
+
+def test_a_name_passes_through_on_a_plain_binding_and_is_a_pseudonym_on_an_hr_one(
+    on_a_plain_binding: Redaction, on_an_hr_shaped_binding: Redaction
+) -> None:
+    # Story 6, both directions (`[TEST7]`): a capability statement still names its ISO
+    # lead, and one flip of the binding's own key turns every name into its letter.
+    # Imogen Sarkar is the one of the three who is never inside the officers block, so
+    # she is the person this pair is about.
+    # The space matters: `[personal contact withheld]` is a different placeholder for a
+    # different category, and a prefix without it would match that instead.
+    assert "Imogen Sarkar" in on_a_plain_binding.text
+    assert "[person " not in on_a_plain_binding.text
+
+    assert "Imogen Sarkar" not in on_an_hr_shaped_binding.text
+    assert "[person Y]" in on_an_hr_shaped_binding.text
+
+
+def test_the_same_name_is_the_same_letter_everywhere_in_one_binding(
+    on_an_hr_shaped_binding: Redaction, page: str
+) -> None:
+    # The page names Imogen Sarkar three times and never inside the officers block, so
+    # every one of her spans is her own tier's and every one must read the same. A
+    # letter drawn per span rather than per name would leave this at one each.
+    assert page.count("Imogen Sarkar") == 3
+    assert on_an_hr_shaped_binding.text.count("[person Y]") == 3
+
+
+def test_a_different_seed_gives_the_same_name_a_different_letter(
+    on_an_hr_shaped_binding: Redaction, under_another_seed: Redaction
+) -> None:
+    # The reason a seed is per binding: two bindings holding the same document must not
+    # be joinable on the letter. Both seeds and all six letters are literals, so this
+    # says which letters rather than that two samples happened to differ (`[TEST9]`).
+    for name, letter in LETTERS_UNDER_SEED.items():
+        under_one = f"[person {letter}]"
+        under_other = f"[person {LETTERS_UNDER_ANOTHER_SEED[name]}]"
+
+        assert under_one != under_other
+        assert under_one in on_an_hr_shaped_binding.text
+        assert under_one not in under_another_seed.text
+        assert under_other in under_another_seed.text
+
+
+def test_a_name_inside_an_officers_block_is_withheld_with_its_block_whatever_the_rules(
+    on_a_plain_binding: Redaction,
+    on_an_hr_shaped_binding: Redaction,
+    with_nothing_switchable_on: Redaction,
+) -> None:
+    # Story 7, over all three bindings, because "whatever the rules in force" is the
+    # whole of the line: the binding that leaves names alone, the one that turns them
+    # into letters, and the one that switches off every rule it is allowed to. The
+    # placeholder follows the tier the finding was raised at and not its category, so an
+    # officer's name loses the pseudonym its category would otherwise have given it.
+    for found in (
+        on_a_plain_binding,
+        on_an_hr_shaped_binding,
+        with_nothing_switchable_on,
+    ):
+        block = officers_block(found.text)
+
+        assert "Rosalind Petheridge" not in block
+        assert "Callum Whitcombe" not in block
+        assert "[person " not in block
+        assert block.count("[withheld]") == 2
+
+
+def test_the_same_name_outside_the_block_is_still_its_own_tier(
+    on_a_plain_binding: Redaction, on_an_hr_shaped_binding: Redaction, page: str
+) -> None:
+    # The other half of the block rule (`[TEST7]`): Rosalind Petheridge is named inside
+    # the officers block and twice again past it, and only the first is the rule's. A
+    # pass that withheld every name everywhere would satisfy the test above and fail
+    # here, and it would also make an HR binding unreadable.
+    assert "Rosalind Petheridge" in past_the_officers_block(on_a_plain_binding.text)
+    assert "[person U]" in past_the_officers_block(on_an_hr_shaped_binding.text)
+    assert tiers_of(on_a_plain_binding, page, "Rosalind Petheridge") == {
+        "always",
+        "default-off",
+    }
