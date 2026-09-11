@@ -75,7 +75,7 @@ import {
 import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { ROLES } from "./roles.ts";
 import { llmRoute, workspaceConfig } from "./schema.ts";
-import { sourceBinding, sourceDocument } from "./source-tables.ts";
+import { RULES_IN_FORCE_KEYS, sourceBinding, sourceDocument } from "./source-tables.ts";
 import {
   conceptWriteRequest,
   suggestion,
@@ -148,6 +148,11 @@ const llmRouteRefinements = {
   provider: (schema: z.ZodString) => schema.trim().min(1),
   model: (schema: z.ZodString) => schema.trim().min(1),
   dimensions: (schema: z.ZodNumber) => schema.int().positive(),
+  // The retention tail is the provider's own sentence, so it is held to being a sentence and
+  // nothing more: a DPIA that printed whitespace would be a document saying nothing where it
+  // has to say what the processor keeps. It stays nullable — a route nobody has read the
+  // provider's terms for has no tail, and that is a different fact from a tail of nothing.
+  retentionTail: (schema: z.ZodString) => schema.trim().min(1),
 };
 
 export const llmRouteSelect = createSelectSchema(llmRoute, llmRouteRefinements);
@@ -606,13 +611,48 @@ export const conceptClassOverrideUpdate = createUpdateSchema(
 );
 
 /**
+ * What a binding's **rules in force** may hold: the two switchable tiers, both of them, each
+ * a boolean, and nothing else. The narrowing is `outcome`'s and the identifier set's — the
+ * callback and the `.pipe()` over the generated column schema — and the reason is the seam's:
+ * this value is the argument the redaction seam runs on, so a key the seam has never heard of
+ * would be a rule a person believes they set and nothing reads.
+ *
+ * Strict, and every key required. A tier that arrived unannounced would be switched off by
+ * whatever the seam does with a key it does not know, and a tier left out would be a binding
+ * whose answer to *is this withheld?* is undefined — which is why the column's default states
+ * the safe set rather than leaving it to be filled in later. A third tier is a word added to
+ * `RULES_IN_FORCE_KEYS`, a migration and a rule in the seam, never a key in somebody's
+ * `jsonb`; the keys are read off the constant so the default, the table's CHECK and this
+ * schema cannot drift apart.
+ *
+ * JSON `null` stays accepted here for the reason `detail`'s and `identifiers`' do — `jsonb
+ * NOT NULL` refuses SQL NULL and not the JSON value, and assertion 3 holds a refinement to
+ * the column's own nullability. The table's `source_binding_rules_in_force_check` refuses it
+ * one layer down, because a binding whose rules are the JSON null withholds by no rule at all.
+ */
+const rulesInForce = z.union([
+  // SAFETY: the entries are built by mapping `RULES_IN_FORCE_KEYS` itself, so the keys are
+  // exactly that tuple's members and each value is the one boolean schema;
+  // `Object.fromEntries` is what loses that on the way out, not the code that feeds it.
+  z.strictObject(
+    Object.fromEntries(RULES_IN_FORCE_KEYS.map((key) => [key, z.boolean()])) as Record<
+      (typeof RULES_IN_FORCE_KEYS)[number],
+      z.ZodBoolean
+    >,
+  ),
+  z.null(),
+]);
+
+/**
  * A source binding as the derivation reads it (ADR 0013, ADR 0039): the three visibility
- * columns narrowed as every readable unit's are, its id the minter's shape.
+ * columns narrowed as every readable unit's are, its id the minter's shape, and the rules in
+ * force the bounded shape above (ADR 0020).
  */
 const sourceBindingRefinements = {
   workspaceId,
   id: bindingId,
   ...readableUnit,
+  rulesInForce: (schema: z.ZodType) => schema.pipe(rulesInForce),
 };
 
 export const sourceBindingSelect = createSelectSchema(sourceBinding, sourceBindingRefinements);

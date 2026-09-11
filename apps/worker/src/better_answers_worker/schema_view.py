@@ -7,9 +7,9 @@ knowledge of what the app's journal built, stamped with the migration id it was
 generated from and with that migration's journal instant, which is what the
 migrator writes into `drizzle.__drizzle_migrations.created_at`."""
 
-MIGRATION_ID = "0030_the-suppression-substrate"
+MIGRATION_ID = "0031_the-rules-in-force-and-the-retention-tail"
 
-MIGRATION_WHEN = 1789084198087
+MIGRATION_WHEN = 1789084887889
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -281,6 +281,7 @@ TABLES: dict[str, dict[str, str]] = {
         "provider": "text NOT NULL",
         "model": "text NOT NULL",
         "dimensions": "integer",
+        "retention_tail": "text",
     },
     "public.mcp_call_counter": {
         "workspace_id": "text NOT NULL",
@@ -435,6 +436,7 @@ TABLES: dict[str, dict[str, str]] = {
         "audience": "text NOT NULL",
         "audience_groups": "text[]",
         "created_at": "timestamp with time zone NOT NULL",
+        "rules_in_force": "jsonb NOT NULL",
     },
     "public.source_document": {
         "workspace_id": "text NOT NULL",

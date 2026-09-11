@@ -218,6 +218,13 @@
       "when": 1789084198087,
       "tag": "0030_the-suppression-substrate",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1789084887889,
+      "tag": "0031_the-rules-in-force-and-the-retention-tail",
+      "breakpoints": true
     }
   ]
 }

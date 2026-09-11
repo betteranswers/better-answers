@@ -19,6 +19,7 @@ import {
   JOB_QUEUED_STATUS,
   NIGHTLY_AUDIT_KIND,
   REDACTION_ALWAYS_TIER,
+  RULES_IN_FORCE_DEFAULT,
   SUGGESTION_EDIT_KIND,
   SUGGESTION_WAITING_STATUS,
   ulid,
@@ -356,6 +357,10 @@ export const testData = (client: pg.PoolClient): TestData => {
       model: "mistral-embed",
       // The dimensions CHECK: only the embedding purpose carries a count.
       dimensions: purpose === "embedding" ? EMBEDDING_DIMENSIONS : null,
+      // No retention tail: S2's model client reads the provider's terms and writes it, and a
+      // seeded route has had nobody read them, which is what the DPIA input has to be able
+      // to say.
+      retentionTail: null,
       ...overrides,
       purpose,
       workspaceId,
@@ -676,6 +681,10 @@ export const testData = (client: pg.PoolClient): TestData => {
       sensitivity: "Internal",
       audience: AUDIENCE_EVERYONE,
       audienceGroups: null,
+      // The safe set, which is what the column's own DEFAULT writes — stated here because the
+      // boundary's insert schema asks for the column, and proved to be the database's own in
+      // `rls.test.ts`, where a binding is written with neither this factory nor the boundary.
+      rulesInForce: RULES_IN_FORCE_DEFAULT,
       ...overrides,
       workspaceId,
     });

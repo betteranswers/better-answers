@@ -11,6 +11,10 @@ import {
   conceptFrontmatter,
   EMBEDDING_DIMENSIONS,
   FINDING_REASON_MAX,
+  REDACTION_ALWAYS_TIER,
+  REDACTION_TIERS,
+  RULES_IN_FORCE_DEFAULT,
+  RULES_IN_FORCE_KEYS,
   SUBJECT_IDENTIFIER_MAX,
   SUBJECT_IDENTIFIERS_MAX,
   SUGGESTION_BODY_MAX,
@@ -239,6 +243,9 @@ const acceptedRows = {
   ],
   // A binding narrowed to Admins over no array, and one for named groups — the two whole
   // shapes of the audience pair (ADR 0039), so the array refinement is proved on the column.
+  // The first says nothing about redaction and takes the column's safe set; the second is the
+  // HR-shaped binding of the S0 spec, where the default-off tier is switched on and a person's
+  // name is withheld — one flip, which is the whole of what the column is for.
   sourceBinding: [
     {
       workspaceId: WS_ID,
@@ -254,6 +261,7 @@ const acceptedRows = {
       sensitivity: "Internal",
       audience: "groups",
       audienceGroups: [GROUP_ID],
+      rulesInForce: { default_on: true, default_off: true },
     },
   ],
   sourceDocument: [{ workspaceId: WS_ID, id: DOCUMENT_ID, bindingId: BINDING_ID }],
@@ -801,7 +809,13 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { id: "not-a-ulid", name: "Workspace A", slug: "a" },
       { id: WS_ID, name: "   ", slug: "a" },
     ],
-    llmRoute: [{ ...acceptedRows.llmRoute[0], dimensions: 0 }],
+    // A route with no width, and a retention tail of whitespace: the DPIA prints the
+    // provider's sentence, and a blank one is a document that says nothing where it has to
+    // say what the processor keeps.
+    llmRoute: [
+      { ...acceptedRows.llmRoute[0], dimensions: 0 },
+      { ...acceptedRows.llmRoute[0], retentionTail: "   " },
+    ],
     // The identity ids the platform reads: one shape, the minter's (ADR 0035). Better
     // Auth's own default id and a hand-composed key are both refused at the boundary.
     user: [{ ...acceptedRows.user[0], id: "kEyIkQBmQ1EnBJnUvKMR6nSFXlQKUcuJ" }],
@@ -896,6 +910,18 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.finding[1], reviewedBy: "priya@example.invalid" },
       { ...acceptedRows.finding[1], reviewReason: "x".repeat(FINDING_REASON_MAX + 1) },
       { ...acceptedRows.finding[2], restoreReason: "x".repeat(FINDING_REASON_MAX + 1) },
+    ],
+    // The binding's rules in force, every way the two switchable tiers can be broken: a third
+    // key — *always* named, which is the one a binding may not switch — one of the two left
+    // out, and a value that is neither a yes nor a no. Each would be a rule a person believes
+    // they set and the seam never reads, because this value is the seam's whole argument.
+    sourceBinding: [
+      {
+        ...acceptedRows.sourceBinding[1],
+        rulesInForce: { default_on: true, default_off: false, always: false },
+      },
+      { ...acceptedRows.sourceBinding[1], rulesInForce: { default_on: true } },
+      { ...acceptedRows.sourceBinding[1], rulesInForce: { default_on: true, default_off: "no" } },
     ],
     // The subject request's refusals. A third kind — the pair is closed, so the day the
     // platform answers a portability request it adds the word to `SUBJECT_REQUEST_KINDS` and
@@ -1034,6 +1060,44 @@ describe("what a finding may hold", () => {
 });
 
 /**
+ * The **rules in force** a binding carries (ADR 0020; the S0 spec, *The seam*): the unit is
+ * the tier and never the category, and the two keys on the column are the two tiers a binding
+ * switches.
+ *
+ * The correspondence between the glossary's three words and these two keys is written down
+ * here rather than derived in `src/`, because deriving it would mean `source-tables.ts`
+ * importing the tier list from `finding-tables.ts`, which already imports the document table
+ * from `source-tables.ts` — a cycle for a fact that fits in one assertion. Both halves are
+ * asserted: the keys are exactly the switchable tiers, and *always* is exactly the one with
+ * no key (`[TEST7]`), so a fourth tier or a renamed one fails here and nowhere else.
+ */
+describe("the rules in force a binding carries", () => {
+  /** A tier's word as the column writes it: the same word, with the separator a key takes. */
+  const asKey = (tier: string) => tier.replaceAll("-", "_");
+  const keyed: readonly string[] = RULES_IN_FORCE_KEYS;
+
+  it("keys the column on the two tiers a binding switches, and on no other", () => {
+    expect(RULES_IN_FORCE_KEYS).toEqual(["default_on", "default_off"]);
+    expect(RULES_IN_FORCE_KEYS).toEqual(
+      REDACTION_TIERS.filter((tier) => tier !== REDACTION_ALWAYS_TIER).map(asKey),
+    );
+    // The other way: the tier with no key is the always set, because no binding switches it
+    // off and a switch for it would be a policy tier that is not policy.
+    expect(REDACTION_TIERS.filter((tier) => !keyed.includes(asKey(tier)))).toEqual([
+      REDACTION_ALWAYS_TIER,
+    ]);
+  });
+
+  it("defaults to the safe set, so a binding nobody configured withholds the more", () => {
+    expect(RULES_IN_FORCE_DEFAULT).toEqual({ default_on: true, default_off: false });
+    expect(
+      boundarySchemas.sourceBinding.select.shape.rulesInForce.safeParse(RULES_IN_FORCE_DEFAULT)
+        .success,
+    ).toBe(true);
+  });
+});
+
+/**
  * Who a subject request is about (the architecture pass of 10/09/2026, candidate 2): **the
  * subject is an identifier set, not only a person id**. A member has both; a person the
  * company's files name who never signed in has the set alone, and the boundary has to take
@@ -1140,6 +1204,7 @@ describe("5 — the inferred type is pinned", () => {
         provider: string;
         model: string;
         dimensions: number | null;
+        retentionTail: string | null;
       }
     >
   >;

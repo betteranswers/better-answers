@@ -2118,6 +2118,85 @@ describe("the audience pair on every readable unit", () => {
 });
 
 /**
+ * The **rules in force** on a binding (ADR 0020; migration 0031): the two tiers a binding
+ * switches, on the row rather than by convention, with the safe set as the column's default.
+ *
+ * Held by the database and not by the boundary alone, because the boundary is the app's and
+ * this value is the *worker's* argument: `worker_rt` holds default DML on every ordinary
+ * `public` table (migration `0000_substrate.sql`), so a shape stated at the boundary alone is
+ * a shape one tier could write around. The refusals are written as UPDATEs for the same reason
+ * the identifier set's are — the CHECK is what the row is held to whoever wrote it.
+ */
+describe("the rules in force on a source binding", () => {
+  it("gives a binding nobody configured the safe set, and takes the one flip that changes it", async () => {
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      // A binding written without the factory and without the boundary, naming the workspace
+      // and the id and nothing else: what lands in the column is then the database's own
+      // DEFAULT and not a value some layer above put there.
+      const id = ulid();
+      await client.query("INSERT INTO source_binding (workspace_id, id) VALUES ($1, $2)", [
+        WS_A,
+        id,
+      ]);
+
+      // The safe set, written down here as a literal (`[TEST9]`): the default-on tier on, the
+      // default-off tier off, and no key for *always*, because no binding switches it off.
+      const born = await client.query<{ rules_in_force: Record<string, boolean> }>(
+        "SELECT rules_in_force FROM source_binding WHERE id = $1",
+        [id],
+      );
+      expect(born.rows).toEqual([{ rules_in_force: { default_on: true, default_off: false } }]);
+
+      // The HR-shaped binding of the S0 spec: names withheld, which is one flip and not a new
+      // column, a new table or a list of categories anywhere near a migration.
+      const flipped = await client.query(
+        `UPDATE source_binding SET rules_in_force = '{"default_on": true, "default_off": true}'::jsonb
+          WHERE id = $1`,
+        [id],
+      );
+      expect(flipped.rowCount).toBe(1);
+    });
+  });
+
+  it("refuses a set of rules the seam could not read as tiers", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const binding = await seed.sourceBinding({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const offShape = [
+        // A tier missing. `->` on an absent key is SQL NULL and a CHECK worth NULL passes, so
+        // this is the case a `=` comparison would have taken: a binding whose answer to *is a
+        // name withheld?* is nothing at all.
+        `'{"default_on": true}'::jsonb`,
+        // A value that is neither a yes nor a no.
+        `'{"default_on": true, "default_off": "no"}'::jsonb`,
+        // The JSON `null`, which `jsonb NOT NULL` takes — it refuses SQL NULL, not the JSON
+        // value — so this is the layer that refuses a binding withholding by no rule at all.
+        `'null'::jsonb`,
+        // A list and a bare string: valid JSON, and not a set of tiers.
+        `'[]'::jsonb`,
+        `'"default_on"'::jsonb`,
+      ];
+      for (const value of offShape) {
+        await client.query("SAVEPOINT rules_in_force_row");
+        await expect(
+          client.query(`UPDATE source_binding SET rules_in_force = ${value} WHERE id = $1`, [
+            binding.id,
+          ]),
+        ).rejects.toThrow(/source_binding_rules_in_force_check/);
+        await client.query("ROLLBACK TO SAVEPOINT rules_in_force_row");
+      }
+    });
+  });
+});
+
+/**
  * The derivation's six tables (ADR 0039; migrations 0019 and 0020, `[SEC3]`): tenant tables
  * like any other, so the zero-rows proof is stated here in their words; the worker's role is
  * refused on all six outright; every composite key refuses a row naming another tenant's

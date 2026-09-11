@@ -55,6 +55,16 @@ export const llmRoute = withRLS(
     model: text("model").notNull(),
     // The embedding route's dimension count; NULL on every other purpose.
     dimensions: integer("dimensions"),
+    /**
+     * The **retention tail**: how long this route's provider says it keeps what is sent to
+     * it, in the provider's own words, as the *DPIA input* prints them (the S0 spec, *The
+     * DPIA input*; ADR 0020 amending ADR 0013). Text and not a duration, because what a DPIA
+     * has to carry is the statement the platform is relying on — *zero retention*, *30 days
+     * for abuse monitoring* — and a number would be this platform's reading of somebody
+     * else's promise. NULL until it is read: S2's model client fills it, and v0.1 calls no
+     * route, so the document says the tail is not yet recorded rather than inventing one.
+     */
+    retentionTail: text("retention_tail"),
   },
   "workspaceId",
   (table) => [
