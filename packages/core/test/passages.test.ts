@@ -8,10 +8,12 @@ import {
   findPassages,
   passageAt,
   previewChunks,
+  type LocatorRefusal,
+  type Passage,
   type PassageHit,
   type PreviewedChunk,
 } from "../src/sources/index.ts";
-import { contractFixture } from "./contract-fixture.ts";
+import { contractFixture, documentChunkRow } from "./contract-fixture.ts";
 import {
   bindingHolding,
   conceptCiting,
@@ -59,16 +61,7 @@ const fixtureSchema = z.object({
   document: z.object({
     source_document_id: z.string().min(1),
     binding_id: z.string().min(1),
-    chunks: z.array(
-      z.object({
-        ordinal: z.int().nonnegative(),
-        id: z.string().min(1),
-        char_start: z.int().nonnegative(),
-        char_end: z.int().nonnegative(),
-        locator: z.string().min(1),
-        content: z.string().min(1),
-      }),
-    ),
+    chunks: z.array(documentChunkRow),
   }),
   open: z.array(
     z.object({
@@ -228,6 +221,20 @@ const hitOn = (
   sensitivity,
 });
 
+/**
+ * The passage this person opens at a wire locator, or the one word they were refused with.
+ *
+ * The act alone, as `searching` and `previewing` below are the act alone for the other two
+ * reads: what a passage is expected to be stays written out in full at every assertion, in
+ * that assertion's own literals (`[TEST9]`), because that is the thing under test and a
+ * helper that carried it would be the suite agreeing with itself.
+ */
+const opening = (person: UserPrincipal, wire: string): Promise<Passage | LocatorRefusal | Error> =>
+  reading(person, async (reader, tx) => {
+    const read = await passageAt(reader, tx, wire);
+    return read.ok ? read.value : read.error;
+  });
+
 describe("the passage a wire locator opens", () => {
   it("answers every case the document-chunk agreement states, the astral character included", async () => {
     const scenario = await arrange();
@@ -235,10 +242,7 @@ describe("the passage a wire locator opens", () => {
 
     const answered = [];
     for (const opened of fixture.open) {
-      const read = await reading(scenario.viewer, (viewer, tx) =>
-        passageAt(viewer, tx, opened.wire),
-      );
-      answered.push({ case: opened.case, answer: read.ok ? read.value : read.error });
+      answered.push({ case: opened.case, answer: await opening(scenario.viewer, opened.wire) });
     }
 
     expect(answered).toEqual(
@@ -300,9 +304,9 @@ describe("the passage a wire locator opens", () => {
     });
     const wire = `${documentId}/chars:4-43`;
 
-    const read = await reading(scenario.admin, (admin, tx) => passageAt(admin, tx, wire));
+    const read = await opening(scenario.admin, wire);
 
-    expect(read.ok ? read.value : read.error).toEqual({
+    expect(read).toEqual({
       locator: wire,
       title: "The staff handbook",
       text: "holiday policy grants twenty-eight days",
@@ -357,8 +361,7 @@ describe("what a passage read refuses", () => {
     };
     const answered: Record<string, unknown> = {};
     for (const [what, wire] of Object.entries(wires)) {
-      const read = await reading(scenario.viewer, (viewer, tx) => passageAt(viewer, tx, wire));
-      answered[what] = read.ok ? read.value : read.error;
+      answered[what] = await opening(scenario.viewer, wire);
     }
 
     // One word for all four, so a reader learns nothing from the difference between a locator
@@ -381,9 +384,9 @@ describe("what a passage read refuses", () => {
     });
     const wire = `${board}/chars:0-${BOARD_CHAR_END}`;
 
-    const read = await reading(scenario.admin, (admin, tx) => passageAt(admin, tx, wire));
+    const read = await opening(scenario.admin, wire);
 
-    expect(read.ok ? read.value : read.error).toEqual({
+    expect(read).toEqual({
       locator: wire,
       title: BOARD_TITLE,
       text: "The board's note on the bid.",
@@ -654,9 +657,7 @@ describe("the review list a binding is previewed with", () => {
 
     const previewed = await previewing(scenario.admin, REVIEW_BINDING);
     const found = await searching(scenario.admin);
-    const opened = await reading(scenario.admin, (admin, tx) =>
-      passageAt(admin, tx, `${TERMS}/chars:0-33`),
-    );
+    const opened = await opening(scenario.admin, `${TERMS}/chars:0-33`);
 
     // The pair both ways (`[TEST7]`) on one arrangement and one person: three rows for the
     // preview, which leaves the published arm out, and nothing at all for the two reads that
@@ -664,7 +665,7 @@ describe("the review list a binding is previewed with", () => {
     // either read ever to lose it, the other two would.
     expect(previewed).toHaveLength(3);
     expect(found).toEqual([]);
-    expect(opened.ok ? opened.value : opened.error).toBe(NOT_FOUND);
+    expect(opened).toBe(NOT_FOUND);
   });
 
   it("applies the class and the audience arms all the same, so an Admin reaches a Restricted row and not a row for a group they are not in", async () => {

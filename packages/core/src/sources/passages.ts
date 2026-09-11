@@ -11,12 +11,12 @@ import {
   attempt,
   err,
   ok,
-  requireAdmin,
   type Result,
   type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import { adminOnBinding } from "./admin-binding.ts";
 import { parseLocator, spanText, type LocatorRefusal } from "./chunk-address.ts";
 
 /**
@@ -313,9 +313,6 @@ export type PreviewedChunk = {
   readonly content: string;
 };
 
-/** A binding's id as the boundary states it — the same schema the narrowing act parses with. */
-const BINDING_ID = boundarySchemas.sourceBinding.select.shape.id;
-
 /**
  * One binding's chunk rows, under the class and the audience arms and **not** the published one.
  *
@@ -374,16 +371,15 @@ export const previewChunks = async (
   tx: Tx,
   input: { readonly bindingId: string; readonly limit?: number },
 ): Promise<Result<readonly PreviewedChunk[], RoleRefusal | "malformed" | Error>> => {
-  const admin = requireAdmin(principal);
-  if (!admin.ok) return err(admin.error);
-  const bindingId = BINDING_ID.safeParse(input.bindingId);
-  if (!bindingId.success) return err("malformed");
+  const acting = adminOnBinding(principal, input.bindingId);
+  if (!acting.ok) return err(acting.error);
+  const { admin, bindingId } = acting.value;
 
   return attempt(async () => {
     const read = await tx.query<PreviewRow>(BINDING_CHUNKS, [
-      admin.value.workspaceId,
-      bindingId.data,
-      ...readableParameters(admin.value),
+      admin.workspaceId,
+      bindingId,
+      ...readableParameters(admin),
       hitsAsked(input.limit ?? MAX_PASSAGE_HITS),
     ]);
     return read.rows.map((row) => ({
