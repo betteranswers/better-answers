@@ -7,9 +7,9 @@ knowledge of what the app's journal built, stamped with the migration id it was
 generated from and with that migration's journal instant, which is what the
 migrator writes into `drizzle.__drizzle_migrations.created_at`."""
 
-MIGRATION_ID = "0033_the-account-timestamp-default"
+MIGRATION_ID = "0034_the-job-subject-and-the-run-key"
 
-MIGRATION_WHEN = 1789249556195
+MIGRATION_WHEN = 1789674602522
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -264,6 +264,7 @@ TABLES: dict[str, dict[str, str]] = {
         "heartbeat_at": "timestamp with time zone",
         "finished_at": "timestamp with time zone",
         "outcome": "jsonb",
+        "subject_id": "text",
     },
     "public.jwks": {
         "id": "text NOT NULL",

@@ -54,7 +54,7 @@ import {
   SOURCE_ENTITY_LABEL_PREFIX,
 } from "./graph-tables.ts";
 import { group, GROUP_ORIGINS, groupMember } from "./group-tables.ts";
-import { job, JOB_KINDS, JOB_STATUSES, REBUILD_REASONS } from "./job-tables.ts";
+import { job, JOB_KINDS, JOB_REASONS, JOB_STATUSES } from "./job-tables.ts";
 import {
   account,
   invitation,
@@ -979,7 +979,9 @@ const jobRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.regex(ULID),
   kind: (schema: z.ZodString) => schema.pipe(z.enum(JOB_KINDS)),
-  reason: (schema: z.ZodString) => schema.pipe(z.enum(REBUILD_REASONS)),
+  // Every reason any kind may carry. Which kind may carry which is the row's rule, because
+  // it is a rule about a pair of columns and a column's boundary sees one column.
+  reason: (schema: z.ZodString) => schema.pipe(z.enum(JOB_REASONS)),
   status: (schema: z.ZodString) => schema.pipe(z.enum(JOB_STATUSES)),
   attempts: (schema: z.ZodNumber) => schema.int().nonnegative(),
   maxAttempts: (schema: z.ZodNumber) => schema.int().positive(),
