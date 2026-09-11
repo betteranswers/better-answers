@@ -29,6 +29,38 @@ from the compose file that chowns this tier's volumes, and the image itself from
 ``build.yml`` matrix leg that builds it. Nothing here is a list someone has to remember
 to edit.
 
+**What the seam costs per page** (`T-122`, acceptance line 3; the spec's *A measurement,
+not a budget*). Taken by the test below, on the image, with the network refused, over
+the fixture page the seam's own suite reads — 405 words, 2,488 bytes. Read on **11
+September 2026** on an Apple M4 Pro (14 cores, 24 GB) under Docker Desktop 29.4, so the
+container is ``linux/arm64`` where ``build.yml`` builds ``linux/amd64`` and the two are
+not one number. Each figure is the median of three runs in one container, and each
+model's one-off load is taken before the first of them and reported apart from it.
+Three readings, minutes apart, on a host shared with other agents' builds and suites:
+
+* ``redact()``, the whole seam, under the pin ``urchade/gliner_multi_pii-v1`` — **2841,
+  1910, 2646 ms per page**, over a load of 6351, 6714, 7137 ms paid once per process.
+* That same model's detector alone — **4082, 2454, 2520 ms per page**.
+* ``knowledgator/gliner-pii-base-v1.0``'s detector alone — **3138, 1340, 2146 ms per
+  page**, over a load of 3143, 3512, 2909 ms paid once per process.
+
+The second and third lines are the pair the pin is judged on: the same registry, the
+same recognisers, the same thresholds and one model different, where ``redact`` also
+resolves overlaps, writes placeholders and draws pseudonyms. The second model is the
+faster of the two in all three readings, and by a margin that is not: the run-to-run
+spread on one figure reaches 66 %, and the first reading put the whole seam *below* its
+own detector, which the call graph forbids. An interleaved control in the same image —
+``redact`` and ``analyze`` alternating rather than run in phases — put them back in
+order, 1766-2198 ms against 1626-1898 ms, so the spread is the machine rather than the
+seam. The two load figures are the steady ones.
+
+**S1 derives the seam's per-document timeout from the first line**, and nothing here is
+asserted. The test below asserts only that each figure is a positive number: a ceiling
+on a number with this spread would fail on a slower machine and tell its reader nothing
+about the seam, which is the lesson ``packages/core/test/graph-budget.test.ts`` records
+in its own docblock. To read the figures, ``uv run --frozen pytest tests/test_image.py
+-k measured --log-cli-level=INFO``.
+
 **Sequenced before `T-006`.** The image runs a ``CMD`` that exits with a message
 today: there is no work loop, so a wrong image is currently harmless. The moment
 ``T-006`` puts a loop in it, a wrong image stops being harmless, and a probe written
@@ -36,6 +68,7 @@ afterwards is a probe written to pass.
 """
 
 import json
+import logging
 import os
 import re
 import subprocess
@@ -517,6 +550,77 @@ sys.stdout.write(json.dumps({
 }))
 """
 
+#: How many times each figure below is taken before its median is kept. Three, because
+#: the first run of anything on a cold container pays for a page fault the second does
+#: not, and a median of three throws that one away without turning a measurement into a
+#: benchmark run.
+MEASUREMENT_RUNS = 3
+
+# The third container's probe, and the only one here that answers numbers. It times
+# three things over the same page: the whole seam under the pinned model, that model's
+# detector alone, and the second model's detector alone. The second and third are the
+# pair the pin was chosen on — the same registry, the same recognisers, the same
+# thresholds, one model different — because `redact` also resolves overlaps, writes
+# placeholders and draws pseudonyms, and a comparison that included all of that would be
+# measuring the seam twice rather than the two models once.
+#
+# Each model's one-off load is taken before the first timed page and reported apart from
+# it: `analyzer()` brings the process-wide engine up the first time it is asked for, so
+# a `redact` that paid for it would be reporting a start-up as a page, and S1 sets a
+# per-document timeout off the page.
+MEASUREMENT_PROBE = """
+import json, os, statistics, sys, time
+
+from better_answers_worker.redaction import redact
+from better_answers_worker.redaction.engine import (
+    ANALYSED_ENTITIES,
+    analyzer,
+    build_analyzer,
+)
+from better_answers_worker.redaction.pins import (
+    GLINER_MODEL_ID,
+    GLINER_MODEL_ID_MEASURED,
+)
+
+page = os.environ["PROBE_PAGE"]
+rules = json.loads(os.environ["PROBE_RULES"])
+seed = os.environ["PROBE_SEED"]
+runs = int(os.environ["PROBE_RUNS"])
+entities = list(ANALYSED_ENTITIES)
+
+def median(work):
+    taken = []
+    for _ in range(runs):
+        started = time.perf_counter()
+        work()
+        taken.append((time.perf_counter() - started) * 1000)
+    return statistics.median(taken)
+
+started = time.perf_counter()
+analyzer()
+pinned_load = (time.perf_counter() - started) * 1000
+
+seam = median(lambda: redact(page, rules, (), seed))
+pinned = median(lambda: analyzer().analyze(text=page, language="en", entities=entities))
+
+started = time.perf_counter()
+second = build_analyzer(GLINER_MODEL_ID_MEASURED)
+measured_load = (time.perf_counter() - started) * 1000
+
+measured = median(lambda: second.analyze(text=page, language="en", entities=entities))
+
+sys.stdout.write(json.dumps({
+    "runs": runs,
+    "pinned_model": GLINER_MODEL_ID,
+    "pinned_load_ms": pinned_load,
+    "seam_ms": seam,
+    "pinned_ms": pinned,
+    "measured_model": GLINER_MODEL_ID_MEASURED,
+    "measured_load_ms": measured_load,
+    "measured_ms": measured,
+}))
+"""
+
 
 @dataclass(frozen=True)
 class ImageContents:
@@ -551,6 +655,42 @@ def _read_contents(stdout: str) -> ImageContents:
         },
         spacy_pipeline=bool(answered["spacy_pipeline"]),
         hf_home=str(answered["hf_home"]),
+    )
+
+
+@dataclass(frozen=True)
+class Measurement:
+    """What one container answered about what the seam costs it to read a page.
+
+    Six numbers and two names, never a threshold: the module docblock records them and
+    nothing asserts them. Both models carry their one-off load apart from their cost per
+    page, because the two are spent once and once per document respectively and S1's
+    timeout is derived from the second of them.
+    """
+
+    runs: int
+    pinned_model: str
+    pinned_load_ms: float
+    seam_ms: float
+    pinned_ms: float
+    measured_model: str
+    measured_load_ms: float
+    measured_ms: float
+
+
+def _read_measurement(stdout: str) -> Measurement:
+    # Narrowed on the statement after the read, like `_read_contents` above and for the
+    # same reason (§ TYPES (Python)).
+    answered = _answered(stdout)
+    return Measurement(
+        runs=int(answered["runs"]),
+        pinned_model=str(answered["pinned_model"]),
+        pinned_load_ms=float(answered["pinned_load_ms"]),
+        seam_ms=float(answered["seam_ms"]),
+        pinned_ms=float(answered["pinned_ms"]),
+        measured_model=str(answered["measured_model"]),
+        measured_load_ms=float(answered["measured_load_ms"]),
+        measured_ms=float(answered["measured_ms"]),
     )
 
 
@@ -824,6 +964,65 @@ def test_the_image_redacts_the_fixture_with_its_network_refused(image: str) -> N
     for pinned in PINNED_IN_THE_VERSION_STRING:
         assert _pin(pinned) in version, pinned
     assert _pin("GLINER_MODEL_ID_MEASURED").rsplit("/", 1)[-1] not in version
+
+
+def test_what_the_seam_costs_per_page_is_measured_on_the_image_and_never_budgeted(
+    image: str,
+) -> None:
+    """Acceptance line 3. A measurement, not a budget — the spec's words.
+
+    The numbers this takes are recorded in the module docblock above and asserted
+    nowhere. A ceiling here would be a test whose failure told a reader about the
+    machine it ran on rather than about the seam:
+    ``packages/core/test/graph-budget.test.ts`` carries that scar in its own docblock,
+    where a budget with threefold headroom had to become eightfold and a third budget
+    had to go. So the only assertion is that each figure is a positive number, which is
+    what catches a probe that timed nothing, and the figures themselves go to a reader
+    through the log.
+
+    It runs on the image and with the network refused for the same reason the test
+    above does: what S1 needs is what a page costs the worker where the worker runs,
+    and a container that could reach a registry might be timing a download.
+    """
+    measured = _read_measurement(
+        _run_the_image(
+            image,
+            {
+                "PROBE_PAGE": FIXTURE_PAGE.read_text("utf-8"),
+                "PROBE_RULES": THE_SAFE_SET,
+                "PROBE_SEED": SEED,
+                "PROBE_RUNS": str(MEASUREMENT_RUNS),
+            },
+            probe=MEASUREMENT_PROBE,
+            network="none",
+            # Two models brought up and nine timed pages, where the test above brings up
+            # one model and reads one page. Long enough that a slower machine finishes,
+            # short enough that a container which has stopped making progress is killed
+            # rather than waited on.
+            timeout=1800,
+        )
+    )
+    logging.getLogger(__name__).info(
+        "T-122 · the seam on the fixture page, median of %d runs on this image: "
+        "redact() %.0f ms/page under %s, whose load costs %.0f ms once; "
+        "its detector alone %.0f ms/page; "
+        "%s's detector alone %.0f ms/page, whose load costs %.0f ms once",
+        measured.runs,
+        measured.seam_ms,
+        measured.pinned_model,
+        measured.pinned_load_ms,
+        measured.pinned_ms,
+        measured.measured_model,
+        measured.measured_ms,
+        measured.measured_load_ms,
+    )
+
+    assert measured.runs == MEASUREMENT_RUNS
+    assert measured.pinned_model == _pin("GLINER_MODEL_ID")
+    assert measured.measured_model == _pin("GLINER_MODEL_ID_MEASURED")
+    assert measured.seam_ms > 0
+    assert measured.pinned_ms > 0
+    assert measured.measured_ms > 0
 
 
 def test_the_container_runs_as_the_uid_that_owns_this_tiers_volumes(

@@ -28,6 +28,11 @@ promise about the first person met. The alternative, handing out A, B, C in appe
 order, gives the same name the same letter in every binding that holds the document,
 which is the join the agreement's own reason for a per-binding seed exists to prevent.
 The letters two seeds hand out are written down below, derived from the seed alone.
+
+**What a page of this fixture costs** is measured where the worker runs rather than
+here, and `tests/test_image.py`'s docblock records it: milliseconds per page under each
+of the two pinned GLiNER models, on the image, with the date and the machine class
+(`T-122`), from which S1 derives the seam's per-document timeout.
 """
 
 from collections.abc import Mapping, Sequence
