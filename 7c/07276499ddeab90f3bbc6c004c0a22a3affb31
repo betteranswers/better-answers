@@ -1,0 +1,23 @@
+packages/core/test/queue.contract.test.ts
+  s_f3ee63bcbb1a0b::t_339241d7012278 291
+  s_f3ee63bcbb1a0b::t_a779116347cf7b 65
+  s_f3ee63bcbb1a0b::t_fb85a96149ef75 5
+  s_f3ee63bcbb1a0b::t_80c6a3ee122bd5 39
+  s_f3ee63bcbb1a0b::t_9be7b96afc230a 266-290,292-298
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7c07276499ddeab90f3bbc6c004c0a22a3affb31",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
