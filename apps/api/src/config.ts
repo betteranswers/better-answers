@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 import { err, ok, type Result } from "@better-answers/core/kernel";
+import type { ObjectStoreSettings } from "@better-answers/core/store/objects";
 
 import {
   bareHostname,
@@ -120,6 +121,37 @@ const identityBootstrapSchema = z
     return new Set(hostnames).size === hostnames.length;
   }, "the three hostnames must differ, the derived `app.` one included: two the same hands one hostname's surface to the other, which is the fence this configuration exists to raise");
 
+/**
+ * The object store, for the two commands that reach it.
+ *
+ * It is its own reading and not part of the bootstrap class above because a process that
+ * cannot reach the object store must still start: `migrate`'s environment is the database
+ * alone, and `pnpm ops` runs in the same image as every other command. Only
+ * `replay-erasures` and `erasure-rehearsal` open this door — the replay reads the copies a
+ * dump predates, the rehearsal runs a routine that writes one — and each refuses on its own
+ * behalf when the reading failed, which is the answer a restore has to see rather than a
+ * process that would not come up.
+ *
+ * The names are the estate's, on `deploy/platform.compose.yaml`'s `x-bootstrap` anchor. The
+ * region has a default because Garage's `s3_region` is configuration and not a place
+ * (`deploy/garage.toml` fixes it as `garage`): an operator on a store that is somewhere real
+ * names theirs, and the estate sets nothing. The credentials are the object-store credential
+ * class, which ADR 0020 keeps out of the envelope precisely because the process that reads
+ * the envelope may be the one being restored.
+ */
+const objectStoreSchema = z.object({
+  // http or https and nothing else. A URL parser reads `objectstore:3900` as a URL — scheme
+  // `objectstore:`, the rest opaque — so `z.url()` alone would take a host and port an
+  // operator wrote without a scheme and hand it to a client that cannot speak it; the first
+  // sign would be a connection error in the middle of a restore. Plain http is allowed
+  // because the estate reaches Garage by service name on an internal network (ADR 0024).
+  S3_ENDPOINT: z.url({ protocol: /^https?$/ }),
+  S3_BUCKET: z.string().min(1),
+  S3_REGION: z.string().min(1).default("garage"),
+  S3_ACCESS_KEY: z.string().min(1),
+  S3_SECRET_KEY: z.string().min(1),
+});
+
 export type Bootstrap = {
   readonly databaseUrl: string;
   readonly port: number;
@@ -170,6 +202,27 @@ export function readIdentityBootstrap(
       agent: parsed.data.AGENT_HOSTNAME,
       apex: parsed.data.APEX_HOSTNAME,
     },
+  });
+}
+
+/**
+ * The object store's settings as `openObjects` takes them, or the reason there are none.
+ *
+ * A refusal here is not a failure to start: the caller decides. `ops.ts` reads it once, opens
+ * the door when it can and hands `undefined` on when it cannot, and the two commands that
+ * want a door say so themselves.
+ */
+export function readObjectStore(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): Result<ObjectStoreSettings> {
+  const parsed = objectStoreSchema.safeParse(environment);
+  if (!parsed.success) return err(invalid(parsed.error));
+  return ok({
+    endpoint: parsed.data.S3_ENDPOINT,
+    region: parsed.data.S3_REGION,
+    bucket: parsed.data.S3_BUCKET,
+    accessKeyId: parsed.data.S3_ACCESS_KEY,
+    secretAccessKey: parsed.data.S3_SECRET_KEY,
   });
 }
 

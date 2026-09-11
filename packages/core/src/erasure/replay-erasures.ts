@@ -51,12 +51,14 @@ import { beyondUseFrom, runErasure, type ErasurePrincipal } from "./routine.ts";
 
 /**
  * The replay's own act. Its subject is the **erasure request replayed**, so a restore that
- * replayed nine erasures is nine rows and never one row hiding nine (`[AUDIT1]`), and the
- * ledger answers "what happened to this erasure" by subject as it does for any other record.
+ * replayed nine erasures is nine rows and never one row hiding nine, which is the constitution's
+ * one-row-per-act-and-target rule, and the ledger answers "what happened to this erasure" by
+ * subject as it does for any other record.
  * The detail carries the two ids again beside the one thing that is this act's own — whether
  * the request had to be re-created from its copy, which is how a reader tells a restore from a
  * dump older than the request from one taken after it. Ids and a flag, and nothing about the
- * person (`[AUDIT5]`): the ledger is the one record an erasure never rewrites.
+ * person: a detail is held to ids and role words and refused an email or a display name, because
+ * the ledger is the one record an erasure never rewrites.
  *
  * `platform.erasure.rehearsed`, the drill's act, is declared in `rehearsal.ts` beside the
  * module that writes it rather than here: a rehearsal is not a replay, and the family already
@@ -96,7 +98,13 @@ export type ReplayedErasure = {
   readonly workspaceId: string;
   readonly subjectRequestId: string;
   readonly erasureRequestId: string;
-  /** The completion that stands on the request — the first run's, which a replay never moves. */
+  /**
+   * The completion standing on the request when this replay ended. Where the restored rows
+   * carried the request it is the first run's, which a replay never moves; where the copy
+   * re-created it there was none to move, so it is **this** run's — a copy holds no report and
+   * the table's own check ties a completion to one, so a restored row is completed by the
+   * routine that actually ran (`restoreFromReplayCopy`). `fromReplayCopy` tells the two apart.
+   */
   readonly completedAt: Date;
   /** Whether the restored database held neither row and the copy re-created them. */
   readonly fromReplayCopy: boolean;
@@ -313,7 +321,8 @@ const detailOf = (erasure: ReplayableErasure): ReplayedDetail => ({
  * The replay's own ledger row, in its request's workspace.
  *
  * It is written in a transaction of its own rather than with the rows it describes, which is
- * the one place this slice departs from `[AUDIT1]`'s shape, and deliberately: the rows this act
+ * the one place this slice departs from the constitution's rule that an act and its event land
+ * in one transaction so the two fail together, and deliberately: the rows this act
  * describes are the *routine's*, and the routine commits several transactions behind a session
  * lock it holds itself, each already landing its own event (`people.erasure.completed`). What
  * this row records is a different fact from any of them — that the **estate**, restoring itself,

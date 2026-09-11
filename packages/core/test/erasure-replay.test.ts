@@ -297,6 +297,8 @@ describe("the set of erasures a restore must replay", () => {
         auditEventId: replayed[0]?.auditEventId ?? "",
       },
     ]);
+    // One row per act and target, its subject the erasure request replayed (`[AUDIT1]`), and a
+    // detail of ids and a flag with nothing about the person on it (`[AUDIT5]`).
     const ledger = await ledgerRowsOf(db().pool, scenario.workspaceId, REPLAYED);
     expect(ledger).toEqual([
       {

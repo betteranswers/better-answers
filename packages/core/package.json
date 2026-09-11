@@ -20,7 +20,8 @@
     "./store/postgres": "./src/store/postgres/index.ts",
     "./store/git": "./src/store/git/index.ts",
     "./store/graph": "./src/store/graph/index.ts",
-    "./store/objects": "./src/store/objects/index.ts"
+    "./store/objects": "./src/store/objects/index.ts",
+    "./testing/objects": "./test/suite-objects.ts"
   },
   "scripts": {
     "lint": "oxlint --config ../../.oxlintrc.json .",

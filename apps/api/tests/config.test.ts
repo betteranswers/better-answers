@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readBootstrap, readIdentityBootstrap } from "../src/config.ts";
+import { readBootstrap, readIdentityBootstrap, readObjectStore } from "../src/config.ts";
 
 /**
  * The two hostnames of an estate the deploy unit sets (ADR 0022, ADR 0034). The third,
@@ -71,6 +71,72 @@ describe("the bootstrap configuration", () => {
     const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x" });
 
     expect(read.ok && read.value.webRoot.endsWith("/apps/web/dist")).toBe(true);
+  });
+
+  it("gives the two ops commands the object store's five settings, shaped for the door", () => {
+    const read = readObjectStore({
+      S3_ENDPOINT: "http://objectstore:3900",
+      S3_BUCKET: "better-answers",
+      S3_ACCESS_KEY: "GK31c2f218a2e44f485b94239e",
+      S3_SECRET_KEY: "b892c0665f0ada8a4755dae98baa3b133590e11dae3bcc1f9d769d67f16c3835",
+    });
+
+    expect(read.ok && read.value).toEqual({
+      endpoint: "http://objectstore:3900",
+      // Garage's own region name is configuration and not a place (`deploy/garage.toml`),
+      // so the estate never sets it and the default is what the cluster answers for.
+      region: "garage",
+      bucket: "better-answers",
+      accessKeyId: "GK31c2f218a2e44f485b94239e",
+      secretAccessKey: "b892c0665f0ada8a4755dae98baa3b133590e11dae3bcc1f9d769d67f16c3835",
+    });
+  });
+
+  it("takes a region an operator names, for a store that is not Garage", () => {
+    const read = readObjectStore({
+      S3_ENDPOINT: "https://s3.eu-west-2.amazonaws.com",
+      S3_BUCKET: "better-answers",
+      S3_REGION: "eu-west-2",
+      S3_ACCESS_KEY: "key",
+      S3_SECRET_KEY: "secret",
+    });
+
+    expect(read.ok && read.value.region).toBe("eu-west-2");
+  });
+
+  it("is refused, and the process still starts, when the estate names no object store", () => {
+    // `migrate`'s environment is the database alone and `pnpm ops` shares this process:
+    // an absent object store is a reading that failed, never a process that will not run.
+    // Only `replay-erasures` and `erasure-rehearsal` want it, and each refuses for itself.
+    expect(readObjectStore({ DATABASE_URL: "postgresql://x@db/x" }).ok).toBe(false);
+  });
+
+  it.each(["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY", "S3_SECRET_KEY"])(
+    "is refused without %s, because a door opened on a half-set store fails at the first key",
+    (name) => {
+      const environment: Record<string, string | undefined> = {
+        S3_ENDPOINT: "http://objectstore:3900",
+        S3_BUCKET: "better-answers",
+        S3_ACCESS_KEY: "key",
+        S3_SECRET_KEY: "secret",
+      };
+      environment[name] = undefined;
+
+      expect(readObjectStore(environment).ok).toBe(false);
+    },
+  );
+
+  it("refuses a host and port written without a scheme, which no S3 client can speak to", () => {
+    // A URL parser reads this as a URL — scheme `objectstore:` — so the door's own check
+    // would pass it and the first sign of it would be a connection error mid-restore.
+    const read = readObjectStore({
+      S3_ENDPOINT: "objectstore:3900",
+      S3_BUCKET: "better-answers",
+      S3_ACCESS_KEY: "key",
+      S3_SECRET_KEY: "secret",
+    });
+
+    expect(read.ok).toBe(false);
   });
 
   it("gives the app the one origin, normalised, its secret and the three hostnames", () => {

@@ -1,12 +1,24 @@
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
 import { serve } from "@hono/node-server";
 
 import { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 
 import { writeConcept } from "@better-answers/core/concepts";
+import {
+  ERASURE,
+  rehearseErasure,
+  seedSyntheticSubject,
+  type ErasureRehearsed,
+} from "@better-answers/core/erasure";
 import { systemClock } from "@better-answers/core/kernel";
 import { head, initRepository } from "@better-answers/core/store/git";
+import { openObjects } from "@better-answers/core/store/objects";
 import { openPostgres, withPrincipal } from "@better-answers/core/store/postgres";
+import { objectStoreForSuite } from "@better-answers/core/testing/objects";
 import { testData } from "@better-answers/schema/testing";
 
 import { fetchHonouringHost } from "../src/ops/http-fetch.ts";
@@ -24,6 +36,45 @@ import { servedApp } from "./suite-app.ts";
 
 type Run = { readonly exitCode: number; readonly lines: readonly string[] };
 
+/**
+ * The instants the erasures below complete at, and the `--since` each replay is given.
+ *
+ * They are pinned and separated on purpose. The set a replay is owed is read across *every*
+ * workspace — the restore is the platform's, not one tenant's — so two cases that both erased
+ * "now" would each find the other's request. Each case therefore erases at an instant of its
+ * own and asks for the window that holds only that one, which is also how a dump stamp works.
+ */
+const FROM_THE_ROWS_AT = new Date("2026-06-01T12:00:00.000Z");
+const FROM_THE_ROWS_SINCE = "2026-05-31T00:00:00Z";
+const FROM_THE_COPY_AT = new Date("2026-07-01T12:00:00.000Z");
+const FROM_THE_COPY_SINCE = "2026-06-15T00:00:00Z";
+/**
+ * The instant the replay of that one runs at, pinned because it is what the re-created request
+ * completes at: a row restored from a copy carries no completion, and cannot — the table's own
+ * check ties `completed_at` to a `report`, and the copy holds no report. So the routine
+ * completes it on the run that actually happened, which is this one.
+ */
+const REPLAYED_AT = new Date("2026-07-15T09:00:00.000Z");
+/** The rehearsal's own, later than both, so the two replay cases never find its request. */
+const REHEARSED_AT = new Date("2026-08-01T12:00:00.000Z");
+
+/**
+ * The four beyond-use dates from `REHEARSED_AT`, worked out by hand as the core suites do
+ * (`[TEST9]`): what makes the file the command wrote the *routine's* report rather than
+ * something this command composed for a file.
+ */
+const BEYOND_USE =
+  "2026-08-03T12:00:00.000Z · 2026-08-31T12:00:00.000Z · " +
+  "2026-09-26T12:00:00.000Z · 2027-02-01T12:00:00.000Z";
+
+/**
+ * A real Garage, because the two erasure commands open the object door and `[TEST3]` refuses a
+ * stand-in for a store as it refuses one for Postgres. It is core's own suite helper, reached
+ * through `@better-answers/core/testing/objects` the way `@better-answers/schema/testing` is:
+ * the helper resolves its own `testcontainers` from core, so this workspace gains no dependency.
+ */
+const objects = objectStoreForSuite();
+
 const ioFor = (app: TestApp, stdin = ""): OpsIo & { readonly lines: string[] } => {
   const lines: string[] = [];
   return {
@@ -35,6 +86,13 @@ const ioFor = (app: TestApp, stdin = ""): OpsIo & { readonly lines: string[] } =
     },
     appHostname: APP_HOSTNAME,
     gitStoreDir: app.gitStoreDir,
+    objects: objects().door,
+    // The real thing, on a real path: what is under test is that the command hands the report
+    // to its writer rather than composing a file of its own, and a writer that kept the body in
+    // memory would prove the first half and not the second.
+    writeReport: async (file, body) => {
+      await writeFile(file, body, "utf8");
+    },
     clock: systemClock(),
   };
 };
@@ -46,6 +104,23 @@ const ops = async (
   pool: Pool = app.database.superuser,
 ): Promise<Run> => {
   const io = ioFor(app, stdin);
+  const exitCode = await runOps(argv, pool, io);
+  return { exitCode, lines: io.lines };
+};
+
+/**
+ * The same run with part of the io replaced — a store the image was never told about, a root
+ * that is not there, a clock pinned to an instant. Every refusal below is a misconfigured image
+ * or a store that did not come back, and both are reached by changing what the process was
+ * given rather than by changing what the command does.
+ */
+const opsWith = async (
+  app: TestApp,
+  argv: readonly string[],
+  overrides: Partial<OpsIo>,
+  pool: Pool = app.database.pool,
+): Promise<Run> => {
+  const io = { ...ioFor(app), ...overrides };
   const exitCode = await runOps(argv, pool, io);
   return { exitCode, lines: io.lines };
 };
@@ -103,6 +178,54 @@ const jobsOf = async (app: TestApp, workspaceId: string): Promise<readonly Queue
   );
   return found.rows;
 };
+
+/**
+ * The four doors an erasure runs over in this suite, with the clock pinned so a report's dates
+ * are literals. The pool is the app's runtime role and not the superuser: `pnpm ops` connects
+ * with `DATABASE_URL`, so an erasure that needed a grant the app's role has not got would pass
+ * here and fail on a drill.
+ */
+const erasureDoors = (app: TestApp, at: Date) => ({
+  git: openTestGit(app),
+  postgres: openPostgres(app.database.pool),
+  objects: objects().door,
+  clock: { now: () => at },
+});
+
+/**
+ * One erasure, completed at `at`, in a workspace of its own — arranged through the erasure
+ * slice rather than through the commands below, so what each case asserts is the command's
+ * answer and not another command's. This is what a dump taken before `at` would have undone,
+ * and what the replay is owed.
+ */
+const erasedAt = async (
+  app: TestApp,
+  at: Date,
+): Promise<ErasureRehearsed & { readonly workspaceId: string }> => {
+  const { workspaceId } = await app.provision();
+  await initRepository(openTestGit(app), workspaceId);
+  const doors = erasureDoors(app, at);
+  const seeded = await seedSyntheticSubject(ERASURE, doors, { workspaceId });
+  if (!seeded.ok) throw new Error(`the seed refused: ${String(seeded.error)}`);
+  const rehearsed = await rehearseErasure(ERASURE, doors, { workspaceId });
+  if (!rehearsed.ok) throw new Error(`the rehearsal refused: ${String(rehearsed.error)}`);
+  return { ...rehearsed.value, workspaceId };
+};
+
+type LedgerRow = { act: string; actor: string; subject_id: string };
+
+/** A workspace's ledger, read as the superuser so no policy can hide a row from an assertion. */
+const ledgerOf = async (app: TestApp, workspaceId: string): Promise<readonly LedgerRow[]> => {
+  const found = await app.database.superuser.query<LedgerRow>(
+    "SELECT act, actor, subject_id FROM audit_event WHERE workspace_id = $1 ORDER BY at, id",
+    [workspaceId],
+  );
+  return found.rows;
+};
+
+/** A file in a directory of this run's own, for `--report <file>`. */
+const reportPath = async (): Promise<string> =>
+  path.join(await mkdtemp(path.join(tmpdir(), "ops-rehearsal-")), "erasure-report.txt");
 
 /**
  * The worker's end of the job, as a test stands in for it: the row this command queued,
@@ -172,15 +295,114 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.join("\n")).toContain("no erasure_request table");
     });
 
-    it("refuses — stopping the restore before api starts — because an erasure can exist here and it cannot replay one", async () => {
-      // `erasure_request` is T-120's own table now, not one this test creates: a migrated
-      // schema can hold an erasure completed after the dump, and the replay the erasure slice
-      // owns (ADR 0020, T-125) is not in this image, so the restore must stop here rather than
-      // turn api healthy over data a subject was told is beyond use.
-      const run = await ops(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"]);
+    it("is done with nothing replayed when the table is there and no erasure followed the dump", async () => {
+      // Later than every erasure this file arranges, so the answer is the *empty set* over a
+      // migrated schema — which is a different fact from the case above, where the table the
+      // set would be read from does not exist. A restore reads the same word for both.
+      const run = await opsWith(app(), ["replay-erasures", "--since", "2026-12-01T00:00:00Z"], {});
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual([
+        "replay-erasures: done — replayed 0 erasures since 2026-12-01T00:00:00.000Z",
+      ]);
+    });
+
+    it("re-applies an erasure the dump undid, reading it from the rows the restore brought back", async () => {
+      const erased = await erasedAt(app(), FROM_THE_ROWS_AT);
+
+      const run = await opsWith(app(), ["replay-erasures", "--since", FROM_THE_ROWS_SINCE], {});
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual([
+        `replay-erasures: ${erased.erasureRequestId} in workspace ${erased.workspaceId} — ` +
+          "completed 2026-06-01T12:00:00.000Z, read from the restored rows",
+        "replay-erasures: done — replayed 1 erasure since 2026-05-31T00:00:00.000Z",
+      ]);
+      // The act is the platform's own (`[AUDIT4]`), its subject the erasure request replayed
+      // (`[AUDIT1]`), and it sits beside the rehearsal that arranged this one.
+      expect(await ledgerOf(app(), erased.workspaceId)).toContainEqual({
+        act: "platform.erasure.replayed",
+        actor: "process:better-answers-erasure",
+        subject_id: erased.erasureRequestId,
+      });
+    });
+
+    it("re-applies one the restored rows do not hold at all, from its replay copy alone", async () => {
+      const erased = await erasedAt(app(), FROM_THE_COPY_AT);
+      // A dump older than the request: the erasure happened, its copy is in the object store,
+      // and neither row is in what came back. Deleted as the superuser because this is the
+      // restore's own state and not an act the platform has.
+      await app().database.superuser.query("DELETE FROM erasure_request WHERE workspace_id = $1", [
+        erased.workspaceId,
+      ]);
+      await app().database.superuser.query("DELETE FROM subject_request WHERE workspace_id = $1", [
+        erased.workspaceId,
+      ]);
+
+      const run = await opsWith(app(), ["replay-erasures", "--since", FROM_THE_COPY_SINCE], {
+        clock: { now: () => REPLAYED_AT },
+      });
+
+      expect(run.exitCode).toBe(0);
+      // The completion is **this run's**, not the first run's, and the line says so honestly:
+      // the copy carries no report and the table refuses a completion without one, so the row
+      // it re-creates is completed by the routine that actually ran here. The erasure request's
+      // own id is the first run's, which is what a ledger row from before the dump joins on.
+      expect(run.lines).toEqual([
+        `replay-erasures: ${erased.erasureRequestId} in workspace ${erased.workspaceId} — ` +
+          "completed 2026-07-15T09:00:00.000Z, re-created from its replay copy",
+        "replay-erasures: done — replayed 1 erasure since 2026-06-15T00:00:00.000Z",
+      ]);
+      const restored = await app().database.superuser.query<{ id: string; pseudonym: string }>(
+        "SELECT id, pseudonym FROM erasure_request WHERE workspace_id = $1",
+        [erased.workspaceId],
+      );
+      // The copy's own pseudonym, not a second one: a subject with two names for one erasure is
+      // a subject the ledger rows from before the restore no longer resolve to.
+      expect(restored.rows).toEqual([
+        { id: erased.erasureRequestId, pseudonym: expect.any(String) },
+      ]);
+    });
+
+    it("refuses without a repositories' root, because an erasure it cannot rewrite is not replayed", async () => {
+      const run = await opsWith(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
+        gitStoreDir: undefined,
+      });
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines.join("\n")).toContain("GIT_STORE_DIR");
+      expect(run.lines.join("\n")).toContain("do not start api");
+    });
+
+    it("refuses when the image was never told about an object store", async () => {
+      const run = await opsWith(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
+        objects: undefined,
+      });
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines.join("\n")).toContain("no object store is configured");
+      expect(run.lines.join("\n")).toContain("do not start api");
+    });
+
+    it("refuses an object store that will not answer, rather than reading silence as nothing owed", async () => {
+      // The store did not come back, or came back on another address: *none* is the one answer
+      // a restore must never hear from a listing it could not make (the S0 spec, seam 4).
+      const unreachable = openObjects({
+        endpoint: "http://127.0.0.1:1",
+        region: "garage",
+        bucket: "better-answers",
+        accessKeyId: "key",
+        secretAccessKey: "secret",
+      });
+      if (!unreachable.ok) throw new Error(`the door refused its settings: ${unreachable.error}`);
+
+      const run = await opsWith(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
+        objects: unreachable.value,
+      });
 
       expect(run.exitCode).toBe(1);
       expect(run.lines.join("\n")).toContain("REFUSED");
+      expect(run.lines.join("\n")).toContain("do not start api");
     });
   });
 
@@ -201,21 +423,141 @@ describe("pnpm ops — the restore scripts' commands", () => {
       },
     );
 
-    it.each(["object-store-orphans", "erasure-rehearsal"])(
-      "%s refuses — exit 1 — now its tables are there and the implementation is not",
-      async (command) => {
-        // T-053 landed the graph tables, T-055 `source_document` and T-120 the erasure
-        // families, so *not built* has stopped being true for either command against a
-        // migrated schema; T-058 filled in the three graph commands below, the orphan sweep
-        // waits on the sources slice and the rehearsal on T-125. That is exactly the state
-        // the third answer is for: the tables exist and this image has no implementation,
-        // which is a refusal a restore must stop on rather than a silence.
-        const run = await ops(app(), [command, "--workspace", "ws_synthetic", "--wait"]);
+    it("object-store-orphans refuses — exit 1 — now its tables are there and the implementation is not", async () => {
+      // T-053 landed the graph tables, T-055 `source_document` and T-120 the erasure families,
+      // so *not built* has stopped being true against a migrated schema; T-058 filled in the
+      // three graph commands below and T-125 the two erasure ones, and the orphan sweep waits
+      // on the sources slice. That is exactly the state the third answer is for: the tables
+      // exist and this image has no implementation, which is a refusal a restore must stop on
+      // rather than a silence.
+      const run = await ops(app(), ["object-store-orphans", "--workspace", "ws_synthetic"]);
 
-        expect(run.exitCode).toBe(1);
-        expect(run.lines.join("\n")).toContain("REFUSED");
-      },
-    );
+      expect(run.exitCode).toBe(1);
+      expect(run.lines.join("\n")).toContain("REFUSED");
+    });
+  });
+
+  describe("erasure-rehearsal — the drill's proof that an erasure erases", () => {
+    it("seeds the synthetic subject and prints their tokens on its last line", async () => {
+      const { workspaceId } = await app().provision();
+      await initRepository(openTestGit(app()), workspaceId);
+
+      const run = await opsWith(
+        app(),
+        ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--seed"],
+        { clock: { now: () => REHEARSED_AT } },
+      );
+
+      expect(run.exitCode).toBe(0);
+      // The last line and nothing after it: the drill reads it with `tail -1` and hands it
+      // straight to `dump-grep --tokens`, which splits on the comma and trims.
+      const email = `subject-${workspaceId.toLowerCase()}@erasure-rehearsal.example.test`;
+      expect(run.lines.at(-1)).toBe(`${email},human:${email},Rehearsal subject ${workspaceId}`);
+      const seeded = await app().database.superuser.query(
+        'SELECT 1 FROM "user" WHERE lower(email) = lower($1)',
+        [email],
+      );
+      expect(seeded.rowCount).toBe(1);
+    });
+
+    it("erases them, writes the routine's own report to the file, and prints the tokens again", async () => {
+      const { workspaceId } = await app().provision();
+      await initRepository(openTestGit(app()), workspaceId);
+      const file = await reportPath();
+      const pinned = { clock: { now: () => REHEARSED_AT } };
+      // Phase one, then phase two, with nothing carried between them but the workspace id —
+      // which is what lets the drill take a `pg_dump` in the middle.
+      const seed = await opsWith(
+        app(),
+        ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--seed"],
+        pinned,
+      );
+
+      const run = await opsWith(
+        app(),
+        ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--run", "--report", file],
+        pinned,
+      );
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines.at(-1)).toBe(seed.lines.at(-1));
+      const request = await app().database.superuser.query<{ id: string }>(
+        "SELECT id FROM subject_request WHERE workspace_id = $1",
+        [workspaceId],
+      );
+      // The report is the routine's, not a document this command composed: it names *this*
+      // run's request, and it carries the four beyond-use dates the lock instant fixes. The
+      // core suite holds the wording word for word; what is held here is that the file the
+      // writer was handed is that report.
+      const written = await readFile(file, "utf8");
+      expect(written).toContain(`Erasure report for subject request ${request.rows[0]?.id ?? ""}.`);
+      expect(written).toContain(
+        "Backup copies taken before 2026-08-01T12:00:00.000Z are beyond use: restored only in a " +
+          "disaster, encrypted at rest, deletable only by the escrowed credential, expiring on " +
+          `${BEYOND_USE}.`,
+      );
+      expect(written).toContain("Exports already issued are not recalled.");
+      expect(await ledgerOf(app(), workspaceId)).toContainEqual({
+        act: "platform.erasure.rehearsed",
+        actor: "process:better-answers-erasure",
+        subject_id: expect.any(String),
+      });
+    });
+
+    it("refuses phase two in a workspace phase one never ran in, rather than erasing whoever is there", async () => {
+      const { workspaceId } = await app().provision();
+      await initRepository(openTestGit(app()), workspaceId);
+      const file = await reportPath();
+
+      const run = await opsWith(
+        app(),
+        ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--run", "--report", file],
+        {},
+      );
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines.join("\n")).toContain("no synthetic subject stands in this workspace");
+    });
+
+    it("answers usage without --synthetic, which is the caller saying this may happen here", async () => {
+      const run = await ops(app(), ["erasure-rehearsal", "--workspace", "ws_synthetic", "--seed"]);
+
+      expect(run.exitCode).toBe(2);
+      expect(run.lines.join("\n")).toContain("--synthetic is required");
+    });
+
+    it("answers usage to neither phase and to both at once, because the dump goes between them", async () => {
+      const both = await ops(app(), [
+        "erasure-rehearsal",
+        "--workspace",
+        "ws_synthetic",
+        "--synthetic",
+        "--seed",
+        "--run",
+      ]);
+      const neither = await ops(app(), [
+        "erasure-rehearsal",
+        "--workspace",
+        "ws_synthetic",
+        "--synthetic",
+      ]);
+
+      expect([both.exitCode, neither.exitCode]).toEqual([2, 2]);
+      expect(both.lines.join("\n")).toContain("exactly one of --seed");
+    });
+
+    it("answers usage to a run with nowhere to put its report, which would prove nothing", async () => {
+      const run = await ops(app(), [
+        "erasure-rehearsal",
+        "--workspace",
+        "ws_synthetic",
+        "--synthetic",
+        "--run",
+      ]);
+
+      expect(run.exitCode).toBe(2);
+      expect(run.lines.join("\n")).toContain("--report <file>");
+    });
   });
 
   describe("graph-rebuild — the map made again, on the worker's queue", () => {

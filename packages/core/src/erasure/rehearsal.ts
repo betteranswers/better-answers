@@ -70,9 +70,10 @@ import { runErasure, type ErasurePrincipal } from "./routine.ts";
 /**
  * The rehearsal's own act. Its subject is the erasure request, as the replay's is, so the
  * ledger answers "what happened to this erasure" by subject however the routine was reached.
- * The detail is three ids and **how many tokens there were** — never a token, because a detail
- * that carried one would be the one record of this person an erasure had just promised to
- * remove (`[AUDIT5]`; ADR 0035).
+ * The detail is three ids and **how many tokens there were** — never a token. The constitution
+ * holds a detail to ids and role words and refuses it an email, a display name, a prompt or a
+ * completion, because the ledger is never rewritten; a detail that carried a token would be the
+ * one record of this person an erasure had just promised to remove (ADR 0035).
  *
  * Declared here rather than beside `platform.erasure.replayed`: a rehearsal is not a replay,
  * and the tree already holds several `platform` declarations, one per module that acts.
