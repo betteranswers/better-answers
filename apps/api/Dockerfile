@@ -83,10 +83,40 @@ RUN pnpm install --frozen-lockfile --prod --filter @better-answers/api...
 
 FROM base AS runtime
 
+# What this stage needs from the operating system beyond Node, and why each one is here.
+#
 # wget, because the deploy unit's healthcheck and this image's HEALTHCHECK must be the same
 # probe (`deploy/platform.compose.yaml` § api) and node:*-slim carries neither wget nor curl.
+#
+# git, because this image is the only process that writes a workspace's repository (ADR 0012):
+# every governed write, every read of a file at a commit and the erasure routine's history
+# rewrite are git commands run from here. The base image carries no git at all.
+#
+# `git filter-repo` and the Python it runs on, because the erasure routine's git step is that
+# tool (ADR 0020) — a text replacement across every commit, then `git reflog expire
+# --expire=now --all` and `git gc --prune=now` on the bare repository. The recorded and
+# rejected alternative is a dulwich rewrite in the worker: the app is the only git writer and
+# the worker holds no git credential, so that alternative founds a second writer for one
+# routine and hands the worker a credential the worker's rules say it does not have.
+#
+# The tool comes from PyPI at an exact version rather than from apt. Debian 12 packages 2.38.0
+# and the machines this repository is developed on install 2.47.0, and a rewrite proved at one
+# version and run at another is a rewrite nobody has tested; the pin here is what keeps the two
+# from skewing. Version read from PyPI on 11/09/2026: git-filter-repo 2.47.0, the current
+# release, published as a pure-Python wheel that needs no build tooling.
+# `--break-system-packages` is answering the marker Debian sets to protect apt's own Python
+# packages — this install lands under /usr/local, which apt owns nothing under, and an image
+# has no system Python application to break. pip is purged in the same layer, because what
+# this image should carry is the tool and not the means of getting it, and
+# `apps/api/tests/image.test.ts` reads the version back out of the built image, so a purge
+# that took the tool with it is red rather than quiet.
+ARG GIT_FILTER_REPO_VERSION=2.47.0
 RUN apt-get update \
- && apt-get install -y --no-install-recommends wget \
+ && apt-get install -y --no-install-recommends wget git python3 python3-pip \
+ && pip3 install --no-cache-dir --break-system-packages \
+      "git-filter-repo==${GIT_FILTER_REPO_VERSION}" \
+ && apt-get purge -y python3-pip \
+ && apt-get autoremove -y \
  && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production \
