@@ -30,7 +30,19 @@ import type { Tx } from "../store/postgres/index.ts";
  * including those concepts — synchronously, inside this act's own transaction, two levels
  * (ADR 0023, ADR 0039). Binding a source, publishing it and widening its class are B7's
  * management surfaces and are not here.
+ *
+ * Beside it, S0's two: the **finding** restore (`findings.ts`), an Admin letting one span of
+ * the always set back into a document with a reason, and the **DPIA input** (`dpia.ts`), a
+ * binding's contribution to a data protection impact assessment as a typed document and its
+ * hash. Both are the sources slice's because the finding and the binding are its records.
  */
+
+export {
+  restoreFinding,
+  type FindingRestored,
+  type FindingRestoreRefusal,
+  type RestoreFindingInput,
+} from "./findings.ts";
 
 /**
  * The narrowing act. Its subject is the binding and its detail what the Admin decided, in
