@@ -483,6 +483,101 @@ export const commitsAfter = async (
 };
 
 /**
+ * Where a bundle's history names somebody: the commits and paths whose file carries one of
+ * the needles, and the commits whose **author line** does.
+ *
+ * The erasure map's git arm (the S0 spec, the routine's step 2). The two answers are
+ * separate because the two forms are: a concept file names a person by `human:<email>` (ADR
+ * 0019), a commit's author line by `Name <address>`, and the routine rewrites each its own
+ * way — a text replacement over blobs, a mailmap over author lines. It is a read of the
+ * store and not of a slice: no slice shells out to `git` (ADR 0029, the four doors).
+ */
+export type HistoryNaming = {
+  /** The file at that commit carries a needle; `git show <commit>:<path>` is the bytes. */
+  readonly blobs: readonly { readonly commit: string; readonly path: string }[];
+  /** The commits whose author line carries a needle. */
+  readonly authors: readonly string[];
+};
+
+/** The answer for a needle set worth nothing and for a bundle with no commits alike. */
+const NAMES_NOBODY: HistoryNaming = { blobs: [], authors: [] };
+
+/**
+ * Matched **without regard to case**, because the two ends were typed by different people:
+ * the address on a concept file is the one the platform wrote from the identity set, and a
+ * needle is what a subject wrote down on a form.
+ */
+const carries = (line: string, needles: readonly string[]): boolean => {
+  const lowered = line.toLowerCase();
+  return needles.some((needle) => lowered.includes(needle.toLowerCase()));
+};
+
+/**
+ * `git grep` exits non-zero when nothing matched, which is an answer and not a failure — so
+ * an empty listing is what a needle nobody's file carries comes back as. `core.quotePath`
+ * off, because a concept whose filename carries an accent would otherwise come back
+ * octal-escaped as a name the repository does not hold; `-I` so no binary blob is read.
+ */
+const blobsNaming = async (
+  gitDir: string,
+  needles: readonly string[],
+  history: readonly string[],
+): Promise<HistoryNaming["blobs"]> => {
+  const listed = await git(gitDir, [
+    "-c",
+    "core.quotePath=false",
+    "grep",
+    "--files-with-matches",
+    "--fixed-strings",
+    "--ignore-case",
+    "-I",
+    ...needles.flatMap((needle) => ["-e", needle]),
+    ...history,
+  ]).catch(() => "");
+  return listed.split("\n").flatMap((entry) => {
+    // `<commit>:<path>`, and a commit is a hash, so the first colon is the separator and
+    // every later one belongs to the path.
+    const at = entry.indexOf(":");
+    const file = entry.slice(at + 1);
+    return at === -1 || file === "" ? [] : [{ commit: entry.slice(0, at), path: file }];
+  });
+};
+
+/** The author's name and address off every commit, so a needle is read against both. */
+const authorsNaming = async (
+  gitDir: string,
+  needles: readonly string[],
+): Promise<readonly string[]> => {
+  // NUL between the fields, because a display name may hold anything but a newline.
+  const logged = await git(gitDir, ["log", "--all", "--format=%H%x00%an%x00%ae"]);
+  return logged.split("\n").flatMap((line) => {
+    const [sha = "", name = "", address = ""] = line.split("\0");
+    return sha !== "" && carries(`${name} <${address}>`, needles) ? [sha] : [];
+  });
+};
+
+export const historyNaming = async (
+  platform: PlatformPrincipal,
+  door: GitDoor,
+  workspaceId: string,
+  needles: readonly string[],
+): Promise<HistoryNaming> => {
+  const wanted = needles.filter((needle) => needle.trim() !== "");
+  if (wanted.length === 0) return NAMES_NOBODY;
+  const gitDir = repositoryPath(door, workspaceId);
+  const history = (await git(gitDir, ["rev-list", "--all"]))
+    .split("\n")
+    .filter((sha) => sha !== "");
+  // A bundle with no commits is where every bundle starts, and `git grep` over no revisions
+  // would fall through to a working tree these repositories do not have.
+  if (history.length === 0) return NAMES_NOBODY;
+  return {
+    blobs: await blobsNaming(gitDir, wanted, history),
+    authors: await authorsNaming(gitDir, wanted),
+  };
+};
+
+/**
  * One commit as the reconciler reads it back: its parent, the trailers the act wrote, and
  * the one file the act changed with its content at that commit. `change` is absent for a
  * commit that changed no file or more than one — not a shape the governed write makes, so

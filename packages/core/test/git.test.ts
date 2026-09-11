@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   commit,
   head,
+  historyNaming,
   initRepository,
   openGit,
   withRepositoryLock,
@@ -15,7 +16,7 @@ import {
   type GitDoor,
 } from "@better-answers/core/store/git";
 
-import type { ActorId, UserPrincipal } from "../src/kernel/index.ts";
+import type { ActorId, PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
 import { bundleHistory, bundlesForSuite, commitFacts, fileAtCommit, staged } from "./bundle.ts";
 
 /**
@@ -292,5 +293,69 @@ describe("the per-repository lock", () => {
     second.open();
     await Promise.all([b, c]);
     expect(order).toEqual(["a", "b", "c"]);
+  });
+});
+
+/**
+ * The platform reading a workspace's history, as the erasure map's git arm does: the routine
+ * runs under the platform principal and names the workspace beside it, which is this door's
+ * shape for every entry a platform makes (`commitsAfter`, `readCommit`).
+ */
+const PLATFORM: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-erasure" };
+
+/** The subject of these three cases: an address a file carries and an address that authored. */
+const SUBJECT_EMAIL = "priya@example.invalid";
+
+/**
+ * One commit whose file names Priya the way a concept file does — `human:<email>` (ADR 0019)
+ * — and whose author line is somebody else's, so the two arms are told apart by the needle
+ * rather than by the commit.
+ */
+const bundleNamingPriya = async (): Promise<{ bundle: Bundle; sha: string }> => {
+  const bundle = await arrange();
+  const written = await commit(
+    bundle.principal,
+    bundle.door,
+    requestFor({
+      path: "knowledge/expenses.md",
+      content: `---\ngenerated:\n  by: human:${SUBJECT_EMAIL}\n---\n\nExpenses are claimed within thirty days.\n`,
+    }),
+  );
+  return { bundle, sha: shaOf(written) };
+};
+
+describe("what a bundle's history names", () => {
+  it("answers the commit and the path whose file carries the needle", async () => {
+    const { bundle, sha } = await bundleNamingPriya();
+
+    const found = await historyNaming(PLATFORM, bundle.door, bundle.workspaceId, [SUBJECT_EMAIL]);
+
+    expect(found).toEqual({
+      blobs: [{ commit: sha, path: "knowledge/expenses.md" }],
+      authors: [],
+    });
+  });
+
+  it("answers the commit whose author line carries the needle, and no file", async () => {
+    const { bundle, sha } = await bundleNamingPriya();
+
+    // `AUTHOR` is `Ada Editor <ada@acme.invalid>` and no file here says so, which is the
+    // whole difference between a person a bundle's files name and one its history authored.
+    const found = await historyNaming(PLATFORM, bundle.door, bundle.workspaceId, [AUTHOR.email]);
+
+    expect(found).toEqual({ blobs: [], authors: [sha] });
+  });
+
+  it("answers nothing for a history that names nobody, and for a bundle with no commits", async () => {
+    const { bundle } = await bundleNamingPriya();
+    const empty = await arrange();
+
+    expect(
+      await historyNaming(PLATFORM, bundle.door, bundle.workspaceId, ["nobody@example.invalid"]),
+    ).toEqual({ blobs: [], authors: [] });
+    expect(await historyNaming(PLATFORM, empty.door, empty.workspaceId, [SUBJECT_EMAIL])).toEqual({
+      blobs: [],
+      authors: [],
+    });
   });
 });
