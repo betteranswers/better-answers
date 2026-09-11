@@ -1,7 +1,21 @@
 import { boundarySchemas } from "@better-answers/schema";
 
-import { narrower, readableClause, readableParameters, type Sensitivity } from "../access/index.ts";
-import { attempt, err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
+import {
+  narrower,
+  readableClause,
+  readableParameters,
+  sensitivityAndAudienceClause,
+  type Sensitivity,
+} from "../access/index.ts";
+import {
+  attempt,
+  err,
+  ok,
+  requireAdmin,
+  type Result,
+  type RoleRefusal,
+  type UserPrincipal,
+} from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { parseLocator, spanText, type LocatorRefusal } from "./chunk-address.ts";
 
@@ -279,6 +293,104 @@ export const findPassages = (
       title: row.title,
       locator: wireLocatorOf(row),
       sensitivity: CHUNK_SENSITIVITY.parse(row.sensitivity),
+    }));
+  });
+};
+
+/**
+ * One chunk row as the review list shows it: the row's own id, the document it belongs to, the
+ * address it will open at once the binding is published, and its text.
+ *
+ * The text is here and not on a search hit, because the question this list is put in front of
+ * an Admin to answer is *should any of this be published at all*, and nobody can answer that
+ * from an address. No class word either: every row of one binding carries the binding's, which
+ * is what the screen already has in front of it.
+ */
+export type PreviewedChunk = {
+  readonly id: string;
+  readonly sourceDocumentId: string;
+  readonly locator: string;
+  readonly content: string;
+};
+
+/** A binding's id as the boundary states it — the same schema the narrowing act parses with. */
+const BINDING_ID = boundarySchemas.sourceBinding.select.shape.id;
+
+/**
+ * One binding's chunk rows, under the class and the audience arms and **not** the published one.
+ *
+ * This is the only statement anywhere in the platform that builds its predicate from
+ * `sensitivityAndAudienceClause` rather than `readableClause`, and the omission is the whole
+ * act rather than an oversight (T-133). A binding still under review carries no published
+ * instant, and a run copies that absence onto every chunk it lands, so every other read steps
+ * over those rows by design — which would leave the Admin who has to decide whether to publish
+ * the binding with nothing to look at. The two arms that remain are the same builder's and are
+ * applied unchanged: this road reaches *earlier* than the others, never wider, so a class or an
+ * audience that withholds a row from this Admin withholds it here too.
+ *
+ * The parameters are positional and their order is this clause's: the workspace, the binding,
+ * the two the predicate reads (the role and the group ids, in that order) and the limit. A
+ * number out of step is a wrong answer rather than an error, so the suite is what holds it.
+ */
+const BINDING_CHUNKS = `SELECT c.id, c.source_document_id, c.char_start, c.char_end, c.content
+     FROM "index".chunk c
+    WHERE c.workspace_id = $1
+      AND c.binding_id = $2
+      AND c.char_start IS NOT NULL
+      AND c.char_end IS NOT NULL
+      AND ${sensitivityAndAudienceClause("c", 3)}
+    ORDER BY c.source_document_id, c.ordinal
+    LIMIT $5`;
+
+type PreviewRow = {
+  readonly id: string;
+  readonly source_document_id: string;
+  readonly char_start: number;
+  readonly char_end: number;
+  readonly content: string;
+};
+
+/**
+ * The chunks of one binding, for the Admin reviewing it before it is published.
+ *
+ * The Sources screen's review list (T-136) and the one road to a binding still under review:
+ * `passageAt` and `findPassages` both carry the published arm, so neither can show an Admin
+ * what they are being asked to decide about. The role is decided first and on its own, before
+ * a row is read and before the id is even parsed, so a Viewer or an Editor learns nothing from
+ * asking — not whether the binding exists, not what shape its id should have been.
+ *
+ * What this widens is the instant and nothing else. The class and the audience arms are
+ * applied as they are everywhere, which means an Admin still reads only what their groups
+ * reach; the one door the role opens here is the same one it opens on every other read, the
+ * Restricted class.
+ *
+ * Ordered by document and then by ordinal, so the screen lists a document's text in the order
+ * it was written rather than the order the splitter happened to commit. Each row's address is
+ * composed from its three columns, as a search hit's is, so the list and the `open` a reviewer
+ * follows it with cannot disagree.
+ */
+export const previewChunks = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: { readonly bindingId: string; readonly limit?: number },
+): Promise<Result<readonly PreviewedChunk[], RoleRefusal | "malformed" | Error>> => {
+  const admin = requireAdmin(principal);
+  if (!admin.ok) return err(admin.error);
+  const bindingId = BINDING_ID.safeParse(input.bindingId);
+  if (!bindingId.success) return err("malformed");
+
+  return attempt(async () => {
+    const read = await tx.query<PreviewRow>(BINDING_CHUNKS, [
+      admin.value.workspaceId,
+      bindingId.data,
+      ...readableParameters(admin.value),
+      hitsAsked(input.limit ?? MAX_PASSAGE_HITS),
+    ]);
+    return read.rows.map((row) => ({
+      id: row.id,
+      sourceDocumentId: row.source_document_id,
+      locator: wireLocatorOf(row),
+      content: row.content,
     }));
   });
 };
