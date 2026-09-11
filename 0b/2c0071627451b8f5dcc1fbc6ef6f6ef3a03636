@@ -1,0 +1,35 @@
+packages/core/src/erasure/index.ts
+  s_f3ee63bcbb1a0b::t_bf7ca3dd195b3d 9-13,18,20-21
+  ai_agent 19
+packages/core/src/erasure/report.ts
+  s_f3ee63bcbb1a0b::t_19e4f109473997 1-163
+packages/core/test/erasure-routine.test.ts
+  ai_agent 6,9,376-378
+  s_f3ee63bcbb1a0b::t_0e83bc0dbfe935 7
+  s_f3ee63bcbb1a0b::t_27e8be7dab93bb 1-5,8,10-375,379-440
+packages/core/src/store/postgres/index.ts
+  s_f3ee63bcbb1a0b::t_41d86f65c0b05b 153
+  s_f3ee63bcbb1a0b::t_e8fbc5d13548fd 137-141,144,147
+  s_f3ee63bcbb1a0b::t_fc62977816328a 121-136,142-143,145-146,148-152,154-161
+packages/core/src/erasure/routine.ts
+  s_f3ee63bcbb1a0b::t_08e51f8f14e133 334
+  s_f3ee63bcbb1a0b::t_5417e82c4ac6f5 106-109,148,221,259,297,322
+  s_f3ee63bcbb1a0b::t_7b87d0979d5318 75-78
+  s_f3ee63bcbb1a0b::t_58212f5dc8249d 1-74,79-105,110-147,149-220,222-258,260-296,298-321,323-333,335-370
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0b2c0071627451b8f5dcc1fbc6ef6f6ef3a03636",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
