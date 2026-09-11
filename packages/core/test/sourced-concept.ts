@@ -91,14 +91,50 @@ export const bindingForGroups = (
 ): Promise<Sourced> =>
   bindingHolding(db, workspaceId, { sensitivity, audience: "groups", audienceGroups: groups });
 
-/** The pair most proofs rest on: a Restricted binding and an Internal one, a document under each. */
+/**
+ * One more document under a binding that already stands, carrying a class of its own — the
+ * word the redaction seam's special-category verdict or an Admin's *narrow these documents*
+ * writes on the row (ADR 0013, amended 2026-09-11). `null` is what every other seeded
+ * document takes, and means the binding's.
+ */
+export const documentUnder = (
+  db: MigratedPostgres,
+  workspaceId: string,
+  bindingId: string,
+  sensitivity: string | null,
+): Promise<Sourced> =>
+  seededBy(db, async (seed) => {
+    const document = await seed.sourceDocument({
+      workspaceId,
+      bindingId,
+      sensitivity,
+    });
+    return { bindingId, documentId: document.id };
+  });
+
+/**
+ * The pair most proofs rest on: a Restricted binding and an Internal one, a document under
+ * each — and beside them the same distinction one level down, a document of the Internal
+ * binding narrowed to Restricted on its own row, whose sibling is `internal`'s document.
+ */
 export const restrictedAndInternal = async (
   db: MigratedPostgres,
   workspaceId: string,
-): Promise<{ readonly restricted: Sourced; readonly internal: Sourced }> => ({
-  restricted: await bindingHolding(db, workspaceId, { sensitivity: "Restricted" }),
-  internal: await bindingHolding(db, workspaceId),
-});
+): Promise<{
+  readonly restricted: Sourced;
+  readonly internal: Sourced;
+  readonly narrowedUnderInternal: Sourced;
+}> => {
+  const restricted = await bindingHolding(db, workspaceId, {
+    sensitivity: "Restricted",
+  });
+  const internal = await bindingHolding(db, workspaceId);
+  return {
+    restricted,
+    internal,
+    narrowedUnderInternal: await documentUnder(db, workspaceId, internal.bindingId, "Restricted"),
+  };
+};
 
 /** A concept resting on both of that pair: the Internal document first, the Restricted second. */
 export const conceptOnBoth = async (

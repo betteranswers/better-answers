@@ -120,13 +120,36 @@ const overrideOf = async (
 };
 
 /**
+ * A citation's binding, and the class its document carries of its own — null where the
+ * document takes its binding's, a word where the redaction seam's special-category verdict or
+ * an Admin's *narrow these documents* wrote one.
+ */
+type SourcedVisibilityRow = VisibilityRow & { readonly document_sensitivity: string | null };
+
+/**
+ * What one citation makes a concept rest on: its binding, and — where the document carries a
+ * class of its own — the binding's audience under the document's word. Two units rather than
+ * a choice between them, so the one derivation takes the narrower of the two classes and the
+ * intersection of the audiences (ADR 0039), and a document can therefore only ever narrow
+ * what its binding decided: a document saying Internal under a Restricted binding resolves to
+ * Restricted, because the narrower of the pair is what the fold keeps. The audience is the
+ * binding's either way — a document has no audience of its own, an audience being a decision
+ * about people and a binding being where that decision is made (ADR 0013, amended
+ * 2026-09-11).
+ */
+const restingOn = (row: SourcedVisibilityRow): readonly Visibility[] =>
+  row.document_sensitivity === null
+    ? [visibilityOf(row)]
+    : [visibilityOf(row), visibilityOf({ ...row, sensitivity: row.document_sensitivity })];
+
+/**
  * What one concept's visibility derives to, from the rows as they stand: the bindings its
- * citations resolve to through the catalogue, the override if one is recorded, the kind's
- * floor, and — when nothing it cites resolves to a binding — the fallback the caller holds,
- * which is the writer's word on a creation and what the row holds now on anything else. A
- * citation whose document the catalogue does not hold contributes no binding: it cannot
- * widen, because it derives nothing, and it cannot narrow, because there is nothing to
- * narrow by.
+ * citations resolve to through the catalogue and the class each of those documents carries of
+ * its own, the override if one is recorded, the kind's floor, and — when nothing it cites
+ * resolves to a binding — the fallback the caller holds, which is the writer's word on a
+ * creation and what the row holds now on anything else. A citation whose document the
+ * catalogue does not hold contributes no binding: it cannot widen, because it derives nothing,
+ * and it cannot narrow, because there is nothing to narrow by.
  *
  * The citations are the concept's standing rows, or — when the caller names `citing` — the
  * documents a write is *about to* cite, so the governed write can ask **before it commits**
@@ -178,8 +201,8 @@ export const conceptVisibilityFrom = async (
 ): Promise<Visibility> => {
   const bindings =
     concept.citing === undefined
-      ? await tx.query<VisibilityRow>(
-          `SELECT b.sensitivity, b.audience, b.audience_groups
+      ? await tx.query<SourcedVisibilityRow>(
+          `SELECT b.sensitivity, b.audience, b.audience_groups, d.sensitivity AS document_sensitivity
              FROM concept_evidence ce
              JOIN source_document d ON d.workspace_id = ce.workspace_id AND d.id = ce.source_document_id
              JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
@@ -187,8 +210,8 @@ export const conceptVisibilityFrom = async (
             FOR SHARE OF b`,
           [scopeParameter(principal), concept.iri],
         )
-      : await tx.query<VisibilityRow>(
-          `SELECT b.sensitivity, b.audience, b.audience_groups
+      : await tx.query<SourcedVisibilityRow>(
+          `SELECT b.sensitivity, b.audience, b.audience_groups, d.sensitivity AS document_sensitivity
              FROM source_document d
              JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
             WHERE d.workspace_id = ${scopeClause(1)} AND d.id = ANY($2::text[])
@@ -209,7 +232,7 @@ export const conceptVisibilityFrom = async (
   return derivedVisibility({
     kind: concept.kind,
     from: [
-      ...bindings.rows.map(visibilityOf),
+      ...bindings.rows.flatMap(restingOn),
       ...(concept.alsoOn ?? []),
       ...(row?.rows ?? []).map(visibilityOf),
     ],
