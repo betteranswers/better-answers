@@ -16,6 +16,7 @@ import {
 } from "../src/index.ts";
 import { type TestData, testData } from "./factory.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
+import { refusesEach } from "./probes.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
 /**
@@ -67,38 +68,6 @@ const countedRows = async (
     rows.push({ table, rows: found.rowCount ?? 0 });
   }
   return rows;
-};
-
-/**
- * A statement that must be refused, the reason a reader wants beside it, its parameters,
- * and the refusal's own words — a privilege's unless the case says otherwise.
- */
-type Refusal = readonly [
-  statement: string,
-  why: string,
-  parameters?: readonly unknown[],
-  message?: RegExp,
-];
-
-/**
- * Every statement in turn, each inside its own savepoint, each asserted with its reason
- * beside it — so a grant that stops refusing names the sentence it broke rather than
- * reporting that a query succeeded. Written once because three grants below are asked the
- * same question, and a copy per suite is three chances to forget the savepoint.
- */
-const refusesEach = async (client: pg.PoolClient, refusals: readonly Refusal[]): Promise<void> => {
-  for (const [statement, why, parameters = [], message = /permission denied/] of refusals) {
-    await client.query("SAVEPOINT refusal_probe");
-    const outcome = await client
-      .query(statement, [...parameters])
-      .then(() => "allowed")
-      .catch((cause: unknown) => (cause as { message: string }).message);
-    expect({ why, outcome }).toEqual({
-      why,
-      outcome: expect.stringMatching(message),
-    });
-    await client.query("ROLLBACK TO SAVEPOINT refusal_probe");
-  }
 };
 
 const rlsFlags = async (qualified: string) => {
@@ -1910,7 +1879,7 @@ describe("a tenant table under app_rt", () => {
 });
 
 describe("the workspace-lifecycle function", () => {
-  it("creates the chunk partition and its HNSW index for app_rt, in one transaction", async () => {
+  it("creates the chunk partition and its full-text index for app_rt, in one transaction", async () => {
     await withRollback(db.pool, async (client) => {
       // Six lines of arrange the test above also has, carried rather than folded: which
       // scope is set, and when, is the whole subject of each of these tests.
@@ -1927,11 +1896,19 @@ describe("the workspace-lifecycle function", () => {
       );
       expect(partition.rowCount).toBe(1);
 
+      // The index a new partition is born with, since migration 0035: a GIN index over the
+      // full-text column `find`'s document arm matches on, and no vector index — nothing
+      // embeds until S8, and an HNSW index over a column nobody writes cost every new
+      // workspace a build and a resident structure for nothing.
       const index = await client.query(
         "SELECT indexdef FROM pg_indexes WHERE schemaname = 'index' AND tablename = $1",
         [`chunk_${WS_A}`],
       );
-      expect(index.rows.map((row) => row.indexdef).join(" ")).toContain("hnsw");
+      const definitions = index.rows.map((row) => String(row.indexdef)).join(" ");
+      expect({
+        fullText: definitions.includes("USING gin (search)"),
+        vector: definitions.includes("hnsw"),
+      }).toEqual({ fullText: true, vector: false });
     });
 
     // "In one transaction" made checkable: the enclosing transaction rolled back, so
@@ -2248,22 +2225,76 @@ describe("the derivation's tables under app_rt", () => {
     });
   });
 
-  it("refuses the worker role on all six tables, reading and writing alike (migration 0020)", async () => {
+  /**
+   * The four of the six the worker still reaches by no road at all. A class and an audience are
+   * applied at read time by the app and derived in the app's own transactions, and a citation,
+   * an override and a composition are records of somebody's decision — none of it a tier that
+   * runs a detector over a document has any business with.
+   */
+  const REFUSED_TO_THE_WORKER = [
+    "concept_evidence",
+    "concept_class_override",
+    "composition",
+    "composition_include",
+  ] as const;
+
+  it("refuses the worker four of the six, and serves it exactly what a run reconciles on the other two (migrations 0020, 0035)", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
-      await seedOneOfEach(seed, WS_A);
+      const seeded = await seedOneOfEach(seed, WS_A);
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      for (const table of DERIVATION_TABLES) {
-        await client.query("SAVEPOINT derivation_probe");
-        await expect(client.query(`SELECT 1 FROM "${table}" LIMIT 1`)).rejects.toThrow(
-          /permission denied/,
-        );
-        await client.query("ROLLBACK TO SAVEPOINT derivation_probe");
-        await expect(client.query(`DELETE FROM "${table}"`)).rejects.toThrow(/permission denied/);
-        await client.query("ROLLBACK TO SAVEPOINT derivation_probe");
+      for (const table of REFUSED_TO_THE_WORKER) {
+        await refusesEach(client, [
+          [`SELECT 1 FROM "${table}" LIMIT 1`, `the worker reading ${table}`],
+          [`DELETE FROM "${table}"`, `the worker taking a row off ${table}`],
+        ]);
       }
+
+      // The two S1 hands back, and only as far as a run needs them: the binding is read so a
+      // run can copy its class and audience onto the rows it writes, and the catalogue row is
+      // read and written back because the hash, the normalised copy's key, the redaction
+      // version, the outcome word and the last-seen stamp are all a run's own findings.
+      const binding = await client.query("SELECT id FROM source_binding");
+      const document = await client.query("SELECT id FROM source_document");
+      await client.query(
+        "UPDATE source_document SET last_seen = now(), outcome = 'converted' WHERE id = $1",
+        [seeded.document.id],
+      );
+      expect({ binding: binding.rows, document: document.rows }).toEqual({
+        binding: [{ id: seeded.binding.id }],
+        document: [{ id: seeded.document.id }],
+      });
+
+      // And no further, each refusal beside the path it fences (`[SEC3]`).
+      await refusesEach(client, [
+        [
+          "UPDATE source_binding SET name = 'renamed by a run'",
+          "a binding is what an Admin made, and the tier that indexes it has no say in what it is",
+        ],
+        [
+          `INSERT INTO source_binding (workspace_id, id, name, connector, sensitivity, audience)
+             VALUES ($1, $2, 'A binding nobody made', 'upload', 'Restricted', 'everyone')`,
+          "a worker that could insert a binding could bind a source no Admin ever connected",
+          [WS_A, ulid()],
+        ],
+        [
+          "DELETE FROM source_binding",
+          "and one that could remove a binding could take a published source away without a record",
+        ],
+        [
+          `INSERT INTO source_document
+             (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size, original_key)
+           VALUES ($1, $2, $3, 'invented.md', 'Invented', 'text/markdown', 1, 'documents/x/original')`,
+          "a worker that could insert a document row could catalogue a document nobody uploaded",
+          [WS_A, ulid(), seeded.binding.id],
+        ],
+        [
+          "DELETE FROM source_document",
+          "the withdrawal of a document is an act with a ledger row, so the run marks one gone and never removes it",
+        ],
+      ]);
     });
   });
 

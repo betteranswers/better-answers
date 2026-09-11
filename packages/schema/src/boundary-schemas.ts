@@ -206,18 +206,40 @@ const readableUnit = {
   audienceGroups: (schema: z.ZodArray<z.ZodString>) => z.array(groupId(schema.element)).min(1),
 };
 
+/**
+ * A chunk as the boundary reads it: the three visibility columns above, the vector that is not
+ * there yet, and the address of the document text the row is a unit of — the document's id, the
+ * span's locator, the splitter's ordinal and the span as two offsets, each nullable exactly as
+ * its column is and each narrowed to what it can be. An offset counts Unicode code points from
+ * the start of the document's normalised redacted text, so it is a whole number and never
+ * negative.
+ */
 const chunkRefinements = {
   id: (schema: z.ZodString) => schema.trim().min(1),
   workspaceId,
   // The customType exception: a plain schema, never a callback (ADR 0028). The
-  // length narrows to what the column's vector(N) accepts.
-  embedding: z.array(z.number()).length(EMBEDDING_DIMENSIONS),
+  // length narrows to what the column's vector(N) accepts, and the schema carries its own
+  // nullability because a plain schema replaces the generated field wholesale — the column is
+  // nullable now that nothing embeds until S8, and a row with no vector has to parse.
+  embedding: z.array(z.number()).length(EMBEDDING_DIMENSIONS).nullable(),
   embeddingRouteId: (schema: z.ZodString) => schema.trim().min(1),
   ...readableUnit,
   bindingId: (schema: z.ZodString) => schema.trim().min(1),
+  sourceDocumentId: (schema: z.ZodString) => schema.trim().min(1),
+  locator: (schema: z.ZodString) => schema.trim().min(1),
+  ordinal: (schema: z.ZodNumber) => schema.int().nonnegative(),
+  charStart: (schema: z.ZodNumber) => schema.int().nonnegative(),
+  charEnd: (schema: z.ZodNumber) => schema.int().nonnegative(),
 };
 
-export const chunkSelect = createSelectSchema(chunk, chunkRefinements);
+// The full-text column is the database's own (migration 0035), so it is refined on the read
+// form alone: a plain schema short-circuits drizzle-zod's shape conditions, which is exactly
+// what keeps a generated column out of the insert and update forms below, and it is optional
+// because no read this platform writes asks for it — it is matched against in SQL.
+export const chunkSelect = createSelectSchema(chunk, {
+  ...chunkRefinements,
+  search: z.string().optional(),
+});
 export const chunkInsert = createInsertSchema(chunk, chunkRefinements);
 // A plain schema replaces the generated field wholesale — the update generation's
 // `.optional()` included — so the update form carries its own optional copy;

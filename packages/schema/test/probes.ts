@@ -1,5 +1,5 @@
 import type pg from "pg";
-import { beforeAll } from "vitest";
+import { beforeAll, expect } from "vitest";
 
 import { type MigratedPostgres } from "./harness.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
@@ -38,7 +38,7 @@ export const postgresForSuite = (): (() => MigratedPostgres) => {
  * The Postgres error's own `constraint`, which is the name the migration wrote — so a refusal
  * is asserted against the rule that refused it and not merely against "it threw".
  */
-export const constraintOf = (error: unknown): string => {
+const constraintOf = (error: unknown): string => {
   const named =
     typeof error === "object" && error !== null && "constraint" in error
       ? error.constraint
@@ -72,4 +72,43 @@ export const refusalOf = async (
   }
   await client.query("ROLLBACK TO SAVEPOINT probe");
   return ADMITTED;
+};
+
+/**
+ * A statement that must be refused, the reason a reader wants beside it, its parameters,
+ * and the refusal's own words — a privilege's unless the case says otherwise.
+ */
+export type Refusal = readonly [
+  statement: string,
+  why: string,
+  parameters?: readonly unknown[],
+  message?: RegExp,
+];
+
+/**
+ * Every statement in turn, each inside its own savepoint, each asserted with its reason
+ * beside it — so a grant that stops refusing names the sentence it broke rather than
+ * reporting that a query succeeded. Written once because several suites ask the same
+ * question of a grant, and a copy per suite is one more chance to forget the savepoint.
+ *
+ * The sibling of `refusalOf` above and not the same probe: that one asks *which rule in the
+ * table refused this row*, this one asks *was this statement refused at all, in these words*
+ * — which is the question a privilege is asked, since a privilege names no constraint.
+ */
+export const refusesEach = async (
+  client: pg.PoolClient,
+  refusals: readonly Refusal[],
+): Promise<void> => {
+  for (const [statement, why, parameters = [], message = /permission denied/] of refusals) {
+    await client.query("SAVEPOINT refusal_probe");
+    const outcome = await client
+      .query(statement, [...parameters])
+      .then(() => "allowed")
+      .catch((cause: unknown) => (cause as { message: string }).message);
+    expect({ why, outcome }).toEqual({
+      why,
+      outcome: expect.stringMatching(message),
+    });
+    await client.query("ROLLBACK TO SAVEPOINT refusal_probe");
+  }
 };

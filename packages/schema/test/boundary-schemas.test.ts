@@ -1236,7 +1236,18 @@ describe("the customType exception, per shape", () => {
   const tooShort = Array.from({ length: EMBEDDING_DIMENSIONS - 1 }, () => 0);
 
   it("chunk.select requires an embedding of the route's width", () => {
-    const row = { ...acceptedRows.chunk[0], publishedAt: null, audienceGroups: null };
+    // A read form names every nullable column rather than leaving it out, which is why the
+    // document, the locator and the span appear here as the nulls a row without them carries.
+    const row = {
+      ...acceptedRows.chunk[0],
+      publishedAt: null,
+      audienceGroups: null,
+      sourceDocumentId: null,
+      locator: null,
+      ordinal: null,
+      charStart: null,
+      charEnd: null,
+    };
     const select = boundarySchemas.chunk.select;
     expect(select.safeParse(row).success).toBe(true);
     expect(select.safeParse({ ...row, embedding: undefined }).success).toBe(false);
@@ -1432,13 +1443,19 @@ describe("5 — the inferred type is pinned", () => {
         id: string;
         workspaceId: WorkspaceId;
         content: string;
-        embedding: number[];
-        embeddingRouteId: string;
+        embedding: number[] | null;
+        embeddingRouteId: string | null;
         publishedAt: Date | null;
         sensitivity: "Restricted" | "Internal" | "Public";
         audience: "everyone" | "groups";
         audienceGroups: GroupId[] | null;
         bindingId: string;
+        sourceDocumentId: string | null;
+        locator: string | null;
+        ordinal: number | null;
+        charStart: number | null;
+        charEnd: number | null;
+        search?: string | undefined;
       }
     >
   >;
