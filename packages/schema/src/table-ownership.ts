@@ -156,8 +156,9 @@ export const TABLE_OWNERS = {
   // read by the replay a restore runs before the app serves anything.
   "public.erasure_request": "erasure",
   // What one document must keep out the next time it is reprocessed (ADR 0020): the same
-  // slice's, written by the routine's step 6. S1's reprocess is handed what to keep out by
-  // the app; the worker reads no suppression, which is why there is no entry below.
+  // slice's, written by the routine's step 6 and never by the tier that reads it. S1's run
+  // gathers the sets standing over each document it converts and hands them to the seam, so
+  // the worker's read is recorded below; the write stays the routine's alone.
   "public.suppression": "erasure",
   // Which evidence a concept cites, and a recorded Admin override of its derived class:
   // both written in the concepts slice's own transactions, the first by the governed write
@@ -399,6 +400,13 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "write",
     reason:
       "The detector runs in the worker and the review of what it found is an Admin's act, so the worker records a span it withheld and holds INSERT alone — no SELECT, no UPDATE, no DELETE, each refusal a test of its own (ADR 0020). A worker that could read this table would hold a workspace's map of where its personal data sits; one that could update it could mark a special-category span reviewed. No lint sees across a process boundary, which is why the grant and this entry are both written down.",
+  },
+  {
+    table: "public.suppression",
+    by: WORKER,
+    access: "read",
+    reason:
+      "A document's applicable suppressions are an argument to the one memoised function a run converts through, so one person's erasure re-reads the documents that mention them and leaves the rest of the binding answered out of the store; the run gathers the sets inside the transaction its own workspace scope is set in and holds SELECT alone (migration 0036). Carrying them on the job row instead would write an erased person's identifiers into a queue row that outlives the run. The three writing roads stay shut and each is a refusal test of its own (ADR 0020): a tier that could insert could suppress a document nobody asked about, one that could update could empty a set, and one that could delete could put a person's data back into every derived store at the next conversion.",
   },
   {
     table: "index.chunk",

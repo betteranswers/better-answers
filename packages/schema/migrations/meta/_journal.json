@@ -267,6 +267,13 @@
       "when": 1789712210692,
       "tag": "0037_the-chunk-substrate",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1789741389846,
+      "tag": "0038_the-suppression-read",
+      "breakpoints": true
     }
   ]
 }
