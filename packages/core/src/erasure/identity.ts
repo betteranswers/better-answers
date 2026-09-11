@@ -102,13 +102,20 @@ const rowsOf = (result: { readonly rowCount: number | null }): number => result.
  */
 const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) => {
   const emails = [...subject.emails];
-  // Keyed by identifier and not by person, which is why it reads the address off the row it is
-  // about to change — the map's own `identity-verification` predicate, matched here.
+  // Keyed by an identifier and not by a person, which is why it reads the address off the row it
+  // is about to change — the map's own `identity-verification` predicate, matched here and for
+  // the same reason it gives.
+  //
+  // **The identifier set is not matched.** This DELETE runs platform-wide, as the platform
+  // principal and past row-level security, so an address in the set that belongs to nobody the
+  // map found would be a stranger's live codes deleted at one company's word. The set is how an
+  // Admin says who the request is about, and the map has already answered that question; what is
+  // erased here is what the person it named holds. The invitation delete below does match the
+  // set, and the paragraph on it says what makes that different.
   const verifications = await tx.query(
     `DELETE FROM verification
-      WHERE lower(identifier) = ANY($2)
-         OR lower(identifier) = (SELECT lower(email) FROM "user" WHERE id = $1)`,
-    [subject.personId, emails],
+      WHERE lower(identifier) = (SELECT lower(email) FROM "user" WHERE id = $1)`,
+    [subject.personId],
   );
   // **Every workspace, because this is the arm on which the person leaves the platform.** An
   // invitation is the one row of the identity set keyed by the address rather than by the

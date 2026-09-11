@@ -2439,6 +2439,29 @@ describe("the finding under both runtime roles", () => {
           "DELETE FROM finding",
           "a finding is the record of what was withheld, and nothing the worker holds takes one away",
         ],
+        // The two the grant's column list is for (migration 0032). Neither of these is an
+        // UPDATE, and both reach the state the revoke of UPDATE was written to prevent: the
+        // row CHECKs admit a review and a restore **on the insert itself**, so a worker that
+        // may name those columns can land a reviewed or restored span without ever holding a
+        // privilege 0024 named. What is refused is the column, not the value.
+        [
+          `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
+                                char_start, char_end, score, rule_version, detector_pin,
+                                review_state, reviewed_by, reviewed_at)
+           VALUES ($1, $2, $3, 'sort-code', 'always', 'sort-code-with-account-number',
+                   30, 38, 0.9, 'r1', 'd1', 'kept-in-text', 'process:better-answers-test', now())`,
+          "a finding is born unreviewed, and one inserted already reviewed is a special-category span a binding may widen over at nobody's word",
+          [WS_A, ulid(), document.id],
+        ],
+        [
+          `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
+                                char_start, char_end, score, rule_version, detector_pin,
+                                restored_at, restored_by, restore_reason)
+           VALUES ($1, $2, $3, 'sort-code', 'always', 'sort-code-with-account-number',
+                   40, 48, 0.9, 'r1', 'd1', now(), 'process:better-answers-test', 'let it stand')`,
+          "the restore is an Admin's act as well, and a span born restored is one the seam withheld and nobody put back",
+          [WS_A, ulid(), document.id],
+        ],
       ]);
 
       // The row the worker wrote, read back under the role that may read it — unreviewed,

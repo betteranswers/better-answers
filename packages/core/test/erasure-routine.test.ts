@@ -164,13 +164,15 @@ const erasureRequestAbout = async (
   workspaceId: string,
   personId: string,
   email: string,
+  /** Whatever else the Admin typed into the set — an address the subject need not own. */
+  alsoNamed: readonly string[] = [],
 ): Promise<string> => {
   const seeded = await seedingWith(db().pool, (seed) =>
     seed.subjectRequest({
       workspaceId,
       kind: "erasure",
       personId,
-      identifiers: { emails: [email], names: ["Priya Anand"], other: [] },
+      identifiers: { emails: [email, ...alsoNamed], names: ["Priya Anand"], other: [] },
     }),
   );
   return seeded.id;
@@ -491,6 +493,28 @@ const identityRowsFor = async (userId: string, email: string): Promise<void> => 
   } finally {
     superuser.release();
   }
+};
+
+/**
+ * One verification code for one address, seeded on its own: it is the row of the identity set
+ * keyed by an **address** rather than by a person, so it can stand for somebody this platform
+ * holds no user row for at all.
+ */
+const verificationCodeFor = async (identifier: string): Promise<void> => {
+  await db().pool.query(
+    `INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at)
+     VALUES ($1, $2, 'code', now(), now(), now())`,
+    [`v-${ulid()}`, identifier],
+  );
+};
+
+/** How many codes stand for one address, whoever it belongs to. */
+const verificationsFor = async (identifier: string): Promise<number> => {
+  const read = await db().pool.query<{ count: string }>(
+    "SELECT count(*) AS count FROM verification WHERE lower(identifier) = $1",
+    [identifier.toLowerCase()],
+  );
+  return Number(read.rows[0]?.count ?? -1);
 };
 
 /** The four identity families the routine's step 5 prunes, counted where it would find them. */
@@ -1079,6 +1103,30 @@ describe("the identity set on the person's last membership", () => {
       verifications: 0,
       invitations: 0,
     });
+  });
+
+  it("deletes the codes the subject's own address holds and never one keyed by an address in the set that is not theirs", async () => {
+    const scenario = await arrange();
+    const email = addressOf("priya");
+    const person = await memberOf(db().pool, scenario.workspaceId, email);
+    // An address with no user row, no membership and no workspace behind it, appended to a
+    // request about a genuine member — which is all an Admin has to do to name one.
+    const notTheirs = addressOf("a-client-contact");
+    await verificationCodeFor(email);
+    await verificationCodeFor(notTheirs);
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email, [
+      notTheirs,
+    ]);
+
+    await completing(scenario, subjectRequestId);
+
+    // The sweep runs platform-wide as the platform principal and past row-level security, so
+    // the set it matches on has to be the subject's own person and never the Admin's typing:
+    // a stranger's code is another person's data, deleted at one company's word.
+    expect({
+      theirs: await verificationsFor(email),
+      theStranger: await verificationsFor(notTheirs),
+    }).toEqual({ theirs: 0, theStranger: 1 });
   });
 
   it("ends this workspace's membership alone when the person holds another, and leaves the identity set standing", async () => {

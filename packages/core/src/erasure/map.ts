@@ -226,8 +226,18 @@ const ERASURE_FAMILY_DESCRIPTORS = {
   },
 
   /**
-   * Verification codes, which are keyed by identifier rather than by person: the subject's own
-   * emails and the address the user row carries, because a code was sent to one of the two.
+   * Verification codes: the one family keyed by an **identifier** rather than by a person, and
+   * so the one that has to say whose identifier.
+   *
+   * It is the address the subject's own user row carries, and never the identifier set. That set
+   * is how an Admin says *who the request is about* — a contact address for somebody with no
+   * login, or the address a member signs in by — and `MEMBER_HERE` above has already used it for
+   * exactly that. Matching it a second time here would search the identity set, which carries no
+   * `workspace_id` and which row-level security reaches none of, for rows nobody has shown belong
+   * to the subject: an Admin who appended any address to a request about a genuine member would
+   * get that stranger's live codes named back in the access answer. The invitation family below
+   * may match the set because its own `workspace_id` fences it to this workspace's records; this
+   * one has no such fence to give it.
    */
   "identity-verification": {
     categories: ["email-address"],
@@ -236,9 +246,7 @@ const ERASURE_FAMILY_DESCRIPTORS = {
         tx,
         subject,
         `SELECT id AS location FROM verification
-          WHERE lower(identifier) = ANY($2)
-             OR lower(identifier) = (SELECT lower(email) FROM "user" WHERE id = $1)`,
-        [subject.emails],
+          WHERE lower(identifier) = (SELECT lower(email) FROM "user" WHERE id = $1)`,
       ),
   },
 

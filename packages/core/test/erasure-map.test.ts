@@ -66,7 +66,6 @@ const conceptFileNaming = (email: string): string =>
 const identityRowsFor = async (userId: string, email: string) => {
   const sessionId = ulid();
   const accountId = ulid();
-  const verificationId = ulid();
   const superuser = await db().pool.connect();
   try {
     await superuser.query(
@@ -79,14 +78,31 @@ const identityRowsFor = async (userId: string, email: string) => {
        VALUES ($1, 'https://accounts.example.invalid', $2, 'google', $3, now(), now())`,
       [accountId, `google-${accountId}`, userId],
     );
+  } finally {
+    superuser.release();
+  }
+  return { sessionId, accountId, verificationId: await verificationFor(email) };
+};
+
+/**
+ * One verification code for one address, and nothing else beside it.
+ *
+ * It is separate from the three above because it is the one row of the identity set keyed by
+ * an **address** rather than by a person, which is the whole of what the case below is about:
+ * an address can be seeded for somebody this platform holds no user row for at all.
+ */
+const verificationFor = async (identifier: string): Promise<string> => {
+  const verificationId = ulid();
+  const superuser = await db().pool.connect();
+  try {
     await superuser.query(
       "INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at) VALUES ($1, $2, 'code', now(), now(), now())",
-      [verificationId, email],
+      [verificationId, identifier],
     );
   } finally {
     superuser.release();
   }
-  return { sessionId, accountId, verificationId };
+  return verificationId;
 };
 
 /** The request as the slice reads it back — the row an Admin recorded, identifier set and all. */
@@ -355,6 +371,44 @@ describe("the erasure map in one workspace's scope", () => {
     for (const theirsOwn of [theirs.ledger.sha, theirs.check.id, theirs.invite.id, shaElsewhere]) {
       expect(named).not.toContain(theirsOwn);
     }
+  });
+});
+
+/**
+ * The second fence, and the one the workspace scope cannot give.
+ *
+ * The identifier set is how an Admin says **who the request is about** — a contact address for
+ * somebody who never signed in, or the address a member signs in by — so it is a search key for
+ * the subject's person and not a list of rows to fetch. The identity set carries no
+ * `workspace_id` and row-level security reaches none of it, so an identity family matched on the
+ * set itself would hand an Admin any stranger's rows for the cost of one extra line on a request
+ * about a genuine member. The families are therefore read by the person the map **found**, and
+ * `verification` — the one keyed by an address rather than by a person — by the addresses those
+ * users hold and no other. The workspace-fenced families still search the whole set, because
+ * what they can reach is this workspace's own records either way.
+ */
+describe("the erasure map for an address in the set the subject does not own", () => {
+  it("names the subject's own verification code and never the stranger's the set also carries", async () => {
+    const here = await arrange();
+    const email = addressOf("priya");
+    const person = await memberOf(db().pool, here.workspaceId, email);
+    // An address with no user row, no membership and no workspace behind it: somebody this
+    // platform knows only because a request about another person named them.
+    const notTheirs = addressOf("a-stranger");
+    const theirs = await verificationFor(email);
+    await verificationFor(notTheirs);
+    const request = await requestFor(here, {
+      personId: person.id,
+      identifiers: { ...identifiersOf(email), emails: [email, notTheirs] },
+    });
+
+    const map = await mapOf(here, request);
+
+    // One location, and it is the subject's own row: the stranger's code is not in the answer,
+    // so no reply under Article 15 can carry a line about a person who never asked for one.
+    expect(map.find((entry) => entry.family === "identity-verification")?.locations).toEqual([
+      theirs,
+    ]);
   });
 });
 

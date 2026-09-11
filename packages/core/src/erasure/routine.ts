@@ -601,12 +601,15 @@ export const runErasure = async (
     // Writing first also couples the two the right way: an object store that cannot take the
     // copy fails the routine before it reports a completion, rather than after. The request
     // stays open, and the operator's re-run is the routine's ordinary second pass.
+    // The person the **map** found, as step 5 was handed and as the completion's detail carries:
+    // the copy is a replay's input, and one written from the request's own column would re-create
+    // a request naming nobody for a subject this run pseudonymised a real user row for.
     const copied = await attempt(() =>
       writeReplayCopy(platform, doors.objects, {
         workspaceId,
         subjectRequestId: request.id,
         erasureRequestId: erasure.id,
-        personId: request.personId,
+        personId: personTheMapFound(map),
         pseudonym,
         completedAt: standsAt,
         identifiers: request.identifiers,

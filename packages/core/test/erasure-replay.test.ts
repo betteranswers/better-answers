@@ -14,7 +14,7 @@ import {
 import { ledgerRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite } from "./suite-objects.ts";
 import { seedingWith } from "./suite-postgres.ts";
-import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
+import { memberOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 /**
  * **The replay's reading half** (ADR 0022; the S0 spec, *The two ops commands*): what
@@ -90,6 +90,9 @@ const TWICE_AT = new Date("2026-06-17T00:00:00.000Z");
 const STOPS_SINCE = new Date("2026-06-18T00:00:00.000Z");
 const STOPS_AT = new Date("2026-06-19T00:00:00.000Z");
 const AFTER_THE_STOP_AT = new Date("2026-06-20T00:00:00.000Z");
+
+const BY_ADDRESS_SINCE = new Date("2026-06-21T00:00:00.000Z");
+const BY_ADDRESS_AT = new Date("2026-06-22T00:00:00.000Z");
 
 /** The one actor every act of a replay is booked to (`[AUDIT4]`, the platform's own id). */
 const ERASURE_ACTOR = "process:better-answers-erasure";
@@ -502,5 +505,51 @@ describe("a request whose routine will not run", () => {
     expect(await ledgerRowsOf(db().pool, scenario.workspaceId, REPLAYED)).toEqual([]);
     expect(await ledgerRowsOf(db().pool, stranded.id, REPLAYED)).toEqual([]);
     expect(second.erasureRequestId).not.toEqual(first.erasureRequestId);
+  });
+});
+
+/**
+ * The copy is a **replay's input**, so it carries the person the routine acted on rather than
+ * the person the request named — and the two are not always one.
+ *
+ * An Admin may record an erasure for somebody they hold a contact address for and no login to
+ * point at, leaving `person_id` null because that is what they knew; the map then resolves the
+ * subject from the identifier set and step 5 pseudonymises a real user row. A copy written from
+ * the request's own column would re-create, on a restore from a dump older than the request, a
+ * request that names nobody — and the routine that ran from it would be answering for an erasure
+ * it could no longer see the person in. The completion's ledger detail is built from the map for
+ * the same reason.
+ *
+ * It is last in the file because its window is the last one: the instants run forward in
+ * declaration order, and a completion this leaves behind must be ahead of every `since` above.
+ */
+describe("the replay copy for a request named by address alone", () => {
+  it("carries the person the map found, and not the nobody the request's own column names", async () => {
+    const scenario = await arrange();
+    const email = addressOf("priya");
+    const person = await memberOf(db().pool, scenario.workspaceId, email);
+    const seeded = await seedingWith(db().pool, (seed) =>
+      seed.subjectRequest({
+        workspaceId: scenario.workspaceId,
+        kind: "erasure",
+        // A whole answer and not an absence: the Admin had an address and no login.
+        personId: null,
+        identifiers: { emails: [email], names: ["Priya Anand"], other: [] },
+      }),
+    );
+
+    const run = await runErasure(ERASURE, doorsFor(scenario, BY_ADDRESS_AT), {
+      workspaceId: scenario.workspaceId,
+      subjectRequestId: seeded.id,
+    });
+    if (!run.ok) throw new Error(`the routine refused: ${String(run.error)}`);
+
+    const copies = await replayCopiesSince(ERASURE, objects().door, BY_ADDRESS_SINCE);
+    if (!copies.ok) throw new Error(`the copies did not read back: ${String(copies.error)}`);
+    expect(
+      copies.value
+        .filter((copy) => copy.workspaceId === scenario.workspaceId)
+        .map((copy) => copy.personId),
+    ).toEqual([person.id]);
   });
 });
