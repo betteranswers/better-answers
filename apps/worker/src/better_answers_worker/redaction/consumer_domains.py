@@ -47,11 +47,11 @@ READ_ON = "2026-09-11"
 #: arrives with a broadband account and is signed up for nowhere.
 SOURCE: tuple[str, ...] = (
     "Google — gmail.com, googlemail.com: https://accounts.google.com/signup",
-    "Microsoft — outlook.com, hotmail.com, hotmail.co.uk, live.com, live.co.uk:"
-    " https://signup.live.com",
-    "Yahoo — yahoo.com, yahoo.co.uk, ymail.com:"
+    "Microsoft — outlook.com, hotmail.com, hotmail.co.uk, live.com, live.co.uk,"
+    " msn.com: https://signup.live.com",
+    "Yahoo — yahoo.com, yahoo.co.uk, ymail.com, myyahoo.com:"
     " https://uk.help.yahoo.com/kb/SLN2153.html",
-    "Apple — icloud.com, me.com: https://account.apple.com",
+    "Apple — icloud.com, me.com, mac.com: https://account.apple.com",
     "Proton — proton.me, protonmail.com: https://account.proton.me/signup",
     "GMX — gmx.com, gmx.co.uk: https://www.gmx.co.uk",
     "AOL — aol.com, aol.co.uk: https://login.aol.com/account/create",
@@ -77,7 +77,10 @@ CONSUMER_DOMAINS: frozenset[str] = frozenset(
         "icloud.com",
         "live.co.uk",
         "live.com",
+        "mac.com",
         "me.com",
+        "msn.com",
+        "myyahoo.com",
         "outlook.com",
         "proton.me",
         "protonmail.com",

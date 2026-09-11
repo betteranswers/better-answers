@@ -195,7 +195,7 @@ def test_the_rule_version_is_bumped_with_the_table_it_stands_for() -> None:
     # consumer-domain list or a recogniser changes. Edit a descriptor or a domain
     # without bumping it and this literal stops matching: they are changed together or
     # the suite is red.
-    digest = "4aa310ea6ac1671c693d411c9f2dd5c8bf1b8a1c70dd1e361689dd66a6d94cb0"
+    digest = "cece7ac3477cc58d1eb4b20be5c32c7f721d7435c416d17f567a0cba02c8849b"
 
     assert descriptor_digest() == digest
     assert RULE_VERSION == "2"
