@@ -1,0 +1,33 @@
+packages/core/test/invisibility.test.ts
+  s_f3ee63bcbb1a0b::t_d9accaf84af4db 7,17,23
+  s_f3ee63bcbb1a0b::t_530396fe008d6b 50-99
+  s_f3ee63bcbb1a0b::t_4eb4c771d79799 278-279,314-317,319,322-325,329,331,336-346,348-352,359,366-375,379-382,389-394
+  s_f3ee63bcbb1a0b::t_e1fe654482abe1 280-294,300-313
+  s_f3ee63bcbb1a0b::t_fef3a3329939b2 295-299
+  s_f3ee63bcbb1a0b::t_f3b09b2dcac256 318,354-358,361-365,384-388
+  s_f3ee63bcbb1a0b::t_16920b466f6216 320-321,326-328,330,332-335,347,353,360,376-378,383
+packages/core/test/sourced-concept.ts
+  s_f3ee63bcbb1a0b::t_694df61c5afdd2 94-106,112-119,123-127,131-134,136-137
+  s_f3ee63bcbb1a0b::t_f3b09b2dcac256 107-111,128-130
+  s_f3ee63bcbb1a0b::t_16920b466f6216 135
+packages/core/src/concepts/visibility.ts
+  s_f3ee63bcbb1a0b::t_4c77ae37ef88a3 123-144,147-152
+  s_f3ee63bcbb1a0b::t_a2a3338c5b21b1 204-205,213-214
+  s_f3ee63bcbb1a0b::t_2e40cf933128ea 235
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e689adf63538e341f765e633a76f001313785022",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}

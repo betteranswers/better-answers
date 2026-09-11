@@ -1,0 +1,29 @@
+packages/core/test/queue.contract.test.ts
+  s_f3ee63bcbb1a0b::t_937a9a7ae677e0 22-24
+  s_f3ee63bcbb1a0b::t_a4b48e29ca1310 66
+  s_f3ee63bcbb1a0b::t_378a4a22b2978f 116
+  s_f3ee63bcbb1a0b::t_da74e327dad394 132-169
+  s_f3ee63bcbb1a0b::t_066a489ceff396 184-197,203,206-207
+  s_f3ee63bcbb1a0b::t_9be7b96afc230a 264-265,34,42-43,266-290,292-298
+  s_f3ee63bcbb1a0b::t_d6b61dcc5501ff 28-33,35-38,40-41,49,58
+  s_f3ee63bcbb1a0b::t_fb85a96149ef75 5
+  s_f3ee63bcbb1a0b::t_80c6a3ee122bd5 39
+  s_f3ee63bcbb1a0b::t_a779116347cf7b 65
+  s_f3ee63bcbb1a0b::t_339241d7012278 291
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ed4273c7728508139805715877e0465b1f655f8c",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}

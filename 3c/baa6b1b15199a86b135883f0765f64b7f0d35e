@@ -1,0 +1,78 @@
+apps/worker/tests/test_tier_contract.py
+  s_f3ee63bcbb1a0b::t_8f43e4a5a85755 331
+  s_f3ee63bcbb1a0b::t_ca73e641a87a4b 332-335,426
+  s_f3ee63bcbb1a0b::t_c80ba844eca6e8 355,365-370,373-403
+  s_f3ee63bcbb1a0b::t_3a2c001ba311ef 371-372
+  s_f3ee63bcbb1a0b::t_fd6f5c1414e4d3 424-425,427-435,441,444-445
+apps/worker/src/better_answers_worker/queue.py
+  s_f3ee63bcbb1a0b::t_e4d117f92c91e8 6-9
+  s_f3ee63bcbb1a0b::t_96ed8d97f408c3 23
+  s_f3ee63bcbb1a0b::t_a0997e00c7d3fe 102,109-115,118-119
+  s_f3ee63bcbb1a0b::t_ca73e641a87a4b 104
+apps/worker/tests/test_work_loop.py
+  s_f3ee63bcbb1a0b::t_bc7d9f168726c6 545-546,548
+packages/schema/migrations/meta/_journal.json
+  s_f3ee63bcbb1a0b::t_6e7ec619f59a8d 228-231,234,244
+  s_f3ee63bcbb1a0b::t_35b5af52a1a039 232-233
+  s_f3ee63bcbb1a0b::t_787a94860f11b4 235-236,238,241
+  s_f3ee63bcbb1a0b::t_9962f0c7ab849e 237,239-240
+apps/worker/tests/factories.py
+  s_f3ee63bcbb1a0b::t_46242e07e1c475 147
+  s_f3ee63bcbb1a0b::t_c1308400094fac 161-162,173,176,184
+  s_f3ee63bcbb1a0b::t_ca73e641a87a4b 163-164
+apps/worker/src/better_answers_worker/schema_view.py
+  s_f3ee63bcbb1a0b::t_0f2befe1f2e9e7 267
+contracts/queue/cases.json
+  s_f3ee63bcbb1a0b::t_40ce53aaeced8a 2,15,29,43,57,66-94,99,113,120-200,205,209,217,221,225,229,233-241,244-268,274,418-434,439,448-487
+packages/schema/migrations/0033_the-job-subject-and-the-run-key-substrate.sql
+  s_f3ee63bcbb1a0b::t_8eb1f853fdd96b 1-99
+packages/schema/test/job-kinds.test.ts
+  s_f3ee63bcbb1a0b::t_d451ba5eb11f27 1,3,11-33,36-37,41-44,46-50,57-58,66,68-71,83-86,154,158-159,169-170,179,186,190,198-243,251-263,272-274,276-286,289,297-298,313-317,319-332,334,350,356-377,381-388,391-392,394,115,134,143
+  s_f3ee63bcbb1a0b::t_4a8e28a699ebb1 2
+  s_f3ee63bcbb1a0b::t_f20a18a1ebb8dd 4-10
+  s_f3ee63bcbb1a0b::t_3cb6c5ed8b4d60 34-35,38-40
+  s_f3ee63bcbb1a0b::t_f838ac203fd156 59-65,67
+  s_f3ee63bcbb1a0b::t_47b4a574a6c816 145,148,72-82,88-90,92-114,118-120,122-133,136-142
+  s_f3ee63bcbb1a0b::t_a9bd8dda037efa 171-178,180-185,187-189,191-197
+  s_f3ee63bcbb1a0b::t_45a256cb743a98 244-250
+  s_f3ee63bcbb1a0b::t_b5564103548332 264,288,318,339,390
+  s_f3ee63bcbb1a0b::t_d6a1494883ce62 271
+  s_f3ee63bcbb1a0b::t_9d1c9497b8f25b 287,290-296,299-312
+  s_f3ee63bcbb1a0b::t_7266deb37abf6f 333,335-338,340-349,351-355
+  s_f3ee63bcbb1a0b::t_85643fe3ba66fc 389,393,395-398
+  s_f3ee63bcbb1a0b::t_0205a6337e6634 399-401,87,91,116-117,121,135,144,402-469,471-479
+  s_f3ee63bcbb1a0b::t_893ebfdbcfeda7 45,51-56
+packages/schema/test/rls.test.ts
+  s_f3ee63bcbb1a0b::t_5853f2268886d3 2250
+  s_f3ee63bcbb1a0b::t_7c5d0785b0500c 2964-2967
+  s_f3ee63bcbb1a0b::t_b6d161e9fca364 3037-3038
+packages/core/test/queue.contract.test.ts
+  s_f3ee63bcbb1a0b::t_937a9a7ae677e0 21-23
+  s_f3ee63bcbb1a0b::t_a4b48e29ca1310 64
+  s_f3ee63bcbb1a0b::t_378a4a22b2978f 114
+  s_f3ee63bcbb1a0b::t_da74e327dad394 130-167
+  s_f3ee63bcbb1a0b::t_066a489ceff396 182-195,201,204-205
+  s_f3ee63bcbb1a0b::t_9be7b96afc230a 262-263
+docs/adr/0031-the-tier-contract-is-six-agreements-in-three-forms-fixtured-in-one-language-neutral-directory-both-suites-read.md
+  s_f3ee63bcbb1a0b::t_b82f0fb4b78c14 12
+  s_f3ee63bcbb1a0b::t_e9da5923de5408 34-42
+  s_f3ee63bcbb1a0b::t_5b2f19ec6ae08e 43
+packages/schema/migrations/meta/0033_snapshot.json
+  s_f3ee63bcbb1a0b::t_9962f0c7ab849e 1-5176
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3cbaa6b1b15199a86b135883f0765f64b7f0d35e",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}

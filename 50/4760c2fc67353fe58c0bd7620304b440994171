@@ -1,0 +1,89 @@
+packages/schema/test/rls.test.ts
+  s_f3ee63bcbb1a0b::t_5853f2268886d3 2227,2119,2122,2228-2241,2244,2248-2252,2254-2286,2289-2297
+  s_f3ee63bcbb1a0b::t_7c5d0785b0500c 2997-3000
+  s_f3ee63bcbb1a0b::t_b6d161e9fca364 3070-3071
+  s_f3ee63bcbb1a0b::t_35f56ea7453665 2120-2121,2314-2316,2287-2288
+  s_f3ee63bcbb1a0b::t_ff52a185a1fd4c 19
+  s_f3ee63bcbb1a0b::t_dbe3ca8cad036b 1882
+  s_f3ee63bcbb1a0b::t_49a9dcec3e47e9 1899-1902,1907-1911
+packages/schema/test/probes.ts
+  s_f3ee63bcbb1a0b::t_d240593a32365a 42-45,51
+  s_f3ee63bcbb1a0b::t_0d62868f8e7026 46-50
+  s_f3ee63bcbb1a0b::t_6a46bbd80188d2 75,76-114
+  s_f3ee63bcbb1a0b::t_9ffbf5c4f90a12 41
+packages/schema/migrations/0035_the-chunk-substrate.sql
+  s_f3ee63bcbb1a0b::t_7b7ad72d1f902e 1-2
+  s_f3ee63bcbb1a0b::t_7d7613bf9e7ccf 3-165
+packages/schema/test/factory.ts
+  s_f3ee63bcbb1a0b::t_c8492a4ee93ae9 11,15,18,25,30
+  s_f3ee63bcbb1a0b::t_2cc59685ccc3f8 534-538,545
+  s_f3ee63bcbb1a0b::t_576d3a540ccd6f 643-645,705-713,728-744
+  s_f3ee63bcbb1a0b::t_0d11cc39420cdf 396-403
+apps/worker/src/better_answers_worker/schema_view.py
+  s_f3ee63bcbb1a0b::t_0f2befe1f2e9e7 273
+  s_f3ee63bcbb1a0b::t_f70623278e3c8e 447-451,457-470
+  s_f3ee63bcbb1a0b::t_402c62d154ed67 10,12,19-20,26-31
+packages/schema/migrations/meta/_journal.json
+  s_f3ee63bcbb1a0b::t_6e7ec619f59a8d 228-231,234,258
+  s_f3ee63bcbb1a0b::t_35b5af52a1a039 232-233
+  s_f3ee63bcbb1a0b::t_787a94860f11b4 235-236,238,241-243,245,248-255
+  s_f3ee63bcbb1a0b::t_9962f0c7ab849e 237,239-240
+  s_f3ee63bcbb1a0b::t_2aabfe5943b468 244,246-247
+packages/schema/migrations/meta/0035_snapshot.json
+  s_f3ee63bcbb1a0b::t_787a94860f11b4 1-5387
+packages/schema/test/chunk-columns.test.ts
+  s_f3ee63bcbb1a0b::t_a27615963f9280 1-51,63-66,72-89,105-106,108-147,149-199,201-231,233-260,262-270,272-274,279-288,290-297,299-300,305-310,312-313,316-329,331,333,349-358,360-378,383-386,392-416
+  s_f3ee63bcbb1a0b::t_523f201a766de7 52-62,67
+  s_f3ee63bcbb1a0b::t_682a6dd9133359 68-71
+  s_f3ee63bcbb1a0b::t_434a6f516d2937 90-104
+  s_f3ee63bcbb1a0b::t_d18ca6307d82ad 107,148,200,232,271,289,311,330,359
+  s_f3ee63bcbb1a0b::t_92ace95437f46c 261
+  s_f3ee63bcbb1a0b::t_9917b66b859bb1 275-278
+  s_f3ee63bcbb1a0b::t_38ff5b192de92c 298,301-304
+  s_f3ee63bcbb1a0b::t_c543e7f08615a8 314-315
+  s_f3ee63bcbb1a0b::t_34164a96828b76 332,334
+  s_f3ee63bcbb1a0b::t_186b02ce904000 335-340,345,347-348
+  s_f3ee63bcbb1a0b::t_7f11cfa70e37a8 341-344,346
+  s_f3ee63bcbb1a0b::t_b0adfde640afaf 379-382,387-391
+packages/schema/test/boundary-schemas.test.ts
+  s_f3ee63bcbb1a0b::t_c28932fb68cfde 256-260,270-310
+  s_f3ee63bcbb1a0b::t_8faa94c08a368d 798-801,817-819
+  s_f3ee63bcbb1a0b::t_95027bf0df7df6 802-803
+  s_f3ee63bcbb1a0b::t_0264f8fcd25162 973-1009
+  s_f3ee63bcbb1a0b::t_0f5eafc553e820 1239-1250
+  s_f3ee63bcbb1a0b::t_281b7a2c5a703a 1446-1447,1453-1458
+packages/schema/src/boundary-schemas.ts
+  s_f3ee63bcbb1a0b::t_e5d942ff8b3e84 55
+  s_f3ee63bcbb1a0b::t_63b27fc5d2e1d9 87,77-86
+  s_f3ee63bcbb1a0b::t_0e74565cb9c73a 1050-1052
+  s_f3ee63bcbb1a0b::t_48ac7ee558eca3 74
+  s_f3ee63bcbb1a0b::t_1003ba65e36503 680,709,1038-1043,1048
+  s_f3ee63bcbb1a0b::t_6c7e7b89284801 681-686,692-693,696-697
+  s_f3ee63bcbb1a0b::t_aed6a06ac40fbf 694-695
+  s_f3ee63bcbb1a0b::t_76b36178ad1734 706-708,710-715,721-730
+  s_f3ee63bcbb1a0b::t_a641e75b65e793 209-216,221-224,228-232,235-242
+packages/schema/src/index-tables.ts
+  s_f3ee63bcbb1a0b::t_4eb9a1887eb36f 1-2
+  s_f3ee63bcbb1a0b::t_1d033200e44fc6 39-48,52,59-63
+  s_f3ee63bcbb1a0b::t_ae387b71a80c6a 74-89
+packages/schema/src/table-ownership.ts
+  s_f3ee63bcbb1a0b::t_1d92b66d81d1d7 136-140
+  s_f3ee63bcbb1a0b::t_6a45da88b74a31 141
+  s_f3ee63bcbb1a0b::t_8ff909f1be025e 402-416
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "504760c2fc67353fe58c0bd7620304b440994171",
+  "prompts": {},
+  "sessions": {
+    "s_f3ee63bcbb1a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "abc5b606-4742-4c35-b863-663ba4e1cfe9",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
