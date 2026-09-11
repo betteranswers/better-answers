@@ -10,6 +10,7 @@ import {
 } from "../src/index.ts";
 import { testData } from "./factory.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
+import { ADMITTED, refusalOf } from "./probes.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
 /**
@@ -143,29 +144,14 @@ const lapseLeaseOf = async (client: pg.PoolClient, jobId: string) => {
 };
 
 /**
- * The Postgres error's own `constraint`, which is the name the migration wrote — so a
- * refusal is asserted against the rule that refused it and not merely against "it threw".
- */
-const constraintOf = (error: unknown): string =>
-  typeof error === "object" && error !== null && "constraint" in error
-    ? String(error.constraint)
-    : `nothing named a constraint: ${String(error)}`;
-
-/**
- * One insert the row must refuse, answered with the constraint that refused it. A failed
- * statement aborts the transaction it happened in, so every probe runs against a savepoint
- * it can come back to — which is what lets one test try a whole descriptor list.
+ * One insert the row must refuse, answered with the constraint that refused it — the savepoint
+ * and the constraint's name are `probes.ts`'s, shared with the catalogue suite. An unexpected
+ * admission answers with the row, so a failure names what got in rather than only that
+ * something did.
  */
 const refusedBy = async (client: pg.PoolClient, row: ProbeRow): Promise<string> => {
-  await client.query("SAVEPOINT probe");
-  try {
-    await insertJob(client, row);
-  } catch (error) {
-    await client.query("ROLLBACK TO SAVEPOINT probe");
-    return constraintOf(error);
-  }
-  await client.query("ROLLBACK TO SAVEPOINT probe");
-  return `admitted: ${JSON.stringify(row)}`;
+  const answer = await refusalOf(client, () => insertJob(client, row));
+  return answer === ADMITTED ? `admitted: ${JSON.stringify(row)}` : answer;
 };
 
 /**

@@ -27,6 +27,7 @@ import {
   fileAtCommit,
   removeRepository,
 } from "./bundle.ts";
+import { bindingHolding } from "./sourced-concept.ts";
 import {
   abortTheTransaction,
   holdingTable,
@@ -270,10 +271,17 @@ describe("a governed write", () => {
 
   it("records the concept, its identity, the commit and its evidence in one transaction", async () => {
     const scenario = await arrange();
+    // Two spans of one catalogued document: evidence is keyed to `source_document` (T-128,
+    // owner D5), so a citation names a document the platform recorded and not a bare id.
+    const handbook = await bindingHolding(db(), scenario.workspaceId);
     const input = writeFor({
       evidence: [
-        { sourceDocumentId: ulid(), locator: "p.4#para-2", resource: "Handbook (2026)" },
-        { sourceDocumentId: ulid(), locator: "p.9", resource: "Handbook (2026)" },
+        {
+          sourceDocumentId: handbook.documentId,
+          locator: "p.4#para-2",
+          resource: "Handbook (2026)",
+        },
+        { sourceDocumentId: handbook.documentId, locator: "p.9", resource: "Handbook (2026)" },
       ],
     });
 
@@ -314,12 +322,13 @@ describe("a governed write", () => {
     const scenario = await arrange();
     // The version is what a later re-read compares against, so a piece of evidence that
     // lost it would be one nobody could tell had moved.
+    const handbook = await bindingHolding(db(), scenario.workspaceId);
     await landed(
       scenario,
       writeFor({
         evidence: [
           {
-            sourceDocumentId: ulid(),
+            sourceDocumentId: handbook.documentId,
             locator: "p.4",
             resource: "Handbook (2026)",
             contentVersion: "2026-03-01",

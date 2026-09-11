@@ -22,6 +22,11 @@ import { workspace } from "./workspace-table.ts";
  */
 
 export { workspace } from "./workspace-table.ts";
+// No table of its own: the visibility vocabulary and the column sets more than one table file
+// writes, in a module neither the concept write path nor the source catalogue can import in a
+// circle (`readable-columns.ts`). Re-exported here so the package's entry point carries the
+// words, which is where `packages/core` reads them from.
+export * from "./readable-columns.ts";
 export * from "./identity-tables.ts";
 export * from "./audit-tables.ts";
 export * from "./group-tables.ts";

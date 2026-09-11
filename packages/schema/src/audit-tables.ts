@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, jsonb, text, timestamp } from "drizzle-orm/pg-core";
+import { check, index, jsonb, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
@@ -82,6 +82,12 @@ export const auditEvent = withRLS(
     index("audit_event_workspace_id_idx").on(table.workspaceId),
     // The ledger is queryable by target (ADR 0014): every event about one record, in order.
     index("audit_event_subject_idx").on(table.workspaceId, table.subjectKind, table.subjectId),
+    // The pair a later row keys to (ADR 0014, amended 2026-09-10). The id alone is already
+    // unique, but a key on it alone runs as the table's owner and bypasses row-level security,
+    // so it would confirm that some other tenant holds a given ledger id. Every cross-table key
+    // in this package is composite over the workspace, and a composite key needs a unique index
+    // on the pair to point at: this is it, and S1's publish row is its first caller.
+    uniqueIndex("audit_event_workspace_id_id_uidx").on(table.workspaceId, table.id),
     check("audit_event_act_check", sql.raw(`act ~ '${ACT_PATTERN}'`)),
     check("audit_event_family_check", sql.raw(`family IN (${familyList})`)),
   ],

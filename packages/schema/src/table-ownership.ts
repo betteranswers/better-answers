@@ -133,10 +133,12 @@ export const TABLE_OWNERS = {
   "public.suggestion": "concepts",
   "public.concept_write_request": "concepts",
 
-  // The visibility derivation's ground (ADR 0013, ADR 0023, ADR 0039): a binding carries the
-  // three permission fields a concept's class is derived from, and the document row is the
-  // platform-held fact that ties a piece of evidence to the binding that yielded it. Both are
-  // the sources slice's; the rest of a binding and of the catalogue is B7's, on these tables.
+  // The visibility derivation's ground (ADR 0013, ADR 0023, ADR 0039) and the catalogue over
+  // it: a binding carries the three permission fields a concept's class is derived from, its
+  // connector, destination, retention class and state; a document row ties a piece of evidence
+  // to the binding that yielded it, holds the keys of its two landed copies, and may carry a
+  // class of its own that only ever narrows its binding's. Both are the sources slice's — the
+  // bind, the review, the publish and the narrowing are its acts.
   "public.source_binding": "sources",
   "public.source_document": "sources",
   // What the redaction seam withheld in one document (ADR 0020): the sources slice's,

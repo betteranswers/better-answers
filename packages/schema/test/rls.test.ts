@@ -2139,10 +2139,10 @@ describe("the rules in force on a source binding", () => {
       // and the id and nothing else: what lands in the column is then the database's own
       // DEFAULT and not a value some layer above put there.
       const id = ulid();
-      await client.query("INSERT INTO source_binding (workspace_id, id) VALUES ($1, $2)", [
-        WS_A,
-        id,
-      ]);
+      await client.query(
+        "INSERT INTO source_binding (workspace_id, id, name, connector) VALUES ($1, $2, 'The handbook', 'upload')",
+        [WS_A, id],
+      );
 
       // The safe set, written down here as a literal (`[TEST9]`): the default-on tier on, the
       // default-off tier off, and no key for *always*, because no binding switches it off.
@@ -2280,7 +2280,9 @@ describe("the derivation's tables under app_rt", () => {
       // an id nobody minted gets, so a prober learns nothing.
       const rows: readonly [string, readonly unknown[], string][] = [
         [
-          "INSERT INTO source_document (workspace_id, id, binding_id) VALUES ($1, $2, $3)",
+          `INSERT INTO source_document
+             (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size, original_key)
+           VALUES ($1, $2, $3, 'handbook.md', 'The handbook', 'text/markdown', 1024, 'documents/x/original')`,
           [WS_A, ulid(), theirs.binding.id],
           "source_document_binding_fk",
         ],

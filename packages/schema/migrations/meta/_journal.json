@@ -239,6 +239,13 @@
       "when": 1789091207327,
       "tag": "0033_the-job-subject-and-the-run-key-substrate",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1789123815213,
+      "tag": "0034_the-binding-and-the-catalogue",
+      "breakpoints": true
     }
   ]
 }

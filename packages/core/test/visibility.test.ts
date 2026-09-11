@@ -838,7 +838,8 @@ describe("narrowing a binding", () => {
         expect(narrowed.ok).toBe(true);
         await attempt(() =>
           tx.query(
-            "INSERT INTO source_binding (workspace_id, id, sensitivity, audience) VALUES ($1, $2, 'Internal', 'everyone')",
+            `INSERT INTO source_binding (workspace_id, id, name, connector, sensitivity, audience)
+             VALUES ($1, $2, 'The handbook', 'upload', 'Internal', 'everyone')`,
             [scenario.workspaceId, binding.bindingId],
           ),
         );

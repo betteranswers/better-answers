@@ -253,6 +253,11 @@ const acceptedRows = {
       publishedAt: NOW,
       sensitivity: "Restricted",
       audience: "everyone",
+      name: "The board minutes",
+      connector: "upload",
+      destination: ["chunk-index", "bundle"],
+      retentionClass: "keep",
+      state: "landed",
     },
     {
       workspaceId: WS_ID,
@@ -262,9 +267,49 @@ const acceptedRows = {
       audience: "groups",
       audienceGroups: [GROUP_ID],
       rulesInForce: { default_on: true, default_off: true },
+      name: "The HR handbook",
+      connector: "upload",
+      // One destination and a mirror's retention, so the fixture proves the set's floor and a
+      // class that is not an upload's are both accepted — the words S4's connectors will use.
+      destination: ["graph"],
+      retentionClass: "mirror",
+      state: "published",
     },
   ],
-  sourceDocument: [{ workspaceId: WS_ID, id: DOCUMENT_ID, bindingId: BINDING_ID }],
+  // The two ends of a document's life: one the bind act landed and no run has been over —
+  // no normalised copy, no hash, no version string, no outcome, and no class of its own — and
+  // one a run converted and an Admin narrowed, which is the whole catalogue filled in.
+  sourceDocument: [
+    {
+      workspaceId: WS_ID,
+      id: DOCUMENT_ID,
+      bindingId: BINDING_ID,
+      sourceSystemId: "board-minutes-2026-03.md",
+      title: "Board minutes, March 2026",
+      mediaType: "text/markdown",
+      byteSize: 4_096,
+      originalKey: `documents/${DOCUMENT_ID.toLowerCase()}/original`,
+    },
+    {
+      workspaceId: WS_ID,
+      id: "01J6NNNNNNNNNNNNNNNNNNNNN2",
+      bindingId: BINDING_ID,
+      sourceSystemId: "handbook.md",
+      title: "The handbook",
+      mediaType: "text/markdown",
+      byteSize: 0,
+      originalKey: "documents/01j6nnnnnnnnnnnnnnnnnnnnn2/original",
+      normalisedKey: "documents/01j6nnnnnnnnnnnnnnnnnnnnn2/normalised",
+      contentHash: CONTENT_SHA256,
+      redactionVersion: "1",
+      firstSeen: NOW,
+      lastSeen: NOW,
+      lastModified: NOW,
+      goneAt: NOW,
+      outcome: "converted",
+      sensitivity: "Restricted",
+    },
+  ],
   // Three findings in the document above: one as the seam wrote it, one an Admin narrowed
   // the document on, and one always-set span an Admin restored with a reason — the three
   // whole shapes the review and restore CHECKs admit.
@@ -750,6 +795,12 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "conceptIdentity",
         "conceptIndex",
         "bundleCommit",
+        // The binding before the document it yielded, and both before the evidence that
+        // locates into that document: a piece of evidence names a document the platform
+        // recorded, by the composite key owner D5 settled, so the catalogue has to be there
+        // before a citation of it can be.
+        "sourceBinding",
+        "sourceDocument",
         "evidence",
         "conceptVerification",
         // The generation row before the rows that stamp it — not a key, but the reading
@@ -763,12 +814,9 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         // after the identity its accepted row resolved to.
         "suggestion",
         "conceptWriteRequest",
-        // The binding before the document it yielded, and the findings after the document
-        // whose spans they locate; the citation after the identity and the evidence row its
-        // key names; the override after the identity; the composition before the include
-        // that names it and the concept it includes.
-        "sourceBinding",
-        "sourceDocument",
+        // The findings after the document whose spans they locate; the citation after the
+        // identity and the evidence row its key names; the override after the identity; the
+        // composition before the include that names it and the concept it includes.
         "finding",
         // The subject request names a person id where the subject has one, so it needs the
         // identity row above and nothing else; the erasure request keys to the subject
@@ -922,6 +970,43 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       },
       { ...acceptedRows.sourceBinding[1], rulesInForce: { default_on: true } },
       { ...acceptedRows.sourceBinding[1], rulesInForce: { default_on: true, default_off: "no" } },
+      // And the binding's four closed word sets, each broken the one way it can be: a
+      // connector the platform has no code for — the roster's other words are S4's, and one
+      // admitted today is a binding no run could claim — a nameless binding the Sources screen
+      // would list as a blank line, a destination store nobody can name, a binding feeding
+      // nothing at all, a retention class outside the three, and a state outside the four.
+      { ...acceptedRows.sourceBinding[0], connector: "sharepoint" },
+      { ...acceptedRows.sourceBinding[0], name: "   " },
+      { ...acceptedRows.sourceBinding[0], destination: ["chunk-index", "warehouse"] },
+      { ...acceptedRows.sourceBinding[0], destination: [] },
+      { ...acceptedRows.sourceBinding[0], retentionClass: "forever" },
+      { ...acceptedRows.sourceBinding[0], state: "reviewing" },
+    ],
+    // The catalogue's refusals: a source-system id of whitespace, which is the key a reconcile
+    // finds a row by; a title a passage would be served under blank; a negative byte count;
+    // both landed-copy keys blank, because a key is the address of bytes and an empty one
+    // addresses none; a hash that is not the one digest shape this platform writes; a run
+    // outcome outside the two words; and a document class outside the three.
+    sourceDocument: [
+      { ...acceptedRows.sourceDocument[0], sourceSystemId: "   " },
+      { ...acceptedRows.sourceDocument[0], title: "   " },
+      { ...acceptedRows.sourceDocument[0], mediaType: "   " },
+      { ...acceptedRows.sourceDocument[0], byteSize: -1 },
+      { ...acceptedRows.sourceDocument[0], byteSize: 1.5 },
+      { ...acceptedRows.sourceDocument[0], originalKey: "   " },
+      { ...acceptedRows.sourceDocument[1], normalisedKey: "   " },
+      { ...acceptedRows.sourceDocument[1], contentHash: "not-a-digest" },
+      { ...acceptedRows.sourceDocument[1], redactionVersion: "   " },
+      { ...acceptedRows.sourceDocument[1], outcome: "skipped" },
+      { ...acceptedRows.sourceDocument[1], sensitivity: "Secret" },
+    ],
+    // The job's subject, T-127's carry-forward: the row's CHECK requires a subject for the
+    // kinds whose descriptor names one, and a string of spaces is not NULL, so a subject of
+    // whitespace would pass the CHECK and reach the worker as an `index` job about no binding.
+    // The boundary is where that is a malformed job rather than an admitted one.
+    job: [
+      { ...acceptedRows.job[0], subjectId: "   " },
+      { ...acceptedRows.job[0], subjectId: "" },
     ],
     // The subject request's refusals. A third kind — the pair is closed, so the day the
     // platform answers a portability request it adds the word to `SUBJECT_REQUEST_KINDS` and

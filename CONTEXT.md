@@ -209,10 +209,11 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   enumerated and indexed by runs; a **referenced source** is bound with a credential and read live
   by a tool when a producer or a reader asks — never enumerated, never indexed, never cached. A
   source type is its origin and its reach.
-- **source document** — the platform's row for one item a binding yields: source-system id and
-  locator, title, author, `last_modified` (recorded absent when the source has none), content hash,
-  first and last seen, `gone_at`, sensitivity, and the references to its original and normalised
-  copies. The catalogue every run reconciles. _Avoid_: ingest trace (the draft's word).
+- **source document** — the platform's row for one item a binding yields: source-system id, title,
+  author, `last_modified` (recorded absent when the source has none), content hash, first and last
+  seen, `gone_at`, sensitivity, and the object-store key of each of its two landed copies. The
+  catalogue every run reconciles. A locator is a span into its normalised redacted text and never
+  one of those keys. _Avoid_: ingest trace (the draft's word).
 - **landed copy** — a source document's bytes as the platform holds them in the object store: the
   original and the normalised redacted text, under one document key.
 - **chunk** — one unit of a source document's normalised redacted text that the chunk index holds,

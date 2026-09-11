@@ -59,3 +59,17 @@ The 2026-08-30 amendment above cited two rules of the constitution for the per-l
 ## Amendment — 2026-09-08, the audience is two columns (T-055, ADR 0039)
 
 *Published · sensitivity · audience* are the three permission fields still, applied as one server-side predicate on every read, and the audience is now **two columns**: `audience text NOT NULL` narrowed to *everyone · groups*, and `audience_groups text[]` holding the named groups' ids, tied by one CHECK on every readable unit and on the binding, the predicate's third term `audience = 'everyone' OR audience_groups && $groups` failing closed at every edge. How audiences combine — by intersection, with *everyone* the identity, an empty intersection forcing Restricted — is ADR 0039's and is not restated here. Everything else in this ADR and its amendments stands.
+
+## Amendment — 2026-09-11, the document's own class, the upload's converters, the publish gate and where a binding's documents go (T-128)
+
+Four things a binding and its documents carry, settled by S1 and recorded here because each is a reading of this ADR's *origin × reach × destination* and its three permission fields.
+
+**A document may carry a class of its own, and it can only narrow.** `source_document.sensitivity` is nullable: NULL means *the binding's*, and a word there is the redaction seam's special-category verdict or an Admin's *narrow these documents*. The visibility derivation reads **the narrower of the binding's class and the document's** through the document row it already joins, so nothing a document says can widen what its binding decided. The audience stays the binding's alone — a document has no audience of its own, because an audience is a decision about people and a binding is where that decision is made.
+
+**The upload's converters, and when docling is reached for.** v0.1 converts markdown, plain text and HTML in pure Python inside the worker; docling is not run. A format that needs layout parsing — a PDF, a scanned page — is S4's trigger for docling, and until then such a document is *quarantined* with its outcome word on its row rather than half-converted into text nobody can cite.
+
+**A publish is refused until the binding is indexed.** The state word on a binding — *landed · indexing · indexed · published* — is what the act reads: an Admin cannot publish a binding whose run has not finished, because publishing is a statement that somebody reviewed what the run found. The refusal is the act's; the column is only the record of where the binding has got to.
+
+**The destination is stored per connector and acted on for the chunk index alone until S7.** A binding's `destination` is a non-empty set of the glossary's three words, defaulting to the upload's — the chunk index and the bundle. Only the chunk index is fed in v0.1: the bundle is S7's and the graph is S8's. It is recorded on the day the binding is made rather than inferred later, because *where a source's documents go* is part of what an Admin decided, and a platform that inferred it from whichever stores happened to hold rows could not tell an Admin what they agreed to.
+
+Everything else in this ADR and its amendments stands.

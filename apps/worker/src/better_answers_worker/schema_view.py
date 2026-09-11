@@ -7,9 +7,9 @@ knowledge of what the app's journal built, stamped with the migration id it was
 generated from and with that migration's journal instant, which is what the
 migrator writes into `drizzle.__drizzle_migrations.created_at`."""
 
-MIGRATION_ID = "0033_the-job-subject-and-the-run-key-substrate"
+MIGRATION_ID = "0034_the-binding-and-the-catalogue"
 
-MIGRATION_WHEN = 1789091207327
+MIGRATION_WHEN = 1789123815213
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -438,11 +438,30 @@ TABLES: dict[str, dict[str, str]] = {
         "audience_groups": "text[]",
         "created_at": "timestamp with time zone NOT NULL",
         "rules_in_force": "jsonb NOT NULL",
+        "name": "text NOT NULL",
+        "connector": "text NOT NULL",
+        "destination": "text[] NOT NULL",
+        "retention_class": "text NOT NULL",
+        "state": "text NOT NULL",
     },
     "public.source_document": {
         "workspace_id": "text NOT NULL",
         "id": "text NOT NULL",
         "binding_id": "text NOT NULL",
+        "source_system_id": "text NOT NULL",
+        "title": "text NOT NULL",
+        "media_type": "text NOT NULL",
+        "byte_size": "integer NOT NULL",
+        "original_key": "text NOT NULL",
+        "normalised_key": "text",
+        "content_hash": "text",
+        "redaction_version": "text",
+        "first_seen": "timestamp with time zone NOT NULL",
+        "last_seen": "timestamp with time zone NOT NULL",
+        "last_modified": "timestamp with time zone",
+        "gone_at": "timestamp with time zone",
+        "outcome": "text",
+        "sensitivity": "text",
     },
     "public.subject_request": {
         "workspace_id": "text NOT NULL",
