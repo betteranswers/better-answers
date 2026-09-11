@@ -2,8 +2,14 @@ import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import { readableClause, readableParameters } from "../src/access/index.ts";
-import type { UserPrincipal } from "../src/kernel/index.ts";
-import { bindUpload, dpiaInputFor, publishBinding, UPLOAD_BYTE_CAP } from "../src/sources/index.ts";
+import { attempt, type UserPrincipal } from "../src/kernel/index.ts";
+import {
+  bindUpload,
+  dpiaInputFor,
+  publishBinding,
+  reprocessBinding,
+  UPLOAD_BYTE_CAP,
+} from "../src/sources/index.ts";
 import { getObject, listObjects } from "../src/store/objects/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
 import { chunkUnder, ledgerRowsOf, groupNamed, seededBy } from "./sourced-concept.ts";
@@ -498,6 +504,16 @@ const chunkStampsOf = async (pool: pg.Pool, workspaceId: string, bindingId: stri
   return read.rows.map((row) => row.published_at);
 };
 
+/** Every run over this binding, newest first — what a reprocess adds one to. */
+const runsOver = async (pool: pg.Pool, workspaceId: string, bindingId: string) => {
+  const read = await pool.query<{ kind: string; reason: string | null; status: string }>(
+    `SELECT kind, reason, status FROM job
+      WHERE workspace_id = $1 AND subject_id = $2 ORDER BY enqueued_at DESC, id DESC`,
+    [workspaceId, bindingId],
+  );
+  return read.rows;
+};
+
 /**
  * The chunks of one document this person reaches, under the one predicate every read of a
  * readable unit appends. T-133's `passageAt` lands beside this ticket rather than under it,
@@ -879,5 +895,131 @@ describe("a Viewer inside the audience", () => {
     // The publish opens the first clause and no other: the audience still names a group this
     // Viewer is not in, so a publish is not a way in (`[TEST7]`, the pair both ways).
     expect(await passagesReadableBy(scenario.viewer, documentId)).toEqual([]);
+  });
+});
+
+/**
+ * The two chunks a finished run left for the handbook: the rows a reprocess takes away, and
+ * the rows the run it queues will land again.
+ */
+const chunksOfTheHandbook = async (
+  workspaceId: string,
+  document: { readonly bindingId: string; readonly documentId: string },
+) => {
+  for (const [ordinal, content, charStart, charEnd] of [
+    [0, HOLIDAY, 0, 53],
+    [1, NOTICE, 54, 101],
+  ] as const) {
+    await chunkUnder(db(), workspaceId, document, { content, ordinal, charStart, charEnd });
+  }
+};
+
+/** A binding whose one run has finished, with the two chunks that run left. */
+const indexedHandbook = async (scenario: Scenario) => {
+  const bound = await boundHandbook(scenario);
+  await runEndedAt(scenario.workspaceId, bound.bindingId, bound.jobId, "done", RUN_FINISHED_AT);
+  await chunksOfTheHandbook(scenario.workspaceId, bound);
+  return bound;
+};
+
+describe("an Admin reprocesses a binding", () => {
+  it("the reprocess takes away every chunk row of the binding and queues one index run carrying the reason it was given", async () => {
+    const scenario = await arrange();
+    const { bindingId, documentId } = await indexedHandbook(scenario);
+
+    const reprocessed = await asAdmin(scenario, (admin, tx) =>
+      reprocessBinding(admin, tx, { bindingId, reason: "rule-change" }),
+    );
+    if (!reprocessed.ok) throw new Error(`the reprocess was refused: ${String(reprocessed.error)}`);
+
+    // The rows are gone — every one of them, which is what makes the run that follows a
+    // rebuild of the binding and not a patch over what the old rules left.
+    expect(reprocessed.value.chunks).toEqual(2);
+    expect(await chunkStampsOf(db().pool, scenario.workspaceId, bindingId)).toEqual([]);
+    expect(await passagesReadableBy(scenario.admin, documentId)).toEqual([]);
+    // And one new run over the binding, at the reason the caller named, beside the finished
+    // one: the queue's own row is where *this binding is being indexed again* is written.
+    expect(await runsOver(db().pool, scenario.workspaceId, bindingId)).toEqual([
+      { kind: "index", reason: "rule-change", status: "queued" },
+      { kind: "index", reason: "bound", status: "done" },
+    ]);
+    expect(await jobRowOf(db().pool, scenario.workspaceId, reprocessed.value.jobId)).toEqual({
+      kind: "index",
+      reason: "rule-change",
+      status: "queued",
+      subject_id: bindingId,
+    });
+  });
+
+  it("the reprocess leaves the chunk rows and queues nothing when the act it rode in fails after it", async () => {
+    const scenario = await arrange();
+    const { bindingId } = await indexedHandbook(scenario);
+
+    // `[TEST7]` and `[TEST8]`: the same act, the other way round — a failure provoked after
+    // the reprocess has done its work, and the assertion on what the transaction left rather
+    // than on what the act answered.
+    await expect(
+      asAdmin(scenario, async (admin, tx) => {
+        const reprocessed = await reprocessBinding(admin, tx, { bindingId, reason: "wiped" });
+        expect(reprocessed.ok).toBe(true);
+        await attempt(() =>
+          tx.query(
+            `INSERT INTO source_binding (workspace_id, id, name, connector, sensitivity, audience)
+             VALUES ($1, $2, 'The staff handbook', 'upload', 'Restricted', 'everyone')`,
+            [scenario.workspaceId, bindingId],
+          ),
+        );
+      }),
+    ).rejects.toThrow(/did not commit/);
+
+    expect(await chunkStampsOf(db().pool, scenario.workspaceId, bindingId)).toEqual([null, null]);
+    expect(await runsOver(db().pool, scenario.workspaceId, bindingId)).toEqual([
+      { kind: "index", reason: "bound", status: "done" },
+    ]);
+  });
+
+  it("refuses the reprocess of a Viewer and an Editor, of a binding this workspace does not hold, of an id the platform does not mint, and of a reason no index run carries — each with the chunk rows still standing", async () => {
+    const scenario = await arrange();
+    const { bindingId } = await indexedHandbook(scenario);
+
+    const byOthers = await Promise.all(
+      [scenario.viewer, scenario.editor].map((person) =>
+        readingAs(db().runtimePool, person, (reader, tx) =>
+          reprocessBinding(reader, tx, { bindingId, reason: "rule-change" }),
+        ),
+      ),
+    );
+    // The three an Admin can ask for and hear a word back. The last is a reason the type
+    // forbids and a transport can hand over anyway, so the queue's own descriptor is what
+    // answers it — which it can only do while the rows are still there, and that is why the
+    // run goes on the queue before the chunks come off.
+    const asked: readonly { readonly bindingId: string; readonly reason: string }[] = [
+      { bindingId: "01J6NNNNNNNNNNNNNNNNNNNNN3", reason: "rule-change" },
+      { bindingId: "  ", reason: "rule-change" },
+      { bindingId, reason: "spring-clean" },
+    ];
+    const refusals = await Promise.all(
+      asked.map((input) =>
+        asAdmin(scenario, (admin, tx) =>
+          reprocessBinding(admin, tx, input as Parameters<typeof reprocessBinding>[2]),
+        ),
+      ),
+    );
+
+    expect(byOthers).toEqual([
+      { ok: false, error: "role-forbids" },
+      { ok: false, error: "role-forbids" },
+    ]);
+    expect(refusals.map((refused) => (refused.ok ? "ok" : refused.error))).toEqual([
+      "no-such-binding",
+      "malformed",
+      "malformed",
+    ]);
+    // Nothing moved on any of the five roads: the rows stand and the only run is the one that
+    // had already finished.
+    expect(await chunkStampsOf(db().pool, scenario.workspaceId, bindingId)).toEqual([null, null]);
+    expect(await runsOver(db().pool, scenario.workspaceId, bindingId)).toEqual([
+      { kind: "index", reason: "bound", status: "done" },
+    ]);
   });
 });
