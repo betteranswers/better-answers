@@ -293,11 +293,80 @@ describe("the deploy tree (T-005)", () => {
     expect(drill).toContain("seed-synthetic.sh");
   });
 
-  it("lets the mirror key run init-repo and git-receive-pack, and nothing else", () => {
+  /**
+   * The drill's erasure rehearsal, in the seven steps the S0 spec fixes (T-125): seed → dump →
+   * grep and find the subject → erase → dump again → grep and find them gone → and gone from git.
+   *
+   * The order is the whole of it. Each step is worth only what the one before it proved: a grep
+   * that found nothing after the routine proves an erasure only if the same grep of the same
+   * database found the subject before it, and a rehearsal that ran the routine alone would prove
+   * that the command exits 0. The markers are the acts rather than the step number, so a script
+   * renumbered again cannot quietly satisfy this.
+   */
+  it("proves the rehearsal in seven steps, in order: seed · dump · found · erase · dump · gone · gone from git", () => {
+    const drill = read("deploy/restore-drill.sh");
+    const at = (needle: string): number => {
+      const index = drill.indexOf(needle);
+      expect({ needle, found: index >= 0 }).toEqual({ needle, found: true });
+      return index;
+    };
+    const steps = [
+      "--synthetic --seed",
+      'pg_dump --format=plain --dbname="${STAGING_DATABASE_URL}" > "${WORK}/pre-erasure.sql"',
+      'dump-grep --tokens "${subject}" < "${WORK}/pre-erasure.sql"',
+      "--synthetic --run --report",
+      'pg_dump --format=plain --dbname="${STAGING_DATABASE_URL}" > "${WORK}/post-erasure.sql"',
+      'dump-grep --tokens "${subject}" < "${WORK}/post-erasure.sql"',
+      "cat-file -e",
+    ];
+    const found = steps.map(at);
+    expect(found).toEqual([...found].sort((left, right) => left - right));
+
+    // Both dumps whole, and read per table. A dump taken with tables left out is not the copy a
+    // restore would use, and an exclusion would hide the very rows the reading below is about.
+    const dumps = drill.split("\n").filter((line) => line.trimStart().startsWith("pg_dump "));
+    expect(dumps).toHaveLength(2);
+    expect(dumps.filter((line) => line.includes("--exclude"))).toEqual([]);
+    // `subject_request` and `suppression` keep the identifier set by design — the routine's steps
+    // 6 and 10 — so *present* there is the expected reading after an erasure and present anywhere
+    // else stops the drill. The allow-list tolerates the schema prefix `pg_dump` writes.
+    expect(drill).toContain("grep -v -E ' of table ([a-z_]+\\.)?(subject_request|suppression)$'");
+    expect(drill).toContain("keep the identifier set BY DESIGN");
+  });
+
+  /**
+   * ADR 0020's "gc on both copies" on the mirror's side, which until T-125 nothing performed: the
+   * nightly `git push --mirror` replaces the mirror's refs after an erasure rewrote a history, and
+   * the objects it replaced stay readable on VPC 2 through the reflog `git-receive-pack` writes.
+   * The push's own `--porcelain` report is what says refs were replaced — `+` a forced update, `-`
+   * a deletion — so an ordinary fast-forward night prunes nothing.
+   */
+  it("prunes the mirror after a --mirror push that replaced refs, and only then", () => {
+    const backup = read("deploy/backup.sh");
+    expect(backup).toContain("push --mirror --porcelain");
+    expect(backup).not.toContain("push --mirror --quiet");
+    expect(backup).toContain("grep -qE '^[+-]'");
+    expect(backup).toContain('prune-repo "${ws}"');
+  });
+
+  /**
+   * And the mirror key's grammar is that third verb and no more. It was two verbs from the day the
+   * file was written until the ADR 0024 amendment of 2026-09-11; the case below was amended with
+   * it, and the claim it makes — everything outside the list is refused — is unchanged.
+   */
+  it("lets the mirror key run init-repo, git-receive-pack and prune-repo, and nothing else", () => {
     const shell = read("deploy/mirror-shell.sh");
     expect(shell).toContain('"init-repo "*)');
     expect(shell).toContain('"git-receive-pack "*)');
     expect(shell).toContain("exec git-receive-pack");
+    expect(shell).toContain('"prune-repo "*)');
+    // The third verb is argument-checked the way the first is: a workspace id, or refused.
+    expect(shell).toContain('is_workspace "${ws}" || refuse "prune-repo: not a workspace id"');
+    expect(shell).toContain('git -C "${target}" reflog expire --expire=now --all');
+    expect(shell).toContain('git -C "${target}" gc --prune=now --quiet');
+    // Three cases and the catch-all, which is what "and nothing else" means here.
+    expect([...shell.matchAll(/^ {2}"[a-z-]+ "\*\)/gm)]).toHaveLength(3);
+    expect(shell).toContain('*) refuse "not a mirror command" ;;');
     expect(read("deploy/host-setup.sh")).toContain(
       'command="/usr/local/bin/mirror-shell /data/mirror",restrict',
     );

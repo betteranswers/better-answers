@@ -915,10 +915,39 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("dump-grep — present or absent per token, never the line", () => {
-    it("reports each token's presence over a plain-SQL dump on stdin and quotes nothing", async () => {
-      const dump =
-        "COPY person (id, email) FROM stdin;\n1\tjane@example.test\n2\tother@example.test\n\\.\n";
+  /**
+   * **Which table, and how many lines in it** — the drill's step 10 reads these lines and decides
+   * whether an erasure erased (`deploy/restore-drill.sh`; the S0 spec, *The two ops commands*).
+   *
+   * Per `COPY` section rather than per dump, because after an erasure the honest answer is not
+   * "absent": `subject_request` and `suppression` keep the subject's identifier set **by design**
+   * — a restore from a dump older than the request has to re-create the suppressions from it —
+   * so a whole-database dump taken after the routine still holds the address and the display
+   * name, in exactly those two tables and nowhere else. A reader told only that *something* holds
+   * the value cannot tell that apart from an erasure that missed a store.
+   *
+   * What does not change: the line itself is never quoted, whatever it says. A dump is personal
+   * data and this output is what a regulator reads.
+   */
+  describe("dump-grep — which table holds a token and in how many lines, never the line", () => {
+    /** One dump of the shape `pg_dump --format=plain` writes, schema-qualified as it writes them. */
+    const dump = [
+      "SET search_path = public;",
+      "COPY public.person (id, email) FROM stdin;",
+      "1\tjane@example.test",
+      "2\tother@example.test",
+      "\\.",
+      "COPY public.subject_request (id, identifiers) FROM stdin;",
+      'r1\t{"emails": ["jane@example.test"]}',
+      "\\.",
+      "COPY public.suppression (id, identifiers) FROM stdin;",
+      's1\t{"emails": ["jane@example.test"]}',
+      's2\t{"emails": ["jane@example.test"]}',
+      "\\.",
+      "",
+    ].join("\n");
+
+    it("names every table a token is in with its count, and says absent for one in none", async () => {
       const run = await ops(
         app(),
         ["dump-grep", "--tokens", "jane@example.test,nobody@example.test"],
@@ -926,8 +955,38 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
 
       expect(run.exitCode).toBe(0);
-      expect(run.lines).toEqual(["jane…st: present in 1 line(s)", "nobo…st: absent"]);
+      expect(run.lines).toEqual([
+        "jane…st: present in 1 line(s) of table public.person",
+        "jane…st: present in 1 line(s) of table public.subject_request",
+        "jane…st: present in 2 line(s) of table public.suppression",
+        "nobo…st: absent",
+      ]);
+      // The other row of `person` was read and never repeated: not the line, not ever.
       expect(run.lines.join("\n")).not.toContain("other@example.test");
+    });
+
+    it("reports a match outside every COPY section as exactly that, because schema is not rows", async () => {
+      const outside = [
+        "SET search_path = public;",
+        "CREATE FUNCTION greet() RETURNS text AS $$ select 'jane@example.test' $$;",
+        "COPY public.person (id, email) FROM stdin;",
+        "1\tsomebody@example.test",
+        "\\.",
+        "",
+      ].join("\n");
+
+      const run = await ops(app(), ["dump-grep", "--tokens", "jane@example.test"], outside);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual(["jane…st: present in 1 line(s) outside any COPY section"]);
+    });
+
+    it("does not count the COPY header, whose column names are the schema and not a row", async () => {
+      // `id` is a column name of all three sections above and a value in none of them.
+      const run = await ops(app(), ["dump-grep", "--tokens", "id"], dump);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual(["id: absent"]);
     });
   });
 });

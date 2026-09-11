@@ -172,7 +172,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   smoke --url <origin> [--workspace <id>] [--find] [--guide] [--ask]
   erasure-rehearsal --workspace <id> --synthetic --seed      phase one: the synthetic subject, its tokens on the last line
   erasure-rehearsal --workspace <id> --synthetic --run --report <file>   phase two: erase them, write the report, print the tokens again
-  dump-grep --tokens <a,b,…>                                stdin: a plain-SQL dump; reports present/absent per token, never a line
+  dump-grep --tokens <a,b,…>                                stdin: a plain-SQL dump; per token, which COPY section holds it and in how many lines — never a line
 exit codes: ${DONE} done · ${REFUSED} refused, stop · ${USAGE} usage · ${NOT_BUILT} the slice this needs has no tables yet`;
 
 /**
@@ -334,6 +334,67 @@ const smoke = async (flags: Flags, io: OpsIo): Promise<number> => {
   return failed === 0 ? DONE : REFUSED;
 };
 
+/** Where a hit was that no `COPY` section claimed — schema, a function body, a comment. */
+const OUTSIDE_ANY_SECTION = "";
+
+/** `COPY <table> (…) FROM stdin;` — the table is whatever stands between the verb and the columns. */
+const SECTION_OPENS = /^COPY\s+([^\s(]+)/;
+
+/** Enough of a token for a reader to recognise it, never enough to be the value itself. */
+const maskToken = (token: string): string =>
+  token.length > 8 ? `${token.slice(0, 4)}…${token.slice(-2)}` : token;
+
+/**
+ * One pass over the dump: per token, how many lines hold it in each `COPY` section.
+ *
+ * A plain-SQL dump is sections of rows (`COPY <table> (…) FROM stdin;` … `\.`) with schema
+ * between them, so the section a line falls in is the table the value is *in*. While a section
+ * is open only `\.` closes it — a row whose first field happens to read `COPY something` is data,
+ * not a header — and the header line itself is skipped, because its column names are the schema
+ * of the table rather than a row of it.
+ */
+const perSectionHits = (
+  text: string,
+  tokens: readonly string[],
+): ReadonlyMap<string, ReadonlyMap<string, number>> => {
+  const hits = new Map<string, Map<string, number>>(
+    tokens.map((token) => [token, new Map<string, number>()]),
+  );
+  let table: string | undefined;
+  for (const line of text.split("\n")) {
+    const opened = table === undefined ? SECTION_OPENS.exec(line)?.[1] : undefined;
+    if (opened !== undefined) {
+      table = opened;
+      continue;
+    }
+    if (table !== undefined && line === "\\.") {
+      table = undefined;
+      continue;
+    }
+    for (const token of tokens) {
+      if (!line.includes(token)) continue;
+      const counted = hits.get(token);
+      const where = table ?? OUTSIDE_ANY_SECTION;
+      counted?.set(where, (counted.get(where) ?? 0) + 1);
+    }
+  }
+  return hits;
+};
+
+/**
+ * **Which table holds a token, and in how many of its lines** — read on stdin, a plain-SQL dump.
+ *
+ * The drill's erasure rehearsal greps the same database before and after the routine and decides
+ * from these lines whether an erasure erased (`deploy/restore-drill.sh`). *Absent* is not the
+ * reading it expects afterwards: `subject_request` and `suppression` keep the subject's
+ * identifier set by design, because a restore from a dump older than the request re-creates the
+ * suppressions from it, so a whole-database dump taken after the routine still holds the address
+ * and the display name — in those two tables and nowhere else. A report that said only that
+ * *something* holds the value could not tell that apart from an erasure that missed a store.
+ *
+ * The line itself is never said, whatever it holds: a dump is personal data and this output is
+ * what a regulator reads. The token is masked for the same reason.
+ */
 const dumpGrep = async (flags: Flags, io: OpsIo): Promise<number> => {
   const tokens = (flagValue(flags, "tokens") ?? "")
     .split(",")
@@ -343,14 +404,18 @@ const dumpGrep = async (flags: Flags, io: OpsIo): Promise<number> => {
     io.say("dump-grep: --tokens <a,b,…> is required");
     return USAGE;
   }
-  const text = await io.stdin();
-  const lines = text.split("\n");
+  const hits = perSectionHits(await io.stdin(), tokens);
   for (const token of tokens) {
-    // Never the line: a dump is personal data and the report is what a regulator reads.
-    const hits = lines.filter((line) => line.includes(token)).length;
-    io.say(
-      `${token.length > 8 ? `${token.slice(0, 4)}…${token.slice(-2)}` : token}: ${hits === 0 ? "absent" : `present in ${hits} line(s)`}`,
-    );
+    const counted = hits.get(token);
+    if (counted === undefined || counted.size === 0) {
+      io.say(`${maskToken(token)}: absent`);
+      continue;
+    }
+    for (const [where, lines] of counted) {
+      const place =
+        where === OUTSIDE_ANY_SECTION ? "outside any COPY section" : `of table ${where}`;
+      io.say(`${maskToken(token)}: present in ${lines} line(s) ${place}`);
+    }
   }
   return 0;
 };

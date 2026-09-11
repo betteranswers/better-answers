@@ -11,9 +11,10 @@
 # THIS IS THE STAGING DRILL. It wipes what it restores, on exit, whatever happened. A production restore is
 # `restore-production.sh` (RUNBOOK.md page 1), which shares the recovery order and none of the traps.
 #
-# Every third month it rehearses the erasure routine on a synthetic subject. The report records, per store,
-# found · acted · verified absent; the three retention dates a real report would quote; a grep of the
-# restored dump for the subject's tokens; graph counts per label; RTO and RPO.
+# Every third month it rehearses the erasure routine on a synthetic subject, in seven steps that each
+# rest on the one before (step 10). The report records, per store, found · acted · verified absent; the
+# three retention dates a real report would quote; a grep of a whole-database dump for the subject's
+# tokens taken BEFORE and AFTER the routine, per table; graph counts per label; RTO and RPO.
 #
 # A step whose slice is not built yet is recorded as such, not skipped silently: every `pnpm ops` command
 # exits 3 for "the store this needs has no tables in this schema" (apps/api/src/ops.ts), and the drill
@@ -209,13 +210,70 @@ say "## 9 bucket listing vs the matrix (tiers live in the bucket lifecycle, neve
 for tier in hourly daily weekly monthly; do printf '%s: %s copies\n' "${tier}" "$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/" | wc -l)" >> "${REPORT}"; done
 
 if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
-  say "## 10 erasure rehearsal on a synthetic subject (ADR 0020, ticket 24)"
-  if subject=$(platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --report /tmp/erasure.md | tail -n1); then
+  say "## 10 erasure rehearsal on a synthetic subject — the proof that an erasure erases (ADR 0020, 0022; ticket 24)"
+  # Seven steps, in this order, because each is only worth what the one before it proved:
+  #   1 seed a synthetic subject      2 dump the whole database      3 grep it and FIND them
+  #   4 erase                         5 dump the whole database again
+  #   6 grep it and find them gone from every table but two          7 and gone from git history
+  # A rehearsal that ran the routine alone would prove the command exits 0. This proves the data left.
+  ws_repo="/data/git/${DRILL_WORKSPACE}.git"
+  # As the bundle clone at step 4 does: the repositories are owned by the api's uid, and git
+  # refuses a repository whose owner is not the user running it.
+  ws_git() { sudo -u '#1000' git -C "${ws_repo}" "$@"; }
+  commits_before_seed=$({ ws_git rev-list --all 2>/dev/null || true; } | sort)
+
+  # 1 — the seed: a synthetic person, an Admin membership and one concept file naming them, in one
+  # commit. Its last line is the subject's tokens (email, address, display name), comma by comma.
+  if subject=$(platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --seed | tail -n1); then
+    # The commits the seed added are the pre-rewrite hashes step 7 expects to be gone. Taken as a
+    # difference and not as "every hash in the repository": `git filter-repo` rewrites the commits
+    # that name the subject and everything after them, and leaves the rest of the restored history
+    # where it was, so asserting every hash had gone would fail on commits no erasure was ever
+    # going to touch.
+    commits_after_seed=$({ ws_git rev-list --all 2>/dev/null || true; } | sort)
+    seeded_commits=$(comm -13 <(printf '%s\n' "${commits_before_seed}") <(printf '%s\n' "${commits_after_seed}"))
+
+    # 2 — a plain-SQL dump of the WHOLE staging database, taken on the host the way a restore reads
+    # one. Whole, and never with `--exclude-table`: a dump with tables left out is not the copy a
+    # restore would use, and an exclusion would hide the very rows step 6 has to read.
+    pg_dump --format=plain --dbname="${STAGING_DATABASE_URL}" > "${WORK}/pre-erasure.sql"
+
+    # 3 — and the subject is in it. If they are not, the seed did not do what it says and every
+    # step below proves nothing.
+    if platform exec -T api pnpm --silent ops dump-grep --tokens "${subject}" < "${WORK}/pre-erasure.sql" | tee -a "${REPORT}" | grep -q ': present in '; then
+      say "dump grep before: the subject is in the pre-erasure copy (expected; the report's expiry dates cover it)"
+    else
+      say "REHEARSAL FAILED: the seeded subject is in no table of the pre-erasure dump"; exit 1
+    fi
+
+    # 4 — the routine itself, under the platform principal, writing the report the drill keeps.
+    platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --run --report /tmp/erasure.md | tee -a "${REPORT}"
     platform exec -T api cat /tmp/erasure.md >> "${REPORT}"
-    # the one check that proves "gone from every copy" rather than assumes it: the pre-erasure dump,
-    # restored to plain SQL by pg_restore on the host, grepped for the subject's tokens inside the api
-    pg_restore -f - "${WORK}/pg.dump" | platform exec -T api pnpm --silent ops dump-grep --tokens "${subject}" >> "${REPORT}" \
-      && say "dump grep: subject present in the pre-erasure copy (expected; expiry dates recorded)"
+
+    # 5 — the same dump again, whole, of the same database.
+    pg_dump --format=plain --dbname="${STAGING_DATABASE_URL}" > "${WORK}/post-erasure.sql"
+
+    # 6 — and now the subject is gone from every table BUT TWO. `subject_request` and `suppression`
+    # keep the identifier set BY DESIGN (the routine's steps 6 and 10): a restore from a dump older
+    # than the request has to re-create the suppressions from that set, so a post-erasure dump that
+    # did not hold it would make the erasure unrepeatable. Present in those two is the expected
+    # reading; present anywhere else is the erasure having missed a store, and stops the drill.
+    platform exec -T api pnpm --silent ops dump-grep --tokens "${subject}" < "${WORK}/post-erasure.sql" > "${WORK}/post-erasure.grep"
+    cat "${WORK}/post-erasure.grep" >> "${REPORT}"
+    if leaked=$(grep ': present in ' "${WORK}/post-erasure.grep" | grep -v -E ' of table ([a-z_]+\.)?(subject_request|suppression)$'); then
+      say "REHEARSAL FAILED: the subject is still held — ${leaked}"; exit 1
+    fi
+    say "dump grep after: the subject is in no table but subject_request and suppression, which keep the identifier set by design"
+
+    # 7 — and gone from git. `git cat-file -e` on each pre-rewrite commit must fail: after
+    # `git filter-repo` and the prune the old objects are not merely unreferenced, they are not
+    # there to read. This is the check that proves "gone from every copy" rather than assuming it.
+    for hash in ${seeded_commits}; do
+      if ws_git cat-file -e "${hash}^{commit}" 2>/dev/null; then
+        say "REHEARSAL FAILED: pre-rewrite commit ${hash} is still readable in ${ws_repo}"; exit 1
+      fi
+    done
+    say "git cat-file: every pre-rewrite commit is gone from the bare repository ($(printf '%s\n' "${seeded_commits}" | grep -c . || true) checked)"
   else
     say "  -> not built yet: the erasure slice has no tables in this schema (recorded, not failed)"
   fi
