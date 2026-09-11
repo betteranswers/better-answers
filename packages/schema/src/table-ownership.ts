@@ -401,6 +401,20 @@ export const CROSS_OWNER_TABLE_ACCESS = [
       "The detector runs in the worker and the review of what it found is an Admin's act, so the worker records a span it withheld and holds INSERT alone — no SELECT, no UPDATE, no DELETE, each refusal a test of its own (ADR 0020). A worker that could read this table would hold a workspace's map of where its personal data sits; one that could update it could mark a special-category span reviewed. No lint sees across a process boundary, which is why the grant and this entry are both written down.",
   },
   {
+    table: "index.chunk",
+    by: WORKER,
+    access: "read and write",
+    reason:
+      "A run writes the chunk rows it split out of one document's normalised redacted text, rewrites them when the same document is processed again, and deletes the rows of a document that has gone from the source — so the worker holds INSERT, UPDATE and DELETE on the table by name (migration 0035) and reaches every row through the policied parent, never through a workspace's partition, which the lifecycle function revokes. The acts over the same rows are the sources slice's: a publish and a narrowing rewrite the visibility copies the run wrote, and the run's last statement re-copies them, so a narrowing that lands mid-run wins (ADR 0013, ADR 0031).",
+  },
+  {
+    table: "public.source_document",
+    by: WORKER,
+    access: "read and write",
+    reason:
+      "The catalogue is what a run reconciles: it reads the row to learn which item it is processing and writes back the content hash, the key of the normalised copy it wrote, the redaction version the seam returned, the outcome word and when it last saw the item. SELECT and UPDATE alone (migration 0035) — a document row is created by the act that bound its source and removed by the act that withdraws it, both the app's, so a worker that could insert one could catalogue a document nobody uploaded (ADR 0013, ADR 0020).",
+  },
+  {
     table: "public.graph_generation",
     by: WORKER,
     access: "read and write",

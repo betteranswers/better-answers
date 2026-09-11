@@ -1,4 +1,5 @@
-import { customType, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { customType, integer, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 
 /**
  * The `index` schema's declarations live in their own module, deliberately outside
@@ -35,17 +36,31 @@ const embeddingVector = customType<{ data: number[]; driverData: string }>({
 });
 
 /**
+ * The full-text vector over a chunk's content, in the English configuration (migration 0035).
+ * A `customType` for the same reason the embedding is one — drizzle-orm 0.45.2 declares no
+ * `tsvector` — and therefore ADR 0028's plain-schema exception again. The driver hands the
+ * column back as text, which is the only form it ever takes on this side of the boundary:
+ * neither tier writes it, and the reads that use it match against it in SQL.
+ */
+const searchVector = customType<{ data: string; driverData: string }>({
+  dataType: () => "tsvector",
+});
+
+/**
  * Declared, not generated: the real DDL is the hand-written migration's `PARTITION BY
  * LIST (workspace_id)` parent (drizzle-orm 0.45.2 has no partitioning API — ADR 0028
- * assertion 4's note), whose per-workspace partitions and HNSW indexes are created by
+ * assertion 4's note), whose per-workspace partitions and full-text indexes are created by
  * the one SECURITY DEFINER lifecycle function.
  */
 export const chunk = indexSchema.table("chunk", {
   id: text("id").notNull(),
   workspaceId: text("workspace_id").notNull(),
   content: text("content").notNull(),
-  embedding: embeddingVector("embedding").notNull(),
-  embeddingRouteId: text("embedding_route_id").notNull(),
+  // Nullable together, and kept together by the row's own CHECK (migration 0035): nothing
+  // embeds until S8, so a chunk lands with neither the vector nor the route that would have
+  // made one — and a row may never carry one of the two without the other.
+  embedding: embeddingVector("embedding"),
+  embeddingRouteId: text("embedding_route_id"),
   // The three visibility columns every readable unit carries (ADR 0023) — the audience as
   // its word and its group-id array (ADR 0039), tied by the CHECK the hand-written DDL
   // copies from `AUDIENCE_CHECK`.
@@ -56,4 +71,20 @@ export const chunk = indexSchema.table("chunk", {
   // On every chunk row: a chunk is always source-derived (ADR 0023 puts `binding_id`
   // on source-derived rows; canonical entities, which carry none, have no chunks).
   bindingId: text("binding_id").notNull(),
+  // The document this is a unit of, and the chunk's own locator — a span,
+  // `chars:<start>-<end>` in Unicode code points into that document's normalised redacted
+  // text (`CONTEXT.md`, *locator*). The migration keys the pair to `source_document` and
+  // cascades a document's deletion through it, and holds one row per document and locator.
+  sourceDocumentId: text("source_document_id"),
+  locator: text("locator"),
+  // The splitter's position, so a passage read never parses a locator it already has the row
+  // for, and the same span as two numbers, so a locator's range resolves to its covering rows
+  // by two comparisons.
+  ordinal: integer("ordinal"),
+  charStart: integer("char_start"),
+  charEnd: integer("char_end"),
+  // The database's own work and neither tier's: one right value, decided by the content.
+  search: searchVector("search")
+    .notNull()
+    .generatedAlwaysAs(sql`to_tsvector('english', content)`),
 });

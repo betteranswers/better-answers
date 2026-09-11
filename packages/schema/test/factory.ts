@@ -393,6 +393,14 @@ export const testData = (client: pg.PoolClient): TestData => {
       audience: AUDIENCE_EVERYONE,
       audienceGroups: null,
       bindingId: `binding-${ulid()}`,
+      // A chunk seeded for the visibility columns alone locates into no document: the suites
+      // that want an address — a passage read, a document's deletion taking its copies with it
+      // — name the document and its span, and every other caller stands as it was.
+      sourceDocumentId: null,
+      locator: null,
+      ordinal: null,
+      charStart: null,
+      charEnd: null,
       ...overrides,
       workspaceId,
     });

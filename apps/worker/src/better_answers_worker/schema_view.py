@@ -7,22 +7,28 @@ knowledge of what the app's journal built, stamped with the migration id it was
 generated from and with that migration's journal instant, which is what the
 migrator writes into `drizzle.__drizzle_migrations.created_at`."""
 
-MIGRATION_ID = "0034_the-binding-and-the-catalogue"
+MIGRATION_ID = "0035_the-chunk-substrate"
 
-MIGRATION_WHEN = 1789123815213
+MIGRATION_WHEN = 1789127323033
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
         "id": "text NOT NULL",
         "workspace_id": "text NOT NULL",
         "content": "text NOT NULL",
-        "embedding": "vector(1024) NOT NULL",
-        "embedding_route_id": "text NOT NULL",
+        "embedding": "vector(1024)",
+        "embedding_route_id": "text",
         "published_at": "timestamp with time zone",
         "sensitivity": "text NOT NULL",
         "audience": "text NOT NULL",
         "binding_id": "text NOT NULL",
         "audience_groups": "text[]",
+        "source_document_id": "text",
+        "locator": "text",
+        "ordinal": "integer",
+        "char_start": "integer",
+        "char_end": "integer",
+        "search": "tsvector NOT NULL",
     },
     "public.access_request": {
         "id": "text NOT NULL",
