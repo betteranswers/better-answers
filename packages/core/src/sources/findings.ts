@@ -24,9 +24,10 @@ import type { Tx } from "../store/postgres/index.ts";
  * The act writes the instant, the Admin and the reason on the finding; the reprocess that
  * puts the span back into the text is S1's, keyed on this row.
  *
- * **The reason lands on the row and never on the ledger** (`[AUDIT5]`). It is free text an
- * Admin typed and could name a person; the detail carries the finding's id alone, so the
- * ledger stays a table an erasure never rewrites.
+ * **The reason lands on the row and never on the ledger.** It is free text an Admin typed and
+ * could name a person, and a ledger detail carries ids and role words and nothing else — so
+ * the detail here is the finding's id alone, and the ledger stays a table an erasure never
+ * rewrites.
  */
 
 /**
@@ -74,7 +75,8 @@ export type FindingRestored = {
 };
 
 /**
- * Restore one always-set span, and record the act, in one transaction (`[AUDIT1]`).
+ * Restore one always-set span, and record the act, in one transaction — the row and its ledger
+ * event land or fail together, so a restore whose event cannot be written did not happen.
  *
  * Every refusal is decided before a row is written: the role, the shape of the id and the
  * reason, the finding's existence, and — against the row as it stands — its tier. The row is
@@ -88,10 +90,10 @@ export type FindingRestored = {
  * which is the second reason the tier is what this reads.
  *
  * The instant is the database's `now()` and not a clock this act was handed, because it is a
- * row's own timestamp (ADR 0040); the actor is the kernel's one derivation from the Principal
- * (`[AUDIT3]`), so no slice composes `human:<id>` by hand. A second restore by an Admin is
- * allowed and writes its own ledger row: correcting a reason is itself an act, and the ledger
- * keeps both (`[AUDIT3]`, the ledger is never rewritten).
+ * row's own timestamp (ADR 0040); the actor is the kernel's one derivation from the Principal,
+ * so no slice composes `human:<id>` by hand and the column holds an actor id as the ledger
+ * does. A second restore by an Admin is allowed and writes its own ledger row: correcting a
+ * reason is itself an act, and the ledger keeps both, because the ledger is never rewritten.
  *
  * The row is read `FOR UPDATE`, so two Admins restoring the same span queue rather than each
  * reading a tier the other is about to leave behind.

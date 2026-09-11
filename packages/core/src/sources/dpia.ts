@@ -206,8 +206,8 @@ const canonical = (value: Canonical): string => {
  * configured — `listRoutes` answers one route per purpose whether or not a row exists, and a
  * choice nobody made is not a processor anybody sends anything to.
  *
- * A read, so it writes no row and records no act (`[AUDIT8]`); the hash is what the publish act
- * records when it lands.
+ * A read, so it writes no row and records no act — a read is not an act on the ledger. The hash
+ * is what the publish act records when it lands.
  */
 export const dpiaInputFor = async (
   principal: UserPrincipal,
