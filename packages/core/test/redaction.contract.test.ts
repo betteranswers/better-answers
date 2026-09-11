@@ -98,9 +98,16 @@ describe("the redaction agreement's tiers", () => {
     const switchable = fixture.tiers.flatMap((tier) =>
       tier.binding_key === null ? [] : [tier.binding_key],
     );
+    // A whole binding, not a partial one: the Admin's own name for the source and its
+    // connector are the two columns `source_binding` defaults nothing for, so an object
+    // without them is refused for being incomplete rather than for its rules. They are
+    // written here rather than seeded, because this suite reads the boundary and never
+    // opens a database.
     const binding = {
       workspaceId: "01J6AAAAAAAAAAAAAAAAAAAAAA",
       id: "01J6VVVVVVVVVVVVVVVVVVVVVV",
+      name: "The handbook",
+      connector: "upload",
       rulesInForce: Object.fromEntries(switchable.map((key) => [key, true])),
     };
 
