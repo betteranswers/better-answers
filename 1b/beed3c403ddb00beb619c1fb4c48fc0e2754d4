@@ -1,0 +1,33 @@
+packages/core/vitest.config.ts
+  s_96a66f19ddb6be::t_a740cda9e6371a 16-40
+packages/schema/test/warm-postgres.test.ts
+  s_96a66f19ddb6be::t_06fcf2d8a155cc 98-110
+  s_96a66f19ddb6be::t_54e8477ce3b9b3 246-250,256-259,271
+  s_96a66f19ddb6be::t_325c9c0f411135 65-96
+packages/schema/test/harness.ts
+  s_96a66f19ddb6be::t_27105e81d14c15 26-54
+  s_96a66f19ddb6be::t_5f45d26624ee4c 110-112
+apps/api/vitest.config.ts
+  s_96a66f19ddb6be::t_1486626ecd531c 17-22
+packages/schema/vitest.config.ts
+  s_96a66f19ddb6be::t_6d49af53af84b6 18-23
+packages/schema/test/warm-postgres.ts
+  s_96a66f19ddb6be::t_00c4c589b8e16c 15
+  s_96a66f19ddb6be::t_28b4985c27cb40 159-161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1bbeed3c403ddb00beb619c1fb4c48fc0e2754d4",
+  "prompts": {},
+  "sessions": {
+    "s_96a66f19ddb6be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1940d59b-7323-446c-9724-222dda88e9e0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
