@@ -191,9 +191,11 @@ identity set — `revokeCredentials` (`packages/core/src/workspaces/index.ts`,
 (`apps/api/src/auth/auth.ts`, `session.active_workspace_id`) — are raw SQL through the pg
 client, which no Drizzle hook can reach either. The four hooks were dead code the CLI
 generator's own output carried in (T-004, 2026-09-02), never a site this codebase wrote a
-decision into, and they are deleted; the columns' DDL is unchanged, because Better Auth
+decision into, and they are deleted; ~~the columns' DDL is unchanged~~ T-109 changes no
+column's DDL, and `account`'s moved later (2026-09-12 amendment below), because Better Auth
 supplies `updatedAt` on every insert and update it makes and no `NOT NULL` column is left
-unset. **No trigger and no migration**: this is not the columns moving to the database's
+unset. ~~**No trigger and no migration**~~ **No trigger, and one migration for `account`
+alone** (2026-09-12 amendment below): this is not the columns moving to the database's
 `now()`, which this record already refuses for a row's timestamp generally when the api would
 be the one deciding to write it — it is the opposite finding, that these four were never the
 api's clock to begin with, so there is nothing here for the api to hand a `now()` to.
@@ -214,3 +216,21 @@ already wrote — the database's own instant, this record's shape for a row's ti
 platform write to an identity row moves its timestamp the same way a library write does. This
 is not the columns' DDL changing and not a trigger: it is the two sites that already write to
 these rows writing one column more, in the same statement, under the same transaction.
+
+## Amendment — 2026-09-12, `account.updated_at` gets the `DEFAULT now()` its declaration has carried since T-004; the default is inert, and the clause struck above recorded of `account` a thing that was already untrue (T-138)
+
+`identity-tables.ts` has declared `account.updated_at` as `.defaultNow().notNull()` since
+T-004, and the DDL that created the column (`migrations/0004_identity-set.sql`) never carried
+the matching `DEFAULT now()`, so the clause struck above recorded of `account` a thing that
+was already untrue: the declaration and the database disagreed, and that disagreement was not
+T-109's to leave. `0033_the-account-timestamp-default` is the one `ALTER` that closes it and
+nothing else. **The default is inert**, which is why nothing ever broke — Better Auth supplies
+`updatedAt` on every insert and update it makes, so the column is never left unset for a
+default to fill, and this is still not a row's timestamp moving onto a clock the api decides;
+the reasoning struck above holds, only its claim about migrations does not. `user` and
+`verification` already carry the default in both places, so this is `account` spelling the
+column the way its two siblings already do (`session.updated_at` carries it in neither and
+stays as it is). What leaving it cost, visibly, was an `ALTER TABLE "account" ALTER COLUMN
+"updated_at" SET DEFAULT now();` that every `drizzle-kit generate` run proposed and that each
+of T-120's four iterations stripped out of a family's migration by hand (`badaad8`); a
+generate run on a clean tree now proposes nothing.
