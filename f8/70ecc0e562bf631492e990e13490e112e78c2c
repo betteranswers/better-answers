@@ -1,0 +1,28 @@
+apps/worker/tests/test_redaction_descriptors.py
+  s_96a66f19ddb6be::t_e6467b3b97fee0 52-55
+  s_96a66f19ddb6be::t_fdfcbc77aa2937 291-293,296
+.github/workflows/check.yml
+  s_96a66f19ddb6be::t_4b51230b799cae 61-66
+  s_96a66f19ddb6be::t_c1663a82833f19 67-75
+  s_96a66f19ddb6be::t_4d26d65e71452d 102
+.gitignore
+  s_96a66f19ddb6be::t_23483bf239124d 12-15
+.oxfmtrc.json
+  s_96a66f19ddb6be::t_e2c3a5ef788a4f 12-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f870ecc0e562bf631492e990e13490e112e78c2c",
+  "prompts": {},
+  "sessions": {
+    "s_96a66f19ddb6be": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1940d59b-7323-446c-9724-222dda88e9e0",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
