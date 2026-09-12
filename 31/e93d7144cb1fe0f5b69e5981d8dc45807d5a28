@@ -1,0 +1,21 @@
+docs/adr/0005-own-app-two-tiers-parts-lifted-by-contract.md
+  s_4444b5138fa933::t_53ad4235f961d8 72
+docs/adr/0021-the-graph-is-neo4j-community-on-one-instance-tenanted-by-rule-written-in-generations-and-never-a-hard-dependency.md
+  s_4444b5138fa933::t_8b173bf55d61ab 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "31e93d7144cb1fe0f5b69e5981d8dc45807d5a28",
+  "prompts": {},
+  "sessions": {
+    "s_4444b5138fa933": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b21cc04e-9441-4374-adca-d0c10532f32c",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
