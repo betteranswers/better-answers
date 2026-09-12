@@ -66,6 +66,20 @@ def manifest() -> dict[str, Any]:
     return dict(tomllib.loads(raw))
 
 
+def _public_version(installed: str) -> str:
+    """The half of PEP 440 version `installed` before a local version segment.
+
+    A wheel's local segment (the part from `+` on) names the build the wheel came
+    from and never the release a pin fixes: CI's amd64 runner resolves torch's CPU
+    wheel, which reports itself as `2.14.0+cpu`, while the pin and the arm64 machine
+    it was written on both say `2.14.0`. Split on `+` rather than reach for
+    `packaging.version.Version(installed).public`, since `packaging` is not a
+    dependency this worker declares — it is only ever installed transitively
+    (12/09/2026).
+    """
+    return installed.partition("+")[0]
+
+
 def pinned_by_the_installer() -> dict[str, str]:
     """Every `name==version` the worker's manifest pins, by the name a distribution has.
 
@@ -239,10 +253,23 @@ def test_the_spacy_pipeline_is_pinned_by_the_url_it_is_downloaded_from() -> None
     assert f"{SPACY_MODEL}-{SPACY_MODEL_VERSION}" in str(source["url"])
 
 
+def test_the_local_version_segment_a_wheel_reports_never_moves_the_pin() -> None:
+    # [TEST9]: CI's amd64 runner resolves torch's CPU wheel, which reports itself as
+    # `2.14.0+cpu` — PEP 440's local version segment names the build the wheel came
+    # from, never the release the pin fixes. The arm64 machine this pin was written on
+    # reports the same release with no local segment at all. Both have to satisfy the
+    # pin and a genuinely different release must not.
+    assert _public_version("2.14.0+cpu") == TORCH_VERSION
+    assert _public_version("2.14.0") == TORCH_VERSION
+    assert _public_version("2.13.0+cpu") != TORCH_VERSION
+
+
 def test_every_pin_is_the_version_the_interpreter_reports() -> None:
     # The half that stops a constant ageing alone: the manifest above says what to
     # install and this says what is installed, so a lock refreshed without the
     # constant, or a constant edited without the lock, is caught on the next run.
+    # Compared on the public version (`_public_version`, [TEST9]) because a CPU wheel's
+    # local segment names its build and not its release.
     reported = {
         "presidio-analyzer": PRESIDIO_VERSION,
         "presidio-anonymizer": PRESIDIO_VERSION,
@@ -253,7 +280,7 @@ def test_every_pin_is_the_version_the_interpreter_reports() -> None:
     }
 
     for distribution, pinned in reported.items():
-        assert installed_version(distribution) == pinned, distribution
+        assert _public_version(installed_version(distribution)) == pinned, distribution
 
 
 def test_the_check_workflow_caches_the_weights_where_the_detector_reads_them() -> None:
