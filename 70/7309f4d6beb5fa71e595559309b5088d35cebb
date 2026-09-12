@@ -1,0 +1,25 @@
+packages/core/test/bundle-root.ts
+  s_4444b5138fa933::t_98374abca9cfa6 39-43
+packages/schema/test/warm-postgres.ts
+  s_4444b5138fa933::t_c4ed69719273bd 34-38
+CODING_RULES.md
+  s_4444b5138fa933::t_39bbacf2809c13 37-38
+packages/core/test/suite-objects.ts
+  s_4444b5138fa933::t_f44155d82e0cad 40-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "707309f4d6beb5fa71e595559309b5088d35cebb",
+  "prompts": {},
+  "sessions": {
+    "s_4444b5138fa933": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b21cc04e-9441-4374-adca-d0c10532f32c",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
