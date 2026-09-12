@@ -1,0 +1,27 @@
+apps/worker/tests/fixtures/redaction/supplier-information-pack.md
+  s_033886426cd8b0::t_d934a8d6d14145 69-73
+apps/worker/tests/test_redaction.py
+  s_033886426cd8b0::t_9d80d256fe45b5 349-371
+  s_033886426cd8b0::t_4a07b76250a772 164-167
+  s_033886426cd8b0::t_0b42de74ea9672 177
+  s_033886426cd8b0::t_d555ae7412d413 151-158
+apps/worker/tests/test_image.py
+  s_033886426cd8b0::t_caa1eb3c874706 149-151,156
+  s_033886426cd8b0::t_c2097a607b5413 167-171,174,183
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "db55abfbb8330440ba10812212ece7db355acd2e",
+  "prompts": {},
+  "sessions": {
+    "s_033886426cd8b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "70c9d141-d7d6-49af-bab3-d6dfca99cfd6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
