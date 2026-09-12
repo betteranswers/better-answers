@@ -33,6 +33,7 @@ import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bu
 import { ledgerRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import {
+  addressOf,
   countWaitingOnLocks,
   readingAs,
   seedingWith,
@@ -121,12 +122,6 @@ const ERASURE_ACTOR = "process:better-answers-erasure";
 
 /** The act the routine's last step writes. */
 const COMPLETED = "people.erasure.completed";
-
-/**
- * A fresh address per arrange block, because `user.email` is unique and this suite seeds a
- * subject several times over one Postgres.
- */
-const addressOf = (person: string): string => `${person}-${ulid().toLowerCase()}@example.invalid`;
 
 /** The routine as a caller reaches it: the platform's own principal, both doors and a clock. */
 const runningTheRoutine = (

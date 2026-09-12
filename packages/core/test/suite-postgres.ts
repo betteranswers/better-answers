@@ -1,3 +1,4 @@
+import { ulid } from "@better-answers/schema";
 import {
   openMigratedPostgres,
   testData,
@@ -43,6 +44,13 @@ export const postgresForSuite = (): (() => MigratedPostgres) => {
     return db;
   };
 };
+
+/**
+ * A fresh address per arrange block, because `user.email` is unique and these suites seed a
+ * subject several times over one Postgres.
+ */
+export const addressOf = (person: string): string =>
+  `${person}-${ulid().toLowerCase()}@example.invalid`;
 
 /**
  * Build rows through the factory, as the superuser, on one connection given back at the

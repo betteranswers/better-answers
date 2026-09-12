@@ -1,4 +1,3 @@
-import { ulid } from "@better-answers/schema";
 import { describe, expect, it } from "vitest";
 
 import { closeObjects, openObjects } from "@better-answers/core/store/objects";
@@ -13,7 +12,7 @@ import {
 } from "../src/erasure/index.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite } from "./suite-objects.ts";
-import { seedingWith } from "./suite-postgres.ts";
+import { addressOf, seedingWith } from "./suite-postgres.ts";
 import { memberOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 /**
@@ -106,12 +105,6 @@ const REPLAYED = "platform.erasure.replayed";
  */
 const FIRST_ID = "01K0000000000000000000000A";
 const SECOND_ID = "01K0000000000000000000000B";
-
-/**
- * A fresh address per arrangement, because `user.email` is unique and this suite seeds a
- * subject a dozen times over one Postgres.
- */
-const addressOf = (person: string): string => `${person}-${ulid().toLowerCase()}@example.invalid`;
 
 /** The doors a replay takes, with its clock pinned to a literal instant (ADR 0040). */
 const doorsFor = (scenario: Scenario, at: Date) => ({

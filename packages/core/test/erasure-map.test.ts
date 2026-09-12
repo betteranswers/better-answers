@@ -18,7 +18,7 @@ import {
 import { actorIdOfPerson, type UserPrincipal } from "../src/kernel/index.ts";
 import { withScope } from "../src/store/postgres/index.ts";
 import { bootstrap } from "./platform.ts";
-import { readingAs, seedingWith } from "./suite-postgres.ts";
+import { addressOf, readingAs, seedingWith } from "./suite-postgres.ts";
 import {
   memberOf,
   principalFor,
@@ -40,12 +40,9 @@ import {
 const { db, arrange } = suiteWithBundles();
 
 /**
- * A fresh address per arrange block, because `user.email` is unique and this suite seeds a
- * subject several times over one Postgres. The expected values below are written from what
- * the arrange returns, never from a second call to the thing under test (`[TEST9]`).
+ * The expected values below are written from what the arrange returns, never from a second
+ * call to the thing under test (`[TEST9]`).
  */
-const addressOf = (person: string): string => `${person}-${ulid().toLowerCase()}@example.invalid`;
-
 const identifiersOf = (email: string): SubjectIdentifiers => ({
   emails: [email],
   names: ["Priya Anand"],
