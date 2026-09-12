@@ -49,8 +49,10 @@ AGREEMENT = REPO_ROOT / "contracts" / "redaction" / "cases.json"
 CHECK_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "check.yml"
 
 #: Where the check workflow puts the detector's weights, spelled as that file spells
-#: it.
-HF_HOME_IN_CI = "${{ github.workspace }}/.cache/huggingface"
+#: it. The runner's own temp directory, not the checkout — a cache restored inside the
+#: checkout is a file every tree walker in that job reads too, and the weights are
+#: neither prose nor small (PR #57 CI).
+HF_HOME_IN_CI = "${{ runner.temp }}/huggingface"
 
 #: The pins module by the path the workflow's cache key hashes.
 PINS_FILE = "apps/worker/src/better_answers_worker/redaction/pins.py"
@@ -286,9 +288,12 @@ def test_every_pin_is_the_version_the_interpreter_reports() -> None:
 def test_the_check_workflow_caches_the_weights_where_the_detector_reads_them() -> None:
     # A model downloaded on every run is a minute a run does not have; one cached
     # under a key that does not name the pins is a stale hit nobody would notice.
+    # HF_HOME is exported to `$GITHUB_ENV` rather than set in the job's own `env:`,
+    # because that block cannot read the `runner` context the runner's temp
+    # directory needs — so this reads the shell assignment, not a YAML mapping.
     workflow = CHECK_WORKFLOW.read_text(encoding="utf-8")
 
-    assert f"HF_HOME: {HF_HOME_IN_CI}" in workflow
+    assert f"HF_HOME={HF_HOME_IN_CI}" in workflow
     assert f"path: {HF_HOME_IN_CI}" in workflow
     assert "uses: actions/cache@" in workflow
     assert PINS_FILE in workflow

@@ -56,15 +56,23 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      # The redaction detector's model weights are fetched on first use and land here
-      # rather than in the runner's home directory, so the cache step below has one path to
-      # name and the worker's suite finds them warm. The worker reads this from the
-      # process, never from a file: the location is the deploy unit's to decide, and the
-      # compose file sets the same variable for the running container.
-      HF_HOME: ${{ github.workspace }}/.cache/huggingface
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The redaction detector's model weights are fetched on first use and land under
+      # the runner's own temp directory, never inside the checkout: a cache restored into
+      # the checkout sits where every tree walker in this job reads it too — oxfmt, the
+      # tag scan, knip, jscpd — and one landed there read as unformatted JSON by the first
+      # and as a string too long to hold by the second, on a run where the cache happened
+      # to be warm before either walker ran. `runner.temp` is this job's own scratch space
+      # and nothing a tree walker visits. A job's own `env:` cannot read the `runner`
+      # context (GitHub's context-availability table), so the value is written to
+      # `$GITHUB_ENV` here instead, once, before anything downstream needs it — the cache
+      # step below still has one path to name and the worker's suite still finds the
+      # weights warm. The worker reads this from the process, never from a file: the
+      # location is the deploy unit's to decide, and the compose file sets the same
+      # variable for the running container.
+      - name: HF_HOME on the runner's own temp directory, not the checkout
+        run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -91,7 +99,7 @@ jobs:
       - name: the redaction detector's weights, keyed on the pins that name them
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ github.workspace }}/.cache/huggingface
+          path: ${{ runner.temp }}/huggingface
           key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
       - run: uv sync --frozen
         working-directory: apps/worker
