@@ -34,7 +34,15 @@ const script = path.join(repositoryRoot, "scripts/mutant-probe.mjs");
 
 const scratch = mkdtempSync(path.join(tmpdir(), "mutant-probe-"));
 afterAll(() => {
-  rmSync(scratch, { recursive: true, force: true });
+  // Nine throwaway git repositories, but no door in front of them: every git child here is
+  // gitIn's spawnSync, already synchronous and so already awaited by the time this runs. What
+  // can still race the removal is the interrupted-probe case's own child and the git processes
+  // it spawns before its SIGINT lands. packages/core/test/bundle-root.ts's removeBundleRoot
+  // waits out the git door's per-repository lock for that same shape of race at the two harness
+  // roots, but this tree has no such lock to wait on — only its bounded retry fallback applies,
+  // because fs.rm retries ENOTEMPTY only when given maxRetries and retryDelay, and force alone
+  // suppresses "does not exist" and nothing else.
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 /** The installed vitest, linked into each throwaway tree so its suite resolves the import. */
