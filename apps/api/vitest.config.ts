@@ -14,5 +14,11 @@ export default defineConfig({
     // calls it. The template copy it governs is milliseconds; nothing healthy approaches this.
     // `image.test.ts` sets its own, because a docker build is not this call.
     hookTimeout: 120_000,
+    // Capped at the Docker VM's CPU count, for the reason and from the readings that
+    // `packages/core/vitest.config.ts` carries. This workspace is capped even though the
+    // readings were not taken against it, because what it contributes to is the total: the
+    // root check runs it alongside core and schema rather than alone, and a cap on two of
+    // the three would leave the third free to over-subscribe the same six CPUs.
+    maxWorkers: 6,
   },
 });

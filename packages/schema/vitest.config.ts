@@ -15,5 +15,11 @@ export default defineConfig({
     // A runaway guard, not a budget: it decides how long a wedged cluster hangs before Vitest
     // calls it. The template copy it governs is milliseconds; nothing healthy approaches this.
     hookTimeout: 120_000,
+    // The Docker VM's CPU count, for the reason `packages/core/vitest.config.ts` records
+    // beside the readings it was chosen from: the forks pool scales to the host's 14 cores
+    // while every container a run starts lives inside a VM of 6. The readings are not
+    // repeated here, because they were taken against that package's check and a measurement
+    // copied into a second file is a second claim nobody re-takes when the first moves.
+    maxWorkers: 6,
   },
 });

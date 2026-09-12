@@ -12,6 +12,7 @@ import {
   applyJournal,
   type MigratedPostgres,
   migratedPostgresOver,
+  POSTGRES_COMMAND,
   startMigratedPostgres,
 } from "./harness.ts";
 
@@ -155,7 +156,9 @@ const untilSessionsGone = async (admin: pg.Client, database: string): Promise<vo
  * the instance closes.
  */
 const startWarmPostgres = async (project: TestProject): Promise<() => Promise<void>> => {
-  const container = await new PostgreSqlContainer(POSTGRES_IMAGE).start();
+  const container = await new PostgreSqlContainer(POSTGRES_IMAGE)
+    .withCommand([...POSTGRES_COMMAND])
+    .start();
   const connectionUri = container.getConnectionUri();
   try {
     await withAdmin(connectionUri, async (admin) => {

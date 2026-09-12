@@ -62,7 +62,52 @@ const isLeftBehind = async (db: MigratedPostgres, name: string): Promise<boolean
 const codeOf = (error: Error): string =>
   "code" in error && typeof error.code === "string" ? error.code : error.message;
 
+/** What a cluster started for a test run is asked to skip: the three durability costs. */
+type Durability = {
+  readonly fsync: string;
+  readonly synchronous_commit: string;
+  readonly full_page_writes: string;
+};
+
+/**
+ * The three settings read back off the connection a caller receives. `SHOW` answers the
+ * running server's own value, so this is the cluster's state rather than a restatement of
+ * the flags the harness passed it — which is the only way to know they were taken.
+ */
+const durabilityOf = async (db: MigratedPostgres): Promise<Durability> => {
+  const [fsync, synchronousCommit, fullPageWrites] = await Promise.all([
+    db.pool.query<{ fsync: string }>("SHOW fsync"),
+    db.pool.query<{ synchronous_commit: string }>("SHOW synchronous_commit"),
+    db.pool.query<{ full_page_writes: string }>("SHOW full_page_writes"),
+  ]);
+  return {
+    fsync: fsync.rows[0]?.fsync ?? "",
+    synchronous_commit: synchronousCommit.rows[0]?.synchronous_commit ?? "",
+    full_page_writes: fullPageWrites.rows[0]?.full_page_writes ?? "",
+  };
+};
+
+/** What both harness paths are expected to have asked their cluster for. */
+const DURABILITY_OFF: Durability = {
+  fsync: "off",
+  synchronous_commit: "off",
+  full_page_writes: "off",
+};
+
 describe("the warm harness", () => {
+  it("hands back a cluster that was started with its three durability costs off", async () => {
+    // Read off the connection the caller receives rather than off the container: what is
+    // asserted is a property of the database handed back, not a count of containers or a
+    // read of the opener's internals, so the case stays inside this file's own rule about
+    // pinning the guarantee instead of the mechanism.
+    const db = await openMigratedPostgres("durability");
+    try {
+      expect(await durabilityOf(db)).toEqual(DURABILITY_OFF);
+    } finally {
+      await db.stop();
+    }
+  });
+
   it("gives each file a database of its own — a route written through one is not there through the other", async () => {
     const one = await openMigratedPostgres("one-file");
     const another = await openMigratedPostgres("another-file");
@@ -198,12 +243,20 @@ describe("the warm harness", () => {
     // A plain Node process: no Vitest, so nothing to inject and no container but the one
     // this call starts. Driven from outside because that absence is the whole condition,
     // and it cannot be arranged inside a run that has a warm cluster to offer.
+    //
+    // The durability reading rides along here rather than in a case of its own because
+    // this path is `harness.ts`'s `startMigratedPostgres` — the second of the two places
+    // that construct a container, and the only one a test can reach. A case of its own
+    // would start a whole second cold container to read three strings.
     const script = [
       `import { openMigratedPostgres } from ${JSON.stringify(warmPostgresModule)};`,
       "const db = await openMigratedPostgres();",
       "const footing = await db.runtimePool.query('SELECT current_user AS role');",
       "const policies = await db.pool.query('SELECT policyname FROM pg_policies WHERE tablename = $1', ['llm_route']);",
-      "const answer = { role: footing.rows[0].role, isolationPolicy: policies.rows[0].policyname };",
+      "const fsync = await db.pool.query('SHOW fsync');",
+      "const synchronousCommit = await db.pool.query('SHOW synchronous_commit');",
+      "const fullPageWrites = await db.pool.query('SHOW full_page_writes');",
+      "const answer = { role: footing.rows[0].role, isolationPolicy: policies.rows[0].policyname, durability: { fsync: fsync.rows[0].fsync, synchronous_commit: synchronousCommit.rows[0].synchronous_commit, full_page_writes: fullPageWrites.rows[0].full_page_writes } };",
       "process.stdout.write(JSON.stringify(answer));",
       "await db.stop();",
     ].join("\n");
@@ -215,6 +268,7 @@ describe("the warm harness", () => {
     expect(JSON.parse(cold.stdout)).toEqual({
       role: "app_rt",
       isolationPolicy: "llm_route_workspace_isolation",
+      durability: DURABILITY_OFF,
     });
   }, 300_000);
 });
