@@ -1,0 +1,19 @@
+packages/devtools/test/mutant-probe.test.ts
+  s_4444b5138fa933::t_9ef84d28b61287 37-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3bf23b72490839fb34c492fb0925b3905a614f42",
+  "prompts": {},
+  "sessions": {
+    "s_4444b5138fa933": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b21cc04e-9441-4374-adca-d0c10532f32c",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
