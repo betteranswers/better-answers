@@ -1,0 +1,21 @@
+docs/adr/0032-the-graph-is-plain-tables-under-rls-the-substrate-is-one-journal-one-role-seam-one-definer-function.md
+  s_4444b5138fa933::t_ce750496486711 56-60
+docs/adr/README.md
+  s_4444b5138fa933::t_392e8df0a8c3d2 40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "34cc0c0a42f5c810dcb62ecff25f20521fccc693",
+  "prompts": {},
+  "sessions": {
+    "s_4444b5138fa933": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b21cc04e-9441-4374-adca-d0c10532f32c",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
