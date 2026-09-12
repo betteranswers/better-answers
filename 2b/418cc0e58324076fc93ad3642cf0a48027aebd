@@ -1,0 +1,38 @@
+CODING_RULES.md
+  s_4444b5138fa933::t_f74156e0ed8ad9 99
+apps/api/tests/coding-rules-tags.test.ts
+  s_4444b5138fa933::t_0afc9537f2b55e 410-444
+  s_4444b5138fa933::t_23d18072839709 368
+  s_4444b5138fa933::t_a1445748a249cc 24-29
+  s_4444b5138fa933::t_c4ea9b100bd1db 119-126
+  s_4444b5138fa933::t_839aee13971fbd 144
+  s_4444b5138fa933::t_c9567e6cdc87d3 186-351
+  s_4444b5138fa933::t_a58e166cbd602c 53-58
+  s_4444b5138fa933::t_abedcf2240d8b1 2
+  s_4444b5138fa933::t_5153a64501a2d4 150
+  s_4444b5138fa933::t_7018a7b0f4430f 49-52,59
+docs/agents/build-loop.md
+  s_4444b5138fa933::t_b70b14a41a6121 64
+apps/web/test/failed-screen.test.tsx
+  s_4444b5138fa933::t_308c204faf89b1 15-19
+.oxlintrc.json
+  s_4444b5138fa933::t_0ce86369834594 343-344
+  s_4444b5138fa933::t_9473fa2f6a99f5 386
+  s_4444b5138fa933::t_f741e27ac9a25c 203-205,207-209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "2b418cc0e58324076fc93ad3642cf0a48027aebd",
+  "prompts": {},
+  "sessions": {
+    "s_4444b5138fa933": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b21cc04e-9441-4374-adca-d0c10532f32c",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
