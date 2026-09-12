@@ -12,6 +12,11 @@ in the agreement would be a finding the app has no word for. Every expectation i
 written down (`[TEST9]`) — the version string and the digest of the descriptor table
 are literals here, so a pin or a rule edited without its bump turns this suite red,
 which is what makes "one record and one bump" a rule rather than a habit.
+
+Two things inside the tier are readings of that same declaration and are held to it
+here as well: the analyzer's registry, which is asked for exactly the entities the
+table declares and for nothing else, and the letter a twenty-seventh name is written
+as, which has to stay inside the shape the agreement pins.
 """
 
 import hashlib
@@ -22,6 +27,8 @@ from importlib.metadata import version as installed_version
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from better_answers_worker.redaction.consumer_domains import (
     CONSUMER_DOMAINS,
     READ_ON,
@@ -30,6 +37,12 @@ from better_answers_worker.redaction.consumer_domains import (
 from better_answers_worker.redaction.descriptors import (
     CATEGORY_BY_ENTITY,
     DESCRIPTORS,
+)
+from better_answers_worker.redaction.engine import (
+    DESCRIPTOR_BY_ENTITY,
+    GLINER_LABELS,
+    build_analyzer,
+    refuse_unreachable_entities,
 )
 from better_answers_worker.redaction.pins import (
     DETECTOR_PIN,
@@ -41,6 +54,11 @@ from better_answers_worker.redaction.pins import (
     SPACY_VERSION,
     TORCH_VERSION,
     VERSION_STRING,
+)
+from better_answers_worker.redaction.pseudonyms import (
+    normalised,
+    pseudonyms_for,
+    written_as,
 )
 
 WORKER_ROOT = Path(__file__).resolve().parents[1]
@@ -186,6 +204,69 @@ def test_every_category_declares_the_words_its_context_enhancer_boosts_on() -> N
     ]
 
     assert without_context == ["person-name"]
+
+
+def test_the_analyzer_is_asked_for_exactly_the_entities_the_descriptors_declare() -> (
+    None
+):
+    # The registry the analyzer is built with is a reading of the declarations and not a
+    # second list, so it is held to them both ways: every entity a descriptor names is
+    # answered for by some recogniser in the built engine, and every entity a recogniser
+    # answers for is one a descriptor names. One direction alone finds a category the
+    # seam can never raise; only the other finds a rule raising a word the seam has no
+    # placeholder for. The engine is built once here — this is where the pipeline and
+    # the model's weights are loaded — and then only read.
+    registry = build_analyzer().registry
+
+    answered_for = {
+        entity
+        for recogniser in registry.recognizers
+        for entity in recogniser.supported_entities
+    }
+
+    assert sorted(answered_for) == sorted(CATEGORY_BY_ENTITY)
+
+
+def test_a_category_nothing_can_raise_is_refused_before_an_analyzer_is_built() -> None:
+    # The refusal is reached with a table rather than with a patched module, which is
+    # why it takes its two tables as arguments: this tier refuses a monkeypatch of its
+    # own modules, so handing the check a declaration that breaks the rule is the only
+    # way to stand in front of it. The real tables pass, because every entity a
+    # descriptor declares is either a factory's or one of the labels the model is asked
+    # for. A labels mapping that names an entity no descriptor declares leaves the two
+    # the model was carrying with nothing at all to raise them, and those two are what
+    # the refusal has to name — not the entities a factory still covers.
+    refuse_unreachable_entities(DESCRIPTOR_BY_ENTITY, GLINER_LABELS)
+    asking_the_model_for_something_else = {"vehicle": "VEHICLE_REGISTRATION"}
+
+    with pytest.raises(ValueError) as refusal:
+        refuse_unreachable_entities(
+            DESCRIPTOR_BY_ENTITY, asking_the_model_for_something_else
+        )
+
+    assert "PERSON" in str(refusal.value)
+    assert "JOB_TITLE" in str(refusal.value)
+    assert "EMAIL_ADDRESS" not in str(refusal.value)
+
+
+def test_the_twenty_seventh_name_keeps_the_shape_the_agreement_pins() -> None:
+    # The alphabet runs out at twenty-six and the twenty-seventh name doubles the letter
+    # it lands back on rather than starting a second scheme. What has to hold is the
+    # shape the other tier parses, never which letter it is: the permutation is the
+    # binding's seed's, so the letter that doubles is the seed's answer and not this
+    # test's. The shape is read from the agreement because that file is where it is
+    # settled, and the placeholder handed to the writer is the one the table declares.
+    shape = re.compile(agreement()["placeholder_shape"])
+    met_in_order = [f"Person Number {index}" for index in range(27)]
+
+    letters = pseudonyms_for(met_in_order, "a-binding-seed")
+
+    assert len(letters) == 27
+    first = letters[normalised(met_in_order[0])]
+    twenty_seventh = letters[normalised(met_in_order[26])]
+    assert len(first) == 1
+    assert twenty_seventh == first * 2
+    assert shape.fullmatch(written_as(twenty_seventh, "[person A]")) is not None
 
 
 def test_the_version_string_is_the_rule_version_and_the_detector_pin() -> None:

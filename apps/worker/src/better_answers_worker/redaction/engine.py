@@ -225,6 +225,35 @@ def raised_to_always(
     )
 
 
+def refuse_unreachable_entities(
+    entity_table: Mapping[str, CategoryDescriptor],
+    labels: Mapping[str, str],
+) -> None:
+    """Refuse a table that declares a category nothing in the tier can raise.
+
+    A declared entity reaches a document one of two ways: a factory in `RECOGNISERS`
+    answers for it, or the model is asked for it under one of `labels`' prompt words.
+    An entity in neither is a category the table promises and the seam can never find,
+    which is a miss nobody would see — so it is refused before an analyzer is built
+    over it, with every such entity named rather than the first one met.
+
+    The two tables are arguments and not the module's own constants because that is what
+    makes the refusal something a test can stand in front of: this tier refuses a
+    `monkeypatch` of its own modules, so a declaration that breaks the rule can only be
+    handed in. `build_analyzer` passes the real two and nothing else does.
+    """
+    unreachable = sorted(
+        entity
+        for entity in entity_table
+        if entity not in RECOGNISERS and entity not in set(labels.values())
+    )
+    if unreachable:
+        raise ValueError(
+            "the category table declares entities nothing raises: "
+            + ", ".join(unreachable)
+        )
+
+
 def build_analyzer(model_id: str = GLINER_MODEL_ID) -> AnalyzerEngine:
     """The analyzer, assembled once from the declarations and the pinned model.
 
@@ -236,19 +265,12 @@ def build_analyzer(model_id: str = GLINER_MODEL_ID) -> AnalyzerEngine:
     registries. Nothing downstream of here knows which model answered: `analyzer()`,
     `detect()` and `redact()` are unchanged, and the version string still names the pin.
     """
-    recognisers: list[EntityRecognizer] = []
-    unreachable: list[str] = []
-    for entity, descriptor in DESCRIPTOR_BY_ENTITY.items():
-        build = RECOGNISERS.get(entity)
-        if build is not None:
-            recognisers.append(build(descriptor))
-        elif entity not in GLINER_LABELS.values():
-            unreachable.append(entity)
-    if unreachable:
-        raise ValueError(
-            "the category table declares entities nothing raises: "
-            + ", ".join(sorted(unreachable))
-        )
+    refuse_unreachable_entities(DESCRIPTOR_BY_ENTITY, GLINER_LABELS)
+    recognisers: list[EntityRecognizer] = [
+        RECOGNISERS[entity](descriptor)
+        for entity, descriptor in DESCRIPTOR_BY_ENTITY.items()
+        if entity in RECOGNISERS
+    ]
     recognisers.append(
         ModelRecogniser(
             labels=GLINER_LABELS,
