@@ -8,6 +8,8 @@ import { afterAll, beforeAll } from "vitest";
 
 import { openGit, type GitDoor } from "@better-answers/core/store/git";
 
+import { removeBundleRoot } from "./bundle-root.ts";
+
 /**
  * One real bare repository per suite, in a temporary directory — the git half of what a
  * governed write's tests need, written once here beside `suite-postgres.ts`, which is the
@@ -28,7 +30,10 @@ export const bundlesForSuite = (): (() => GitDoor) => {
   });
 
   afterAll(async () => {
-    if (root !== undefined) await rm(root, { recursive: true, force: true });
+    // Not a bare `rm`: the acts this suite left on the repository's lock are waited for
+    // first, because one of them still writing while the removal walks the tree is an
+    // `ENOTEMPTY` against a file whose every assertion passed (`bundle-root.ts`, T-172).
+    if (root !== undefined) await removeBundleRoot(root);
   });
 
   return () => {

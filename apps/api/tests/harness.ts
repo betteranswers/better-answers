@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Writable } from "node:stream";
@@ -10,6 +10,7 @@ import { pino } from "pino";
 import { systemClock, type Clock, type PlatformPrincipal } from "@better-answers/core/kernel";
 import { openGit, type GitDoor } from "@better-answers/core/store/git";
 import { openPostgres } from "@better-answers/core/store/postgres";
+import { removeBundleRoot } from "@better-answers/core/testing/bundle-root";
 import {
   provisionWorkspace,
   revokeCredentials as revokeCredentials_,
@@ -448,7 +449,10 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     client,
     stop: async () => {
       await database.stop();
-      await rm(gitStoreDir, { recursive: true, force: true });
+      // Core's own teardown rather than a bare `rm`, and for the reason it was written: an
+      // act still writing into a bundle while the removal walks the tree is an `ENOTEMPTY`
+      // against a file that passed, and `ops.test.ts` is where this root read one (T-172).
+      await removeBundleRoot(gitStoreDir);
     },
   };
 };
