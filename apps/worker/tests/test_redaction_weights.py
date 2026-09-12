@@ -2,10 +2,16 @@
 
 The cheap half of the image's promise, and the half that runs on every `check` whether
 or not a Docker daemon answered. Two things a change could otherwise break in silence:
-the table naming a model the pins do not, or the pins naming a model the table never
-fetches — either of which ships an image whose network-refused container cannot load
-what it was asked to load — and the Dockerfile naming the model ids a second time,
-which is the drift `[DEPS2]` exists to stop.
+the table naming a model the pins do not — an image whose network-refused container
+cannot load what it was asked to load — or the table quietly regaining the model the pin
+was measured against, which is a second repository of weights in every layer a deploy
+pulls, for a comparison made once and written down. And the Dockerfile naming the model
+ids a second time, which is the drift `[DEPS2]` exists to stop.
+
+`pins.py` declares one id the table deliberately does not fetch. That is not the drift
+above: `GLINER_MODEL_ID_MEASURED` is the id the 11 September 2026 comparison was taken
+against, kept as a pinned constant because the version-string guard in
+`tests/test_image.py` has to name it to assert its absence from a finding.
 
 The expensive half is `tests/test_image.py`: a container started from the built image
 with its network refused, which is the only place the weights are proved present rather
@@ -23,13 +29,15 @@ from better_answers_worker.redaction.weights import WEIGHTS
 DOCKERFILE = Path(__file__).resolve().parents[1] / "Dockerfile"
 
 
-def test_the_table_fetches_both_pinned_models_and_nothing_else() -> None:
-    # Both ways (`[TEST7]`): every pin is fetched, and nothing is fetched that no pin
-    # names. A table that merely contained the two would pass the first direction while
-    # pulling a third model nobody read a version for.
-    assert WEIGHTS == (GLINER_MODEL_ID, GLINER_MODEL_ID_MEASURED)
-    assert set(WEIGHTS) == {GLINER_MODEL_ID, GLINER_MODEL_ID_MEASURED}
-    assert len(WEIGHTS) == 2
+def test_the_table_fetches_the_model_the_seam_runs_and_nothing_beside_it() -> None:
+    # Both ways (`[TEST7]`): the one model the seam runs is fetched, and the one it was
+    # measured against is not. A table that merely contained the pin would pass the
+    # first direction while pulling a second model no container ever loads — which is
+    # what this table did until the comparison it carried that model for was made,
+    # recorded in `tests/test_image.py`'s docblock, and the model dropped.
+    assert WEIGHTS == (GLINER_MODEL_ID,)
+    assert GLINER_MODEL_ID_MEASURED not in WEIGHTS
+    assert len(WEIGHTS) == 1
 
 
 def test_the_two_models_are_two_models() -> None:

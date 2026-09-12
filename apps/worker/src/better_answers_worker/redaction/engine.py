@@ -258,10 +258,12 @@ def build_analyzer(model_id: str = GLINER_MODEL_ID) -> AnalyzerEngine:
     """The analyzer, assembled once from the declarations and the pinned model.
 
     The model is a defaulted argument and not a second table: every caller in the tier
-    takes the default, which is the pin, and the two that do not are the image's weight
-    fetch and S0's measurement (`T-122`). Both want the whole analyzer — the same
-    registry, the same recognisers, the same thresholds — with one thing different, and
-    a measurement of two models through two registries would be a measurement of the
+    takes the default, which is the pin, and the one that does not is the image's weight
+    fetch, which passes each id in `weights.py`'s table. S0's measurement was the second
+    such caller until `T-148` took the model it compared against out of the image
+    (`T-122` records the figures). Both wanted the whole analyzer — the same registry,
+    the same recognisers, the same thresholds — with one thing different, and a
+    measurement of two models through two registries would be a measurement of the
     registries. Nothing downstream of here knows which model answered: `analyzer()`,
     `detect()` and `redact()` are unchanged, and the version string still names the pin.
     """

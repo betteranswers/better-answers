@@ -8,13 +8,13 @@ without a rebuild is an image that cannot start the seam, which is the direction
 has to fail in.
 
 **It fetches by loading, not by snapshotting.** A snapshot of a model's own repository
-is both too much and too little. Too much: one of the two pinned repositories carries
-over a gigabyte of ONNX variants no PyTorch load ever reads. Too little: the base
-encoder's tokenizer lives in a *second* repository — four megabytes, a separate cache
-entry — so a container given only the model's own repository is one small fetch short of
-working, and would discover that on its first document rather than here. Building the
-seam's own analyzer is what makes the set of warmed entries exactly the set a run-time
-load touches, because it is the same load.
+is both too much and too little. Too much: a repository carries variants no PyTorch load
+ever reads — ONNX above all, and by the gigabyte. Too little: the base encoder's
+tokenizer lives in a *second* repository — four megabytes, a separate cache entry — so a
+container given only the model's own repository is one small fetch short of working, and
+would discover that on its first document rather than here. Building the seam's own
+analyzer is what makes the set of warmed entries exactly the set a run-time load
+touches, because it is the same load.
 
 The analyzer it builds also brings up the spaCy pipeline the context enhancer reads its
 lemmas from. That one is a pinned wheel in ``uv.lock`` rather than an entry under
@@ -30,20 +30,27 @@ container's, and it is ``huggingface_hub`` that reads it, never anything of ours
 from typing import Final
 
 from .engine import build_analyzer
-from .pins import GLINER_MODEL_ID, GLINER_MODEL_ID_MEASURED
+from .pins import GLINER_MODEL_ID
 
-#: Every model the image carries, declared once: the model the seam runs, and the one S0
-#: measures it against on the fixture's page (`T-122`). A test holds this against the
-#: pins both ways, so neither can gain a model the other does not have.
-WEIGHTS: Final = (GLINER_MODEL_ID, GLINER_MODEL_ID_MEASURED)
+#: Every model the image carries, declared once: the model the seam runs, and nothing
+#: beside it. It carried a second until `T-148` — `GLINER_MODEL_ID_MEASURED`, there so
+#: S0 could measure the pin against it on the fixture's own page. That comparison was
+#: taken once, on 11 September 2026, and its figures are recorded in
+#: `tests/test_image.py`'s docblock. Carrying the model on past it bought nothing and
+#: cost every deploy the whole of its repository, over a gigabyte of which is the ONNX
+#: variants no PyTorch load ever reads — so the id stays a pin in `pins.py`, where the
+#: version string still has to name it to assert its absence, and leaves this table. A
+#: test holds this against the pins both ways, so the table can neither lose the model
+#: the seam runs nor regain the one it does not.
+WEIGHTS: Final = (GLINER_MODEL_ID,)
 
 
 def fetch() -> None:
     """Warm every cache entry a run-time load will read, by doing the load.
 
     Each analyzer is discarded as soon as it is built: what is wanted is the bytes it
-    left on disk, and holding two of them alive at once would be twice the weights in
-    one build step's memory for no reason.
+    left on disk, and holding every analyzer the table names alive at once would be that
+    many copies of the weights in one build step's memory for no reason.
     """
     for model_id in WEIGHTS:
         build_analyzer(model_id)

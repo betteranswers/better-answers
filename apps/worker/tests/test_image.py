@@ -54,12 +54,21 @@ own detector, which the call graph forbids. An interleaved control in the same i
 order, 1766-2198 ms against 1626-1898 ms, so the spread is the machine rather than the
 seam. The two load figures are the steady ones.
 
+That pair was judged once, and on those readings: the image stopped carrying
+``knowledgator/gliner-pii-base-v1.0`` with `T-148`, so the third line above is no longer
+re-runnable here — a container under ``HF_HUB_OFFLINE=1`` cannot load a model the build
+never fetched, and the leg that timed it is gone from the probe below. The figures stand
+as the record of a comparison already made, and the pin they chose is the pin the seam
+runs. Re-taking them means putting the second model back in ``weights.py``'s table,
+rebuilding, and carrying its repository again for the length of the question.
+
 **S1 derives the seam's per-document timeout from the first line**, and nothing here is
 asserted. The test below asserts only that each figure is a positive number: a ceiling
 on a number with this spread would fail on a slower machine and tell its reader nothing
 about the seam, which is the lesson ``packages/core/test/graph-budget.test.ts`` records
-in its own docblock. To read the figures, ``uv run --frozen pytest tests/test_image.py
--k measured --log-cli-level=INFO``.
+in its own docblock. To re-take the two figures the image can still answer — the whole
+seam under the pin, and that model's detector alone — ``uv run --frozen pytest
+tests/test_image.py -k measured --log-cli-level=INFO``.
 
 **Sequenced before `T-006`.** The image runs a ``CMD`` that exits with a message
 today: there is no work loop, so a wrong image is currently harmless. The moment
@@ -400,7 +409,13 @@ def _pin(name: str) -> str:
 
 
 def pinned_model_ids() -> tuple[str, ...]:
-    """Both GLiNER models the seam pins: the one it runs, and the one S0 measures."""
+    """Both GLiNER models the seam pins: the one it runs, and the one S0 measured.
+
+    Two ids and one of them in the image. `pins.py` still declares both — the second is
+    what the version-string guard below names to assert its absence — and the probe is
+    still asked about both, because an ask narrowed to the one the image carries could
+    prove presence and never absence.
+    """
     return (_pin("GLINER_MODEL_ID"), _pin("GLINER_MODEL_ID_MEASURED"))
 
 
@@ -578,15 +593,19 @@ sys.stdout.write(json.dumps({
 #: benchmark run.
 MEASUREMENT_RUNS = 3
 
-# The third container's probe, and the only one here that answers numbers. It times
-# three things over the same page: the whole seam under the pinned model, that model's
-# detector alone, and the second model's detector alone. The second and third are the
-# pair the pin was chosen on — the same registry, the same recognisers, the same
-# thresholds, one model different — because `redact` also resolves overlaps, writes
-# placeholders and draws pseudonyms, and a comparison that included all of that would be
-# measuring the seam twice rather than the two models once.
+# The third container's probe, and the only one here that answers numbers. It times two
+# things over the same page: the whole seam under the pinned model, and that model's
+# detector alone. The difference between them is what `redact` adds to a detection —
+# resolving overlaps, writing placeholders, drawing pseudonyms — and S1 derives its
+# per-document timeout from the first of the two.
 #
-# Each model's one-off load is taken before the first timed page and reported apart from
+# It timed a third thing until `T-148`: the detector of the model the pin was chosen
+# against, which made the comparison the docblock above records. The image stopped
+# carrying that model once the comparison was made, and a container under
+# `HF_HUB_OFFLINE=1` cannot load a model the build never fetched, so the leg would now
+# raise rather than measure. The figures are the record; the leg is gone.
+#
+# The model's one-off load is taken before the first timed page and reported apart from
 # it: `analyzer()` brings the process-wide engine up the first time it is asked for, so
 # a `redact` that paid for it would be reporting a start-up as a page, and S1 sets a
 # per-document timeout off the page.
@@ -594,15 +613,8 @@ MEASUREMENT_PROBE = """
 import json, os, statistics, sys, time
 
 from better_answers_worker.redaction import redact
-from better_answers_worker.redaction.engine import (
-    ANALYSED_ENTITIES,
-    analyzer,
-    build_analyzer,
-)
-from better_answers_worker.redaction.pins import (
-    GLINER_MODEL_ID,
-    GLINER_MODEL_ID_MEASURED,
-)
+from better_answers_worker.redaction.engine import ANALYSED_ENTITIES, analyzer
+from better_answers_worker.redaction.pins import GLINER_MODEL_ID
 
 page = os.environ["PROBE_PAGE"]
 rules = json.loads(os.environ["PROBE_RULES"])
@@ -625,21 +637,12 @@ pinned_load = (time.perf_counter() - started) * 1000
 seam = median(lambda: redact(page, rules, (), seed))
 pinned = median(lambda: analyzer().analyze(text=page, language="en", entities=entities))
 
-started = time.perf_counter()
-second = build_analyzer(GLINER_MODEL_ID_MEASURED)
-measured_load = (time.perf_counter() - started) * 1000
-
-measured = median(lambda: second.analyze(text=page, language="en", entities=entities))
-
 sys.stdout.write(json.dumps({
     "runs": runs,
     "pinned_model": GLINER_MODEL_ID,
     "pinned_load_ms": pinned_load,
     "seam_ms": seam,
     "pinned_ms": pinned,
-    "measured_model": GLINER_MODEL_ID_MEASURED,
-    "measured_load_ms": measured_load,
-    "measured_ms": measured,
 }))
 """
 
@@ -684,8 +687,8 @@ def _read_contents(stdout: str) -> ImageContents:
 class Measurement:
     """What one container answered about what the seam costs it to read a page.
 
-    Six numbers and two names, never a threshold: the module docblock records them and
-    nothing asserts them. Both models carry their one-off load apart from their cost per
+    Four numbers and one name, never a threshold: the module docblock records them and
+    nothing asserts them. The model carries its one-off load apart from its cost per
     page, because the two are spent once and once per document respectively and S1's
     timeout is derived from the second of them.
     """
@@ -695,9 +698,6 @@ class Measurement:
     pinned_load_ms: float
     seam_ms: float
     pinned_ms: float
-    measured_model: str
-    measured_load_ms: float
-    measured_ms: float
 
 
 def _read_measurement(stdout: str) -> Measurement:
@@ -710,9 +710,6 @@ def _read_measurement(stdout: str) -> Measurement:
         pinned_load_ms=float(answered["pinned_load_ms"]),
         seam_ms=float(answered["seam_ms"]),
         pinned_ms=float(answered["pinned_ms"]),
-        measured_model=str(answered["measured_model"]),
-        measured_load_ms=float(answered["measured_load_ms"]),
-        measured_ms=float(answered["measured_ms"]),
     )
 
 
@@ -891,15 +888,23 @@ def test_the_image_carries_every_library_the_detector_runs_on(
     assert set(contents.imports) == set(PROBED_IMPORTS)
 
 
-def test_the_image_carries_both_pinned_models_and_the_pinned_pipeline(
+def test_the_image_carries_the_model_the_seam_runs_and_not_the_one_it_was_measured_on(
     contents: ImageContents,
 ) -> None:
     # Acceptance line 2's second clause, asked the way a run-time load asks it: the
-    # cache holds the model, offline. Both models, because the pin is chosen by
-    # measuring it against the other one on the image (`T-122`), and the spaCy pipeline
-    # because it is the other half of what the seam loads — a pinned wheel in the venv
-    # rather than an entry under `HF_HOME`, which is why it is asked for by loading it.
-    assert dict(contents.weights) == dict.fromkeys(pinned_model_ids(), True)
+    # cache holds the model, offline. The container is still asked about both pinned ids
+    # and the answer is a literal pair, one true and one false, because the image is now
+    # held to two things rather than one — the model the seam runs is there, and the
+    # model S0 measured it against is not, having left `weights.py`'s table with `T-148`
+    # once the comparison was made. Asking for both is what makes the second provable;
+    # an ask narrowed to the pin could only ever prove presence, and would keep passing
+    # the day a second repository of unread weights came back. The spaCy pipeline is
+    # the other half of what the seam loads — a pinned wheel in the venv rather than an
+    # entry under `HF_HOME`, which is why it is asked for by loading it.
+    assert dict(contents.weights) == {
+        _pin("GLINER_MODEL_ID"): True,
+        _pin("GLINER_MODEL_ID_MEASURED"): False,
+    }
     assert len(pinned_model_ids()) == 2
     assert contents.spacy_pipeline is True
 
@@ -1011,8 +1016,11 @@ def test_the_image_redacts_the_fixture_with_its_network_refused(image: str) -> N
     } == dict(FINDINGS_BY_CATEGORY)
     assert found["verdict"] == VERDICT
     # Both halves of the version string, and the pin that is not in it (`[TEST7]`): the
-    # image runs the model the seam pins, and the second model it carries is one it
-    # measures rather than one it detects with.
+    # image runs the model the seam pins, and the model that pin was measured against
+    # reaches no finding. Since `T-148` the image does not carry that model either,
+    # which makes this the weaker of the two statements about it — the contents test
+    # above is where its absence from the image is asserted — and still the one that
+    # matters to a reader of a finding, who is told which detector answered.
     assert version.startswith(f"{_pin('RULE_VERSION')}:")
     for pinned in PINNED_IN_THE_VERSION_STRING:
         assert _pin(pinned) in version, pinned
@@ -1048,34 +1056,31 @@ def test_what_the_seam_costs_per_page_is_measured_on_the_image_and_never_budgete
             },
             probe=MEASUREMENT_PROBE,
             network="none",
-            # Two models brought up and nine timed pages, where the test above brings up
+            # One model brought up and six timed pages, where the test above brings up
             # one model and reads one page. Long enough that a slower machine finishes,
             # short enough that a container which has stopped making progress is killed
-            # rather than waited on.
+            # rather than waited on. It is unchanged from when this probe timed a
+            # second model as well: the headroom was the point of the number, and a
+            # ceiling that tracked the work would be a budget, which the docstring
+            # above refuses.
             timeout=1800,
         )
     )
     logging.getLogger(__name__).info(
         "T-122 · the seam on the fixture page, median of %d runs on this image: "
         "redact() %.0f ms/page under %s, whose load costs %.0f ms once; "
-        "its detector alone %.0f ms/page; "
-        "%s's detector alone %.0f ms/page, whose load costs %.0f ms once",
+        "its detector alone %.0f ms/page",
         measured.runs,
         measured.seam_ms,
         measured.pinned_model,
         measured.pinned_load_ms,
         measured.pinned_ms,
-        measured.measured_model,
-        measured.measured_ms,
-        measured.measured_load_ms,
     )
 
     assert measured.runs == MEASUREMENT_RUNS
     assert measured.pinned_model == _pin("GLINER_MODEL_ID")
-    assert measured.measured_model == _pin("GLINER_MODEL_ID_MEASURED")
     assert measured.seam_ms > 0
     assert measured.pinned_ms > 0
-    assert measured.measured_ms > 0
 
 
 def test_the_container_runs_as_the_uid_that_owns_this_tiers_volumes(
