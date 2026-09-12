@@ -104,12 +104,27 @@ describe("routes.list's types crossing from apps/api", () => {
   it("answers one route per purpose, with the words a screen shows", () => {
     type Route = inferOutput<ListProcedure>[number];
 
-    expectTypeOf<Route["purpose"]>().toEqualTypeOf<
-      "extraction" | "enrichment" | "answering" | "judging" | "embedding"
-    >();
-    expectTypeOf<Route["provider"]>().toEqualTypeOf<string | null>();
-    expectTypeOf<Route["model"]>().toEqualTypeOf<string | null>();
-    expectTypeOf<Route["dimensions"]>().toEqualTypeOf<number | null>();
-    expectTypeOf<Route["fixed"]>().toEqualTypeOf<boolean>();
+    // Written down here rather than imported: apps/web reaches apps/api and nothing else,
+    // and the one type-only import it takes is AppRouter (shared/api/trpc.ts). Importing
+    // WorkspaceRoute from @better-answers/core/llm would open a web→core edge this
+    // workspace does not have, so the expected shape is spelled out as a literal instead.
+    //
+    // readonly is part of the assertion: toEqualTypeOf compares modifiers, so this fails
+    // against a source type missing readonly just as it would against a wrong field type.
+    // If this fails, check the modifiers before the field list.
+    //
+    // One whole-type assertion, not five field-by-field ones: field-by-field is what let
+    // retentionTail cross the wire unasserted. This form fails on a field added, removed
+    // or retyped on either side, which is what proves both directions rather than one.
+    type ExpectedRoute = {
+      readonly purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
+      readonly provider: string | null;
+      readonly model: string | null;
+      readonly dimensions: number | null;
+      readonly fixed: boolean;
+      readonly retentionTail: string | null;
+    };
+
+    expectTypeOf<Route>().toEqualTypeOf<ExpectedRoute>();
   });
 });
