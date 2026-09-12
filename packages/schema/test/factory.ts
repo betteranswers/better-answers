@@ -706,7 +706,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     const documentId = overrides.documentId ?? (await sourceDocument({ workspaceId })).id;
     return insertRow(client, "finding", {
       id: ulid(),
-      category: "sort-code",
+      category: "bank-details",
       tier: REDACTION_ALWAYS_TIER,
       ruleId: "sort-code-with-account-number",
       charStart: 0,
