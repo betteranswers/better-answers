@@ -7,9 +7,9 @@ knowledge of what the app's journal built, stamped with the migration id it was
 generated from and with that migration's journal instant, which is what the
 migrator writes into `drizzle.__drizzle_migrations.created_at`."""
 
-MIGRATION_ID = "0022_the-queue-substrate"
+MIGRATION_ID = "0032_the-worker-writes-a-finding-unreviewed"
 
-MIGRATION_WHEN = 1788883705941
+MIGRATION_WHEN = 1789165477047
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -146,6 +146,21 @@ TABLES: dict[str, dict[str, str]] = {
         "body": "text NOT NULL",
         "base_content_hash": "text",
     },
+    "public.erasure_request": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "subject_request_id": "text NOT NULL",
+        "pseudonym": "text NOT NULL",
+        "locked_at": "timestamp with time zone NOT NULL",
+        "actions": "jsonb NOT NULL",
+        "anchored_at": "timestamp with time zone NOT NULL",
+        "beyond_use_hourly_at": "timestamp with time zone NOT NULL",
+        "beyond_use_daily_at": "timestamp with time zone NOT NULL",
+        "beyond_use_weekly_at": "timestamp with time zone NOT NULL",
+        "beyond_use_monthly_at": "timestamp with time zone NOT NULL",
+        "completed_at": "timestamp with time zone",
+        "report": "text",
+    },
     "public.evidence": {
         "workspace_id": "text NOT NULL",
         "source_document_id": "text NOT NULL",
@@ -153,6 +168,26 @@ TABLES: dict[str, dict[str, str]] = {
         "resource": "text NOT NULL",
         "content_version": "text",
         "recorded_at": "timestamp with time zone NOT NULL",
+    },
+    "public.finding": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "document_id": "text NOT NULL",
+        "category": "text NOT NULL",
+        "tier": "text NOT NULL",
+        "rule_id": "text NOT NULL",
+        "char_start": "integer NOT NULL",
+        "char_end": "integer NOT NULL",
+        "score": "double precision NOT NULL",
+        "rule_version": "text NOT NULL",
+        "detector_pin": "text NOT NULL",
+        "review_state": "text NOT NULL",
+        "reviewed_by": "text",
+        "reviewed_at": "timestamp with time zone",
+        "review_reason": "text",
+        "restored_at": "timestamp with time zone",
+        "restored_by": "text",
+        "restore_reason": "text",
     },
     "public.graph_edge": {
         "workspace_id": "text NOT NULL",
@@ -246,6 +281,7 @@ TABLES: dict[str, dict[str, str]] = {
         "provider": "text NOT NULL",
         "model": "text NOT NULL",
         "dimensions": "integer",
+        "retention_tail": "text",
     },
     "public.mcp_call_counter": {
         "workspace_id": "text NOT NULL",
@@ -400,11 +436,25 @@ TABLES: dict[str, dict[str, str]] = {
         "audience": "text NOT NULL",
         "audience_groups": "text[]",
         "created_at": "timestamp with time zone NOT NULL",
+        "rules_in_force": "jsonb NOT NULL",
     },
     "public.source_document": {
         "workspace_id": "text NOT NULL",
         "id": "text NOT NULL",
         "binding_id": "text NOT NULL",
+    },
+    "public.subject_request": {
+        "workspace_id": "text NOT NULL",
+        "id": "text NOT NULL",
+        "kind": "text NOT NULL",
+        "person_id": "text",
+        "identifiers": "jsonb NOT NULL",
+        "received_at": "timestamp with time zone NOT NULL",
+        "clock_started_at": "timestamp with time zone NOT NULL",
+        "due_at": "timestamp with time zone NOT NULL",
+        "extended_to": "timestamp with time zone",
+        "answered_at": "timestamp with time zone",
+        "answer": "text",
     },
     "public.suggestion": {
         "workspace_id": "text NOT NULL",
@@ -418,6 +468,12 @@ TABLES: dict[str, dict[str, str]] = {
         "reason": "text",
         "proposed_at": "timestamp with time zone NOT NULL",
         "decided_at": "timestamp with time zone",
+    },
+    "public.suppression": {
+        "workspace_id": "text NOT NULL",
+        "erasure_request_id": "text NOT NULL",
+        "document_id": "text NOT NULL",
+        "identifiers": "jsonb NOT NULL",
     },
     "public.user": {
         "id": "text NOT NULL",

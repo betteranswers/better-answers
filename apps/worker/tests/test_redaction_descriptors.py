@@ -1,0 +1,380 @@
+"""The category descriptors against the agreement, and the pins against what is there.
+
+One declared descriptor per category is what the analyzer registry, the entity table
+and the version string are all built from, so this suite holds that one declaration to
+the two things outside it that have to agree with it: the ``redaction`` agreement in
+``contracts/``, which is what the other tier reads, and the versions the installer and
+the running interpreter report.
+
+Both directions are asserted (`[TEST7]`): a category in the agreement with no
+descriptor would be a word the worker cannot raise, and a descriptor with no category
+in the agreement would be a finding the app has no word for. Every expectation is
+written down (`[TEST9]`) — the version string and the digest of the descriptor table
+are literals here, so a pin or a rule edited without its bump turns this suite red,
+which is what makes "one record and one bump" a rule rather than a habit.
+
+Two things inside the tier are readings of that same declaration and are held to it
+here as well: the analyzer's registry, which is asked for exactly the entities the
+table declares and for nothing else, and the letter a twenty-seventh name is written
+as, which has to stay inside the shape the agreement pins.
+"""
+
+import hashlib
+import json
+import re
+import tomllib
+from importlib.metadata import version as installed_version
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from better_answers_worker.redaction.consumer_domains import (
+    CONSUMER_DOMAINS,
+    READ_ON,
+    SOURCE,
+)
+from better_answers_worker.redaction.descriptors import (
+    CATEGORY_BY_ENTITY,
+    DESCRIPTORS,
+)
+from better_answers_worker.redaction.engine import (
+    DESCRIPTOR_BY_ENTITY,
+    GLINER_LABELS,
+    build_analyzer,
+    refuse_unreachable_entities,
+)
+from better_answers_worker.redaction.pins import (
+    DETECTOR_PIN,
+    GLINER_VERSION,
+    PRESIDIO_VERSION,
+    RULE_VERSION,
+    SPACY_MODEL,
+    SPACY_MODEL_VERSION,
+    SPACY_VERSION,
+    TORCH_VERSION,
+    VERSION_STRING,
+)
+from better_answers_worker.redaction.pseudonyms import (
+    normalised,
+    pseudonyms_for,
+    written_as,
+)
+
+WORKER_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = WORKER_ROOT.parents[1]
+AGREEMENT = REPO_ROOT / "contracts" / "redaction" / "cases.json"
+CHECK_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "check.yml"
+
+#: Where the check workflow puts the detector's weights, spelled as that file spells
+#: it. The runner's own temp directory, not the checkout — a cache restored inside the
+#: checkout is a file every tree walker in that job reads too, and the weights are
+#: neither prose nor small (PR #57 CI).
+HF_HOME_IN_CI = "${{ runner.temp }}/huggingface"
+
+#: The pins module by the path the workflow's cache key hashes.
+PINS_FILE = "apps/worker/src/better_answers_worker/redaction/pins.py"
+
+
+def agreement() -> dict[str, Any]:
+    raw = AGREEMENT.read_text(encoding="utf-8")
+    return dict(json.loads(raw))
+
+
+def manifest() -> dict[str, Any]:
+    raw = (WORKER_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    return dict(tomllib.loads(raw))
+
+
+def _public_version(installed: str) -> str:
+    """The half of PEP 440 version `installed` before a local version segment.
+
+    A wheel's local segment (the part from `+` on) names the build the wheel came
+    from and never the release a pin fixes: CI's amd64 runner resolves torch's CPU
+    wheel, which reports itself as `2.14.0+cpu`, while the pin and the arm64 machine
+    it was written on both say `2.14.0`. Split on `+` rather than reach for
+    `packaging.version.Version(installed).public`, since `packaging` is not a
+    dependency this worker declares — it is only ever installed transitively
+    (12/09/2026).
+    """
+    return installed.partition("+")[0]
+
+
+def pinned_by_the_installer() -> dict[str, str]:
+    """Every `name==version` the worker's manifest pins, by the name a distribution has.
+
+    The extras in brackets are part of what to install and no part of what it is
+    called.
+    """
+    pins: dict[str, str] = {}
+    for requirement in manifest()["project"]["dependencies"]:
+        name, _, pinned = str(requirement).partition("==")
+        if pinned:
+            pins[name.split("[")[0].strip().lower().replace("_", "-")] = pinned
+    return pins
+
+
+def descriptor_digest() -> str:
+    """A digest of everything a rule version stands for, computed here, never by it.
+
+    The rendering is this suite's own, so the literal below cannot drift with a change
+    to how the worker spells a descriptor: only a change to what one *says* moves it.
+
+    The consumer-domain list is in the digest because it is part of the rule and not a
+    reference table the rule happens to read. Which domains count decides which
+    addresses are withheld exactly as a threshold or a placeholder does, so a domain
+    added or dropped without a bump of ``RULE_VERSION`` would leave findings written
+    under two different rules claiming the same version. Sorted rather than taken in
+    the order the module spells them, because a ``frozenset`` has no order to hash.
+    """
+    canonical = json.dumps(
+        {
+            "categories": [
+                {
+                    "category": descriptor.category,
+                    "tier": descriptor.tier,
+                    "raised_by": list(descriptor.raised_by),
+                    "threshold": descriptor.threshold,
+                    "context": list(descriptor.context),
+                    "placeholder": descriptor.placeholder,
+                    "narrows_to": descriptor.narrows_to,
+                }
+                for descriptor in DESCRIPTORS
+            ],
+            "consumer_domains": sorted(CONSUMER_DOMAINS),
+        },
+        sort_keys=True,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def test_the_descriptors_and_the_agreement_name_the_same_categories() -> None:
+    declared = sorted(descriptor.category for descriptor in DESCRIPTORS)
+    agreed = sorted(category["category"] for category in agreement()["categories"])
+
+    assert declared == agreed
+
+
+def test_each_descriptor_takes_its_tier_word_and_narrowing_from_the_agreement() -> None:
+    by_category = {descriptor.category: descriptor for descriptor in DESCRIPTORS}
+
+    for category in agreement()["categories"]:
+        descriptor = by_category[category["category"]]
+        assert descriptor.tier == category["tier"], descriptor.category
+        assert descriptor.placeholder == category["placeholder"], descriptor.category
+        assert descriptor.narrows_to == category["narrows_to"], descriptor.category
+
+
+def test_the_entity_table_is_the_inverse_of_what_raises_each_category() -> None:
+    # The table a recogniser's answer is read through is derived from the declarations
+    # and never written twice, so this holds the derivation both ways: every entity a
+    # descriptor names is in the table under that category, and the table names no
+    # entity no descriptor raises. An entity claimed by two categories would collapse
+    # silently into whichever was declared last, so the count is asserted as well.
+    raised = [
+        (entity, descriptor.category)
+        for descriptor in DESCRIPTORS
+        for entity in descriptor.raised_by
+    ]
+
+    assert sorted(CATEGORY_BY_ENTITY.items()) == sorted(raised)
+    assert len(raised) == len({entity for entity, _ in raised})
+
+
+def test_the_always_set_is_raised_at_least_as_readily_as_a_switchable_one() -> None:
+    # A threshold is policy and not a tuning knob: the set no binding switches off is
+    # the set a miss costs most, so it may never ask for more confidence than a tier a
+    # binding can turn off. Every threshold is a Presidio score, which is a
+    # probability.
+    always = [item.threshold for item in DESCRIPTORS if item.tier == "always"]
+    switchable = [item.threshold for item in DESCRIPTORS if item.tier != "always"]
+
+    assert max(always) <= min(switchable)
+    for descriptor in DESCRIPTORS:
+        assert 0.0 < descriptor.threshold <= 1.0, descriptor.category
+
+
+def test_every_category_declares_the_words_its_context_enhancer_boosts_on() -> None:
+    # "In context" in the spec is Presidio's context enhancer, named: a date beside
+    # *date of birth* is a finding and a bare date is not. The two tiers a binding can
+    # switch off are the ones that need the word beside the span; a name is raised by
+    # the model itself, so `person-name` is the one category that declares none.
+    without_context = [
+        descriptor.category for descriptor in DESCRIPTORS if not descriptor.context
+    ]
+
+    assert without_context == ["person-name"]
+
+
+def test_the_analyzer_is_asked_for_exactly_the_entities_the_descriptors_declare() -> (
+    None
+):
+    # The registry the analyzer is built with is a reading of the declarations and not a
+    # second list, so it is held to them both ways: every entity a descriptor names is
+    # answered for by some recogniser in the built engine, and every entity a recogniser
+    # answers for is one a descriptor names. One direction alone finds a category the
+    # seam can never raise; only the other finds a rule raising a word the seam has no
+    # placeholder for. The engine is built once here — this is where the pipeline and
+    # the model's weights are loaded — and then only read.
+    registry = build_analyzer().registry
+
+    answered_for = {
+        entity
+        for recogniser in registry.recognizers
+        for entity in recogniser.supported_entities
+    }
+
+    assert sorted(answered_for) == sorted(CATEGORY_BY_ENTITY)
+
+
+def test_a_category_nothing_can_raise_is_refused_before_an_analyzer_is_built() -> None:
+    # The refusal is reached with a table rather than with a patched module, which is
+    # why it takes its two tables as arguments: this tier refuses a monkeypatch of its
+    # own modules, so handing the check a declaration that breaks the rule is the only
+    # way to stand in front of it. The real tables pass, because every entity a
+    # descriptor declares is either a factory's or one of the labels the model is asked
+    # for. A labels mapping that names an entity no descriptor declares leaves the two
+    # the model was carrying with nothing at all to raise them, and those two are what
+    # the refusal has to name — not the entities a factory still covers.
+    refuse_unreachable_entities(DESCRIPTOR_BY_ENTITY, GLINER_LABELS)
+    asking_the_model_for_something_else = {"vehicle": "VEHICLE_REGISTRATION"}
+
+    with pytest.raises(ValueError) as refusal:
+        refuse_unreachable_entities(
+            DESCRIPTOR_BY_ENTITY, asking_the_model_for_something_else
+        )
+
+    assert "PERSON" in str(refusal.value)
+    assert "JOB_TITLE" in str(refusal.value)
+    assert "EMAIL_ADDRESS" not in str(refusal.value)
+
+
+def test_the_twenty_seventh_name_keeps_the_shape_the_agreement_pins() -> None:
+    # The alphabet runs out at twenty-six and the twenty-seventh name doubles the letter
+    # it lands back on rather than starting a second scheme. What has to hold is the
+    # shape the other tier parses, never which letter it is: the permutation is the
+    # binding's seed's, so the letter that doubles is the seed's answer and not this
+    # test's. The shape is read from the agreement because that file is where it is
+    # settled, and the placeholder handed to the writer is the one the table declares.
+    shape = re.compile(agreement()["placeholder_shape"])
+    met_in_order = [f"Person Number {index}" for index in range(27)]
+
+    letters = pseudonyms_for(met_in_order, "a-binding-seed")
+
+    assert len(letters) == 27
+    first = letters[normalised(met_in_order[0])]
+    twenty_seventh = letters[normalised(met_in_order[26])]
+    assert len(first) == 1
+    assert twenty_seventh == first * 2
+    assert shape.fullmatch(written_as(twenty_seventh, "[person A]")) is not None
+
+
+def test_the_version_string_is_the_rule_version_and_the_detector_pin() -> None:
+    written = VERSION_STRING
+
+    assert written == (
+        "2:presidio-2.2.364+gliner-0.2.29+torch-2.14.0"
+        "+spacy-3.8.16+en-core-web-sm-3.8.0+gliner-multi-pii-v1"
+    )
+    assert RULE_VERSION == "2"
+    assert VERSION_STRING.count(":") == 1
+    assert VERSION_STRING.split(":") == [RULE_VERSION, DETECTOR_PIN]
+
+
+def test_the_version_string_is_written_the_way_the_agreement_says() -> None:
+    pattern = re.compile(agreement()["version_string"]["pattern"])
+
+    assert pattern.fullmatch(VERSION_STRING) is not None
+
+
+def test_the_rule_version_is_bumped_with_the_table_it_stands_for() -> None:
+    # `rule_version` is one constant bumped whenever a rule, the category table, the
+    # consumer-domain list or a recogniser changes. Edit a descriptor or a domain
+    # without bumping it and this literal stops matching: they are changed together or
+    # the suite is red.
+    digest = "cece7ac3477cc58d1eb4b20be5c32c7f721d7435c416d17f567a0cba02c8849b"
+
+    assert descriptor_digest() == digest
+    assert RULE_VERSION == "2"
+
+
+def test_the_consumer_domain_list_carries_its_date_and_its_source() -> None:
+    # What acceptance asks of a list that decides what is withheld: it is a tracked
+    # file, it says when it was settled, and it says where each domain on it was read.
+    # Membership is asserted both ways (`[TEST7]`) — a domain with no source line is a
+    # rule nobody can check, and a source line naming a domain that is not on the list
+    # is a citation for a rule that is not there.
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", READ_ON) is not None
+    assert CONSUMER_DOMAINS
+
+    cited = {
+        word.strip(",:")
+        for line in SOURCE
+        for word in line.split()
+        if "." in word and not word.startswith("http")
+    }
+
+    assert cited == set(CONSUMER_DOMAINS)
+
+
+def test_every_pin_is_the_version_the_installer_pins() -> None:
+    pins = pinned_by_the_installer()
+
+    assert pins["presidio-analyzer"] == PRESIDIO_VERSION
+    assert pins["presidio-anonymizer"] == PRESIDIO_VERSION
+    assert pins["gliner"] == GLINER_VERSION
+    assert pins["spacy"] == SPACY_VERSION
+    assert pins["torch"] == TORCH_VERSION
+
+
+def test_the_spacy_pipeline_is_pinned_by_the_url_it_is_downloaded_from() -> None:
+    # The English pipeline is a release asset rather than a PyPI package, so the
+    # download URL is its pin and the two constants have to be the URL's own two
+    # halves.
+    source = manifest()["tool"]["uv"]["sources"]["en-core-web-sm"]
+
+    assert f"{SPACY_MODEL}-{SPACY_MODEL_VERSION}" in str(source["url"])
+
+
+def test_the_local_version_segment_a_wheel_reports_never_moves_the_pin() -> None:
+    # [TEST9]: CI's amd64 runner resolves torch's CPU wheel, which reports itself as
+    # `2.14.0+cpu` — PEP 440's local version segment names the build the wheel came
+    # from, never the release the pin fixes. The arm64 machine this pin was written on
+    # reports the same release with no local segment at all. Both have to satisfy the
+    # pin and a genuinely different release must not.
+    assert _public_version("2.14.0+cpu") == TORCH_VERSION
+    assert _public_version("2.14.0") == TORCH_VERSION
+    assert _public_version("2.13.0+cpu") != TORCH_VERSION
+
+
+def test_every_pin_is_the_version_the_interpreter_reports() -> None:
+    # The half that stops a constant ageing alone: the manifest above says what to
+    # install and this says what is installed, so a lock refreshed without the
+    # constant, or a constant edited without the lock, is caught on the next run.
+    # Compared on the public version (`_public_version`, [TEST9]) because a CPU wheel's
+    # local segment names its build and not its release.
+    reported = {
+        "presidio-analyzer": PRESIDIO_VERSION,
+        "presidio-anonymizer": PRESIDIO_VERSION,
+        "gliner": GLINER_VERSION,
+        "spacy": SPACY_VERSION,
+        "torch": TORCH_VERSION,
+        "en-core-web-sm": SPACY_MODEL_VERSION,
+    }
+
+    for distribution, pinned in reported.items():
+        assert _public_version(installed_version(distribution)) == pinned, distribution
+
+
+def test_the_check_workflow_caches_the_weights_where_the_detector_reads_them() -> None:
+    # A model downloaded on every run is a minute a run does not have; one cached
+    # under a key that does not name the pins is a stale hit nobody would notice.
+    # HF_HOME is exported to `$GITHUB_ENV` rather than set in the job's own `env:`,
+    # because that block cannot read the `runner` context the runner's temp
+    # directory needs — so this reads the shell assignment, not a YAML mapping.
+    workflow = CHECK_WORKFLOW.read_text(encoding="utf-8")
+
+    assert f"HF_HOME={HF_HOME_IN_CI}" in workflow
+    assert f"path: {HF_HOME_IN_CI}" in workflow
+    assert "uses: actions/cache@" in workflow
+    assert PINS_FILE in workflow

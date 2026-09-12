@@ -24,23 +24,53 @@ export const CONFIGURED_LLM_ROUTES = [
   readonly model: string;
 }[];
 
-/** What listing that workspace's routes answers: one row per purpose, in the slice's order. */
+/**
+ * What listing that workspace's routes answers: one row per purpose, in the slice's order.
+ *
+ * Every route reads a `retentionTail` of `null`: the scenario seeds routes nobody has read the
+ * provider's terms for, and that absence is the fact the DPIA input has to be able to print as
+ * *not recorded* rather than invent (the S0 spec, *The DPIA input*). A suite about a tail that
+ * was read seeds its own route and says so.
+ */
 export const LISTED_LLM_ROUTES = [
-  { purpose: "extraction", provider: null, model: null, dimensions: null, fixed: false },
-  { purpose: "enrichment", provider: null, model: null, dimensions: null, fixed: false },
+  {
+    purpose: "extraction",
+    provider: null,
+    model: null,
+    dimensions: null,
+    fixed: false,
+    retentionTail: null,
+  },
+  {
+    purpose: "enrichment",
+    provider: null,
+    model: null,
+    dimensions: null,
+    fixed: false,
+    retentionTail: null,
+  },
   {
     purpose: "answering",
     provider: "anthropic",
     model: "claude-sonnet-5",
     dimensions: null,
     fixed: false,
+    retentionTail: null,
   },
-  { purpose: "judging", provider: null, model: null, dimensions: null, fixed: false },
+  {
+    purpose: "judging",
+    provider: null,
+    model: null,
+    dimensions: null,
+    fixed: false,
+    retentionTail: null,
+  },
   {
     purpose: "embedding",
     provider: "mistral",
     model: "mistral-embed",
     dimensions: EMBEDDING_DIMENSIONS,
     fixed: true,
+    retentionTail: null,
   },
 ] as const;

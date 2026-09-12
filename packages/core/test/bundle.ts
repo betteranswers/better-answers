@@ -8,6 +8,8 @@ import { afterAll, beforeAll } from "vitest";
 
 import { openGit, type GitDoor } from "@better-answers/core/store/git";
 
+import { removeBundleRoot } from "./bundle-root.ts";
+
 /**
  * One real bare repository per suite, in a temporary directory — the git half of what a
  * governed write's tests need, written once here beside `suite-postgres.ts`, which is the
@@ -28,7 +30,10 @@ export const bundlesForSuite = (): (() => GitDoor) => {
   });
 
   afterAll(async () => {
-    if (root !== undefined) await rm(root, { recursive: true, force: true });
+    // Not a bare `rm`: the acts this suite left on the repository's lock are waited for
+    // first, because one of them still writing while the removal walks the tree is an
+    // `ENOTEMPTY` against a file whose every assertion passed (`bundle-root.ts`, T-172).
+    if (root !== undefined) await removeBundleRoot(root);
   });
 
   return () => {
@@ -58,6 +63,28 @@ const git = async (
     { env: { ...process.env, ...env } },
   );
   return stdout;
+};
+
+/**
+ * Take one object out of the repository's store and leave every reference to it standing: what
+ * a half-written or corrupted object looks like to a reader that walks the history to it.
+ *
+ * It is here rather than in a suite because the failure it arranges is a store's and not an
+ * act's, and because it is the only way to see the one exit that matters: `git grep` meets an
+ * object it cannot read, writes `error: … unable to read …` to stderr and exits **1** — the
+ * same status a needle nobody's file carries exits with — so a door that reads 1 as *nothing
+ * matched* tells an erasure that no file names the person by the one store that could not look.
+ */
+export const objectRemovedFrom = async (
+  door: GitDoor,
+  workspaceId: string,
+  revision: string,
+): Promise<string> => {
+  const id = (await git(door, workspaceId, ["rev-parse", revision])).trim();
+  // Loose, because every object these suites write is written one at a time and nothing packs
+  // them; a packed object would have to be removed with its pack and is not what this arranges.
+  await rm(path.join(door.root, `${workspaceId}.git`, "objects", id.slice(0, 2), id.slice(2)));
+  return id;
 };
 
 /** The empty tree, which git holds in every repository without writing an object for it. */
@@ -160,3 +187,57 @@ export const staged = async (door: GitDoor, workspaceId: string): Promise<readon
 /** Take a workspace's bundle away, for the tests about a repository that is not there. */
 export const removeRepository = (door: GitDoor, workspaceId: string): Promise<void> =>
   rm(path.join(door.root, `${workspaceId}.git`), { recursive: true, force: true });
+
+/**
+ * Every object the bundle's history reaches, as one run of bytes: the commits with their
+ * author lines and messages, the trees, and every blob at every commit. A claim about what a
+ * rewritten repository no longer holds is made against this and never against the head's
+ * tree, because the head is the one place a rewrite is easy to get right by accident.
+ *
+ * `rev-list --objects` names every object reachable from the ref, oldest commit's blobs
+ * included, and `cat-file --batch` prints each one's contents in a single pass.
+ */
+export const everyObjectOf = async (door: GitDoor, workspaceId: string): Promise<string> => {
+  const listed = await git(door, workspaceId, ["rev-list", "--objects", "main"]).catch(() => "");
+  const objects = listed
+    .split("\n")
+    .map((line) => line.split(" ")[0] ?? "")
+    .filter((sha) => sha !== "");
+  if (objects.length === 0) return "";
+  const child = run(
+    "git",
+    ["--git-dir", path.join(door.root, `${workspaceId}.git`), "cat-file", "--batch", "--buffer"],
+    { env: { ...process.env }, maxBuffer: 64 * 1024 * 1024 },
+  );
+  child.child.stdin?.end(`${objects.join("\n")}\n`);
+  const { stdout } = await child;
+  return stdout;
+};
+
+/**
+ * Whether the repository still holds an object under this hash — `git cat-file -e`, whose
+ * whole answer is its exit status. A pre-rewrite commit that answers `true` is a commit the
+ * rewrite left behind for anyone who kept its hash.
+ */
+export const objectPresent = async (
+  door: GitDoor,
+  workspaceId: string,
+  sha: string,
+): Promise<boolean> =>
+  git(door, workspaceId, ["cat-file", "-e", sha])
+    .then(() => true)
+    .catch(() => false);
+
+/** `Name <address>` for every commit on the bundle's ref, oldest first. */
+export const authorLinesOf = async (
+  door: GitDoor,
+  workspaceId: string,
+): Promise<readonly string[]> => {
+  const logged = await git(door, workspaceId, [
+    "log",
+    "--reverse",
+    "--format=%an <%ae>",
+    "main",
+  ]).catch(() => "");
+  return logged.split("\n").filter((line) => line !== "");
+};

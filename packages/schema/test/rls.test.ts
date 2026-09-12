@@ -2118,6 +2118,85 @@ describe("the audience pair on every readable unit", () => {
 });
 
 /**
+ * The **rules in force** on a binding (ADR 0020; migration 0031): the two tiers a binding
+ * switches, on the row rather than by convention, with the safe set as the column's default.
+ *
+ * Held by the database and not by the boundary alone, because the boundary is the app's and
+ * this value is the *worker's* argument: `worker_rt` holds default DML on every ordinary
+ * `public` table (migration `0000_substrate.sql`), so a shape stated at the boundary alone is
+ * a shape one tier could write around. The refusals are written as UPDATEs for the same reason
+ * the identifier set's are — the CHECK is what the row is held to whoever wrote it.
+ */
+describe("the rules in force on a source binding", () => {
+  it("gives a binding nobody configured the safe set, and takes the one flip that changes it", async () => {
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      // A binding written without the factory and without the boundary, naming the workspace
+      // and the id and nothing else: what lands in the column is then the database's own
+      // DEFAULT and not a value some layer above put there.
+      const id = ulid();
+      await client.query("INSERT INTO source_binding (workspace_id, id) VALUES ($1, $2)", [
+        WS_A,
+        id,
+      ]);
+
+      // The safe set, written down here as a literal (`[TEST9]`): the default-on tier on, the
+      // default-off tier off, and no key for *always*, because no binding switches it off.
+      const born = await client.query<{ rules_in_force: Record<string, boolean> }>(
+        "SELECT rules_in_force FROM source_binding WHERE id = $1",
+        [id],
+      );
+      expect(born.rows).toEqual([{ rules_in_force: { default_on: true, default_off: false } }]);
+
+      // The HR-shaped binding of the S0 spec: names withheld, which is one flip and not a new
+      // column, a new table or a list of categories anywhere near a migration.
+      const flipped = await client.query(
+        `UPDATE source_binding SET rules_in_force = '{"default_on": true, "default_off": true}'::jsonb
+          WHERE id = $1`,
+        [id],
+      );
+      expect(flipped.rowCount).toBe(1);
+    });
+  });
+
+  it("refuses a set of rules the seam could not read as tiers", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const binding = await seed.sourceBinding({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const offShape = [
+        // A tier missing. `->` on an absent key is SQL NULL and a CHECK worth NULL passes, so
+        // this is the case a `=` comparison would have taken: a binding whose answer to *is a
+        // name withheld?* is nothing at all.
+        `'{"default_on": true}'::jsonb`,
+        // A value that is neither a yes nor a no.
+        `'{"default_on": true, "default_off": "no"}'::jsonb`,
+        // The JSON `null`, which `jsonb NOT NULL` takes — it refuses SQL NULL, not the JSON
+        // value — so this is the layer that refuses a binding withholding by no rule at all.
+        `'null'::jsonb`,
+        // A list and a bare string: valid JSON, and not a set of tiers.
+        `'[]'::jsonb`,
+        `'"default_on"'::jsonb`,
+      ];
+      for (const value of offShape) {
+        await client.query("SAVEPOINT rules_in_force_row");
+        await expect(
+          client.query(`UPDATE source_binding SET rules_in_force = ${value} WHERE id = $1`, [
+            binding.id,
+          ]),
+        ).rejects.toThrow(/source_binding_rules_in_force_check/);
+        await client.query("ROLLBACK TO SAVEPOINT rules_in_force_row");
+      }
+    });
+  });
+});
+
+/**
  * The derivation's six tables (ADR 0039; migrations 0019 and 0020, `[SEC3]`): tenant tables
  * like any other, so the zero-rows proof is stated here in their words; the worker's role is
  * refused on all six outright; every composite key refuses a row naming another tenant's
@@ -2299,6 +2378,600 @@ describe("the derivation's tables under app_rt", () => {
         { table: "concept_class_override", rows: 0 },
         { table: "composition_include", rows: 0 },
       ]);
+    });
+  });
+});
+
+/**
+ * The **finding** (`CONTEXT.md`; ADR 0020, the S0 spec's tier boundary): what the seam found
+ * in one source document, written by the worker and reviewed by the app. A tenant table like
+ * any other, so the zero-rows proof is stated here in its words — and the grant is the whole
+ * of the boundary between the two tiers (`[SEC3]`): the worker's role holds INSERT alone, so
+ * a compromised worker can record what it withheld and can never read a workspace's findings
+ * back, stamp a review, or take away the record of a span.
+ *
+ * The table never holds the value it found — offsets, a category and a score, and nothing a
+ * personal detail could sit in. `boundary-schemas.test.ts` writes that column set down.
+ */
+describe("the finding under both runtime roles", () => {
+  it("returns zero rows on a missing scope and only the scoped tenant's findings otherwise", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      for (const workspaceId of [WS_A, WS_B]) await seed.finding({ workspaceId });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      expect(await countedRows(client, ["finding"])).toEqual([{ table: "finding", rows: 0 }]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      expect(await countedRows(client, ["finding"])).toEqual([{ table: "finding", rows: 1 }]);
+    });
+  });
+
+  it("lets the worker record a finding and refuses it every road back to one (migration 0023)", async () => {
+    // Migration 0000 hands both runtime roles the DML on every new `public` table by default
+    // privilege, so the substrate revokes and grants INSERT back alone. The served path is
+    // written without RETURNING on purpose: INSERT is the whole of what the worker holds, and
+    // a statement that read its own row back would want the SELECT this grant withholds.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const document = await seed.sourceDocument({ workspaceId: WS_A });
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      await client.query(
+        `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
+                              char_start, char_end, score, rule_version, detector_pin)
+         VALUES ($1, $2, $3, 'sort-code', 'always', 'sort-code-with-account-number',
+                 12, 20, 0.85, 'r1', 'd1')`,
+        [WS_A, ulid(), document.id],
+      );
+
+      await refusesEach(client, [
+        [
+          "SELECT 1 FROM finding LIMIT 1",
+          "the worker never reviews a finding, so it never reads one back",
+        ],
+        [
+          "UPDATE finding SET review_state = 'narrowed'",
+          "the review is an Admin's act, and a worker that could stamp one could mark a special-category span reviewed",
+        ],
+        [
+          "DELETE FROM finding",
+          "a finding is the record of what was withheld, and nothing the worker holds takes one away",
+        ],
+        // The two the grant's column list is for (migration 0032). Neither of these is an
+        // UPDATE, and both reach the state the revoke of UPDATE was written to prevent: the
+        // row CHECKs admit a review and a restore **on the insert itself**, so a worker that
+        // may name those columns can land a reviewed or restored span without ever holding a
+        // privilege 0024 named. What is refused is the column, not the value.
+        [
+          `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
+                                char_start, char_end, score, rule_version, detector_pin,
+                                review_state, reviewed_by, reviewed_at)
+           VALUES ($1, $2, $3, 'sort-code', 'always', 'sort-code-with-account-number',
+                   30, 38, 0.9, 'r1', 'd1', 'kept-in-text', 'process:better-answers-test', now())`,
+          "a finding is born unreviewed, and one inserted already reviewed is a special-category span a binding may widen over at nobody's word",
+          [WS_A, ulid(), document.id],
+        ],
+        [
+          `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
+                                char_start, char_end, score, rule_version, detector_pin,
+                                restored_at, restored_by, restore_reason)
+           VALUES ($1, $2, $3, 'sort-code', 'always', 'sort-code-with-account-number',
+                   40, 48, 0.9, 'r1', 'd1', now(), 'process:better-answers-test', 'let it stand')`,
+          "the restore is an Admin's act as well, and a span born restored is one the seam withheld and nobody put back",
+          [WS_A, ulid(), document.id],
+        ],
+      ]);
+
+      // The row the worker wrote, read back under the role that may read it — unreviewed,
+      // which is what a finding is born as.
+      await client.query("RESET ROLE");
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const recorded = await client.query<{ document_id: string; review_state: string }>(
+        "SELECT document_id, review_state FROM finding",
+      );
+      expect(recorded.rows).toEqual([{ document_id: document.id, review_state: "unreviewed" }]);
+    });
+  });
+
+  it("refuses a finding naming another tenant's document, at its key", async () => {
+    // The key names the workspace beside the document id, as every cross-table key in this
+    // package does: a foreign-key check runs outside row-level security, so a key on the id
+    // alone would confirm that some other tenant holds a given document.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const theirs = await seed.sourceDocument({ workspaceId: WS_B });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await expect(
+        client.query(
+          `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
+                                char_start, char_end, score, rule_version, detector_pin)
+           VALUES ($1, $2, $3, 'home-address', 'default-on', 'uk-address', 0, 9, 0.6, 'r1', 'd1')`,
+          [WS_A, ulid(), theirs.id],
+        ),
+      ).rejects.toThrow(/finding_document_fk/);
+    });
+  });
+
+  it("refuses a review, a restore and a tier the finding's own sentences do not admit", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const always = await seed.finding({ workspaceId: WS_A });
+      const defaultOn = await seed.finding({
+        workspaceId: WS_A,
+        documentId: always.documentId,
+        tier: "default-on",
+        category: "home-address",
+      });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const rows: readonly [string, readonly unknown[], string][] = [
+        // A fourth tier and a fourth review state: both word sets are closed, and the
+        // seam's three tiers are the glossary's.
+        ["UPDATE finding SET tier = 'sometimes' WHERE id = $1", [always.id], "finding_tier_check"],
+        // A fourth review state, with a whole review beside it so that only the state's own
+        // CHECK can be what refuses the row.
+        [
+          `UPDATE finding SET review_state = 'dismissed', reviewed_at = now(),
+                              reviewed_by = 'process:better-answers-test'
+             WHERE id = $1`,
+          [always.id],
+          "finding_review_state_check",
+        ],
+        // Half a review: a state that moved with no Admin and no instant beside it would be
+        // a reviewed span the screen cannot say who reviewed.
+        [
+          "UPDATE finding SET review_state = 'narrowed' WHERE id = $1",
+          [always.id],
+          "finding_review_check",
+        ],
+        // Half a restore, and a restore of a span no binding could switch off: the always
+        // set is the only tier a restore applies to, which is the act's refusal made the
+        // database's.
+        [
+          "UPDATE finding SET restored_at = now() WHERE id = $1",
+          [always.id],
+          "finding_restore_check",
+        ],
+        [
+          `UPDATE finding SET restored_at = now(), restored_by = 'human:${WS_B}',
+                              restore_reason = 'the client asked for the officer block back'
+             WHERE id = $1`,
+          [defaultOn.id],
+          "finding_restore_check",
+        ],
+      ];
+      for (const [statement, parameters, constraint] of rows) {
+        await client.query("SAVEPOINT finding_row");
+        await expect(client.query(statement, [...parameters])).rejects.toThrow(
+          new RegExp(constraint),
+        );
+        await client.query("ROLLBACK TO SAVEPOINT finding_row");
+      }
+    });
+  });
+});
+
+/**
+ * The **subject request** (`CONTEXT.md`; ADR 0020, the S0 spec's record families): a person's
+ * access or erasure request as an Admin recorded it, with the subject and the clock. A tenant
+ * table like any other, so the zero-rows proof is stated here in its words.
+ *
+ * **The worker holds nothing here**, and that is the whole of its relation to this table
+ * (`[SEC3]`). Migration 0000's default privileges would have handed it the four, as they did
+ * on `finding`, so the substrate revokes and grants none back: the identifier set is
+ * restricted personal data — the names and addresses a subject gave, in a workspace's own
+ * words — and a tier whose only job is to run a detector over a document has no road to it.
+ * A worker that could read this table would hold the platform's list of who has asked to be
+ * erased; one that could write it could start a clock nobody set or answer a request nobody
+ * answered.
+ */
+describe("the subject request under both runtime roles", () => {
+  it("returns zero rows on a missing scope and only the scoped tenant's requests otherwise", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      for (const workspaceId of [WS_A, WS_B]) await seed.subjectRequest({ workspaceId });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      expect(await countedRows(client, ["subject_request"])).toEqual([
+        { table: "subject_request", rows: 0 },
+      ]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      expect(await countedRows(client, ["subject_request"])).toEqual([
+        { table: "subject_request", rows: 1 },
+      ]);
+    });
+  });
+
+  it("refuses the worker every road to a subject request", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.subjectRequest({ workspaceId: WS_A });
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await refusesEach(client, [
+        [
+          "SELECT 1 FROM subject_request LIMIT 1",
+          "the identifier set is restricted personal data, and a worker that could read it would hold the platform's list of who has asked to be erased",
+        ],
+        [
+          `INSERT INTO subject_request (workspace_id, id, kind, identifiers, received_at,
+                                        clock_started_at, due_at)
+           VALUES ($1, $2, 'erasure', '{"emails": [], "names": [], "other": []}'::jsonb,
+                   now(), now(), now() + interval '1 month')`,
+          "recording a request is an Admin's act, so a worker that could insert one could start a clock nobody set",
+          [WS_A, ulid()],
+        ],
+        [
+          "UPDATE subject_request SET answered_at = now(), answer = 'nothing found'",
+          "and one that could stamp an answer could close a request nobody answered",
+        ],
+        [
+          "DELETE FROM subject_request",
+          "a request a tier can remove is a clock that stops without a record",
+        ],
+      ]);
+
+      // The row every one of those statements reached for, read back under the role that may
+      // read it: still there, still unanswered. The refusals above are privileges rather than
+      // policies, so this is what says the four were refused before the row and not after it.
+      await client.query("RESET ROLE");
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const standing = await client.query<{ answered_at: Date | null }>(
+        "SELECT answered_at FROM subject_request",
+      );
+      expect(standing.rows).toEqual([{ answered_at: null }]);
+    });
+  });
+
+  it("refuses a subject, a clock and an identifier set the request's own sentences do not admit", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const request = await seed.subjectRequest({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const rows: readonly [string, readonly unknown[], string][] = [
+        // A third kind: the pair is closed, as the glossary's *subject request* is.
+        [
+          "UPDATE subject_request SET kind = 'portability' WHERE id = $1",
+          [request.id],
+          "subject_request_kind_check",
+        ],
+        // A request naming nobody. The subject is a person id or the identifier set, and a
+        // row with neither is a request no finder could run and no answer could reach.
+        [
+          `UPDATE subject_request
+              SET person_id = NULL,
+                  identifiers = '{"emails": [], "names": [], "other": []}'::jsonb
+            WHERE id = $1`,
+          [request.id],
+          "subject_request_subject_check",
+        ],
+        // The set's three kinds, held by the database as well as the boundary: the finders
+        // read one arm each, and an arm that is not a list is a finder with nothing to walk.
+        // Two of the three missing is the case a `=` comparison would have taken, because
+        // `->` on an absent key is SQL NULL and a CHECK worth NULL passes.
+        [
+          `UPDATE subject_request SET identifiers = '{"emails": []}'::jsonb WHERE id = $1`,
+          [request.id],
+          "subject_request_identifiers_check",
+        ],
+        // The one way off the shape the boundary does not refuse: `jsonb NOT NULL` takes the
+        // JSON `null`, so this is the layer that refuses a set naming nobody at all.
+        [
+          `UPDATE subject_request SET identifiers = 'null'::jsonb WHERE id = $1`,
+          [request.id],
+          "subject_request_identifiers_check",
+        ],
+        // The clock, in the order the ICO's guidance sets it: the month runs from the start,
+        // which is receipt or the later instant identity was confirmed, never before receipt.
+        [
+          "UPDATE subject_request SET clock_started_at = received_at - interval '1 day' WHERE id = $1",
+          [request.id],
+          "subject_request_clock_check",
+        ],
+        [
+          "UPDATE subject_request SET due_at = clock_started_at WHERE id = $1",
+          [request.id],
+          "subject_request_clock_check",
+        ],
+        // An extension that does not extend. Article 12's two further months move the date
+        // out; a date inside the month would be the platform shortening its own deadline.
+        [
+          "UPDATE subject_request SET extended_to = due_at WHERE id = $1",
+          [request.id],
+          "subject_request_clock_check",
+        ],
+        // Half an answer, either way: an instant with no words, and words with no instant.
+        [
+          "UPDATE subject_request SET answered_at = now() WHERE id = $1",
+          [request.id],
+          "subject_request_answer_check",
+        ],
+        [
+          "UPDATE subject_request SET answer = 'nothing found' WHERE id = $1",
+          [request.id],
+          "subject_request_answer_check",
+        ],
+      ];
+      for (const [statement, parameters, constraint] of rows) {
+        await client.query("SAVEPOINT subject_request_row");
+        await expect(client.query(statement, [...parameters])).rejects.toThrow(
+          new RegExp(constraint),
+        );
+        await client.query("ROLLBACK TO SAVEPOINT subject_request_row");
+      }
+    });
+  });
+});
+
+/**
+ * The **erasure request** (`CONTEXT.md`; ADR 0020, amended 2026-09-05): what the routine did
+ * in every store for one subject request — the *erasure pseudonym* it minted, the instant it
+ * took the lock, the per-store actions, the anchor with its four beyond-use dates, and the
+ * report. The worker holds nothing here for the reason it holds nothing on the request: the
+ * routine is the app tier's, under the platform principal, and this row is the record a
+ * restore replays from.
+ */
+describe("the erasure request under both runtime roles", () => {
+  it("returns zero rows on a missing scope and only the scoped tenant's routines otherwise", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      for (const workspaceId of [WS_A, WS_B]) await seed.erasureRequest({ workspaceId });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      expect(await countedRows(client, ["erasure_request"])).toEqual([
+        { table: "erasure_request", rows: 0 },
+      ]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      expect(await countedRows(client, ["erasure_request"])).toEqual([
+        { table: "erasure_request", rows: 1 },
+      ]);
+    });
+  });
+
+  it("refuses the worker every road to an erasure request", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const request = await seed.erasureRequest({ workspaceId: WS_A });
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await refusesEach(client, [
+        [
+          "SELECT 1 FROM erasure_request LIMIT 1",
+          "the pseudonym is what a rewritten history was rewritten to, and a worker that could read it could join the history back to the request that caused it",
+        ],
+        [
+          `INSERT INTO erasure_request (workspace_id, id, subject_request_id, pseudonym,
+                                        locked_at, anchored_at, beyond_use_hourly_at,
+                                        beyond_use_daily_at, beyond_use_weekly_at,
+                                        beyond_use_monthly_at)
+           VALUES ($1, $2, $3, $4, now(), now(), now() + interval '2 days',
+                   now() + interval '30 days', now() + interval '8 weeks',
+                   now() + interval '6 months')`,
+          "the routine runs under the platform principal in the app tier, so a worker that could insert one could claim an erasure that never ran",
+          [WS_A, ulid(), request.subjectRequestId, ulid()],
+        ],
+        [
+          "UPDATE erasure_request SET completed_at = now(), report = 'done'",
+          "and one that could complete a request could close a routine that had touched no store",
+        ],
+        [
+          "DELETE FROM erasure_request",
+          "this row is what a restore replays from, so a tier that could remove one could make an erasure un-replayable",
+        ],
+      ]);
+
+      // The row all four reached for, read back under the role that may read it: still there,
+      // still unfinished, and still carrying the pseudonym the routine minted.
+      await client.query("RESET ROLE");
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const standing = await client.query<{ pseudonym: string; completed_at: Date | null }>(
+        "SELECT pseudonym, completed_at FROM erasure_request",
+      );
+      expect(standing.rows).toEqual([{ pseudonym: request.pseudonym, completed_at: null }]);
+    });
+  });
+
+  it("refuses a completion, a pseudonym and a set of dates the routine's own sentences do not admit", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const request = await seed.erasureRequest({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const rows: readonly [string, readonly unknown[], string][] = [
+        // Half a completion, either way: a stamp with no report is a routine that finished
+        // without saying what it did, and a report with no stamp is one that never finished.
+        [
+          "UPDATE erasure_request SET completed_at = now() WHERE id = $1",
+          [request.id],
+          "erasure_request_completion_check",
+        ],
+        [
+          "UPDATE erasure_request SET report = 'done' WHERE id = $1",
+          [request.id],
+          "erasure_request_completion_check",
+        ],
+        // The four dates run out from the anchor in order — 48 hours, 30 days, 8 weeks, six
+        // months — because that is what the report promises about each backup tier. A weekly
+        // date inside the daily one would be a promise the lifecycle rule cannot keep.
+        [
+          "UPDATE erasure_request SET beyond_use_weekly_at = beyond_use_daily_at WHERE id = $1",
+          [request.id],
+          "erasure_request_beyond_use_check",
+        ],
+        [
+          "UPDATE erasure_request SET beyond_use_hourly_at = anchored_at WHERE id = $1",
+          [request.id],
+          "erasure_request_beyond_use_check",
+        ],
+        // The actions are one flat object per store family; a `null` or a string would be a
+        // record of what was done that no report could be written from.
+        [
+          `UPDATE erasure_request SET actions = 'null'::jsonb WHERE id = $1`,
+          [request.id],
+          "erasure_request_actions_check",
+        ],
+      ];
+      for (const [statement, parameters, constraint] of rows) {
+        await client.query("SAVEPOINT erasure_request_row");
+        await expect(client.query(statement, [...parameters])).rejects.toThrow(
+          new RegExp(constraint),
+        );
+        await client.query("ROLLBACK TO SAVEPOINT erasure_request_row");
+      }
+    });
+  });
+
+  it("refuses a second routine over one subject request, and one naming another tenant's", async () => {
+    // One erasure per subject request: the replay re-runs the routine and finds the same
+    // pseudonym on the same row, which is what makes it idempotent. A second row would be a
+    // second pseudonym for one person, and a history rewritten twice to two opaque ids.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const mine = await seed.erasureRequest({ workspaceId: WS_A });
+      const theirs = await seed.subjectRequest({ workspaceId: WS_B, kind: "erasure" });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const insert = `INSERT INTO erasure_request (workspace_id, id, subject_request_id, pseudonym,
+                                                   locked_at, anchored_at, beyond_use_hourly_at,
+                                                   beyond_use_daily_at, beyond_use_weekly_at,
+                                                   beyond_use_monthly_at)
+                      VALUES ($1, $2, $3, $4, now(), now(), now() + interval '2 days',
+                              now() + interval '30 days', now() + interval '8 weeks',
+                              now() + interval '6 months')`;
+
+      await client.query("SAVEPOINT second_routine");
+      await expect(
+        client.query(insert, [WS_A, ulid(), mine.subjectRequestId, ulid()]),
+      ).rejects.toThrow(/erasure_request_subject_request_uidx/);
+      await client.query("ROLLBACK TO SAVEPOINT second_routine");
+
+      // And the key names the workspace beside the request id, as every cross-table key in
+      // this package does: a foreign-key check runs outside row-level security.
+      await expect(client.query(insert, [WS_A, ulid(), theirs.id, ulid()])).rejects.toThrow(
+        /erasure_request_subject_request_fk/,
+      );
+    });
+  });
+});
+
+/**
+ * The **suppression** (`CONTEXT.md`; ADR 0020): what keeps a person's data out of every
+ * derived store the next time one document is reprocessed — one row per document per erasure
+ * request, carrying the identifiers to keep out. Restricted personal data itself, which is
+ * why the worker holds nothing here either: the reprocess that reads a suppression is the
+ * app's act, and S1's worker is handed what to keep out rather than reading the table.
+ */
+describe("the suppression under both runtime roles", () => {
+  it("returns zero rows on a missing scope and only the scoped tenant's suppressions otherwise", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      for (const workspaceId of [WS_A, WS_B]) await seed.suppression({ workspaceId });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      expect(await countedRows(client, ["suppression"])).toEqual([
+        { table: "suppression", rows: 0 },
+      ]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      expect(await countedRows(client, ["suppression"])).toEqual([
+        { table: "suppression", rows: 1 },
+      ]);
+    });
+  });
+
+  it("refuses the worker every road to a suppression", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const suppression = await seed.suppression({ workspaceId: WS_A });
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await refusesEach(client, [
+        [
+          "SELECT 1 FROM suppression LIMIT 1",
+          "a suppression is the identifiers of an erased person, so a worker that could read one would hold what the erasure was for",
+        ],
+        [
+          `INSERT INTO suppression (workspace_id, erasure_request_id, document_id, identifiers)
+           VALUES ($1, $2, $3, '{"emails": ["x@y.invalid"], "names": [], "other": []}'::jsonb)`,
+          "the routine writes suppressions under the platform principal, so a worker that could insert one could suppress a document nobody asked about",
+          [WS_A, suppression.erasureRequestId, suppression.documentId],
+        ],
+        [
+          `UPDATE suppression SET identifiers = '{"emails": [], "names": [], "other": []}'::jsonb`,
+          "and one that could edit the set could empty it, which is an erasure quietly undone at the next reprocess",
+        ],
+        [
+          "DELETE FROM suppression",
+          "a suppression a tier can remove is a person's data back in the derived stores the next time the document is converted",
+        ],
+      ]);
+
+      // The row all four reached for, read back under the role that may read it: still there,
+      // still carrying the identifiers the routine wrote from the request's set.
+      await client.query("RESET ROLE");
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const standing = await client.query<{ identifiers: unknown }>(
+        "SELECT identifiers FROM suppression",
+      );
+      expect(standing.rows).toEqual([{ identifiers: suppression.identifiers }]);
+    });
+  });
+
+  it("refuses a suppression that keeps nothing out, and one naming another tenant's rows", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const mine = await seed.suppression({ workspaceId: WS_A });
+      const theirDocument = await seed.sourceDocument({ workspaceId: WS_B });
+      const theirRoutine = await seed.erasureRequest({ workspaceId: WS_B });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      const insert = `INSERT INTO suppression (workspace_id, erasure_request_id, document_id, identifiers)
+                      VALUES ($1, $2, $3, $4::jsonb)`;
+      const set = '{"emails": ["priya@client.invalid"], "names": [], "other": []}';
+      const empty = '{"emails": [], "names": [], "other": []}';
+
+      const rows: readonly [string, readonly unknown[], string][] = [
+        // A suppression keeps something out or it is not one: an empty set is a row the
+        // reprocess would read and act on by doing nothing at all.
+        [
+          `UPDATE suppression SET identifiers = '${empty}'::jsonb WHERE document_id = $1`,
+          [mine.documentId],
+          "suppression_identifiers_check",
+        ],
+        // Both keys name the workspace beside the id, as every cross-table key in this
+        // package does: a foreign-key check runs outside row-level security.
+        [insert, [WS_A, mine.erasureRequestId, theirDocument.id, set], "suppression_document_fk"],
+        [insert, [WS_A, theirRoutine.id, mine.documentId, set], "suppression_erasure_request_fk"],
+      ];
+      for (const [statement, parameters, constraint] of rows) {
+        await client.query("SAVEPOINT suppression_row");
+        await expect(client.query(statement, [...parameters])).rejects.toThrow(
+          new RegExp(constraint),
+        );
+        await client.query("ROLLBACK TO SAVEPOINT suppression_row");
+      }
     });
   });
 });

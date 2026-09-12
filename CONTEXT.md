@@ -172,9 +172,15 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **finding** — what the pre-scan found in one source document: a category (bank details, date of
   birth, home address, personal contact, special category, …), offsets into the normalised text,
   the rule and detector version that fired. Counted per category; never a class, never a value.
+- **redaction seam** — the one place a document's text is read for what must be withheld and
+  the placeholders are written in, ahead of chunking, extraction and every model call, so that
+  no derived store and no model ever holds the value.
 - **redaction rule** — one of three tiers of what the seam withholds: **always** (policy no
   binding switches off; a span restorable with a reason), **default on** per binding, **default
   off** per binding. The officer-block rule always wins.
+- **consumer-domain list** — the email domains this repository judges a consumer provider's,
+  dated and sourced. An address on one is a person's own and is personal contact; an address on
+  any other domain is a company's and stays in the text. A judgement, never a complete register.
 - **withheld** — the placeholder word: `[withheld]` for the always set, `[home address withheld]`
   and the like for the rest, `[person A]` for a pseudonymised name.
 - **relation** — a link from one concept to another as the map holds it: the two kinds, the
@@ -294,6 +300,9 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   enrichment, answering, judging, embedding), local or hosted; one route per purpose. The
   embedding route is **fixed** — the word a reader sees on it — and never changes once vectors
   exist (ADR 0020).
+- **DPIA input** — what one binding contributes to a data protection impact assessment, as a
+  document and its hash: the personal data categories its rules in force can raise, its scope,
+  class, routes, *retention class* and audience. The hash rides on the publish audit row.
 
 ## Trust words the reader sees
 
@@ -484,6 +493,19 @@ to it by IRI and never restates it (ADR 0014).
   a passage.
 - **suppression** — the entry that keeps a person's data out of every derived store when a
   document is reprocessed; applied per document, linked to its erasure request.
+- **erasure map** — the per-store finder's answer for one *subject request*: every store family
+  the platform holds and what in each of them names the person, found over the request's
+  identifier set. The *suppression* entries and the report are written from it.
+- **replay copy** — the completed *erasure request*'s copy in the object store — the request, its
+  *erasure pseudonym*, the identifier set and the *erasure map* — that a restore reads to run the
+  erasure again over a dump older than the request. Restricted personal data, as a *suppression* is.
+- **erasure rehearsal** — the *restore drill*'s proof that erasure erases, run against *staging* in
+  two phases so a dump can be taken between them: a **synthetic subject** — a person the platform
+  invented, addressed under a reserved domain that resolves nowhere — is seeded into a workspace
+  with a membership and a concept file naming them, and the erasure routine is then run over them
+  and answers with the real report. Its **tokens** are the values that subject is greppable by in a
+  dump, each one a value the erasure removes; *token* here is `dump-grep --tokens`' sense of the
+  word and never a credential (*personal token*, *agent token*).
 - **version (of a record)** — one state of a composition or a guide definition, kept for good with
   who changed it and why; the current state is the latest version. Concepts have git instead.
 

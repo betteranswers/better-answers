@@ -14,15 +14,42 @@ set -uo pipefail
 # files, or commits its upstream (or `main`, when it has none) does not have. A
 # hook-created worktree carries no Claude Code marker, so the periodic sweep never
 # removes it; a kept worktree is removed by hand with `git worktree remove --force`.
+#
+# A worktree removed here also gives up its jCodeMunch index, the one
+# .claude/hooks/provision-worktree.sh gave it at creation (T-181): without that, the
+# registry keeps naming a root that is no longer on disk, which is the state the owner's
+# machine was found in — seven create events and no removals, the oldest naming a path
+# gone for a fortnight. A jCodeMunch repository id is not derivable from its path, so it
+# is read from the registry `list-repos --json` prints. Everything about that stage is
+# best effort: this hook tidies and never blocks, so a machine without the tool, a path
+# the registry does not know and a refused delete are each one line on stderr and an
+# exit 0 like every other outcome.
 
 INPUT="$(cat)"
 WT="$(printf '%s' "$INPUT" | jq -r '.worktree_path // empty' 2>/dev/null || true)"
 [ -n "$WT" ] || { echo "worktree-remove-hook: no worktree_path in input" >&2; exit 0; }
 [ -d "$WT" ] || { echo "worktree-remove-hook: $WT already gone" >&2; exit 0; }
+# Physically, and before the removal: the registry holds resolved roots, and the path
+# cannot be resolved once the directory it names has gone.
+WT_REAL="$(cd "$WT" && pwd -P)"
 
 keep() {
   echo "worktree-remove-hook: keeping $WT — $1" >&2
   exit 0
+}
+
+drop_index() {
+  command -v jcodemunch-mcp >/dev/null 2>&1 || return 0
+  REPO="$(jcodemunch-mcp list-repos --json 2>/dev/null \
+    | jq -r --arg root "$WT_REAL" 'map(select(.source_root == $root)) | first | .repo_id // empty' \
+      2>/dev/null || true)"
+  if [ -z "$REPO" ] || [ "$REPO" = "null" ]; then
+    echo "worktree-remove-hook: jcodemunch: no index named $WT_REAL" >&2
+  elif jcodemunch-mcp delete-index "$REPO" >/dev/null 2>&1; then
+    echo "worktree-remove-hook: jcodemunch: dropped the index $REPO" >&2
+  else
+    echo "worktree-remove-hook: jcodemunch: could not drop the index $REPO — run jcodemunch-mcp delete-index $REPO by hand" >&2
+  fi
 }
 
 git -C "$WT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || keep "not a git worktree"
@@ -47,6 +74,7 @@ ROOT="$(dirname "$COMMON")"
 
 if git -C "$ROOT" worktree remove "$WT" >&2 2>&1; then
   echo "worktree-remove-hook: removed $WT" >&2
+  drop_index
   if [ -n "$BRANCH" ] && git -C "$ROOT" branch -d "$BRANCH" >/dev/null 2>&1; then
     echo "worktree-remove-hook: deleted branch $BRANCH" >&2
   fi

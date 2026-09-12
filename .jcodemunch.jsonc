@@ -1,0 +1,23 @@
+// jCodeMunch's per-project configuration, read from the repository root and overlaid on the
+// global `~/.code-index/config.jsonc` per key at read time rather than merged at load. Declare a
+// key here in full: whether a project array concatenates with the global one or replaces it is
+// documented nowhere, so the list below is the whole list and not an addition to one.
+{
+  // Agent worktrees are never this repository's source. They are copies of it, at whatever commit
+  // their ticket was cut from, and a search that answers from one answers about another ticket's
+  // work — or about a worktree that is no longer on disk, which is what T-123's implementor hit.
+  //
+  // The discovery walk was never the leak: it honours `.gitignore`, where `.claude/worktrees/`
+  // already sits, and an `index_folder` over a checkout reports those files under its
+  // `gitignore` skip count. The leak is the per-file path. An edit inside a worktree is
+  // registered against the root that contains it, and the main checkout contains every worktree
+  // under `.claude/worktrees/`, so `index_file` resolves the edit into the *main* index at a
+  // relative path beginning `.claude/worktrees/`. On 12/09/2026 the main index carried sixty-odd
+  // such files from eight worktrees, six of which no longer existed. The server's built-in skip
+  // list carries no `.claude` entry and no `worktrees` entry, so nothing else refuses them.
+  //
+  // These patterns are gitignore syntax, matched by the vendored `pathspec` `GitIgnoreSpec`, so
+  // `**` is supported. The spelling is `jscpd.config.mjs`'s and `.oxlintrc.json`'s, which refuse
+  // the same directory for the same reason.
+  "extra_ignore_patterns": ["**/.claude/worktrees/**"],
+}

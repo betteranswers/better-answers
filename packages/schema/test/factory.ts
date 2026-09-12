@@ -14,9 +14,12 @@ import {
   CREATOR_ROLE,
   CURATED_ORIGIN,
   EMBEDDING_DIMENSIONS,
+  FINDING_UNREVIEWED_STATE,
   JOB_MAX_ATTEMPTS,
   JOB_QUEUED_STATUS,
   NIGHTLY_AUDIT_KIND,
+  REDACTION_ALWAYS_TIER,
+  RULES_IN_FORCE_DEFAULT,
   SUGGESTION_EDIT_KIND,
   SUGGESTION_WAITING_STATUS,
   ulid,
@@ -149,6 +152,37 @@ export type TestData = {
   sourceDocument(
     overrides?: Partial<InsertInput<"sourceDocument">>,
   ): Promise<Row<"sourceDocument">>;
+  /**
+   * A finding; creates the document the span sits in unless one is named. An unreviewed
+   * always-set span, because that is the tier a restore applies to and the state every
+   * finding is born at; a suite about the two defaults names `tier` and its `category`.
+   */
+  finding(overrides?: Partial<InsertInput<"finding">>): Promise<Row<"finding">>;
+  /**
+   * A subject request; creates the person it is about unless one is named, and their
+   * membership with them, because a request is recorded in the workspace the person belongs
+   * to. An access request received today, its clock started at receipt and unanswered — the
+   * row an Admin has just written; a suite about the person who never signed in names
+   * `personId: null` and its own `identifiers`.
+   */
+  subjectRequest(
+    overrides?: Partial<InsertInput<"subjectRequest">>,
+  ): Promise<Row<"subjectRequest">>;
+  /**
+   * An erasure request; creates the subject request it answers — of kind *erasure* — unless
+   * one is named. A routine that has taken the lock and computed its four dates and touched
+   * no store yet: unfinished, because a suite about the replay names `completedAt` and its
+   * `report`.
+   */
+  erasureRequest(
+    overrides?: Partial<InsertInput<"erasureRequest">>,
+  ): Promise<Row<"erasureRequest">>;
+  /**
+   * A suppression; creates the routine that wrote it and the document it stands over unless
+   * either is named. It keeps one email out, because a suppression that kept nothing out is
+   * the row its own CHECK refuses.
+   */
+  suppression(overrides?: Partial<InsertInput<"suppression">>): Promise<Row<"suppression">>;
   /**
    * A concept's citation of one piece of evidence; creates its own workspace and identity
    * unless the IRI is named, and the evidence row the key names unless both halves of that
@@ -323,6 +357,10 @@ export const testData = (client: pg.PoolClient): TestData => {
       model: "mistral-embed",
       // The dimensions CHECK: only the embedding purpose carries a count.
       dimensions: purpose === "embedding" ? EMBEDDING_DIMENSIONS : null,
+      // No retention tail: S2's model client reads the provider's terms and writes it, and a
+      // seeded route has had nobody read them, which is what the DPIA input has to be able
+      // to say.
+      retentionTail: null,
       ...overrides,
       purpose,
       workspaceId,
@@ -643,6 +681,10 @@ export const testData = (client: pg.PoolClient): TestData => {
       sensitivity: "Internal",
       audience: AUDIENCE_EVERYONE,
       audienceGroups: null,
+      // The safe set, which is what the column's own DEFAULT writes — stated here because the
+      // boundary's insert schema asks for the column, and proved to be the database's own in
+      // `rls.test.ts`, where a binding is written with neither this factory nor the boundary.
+      rulesInForce: RULES_IN_FORCE_DEFAULT,
       ...overrides,
       workspaceId,
     });
@@ -656,6 +698,136 @@ export const testData = (client: pg.PoolClient): TestData => {
       ...overrides,
       workspaceId,
       bindingId,
+    });
+  };
+
+  const finding: TestData["finding"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const documentId = overrides.documentId ?? (await sourceDocument({ workspaceId })).id;
+    return insertRow(client, "finding", {
+      id: ulid(),
+      category: "sort-code",
+      tier: REDACTION_ALWAYS_TIER,
+      ruleId: "sort-code-with-account-number",
+      charStart: 0,
+      charEnd: 8,
+      score: 0.85,
+      ruleVersion: "1",
+      detectorPin: "presidio-test",
+      // Unreviewed and unrestored, which is what the seam writes: the six columns the two
+      // acts fill are stated as null rather than left off, as `sourceBinding`'s audience
+      // pair is, so the seeded row is the whole shape a reviewer would open.
+      reviewState: FINDING_UNREVIEWED_STATE,
+      reviewedBy: null,
+      reviewedAt: null,
+      reviewReason: null,
+      restoredAt: null,
+      restoredBy: null,
+      restoreReason: null,
+      ...overrides,
+      workspaceId,
+      documentId,
+    });
+  };
+
+  const subjectRequest: TestData["subjectRequest"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    // `null` is a whole answer here and not an absence — the person who never signed in —
+    // so the person is only minted when the caller said nothing at all.
+    const personId = overrides.personId === undefined ? (await user()).id : overrides.personId;
+    const receivedAt = overrides.receivedAt ?? new Date();
+    const clockStartedAt = overrides.clockStartedAt ?? receivedAt;
+    // The deadline the clock starts on: the same day of the month one month on, or the target
+    // month's last day where that month has no such day — the 31st of January is due on the
+    // 28th of February, the 29th in a leap year, because a day a short month does not have
+    // lands in the month after it. Its pair is `dueDateOf` in
+    // `packages/core/src/erasure/requests.ts`, which states the same rule in its own line
+    // because these tests cannot import that package; change one and change the other in the
+    // same commit.
+    const dayAsked = clockStartedAt.getUTCDate();
+    const dueAt = new Date(clockStartedAt);
+    dueAt.setUTCDate(1);
+    dueAt.setUTCMonth(dueAt.getUTCMonth() + 1);
+    const lastDayOfTheMonth = new Date(
+      Date.UTC(dueAt.getUTCFullYear(), dueAt.getUTCMonth() + 1, 0),
+    ).getUTCDate();
+    dueAt.setUTCDate(Math.min(dayAsked, lastDayOfTheMonth));
+    return insertRow(client, "subjectRequest", {
+      id: ulid(),
+      kind: "access",
+      // An identifier set that names somebody, so a suite naming `personId: null` still gets
+      // a request the subject CHECK admits.
+      identifiers: { emails: ["subject@example.invalid"], names: [], other: [] },
+      dueAt,
+      // Unextended and unanswered, which is what an Admin has just written: the three columns
+      // the extension and the answer fill are stated as null rather than left off, as the
+      // finding's six are, so the seeded row is the whole shape a screen would open.
+      extendedTo: null,
+      answeredAt: null,
+      answer: null,
+      ...overrides,
+      workspaceId,
+      personId,
+      receivedAt,
+      clockStartedAt,
+    });
+  };
+
+  const erasureRequest: TestData["erasureRequest"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const subjectRequestId =
+      overrides.subjectRequestId ?? (await subjectRequest({ workspaceId, kind: "erasure" })).id;
+    const anchoredAt = overrides.anchoredAt ?? new Date();
+    // The four tiers the operations document names, out from the anchor in order, each
+    // computed as Postgres computes that interval — which is what `deploy/backup.sh` writes
+    // onto every dump's `backup_run.expires_at`, so a seeded row promises what a real one
+    // would. The first three are exact durations; six months is calendar arithmetic, landing
+    // on the same day of the month or on that month's last day, so the 31st of August is
+    // beyond use on the 28th of February. Its pair is `beyondUseFrom` in
+    // `packages/core/src/erasure/routine.ts`, over `monthsOn` in the same slice, which states
+    // the same rule in its own line because these tests cannot import that package; change one
+    // and change the other in the same commit.
+    const outFrom = (milliseconds: number) => new Date(anchoredAt.getTime() + milliseconds);
+    const hour = 60 * 60 * 1000;
+    const dayAsked = anchoredAt.getUTCDate();
+    const sixMonthsOn = new Date(anchoredAt);
+    sixMonthsOn.setUTCDate(1);
+    sixMonthsOn.setUTCMonth(sixMonthsOn.getUTCMonth() + 6);
+    const lastDayOfThatMonth = new Date(
+      Date.UTC(sixMonthsOn.getUTCFullYear(), sixMonthsOn.getUTCMonth() + 1, 0),
+    ).getUTCDate();
+    sixMonthsOn.setUTCDate(Math.min(dayAsked, lastDayOfThatMonth));
+    return insertRow(client, "erasureRequest", {
+      id: ulid(),
+      pseudonym: ulid(),
+      lockedAt: anchoredAt,
+      beyondUseHourlyAt: outFrom(48 * hour),
+      beyondUseDailyAt: outFrom(30 * 24 * hour),
+      beyondUseWeeklyAt: outFrom(8 * 7 * 24 * hour),
+      beyondUseMonthlyAt: sixMonthsOn,
+      // No store touched yet, and the two columns the last step writes stated as null rather
+      // than left off, so the seeded row is the whole shape a replay would open.
+      actions: {},
+      completedAt: null,
+      report: null,
+      ...overrides,
+      workspaceId,
+      subjectRequestId,
+      anchoredAt,
+    });
+  };
+
+  const suppression: TestData["suppression"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const erasureRequestId =
+      overrides.erasureRequestId ?? (await erasureRequest({ workspaceId })).id;
+    const documentId = overrides.documentId ?? (await sourceDocument({ workspaceId })).id;
+    return insertRow(client, "suppression", {
+      identifiers: { emails: ["subject@example.invalid"], names: [], other: [] },
+      ...overrides,
+      workspaceId,
+      erasureRequestId,
+      documentId,
     });
   };
 
@@ -747,6 +919,10 @@ export const testData = (client: pg.PoolClient): TestData => {
     conceptWriteRequest,
     sourceBinding,
     sourceDocument,
+    finding,
+    subjectRequest,
+    erasureRequest,
+    suppression,
     conceptEvidence,
     conceptClassOverride,
     composition,

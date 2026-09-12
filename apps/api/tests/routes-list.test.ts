@@ -34,6 +34,9 @@ const routeShape = z.object({
   model: z.string().nullable(),
   dimensions: z.number().nullable(),
   fixed: z.boolean(),
+  // The provider's own retention sentence, which the DPIA input prints for this route (the S0
+  // spec, *The DPIA input*): the wire carries it, so the shape this suite parses names it.
+  retentionTail: z.string().nullable(),
 });
 const answered = z.object({ result: z.object({ data: z.array(routeShape) }) });
 const refused = z.object({ error: z.object({ message: z.string() }) });

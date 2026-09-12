@@ -8,12 +8,14 @@ set -euo pipefail
 # .claude/hooks/worktree-create-hook.sh for every worktree Claude Code creates; runnable
 # by hand after `git worktree add`, which fires no hook.
 #
-# Four stages, each reporting on its own line and none stopping the next:
-#   upstream      — the branch tracks nothing until someone says so
-#   pnpm install  — the TypeScript workspaces
-#   uv sync       — the Python worker
-#   skills        — .claude/hooks/provision-skills.sh: the installed, ignored agent
-#                   tooling (`.agents/`, `.claude/skills/*`, `tasks/AGENTS.md`)
+# Five stages, each reporting on its own line and none stopping the next:
+#   upstream         — the branch tracks nothing until someone says so
+#   pnpm install     — the TypeScript workspaces
+#   uv sync          — the Python worker
+#   jcodemunch index — the worktree as a jCodeMunch root of its own
+#   skills           — .claude/hooks/provision-skills.sh: the installed, ignored agent
+#                      tooling (`.agents/`, `.claude/skills/*`, each workspace's
+#                      `.claude/skills/*`, `tasks/AGENTS.md`)
 #
 # `git worktree add -b <branch> <path> origin/main` sets the new branch to track
 # `origin/main`, silently: a bare `git push` from the worktree then aims at `main`, and
@@ -31,6 +33,18 @@ set -euo pipefail
 # `packages/core` and worker source, so a worktree's tests would run against code it
 # is not editing. That rule is about path resolution and does not reach the skills,
 # which are static markdown; provision-skills.sh copies those, and says why there.
+#
+# The worktree is given a jCodeMunch index of its own here, rather than at whatever edit
+# happens first, because jCodeMunch resolves an edited file into the nearest containing
+# indexed root: until the worktree is one, every file an agent edits in it is registered
+# into the *primary checkout's* index under `.claude/worktrees/…`, where a later search
+# answers out of a ticket that is not the reader's, or out of a worktree no longer on disk
+# (T-146, T-181). The verb is the CLI's own `index <path>`; `index_folder` is the MCP
+# tool's name and is not something a script can call. A machine without jCodeMunch is not
+# a broken worktree, so that case says what it costs and leaves STATUS alone — the shape
+# `actionlint` has in lefthook.yml — while an index that was attempted and failed is a
+# stage failure like any other. .claude/hooks/worktree-remove-hook.sh drops the index
+# again when it removes the worktree.
 #
 # Nothing is copied from `.env.local`: no workspace, test or compose file reads it
 # (checked 02/09/2026), and tests reach Postgres through Testcontainers. If that
@@ -100,6 +114,19 @@ if [ -f "$WORKER/pyproject.toml" ]; then
     echo "  uv: not on PATH — skipped" >&2
     STATUS=1
   fi
+fi
+
+# --- jcodemunch: the worktree is a root of its own from its first edit ---
+if command -v jcodemunch-mcp >/dev/null 2>&1; then
+  START=$SECONDS
+  if jcodemunch-mcp index "$WORKTREE_PATH" >&2 2>&1; then
+    echo "  jcodemunch index: done in $((SECONDS - START))s" >&2
+  else
+    echo "  jcodemunch index: FAILED — run jcodemunch-mcp index \"$WORKTREE_PATH\" by hand" >&2
+    STATUS=1
+  fi
+else
+  echo "  jcodemunch: not on PATH — skipped; edits here register in the primary checkout's index" >&2
 fi
 
 # --- skills: the installed agent tooling, copied from the primary checkout ---

@@ -1,13 +1,16 @@
 import { execFile } from "node:child_process";
 import { statSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
 import {
   err,
+  isPortablePath,
+  normalizeError,
   ok,
+  PERSON_PREFIX,
   type ActorId,
   type PlatformPrincipal,
   type Result,
@@ -195,6 +198,32 @@ const git = async (
 };
 
 /**
+ * The exit status a failed `git` carries, or `null` for a failure that never became one.
+ *
+ * `execFile`'s rejection puts the child's exit status on `code` as a **number** and a failure
+ * to spawn at all — `ENOENT` for a binary off the path, `E2BIG` for an argument list past
+ * `ARG_MAX` — as a **string** in the same field. The two are told apart by type and never by
+ * spelling, and `null` is the honest answer for the second: a call that never ran has no status
+ * to classify, so every caller below treats it as the store failure it is.
+ *
+ * The parameter is named `cause` in both of these because that is the one name
+ * `anti-slop/no-unknown-parameters` allows for a rejection nobody can type — the kernel's own
+ * `normalizeError` says so where it stands — and because that is what it becomes on the Error.
+ */
+const exitStatusOf = (cause: unknown): number | null => {
+  if (typeof cause !== "object" || cause === null || !("code" in cause)) return null;
+  const { code } = cause;
+  return typeof code === "number" ? code : null;
+};
+
+/** What the failed call wrote to stderr, and the empty string where it wrote nothing. */
+const stderrOf = (cause: unknown): string => {
+  if (typeof cause !== "object" || cause === null || !("stderr" in cause)) return "";
+  const { stderr } = cause;
+  return typeof stderr === "string" ? stderr.trim() : "";
+};
+
+/**
  * Create a workspace's empty bare repository — the one entry here that takes a workspace id
  * rather than a Principal, and the reason is what it does: it runs **before anybody can be a
  * member acting in that workspace**, at provisioning, and it reads and writes no tenant data,
@@ -269,25 +298,6 @@ const messageWith = (message: string, lines: readonly string[]): string =>
   `${message}\n\n${lines.join("\n")}\n`;
 
 /**
- * A path inside the bundle and nothing else: relative, no `..` segment, no leading slash.
- * The path reaches `update-index --cacheinfo`, which writes into the repository's object
- * graph rather than the filesystem, so this is not a traversal guard — it is what keeps a
- * bundle's tree readable by any OKF tool (ADR 0012's export promise).
- */
-const isBundlePath = (candidate: string): boolean =>
-  candidate.length > 0 &&
-  !candidate.startsWith("/") &&
-  // No control character: a tab or a newline in a path is a name no OKF tool reads back and
-  // a line git's own listings would have to quote — and the reader below takes NUL-delimited
-  // listings for exactly the characters git does quote, so this is what keeps the two
-  // ends of the door agreeing on what a path can be.
-  !candidate.split("").some((character) => {
-    const code = character.charCodeAt(0);
-    return code < 0x20 || code === 0x7f;
-  }) &&
-  !candidate.split("/").some((segment) => segment === "" || segment === "." || segment === "..");
-
-/**
  * One governed write's commit: the hash precondition, then one commit with the person as
  * author and the platform bot as committer, then the ref moved under the same precondition.
  *
@@ -303,7 +313,11 @@ export const commit = async (
   door: GitDoor,
   request: CommitRequest,
 ): Promise<Result<Committed, CommitRefusal | Error>> => {
-  if (!isBundlePath(request.path)) return err("malformed-path");
+  // A path inside the bundle and nothing else. It reaches `update-index --cacheinfo`, which
+  // writes into the repository's object graph rather than the filesystem, so the refusal is
+  // not a traversal guard: it is what keeps a bundle's tree readable by any OKF tool, which
+  // is ADR 0012's export promise (`kernel/portable-path.ts`).
+  if (!isPortablePath(request.path)) return err("malformed-path");
   const trailers = trailerLines(request.trailers);
   if (!isSubjectLine(request.message) || trailers === undefined) return err("malformed-message");
   const gitDir = bundleOf(door, principal);
@@ -483,6 +497,113 @@ export const commitsAfter = async (
 };
 
 /**
+ * Where a bundle's history names somebody: the commits and paths whose file carries one of
+ * the needles, and the commits whose **author line** does.
+ *
+ * The erasure map's git arm (the S0 spec, the routine's step 2). The two answers are
+ * separate because the two forms are: a concept file names a person by `human:<email>` (ADR
+ * 0019), a commit's author line by `Name <address>`, and the routine rewrites each its own
+ * way — a text replacement over blobs, a mailmap over author lines. It is a read of the
+ * store and not of a slice: no slice shells out to `git` (ADR 0029, the four doors).
+ */
+export type HistoryNaming = {
+  /** The file at that commit carries a needle; `git show <commit>:<path>` is the bytes. */
+  readonly blobs: readonly { readonly commit: string; readonly path: string }[];
+  /** The commits whose author line carries a needle. */
+  readonly authors: readonly string[];
+};
+
+/** The answer for a needle set worth nothing and for a bundle with no commits alike. */
+const NAMES_NOBODY: HistoryNaming = { blobs: [], authors: [] };
+
+/**
+ * Matched **without regard to case**, because the two ends were typed by different people:
+ * the address on a concept file is the one the platform wrote from the identity set, and a
+ * needle is what a subject wrote down on a form.
+ */
+const carries = (line: string, needles: readonly string[]): boolean => {
+  const lowered = line.toLowerCase();
+  return needles.some((needle) => lowered.includes(needle.toLowerCase()));
+};
+
+/**
+ * `git grep` exits 1 when nothing matched, which is an answer and not a failure — so an empty
+ * listing is what a needle nobody's file carries comes back as. `core.quotePath` off, because a
+ * concept whose filename carries an accent would otherwise come back octal-escaped as a name
+ * the repository does not hold; `-I` so no binary blob is read.
+ *
+ * **Exit 1 is two answers, and only the silent one is *nothing matched*.** `git grep` exits 1
+ * again when it could not read an object, having written `error: '<commit>:<path>': unable to
+ * read <oid>` to stderr and matched nothing; a revision it cannot parse exits 128; an argument
+ * list past `ARG_MAX` never reaches an exit status at all. Every one of those came back as an
+ * empty listing before, so this door told the erasure routine *no file in this bundle names the
+ * person* on behalf of a store that had not looked — and the routine completed, reported and
+ * booked its ledger event over it. So a 1 that said nothing is the no-match and everything else
+ * is this door's failure, raised where a caller's `attempt` turns it into a refusal.
+ */
+const blobsNaming = async (
+  gitDir: string,
+  needles: readonly string[],
+  history: readonly string[],
+): Promise<HistoryNaming["blobs"]> => {
+  const listed = await git(gitDir, [
+    "-c",
+    "core.quotePath=false",
+    "grep",
+    "--files-with-matches",
+    "--fixed-strings",
+    "--ignore-case",
+    "-I",
+    ...needles.flatMap((needle) => ["-e", needle]),
+    ...history,
+  ]).catch((cause: unknown) => {
+    if (exitStatusOf(cause) === 1 && stderrOf(cause) === "") return "";
+    throw normalizeError(cause);
+  });
+  return listed.split("\n").flatMap((entry) => {
+    // `<commit>:<path>`, and a commit is a hash, so the first colon is the separator and
+    // every later one belongs to the path.
+    const at = entry.indexOf(":");
+    const file = entry.slice(at + 1);
+    return at === -1 || file === "" ? [] : [{ commit: entry.slice(0, at), path: file }];
+  });
+};
+
+/** The author's name and address off every commit, so a needle is read against both. */
+const authorsNaming = async (
+  gitDir: string,
+  needles: readonly string[],
+): Promise<readonly string[]> => {
+  // NUL between the fields, because a display name may hold anything but a newline.
+  const logged = await git(gitDir, ["log", "--all", "--format=%H%x00%an%x00%ae"]);
+  return logged.split("\n").flatMap((line) => {
+    const [sha = "", name = "", address = ""] = line.split("\0");
+    return sha !== "" && carries(`${name} <${address}>`, needles) ? [sha] : [];
+  });
+};
+
+export const historyNaming = async (
+  platform: PlatformPrincipal,
+  door: GitDoor,
+  workspaceId: string,
+  needles: readonly string[],
+): Promise<HistoryNaming> => {
+  const wanted = needles.filter((needle) => needle.trim() !== "");
+  if (wanted.length === 0) return NAMES_NOBODY;
+  const gitDir = repositoryPath(door, workspaceId);
+  const history = (await git(gitDir, ["rev-list", "--all"]))
+    .split("\n")
+    .filter((sha) => sha !== "");
+  // A bundle with no commits is where every bundle starts, and `git grep` over no revisions
+  // would fall through to a working tree these repositories do not have.
+  if (history.length === 0) return NAMES_NOBODY;
+  return {
+    blobs: await blobsNaming(gitDir, wanted, history),
+    authors: await authorsNaming(gitDir, wanted),
+  };
+};
+
+/**
  * One commit as the reconciler reads it back: its parent, the trailers the act wrote, and
  * the one file the act changed with its content at that commit. `change` is absent for a
  * commit that changed no file or more than one — not a shape the governed write makes, so
@@ -562,4 +683,303 @@ export const readCommit = async (
     trailers: trailersOf(message.join("\0")),
     change,
   };
+};
+
+/**
+ * **One file's bytes at one commit** — `git show <commit>:<path>`, the read a routine makes
+ * when it already knows which commit to ask: a `concept_index` row names its own commit and
+ * its own path, so this is how the platform reads back the file that row describes without
+ * walking a history for it.
+ *
+ * `null` for a path that commit's tree does not hold, and for a path outside the bundle: a
+ * caller asking about a file that is not there is asking a fair question, and the answer is
+ * that there is nothing there — not a failure. Raw, so what comes back is the file's bytes
+ * with their own trailing newline, which is what a content hash is taken over.
+ *
+ * **A commit this repository does not hold is a failure and not an absent file**, and telling
+ * the two apart costs a second question. `git show` answers both with the same words and the
+ * same 128 — `fatal: path '<path>' does not exist in '<sha>'`, whether the path is missing from
+ * a tree it read or the whole name resolved to nothing — so there is nothing in the first
+ * answer to classify. `ls-tree` is asked instead, and only when `show` has already failed: it
+ * exits 0 with an empty listing for a path the tree does not hold, 0 naming the path for one it
+ * does, and non-zero for a commit it could not read. So *the tree was read and the path is not
+ * in it* is the one reading that answers `null`; a listing that names the path is an object the
+ * store could not hand back, and a listing that could not be taken is a row naming a commit
+ * this bundle has never held — a repository and a database disagreeing about the past, which is
+ * the reconciler's to answer and which step 4 of the erasure routine would otherwise skip in
+ * silence while reporting the check it did not carry.
+ */
+export const fileAt = async (
+  platform: PlatformPrincipal,
+  door: GitDoor,
+  workspaceId: string,
+  sha: string,
+  filePath: string,
+): Promise<string | null> => {
+  if (!isPortablePath(filePath)) return null;
+  const gitDir = repositoryPath(door, workspaceId);
+  try {
+    return await git(gitDir, ["show", `${sha}:${filePath}`], { raw: true });
+  } catch (thrown) {
+    const listed = await git(gitDir, ["ls-tree", "--name-only", sha, "--", filePath]);
+    if (listed === "") return null;
+    throw normalizeError(thrown);
+  }
+};
+
+/**
+ * The **history rewrite** — the erasure routine's git step (ADR 0020; ADR 0012; the S0 spec,
+ * step 3).
+ *
+ * The one entry here that changes a commit already written. Every other write this door makes
+ * adds to a history; this one replaces it, which is why it is a routine with a report against
+ * it and not an act a person can reach. It runs `git filter-repo`, the tool ADR 0020 fixes,
+ * because a rewrite of a whole history is a thing to consume and not a thing to write (ADR
+ * 0005) — and the app runs it, the app being the only writer of the bundle (ADR 0012) and the
+ * worker holding no git credential, which is why a rewrite in the worker was rejected.
+ *
+ * **The shelling out is this door's and never a slice's.** A slice that ran git for an erasure
+ * would be a second place that knows where a workspace's repository lives, and that arithmetic
+ * is the one thing this module exists to keep.
+ *
+ * The caller holds the per-repository lock across this call and across whatever it writes
+ * about the result, because a rewrite and the rows that name its commits have to move together
+ * or the reconciler finds a head its watermark cannot reach.
+ */
+
+/**
+ * Who the rewrite is about in this repository, and what they become.
+ *
+ * The addresses are the identifier set's, because the two places a bundle names a person are
+ * both by address: a concept file's `generated.by` and `verified[].by` carry `human:<address>`
+ * (ADR 0019) and a commit's author line carries the address itself. The records keep
+ * `human:<person id>` instead and are never rewritten — the decision `kernel/actor.ts` writes
+ * down, and the reason this takes addresses and no person id.
+ *
+ * The **erasure pseudonym** (`CONTEXT.md`) is what replaces them: minted at erasure, one per
+ * workspace, never the person id, so two workspaces' rewritten histories cannot be joined on
+ * one person (ADR 0035; ADR 0020, amended 2026-09-05).
+ */
+export type Pseudonymisation = {
+  readonly addresses: readonly string[];
+  readonly pseudonym: string;
+};
+
+/**
+ * What the rewrite moved: one pair per commit whose hash changed, old then new.
+ *
+ * A commit the rewrite left where it was is **not** here. The caller's work is to carry rows
+ * that name a hash onto the hash that replaced it, and a commit that did not move is a row
+ * with nothing to do — so the empty list is the whole answer for a repository that named
+ * nobody, which is what makes a second run of the routine a run that writes nothing.
+ */
+export type HistoryRewritten = {
+  readonly moved: readonly (readonly [string, string])[];
+};
+
+const NOTHING_MOVED: HistoryRewritten = { moved: [] };
+
+/**
+ * Where a rewritten author line points. `.invalid` is reserved and resolves nowhere (RFC
+ * 2606), as the platform bot's address above is: an author line has to carry *an* address, and
+ * the one it carries after an erasure must not be a mailbox anybody can reach.
+ *
+ * Exported because the identity set's tombstone is the same address (the S0 spec, step 5): one
+ * person erased in one workspace is one address wherever the platform had written theirs, and
+ * two domains for one idea would be two things to keep in step.
+ */
+export const ERASED_DOMAIN = "erased.better-answers.invalid";
+
+/**
+ * The characters Python's own `re.escape` escapes, which is the dialect `filter-repo` compiles
+ * a `regex:` expression in. An address is matched as literal text, so each of them is
+ * neutralised before it reaches that compiler — `+` in a tagged address and `.` in a domain
+ * are the two that would otherwise match text belonging to somebody else.
+ */
+const PYTHON_SPECIAL = /[()[\]{}?*+\-|^$\\.&~# \t\n\r\v\f]/g;
+
+const escapedForPython = (literal: string): string =>
+  literal.replace(PYTHON_SPECIAL, (character) => `\\${character}`);
+
+/**
+ * One replacement expression per address, matched **without regard to case**, because the two
+ * ends were typed by different people: the address in the identifier set by whoever made the
+ * request, the one in the file by whoever wrote the concept. `historyNaming` reads the history
+ * the same way, so a rewrite that matched case would leave behind exactly the naming the map
+ * had just reported.
+ *
+ * `filter-repo` splits each line on its **last** `==>`, and what follows here is a minted id,
+ * so the separator cannot be mistaken for part of an expression however an address was spelled.
+ */
+const replacementsFor = (addresses: readonly string[], pseudonym: string): string =>
+  addresses
+    .map(
+      (address) =>
+        `regex:(?i)${escapedForPython(`${PERSON_PREFIX}${address}`)}==>${PERSON_PREFIX}${pseudonym}\n`,
+    )
+    .join("");
+
+/**
+ * The identities in this history that name the person, each address spelled the way the
+ * commits spell it — read off the history rather than taken from the identifier set, because
+ * a mailmap matches an address as written and the two ends were typed by different people. An
+ * address the request spells in lower case and a commit signs in another is one identity, and
+ * this is where the two are reconciled.
+ *
+ * Both lines a commit carries are read. The committer is the platform bot on every commit this
+ * door writes, but a repository restored from elsewhere is not this door's to assume about.
+ */
+const identitiesNaming = async (
+  gitDir: string,
+  needles: readonly string[],
+): Promise<readonly string[]> => {
+  const logged = await git(gitDir, ["log", "--all", "--format=%an%x00%ae%x00%cn%x00%ce"]);
+  // Keyed by the lowered address so one identity signed two ways is one mailmap line, and
+  // valued by the spelling the history holds, which is what a mailmap has to match.
+  const found = new Map<string, string>();
+  for (const line of logged.split("\n")) {
+    const [author = "", authorAddress = "", committer = "", committerAddress = ""] =
+      line.split("\0");
+    for (const [name, address] of [
+      [author, authorAddress],
+      [committer, committerAddress],
+    ] as const) {
+      if (address !== "" && carries(`${name} <${address}>`, needles)) {
+        found.set(address.toLowerCase(), address);
+      }
+    }
+  }
+  return [...found.values()];
+};
+
+/**
+ * The mailmap, which is how an author line is rewritten: `Proper Name <proper@address> <the
+ * address on the commit>`. The display name goes with the address — a mailmap replaces both —
+ * and what stands in their place is the one id the rest of the rewrite names this person by.
+ */
+const mailmapFor = (addresses: readonly string[], pseudonym: string): string =>
+  addresses
+    .map((address) => `${PERSON_PREFIX}${pseudonym} <${pseudonym}@${ERASED_DOMAIN}> <${address}>\n`)
+    .join("");
+
+/**
+ * `filter-repo` is run **inside** the repository rather than through `--git-dir`, which it does
+ * not take: it reads the repository from the working directory, and a bare repository is its
+ * own. The environment is the parent's plus `LC_ALL=C`, as every other call here is.
+ */
+const filterRepo = async (gitDir: string, arguments_: readonly string[]): Promise<void> => {
+  await run("git", ["filter-repo", ...arguments_], {
+    cwd: gitDir,
+    env: { ...process.env, LC_ALL: "C" },
+    maxBuffer: 64 * 1024 * 1024,
+  });
+};
+
+/** A commit `filter-repo` dropped rather than carried over: the mapping it writes for one. */
+const DROPPED = "0".repeat(40);
+
+const COMMIT_MAP_LINE = /^([0-9a-f]{40})\s+([0-9a-f]{40})$/;
+
+/**
+ * The mapping read back from the file `filter-repo` writes under the repository it rewrote,
+ * rather than worked out by rewriting the history a second time in our own head. It is the
+ * tool's own record of what it did, and the only thing that knows which commit became which.
+ *
+ * Two things about that file decide this function's shape. It is **cumulative**: a second run
+ * over the same repository leaves the first run's pairs in place and composes onto them, so a
+ * pair whose old hash was not in the history *this* run started from belongs to a run already
+ * accounted for and is skipped. And a commit the rewrite dropped is mapped to forty zeroes —
+ * which cannot happen here because the pruning is turned off below, and which is a throw
+ * rather than a silent skip if it ever does: a governed write whose commit has gone is a row
+ * the ledger can no longer be joined to.
+ */
+const commitMapOf = async (
+  gitDir: string,
+  started: ReadonlySet<string>,
+): Promise<readonly (readonly [string, string])[]> => {
+  const mapped = await readFile(path.join(gitDir, "filter-repo", "commit-map"), "utf8");
+  const moved: (readonly [string, string])[] = [];
+  for (const line of mapped.split("\n")) {
+    const match = COMMIT_MAP_LINE.exec(line.trim());
+    const before = match?.[1];
+    const after = match?.[2];
+    if (before === undefined || after === undefined || !started.has(before)) continue;
+    if (after === DROPPED) {
+      throw new Error(`git: the history rewrite dropped commit ${before} rather than moving it`);
+    }
+    if (before !== after) moved.push([before, after]);
+  }
+  return moved;
+};
+
+/**
+ * Rewrite this workspace's bundle so nothing in it names the person by address: every
+ * `human:<address>` in a file or a commit message becomes `human:<erasure pseudonym>`, every
+ * author line that address signed is mailmapped onto it, and the objects the old history held
+ * are pruned, so `git cat-file -e` on a hash anybody kept answers with a failure.
+ *
+ * **It reads the history before it rewrites it and does nothing at all when nothing names the
+ * person.** That is the whole of the routine's idempotence at this store, and it is a property
+ * rather than a remembered check: the replay runs every completed request through the routine
+ * again and has no branch that asks whether one already ran, so the second pass has to find an
+ * unnamed history and leave it exactly where the first pass put it.
+ *
+ * Three things `filter-repo` does that this call is shaped around. It refuses to run on a
+ * repository it does not take for a fresh clone — which any repository it has already
+ * rewritten is — so `--force` is passed, and that is what makes a second run possible at all.
+ * Pruning is turned **off** in both its senses, because one `bundle_commit` row names one
+ * commit and a rewrite that dropped a commit for being empty would leave a governed write with
+ * nothing to join to. And the tool repacks and expires as it finishes; the two commands ADR
+ * 0020 names are run after it regardless, because the ADR's sentence is the contract and a
+ * tool that quietly stopped doing it for us would leave the old objects reachable in silence.
+ */
+export const rewriteHistory = async (
+  platform: PlatformPrincipal,
+  door: GitDoor,
+  workspaceId: string,
+  who: Pseudonymisation,
+): Promise<HistoryRewritten> => {
+  const addresses = who.addresses.map((address) => address.trim()).filter((one) => one !== "");
+  const pseudonym = who.pseudonym.trim();
+  if (addresses.length === 0 || pseudonym === "") return NOTHING_MOVED;
+
+  const naming = await historyNaming(platform, door, workspaceId, addresses);
+  if (naming.blobs.length === 0 && naming.authors.length === 0) return NOTHING_MOVED;
+
+  const gitDir = repositoryPath(door, workspaceId);
+  const started = new Set(
+    (await git(gitDir, ["rev-list", "--all"])).split("\n").filter((sha) => sha !== ""),
+  );
+  const signed = await identitiesNaming(gitDir, addresses);
+  const written = await mkdtemp(path.join(tmpdir(), "better-answers-rewrite-"));
+  try {
+    const text = path.join(written, "replacements");
+    const mailmap = path.join(written, "mailmap");
+    await writeFile(text, replacementsFor(addresses, pseudonym), "utf8");
+    await writeFile(mailmap, mailmapFor(signed, pseudonym), "utf8");
+    await filterRepo(gitDir, [
+      "--force",
+      "--replace-text",
+      text,
+      // A commit message is text in this repository too, and an act's message is written by
+      // the person whose address is being taken out of it.
+      "--replace-message",
+      text,
+      // A history that names the person only inside its files signs nothing, and a mailmap
+      // with no lines in it is a file to leave unpassed rather than one to hand over empty.
+      ...(signed.length === 0 ? [] : ["--mailmap", mailmap]),
+      "--prune-empty",
+      "never",
+      "--prune-degenerate",
+      "never",
+    ]);
+    const moved = await commitMapOf(gitDir, started);
+    // ADR 0020's two commands, in its words: the reflog first, because an entry in it is a
+    // reference and `gc` does not prune what something still refers to.
+    await git(gitDir, ["reflog", "expire", "--expire=now", "--all"]);
+    await git(gitDir, ["gc", "--prune=now", "--quiet"]);
+    return { moved };
+  } finally {
+    await rm(written, { recursive: true, force: true });
+  }
 };

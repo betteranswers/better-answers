@@ -7,7 +7,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   commit,
+  fileAt,
   head,
+  historyNaming,
   initRepository,
   openGit,
   withRepositoryLock,
@@ -15,8 +17,15 @@ import {
   type GitDoor,
 } from "@better-answers/core/store/git";
 
-import type { ActorId, UserPrincipal } from "../src/kernel/index.ts";
-import { bundleHistory, bundlesForSuite, commitFacts, fileAtCommit, staged } from "./bundle.ts";
+import type { ActorId, PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
+import {
+  bundleHistory,
+  bundlesForSuite,
+  commitFacts,
+  fileAtCommit,
+  objectRemovedFrom,
+  staged,
+} from "./bundle.ts";
 
 /**
  * The git door through its own interface (`[TEST1]`), against a real bare repository and no
@@ -292,5 +301,117 @@ describe("the per-repository lock", () => {
     second.open();
     await Promise.all([b, c]);
     expect(order).toEqual(["a", "b", "c"]);
+  });
+});
+
+/**
+ * The platform reading a workspace's history, as the erasure map's git arm does: the routine
+ * runs under the platform principal and names the workspace beside it, which is this door's
+ * shape for every entry a platform makes (`commitsAfter`, `readCommit`).
+ */
+const PLATFORM: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-erasure" };
+
+/** The subject of these three cases: an address a file carries and an address that authored. */
+const SUBJECT_EMAIL = "priya@example.invalid";
+
+/**
+ * One commit whose file names Priya the way a concept file does — `human:<email>` (ADR 0019)
+ * — and whose author line is somebody else's, so the two arms are told apart by the needle
+ * rather than by the commit.
+ */
+const bundleNamingPriya = async (): Promise<{ bundle: Bundle; sha: string }> => {
+  const bundle = await arrange();
+  const written = await commit(
+    bundle.principal,
+    bundle.door,
+    requestFor({
+      path: "knowledge/expenses.md",
+      content: `---\ngenerated:\n  by: human:${SUBJECT_EMAIL}\n---\n\nExpenses are claimed within thirty days.\n`,
+    }),
+  );
+  return { bundle, sha: shaOf(written) };
+};
+
+describe("what a bundle's history names", () => {
+  it("answers the commit and the path whose file carries the needle", async () => {
+    const { bundle, sha } = await bundleNamingPriya();
+
+    const found = await historyNaming(PLATFORM, bundle.door, bundle.workspaceId, [SUBJECT_EMAIL]);
+
+    expect(found).toEqual({
+      blobs: [{ commit: sha, path: "knowledge/expenses.md" }],
+      authors: [],
+    });
+  });
+
+  it("answers the commit whose author line carries the needle, and no file", async () => {
+    const { bundle, sha } = await bundleNamingPriya();
+
+    // `AUTHOR` is `Ada Editor <ada@acme.invalid>` and no file here says so, which is the
+    // whole difference between a person a bundle's files name and one its history authored.
+    const found = await historyNaming(PLATFORM, bundle.door, bundle.workspaceId, [AUTHOR.email]);
+
+    expect(found).toEqual({ blobs: [], authors: [sha] });
+  });
+
+  it("answers nothing for a history that names nobody, and for a bundle with no commits", async () => {
+    const { bundle } = await bundleNamingPriya();
+    const empty = await arrange();
+
+    expect(
+      await historyNaming(PLATFORM, bundle.door, bundle.workspaceId, ["nobody@example.invalid"]),
+    ).toEqual({ blobs: [], authors: [] });
+    expect(await historyNaming(PLATFORM, empty.door, empty.workspaceId, [SUBJECT_EMAIL])).toEqual({
+      blobs: [],
+      authors: [],
+    });
+  });
+
+  /**
+   * The pair to the case above, and the reason it is a pair rather than one assertion: **both
+   * answers leave `git grep` exiting 1.** A needle nobody's file carries exits 1 in silence; an
+   * object git cannot read exits 1 having written `error: … unable to read …` to stderr and
+   * matched nothing. A door that read the status alone would answer *no file names this person*
+   * for a store that never looked, and an erasure would complete over it.
+   *
+   * A removed object rather than a nonexistent revision, because a caller cannot hand this
+   * entry one: the revisions are `rev-list --all`'s own and never an argument.
+   */
+  it("hands back the store's failure when git could not read an object, rather than answering that nobody is named", async () => {
+    const { bundle, sha } = await bundleNamingPriya();
+    await objectRemovedFrom(bundle.door, bundle.workspaceId, `${sha}:knowledge/expenses.md`);
+
+    await expect(
+      historyNaming(PLATFORM, bundle.door, bundle.workspaceId, [SUBJECT_EMAIL]),
+    ).rejects.toThrow(/unable to read/);
+  });
+});
+
+/**
+ * `git show <commit>:<path>` answers a path the tree does not hold and a commit the repository
+ * does not with **the same words and the same status** — `fatal: path '<path>' does not exist
+ * in '<sha>'`, exit 128, for both — so the door cannot classify the failure by reading it. What
+ * tells the two apart is a second question, and these two cases are why one is asked.
+ */
+describe("the file this door reads back at a commit", () => {
+  it("answers nothing for a path the commit's tree does not hold, because that is a fair question", async () => {
+    const { bundle, sha } = await bundleNamingPriya();
+
+    expect(
+      await fileAt(PLATFORM, bundle.door, bundle.workspaceId, sha, "knowledge/travel.md"),
+    ).toBe(null);
+  });
+
+  it("refuses a commit the repository does not hold, rather than calling it an absent file", async () => {
+    const { bundle } = await bundleNamingPriya();
+
+    // A row naming a commit this bundle has never held is a repository and a database that
+    // disagree about the past. Read as *no file there*, step 4 of the erasure routine skips the
+    // row and reports a check carried that nothing carried.
+    // Matched on the commit rather than on git's words: which of them says *not a tree object*
+    // is the binary's business, and what a reader of this failure needs is the sha the row named.
+    await expect(
+      fileAt(PLATFORM, bundle.door, bundle.workspaceId, "0".repeat(40), "knowledge/expenses.md"),
+    ).rejects.toThrow(/0{40}/);
   });
 });

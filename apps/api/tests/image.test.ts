@@ -32,6 +32,11 @@ import { workspacePackages } from "./workspaces.ts";
  * the workspace or a dependency moved between `dependencies` and `devDependencies` changes
  * what this test demands without anyone remembering to edit it.
  *
+ * The third thing asserted here is the opposite failure: a tool the running app needs that
+ * the image does not carry. The erasure routine's git step runs `git filter-repo` inside this
+ * image (ADR 0020), and nothing else in the suite would notice its absence — the routine's
+ * own tests run against the tool on the machine that runs them, never against this image.
+ *
  * The daemon rule, the image id and the build-and-remove lifecycle are `image-probe.ts`'s,
  * shared with the worker's and the backup's probes (`T-084`). The mechanism all three legs
  * run under is `image-job.test.ts`'s; what stays here is this image and this file's own
@@ -71,22 +76,53 @@ const developmentOnlyPackages = (): readonly string[] => {
   return [...development].filter((name) => !production.has(name)).sort();
 };
 
+/**
+ * The version `apps/api/Dockerfile` pins `git-filter-repo` at, read out of the Dockerfile
+ * rather than restated here: a version written down twice is a second pin that ages alone
+ * (`[DEPS2]`). What a person cannot see by reading the Dockerfile is whether the image it
+ * builds actually ends up carrying what the file asks for, and that is this test's half.
+ */
+const pinnedFilterRepoVersion = (): string => {
+  const dockerfile = readFileSync(path.join(repositoryRoot, "apps/api/Dockerfile"), "utf8");
+  const version = /^ARG\s+GIT_FILTER_REPO_VERSION=(?<version>\S+)\s*$/m.exec(dockerfile)?.groups?.[
+    "version"
+  ];
+  if (version === undefined) {
+    throw new Error(
+      "apps/api/Dockerfile no longer pins the rewrite tool in an `ARG GIT_FILTER_REPO_VERSION=` line this can read",
+    );
+  }
+  return version;
+};
+
 const contentsSchema = z.object({
   resolvable: z.array(z.string()),
   missing: z.array(z.string()),
   hasContracts: z.boolean(),
   hasSpaBuild: z.boolean(),
+  filterRepoVersion: z.string(),
+  gitRanFilterRepo: z.boolean(),
 });
 
 type ImageContents = z.infer<typeof contentsSchema>;
 
 // Read inside the container by the image's own node, from the api's own directory, so
-// "resolvable" means what it means to the process the deploy unit starts.
+// "resolvable" means what it means to the process the deploy unit starts — and, for the
+// rewrite tool, run as the user the image runs as, because a file root can execute and
+// `node` cannot is a tool this app does not have.
 const probe = `
 const { createRequire } = require("node:module");
 const { existsSync } = require("node:fs");
+const { execFileSync } = require("node:child_process");
 const from = createRequire("/app/apps/api/");
 const resolves = (name) => { try { from.resolve(name); return true; } catch { return false; } };
+const answered = (command, args) => {
+  try {
+    return execFileSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return "";
+  }
+};
 const resolvable = JSON.parse(process.env.PROBE_NAMES).filter(resolves);
 const missing = JSON.parse(process.env.PROBE_REQUIRED).filter((name) => !resolves(name));
 process.stdout.write(JSON.stringify({
@@ -94,6 +130,11 @@ process.stdout.write(JSON.stringify({
   missing,
   hasContracts: existsSync("/app/contracts"),
   hasSpaBuild: existsSync("/app/apps/web/dist/index.html"),
+  filterRepoVersion: answered("python3", [
+    "-c",
+    "import importlib.metadata as m; print(m.version('git-filter-repo'))",
+  ]),
+  gitRanFilterRepo: answered("git", ["filter-repo", "--version"]) !== "",
 }));
 `;
 
@@ -137,6 +178,21 @@ describe.skipIf(nothingToProbeHere)("the app tier's runtime image", () => {
 
   it("carries the single-page app's build where the app reads it", () => {
     expect(contents.hasSpaBuild).toBe(true);
+  });
+
+  it("carries the history-rewrite tool at the version the Dockerfile pins", () => {
+    // Read from the installed distribution's own metadata, because `git filter-repo
+    // --version` answers the commit the release was cut from — `a40bce548d2c` for 2.47.0 —
+    // and a test asserting on that would be asserting a string nobody can trace back to a
+    // pin. The metadata is the requirement pip was given, which is the pin itself.
+    expect(contents.filterRepoVersion).toBe(pinnedFilterRepoVersion());
+  });
+
+  it("puts the rewrite tool where git finds it as a subcommand", () => {
+    // The routine shells out to `git filter-repo` (ADR 0020), so the tool being installed
+    // somewhere is not the question — git resolving it as a subcommand, for this user, is.
+    // The version above already says which tool answered here.
+    expect(contents.gitRanFilterRepo).toBe(true);
   });
 });
 

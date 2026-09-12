@@ -2,8 +2,16 @@ import { ACTOR_ID, boundarySchemas } from "@better-answers/schema";
 
 import type { Principal, UserId } from "./principal.ts";
 
-/** The one prefix a person's actor id carries, written once and read back once. */
-const PERSON_PREFIX = "human:";
+/**
+ * The one prefix a person's actor id carries, written once and read back once.
+ *
+ * Exported because the erasure routine's git step needs the same six characters to build the
+ * needle it replaces and the name it replaces it with, and a second literal of them in the
+ * git door would be the one place the two forms could drift apart. What follows the prefix
+ * differs by decision — a record keeps the person id, a concept file keeps the address (see
+ * below) — and that difference is the caller's, never this constant's.
+ */
+export const PERSON_PREFIX = "human:";
 
 /**
  * The **actor id** (`CONTEXT.md`): who a record the platform keeps names — the ledger's

@@ -33,6 +33,16 @@ export type WorkspaceRoute = {
    * route yet is not fixed — there is nothing chosen for a vector to depend on.
    */
   readonly fixed: boolean;
+  /**
+   * How long the provider keeps what is sent to it, in the provider's own words — the
+   * sentence the **DPIA input** prints for this route (ADR 0020 amending ADR 0013's route
+   * slot; the S0 spec, *The DPIA input*). It is on the read because a DPIA is assembled from
+   * a route as a reader sees one, and this is the one door a route is read through.
+   *
+   * `null` where nobody has read the provider's terms yet, which is a different fact from a
+   * tail of nothing — an unconfigured purpose has no tail, as it has no provider.
+   */
+  readonly retentionTail: string | null;
 };
 
 const FIXED_PURPOSE: LlmPurpose = "embedding";
@@ -42,6 +52,7 @@ type RouteRow = {
   readonly provider: string;
   readonly model: string;
   readonly dimensions: number | null;
+  readonly retentionTail: string | null;
 };
 
 /**
@@ -59,7 +70,8 @@ export const listRoutes = async (
 ): Promise<Result<readonly WorkspaceRoute[], Error>> => {
   const configured = await attempt(() =>
     tx.query<RouteRow>(
-      "SELECT purpose, provider, model, dimensions FROM llm_route WHERE workspace_id = $1",
+      `SELECT purpose, provider, model, dimensions, retention_tail AS "retentionTail"
+         FROM llm_route WHERE workspace_id = $1`,
       [principal.workspaceId],
     ),
   );
@@ -74,6 +86,7 @@ export const listRoutes = async (
         model: row?.model ?? null,
         dimensions: row?.dimensions ?? null,
         fixed: row !== undefined && purpose === FIXED_PURPOSE,
+        retentionTail: row?.retentionTail ?? null,
       };
     }),
   );

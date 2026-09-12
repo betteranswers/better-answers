@@ -11,6 +11,12 @@
 # completed after the dump's timestamp is REPLAYED before `api` starts (ADR 0020, ADR 0022). A restore
 # that skipped that step would serve reads over data a subject was told is beyond use.
 #
+# WHERE the replay sits moved on 11/09/2026 (T-125, ADR 0022 amended): it runs AFTER the object store
+# and the git store are back, not beside `migrate`. The routine it re-runs rewrites the bare repository
+# and reads the replay copies an erasure left in the object store, so a replay ahead of those two stores
+# either finds nothing to replay or rewrites a repository the git step is about to overwrite. It still
+# runs before `api` is started, which is the rule that was never negotiable.
+#
 # Usage, as root on VPC 1 (or a rebuilt VPC 1 — RUNBOOK.md page 1 says when):
 #   restore-production.sh --dump latest|pg-<stamp>.dump.age [--tier daily|hourly|weekly|monthly]
 #                         [--objectstore] [--git] [--yes]
@@ -90,9 +96,8 @@ tool sh -c 'pg_restore --clean --if-exists --no-owner --dbname="$DATABASE_URL" /
 rm -f "${WORK}/pg.dump" "${WORK}/pg.dump.age" "${WORK}/globals.sql.age"
 say "restored — RPO $(( ( $(date +%s) - $(date -d "${stamp:0:8} ${stamp:9:2}:${stamp:11:2}" +%s) ) / 60 )) min"
 
-say "## 3 migrate, then REPLAY ERASURES completed after ${stamp} — mandatory; a failure here leaves api stopped"
+say "## 3 migrate — the schema the restored dump carries, brought forward"
 platform run --rm migrate
-platform run --rm migrate pnpm ops replay-erasures --since "${stamp}" | tee -a "${LOG}"
 
 if [ "${objectstore}" = yes ]; then
   say "## 4 object store — mirror back from the MIRROR bucket (deletions there are erasures: they stay deleted)"
@@ -113,7 +118,17 @@ if [ "${git}" = yes ]; then
 fi
 cleanup_work
 
-say "## 6 start api and prove it answers"
+say "## 6 REPLAY ERASURES completed after ${stamp} — mandatory; a failure here leaves api stopped"
+# On `api`, not on `migrate`. The routine the replay re-runs rewrites the workspace's bare repository
+# and reads the replay copy each erasure left in the object store, so the one-shot must carry
+# GIT_STORE_DIR with /data/git mounted and the S3 endpoint, bucket, region and credentials. The `api`
+# service in platform.compose.yaml carries all of that; `migrate` carries the bootstrap env alone —
+# no git directory, no volume, and no reason to grow one for a command it does not run.
+# --no-deps because `migrate` ran at step 3 and `api` declares it a dependency: without this, compose
+# would run the migration a second time inside the replay's one-shot.
+platform run --rm --no-deps api pnpm ops replay-erasures --since "${stamp}" | tee -a "${LOG}"
+
+say "## 7 start api and prove it answers"
 platform up -d --wait api
 platform exec -T api pnpm ops smoke --url http://127.0.0.1:3000 | tee -a "${LOG}"
 

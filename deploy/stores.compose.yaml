@@ -47,7 +47,9 @@ x-mem-384: &mem384
 
 services:
   # `embeddings:1000` is absent from the list because the service below is commented out; it
-  # returns with the service.
+  # returns with the service. `worker/hf-cache:1000` left it with `T-122`: the model weights
+  # are baked into the worker image at build, nothing on the host holds them and nothing is
+  # mounted over the path they sit at, so there is no host directory left to create or chown.
   init:
     # alpine 3.23.5, read from Docker Hub's tag API on 03/09/2026 — `latest` on that
     # day resolved to 3.22.5, so the current release line is named rather than the alias.
@@ -60,7 +62,7 @@ services:
     <<: *mem128
     command: >
       sh -ec '
-        for d in objectstore:1000 git:1000 worker/lmdb:1000 worker/trees:1000 worker/hf-cache:1000 backup/staging:1000 mirror:1000; do
+        for d in objectstore:1000 git:1000 worker/lmdb:1000 worker/trees:1000 backup/staging:1000 mirror:1000; do
           p=/data/$${d%%:*}; u=$${d##*:}; mkdir -p "$$p"; [ "$$(stat -c %u "$$p")" = "$$u" ] || chown -R "$$u:$$u" "$$p";
         done'
     volumes: ["/data:/data"]

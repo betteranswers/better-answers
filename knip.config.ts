@@ -20,6 +20,13 @@ import type { KnipConfig } from "knip";
  * rather than JSON so those reasons can be sentences.
  */
 const config: KnipConfig = {
+  // A GitNexus index, written under `.gitnexus/` per checkout. It is excluded from git
+  // through `.git/info/exclude` rather than `.gitignore` — machine-local state never
+  // committed to the tree — and knip reads `.gitignore` only, never `.git/info/exclude`. A
+  // checkout that has been analysed therefore names `.gitnexus/run.cjs` as an unused file for
+  // a reason that is not the tree's: the directory not being in the tree at all.
+  ignore: [".gitnexus/**"],
+
   // `uv` is the Python tier's package manager, named by the root `check:worker` step and by
   // the pre-commit hook. It is installed on the machine, never by npm, so there is no
   // manifest for knip to find it in.
@@ -49,18 +56,6 @@ const config: KnipConfig = {
         // surface that does not exist yet is not dead code, so the directory is an entry
         // point and the dependencies only it imports count as used.
         "src/shared/ui/**",
-      ],
-    },
-
-    "packages/core": {
-      ignore: [
-        // The object-store door (ADR 0029): a module whose invariant is written down and
-        // whose implementation has not landed. It is not exported from the store barrel,
-        // because exporting an empty door would widen an interface for nothing, and it is
-        // not deleted, because the invariant is the decision. Delete this line the day
-        // the door gains an implementation — the git door's went with T-052 and the graph
-        // door's with T-053, which is what a landed door looks like here.
-        "src/store/objects/index.ts",
       ],
     },
 

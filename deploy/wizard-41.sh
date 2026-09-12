@@ -191,8 +191,8 @@ finish() {
 # the database on the official pgvector image by digest (ADR 0032), and the first restore drill run
 # by hand BEFORE any client's data is on the box.
 
-TOTAL_STAGES=10
-banner "Better Answers — ticket 41 / T-005: accounts, boxes, edge, control plane, the first drill (stages 1, 4, 7, 8 and the drill precede the first client's data; the rest may follow go-live)"
+TOTAL_STAGES=11
+banner "Better Answers — ticket 41 / T-005: accounts, boxes, edge, control plane, the object store, the first drill (stages 1, 4, 7, 8, 9 and the drill precede the first client's data; the rest may follow go-live)"
 
 # ────────────────────────────────────────────────────────────────────────
 stage "Escrow vault"
@@ -331,7 +331,38 @@ set_var COOLIFY_PROD_APP_UUID "$COOLIFY_PROD_APP_UUID"
 set_var PUBLIC_URL "https://app.$APEX"
 set_secret COOLIFY_DEPLOY_TOKEN "$COOLIFY_DEPLOY_TOKEN"
 write_env COOLIFY_URL "$COOLIFY_URL"; write_env COOLIFY_PROD_APP_UUID "$COOLIFY_PROD_APP_UUID"
+note "OBJECTSTORE_ROOT_KEY, OBJECTSTORE_ROOT_SECRET and S3_BUCKET on the platform resource are the NEXT stage's: Garage has no key and no bucket until somebody makes them, and the platform compose file refuses to start without all three."
 pause
+
+# ────────────────────────────────────────────────────────────────────────
+# The object store's own bootstrap, which until 11/09/2026 no script in this repository performed:
+# `garage key create` appeared once, in a comment in stores.compose.yaml, and the only `garage key`
+# lines in the tree were the drill's, for staging. So a production Garage came up empty and the three
+# values platform.compose.yaml requires had no source. The consequence was not an inconvenience: the
+# restore path refuses when the object store is unreachable (apps/api/src/ops/index.ts), so the
+# replay of the erasures a dump undid could never have run on the estate as it was provisioned, and
+# `restore-production.sh` would have stopped there with `api` down — which is a restore path that
+# does not restore. This stage is the missing half.
+stage "Garage — the platform's root key and its bucket (nothing in the estate created either until now)"
+say "The stores stack runs Garage single-node with an empty /data/objectstore: no key, no bucket."
+say "Three values come out of this stage and go to the PLATFORM resource's Coolify env:"
+say "  OBJECTSTORE_ROOT_KEY · OBJECTSTORE_ROOT_SECRET · S3_BUCKET"
+note "S3_ENDPOINT and S3_REGION are NOT asked for: they are fixed in deploy/platform.compose.yaml (http://objectstore:3900, region garage) because both are facts of this estate, not choices."
+say "Run each command on VPC 1, with the stores stack up. The prefix for all of them:"
+note "  docker compose --project-directory /path/to/deploy --env-file <stores env> -f stores.compose.yaml -p better-answers-stores exec objectstore /garage"
+step "First:  … status  — the node must read HEALTHY before a key or a bucket can be made."
+ask S3_BUCKET "Bucket name for the platform's objects (suggest: better-answers):"
+step "Create the key:  … key create platform-root  — it prints a Key ID and a Secret key, ONCE. The secret is never shown again."
+step "Create the bucket:  … bucket create $S3_BUCKET"
+step "Let the key reach it:  … bucket allow --read --write $S3_BUCKET --key platform-root"
+step "Check it:  … bucket info $S3_BUCKET  — platform-root must be listed with read and write."
+ask OBJECTSTORE_ROOT_KEY "Key ID as garage printed it (the public half):"
+step "Coolify → the PLATFORM resource → env: OBJECTSTORE_ROOT_KEY=$OBJECTSTORE_ROOT_KEY · OBJECTSTORE_ROOT_SECRET=<the secret half> · S3_BUCKET=$S3_BUCKET. All three, or the stack refuses to start."
+step "Escrow the secret half in '$ESCROW_VAULT' beside the other items: a lost Garage secret is a new key and a re-grant, and there is no copy of it anywhere else."
+warn "Do not paste the secret half here. This wizard writes facts to $ENV_FILE and never a credential (see the STAGES header)."
+say "The drill's staging Garage gets the same treatment automatically: deploy/restore-drill.sh step 2 imports its own pair and creates the same bucket by name (STAGING_S3_BUCKET in /etc/better-answers/drill.env — set it to '$S3_BUCKET' if you chose another name)."
+write_env S3_BUCKET "$S3_BUCKET"; write_env OBJECTSTORE_ROOT_KEY "$OBJECTSTORE_ROOT_KEY"
+pause "Key created, bucket created, the key allowed on it, and all three values in the platform resource's env?"
 
 # ────────────────────────────────────────────────────────────────────────
 stage "healthchecks.io — the dead-man's switch, the second channel, the weekly digest"

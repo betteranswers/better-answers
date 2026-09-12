@@ -10,6 +10,13 @@ import {
   CONCEPT_FRONTMATTER_MAX,
   conceptFrontmatter,
   EMBEDDING_DIMENSIONS,
+  FINDING_REASON_MAX,
+  REDACTION_ALWAYS_TIER,
+  REDACTION_TIERS,
+  RULES_IN_FORCE_DEFAULT,
+  RULES_IN_FORCE_KEYS,
+  SUBJECT_IDENTIFIER_MAX,
+  SUBJECT_IDENTIFIERS_MAX,
   SUGGESTION_BODY_MAX,
   SUGGESTION_REASON_MAX,
 } from "../src/index.ts";
@@ -45,6 +52,27 @@ const BINDING_ID = "01J6VVVVVVVVVVVVVVVVVVVVVV";
 // The document the evidence row below locates into, catalogued under the binding above.
 const DOCUMENT_ID = "01J6NNNNNNNNNNNNNNNNNNNNNN";
 const COMPOSITION_ID = "01J6WWWWWWWWWWWWWWWWWWWWWW";
+// A span the seam withheld in the document above.
+const FINDING_ID = "01J6XXXXXXXXXXXXXXXXXXXXXX";
+// The two subject requests below: the member's, and the one recorded on behalf of a person
+// the company's files name who never signed in.
+const SUBJECT_REQUEST_ID = "01J6YYYYYYYYYYYYYYYYYYYYYY";
+const STRANGER_REQUEST_ID = "01J6YYYYYYYYYYYYYYYYYYYYY2";
+// A third: the member's erasure request, which the running routine below belongs to.
+const MEMBER_ERASURE_ID = "01J6YYYYYYYYYYYYYYYYYYYYY3";
+// The month the clock runs, and the two further months an Article 12 extension may add.
+const DUE = new Date("2026-10-01T00:00:00Z");
+const EXTENDED = new Date("2026-12-01T00:00:00Z");
+// The two routines below, and the opaque id the first of them rewrote a history to.
+const ERASURE_REQUEST_ID = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
+const ERASURE_PSEUDONYM = "01J6ZZZZZZZZZZZZZZZZZZZZZ2";
+// The four tiers' beyond-use dates, out from the anchor: 48 hours, 30 days, 8 weeks, 6 months.
+const BEYOND_USE = {
+  hourly: new Date("2026-09-03T00:00:00Z"),
+  daily: new Date("2026-10-01T00:00:00Z"),
+  weekly: new Date("2026-10-27T00:00:00Z"),
+  monthly: new Date("2027-03-01T00:00:00Z"),
+};
 
 /** Rows each refined insert schema accepts — assertion 4's input. */
 const acceptedRows = {
@@ -215,6 +243,9 @@ const acceptedRows = {
   ],
   // A binding narrowed to Admins over no array, and one for named groups — the two whole
   // shapes of the audience pair (ADR 0039), so the array refinement is proved on the column.
+  // The first says nothing about redaction and takes the column's safe set; the second is the
+  // HR-shaped binding of the S0 spec, where the default-off tier is switched on and a person's
+  // name is withheld — one flip, which is the whole of what the column is for.
   sourceBinding: [
     {
       workspaceId: WS_ID,
@@ -230,9 +261,149 @@ const acceptedRows = {
       sensitivity: "Internal",
       audience: "groups",
       audienceGroups: [GROUP_ID],
+      rulesInForce: { default_on: true, default_off: true },
     },
   ],
   sourceDocument: [{ workspaceId: WS_ID, id: DOCUMENT_ID, bindingId: BINDING_ID }],
+  // Three findings in the document above: one as the seam wrote it, one an Admin narrowed
+  // the document on, and one always-set span an Admin restored with a reason — the three
+  // whole shapes the review and restore CHECKs admit.
+  finding: [
+    {
+      workspaceId: WS_ID,
+      id: FINDING_ID,
+      documentId: DOCUMENT_ID,
+      category: "sort-code",
+      tier: "always",
+      ruleId: "sort-code-with-account-number",
+      charStart: 12,
+      charEnd: 20,
+      score: 0.85,
+      ruleVersion: "1",
+      detectorPin: "presidio-2.2.364",
+    },
+    {
+      workspaceId: WS_ID,
+      id: "01J6XXXXXXXXXXXXXXXXXXXXX2",
+      documentId: DOCUMENT_ID,
+      category: "health-cue",
+      tier: "always",
+      ruleId: "health-cue-list",
+      charStart: 40,
+      charEnd: 64,
+      score: 0.6,
+      ruleVersion: "1",
+      detectorPin: "presidio-2.2.364",
+      reviewState: "narrowed",
+      reviewedBy: `human:${USER_ID}`,
+      reviewedAt: NOW,
+      reviewReason: "a health cue in a case study, so the document is Restricted",
+    },
+    {
+      workspaceId: WS_ID,
+      id: "01J6XXXXXXXXXXXXXXXXXXXXX3",
+      documentId: DOCUMENT_ID,
+      category: "person-name",
+      tier: "always",
+      ruleId: "officer-block",
+      charStart: 80,
+      charEnd: 92,
+      score: 0.9,
+      ruleVersion: "1",
+      detectorPin: "presidio-2.2.364",
+      restoredAt: NOW,
+      restoredBy: `human:${USER_ID}`,
+      restoreReason: "the officer block is on the company's own filing",
+    },
+  ],
+  // Two subject requests: a member's access request, answered inside the month, and an
+  // erasure request recorded on behalf of a person the company's files name who never signed
+  // in — no person id, the identifier set alone, the clock started when the Admin confirmed
+  // identity rather than at receipt, and the month extended by two.
+  subjectRequest: [
+    {
+      workspaceId: WS_ID,
+      id: SUBJECT_REQUEST_ID,
+      kind: "access",
+      personId: USER_ID,
+      identifiers: { emails: ["person@example.invalid"], names: ["A person"], other: [] },
+      receivedAt: NOW,
+      clockStartedAt: NOW,
+      dueAt: DUE,
+    },
+    {
+      workspaceId: WS_ID,
+      id: STRANGER_REQUEST_ID,
+      kind: "erasure",
+      personId: null,
+      identifiers: {
+        emails: ["priya@client.invalid"],
+        names: ["Priya Nair"],
+        other: ["07700 900123"],
+      },
+      receivedAt: NOW,
+      clockStartedAt: new Date("2026-09-08T00:00:00Z"),
+      dueAt: DUE,
+      extendedTo: EXTENDED,
+      answeredAt: new Date("2026-09-20T00:00:00Z"),
+      answer: "The platform holds this person in the concept files and the git history.",
+    },
+    {
+      workspaceId: WS_ID,
+      id: MEMBER_ERASURE_ID,
+      kind: "erasure",
+      personId: USER_ID,
+      identifiers: { emails: ["person@example.invalid"], names: [], other: [] },
+      receivedAt: NOW,
+      clockStartedAt: NOW,
+      dueAt: DUE,
+    },
+  ],
+  // Two routines: one still running — the lock taken, the dates computed, no store touched
+  // and no report — and one that finished, with what each store family did and the words the
+  // report was written in.
+  erasureRequest: [
+    {
+      workspaceId: WS_ID,
+      id: ERASURE_REQUEST_ID,
+      subjectRequestId: MEMBER_ERASURE_ID,
+      pseudonym: ERASURE_PSEUDONYM,
+      lockedAt: NOW,
+      anchoredAt: NOW,
+      beyondUseHourlyAt: BEYOND_USE.hourly,
+      beyondUseDailyAt: BEYOND_USE.daily,
+      beyondUseWeeklyAt: BEYOND_USE.weekly,
+      beyondUseMonthlyAt: BEYOND_USE.monthly,
+    },
+    {
+      workspaceId: WS_ID,
+      id: "01J6ZZZZZZZZZZZZZZZZZZZZZ3",
+      subjectRequestId: STRANGER_REQUEST_ID,
+      pseudonym: "01J6ZZZZZZZZZZZZZZZZZZZZZ4",
+      lockedAt: NOW,
+      anchoredAt: NOW,
+      actions: {
+        git: { rewritten: true, commits: 12 },
+        "identity-set": { pseudonymised: false, reason: "no user row" },
+      },
+      beyondUseHourlyAt: BEYOND_USE.hourly,
+      beyondUseDailyAt: BEYOND_USE.daily,
+      beyondUseWeeklyAt: BEYOND_USE.weekly,
+      beyondUseMonthlyAt: BEYOND_USE.monthly,
+      completedAt: new Date("2026-09-02T00:00:00Z"),
+      report: "Backup copies taken before 2026-09-01 are beyond use.",
+    },
+  ],
+  // One suppression, in the document the finding above located a span in: what the reprocess
+  // must keep out of every derived store next time that document is converted.
+  suppression: [
+    {
+      workspaceId: WS_ID,
+      erasureRequestId: ERASURE_REQUEST_ID,
+      documentId: DOCUMENT_ID,
+      identifiers: { emails: ["person@example.invalid"], names: ["A person"], other: [] },
+    },
+  ],
   // The citation: the concept above, the evidence row above by its own key.
   conceptEvidence: [
     { workspaceId: WS_ID, iri: CONCEPT_IRI, sourceDocumentId: DOCUMENT_ID, locator: "p.4#para-2" },
@@ -592,11 +763,20 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         // after the identity its accepted row resolved to.
         "suggestion",
         "conceptWriteRequest",
-        // The binding before the document it yielded; the citation after the identity and
-        // the evidence row its key names; the override after the identity; the composition
-        // before the include that names it and the concept it includes.
+        // The binding before the document it yielded, and the findings after the document
+        // whose spans they locate; the citation after the identity and the evidence row its
+        // key names; the override after the identity; the composition before the include
+        // that names it and the concept it includes.
         "sourceBinding",
         "sourceDocument",
+        "finding",
+        // The subject request names a person id where the subject has one, so it needs the
+        // identity row above and nothing else; the erasure request keys to the subject
+        // request by the pair, so it comes after.
+        "subjectRequest",
+        "erasureRequest",
+        // The suppression names both the routine above and the document above it.
+        "suppression",
         "conceptEvidence",
         "conceptClassOverride",
         "composition",
@@ -629,7 +809,13 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { id: "not-a-ulid", name: "Workspace A", slug: "a" },
       { id: WS_ID, name: "   ", slug: "a" },
     ],
-    llmRoute: [{ ...acceptedRows.llmRoute[0], dimensions: 0 }],
+    // A route with no width, and a retention tail of whitespace: the DPIA prints the
+    // provider's sentence, and a blank one is a document that says nothing where it has to
+    // say what the processor keeps.
+    llmRoute: [
+      { ...acceptedRows.llmRoute[0], dimensions: 0 },
+      { ...acceptedRows.llmRoute[0], retentionTail: "   " },
+    ],
     // The identity ids the platform reads: one shape, the minter's (ADR 0035). Better
     // Auth's own default id and a hand-composed key are both refused at the boundary.
     user: [{ ...acceptedRows.user[0], id: "kEyIkQBmQ1EnBJnUvKMR6nSFXlQKUcuJ" }],
@@ -710,6 +896,109 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.suggestion[0], proposer: "ada@acme.invalid" },
       { ...acceptedRows.suggestion[0], reason: "x".repeat(SUGGESTION_REASON_MAX + 1) },
     ],
+    // The finding's refusals: a fourth tier and a fourth review state, both word sets being
+    // closed; an offset that is not a whole number and a span of no length; a score outside
+    // the detector's range; a category that is only whitespace; an Admin named by address
+    // rather than by person id; and a reason longer than the column carries.
+    finding: [
+      { ...acceptedRows.finding[0], tier: "sometimes" },
+      { ...acceptedRows.finding[1], reviewState: "dismissed" },
+      { ...acceptedRows.finding[0], charStart: 1.5 },
+      { ...acceptedRows.finding[0], charEnd: 0 },
+      { ...acceptedRows.finding[0], score: 1.1 },
+      { ...acceptedRows.finding[0], category: "   " },
+      { ...acceptedRows.finding[1], reviewedBy: "priya@example.invalid" },
+      { ...acceptedRows.finding[1], reviewReason: "x".repeat(FINDING_REASON_MAX + 1) },
+      { ...acceptedRows.finding[2], restoreReason: "x".repeat(FINDING_REASON_MAX + 1) },
+    ],
+    // The binding's rules in force, every way the two switchable tiers can be broken: a third
+    // key — *always* named, which is the one a binding may not switch — one of the two left
+    // out, and a value that is neither a yes nor a no. Each would be a rule a person believes
+    // they set and the seam never reads, because this value is the seam's whole argument.
+    sourceBinding: [
+      {
+        ...acceptedRows.sourceBinding[1],
+        rulesInForce: { default_on: true, default_off: false, always: false },
+      },
+      { ...acceptedRows.sourceBinding[1], rulesInForce: { default_on: true } },
+      { ...acceptedRows.sourceBinding[1], rulesInForce: { default_on: true, default_off: "no" } },
+    ],
+    // The subject request's refusals. A third kind — the pair is closed, so the day the
+    // platform answers a portability request it adds the word to `SUBJECT_REQUEST_KINDS` and
+    // nowhere else — a person named by address rather than by the one person id (ADR 0035),
+    // and an answer that is only whitespace.
+    //
+    // Then the identifier set, every way its bounded shape can be broken: a fourth kind of
+    // identifier, one of the three missing, a kind that is a string rather than a list of
+    // them, an entry that is an object, an entry that is only whitespace, an entry longer
+    // than the bound, more entries than the bound, and the set absent altogether. The bound
+    // matters because this is the one column of the erasure slice a person's own words fill
+    // — an Admin types what the subject gave — and the set is copied into the replay copy,
+    // every suppression and every finder's argument, so an unbounded one is storage chosen
+    // by whoever asks.
+    subjectRequest: [
+      { ...acceptedRows.subjectRequest[0], kind: "portability" },
+      { ...acceptedRows.subjectRequest[0], personId: "priya@example.invalid" },
+      { ...acceptedRows.subjectRequest[1], answer: "   " },
+      {
+        ...acceptedRows.subjectRequest[0],
+        identifiers: { emails: [], names: [], other: [], phones: ["07700 900123"] },
+      },
+      { ...acceptedRows.subjectRequest[0], identifiers: { emails: [], names: [] } },
+      {
+        ...acceptedRows.subjectRequest[0],
+        identifiers: { emails: "person@example.invalid", names: [], other: [] },
+      },
+      {
+        ...acceptedRows.subjectRequest[0],
+        identifiers: { emails: [{ address: "person@example.invalid" }], names: [], other: [] },
+      },
+      { ...acceptedRows.subjectRequest[0], identifiers: { emails: ["   "], names: [], other: [] } },
+      {
+        ...acceptedRows.subjectRequest[0],
+        identifiers: { emails: ["x".repeat(SUBJECT_IDENTIFIER_MAX + 1)], names: [], other: [] },
+      },
+      {
+        ...acceptedRows.subjectRequest[0],
+        identifiers: {
+          emails: Array.from(
+            { length: SUBJECT_IDENTIFIERS_MAX + 1 },
+            (_, at) => `p${at}@x.invalid`,
+          ),
+          names: [],
+          other: [],
+        },
+      },
+      // A set written as the JSON `null` is not here: `jsonb NOT NULL` refuses SQL NULL and
+      // not the JSON value, so the generated column schema takes it and assertion 3 holds
+      // the refinement to that. It is refused one layer down, by the table's own CHECK, and
+      // `rls.test.ts` is where that refusal is written.
+    ],
+    // The erasure request's refusals: a pseudonym that is not the minter's shape — the one
+    // thing a rewritten history is joined on, so a hand-composed one would be a rewrite
+    // nobody could undo — an empty report, and a store's actions nested deeper than the flat
+    // object per family, which is the shape that keeps a person's name out of the record of
+    // what was done about them.
+    erasureRequest: [
+      { ...acceptedRows.erasureRequest[0], pseudonym: `erasure-${USER_ID}` },
+      { ...acceptedRows.erasureRequest[1], report: "   " },
+      {
+        ...acceptedRows.erasureRequest[1],
+        actions: { git: { rewritten: { commits: ["abc123"] } } },
+      },
+    ],
+    // The suppression carries the same identifier set as the request it was written from, so
+    // it is refused the same ways: a fourth kind of identifier, and an entry over the bound.
+    suppression: [
+      {
+        ...acceptedRows.suppression[0],
+        identifiers: { emails: [], names: [], other: [], phones: ["07700 900123"] },
+      },
+      {
+        ...acceptedRows.suppression[0],
+        identifiers: { emails: ["x".repeat(SUBJECT_IDENTIFIER_MAX + 1)], names: [], other: [] },
+      },
+    ],
     // The payload's refusals: the bundle's manifest, which is not a concept file — and the
     // two columns a producer fills at a size of its own choosing, each held to its bound,
     // so a compromised one cannot fill a tenant's storage a suggestion at a time.
@@ -730,6 +1019,112 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       }
     });
   }
+});
+
+/**
+ * The claim the `finding` table is built on (ADR 0020): **it never holds the value**. A
+ * category, a tier, a rule id, two offsets and a score locate a span; they do not quote it.
+ * That is what makes a finding safe to keep for as long as the document lives, safe to put
+ * on a review screen, and nothing an erasure has to rewrite.
+ *
+ * The whole column set is written down here as a literal (`[TEST9]`) rather than asserted by
+ * a rule about names, because there is no rule that could tell a column holding a postcode
+ * from one holding a rule id. A column that could carry a value has to be added to this list
+ * by hand, in the same diff — which is the review the claim actually needs.
+ */
+describe("what a finding may hold", () => {
+  it("has exactly these columns, and not one a personal detail could sit in", () => {
+    expect(Object.keys(boundarySchemas.finding.select.shape).toSorted()).toEqual(
+      [
+        "workspaceId",
+        "id",
+        "documentId",
+        "category",
+        "tier",
+        "ruleId",
+        "charStart",
+        "charEnd",
+        "score",
+        "ruleVersion",
+        "detectorPin",
+        "reviewState",
+        "reviewedBy",
+        "reviewedAt",
+        "reviewReason",
+        "restoredAt",
+        "restoredBy",
+        "restoreReason",
+      ].toSorted(),
+    );
+  });
+});
+
+/**
+ * The **rules in force** a binding carries (ADR 0020; the S0 spec, *The seam*): the unit is
+ * the tier and never the category, and the two keys on the column are the two tiers a binding
+ * switches.
+ *
+ * The correspondence between the glossary's three words and these two keys is written down
+ * here rather than derived in `src/`, because deriving it would mean `source-tables.ts`
+ * importing the tier list from `finding-tables.ts`, which already imports the document table
+ * from `source-tables.ts` — a cycle for a fact that fits in one assertion. Both halves are
+ * asserted: the keys are exactly the switchable tiers, and *always* is exactly the one with
+ * no key (`[TEST7]`), so a fourth tier or a renamed one fails here and nowhere else.
+ */
+describe("the rules in force a binding carries", () => {
+  /** A tier's word as the column writes it: the same word, with the separator a key takes. */
+  const asKey = (tier: string) => tier.replaceAll("-", "_");
+  const keyed: readonly string[] = RULES_IN_FORCE_KEYS;
+
+  it("keys the column on the two tiers a binding switches, and on no other", () => {
+    expect(RULES_IN_FORCE_KEYS).toEqual(["default_on", "default_off"]);
+    expect(RULES_IN_FORCE_KEYS).toEqual(
+      REDACTION_TIERS.filter((tier) => tier !== REDACTION_ALWAYS_TIER).map(asKey),
+    );
+    // The other way: the tier with no key is the always set, because no binding switches it
+    // off and a switch for it would be a policy tier that is not policy.
+    expect(REDACTION_TIERS.filter((tier) => !keyed.includes(asKey(tier)))).toEqual([
+      REDACTION_ALWAYS_TIER,
+    ]);
+  });
+
+  it("defaults to the safe set, so a binding nobody configured withholds the more", () => {
+    expect(RULES_IN_FORCE_DEFAULT).toEqual({ default_on: true, default_off: false });
+    expect(
+      boundarySchemas.sourceBinding.select.shape.rulesInForce.safeParse(RULES_IN_FORCE_DEFAULT)
+        .success,
+    ).toBe(true);
+  });
+});
+
+/**
+ * Who a subject request is about (the architecture pass of 10/09/2026, candidate 2): **the
+ * subject is an identifier set, not only a person id**. A member has both; a person the
+ * company's files name who never signed in has the set alone, and the boundary has to take
+ * that row or the platform can only answer the people who happen to hold a login.
+ *
+ * Absent and null are asserted apart because they are different sentences from a caller —
+ * the act that omits the column and the act that writes the subject's absence down — and a
+ * refinement that narrowed the column to a string would take one and refuse the other.
+ */
+describe("who a subject request is about", () => {
+  const stranger = acceptedRows.subjectRequest[1];
+
+  it("takes a request whose subject never signed in, written either way", () => {
+    expect(boundarySchemas.subjectRequest.insert.safeParse(stranger).success).toBe(true);
+
+    const { personId: _absent, ...omitted } = { ...stranger };
+    expect(boundarySchemas.subjectRequest.insert.safeParse(omitted).success).toBe(true);
+  });
+
+  it("keeps the identifier set's three kinds, so every finder reads its own arm", () => {
+    const parsed = boundarySchemas.subjectRequest.insert.parse(stranger);
+    expect(parsed.identifiers).toEqual({
+      emails: ["priya@client.invalid"],
+      names: ["Priya Nair"],
+      other: ["07700 900123"],
+    });
+  });
 });
 
 describe("the frontmatter bound's unit", () => {
@@ -809,6 +1204,7 @@ describe("5 — the inferred type is pinned", () => {
         provider: string;
         model: string;
         dimensions: number | null;
+        retentionTail: string | null;
       }
     >
   >;

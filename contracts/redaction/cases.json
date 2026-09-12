@@ -1,0 +1,137 @@
+{
+  "description": "redaction (ADR 0031, ADR 0020): what the seam withholds, said once for both tiers. The detector runs in the worker and the review of a finding is an Admin's act, so the two tiers have to agree about four things and only these four — which categories exist, what word stands in place of each, when a finding narrows the document, and how the version string that rides on every finding is written. This file is the contract and T-121's category descriptors derive it: name, tier, recogniser, threshold, context words, placeholder and narrowing are one declaration per category in the worker, from which the analyzer registry and `rule_version` are built, and that table is held to this file. Nothing here is derived from a detector — no recogniser, no threshold, no model id — because the detector is T-121's and a fixture that named one would be the seam describing itself. A category's `tier` is the tier it is ordinarily raised at, and one rule outranks it: the officer-block post-pass always wins, so a name inside an officers block is a `person-name` finding raised at the always tier and written into the row that way. **The placeholder follows the tier the finding was raised at, not the category**, which is why such a name is `[withheld]` with its block and not `[person A]`: the always set has one word for everything in it. The TypeScript half asserts against this tier's own boundary schemas (packages/core/test/redaction.contract.test.ts); the Python half asserts against the columns the worker writes findings into (apps/worker/tests/test_redaction_contract.py). Neither holds the other's literals.",
+  "placeholder_shape": "^\\[[a-z]+(?: [a-zA-Z]+)*\\]$",
+  "always_placeholder": "[withheld]",
+  "narrows_to": "Restricted",
+  "tiers": [
+    {
+      "tier": "always",
+      "switchable": false,
+      "binding_key": null,
+      "why": "Policy: no binding switches it off, so it carries no key on a binding's rules in force. A span it withheld is restorable one at a time by an Admin with a reason, which is the only way it is ever let back into the text."
+    },
+    {
+      "tier": "default-on",
+      "switchable": true,
+      "binding_key": "default_on",
+      "why": "On unless a binding says otherwise. The safe set an unconfigured binding gets has this tier on, so a binding nobody thought about withholds more rather than less."
+    },
+    {
+      "tier": "default-off",
+      "switchable": true,
+      "binding_key": "default_off",
+      "why": "Off unless a binding says otherwise, because a bid library is full of the names and titles of people whose work the company is describing. Seeded on for meeting-note, support-ticket and HR-shaped bindings, which is one flip of this key."
+    }
+  ],
+  "categories": [
+    {
+      "category": "special-category",
+      "tier": "always",
+      "placeholder": "[withheld]",
+      "special_category": true,
+      "narrows_to": "Restricted",
+      "why": "An Article 9 kind — health first, and the condition the platform records is none until a health-sector client. Raised at sentence level, because a cue withheld out of its sentence leaves the sentence saying it anyway, and never inferred by a prompt."
+    },
+    {
+      "category": "bank-details",
+      "tier": "always",
+      "placeholder": "[withheld]",
+      "special_category": false,
+      "narrows_to": null,
+      "why": "A financial account identifier: the account number with its sort code. Policy because a company cannot consent on behalf of the person whose account it is."
+    },
+    {
+      "category": "government-identifier",
+      "tier": "always",
+      "placeholder": "[withheld]",
+      "special_category": false,
+      "narrows_to": null,
+      "why": "An identifier the state issued to one person — in the United Kingdom the National Insurance number and the NHS number. Policy for the same reason, and one neutral word for all three of the always set, because a typed placeholder would tell the audience what class of data the document holds."
+    },
+    {
+      "category": "date-of-birth",
+      "tier": "default-on",
+      "placeholder": "[date of birth withheld]",
+      "special_category": false,
+      "narrows_to": null,
+      "why": "A date read as a person's, not a date. A bare date is never this category: a bid library is dates all the way down, and a seam that withheld them would return a document nobody could read."
+    },
+    {
+      "category": "home-address",
+      "tier": "default-on",
+      "placeholder": "[home address withheld]",
+      "special_category": false,
+      "narrows_to": null,
+      "why": "Where a person lives, which in the United Kingdom is usually recognised from the postcode outward. The company's own registered office is an address and not this category."
+    },
+    {
+      "category": "personal-contact",
+      "tier": "default-on",
+      "placeholder": "[personal contact withheld]",
+      "special_category": false,
+      "narrows_to": null,
+      "why": "A person's own email address or telephone number, as distinct from the company's published ones. Typed, because the reader has to know a way of reaching somebody was removed rather than a name."
+    },
+    {
+      "category": "person-name",
+      "tier": "default-off",
+      "placeholder": "[person A]",
+      "special_category": false,
+      "narrows_to": null,
+      "why": "A person's name, replaced by a stable pseudonym rather than a blank: the same name is the same letter everywhere in one binding and a different letter in another, so a document still reads as a document and two bindings cannot be joined on the letter. `[person A]` is the first letter, and the placeholder every later one is written in the shape of. This is the tier a name is ordinarily raised at; a name inside an officers block is raised at the always tier instead, whatever a binding says, and takes that tier's word."
+    },
+    {
+      "category": "job-title",
+      "tier": "default-off",
+      "placeholder": "[job title withheld]",
+      "special_category": false,
+      "narrows_to": null,
+      "why": "A person's role, which names them in a small company however the name is handled. Off by default because a bid is largely an account of who did what."
+    }
+  ],
+  "version_string": {
+    "shape": "rule_version:detector_pin",
+    "separator": ":",
+    "pattern": "^[^:\\s]+:[^:\\s]+$",
+    "must_parse": [
+      {
+        "value": "3:presidio-2.2.364+gliner-multi-pii-v1",
+        "why": "the ordinary shape: the worker's own rule version, then a pin derived from the packages and the model id"
+      },
+      {
+        "value": "12:9f2c1ab4e7d0",
+        "why": "the same string with a hashed pin — deliberately unlike the sample above, because the agreement pins the shape of the string and not the format of either part, and a tier that read a format into one would break on the first bump"
+      }
+    ],
+    "must_not_parse": [
+      {
+        "value": "3",
+        "why": "the rule version alone: a finding that named the rules and not the detector could not be re-baselined when the detector moved"
+      },
+      {
+        "value": ":9f2c1ab4e7d0",
+        "why": "no rule version"
+      },
+      {
+        "value": "3:",
+        "why": "no detector pin"
+      },
+      {
+        "value": "3:presidio:2.2.364",
+        "why": "two separators: the colon appears exactly once, so splitting on it is the same operation in both tiers whichever end they split from"
+      },
+      {
+        "value": "3 presidio-2.2.364",
+        "why": "a space where the separator goes"
+      },
+      {
+        "value": "3: presidio-2.2.364",
+        "why": "whitespace inside the string, which would make two versions that are the same version compare unequal"
+      },
+      {
+        "value": "",
+        "why": "empty"
+      }
+    ]
+  }
+}

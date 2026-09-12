@@ -9,6 +9,7 @@
     "renovate.json",
     "packages/devtools/lifts/anti-slop/**",
     ".claude/worktrees/**",
-    "packages/schema/migrations/**"
+    "packages/schema/migrations/**",
+    ".cache/**"
   ]
 }
