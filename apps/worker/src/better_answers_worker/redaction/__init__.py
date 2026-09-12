@@ -28,7 +28,13 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from .descriptors import A_PERSON_NAME, DESCRIPTORS
-from .engine import ALWAYS_TIER, DESCRIPTOR_BY_CATEGORY, Finding, detect
+from .engine import (
+    ALWAYS_TIER,
+    DESCRIPTOR_BY_CATEGORY,
+    Finding,
+    detect,
+    without_overlaps,
+)
 from .officers import raised_by_the_block_rule
 from .pins import VERSION_STRING
 from .pseudonyms import normalised, pseudonyms_for, written_as
@@ -58,6 +64,11 @@ class Redaction:
     placeholder written. `verdict` is the sensitivity this document must be narrowed
     to, or nothing when no finding narrows it, and `version` is what rides on every
     finding row so a re-detection can tell what moved.
+
+    Two findings may claim the same run of characters — a job title inside a health
+    sentence, an officer's name inside the address they are care of — because each is
+    a rule's own answer and the Admin reviewing them is owed both. Only one of any such
+    pair is written out of `text`, which is a separate decision and this binding's.
     """
 
     text: str
@@ -87,17 +98,27 @@ def redact(
     Plain types in and plain types out, and nothing read that was not passed in.
     """
     # Two post-passes over one detection, each of which only ever raises a tier, so the
-    # order they run in cannot change the answer. The letters are drawn afterwards and
-    # over every name the document holds, whatever tier it ended at: a name that gives
-    # up its place in the queue when it is withheld would move everybody met after it
-    # onto a different letter, and a suppression has to change the output for the person
-    # it names and for nobody else.
+    # order those two run in cannot change the answer. What their placement does decide
+    # is that both have spoken before any run of characters is settled on one finding:
+    # the officer-block rule outranks the tier a binding switches, and a pass that ran
+    # after the run was settled would find the name it meant to raise already gone.
+    # Every span the rules raise stays a finding here, whatever the binding says and
+    # whatever else claims the same characters, because a finding is the row an Admin
+    # reviews rather than a claim on the text.
     findings = raised_by_a_suppression(
         raised_by_the_block_rule(detect(text), text), text, suppressions
     )
+    # The letters are drawn over every name the document holds, whatever tier it ended
+    # at: a name that gives up its place in the queue when it is withheld would move
+    # everybody met after it onto a different letter, and a suppression has to change
+    # the output for the person it names and for nobody else.
     letters = pseudonyms_for(_names_in(text, findings), seed)
-    withheld = tuple(
-        finding for finding in findings if _in_force(finding.tier, rules_in_force)
+    # And the overlap is settled last, over the findings this binding actually
+    # withholds, because a span left in the text stands in for nothing: a name that lost
+    # its run of characters to a home address the binding had switched off used to leave
+    # the pair of them on the page together (T-145).
+    withheld = without_overlaps(
+        [finding for finding in findings if _in_force(finding.tier, rules_in_force)]
     )
     return Redaction(
         text=_written(text, withheld, letters),

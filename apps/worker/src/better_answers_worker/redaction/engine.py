@@ -291,11 +291,14 @@ def analyzer() -> AnalyzerEngine:
 def detect(text: str) -> tuple[Finding, ...]:
     """Every span the rules raise in one document's normalised text, in reading order.
 
-    Overlaps are resolved here rather than left to the caller: two rules that claim the
-    same run of characters would otherwise write two placeholders over one span, and
-    which of them survived would depend on the order the registry happened to answer
-    in. The tier decides first, then the longer span, then the surer answer — so a
-    health sentence keeps the name inside it, and the name is not written out twice.
+    Every span, and not the subset that survived an overlap. Two rules that claim the
+    same run of characters are two findings, and which of them a reader loses that run
+    to is a question about what is written out rather than about what was found — so it
+    is settled in `redact`, by `without_overlaps`, over the findings the binding
+    actually withholds and after the post-passes have had their say about the tier.
+    Settling it here instead cost a document both spans at once: an officer's name lost
+    the run to the home address around it, so the block rule never saw the name, and a
+    binding that switched the address tier off then wrote neither of them out (T-145).
     """
     raised = [
         finding
@@ -307,7 +310,7 @@ def detect(text: str) -> tuple[Finding, ...]:
         )
         if finding is not None
     ]
-    return _without_overlaps(raised)
+    return tuple(sorted(raised, key=lambda it: (it.start, it.end, it.rule_id)))
 
 
 def _finding_of(result: RecognizerResult) -> Finding | None:
@@ -324,15 +327,42 @@ def _finding_of(result: RecognizerResult) -> Finding | None:
     )
 
 
-def _without_overlaps(raised: list[Finding]) -> tuple[Finding, ...]:
+def without_overlaps(raised: Sequence[Finding]) -> tuple[Finding, ...]:
+    """One placeholder per run of characters, over the findings that will be written.
+
+    Give this the findings a binding leaves in force and never every finding raised. A
+    span the binding does not write out withholds nothing, so a run of characters it won
+    is a run left on the page — which is how an officer's name and the home address
+    around it once reached the same reader together (T-145).
+
+    A span inside another gives way first, whatever tier either was raised at, because
+    the placeholder written over the longer span covers the shorter one's characters
+    too: taking the container withholds strictly more, so an officer's name inside a
+    home address is withheld **by** that address rather than instead of it, and a health
+    sentence still keeps the job title inside it. What is left overlaps only in part,
+    and there the tier decides, then the longer span, then the surer answer — an order
+    no registry's answering order can move.
+    """
+    competing = [finding for finding in raised if not _inside_another(finding, raised)]
     taken: list[Finding] = []
-    for finding in sorted(raised, key=_precedence):
+    for finding in sorted(competing, key=_precedence):
         if any(
             finding.start < other.end and other.start < finding.end for other in taken
         ):
             continue
         taken.append(finding)
     return tuple(sorted(taken, key=lambda it: (it.start, it.end, it.rule_id)))
+
+
+def _inside_another(finding: Finding, raised: Sequence[Finding]) -> bool:
+    # Strictly inside, so two rules claiming the very same run of characters are left
+    # to the tier below rather than each ruling the other out and leaving it unwritten.
+    return any(
+        other.start <= finding.start
+        and finding.end <= other.end
+        and other.end - other.start > finding.end - finding.start
+        for other in raised
+    )
 
 
 def _precedence(finding: Finding) -> tuple[int, int, float, int, str]:

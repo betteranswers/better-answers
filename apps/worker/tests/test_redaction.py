@@ -1,7 +1,8 @@
 """The redaction seam over one synthetic page, span by span.
 
 The page under `tests/fixtures/redaction/` carries the eight spans a supplier pack was
-flagged for and prototype 52's health note, every value invented (ADR 0027). The first
+flagged for, prototype 52's health note and one planted overlap, every value invented
+(ADR 0027). The first
 assertion here is the one research 65 asks for and the reason this suite exists: a
 detector that reports offsets it cannot cut its own span back out of would withhold the
 wrong run of characters, and the round-trip pass rate that research measured for
@@ -11,6 +12,18 @@ offsets the seam returned and compared to the literal the fixture planted (`[TES
 The offsets are code points into the **normalised text the seam was given**, never into
 the redacted text it returns: the two are the same document read two ways and their
 lengths differ by every placeholder written.
+
+**The planted overlap, and what it settles.** The signatories block's address is care of
+a named officer, so the home-address rule and the person-name rule claim one run of
+characters and only one placeholder can be written over it. Two rules of this seam meet
+there: the tier a binding switches, which decides whether the address is written out at
+all, and the officer-block rule, which puts a name inside such a block beyond any
+binding's reach. Before T-145 the run was settled at detection time, ahead of both, and
+the address won it on tier alone — so under a binding with the address tier switched off
+the seam wrote neither span and the reader got the officer and his street together. The
+run is now settled over the findings the binding actually withholds, and a span inside
+another gives way to the one around it, which is what keeps the fix from becoming the
+opposite leak: the name withheld and the street and postcode left in the clear.
 
 **The known false-positive class.** A sort-code-shaped number inside a code fence or a
 URL is a finding today. The fixture's appendix carries one — a payment-file example
@@ -88,10 +101,13 @@ SEED = "b0f3a1d2c4e5"
 #: where they happen to agree (`[TEST9]`).
 ANOTHER_SEED = "7c1e9b04af62"
 
-#: The letter each of the page's three people takes under each seed, by the order their
-#: names are first met: Rosalind Petheridge, then Callum Whitcombe, then Imogen Sarkar.
-#: Each is the seeded permutation of the alphabet read at index 0, 1 and 2, derived from
-#: the seed and the alphabet alone and written down here rather than read off the seam.
+#: The letter each of the page's first three people takes under each seed, by the order
+#: their names are first met: Rosalind Petheridge, then Callum Whitcombe, then Imogen
+#: Sarkar. Each is the seeded permutation of the alphabet read at index 0, 1 and 2,
+#: derived from the seed and the alphabet alone and written down here rather than read
+#: off the seam. The fourth person the page names is the signatory, met last and so at
+#: index 3, and no letter of his is written down because none is ever written out: the
+#: officer-block rule puts him at the always tier, which has one word for everybody.
 LETTERS_UNDER_SEED: Mapping[str, str] = {
     "Rosalind Petheridge": "U",
     "Callum Whitcombe": "E",
@@ -117,6 +133,21 @@ ONE_NAME_SUPPRESSED: Sequence[Mapping[str, Sequence[str]]] = (
 A_CONSUMER_ADDRESS = "rosalind.petheridge@hotmail.co.uk"
 A_COMPANY_ADDRESS = "callum.whitcombe@meridianfenland.co.uk"
 
+#: The signatories section's planted overlap, and the fourth person the page names. The
+#: address is one span the home-address rule raises and the name sits **inside** it, so
+#: the two rules claim the same run of characters and only one placeholder can be
+#: written over it. The name is also inside a block of officers, which is the one place
+#: the tier a finding is raised at stops being the binding's to switch.
+A_FOURTH_OFFICER = "Oliver Denbigh"
+AN_ADDRESS_AROUND_A_NAME = "9 Kestrel Lane, care of Oliver Denbigh, Barwick, LS22 4TD"
+
+#: The two ends of that address, held separately because the whole literal cannot say
+#: what has to be said here. A pass that let the name outrank the span around it would
+#: write one word over the name alone and hand the reader `9 Kestrel Lane, care of
+#: [withheld], Barwick, LS22 4TD` — the whole address bar the person it belongs to, and
+#: a string the literal above no longer matches.
+A_STREET_AND_ITS_POSTCODE: tuple[str, ...] = ("9 Kestrel Lane", "LS22 4TD")
+
 #: Every span the recall set is made of, as the category it must be raised under and
 #: the literal the fixture planted. Written out here rather than read back from the
 #: seam, so a recogniser that moved a boundary by one character fails rather than
@@ -126,6 +157,7 @@ PLANTED_SPANS: tuple[tuple[str, str], ...] = (
     ("date-of-birth", "3 February 1978"),
     ("home-address", "14 Marlbrook Rise, Hensworth, NN12 3AB"),
     ("home-address", "7 Pinfold Gate, Ashdale, YO41 9ZZ"),
+    ("home-address", AN_ADDRESS_AROUND_A_NAME),
     ("bank-details", "00-00-00, account number 12345678"),
     ("personal-contact", A_CONSUMER_ADDRESS),
     ("personal-contact", "07700 900123"),
@@ -224,13 +256,16 @@ def test_every_span_is_cut_back_out_of_the_text_by_the_offsets_it_came_with(
 
 def test_the_recall_set_is_found_in_full(on_a_plain_binding: Redaction) -> None:
     # The eight flagged spans and the health note, counted by the category each is
-    # raised under: two home addresses, two pieces of personal contact, and one each of
-    # the rest. Personal contact is two and not three because the page's third address
-    # is the company's own, which no consumer-domain rule raises.
+    # raised under: three home addresses, two pieces of personal contact, and one each
+    # of the rest. Personal contact is two and not three because the page's third email
+    # address is the company's own, which no consumer-domain rule raises. The third home
+    # address is the signatories block's, planted around an officer's name, and it is
+    # counted here because a finding is what a rule raised and not what a binding wrote
+    # out — the name inside it is a finding too.
     counts = on_a_plain_binding.counts
 
     assert counts["date-of-birth"] == 1
-    assert counts["home-address"] == 2
+    assert counts["home-address"] == 3
     assert counts["bank-details"] == 2
     assert counts["personal-contact"] == 2
     assert counts["government-identifier"] == 1
@@ -264,10 +299,12 @@ def test_the_always_set_is_withheld_where_every_switchable_rule_is_off(
     assert "00-00-00, account number 12345678" not in redacted
     assert "999 000 0018" not in redacted
     assert "cancer diagnosis" not in redacted
-    # Six spans: the two sort-code pairs, the NHS number, the health sentence and the
-    # two officers the block rule raised to this tier out of the one a binding could
-    # have switched off.
-    assert redacted.count("[withheld]") == 6
+    # Seven spans: the two sort-code pairs, the NHS number, the health sentence and the
+    # three officers the block rule raised to this tier out of the one a binding could
+    # have switched off. The third of those officers is the signatory, and this binding
+    # is the one that proves the rule reaches him: the home address around his name is
+    # switched off here, so nothing else on the page covers those characters.
+    assert redacted.count("[withheld]") == 7
 
 
 def test_a_switchable_tier_that_is_off_leaves_its_spans_in_the_text(
@@ -291,7 +328,7 @@ def test_the_default_on_tier_writes_its_own_word_in_place_of_each_span(
     redacted = on_a_plain_binding.text
 
     assert "[date of birth withheld]" in redacted
-    assert redacted.count("[home address withheld]") == 2
+    assert redacted.count("[home address withheld]") == 3
     assert redacted.count("[personal contact withheld]") == 2
     assert A_CONSUMER_ADDRESS not in redacted
 
@@ -488,6 +525,38 @@ def test_the_same_name_outside_the_block_is_still_its_own_tier(
         "always",
         "default-off",
     }
+
+
+def test_a_signatory_named_inside_a_home_address_is_withheld_with_its_block(
+    on_a_plain_binding: Redaction,
+    with_nothing_switchable_on: Redaction,
+    page: str,
+) -> None:
+    # The signatories block carries a home address whose span contains the officer it is
+    # care of, so two rules claim one run of characters and only one placeholder can be
+    # written over it. Both are still findings — the row an Admin reviews is what a rule
+    # raised — and the name is at the always tier, because a name inside a block of
+    # officers is not the binding's to switch.
+    assert AN_ADDRESS_AROUND_A_NAME in spans_under(
+        on_a_plain_binding, page, "home-address"
+    )
+    assert tiers_of(on_a_plain_binding, page, A_FOURTH_OFFICER) == {"always"}
+
+    # What is written out is two-sided, and this is the half a bare precedence move
+    # breaks: with the address tier on, the address covers the run, so the street and
+    # the postcode leave the page with the name rather than staying behind it.
+    assert A_FOURTH_OFFICER not in on_a_plain_binding.text
+    for end_of_the_address in A_STREET_AND_ITS_POSTCODE:
+        assert end_of_the_address not in on_a_plain_binding.text
+
+    # And the other half, which is where the seam used to write neither span: with that
+    # tier switched off nothing else on the page covers those characters, so the block
+    # rule is the only thing left between the officer and the reader. The street and the
+    # postcode stay, because switching the address tier off is what this binding asked
+    # for and the block rule reaches names alone.
+    assert A_FOURTH_OFFICER not in with_nothing_switchable_on.text
+    for end_of_the_address in A_STREET_AND_ITS_POSTCODE:
+        assert end_of_the_address in with_nothing_switchable_on.text
 
 
 def test_a_suppressed_name_is_withheld_and_every_other_name_is_untouched(

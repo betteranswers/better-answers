@@ -60,3 +60,9 @@ SORTCODE=00-00-99 ACCOUNT=87654321 AMOUNT=000012500
 
 Rosalind Petheridge approved this pack before it was sent, and Imogen Sarkar read it
 through once more. Imogen Sarkar keeps the signed copy.
+
+## Signatories
+
+The counterpart was signed at our registered correspondence address,
+9 Kestrel Lane, care of Oliver Denbigh, Barwick, LS22 4TD, and the original was
+returned to us by post.
