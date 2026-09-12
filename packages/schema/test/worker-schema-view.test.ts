@@ -83,7 +83,9 @@ describe("the worker's schema view", () => {
     expect(new Set(entries.map((entry) => entry.when)).size).toBe(entries.length);
 
     const last = entries.at(-1);
-    const later = { tag: "9999_a-second-at-the-same-instant", when: last?.when ?? 0 };
+    // `idx` is part of the shape the journal's reader parses, so a hand-built entry carries
+    // one: the defect under test is the shared instant and nothing else.
+    const later = { idx: 9999, tag: "9999_a-second-at-the-same-instant", when: last?.when ?? 0 };
     expect(journalEntriesOf({ entries: [...entries, later] })).toEqual({
       ok: false,
       error: { earlier: last, later },
