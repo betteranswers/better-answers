@@ -1,0 +1,26 @@
+packages/core/vitest.config.ts
+  s_4444b5138fa933::t_8ff54cc8e55869 18-21
+  s_4444b5138fa933::t_3956fa2a563b70 22-27
+  s_4444b5138fa933::t_e4eaac35943785 47-71
+  s_4444b5138fa933::t_72a9cebf7b399d 72-75
+apps/api/vitest.config.ts
+  s_4444b5138fa933::t_37066a044eeedb 17-24
+packages/schema/vitest.config.ts
+  s_4444b5138fa933::t_b96090bbd045ae 18-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "fec2c93dad65017e59bf18453dddba87edea81b0",
+  "prompts": {},
+  "sessions": {
+    "s_4444b5138fa933": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b21cc04e-9441-4374-adca-d0c10532f32c",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
