@@ -7,6 +7,7 @@ import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts
 import {
   type Act,
   DETAIL_KINDS,
+  type DetailKind,
   type DetailOf,
   type DetailShape,
   type DetailValue,
@@ -117,6 +118,22 @@ export const eventsOfAct = async (
  */
 const eventInsert = boundarySchemas.auditEvent.insert.omit({ workspaceId: true });
 
+// The base names that take "an" rather than "a" — a vowel sound, not a spelling rule
+// (`gitSha` starts with a letter but says "jit"). Everything else in DETAIL_KINDS takes "a".
+const AN_KINDS: ReadonlySet<string> = new Set(["id", "iri", "audience"]);
+
+// What `kind` should read as in a sentence: the raw key is a lookup label, not a word — a
+// trailing `?` marks an optional kind for `DETAIL_KINDS` and `isOptionalKind`, and is never
+// itself part of the noun. So the noun is the base name with the `?` stripped, the article
+// agreeing with that base, and the optional case adding the clause that absence was allowed
+// (since the field skipped at the check above is exactly the one this refusal never reaches).
+const kindRefusal = (kind: DetailKind): string => {
+  const optional = isOptionalKind(kind);
+  const base = optional ? kind.slice(0, -1) : kind;
+  const article = AN_KINDS.has(base) ? "an" : "a";
+  return optional ? `${article} ${base}, or absent` : `${article} ${base}`;
+};
+
 const detailRefusal = (
   shape: DetailShape,
   detail: Readonly<Record<string, DetailValue | undefined>>,
@@ -136,7 +153,7 @@ const detailRefusal = (
       if (isOptionalKind(kind)) continue;
       return `detail is missing the field ${field}`;
     }
-    if (!DETAIL_KINDS[kind](value)) return `detail's ${field} is not a ${kind}`;
+    if (!DETAIL_KINDS[kind](value)) return `detail's ${field} is not ${kindRefusal(kind)}`;
   }
   return undefined;
 };

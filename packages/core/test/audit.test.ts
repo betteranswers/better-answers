@@ -412,7 +412,7 @@ describe("the first door — record, the actor derived from the Principal", () =
         subjectId: adminUserId,
         detail: { adminUserId: "priya@example.invalid", confirmed: true },
       }),
-    ).rejects.toThrow(/adminUserId is not a id\?/);
+    ).rejects.toThrow(/adminUserId is not an id, or absent/);
   });
 
   it("rejects a detail that names a field the act does not, before any row exists", async () => {
@@ -444,7 +444,7 @@ describe("the first door — record, the actor derived from the Principal", () =
         subjectId: adminUserId,
         detail: { adminUserId: "priya@example.invalid", role: "Admin", confirmed: true },
       }),
-    ).rejects.toThrow(/adminUserId is not a id/);
+    ).rejects.toThrow(/adminUserId is not an id/);
     await expect(
       write({
         id: ulid(),
