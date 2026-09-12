@@ -36,6 +36,11 @@ import { openGit, withRepositoryLockAs } from "../src/store/git/index.ts";
  * the database is still up. A governed write holds this same lock from its hash precondition
  * through its Postgres COMMIT, so an act this drain has waited out has finished on both stores,
  * and the order stops mattering rather than having to be reversed.
+ *
+ * Test-only surface: this file is never imported directly. `packages/core` hands
+ * `removeBundleRoot` out only through its own `./testing/bundle-root` export in the
+ * package's `exports` map — the root coding rules' rule on tests through the interface is
+ * what licenses that entry — and never through a path into this package's `test/` tree.
  */
 
 /**

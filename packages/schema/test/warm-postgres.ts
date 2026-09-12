@@ -31,6 +31,11 @@ import {
  *
  * Register it from a workspace's Vitest config:
  * `globalSetup: ["@better-answers/schema/testing/warm-postgres"]`.
+ *
+ * Test-only surface: this file is never imported directly. `@better-answers/schema` hands
+ * it out only through its own `./testing/warm-postgres` export in the package's `exports`
+ * map — the root coding rules' rule on tests through the interface is what licenses that
+ * entry — and never through a path into this package's `test/` tree.
  */
 
 /** What `globalSetup` hands every test file: where the cluster is, and what to copy. */

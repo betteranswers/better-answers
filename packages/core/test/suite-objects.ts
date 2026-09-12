@@ -37,6 +37,11 @@ import {
  *
  * Every `exec` still reads its exit code: a silent failure here surfaces as an S3 403 in a
  * test a long way away.
+ *
+ * Test-only surface: this file is never imported directly. `packages/core` hands its
+ * accessor out only through its own `./testing/objects` export in the package's `exports`
+ * map — the root coding rules' rule on tests through the interface is what licenses that
+ * entry — and never through a path into this package's `test/` tree.
  */
 
 /**
