@@ -80,6 +80,8 @@ from typing import Any
 
 import pytest
 
+from conftest import DAEMON_SKIP_REASON
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKSPACE = REPO_ROOT / "apps" / "worker"
 BUILD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "build.yml"
@@ -800,7 +802,7 @@ def image() -> Iterator[str]:
     if not DOCKER_ANSWERS:
         if DAEMON_IS_REQUIRED:
             raise RuntimeError(NO_DAEMON)
-        pytest.skip("no Docker daemon answered")
+        pytest.skip(DAEMON_SKIP_REASON)
 
     supplied = os.environ.get(IMAGE_ID_VARIABLE, "").strip()
     # The image is run by the id the build prints, and is never tagged. A tag is a name

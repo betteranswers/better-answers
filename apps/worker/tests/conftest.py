@@ -108,3 +108,41 @@ def guarded_monkeypatch() -> Iterator[pytest.MonkeyPatch]:
         for act in GUARDED_ACTS:
             setattr(patcher, act, _guarded(act, getattr(patcher, act)))
         yield patcher
+
+
+#: The reason `test_image.py`'s `image` fixture skips when no Docker daemon answered
+#: off CI. Named here, not in that test module, because `pytest_terminal_summary`
+#: below has to recognise the same string a skip carries, and a hook defined in a test
+#: module is never collected — pytest gathers `pytest_terminal_summary` from
+#: `conftest.py` files and registered plugins only.
+DAEMON_SKIP_REASON = "no Docker daemon answered"
+
+
+def pytest_terminal_summary(terminalreporter: pytest.TerminalReporter) -> None:
+    """One unmissable line when a run skipped every daemon-gated case for lack of
+    Docker.
+
+    A laptop without Docker still runs `check` — `test_image.py`'s own comment above
+    `DAEMON_IS_REQUIRED` commits to that — so the skip itself is not the problem; going
+    quiet about it is. Those skipped cases are the only proof the worker image holds
+    what it claims, so a run that skipped every one of them and said nothing would
+    report green having shown nothing. On CI the same absence is not skipped at all —
+    `DAEMON_IS_REQUIRED` turns it into a failure there — so this is the off-CI half of
+    the same rule: loud instead of silent, never a second gate and never an opt-out.
+    Silent when the count is zero, so an ordinary run with Docker answering is
+    unchanged.
+    """
+    skipped = [
+        report
+        for report in terminalreporter.stats.get("skipped", [])
+        if DAEMON_SKIP_REASON in report.longreprtext
+    ]
+    if not skipped:
+        return
+    terminalreporter.write_line(
+        f"{len(skipped)} case(s) skipped because {DAEMON_SKIP_REASON}: these are the "
+        "only proof the worker image is what it claims, and CI fails rather than "
+        "skips them.",
+        red=True,
+        bold=True,
+    )
