@@ -34,7 +34,7 @@ For `apps/web`, the interface is the **served build driven by a browser** (Playw
 
 `packages/core` is where most behaviour lives (ADR 0029), so its `exports` map is the surface this rule points at. A slice's internals — its store modules, its helpers — are reached through that entry point, never imported by a test.
 
-A package may also need to hand a sibling workspace shared test infrastructure — a harness, a factory, a fixture that lives under its own `test/` — and it does that only through one entry under the `./testing` name in its `exports` map: either `./testing` itself, a single barrel over the whole surface, or a `./testing/*` subpath named for what that one entry hands over — never through a bare path into the rest of its tree. `packages/core` and `packages/schema` are both `private: true` and never published, and every consumer of such an entry is a test file or a `vitest.config.ts`: the entry exists so a sibling workspace reaches one face, not a way into another package's internals.
+A package may also need to hand a sibling workspace shared test infrastructure — a harness, a factory, a fixture that lives under its own `test/` — and it does that only through an entry under the `./testing` name in its `exports` map: either `./testing` itself, a single barrel over the whole surface, or a `./testing/*` subpath named for what that one entry hands over — never through a bare path into the rest of its tree. `packages/core` and `packages/schema` are both `private: true` and never published, and every consumer of such an entry is a test file or a `vitest.config.ts`: the entry exists so a sibling workspace reaches one face, not a way into another package's internals.
 
 ### [TEST2] Real Postgres, always
 
