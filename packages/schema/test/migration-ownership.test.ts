@@ -1,6 +1,8 @@
 import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import type { DrizzleSnapshotJSON } from "drizzle-kit/api";
+import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
 import { afterAll, describe, expect, it } from "vitest";
 
 import {
@@ -16,6 +18,9 @@ import {
   journalSnapshots,
   journalSnapshotsIn,
 } from "../src/journal.ts";
+// The declarations as drizzle-kit's own `generate` reads them: the config names this module
+// and nothing else, so a table it does not reach is not generated (`drizzle.config.ts`).
+import * as declarations from "../src/schema.ts";
 
 /**
  * The one-journal rule's CI check (ADR 0032): Drizzle *generates* migrations for
@@ -158,6 +163,74 @@ describe("the journal's meta folder", () => {
       ok: false,
       error: { kind: "chain-unrooted", snapshot: "0000_snapshot.json" },
     });
+  });
+});
+
+/**
+ * **The declarations against the DDL beneath them.** Everything above reads files the journal
+ * already holds and holds them against each other; none of it opens `src/`, which is where the
+ * one drift this repository has actually had lived. `account.updated_at` carried `.defaultNow()`
+ * in its declaration from T-004 and no migration ever landed the `DEFAULT now()`, so every
+ * `drizzle-kit generate` run for thirty-three migrations proposed the same `ALTER` and four
+ * T-120 iterations stripped it from a family's migration by hand — while this suite and the
+ * worker-view drift suite stayed green the whole time, because neither compares a declaration
+ * to the DDL. T-138 landed the migration; this is what stops the next such gap standing open
+ * as long as that one did.
+ *
+ * It is `generate`'s own arithmetic rather than a re-implementation of it, run in-process
+ * through `drizzle-kit/api`: the declarations become a snapshot, that snapshot is diffed
+ * against the newest one in `meta/`, and a tree with nothing left to propose is an empty list
+ * of statements. No Postgres and no child process — `generate` is offline, which is why
+ * `drizzle.config.ts` carries no `dbCredentials`.
+ *
+ * The second case is what makes the first one mean something. A checker pointed at the wrong
+ * module, or diffing a snapshot against itself, answers "nothing to propose" for every tree
+ * there is; so the differ is handed the newest snapshot minus a single column default and read
+ * back for the one statement that restores it — which is `0033`'s whole body, word for word.
+ */
+
+/** `0033_the-account-timestamp-default.sql` in full, spelled here rather than read from it. */
+const THE_ALTER_THAT_LANDED_THE_DEFAULT =
+  'ALTER TABLE "account" ALTER COLUMN "updated_at" SET DEFAULT now();';
+
+/** Where the snapshots sit: beside the migrations the journal names. */
+const theMetaFolder = path.join(path.dirname(journalMigrationFiles()[0] ?? ""), "meta");
+
+/**
+ * The snapshot of the newest migration, taken from the journal's own walk rather than by naming
+ * a tag, so the migration after this one needs no edit here. `journalSnapshots` answers them in
+ * the journal's order, and the last of them is the schema as the last migration left it.
+ */
+const theNewestSnapshot = (): DrizzleSnapshotJSON => {
+  const walked = journalSnapshots();
+  const newest = walked.ok ? walked.value.at(-1) : undefined;
+  if (newest === undefined) throw new Error("there is no newest snapshot to diff against");
+  return JSON.parse(readFileSync(path.join(theMetaFolder, newest), "utf8")) as DrizzleSnapshotJSON;
+};
+
+/** The declarations as a snapshot, filtered to `public` as the config filters them. */
+const theDeclarations = (prevId: string): DrizzleSnapshotJSON =>
+  generateDrizzleJson(declarations, prevId, ["public"]);
+
+describe("the declarations and the DDL generated from them", () => {
+  it("leaves a generate run on this tree with nothing to propose", async () => {
+    const newest = theNewestSnapshot();
+
+    expect(await generateMigration(newest, theDeclarations(newest.id))).toEqual([]);
+  });
+
+  it("proposes the ALTER when a default is in the declarations and not in the DDL", async () => {
+    // T-138's own drift, staged back: the newest snapshot with `account.updated_at`'s default
+    // taken out of it is what `meta/` held for thirty-three migrations, and the statement below
+    // is what `generate` proposed on every one of those runs.
+    const before = structuredClone(theNewestSnapshot());
+    const column = before.tables["public.account"]?.columns["updated_at"];
+    if (column === undefined) throw new Error("account.updated_at is not in the newest snapshot");
+    delete column.default;
+
+    expect(await generateMigration(before, theDeclarations(before.id))).toEqual([
+      THE_ALTER_THAT_LANDED_THE_DEFAULT,
+    ]);
   });
 });
 
