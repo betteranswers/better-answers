@@ -12,10 +12,11 @@ import { Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
 
 /**
- * `[WEB5]`: what a reader is left with when a screen throws, through the router a browser
- * drives (`[TEST1]`: a rendered component through Testing Library where a component's own
- * behaviour is the thing under test). The same failure over the served build, with axe,
- * is `e2e/failed-screen.spec.ts`.
+ * What a reader is left with when a screen throws, through the router a browser drives: the
+ * frame, its landmarks and its navigation stand, the outcome is announced, and nothing of
+ * the error itself reaches the page. (`[TEST1]`: a rendered component through Testing
+ * Library where a component's own behaviour is the thing under test.) The same failure over
+ * the served build, with axe, is `e2e/failed-screen.spec.ts`.
  */
 
 afterEach(() => {
