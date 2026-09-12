@@ -1,0 +1,20 @@
+apps/web/test/api-client.test.tsx
+  s_033886426cd8b0::t_4095437ce38708 125
+  s_033886426cd8b0::t_22231b9841fe1d 107-124,126-128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7de4d3fcb322774f6d093d880ee23308435ab44c",
+  "prompts": {},
+  "sessions": {
+    "s_033886426cd8b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "70c9d141-d7d6-49af-bab3-d6dfca99cfd6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
