@@ -148,11 +148,23 @@ AN_ADDRESS_AROUND_A_NAME = "9 Kestrel Lane, care of Oliver Denbigh, Barwick, LS2
 #: a string the literal above no longer matches.
 A_STREET_AND_ITS_POSTCODE: tuple[str, ...] = ("9 Kestrel Lane", "LS22 4TD")
 
+#: The title planted in the roles section, and the fifth the page carries. It is the
+#: only one of the five that sits inside no other finding's span, which is what makes it
+#: the span this suite can read the switchable-off tier off: the health sentence covers
+#: one of the other four whatever a binding says about job titles, because the run of
+#: characters a placeholder is written over is settled between findings and not between
+#: categories.
+A_PLANTED_JOB_TITLE = "procurement manager"
+
 #: Every span the recall set is made of, as the category it must be raised under and
 #: the literal the fixture planted. Written out here rather than read back from the
 #: seam, so a recogniser that moved a boundary by one character fails rather than
 #: agrees with itself. The company address is deliberately absent: it is on no consumer
 #: domain, so it is not personal contact and the page keeps it.
+#:
+#: The health sentence is last and has to stay last, because the test that narrows the
+#: document reads this tuple's final entry as that sentence. A span planted later than
+#: it goes into the middle of the list and never onto the end.
 PLANTED_SPANS: tuple[tuple[str, str], ...] = (
     ("date-of-birth", "3 February 1978"),
     ("home-address", "14 Marlbrook Rise, Hensworth, NN12 3AB"),
@@ -162,6 +174,7 @@ PLANTED_SPANS: tuple[tuple[str, str], ...] = (
     ("personal-contact", A_CONSUMER_ADDRESS),
     ("personal-contact", "07700 900123"),
     ("government-identifier", "999 000 0018"),
+    ("job-title", A_PLANTED_JOB_TITLE),
     (
         "special-category",
         "One of our supervisors was on long-term sick leave following a cancer "
@@ -331,6 +344,29 @@ def test_the_default_on_tier_writes_its_own_word_in_place_of_each_span(
     assert redacted.count("[home address withheld]") == 3
     assert redacted.count("[personal contact withheld]") == 2
     assert A_CONSUMER_ADDRESS not in redacted
+
+
+def test_a_job_title_stays_in_the_text_until_the_binding_switches_its_tier_on(
+    on_a_plain_binding: Redaction, on_an_hr_shaped_binding: Redaction, page: str
+) -> None:
+    # The last category the agreement declares and nothing here read off the seam. The
+    # roles section plants a title inside no other finding's span, so no placeholder can
+    # be written across it and what becomes of it is the binding's own answer: the
+    # binding nobody configured leaves a job title where a reader can see whose job it
+    # is, and the one flip an HR-shaped binding makes takes it out under its own word
+    # rather than the neutral one. The count is the same on both, because what a binding
+    # has in force decides what is written out and never what was found — which is also
+    # why the four titles already on the page are counted here beside the planted one.
+    assert A_PLANTED_JOB_TITLE in spans_under(on_a_plain_binding, page, "job-title")
+    assert tiers_of(on_a_plain_binding, page, A_PLANTED_JOB_TITLE) == {"default-off"}
+
+    assert A_PLANTED_JOB_TITLE in on_a_plain_binding.text
+    assert "[job title withheld]" not in on_a_plain_binding.text
+    assert on_a_plain_binding.counts["job-title"] == 5
+
+    assert A_PLANTED_JOB_TITLE not in on_an_hr_shaped_binding.text
+    assert "[job title withheld]" in on_an_hr_shaped_binding.text
+    assert on_an_hr_shaped_binding.counts["job-title"] == 5
 
 
 def test_a_bare_date_is_not_a_finding_and_a_date_beside_date_of_birth_is(

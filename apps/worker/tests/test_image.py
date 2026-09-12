@@ -146,10 +146,14 @@ SEED = "b0f3a1d2c4e5"
 #: The page's second email address is deliberately not here. It sits on the invented
 #: company's own domain rather than on a consumer provider's, so the seam leaves it in
 #: the text and a line asserting it gone would be asserting the opposite of the rule.
+#: Neither is the page's planted job title, on the one tier this binding leaves off: it
+#: is meant to be readable here, and the binding an HR-shaped workspace holds is what
+#: takes it out.
 PLANTED_SPANS = (
     "3 February 1978",
     "14 Marlbrook Rise, Hensworth, NN12 3AB",
     "7 Pinfold Gate, Ashdale, YO41 9ZZ",
+    "9 Kestrel Lane, care of Oliver Denbigh, Barwick, LS22 4TD",
     "00-00-00, account number 12345678",
     "rosalind.petheridge@hotmail.co.uk",
     "07700 900123",
@@ -160,11 +164,14 @@ PLANTED_SPANS = (
 
 #: The findings by category, and the word each tier writes in place of a span it takes:
 #: one neutral word for the always tier, six spans of it here — the two sort-code pairs,
-#: the NHS number, the health sentence and the two officers the block rule raised — and
-#: a typed placeholder for each span the binding's own tier gave up.
+#: the NHS number, the health sentence and two of the three officers the block rule
+#: raised — and a typed placeholder for each span the binding's own tier gave up. The
+#: third officer is named inside the signatories block's home address, so the address's
+#: own placeholder is written across him: the neutral word stays at six where the home
+#: addresses go to three.
 FINDINGS_BY_CATEGORY: Mapping[str, int] = {
     "date-of-birth": 1,
-    "home-address": 2,
+    "home-address": 3,
     "bank-details": 2,
     "personal-contact": 2,
     "government-identifier": 1,
@@ -173,7 +180,7 @@ FINDINGS_BY_CATEGORY: Mapping[str, int] = {
 PLACEHOLDERS_IN_THE_TEXT: Mapping[str, int] = {
     "[withheld]": 6,
     "[date of birth withheld]": 1,
-    "[home address withheld]": 2,
+    "[home address withheld]": 3,
     "[personal contact withheld]": 2,
 }
 

@@ -66,3 +66,8 @@ through once more. Imogen Sarkar keeps the signed copy.
 The counterpart was signed at our registered correspondence address,
 9 Kestrel Lane, care of Oliver Denbigh, Barwick, LS22 4TD, and the original was
 returned to us by post.
+
+## Roles on this framework
+
+Our tender names one role against this contract, procurement manager, and that title
+has not changed hands since the framework was let.
