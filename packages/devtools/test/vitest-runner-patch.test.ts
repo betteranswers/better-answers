@@ -159,7 +159,13 @@ describe("the vitest runner's patch, run over a throwaway workspace (T-107)", ()
         statusReason: expect.stringContaining("is not a family"),
       });
     } finally {
-      rmSync(root, { recursive: true, force: true });
+      // spawnSync guarantees only that the top-level stryker process has exited: it forks
+      // workers to run each mutant's tests, with `root` as their cwd, and nothing here waits
+      // on those. One that outlives the CLI leaves an extra entry under `root`, which makes
+      // the final rmdir fail ENOTEMPTY — and fs.rmSync retries ENOTEMPTY only when given both
+      // maxRetries and retryDelay, since force alone suppresses "does not exist" and nothing
+      // else.
+      rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });
 });
