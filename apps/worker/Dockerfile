@@ -38,20 +38,34 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /app
 # The lockfile's dependencies first, so a source edit does not re-resolve them. `--frozen`
 # fails rather than updating `uv.lock`: the committed lockfile is the pin.
+#
+# Then the redaction seam, and only it. The weights step below fetches by loading the
+# seam's own analyzer, so those modules have to be present before it runs — and nothing
+# else does: no module under `redaction/` imports anything outside it. Copying the subtree
+# here rather than the whole of `src` is what puts the weights above the source: an edit to
+# a file outside the seam reuses roughly three gigabytes of weight layers, and an edit
+# inside it rebuilds them, which is right, because a moved pin has to re-fetch. This stage
+# reads nothing else from `src` after this point, and the runtime stage copies the tree
+# from the build context rather than from here, so the rest of it never enters this stage.
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
-COPY src src
+COPY src/better_answers_worker/__init__.py src/better_answers_worker/__init__.py
+COPY src/better_answers_worker/redaction src/better_answers_worker/redaction
 RUN uv sync --frozen --no-dev
 
 # The weights, fetched by loading each pinned model through the seam's own analyzer —
 # `redaction/weights.py` says why a load and not a snapshot, and holds the model ids, so no
 # id is spelled in this file. The cache mount is why a source edit does not re-download
-# nearly two gigabytes on every local rebuild; the copy out of it is why the weights are in
-# the image and not only in the builder's cache, which a `--mount=type=cache` does not ship.
+# nearly two gigabytes on every local rebuild, and the copy out of it is why the weights
+# are in the image and not only in the builder's cache, which a `--mount=type=cache` does
+# not ship. The module does that copy rather than a `cp` of the mount, and that is the
+# point of the argument it is given: the mount is shared by every build on a machine, so
+# copying the whole of it made the image whatever the mount held — a model dropped from the
+# table kept shipping because an older build had fetched it — while the module copies the
+# repositories the table declares and nothing beside them.
 RUN --mount=type=cache,target=/hf-cache,uid=0 \
     HF_HOME=/hf-cache /app/.venv/bin/python -m better_answers_worker.redaction.weights \
- && mkdir -p /data/worker/hf-cache \
- && cp -a /hf-cache/. /data/worker/hf-cache/
+    /data/worker/hf-cache
 
 FROM python:3.13.15-slim-bookworm@sha256:ed86c82274b3c69b52fb5820f358f0bd7df0b603332063cb5c6e32bd220c3e6e AS runtime
 
