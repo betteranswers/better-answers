@@ -224,9 +224,9 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   the facts the claim protocol needs. Queued until a *claimant* takes it under
   a *lease*; ends *done* or *failed* with an *outcome*, or *poisoned* after its last lost claim.
   The app enqueues; a job's kind names the tier that claims it — the worker for every kind but the
-  ones only the app can run (a foreground rebuild from `pnpm ops`; the question-set job, whose
-  answer path is the app's) — both through the same queue SQL functions (ADR 0031's `queue`
-  agreement, which already admits the app as a claimant; ADR 0005: the control plane is rows;
+  one only the app can run (the question-set job, S6's, whose answer path is the app's) — both
+  through the same queue SQL functions (ADR 0031's `queue` agreement, which already admits the app
+  as a claimant; ADR 0005: the control plane is rows;
   09/09/2026). A job is its own record and never an *audit event*. A *run* is a job being done:
   a *connector run* or a *graph sync run* is one job's execution. _Avoid_: task, ticket.
 - **lease** — the scheduler's grip on a claimed run: held only while its claimant keeps confirming
