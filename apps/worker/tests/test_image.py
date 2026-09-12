@@ -445,11 +445,21 @@ def worker_environment(name: str) -> str:
 
 
 def worker_mounts_over(path: str) -> list[str]:
-    """Every volume the worker's deploy unit mounts over a path inside the container."""
+    """Every volume the worker's deploy unit mounts over a path inside the container.
+
+    The terminator admits an optional third, colon-prefixed field, then trailing
+    whitespace, then an optional ``#`` comment to the end of the line — a real mount
+    written with a comment on it (``deploy/platform.compose.yaml``'s own lmdb line) must
+    still be seen, or a guard built on this helper proves nothing about a commented
+    mount. ``(:\\S*)?`` is anchored on the literal path first, so a path that is only a
+    *prefix* of a longer one (``/data/worker/lmdb`` against a line ending
+    ``/data/worker/lmdb-extra``) still fails to match: the extra characters have no
+    colon, whitespace or ``#`` to be absorbed by, so ``$`` never lands.
+    """
     return [
         line.strip()
         for line in _worker_service().splitlines()
-        if re.match(rf"\s*- \S+:{re.escape(path)}(:|\s*$)", line)
+        if re.match(rf"\s*- \S+:{re.escape(path)}(:\S*)?\s*(#.*)?$", line)
     ]
 
 
@@ -913,6 +923,37 @@ def test_the_deploy_unit_mounts_nothing_over_the_weights_the_image_carries() -> 
     at all, on a box whose first job is the one that would have warmed it.
     """
     assert worker_mounts_over(worker_environment("HF_HOME")) == []
+
+
+def test_the_lmdb_mount_with_its_trailing_comment_is_caught_and_a_longer_path_is_not(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The positive control the guard above needed: written first, red against the
+    helper as it stood, so the guard's own passing was proof of something rather than
+    an accident of a terminator that could not see a commented line.
+
+    ``worker_mounts_over``'s terminator used to require a line to end at the path or
+    continue with a third, colon-prefixed field. A mount with a trailing comment ends
+    neither way, so the helper matched nothing on such a line — which is exactly the
+    shape of ``deploy/platform.compose.yaml``'s real lmdb mount, and exactly why the
+    guard above passed whether or not a stray ``HF_HOME`` bind existed: a helper that
+    cannot see a commented mount cannot see one added over the weights either. This
+    reads the compose file's own lmdb line for real, so the finding is provable without
+    ever editing that file.
+    """
+    assert worker_mounts_over("/data/worker/lmdb") == [
+        "- /data/worker/lmdb:/data/worker/lmdb        "
+        "# one LMDB per binding — personal data on disk; never backed up"
+    ]
+
+    # Widening the terminator must not widen what counts as "the same path": a bind
+    # mount over a longer, merely-prefixed path is a different volume and must still
+    # not match.
+    monkeypatch.setattr(
+        f"{__name__}._worker_service",
+        lambda: "  - /data/worker/lmdb-extra:/data/worker/lmdb-extra",
+    )
+    assert worker_mounts_over("/data/worker/lmdb") == []
 
 
 def test_the_build_fetches_the_weights_by_running_the_module_that_names_them(
