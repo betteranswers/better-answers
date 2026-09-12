@@ -1,0 +1,23 @@
+.claude/agents/implementor.md
+  s_4444b5138fa933::t_c5eee9f9339f35 17-20
+docs/agents/build-loop.md
+  s_4444b5138fa933::t_681829a71aa739 61-71,73
+  s_4444b5138fa933::t_a158e0921395c8 60
+  s_4444b5138fa933::t_a72bc38869a20a 72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "09a4605c437bd69d2e20f3998c579275bc00c450",
+  "prompts": {},
+  "sessions": {
+    "s_4444b5138fa933": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b21cc04e-9441-4374-adca-d0c10532f32c",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
