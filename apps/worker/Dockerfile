@@ -67,6 +67,24 @@ RUN --mount=type=cache,target=/hf-cache,uid=0 \
     HF_HOME=/hf-cache /app/.venv/bin/python -m better_answers_worker.redaction.weights \
     /data/worker/hf-cache
 
+# The list of public suffixes, warmed the same way and shipped the same way, for a
+# failure that is the weights' opposite. A weight the build missed raises on the first
+# job. A suffix list the build missed costs two connection attempts and their timeouts
+# inside the first email address every worker process matches, and then answers
+# correctly off the copy bundled in `tldextract`'s own wheel — so nothing fails, nothing
+# is logged where anyone looks, and the bill is paid again by the next process.
+# `redaction/suffixes.py` carries the rest: why the fence has to be the `ENV` in the
+# runtime stage rather than anything either tier could call, and why a cache hit is the
+# only thing that reaches it through Presidio.
+#
+# Its own step, its own mount and its own target. The weights step above copies what the
+# model table declares and nothing beside it, which is the point of that step; a second
+# thing folded into it would be a second thing that table does not name.
+RUN --mount=type=cache,target=/tldextract-cache,uid=0 \
+    TLDEXTRACT_CACHE=/tldextract-cache \
+    /app/.venv/bin/python -m better_answers_worker.redaction.suffixes \
+    /data/worker/tldextract-cache
+
 FROM python:3.13.15-slim-bookworm@sha256:ed86c82274b3c69b52fb5820f358f0bd7df0b603332063cb5c6e32bd220c3e6e AS runtime
 
 # uid 1000, the uid `init` in `deploy/stores.compose.yaml` chowns /data/worker/{lmdb,trees}
@@ -90,8 +108,17 @@ COPY src src
 # user that reads them. `HF_HUB_OFFLINE` is the fence over them: the seam loads what is
 # here or it raises, and a running worker never reaches a registry.
 COPY --from=build --chown=worker:worker /data/worker/hf-cache /data/worker/hf-cache
+
+# The suffix list the build warmed, and the variable that makes the container read it.
+# It is owned by the worker rather than merely readable by it because `tldextract` takes
+# a lock file beside a cache entry before reading it, so a directory this user cannot
+# write to is a cache it cannot use — and the way it reports that is to fetch instead,
+# which is the thing being stopped. There is no `OFFLINE` switch to set beside this one:
+# the library has no such mode, and a cache hit is what stands in for it.
+COPY --from=build --chown=worker:worker /data/worker/tldextract-cache /data/worker/tldextract-cache
 ENV HF_HOME=/data/worker/hf-cache \
-    HF_HUB_OFFLINE=1
+    HF_HUB_OFFLINE=1 \
+    TLDEXTRACT_CACHE=/data/worker/tldextract-cache
 
 USER worker
 

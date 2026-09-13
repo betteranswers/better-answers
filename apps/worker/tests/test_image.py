@@ -20,7 +20,13 @@ the build succeeds, the container starts, and each of them still ships.
   ``HF_HUB_OFFLINE`` set beside it the result is a worker that detects nothing at all
   rather than one that quietly re-downloads; and a copy that lands outside the path the
   runtime stage reads ships an image whose weights are in the builder alone. The
-  network-refused container below is what catches all three at once.
+  network-refused container below is what catches all three at once — and one more
+  thing beside them that is not a weight and is not covered by ``HF_HUB_OFFLINE``: the
+  list of public suffixes Presidio's email recogniser asks ``tldextract`` for on its
+  first match. That one goes wrong silently by design, since the library falls back to
+  the copy bundled in its own wheel and writes the two URLs it could not reach to a log
+  nobody reads, so a page still redacts correctly while every worker process pays a
+  connection attempt to find that out (`T-152`).
 
 Everything the image is held to is derived. The development list comes from
 ``pyproject.toml``'s ``[dependency-groups] dev``, the interpreter from
@@ -103,6 +109,13 @@ DOCKERFILE = WORKSPACE / "Dockerfile"
 #: Where ``COPY src src`` puts this tier's source, and the one directory beside it that
 #: a wider ``COPY`` would bring: the image's ``WORKDIR`` is ``/app``.
 TESTS_IN_THE_IMAGE = "/app/tests"
+
+#: Where the image keeps the list of public suffixes the build warmed, as a literal and
+#: not as whatever the Dockerfile happens to say: under ``/data/<service>`` beside the
+#: weights, because it is this tier's state and it is owned by this tier's uid. A
+#: container that answers anything else is a container reading a list the build never
+#: warmed, and the only outward sign of that is a fetch nobody asked for.
+SUFFIX_CACHE_IN_THE_IMAGE = "/data/worker/tldextract-cache"
 
 #: The prefix the official Python image installs its interpreter under. It cannot be
 #: read off a file in this repository — it is that image's own convention — and it is
@@ -568,10 +581,40 @@ sys.stdout.write(json.dumps({
 # the answers it is held to are literals above, read out of `tests/test_redaction.py`.
 # The suppressions are empty here: no erasure request applies to a fixture, and the
 # seam's argument for one is exercised by that file rather than by a container.
+#
+# It also watches one third-party logger and reads one directory, and both are about the
+# same thing: the list of public suffixes `tldextract` wants the first time the seam
+# matches an email address. `tldextract` logs a warning for each list URL it fails to
+# reach and then falls back to the copy bundled in its own wheel, so a container with no
+# route out redacts the page and answers correctly either way — which is exactly why
+# "the seam returned" cannot tell a reader whether the list came off the image or off a
+# fetch that timed out. The warnings can.
 REDACTION_PROBE = """
-import json, os, sys
+import json, logging, os, sys
 
 from better_answers_worker.redaction import redact
+
+reached_out = []
+
+class Caught(logging.Handler):
+    def emit(self, record):
+        reached_out.append(record.getMessage())
+
+# The load is lazy — importing the library builds its extractor, and the list is read on
+# the first address it is asked about — so a handler attached after the import above
+# still sees every attempt the seam makes.
+watched = logging.getLogger("tldextract")
+watched.setLevel(logging.WARNING)
+watched.addHandler(Caught(level=logging.WARNING))
+
+# Listed before the seam runs, so what is answered is what the image was carrying and
+# never something this container wrote on its way through.
+cache = os.environ.get("TLDEXTRACT_CACHE", "")
+warmed = sorted(
+    os.path.relpath(os.path.join(where, name), cache)
+    for where, _, names in os.walk(cache)
+    for name in names
+)
 
 found = redact(
     os.environ["PROBE_PAGE"],
@@ -584,6 +627,9 @@ sys.stdout.write(json.dumps({
     "counts": dict(found.counts),
     "verdict": found.verdict,
     "version": found.version,
+    "suffix_cache": cache,
+    "suffix_cache_entries": warmed,
+    "reached_out": reached_out,
 }))
 """
 
@@ -976,7 +1022,9 @@ def test_the_build_fetches_the_weights_by_running_the_module_that_names_them(
     assert contents.hf_home in dockerfile
 
 
-def test_the_image_redacts_the_fixture_with_its_network_refused(image: str) -> None:
+def test_the_image_redacts_the_fixture_with_its_network_refused_and_fetches_nothing(
+    image: str,
+) -> None:
     """Acceptance line 1's second half, and the strongest thing this file says.
 
     Every assertion above is a statement about what is in the image. This one is the
@@ -986,9 +1034,23 @@ def test_the_image_redacts_the_fixture_with_its_network_refused(image: str) -> N
     was already there. It is also the only test here that would fail on the four
     megabytes of that tokenizer, which is the whole reason the build fetches by loading.
 
+    **And it is the one place a fetch that fails quietly can be seen.** The weights fail
+    loudly when they are missing, because ``HF_HUB_OFFLINE`` makes a cache miss an
+    exception. The list of public suffixes does not: ``tldextract`` tries two URLs, logs
+    a warning for each, falls back to the copy in its own wheel and answers correctly —
+    so every assertion above this one passed before the image carried that list at all,
+    and would pass again the day it stopped carrying it. What that costs is not
+    correctness but a connection attempt and its timeout, paid inside the first email
+    match of every process the deploy unit starts, on a box that may have no route out
+    to time out against. So this asks for the silence rather than for the answer
+    (`T-152`).
+
     The page reaches the container by the name of an environment variable and never by
     its value, the same way the derived lists above do: it is synthetic, but it is
-    PII-shaped, and a value on a command line is a value in somebody else's ``ps``.
+    PII-shaped, and a value on a command line is a value in somebody else's ``ps``. The
+    address planted in it is at a consumer provider's UK domain, which is what drives
+    Presidio's email recogniser into ``tldextract`` and makes the silence below mean
+    something.
     """
     found = _answered(
         _run_the_image(
@@ -1025,6 +1087,17 @@ def test_the_image_redacts_the_fixture_with_its_network_refused(image: str) -> N
     for pinned in PINNED_IN_THE_VERSION_STRING:
         assert _pin(pinned) in version, pinned
     assert _pin("GLINER_MODEL_ID_MEASURED").rsplit("/", 1)[-1] not in version
+
+    # Nothing was reached for while that ran. Each of these three says something the
+    # other two cannot: the image points the library at the directory the build warmed,
+    # that directory arrived in the image with something in it, and the library
+    # therefore never went looking. Drop the `ENV` and the first fails; drop the `COPY`
+    # and the second does; get either subtly wrong — a path off by a directory, a
+    # `--chown` that left the files unreadable — and the third does, because a library
+    # that cannot read its cache fetches instead of saying so.
+    assert found["suffix_cache"] == SUFFIX_CACHE_IN_THE_IMAGE
+    assert found["suffix_cache_entries"] != []
+    assert found["reached_out"] == []
 
 
 def test_what_the_seam_costs_per_page_is_measured_on_the_image_and_never_budgeted(
