@@ -87,6 +87,7 @@ import logging
 import os
 import re
 import subprocess
+import tempfile
 import tomllib
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
@@ -759,17 +760,132 @@ def _read_measurement(stdout: str) -> Measurement:
     )
 
 
+#: What the `type=gha` build cache reads its credentials out of. The token is the same
+#: one on either version of that backend; the endpoint moved from the first name below
+#: to the second when the Actions cache service went to v2, so both are read and either
+#: will do (Docker, *GitHub Actions cache*, 13/09/2026). A runner hands these to an
+#: **action's** own process and to nothing else — which is why
+#: `docker/build-push-action` needs nothing extra, a `docker buildx build` run from
+#: inside this suite does, and a workflow step has to copy them into the job's
+#: environment before `check` runs.
+SHARED_CACHE_TOKEN = "ACTIONS_RUNTIME_TOKEN"
+SHARED_CACHE_URLS = ("ACTIONS_RESULTS_URL", "ACTIONS_CACHE_URL")
+
+#: The driver a plain daemon answers with, and the one driver that can export a cache
+#: nowhere: it builds straight into the daemon's image store, so a build handed
+#: `--cache-to` on it stops with an error rather than ignoring the flag. Every other
+#: driver — the container one a runner's setup step creates — can.
+DRIVER_WITHOUT_AN_EXPORT = "docker"
+
+
+def _builder_that_can_export(inspected: str) -> str | None:
+    """The builder ``docker buildx inspect`` described, if it can export a cache.
+
+    ``inspect`` answers a block of ``Name: value`` lines for the builder and then a
+    ``Nodes:`` block that repeats several of those names for each node, so the first
+    reading of a name is the builder's own and the rest are a node's. Nothing here
+    parses further than that: what this has to decide is one thing, and a driver this
+    repository has never seen is treated as able rather than unable, since the only
+    driver that cannot is the default one every machine already has.
+    """
+    read: dict[str, str] = {}
+    for line in inspected.splitlines():
+        name, separator, value = line.partition(":")
+        if separator and not line.startswith((" ", "\t")):
+            read.setdefault(name.strip(), value.strip())
+    named = read.get("Name", "")
+    driver = read.get("Driver", "")
+    if not named or not driver or driver == DRIVER_WITHOUT_AN_EXPORT:
+        return None
+    return named
+
+
+def _shared_cache_builder() -> str | None:
+    """The builder this machine may export a ``type=gha`` cache to, or ``None``.
+
+    Two questions in this order and both must answer. The credentials are asked for
+    first because they are what a laptop never has and because the answer costs
+    nothing; only then is the daemon asked which builder it would use. Either question
+    coming back empty is the plain build — failing closed, because the cached arm is
+    not a faster build on a machine that cannot reach the cache, it is a failed one.
+    """
+    if not os.environ.get(SHARED_CACHE_TOKEN, "").strip():
+        return None
+    if not any(os.environ.get(name, "").strip() for name in SHARED_CACHE_URLS):
+        return None
+    try:
+        inspected = subprocess.run(
+            ["docker", "buildx", "inspect"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if inspected.returncode != 0:
+        return None
+    return _builder_that_can_export(inspected.stdout)
+
+
+def _build_command(
+    leg: Mapping[str, str], *, builder: str | None, iidfile: Path
+) -> list[str]:
+    """The argv that builds this tier's image, with the shared cache or without it.
+
+    A pure function of the two things that decide it, so that both commands can be read
+    on any machine and neither has to be run to be held. Four flags make the cached arm
+    what it is: the two halves of the cache, ``mode=max`` so every layer of a
+    multi-stage build is exported and not only the last stage's, and ``--load``, which
+    the container driver needs before the image is in the daemon at all — the suite
+    starts containers from what this returns. ``--quiet`` is not asked of that arm
+    because it is not the id's source there: buildx writes the id to ``--iidfile``,
+    which is a file this run owns rather than a line to be picked out of a build log.
+    """
+    if builder is None:
+        return [
+            "docker",
+            "build",
+            "--quiet",
+            "--file",
+            leg["dockerfile"],
+            leg["context"],
+        ]
+    return [
+        "docker",
+        "buildx",
+        "build",
+        "--builder",
+        builder,
+        "--cache-from",
+        "type=gha",
+        "--cache-to",
+        "type=gha,mode=max",
+        "--load",
+        "--iidfile",
+        str(iidfile),
+        "--file",
+        leg["dockerfile"],
+        leg["context"],
+    ]
+
+
 def _build_the_image(leg: Mapping[str, str]) -> str:
     """The image `build.yml` builds for this tier, by the id its build printed."""
-    built = subprocess.run(
-        ["docker", "build", "--quiet", "--file", leg["dockerfile"], leg["context"]],
-        cwd=REPO_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=900,
-    )
-    return built.stdout.strip()
+    builder = _shared_cache_builder()
+    with tempfile.TemporaryDirectory() as scratch:
+        iidfile = Path(scratch) / "image-id"
+        built = subprocess.run(
+            _build_command(leg, builder=builder, iidfile=iidfile),
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=900,
+        )
+        if builder is None:
+            return built.stdout.strip()
+        return iidfile.read_text(encoding="utf-8").strip()
 
 
 def _run_the_image(
@@ -1201,3 +1317,106 @@ def test_the_worker_leg_of_the_image_job_names_this_file_as_its_probe() -> None:
 
     assert str(here) in leg["probe"]
     assert "apps/worker" in leg["probe"]
+
+
+def test_a_runner_builds_through_buildx_and_a_laptop_builds_as_it_always_did() -> None:
+    """The one build this suite runs, read as the two commands it can be.
+
+    On a runner the layers this build makes are worth keeping — the weights step alone
+    fetches over a gigabyte — and the only place to keep them is a cache the runner
+    does not own, which is what ``type=gha`` is. Everywhere else that cache is
+    unreachable and asking for it fails the build rather than skipping it, so the
+    choice is made once, here, and the argv is the whole of it. Both arms are literals
+    and neither needs a daemon: what this holds is that the fallback is *exactly* the
+    command that ran before the cache existed, and that the cached arm carries all four
+    of the things it cannot work without.
+    """
+    leg = {"dockerfile": "apps/worker/Dockerfile", "context": "apps/worker"}
+    written_to = Path("/tmp/the-id-this-build-wrote")
+
+    assert _build_command(leg, builder="the-container-builder", iidfile=written_to) == [
+        "docker",
+        "buildx",
+        "build",
+        "--builder",
+        "the-container-builder",
+        "--cache-from",
+        "type=gha",
+        "--cache-to",
+        "type=gha,mode=max",
+        "--load",
+        "--iidfile",
+        "/tmp/the-id-this-build-wrote",
+        "--file",
+        "apps/worker/Dockerfile",
+        "apps/worker",
+    ]
+    assert _build_command(leg, builder=None, iidfile=written_to) == [
+        "docker",
+        "build",
+        "--quiet",
+        "--file",
+        "apps/worker/Dockerfile",
+        "apps/worker",
+    ]
+
+
+def test_only_a_builder_that_can_export_a_cache_is_taken_for_one() -> None:
+    """What `docker buildx inspect` answers, read both ways as two literals.
+
+    A driver is not a detail here. The `docker` driver builds into the daemon's own
+    store and has nowhere at all to put an export, so a build handed `--cache-to` on it
+    stops with an error; the container driver a runner's setup step creates is the one
+    that can. Every machine with Docker on it answers this question, and only one kind
+    of answer may take the cached arm above — a reading that said yes to the daemon's
+    own builder would turn every laptop's build into a failure.
+    """
+    assert (
+        _builder_that_can_export(
+            "Name:          builder-1c0ffee\n"
+            "Driver:        docker-container\n"
+            "Last Activity: 2026-09-13 09:14:22 +0000 UTC\n"
+            "\n"
+            "Nodes:\n"
+            "Name:      builder-1c0ffee0\n"
+            "Endpoint:  unix:///var/run/docker.sock\n"
+            "Status:    running\n"
+        )
+        == "builder-1c0ffee"
+    )
+    assert (
+        _builder_that_can_export(
+            "Name:          default\n"
+            "Driver:        docker\n"
+            "Last Activity: 2026-09-13 09:14:22 +0000 UTC\n"
+            "\n"
+            "Nodes:\n"
+            "Name:      default\n"
+            "Endpoint:  default\n"
+            "Status:    running\n"
+        )
+        is None
+    )
+
+
+def test_a_machine_without_the_cache_credentials_asks_the_daemon_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The order the probe asks its two questions in, which is the fail-closed half.
+
+    A builder that can export is no use without somewhere to export to, and the
+    credentials are the half that is missing on every machine but a runner mid-job. So
+    they are read first and the daemon is never asked — asserted by making the ask
+    itself a failure, because ``None`` is also what a machine with no Docker at all
+    would answer and the two would be indistinguishable.
+    """
+    for name in (SHARED_CACHE_TOKEN, *SHARED_CACHE_URLS):
+        monkeypatch.delenv(name, raising=False)
+
+    def refuse_to_run(*_arguments: object, **_keywords: object) -> None:
+        message = "the probe asked the daemon for a builder it could not have used"
+        raise AssertionError(message)
+
+    monkeypatch.setattr(subprocess, "run", refuse_to_run)
+
+    assert _shared_cache_builder() is None
