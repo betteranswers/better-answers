@@ -1,0 +1,34 @@
+apps/worker/src/better_answers_worker/redaction/suffixes.py
+  s_033886426cd8b0::t_c0597a70cf77bc 1-109
+apps/worker/Dockerfile
+  s_033886426cd8b0::t_354abcab75ab47 70-87
+  s_033886426cd8b0::t_6cfcfd26a128c4 111-118,120-121
+apps/worker/tests/test_image.py
+  s_033886426cd8b0::t_177dde202868c3 1084-1094
+  s_033886426cd8b0::t_63d688bab249b1 23-29
+  s_033886426cd8b0::t_6e0a41be1d3731 113-119
+  s_033886426cd8b0::t_e3b0f0e3f429f2 577-584,586,590-611,623-625
+  s_033886426cd8b0::t_56e7bb6f42167c 1018-1020,1030-1040,1043-1046
+apps/worker/tests/test_redaction_suffixes.py
+  s_033886426cd8b0::t_0255932863f7fe 2,9-55,60-105
+  s_033886426cd8b0::t_171f7c7c3084cf 56-59
+  s_033886426cd8b0::t_cd39bdb9448362 4-8
+  s_033886426cd8b0::t_83770a11def9ec 1
+  s_033886426cd8b0::t_e26e2a33252fa5 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ff1664e709410cc8398d8c2c1de82af13a805bc6",
+  "prompts": {},
+  "sessions": {
+    "s_033886426cd8b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "70c9d141-d7d6-49af-bab3-d6dfca99cfd6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
