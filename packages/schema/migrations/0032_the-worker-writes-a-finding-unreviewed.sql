@@ -1,0 +1,37 @@
+-- Custom migration (hand-written SQL; ADR 0032).
+-- The worker writes a finding **unreviewed** (ADR 0020; the S0 spec, *The tier boundary*):
+-- migration 0024's grant made column-level, so the review's and the restore's columns can only
+-- come from their defaults.
+--
+-- **This is s0's 0032.** The `s1` branch carries its own 0032 to 0036 and renumbers them when it
+-- rebases onto `main`; the journal is one file and does not merge, which is why the number is
+-- stated here rather than left for a reader to work out from a conflict.
+--
+-- **What 0024's docblock got wrong, corrected here rather than by editing it.** 0024 rests the
+-- refusal on UPDATE — "One that could UPDATE could mark a special-category span reviewed and let
+-- a binding widen over it" — and revokes UPDATE for that reason. INSERT reaches the same state
+-- without going near UPDATE: the row's own CHECKs admit `review_state = 'kept-in-text'` with
+-- `reviewed_by` and `reviewed_at` beside it, and `tier = 'always'` with the restore's three, **on
+-- the insert itself**. A role holding table-level INSERT could therefore land a span already
+-- reviewed, or already restored, and every sentence 0024 wrote would still read as true. Both
+-- were landed as `worker_rt` on 11/09/2026, before this migration existed.
+--
+-- So the grant names the detector's own columns and no others: what the seam found, where it
+-- found it and what found it. `review_state` takes its `'unreviewed'` default, and
+-- `reviewed_by`, `reviewed_at`, `review_reason`, `restored_at`, `restored_by` and
+-- `restore_reason` take theirs, which is NULL. A worker that names one of the seven is refused
+-- on the **column**, which is a refusal that cannot be got around by writing a different value.
+--
+-- The list is the table's declaration in packages/schema/src/finding-tables.ts, minus those
+-- seven. A column added there for the detector is one this grant has to gain in a migration of
+-- its own, and until it does the worker's insert is refused — which is the direction to fail in.
+--
+-- The revoke is what makes the grant mean anything: a table-level INSERT left standing beside a
+-- column-level one is still a table-level INSERT.
+--
+-- Both roads are held beside the served path by "lets the worker record a finding and refuses it
+-- every road back to one" in packages/schema/test/rls.test.ts.
+REVOKE INSERT ON "finding" FROM worker_rt;
+--> statement-breakpoint
+GRANT INSERT (workspace_id, id, document_id, category, tier, rule_id, char_start, char_end,
+              score, rule_version, detector_pin) ON "finding" TO worker_rt;

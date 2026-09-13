@@ -853,30 +853,53 @@ describe("the fence", () => {
   });
 });
 
+/**
+ * This case builds three workspaces in one act — the periodic pass has to carry a bundle
+ * left behind, a bundle current and a bundle gone, together, each landing on its own
+ * outcome — so it is the slowest thing in this workspace and not an accident. Measured
+ * 49.4 s alone in `packages/core`'s own six-fork suite, beside the batch's two load loops
+ * (12/09/2026; Apple M4 Pro, 14 cores, 24 GiB; Docker VM 6 CPUs, 6144 MiB) — the slowest
+ * case in the workspace by 16 s over the next (`rebuild-equivalence.test.ts`, 33.7 s).
+ * Under a root `check`, contending with every other workspace's suite for the same six VM
+ * CPUs, this workspace's summed test time rose from 2003.9 s to 2749.2 s and 2796.5 s — a
+ * contention factor of ×1.37–1.40 — which puts the case's real need at about 68 s; it cut
+ * the config's 60 s `testTimeout` at 60013 ms and 60012 ms on two separate root-check
+ * runs, the only failure in either (T-140). The case shells out to nothing — three
+ * `arrange()`s, one `removeRepository`, one windowed write, one `reconcileEveryWorkspace`
+ * — so the allowance is the case's own and not standing in for a subprocess it starts.
+ * Ninety seconds leaves it clear of the measured 68 s need with margin against another
+ * few points of contention, without raising the file's other cases off their 60 s default.
+ */
+const PERIODIC_HEAD_CHECK_ALLOWANCE_MS = 90_000;
+
 describe("the periodic head check's pass", () => {
-  it("reconciles every workspace, each on its own outcome", async () => {
-    const behind = await arrange();
-    const current = await arrange();
-    const missing = await arrange();
-    await removeRepository(missing.git, missing.workspaceId);
-    const history = await writeInTheWindow(behind, behind.editor, guideline("Lunch"));
+  it(
+    "reconciles every workspace, each on its own outcome",
+    async () => {
+      const behind = await arrange();
+      const current = await arrange();
+      const missing = await arrange();
+      await removeRepository(missing.git, missing.workspaceId);
+      const history = await writeInTheWindow(behind, behind.editor, guideline("Lunch"));
 
-    const pass = await reconcileEveryWorkspace(RECONCILER, doorsOf(behind));
+      const pass = await reconcileEveryWorkspace(RECONCILER, doorsOf(behind));
 
-    expect(pass.ok).toBe(true);
-    if (!pass.ok) return;
-    const outcomes = new Map(pass.value.map((outcome) => [outcome.workspaceId, outcome.outcome]));
-    expect(outcomes.get(behind.workspaceId)).toMatchObject({
-      ok: true,
-      value: { replayed: history },
-    });
-    expect(outcomes.get(current.workspaceId)).toMatchObject({
-      ok: true,
-      value: { head: null, replayed: [] },
-    });
-    // One bundle's refusal is that bundle's fact, and the others were not left behind.
-    expect(outcomes.get(missing.workspaceId)).toEqual({ ok: false, error: "no-such-repository" });
-  });
+      expect(pass.ok).toBe(true);
+      if (!pass.ok) return;
+      const outcomes = new Map(pass.value.map((outcome) => [outcome.workspaceId, outcome.outcome]));
+      expect(outcomes.get(behind.workspaceId)).toMatchObject({
+        ok: true,
+        value: { replayed: history },
+      });
+      expect(outcomes.get(current.workspaceId)).toMatchObject({
+        ok: true,
+        value: { head: null, replayed: [] },
+      });
+      // One bundle's refusal is that bundle's fact, and the others were not left behind.
+      expect(outcomes.get(missing.workspaceId)).toEqual({ ok: false, error: "no-such-repository" });
+    },
+    PERIODIC_HEAD_CHECK_ALLOWANCE_MS,
+  );
 });
 
 describe("reconciler hits", () => {

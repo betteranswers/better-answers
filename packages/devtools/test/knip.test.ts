@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 import { knipOver } from "@better-answers/devtools/throwaway-tree";
 import type { KnipFinding, Tree } from "@better-answers/devtools/throwaway-tree";
 
+import knipConfig from "../../../knip.config.ts";
+
 /**
  * knip as a gate, run over a throwaway tree (`[CHECK1]`).
  *
@@ -19,6 +21,14 @@ import type { KnipFinding, Tree } from "@better-answers/devtools/throwaway-tree"
  * SPA's shared UI directory is an entry point, so a component installed for a surface that
  * does not exist yet is never a finding (ADR 0033). The rule is a directory in the
  * configuration, so the test that proves it is a tree with an unreached file in one.
+ *
+ * The last three cases hold T-180's fix: `.gitnexus/`, a per-checkout GitNexus index, is
+ * excluded from git through `.git/info/exclude` rather than `.gitignore`, which is the only
+ * file knip reads, so an analysed checkout named `.gitnexus/run.cjs` an unused file for a
+ * reason that was never the tree's. One case reads the repository's own `knip.config.ts` as
+ * a value, the way `packages/devtools/test/jscpd.test.ts:103-112` reads jscpd's; the other
+ * two run the mechanism itself over a throwaway tree, both ways, so the silence is proved
+ * and not assumed from the tool's own docs.
  */
 
 const MANIFEST = JSON.stringify({
@@ -122,5 +132,61 @@ describe("the knip gate is a step of the root check (T-066)", () => {
 
     expect(scripts["knip"], "the root declares no knip script").toBeDefined();
     expect(scripts["check"] ?? "").toContain(" knip");
+  });
+});
+
+describe("the repository's own configuration ignores `.gitnexus/` (T-180)", () => {
+  it("names `.gitnexus/**` in the top-level `ignore`", () => {
+    // SAFETY: `knip.config.ts`'s declared type admits the function form knip supports for a
+    // CLI-argument-aware config; this repository's own config is always the plain object
+    // below, so the cast reads a value nobody is asking knip to compute. Read as a value so
+    // a deleted line fails here rather than turning into a red gate on a branch that never
+    // carries a GitNexus index — the jscpd precedent above reads its config the same way.
+    const { ignore } = knipConfig as { readonly ignore?: readonly string[] };
+
+    expect(ignore).toContain(".gitnexus/**");
+  });
+});
+
+describe("the top-level `ignore` glob, proved both ways (T-180)", () => {
+  // A knip config shaped like this repository's own fix: the same entry and project globs
+  // as the scaffold above, plus the one line under test. A separate runner from `knip`
+  // above, because that scaffold's config carries no `ignore` at all.
+  const IGNORES_GITNEXUS = JSON.stringify({
+    entry: ["src/main.ts", "src/registry/**"],
+    project: ["**/*.ts"],
+    ignore: [".gitnexus/**"],
+  });
+
+  const gitnexusIgnore = knipOver(
+    { "package.json": MANIFEST, "knip.json": IGNORES_GITNEXUS },
+    {
+      tree: {
+        "src/main.ts": MAIN,
+        "src/reached.ts": REACHED,
+        "other/probe.ts": "export const alone = 1;\n",
+      },
+      findings: [{ kind: "files", file: "other/probe.ts", name: "other/probe.ts" }],
+    },
+  );
+
+  it("stays silent about an unreached file under the ignored directory", () => {
+    const findings = gitnexusIgnore.findings({
+      "src/main.ts": MAIN,
+      "src/reached.ts": REACHED,
+      ".gitnexus/probe.ts": "export const alone = 1;\n",
+    });
+
+    expect(findings).toEqual([]);
+  });
+
+  it("still names the same shape of unreached file under a directory the config does not name", () => {
+    const findings = gitnexusIgnore.findings({
+      "src/main.ts": MAIN,
+      "src/reached.ts": REACHED,
+      "other/probe.ts": "export const alone = 1;\n",
+    });
+
+    expect(namesOf(findings)).toEqual(["files:other/probe.ts:other/probe.ts"]);
   });
 });

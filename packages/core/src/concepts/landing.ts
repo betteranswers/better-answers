@@ -7,6 +7,7 @@ import {
   SUGGESTION_ACCEPTED_STATUS,
   SUGGESTION_REPAIR_KIND,
   SUGGESTION_WAITING_STATUS,
+  VERIFICATION_ERASURE_ORIGIN,
   VERIFICATION_REPAIR_ORIGIN,
 } from "@better-answers/schema";
 import type { z } from "zod";
@@ -17,12 +18,12 @@ import {
   visibilityOf,
   type Visibility,
 } from "../access/index.ts";
-import type { ActorId, Principal } from "../kernel/index.ts";
-import type { Committed } from "../store/git/index.ts";
+import type { ActorId, PlatformPrincipal, Principal } from "../kernel/index.ts";
+import { fileAt, type Committed, type GitDoor } from "../store/git/index.ts";
 import { recomputeCompositionsIncluding } from "../guides/index.ts";
 import { writeConceptDelta } from "../store/graph/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
-import type { Frontmatter, HashedSource } from "./file.ts";
+import { contentHashOf, parseConceptFile, type Frontmatter, type HashedSource } from "./file.ts";
 import { markDeciding } from "./inbox.ts";
 import type { Acceptance } from "./index.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
@@ -445,4 +446,151 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
       WHERE workspace_id = $1 AND iri = $2 AND content_hash IS NOT NULL`,
     [index.workspaceId, index.iri, index.contentHash, VERIFICATION_REPAIR_ORIGIN],
   );
+};
+
+/**
+ * Carry the bundle's commit rows onto a rewritten history: one pair per commit whose hash
+ * moved, old then new, as the git door's rewrite reported them.
+ *
+ * **This is the concepts slice's because `bundle_commit` is** (`packages/schema`'s ownership
+ * map). The erasure routine is what calls it — the one slice that sits at the top of the
+ * graph and may import another's face (ADR 0029 rule 4) — and it calls it rather than writing
+ * SQL of its own, so the table keeps one writer and a reviewer reading this file sees every
+ * statement that has ever moved a row in it.
+ *
+ * The platform principal, never a person's: a person's act adds a commit, and moving the rows
+ * under one is a routine the platform runs on a valid erasure request (ADR 0020).
+ *
+ * **One statement for the rows, because of the chain.** `bundle_commit.parent_sha` is a
+ * foreign key onto `bundle_commit.sha` in the same workspace, and it is not deferrable: a
+ * statement that moved the hashes and left the parents behind would break it the moment it
+ * ended. Both columns move in the one `UPDATE`, so the constraint is checked once, against a
+ * table that is whole again. The index row's key into the same table is a second statement and
+ * can be, because *that* constraint is deferred to the end of the transaction (migration 0015)
+ * — which is also why the caller must do both inside one.
+ *
+ * A commit the rewrite did not move is not in the pairs, and a pair naming a commit this
+ * workspace never recorded matches nothing. So a second run of the routine, which finds
+ * nothing to rewrite and therefore reports no pairs, moves no row at all.
+ */
+export const moveBundleCommits = async (
+  platform: PlatformPrincipal,
+  tx: Tx,
+  moved: readonly (readonly [string, string])[],
+): Promise<number> => {
+  if (moved.length === 0) return 0;
+  const before = moved.map(([old]) => old);
+  const after = moved.map(([, now]) => now);
+  const rows = await tx.query(
+    `WITH moved(before_sha, after_sha) AS (SELECT * FROM unnest($2::text[], $3::text[]))
+     UPDATE bundle_commit AS c
+        SET sha = COALESCE((SELECT m.after_sha FROM moved m WHERE m.before_sha = c.sha), c.sha),
+            parent_sha = COALESCE(
+              (SELECT m.after_sha FROM moved m WHERE m.before_sha = c.parent_sha),
+              c.parent_sha
+            )
+      WHERE c.workspace_id = ${scopeClause(1)}
+        AND (c.sha = ANY($2::text[]) OR c.parent_sha = ANY($2::text[]))`,
+    [scopeParameter(platform), before, after],
+  );
+  await tx.query(
+    `WITH moved(before_sha, after_sha) AS (SELECT * FROM unnest($2::text[], $3::text[]))
+     UPDATE concept_index AS i
+        SET commit_sha = m.after_sha
+       FROM moved m
+      WHERE i.workspace_id = ${scopeClause(1)} AND i.commit_sha = m.before_sha`,
+    [scopeParameter(platform), before, after],
+  );
+  return rows.rowCount ?? 0;
+};
+
+/** What the erasure's step 4 moved: index rows carried on, and checks re-pointed at them. */
+export type ChecksCarried = {
+  /** Index rows whose file the rewrite changed, and which now hold what the file holds. */
+  readonly concepts: number;
+  /** Checks re-pointed at the moved hash and marked with the origin that says why. */
+  readonly checks: number;
+};
+
+/** The index row this step reads back, and the file it claims to describe. */
+type RewrittenRow = {
+  readonly iri: string;
+  readonly path: string;
+  readonly commit_sha: string;
+  readonly content_hash: string;
+};
+
+/**
+ * **The checks the erasure rewrite moved** — the routine's step 4 (ADR 0019; ADR 0020; the S0
+ * spec, step 4). The paths are the ones the erasure map found the person in; for each, the file
+ * is read back from the commit its index row names and hashed again.
+ *
+ * **Most of the time nothing moves, and that is the design working.** A bundle names a person
+ * as `human:<address>` in `generated` and `verified[].by`, and ADR 0019 keeps both out of the
+ * content hash — a check must not move its own file's hash — so a rewrite that touches only
+ * those keys leaves every hash exactly where it was and this step correctly does nothing. What
+ * it is here for is the file that named the person inside the text the hash *is* taken over: a
+ * body that quoted an actor id, a cited resource that did. There the canonical text really
+ * changed, and without this step every standing check would read *Changed since checked* the
+ * moment the erasure committed — for a change nobody made to the fact.
+ *
+ * So two rows move together. The index row is carried onto what the file now says, because it
+ * is a copy of that file and an index still holding the address would be the erasure missing a
+ * store. And the checks over it are re-pointed at the new hash and marked **erasure-rewrite**,
+ * so the row still says who checked and when, and says that a routine moved its hash — the
+ * origin `VERIFICATION_REPAIR_ORIGIN`'s docblock names as its twin. An imported check carries
+ * no hash and is left exactly alone.
+ *
+ * **This is the concepts slice's because `concept_index` and `concept_verification` are**, as
+ * `moveBundleCommits` above is; the erasure routine calls it inside the transaction that moved
+ * the commits, rather than writing SQL of its own (ADR 0029 rule 4).
+ *
+ * A file the platform cannot read back is a throw and never a skip: the alternative is an index
+ * row and a bundle that disagree about a concept, with nothing anywhere saying so.
+ */
+export const carryChecksOntoRewrite = async (
+  platform: PlatformPrincipal,
+  tx: Tx,
+  door: GitDoor,
+  input: { readonly workspaceId: string; readonly paths: readonly string[] },
+): Promise<ChecksCarried> => {
+  if (input.paths.length === 0) return { concepts: 0, checks: 0 };
+  const indexed = await tx.query<RewrittenRow>(
+    `SELECT iri, path, commit_sha, content_hash
+       FROM concept_index
+      WHERE workspace_id = ${scopeClause(1)} AND path = ANY($2::text[])`,
+    [scopeParameter(platform), [...input.paths]],
+  );
+
+  let concepts = 0;
+  let checks = 0;
+  for (const row of indexed.rows) {
+    const content = await fileAt(platform, door, input.workspaceId, row.commit_sha, row.path);
+    // No file at the commit the row names, and **nothing else**: the door answers `null` only
+    // where it read that commit's tree and the path is not in it, and raises every other
+    // failure — a commit this bundle has never held, an object it could not hand back — so the
+    // rule this function's docblock states is kept at the door rather than guessed at here. The
+    // row describes a concept this bundle does not hold, which is the reconciler's to answer.
+    if (content === null) continue;
+    const read = parseConceptFile(content);
+    if (!read.ok) {
+      throw new Error(`concepts: the bundle holds a file the platform cannot read: ${row.path}`);
+    }
+    const contentHash = contentHashOf(read.value.frontmatter, read.value.body, row.path);
+    if (contentHash === row.content_hash) continue;
+
+    await tx.query(
+      `UPDATE concept_index SET frontmatter = $3, body = $4, content_hash = $5
+        WHERE workspace_id = ${scopeClause(1)} AND iri = $2`,
+      [scopeParameter(platform), row.iri, read.value.frontmatter, read.value.body, contentHash],
+    );
+    concepts += 1;
+    const moved = await tx.query(
+      `UPDATE concept_verification SET content_hash = $3, origin = $4
+        WHERE workspace_id = ${scopeClause(1)} AND iri = $2 AND content_hash IS NOT NULL`,
+      [scopeParameter(platform), row.iri, contentHash, VERIFICATION_ERASURE_ORIGIN],
+    );
+    checks += moved.rowCount ?? 0;
+  }
+  return { concepts, checks };
 };

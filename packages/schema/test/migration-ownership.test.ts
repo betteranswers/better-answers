@@ -1,6 +1,9 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import type { DrizzleSnapshotJSON } from "drizzle-kit/api";
+import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
+import { afterAll, describe, expect, it } from "vitest";
 
 import {
   AUDIENCE_CHECK,
@@ -9,7 +12,15 @@ import {
   SUGGESTION_KINDS_FROM_THE_APP,
   SUGGESTION_SET_MAX,
 } from "../src/index.ts";
-import { journalEntries, journalMigrationFiles } from "../src/journal.ts";
+import {
+  journalEntries,
+  journalMigrationFiles,
+  journalSnapshots,
+  journalSnapshotsIn,
+} from "../src/journal.ts";
+// The declarations as drizzle-kit's own `generate` reads them: the config names this module
+// and nothing else, so a table it does not reach is not generated (`drizzle.config.ts`).
+import * as declarations from "../src/schema.ts";
 
 /**
  * The one-journal rule's CI check (ADR 0032): Drizzle *generates* migrations for
@@ -51,6 +62,175 @@ describe("the migration journal", () => {
           .not.toMatch(forbidden);
       }
     }
+  });
+});
+
+/**
+ * **The other half of `meta/`.** The journal names a `.sql` file per entry, held above, and
+ * drizzle-kit writes a second file per entry beside it — `meta/<idx>_snapshot.json`, the
+ * schema as it stood after that migration, each one pointing back at the one before through
+ * `prevId`. That chain is what the next `generate` diffs against, so a snapshot that is not
+ * there or a link that points at the wrong id makes the next generated migration wrong in a
+ * way no test read until now: the journal and its directory were held against each other,
+ * and `meta/` was never opened.
+ *
+ * The four breaks below are provoked over a **copy** of `meta/` in a throwaway directory,
+ * never the tracked one. A test that deletes a tracked snapshot to watch a checker refuse it
+ * has left the repository broken for every other suite in the run, and this package's suites
+ * run in parallel workers against the same tree. The copy is this case's own, and the expected
+ * refusal is spelled here rather than read back out of the copy, so a checker that returned
+ * the folder's own state would still be caught.
+ */
+
+/** A well-formed id that is not any snapshot's, for a planted link to point at. */
+const NOT_THE_ONE_BEFORE = "11111111-1111-1111-1111-111111111111";
+const trees = mkdtempSync(path.join(tmpdir(), "journal-meta-"));
+let copies = 0;
+
+afterAll(() => rmSync(trees, { recursive: true, force: true }));
+
+/** A fresh copy of the tracked `meta/`, for one case to break however it needs to. */
+const aCopyOfMeta = (): string => {
+  const source = path.join(path.dirname(journalMigrationFiles()[0] ?? ""), "meta");
+  const destination = path.join(trees, `meta-${String(++copies)}`);
+  cpSync(source, destination, { recursive: true });
+  return destination;
+};
+
+/**
+ * A copy whose named snapshot has been made to point at an id no snapshot has. Only `prevId`
+ * moves: the schema the file carries is left as it was, so what the checker refuses is the
+ * link and not a file it could not read.
+ */
+const aCopyWithAPlantedLink = (snapshotName: string): string => {
+  const meta = aCopyOfMeta();
+  const snapshot = path.join(meta, snapshotName);
+  const planted = JSON.parse(readFileSync(snapshot, "utf8")) as Record<string, unknown>;
+  writeFileSync(snapshot, JSON.stringify({ ...planted, prevId: NOT_THE_ONE_BEFORE }));
+  return meta;
+};
+
+describe("the journal's meta folder", () => {
+  it("has a snapshot for every entry, an entry for every snapshot, and one chain through them", () => {
+    const read = journalSnapshots();
+
+    // The refusal is the failure message. An assertion on `ok` alone would read `false`,
+    // where the folder's own answer names the file somebody has to open.
+    expect(read.ok || read.error).toBe(true);
+    expect(read.ok && read.value.at(0)).toBe("0000_snapshot.json");
+  });
+
+  it("refuses a journal entry whose snapshot is not in the folder", () => {
+    const meta = aCopyOfMeta();
+    rmSync(path.join(meta, "0001_snapshot.json"));
+
+    expect(journalSnapshotsIn(meta)).toEqual({
+      ok: false,
+      // The tag is the journal's own word for the migration, which is what a reader needs to
+      // find the entry; no migration can renumber this one.
+      error: { kind: "snapshot-missing", tag: "0001_first-tables", snapshot: "0001_snapshot.json" },
+    });
+  });
+
+  it("refuses a snapshot the journal does not name", () => {
+    // The other direction. One direction finds the snapshot a migration never got; only this
+    // one finds the snapshot left behind by a migration that was renamed or dropped, which
+    // the next `generate` may well diff against.
+    const meta = aCopyOfMeta();
+    writeFileSync(path.join(meta, "9999_snapshot.json"), "{}");
+
+    expect(journalSnapshotsIn(meta)).toEqual({
+      ok: false,
+      error: { kind: "snapshot-orphaned", snapshot: "9999_snapshot.json" },
+    });
+  });
+
+  it("refuses a snapshot whose prevId is not the id of the snapshot before it", () => {
+    // Membership alone would pass a folder whose snapshots are all present and in the wrong
+    // order, or one carrying a snapshot taken from another branch: the chain is what says
+    // these files are one history rather than a set of files with matching names.
+    expect(journalSnapshotsIn(aCopyWithAPlantedLink("0001_snapshot.json"))).toEqual({
+      ok: false,
+      error: { kind: "chain-broken", earlier: "0000_snapshot.json", later: "0001_snapshot.json" },
+    });
+  });
+
+  it("refuses a first snapshot that points at something rather than at nothing", () => {
+    // The chain's root. Every link after this one is checked against the snapshot before it,
+    // so nothing but this holds the head: a first snapshot pointing at an id would make the
+    // whole folder the tail of a history this repository does not have.
+    expect(journalSnapshotsIn(aCopyWithAPlantedLink("0000_snapshot.json"))).toEqual({
+      ok: false,
+      error: { kind: "chain-unrooted", snapshot: "0000_snapshot.json" },
+    });
+  });
+});
+
+/**
+ * **The declarations against the DDL beneath them.** Everything above reads files the journal
+ * already holds and holds them against each other; none of it opens `src/`, which is where the
+ * one drift this repository has actually had lived. `account.updated_at` carried `.defaultNow()`
+ * in its declaration from T-004 and no migration ever landed the `DEFAULT now()`, so every
+ * `drizzle-kit generate` run for thirty-three migrations proposed the same `ALTER` and four
+ * T-120 iterations stripped it from a family's migration by hand — while this suite and the
+ * worker-view drift suite stayed green the whole time, because neither compares a declaration
+ * to the DDL. T-138 landed the migration; this is what stops the next such gap standing open
+ * as long as that one did.
+ *
+ * It is `generate`'s own arithmetic rather than a re-implementation of it, run in-process
+ * through `drizzle-kit/api`: the declarations become a snapshot, that snapshot is diffed
+ * against the newest one in `meta/`, and a tree with nothing left to propose is an empty list
+ * of statements. No Postgres and no child process — `generate` is offline, which is why
+ * `drizzle.config.ts` carries no `dbCredentials`.
+ *
+ * The second case is what makes the first one mean something. A checker pointed at the wrong
+ * module, or diffing a snapshot against itself, answers "nothing to propose" for every tree
+ * there is; so the differ is handed the newest snapshot minus a single column default and read
+ * back for the one statement that restores it — which is `0033`'s whole body, word for word.
+ */
+
+/** `0033_the-account-timestamp-default.sql` in full, spelled here rather than read from it. */
+const THE_ALTER_THAT_LANDED_THE_DEFAULT =
+  'ALTER TABLE "account" ALTER COLUMN "updated_at" SET DEFAULT now();';
+
+/** Where the snapshots sit: beside the migrations the journal names. */
+const theMetaFolder = path.join(path.dirname(journalMigrationFiles()[0] ?? ""), "meta");
+
+/**
+ * The snapshot of the newest migration, taken from the journal's own walk rather than by naming
+ * a tag, so the migration after this one needs no edit here. `journalSnapshots` answers them in
+ * the journal's order, and the last of them is the schema as the last migration left it.
+ */
+const theNewestSnapshot = (): DrizzleSnapshotJSON => {
+  const walked = journalSnapshots();
+  const newest = walked.ok ? walked.value.at(-1) : undefined;
+  if (newest === undefined) throw new Error("there is no newest snapshot to diff against");
+  return JSON.parse(readFileSync(path.join(theMetaFolder, newest), "utf8")) as DrizzleSnapshotJSON;
+};
+
+/** The declarations as a snapshot, filtered to `public` as the config filters them. */
+const theDeclarations = (prevId: string): DrizzleSnapshotJSON =>
+  generateDrizzleJson(declarations, prevId, ["public"]);
+
+describe("the declarations and the DDL generated from them", () => {
+  it("leaves a generate run on this tree with nothing to propose", async () => {
+    const newest = theNewestSnapshot();
+
+    expect(await generateMigration(newest, theDeclarations(newest.id))).toEqual([]);
+  });
+
+  it("proposes the ALTER when a default is in the declarations and not in the DDL", async () => {
+    // T-138's own drift, staged back: the newest snapshot with `account.updated_at`'s default
+    // taken out of it is what `meta/` held for thirty-three migrations, and the statement below
+    // is what `generate` proposed on every one of those runs.
+    const before = structuredClone(theNewestSnapshot());
+    const column = before.tables["public.account"]?.columns["updated_at"];
+    if (column === undefined) throw new Error("account.updated_at is not in the newest snapshot");
+    delete column.default;
+
+    expect(await generateMigration(before, theDeclarations(before.id))).toEqual([
+      THE_ALTER_THAT_LANDED_THE_DEFAULT,
+    ]);
   });
 });
 

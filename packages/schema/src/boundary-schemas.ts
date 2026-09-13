@@ -31,6 +31,21 @@ import {
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import {
+  erasureRequest,
+  SUBJECT_IDENTIFIER_KINDS,
+  SUBJECT_IDENTIFIER_MAX,
+  SUBJECT_IDENTIFIERS_MAX,
+  SUBJECT_REQUEST_KINDS,
+  subjectRequest,
+  suppression,
+} from "./erasure-tables.ts";
+import {
+  finding,
+  FINDING_REASON_MAX,
+  FINDING_REVIEW_STATES,
+  REDACTION_TIERS,
+} from "./finding-tables.ts";
+import {
   GRAPH_EDGE_LABELS,
   GRAPH_NODE_LABELS,
   graphEdge,
@@ -60,7 +75,7 @@ import {
 import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { ROLES } from "./roles.ts";
 import { llmRoute, workspaceConfig } from "./schema.ts";
-import { sourceBinding, sourceDocument } from "./source-tables.ts";
+import { RULES_IN_FORCE_KEYS, sourceBinding, sourceDocument } from "./source-tables.ts";
 import {
   conceptWriteRequest,
   suggestion,
@@ -133,6 +148,11 @@ const llmRouteRefinements = {
   provider: (schema: z.ZodString) => schema.trim().min(1),
   model: (schema: z.ZodString) => schema.trim().min(1),
   dimensions: (schema: z.ZodNumber) => schema.int().positive(),
+  // The retention tail is the provider's own sentence, so it is held to being a sentence and
+  // nothing more: a DPIA that printed whitespace would be a document saying nothing where it
+  // has to say what the processor keeps. It stays nullable — a route nobody has read the
+  // provider's terms for has no tail, and that is a different fact from a tail of nothing.
+  retentionTail: (schema: z.ZodString) => schema.trim().min(1),
 };
 
 export const llmRouteSelect = createSelectSchema(llmRoute, llmRouteRefinements);
@@ -591,13 +611,48 @@ export const conceptClassOverrideUpdate = createUpdateSchema(
 );
 
 /**
+ * What a binding's **rules in force** may hold: the two switchable tiers, both of them, each
+ * a boolean, and nothing else. The narrowing is `outcome`'s and the identifier set's — the
+ * callback and the `.pipe()` over the generated column schema — and the reason is the seam's:
+ * this value is the argument the redaction seam runs on, so a key the seam has never heard of
+ * would be a rule a person believes they set and nothing reads.
+ *
+ * Strict, and every key required. A tier that arrived unannounced would be switched off by
+ * whatever the seam does with a key it does not know, and a tier left out would be a binding
+ * whose answer to *is this withheld?* is undefined — which is why the column's default states
+ * the safe set rather than leaving it to be filled in later. A third tier is a word added to
+ * `RULES_IN_FORCE_KEYS`, a migration and a rule in the seam, never a key in somebody's
+ * `jsonb`; the keys are read off the constant so the default, the table's CHECK and this
+ * schema cannot drift apart.
+ *
+ * JSON `null` stays accepted here for the reason `detail`'s and `identifiers`' do — `jsonb
+ * NOT NULL` refuses SQL NULL and not the JSON value, and assertion 3 holds a refinement to
+ * the column's own nullability. The table's `source_binding_rules_in_force_check` refuses it
+ * one layer down, because a binding whose rules are the JSON null withholds by no rule at all.
+ */
+const rulesInForce = z.union([
+  // SAFETY: the entries are built by mapping `RULES_IN_FORCE_KEYS` itself, so the keys are
+  // exactly that tuple's members and each value is the one boolean schema;
+  // `Object.fromEntries` is what loses that on the way out, not the code that feeds it.
+  z.strictObject(
+    Object.fromEntries(RULES_IN_FORCE_KEYS.map((key) => [key, z.boolean()])) as Record<
+      (typeof RULES_IN_FORCE_KEYS)[number],
+      z.ZodBoolean
+    >,
+  ),
+  z.null(),
+]);
+
+/**
  * A source binding as the derivation reads it (ADR 0013, ADR 0039): the three visibility
- * columns narrowed as every readable unit's are, its id the minter's shape.
+ * columns narrowed as every readable unit's are, its id the minter's shape, and the rules in
+ * force the bounded shape above (ADR 0020).
  */
 const sourceBindingRefinements = {
   workspaceId,
   id: bindingId,
   ...readableUnit,
+  rulesInForce: (schema: z.ZodType) => schema.pipe(rulesInForce),
 };
 
 export const sourceBindingSelect = createSelectSchema(sourceBinding, sourceBindingRefinements);
@@ -617,6 +672,149 @@ const sourceDocumentRefinements = {
 export const sourceDocumentSelect = createSelectSchema(sourceDocument, sourceDocumentRefinements);
 export const sourceDocumentInsert = createInsertSchema(sourceDocument, sourceDocumentRefinements);
 export const sourceDocumentUpdate = createUpdateSchema(sourceDocument, sourceDocumentRefinements);
+
+/**
+ * A **finding** (ADR 0020): a span the seam withheld, located and never quoted. The document
+ * is narrowed exactly as `evidence.source_document_id` is; the two closed word sets are the
+ * boundary's to narrow; the offsets are whole numbers and the score is the detector's own
+ * range; and the two actors are the ledger's own actor shape, so whoever reviewed and
+ * whoever restored read here as they do on the audit row that records the act.
+ *
+ * The category is held to being non-empty and nothing more, on purpose: which categories
+ * exist is the `redaction` agreement's, which nothing imports (ADR 0031), and a second copy
+ * of the list here would be a second thing to bump when a rule lands.
+ */
+const findingRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  documentId: (schema: z.ZodString) => schema.trim().min(1),
+  category: (schema: z.ZodString) => schema.trim().min(1),
+  tier: (schema: z.ZodString) => schema.pipe(z.enum(REDACTION_TIERS)),
+  ruleId: (schema: z.ZodString) => schema.trim().min(1),
+  charStart: (schema: z.ZodNumber) => schema.int().nonnegative(),
+  charEnd: (schema: z.ZodNumber) => schema.int().positive(),
+  score: (schema: z.ZodNumber) => schema.min(0).max(1),
+  ruleVersion: (schema: z.ZodString) => schema.trim().min(1),
+  detectorPin: (schema: z.ZodString) => schema.trim().min(1),
+  reviewState: (schema: z.ZodString) => schema.pipe(z.enum(FINDING_REVIEW_STATES)),
+  reviewedBy: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
+  reviewReason: (schema: z.ZodString) => schema.trim().min(1).max(FINDING_REASON_MAX),
+  restoredBy: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
+  restoreReason: (schema: z.ZodString) => schema.trim().min(1).max(FINDING_REASON_MAX),
+};
+
+export const findingSelect = createSelectSchema(finding, findingRefinements);
+export const findingInsert = createInsertSchema(finding, findingRefinements);
+export const findingUpdate = createUpdateSchema(finding, findingRefinements);
+
+/**
+ * What a **subject request's identifier set** may hold: three lists of identifiers, one per
+ * kind, and nothing else. The shape is the narrowing, exactly as `outcome`'s is — but the
+ * reason is the other way round. An outcome is bounded so a person's details cannot get in;
+ * this column is where a person's details are the point, so it is bounded so that the words
+ * a subject gave cannot arrive as a shape no finder can walk and no bound can measure.
+ *
+ * Strict, so a fourth kind of identifier is a word added to `SUBJECT_IDENTIFIER_KINDS` and a
+ * finder written for it, never a key that arrives in somebody's `jsonb` and is silently
+ * never searched. All three kinds are required for the same reason: a finder reads its own
+ * arm without asking whether it is there. The keys are read off the constant so the closed
+ * list, the CHECK the table carries and this schema cannot drift apart.
+ *
+ * JSON `null` stays accepted for the same reason `detail`'s does — `jsonb NOT NULL` refuses
+ * SQL NULL, not the JSON value, and the parity suite holds a refinement to the column's own
+ * nullability. It is the one way off the shape this schema does not refuse, and the table's
+ * `subject_request_identifiers_check` refuses it there instead, because a request whose
+ * identifier set is the JSON null names nobody.
+ */
+const subjectIdentifier = z.string().trim().min(1).max(SUBJECT_IDENTIFIER_MAX);
+const subjectIdentifierList = z.array(subjectIdentifier).max(SUBJECT_IDENTIFIERS_MAX);
+const subjectIdentifiers = z.union([
+  // SAFETY: the entries are built by mapping `SUBJECT_IDENTIFIER_KINDS` itself, so the keys
+  // are exactly that tuple's members and each value is the one list schema above;
+  // `Object.fromEntries` is what loses that on the way out, not the code that feeds it.
+  z.strictObject(
+    Object.fromEntries(
+      SUBJECT_IDENTIFIER_KINDS.map((kind) => [kind, subjectIdentifierList]),
+    ) as Record<(typeof SUBJECT_IDENTIFIER_KINDS)[number], typeof subjectIdentifierList>,
+  ),
+  z.null(),
+]);
+
+/**
+ * A **subject request** (ADR 0020, ADR 0035): the id is the minter's shape, the kind is the
+ * closed pair, and the person id — where the subject has one — is the one person id and
+ * never an address. The identifier set is the bounded shape above.
+ *
+ * `person_id` is narrowed and stays nullable, which is the whole of candidate 2 of the
+ * architecture pass: a member is named by id, and a person the company's files name who
+ * never signed in is named by the set alone. The answer is held to being non-empty and
+ * nothing more — it is the platform's own document, not a stranger's field.
+ */
+const subjectRequestRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  kind: (schema: z.ZodString) => schema.pipe(z.enum(SUBJECT_REQUEST_KINDS)),
+  personId: (schema: z.ZodString) => schema.regex(ULID),
+  identifiers: (schema: z.ZodType) => schema.pipe(subjectIdentifiers),
+  answer: (schema: z.ZodString) => schema.trim().min(1),
+};
+
+export const subjectRequestSelect = createSelectSchema(subjectRequest, subjectRequestRefinements);
+export const subjectRequestInsert = createInsertSchema(subjectRequest, subjectRequestRefinements);
+export const subjectRequestUpdate = createUpdateSchema(subjectRequest, subjectRequestRefinements);
+
+/**
+ * What an **erasure request's actions** may hold: one flat object per store family — what
+ * was done there and how it went. The narrowing is `outcome`'s and so is the reason: this is
+ * a record of what the routine did about a person, and a shape with nowhere nested to hide
+ * would have to be rewritten by the next erasure if a name could reach it. The family names
+ * are the erasure map's, held to being strings and nothing more, because the typed union
+ * that lists them is the slice's and a second copy here would be a second place to change.
+ *
+ * JSON `null` stays accepted for the reason `detail`'s does; the table's own CHECK is what
+ * refuses it, since a routine's record written as `null` is no record at all.
+ */
+const erasureAction = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const erasureActions = z.union([
+  z.record(z.string(), z.record(z.string(), erasureAction)),
+  z.null(),
+]);
+
+/**
+ * An **erasure request** (ADR 0020, ADR 0035): the id and the subject request it answers are
+ * the minter's shape, and so is the *erasure pseudonym* — the one value a rewritten history
+ * is joined on, which a hand-composed id would make un-undoable. The report is held to being
+ * non-empty and nothing more: it is a document in fixed words, not a field.
+ */
+const erasureRequestRefinements = {
+  workspaceId,
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  subjectRequestId: (schema: z.ZodString) => schema.regex(ULID),
+  pseudonym: (schema: z.ZodString) => schema.regex(ULID),
+  actions: (schema: z.ZodType) => schema.pipe(erasureActions),
+  report: (schema: z.ZodString) => schema.trim().min(1),
+};
+
+export const erasureRequestSelect = createSelectSchema(erasureRequest, erasureRequestRefinements);
+export const erasureRequestInsert = createInsertSchema(erasureRequest, erasureRequestRefinements);
+export const erasureRequestUpdate = createUpdateSchema(erasureRequest, erasureRequestRefinements);
+
+/**
+ * A **suppression** (ADR 0020): the routine it was written by and the document it stands over
+ * are the minter's shape and the document's own, and the identifiers are the request's set —
+ * the same bounded shape, because this row is a copy of it and a second narrowing would be a
+ * second thing the reprocess could disagree with.
+ */
+const suppressionRefinements = {
+  workspaceId,
+  erasureRequestId: (schema: z.ZodString) => schema.regex(ULID),
+  documentId: (schema: z.ZodString) => schema.trim().min(1),
+  identifiers: (schema: z.ZodType) => schema.pipe(subjectIdentifiers),
+};
+
+export const suppressionSelect = createSelectSchema(suppression, suppressionRefinements);
+export const suppressionInsert = createInsertSchema(suppression, suppressionRefinements);
+export const suppressionUpdate = createUpdateSchema(suppression, suppressionRefinements);
 
 /** A composition (ADR 0004, ADR 0015): a readable unit, its id the minter's shape. */
 const compositionRefinements = {
@@ -1006,6 +1204,30 @@ export const boundarySchemas = {
     select: sourceDocumentSelect,
     insert: sourceDocumentInsert,
     update: sourceDocumentUpdate,
+  },
+  finding: {
+    table: finding,
+    select: findingSelect,
+    insert: findingInsert,
+    update: findingUpdate,
+  },
+  subjectRequest: {
+    table: subjectRequest,
+    select: subjectRequestSelect,
+    insert: subjectRequestInsert,
+    update: subjectRequestUpdate,
+  },
+  erasureRequest: {
+    table: erasureRequest,
+    select: erasureRequestSelect,
+    insert: erasureRequestInsert,
+    update: erasureRequestUpdate,
+  },
+  suppression: {
+    table: suppression,
+    select: suppressionSelect,
+    insert: suppressionInsert,
+    update: suppressionUpdate,
   },
   composition: {
     table: composition,

@@ -15,6 +15,32 @@ dependencies = [
     # so it belongs to what the image ships.
     "psycopg[binary]==3.3.5",
     "structlog>=26.1.0",
+    # The redaction seam's detector (ADR 0020). Presidio is the frame — the registry that
+    # runs the recognisers, the context enhancer and the anonymizer that writes the
+    # placeholders — and its `gliner` extra is what lets a GLiNER model stand in as the
+    # NER. Both halves move together, so both carry the same pin. Versions read from
+    # PyPI's release metadata on 11/09/2026; MIT, which is the arm this repository takes
+    # (ADR 0027).
+    "presidio-analyzer[gliner]==2.2.364",
+    "presidio-anonymizer==2.2.364",
+    # Named here as well as reached through the extra above: the library that decides what
+    # a name or an address is belongs to a version this repository pins itself, and the
+    # extra's own range would let it move underneath the recall the fixture proves. Read
+    # from PyPI on 11/09/2026; Apache-2.0.
+    "gliner==0.2.29",
+    # Tokenisation and lemmas only — the seam removes spaCy's own NER recogniser and keeps
+    # the pipeline for the lemmas Presidio's context enhancer boosts on. Read from PyPI on
+    # 11/09/2026; MIT.
+    "spacy==3.8.16",
+    # The English pipeline spaCy loads. Explosion publishes it as a GitHub release asset
+    # and not to PyPI, so the URL under `tool.uv.sources` is its pin and there is no
+    # version to write here. 3.8.0 is the newest English pipeline on that repository's
+    # releases, read on 11/09/2026; MIT.
+    "en-core-web-sm",
+    # GLiNER's tensor runtime, pinned directly so `tool.uv.sources` can send Linux to the
+    # CPU wheel index below. Version read from PyPI on 11/09/2026 and resolved out of
+    # PyTorch's own CPU channel for Linux, which carries the same release as `+cpu`.
+    "torch==2.14.0",
 ]
 
 [project.scripts]
@@ -40,6 +66,22 @@ build-backend = "uv_build"
 module-name = "better_answers_worker"
 module-root = "src"
 
+# PyTorch's CPU wheel channel, reached only by what `tool.uv.sources` sends here
+# (`explicit`), so nothing else in the tree resolves out of it by accident.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+# Linux takes the `+cpu` build; macOS arm64 takes PyPI's wheel, which is CPU-only already.
+# The detector runs on the CPU by design (ADR 0020), so the CUDA runtime in PyPI's Linux
+# wheel is two gigabytes of the worker image that nothing in this estate would ever call.
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+# The spaCy pipeline is a release asset, not a PyPI package, so the download URL is the
+# pin and the lock records its hash.
+en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
+
 [tool.ruff]
 target-version = "py313"
 src = ["src", "tests"]
@@ -53,6 +95,11 @@ select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20", 
 # replaced behind its adapter with an in-memory implementation.
 "unittest.mock".msg = "our own code is never mocked; replace the external service behind its adapter"
 "mock".msg = "our own code is never mocked; replace the external service behind its adapter"
+# The redaction seam is a plain function of its arguments, and a cocoindex type crossing
+# into it would make it one only cocoindex could call. The whole tier is banned so that
+# the one module allowed to compose the engine has to declare itself: the pipeline module
+# lifts this ban for its own directory by a per-file ignore when it lands (ADR 0036).
+"cocoindex".msg = "only the pipeline module composes cocoindex, and it lifts this ban by a per-file ignore; a cocoindex type never crosses a module seam"
 
 [tool.ruff.lint.per-file-ignores]
 # The check runner is a script; it is the one place print-shaped output is allowed,
@@ -63,6 +110,20 @@ select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20", 
 python_version = "3.13"
 strict = true
 files = ["src", "tests"]
+
+# The detector's libraries ship no type information, so an import of one is an error under
+# strict mode before a line of ours is read. The overrides are per module and name only
+# what the seam imports: strict stays on over everything this repository wrote, and a
+# value that arrives from one of these is narrowed on the statement after it arrives
+# rather than carried as `Any`. A wildcard here would silence our own code too.
+[[tool.mypy.overrides]]
+module = [
+    "presidio_analyzer.*",
+    "presidio_anonymizer.*",
+    "gliner.*",
+    "spacy.*",
+]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

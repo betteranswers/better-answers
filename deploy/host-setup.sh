@@ -104,6 +104,9 @@ BACKUP_MIRROR_BUCKET=
 BACKUP_AGE_IDENTITY_FILE=/etc/better-answers/backup-age.key
 STAGING_OBJECTSTORE_ROOT_KEY=
 STAGING_OBJECTSTORE_ROOT_SECRET=
+# The platform's bucket inside the staging Garage: the drill creates it and the api reads it, so it
+# must equal S3_BUCKET in staging.env. The one value here that carries a default.
+STAGING_S3_BUCKET=better-answers
 # psql against PRODUCTION over the SSH connection this box already holds — no Postgres port is open (ticket 79 A12).
 # The container is named by the Coolify DATABASE RESOURCE'S UUID, not the resource's display
 # name (first deploy, 04/09/2026): read it with `docker ps` on VPC 1 and replace the placeholder.

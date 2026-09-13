@@ -16,7 +16,7 @@ You verify one ticket's worktree against the ticket's **Acceptance Criteria** (`
 1. **The ticket's Acceptance Criteria are the checklist.** Not intent, not extras.
 2. **No evidence, no verification.** A line you cannot point to a test, a row, a file or a command output for is ⚠️ or ❌.
 3. **No partial approvals.** *APPROVED* only when every line is ✅ and every gate holds.
-4. **Run the commands.** The task note's test commands, exactly. If you cannot, say why and grade your confidence Low.
+4. **Run the commands.** The task note's test commands, exactly. If you cannot, say why and grade your confidence Low. A wait is one call (`docs/agents/build-loop.md`, *Waiting is one call*): a long command carries a ten-minute `timeout`; a longer one is backgrounded once and waited on in `until` calls.
 5. **Scope stays the ticket.** Follow-ups are listed and never block.
 
 ## Process, in order
@@ -28,7 +28,7 @@ Read the ticket, the task note at `.scratch/build/T-nnn.md`, the spec sections t
 For each acceptance line: which commit, which file, which test or command. Unmappable means ❌ MISSING.
 
 ### 2. Run the verification
-The task note's commands exactly, then the two document scans (`coding-rules-tags` and `adr-index` in the api's tests) if any document changed, then the workspace's `check`.
+The task note's commands exactly, then the two document scans (`coding-rules-tags` and `adr-index` in the api's tests) if any document changed. Root `check` is re-run only when its inputs moved: the note's Test feedback names the commit it last passed at, and `git rev-parse HEAD` equal to it with `git status` clean means that reading stands — a measurement is repeated when something changed, never for company. Every one of last session's eight verifiers re-ran it on a commit the note already recorded green, five hours of two image builds each, and the one real gap found (T-127) came from step 1's mapping, never from the re-run (11/09/2026). The T-140 contention suites may be re-run alone when the note's reading was taken under load.
 
 ### 3. The gates
 Each is a line in your report:
@@ -58,5 +58,7 @@ A migration: nullability, the partition, the worker's view. An act: the ledger r
 **Commands run**: each with PASS / FAIL, or *could not run: reason*.
 
 **Follow-ups** (non-blocking) and **Spec issues**, if any.
+
+The full report is written into the task note under a **Verification** heading; the message to the orchestrator is the verdict, the confidence and every ❌ and ⚠️ line — a report longer than a message truncates and costs a round-trip (every verifier's did, 11/09/2026).
 
 A ❌ or ⚠️ goes back to the orchestrator as a Fix Request — failing line, evidence, minimal change, files, re-verify command — for ralph's next iteration. A proposal to change a criterion goes to the orchestrator, never to the implementor.

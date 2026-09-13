@@ -29,16 +29,18 @@ import { afterAll, describe, expect, it } from "vitest";
  *
  * A `git worktree add` checks out tracked files only, and the agent tooling this repository
  * runs on is installed and ignored (ADR 0027): `.agents/skills/`, the symlinks under
- * `.claude/skills/` that point into it, the plugin skills that live there directly, and
- * `tasks/AGENTS.md`. `.claude/hooks/provision-skills.sh` copies them from the primary
- * checkout — the one `git rev-parse --git-common-dir` names — and is the stage
- * `provision-worktree.sh` runs after the installs. It is run here rather than read, because
+ * `.claude/skills/` that point into it, the plugin skills that live there directly, the
+ * skills each workspace keeps beside its own code (`apps/api/.claude/skills/` and its
+ * siblings, the tier's skills `build-loop.md` names), and `tasks/AGENTS.md`.
+ * `.claude/hooks/provision-skills.sh` copies them from the primary checkout — the one
+ * `git rev-parse --git-common-dir` names — and is the stage `provision-worktree.sh` runs
+ * after the installs. It is run here rather than read, because
  * everything it promises is about a filesystem: what was copied, what was left alone, and
  * whether a link that was right in one tree is still right in the other.
  *
  * The primary checkout is a throwaway git repository shaped like this one where it matters:
- * one skill tracked under `.claude/skills/`, the rest installed and ignored. Nothing here
- * touches the real checkout or its worktrees.
+ * one skill tracked under `.claude/skills/`, the rest installed and ignored, two of them under
+ * a workspace's own `.claude/skills/`. Nothing here touches the real checkout or its worktrees.
  *
  * The tree is not the runner's flat record of file contents run by a package's binary: this
  * tool is a repository script, and what it is proved over is a git repository with a worktree
@@ -56,21 +58,33 @@ afterAll(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-/** A relative symlink from `.claude/skills/<name>` into `.agents/skills/<name>`. */
-const linkSkill = (root: string, name: string, target = `../../.agents/skills/${name}`): void => {
-  mkdirSync(path.join(root, ".claude/skills"), { recursive: true });
-  symlinkSync(target, path.join(root, ".claude/skills", name));
+/**
+ * A relative symlink from `<under>/<name>` into `.agents/skills/<name>` — `under` is the
+ * root's `.claude/skills` unless a workspace's is named, whose links climb two levels more.
+ */
+const linkSkill = (
+  root: string,
+  name: string,
+  target = `../../.agents/skills/${name}`,
+  under = ".claude/skills",
+): void => {
+  mkdirSync(path.join(root, under), { recursive: true });
+  symlinkSync(target, path.join(root, under, name));
 };
 
 const IGNORE = [
   ".claude/skills/*",
   "!.claude/skills/browser-suite/",
+  "apps/*/.claude/skills/*",
   ".agents/",
   "tasks/AGENTS.md",
   "",
 ].join("\n");
 
 const TRACKED_SKILL = "# browser-suite\n\nThe one skill this repository wrote.\n";
+/** Two skills a workspace keeps beside its code, installed and ignored like the root's. */
+const API_SKILL = "# trpc-router — the api's, co-located\n";
+const WORKER_SKILL = "# cocoindex — the worker's, co-located\n";
 
 /**
  * A primary checkout: one commit holding the tracked skill, the ignore block and the
@@ -89,6 +103,9 @@ const primaryCheckout = (name: string, installed: boolean): string => {
     linkSkill(root, "hono");
     linkSkill(root, "auth");
     write(root, ".claude/skills/gitnexus/SKILL.md", "# gitnexus — a plugin install\n");
+    write(root, "apps/api/.claude/skills/trpc-router/SKILL.md", API_SKILL);
+    linkSkill(root, "hono", "../../../../.agents/skills/hono", "apps/api/.claude/skills");
+    write(root, "apps/worker/.claude/skills/cocoindex/SKILL.md", WORKER_SKILL);
     write(root, "tasks/AGENTS.md", "# ordna\n");
   }
   return root;
@@ -173,6 +190,40 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
     expect(isSymlink(path.join(worktree, ".claude/skills/guide"))).toBe(true);
   });
 
+  it("copies each workspace's co-located skills too, a link among them resolving inside the worktree", () => {
+    const primary = primaryCheckout("workspaces-primary", true);
+    const worktree = worktreeOf(primary, "workspaces-worktree");
+    expect(existsSync(path.join(worktree, "apps/api/.claude/skills"))).toBe(false);
+
+    const run = provision(worktree);
+
+    ready(run);
+    expect(
+      readFileSync(path.join(worktree, "apps/api/.claude/skills/trpc-router/SKILL.md"), "utf8"),
+    ).toBe(API_SKILL);
+    expect(
+      readFileSync(path.join(worktree, "apps/worker/.claude/skills/cocoindex/SKILL.md"), "utf8"),
+    ).toBe(WORKER_SKILL);
+    const link = path.join(worktree, "apps/api/.claude/skills/hono");
+    expect(isSymlink(link)).toBe(true);
+    expect(readlinkSync(link)).toBe("../../../../.agents/skills/hono");
+    const resolved = realpathSync(link);
+    expect(resolved.startsWith(realpathSync(worktree) + path.sep)).toBe(true);
+    expect(resolved.startsWith(realpathSync(primary) + path.sep)).toBe(false);
+  });
+
+  it("fails, naming the link, when a workspace's skill link dangles", () => {
+    const primary = primaryCheckout("workspace-dangling-primary", true);
+    // The root's link shape, two levels short from a workspace: it reaches nothing there.
+    linkSkill(primary, "gone", "../../.agents/skills/gone", "apps/web/.claude/skills");
+    const worktree = worktreeOf(primary, "workspace-dangling-worktree");
+
+    const run = provision(worktree);
+
+    expect(run.status).not.toBe(0);
+    expect(run.stderr).toContain("apps/web/.claude/skills/gone");
+  });
+
   it("never overwrites what the checkout already carries", () => {
     const primary = primaryCheckout("tracked-primary", true);
     const worktree = worktreeOf(primary, "tracked-worktree");
@@ -185,6 +236,30 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
     expect(readFileSync(path.join(worktree, ".claude/skills/browser-suite/SKILL.md"), "utf8")).toBe(
       TRACKED_SKILL,
     );
+  });
+
+  it("carries a skill installed in the primary after the worktree was provisioned", () => {
+    const primary = primaryCheckout("later-primary", true);
+    const worktree = worktreeOf(primary, "later-worktree");
+    ready(provision(worktree));
+    // Installed on the primary afterwards: a new skill and its link, at the root and in a
+    // workspace. The worktree's `.agents` is already there, so a copy of it whole would skip both.
+    write(primary, ".agents/skills/later/SKILL.md", "# later\n");
+    linkSkill(primary, "later");
+    linkSkill(primary, "later-too", "../../../../.agents/skills/later", "apps/web/.claude/skills");
+
+    const run = provision(worktree);
+
+    ready(run);
+    expect(readFileSync(path.join(worktree, ".agents/skills/later/SKILL.md"), "utf8")).toBe(
+      "# later\n",
+    );
+    expect(readFileSync(path.join(worktree, ".claude/skills/later/SKILL.md"), "utf8")).toBe(
+      "# later\n",
+    );
+    expect(
+      readFileSync(path.join(worktree, "apps/web/.claude/skills/later-too/SKILL.md"), "utf8"),
+    ).toBe("# later\n");
   });
 
   it("is idempotent: a second run changes nothing and fails nothing", () => {

@@ -48,6 +48,8 @@ ordna show T-004                                             # confirm the edit 
 
 `ordna create` and `ordna move` write the local ref only; push it by hand the same way (`git push origin refs/ordna/tasks/T-030`) or the next fetch will not delete it but no other clone will see it. Two sessions editing the same task race on origin; re-read before writing.
 
+`ordna move` fails silently about one time in ten (12–13/09/2026: three of thirty moves). Read the status line back — `ordna show T-nnn | sed -n 2p` — after every move and before its push.
+
 ### When a skill says "publish to the issue tracker"
 
 `ordna create` a task. Give it a `## Goal`, an `## Acceptance Criteria` checklist and `## Notes` naming the ADRs it touches — match the shape of `T-001`–`T-008`, which are the house style. Set `-d` for every task it genuinely depends on; the CLI enforces it later.

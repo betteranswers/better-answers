@@ -20,6 +20,13 @@ export type TestDatabase = {
   readonly pool: Pool;
   /** The cluster's superuser — for seeding and catalogue reads only. */
   readonly superuser: Pool;
+  /**
+   * Where this database is, as a connection string. Carried through from the harness for
+   * the one test that needs another database on the same cluster: `tests/ops.test.ts` shows
+   * the restore commands' *not built* answer against the cluster's own `postgres` database,
+   * which the journal has never been applied to.
+   */
+  readonly connectionUri: string;
   stop: () => Promise<void>;
 };
 
@@ -28,6 +35,7 @@ export async function startTestDatabase(): Promise<TestDatabase> {
   return {
     pool: migrated.runtimePool,
     superuser: migrated.pool,
+    connectionUri: migrated.connectionUri,
     stop: () => migrated.stop(),
   };
 }

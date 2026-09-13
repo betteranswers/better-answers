@@ -17,7 +17,7 @@ from typing import Any, cast
 import pytest
 from psycopg import Cursor
 
-SPOKEN_CONTRACT_VERSION = 5
+SPOKEN_CONTRACT_VERSION = 6
 SPOKEN_AGREEMENTS = {
     "concept-file": "fixtured",
     "concept-inbox": "sql-function",
@@ -26,6 +26,7 @@ SPOKEN_AGREEMENTS = {
     "credential-envelope": "fixtured",
     "llm-routing": "sql-function",
     "queue": "sql-function",
+    "redaction": "fixtured",
     "visibility-columns": "fixtured",
 }
 NOT_FIXTURES = {"manifest.json", "README.md"}

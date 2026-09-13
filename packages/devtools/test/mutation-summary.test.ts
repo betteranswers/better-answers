@@ -30,6 +30,12 @@ const script = path.join(repositoryRoot, "scripts/mutation-summary.mjs");
 
 const scratch = mkdtempSync(path.join(tmpdir(), "mutation-summary-"));
 afterAll(() => {
+  // No retry here, unlike the mutant probe's teardown: this file's one spawn site is the
+  // `run` helper's spawnSync, synchronous and so already awaited by the time this runs, over
+  // scripts/mutation-summary.mjs, a fifteen-line script that reads files and writes stdout
+  // and spawns nothing itself. There is no git repository under this tree, no SIGINT case and
+  // no background writer, so nothing asynchronous can hold scratch when the removal runs —
+  // a retry here would be a fallback for a race that cannot occur.
   rmSync(scratch, { recursive: true, force: true });
 });
 

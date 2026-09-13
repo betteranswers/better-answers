@@ -200,9 +200,13 @@
       // below narrow them further.
       //
       // Filenames are kebab-case, so a component's file reads the same on a case-insensitive
-      // and a case-sensitive filesystem and a rename is never a no-op commit.
+      // and a case-sensitive filesystem and a rename is never a no-op commit. This is the
+      // file half of [WEB3]; oxlint 1.80 has no rule for a directory's own name, so the
+      // folder half is walked by a test in the workspace instead.
       //
-      // `no-restricted-imports` carries the SPA's import shape. oxlint 1.80 has no
+      // `no-restricted-imports` carries the SPA's import shape — three zones and the
+      // direction app → features → shared, never back, and no feature reaching another
+      // ([WEB1]). oxlint 1.80 has no
       // `import/no-restricted-paths`, so a layering zone cannot be expressed as "this directory
       // may not reach that one"; it is expressed instead as a convention a glob *can* read — a
       // relative import stays inside its own directory, and anything that crosses one is written
@@ -336,7 +340,8 @@
     },
     {
       // ADR 0006's one exception, as one line of configuration: this file, `AppRouter`, and
-      // `import type`. Everything else the shared override bans stays banned, so a value import
+      // `import type` ([WEB4], the api is a type and in one file).
+      // Everything else the shared override bans stays banned, so a value import
       // of `AppRouter` fails here and an `import type` of it fails in every other file.
       "files": ["apps/web/src/shared/api/trpc.ts"],
       "rules": {
@@ -378,7 +383,7 @@
     },
     {
       // T-037 — the SPA's identity feature is the one directory in `apps/web` that may name
-      // `better-auth`, which is the same shape `apps/api/src/auth/` has on the other side
+      // `better-auth` ([WEB2]), which is the same shape `apps/api/src/auth/` has on the other side
       // (ADR 0009): one directory owns the library, and everything above it
       // speaks screens, workspaces and roles rather than endpoints. The product signs a
       // person in by posting to Better Auth, so *somewhere* has to know its client; what

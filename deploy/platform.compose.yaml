@@ -33,7 +33,17 @@ x-mem-512: &mem512
 x-bootstrap: &bootstrap
   # Bootstrap class only; every tenant credential is a row under the envelope, never a variable here.
   DATABASE_URL: ${DATABASE_URL:?}
-  S3_ENDPOINT: http://objectstore:3900   # Garage, path-style, region "garage" (deploy/garage.toml)
+  # The five the object door is opened from (apps/api/src/config.ts § readObjectStore reads exactly
+  # these names, and defaults none of them). The endpoint and the region are facts of this estate
+  # rather than values an operator supplies: Garage is reached by service name on the internal
+  # network, path-style, and garage.toml fixes `s3_region = "garage"`. The region is therefore
+  # written in exactly two places — there, for the cluster, and here, for the client that signs
+  # against it — and the deploy tree's own test reads both lines and holds them equal, because a
+  # client signing for a region the cluster does not answer to is refused rather than misrouted.
+  # The bucket and the key pair come from wizard-41.sh's Garage stage, which creates all three.
+  S3_ENDPOINT: http://objectstore:3900   # Garage, path-style, region below (deploy/garage.toml)
+  S3_REGION: garage                      # deploy/garage.toml § [s3_api] s3_region
+  S3_BUCKET: ${S3_BUCKET:?the platform's bucket — wizard-41.sh § Garage creates it}
   S3_ACCESS_KEY: ${OBJECTSTORE_ROOT_KEY:?}
   S3_SECRET_KEY: ${OBJECTSTORE_ROOT_SECRET:?}
   # Unset in the first estate: no embedding host runs there (client one is on the hosted route —
@@ -44,8 +54,9 @@ x-bootstrap: &bootstrap
 services:
   # One-shot: the tier's Drizzle migrations, including the DDL it owns in `index` and the graph.
   # `exclude_from_hc` stops Coolify reporting the stack as Exited after every deploy (research 68 §2a).
-  # Before `api` turns healthy after a RESTORE, the same image replays every erasure_request
-  # completed after the dump's timestamp (`pnpm ops replay-erasures`) — deploy/restore-drill.sh.
+  # After a RESTORE this runs first and the replay of the erasures the dump undid runs later, on
+  # `api` — `pnpm ops replay-erasures` needs the git store and the object store, and this service
+  # carries neither by design (T-125, 11/09/2026). The restore scripts hold the order.
   migrate:
     image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?set by the release workflow}
     command: ["pnpm", "migrate"]
@@ -125,8 +136,8 @@ services:
       <<: *bootstrap
       DATABASE_URL: ${WORKER_DATABASE_URL:?}   # the workspace-scoped worker role, never the owner
       GIT_STORE_DIR: /data/git                # the bare repositories, read at a head; mounted :ro below
-      HF_HOME: /data/worker/hf-cache
-      HF_HUB_OFFLINE: "1"                     # after first warm
+      HF_HOME: /data/worker/hf-cache          # where the image baked the weights; nothing is mounted over it (see volumes)
+      HF_HUB_OFFLINE: "1"                     # the weights ship in the image, warmed at build — a running worker fetches nothing
       MAX_CONCURRENT_RUNS: "1"                # one index at a time on a 4 GB box (ADR 0024); ticket 42 measures whether it can rise
       LMDB_MAX_BYTES_PER_BINDING: "4294967296" # 4 GB cap; over it the binding's LMDB is wiped and reprocessed — it is disposable (ADR 0036)
     healthcheck:
@@ -146,7 +157,10 @@ services:
     volumes:
       - /data/worker/lmdb:/data/worker/lmdb        # one LMDB per binding — personal data on disk; never backed up
       - /data/worker/trees:/data/worker/trees      # git working trees per workspace — rebuilt
-      - /data/worker/hf-cache:/data/worker/hf-cache
+      # Nothing here for HF_HOME, deliberately (`T-122`): the model weights are in the image,
+      # fetched at build, and a host directory mounted over that path would mask every byte of
+      # them. With HF_HUB_OFFLINE set above that is not a quiet re-download but a worker that
+      # cannot load a model at all. `apps/worker/tests/test_image.py` holds this file to it.
       - /data/git:/data/git:ro                     # read at the run's commit (`bundle_commit` on the run row); never written by the worker (ADR 0024)
     deploy:
       resources:

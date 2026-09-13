@@ -89,9 +89,20 @@ job_git_mirror() { # the second copy: every bare repository force-mirrored to VP
   local started rc=0; started=$(date -u +%FT%TZ)
   while read -r repo; do
     ws=$(basename "${repo}" .git)
-    # the mirror key's forced command is deploy/mirror-shell.sh: `init-repo <ws>` (creates the bare target if absent) and git-receive-pack, nothing else
+    # the mirror key's forced command is deploy/mirror-shell.sh: `init-repo <ws>` (creates the bare target if absent), git-receive-pack and `prune-repo <ws>` — three verbs, nothing else
     ssh -o BatchMode=yes "${GIT_MIRROR_SSH_TARGET%%:*}" init-repo "${ws}" >/dev/null || { rc=1; continue; }
-    git -C "${repo}" push --mirror --quiet "${GIT_MIRROR_SSH_TARGET}/${ws}.git" || rc=1
+    # --porcelain so the push says on stdout what it did: a ref line beginning `+` is a forced
+    # update and one beginning `-` a deletion, which together are exactly "refs were replaced".
+    if ! pushed=$(git -C "${repo}" push --mirror --porcelain "${GIT_MIRROR_SSH_TARGET}/${ws}.git"); then rc=1; continue; fi
+    if printf '%s\n' "${pushed}" | grep -qE '^[+-]'; then
+      # Refs were replaced, which is what an erasure's history rewrite does to the mirror. The
+      # objects it replaced are still readable there through the reflog git-receive-pack just
+      # wrote, so the second copy would keep what the first has erased. This prune is the routine's
+      # own `git gc --prune=now` on the mirror's side, run by the backup service because the push
+      # is the only thing that knows a rewrite happened — inside the first of the erasure report's
+      # beyond-use dates. An ordinary fast-forward night prints neither flag and prunes nothing.
+      ssh -o BatchMode=yes "${GIT_MIRROR_SSH_TARGET%%:*}" prune-repo "${ws}" >/dev/null || rc=1
+    fi
   done < <(find "${GIT_STORE}" -mindepth 1 -maxdepth 1 -type d -name '*.git')
   if [ "${rc}" -eq 0 ]; then record backup git-mirror "${started}" ok 0 "mirror/" true NULL; else record backup git-mirror "${started}" failed 0 "" true NULL; fi
   return "${rc}"

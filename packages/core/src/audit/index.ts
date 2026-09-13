@@ -7,10 +7,12 @@ import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts
 import {
   type Act,
   DETAIL_KINDS,
+  type DetailKind,
   type DetailOf,
   type DetailShape,
   type DetailValue,
   isDeclared,
+  isOptionalKind,
 } from "./vocabulary.ts";
 
 /**
@@ -116,7 +118,26 @@ export const eventsOfAct = async (
  */
 const eventInsert = boundarySchemas.auditEvent.insert.omit({ workspaceId: true });
 
-const detailRefusal = (shape: DetailShape, detail: Readonly<Record<string, DetailValue>>) => {
+// The base names that take "an" rather than "a" — a vowel sound, not a spelling rule
+// (`gitSha` starts with a letter but says "jit"). Everything else in DETAIL_KINDS takes "a".
+const AN_KINDS: ReadonlySet<string> = new Set(["id", "iri", "audience"]);
+
+// What `kind` should read as in a sentence: the raw key is a lookup label, not a word — a
+// trailing `?` marks an optional kind for `DETAIL_KINDS` and `isOptionalKind`, and is never
+// itself part of the noun. So the noun is the base name with the `?` stripped, the article
+// agreeing with that base, and the optional case adding the clause that absence was allowed
+// (since the field skipped at the check above is exactly the one this refusal never reaches).
+const kindRefusal = (kind: DetailKind): string => {
+  const optional = isOptionalKind(kind);
+  const base = optional ? kind.slice(0, -1) : kind;
+  const article = AN_KINDS.has(base) ? "an" : "a";
+  return optional ? `${article} ${base}, or absent` : `${article} ${base}`;
+};
+
+const detailRefusal = (
+  shape: DetailShape,
+  detail: Readonly<Record<string, DetailValue | undefined>>,
+) => {
   for (const field of Object.keys(detail)) {
     if (!Object.hasOwn(shape, field)) return `detail names a field the act does not: ${field}`;
   }
@@ -125,9 +146,14 @@ const detailRefusal = (shape: DetailShape, detail: Readonly<Record<string, Detai
     // Every DETAIL_KINDS predicate starts with a `typeof` check, none of which a
     // `value` of `undefined` ever passes — so a missing field would still be refused
     // one line down. This check stays for the sharper message naming what is missing,
-    // never the fallback "is not a kind" a masked check would settle for.
-    if (value === undefined) return `detail is missing the field ${field}`;
-    if (!DETAIL_KINDS[kind](value)) return `detail's ${field} is not a ${kind}`;
+    // never the fallback "is not a kind" a masked check would settle for. A kind
+    // written with a `?` is the one case where absence is what the act declared, so
+    // the field is skipped rather than refused; present, it is checked as its kind is.
+    if (value === undefined) {
+      if (isOptionalKind(kind)) continue;
+      return `detail is missing the field ${field}`;
+    }
+    if (!DETAIL_KINDS[kind](value)) return `detail's ${field} is not ${kindRefusal(kind)}`;
   }
   return undefined;
 };

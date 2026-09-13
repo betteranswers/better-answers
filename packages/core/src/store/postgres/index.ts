@@ -118,6 +118,48 @@ export const withScope = async <T>(
   });
 
 /**
+ * Hold one of Postgres's **session-scoped** advisory locks for the whole of `work`, on a
+ * connection of its own, and give it back however `work` ends.
+ *
+ * The transaction-scoped twin — `pg_advisory_xact_lock`, which the visibility cascade takes —
+ * is the right lock for a thing that happens inside one transaction, because Postgres
+ * releases it at the commit whatever the code does. This one is for the opposite shape: a
+ * routine that spans several transactions and must exclude something outside the database
+ * for all of them. The erasure routine is the caller, and the thing it excludes is the
+ * hourly dump, which try-locks the same key before it runs (ADR 0022; `deploy/backup.sh`).
+ *
+ * **Its own connection, and an explicit unlock.** A session lock outlives every transaction
+ * on the connection that took it, so it also outlives that connection's return to the pool:
+ * releasing without unlocking would hand the next borrower a lock nobody meant them to hold,
+ * and the dump would wait for ever. The connection is dedicated so that the work's own
+ * transactions are free to open and commit on other connections while this one does nothing
+ * but hold the key.
+ *
+ * **The platform principal is the first argument and the body does not read it**, as the git
+ * door's `withRepositoryLockAs` does not read its own: a lock the whole estate waits behind
+ * is the platform's to take, and the type is what says so at every call site — a person's
+ * Principal cannot reach this function, whatever a slice meant to do with it.
+ */
+export const withSessionLock = async <T>(
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  key: number,
+  work: (platform: PlatformPrincipal) => Promise<T>,
+): Promise<T> => {
+  const holder = await door.pool.connect();
+  try {
+    await holder.query("SELECT pg_advisory_lock($1)", [key]);
+    try {
+      return await work(platform);
+    } finally {
+      await holder.query("SELECT pg_advisory_unlock($1)", [key]);
+    }
+  } finally {
+    holder.release();
+  }
+};
+
+/**
  * Run `work` inside one transaction with no scope, as the platform: a write to the
  * identity set (ADR 0009), which no workspace scope reaches — revoking a person's
  * credentials, for one. Never a tenant read: an unscoped transaction sees zero tenant

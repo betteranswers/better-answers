@@ -11,6 +11,17 @@
 # uv to a Python base. It puts the exact uv version in this file, where a reader looking for
 # the pin finds it, rather than behind an installer script that resolves "latest" at build
 # time — a version nobody read on the day, which is what pinning exists to stop.
+#
+# The redaction seam's model weights are part of this image (ADR 0020, `T-122`). They are
+# fetched at build under `HF_HOME` and the runtime stage sets `HF_HUB_OFFLINE=1` over them,
+# so the image is self-sufficient: a worker on a 4 GB box with no route to a registry still
+# detects, and a weight nobody fetched here fails at once instead of being downloaded onto a
+# production volume on a first document. The corollary belongs with the pin: **nothing may
+# be mounted over `HF_HOME` in a deploy unit.** A host directory there masks every byte this
+# build fetched, and with `HF_HUB_OFFLINE` set beside it the result is not a quiet
+# re-download but a worker that cannot load a model at all — which is why
+# `deploy/platform.compose.yaml` mounts the LMDB and the trees and nothing else, and why
+# `apps/worker/tests/test_image.py` holds that file to it.
 FROM ghcr.io/astral-sh/uv:0.12.9@sha256:8b940d3a9d65bed080436972241af2e21c84b5e8c9193f7014ed71479ee795ff AS uv
 
 FROM python:3.13.15-slim-bookworm@sha256:ed86c82274b3c69b52fb5820f358f0bd7df0b603332063cb5c6e32bd220c3e6e AS build
@@ -27,16 +38,59 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /app
 # The lockfile's dependencies first, so a source edit does not re-resolve them. `--frozen`
 # fails rather than updating `uv.lock`: the committed lockfile is the pin.
+#
+# Then the redaction seam, and only it. The weights step below fetches by loading the
+# seam's own analyzer, so those modules have to be present before it runs — and nothing
+# else does: no module under `redaction/` imports anything outside it. Copying the subtree
+# here rather than the whole of `src` is what puts the weights above the source: an edit to
+# a file outside the seam reuses roughly three gigabytes of weight layers, and an edit
+# inside it rebuilds them, which is right, because a moved pin has to re-fetch. This stage
+# reads nothing else from `src` after this point, and the runtime stage copies the tree
+# from the build context rather than from here, so the rest of it never enters this stage.
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
-COPY src src
+COPY src/better_answers_worker/__init__.py src/better_answers_worker/__init__.py
+COPY src/better_answers_worker/redaction src/better_answers_worker/redaction
 RUN uv sync --frozen --no-dev
+
+# The weights, fetched by loading each pinned model through the seam's own analyzer —
+# `redaction/weights.py` says why a load and not a snapshot, and holds the model ids, so no
+# id is spelled in this file. The cache mount is why a source edit does not re-download
+# nearly two gigabytes on every local rebuild, and the copy out of it is why the weights
+# are in the image and not only in the builder's cache, which a `--mount=type=cache` does
+# not ship. The module does that copy rather than a `cp` of the mount, and that is the
+# point of the argument it is given: the mount is shared by every build on a machine, so
+# copying the whole of it made the image whatever the mount held — a model dropped from the
+# table kept shipping because an older build had fetched it — while the module copies the
+# repositories the table declares and nothing beside them.
+RUN --mount=type=cache,target=/hf-cache,uid=0 \
+    HF_HOME=/hf-cache /app/.venv/bin/python -m better_answers_worker.redaction.weights \
+    /data/worker/hf-cache
+
+# The list of public suffixes, warmed the same way and shipped the same way, for a
+# failure that is the weights' opposite. A weight the build missed raises on the first
+# job. A suffix list the build missed costs two connection attempts and their timeouts
+# inside the first email address every worker process matches, and then answers
+# correctly off the copy bundled in `tldextract`'s own wheel — so nothing fails, nothing
+# is logged where anyone looks, and the bill is paid again by the next process.
+# `redaction/suffixes.py` carries the rest: why the fence has to be the `ENV` in the
+# runtime stage rather than anything either tier could call, and why a cache hit is the
+# only thing that reaches it through Presidio.
+#
+# Its own step, its own mount and its own target. The weights step above copies what the
+# model table declares and nothing beside it, which is the point of that step; a second
+# thing folded into it would be a second thing that table does not name.
+RUN --mount=type=cache,target=/tldextract-cache,uid=0 \
+    TLDEXTRACT_CACHE=/tldextract-cache \
+    /app/.venv/bin/python -m better_answers_worker.redaction.suffixes \
+    /data/worker/tldextract-cache
 
 FROM python:3.13.15-slim-bookworm@sha256:ed86c82274b3c69b52fb5820f358f0bd7df0b603332063cb5c6e32bd220c3e6e AS runtime
 
-# uid 1000, the uid `init` in `deploy/stores.compose.yaml` chowns /data/worker/{lmdb,trees,hf-cache}
+# uid 1000, the uid `init` in `deploy/stores.compose.yaml` chowns /data/worker/{lmdb,trees}
 # to; nothing runs as root to own a volume. The Python base ships no non-root
-# user, so this is where the worker's gets made.
+# user, so this is where the worker's gets made. The weights below are chowned to the same
+# uid by their own `COPY`, since they come out of the build stage rather than off a host.
 RUN groupadd --system --gid 1000 worker \
  && useradd --system --uid 1000 --gid worker --home-dir /home/worker --create-home worker
 
@@ -49,6 +103,22 @@ COPY --from=build /app/.venv /app/.venv
 # including `schema_view.py`, the committed, generated view of the app's schema the worker
 # reads and never migrates (ADR 0032).
 COPY src src
+
+# The weights the build fetched, at the path the deploy unit already names, owned by the
+# user that reads them. `HF_HUB_OFFLINE` is the fence over them: the seam loads what is
+# here or it raises, and a running worker never reaches a registry.
+COPY --from=build --chown=worker:worker /data/worker/hf-cache /data/worker/hf-cache
+
+# The suffix list the build warmed, and the variable that makes the container read it.
+# It is owned by the worker rather than merely readable by it because `tldextract` takes
+# a lock file beside a cache entry before reading it, so a directory this user cannot
+# write to is a cache it cannot use — and the way it reports that is to fetch instead,
+# which is the thing being stopped. There is no `OFFLINE` switch to set beside this one:
+# the library has no such mode, and a cache hit is what stands in for it.
+COPY --from=build --chown=worker:worker /data/worker/tldextract-cache /data/worker/tldextract-cache
+ENV HF_HOME=/data/worker/hf-cache \
+    HF_HUB_OFFLINE=1 \
+    TLDEXTRACT_CACHE=/data/worker/tldextract-cache
 
 USER worker
 

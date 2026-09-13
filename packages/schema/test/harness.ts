@@ -23,6 +23,35 @@ import { POSTGRES_IMAGE } from "../src/postgres-image.ts";
  * copied from the template that run's `globalSetup` migrated once. Both hand back this
  * same shape, so a suite reads its database the same way whichever started it.
  */
+/**
+ * How a test cluster is started: the pinned image's own `postgres`, with its three
+ * durability costs off. Every governed write in the slow suites otherwise pays a flush
+ * through the Docker VM's virtual disk, and durability across a crash is not a property
+ * any suite tests — the container is thrown away when the run ends, whatever it survived.
+ *
+ * It is still a real Postgres (`[TEST2]`). These are settings the same engine reads, not a
+ * substitute engine: transactions, RLS, constraints, the journal and every behaviour a
+ * suite asserts answer exactly as they do with the three on. What is given up is only what
+ * a test cluster is not for — surviving a power cut with its last commit intact.
+ *
+ * Declared here and imported by the warm half, because both places that construct a
+ * container must ask for the same cluster; one durability on the cold path and another on
+ * the warm one would be two harnesses wearing one name.
+ *
+ * `withCommand` replaces the image's CMD, which the official entrypoint forwards to after
+ * it has initialised the data directory — so the first word stays `postgres` and the flags
+ * follow it. Spread at each call site because `withCommand` takes a mutable array.
+ */
+export const POSTGRES_COMMAND = [
+  "postgres",
+  "-c",
+  "fsync=off",
+  "-c",
+  "synchronous_commit=off",
+  "-c",
+  "full_page_writes=off",
+] as const;
+
 export type MigratedPostgres = {
   /** The container's superuser — bypasses RLS; for seeding and catalogue reads. */
   readonly pool: pg.Pool;
@@ -78,9 +107,9 @@ export const migratedPostgresOver = (
 };
 
 export const startMigratedPostgres = async (): Promise<MigratedPostgres> => {
-  const container: StartedPostgreSqlContainer = await new PostgreSqlContainer(
-    POSTGRES_IMAGE,
-  ).start();
+  const container: StartedPostgreSqlContainer = await new PostgreSqlContainer(POSTGRES_IMAGE)
+    .withCommand([...POSTGRES_COMMAND])
+    .start();
   const migrated = migratedPostgresOver(container.getConnectionUri(), async () => {
     await container.stop();
   });

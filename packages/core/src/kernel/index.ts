@@ -35,14 +35,26 @@
  * - `Clock` and `systemClock` — the platform's one reading of the wall clock, constructed
  *   once by the api at boot and handed on explicitly to every act that needs it; not a
  *   door, and not a defaulted parameter (ADR 0040). T-104.
+ * - `isPortablePath` — the shape of a name a store can hand back, shared by the git door's
+ *   bundle paths and the object door's keys because ADR 0029 rule 2 leaves them nowhere
+ *   else to share it. Not a traversal guard; `portable-path.ts` says what it is instead.
+ *   T-124.
  */
 export { ulid } from "@better-answers/schema";
 export { systemClock } from "./clock.ts";
 export type { Clock } from "./clock.ts";
 export { refusalFor } from "./constraint.ts";
+export { isPortablePath } from "./portable-path.ts";
 export { attempt, err, normalizeError, ok } from "./result.ts";
 export type { Result } from "./result.ts";
-export { actorIdOf, actorIdOfPerson, isActorId, isPersonActor, personOfActor } from "./actor.ts";
+export {
+  actorIdOf,
+  actorIdOfPerson,
+  isActorId,
+  isPersonActor,
+  personOfActor,
+  PERSON_PREFIX,
+} from "./actor.ts";
 export type { ActorId, ProcessActorId } from "./actor.ts";
 export { requireAdmin } from "./role.ts";
 export type { AdminUserPrincipal, RoleRefusal } from "./role.ts";

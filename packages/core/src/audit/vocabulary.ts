@@ -54,9 +54,19 @@ export type DetailValue = string | number | boolean;
  * or contact does not exist, which is how the ledger stays a table an erasure never
  * rewrites; a kind an act needs and this list lacks is added here, with the act that needs
  * it. Each kind's check runs on every write.
+ *
+ * A kind written with a trailing `?` — **id?** so far — is that kind *or absent*: the field
+ * may be left out of a row's detail, and is checked exactly as its kind when it is there.
+ * The one act that needs it is the subject request's, whose detail carries the person id
+ * where the subject holds a login and nothing at all where they hold none (T-123): a null
+ * standing in for a person would be a value the ledger does not have a word for, and a
+ * second act for the second case would be one act name for one thing that happened.
  */
+const isId = (value: DetailValue) => typeof value === "string" && ULID.test(value);
+
 export const DETAIL_KINDS = {
-  id: (value: DetailValue) => typeof value === "string" && ULID.test(value),
+  id: isId,
+  "id?": isId,
   role: (value: DetailValue) => typeof value === "string" && ROLES.some((role) => role === value),
   flag: (value: DetailValue) => typeof value === "boolean",
   iri: (value: DetailValue) => typeof value === "string" && IRI.test(value),
@@ -73,6 +83,15 @@ export type DetailKind = keyof typeof DETAIL_KINDS;
 /** The fields a declared act's detail carries, each named with its kind. */
 export type DetailShape = Readonly<Record<string, DetailKind>>;
 
+/** The kinds written with a trailing `?`: a field of one may be left out of a detail. */
+type OptionalDetailKind = Extract<DetailKind, `${string}?`>;
+
+/**
+ * Whether a kind was written with the `?` — the runtime half of the type above, and the one
+ * question the write path asks before it calls a field missing.
+ */
+export const isOptionalKind = (kind: DetailKind): boolean => kind.endsWith("?");
+
 type DetailValueOf<K extends DetailKind> = K extends "role"
   ? Role
   : K extends "flag"
@@ -81,9 +100,18 @@ type DetailValueOf<K extends DetailKind> = K extends "role"
       ? number
       : string;
 
-/** The detail a row of one declared act carries: the shape's fields, each at its kind's type. */
+/**
+ * The detail a row of one declared act carries: the shape's fields, each at its kind's type,
+ * and a field whose kind ends in `?` optional rather than required.
+ */
 export type DetailOf<Shape extends DetailShape> = {
-  readonly [Field in keyof Shape]: DetailValueOf<Shape[Field]>;
+  readonly [
+    Field in keyof Shape as Shape[Field] extends OptionalDetailKind ? never : Field
+  ]: DetailValueOf<Shape[Field]>;
+} & {
+  readonly [
+    Field in keyof Shape as Shape[Field] extends OptionalDetailKind ? Field : never
+  ]?: DetailValueOf<Shape[Field]>;
 };
 
 /**

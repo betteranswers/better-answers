@@ -6,6 +6,9 @@ import path from "node:path";
 import { parse } from "yaml";
 import { describe, expect, it } from "vitest";
 
+import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
+import type { Tool } from "@better-answers/devtools/throwaway-tree";
+
 /**
  * The pre-commit hook read as a value (T-070). The hook itself is never run here: its
  * commands are proved by the tools' own suites, and what a quiet edit can break is the
@@ -52,16 +55,20 @@ const runOf = (name: string): string => {
  * A package's own declared binary, resolved through the module graph. Assembling the path
  * from a guessed `node_modules/.bin` entry would pass on a machine where pnpm happened to
  * hoist it and fail on one where it did not.
+ *
+ * `binaryName` defaults to the package name because that is true of every binary this file
+ * proved before T-174: oxfmt declares `oxfmt`, oxlint declares `oxlint`. `typescript`
+ * declares `tsc`, so the two names are given separately rather than assumed to match.
  */
-const declaredBinary = (packageName: string): string => {
+const declaredBinary = (packageName: string, binaryName: string = packageName): string => {
   const manifestPath = createRequire(import.meta.url).resolve(`${packageName}/package.json`);
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
     bin?: string | Record<string, string>;
   };
   const bin = manifest.bin;
-  const relative = typeof bin === "string" ? bin : bin?.[packageName];
+  const relative = typeof bin === "string" ? bin : bin?.[binaryName];
   if (relative === undefined) {
-    throw new Error(`${packageName} declares no \`${packageName}\` binary`);
+    throw new Error(`${packageName} declares no \`${binaryName}\` binary`);
   }
   return path.join(path.dirname(manifestPath), relative);
 };
@@ -69,12 +76,14 @@ const declaredBinary = (packageName: string): string => {
 /**
  * How a command's tool is proved to exist:
  *
- * - `npm` — a package this repository declares, resolved through the module graph;
+ * - `npm` — a package this repository declares, resolved through the module graph. `binary`
+ *   is only named when it differs from the package (`typescript` declares `tsc`); it
+ *   defaults to the package name, which is every case before T-174.
  * - `uv` — reached through the worker's runner, which the shell must be able to find;
  * - `guarded` — not ours to install, so what is proved is the skip, not the binary.
  */
 type Proof =
-  | { readonly kind: "npm"; readonly package: string }
+  | { readonly kind: "npm"; readonly package: string; readonly binary?: string }
   | { readonly kind: "uv" }
   | { readonly kind: "guarded"; readonly binary: string };
 
@@ -95,6 +104,30 @@ const HOOK: Readonly<Record<string, { readonly glob: string | undefined; readonl
       glob: ".github/workflows/*.{yml,yaml}",
       proof: { kind: "guarded", binary: "actionlint" },
     },
+    // One per workspace with a `typecheck` script (every one but the design system, which has
+    // no `tsconfig.json` and no `scripts` block at all). Each runs only over its own staged
+    // files, which is why five commands rather than one: `root:` is what makes a `packages/core`
+    // change invisible to `apps/api`'s command unless an `apps/api` file is staged beside it.
+    "api-typecheck": {
+      glob: "*.{ts,tsx}",
+      proof: { kind: "npm", package: "typescript", binary: "tsc" },
+    },
+    "web-typecheck": {
+      glob: "*.{ts,tsx}",
+      proof: { kind: "npm", package: "typescript", binary: "tsc" },
+    },
+    "core-typecheck": {
+      glob: "*.{ts,tsx}",
+      proof: { kind: "npm", package: "typescript", binary: "tsc" },
+    },
+    "schema-typecheck": {
+      glob: "*.{ts,tsx}",
+      proof: { kind: "npm", package: "typescript", binary: "tsc" },
+    },
+    "devtools-typecheck": {
+      glob: "*.{ts,tsx}",
+      proof: { kind: "npm", package: "typescript", binary: "tsc" },
+    },
   };
 
 /**
@@ -103,9 +136,9 @@ const HOOK: Readonly<Record<string, { readonly glob: string | undefined; readonl
  * skipped without anyone noticing — which is the rule `vitest/no-conditional-expect` holds
  * and exactly the silence this suite exists to avoid.
  */
-const npmCommands = (): readonly (readonly [string, string])[] =>
+const npmCommands = (): readonly (readonly [string, string, string])[] =>
   Object.entries(HOOK).flatMap(([name, { proof }]) =>
-    proof.kind === "npm" ? [[name, proof.package] as const] : [],
+    proof.kind === "npm" ? [[name, proof.package, proof.binary ?? proof.package] as const] : [],
   );
 
 const uvCommands = (): readonly string[] =>
@@ -115,6 +148,51 @@ const guardedCommands = (): readonly (readonly [string, string])[] =>
   Object.entries(HOOK).flatMap(([name, { proof }]) =>
     proof.kind === "guarded" ? [[name, proof.binary] as const] : [],
   );
+
+/**
+ * The proof that the hook's new typecheck commands actually do what the hook depends on
+ * them to do (T-174): `tsc --noEmit` over a throwaway tree, run rather than remembered, in
+ * both directions a gate must prove — where it fires and where it stays silent. The hook
+ * itself is never run in this suite (see the file's own docblock above), so this is what
+ * stands in for it: the same binary, the same flag, over a tree this test controls.
+ */
+const TSCONFIG = JSON.stringify({
+  compilerOptions: {
+    strict: true,
+    noEmit: true,
+    module: "esnext",
+    target: "es2022",
+    moduleResolution: "bundler",
+    skipLibCheck: true,
+  },
+  include: ["*.ts"],
+});
+
+const TYPE_ERROR_SOURCE = 'export const bad: number = "not a number";\n';
+const CLEAN_SOURCE = "export const ok: number = 1;\n";
+
+const typecheckTool: Tool = {
+  executable: { package: "typescript", path: ["bin", "tsc"] },
+  argv: ["--noEmit"],
+  scaffold: { "tsconfig.json": TSCONFIG },
+  foundSomething: [1],
+  smoke: {
+    tree: { "broken.ts": TYPE_ERROR_SOURCE },
+    reports: (output) => output.includes("error TS"),
+  },
+};
+
+describe("the hook's typecheck commands refuse a staged type error (T-174)", () => {
+  const typecheck = runsOverThrowawayTree(typecheckTool);
+
+  it("refuses a type error, naming it in the report", () => {
+    expect(typecheck({ "broken.ts": TYPE_ERROR_SOURCE })).toContain("error TS");
+  });
+
+  it("stays silent over a tree with no type error", () => {
+    expect(typecheck({ "clean.ts": CLEAN_SOURCE })).toBe("");
+  });
+});
 
 describe("the pre-commit hook (T-070)", () => {
   it("runs exactly the commands this test knows how to prove", () => {
@@ -145,9 +223,9 @@ describe("the pre-commit hook (T-070)", () => {
 
   it.each(npmCommands())(
     "runs `%s` from a binary this repository's own packages declare",
-    (command, packageName) => {
-      expect(runOf(command)).toContain(packageName);
-      expect(existsSync(declaredBinary(packageName))).toBe(true);
+    (command, packageName, binaryName) => {
+      expect(runOf(command)).toContain(binaryName);
+      expect(existsSync(declaredBinary(packageName, binaryName))).toBe(true);
     },
   );
 
@@ -172,9 +250,15 @@ describe("the pre-commit hook (T-070)", () => {
     },
   );
 
-  it("runs no tests and no typecheck, so it stays a seconds-long hook", () => {
+  /**
+   * No test suite runs here — that is still `pnpm check`'s alone. The typecheck commands
+   * (T-174) are the one exception to "no typecheck", so what this asserts now is that they
+   * stay the only exception, and that the header records what they cost rather than leaving
+   * that to be remeasured by whoever next wonders why the hook takes as long as it does.
+   */
+  it("runs no test suite, and bounds its typecheck to the measured worst case", () => {
     for (const [name, command] of Object.entries(commands())) {
-      for (const forbidden of ["vitest", "tsc", "pytest", "typecheck", "pnpm test", "run test"]) {
+      for (const forbidden of ["vitest", "pytest", "pnpm test", "run test"]) {
         expect({ name, forbidden, present: (command.run ?? "").includes(forbidden) }).toEqual({
           name,
           forbidden,
@@ -182,12 +266,20 @@ describe("the pre-commit hook (T-070)", () => {
         });
       }
     }
+    // The header's own record of the measurement, not a re-run here: re-measuring on every
+    // suite run would make this test as slow as the thing it is bounding.
+    const header = read("lefthook.yml").split(/^[^#\s]/m)[0] ?? "";
+    expect(header).toContain("worst case");
+    expect(header).toMatch(/\d+(\.\d+)?s/);
   });
 
-  it("documents both escape hatches in its own header, so a skip is never a deleted hook", () => {
+  it("documents both escape hatches and the typecheck's own workspace limit in its header", () => {
     const header = read("lefthook.yml").split(/^[^#\s]/m)[0] ?? "";
     expect(header).toContain("LEFTHOOK=0");
     expect(header).toContain("LEFTHOOK_EXCLUDE");
+    // The price of a hook that stays seconds long: a command fires only on its own
+    // workspace's staged files, so a cross-workspace break is root `check`'s to catch.
+    expect(header).toContain("root `check` owns the cross-workspace case");
   });
 
   it("is installed by a root `prepare` script, so a fresh clone needs no remembered step", () => {

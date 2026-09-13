@@ -2,6 +2,7 @@
   "name": "better-answers",
   "private": true,
   "description": "Better Answers — a living company knowledge map for UK SMBs on OKF v0.2 (see AGENTS.md)",
+  "type": "module",
   "scripts": {
     "prepare": "lefthook install || echo 'lefthook is absent — no git hooks installed (see lefthook.yml)'",
     "check": "node scripts/check.mjs format:check lint jscpd knip check:workspaces check:worker",

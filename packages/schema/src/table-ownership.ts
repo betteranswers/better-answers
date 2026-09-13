@@ -139,6 +139,24 @@ export const TABLE_OWNERS = {
   // the sources slice's; the rest of a binding and of the catalogue is B7's, on these tables.
   "public.source_binding": "sources",
   "public.source_document": "sources",
+  // What the redaction seam withheld in one document (ADR 0020): the sources slice's,
+  // because the acts over these rows — the review of a finding and the restore of an
+  // always-set span — are the slice's own, and the counts a publish dialog reads come off
+  // them. The worker inserts them and owns nothing here; the entry below records that.
+  "public.finding": "sources",
+  // A person's access or erasure request, with the identifier set it is about and the clock
+  // it runs on (ADR 0020): the erasure slice's, which sits at the top of the slice graph
+  // (ADR 0029 rule 4) and is the only writer — the request is recorded by an act, the map is
+  // computed from the set, and the routine writes the answer back on the same row.
+  "public.subject_request": "erasure",
+  // What the routine did in every store for one of those requests (ADR 0020, amended
+  // 2026-09-05): the same slice's, written by the routine under the platform principal and
+  // read by the replay a restore runs before the app serves anything.
+  "public.erasure_request": "erasure",
+  // What one document must keep out the next time it is reprocessed (ADR 0020): the same
+  // slice's, written by the routine's step 6. S1's reprocess is handed what to keep out by
+  // the app; the worker reads no suppression, which is why there is no entry below.
+  "public.suppression": "erasure",
   // Which evidence a concept cites, and a recorded Admin override of its derived class:
   // both written in the concepts slice's own transactions, the first by the governed write
   // and the second by the override act.
@@ -218,6 +236,48 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "workspaces",
     access: "write",
     reason: "The same two scopes, so a live access token cannot outlive its refresh row.",
+  },
+  {
+    table: "public.user",
+    by: "erasure",
+    access: "read and write",
+    reason:
+      "The routine's step 5 pseudonymises the row on the person's last membership — the address to a tombstone the erasure pseudonym names, the name cleared, the id kept because every ledger row names it (ADR 0020, ADR 0035) — and reads the address off it first, because the two rows deleted below are keyed by address and not by person. The erasure rehearsal's seed writes one row the other way, the synthetic subject a drill erases, under a reserved domain that resolves nowhere (ADR 0022, ADR 0024).",
+  },
+  {
+    table: "public.member",
+    by: "erasure",
+    access: "write",
+    reason:
+      "Every erasure request ends this workspace's membership, which is the whole of what the arm for a person who holds another does; the judgement between the two arms is the platform's and is never shown to an Admin (ADR 0035's rejected oracle). The read that makes it is `workspacesHeldBy` through the workspaces slice, recorded above. The erasure rehearsal's seed writes the one membership it later ends, so the drill's subject is held where a real member is (ADR 0022).",
+  },
+  {
+    table: "public.session",
+    by: "erasure",
+    access: "write",
+    reason:
+      "A sign-in carries the address it came from and the agent that made it, so the person's sessions go with the identity set on the last membership (ADR 0020).",
+  },
+  {
+    table: "public.verification",
+    by: "erasure",
+    access: "write",
+    reason:
+      "A verification row is keyed by the address a code was sent to rather than by person, so it is deleted by the identifier set's addresses and the one the user row still carries — the erasure map's own predicate, which is why it runs before the address is taken away.",
+  },
+  {
+    table: "public.invitation",
+    by: "erasure",
+    access: "write",
+    reason:
+      "An invitation names the address it was sent to. Deleted inside the requesting workspace and no other: an invitation another company sent is that company's record to answer for, and the map is fenced the same way.",
+  },
+  {
+    table: "public.account",
+    by: "erasure",
+    access: "write",
+    reason:
+      "A linked account is the external identity a sign-in came through — a name for this person at another provider — so it goes with the identity set on the last membership (ADR 0020).",
   },
   {
     table: "public.member",
@@ -330,6 +390,13 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "read",
     reason:
       "The nightly audit compares its own parse of each file against the row's content hash, and the full rebuild copies the row's identity, kind, status and visibility columns onto the generation it writes rather than re-deriving them (ADR 0023, ADR 0031). The worker never writes this table.",
+  },
+  {
+    table: "public.finding",
+    by: WORKER,
+    access: "write",
+    reason:
+      "The detector runs in the worker and the review of what it found is an Admin's act, so the worker records a span it withheld and holds INSERT alone — no SELECT, no UPDATE, no DELETE, each refusal a test of its own (ADR 0020). A worker that could read this table would hold a workspace's map of where its personal data sits; one that could update it could mark a special-category span reviewed. No lint sees across a process boundary, which is why the grant and this entry are both written down.",
   },
   {
     table: "public.graph_generation",
