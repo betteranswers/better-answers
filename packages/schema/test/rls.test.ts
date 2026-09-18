@@ -1896,7 +1896,7 @@ describe("the workspace-lifecycle function", () => {
       );
       expect(partition.rowCount).toBe(1);
 
-      // The index a new partition is born with, since migration 0035: a GIN index over the
+      // The index a new partition is born with, since migration 0037: a GIN index over the
       // full-text column `find`'s document arm matches on, and no vector index — nothing
       // embeds until S8, and an HNSW index over a column nobody writes cost every new
       // workspace a build and a resident structure for nothing.
@@ -2238,7 +2238,7 @@ describe("the derivation's tables under app_rt", () => {
     "composition_include",
   ] as const;
 
-  it("refuses the worker four of the six, and serves it exactly what a run reconciles on the other two (migrations 0020, 0035)", async () => {
+  it("refuses the worker four of the six, and serves it exactly what a run reconciles on the other two (migrations 0020, 0037)", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const seeded = await seedOneOfEach(seed, WS_A);
@@ -2910,7 +2910,7 @@ describe("the erasure request under both runtime roles", () => {
  * The **suppression** (`CONTEXT.md`; ADR 0020): what keeps a person's data out of every
  * derived store the next time one document is reprocessed — one row per document per erasure
  * request, carrying the identifiers to keep out. Restricted personal data itself, so the one
- * road the other tier holds is the read its run cannot do without (migration 0036): a
+ * road the other tier holds is the read its run cannot do without (migration 0038): a
  * document's applicable sets are an argument to the memoised function S1 converts through,
  * gathered inside the run's own scoped transaction and held no longer than the run. The three
  * writing roads stay shut, and the policy still stands over the read that is open.

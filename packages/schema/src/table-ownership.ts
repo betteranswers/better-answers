@@ -406,21 +406,21 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: WORKER,
     access: "read",
     reason:
-      "A document's applicable suppressions are an argument to the one memoised function a run converts through, so one person's erasure re-reads the documents that mention them and leaves the rest of the binding answered out of the store; the run gathers the sets inside the transaction its own workspace scope is set in and holds SELECT alone (migration 0036). Carrying them on the job row instead would write an erased person's identifiers into a queue row that outlives the run. The three writing roads stay shut and each is a refusal test of its own (ADR 0020): a tier that could insert could suppress a document nobody asked about, one that could update could empty a set, and one that could delete could put a person's data back into every derived store at the next conversion.",
+      "A document's applicable suppressions are an argument to the one memoised function a run converts through, so one person's erasure re-reads the documents that mention them and leaves the rest of the binding answered out of the store; the run gathers the sets inside the transaction its own workspace scope is set in and holds SELECT alone (migration 0038). Carrying them on the job row instead would write an erased person's identifiers into a queue row that outlives the run. The three writing roads stay shut and each is a refusal test of its own (ADR 0020): a tier that could insert could suppress a document nobody asked about, one that could update could empty a set, and one that could delete could put a person's data back into every derived store at the next conversion.",
   },
   {
     table: "index.chunk",
     by: WORKER,
     access: "read and write",
     reason:
-      "A run writes the chunk rows it split out of one document's normalised redacted text, rewrites them when the same document is processed again, and deletes the rows of a document that has gone from the source — so the worker holds INSERT, UPDATE and DELETE on the table by name (migration 0035) and reaches every row through the policied parent, never through a workspace's partition, which the lifecycle function revokes. The acts over the same rows are the sources slice's: a publish and a narrowing rewrite the visibility copies the run wrote, and the run's last statement re-copies them, so a narrowing that lands mid-run wins (ADR 0013, ADR 0031).",
+      "A run writes the chunk rows it split out of one document's normalised redacted text, rewrites them when the same document is processed again, and deletes the rows of a document that has gone from the source — so the worker holds INSERT, UPDATE and DELETE on the table by name (migration 0037) and reaches every row through the policied parent, never through a workspace's partition, which the lifecycle function revokes. The acts over the same rows are the sources slice's: a publish and a narrowing rewrite the visibility copies the run wrote, and the run's last statement re-copies them, so a narrowing that lands mid-run wins (ADR 0013, ADR 0031).",
   },
   {
     table: "public.source_document",
     by: WORKER,
     access: "read and write",
     reason:
-      "The catalogue is what a run reconciles: it reads the row to learn which item it is processing and writes back the content hash, the key of the normalised copy it wrote, the redaction version the seam returned, the outcome word and when it last saw the item. SELECT and UPDATE alone (migration 0035) — a document row is created by the act that bound its source and removed by the act that withdraws it, both the app's, so a worker that could insert one could catalogue a document nobody uploaded (ADR 0013, ADR 0020).",
+      "The catalogue is what a run reconciles: it reads the row to learn which item it is processing and writes back the content hash, the key of the normalised copy it wrote, the redaction version the seam returned, the outcome word and when it last saw the item. SELECT and UPDATE alone (migration 0037) — a document row is created by the act that bound its source and removed by the act that withdraws it, both the app's, so a worker that could insert one could catalogue a document nobody uploaded (ADR 0013, ADR 0020).",
   },
   {
     table: "public.graph_generation",

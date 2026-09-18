@@ -4,7 +4,7 @@ The app↔worker control plane is rows and never HTTP (ADR 0005), so this module
 whole of what "talking to the app" means here: claim a job, keep its lease alive, say
 what it found. Every one of the four calls is a SQL function the app migrated
 (`0022_the-queue-substrate.sql`, the claim replaced by
-`0033_the-job-subject-and-the-run-key-substrate.sql`), and every one is SECURITY INVOKER
+`0035_the-job-subject-and-the-run-key-substrate.sql`), and every one is SECURITY INVOKER
 — so what fences a call is this connection's role and the workspace the transaction is
 scoped to, and there is no workspace argument anywhere for a caller to get wrong.
 

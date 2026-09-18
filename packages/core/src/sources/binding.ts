@@ -418,7 +418,7 @@ export type BindingPublished = {
 
 /**
  * **The gate: the binding's latest `index` run, by subject.** Not the `state` column — the
- * worker holds `SELECT` alone on `source_binding` (migration 0035), so the run's own row is
+ * worker holds `SELECT` alone on `source_binding` (migration 0037), so the run's own row is
  * the only place the tier doing the work can say where it got to. *Done* alone lets a publish
  * through: queued and claimed have not finished, and a run that *failed* or was *poisoned*
  * found nothing for anybody to review, which is what a publish is a statement about (ADR

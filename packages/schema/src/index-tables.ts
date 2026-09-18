@@ -36,7 +36,7 @@ const embeddingVector = customType<{ data: number[]; driverData: string }>({
 });
 
 /**
- * The full-text vector over a chunk's content, in the English configuration (migration 0035).
+ * The full-text vector over a chunk's content, in the English configuration (migration 0037).
  * A `customType` for the same reason the embedding is one — drizzle-orm 0.45.2 declares no
  * `tsvector` — and therefore ADR 0028's plain-schema exception again. The driver hands the
  * column back as text, which is the only form it ever takes on this side of the boundary:
@@ -56,7 +56,7 @@ export const chunk = indexSchema.table("chunk", {
   id: text("id").notNull(),
   workspaceId: text("workspace_id").notNull(),
   content: text("content").notNull(),
-  // Nullable together, and kept together by the row's own CHECK (migration 0035): nothing
+  // Nullable together, and kept together by the row's own CHECK (migration 0037): nothing
   // embeds until S8, so a chunk lands with neither the vector nor the route that would have
   // made one — and a row may never carry one of the two without the other.
   embedding: embeddingVector("embedding"),

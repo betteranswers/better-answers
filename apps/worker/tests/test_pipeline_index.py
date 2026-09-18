@@ -12,8 +12,8 @@ which key was read and which was written any more clearly than a dictionary does
 superuser bypasses it by design, so the runs below open Postgres as a login role that is
 a member of `worker_rt` and is nothing else — the shape the deploy unit gives the
 worker. That is also what holds the grants honest: the suppression read is migration
-0036's, the finding insert migration 0024's, and the catalogue's update migration
-0035's, and a run connected as the owner would prove none of them. Rows are **read back
+0038's, the finding insert migration 0024's, and the catalogue's update migration
+0037's, and a run connected as the owner would prove none of them. Rows are **read back
 on the owner connection**, so a verification read never stands in for the write under
 test.
 
@@ -580,7 +580,7 @@ def test_a_suppression_standing_over_a_document_is_read_off_the_table_and_kept_o
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     """The run gathers what each document must keep out from the `suppression` table
-    itself, under its own workspace scope and through the SELECT migration 0036 grants —
+    itself, under its own workspace scope and through the SELECT migration 0038 grants —
     rather than being handed a set on the job row, which would write an erased person's
     identifiers into a queue row that outlives the run.
 

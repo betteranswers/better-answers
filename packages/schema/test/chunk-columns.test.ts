@@ -51,7 +51,7 @@ const attributesOf = async (client: pg.PoolClient, relation: string): Promise<At
 
 /**
  * Which of the two indexes one partition carries: the full-text one every partition is meant
- * to have from migration 0035 onward, and the vector one none of them is meant to have until
+ * to have from migration 0037 onward, and the vector one none of them is meant to have until
  * S8. Asked of a partition twice below — of one made after the migration and of one made
  * before it — and answered the same way both times, because the ruling is that no two
  * partitions differ.

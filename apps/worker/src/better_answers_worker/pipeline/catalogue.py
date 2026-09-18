@@ -26,8 +26,8 @@ and rewrites them itself.
 
 **What each grant is for.** The binding and the catalogue are SELECT and the catalogue
 is also UPDATE, because the hash, the normalised copy's key, the version, the outcome
-word and the last-seen stamp are a run's own findings (migration 0035). The suppression
-is SELECT alone (migration 0036). The finding is INSERT alone (migration 0024): the
+word and the last-seen stamp are a run's own findings (migration 0037). The suppression
+is SELECT alone (migration 0038). The finding is INSERT alone (migration 0024): the
 detector runs here and the review of what it found is an Admin's act, so a run records a
 span it withheld and can neither read the table back nor mark one reviewed.
 """

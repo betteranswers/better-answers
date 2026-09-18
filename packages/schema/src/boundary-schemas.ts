@@ -232,7 +232,7 @@ const chunkRefinements = {
   charEnd: (schema: z.ZodNumber) => schema.int().nonnegative(),
 };
 
-// The full-text column is the database's own (migration 0035), so it is refined on the read
+// The full-text column is the database's own (migration 0037), so it is refined on the read
 // form alone: a plain schema short-circuits drizzle-zod's shape conditions, which is exactly
 // what keeps a generated column out of the insert and update forms below, and it is optional
 // because no read this platform writes asks for it — it is matched against in SQL.
