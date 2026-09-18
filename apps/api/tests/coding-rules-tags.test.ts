@@ -191,6 +191,13 @@ const cite = ({ file, line, tag }: Citation): string => `${file}:${line} cites [
  * stopped citing one is refused too, and the list only ever shrinks. A ticket that takes a
  * tag out of one of these files takes its entry with it, in the same commit.
  *
+ * It stands at 120 since 2026-09-18, and that is the freeze completed, never the ratchet
+ * loosened: the walk of 12 September read `s0`'s tree, and fifteen of S1's tests — written
+ * on `s1` on 10 and 11 September, before the rule changed — cited a tag that same morning
+ * on a branch the walk could not see. They joined when `s1` was rebased onto `main`, by the
+ * owner's ruling, under the same terms as the 105. A test written after 12 September has
+ * no such claim, on any branch.
+ *
  * Generated, never typed — from the repository root, and the output pasted whole:
  *
  *     git ls-files --cached --others --exclude-standard \
@@ -251,9 +258,15 @@ const TESTS_CITING_A_TAG: readonly string[] = [
   "apps/worker/tests/pg_harness.py",
   "apps/worker/tests/test_cocoindex_ban.py",
   "apps/worker/tests/test_concept_file.py",
+  "apps/worker/tests/test_config.py",
+  "apps/worker/tests/test_document_chunk_contract.py",
   "apps/worker/tests/test_image.py",
   "apps/worker/tests/test_links.py",
+  "apps/worker/tests/test_log_bridge.py",
   "apps/worker/tests/test_monkeypatch_guard.py",
+  "apps/worker/tests/test_pipeline_host.py",
+  "apps/worker/tests/test_pipeline_index.py",
+  "apps/worker/tests/test_pipeline_landed.py",
   "apps/worker/tests/test_pytest_options.py",
   "apps/worker/tests/test_redaction.py",
   "apps/worker/tests/test_redaction_contract.py",
@@ -266,6 +279,8 @@ const TESTS_CITING_A_TAG: readonly string[] = [
   "packages/core/test/bundle-root.test.ts",
   "packages/core/test/bundle.ts",
   "packages/core/test/concepts.test.ts",
+  "packages/core/test/contract-fixture.ts",
+  "packages/core/test/document-chunk.contract.test.ts",
   "packages/core/test/dpia.test.ts",
   "packages/core/test/erasure-map.test.ts",
   "packages/core/test/erasure-rehearsal.test.ts",
@@ -281,12 +296,16 @@ const TESTS_CITING_A_TAG: readonly string[] = [
   "packages/core/test/kernel.test.ts",
   "packages/core/test/llm-routes.test.ts",
   "packages/core/test/members.test.ts",
+  "packages/core/test/passages.test.ts",
   "packages/core/test/principal.test.ts",
+  "packages/core/test/queue.contract.test.ts",
   "packages/core/test/reconciler.test.ts",
   "packages/core/test/redaction.contract.test.ts",
   "packages/core/test/runs.test.ts",
+  "packages/core/test/sources.test.ts",
   "packages/core/test/suggestions.test.ts",
   "packages/core/test/suite-postgres.ts",
+  "packages/core/test/visibility-columns.contract.test.ts",
   "packages/core/test/visibility.test.ts",
   "packages/core/test/worker-process.ts",
   "packages/core/test/workspace-with-bundle.ts",
@@ -298,11 +317,14 @@ const TESTS_CITING_A_TAG: readonly string[] = [
   "packages/devtools/test/throwaway-tree.test.ts",
   "packages/devtools/test/vitest-runner-patch.test.ts",
   "packages/schema/test/boundary-schemas.test.ts",
+  "packages/schema/test/chunk-columns.test.ts",
   "packages/schema/test/factory.ts",
   "packages/schema/test/harness.ts",
+  "packages/schema/test/job-kinds.test.ts",
   "packages/schema/test/llm-route-scenario.ts",
   "packages/schema/test/migration-ownership.test.ts",
   "packages/schema/test/rls.test.ts",
+  "packages/schema/test/source-catalogue.test.ts",
   "packages/schema/test/table-ownership.test.ts",
   "packages/schema/test/testing.ts",
   "packages/schema/test/warm-postgres.test.ts",
