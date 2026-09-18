@@ -453,6 +453,23 @@ def test_the_findings_land_as_the_rows_an_admin_will_review(
             DETECTOR_PIN,
             "unreviewed",
         ),
+        # *team lead*, wholly inside the health span above and on a tier this binding
+        # leaves off: the seam keeps every span its rules raise as a finding, whatever
+        # else claims the same characters, because a finding is the row an Admin reviews
+        # and not a claim on the text. The score is the model's, so it is held to a
+        # tolerance a second machine class can meet (0.9593 on arm64, 18/09/2026).
+        (
+            A_SICK_NOTE_ID,
+            "job-title",
+            "default-off",
+            "JOB_TITLE",
+            67,
+            76,
+            pytest.approx(0.96, abs=0.05),
+            RULE_VERSION,
+            DETECTOR_PIN,
+            "unreviewed",
+        ),
     ]
 
 
