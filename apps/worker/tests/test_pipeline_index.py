@@ -679,13 +679,26 @@ def test_the_wipe_reason_empties_the_bindings_store_before_the_run_reads_anythin
     bootstrap = bootstrap_for(dsn, tmp_path)
     binding_directory = tmp_path / workspace_id / BINDING
 
-    def files_now() -> dict[str, int]:
-        """Every file in the binding's store by name, and which file it is."""
+    def files_now() -> dict[str, tuple[int, int]]:
+        """Every file in the binding's store by name, and which file it is: the inode
+        and the instant that inode last changed, as a pair. The pair rather than the
+        number, because ext4 hands a freed inode number straight back to the next file
+        made — the CI runner's filesystem, 19/09/2026 — so after a wipe a new file can
+        carry the number an old one had, where APFS never reuses one and let the number
+        alone pass here. A file that stayed keeps both; a file made in its place shares
+        at most the number."""
         return {
-            str(path.relative_to(binding_directory)): path.stat().st_ino
+            str(path.relative_to(binding_directory)): (
+                path.stat().st_ino,
+                path.stat().st_ctime_ns,
+            )
             for path in sorted(binding_directory.rglob("*"))
             if path.is_file()
         }
+
+    def inodes_of(files: dict[str, tuple[int, int]]) -> dict[str, int]:
+        """By inode alone: what a run that kept the store leaves as it was."""
+        return {name: inode for name, (inode, _) in files.items()}
 
     index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
     after_the_first = files_now()
@@ -707,7 +720,8 @@ def test_the_wipe_reason_empties_the_bindings_store_before_the_run_reads_anythin
     wiped_read = read_afresh_in(capsys.readouterr().out)
 
     assert after_the_first != {}
-    assert after_the_rule_change.items() >= after_the_first.items()
+    kept, first = inodes_of(after_the_rule_change), inodes_of(after_the_first)
+    assert kept.items() >= first.items()
     assert planted.exists() is False
     assert set(after_the_wipe) & set(after_the_first) != set()
     assert set(after_the_wipe.values()).isdisjoint(after_the_first.values())
