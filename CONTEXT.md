@@ -182,7 +182,10 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   dated and sourced. An address on one is a person's own and is personal contact; an address on
   any other domain is a company's and stays in the text. A judgement, never a complete register.
 - **withheld** — the placeholder word: `[withheld]` for the always set, `[home address withheld]`
-  and the like for the rest, `[person A]` for a pseudonymised name.
+  and the like for the rest, `[person A]` for a pseudonymised name. The latter two are **typed
+  placeholders** — each names the class of data taken, one word per category — where the always
+  set has the one neutral word for everything in it, so that a reader is never told what class of
+  data the document held.
 - **relation** — a link from one concept to another as the map holds it: the two kinds, the
   section and the sentence around the link (`LINKS_TO`); the kind of a relation is read from
   the sentence, never from a predicate list (ADR 0026). *Supersedes*, a composition's citation
