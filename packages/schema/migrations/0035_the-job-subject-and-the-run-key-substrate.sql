@@ -1,7 +1,7 @@
--- Custom migration (hand-written SQL; ADR 0032), the substrate half of migration 0034's
--- pair: drizzle-kit emits no function, and `claim_job` has to be rewritten now that the row
--- it hands out carries a kind a claimant may not run and a subject only one run at a time
--- may hold.
+-- Custom migration (hand-written SQL; ADR 0032).
+-- The substrate half of migration 0034's pair: drizzle-kit emits no function, and `claim_job`
+-- has to be rewritten now that the row it hands out carries a kind a claimant may not run and
+-- a subject only one run at a time may hold.
 --
 -- **A drop and a create, not CREATE OR REPLACE.** The argument list changes, and Postgres
 -- identifies a function by its arguments — a replace would have left the two-argument
