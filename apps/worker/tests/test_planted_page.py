@@ -11,19 +11,23 @@ bytes. No daemon, no detector, and a failure that names the literal rather than 
 that came out one short.
 """
 
+import pytest
+
 from planted_page import (
     A_CONSUMER_ADDRESS,
     A_PLANTED_JOB_TITLE,
     FIXTURE_PAGE,
     PLANTED_SPANS,
     spans_withheld_under,
+    typed_placeholders_under,
 )
 
-#: A binding nobody configured, and the one flip an HR-shaped workspace makes — the two
-#: `test_redaction.py` hands the seam, spelled here to be handed to the derivation the
-#: image suite's absence list is built by.
+#: A binding nobody configured, the one flip an HR-shaped workspace makes, and every
+#: rule a binding can switch off switched off — the three `test_redaction.py` hands the
+#: seam, spelled here to be handed to the derivations both suites read from.
 THE_SAFE_SET = {"default_on": True, "default_off": False}
 AN_HR_SHAPED_BINDING = {"default_on": True, "default_off": True}
+NOTHING_SWITCHABLE = {"default_on": False, "default_off": False}
 
 
 def test_every_span_the_declaration_plants_is_on_the_page_once() -> None:
@@ -47,3 +51,29 @@ def test_a_span_goes_when_its_binding_switches_its_tier_on_and_not_before() -> N
     assert A_CONSUMER_ADDRESS in unconfigured
     assert A_PLANTED_JOB_TITLE not in unconfigured
     assert A_PLANTED_JOB_TITLE in spans_withheld_under(AN_HR_SHAPED_BINDING)
+
+
+def test_a_binding_writes_a_typed_word_for_each_switchable_tier_it_has_on() -> None:
+    # Both suites read their placeholder totals out of this derivation, so a run where
+    # it answered nothing would let both of them loop over an empty mapping and pass
+    # having asserted nothing. The words are named here, once, and only the words: how
+    # many of each is the fixture's business and stays where the fixture's counts are,
+    # so a page that grows a fourth home address never touches this case.
+    assert set(typed_placeholders_under(THE_SAFE_SET)) == {
+        "[date of birth withheld]",
+        "[home address withheld]",
+        "[personal contact withheld]",
+    }
+    # The other way: with every switchable rule off there is no typed word to write, and
+    # what the binding still takes goes under the always tier's one neutral word — which
+    # is the total neither suite can derive and each writes down for itself.
+    assert typed_placeholders_under(NOTHING_SWITCHABLE) == {}
+
+
+def test_a_binding_whose_tier_this_page_carries_no_count_for_is_refused() -> None:
+    # This page's counts are the recall set's, and the agreement raises a name and a job
+    # title at the tier an HR-shaped binding switches on. Answering that binding would
+    # mean handing back a mapping short by two words and no sign of it, so the direction
+    # the mistake has to fail in is loudly, at the call rather than in the assertion.
+    with pytest.raises(RuntimeError, match="no count"):
+        typed_placeholders_under(AN_HR_SHAPED_BINDING)

@@ -83,6 +83,7 @@ from planted_page import (
     FINDINGS_BY_CATEGORY,
     FIXTURE_PAGE,
     PLANTED_SPANS,
+    typed_placeholders_under,
 )
 
 #: A binding nobody configured: the always tier and the default-on tier in force, names
@@ -281,7 +282,9 @@ def test_the_always_set_is_withheld_where_every_switchable_rule_is_off(
     # three officers the block rule raised to this tier out of the one a binding could
     # have switched off. The third of those officers is the signatory, and this binding
     # is the one that proves the rule reaches him: the home address around his name is
-    # switched off here, so nothing else on the page covers those characters.
+    # switched off here, so nothing else on the page covers those characters. The image
+    # suite counts six of the same word on a different binding, and
+    # `planted_page.typed_placeholders_under` says why neither total is derived.
     assert redacted.count("[withheld]") == 7
 
 
@@ -302,12 +305,19 @@ def test_the_default_on_tier_writes_its_own_word_in_place_of_each_span(
 ) -> None:
     # The always tier has one word for everything in it; the tiers a binding switches
     # say what was taken, because a reader has to know a way of reaching somebody was
-    # removed rather than a name.
+    # removed rather than a name. Which word and how many of each is the declaration's,
+    # derived from the same rules this binding was built from: one placeholder per
+    # finding at a tier this binding has on, so a third copy of those numbers cannot sit
+    # here and go stale the way the image suite's did.
     redacted = on_a_plain_binding.text
+    typed = typed_placeholders_under(THE_SAFE_SET)
 
-    assert "[date of birth withheld]" in redacted
-    assert redacted.count("[home address withheld]") == 3
-    assert redacted.count("[personal contact withheld]") == 2
+    # A derived expectation that came back empty would leave the loop below asserting
+    # nothing, and this file is run on its own often enough that it cannot lean on the
+    # case in `test_planted_page.py` that names the words.
+    assert typed
+    for placeholder, written in typed.items():
+        assert redacted.count(placeholder) == written, placeholder
     assert A_CONSUMER_ADDRESS not in redacted
 
 

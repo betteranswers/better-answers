@@ -98,7 +98,12 @@ import pytest
 
 from conftest import DAEMON_SKIP_REASON
 from deploy_unit import PLATFORM_COMPOSE, worker_service
-from planted_page import FINDINGS_BY_CATEGORY, FIXTURE_PAGE, spans_withheld_under
+from planted_page import (
+    FINDINGS_BY_CATEGORY,
+    FIXTURE_PAGE,
+    spans_withheld_under,
+    typed_placeholders_under,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKSPACE = REPO_ROOT / "apps" / "worker"
@@ -167,35 +172,32 @@ PROBED_IMPORTS = REQUIRED_IMPORTS + DETECTOR_IMPORTS + HOST_IMPORTS
 WEIGHTS_MODULE = "better_answers_worker.redaction.weights"
 
 #: A binding nobody configured, and one binding's seed — ``THE_SAFE_SET`` and ``SEED``
-#: in ``tests/test_redaction.py``, spelled here as the JSON the probe is handed.
+#: in ``tests/test_redaction.py``, spelled here as the JSON the probe is handed. Every
+#: expectation below is derived from the parsed form rather than from a second
+#: statement of the same binding, so a case cannot go on describing one binding while
+#: the container is given another.
 THE_SAFE_SET = '{"default_on": true, "default_off": false}'
 SEED = "b0f3a1d2c4e5"
+THE_RULES_IN_FORCE = cast("Mapping[str, bool]", json.loads(THE_SAFE_SET))
 
 #: What the fixture planted that this binding therefore withholds, out of the one
-#: declaration of the page's answers and the same rules the container is handed —
-#: parsed rather than restated, so the list cannot go on saying one binding while the
-#: probe runs another. The page's planted job title is absent from it because
-#: ``default_off`` is false on the line above and the agreement raises a title at that
+#: declaration of the page's answers. The page's planted job title is absent from it
+#: because ``default_off`` is false above and the agreement raises a title at that
 #: tier; flip that key and the title joins the list of its own accord. They are still
 #: literals this repository wrote rather than anything read back from the container:
 #: what is being proved is that the image's seam answers what this repository's seam
 #: answers, and a container asked to grade its own work proves nothing.
-WITHHELD_SPANS = spans_withheld_under(
-    cast("Mapping[str, bool]", json.loads(THE_SAFE_SET))
-)
+WITHHELD_SPANS = spans_withheld_under(THE_RULES_IN_FORCE)
 
-#: The word each tier writes in place of a span it takes: one neutral word for the
-#: always tier, six spans of it here — the two sort-code pairs, the NHS number, the
-#: health sentence and two of the three officers the block rule raised — and a typed
-#: placeholder for each span the binding's own tier gave up. The third officer is named
-#: inside the signatories block's home address, so the address's own placeholder is
-#: written across him: the neutral word stays at six where the home addresses go to
-#: three.
+#: Every placeholder this binding leaves in the text, by how many of it. The typed ones
+#: are the shared declaration's — one word per finding at a switchable tier this binding
+#: has on, the word the agreement's and the number the category's. The always tier's
+#: single neutral word is written down instead, at the six spans of this page it covers;
+#: ``planted_page.typed_placeholders_under`` says why that one total cannot be derived
+#: and why ``tests/test_redaction.py`` counts the same word at seven.
 PLACEHOLDERS_IN_THE_TEXT: Mapping[str, int] = {
     "[withheld]": 6,
-    "[date of birth withheld]": 1,
-    "[home address withheld]": 3,
-    "[personal contact withheld]": 2,
+    **typed_placeholders_under(THE_RULES_IN_FORCE),
 }
 
 #: The sensitivity the health sentence narrows the document to.

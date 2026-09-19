@@ -41,8 +41,8 @@ FIXTURE_PAGE = (
 )
 
 #: The redaction agreement both tiers read (ADR 0031). Its tables carry the tier each
-#: category is raised at and the binding key each tier is switched by, which is why this
-#: module declares neither.
+#: category is raised at, the binding key each tier is switched by and the word written
+#: in place of a span of each category, which is why this module declares none of them.
 TIER_AGREEMENT = REPO_ROOT / "contracts" / "redaction" / "cases.json"
 
 _AGREEMENT = cast(
@@ -53,10 +53,20 @@ _AGREEMENT = cast(
 #: officer-block post-pass puts a name inside such a block at the always tier whatever
 #: its category says — and no span below is a name, so nothing derived from this table
 #: reads through that rule.
-TIER_BY_CATEGORY: Mapping[str, str] = {
+_TIER_BY_CATEGORY: Mapping[str, str] = {
     str(category["category"]): str(category["tier"])
     for category in _AGREEMENT["categories"]
 }
+
+#: The word written in place of a span of each category, and the tiers whose word is
+#: that typed one rather than the always tier's single neutral word.
+_PLACEHOLDER_BY_CATEGORY: Mapping[str, str] = {
+    str(category["category"]): str(category["placeholder"])
+    for category in _AGREEMENT["categories"]
+}
+_SWITCHABLE_TIERS = frozenset(
+    str(tier["tier"]) for tier in _AGREEMENT["tiers"] if tier["switchable"]
+)
 
 #: The page's consumer-domain email address: an invented mailbox at a real provider. The
 #: page carries a second address, on the invented company's own domain, which is
@@ -153,5 +163,53 @@ def spans_withheld_under(rules: Mapping[str, bool]) -> tuple[str, ...]:
     return tuple(
         planted
         for category, planted in PLANTED_SPANS
-        if TIER_BY_CATEGORY[category] in in_force
+        if _TIER_BY_CATEGORY[category] in in_force
     )
+
+
+def typed_placeholders_under(rules: Mapping[str, bool]) -> Mapping[str, int]:
+    """Every typed placeholder this page carries under a binding, and how many of each.
+
+    A finding at a switchable tier the binding has in force is written out under its
+    own category's word, one placeholder per finding — so the word is the agreement's
+    and the number is that category's count above, and a suite that spelled either out
+    would be keeping a third copy of an answer this module already holds.
+
+    The answer is complete or there is no answer. This page's counts cover the recall
+    set and not the two categories the agreement raises at the tier an unconfigured
+    binding leaves off, so a binding that switches *that* tier on is refused rather than
+    handed a mapping short by a word and no sign of it; a word two categories at one
+    in-force tier would share is refused for the same reason, since the second would
+    land on the first and the mapping would read as complete.
+
+    **The always tier is not here and cannot be derived.** It has one neutral word for
+    every category in it, and what that word ends up covering is settled between
+    findings rather than per category, so each suite writes its own total for it down:
+    six under the binding nobody configured, seven under the binding with every
+    switchable rule off, where the home address around an officer's name is left in the
+    text and his name needs a word of its own.
+    """
+    in_force = set(_tiers_in_force(rules)) & _SWITCHABLE_TIERS
+    taken = [
+        category for category, tier in _TIER_BY_CATEGORY.items() if tier in in_force
+    ]
+    uncounted = sorted(
+        category for category in taken if category not in FINDINGS_BY_CATEGORY
+    )
+    if uncounted:
+        message = (
+            f"{', '.join(uncounted)}: raised at a tier these rules have in force, and "
+            f"{FIXTURE_PAGE.name} declares no count"
+        )
+        raise RuntimeError(message)
+    written = {
+        _PLACEHOLDER_BY_CATEGORY[category]: FINDINGS_BY_CATEGORY[category]
+        for category in taken
+    }
+    if len(written) != len(taken):
+        message = (
+            f"{TIER_AGREEMENT.name} gives two of {', '.join(sorted(taken))} the same "
+            "word at a tier these rules have in force, so one total would hide another"
+        )
+        raise RuntimeError(message)
+    return written
