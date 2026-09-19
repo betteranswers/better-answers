@@ -9,6 +9,11 @@ wrong run of characters, and the round-trip pass rate that research measured for
 Presidio was 64 %. So every span the recall set names is sliced out of the text by the
 offsets the seam returned and compared to the literal the fixture planted (`[TEST9]`).
 
+What the page plants and what it answers by category are declared in `planted_page.py`
+and read from there. `tests/test_image.py` asks the same page the same questions inside
+the worker image, and two copies of one fixture's answers drift: one of them was false
+for a week and green the whole time.
+
 The offsets are code points into the **normalised text the seam was given**, never into
 the redacted text it returns: the two are the same document read two ways and their
 lengths differ by every placeholder written.
@@ -65,18 +70,19 @@ of the two pinned GLiNER models, on the image, with the date and the machine cla
 """
 
 from collections.abc import Mapping, Sequence
-from pathlib import Path
 
 import pytest
 
 from better_answers_worker.redaction import Redaction, redact
 from better_answers_worker.redaction.pins import VERSION_STRING
-
-FIXTURE = (
-    Path(__file__).resolve().parent
-    / "fixtures"
-    / "redaction"
-    / "supplier-information-pack.md"
+from planted_page import (
+    A_CONSUMER_ADDRESS,
+    A_HEALTH_SENTENCE,
+    A_PLANTED_JOB_TITLE,
+    AN_ADDRESS_AROUND_A_NAME,
+    FINDINGS_BY_CATEGORY,
+    FIXTURE_PAGE,
+    PLANTED_SPANS,
 )
 
 #: A binding nobody configured: the always tier and the default-on tier in force, names
@@ -126,20 +132,18 @@ ONE_NAME_SUPPRESSED: Sequence[Mapping[str, Sequence[str]]] = (
     {"emails": (), "names": ("Rosalind Petheridge",), "other": ()},
 )
 
-#: The page's two email addresses, which are the pair the consumer-domain rule is read
-#: through: an invented mailbox at a real consumer provider, and an invented mailbox on
-#: the invented company's own domain. Only the domain differs in kind — both local parts
-#: are a person's name — so what either assertion below can be about is the domain.
-A_CONSUMER_ADDRESS = "rosalind.petheridge@hotmail.co.uk"
+#: The other half of the pair the consumer-domain rule is read through: an invented
+#: mailbox on the invented company's own domain, against `A_CONSUMER_ADDRESS` at a real
+#: consumer provider's. Only the domain differs in kind — both local parts are a
+#: person's name — so what either assertion below can be about is the domain.
 A_COMPANY_ADDRESS = "callum.whitcombe@meridianfenland.co.uk"
 
-#: The signatories section's planted overlap, and the fourth person the page names. The
-#: address is one span the home-address rule raises and the name sits **inside** it, so
-#: the two rules claim the same run of characters and only one placeholder can be
-#: written over it. The name is also inside a block of officers, which is the one place
-#: the tier a finding is raised at stops being the binding's to switch.
+#: The fourth person the page names, and the one inside `AN_ADDRESS_AROUND_A_NAME`: the
+#: signatories block's address is care of him, so the home-address rule and the
+#: person-name rule claim the same run of characters. He is also inside a block of
+#: officers, which is the one place the tier a finding is raised at stops being the
+#: binding's to switch.
 A_FOURTH_OFFICER = "Oliver Denbigh"
-AN_ADDRESS_AROUND_A_NAME = "9 Kestrel Lane, care of Oliver Denbigh, Barwick, LS22 4TD"
 
 #: The two ends of that address, held separately because the whole literal cannot say
 #: what has to be said here. A pass that let the name outrank the span around it would
@@ -147,40 +151,6 @@ AN_ADDRESS_AROUND_A_NAME = "9 Kestrel Lane, care of Oliver Denbigh, Barwick, LS2
 #: [withheld], Barwick, LS22 4TD` — the whole address bar the person it belongs to, and
 #: a string the literal above no longer matches.
 A_STREET_AND_ITS_POSTCODE: tuple[str, ...] = ("9 Kestrel Lane", "LS22 4TD")
-
-#: The title planted in the roles section, and the fifth the page carries. It is the
-#: only one of the five that sits inside no other finding's span, which is what makes it
-#: the span this suite can read the switchable-off tier off: the health sentence covers
-#: one of the other four whatever a binding says about job titles, because the run of
-#: characters a placeholder is written over is settled between findings and not between
-#: categories.
-A_PLANTED_JOB_TITLE = "procurement manager"
-
-#: Every span the recall set is made of, as the category it must be raised under and
-#: the literal the fixture planted. Written out here rather than read back from the
-#: seam, so a recogniser that moved a boundary by one character fails rather than
-#: agrees with itself. The company address is deliberately absent: it is on no consumer
-#: domain, so it is not personal contact and the page keeps it.
-#:
-#: The health sentence is last and has to stay last, because the test that narrows the
-#: document reads this tuple's final entry as that sentence. A span planted later than
-#: it goes into the middle of the list and never onto the end.
-PLANTED_SPANS: tuple[tuple[str, str], ...] = (
-    ("date-of-birth", "3 February 1978"),
-    ("home-address", "14 Marlbrook Rise, Hensworth, NN12 3AB"),
-    ("home-address", "7 Pinfold Gate, Ashdale, YO41 9ZZ"),
-    ("home-address", AN_ADDRESS_AROUND_A_NAME),
-    ("bank-details", "00-00-00, account number 12345678"),
-    ("personal-contact", A_CONSUMER_ADDRESS),
-    ("personal-contact", "07700 900123"),
-    ("government-identifier", "999 000 0018"),
-    ("job-title", A_PLANTED_JOB_TITLE),
-    (
-        "special-category",
-        "One of our supervisors was on long-term sick leave following a cancer "
-        "diagnosis, which is why the programme slipped by six weeks.",
-    ),
-)
 
 #: The dates in the fixture's contract history. A bid library is dates all the way down
 #: and none of these is a person's, so none of them may be raised as one.
@@ -198,7 +168,7 @@ FENCED_SORT_CODE = "00-00-99 ACCOUNT=87654321"
 
 @pytest.fixture(scope="module")
 def page() -> str:
-    return FIXTURE.read_text(encoding="utf-8")
+    return FIXTURE_PAGE.read_text(encoding="utf-8")
 
 
 @pytest.fixture(scope="module")
@@ -269,20 +239,15 @@ def test_every_span_is_cut_back_out_of_the_text_by_the_offsets_it_came_with(
 
 def test_the_recall_set_is_found_in_full(on_a_plain_binding: Redaction) -> None:
     # The eight flagged spans and the health note, counted by the category each is
-    # raised under: three home addresses, two pieces of personal contact, and one each
-    # of the rest. Personal contact is two and not three because the page's third email
-    # address is the company's own, which no consumer-domain rule raises. The third home
-    # address is the signatories block's, planted around an officer's name, and it is
-    # counted here because a finding is what a rule raised and not what a binding wrote
-    # out — the name inside it is a finding too.
+    # raised under. Which numbers and why is `planted_page.py`'s to say, because the
+    # image suite holds the same page to the same answers; what this holds is that the
+    # seam in this tree is the one that gives them. Read as one comparison rather than
+    # six, so a run that answered two of them wrongly says so in one failure.
     counts = on_a_plain_binding.counts
 
-    assert counts["date-of-birth"] == 1
-    assert counts["home-address"] == 3
-    assert counts["bank-details"] == 2
-    assert counts["personal-contact"] == 2
-    assert counts["government-identifier"] == 1
-    assert counts["special-category"] == 1
+    assert {
+        category: counts.get(category, 0) for category in FINDINGS_BY_CATEGORY
+    } == dict(FINDINGS_BY_CATEGORY)
 
 
 def test_every_finding_names_the_tier_its_category_is_raised_at(
@@ -448,9 +413,9 @@ def test_a_health_cue_withholds_its_sentence_and_narrows_the_document(
     # document's sensitivity must become, and it is the only verdict the seam gives.
     sentences = spans_under(on_a_plain_binding, page, "special-category")
 
-    assert sentences == [PLANTED_SPANS[-1][1]]
+    assert sentences == [A_HEALTH_SENTENCE]
     assert on_a_plain_binding.verdict == "Restricted"
-    assert PLANTED_SPANS[-1][1] not in on_a_plain_binding.text
+    assert A_HEALTH_SENTENCE not in on_a_plain_binding.text
 
 
 def test_a_page_with_no_special_category_cue_narrows_nothing() -> None:

@@ -92,12 +92,13 @@ import tomllib
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from conftest import DAEMON_SKIP_REASON
 from deploy_unit import PLATFORM_COMPOSE, worker_service
+from planted_page import FINDINGS_BY_CATEGORY, FIXTURE_PAGE, spans_withheld_under
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKSPACE = REPO_ROOT / "apps" / "worker"
@@ -165,57 +166,31 @@ PROBED_IMPORTS = REQUIRED_IMPORTS + DETECTOR_IMPORTS + HOST_IMPORTS
 #: Dockerfile and nowhere else, so the module cannot move without both moving.
 WEIGHTS_MODULE = "better_answers_worker.redaction.weights"
 
-#: The page the seam is run over inside the image: the fixture
-#: ``tests/test_redaction.py`` runs it over, so the answers below are that file's
-#: answers for the same arguments.
-FIXTURE_PAGE = (
-    WORKSPACE / "tests" / "fixtures" / "redaction" / "supplier-information-pack.md"
-)
-
 #: A binding nobody configured, and one binding's seed — ``THE_SAFE_SET`` and ``SEED``
 #: in ``tests/test_redaction.py``, spelled here as the JSON the probe is handed.
 THE_SAFE_SET = '{"default_on": true, "default_off": false}'
 SEED = "b0f3a1d2c4e5"
 
-#: What the fixture planted, none of which may survive the seam on that binding. Written
-#: out as literals rather than read back from the container (`[TEST9]`): what is being
-#: proved is that the image's seam answers what this repository's seam answers, and a
-#: container asked to grade its own work proves nothing.
-#:
-#: The page's second email address is deliberately not here. It sits on the invented
-#: company's own domain rather than on a consumer provider's, so the seam leaves it in
-#: the text and a line asserting it gone would be asserting the opposite of the rule.
-#: Neither is the page's planted job title, on the one tier this binding leaves off: it
-#: is meant to be readable here, and the binding an HR-shaped workspace holds is what
-#: takes it out.
-PLANTED_SPANS = (
-    "3 February 1978",
-    "14 Marlbrook Rise, Hensworth, NN12 3AB",
-    "7 Pinfold Gate, Ashdale, YO41 9ZZ",
-    "9 Kestrel Lane, care of Oliver Denbigh, Barwick, LS22 4TD",
-    "00-00-00, account number 12345678",
-    "rosalind.petheridge@hotmail.co.uk",
-    "07700 900123",
-    "999 000 0018",
-    "One of our supervisors was on long-term sick leave following a cancer "
-    "diagnosis, which is why the programme slipped by six weeks.",
+#: What the fixture planted that this binding therefore withholds, out of the one
+#: declaration of the page's answers and the same rules the container is handed —
+#: parsed rather than restated, so the list cannot go on saying one binding while the
+#: probe runs another. The page's planted job title is absent from it because
+#: ``default_off`` is false on the line above and the agreement raises a title at that
+#: tier; flip that key and the title joins the list of its own accord. They are still
+#: literals this repository wrote rather than anything read back from the container:
+#: what is being proved is that the image's seam answers what this repository's seam
+#: answers, and a container asked to grade its own work proves nothing.
+WITHHELD_SPANS = spans_withheld_under(
+    cast("Mapping[str, bool]", json.loads(THE_SAFE_SET))
 )
 
-#: The findings by category, and the word each tier writes in place of a span it takes:
-#: one neutral word for the always tier, six spans of it here — the two sort-code pairs,
-#: the NHS number, the health sentence and two of the three officers the block rule
-#: raised — and a typed placeholder for each span the binding's own tier gave up. The
-#: third officer is named inside the signatories block's home address, so the address's
-#: own placeholder is written across him: the neutral word stays at six where the home
-#: addresses go to three.
-FINDINGS_BY_CATEGORY: Mapping[str, int] = {
-    "date-of-birth": 1,
-    "home-address": 3,
-    "bank-details": 2,
-    "personal-contact": 2,
-    "government-identifier": 1,
-    "special-category": 1,
-}
+#: The word each tier writes in place of a span it takes: one neutral word for the
+#: always tier, six spans of it here — the two sort-code pairs, the NHS number, the
+#: health sentence and two of the three officers the block rule raised — and a typed
+#: placeholder for each span the binding's own tier gave up. The third officer is named
+#: inside the signatories block's home address, so the address's own placeholder is
+#: written across him: the neutral word stays at six where the home addresses go to
+#: three.
 PLACEHOLDERS_IN_THE_TEXT: Mapping[str, int] = {
     "[withheld]": 6,
     "[date of birth withheld]": 1,
@@ -570,9 +545,10 @@ sys.stdout.write(json.dumps({
 
 # The second container's probe. It takes the page out of its environment by name, runs
 # the seam over it and writes down what the seam answered; it asserts nothing, because
-# the answers it is held to are literals above, read out of `tests/test_redaction.py`.
+# the answers it is held to are the ones `tests/planted_page.py` declares for that page.
 # The suppressions are empty here: no erasure request applies to a fixture, and the
-# seam's argument for one is exercised by that file rather than by a container.
+# seam's argument for one is exercised by `tests/test_redaction.py` and not by a
+# container.
 #
 # It also watches one third-party logger and reads one directory, and both are about the
 # same thing: the list of public suffixes `tldextract` wants the first time the seam
@@ -1188,7 +1164,7 @@ def test_the_image_redacts_the_fixture_with_its_network_refused_and_fetches_noth
     answered: Mapping[str, Any] = found["counts"]
     version = str(found["version"])
 
-    for planted in PLANTED_SPANS:
+    for planted in WITHHELD_SPANS:
         assert planted not in redacted, planted
     for placeholder, written in PLACEHOLDERS_IN_THE_TEXT.items():
         assert redacted.count(placeholder) == written, placeholder
