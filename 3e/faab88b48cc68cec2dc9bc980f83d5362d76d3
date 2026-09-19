@@ -1,0 +1,33 @@
+packages/core/test/visibility.test.ts
+  s_d0af3feba9b401::t_4cda0e84e7f5cf 687
+  s_d0af3feba9b401::t_cb4ad8f5db6819 767-769
+  s_d0af3feba9b401::t_b18f4c9fa8088c 792
+  s_d0af3feba9b401::t_44e820bd1114ca 752
+  s_d0af3feba9b401::t_326eafffcd399f 703-709
+packages/core/src/sources/admin-binding.ts
+  s_d0af3feba9b401::t_e3781bfecf03ff 25-30
+packages/core/src/sources/index.ts
+  s_d0af3feba9b401::t_e9b673a0dbd050 243
+  s_d0af3feba9b401::t_8ba3c876c15c80 282,285-286,289-290,294
+  s_d0af3feba9b401::t_eac6b9e4b46c96 273
+  s_d0af3feba9b401::t_3f66a9c8bd681a 1
+  s_d0af3feba9b401::t_aa78bf94600fa5 26
+  s_d0af3feba9b401::t_231ace4d23d245 264
+  s_d0af3feba9b401::t_861cd8b5aa2831 237-241,245,250
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3efaab88b48cc68cec2dc9bc980f83d5362d76d3",
+  "prompts": {},
+  "sessions": {
+    "s_d0af3feba9b401": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe1d0bc2-0cc8-462e-8315-25c2d57ff65d",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
