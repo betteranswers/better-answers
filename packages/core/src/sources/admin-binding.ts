@@ -80,11 +80,13 @@ type BindingRead = {
  *
  * It takes the head's own answer rather than the Principal, so an act that must decide
  * something between the two — the publish, which refuses a missing confirmation before it asks
- * the database anything — keeps that refusal in its own order.
+ * the database anything — keeps that refusal in its own order. That answer is the first
+ * parameter, the place the Principal it carries would sit on any other tenant read
+ * (`[SEC2]`'s shape, held by the review of 19/09/2026).
  */
 export const bindingNamed = async <Row extends TxRow>(
-  tx: Tx,
   acting: ActingOnBinding,
+  tx: Tx,
   read: BindingRead,
 ): Promise<Result<Row, "no-such-binding" | Error>> => {
   const locked = read.lock === "for-update" ? " FOR UPDATE" : "";

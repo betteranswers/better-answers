@@ -251,6 +251,19 @@ const jobsIn = async (workspaceId: string) =>
     )
   ).rows;
 
+/** The upload act's job on the queue, and its id — the row every run-key test enqueues behind. */
+const queuedBound = async (scenario: Scenario): Promise<string> => {
+  const first = await actOf(scenario, (tx) =>
+    enqueueJobIn(graphMaintenance, tx, boundJob(scenario.workspaceId)),
+  );
+  if (!first.ok) throw new Error(`the job was not queued: ${String(first.error)}`);
+  return first.value.jobId;
+};
+
+/** The reason each of this workspace's queued jobs carries, in enqueue order. */
+const reasonsIn = async (workspaceId: string): Promise<readonly string[]> =>
+  (await jobsIn(workspaceId)).map((row: { reason: string }) => row.reason);
+
 describe("an act that lands its rows and its job in one transaction", () => {
   it("rolls back with the act it rode in, so nothing is queued for work that never landed", async () => {
     // `[TEST8]`: the act's transaction is the thing under test, so its outcome is asserted
@@ -276,10 +289,7 @@ describe("an act that lands its rows and its job in one transaction", () => {
     // somebody else's act must never do — so the act goes on after the second enqueue and the
     // test asserts that it did.
     const scenario = await arrange();
-    const first = await actOf(scenario, (tx) =>
-      enqueueJobIn(graphMaintenance, tx, boundJob(scenario.workspaceId)),
-    );
-    if (!first.ok) throw new Error(`the job was not queued: ${String(first.error)}`);
+    const firstJobId = await queuedBound(scenario);
 
     const second = await actOf(scenario, async (tx) => {
       const answered = await enqueueJobIn(graphMaintenance, tx, {
@@ -290,11 +300,11 @@ describe("an act that lands its rows and its job in one transaction", () => {
       return answered;
     });
 
-    expect(second).toEqual({ ok: true, value: { jobId: first.value.jobId } });
+    expect(second).toEqual({ ok: true, value: { jobId: firstJobId } });
     // One row, still carrying the reason the first enqueue gave it: the second changed nothing.
     expect(await jobsIn(scenario.workspaceId)).toEqual([
       {
-        id: first.value.jobId,
+        id: firstJobId,
         kind: "index",
         subject_id: BINDING,
         reason: "bound",
@@ -303,14 +313,34 @@ describe("an act that lands its rows and its job in one transaction", () => {
     ]);
   });
 
+  it("takes a wipe onto the job already queued, and keeps it there when a later reason arrives", async () => {
+    // The one reason the queued job cannot cover for its successor: the worker removes the
+    // binding's directory only on a run whose reason is `wiped` (ADR 0036's pairing), so a
+    // wipe enqueued behind a queued `bound` run must become that run's reason, or the chunk
+    // rows go and the LMDB stays. The other way round, a `restored` behind a queued wipe is
+    // covered — a wipe rebuilds everything — so the wipe stays. Both ways, the pair.
+    const scenario = await arrange();
+    const firstJobId = await queuedBound(scenario);
+
+    const wipe = await actOf(scenario, (tx) =>
+      enqueueJobIn(graphMaintenance, tx, { ...boundJob(scenario.workspaceId), reason: "wiped" }),
+    );
+    expect(wipe).toEqual({ ok: true, value: { jobId: firstJobId } });
+    expect(await reasonsIn(scenario.workspaceId)).toEqual(["wiped"]);
+
+    const later = await actOf(scenario, (tx) =>
+      enqueueJobIn(graphMaintenance, tx, { ...boundJob(scenario.workspaceId), reason: "restored" }),
+    );
+    expect(later).toEqual({ ok: true, value: { jobId: firstJobId } });
+    expect(await reasonsIn(scenario.workspaceId)).toEqual(["wiped"]);
+  });
+
   it("queues a second binding on its own, because the run key is one per subject", async () => {
     // The other half of the pair above (`[TEST7]`): the rule is one queued run per binding,
     // never one per kind, so a workspace binding two files queues two jobs.
     const scenario = await arrange();
 
-    const first = await actOf(scenario, (tx) =>
-      enqueueJobIn(graphMaintenance, tx, boundJob(scenario.workspaceId)),
-    );
+    const firstJobId = await queuedBound(scenario);
     const other = await actOf(scenario, (tx) =>
       enqueueJobIn(graphMaintenance, tx, {
         ...boundJob(scenario.workspaceId),
@@ -318,10 +348,10 @@ describe("an act that lands its rows and its job in one transaction", () => {
       }),
     );
 
-    if (!first.ok || !other.ok) throw new Error("a job was not queued");
+    if (!other.ok) throw new Error("a job was not queued");
     expect(await jobsIn(scenario.workspaceId)).toEqual([
       {
-        id: first.value.jobId,
+        id: firstJobId,
         kind: "index",
         subject_id: BINDING,
         reason: "bound",

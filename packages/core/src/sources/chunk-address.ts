@@ -59,6 +59,14 @@ export const chunkIdOf = (sourceDocumentId: string, ordinal: number): string =>
   `${sourceDocumentId}${CHUNK_ID_SEPARATOR}${String(ordinal).padStart(ORDINAL_DIGITS, "0")}`;
 
 /**
+ * A chunk's wire locator from the three columns the splitter wrote: the one spelling of the
+ * address this tier composes, the inverse of `parseLocator`, and the same shape the worker's
+ * `locator_of` writes into the row's own column (ADR 0031).
+ */
+export const locatorOf = (sourceDocumentId: string, charStart: number, charEnd: number): string =>
+  `${sourceDocumentId}${PATH_SEPARATOR}${SPAN_PREFIX}${charStart}${SPAN_SEPARATOR}${charEnd}`;
+
+/**
  * The document and the span a wire locator names, or the one refusal word.
  *
  * What is refused here is what the string itself is wrong about — a missing span, an end

@@ -483,7 +483,7 @@ export const publishBinding = async (
 
   // `FOR UPDATE`, so two publishes of one binding queue rather than both reading it
   // unpublished and both writing a ledger row for the one publication.
-  const binding = await bindingNamed<{ published_at: Date | null }>(tx, acting.value, {
+  const binding = await bindingNamed<{ published_at: Date | null }>(acting.value, tx, {
     columns: "published_at",
     lock: "for-update",
   });
@@ -604,7 +604,7 @@ export const reprocessBinding = async (
 
   // No column: what this act needs off the row is that it is there and that it is held until
   // the transaction ends.
-  const standing = await bindingNamed(tx, acting.value, { columns: "1", lock: "for-update" });
+  const standing = await bindingNamed(acting.value, tx, { columns: "1", lock: "for-update" });
   if (!standing.ok) return err(standing.error);
 
   const queued = await enqueueJobIn(admin, tx, {

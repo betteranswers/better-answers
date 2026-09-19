@@ -211,7 +211,7 @@ export const dpiaInputFor = async (
   const { admin, bindingId } = acting.value;
 
   // A read, so no lock: there is nothing here for a second act to queue behind.
-  const read = await bindingNamed<BindingRow>(tx, acting.value, {
+  const read = await bindingNamed<BindingRow>(acting.value, tx, {
     columns: "sensitivity, audience, rules_in_force",
     lock: "none",
   });

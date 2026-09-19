@@ -58,6 +58,8 @@ export type JobStatus = (typeof JOB_STATUSES)[number];
 export type RebuildReason = (typeof REBUILD_REASONS)[number];
 /** The five things that put a binding back through the seam and into the index. */
 export type IndexReason = (typeof INDEX_REASONS)[number];
+/** The one index reason a queued run cannot cover for: the worker removes the store on it. */
+const WIPE_REASON = "wiped" satisfies IndexReason;
 
 /**
  * What is put on the queue: the kind, the subject a kind that names one is about, and the
@@ -261,11 +263,26 @@ const admittedToEnqueue = (
  * nothing: the two arms are read from one snapshot and a data-modifying CTE's effects are
  * not in it, so without the guard a queued row deleted by a transaction that committed after
  * the snapshot would be answered *beside* the row just written.
+ *
+ * The queued row covers every later reason but one. A wipe is the reason the worker removes
+ * the binding's directory on (ADR 0036's pairing: the app's act deletes the chunk rows, the
+ * run the app enqueued removes the store), and a queued `bound` run would rebuild into the
+ * store the wipe meant to throw away. So a wipe arriving behind a queued run becomes that
+ * run's reason — the row is unclaimed, nothing has read it — and a reason arriving behind a
+ * queued wipe leaves the wipe, which rebuilds everything anyway. The `taken` arm is that
+ * one exception and does nothing on every other enqueue; it runs once whether or not the
+ * primary query reads it, as a data-modifying CTE does (the review of 19/09/2026).
  */
 const ENQUEUE = `WITH inserted AS (
     INSERT INTO job (workspace_id, id, kind, subject_id, reason)
     VALUES ($1, $2, $3, $4::text, $5::text)
     ON CONFLICT (workspace_id, kind, subject_id) WHERE status = '${JOB_QUEUED_STATUS}' DO NOTHING
+    RETURNING id
+  ), taken AS (
+    UPDATE job SET reason = $5::text
+     WHERE workspace_id = $1 AND kind = $3 AND subject_id = $4::text
+       AND status = '${JOB_QUEUED_STATUS}' AND $5::text = '${WIPE_REASON}' AND reason <> '${WIPE_REASON}'
+       AND NOT EXISTS (SELECT 1 FROM inserted)
     RETURNING id
   )
   SELECT id FROM inserted
@@ -289,7 +306,8 @@ const ENQUEUE = `WITH inserted AS (
  * The id is minted before the insert, as every id the platform writes for itself is
  * (ADR 0035), and answered so a caller can wait for the job it queued rather than for the next
  * one to appear. A second enqueue for a binding already queued answers the **first** job's id:
- * the work that job will do covers this caller's reason too.
+ * the work that job will do covers this caller's reason too — a wipe excepted, which the
+ * queued job takes on as its own reason (`ENQUEUE`).
  */
 export const enqueueJobIn = async (
   principal: Principal,

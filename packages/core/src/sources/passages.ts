@@ -17,7 +17,7 @@ import {
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { adminOnBinding } from "./admin-binding.ts";
-import { parseLocator, spanText, type LocatorRefusal } from "./chunk-address.ts";
+import { locatorOf, parseLocator, spanText, type LocatorRefusal } from "./chunk-address.ts";
 
 /**
  * The reads over a chunk's columns: what a locator opens.
@@ -203,7 +203,7 @@ const wireLocatorOf = (row: {
   readonly source_document_id: string;
   readonly char_start: number;
   readonly char_end: number;
-}): string => `${row.source_document_id}/chars:${row.char_start}-${row.char_end}`;
+}): string => locatorOf(row.source_document_id, row.char_start, row.char_end);
 
 /**
  * The chunk rows a reader's words match, ranked, with the documents a concept they may see
