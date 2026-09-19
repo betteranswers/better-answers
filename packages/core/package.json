@@ -43,7 +43,7 @@
     "@stryker-mutator/api": "10.0.0",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
-    "@types/node": "24.13.3",
+    "@types/node": "24.13.6",
     "@types/pg": "8.23.1",
     "testcontainers": "12.1.0",
     "typescript": "7.0.2",

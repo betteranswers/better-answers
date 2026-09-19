@@ -19,14 +19,14 @@
   },
   "devDependencies": {
     "@better-answers/devtools": "workspace:*",
-    "@oxlint/plugins": "1.80.0",
+    "@oxlint/plugins": "1.83.0",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
-    "@types/node": "24.13.3",
-    "jscpd": "5.1.2",
-    "knip": "6.34.0",
-    "oxlint": "1.80.0",
-    "oxlint-tsgolint": "7.0.2001",
+    "@types/node": "24.13.6",
+    "jscpd": "5.3.0",
+    "knip": "6.37.0",
+    "oxlint": "1.83.0",
+    "oxlint-tsgolint": "7.0.2002",
     "typescript": "7.0.2",
     "vitest": "4.1.11"
   }
