@@ -35,17 +35,17 @@ Commands, versions and scripts are read from each workspace's `package.json` or 
 
 ## Skills
 
-`/to-spec` before a block's build and `/to-tickets` after; `/grilling` and `/domain-modeling` for any design conversation; `/codebase-design` when shaping a module; `/tdd` for red–green work; `/writing-for-agents` when editing any file; `/diagnosing-bugs` for anything broken or slow; `/browser-suite` for any Playwright spec under `apps/web/e2e/`; `/better-answers-design` for anything a person will look at; the api's tRPC skills under `apps/api/.claude/skills/` for any procedure, link or adapter in `apps/api/` (the transport rule in `apps/api/CODING_RULES.md`); `/c4-architecture` when an architecture review has moved the shape and the diagrams must say so. Other skills are available, co-located where they are most often utilised e.g., `apps/worker/.claude/skills/`, `apps/web/.claude/skills/`. If a task has a skill associated to it, use it to ensure best practice e.g., coolify and Hono skills for deployment, cocoindex for pipeline, better-auth for authentication etc.
+`/to-spec` before a block's build and `/to-tickets` after; `/implement` for every ticket, end to end (`docs/agents/workflow.md`); `/grilling` and `/domain-modeling` for any design conversation; `/codebase-design` when shaping a module; `/tdd` for red–green work; `/writing-for-agents` when editing any file; `/diagnosing-bugs` for anything broken or slow; `/browser-suite` for any Playwright spec under `apps/web/e2e/`; `/better-answers-design` for anything a person will look at; the api's tRPC skills under `apps/api/.claude/skills/` for any procedure, link or adapter in `apps/api/` (the transport rule in `apps/api/CODING_RULES.md`); `/c4-architecture` when an architecture review has moved the shape and the diagrams must say so. Other skills are available, co-located where they are most often utilised e.g., `apps/worker/.claude/skills/`, `apps/web/.claude/skills/`. If a task has a skill associated to it, use it to ensure best practice e.g., coolify and Hono skills for deployment, cocoindex for pipeline, better-auth for authentication etc.
 
 ## Agent skills
 
 ### Issue tracker
 
-Three lanes. Build tasks live in **ordna** (`storage: namespace` — git blobs at `refs/ordna/tasks/<id>`, no files on disk; use the `ordna` CLI), cut from a block of the route spec; wayfinding maps and their tickets live as markdown under `.scratch/<effort>/`; a finding from a gate, a mutation run or a review is one ordna task tagged `hygiene` — no map, no spec, no grilling, picked when a block is blocked or a session is short. A body edit or a new task is pushed to **origin first**, then set locally: an open board auto-fetches every minute and reverts a local-only ref. Procedure in `docs/agents/issue-tracker.md`.
+Three lanes. Build tasks live in **ordna** (`storage: namespace` — git blobs at `refs/ordna/tasks/<id>`, no files on disk; use the `ordna` CLI), cut from a block of the route spec; wayfinding maps and their tickets live as markdown under `.scratch/<effort>/`; a finding — from a gate, a mutation run, a review or an agent's attempt at a ticket — is one ordna task tagged `needs-triage` carrying the command and output that show it, and `/triage` decides whether it joins the hygiene lane (tagged `hygiene`, picked when a block is blocked or a session is short). A body edit or a new task is pushed to **origin first**, then set locally: an open board auto-fetches every minute and reverts a local-only ref. Procedure in `docs/agents/issue-tracker.md`.
 
-### Build loop
+### Workflow
 
-A block's tickets are built by agents: the session orchestrates, `ralph` runs one ticket as a work → test loop over fresh `implementor` children, the `verifier` signs it off against the ordna acceptance criteria, and the ticket lands on the block branch — one worktree per ticket, one PR per block, migrations serialised. The rules, the brief and the gates are `docs/agents/build-loop.md`; the agent files under `.claude/agents/` point there and carry nothing of their own.
+A set of ordna tickets is built under one `/goal` in one session, the Coordinator: one agent per ticket runs `/implement` end to end and fixes what its own `/code-review` finds; one PR per ticket into `main`, CI's root `check` the arbiter; a finding outside the ticket is a `needs-triage` task. The steps, the goal's shape and what `check` runs where are `docs/agents/workflow.md`.
 
 ### Triage labels
 
@@ -61,7 +61,7 @@ A survivor is a hypothesis until a probe answers it: controls both ways, the who
 
 ### Code review
 
-Cubic reviews every PR and its findings are triaged through the `cubic` MCP on the PR threads, one commit per round, three rounds at most — **paused since 10/09/2026** at the plan's limit, the substitute being `docs/agents/build-loop.md`'s review section; GitNexus gates every edit and commit; the wiki orients and never decides. The loop is `docs/agents/code-review.md` — read it before opening a PR.
+Cubic reviews every PR and its findings are triaged through the `cubic` MCP on the PR threads, one commit per round, three rounds at most — **paused since 10/09/2026** at the plan's limit, the substitute being the `/code-review` that ends every agent's `/implement` and CI on the ticket's PR (`docs/agents/workflow.md`); GitNexus gates every edit and commit; the wiki orients and never decides. The loop is `docs/agents/code-review.md` — read it before opening a PR.
 
 ## Code Exploration Policy
 
@@ -90,6 +90,8 @@ This server runs the **front door** surface: three tools reach every jCodeMunch 
 - Edited files are reindexed automatically.
 
 **Announce your model once per session** so the server can size its answers: `announce_model { "model": "<your-model-id>" }`.
+
+**From a worktree, two indexes.** jCodeMunch reads the worktree's own index, which the create hook builds, so it sees this branch's uncommitted edits. GitNexus reads the main checkout's, taken at its last `analyze`, which runs in the main checkout only — the runner is absent from a worktree — after every merge to `main`. So `detect_changes` from a worktree takes `repo: "better-answers"` **and** `worktree: <the worktree's absolute path>`; and an `impact` that answers *ambiguous* is re-run by `target_uid` before its risk counts. Prose is in neither index — jCodeMunch indexes no markdown and GitNexus holds headings only — so a search across documents is a shell `grep`, with that reason said.
 
 <!-- gitnexus:start -->
 <!-- gitnexus:keep -->

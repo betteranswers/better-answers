@@ -720,7 +720,14 @@ How the work from the foundation to a finished v0.1 is cut and ordered (T-112, 0
   *records strand* (guides, suggestions). A block belongs to one strand; a cross-strand edge is
   stated on the block. Not a *lane*, which is a queue the tracker keeps (`docs/agents/issue-tracker.md`).
   _Avoid_: lane, track, path (the write path, the answer path).
-- **hygiene lane** — where a finding from a gate, a mutation run or a review goes: one ordna task
-  tagged `hygiene`, with no map, no spec and no grilling, picked when a route block is blocked or
-  a session is short. Off the route, so it never charts a map. _Avoid_: tech debt, chores,
-  follow-ups.
+- **hygiene lane** — the off-route queue: an ordna task tagged `hygiene` that `/triage` has judged
+  worth doing and that belongs to no block, picked when a route block is blocked or a session is
+  short. A finding — from a gate, a mutation run, a review or an agent's attempt at a ticket —
+  enters the tracker tagged `needs-triage` and reaches this lane only through `/triage`; it never
+  lands here directly and never charts a map (amended 19/09/2026; until then a finding was cut
+  straight to the lane, and 39 of 62 such tasks were the ticket's own work). _Avoid_: tech debt,
+  chores, follow-ups.
+- **Coordinator** — the one session that owns a `/goal` over a set of ordna tasks and works it
+  to its end state: it dispatches each task to an agent with a context of its own — in a
+  worktree, beside others in parallel — reads what comes back, and decides what runs next.
+  Settled 19/09/2026 in the workflow grill. _Avoid_: orchestrator, ralph.

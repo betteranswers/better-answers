@@ -31,7 +31,7 @@ import { afterAll, describe, expect, it } from "vitest";
  * runs on is installed and ignored (ADR 0027): `.agents/skills/`, the symlinks under
  * `.claude/skills/` that point into it, the plugin skills that live there directly, the
  * skills each workspace keeps beside its own code (`apps/api/.claude/skills/` and its
- * siblings, the tier's skills `build-loop.md` names), and `tasks/AGENTS.md`.
+ * siblings, the tier's skills `AGENTS.md` names), and `tasks/AGENTS.md`.
  * `.claude/hooks/provision-skills.sh` copies them from the primary checkout — the one
  * `git rev-parse --git-common-dir` names — and is the stage `provision-worktree.sh` runs
  * after the installs. It is run here rather than read, because

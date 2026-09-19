@@ -6,9 +6,11 @@ This repo runs **three lanes**, and a skill must know which one it is in.
 | --- | --- | --- | --- |
 | **Build queue** | ordna — git blobs at `refs/ordna/tasks/<id>` | Tasks that produce code: `T-001`, `T-002`, … — cut from a *block* of the route spec (`docs/specs/v01-route.md`) | `/to-tickets`, `/triage`, humans |
 | **Discovery** | `.scratch/<effort>/` markdown | The wayfinder map and its research · prototype · grilling tickets | `/wayfinder`, `/research`, `/prototype` |
-| **Hygiene** | ordna — tasks tagged `hygiene` | A finding from a gate, a mutation run or a review: one task each, no map, no spec, no grilling | The gate that found it, `/triage`, humans |
+| **Hygiene** | ordna — tasks tagged `hygiene` | A task `/triage` has judged worth doing that belongs to no block: one each, no map, no spec | `/triage`, humans |
 
 A discovery ticket asks *what should we build*. An ordna task says *build this*. Discovery output becomes a spec; a spec becomes ordna tasks. Never the reverse.
+
+**A finding enters as `needs-triage`.** Whoever finds something outside the ticket in hand — a gate, a mutation run, a review, an agent's attempt at a ticket — creates one task tagged `needs-triage` carrying the command and output that show it, and stops there; `/triage` moves it on, to the hygiene lane or elsewhere, in a session of its own (`docs/agents/workflow.md`). Since 19/09/2026; before it a finding was cut straight to the lane, and most such tasks were the finding ticket's own work.
 
 **The hygiene lane is off the route.** A hygiene task is picked when a route block is blocked or a session is short; it never charts a map and never becomes a spec round. The route spec's status table is the only frontier a product session reads, and a Wayfinder map is charted only for a destination the route spec does not already hold (`CONTEXT.md`, *hygiene lane*, *route spec*).
 

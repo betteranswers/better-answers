@@ -11,7 +11,7 @@ set -euo pipefail
 # `.agents/skills/` holds the installed skills, `.claude/skills/` a relative symlink per
 # skill into it plus the plugin skills that live there directly, each workspace's own
 # `.claude/skills/` (`apps/api/.claude/skills/` and its siblings — the tier's skills that
-# `docs/agents/build-loop.md` names, kept beside the code they are for) the same two
+# `AGENTS.md` names, kept beside the code they are for) the same two
 # shapes, and `tasks/AGENTS.md` is `ordna skill install`'s copy of the ordna guide.
 # Without this stage a worktree is offered only `.claude/skills/browser-suite/`, the one
 # skill this repository wrote.
