@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { knipOver } from "@better-answers/devtools/throwaway-tree";
 import type { KnipFinding, Tree } from "@better-answers/devtools/throwaway-tree";
 
-import knipConfig from "../../../knip.config.ts";
+import knipConfig, { topLevelIgnore } from "../../../knip.config.ts";
 
 /**
  * knip as a gate, run over a throwaway tree (`[CHECK1]`).
@@ -22,13 +22,21 @@ import knipConfig from "../../../knip.config.ts";
  * does not exist yet is never a finding (ADR 0033). The rule is a directory in the
  * configuration, so the test that proves it is a tree with an unreached file in one.
  *
- * The last three cases hold T-180's fix: `.gitnexus/`, a per-checkout GitNexus index, is
- * excluded from git through `.git/info/exclude` rather than `.gitignore`, which is the only
- * file knip reads, so an analysed checkout named `.gitnexus/run.cjs` an unused file for a
- * reason that was never the tree's. One case reads the repository's own `knip.config.ts` as
- * a value, the way `packages/devtools/test/jscpd.test.ts:103-112` reads jscpd's; the other
- * two run the mechanism itself over a throwaway tree, both ways, so the silence is proved
- * and not assumed from the tool's own docs.
+ * The last five cases hold `.gitnexus/`, a per-checkout GitNexus index: it is excluded from
+ * git through `.git/info/exclude` rather than `.gitignore`, which is the only file knip
+ * reads, so an analysed checkout named `.gitnexus/run.cjs` an unused file for a reason that
+ * was never the tree's (T-180). Two read the function `knip.config.ts` computes its
+ * top-level `ignore` through, both ways as literals, because a directory that is absent is
+ * a pattern matching nothing, which knip prints as a configuration hint on every run from a
+ * checkout that was never analysed (T-192); a third reads the configuration's own value, so
+ * the call that joins the two cannot be dropped or handed the presence inverted while the
+ * suite stays green. The other two run the mechanism itself over a throwaway tree, both
+ * ways, so the silence is proved and not assumed from the tool's own docs.
+ *
+ * The hint itself is out of this runner's reach and is not asserted anywhere: knip prints
+ * configuration hints from its default reporter only, and the runner reads the JSON one,
+ * which answers `{"issues":[]}` and no hints for the same tree. It was proved by hand
+ * instead, and the run is in T-192's commit message.
  */
 
 const MANIFEST = JSON.stringify({
@@ -135,16 +143,34 @@ describe("the knip gate is a step of the root check (T-066)", () => {
   });
 });
 
-describe("the repository's own configuration ignores `.gitnexus/` (T-180)", () => {
-  it("names `.gitnexus/**` in the top-level `ignore`", () => {
-    // SAFETY: `knip.config.ts`'s declared type admits the function form knip supports for a
-    // CLI-argument-aware config; this repository's own config is always the plain object
-    // below, so the cast reads a value nobody is asking knip to compute. Read as a value so
-    // a deleted line fails here rather than turning into a red gate on a branch that never
-    // carries a GitNexus index — the jscpd precedent above reads its config the same way.
-    const { ignore } = knipConfig as { readonly ignore?: readonly string[] };
+describe("the repository's own top-level `ignore` follows the index's presence (T-192)", () => {
+  it("ignores `.gitnexus/**` for a checkout that carries an index", () => {
+    expect(topLevelIgnore(true)).toEqual([".gitnexus/**"]);
+  });
 
-    expect(ignore).toContain(".gitnexus/**");
+  it("ignores nothing for a checkout that carries none", () => {
+    // A worktree carries no index of its own — GitNexus analyses the main checkout only —
+    // and knip prints a pattern that matches nothing as a hint to remove it, on every run,
+    // while the exit stays 0. The pattern is dropped rather than the hint silenced: the
+    // only silence knip offers is `--no-config-hints`, which would also hide the
+    // redundant-entry hints `knip.config.ts`'s docblock is written to keep.
+    expect(topLevelIgnore(false)).toEqual([]);
+  });
+
+  it("ignores what this checkout's own directory asks for", () => {
+    // The two cases above hold the function; this one holds the line that calls it, which
+    // nothing else reads: dropped, or handed the presence inverted, the configuration would
+    // be silent here and knip would name `.gitnexus/run.cjs` unused on an analysed checkout
+    // again — the red gate T-180 landed to stop. The expectation is a literal on each side
+    // of a branch taken from the filesystem, so the case holds wherever it runs: `[]` from a
+    // worktree, the glob from a main checkout that has been analysed.
+    // SAFETY: `knip.config.ts`'s declared type admits the function form knip supports for a
+    // CLI-argument-aware config; this repository's own config is always a plain object, so
+    // the cast reads a value nobody is asking knip to compute.
+    const { ignore } = knipConfig as { readonly ignore?: readonly string[] };
+    const root = path.resolve(import.meta.dirname, "../../..");
+
+    expect(ignore).toEqual(existsSync(path.join(root, ".gitnexus")) ? [".gitnexus/**"] : []);
   });
 });
 

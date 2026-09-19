@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 import type { KnipConfig } from "knip";
 
 /**
@@ -19,13 +22,30 @@ import type { KnipConfig } from "knip";
  * What is left is what knip cannot know, each with its reason beside it. This is TypeScript
  * rather than JSON so those reasons can be sentences.
  */
+
+/**
+ * The top-level `ignore`, from whether this checkout carries a GitNexus index.
+ *
+ * A GitNexus index is written under `.gitnexus/` per checkout. It is excluded from git
+ * through `.git/info/exclude` rather than `.gitignore` — machine-local state never
+ * committed to the tree — and knip reads `.gitignore` only, never `.git/info/exclude`. A
+ * checkout that has been analysed therefore names `.gitnexus/run.cjs` as an unused file for
+ * a reason that is not the tree's: the directory not being in the tree at all.
+ *
+ * A checkout that has not been analysed carries no such directory, and every worktree is
+ * one of those — GitNexus's runner lives in the main checkout. There the pattern matches
+ * nothing, and knip prints a pattern matching nothing as a configuration hint ("Remove from
+ * ignore") on every run while the exit stays 0, which is the same noise on a gate the
+ * docblock above refuses to leave standing. So the pattern is named only where it matches.
+ * The alternative, silencing the hint, is `--no-config-hints` and nothing narrower: it
+ * would take the redundant-entry hints with it, and those are the ones this configuration
+ * is written to keep agreeing with.
+ */
+export const topLevelIgnore = (hasGitNexusIndex: boolean): readonly string[] =>
+  hasGitNexusIndex ? [".gitnexus/**"] : [];
+
 const config: KnipConfig = {
-  // A GitNexus index, written under `.gitnexus/` per checkout. It is excluded from git
-  // through `.git/info/exclude` rather than `.gitignore` — machine-local state never
-  // committed to the tree — and knip reads `.gitignore` only, never `.git/info/exclude`. A
-  // checkout that has been analysed therefore names `.gitnexus/run.cjs` as an unused file for
-  // a reason that is not the tree's: the directory not being in the tree at all.
-  ignore: [".gitnexus/**"],
+  ignore: [...topLevelIgnore(existsSync(path.resolve(import.meta.dirname, ".gitnexus")))],
 
   // `uv` is the Python tier's package manager, named by the root `check:worker` step and by
   // the pre-commit hook. It is installed on the machine, never by npm, so there is no
