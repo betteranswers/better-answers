@@ -8,8 +8,8 @@ import { workspace } from "./workspace-table.ts";
 
 /**
  * The **queue** the worker claims from: one ordinary tenant table (`withRLS()`, ADR 0032),
- * owned by the `runs` slice — the worker control plane as the app sees it — and written by
- * both tiers, the app enqueueing and the worker claiming (ADR 0005: the control plane is
+ * owned by the `runs` slice — the worker control plane as the api sees it — and written by
+ * both tiers, the api enqueueing and the worker claiming (ADR 0005: the control plane is
  * rows, never HTTP).
  *
  * The claim, the lease, the heartbeat and the two finishes are **SQL functions** in the
@@ -35,7 +35,7 @@ export const INDEX_KIND = "index";
 
 /**
  * The six reasons a full rebuild happens, exactly as ADR 0023 names them. A rebuild is
- * never routine — an ordinary edit's delta lands in the app's own commit transaction — so
+ * never routine — an ordinary edit's delta lands in the api's own commit transaction — so
  * every one of them is a thing that happened, and the row says which.
  */
 export const REBUILD_REASONS = [
@@ -55,12 +55,16 @@ export const REBUILD_REASONS = [
 export const INDEX_REASONS = ["bound", "restored", "rule-change", "wiped", "narrowed"] as const;
 
 /**
- * Which tier's loop claims a kind. Every kind today is the worker's — the app enqueues a
+ * Which tier's loop claims a kind. Every kind today is the worker's — the api enqueues a
  * rebuild from `pnpm ops` and waits for the worker to run it — and the word is on the
- * record because a later kind is the app's own: a question set's answer path runs where the
+ * record because a later kind is the api's own: a question set's answer path runs where the
  * answering does (ADR 0005: the control plane is rows, so neither tier calls the other).
+ *
+ * **api**, not *app*, for the TypeScript deployable (`CONTEXT.md`, *api*): `apps/` holds three
+ * of them, and `app` is already a hostname role and the name of the Postgres runtime role the
+ * api connects as (`app_rt`).
  */
-export type ClaimingTier = "app" | "worker";
+export type ClaimingTier = "api" | "worker";
 
 /**
  * What one **kind** of job is, declared in one place: the word on the row, the tier that
@@ -86,7 +90,7 @@ export type JobKindDescriptor = {
 
 /**
  * One record per kind. The first two are the queue's own, T-006's obligations: the
- * **nightly parser audit**, where the Python parser cross-checks the app's parse
+ * **nightly parser audit**, where the Python parser cross-checks the api's parse
  * hash-by-hash, and the **full rebuild**, the graph sync run that writes a new generation
  * beside the live one and flips it (`CONTEXT.md`, *graph sync run*; ADR 0023). The third
  * is S1's: an **index** run over one binding, which is the only kind so far whose row says
@@ -188,7 +192,7 @@ export const JOB_MAX_ATTEMPTS = 3;
  * whose values are a scalar, a list of scalars, or a list of flat objects of scalars — the
  * auditor's `{path, expected, actual}` triple and nothing deeper. The worker writes exactly
  * that shape (`ParseFindings.as_row`, `RebuildOutcome.as_row` and the failure's `{error}` in
- * `apps/worker`), and the app parses every outcome it reads back through the boundary before
+ * `apps/worker`), and the api parses every outcome it reads back through the boundary before
  * it answers a caller, so an outcome that grew a nested place to hide content in is refused
  * on the way out rather than served.
  *

@@ -30,10 +30,10 @@ import {
 import { withMembership, withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 
 /**
- * Slice: **runs** — the worker control plane as the app sees it.
+ * Slice: **runs** — the worker control plane as the api sees it.
  *
  * The plane is **rows and never HTTP** (ADR 0005), so this slice is one table's worth of
- * app-side calls: put a job on the queue, and read what the last one found. The claim
+ * api-side calls: put a job on the queue, and read what the last one found. The claim
  * protocol itself — claim, lease, heartbeat, the two finishes — is SQL functions both tiers
  * call (`0022_the-queue-substrate.sql`, fixtured as the queue agreement in `contracts/`),
  * which is why there is no claiming here: a transition two clients each implemented would
@@ -44,11 +44,12 @@ import { withMembership, withScope, type PostgresDoor, type Tx } from "../store/
  * names one. Enqueueing, claiming and finishing write no ledger row, and this slice calls no
  * audit door. What a job did is read off the job.
  *
- * **Both principals reach this queue, and they are not the same road.** A person's enqueue is
- * an Admin's act in their own workspace, re-checked inside the transaction. The platform's
- * runs for no person at all — the ops commands are cron's, inside a container, with no
- * session to resolve — so it names the workspace as an argument and is scoped to it, which is
- * the shape the Postgres door already has for a platform act.
+ * **Both principals reach this queue, and they are not the same road.** A person's enqueue is an
+ * act at the role the kind names — `JOB_KIND_DESCRIPTORS`' `enqueuedBy`, which `admittedToEnqueue`
+ * reads — in their own workspace, re-checked inside the transaction. The platform's runs for no
+ * person at all — the ops commands are cron's, inside a container, with no session to resolve — so
+ * it names the workspace as an argument and is scoped to it, which is the shape the Postgres door
+ * already has for a platform act.
  *
  * ADR 0029 rule 3 — imports `kernel` and `store`; never another slice.
  */
@@ -129,7 +130,7 @@ export type JobState = {
  *
  * **The boundary's own shape, parsed on every read.** The finish functions take any JSONB
  * the claimant hands them — the queue agreement's functions are the database's and carry no
- * schema — so what holds the contract is that every outcome the app reads back goes through
+ * schema — so what holds the contract is that every outcome the api reads back goes through
  * the boundary first: one that grew a nested place to hide content in is an outcome this
  * slice will not serve, not a value it hands a caller under the documented type.
  */
@@ -189,28 +190,6 @@ const inWorkspace = async <T>(
   return ok(held.value.value);
 };
 
-/**
- * The person's gate on this slice's **reads**: an Admin, reading in the workspace their
- * credential names. The platform passes — it has no role to check and no workspace of its own
- * to hold it to; the argument beside it is the workspace it acts in.
- *
- * The word for a foreign workspace is the caller's, because a read and a write mean different
- * things by one: a poll for a job in another tenant's workspace is a job this workspace never
- * held, while the enqueue calls the same caller `malformed` (`admittedToEnqueue`, which is the
- * write's own gate because the role it requires is the kind's and not this one fixed word).
- */
-const adminInOwnWorkspace = <Elsewhere extends string>(
-  principal: Principal,
-  workspaceId: string,
-  elsewhere: Elsewhere,
-): Result<undefined, RoleRefusal | Elsewhere> => {
-  if (principal.kind === "platform") return ok(undefined);
-  const admin = requireAdmin(principal);
-  if (!admin.ok) return err(admin.error);
-  if (workspaceId !== principal.workspaceId) return err(elsewhere);
-  return ok(undefined);
-};
-
 /** The declared kind this word names, or nothing at all for a word the queue does not carry. */
 const descriptorOf = (kind: string): JobKindDescriptor | undefined =>
   JOB_KIND_DESCRIPTORS.find((descriptor) => descriptor.kind === kind);
@@ -265,8 +244,8 @@ const admittedToEnqueue = (
  * the snapshot would be answered *beside* the row just written.
  *
  * The queued row covers every later reason but one. A wipe is the reason the worker removes
- * the binding's directory on (ADR 0036's pairing: the app's act deletes the chunk rows, the
- * run the app enqueued removes the store), and a queued `bound` run would rebuild into the
+ * the binding's directory on (ADR 0036's pairing: the api's act deletes the chunk rows, the
+ * run the api enqueued removes the store), and a queued `bound` run would rebuild into the
  * store the wipe meant to throw away. So a wipe arriving behind a queued run becomes that
  * run's reason — the row is unclaimed, nothing has read it — and a reason arriving behind a
  * queued wipe leaves the wipe, which rebuilds everything anyway. The `taken` arm is that
@@ -400,7 +379,10 @@ export const enqueueJob = async (
  *
  * `no-such-job` rather than an empty answer, because a caller polling an id it was handed and
  * finding nothing has been given the wrong id or the wrong workspace, and a `null` would let
- * it poll that mistake until its timeout.
+ * it poll that mistake until its timeout. A person naming a workspace that is not theirs is
+ * told that same word rather than `malformed`, because a read and a write mean different things
+ * by the one mistake: a job in another tenant's workspace is a job this workspace never held,
+ * while the enqueue's own gate calls that caller `malformed` (`admittedToEnqueue`).
  *
  * **A person reading one is an Admin**, which is `bundleHealth`'s gate beside it and for the
  * same reason: an audit's `outcome` carries the paths of every file whose hash disagreed with
@@ -414,8 +396,11 @@ export const jobById = async (
   door: PostgresDoor,
   input: { readonly workspaceId: string; readonly jobId: string },
 ): Promise<Result<JobState, "no-such-job" | RoleRefusal | PrincipalRefusal | Error>> => {
-  const admitted = adminInOwnWorkspace(principal, input.workspaceId, "no-such-job");
-  if (!admitted.ok) return err(admitted.error);
+  if (principal.kind !== "platform") {
+    const admin = requireAdmin(principal);
+    if (!admin.ok) return err(admin.error);
+    if (input.workspaceId !== principal.workspaceId) return err("no-such-job");
+  }
   const read = await inWorkspace(principal, door, input.workspaceId, (tx) =>
     tx.query<JobRow>(
       "SELECT id, kind, reason, status, attempts, outcome FROM job WHERE workspace_id = $1 AND id = $2",
@@ -450,7 +435,7 @@ type OutcomeRow = { readonly outcome: OutcomeColumn };
 const AUDIT_FINDINGS = ["mismatched", "unparsed", "missing_row", "missing_file"] as const;
 
 /**
- * **Bundle health**: whether the app's parse and the worker's still agree about this
+ * **Bundle health**: whether the api's parse and the worker's still agree about this
  * workspace's bundle (ADR 0012, ADR 0023).
  *
  * A *signal* in ADR 0025's sense — a named query over rows the platform already keeps —
