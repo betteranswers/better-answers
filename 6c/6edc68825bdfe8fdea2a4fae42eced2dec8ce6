@@ -1,0 +1,35 @@
+apps/api/src/auth/auth.ts
+  s_d0af3feba9b401::t_00b93a099a5130 498-504,506-526,529-532,534-542,544-546,551-553,555-561,563-568,570-581,586-588,613,615
+  s_d0af3feba9b401::t_5aef47c24a169c 99
+  s_d0af3feba9b401::t_b6927e8a7df430 77
+  s_d0af3feba9b401::t_11e3ec2aa7394b 554
+  s_d0af3feba9b401::t_2f9194e792796c 497,592
+  s_d0af3feba9b401::t_14fb4b0f01331c 95
+apps/api/tests/harness.ts
+  s_d0af3feba9b401::t_55b1b32f5ce5af 119-127
+apps/api/src/auth/verify.ts
+  s_d0af3feba9b401::t_89c8bf00a90874 142-146,149-152
+apps/api/tsconfig.json
+  s_d0af3feba9b401::t_70fff6a22cd4c4 4
+packages/devtools/src/oxlint-config.ts
+  s_d0af3feba9b401::t_a876feeaef7744 73
+packages/core/src/answering/index.ts
+  s_d0af3feba9b401::t_62b2e4cb7b21bc 190-194,201
+  s_d0af3feba9b401::t_6a262f8cd52910 141-145,148-157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "6c6edc68825bdfe8fdea2a4fae42eced2dec8ce6",
+  "prompts": {},
+  "sessions": {
+    "s_d0af3feba9b401": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe1d0bc2-0cc8-462e-8315-25c2d57ff65d",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
