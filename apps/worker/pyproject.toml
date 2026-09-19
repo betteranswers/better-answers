@@ -49,6 +49,16 @@ dependencies = [
     # x86_64 and aarch64 as well as macOS arm64, which is every machine this repository
     # builds on. Version read from PyPI's release metadata on 11/09/2026; Apache-2.0,
     # which is the arm this repository takes (ADR 0027).
+    #
+    # The engine also calls home, and the value that refuses that call is proved
+    # against this version alone. `COCOINDEX_DISABLE_USAGE_TRACKING=1` is what stops
+    # the native core reaching `cocoindex.gateway.scarf.sh`; the `ENV` at the end of
+    # `apps/worker/Dockerfile` says why it is refused, and the image suite holds the
+    # three places that set it — image, deploy unit and CI runner — to each other. The
+    # run that proved the value, with its date, the engine version and both arms, is
+    # the docblock on `apps/worker/tests/test_image.py`'s
+    # `test_the_image_stops_the_engine_calling_its_gateway_and_the_deploy_unit_agrees`.
+    # Bumping this pin re-runs that probe and re-dates that record in the same commit.
     "cocoindex==1.0.22",
     # The driver the engine's Postgres target acquires its own connections through, and
     # the one the pipeline's per-workspace pool is built from. It is named here rather
