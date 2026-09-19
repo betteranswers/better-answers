@@ -138,10 +138,23 @@ export type OpenInput =
  * What `open` answers. The success case names a concept or a passage; the type allows
  * both keys optionally so the wire schema (one object with two optional fields) and
  * this type agree — exactly one is ever present, and `renderOpen` reads whichever is.
+ *
+ * Each optional key admits `undefined` as well as absence, which is the agreement stated
+ * exactly: an optional field on the wire schema is a key that may be *sent* as `undefined`,
+ * and under `exactOptionalPropertyTypes` a bare `?:` would be the narrower promise that it
+ * is only ever missing — a promise the surface that renders this cannot make.
  */
 export type OpenResult =
-  | { readonly found: true; readonly concept?: ConceptView; readonly passage?: PassageView }
-  | { readonly found: false; readonly iri?: string; readonly locator?: string };
+  | {
+      readonly found: true;
+      readonly concept?: ConceptView | undefined;
+      readonly passage?: PassageView | undefined;
+    }
+  | {
+      readonly found: false;
+      readonly iri?: string | undefined;
+      readonly locator?: string | undefined;
+    };
 
 /** The map's state, as the answer carries it (ADR 0016, 2026-08-29 amendment): never a count. */
 export type MapState =
@@ -174,14 +187,18 @@ export const NOT_ANSWERED = "Not answered from the company's knowledge.";
 
 export type FeedbackReason = "wrong" | "out-of-date" | "incomplete" | "should-not-have-shown";
 
-/** A reader's verdict on one answer, never the platform's: helpful, or a flag with a reason (CONTEXT.md, *feedback*). */
+/**
+ * A reader's verdict on one answer, never the platform's: helpful, or a flag with a reason
+ * (CONTEXT.md, *feedback*). `detail` admits `undefined` as well as absence: the flag arrives
+ * through a wire schema whose optional field is a key that may be sent as `undefined`.
+ */
 export type FeedbackInput =
   | { readonly iri: string; readonly verdict: "helpful" }
   | {
       readonly iri: string;
       readonly verdict: "flag";
       readonly reason: FeedbackReason;
-      readonly detail?: string;
+      readonly detail?: string | undefined;
     };
 
 export type FeedbackReceipt = {

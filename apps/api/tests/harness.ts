@@ -116,8 +116,15 @@ export type TestApp = {
   readonly logs: LogLine[];
   /** The last six-digit code sent to an address. */
   codeSentTo(email: string): string;
-  /** A workspace with its first Admin, provisioned through the platform's one act. */
-  provision(input?: { name?: string; adminEmail?: string }): Promise<Provisioned>;
+  /**
+   * A workspace with its first Admin, provisioned through the platform's one act. Either
+   * field may be absent *or* `undefined` — a caller reading them off a parsed request body
+   * has no other way to say "not asked for", and both are defaulted here.
+   */
+  provision(input?: {
+    name?: string | undefined;
+    adminEmail?: string | undefined;
+  }): Promise<Provisioned>;
   /** A person in the identity set with no membership anywhere. */
   person(email?: string): Promise<Person>;
   /** Add a person to a workspace at a role (seeded directly: Better Auth's invitation flow is not under test). */
