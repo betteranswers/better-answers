@@ -28,11 +28,23 @@ import * as declarations from "../src/schema.ts";
  * The one-journal rule's CI check (ADR 0032): Drizzle *generates* migrations for
  * `public` and *carries* hand-written ones for everything else, so a generated
  * migration must never touch the `index` schema or the graph tables. A hand-written
- * migration declares itself with the first-line marker; anything without it is
- * treated as generated and held to the rule.
+ * migration declares itself with the marker as its exact first line; anything without
+ * it is treated as generated and held to the rule.
  */
 
 const CUSTOM_MARKER = "-- Custom migration (hand-written SQL; ADR 0032).";
+/**
+ * A first line claiming to be hand-written, however it spells the claim: the marker's own two
+ * words, anywhere in that line and in any casing, the `--` and its spacing let go with the
+ * rest. The case below then holds that line to the whole marker, because a near-miss — a
+ * second citation inside the brackets, prose carried on past the full stop, a lost capital —
+ * reads as drizzle-generated instead, and is held to a rule it was never written to answer
+ * while saying nothing about the mismatch. The loose match costs no generated migration its
+ * check: drizzle-kit writes DDL, and nothing it emits says these two words.
+ */
+const CLAIMS_TO_BE_HAND_WRITTEN = /custom migration/iu;
+/** A migration's first line, the only line the marker may occupy. */
+const firstLineOf = (sql: string): string => sql.split("\n", 1)[0] ?? "";
 // Any mention of the quoted schema at all — `"index".chunk` and `CREATE SCHEMA
 // "index"` alike — and the graph tables by name, the live-generation row's included.
 const FORBIDDEN_IN_GENERATED = [
@@ -53,10 +65,53 @@ describe("the migration journal", () => {
     expect(journalFiles.toSorted()).toEqual(onDisk.toSorted());
   });
 
+  /**
+   * The predicate held both ways over lines written down here, because the case after this one
+   * walks the tracked tree and skips what makes no claim: a predicate that matched nothing
+   * would skip every migration there is and pass in silence, which is the very shape of
+   * failure this ticket exists to remove. Three lines claim to be hand-written and none is the
+   * marker — the one `0018` carried until this ticket, and the two slips, a lost space and a
+   * lost capital, that a prefix match would have waved back into the generated set. The marker
+   * itself must read as a claim or every hand-written file would be skipped, and drizzle-kit's
+   * own DDL must not, or a generated migration would escape the rule it is held to.
+   */
+  it("reads a near-miss as a claim, and reads generated DDL as no claim at all", () => {
+    for (const nearMiss of [
+      "-- Custom migration (hand-written SQL; ADR 0031, ADR 0032).",
+      "--Custom migration (hand-written SQL; ADR 0032).",
+      "-- custom migration (hand-written SQL; ADR 0032).",
+    ]) {
+      expect
+        .soft(CLAIMS_TO_BE_HAND_WRITTEN.test(nearMiss), `${nearMiss} claims to be hand-written`)
+        .toBe(true);
+      expect.soft(nearMiss, `${nearMiss} is a near-miss, not the marker`).not.toBe(CUSTOM_MARKER);
+    }
+
+    expect(CLAIMS_TO_BE_HAND_WRITTEN.test(CUSTOM_MARKER)).toBe(true);
+    expect(CLAIMS_TO_BE_HAND_WRITTEN.test('CREATE TABLE "account" (')).toBe(false);
+    expect(
+      CLAIMS_TO_BE_HAND_WRITTEN.test('ALTER TABLE "suggestion" FORCE ROW LEVEL SECURITY;'),
+    ).toBe(false);
+  });
+
+  it("spells the marker exactly on every migration that claims to be hand-written", () => {
+    for (const [position, file] of journalMigrationFiles().entries()) {
+      const first = firstLineOf(readFileSync(file, "utf8"));
+      if (!CLAIMS_TO_BE_HAND_WRITTEN.test(first)) continue;
+      const tag = journalEntries()[position]?.tag ?? path.basename(file);
+      // The marker written down here rather than read from the constant: the constant is the
+      // gate, so a file that cites one more ADR on the line, or runs its explanation on past
+      // the full stop, fails here rather than passing as drizzle's own work.
+      expect
+        .soft(first, `${tag}.sql claims to be hand-written, so its first line must be the marker`)
+        .toBe("-- Custom migration (hand-written SQL; ADR 0032).");
+    }
+  });
+
   it("never touches `index` or the graph tables from a generated migration", () => {
     for (const [position, file] of journalMigrationFiles().entries()) {
       const sql = readFileSync(file, "utf8");
-      if (sql.startsWith(CUSTOM_MARKER)) continue;
+      if (firstLineOf(sql) === CUSTOM_MARKER) continue;
       const tag = journalEntries()[position]?.tag ?? path.basename(file);
       for (const forbidden of FORBIDDEN_IN_GENERATED) {
         expect

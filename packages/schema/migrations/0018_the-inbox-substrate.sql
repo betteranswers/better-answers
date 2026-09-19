@@ -1,4 +1,4 @@
--- Custom migration (hand-written SQL; ADR 0031, ADR 0032).
+-- Custom migration (hand-written SQL; ADR 0032).
 -- The inbox's substrate: the FORCE line withRLS() cannot emit, the privileges that make
 -- "nothing reads a payload but the acceptance path" the database's sentence rather than a
 -- convention, and the three concept-inbox SQL functions both tiers call (ADR 0031).
