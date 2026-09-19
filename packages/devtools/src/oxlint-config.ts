@@ -60,14 +60,26 @@ export const readOxlintConfig = (): OxlintConfig =>
     ),
   ) as OxlintConfig;
 
+/** An override the search matched on its file list, so whether it has one is settled. */
+type GlobbedOverride = OxlintConfig["overrides"][number] & {
+  readonly files: readonly string[];
+};
+
 /**
  * The override declaring exactly `glob`, or a throw naming it.
  *
  * A suite that read `undefined` here would build a throwaway config missing the very rule it
  * is about to assert on, and then read oxlint's silence as the rule staying quiet.
+ *
+ * The search is what settles `files`: an override is matched *by* the list holding `glob`, so
+ * the one this answers with has one. The predicate says that to the type, which leaves the
+ * throw below as the single condition — and lets a caller pass the override straight back into
+ * an override literal without restating a `files` that cannot be missing.
  */
-export const oxlintOverrideFor = (glob: string): OxlintConfig["overrides"][number] => {
-  const found = readOxlintConfig().overrides.find((override) => override.files?.includes(glob));
+export const oxlintOverrideFor = (glob: string): GlobbedOverride => {
+  const found = readOxlintConfig().overrides.find(
+    (override): override is GlobbedOverride => override.files?.includes(glob) === true,
+  );
   if (found === undefined) throw new Error(`no override for ${glob} in .oxlintrc.json`);
   return found;
 };

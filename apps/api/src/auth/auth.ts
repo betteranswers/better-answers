@@ -4,6 +4,7 @@ import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth, type Session } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { emailOTP, jwt, organization } from "better-auth/plugins";
+import type { BetterAuthPlugin } from "better-auth/types";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { decodeJwt } from "jose";
 import type pg from "pg";
@@ -68,6 +69,35 @@ import { accessControl, creatorRole, roles } from "./roles.ts";
  * Prototype 61's three silent traps are each a line here with the trap named beside
  * it, and `apps/api/tests/oauth-flow.test.ts` holds each as a regression.
  */
+
+/** An endpoint as Better Auth's own plugin type declares one. */
+type AuthEndpoint = NonNullable<BetterAuthPlugin["endpoints"]>[string];
+
+/** A plugin with its `/oauth2/authorize` endpoint at Better Auth's own `Endpoint`, every other exactly as declared. */
+type WidenedAuthorize<P extends { readonly endpoints: object }> = Omit<P, "endpoints"> & {
+  readonly endpoints: Omit<P["endpoints"], "oauth2Authorize"> & {
+    readonly oauth2Authorize: AuthEndpoint;
+  };
+};
+
+/**
+ * The OAuth provider plugin, typed so `betterAuth` will accept it.
+ *
+ * `@better-auth/oauth-provider@1.7.2` writes the OpenAPI parameters of its
+ * `/oauth2/authorize` endpoint as literals carrying `items?: undefined`, and
+ * `exactOptionalPropertyTypes` refuses `undefined` where Better Auth's own
+ * `OpenAPIParameter` declares `items?: { type: OpenAPISchemaType }`. That one endpoint
+ * fails `BetterAuthPlugin`, so the whole plugin does, so `betterAuth`'s option type falls
+ * back to its constraint — and with it goes every inferred `auth.api.*` endpoint this tier
+ * calls by name and every field of `auth.options` its suites read. Widening the one
+ * endpoint keeps the other thirty-one, and every other plugin, exactly as declared.
+ */
+const widenAuthorize = <P extends { readonly endpoints: object }>(plugin: P): WidenedAuthorize<P> =>
+  // SAFETY: nothing about the value changes — the result is the plugin the library built,
+  // read at Better Auth's own `BetterAuthPlugin["endpoints"]` element type instead of at the
+  // literal whose OpenAPI metadata that very type and this flag disagree about. The endpoint
+  // is one the library constructed and satisfies at runtime; only its declaration differs.
+  plugin as WidenedAuthorize<P>;
 
 /** One email, as the sign-in page needs to send it. The transport is injected: SMTP becomes a credential row later, and nothing here reads it. */
 export type EmailMessage = {
@@ -464,99 +494,103 @@ export const createAuth = (deps: AuthDependencies) => {
           });
         },
       }),
-      oauthProvider({
-        // The three pages of the flow, all on the one origin (ADR 0034) and all named
-        // absolutely: the redirect's `Location` and the continue endpoint's answer are the
-        // configured string verbatim, and `auth/routes.ts` and the SPA's picker both read
-        // that answer as a URL rather than resolving a path against whatever origin they
-        // happen to be on. None carries a query of its own: the signed query is appended
-        // with an unconditional `?`, and a second one would corrupt the signature.
-        loginPage: `${deps.publicUrl}/sign-in`,
-        // Consent is this tier's own page, outside the product's shell; on the same
-        // origin as the product because the closed client list plus PKCE bounds what a
-        // script in the shell could do with it (ADR 0034), and with a navigation-only
-        // fence on its POST (`auth/routes.ts`).
-        consentPage: `${deps.publicUrl}/consent`,
-        scopes: [...OAUTH_SCOPES],
-        accessTokenExpiresIn: ACCESS_TOKEN_LIFETIME_SECONDS,
-        refreshTokenExpiresIn: REFRESH_TOKEN_LIFETIME_SECONDS,
-        // RFC 8707: the token is bound to the MCP URL the person typed (research 80
-        // row 25: the row must exist before a connector can authorise).
-        resources: [deps.mcpUrl],
-        // CIMD only (research 80 F2): dynamic registration stays at its default, off.
-        // Trap 1 (prototype 61): a CIMD-discovered client is persisted with the
-        // *registration* scopes, and claude.ai appends `offline_access` whenever the
-        // metadata advertises it — leave it out here and every connection dies on
-        // `invalid_scope`.
-        clientRegistrationDefaultScopes: [...OAUTH_SCOPES],
-        clientRegistrationAllowedScopes: [...OAUTH_SCOPES],
-        // Trap 2: a client is linked to the resources it may ask for; without the link
-        // the `resource` claude.ai sends is refused with `invalid_target`.
-        clientRegistrationDefaultResources: [deps.mcpUrl],
-        clientRegistrationAllowedResources: [deps.mcpUrl],
-        postLogin: {
-          // The SPA's picker, absolute for the same reason as `loginPage` above.
-          page: `${deps.publicUrl}/choose-workspace`,
-          // ADR 0018's `workspace` claim: the active workspace, or no token at all.
-          consentReferenceId: async ({ session, user: person }) => {
-            // One read, and the claim is checked against it. The session object here may
-            // predate `shouldRedirect`'s write for a sole-membership session, so the
-            // sole-membership fallback is read the same way; and the active workspace is
-            // taken only if the person still holds it, because a `workspace` claim is a
-            // statement the platform makes about them at the moment of minting.
-            //
-            // The inner of two fences, and never the load-bearing one. A consent posted
-            // to the product's own page resolves the Principal first and answers 401 to
-            // a person whose membership has ended (`auth/routes.ts`; the flow test
-            // "mints no code for a person whose membership ended…"), and the resolver
-            // refuses a lost claim on every later call. What this line covers is Better
-            // Auth's own `/oauth2/consent`, which that page's fence does not sit in
-            // front of (adversarial pass, T-077).
-            const held = await membershipsOf(person.id);
-            const stillActive = activeWorkspaceOf(session);
-            const active =
-              stillActive !== undefined && held.includes(stillActive) ? stillActive : soleOf(held);
-            if (active === undefined) {
-              throw new APIError("BAD_REQUEST", {
-                error: "set_workspace",
-                error_description: "a workspace must be chosen before consent",
-              });
-            }
-            return active;
+      widenAuthorize(
+        oauthProvider({
+          // The three pages of the flow, all on the one origin (ADR 0034) and all named
+          // absolutely: the redirect's `Location` and the continue endpoint's answer are the
+          // configured string verbatim, and `auth/routes.ts` and the SPA's picker both read
+          // that answer as a URL rather than resolving a path against whatever origin they
+          // happen to be on. None carries a query of its own: the signed query is appended
+          // with an unconditional `?`, and a second one would corrupt the signature.
+          loginPage: `${deps.publicUrl}/sign-in`,
+          // Consent is this tier's own page, outside the product's shell; on the same
+          // origin as the product because the closed client list plus PKCE bounds what a
+          // script in the shell could do with it (ADR 0034), and with a navigation-only
+          // fence on its POST (`auth/routes.ts`).
+          consentPage: `${deps.publicUrl}/consent`,
+          scopes: [...OAUTH_SCOPES],
+          accessTokenExpiresIn: ACCESS_TOKEN_LIFETIME_SECONDS,
+          refreshTokenExpiresIn: REFRESH_TOKEN_LIFETIME_SECONDS,
+          // RFC 8707: the token is bound to the MCP URL the person typed (research 80
+          // row 25: the row must exist before a connector can authorise).
+          resources: [deps.mcpUrl],
+          // CIMD only (research 80 F2): dynamic registration stays at its default, off.
+          // Trap 1 (prototype 61): a CIMD-discovered client is persisted with the
+          // *registration* scopes, and claude.ai appends `offline_access` whenever the
+          // metadata advertises it — leave it out here and every connection dies on
+          // `invalid_scope`.
+          clientRegistrationDefaultScopes: [...OAUTH_SCOPES],
+          clientRegistrationAllowedScopes: [...OAUTH_SCOPES],
+          // Trap 2: a client is linked to the resources it may ask for; without the link
+          // the `resource` claude.ai sends is refused with `invalid_target`.
+          clientRegistrationDefaultResources: [deps.mcpUrl],
+          clientRegistrationAllowedResources: [deps.mcpUrl],
+          postLogin: {
+            // The SPA's picker, absolute for the same reason as `loginPage` above.
+            page: `${deps.publicUrl}/choose-workspace`,
+            // ADR 0018's `workspace` claim: the active workspace, or no token at all.
+            consentReferenceId: async ({ session, user: person }) => {
+              // One read, and the claim is checked against it. The session object here may
+              // predate `shouldRedirect`'s write for a sole-membership session, so the
+              // sole-membership fallback is read the same way; and the active workspace is
+              // taken only if the person still holds it, because a `workspace` claim is a
+              // statement the platform makes about them at the moment of minting.
+              //
+              // The inner of two fences, and never the load-bearing one. A consent posted
+              // to the product's own page resolves the Principal first and answers 401 to
+              // a person whose membership has ended (`auth/routes.ts`; the flow test
+              // "mints no code for a person whose membership ended…"), and the resolver
+              // refuses a lost claim on every later call. What this line covers is Better
+              // Auth's own `/oauth2/consent`, which that page's fence does not sit in
+              // front of (adversarial pass, T-077).
+              const held = await membershipsOf(person.id);
+              const stillActive = activeWorkspaceOf(session);
+              const active =
+                stillActive !== undefined && held.includes(stillActive)
+                  ? stillActive
+                  : soleOf(held);
+              if (active === undefined) {
+                throw new APIError("BAD_REQUEST", {
+                  error: "set_workspace",
+                  error_description: "a workspace must be chosen before consent",
+                });
+              }
+              return active;
+            },
+            // True sends the person to the picker: more than one membership and none
+            // active, or an active one they no longer hold. A person in exactly one
+            // workspace never gets here with none active — the session-create hook above
+            // set it before the session existed (ADR 0009's 2026-08-27 amendment).
+            shouldRedirect: async ({ session, user: person }) => {
+              const held = await membershipsOf(person.id);
+              const active = activeWorkspaceOf(session);
+              if (active !== undefined && held.includes(active)) return false;
+              // A session made before the person's one membership existed: the
+              // session-create hook could not set it, so it is set here, once, as the
+              // platform's own write to the identity set.
+              const only = soleOf(held);
+              if (only !== undefined) {
+                await withIdentityWrite(PLATFORM_PRINCIPAL, deps.door, (tx) =>
+                  // `updated_at = now()`: the database's instant, ADR 0040's own shape for a
+                  // row's timestamp — this platform write moves it the way a library write does.
+                  tx.query(
+                    "UPDATE session SET active_workspace_id = $1, updated_at = now() WHERE id = $2",
+                    [only, session.id],
+                  ),
+                );
+                return false;
+              }
+              return true;
+            },
           },
-          // True sends the person to the picker: more than one membership and none
-          // active, or an active one they no longer hold. A person in exactly one
-          // workspace never gets here with none active — the session-create hook above
-          // set it before the session existed (ADR 0009's 2026-08-27 amendment).
-          shouldRedirect: async ({ session, user: person }) => {
-            const held = await membershipsOf(person.id);
-            const active = activeWorkspaceOf(session);
-            if (active !== undefined && held.includes(active)) return false;
-            // A session made before the person's one membership existed: the
-            // session-create hook could not set it, so it is set here, once, as the
-            // platform's own write to the identity set.
-            const only = soleOf(held);
-            if (only !== undefined) {
-              await withIdentityWrite(PLATFORM_PRINCIPAL, deps.door, (tx) =>
-                // `updated_at = now()`: the database's instant, ADR 0040's own shape for a
-                // row's timestamp — this platform write moves it the way a library write does.
-                tx.query(
-                  "UPDATE session SET active_workspace_id = $1, updated_at = now() WHERE id = $2",
-                  [only, session.id],
-                ),
-              );
-              return false;
-            }
-            return true;
-          },
-        },
-        // The claims ADR 0018 asserts: `{workspace, user}`. `role` is deliberately
-        // absent — it is read per call, in the same transaction as the read.
-        customAccessTokenClaims: async ({ user: person, referenceId }) => ({
-          workspace: referenceId ?? null,
-          user: person?.id ?? null,
+          // The claims ADR 0018 asserts: `{workspace, user}`. `role` is deliberately
+          // absent — it is read per call, in the same transaction as the read.
+          customAccessTokenClaims: async ({ user: person, referenceId }) => ({
+            workspace: referenceId ?? null,
+            user: person?.id ?? null,
+          }),
         }),
-      }),
+      ),
       cimd({
         fetchClientMetadataResource: deps.fetchClientMetadataResource,
         metadataProfile: "mcp-2026-07-28",
@@ -577,7 +611,9 @@ export const createAuth = (deps: AuthDependencies) => {
 
 export type Auth = ReturnType<typeof createAuth>;
 
-const sessionWorkspace = z.object({ activeOrganizationId: z.string().nullish() });
+const sessionWorkspace = z.object({
+  activeOrganizationId: z.string().nullish(),
+});
 
 /** The organisation plugin's active id on a session object, read without a cast. */
 const activeWorkspaceOf = (session: Session): string | undefined => {

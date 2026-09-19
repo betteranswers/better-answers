@@ -139,10 +139,17 @@ const sessionShape = z.object({
   }),
 });
 
-/** What Better Auth's `getSession` answers, as far as this module reads it. */
+/**
+ * What Better Auth's `getSession` answers, as far as this module reads it. The active
+ * workspace is absent, `null` or a string — three states the library's own type carries and
+ * this one has to admit, because the reader is handed `auth.api.getSession` itself.
+ */
 type SessionRecord = {
   readonly user: { readonly id: string };
-  readonly session: { readonly createdAt: Date; readonly activeOrganizationId?: string | null };
+  readonly session: {
+    readonly createdAt: Date;
+    readonly activeOrganizationId?: string | null | undefined;
+  };
 };
 export type SessionReader = (headers: Headers) => Promise<SessionRecord | null>;
 
