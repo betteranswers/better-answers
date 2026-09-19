@@ -41,7 +41,10 @@ import {
  * The refusals are one word. A locator the parser will not read, a span past the end of the
  * text, a document this workspace does not hold and a row this reader may not see all answer
  * *not found*, and the pair both ways (`[TEST7]`) is the Admin who does see the withheld row
- * getting the passage from the same locator.
+ * getting the passage from the same locator. A span covered by two rows of which the reader
+ * may see only one is refused **whole** and by the same word, either way round, because the
+ * predicate sits inside the covering-rows query and a row withheld is a row that never came
+ * back: serving the readable half would say where the withheld part of the document begins.
  *
  * Beside it, `findPassages`: the search over the same rows, whose own pair both ways is the
  * document a concept cites — withheld from the reader who may see that concept, because a
@@ -175,6 +178,72 @@ const documentWithOneChunk = (
     return held.id;
   });
 
+/** One chunk row of a two-row document: the text it holds, where it ends, and its class. */
+type StraddledRow = {
+  readonly text: string;
+  readonly charEnd: number;
+  readonly sensitivity: string;
+};
+
+/**
+ * One document of this workspace whose text is partitioned across two chunk rows; its id.
+ *
+ * The trailing row starts exactly where the leading row ends, because that partition is what
+ * a span crossing the boundary is answered from (ADR 0031): a seeder that left a gap would be
+ * arranging the refusal the test then went on to assert.
+ *
+ * Each row carries a class of its own, which is what lets one row of a span be withheld while
+ * the other is served — a read of a chunk reads the copy on the row and never the binding's
+ * (ADR 0023), so the binding is left at the factory's class rather than claiming one its two
+ * rows disagree about.
+ */
+const documentWithTwoChunks = (
+  workspaceId: string,
+  what: {
+    readonly title: string;
+    readonly leading: StraddledRow;
+    readonly trailing: StraddledRow;
+  },
+): Promise<string> =>
+  seededBy(db(), async (seed) => {
+    const binding = await seed.sourceBinding({ workspaceId, publishedAt: PUBLISHED });
+    const held = await seed.sourceDocument({
+      workspaceId,
+      bindingId: binding.id,
+      title: what.title,
+    });
+    const rows = [
+      { ...what.leading, ordinal: 0, charStart: 0 },
+      { ...what.trailing, ordinal: 1, charStart: what.leading.charEnd },
+    ];
+    for (const row of rows) {
+      await seed.chunk({
+        workspaceId,
+        bindingId: binding.id,
+        sourceDocumentId: held.id,
+        content: row.text,
+        locator: `${held.id}/chars:${row.charStart}-${row.charEnd}`,
+        ordinal: row.ordinal,
+        charStart: row.charStart,
+        charEnd: row.charEnd,
+        publishedAt: PUBLISHED,
+        sensitivity: row.sensitivity,
+      });
+    }
+    return held.id;
+  });
+
+/**
+ * The staff handbook as a run lands it when its text runs past one chunk: the same sentence
+ * the search suite below holds as one row, here partitioned across two, and a span that starts
+ * inside the leading row and ends inside the trailing one — answerable from the two rows
+ * together and from neither of them alone.
+ */
+const STRADDLED_TITLE = "The staff handbook";
+const STRADDLED_LEADING = { text: "The holiday policy ", charEnd: 19 } as const;
+const STRADDLED_TRAILING = { text: "grants twenty-eight days.", charEnd: 44 } as const;
+const STRADDLING_SPAN = "chars:4-43";
+
 const BOARD_TITLE = "The board's note";
 const BOARD_TEXT = "The board's note on the bid.";
 const BOARD_CHAR_END = 28;
@@ -266,43 +335,12 @@ describe("the passage a wire locator opens", () => {
     // Two rows partitioning one text, the second narrowed on its own row: a straddle has to
     // join the rows' content in ordinal order, offset the span by the first row's start, and
     // answer the narrower class of the rows it actually read.
-    const documentId = await seededBy(db(), async (seed) => {
-      const binding = await seed.sourceBinding({
-        workspaceId: scenario.workspaceId,
-        publishedAt: PUBLISHED,
-      });
-      const held = await seed.sourceDocument({
-        workspaceId: scenario.workspaceId,
-        bindingId: binding.id,
-        title: "The staff handbook",
-      });
-      await seed.chunk({
-        workspaceId: scenario.workspaceId,
-        bindingId: binding.id,
-        sourceDocumentId: held.id,
-        content: "The holiday policy ",
-        locator: `${held.id}/chars:0-19`,
-        ordinal: 0,
-        charStart: 0,
-        charEnd: 19,
-        publishedAt: PUBLISHED,
-        sensitivity: "Internal",
-      });
-      await seed.chunk({
-        workspaceId: scenario.workspaceId,
-        bindingId: binding.id,
-        sourceDocumentId: held.id,
-        content: "grants twenty-eight days.",
-        locator: `${held.id}/chars:19-44`,
-        ordinal: 1,
-        charStart: 19,
-        charEnd: 44,
-        publishedAt: PUBLISHED,
-        sensitivity: "Restricted",
-      });
-      return held.id;
+    const documentId = await documentWithTwoChunks(scenario.workspaceId, {
+      title: STRADDLED_TITLE,
+      leading: { ...STRADDLED_LEADING, sensitivity: "Internal" },
+      trailing: { ...STRADDLED_TRAILING, sensitivity: "Restricted" },
     });
-    const wire = `${documentId}/chars:4-43`;
+    const wire = `${documentId}/${STRADDLING_SPAN}`;
 
     const read = await opening(scenario.admin, wire);
 
@@ -371,6 +409,54 @@ describe("what a passage read refuses", () => {
       absent: NOT_FOUND,
       malformed: NOT_FOUND,
       "out of range": NOT_FOUND,
+    });
+  });
+
+  it("refuses a straddle whole when either its leading or its trailing row is withheld, and serves the Admin who reaches both from the same locator", async () => {
+    const scenario = await arrange();
+    // The same two-row document narrowed on opposite rows, because a straddle withheld in
+    // part leaves the read by two different roads: with the trailing row gone the rows that
+    // did come back reach short of the span's end, and with the leading row gone the first
+    // row that came back starts past the span's start. Neither Viewer is served the half of
+    // the span they may see, because a readable prefix would say where the withheld part of
+    // the document begins.
+    const narrowedTrailing = await documentWithTwoChunks(scenario.workspaceId, {
+      title: STRADDLED_TITLE,
+      leading: { ...STRADDLED_LEADING, sensitivity: "Internal" },
+      trailing: { ...STRADDLED_TRAILING, sensitivity: "Restricted" },
+    });
+    const narrowedLeading = await documentWithTwoChunks(scenario.workspaceId, {
+      title: STRADDLED_TITLE,
+      leading: { ...STRADDLED_LEADING, sensitivity: "Restricted" },
+      trailing: { ...STRADDLED_TRAILING, sensitivity: "Internal" },
+    });
+    const atNarrowedTrailing = `${narrowedTrailing}/${STRADDLING_SPAN}`;
+    const atNarrowedLeading = `${narrowedLeading}/${STRADDLING_SPAN}`;
+
+    const answered = {
+      "the Viewer, trailing row withheld": await opening(scenario.viewer, atNarrowedTrailing),
+      "the Viewer, leading row withheld": await opening(scenario.viewer, atNarrowedLeading),
+      "the Admin, trailing row narrowed": await opening(scenario.admin, atNarrowedTrailing),
+      "the Admin, leading row narrowed": await opening(scenario.admin, atNarrowedLeading),
+    };
+
+    // The refusal is the one word an absent and a malformed locator answer with, and the
+    // Admin reading the identical address is what makes it the predicate and not an absence.
+    expect(answered).toEqual({
+      "the Viewer, trailing row withheld": NOT_FOUND,
+      "the Viewer, leading row withheld": NOT_FOUND,
+      "the Admin, trailing row narrowed": {
+        locator: atNarrowedTrailing,
+        title: "The staff handbook",
+        text: "holiday policy grants twenty-eight days",
+        sensitivity: "Restricted",
+      },
+      "the Admin, leading row narrowed": {
+        locator: atNarrowedLeading,
+        title: "The staff handbook",
+        text: "holiday policy grants twenty-eight days",
+        sensitivity: "Restricted",
+      },
     });
   });
 
