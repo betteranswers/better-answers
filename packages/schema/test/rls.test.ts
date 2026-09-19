@@ -2017,6 +2017,115 @@ describe("the workspace-lifecycle function", () => {
 });
 
 /**
+ * The worker's hold on the chunk index, as ADR 0032's 2026-09-19 amendment records it:
+ * SELECT beside INSERT, UPDATE and DELETE on the policied parent, and nothing at all on a
+ * workspace's partition. The read is deliberate — all three statements a run makes against
+ * the table read it, the upsert's `EXCLUDED` over every column the pipeline declares and
+ * the delete's and the update's `WHERE` over the key columns, and PostgreSQL requires
+ * SELECT on every column a predicate or an `EXCLUDED` reference reads — so it is pinned
+ * here rather than revoked, and a migration that took it away would fail this suite first.
+ */
+describe("the chunk index under worker_rt", () => {
+  /**
+   * Every privilege a table can carry on the pinned image (PostgreSQL 18), so *no other
+   * privilege* is read off the closed set rather than off the four a reader thought of.
+   * The set is the image's, not PostgreSQL's forever — `MAINTAIN` arrived in 17 — so a
+   * bump of `POSTGRES_IMAGE` re-reads `GRANT ALL` through `aclexplode` against this list.
+   */
+  const TABLE_PRIVILEGES = [
+    "SELECT",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "TRUNCATE",
+    "REFERENCES",
+    "TRIGGER",
+    "MAINTAIN",
+  ] as const;
+
+  /** What the catalogue says a role holds on one table, every privilege answered. */
+  const privilegesHeld = async (
+    client: pg.PoolClient,
+    role: string,
+    table: string,
+  ): Promise<Record<string, boolean>> => {
+    const held = await client.query<{ privilege: string; held: boolean }>(
+      "SELECT privilege, has_table_privilege($1, $2, privilege) AS held FROM unnest($3::text[]) AS privilege",
+      [role, table, [...TABLE_PRIVILEGES]],
+    );
+    return Object.fromEntries(held.rows.map((row) => [row.privilege, row.held]));
+  };
+
+  it("holds the four verbs on the parent and no other privilege, and nothing at all on a partition (migrations 0000 and 0037)", async () => {
+    await withRollback(db.pool, async (client) => {
+      // Four lines of arrange the lifecycle tests also have, carried rather than folded for
+      // the reason they give: which role is set, and under which scope, is the subject.
+      /* jscpd:ignore-start */
+      await seedTwoWorkspaces(client);
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      await client.query("SELECT create_workspace_partition($1)", [WS_A]);
+      /* jscpd:ignore-end */
+      // Back to the seeding role: the catalogue answers the same whoever asks it, and the
+      // partition had to be made by the one role the lifecycle function admits.
+      await client.query("RESET ROLE");
+
+      // The parent: the three writing verbs migration 0037 grants by name, and the read
+      // migration 0000's default privileges gave — recorded as intended, never revoked.
+      expect(await privilegesHeld(client, "worker_rt", '"index".chunk')).toEqual({
+        SELECT: true,
+        INSERT: true,
+        UPDATE: true,
+        DELETE: true,
+        TRUNCATE: false,
+        REFERENCES: false,
+        TRIGGER: false,
+        MAINTAIN: false,
+      });
+
+      // The partition: nothing, on any verb. Parent policies do not reach a query aimed at
+      // a child and default privileges do, so the lifecycle function's REVOKE ALL is what
+      // keeps the parent the only road — asserted at the child, never inferred.
+      expect(await privilegesHeld(client, "worker_rt", `"index"."chunk_${WS_A}"`)).toEqual({
+        SELECT: false,
+        INSERT: false,
+        UPDATE: false,
+        DELETE: false,
+        TRUNCATE: false,
+        REFERENCES: false,
+        TRIGGER: false,
+        MAINTAIN: false,
+      });
+    });
+  });
+
+  it("reads this tenant's chunk rows through the parent, and none on another scope or no scope", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const mine = await seed.chunk({ workspaceId: WS_A, content: "ours" });
+      await client.query("SET LOCAL ROLE worker_rt");
+
+      // The grant is a table privilege; the policy is still what says which rows — the
+      // same guarantee the app's role reads under, proved for the tier that writes them.
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const scoped = await client.query('SELECT id FROM "index".chunk');
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
+      const otherTenant = await client.query('SELECT id FROM "index".chunk');
+
+      await client.query("SELECT set_config('app.workspace_id', '', true)");
+      const missingScope = await client.query('SELECT id FROM "index".chunk');
+
+      expect({
+        scoped: scoped.rows,
+        otherTenant: otherTenant.rows,
+        missingScope: missingScope.rows,
+      }).toEqual({ scoped: [{ id: mine.id }], otherTenant: [], missingScope: [] });
+    });
+  });
+});
+
+/**
  * The audience pair on every readable unit (ADR 0039; migrations 0019 and 0020, `[SEC3]`):
  * the word and the array are one fact the row holds — *everyone* over no array, *groups*
  * over a non-empty one with no NULL element — refused in every half-shape on every table
