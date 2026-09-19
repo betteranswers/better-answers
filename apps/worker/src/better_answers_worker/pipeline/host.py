@@ -50,12 +50,14 @@ from ..config import Bootstrap
 from ..log import logger
 from .tables import POOL, Table, declare_nothing, declare_rows
 
-#: How many bindings' Environments one process keeps open. A named Environment has no
-#: close of its own and an open one is an open LMDB handle, so a host that kept every
-#: binding it ever saw would grow handles for the life of the process. Small, because
-#: the loop runs one job at a time: the cache is here so that a workspace working
-#: through a handful of bindings does not reopen a store on every claim, not to
-#: hold an estate.
+#: How many bindings' Environments one `Host` keeps open. **Today the cache never holds
+#: more than the run's one binding**, so this bound is never reached: `index_binding`
+#: opens a `Host` around the job it is handed and closes it when the job ends, and one
+#: index job is one binding. The bound is the eviction rule the structure carries for
+#: the day a `Host` outlives its run, which the S1 spec holds as a written trigger.
+#: Small for that day, because the loop runs one job at a time: a named Environment has
+#: no close of its own and an open one is an open LMDB handle, so a host that kept every
+#: binding it ever saw would grow handles for the life of the process.
 ENVIRONMENTS_HELD = 4
 
 #: At most two connections per workspace (see this module's docblock), and none held
@@ -159,7 +161,14 @@ class _Loop:
 
 
 class Host:
-    """What a process holds between index runs: the loop, the pools and the stores.
+    """What one index run holds: the loop, its workspace's pool and its binding's store.
+
+    A `Host` lives for exactly one run — `index_binding` opens it around the job it is
+    handed and `close` drops every Environment and every pool when the job ends — so the
+    pool is that run's and the binding's `Environment` is that run's, and nothing here
+    survives to the next claim. The dict of pools and the LRU of Environments are the
+    shapes a `Host` that outlived its run would need; the S1 spec names the trigger for
+    building one and what it must then carry.
 
     Everything crossing this class's surface is a plain type. The Environments, the apps
     and the pool's identity to the engine stay inside it, which is what keeps the exit

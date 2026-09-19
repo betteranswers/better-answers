@@ -9,8 +9,8 @@ What a caller reaches for:
 
 - `index_binding(bootstrap, run) -> IndexOutcome` — one index run, the seam the worker's
   registry dispatches an `index` job through.
-- `Host` — what a process holds between runs: the one event loop, one connection pool
-  per workspace and the bounded cache of per-binding stores.
+- `Host` — what one index run holds: the one event loop, its workspace's connection pool
+  and its binding's store, opened and closed around the job `index_binding` is handed.
 - `Table`, `Column` — a table the app created, described for the engine to write rows
   into and never to create, alter or drop; `CHUNK_TABLE` is the one this tier writes.
 - `SENSITIVITY_ORDER` — the class words from the narrowest outwards, which is the order
