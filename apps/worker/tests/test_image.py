@@ -125,13 +125,6 @@ DOCKERFILE = WORKSPACE / "Dockerfile"
 #: a wider ``COPY`` would bring: the image's ``WORKDIR`` is ``/app``.
 TESTS_IN_THE_IMAGE = "/app/tests"
 
-#: Where the image keeps the list of public suffixes the build warmed, as a literal and
-#: not as whatever the Dockerfile happens to say: under ``/data/<service>`` beside the
-#: weights, because it is this tier's state and it is owned by this tier's uid. A
-#: container that answers anything else is a container reading a list the build never
-#: warmed, and the only outward sign of that is a fetch nobody asked for.
-SUFFIX_CACHE_IN_THE_IMAGE = "/data/worker/tldextract-cache"
-
 #: The prefix the official Python image installs its interpreter under. It cannot be
 #: read off a file in this repository — it is that image's own convention — and it is
 #: what makes the assertion below a statement about *whose* interpreter this is: one uv
@@ -1156,6 +1149,25 @@ def test_the_lmdb_mount_with_its_trailing_comment_is_caught_and_a_longer_path_is
     assert worker_mounts_over("/data/worker/lmdb") == []
 
 
+def test_the_deploy_unit_mounts_nothing_over_the_suffix_list_in_the_image() -> None:
+    """A host directory over ``TLDEXTRACT_CACHE`` masks the list the build warmed.
+
+    The same class as the weights guard two above, and the quieter of the two. A masked
+    ``HF_HOME`` raises on the first load, because ``HF_HUB_OFFLINE`` is set beside it; a
+    masked suffix list raises nothing at all. ``tldextract`` given an empty directory
+    tries two URLs, logs a warning for each, falls back to the copy in its own wheel and
+    answers correctly — so a bind mount here is a fetch per container, out to two hosts
+    nothing else in this tier reaches, and the only outward sign of it is a warning
+    nobody reads.
+
+    What an empty list here rests on is the case above, cited rather than repeated:
+    ``test_the_lmdb_mount_with_its_trailing_comment_is_caught_and_a_longer_path_is_not``
+    is where ``worker_mounts_over`` is shown seeing a mount when there is one. Without
+    that case this would pass just as readily against a helper that can see none.
+    """
+    assert worker_mounts_over(worker_environment("TLDEXTRACT_CACHE")) == []
+
+
 def test_the_build_fetches_the_weights_by_running_the_module_that_names_them(
     contents: ImageContents,
 ) -> None:
@@ -1236,13 +1248,22 @@ def test_the_image_redacts_the_fixture_with_its_network_refused_and_fetches_noth
     assert _pin("GLINER_MODEL_ID_MEASURED").rsplit("/", 1)[-1] not in version
 
     # Nothing was reached for while that ran. Each of these three says something the
-    # other two cannot: the image points the library at the directory the build warmed,
-    # that directory arrived in the image with something in it, and the library
-    # therefore never went looking. Drop the `ENV` and the first fails; drop the `COPY`
-    # and the second does; get either subtly wrong — a path off by a directory, a
+    # other two cannot: the container and the deploy unit point the library at one
+    # directory, that directory arrived in the image with something in it, and the
+    # library therefore never went looking. Drop the `ENV` and the first fails; drop the
+    # `COPY` and the second does; get either subtly wrong — a path off by a directory, a
     # `--chown` that left the files unreadable — and the third does, because a library
     # that cannot read its cache fetches instead of saying so.
-    assert found["suffix_cache"] == SUFFIX_CACHE_IN_THE_IMAGE
+    #
+    # The first is held against the deploy unit rather than against a path written down
+    # here, for the reason `worker_environment` gives: where this tier's caches live is
+    # the deploy unit's to state. It is also what makes the mount guard above worth
+    # having, since that guard asks the compose file for the path it protects: a compose
+    # line naming a directory the image does not bake would leave it guarding nothing
+    # the container reads, and this is the assertion that catches that. The path is
+    # still spelled out once — `test_redaction_suffixes.py` reads both halves of it off
+    # the Dockerfile — so this being agreement rather than a pin costs nothing.
+    assert found["suffix_cache"] == worker_environment("TLDEXTRACT_CACHE")
     assert found["suffix_cache_entries"] != []
     assert found["reached_out"] == []
 

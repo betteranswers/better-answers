@@ -35,10 +35,16 @@ a copy of the whole of it would make the image whatever some other build left th
 the mistake `T-148` found in the weights fence and `T-149` fixed.
 
 This module reads no environment variable. ``config.py`` is the only module in this tier
-allowed to read one, and the variable here is not the deploy unit's to give: it is a
-path this image bakes. ``tldextract`` reads it — when it warms the list, and again when
-this module asks it where the cache it just warmed is — and the directory to copy into
-arrives on the command line.
+allowed to read one, and no module of ours reads this one at all: ``tldextract`` reads
+it — when it warms the list, and again when this module asks it where the cache it just
+warmed is — and the directory to copy into arrives on the command line.
+
+The image bakes the path and the deploy unit declares the same one over it (`T-196`).
+The second is not a second owner: it is what gives the image suite's mount guard a path
+to ask about, since nothing can prove that no volume is mounted over a directory the
+deploy unit never names. The two are held equal by the container case in
+`apps/worker/tests/test_image.py`, so a compose line naming a directory this image does
+not bake fails there rather than in a redaction nobody is watching.
 """
 
 import shutil
