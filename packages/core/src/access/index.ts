@@ -62,7 +62,7 @@ export type Visibility = { readonly sensitivity: Sensitivity } & Audience;
 const RESTRICTED = "Restricted" satisfies Sensitivity;
 
 /** Everybody in the workspace — what a unit is born with, and the combining rule's identity. */
-export const EVERYONE = { audience: AUDIENCE_EVERYONE, audienceGroups: null } as const;
+const EVERYONE = { audience: AUDIENCE_EVERYONE, audienceGroups: null } as const;
 
 /**
  * Admins and nobody else: the most restrictive visibility there is, and what an empty
@@ -139,7 +139,7 @@ export const narrower = (one: Sensitivity, other: Sensitivity): Sensitivity =>
  * never a stored one: the caller forces the unit Restricted, so two disjoint audiences never
  * accidentally union into visibility and never leave an empty list the row's CHECK refuses.
  */
-export const audienceIntersection = (audiences: readonly Audience[]): Audience | "nobody" => {
+const audienceIntersection = (audiences: readonly Audience[]): Audience | "nobody" => {
   let named: readonly GroupId[] | undefined;
   for (const each of audiences) {
     if (each.audienceGroups === null) continue;
@@ -160,7 +160,7 @@ export const audienceIntersection = (audiences: readonly Audience[]): Audience |
  * kind the index row carries.
  */
 // oxlint-disable-next-line anti-slop/no-known-value-widening -- kinds are open (ADR 0026): a concept arrives with whatever folded kind its file carries, so the floor is looked up by any string and the open dictionary is the decision, not an omission.
-export const KIND_FLOOR: Readonly<Record<string, Sensitivity>> = { Person: RESTRICTED };
+const KIND_FLOOR: Readonly<Record<string, Sensitivity>> = { Person: RESTRICTED };
 
 /**
  * What a unit's visibility is derived from: the units it rests on — the bindings of the
