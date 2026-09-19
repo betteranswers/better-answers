@@ -437,6 +437,9 @@ describe("the first door — record, the actor derived from the Principal", () =
     const { door, workspaceId, adminUserId } = await provisioned();
     const write = writingIn(door, workspaceId);
 
+    // The end anchor is what tells this refusal from the optional kind's, which is this one
+    // plus ", or absent": unanchored, the pattern matches both, and a required field that
+    // wrongly gained the absence clause would still read green here.
     await expect(
       write({
         id: ulid(),
@@ -444,7 +447,7 @@ describe("the first door — record, the actor derived from the Principal", () =
         subjectId: adminUserId,
         detail: { adminUserId: "priya@example.invalid", role: "Admin", confirmed: true },
       }),
-    ).rejects.toThrow(/adminUserId is not an id/);
+    ).rejects.toThrow(/adminUserId is not an id$/);
     await expect(
       write({
         id: ulid(),
