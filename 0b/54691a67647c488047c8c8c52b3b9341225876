@@ -1,0 +1,21 @@
+apps/worker/tests/test_pipeline_index.py
+  s_526db057452fb6::t_b9f1c1b1e46f63 700
+  s_526db057452fb6::t_768030256cf960 682-689,691-694,699,701
+  s_526db057452fb6::t_beda0cdf9ce780 723-724
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0b54691a67647c488047c8c8c52b3b9341225876",
+  "prompts": {},
+  "sessions": {
+    "s_526db057452fb6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "347a0f5c-b9d7-43eb-bbf1-a407d152e0d7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
