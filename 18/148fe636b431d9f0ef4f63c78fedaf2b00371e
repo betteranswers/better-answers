@@ -1,0 +1,19 @@
+docs/specs/v01-route.md
+  s_526db057452fb6::t_ea80e0cb4f68b1 436
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "18148fe636b431d9f0ef4f63c78fedaf2b00371e",
+  "prompts": {},
+  "sessions": {
+    "s_526db057452fb6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "347a0f5c-b9d7-43eb-bbf1-a407d152e0d7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
