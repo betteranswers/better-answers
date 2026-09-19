@@ -1,0 +1,37 @@
+packages/schema/test/boundary-schemas.test.ts
+  s_d0af3feba9b401::t_6b4f5134572f0e 334
+  s_d0af3feba9b401::t_ea12f889567daa 321
+packages/schema/test/rls.test.ts
+  s_d0af3feba9b401::t_d20b860286445a 2494
+  s_d0af3feba9b401::t_a066ca9d1c3515 2458
+  s_d0af3feba9b401::t_ec88c0e74afdbe 2485
+packages/schema/test/finding-factory.test.ts
+  s_d0af3feba9b401::t_0c5ff362fb1bfc 52
+  s_d0af3feba9b401::t_5ac775cf131f84 126
+  s_d0af3feba9b401::t_84cdd604df3169 45-50,53
+  s_d0af3feba9b401::t_97c351f60fab27 81
+  s_d0af3feba9b401::t_a5777fac865171 152,155-172
+  s_d0af3feba9b401::t_0666a4bcd98a94 86-92,94-97,105,108-113,115-121,123-125
+  s_d0af3feba9b401::t_af50b7d7b814c7 38-41
+  s_d0af3feba9b401::t_27b9c45db72441 54
+  s_d0af3feba9b401::t_c77140f9e9cb9e 82
+  s_d0af3feba9b401::t_595f8bf2597d40 149-151,153-154,173-174
+  s_d0af3feba9b401::t_aecf324be14d2a 1,11-13,15-24,36-37,42-44,51,55-80,83-85,93,98-104,106-107,114,122
+  s_d0af3feba9b401::t_bbd9de329ab63f 25-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "66d32a6011388cb8d49b64ae99c4216019525a1b",
+  "prompts": {},
+  "sessions": {
+    "s_d0af3feba9b401": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe1d0bc2-0cc8-462e-8315-25c2d57ff65d",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
