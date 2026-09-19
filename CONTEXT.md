@@ -50,6 +50,13 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   commit and from the records as they change; never a source of truth.
 - **bundle manifest** — the bundle's self-description carried inside it: identity, origin,
   owner, content version.
+- **api** — the TypeScript deployable: one directory (`apps/api`), one compose service and one
+  process, carrying tRPC, the MCP surface, the authorization server and the SPA's build on one
+  origin. The word for that tier in prose, in code and on a job's *claimant*, because "the app" is
+  ambiguous three ways — `apps/` holds three deployables, `app` is a hostname role in the ingress,
+  and "the app" reads as the whole product (Liam, 19/09/2026). `app_rt` is the Postgres runtime
+  role the api connects as, an identifier rather than a second word for the tier. _Avoid_: app (for
+  the tier), the backend, the server.
 - **estate** — the running deployment: the boxes, the stores, the stacks and the copies kept off
   them. The word every deploy document uses ("the estate is two 4 GB boxes"). _Avoid_: environment,
   infrastructure.
@@ -241,9 +248,9 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   job is for, named on the row by a typed column a kind's CHECK requires (T-113, 10/09/2026) — and
   the facts the claim protocol needs. Queued until a *claimant* takes it under
   a *lease*; ends *done* or *failed* with an *outcome*, or *poisoned* after its last lost claim.
-  The app enqueues; a job's kind names the tier that claims it — the worker for every kind but the
-  one only the app can run (the question-set job, S6's, whose answer path is the app's) — both
-  through the same queue SQL functions (ADR 0031's `queue` agreement, which already admits the app
+  The api enqueues; a job's kind names the tier that claims it — the worker for every kind but the
+  one only the api can run (the question-set job, S6's, whose answer path is the api's) — both
+  through the same queue SQL functions (ADR 0031's `queue` agreement, which already admits the api
   as a claimant; ADR 0005: the control plane is rows;
   09/09/2026). A job is its own record and never an *audit event*. A *run* is a job being done:
   a *connector run* or a *graph sync run* is one job's execution. _Avoid_: task, ticket.
@@ -535,16 +542,16 @@ to it by IRI and never restates it (ADR 0014).
 - **staging** — a second copy of the platform on VPC 2 holding synthetic data only, brought up on
   demand for a drill or a rehearsal and wiped after; it never stands between them (ADR 0024).
 - **git store** — one of the platform's four shared stores (ADR 0005): the bare git repositories
-  under `/data/git`, one per workspace, holding the bundle. The app is its only writer and the
+  under `/data/git`, one per workspace, holding the bundle. The api is its only writer and the
   worker mounts it read-only at a commit; it is backed up as a verified `git bundle` per workspace
   and mirrored to the second box. _Avoid_: git host, repository server.
 - **forge** — the same thing named from the outside: the bare git repository per workspace that the
-  app writes and the worker reads at a commit. **No forge *service* runs** — no UI, no SSH server,
+  api writes and the worker reads at a commit. **No forge *service* runs** — no UI, no SSH server,
   no user model, no second schema (ADR 0024). _Avoid_: Forgejo (as a component).
 - **root refusal** — `openGit`'s refusal of a root that is not an absolute path or not an existing
   directory: checked once, at open, so nothing downstream — `initRepository` included — trusts a
   root nobody validated (ADR 0024).
-- **deploy unit** — **what one release changes**: the platform stack — `migrate`, `app`, `worker` —
+- **deploy unit** — **what one release changes**: the platform stack — `migrate`, `api`, `worker` —
   deployed by image digest. The stores stack and the database resource are **not** in it: they change
   on their own upgrade drill, not on a release. Use the phrase in this sense only; a document that
   means "everything on the boxes" says **estate** (ADR 0022; A16 of the pre-build gate).
@@ -552,7 +559,7 @@ to it by IRI and never restates it (ADR 0014).
 - **signal** — a named query over rows the platform already keeps, with a threshold that makes it
   worth a line on System (ADR 0025). Never a metric scraped from a process. _Avoid_: metric, KPI.
 - **alert** — a signal over its threshold, recorded once as a `platform_event` and emailed by the
-  app (immediate or in the daily digest) until a *cleared* event closes it (ADR 0025).
+  api (immediate or in the daily digest) until a *cleared* event closes it (ADR 0025).
 - **dead-man ping** — the outbound heartbeat a job sends only after its work is verified; silence
   is the alert. Carries an outcome word and sizes, never a path or an error.
 - **escrow** — the two-holder vault outside every box that keeps the handful of secrets whose loss
@@ -609,7 +616,7 @@ to it by IRI and never restates it (ADR 0014).
   person holds, by an instant on the person. Both end what was issued; a fresh sign-in mints
   anew. _Avoid_: suspend, ban, deactivate.
 - **agent token** — a **share agent's** credential: binding-scoped, minted and revoked by an Admin,
-  checked in the app before any request body is read, and good only for the `/agent/v1` routes a
+  checked in the api before any request body is read, and good only for the `/agent/v1` routes a
   share agent uses to push documents in from a company's own network (ADR 0008 amendment, `[SEC1]`'s
   *agent* class). Not a personal token (a person's own bearer for Claude Code and scripts) and not an
   OAuth access token. _Avoid_: api key, service account.
@@ -654,7 +661,7 @@ to it by IRI and never restates it (ADR 0014).
 - **MCP surface** — the platform's one tools-only MCP server at `app.<domain>/mcp`, on the product's
   own origin (T-045, 2026-09-03; `mcp.<domain>` before it): four entries in
   v0.1 — `find`, `ask`, `open`, `give_feedback` — the principal from the
-  token, the same predicate and audit as the app, grown later by token scope, never by a
+  token, the same predicate and audit as the api, grown later by token scope, never by a
   second server (ADR 0018). Guides and the question set are not on it. Never named on a screen;
   the System card says *Connected clients*. _Avoid_: connector, endpoint, MCP (on a screen).
 - **MCP tool** — one of the surface's entries: a named, described, typed function that never
@@ -697,21 +704,21 @@ to it by IRI and never restates it (ADR 0014).
   *sync*, *traversal* and *generation* never do). **Two** fixed phrases tell its state: **map as of
   <time>** (the ordinary case — the map agrees with the bundle, stamped) and **map unavailable since
   <time>** (the panel is replaced by the phrase and one sentence of what still works). Because the
-  map lives inside the same Postgres the app commits to, it is unavailable only when the database
+  map lives inside the same Postgres the api commits to, it is unavailable only when the database
   itself is, at which point nothing else works either. The third phrase, *map as of <time> ·
-  updating*, is **retired**: the graph delta joins the app's commit transaction, so the map is never
+  updating*, is **retired**: the graph delta joins the api's commit transaction, so the map is never
   behind for an edit, and a full rebuild writes beside the live generation and flips in one row
   update, so it is never behind during a rebuild either (ADR 0023, *the graph is application data*).
   Never a verdict; an answer carries the phrase in its context header line.
 - **generation** — the stamp every bundle-and-record node and edge in the graph carries; a
   workspace has one live generation, flipped by one row update after a full rebuild, and every read
   binds it. Generations exist **for full rebuilds only** — an ordinary edit's delta lands in the
-  app's own commit transaction and writes no new generation (ADR 0023). Source entities carry none:
+  api's own commit transaction and writes no new generation (ADR 0023). Source entities carry none:
   they are reconciled per document.
 - **graph sync run** — the job that **rebuilds** one workspace's graph in full as a new generation,
   for one of six reasons — first sync · route change · reconciler · erasure · upgrade · drill — and
   flips it live in one row update. It is not how an ordinary edit reaches the map: that delta is
-  written by the app in the same transaction as the concept index row, the `bundle_commit` and the
+  written by the api in the same transaction as the concept index row, the `bundle_commit` and the
   `audit_event` (ADR 0023). _Avoid_: derive-and-sync (for the edit path), sync lag.
 - **entity merge** — the rule an Admin's confirmed alias-merge suggestion writes: an audit event,
   never a commit; undone by deleting it and re-deriving (ADR 0023).
