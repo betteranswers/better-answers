@@ -229,29 +229,49 @@ def refuse_unreachable_entities(
     entity_table: Mapping[str, CategoryDescriptor],
     labels: Mapping[str, str],
 ) -> None:
-    """Refuse a table that declares a category nothing in the tier can raise.
+    """Refuse an entity nothing can carry from the seam to a document.
 
-    A declared entity reaches a document one of two ways: a factory in `RECOGNISERS`
-    answers for it, or the model is asked for it under one of `labels`' prompt words.
-    An entity in neither is a category the table promises and the seam can never find,
-    which is a miss nobody would see — so it is refused before an analyzer is built
-    over it, with every such entity named rather than the first one met.
+    The table and the labels are a pair, and it is held both ways, because an entity on
+    either side with no opposite number is one no span can ever reach the app under. A
+    declared entity reaches a document one of two ways: a factory in `RECOGNISERS`
+    answers for it, or the model is asked for it under one of `labels`' prompt words. An
+    entity in neither is a category the table promises and the seam can never find,
+    which is a miss nobody would see. The other way round, a label naming an entity the
+    table does not declare is an answer with no threshold to weigh it by, no tier and no
+    word to be written out as — `_finding_of` drops every span raised under it — and the
+    analyzer is never built to raise one anyway, because `build_analyzer` reads the
+    descriptor table by every label's entity to pick the model's threshold and without
+    this refusal that read is a bare `KeyError` where the orphan's name is wanted.
 
-    The two tables are arguments and not the module's own constants because that is what
-    makes the refusal something a test can stand in front of: this tier refuses a
-    `monkeypatch` of its own modules, so a declaration that breaks the rule can only be
-    handed in. `build_analyzer` passes the real two and nothing else does.
+    Both directions are answered in the one refusal, each naming every entity it found
+    rather than the first one met, so a pair broken both ways is one reading and not two
+    runs. The two tables are arguments and not the module's own constants because that
+    is what makes the refusal something a test can stand in front of: this tier refuses
+    a `monkeypatch` of its own modules, so a declaration that breaks the rule can only
+    be handed in. `build_analyzer` passes the real two and nothing else does.
     """
+    asked_of_the_model = set(labels.values())
+    faults: list[str] = []
     unreachable = sorted(
         entity
         for entity in entity_table
-        if entity not in RECOGNISERS and entity not in set(labels.values())
+        if entity not in RECOGNISERS and entity not in asked_of_the_model
     )
     if unreachable:
-        raise ValueError(
+        faults.append(
             "the category table declares entities nothing raises: "
             + ", ".join(unreachable)
         )
+    undeclared = sorted(
+        entity for entity in asked_of_the_model if entity not in entity_table
+    )
+    if undeclared:
+        faults.append(
+            "the model is asked for entities no descriptor declares: "
+            + ", ".join(undeclared)
+        )
+    if faults:
+        raise ValueError("; ".join(faults))
 
 
 def build_analyzer(model_id: str = GLINER_MODEL_ID) -> AnalyzerEngine:

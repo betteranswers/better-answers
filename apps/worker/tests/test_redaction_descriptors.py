@@ -235,7 +235,7 @@ def test_a_category_nothing_can_raise_is_refused_before_an_analyzer_is_built() -
     # descriptor declares is either a factory's or one of the labels the model is asked
     # for. A labels mapping that names an entity no descriptor declares leaves the two
     # the model was carrying with nothing at all to raise them, and those two are what
-    # the refusal has to name — not the entities a factory still covers.
+    # this direction has to name — not the entities a factory still covers.
     refuse_unreachable_entities(DESCRIPTOR_BY_ENTITY, GLINER_LABELS)
     asking_the_model_for_something_else = {"vehicle": "VEHICLE_REGISTRATION"}
 
@@ -247,6 +247,34 @@ def test_a_category_nothing_can_raise_is_refused_before_an_analyzer_is_built() -
     assert "PERSON" in str(refusal.value)
     assert "JOB_TITLE" in str(refusal.value)
     assert "EMAIL_ADDRESS" not in str(refusal.value)
+
+
+def test_a_label_no_descriptor_declares_is_refused_before_an_analyzer_is_built() -> (
+    None
+):
+    # The other way round the same pair, and the way a labels mapping is likeliest to
+    # break: the two the model carries are kept and a third is added, so every entity
+    # the table declares is still raised and the direction above finds nothing. The
+    # third is the fault — an entity the model would answer under that no descriptor
+    # declares, with no threshold to weigh it by, no tier and no word to be written out
+    # as, which `build_analyzer` meets as a bare `KeyError` when it reads the descriptor
+    # table by every label's entity. The two are spelled out here rather than spread
+    # from the module's own mapping, because a mapping derived from the subject would
+    # leave both negative assertions true for the wrong reason if that mapping were ever
+    # blanked; they pass first as a labels mapping this refusal has nothing against.
+    the_two_the_model_raises = {"person": "PERSON", "job title": "JOB_TITLE"}
+
+    refuse_unreachable_entities(DESCRIPTOR_BY_ENTITY, the_two_the_model_raises)
+
+    with pytest.raises(ValueError) as refusal:
+        refuse_unreachable_entities(
+            DESCRIPTOR_BY_ENTITY,
+            {**the_two_the_model_raises, "vehicle": "VEHICLE_REGISTRATION"},
+        )
+
+    assert "VEHICLE_REGISTRATION" in str(refusal.value)
+    assert "PERSON" not in str(refusal.value)
+    assert "JOB_TITLE" not in str(refusal.value)
 
 
 def test_the_twenty_seventh_name_keeps_the_shape_the_agreement_pins() -> None:
