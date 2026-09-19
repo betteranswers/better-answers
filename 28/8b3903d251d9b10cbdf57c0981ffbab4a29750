@@ -1,0 +1,43 @@
+packages/core/src/sources/admin-binding.ts
+  s_526db057452fb6::t_42101f868782f5 83-85,89
+packages/core/src/sources/passages.ts
+  s_526db057452fb6::t_d1d3e97898a5c4 206
+  s_526db057452fb6::t_b76de4ff3cc0d6 20
+docs/adr/README.md
+  s_526db057452fb6::t_3c4a38a75e777d 44
+packages/core/test/runs.test.ts
+  s_526db057452fb6::t_88e6d545bcc36c 254-266
+  s_526db057452fb6::t_f2b2aa618e32de 316-322,324-327,330-333,336-337
+  s_526db057452fb6::t_fbe0045e989687 343,351,354
+  s_526db057452fb6::t_e11a80a761a1eb 323,328-329,334-335
+  s_526db057452fb6::t_747c5d50dd0661 292,303,307
+packages/core/src/sources/binding.ts
+  s_526db057452fb6::t_990cca4d52431a 607
+  s_526db057452fb6::t_4c3e93396565e4 486
+packages/core/src/runs/index.ts
+  s_526db057452fb6::t_ffcf488945e92c 266-274,281-285
+  s_526db057452fb6::t_01f27043f66d99 61-62
+  s_526db057452fb6::t_c3b612e5a8e8ce 309-310
+docs/specs/s1-one-uploaded-document-to-a-cited-passage.md
+  s_526db057452fb6::t_0cc039f97205c7 116
+packages/core/src/sources/chunk-address.ts
+  s_526db057452fb6::t_bc3aa4e39ad149 62-68
+packages/core/src/sources/dpia.ts
+  s_526db057452fb6::t_96d956ab6e92e0 214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "288b3903d251d9b10cbdf57c0981ffbab4a29750",
+  "prompts": {},
+  "sessions": {
+    "s_526db057452fb6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "347a0f5c-b9d7-43eb-bbf1-a407d152e0d7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
