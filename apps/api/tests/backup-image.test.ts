@@ -159,7 +159,7 @@ describe.skipIf(nothingToProbeHere)("the backup image", () => {
     const leg = legFor("backup");
     contents = readContents(
       await readTheImage(
-        { dockerfile: leg.dockerfile, context: leg.context },
+        { tier: leg.tier, dockerfile: leg.dockerfile, context: leg.context },
         { command: ["sh", "-c", probe], environment: { PROBE_SCRIPT: scriptPath() } },
       ),
     );

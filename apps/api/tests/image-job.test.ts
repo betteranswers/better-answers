@@ -140,6 +140,28 @@ describe("the job that probes every image it pushes", () => {
     expect(buildWorkflow().jobs.check.with?.[named ?? ""]).toBe(true);
   });
 
+  it("gives the job that runs `check` a builder and the cache credentials first", () => {
+    // Both image probes build through `docker buildx build` with a `type=gha` cache where
+    // one is reachable, and neither half of "reachable" is this repository's to hand
+    // itself: the container-driver builder comes from the first step below and the
+    // `ACTIONS_*` variables from the second, which a runner gives an action's own process
+    // and no `run:` step. Losing either is silent — every image goes back to a cold build
+    // on every pull request while the run stays green — so the order is read here rather
+    // than trusted to the comment beside each step.
+    const steps = checkWorkflow().jobs.check.steps;
+    const at = (action: string): number =>
+      steps.findIndex((step) => (step.uses ?? "").startsWith(`${action}@`));
+    const builderAt = at("docker/setup-buildx-action");
+    const credentialsAt = at("crazy-max/ghaction-github-runtime");
+    const checkedAt = steps.findIndex((step) => (step.run ?? "").includes("pnpm check"));
+
+    expect(checkedAt).toBeGreaterThan(-1);
+    expect(builderAt).toBeGreaterThan(-1);
+    expect(credentialsAt).toBeGreaterThan(-1);
+    expect(checkedAt).toBeGreaterThan(builderAt);
+    expect(checkedAt).toBeGreaterThan(credentialsAt);
+  });
+
   it("loads before it probes and pushes after, never the other way round", () => {
     const steps = imageJob().steps;
     const loadedAt = steps.findIndex((step) => input(step, "outputs").includes("type=docker"));

@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -84,6 +85,12 @@ export const nothingToProbeHere =
 
 /** Which image to read, in the terms `build.yml`'s matrix carries for it. */
 export interface ImageUnderTest {
+  /**
+   * The leg's own name, which is also the name its layer cache is kept under. One leg
+   * builds one image, so a scope named for the leg cannot fall out of step with what is in
+   * it.
+   */
+  readonly tier: string;
   readonly dockerfile: string;
   readonly context: string;
 }
@@ -111,13 +118,154 @@ const CONTAINER_ALLOWANCE = 120_000;
  */
 export const IMAGE_PROBE_ALLOWANCE = BUILD_ALLOWANCE + CONTAINER_ALLOWANCE;
 
-const buildTheImage = async (image: ImageUnderTest): Promise<string> => {
-  const built = await run(
+/**
+ * What the `type=gha` build cache reads its credentials out of. The token is the same one
+ * on either version of that backend; the endpoint moved from the first name below to the
+ * second when the Actions cache service went to v2, so both are read and either will do. A
+ * runner hands these to an **action's** own process and to nothing else — which is why
+ * `docker/build-push-action` needs nothing extra, a `docker buildx build` run from inside
+ * this suite does, and `check.yml` copies them into the job's environment before `check`
+ * runs (Docker, *GitHub Actions cache*, 13/09/2026). That the workflow still does so is
+ * `image-job.test.ts`'s case, not this comment's word.
+ */
+const SHARED_CACHE_TOKEN = "ACTIONS_RUNTIME_TOKEN";
+const SHARED_CACHE_URLS = ["ACTIONS_RESULTS_URL", "ACTIONS_CACHE_URL"] as const;
+
+/**
+ * The driver a plain daemon answers with, and the one driver that can export a cache
+ * nowhere: it builds straight into the daemon's image store, so a runner's daemon handed
+ * `--cache-to` stops with an error rather than ignoring the flag — `build.yml` carries the
+ * message it stops with, which is why its own job creates a builder before it builds
+ * anything. Every other driver, the container one that step creates above all, can.
+ */
+const DRIVER_WITHOUT_AN_EXPORT = "docker";
+
+/** One question to the daemon about which builder it would use. */
+const INSPECT_ALLOWANCE = 60_000;
+
+/** What the environment a build is chosen from looks like, which is `process.env`'s shape. */
+type BuildEnvironment = Readonly<Record<string, string | undefined>>;
+
+/**
+ * The builder `docker buildx inspect` described, if it can export a cache.
+ *
+ * `inspect` answers a block of `Name: value` lines for the builder and then a `Nodes:` block
+ * that repeats several of those names for each node, so the first reading of a name is the
+ * builder's own and the rest are a node's. Nothing here parses further than that: what this
+ * has to decide is one thing, and a driver this repository has never seen is treated as able
+ * rather than unable, since the only driver that cannot is the default one every machine
+ * already has.
+ */
+export const builderThatCanExport = (inspected: string): string | undefined => {
+  const read = new Map<string, string>();
+  for (const line of inspected.split("\n")) {
+    const separator = line.indexOf(":");
+    if (separator === -1 || line.startsWith(" ") || line.startsWith("\t")) continue;
+    const name = line.slice(0, separator).trim();
+    if (!read.has(name)) read.set(name, line.slice(separator + 1).trim());
+  }
+  const named = read.get("Name") ?? "";
+  const driver = read.get("Driver") ?? "";
+  if (named === "" || driver === "" || driver === DRIVER_WITHOUT_AN_EXPORT) return undefined;
+  return named;
+};
+
+/**
+ * The builder this machine may export a `type=gha` cache to, or nothing.
+ *
+ * Two questions in this order and both must answer. The credentials are asked for first
+ * because they are what a laptop never has and because the answer costs nothing; only then
+ * is the daemon asked which builder it would use. Either question coming back empty is the
+ * plain build, because both ways of getting the cached arm wrong cost more than never
+ * asking for it. With no credentials at all buildx drops both halves and builds uncached
+ * without saying so — exit 0 and no cache step in the log, probed by hand on buildx
+ * v0.36.1 against Docker 29.7.2 — so the flags would be a claim to a cache nothing wrote
+ * to. With credentials it cannot use, the build stops outright: `failed to configure gha
+ * cache exporter: token is malformed`, and a runner whose token this suite half-read is a
+ * red run rather than a slow one. The daemon is a parameter so that the order can be proved
+ * without one.
+ */
+export const sharedCacheBuilder = async (
+  environment: BuildEnvironment,
+  inspectTheBuilder: () => Promise<string | undefined>,
+): Promise<string | undefined> => {
+  if ((environment[SHARED_CACHE_TOKEN] ?? "").trim() === "") return undefined;
+  if (!SHARED_CACHE_URLS.some((name) => (environment[name] ?? "").trim() !== "")) return undefined;
+  const inspected = await inspectTheBuilder();
+  return inspected === undefined ? undefined : builderThatCanExport(inspected);
+};
+
+/**
+ * The argv that builds this image, with the shared cache or without it.
+ *
+ * A pure function of the two things that decide it, so that both commands can be read on any
+ * machine and neither has to be run to be held. Five flags make the cached arm what it is:
+ * the two halves of the cache, `mode=max` so every layer of a multi-stage build is exported
+ * and not only the last stage's, `--load`, which the container driver needs before the image
+ * is in the daemon at all — the probes start containers from what this returns — and a
+ * `scope=` on both halves. The scope is the leg's name because the backend's default is
+ * `buildkit` for everyone: one scope holds one manifest, so the two images this workspace
+ * builds would each overwrite the other's export, and every run after them would read a
+ * cache made for the other image and build cold — a clash no single run can show.
+ *
+ * `--quiet` is not asked of that arm because it is not the id's source there: buildx writes
+ * the id to `--iidfile`, a file this run owns rather than a line to be picked out of a build
+ * log.
+ */
+export const buildCommand = (
+  image: ImageUnderTest,
+  choice: { readonly builder: string | undefined; readonly iidfile: string },
+): readonly [string, ...string[]] => {
+  if (choice.builder === undefined) {
+    return ["docker", "build", "--quiet", "--file", image.dockerfile, image.context];
+  }
+  return [
     "docker",
-    ["build", "--quiet", "--file", image.dockerfile, image.context],
-    { cwd: repositoryRoot, timeout: BUILD_ALLOWANCE, maxBuffer: 64 * 1024 * 1024 },
-  );
-  return built.stdout.trim();
+    "buildx",
+    "build",
+    "--builder",
+    choice.builder,
+    "--cache-from",
+    `type=gha,scope=${image.tier}`,
+    "--cache-to",
+    `type=gha,mode=max,scope=${image.tier}`,
+    "--load",
+    "--iidfile",
+    choice.iidfile,
+    "--file",
+    image.dockerfile,
+    image.context,
+  ];
+};
+
+/** What `docker buildx inspect` wrote about the builder this machine would use. */
+const inspectTheCurrentBuilder = async (): Promise<string | undefined> => {
+  try {
+    const { stdout } = await run("docker", ["buildx", "inspect"], { timeout: INSPECT_ALLOWANCE });
+    return stdout;
+  } catch {
+    // No buildx plugin, no daemon, or an inspect that ended non-zero: all three say the one
+    // thing the caller asked — this machine has no builder it could export a cache from —
+    // and the plain build follows from each, so the difference between them is not carried.
+    return undefined;
+  }
+};
+
+const buildTheImage = async (image: ImageUnderTest): Promise<string> => {
+  const builder = await sharedCacheBuilder(process.env, inspectTheCurrentBuilder);
+  const scratch = mkdtempSync(path.join(tmpdir(), "image-probe-"));
+  const iidfile = path.join(scratch, "image-id");
+  try {
+    const [program, ...argv] = buildCommand(image, { builder, iidfile });
+    const built = await run(program, argv, {
+      cwd: repositoryRoot,
+      timeout: BUILD_ALLOWANCE,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    return builder === undefined ? built.stdout.trim() : readFileSync(iidfile, "utf8").trim();
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 };
 
 /**
@@ -130,10 +278,11 @@ const buildTheImage = async (image: ImageUnderTest): Promise<string> => {
  * pushes only if the probe passes, so the artefact that ships is the artefact that was
  * read (`T-043`).
  *
- * The image is run by the id the build prints, and is never tagged. A tag is a name on the
- * daemon, and the daemon is shared: two worktrees running `check` at once would overwrite
- * each other's tag and one would read the other's image. The id cannot be taken from under
- * a probe. A supplied id is the same kind of thing — the id the workflow's own load
+ * The image is run by the id its build answered with — printed by `docker build --quiet`, or
+ * written to the `--iidfile` a `buildx` build is given — and is never tagged. A tag is a name
+ * on the daemon, and the daemon is shared: two worktrees running `check` at once would
+ * overwrite each other's tag and one would read the other's image. The id cannot be taken
+ * from under a probe. A supplied id is the same kind of thing — the id the workflow's own load
  * printed — for the same reason.
  */
 export const readTheImage = async (
@@ -177,6 +326,8 @@ export const readTheImage = async (
 /** A workflow step, in the fields a probe's wiring is read out of. */
 export const workflowStepSchema = z.object({
   if: z.string().optional(),
+  /** The action a step runs, at the pin it runs — read by prefix, never by version. */
+  uses: z.string().optional(),
   run: z.string().optional(),
   env: z.record(z.string(), z.string()).optional(),
   with: z.record(z.string(), z.unknown()).optional(),

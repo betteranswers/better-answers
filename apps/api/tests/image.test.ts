@@ -145,7 +145,7 @@ describe.skipIf(nothingToProbeHere)("the app tier's runtime image", () => {
   beforeAll(async () => {
     const leg = legFor("api");
     const stdout = await readTheImage(
-      { dockerfile: leg.dockerfile, context: leg.context },
+      { tier: leg.tier, dockerfile: leg.dockerfile, context: leg.context },
       {
         command: ["node", "-e", probe],
         environment: {
