@@ -6,7 +6,6 @@
   "exports": {
     "./kernel": "./src/kernel/index.ts",
     "./access": "./src/access/index.ts",
-    "./store": "./src/store/index.ts",
     "./llm": "./src/llm/index.ts",
     "./audit": "./src/audit/index.ts",
     "./sources": "./src/sources/index.ts",
