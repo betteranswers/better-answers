@@ -684,7 +684,7 @@ describe("narrowing a binding", () => {
     expect(editor?.ok && editor.value.found).toBe(true);
   });
 
-  it("refuses a Viewer and an Editor before anything moves", async () => {
+  it("refuses a Viewer and an Editor before anything moves, and before reading the id they asked with", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
 
@@ -697,6 +697,16 @@ describe("narrowing a binding", () => {
         }),
       );
       expect(refused).toEqual({ ok: false, error: "role-forbids" });
+      // The role is decided ahead of the shape, so a person who may not act learns nothing
+      // from the string they asked with — not even that it was never a binding id.
+      const askedWithNonsense = await reading(person, (reader, tx) =>
+        narrowBinding(reader, tx, {
+          bindingId: "not-a-binding-id",
+          sensitivity: "Restricted",
+          audience: "everyone",
+        }),
+      );
+      expect(askedWithNonsense).toEqual({ ok: false, error: "role-forbids" });
     }
     expect(
       await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
@@ -739,7 +749,7 @@ describe("narrowing a binding", () => {
     expect(kept.ok).toBe(true);
   });
 
-  it("refuses a group this workspace does not hold, a binding it does not hold, and a pair that is not an audience", async () => {
+  it("refuses a group this workspace does not hold, a binding it does not hold, an id that is not the column's shape, and a pair that is not an audience", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
     const elsewhere = await arrange();
@@ -754,6 +764,9 @@ describe("narrowing a binding", () => {
           audienceGroups: [theirGroup],
         },
         { bindingId: ulid(), sensitivity: "Restricted", audience: "everyone" },
+        // An id the binding table's own column would never hold is refused by its shape,
+        // before any statement carries it, and reads the same as a visibility that is no pair.
+        { bindingId: "not-a-binding-id", sensitivity: "Restricted", audience: "everyone" },
         {
           bindingId: binding.bindingId,
           sensitivity: "Internal",
@@ -773,6 +786,7 @@ describe("narrowing a binding", () => {
     expect(refusals.map((refused) => (refused.ok ? "ok" : refused.error))).toEqual([
       "no-such-group",
       "no-such-binding",
+      "malformed",
       "malformed",
       "malformed",
       "malformed",
