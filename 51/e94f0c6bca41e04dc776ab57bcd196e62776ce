@@ -1,0 +1,26 @@
+apps/worker/src/better_answers_worker/pipeline/__init__.py
+  s_d0af3feba9b401::t_edf79aa080045e 12-13
+docs/specs/s1-one-uploaded-document-to-a-cited-passage.md
+  s_d0af3feba9b401::t_9f10f329c290d8 240
+  s_d0af3feba9b401::t_c5861b8c358b7d 147
+  s_d0af3feba9b401::t_3d7a4a7fc80c4f 142
+apps/worker/src/better_answers_worker/pipeline/host.py
+  s_d0af3feba9b401::t_f6f11522fbe984 164-171
+  s_d0af3feba9b401::t_1dd30fa5ff1ba3 53-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "51e94f0c6bca41e04dc776ab57bcd196e62776ce",
+  "prompts": {},
+  "sessions": {
+    "s_d0af3feba9b401": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe1d0bc2-0cc8-462e-8315-25c2d57ff65d",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
