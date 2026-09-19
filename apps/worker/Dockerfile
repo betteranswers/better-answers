@@ -116,9 +116,20 @@ COPY --from=build --chown=worker:worker /data/worker/hf-cache /data/worker/hf-ca
 # which is the thing being stopped. There is no `OFFLINE` switch to set beside this one:
 # the library has no such mode, and a cache hit is what stands in for it.
 COPY --from=build --chown=worker:worker /data/worker/tldextract-cache /data/worker/tldextract-cache
+# The two caches above, and one thing that is not a cache at all: the engine's call
+# home. cocoindex reaches `cocoindex.gateway.scarf.sh` when it starts, when an
+# Environment opens and on every update — an outbound request per document of every
+# index run, telling a third party the package, its version and this box's IP. What
+# makes it worth a line here rather than a firewall rule somebody has to remember is
+# that nothing fails when it goes out: the worker indexes either way, so the only place
+# the call is visible is the wire. The variable is the native core's, nothing in the
+# Python package holds it, and `1` is a value a run proved rather than one a document
+# asserted — `apps/worker/tests/test_image.py` carries that run beside the case that
+# holds this line and `deploy/platform.compose.yaml`'s to each other.
 ENV HF_HOME=/data/worker/hf-cache \
     HF_HUB_OFFLINE=1 \
-    TLDEXTRACT_CACHE=/data/worker/tldextract-cache
+    TLDEXTRACT_CACHE=/data/worker/tldextract-cache \
+    COCOINDEX_DISABLE_USAGE_TRACKING=1
 
 USER worker
 
