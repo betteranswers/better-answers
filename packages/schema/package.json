@@ -9,7 +9,7 @@
     "./testing/warm-postgres": "./test/warm-postgres.ts"
   },
   "scripts": {
-    "generate": "drizzle-kit generate",
+    "generate": "node scripts/generate-migrations.ts",
     "generate:worker-view": "node scripts/generate-worker-schema.ts",
     "lint": "oxlint --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",

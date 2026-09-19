@@ -6,8 +6,13 @@ import { z } from "zod";
 // Not imported from index.ts — that would make the package entry point and this
 // module a cycle the day index.ts re-exports the journal readers.
 const migrationsFolder = fileURLToPath(new URL("../migrations", import.meta.url));
-/** Where drizzle-kit keeps the journal and one snapshot per entry. */
-const metaFolder = path.join(migrationsFolder, "meta");
+/**
+ * Where drizzle-kit keeps the journal and one snapshot per entry. Exported because the folder
+ * is written to as well as read: `scripts/generate-migrations.ts` restores the journal's final
+ * newline there after a generate run, and a second spelling of the path would go on pointing
+ * at `migrations/meta` the day this one moved.
+ */
+export const journalMetaFolder = path.join(migrationsFolder, "meta");
 
 /**
  * The one reader of drizzle-kit's journal (`migrations/meta/_journal.json`): the
@@ -91,7 +96,7 @@ const entriesIn = (folder: string): readonly JournalEntry[] => {
 };
 
 /** The tracked journal's entries. */
-export const journalEntries = (): readonly JournalEntry[] => entriesIn(metaFolder);
+export const journalEntries = (): readonly JournalEntry[] => entriesIn(journalMetaFolder);
 
 export const journalMigrationFiles = (): readonly string[] =>
   journalEntries().map((entry) => path.join(migrationsFolder, `${entry.tag}.sql`));
@@ -184,7 +189,7 @@ export const journalSnapshotsIn = (folder: string): Result<readonly string[], Sn
  * file broke where a thrown sentence would have to be read out of a stack trace.
  */
 export const journalSnapshots = (): Result<readonly string[], SnapshotRefusal> =>
-  journalSnapshotsIn(metaFolder);
+  journalSnapshotsIn(journalMetaFolder);
 
 /** The migration the database is stamped with once the whole journal has been applied. */
 export const lastMigration = (): JournalEntry => {

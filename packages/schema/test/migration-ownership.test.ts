@@ -5,6 +5,7 @@ import type { DrizzleSnapshotJSON } from "drizzle-kit/api";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
 import { afterAll, describe, expect, it } from "vitest";
 
+import { restoreFinalNewline } from "../scripts/journal-newline.ts";
 import {
   AUDIENCE_CHECK,
   CONCEPT_FRONTMATTER_MAX,
@@ -14,6 +15,7 @@ import {
 } from "../src/index.ts";
 import {
   journalEntries,
+  journalMetaFolder,
   journalMigrationFiles,
   journalSnapshots,
   journalSnapshotsIn,
@@ -91,9 +93,8 @@ afterAll(() => rmSync(trees, { recursive: true, force: true }));
 
 /** A fresh copy of the tracked `meta/`, for one case to break however it needs to. */
 const aCopyOfMeta = (): string => {
-  const source = path.join(path.dirname(journalMigrationFiles()[0] ?? ""), "meta");
   const destination = path.join(trees, `meta-${String(++copies)}`);
-  cpSync(source, destination, { recursive: true });
+  cpSync(journalMetaFolder, destination, { recursive: true });
   return destination;
 };
 
@@ -167,6 +168,57 @@ describe("the journal's meta folder", () => {
 });
 
 /**
+ * **The byte drizzle-kit leaves off.** `_journal.json` is the one file in `meta/` the tool
+ * rewrites on every `generate`, and it writes it without a final newline — so the file's last
+ * line turns up in the diff of any generate run that touched the journal, whatever else that
+ * run changed. No formatter covers `migrations/`, so nothing put it back. `generate` is a node
+ * script that restores it (`scripts/generate-migrations.ts`), and the tracked file and that
+ * script's function are held separately below: a `generate` run with nothing to propose leaves
+ * the journal untouched, so running the wrapper is no proof that either one is right.
+ */
+
+/** A journal as drizzle-kit hands it over: well-formed, and one byte short at the end. */
+const A_JOURNAL_AS_DRIZZLE_KIT_WRITES_IT = '{\n  "version": "7",\n  "entries": []\n}';
+
+/** A throwaway folder holding a `_journal.json` that reads exactly as it is spelled here. */
+const aFolderHoldingAJournalThatReads = (text: string): string => {
+  const folder = mkdtempSync(path.join(trees, "written-"));
+  writeFileSync(path.join(folder, "_journal.json"), text);
+  return folder;
+};
+
+describe("the journal's final newline", () => {
+  it("is the last byte of the tracked journal", () => {
+    // The raw bytes, not the parsed document: `JSON.parse` answers the same entries with the
+    // byte or without it, and the byte is the whole of what a reader sees in the diff.
+    const journal = readFileSync(path.join(journalMetaFolder, "_journal.json"));
+
+    expect(journal.at(-1)).toBe(0x0a);
+  });
+
+  it("is put back on a journal written without it", () => {
+    const folder = aFolderHoldingAJournalThatReads(A_JOURNAL_AS_DRIZZLE_KIT_WRITES_IT);
+    restoreFinalNewline(folder);
+
+    expect(readFileSync(path.join(folder, "_journal.json"), "utf8")).toBe(
+      `${A_JOURNAL_AS_DRIZZLE_KIT_WRITES_IT}\n`,
+    );
+  });
+
+  it("is left alone on a journal that already ends in one", () => {
+    // The other direction, and the one that matters from the second `generate` onwards: a
+    // fixer that appends whatever it is handed passes the case above and then adds a blank
+    // line on every run, which is the gratuitous last-line diff the wrapper exists to stop.
+    const folder = aFolderHoldingAJournalThatReads(`${A_JOURNAL_AS_DRIZZLE_KIT_WRITES_IT}\n`);
+    restoreFinalNewline(folder);
+
+    expect(readFileSync(path.join(folder, "_journal.json"), "utf8")).toBe(
+      `${A_JOURNAL_AS_DRIZZLE_KIT_WRITES_IT}\n`,
+    );
+  });
+});
+
+/**
  * **The declarations against the DDL beneath them.** Everything above reads files the journal
  * already holds and holds them against each other; none of it opens `src/`, which is where the
  * one drift this repository has actually had lived. `account.updated_at` carried `.defaultNow()`
@@ -193,9 +245,6 @@ describe("the journal's meta folder", () => {
 const THE_ALTER_THAT_LANDED_THE_DEFAULT =
   'ALTER TABLE "account" ALTER COLUMN "updated_at" SET DEFAULT now();';
 
-/** Where the snapshots sit: beside the migrations the journal names. */
-const theMetaFolder = path.join(path.dirname(journalMigrationFiles()[0] ?? ""), "meta");
-
 /**
  * The snapshot of the newest migration, taken from the journal's own walk rather than by naming
  * a tag, so the migration after this one needs no edit here. `journalSnapshots` answers them in
@@ -205,7 +254,9 @@ const theNewestSnapshot = (): DrizzleSnapshotJSON => {
   const walked = journalSnapshots();
   const newest = walked.ok ? walked.value.at(-1) : undefined;
   if (newest === undefined) throw new Error("there is no newest snapshot to diff against");
-  return JSON.parse(readFileSync(path.join(theMetaFolder, newest), "utf8")) as DrizzleSnapshotJSON;
+  return JSON.parse(
+    readFileSync(path.join(journalMetaFolder, newest), "utf8"),
+  ) as DrizzleSnapshotJSON;
 };
 
 /** The declarations as a snapshot, filtered to `public` as the config filters them. */
