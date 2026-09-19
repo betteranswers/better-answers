@@ -22,12 +22,12 @@ import type { Tx, TxRow } from "../store/postgres/index.ts";
  * string as far as a statement. Past both there is an Admin and a binding id, and the act can
  * begin.
  *
- * It is written once because more than one act opens this way — the DPIA input (`dpia.ts`),
- * the review list (`passages.ts`), and the publish and the reprocess (`binding.ts`) — and the
- * same decision taken in two places is a decision that can come apart. The narrowing act
- * (`index.ts`) opens the same way and decides one more refusal beside these two; it is not
- * folded in here, because that act's own suites are what would have to prove the fold and they
- * are not this ticket's.
+ * It is written once because every act on a binding opens this way — the DPIA input
+ * (`dpia.ts`), the review list (`passages.ts`), the publish and the reprocess (`binding.ts`)
+ * and the narrowing (`index.ts`) — and the same decision taken in two places is a decision
+ * that can come apart. The narrowing has a third refusal, a class and an audience that are no
+ * pair; that one is its own and it decides it after this head, so the order written here is
+ * the order every act on a binding keeps.
  */
 
 const BINDING_ID = boundarySchemas.sourceBinding.select.shape.id;

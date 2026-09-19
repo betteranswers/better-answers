@@ -1,4 +1,4 @@
-import { boundarySchemas, SENSITIVITIES } from "@better-answers/schema";
+import { SENSITIVITIES } from "@better-answers/schema";
 
 import {
   narrower,
@@ -12,7 +12,6 @@ import {
   attempt,
   err,
   ok,
-  requireAdmin,
   ulid,
   type Result,
   type RoleRefusal,
@@ -24,6 +23,7 @@ import {
 } from "../concepts/index.ts";
 import { recomputeCompositionsIncluding } from "../guides/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import { adminOnBinding } from "./admin-binding.ts";
 
 /**
  * Slice: **sources** — bindings, the source catalogue, the publish and sensitivity gates,
@@ -163,8 +163,6 @@ export type BindingNarrowed = {
   readonly compositions: readonly string[];
 };
 
-const BINDING_ID = boundarySchemas.sourceBinding.select.shape.id;
-
 type BindingRow = {
   readonly sensitivity: string;
   readonly audience: string;
@@ -236,19 +234,20 @@ export const narrowBinding = async (
   tx: Tx,
   input: NarrowBindingInput,
 ): Promise<Result<BindingNarrowed, NarrowBindingRefusal>> => {
-  const admin = requireAdmin(principal);
-  if (!admin.ok) return err(admin.error);
-  const bindingId = BINDING_ID.safeParse(input.bindingId);
+  const acting = adminOnBinding(principal, input.bindingId);
+  if (!acting.ok) return err(acting.error);
+  const { admin, workspaceId, bindingId } = acting.value;
+  // The act's own third refusal, beside the head's two and reading the same to a caller: a
+  // class and an audience that are no pair at all.
   const next = visibilityFrom(input);
-  if (!bindingId.success || next === undefined) return err("malformed");
-  const { workspaceId } = admin.value;
+  if (next === undefined) return err("malformed");
 
-  const groups = await openingACascadeOverHeldGroups(admin.value, tx, next.audienceGroups ?? []);
+  const groups = await openingACascadeOverHeldGroups(admin, tx, next.audienceGroups ?? []);
   if (!groups.ok) return err(groups.error);
   const known = await attempt(() =>
     tx.query<BindingRow>(
       "SELECT sensitivity, audience, audience_groups FROM source_binding WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
-      [workspaceId, bindingId.data],
+      [workspaceId, bindingId],
     ),
   );
   if (!known.ok) return err(known.error);
@@ -262,7 +261,7 @@ export const narrowBinding = async (
     tx.query(
       `UPDATE source_binding SET sensitivity = $3, audience = $4, audience_groups = $5
         WHERE workspace_id = $1 AND id = $2`,
-      [workspaceId, bindingId.data, next.sensitivity, next.audience, next.audienceGroups],
+      [workspaceId, bindingId, next.sensitivity, next.audience, next.audienceGroups],
     ),
   );
   if (!narrowed.ok) return err(narrowed.error);
@@ -271,7 +270,7 @@ export const narrowBinding = async (
   const copies = await attempt(() =>
     tx.query(NARROW_CHUNK_COPIES, [
       workspaceId,
-      bindingId.data,
+      bindingId,
       next.sensitivity,
       next.audience,
       next.audienceGroups,
@@ -280,21 +279,17 @@ export const narrowBinding = async (
   );
   if (!copies.ok) return err(copies.error);
   // Bare, after the row: the door's rejection aborts the transaction the row landed in.
-  await record(admin.value, tx, {
+  await record(admin, tx, {
     id: auditEventId,
     act: SOURCE_ACTS.narrowed,
-    subjectId: bindingId.data,
-    detail: { bindingId: bindingId.data, sensitivity: next.sensitivity, audience: next.audience },
+    subjectId: bindingId,
+    detail: { bindingId, sensitivity: next.sensitivity, audience: next.audience },
   });
   const cascaded = await attempt(async () => {
-    const concepts = await recomputeVisibilitySourcedFrom(admin.value, tx, {
-      bindingId: bindingId.data,
-    });
-    const compositions = await recomputeCompositionsIncluding(admin.value, tx, {
-      iris: concepts,
-    });
+    const concepts = await recomputeVisibilitySourcedFrom(admin, tx, { bindingId });
+    const compositions = await recomputeCompositionsIncluding(admin, tx, { iris: concepts });
     return { concepts, compositions };
   });
   if (!cascaded.ok) return err(cascaded.error);
-  return ok({ bindingId: bindingId.data, auditEventId, visibility: next, ...cascaded.value });
+  return ok({ bindingId, auditEventId, visibility: next, ...cascaded.value });
 };
