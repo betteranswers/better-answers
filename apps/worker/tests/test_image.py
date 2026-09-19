@@ -1,7 +1,7 @@
 """The worker image's contents, read from one container started from it (`T-084`).
 
 The image is asserted through the one interface a deploy unit has on it: a container.
-Four failures are silent everywhere else in this repository — the Dockerfile parses,
+Five failures are silent everywhere else in this repository — the Dockerfile parses,
 the build succeeds, the container starts, and each of them still ships.
 
 * ``uv sync --frozen --no-dev`` is the one thing keeping ruff, mypy, pytest, mutmut,
@@ -27,6 +27,14 @@ the build succeeds, the container starts, and each of them still ships.
   the copy bundled in its own wheel and writes the two URLs it could not reach to a log
   nobody reads, so a page still redacts correctly while every worker process pays a
   connection attempt to find that out (`T-152`).
+* The **engine's usage call** — cocoindex reaches ``cocoindex.gateway.scarf.sh`` when it
+  starts, when an Environment opens and on every update, unless
+  ``COCOINDEX_DISABLE_USAGE_TRACKING=1`` is in the process's environment (`T-163`).
+  Nothing fails when it does: the request goes out, the worker indexes, and a third
+  party is told the package, its version and the box's IP once per document of every
+  run. It is the quietest of the five, because a call nobody refused leaves no trace
+  here at all — which is why the case below holds the image and the deploy unit to the
+  variable, and why its docblock carries the run that proved the value.
 
 Everything the image is held to is derived. The development list comes from
 ``pyproject.toml``'s ``[dependency-groups] dev``, the interpreter from
@@ -565,6 +573,7 @@ sys.stdout.write(json.dumps({
     "weights": {m: cached(m) for m in json.loads(os.environ["PROBE_MODEL_IDS"])},
     "spacy_pipeline": pipeline(os.environ["PROBE_SPACY_PIPELINE"]),
     "hf_home": os.environ.get("HF_HOME", ""),
+    "usage_tracking": os.environ.get("COCOINDEX_DISABLE_USAGE_TRACKING", ""),
 }))
 """
 
@@ -698,6 +707,7 @@ class ImageContents:
     weights: Mapping[str, bool]
     spacy_pipeline: bool
     hf_home: str
+    usage_tracking: str
 
 
 def _read_contents(stdout: str) -> ImageContents:
@@ -718,6 +728,7 @@ def _read_contents(stdout: str) -> ImageContents:
         },
         spacy_pipeline=bool(answered["spacy_pipeline"]),
         hf_home=str(answered["hf_home"]),
+        usage_tracking=str(answered["usage_tracking"]),
     )
 
 
@@ -1085,6 +1096,45 @@ def test_the_image_holds_its_weights_where_the_deploy_unit_says_they_are(
     assert contents.hf_home != ""
 
 
+def test_the_image_stops_the_engine_calling_its_gateway_and_the_deploy_unit_agrees(
+    contents: ImageContents,
+) -> None:
+    """The engine's usage call, refused in the image and declared by the deploy unit.
+
+    cocoindex reaches ``https://cocoindex.gateway.scarf.sh`` when it starts, when an
+    Environment opens and on every update, which for this tier is an outbound call per
+    document of every index run — a request that names the package, its version and the
+    box's IP to a third party nobody chose. The call is the native core's alone: nothing
+    in the Python package holds either the host or the variable below, so no setting of
+    ours stands in for it and the deploy unit is the only place it can be answered.
+
+    **The value was probed before it was written down**, because a truthy string is an
+    assumption until a run says otherwise. On **19 September 2026**, against the pinned
+    engine — cocoindex **1.0.22**, ``pyproject.toml`` — this tier's pipeline suite
+    (``test_pipeline_host.py``, ``test_pipeline_index.py``, ``test_pipeline_landed.py``)
+    was run twice through a proxy of the run's own, which wrote down every host it was
+    asked to reach and reached none. The proxy was named to the run in ``HTTPS_PROXY``,
+    ``HTTP_PROXY`` and ``ALL_PROXY``, with the loopback and Hugging Face in ``NO_PROXY``
+    so that Testcontainers and the detector's weights went their usual way and the
+    engine's own call was the only thing in view. Without the variable: 33 passed, and
+    **93 CONNECTs to cocoindex.gateway.scarf.sh:443**. With
+    ``COCOINDEX_DISABLE_USAGE_TRACKING=1``: 33 passed, and **none**. So ``1`` is the
+    value proved and the only one: the run has two arms and neither of them is another
+    spelling of truth, so ``true``, ``yes`` and ``0`` are all untested here — and ``0``
+    reads to a person as the call switched back on.
+
+    Which is why the assertions are two and not one. The first is ``HF_HOME``'s shape
+    above, and says the image and the deploy unit have not drifted apart; it would hold
+    just as well with all three places moved together to a word nobody has run. The
+    second writes the proved value down, and is what makes the first a statement about
+    silence rather than about agreement.
+    """
+    assert contents.usage_tracking == worker_environment(
+        "COCOINDEX_DISABLE_USAGE_TRACKING"
+    )
+    assert contents.usage_tracking == "1"
+
+
 def test_the_deploy_unit_mounts_nothing_over_the_weights_the_image_carries() -> None:
     """A host directory over ``HF_HOME`` masks every byte the build fetched.
 
@@ -1311,6 +1361,34 @@ def test_this_tier_reads_the_names_the_workflows_actually_hand_it() -> None:
 
     assert len(handed) == 1, BUILD_WORKFLOW
     assert len(deferred) == 1, CHECK_WORKFLOW
+
+
+def test_the_runner_refuses_the_engines_gateway_call_the_way_the_image_does() -> None:
+    """The place in CI where this tier's suite runs outside a configured container.
+
+    The image's ``ENV`` reaches a container and nothing else, and the job that runs this
+    tier's suite starts none: ``pnpm check`` runs it on the runner itself, where the
+    engine is the same engine and the call is the same call — once per update, on every
+    pull request, from a machine the deploy unit has never configured. The value is read
+    off the compose file rather than written here, so the runner cannot come to disagree
+    with what ships.
+
+    **This covers the runner and not a laptop.** ``uv run --frozen check`` sets nothing,
+    so a developer running this tier's gate makes the same calls the run recorded above
+    counted. That is `T-204` rather than a line here: the tier's own runner is the only
+    place it could go, and whether it is worth going there at all is a ruling nobody has
+    made.
+    """
+    declared = [
+        line
+        for line in CHECK_WORKFLOW.read_text("utf-8").splitlines()
+        if "COCOINDEX_DISABLE_USAGE_TRACKING:" in line
+    ]
+
+    assert len(declared) == 1, CHECK_WORKFLOW
+    assert declared[0].split(":", 1)[1].strip().strip('"') == worker_environment(
+        "COCOINDEX_DISABLE_USAGE_TRACKING"
+    )
 
 
 def test_the_worker_leg_of_the_image_job_names_this_file_as_its_probe() -> None:
