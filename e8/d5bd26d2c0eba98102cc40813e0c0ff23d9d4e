@@ -1,0 +1,40 @@
+packages/core/src/runs/index.ts
+  s_d0af3feba9b401::t_7bdb6b3018fbfc 438
+  s_d0af3feba9b401::t_be0bb435cbd240 33,36
+  s_d0af3feba9b401::t_bfe9777d0bb01f 382-384
+  s_d0af3feba9b401::t_06ad8ec3d04760 47-52
+  s_d0af3feba9b401::t_c83678731c54e2 247-248
+  s_d0af3feba9b401::t_743c5e8363d58e 133
+  s_d0af3feba9b401::t_4bedb8c0d789fe 399-403
+  s_d0af3feba9b401::t_ef5bc73a0aebe6 385
+CONTEXT.md
+  s_d0af3feba9b401::t_3cd1084b99559c 53-59
+  s_d0af3feba9b401::t_3c354e5d13f4ba 559
+  s_d0af3feba9b401::t_39639d4002f055 248-250
+  s_d0af3feba9b401::t_e3106c7b73955f 551
+  s_d0af3feba9b401::t_5bc33f4ea16d2e 546
+  s_d0af3feba9b401::t_e340d6df35f156 616
+packages/schema/src/job-tables.ts
+  s_d0af3feba9b401::t_c5190569c5efc3 38,93
+  s_d0af3feba9b401::t_308d986dc8f80b 63-65
+  s_d0af3feba9b401::t_0c2bf06d3f3808 195
+  s_d0af3feba9b401::t_926508478546ec 11
+  s_d0af3feba9b401::t_74fd63a9f8e0db 58,60,62,67
+  s_d0af3feba9b401::t_d36e80b6c564f0 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e8d5bd26d2c0eba98102cc40813e0c0ff23d9d4e",
+  "prompts": {},
+  "sessions": {
+    "s_d0af3feba9b401": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe1d0bc2-0cc8-462e-8315-25c2d57ff65d",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
