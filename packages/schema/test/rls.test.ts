@@ -2455,7 +2455,7 @@ describe("the finding under both runtime roles", () => {
       await client.query(
         `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
                               char_start, char_end, score, rule_version, detector_pin)
-         VALUES ($1, $2, $3, 'sort-code', 'always', 'sort-code-with-account-number',
+         VALUES ($1, $2, $3, 'bank-details', 'always', 'sort-code-with-account-number',
                  12, 20, 0.85, 'r1', 'd1')`,
         [WS_A, ulid(), document.id],
       );
@@ -2482,7 +2482,7 @@ describe("the finding under both runtime roles", () => {
           `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
                                 char_start, char_end, score, rule_version, detector_pin,
                                 review_state, reviewed_by, reviewed_at)
-           VALUES ($1, $2, $3, 'sort-code', 'always', 'sort-code-with-account-number',
+           VALUES ($1, $2, $3, 'bank-details', 'always', 'sort-code-with-account-number',
                    30, 38, 0.9, 'r1', 'd1', 'kept-in-text', 'process:better-answers-test', now())`,
           "a finding is born unreviewed, and one inserted already reviewed is a special-category span a binding may widen over at nobody's word",
           [WS_A, ulid(), document.id],
@@ -2491,7 +2491,7 @@ describe("the finding under both runtime roles", () => {
           `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
                                 char_start, char_end, score, rule_version, detector_pin,
                                 restored_at, restored_by, restore_reason)
-           VALUES ($1, $2, $3, 'sort-code', 'always', 'sort-code-with-account-number',
+           VALUES ($1, $2, $3, 'bank-details', 'always', 'sort-code-with-account-number',
                    40, 48, 0.9, 'r1', 'd1', now(), 'process:better-answers-test', 'let it stand')`,
           "the restore is an Admin's act as well, and a span born restored is one the seam withheld and nobody put back",
           [WS_A, ulid(), document.id],
