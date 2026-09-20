@@ -66,12 +66,30 @@ Four things a binding and its documents carry, settled by S1 and recorded here b
 
 **A document may carry a class of its own, and it can only narrow.** `source_document.sensitivity` is nullable: NULL means *the binding's*, and a word there is the redaction seam's special-category verdict or an Admin's *narrow these documents*. The visibility derivation reads **the narrower of the binding's class and the document's** through the document row it already joins, so nothing a document says can widen what its binding decided. The audience stays the binding's alone — a document has no audience of its own, because an audience is a decision about people and a binding is where that decision is made.
 
-**The upload's converters, and when docling is reached for.** v0.1 converts markdown, plain text and HTML in pure Python inside the worker; docling is not run. A format that needs layout parsing — a PDF, a scanned page — is S4's trigger for docling, and until then such a document is *quarantined* with its outcome word on its row rather than half-converted into text nobody can cite.
+**The upload's converters, and when docling is reached for.** ~~v0.1 converts markdown, plain text and HTML in pure Python inside the worker; docling is not run. A format that needs layout parsing — a PDF, a scanned page — is S4's trigger for docling, and until then such a document is *quarantined* with its outcome word on its row rather than half-converted into text nobody can cite.~~
+
+*Overtaken 2026-09-20 (T-130) by the amendment of that date, below — which converter reads which media type, and what stands where docling's trigger stood. One line stands as written: a document a converter cannot read is *quarantined* with its outcome word on its row rather than half-converted into text nobody can cite.*
 
 **A publish is refused until the binding is indexed.** ~~The state word on a binding — *landed · indexing · indexed · published* — is what the act reads:~~ an Admin cannot publish a binding whose run has not finished, because publishing is a statement that somebody reviewed what the run found. The refusal is the act's; the column is only the record of where the binding has got to.
 
 *Corrected 2026-09-11 (T-131), the same day: **the publish act reads the latest `index` job by subject, never the state column**, and only *done* lets it through — a run that is queued or claimed has not finished, and one that failed or was poisoned found nothing to review, whose road out is a reprocess. **The state word is written by the app's acts and rendered from the job between them**: the bind writes *landed* and the publish writes *published*, and *indexing* and *indexed* are never stored, because the worker holds `SELECT` alone on `source_binding` (migration 0037) and the tier doing the work can only say where it got to on the job's own row.*
 
 **The destination is stored per connector and acted on for the chunk index alone until S7.** A binding's `destination` is a non-empty set of the glossary's three words, defaulting to the upload's — the chunk index and the bundle. Only the chunk index is fed in v0.1: the bundle is S7's and the graph is S8's. It is recorded on the day the binding is made rather than inferred later, because *where a source's documents go* is part of what an Admin decided, and a platform that inferred it from whichever stores happened to hold rows could not tell an Admin what they agreed to.
+
+Everything else in this ADR and its amendments stands.
+
+## Amendment — 2026-09-20, one converter per media type, no model, inside the worker (T-130)
+
+Decided by the owner from first principles before T-130 was built, against the amendment of 2026-09-11 and S1's default decision (5).
+
+**A media type has one converter, chosen once.** The normalised text a converter writes is the address space every span (`<document id>/chars:<start>-<end>`) and every `content_hash` is read against. A converter's code is one function and swaps in an hour; its output, swapped, reprocesses every document of that type and sends every citation into them to citation repair. So the choice is made per media type before the first client's documents land, and **each converter's name and version is part of the memoised function's version** — an upgrade misses the memo for every document of its type, so it is a reprocess somebody chose, never a drift.
+
+**The upload's four media types**, which are the whole of the allow-list: markdown and plain text pass through as the normalised text; `.docx` converts to Markdown through `anydoc`; PDF converts to Markdown through `pdf-inspector`. PDF is `pdf-inspector`'s alone — `anydoc` bundles its own build of that engine and the two outputs differ, which the rule above forbids for one type. HTML is no upload type; the website connector names its converter at S4 under the same rule, as every later media type does.
+
+**No model, and nothing leaves the worker.** *Pure Python* was a proxy for *no model*: the memory and the segfault it answered are torch's, and a Rust extension beside cocoindex's own carries neither. Conversion runs before the redaction seam, so its input is unredacted (ADR 0020) and a hosted parser is refused — `anydoc`'s `ocr` stays `"reject"`, held by a test.
+
+**A page with no text layer quarantines its document whole**, under the error's name. Docling is no longer S4's trigger: on CPU it wants more than twice the worker's 1.5 GB, at S4 as now (ADR 0024). OCR or a layout model is reached for when a binding's share of documents *quarantined* for want of OCR is one an Admin will not accept, and the answer then starts at ADR 0024's precondition for a model host.
+
+**T-130's first act proves both converters on the worker image under the cocoindex runtime**; a converter that fails it falls back as that ticket names, and the fallback taken amends this paragraph in the same PR. The reasoning and the probe of 20/09/2026 are `.scratch/t-130-converter/first-principles.md`.
 
 Everything else in this ADR and its amendments stands.
