@@ -115,6 +115,11 @@ THE_HEADINGS_ON_THE_WHOLE_PAGE = (
 )
 THE_FIRST_HEADING_EVERY_LENGTH_KEEPS = 815
 
+#: The run under *Contacts*: 378 characters, inside the ceiling, and carrying blank
+#: lines of its own. It is the run that tells a heading anchor from a blank-line one.
+THE_CONTACTS_RUN = 1641
+THE_CONTACTS_RUN_ENDS_AT = 2019
+
 #: The heading-less fixture's first paragraph, rewritten at eight lengths. Everything
 #: below it is byte-identical in all eight, so a finding in the tail that moves moved
 #: because the grid moved under it and for no other reason.
@@ -275,6 +280,17 @@ def test_every_window_begins_where_the_page_begins_something() -> None:
         assert not any(window.start < heading < window.end for heading in heading_at), (
             window.start
         )
+
+    # And a run inside the ceiling is read **whole**, blank lines and all. That is what
+    # makes the anchor the heading rather than every blank line, and it is not a detail:
+    # a rule that cut at every blank line was measured and loses the planted page a true
+    # `job-title 'supervisors'`. Without this, a chunker that found no heading at all
+    # would satisfy every other assertion in this file, because on Markdown a heading is
+    # always preceded by the blank line a paragraph rule would have cut at anyway.
+    assert (THE_CONTACTS_RUN, THE_CONTACTS_RUN_ENDS_AT) in [
+        (window.start, window.end) for window in windows
+    ]
+    assert "\n\n" in page[THE_CONTACTS_RUN:THE_CONTACTS_RUN_ENDS_AT]
 
 
 def test_a_heading_inside_a_code_fence_opens_no_window() -> None:
