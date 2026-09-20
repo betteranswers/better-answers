@@ -1,0 +1,20 @@
+packages/core/src/runs/index.ts
+  s_76834b2fe19bf1::t_fa20e2eec22fc5 3-4
+  s_76834b2fe19bf1::t_71df231cc3a91e 430-464
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "057a861384b1dcec8ecdd09f76cf153994ca75d3",
+  "prompts": {},
+  "sessions": {
+    "s_76834b2fe19bf1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3978e665-a0d3-4ce5-b180-4ce3a4ca0cbe",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
