@@ -6,7 +6,7 @@ How a set of ordna tickets becomes merged code. One session — the **Coordinato
 
 route spec → `/to-spec` (a block) → `/to-tickets` (its tracer bullets, on the board) → **`/goal` over the tickets** → a PR per ticket → the route's status table.
 
-A goal's scope is the session's to set: a block's remaining tickets, two named ids, the `backlog` tag. The Coordinator dispatches, reads and decides. It writes no code, since the context the loop lives in is the one thing it cannot spend. A ticket the goal reveals is settled with the owner at the goal's end and cut by whichever context has room.
+A goal's scope is the session's to set: a block's remaining tickets, two named ids, the `backlog` tag. The Coordinator dispatches, reads and decides. It writes no code, since the context the loop lives in is the one thing it cannot spend.
 
 ## The goal
 
@@ -25,11 +25,9 @@ Three parts, each load-bearing: the **end state** the board can show, the **chec
 5. **Land**: push the branch, open the PR, wait for CI — the root `check` runs on every pull request — merge on green, then `node .gitnexus/run.cjs analyze` in the main checkout.
 6. **Record**: a Progress entry on the task — merged when and where, what landed, the suites, the review, a measurement if the ticket records one — through the origin-first edit; `ordna move T-nnn done`; push the ref; print `ordna list -s todo`.
 
-## The agent's attempt
+## Per task implementation
 
-One agent owns the ticket end to end, so every finding on its own diff is its own to fix. `/mattpocock-skills:implement` is the process: `/tdd` at the seams the ticket names, the tier's skills (`AGENTS.md`, *Skills*), typecheck and single suites as it goes, the checks below once at the end, then `/code-review` against the ticket, each finding fixed before the commit. Words land in `CONTEXT.md` before code names them; an ADR amendment and its `docs/adr/README.md` row land in the commit that changes what the ADR decides.
-
-A finding that leaves the ticket is one task: `ordna create "…" -t needs-triage`, carrying the command and output that show it, pushed origin first. `/triage` decides its fate; the agent that found it never does.
+One agent owns the ticket end to end - `/mattpocock-skills:implement` is the process: `/tdd` at the seams the ticket names, the tier's skills (`AGENTS.md`, *Skills*), typecheck and single suites as it goes, the checks below once at the end, then `/code-review` against the ticket, each finding fixed before the commit. Words land in `CONTEXT.md` before code names them; an ADR amendment and its `docs/adr/README.md` row land in the commit that changes what the ADR decides.
 
 Commits go on the ticket's branch, one message in the repository's prose shape ending with the ticket id in brackets, `detect_changes` clean before each.
 
@@ -40,9 +38,8 @@ Commits go on the ticket's branch, one message in the repository's prose shape e
 | When | What | Who |
 | --- | --- | --- |
 | The attempt's end | each touched workspace's `check` (`pnpm --filter <workspace> check`; `cd apps/worker && uv run --frozen check`) and the root gates named ahead of `check:workspaces` in the root `package.json` (`node scripts/check.mjs format:check lint jscpd knip`), with `IMAGE_PROBE_DEFERRED=true` so neither tier's image-contents suite builds an image | the agent |
-| Before the PR opens | root `pnpm check` once, in full, images included | the agent, as `/implement`'s last step |
 | The PR | root `check` in full on the runner (`.github/workflows/check.yml`) | CI, the arbiter |
 
 ## Environment
 
-A Docker daemon (every suite starts a Testcontainers Postgres, the core suites a Garage), `uv`, `pnpm`, Playwright's Chromium for the web (`pnpm --filter @better-answers/web exec playwright install chromium`), a warm `HF_HOME` for the detector's weights, and `git-filter-repo` at the version `apps/api/Dockerfile` pins. The buildx cache is bounded by the builder's own garbage-collection policy, written where the builder reads it; a prune by hand reclaims nothing from the builder in use (T-175, 12/09/2026).
+A Docker daemon (every suite starts a Testcontainers Postgres, the core suites a Garage), `uv`, `pnpm`, Playwright's Chromium for the web (`pnpm --filter @better-answers/web exec playwright install chromium`), a warm `HF_HOME` for the detector's weights, and `git-filter-repo` at the version `apps/api/Dockerfile` pins. The buildx cache is bounded by the builder's own garbage-collection policy, written where the builder reads it.
