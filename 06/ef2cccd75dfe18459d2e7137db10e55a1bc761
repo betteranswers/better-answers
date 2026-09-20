@@ -1,0 +1,13 @@
+.github/workflows/build.yml
+  ai_agent 28-29,67-69,73-74,205-208,267-295
+apps/api/tests/image-job.test.ts
+  ai_agent 53-60,155-180,206-210,213-218,229,282
+apps/api/tests/image-probe.ts
+  ai_agent 328-329,331-335
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "06ef2cccd75dfe18459d2e7137db10e55a1bc761",
+  "prompts": {}
+}
