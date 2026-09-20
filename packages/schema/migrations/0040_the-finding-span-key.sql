@@ -1,0 +1,2 @@
+DROP INDEX "finding_workspace_id_document_id_idx";--> statement-breakpoint
+CREATE UNIQUE INDEX "finding_span_key" ON "finding" USING btree ("workspace_id","document_id","rule_id","char_start","char_end");

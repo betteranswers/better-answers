@@ -70,6 +70,7 @@ from better_answers_worker.pipeline import (
     suppression_of,
     timeout_for,
 )
+from better_answers_worker.redaction import Restore
 from better_answers_worker.redaction.pins import DETECTOR_PIN, RULE_VERSION
 from test_pipeline_host import bootstrap_for
 
@@ -249,6 +250,7 @@ def a_landed_document(
     *,
     media_type: str = "text/markdown",
     suppressions: Sequence[Suppression] = (),
+    restores: Sequence[Restore] = (),
 ) -> LandedDocument:
     """One document as its catalogue row addresses it, with the bind act's two keys."""
     return LandedDocument(
@@ -257,6 +259,7 @@ def a_landed_document(
         original_key=f"documents/{document_id.lower()}/original",
         normalised_key=f"documents/{document_id.lower()}/normalised",
         suppressions=tuple(suppressions),
+        restores=tuple(restores),
     )
 
 
@@ -403,6 +406,34 @@ def test_a_suppression_on_one_document_re_reads_that_document_and_no_other(
     assert answer.read_afresh == 1
     assert text_of(answer, A_DELIVERY_NOTE_ID) == A_DELIVERY_NOTE_SUPPRESSED
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
+
+
+def test_a_restore_on_one_document_re_reads_that_document_and_no_other(
+    host: Host,
+) -> None:
+    """What "keyed on the finding" means (ADR 0020, amended 2026-09-20): a restore is an
+    argument and never a change key, so the run an Admin's *keep in text* queues reads
+    the one document whose span was kept and answers the rest of the binding out of the
+    memo. The span is named as the run is told of it — its rule and its two offsets —
+    and the account is back in the invoice's text, which is the whole of what the act
+    was for.
+    """
+    bucket = a_bucket_holding_both()
+    before = (THE_INVOICE, THE_DELIVERY_NOTE)
+    after = (
+        a_landed_document(
+            AN_INVOICE_ID,
+            restores=(Restore(rule_id="UK_BANK_ACCOUNT", start=54, end=97),),
+        ),
+        THE_DELIVERY_NOTE,
+    )
+
+    read_the_copies(host, bucket, before)
+    answer = read_the_copies(host, bucket, after)
+
+    assert answer.read_afresh == 1
+    assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE
+    assert text_of(answer, A_DELIVERY_NOTE_ID) == A_DELIVERY_NOTE
 
 
 def test_a_run_under_a_moved_detector_pin_reads_every_document_afresh(

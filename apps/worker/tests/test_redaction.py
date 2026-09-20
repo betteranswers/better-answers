@@ -70,7 +70,7 @@ from collections.abc import Mapping, Sequence
 
 import pytest
 
-from better_answers_worker.redaction import Redaction, redact
+from better_answers_worker.redaction import Redaction, Restore, redact
 from better_answers_worker.redaction.pins import VERSION_STRING
 from planted_page import (
     A_CONSUMER_ADDRESS,
@@ -672,3 +672,100 @@ def test_the_same_inputs_twice_give_identical_output(
     assert again.counts == on_an_hr_shaped_binding.counts
     assert again.verdict == on_an_hr_shaped_binding.verdict
     assert again.version == on_an_hr_shaped_binding.version
+
+
+# -- the restore -----------------------------------------------------------------------
+
+#: The span the restore exists for (ADR 0020): the project account on the company's own
+#: supplier pack, which is a business fact and not a person's — invented, as every value
+#: on the page is. The appendix's fenced sort code is the page's other `bank-details`
+#: finding, and it is the one nobody restored.
+THE_COMPANYS_OWN_ACCOUNT = "00-00-00, account number 12345678"
+
+
+def restore_of(found: Redaction, page: str, span: str, tier: str = "always") -> Restore:
+    """The restore an Admin's keep leaves for one span: the rule that raised it and its
+    two offsets, which is what a finding is and all a run is ever told of one.
+    """
+    (finding,) = [
+        finding
+        for finding in found.findings
+        if finding.tier == tier and page[finding.start : finding.end] == span
+    ]
+    return Restore(rule_id=finding.rule_id, start=finding.start, end=finding.end)
+
+
+def test_a_restored_span_is_left_in_the_text_and_is_still_the_finding_it_was(
+    on_a_plain_binding: Redaction, page: str
+) -> None:
+    # Both ways (`[TEST7]`): withheld on the control and in the text under the restore,
+    # on a binding whose only difference is the restore. And a finding and a withholding
+    # stay two things — the row an Admin reviewed is still raised and still counted, so
+    # the review, the publish totals and the erasure map read what they read before.
+    kept = restore_of(on_a_plain_binding, page, THE_COMPANYS_OWN_ACCOUNT)
+
+    found = redact(page, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [kept])
+
+    assert THE_COMPANYS_OWN_ACCOUNT not in on_a_plain_binding.text
+    assert THE_COMPANYS_OWN_ACCOUNT in found.text
+    assert found.findings == on_a_plain_binding.findings
+    assert found.counts == on_a_plain_binding.counts
+    # The span nobody restored, under the same rule, is where it was.
+    assert FENCED_SORT_CODE not in found.text
+
+
+def test_a_restore_is_of_one_rules_span_and_another_rule_over_it_restores_nothing(
+    on_a_plain_binding: Redaction, page: str
+) -> None:
+    # The rule is part of what a finding is, because two rules may claim one run of
+    # characters and an Admin restored one of them. A restore that matched on the
+    # offsets alone would let back a span nobody reviewed.
+    kept = restore_of(on_a_plain_binding, page, THE_COMPANYS_OWN_ACCOUNT)
+    under_another_rule = Restore(rule_id="UK_NHS", start=kept.start, end=kept.end)
+
+    found = redact(page, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [under_another_rule])
+
+    assert found.text == on_a_plain_binding.text
+
+
+def test_an_unrestored_finding_over_the_same_characters_still_withholds_them(
+    on_a_plain_binding: Redaction, page: str
+) -> None:
+    # The signatory sits inside the home address he is care of, so two rules claim one
+    # run of characters. Restoring his name lets the name back and nothing else: with
+    # the address tier in force the address still covers him, and with it switched off
+    # nothing unrestored does — which is the only case the restore shows through.
+    his_name = restore_of(on_a_plain_binding, page, A_FOURTH_OFFICER)
+
+    under_the_address = redact(page, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [his_name])
+    with_the_address_off = redact(
+        page, NOTHING_SWITCHABLE, NO_SUPPRESSIONS, SEED, [his_name]
+    )
+
+    assert A_FOURTH_OFFICER not in under_the_address.text
+    assert A_FOURTH_OFFICER in with_the_address_off.text
+
+
+def test_an_erasure_outranks_a_restore(
+    on_an_hr_shaped_binding: Redaction, page: str
+) -> None:
+    # A suppression raises the tier of the finding that is already there — the same
+    # rule, the same offsets, so the same finding an Admin may have restored long before
+    # the person asked to be erased. The restore must not be what lets her back: an
+    # identifier a request named is kept out of everything derived from the document.
+    # Both ways: the restore shows her inside the officers block until the request
+    # arrives, and nowhere on the page once it has.
+    in_the_block = next(
+        Restore(rule_id=finding.rule_id, start=finding.start, end=finding.end)
+        for finding in on_an_hr_shaped_binding.findings
+        if finding.tier == "always"
+        and page[finding.start : finding.end] == "Rosalind Petheridge"
+    )
+
+    restored = redact(page, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED, [in_the_block])
+    erased = redact(
+        page, AN_HR_SHAPED_BINDING, ONE_NAME_SUPPRESSED, SEED, [in_the_block]
+    )
+
+    assert "Rosalind Petheridge" in officers_block(restored.text)
+    assert "Rosalind Petheridge" not in erased.text

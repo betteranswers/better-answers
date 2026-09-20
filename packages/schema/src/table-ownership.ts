@@ -397,9 +397,9 @@ export const CROSS_OWNER_TABLE_ACCESS = [
   {
     table: "public.finding",
     by: WORKER,
-    access: "write",
+    access: "read and write",
     reason:
-      "The detector runs in the worker and the review of what it found is an Admin's act, so the worker records a span it withheld and holds INSERT alone — no SELECT, no UPDATE, no DELETE, each refusal a test of its own (ADR 0020). A worker that could read this table would hold a workspace's map of where its personal data sits; one that could update it could mark a special-category span reviewed. No lint sees across a process boundary, which is why the grant and this entry are both written down.",
+      "The detector runs in the worker and the review of what it found is an Admin's act, so the worker records a span it withheld — INSERT on the detector's own columns (migrations 0024, 0032) — and reads back one thing: which spans of a document an Admin restored, through SELECT on the five columns that say which span a row is and on `restored_at`, and on no other column (migration 0041; ADR 0020, amended 2026-09-20). The restored spans are an argument to the one memoised function a run converts through, as a document's suppressions are, so a restore re-reads that one document and the seam leaves the span in the text; the same five columns are the conflict target the run's insert steps over, which is what keeps a second run from doubling a binding's findings and an Admin's mark on the row it was made on. No UPDATE and no DELETE, and every withheld column a refusal test of its own: a worker that could read a category would hold a workspace's map of what kind of personal data sits where, one that could read a reason would read a sentence an Admin typed about a person, and one that could update could mark a special-category span reviewed. No lint sees across a process boundary, which is why the grant and this entry are both written down.",
   },
   {
     table: "public.suppression",

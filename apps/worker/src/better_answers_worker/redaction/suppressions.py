@@ -42,12 +42,30 @@ def raised_by_a_suppression(
     suppressions: Sequence[Mapping[str, Sequence[str]]],
 ) -> tuple[Finding, ...]:
     """Every finding whose span is an identifier a request named, at the always tier."""
-    named = _identifiers_in(suppressions)
-    if not named:
+    erased = suppressed_among(findings, text, suppressions)
+    if not erased:
         return tuple(findings)
-    return raised_to_always(
-        findings,
-        lambda finding: normalised(text[finding.start : finding.end]) in named,
+    return raised_to_always(findings, lambda finding: finding in erased)
+
+
+def suppressed_among(
+    findings: Sequence[Finding],
+    text: str,
+    suppressions: Sequence[Mapping[str, Sequence[str]]],
+) -> frozenset[Finding]:
+    """The findings whose span is an identifier a request named.
+
+    Asked on its own by the seam as well as by the pass above, because raising a tier
+    does not say *why* it was raised: an officer's name and an erased person's name are
+    both at the always tier afterwards, and only one of them is a span no restore may
+    let back (`restores.py`). Asked of the findings as they stand when it is called —
+    the tier is not part of the question, so before the pass and after it answer alike.
+    """
+    named = _identifiers_in(suppressions)
+    return frozenset(
+        finding
+        for finding in findings
+        if normalised(text[finding.start : finding.end]) in named
     )
 
 

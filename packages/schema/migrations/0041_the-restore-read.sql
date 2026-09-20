@@ -1,0 +1,51 @@
+-- Custom migration (hand-written SQL; ADR 0032).
+-- The one read a run needs of the finding, and no other (ADR 0020, amended 2026-09-20): which
+-- spans of a document an Admin restored.
+--
+-- Hand-written rather than generated because a grant is not a column: `drizzle-kit generate`
+-- writes the DDL its schema file reaches and nothing about who may reach a table afterwards,
+-- so every cross-tier privilege in this package is written here beside the sentence that
+-- explains it — as migrations 0020, 0024, 0030, 0032, 0037 and 0038 each are.
+--
+-- **What 0024 and 0032 said, superseded here rather than edited there.** Both rest on the
+-- worker holding INSERT on this table and nothing else: "a run records a span it withheld and
+-- can neither read the table back nor mark one reviewed". That was written before anybody had
+-- asked how a restore takes effect, and the answer it leaves is that none does: an Admin lets
+-- one span of the always set back into a document with a reason, the act queues the run that
+-- is to put it back — and the run, unable to learn that the span was restored, withholds it
+-- again. A landed migration is a record of what ran, so the sentence stays where it is and the
+-- correction is this file.
+--
+-- **The restore reaches the run as an argument, by the road a suppression does.** The run
+-- gathers each document's restored spans inside the transaction its workspace scope is set in
+-- and hands them to the one memoised function beside the suppressions (migration 0038), so a
+-- restore moves that one document's memo key and no other's, and the seam leaves the span in
+-- the text. A set carried on the job row instead would be a payload on a queue row, which the
+-- queue's descriptor refuses (the S1 spec, *The queue*: a typed column, never a payload).
+--
+-- **Six columns, and what each is for.** `workspace_id`, `document_id`, `rule_id`,
+-- `char_start` and `char_end` are what a finding *is* — migration 0040's unique key — and
+-- `restored_at` is whether an Admin let it back. The first five are also exactly what the
+-- run's insert names as its conflict target, and PostgreSQL requires SELECT on every column a
+-- conflict target names: so this grant is what lets the insert step over **this key and no
+-- other**, where the untargeted form would swallow a primary-key collision in silence.
+--
+-- **And what is withheld, which is the point of naming columns.** `restore_reason` is a
+-- sentence an Admin typed and may name a person; `restored_by` and the four review columns are
+-- who did what about a span, which is the ledger's business and the review's; `category`,
+-- `tier` and `score` are a workspace's map of what kind of personal data sits where, which the
+-- seam raises again on every run without being told; `id` is the ledger's subject and nothing
+-- a run names; `rule_version` and `detector_pin` are the reading of the run that first found
+-- the span, and a run carries its own pair. A worker that reads one of them is refused on the
+-- **column**. UPDATE and DELETE stay revoked for the reasons 0024 gave, unchanged: a tier that
+-- could update could mark a special-category span reviewed, and one that could delete could
+-- take away the record of a span.
+--
+-- The served read, each withheld column and both conflict forms are proved as `worker_rt`
+-- itself in `packages/schema/test/rls.test.ts`, and the row-level policy still stands over the
+-- read: an unscoped connection sees zero rows, and a scoped one its own tenant's alone. The
+-- worker's read is recorded in the table-ownership map beside this grant
+-- (`packages/schema/src/table-ownership.ts`), because no import-direction rule can see across a
+-- process boundary and a grant nobody wrote down is a road nobody reviews.
+GRANT SELECT (workspace_id, document_id, rule_id, char_start, char_end, restored_at)
+  ON "finding" TO worker_rt;

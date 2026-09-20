@@ -596,11 +596,9 @@ export type BindingReprocessed = {
  * left to account for it, and the worker cannot delete. The statement is this act's because
  * the wipe is.
  *
- * A row left standing is not doubled by the run this queues because a finding is the same
- * finding on every run that finds it — the amendment's unique key over the document, the rule
- * and the offsets, which the worker's insert steps over. **That key is not in the tree at this
- * commit**: it and the worker's half land after migration 0039, on this ticket, and until they
- * do a spared row comes back from the next run with an unmarked twin beside it.
+ * A row left standing is not doubled by the run this queues, because a finding is the same
+ * finding on every run that finds it: the document, the rule and the two offsets are unique on
+ * the row (migration 0040), and the worker's insert steps over a span it has found before.
  *
  * **The LMDB directory is not this act's.** The engine's store for this binding sits on the
  * worker's own volume, and the worker removes it at the head of the `index` run this enqueues

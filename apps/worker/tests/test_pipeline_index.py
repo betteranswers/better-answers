@@ -42,6 +42,7 @@ from better_answers_worker.pipeline import IndexRun, index_binding
 from better_answers_worker.redaction.pins import DETECTOR_PIN, RULE_VERSION
 from factories import (
     seed_job,
+    seed_restore,
     seed_source_binding,
     seed_source_document,
     seed_suppression,
@@ -797,6 +798,106 @@ def test_a_suppression_standing_over_a_document_is_read_off_the_table_and_kept_o
     assert kept == [A_DELIVERY_NOTE]
     assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
         A_DELIVERY_NOTE_SUPPRESSED
+    ]
+
+
+# -- a finding across runs, and the restore --------------------------------------------
+
+
+def marked_rows_of(
+    connection: psycopg.Connection, workspace_id: str
+) -> list[dict[str, Any]]:
+    """Every finding, its id and what an Admin wrote on it, as the owner reads it."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT id, document_id, rule_id, char_start, char_end, review_state,"
+            " restored_at IS NOT NULL AS restored"
+            " FROM finding WHERE workspace_id = %s ORDER BY document_id, char_start",
+            (workspace_id,),
+        )
+        return by_column(cursor)
+
+
+def test_a_second_run_lands_no_second_finding_row_and_moves_none(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """A finding is the same finding on every run that finds it: the document, the rule
+    and the two offsets are unique (migration 0040), and the run's insert steps over a
+    span it has found before. So a binding indexed again for any reason holds each span
+    once, under the id it was first given — which is the id the ledger names when an
+    Admin restores it, and the reason the insert leaves the row alone rather than
+    writing it again.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(
+        connection, documents=(AN_INVOICE_ID, A_SICK_NOTE_ID)
+    )
+    bootstrap = bootstrap_for(dsn, tmp_path)
+
+    index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    first = marked_rows_of(connection, workspace_id)
+    index_binding(
+        bootstrap,
+        run_for(workspace_id, "narrowed"),
+        copies=a_bucket_holding_the_three(),
+    )
+
+    assert [(row["rule_id"], row["char_start"], row["char_end"]) for row in first] == [
+        ("UK_BANK_ACCOUNT", 54, 97),
+        ("HEALTH_CUE", 63, 131),
+        ("JOB_TITLE", 67, 76),
+    ]
+    assert marked_rows_of(connection, workspace_id) == first
+
+
+def test_a_span_an_admin_restored_is_back_in_the_text_after_the_next_run(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """The run reads which spans of each document were restored off the `finding` table
+    itself, through the six columns migration 0041 grants and no other, and hands them
+    to the memoised function beside the suppressions — so the run *keep in text* queues
+    is the run that lets the span back.
+
+    Held both ways (`[TEST7]`): withheld before the restore and in the text after it.
+    And the row is where the Admin left it: the same id, still restored, still reviewed
+    — the second run found the span again and wrote nothing over it.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
+    bootstrap = bootstrap_for(dsn, tmp_path)
+
+    index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    withheld = [row["content"] for row in chunk_rows_of(connection, workspace_id)]
+
+    with connection.cursor() as cursor:
+        kept = seed_restore(
+            cursor,
+            workspace_id=workspace_id,
+            document_id=AN_INVOICE_ID,
+            rule_id="UK_BANK_ACCOUNT",
+            char_start=54,
+            char_end=97,
+        )
+    connection.commit()
+
+    bucket = a_bucket_holding_the_three()
+    index_binding(bootstrap, run_for(workspace_id, "restored"), copies=bucket)
+
+    assert withheld == [AN_INVOICE_REDACTED]
+    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+        AN_INVOICE
+    ]
+    assert bucket.objects[normalised_key_of(AN_INVOICE_ID)] == AN_INVOICE.encode()
+    assert marked_rows_of(connection, workspace_id) == [
+        {
+            "id": kept["id"],
+            "document_id": AN_INVOICE_ID,
+            "rule_id": "UK_BANK_ACCOUNT",
+            "char_start": 54,
+            "char_end": 97,
+            "review_state": "kept-in-text",
+            "restored": True,
+        }
     ]
 
 

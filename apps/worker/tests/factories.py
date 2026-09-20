@@ -229,6 +229,44 @@ def seed_suppression(
     return _returning_row(cursor)
 
 
+def seed_restore(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    document_id: str,
+    rule_id: str,
+    char_start: int,
+    char_end: int,
+) -> dict[str, Any]:
+    """An Admin's *keep in text* as it leaves one finding's row: restored and reviewed.
+
+    The act is the app's and this tier never takes it, so a case that needs a restored
+    span standing over a document writes what the act writes, here, on the owner's
+    connection. The finding is named as a run is told of it — the document, the rule and
+    the two offsets, which is what the row is unique on — and both of the act's marks
+    land, because the row's own CHECKs tie a reason to a restore and an actor to a
+    review and a row carrying half of either is one no act could have written.
+    """
+    cursor.execute(
+        "UPDATE finding SET restored_at = now(), restored_by = %(admin)s,"
+        " restore_reason = %(reason)s, review_state = 'kept-in-text',"
+        " reviewed_by = %(admin)s, reviewed_at = now(), review_reason = %(reason)s"
+        " WHERE workspace_id = %(workspace_id)s AND document_id = %(document_id)s"
+        " AND rule_id = %(rule_id)s AND char_start = %(char_start)s"
+        " AND char_end = %(char_end)s RETURNING *",
+        {
+            "admin": f"human:{ulid()}",
+            "reason": "The account is the company's own, printed on every invoice.",
+            "workspace_id": workspace_id,
+            "document_id": document_id,
+            "rule_id": rule_id,
+            "char_start": char_start,
+            "char_end": char_end,
+        },
+    )
+    return _returning_row(cursor)
+
+
 def seed_concept_identity(
     cursor: Cursor[Any],
     *,
