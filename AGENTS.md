@@ -41,7 +41,7 @@ Commands, versions and scripts are read from each workspace's `package.json` or 
 
 ### Issue tracker
 
-Three lanes. Build tasks live in **ordna** (`storage: namespace` — git blobs at `refs/ordna/tasks/<id>`, no files on disk; use the `ordna` CLI), cut from a block of the route spec; wayfinding maps and their tickets live as markdown under `.scratch/<effort>/`; a finding — from a gate, a mutation run, a review or an agent's attempt at a ticket — is one ordna task tagged `needs-triage` carrying the command and output that show it, and `/triage` decides whether it joins the hygiene lane (tagged `hygiene`, picked when a block is blocked or a session is short). A body edit or a new task is pushed to **origin first**, then set locally: an open board auto-fetches every minute and reverts a local-only ref. Procedure in `docs/agents/issue-tracker.md`.
+Build tasks live in **ordna** (`storage: namespace` — git blobs at `refs/ordna/tasks/<id>`, no files on disk; use the `ordna` CLI), cut from a block of the route spec; wayfinding maps and their tickets live as markdown under `.scratch/<effort>/`. A body edit or a new task is pushed to **origin first**, then set locally: an open board auto-fetches every minute and reverts a local-only ref. Procedure in `docs/agents/issue-tracker.md`.
 
 ### Workflow
 

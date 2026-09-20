@@ -62,6 +62,7 @@ tasks/AGENTS.md
 apps/api/.claude/skills/*
 apps/web/.claude/skills/*
 apps/worker/.claude/skills/*
+.github/.claude/skills/*
 
 
 # Worktrees created by background agents (Claude Code `isolation: worktree`).
