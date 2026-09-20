@@ -1356,8 +1356,8 @@ def test_the_runner_refuses_the_engines_gateway_call_the_way_the_image_does() ->
     **This covers the runner and not a laptop.** ``uv run --frozen check`` sets nothing,
     and neither does one suite run by file, so neither is covered from out here. What
     covers them is the pipeline package, which sets the variable ahead of its own
-    import of the engine (`T-204`); ``tests/test_pipeline_usage_tracking.py`` holds that
-    against the same line of the compose file, and says why no later line would do.
+    import of the engine (`T-204`); ``tests/test_pipeline_engine_environment.py`` holds
+    that against the same line of the compose file, and says why no later line would do.
     """
     declared = [
         line

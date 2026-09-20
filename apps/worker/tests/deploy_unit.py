@@ -5,8 +5,8 @@ holds every variable this module reads against the box that fills it, because a 
 read by a module no box sets is a worker that refuses to start on the estate and passes
 every test. The image suite holds what the image itself carries against what the unit
 puts around it — the caches, the mounts and the uid the volumes are chowned to. The
-usage-tracking suite holds what the pipeline package writes into its own process
-against what the unit would have put there.
+engine-environment suite holds what the pipeline package writes into its own process,
+ahead of its import of the engine, against what the unit would have put there.
 
 Read with a reader rather than a YAML parser: this tier has no YAML dependency and wants
 none for a test, and what is being read is a run of plain `key: value` lines under one

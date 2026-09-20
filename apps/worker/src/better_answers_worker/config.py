@@ -55,13 +55,6 @@ MAX_INFLIGHT_COMPONENTS = 4
 #: cannot happen; a higher value waits on S4's own measurement.
 CONCURRENT_RUNS = 1
 
-#: What the engine's Rust core is told to print. It installs a global tracing subscriber
-#: at `info` on first use of its runtime and writes its own non-JSON shape to stdout,
-#: and `RUST_LOG` is the only thing that quiets it — so the tier that has one logger
-#: states the level here as well as in the deploy file, and one JSON shape leaves
-#: the process.
-RUST_LOG = "warn"
-
 
 class BootstrapError(ValueError):
     """The worker was started without the environment the deploy unit owes it."""
@@ -93,7 +86,6 @@ class Engine:
     lmdb_map_bytes: int = LMDB_MAP_BYTES
     max_inflight_components: int = MAX_INFLIGHT_COMPONENTS
     concurrent_runs: int = CONCURRENT_RUNS
-    rust_log: str = RUST_LOG
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +168,5 @@ def read_bootstrap(environment: Mapping[str, str] | None = None) -> Bootstrap:
                 source, "LMDB_MAX_BYTES_PER_BINDING", LMDB_MAP_BYTES
             ),
             concurrent_runs=_one_run_only(source),
-            rust_log=source.get("RUST_LOG") or RUST_LOG,
         ),
     )

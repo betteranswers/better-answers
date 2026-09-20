@@ -14,7 +14,6 @@ role, never the owner.
 """
 
 import asyncio
-import os
 import re
 from collections.abc import Iterator
 from pathlib import Path
@@ -369,30 +368,3 @@ def test_a_bindings_lmdb_size_is_readable_after_its_run(
 
     assert after > 0
     assert Path(host.binding_directory(run)).is_dir()
-
-
-def test_the_host_tells_the_engines_rust_core_to_log_warnings_and_no_lower(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The engine's core installs a global tracing subscriber at `info` on first use and
-    prints its own non-JSON shape to stdout; it reads `RUST_LOG` to decide, from the
-    process environment and nowhere else. The deploy unit sets it, and the host sets it
-    too from the value the config module read — so one shape leaves the process even
-    when the box forgot, and the box still wins when it did not.
-    """
-    monkeypatch.delenv("RUST_LOG", raising=False)
-
-    with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)):
-        assert os.environ["RUST_LOG"] == "warn"
-
-    louder = bootstrap_for("postgresql://unreached/unreached", tmp_path / "second")
-    with Host(
-        Bootstrap(
-            database_url=louder.database_url,
-            git_store_dir=louder.git_store_dir,
-            worker_id=louder.worker_id,
-            object_store=louder.object_store,
-            engine=Engine(lmdb_dir=louder.engine.lmdb_dir, rust_log="debug"),
-        )
-    ):
-        assert os.environ["RUST_LOG"] == "debug"
