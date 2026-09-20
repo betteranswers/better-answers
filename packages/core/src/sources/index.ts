@@ -98,6 +98,7 @@ export {
   narrowDocuments,
   type DocumentsNarrowed,
   type FindingGroup,
+  type FindingGroupKey,
   type FindingsOfRefusal,
   type KeepInTextInput,
   type KeepInTextRefusal,

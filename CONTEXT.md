@@ -185,14 +185,20 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   is, for as long as the document's content stands, so what an Admin decided about it stands on
   every later run. The detector's score and version are one run's reading of it, never part of
   what it is.
-- **keep in text** — an Admin's bulk act over named *findings* of one binding: each span restored
-  with one reason because it is the company's own business fact and reviewed as *kept in text*,
-  and the run that lets them back into the document queued with them. The always set alone, one
-  ledger row per span.
-- **narrow these documents** — an Admin's bulk act over named *source documents* of one binding:
-  each takes a class of its own, its chunk copies are rewritten, the *cascade* runs from the
-  concepts citing them, and the run that puts the binding back through the index is queued with
-  them. One ledger row per document; it never widens.
+- **finding group** — the unit of the review: one document's *findings* of one category, raised
+  by one rule at one tier, with how many there are. It is what the review lists and what the two
+  bulk acts below are taken over; it names no span and carries no value, so a reviewer acts on
+  what was found without ever being shown it. _Avoid_: group on its own (a *group* is members).
+- **keep in text** — an Admin's bulk act over named *finding groups* of one binding: every span
+  of each group restored with one reason because it is the company's own business fact and
+  reviewed as *kept in text*, and the run that lets them back into the document queued with
+  them. The always set alone, one ledger row per span.
+- **narrow these documents** — an Admin's bulk act over named *finding groups* of one binding,
+  taken on the *source documents* they sit in: each document takes a class of its own, its chunk
+  copies are rewritten, the named groups' unreviewed findings are reviewed as *narrowed* — and
+  no finding the Admin was not shown — the *cascade* runs from the concepts citing the
+  documents, and the run that puts the binding back through the index is queued with them. One
+  ledger row per document; it never widens.
 - **redaction seam** — the one place a document's text is read for what must be withheld and
   the placeholders are written in, ahead of chunking, extraction and every model call, so that
   no derived store and no model ever holds the value.

@@ -8,7 +8,7 @@ import {
   narrowDocuments,
   passageAt,
   reprocessBinding,
-  type NarrowDocumentsInput,
+  type FindingGroupKey,
   type ReprocessBindingInput,
 } from "../src/sources/index.ts";
 import {
@@ -43,9 +43,22 @@ const { db, arrange, reading: acting } = visibilitySuite();
 /** The sentence an Admin types over a batch of spans, written once so every case reads the same one. */
 const BUSINESS_FACT = "The sort code is the company's own, printed on every invoice it sends.";
 
+/** The keep as a person at this role would reach it, over these groups and for the one reason. */
+const keepAs = (who: UserPrincipal, bindingId: string, findingGroups: readonly FindingGroupKey[]) =>
+  acting(who, (principal, tx) =>
+    keepInText(principal, tx, { bindingId, findingGroups, reason: BUSINESS_FACT }),
+  );
+
 /** The narrowing act as a person at this role would reach it, through the slice's own export. */
-const narrowAs = (who: UserPrincipal, input: NarrowDocumentsInput) =>
-  acting(who, (principal, tx) => narrowDocuments(principal, tx, input));
+const narrowAs = (
+  who: UserPrincipal,
+  bindingId: string,
+  findingGroups: readonly FindingGroupKey[],
+  to: { readonly sensitivity?: string } = {},
+) =>
+  acting(who, (principal, tx) =>
+    narrowDocuments(principal, tx, { bindingId, findingGroups, sensitivity: to.sensitivity }),
+  );
 
 /** One span the seam raised in a document, at the category, rule and tier the case is about. */
 const findingIn = async (
@@ -55,12 +68,33 @@ const findingIn = async (
     readonly category?: string;
     readonly ruleId?: string;
     readonly tier?: string;
+    readonly charStart?: number;
+    readonly charEnd?: number;
   } = {},
 ): Promise<string> =>
   seededBy(db(), async (seed) => {
     const row = await seed.finding({ workspaceId, documentId, ...overrides });
     return row.id;
   });
+
+/**
+ * A finding group of one document, as the review read lists it and a caller hands it back. The
+ * words are the ones a seeded finding carries unless a case says otherwise — the company's own
+ * sort code, raised at the always tier.
+ */
+const findingGroupIn = (
+  documentId: string,
+  overrides: Partial<Omit<FindingGroupKey, "documentId">> = {},
+): FindingGroupKey => ({
+  documentId,
+  category: "bank-details",
+  ruleId: "sort-code-with-account-number",
+  tier: "always",
+  ...overrides,
+});
+
+/** A second group of the always set, for the span or the group a case leaves alone. */
+const NATIONAL_INSURANCE = { category: "government-id", ruleId: "national-insurance-number" };
 
 /** The columns the two acts write on one finding, as the superuser reads them off the row. */
 const marksOf = async (workspaceId: string, findingId: string) => {
@@ -332,34 +366,45 @@ describe("the review read of a binding's findings", () => {
 });
 
 /**
- * The keep both of its cases below are read off: the Admin keeps one span in each document of
- * the binding and leaves a third, in the first document, that nobody selected.
+ * The keep its cases below are read off: the Admin keeps the sort-code group of each document —
+ * the first document's holding **two** spans, because a group is kept whole and the act finds
+ * its spans itself — and leaves a second group in the first document that nobody selected.
  */
-const keepingTwoSpansOfThree = async (scenario: Scenario) => {
+const keepingTwoGroupsOfThree = async (scenario: Scenario) => {
   const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
   const kept = await findingIn(scenario.workspaceId, first.documentId);
+  const keptBesideIt = await findingIn(scenario.workspaceId, first.documentId, {
+    charStart: 40,
+    charEnd: 48,
+  });
   const alsoKept = await findingIn(scenario.workspaceId, second.documentId);
-  const left = await findingIn(scenario.workspaceId, first.documentId);
-  const outcome = await acting(scenario.admin, (principal, tx) =>
-    keepInText(principal, tx, { bindingId, findingIds: [kept, alsoKept], reason: BUSINESS_FACT }),
-  );
-  return { bindingId, kept, alsoKept, left, outcome };
+  const left = await findingIn(scenario.workspaceId, first.documentId, NATIONAL_INSURANCE);
+  const outcome = await keepAs(scenario.admin, bindingId, [
+    findingGroupIn(first.documentId),
+    findingGroupIn(second.documentId),
+  ]);
+  // Oldest id first, which is the order the act restores in and the ledger rows land in.
+  const spans = [kept, keptBesideIt, alsoKept].toSorted();
+  return { bindingId, kept, keptBesideIt, alsoKept, left, spans, outcome };
 };
 
-describe("an Admin keeping named spans in the text", () => {
-  it("restores every one of them under a batch id and queues one index run to let them back in", async () => {
+describe("an Admin keeping named finding groups in the text", () => {
+  it("restores every span of every group under one batch id and queues one index run to let them back in", async () => {
     const scenario = await arrange();
 
-    const { bindingId, kept, alsoKept, left, outcome } = await keepingTwoSpansOfThree(scenario);
+    const { bindingId, kept, keptBesideIt, alsoKept, left, spans, outcome } =
+      await keepingTwoGroupsOfThree(scenario);
 
-    expect(outcome).toMatchObject({ ok: true, value: { bindingId, findingIds: [kept, alsoKept] } });
+    expect(outcome).toMatchObject({ ok: true, value: { bindingId, findingIds: spans } });
     expect(await restoreOf(scenario.workspaceId, kept)).toEqual({
       restored: true,
       restored_by: `human:${scenario.admin.userId}`,
       restore_reason: BUSINESS_FACT,
     });
+    // The group is kept whole: the act was handed no span, and found both of this one's.
+    expect(await restoreOf(scenario.workspaceId, keptBesideIt)).toMatchObject({ restored: true });
     expect(await restoreOf(scenario.workspaceId, alsoKept)).toMatchObject({ restored: true });
-    // The span nobody selected is untouched: a bulk act reaches what it was given and no more.
+    // The group nobody selected is untouched: a bulk act reaches what it was given and no more.
     expect(await restoreOf(scenario.workspaceId, left)).toEqual({
       restored: false,
       restored_by: null,
@@ -369,11 +414,10 @@ describe("an Admin keeping named spans in the text", () => {
     const ledger = await batchedRowsOf(db().pool, scenario.workspaceId, "sources.finding.restored");
     const batchId = outcome.ok ? outcome.value.batchId : undefined;
     expect(typeof batchId).toBe("string");
-    // Two rows sharing one batch id, never one row hiding two (ADR 0014 rule 4).
-    expect(ledger).toEqual([
-      { subject_id: kept, batch_id: batchId, detail: { findingId: kept } },
-      { subject_id: alsoKept, batch_id: batchId, detail: { findingId: alsoKept } },
-    ]);
+    // One row per span sharing one batch id, never one row hiding three (ADR 0014 rule 4).
+    expect(ledger).toEqual(
+      spans.map((span) => ({ subject_id: span, batch_id: batchId, detail: { findingId: span } })),
+    );
     expect(await jobsOf(scenario.workspaceId)).toEqual([
       { kind: "index", reason: "restored", subject_id: bindingId },
     ]);
@@ -382,7 +426,7 @@ describe("an Admin keeping named spans in the text", () => {
   it("marks every span it kept as reviewed — kept in text, by this Admin, for the batch's reason — and no other", async () => {
     const scenario = await arrange();
 
-    const { kept, alsoKept, left } = await keepingTwoSpansOfThree(scenario);
+    const { kept, alsoKept, left } = await keepingTwoGroupsOfThree(scenario);
 
     const keptInText = {
       review_state: "kept-in-text",
@@ -392,24 +436,52 @@ describe("an Admin keeping named spans in the text", () => {
     };
     expect(await reviewOf(scenario.workspaceId, kept)).toEqual(keptInText);
     expect(await reviewOf(scenario.workspaceId, alsoKept)).toEqual(keptInText);
-    // The span nobody selected is still nobody's review: the widening block reads this column.
+    // The group nobody selected is still nobody's review: the widening block reads this column.
     expect(await reviewOf(scenario.workspaceId, left)).toEqual(UNREVIEWED);
   });
 
-  it("keeps one span on its own with no batch id, because there is no batch to name", async () => {
+  it("keeps one group of two spans under a batch id, because the batch is the spans and never the groups", async () => {
     const scenario = await arrange();
     const { bindingId, first } = await bindingWithTwoDocuments(scenario);
-    const kept = await findingIn(scenario.workspaceId, first.documentId);
+    await findingIn(scenario.workspaceId, first.documentId);
+    await findingIn(scenario.workspaceId, first.documentId, { charStart: 40, charEnd: 48 });
 
-    const outcome = await acting(scenario.admin, (principal, tx) =>
-      keepInText(principal, tx, { bindingId, findingIds: [kept], reason: BUSINESS_FACT }),
-    );
+    const outcome = await keepAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
 
-    expect(outcome).toMatchObject({ ok: true, value: { batchId: undefined } });
+    const batchId = outcome.ok ? outcome.value.batchId : undefined;
+    expect(typeof batchId).toBe("string");
     expect(
-      await batchedRowsOf(db().pool, scenario.workspaceId, "sources.finding.restored"),
-    ).toEqual([{ subject_id: kept, batch_id: null, detail: { findingId: kept } }]);
+      (await batchedRowsOf(db().pool, scenario.workspaceId, "sources.finding.restored")).map(
+        (row) => row.batch_id,
+      ),
+    ).toEqual([batchId, batchId]);
   });
+
+  it.each([
+    ["named once", 1],
+    ["named twice, which is one group all the same", 2],
+  ] as const)(
+    "keeps a group of one span, %s, as one restore with no batch id — there is no batch to name",
+    async (_how, times) => {
+      const scenario = await arrange();
+      const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+      const kept = await findingIn(scenario.workspaceId, first.documentId);
+
+      const outcome = await keepAs(
+        scenario.admin,
+        bindingId,
+        Array.from({ length: times }, () => findingGroupIn(first.documentId)),
+      );
+
+      expect(outcome).toMatchObject({
+        ok: true,
+        value: { findingIds: [kept], batchId: undefined },
+      });
+      expect(
+        await batchedRowsOf(db().pool, scenario.workspaceId, "sources.finding.restored"),
+      ).toEqual([{ subject_id: kept, batch_id: null, detail: { findingId: kept } }]);
+    },
+  );
 
   it.each([
     ["an Editor", (scenario: Scenario) => scenario.editor, "role-forbids"],
@@ -419,52 +491,86 @@ describe("an Admin keeping named spans in the text", () => {
     const { bindingId, first } = await bindingWithTwoDocuments(scenario);
     const named = await findingIn(scenario.workspaceId, first.documentId);
 
-    const outcome = await acting(personOf(scenario), (principal, tx) =>
-      keepInText(principal, tx, { bindingId, findingIds: [named], reason: BUSINESS_FACT }),
-    );
+    const outcome = await keepAs(personOf(scenario), bindingId, [findingGroupIn(first.documentId)]);
 
     expect(outcome).toEqual({ ok: false, error: refusal });
     expect(await restoreOf(scenario.workspaceId, named)).toMatchObject({ restored: false });
     expect(await jobsOf(scenario.workspaceId)).toEqual([]);
   });
 
-  it("refuses a span outside the always set, and the batch beside it lands nothing", async () => {
+  it("refuses a group outside the always set, and the group beside it lands nothing", async () => {
     const scenario = await arrange();
     const { bindingId, first } = await bindingWithTwoDocuments(scenario);
     const alwaysSet = await findingIn(scenario.workspaceId, first.documentId);
-    const switchedAtTheBinding = await findingIn(scenario.workspaceId, first.documentId, {
+    const switchedAtTheBinding = {
       tier: "default-on",
       category: "home-address",
       ruleId: "postal-address",
-    });
+    };
+    await findingIn(scenario.workspaceId, first.documentId, switchedAtTheBinding);
 
-    const outcome = await acting(scenario.admin, (principal, tx) =>
-      keepInText(principal, tx, {
-        bindingId,
-        findingIds: [alwaysSet, switchedAtTheBinding],
-        reason: BUSINESS_FACT,
-      }),
-    );
+    const outcome = await keepAs(scenario.admin, bindingId, [
+      findingGroupIn(first.documentId),
+      findingGroupIn(first.documentId, switchedAtTheBinding),
+    ]);
 
     expect(outcome).toEqual({ ok: false, error: "not-the-always-set" });
-    // The act is one transaction, so the span it did restore before the refusal is rolled
-    // back with it: a keep that half landed would leave a run to queue and nobody to queue it.
+    // Every group is answered before the first span moves, so the always-set group beside the
+    // refused one lands nothing: a keep that half landed would leave the caller to undo it.
     expect(await restoreOf(scenario.workspaceId, alwaysSet)).toMatchObject({ restored: false });
     expect(await jobsOf(scenario.workspaceId)).toEqual([]);
   });
 
-  it("refuses a span of another binding, because a keep is one binding's review", async () => {
+  it("refuses a group of another binding, because a keep is one binding's review", async () => {
     const scenario = await arrange();
     const { bindingId } = await bindingWithTwoDocuments(scenario);
     const elsewhere = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
     const theirs = await findingIn(scenario.workspaceId, elsewhere.documentId);
 
-    const outcome = await acting(scenario.admin, (principal, tx) =>
-      keepInText(principal, tx, { bindingId, findingIds: [theirs], reason: BUSINESS_FACT }),
-    );
+    const outcome = await keepAs(scenario.admin, bindingId, [findingGroupIn(elsewhere.documentId)]);
 
     expect(outcome).toEqual({ ok: false, error: "no-such-finding" });
     expect(await restoreOf(scenario.workspaceId, theirs)).toMatchObject({ restored: false });
+  });
+
+  it("refuses a group that holds no finding, and the group beside it lands nothing", async () => {
+    const scenario = await arrange();
+    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const held = await findingIn(scenario.workspaceId, first.documentId);
+
+    const outcome = await keepAs(scenario.admin, bindingId, [
+      findingGroupIn(first.documentId),
+      findingGroupIn(first.documentId, NATIONAL_INSURANCE),
+    ]);
+
+    // A keep over nothing would queue a run for nothing, and a screen that named a group the
+    // binding no longer holds is a screen to read again.
+    expect(outcome).toEqual({ ok: false, error: "no-such-finding" });
+    expect(await restoreOf(scenario.workspaceId, held)).toMatchObject({ restored: false });
+    expect(await jobsOf(scenario.workspaceId)).toEqual([]);
+  });
+
+  it("keeps an officer's name raised at the always tier and leaves the same rule's default-off names in that document", async () => {
+    // The officer-block rule raises a person's name at the always tier under the rule that
+    // finds every name (the S0 spec; `findings.ts`), so one document holds one category and one
+    // rule at two tiers — two groups on the review, and only one of them is a keep's to take.
+    const scenario = await arrange();
+    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const names = { category: "person-name", ruleId: "PERSON" };
+    const officer = await findingIn(scenario.workspaceId, first.documentId, names);
+    const bidWriter = await findingIn(scenario.workspaceId, first.documentId, {
+      ...names,
+      tier: "default-off",
+      charStart: 40,
+      charEnd: 48,
+    });
+
+    const outcome = await keepAs(scenario.admin, bindingId, [
+      findingGroupIn(first.documentId, names),
+    ]);
+
+    expect(outcome).toMatchObject({ ok: true, value: { findingIds: [officer] } });
+    expect(await restoreOf(scenario.workspaceId, bidWriter)).toMatchObject({ restored: false });
   });
 });
 
@@ -473,7 +579,7 @@ describe("an Admin narrowing named documents", () => {
     const scenario = await arrange();
     const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
 
-    const outcome = await narrowAs(scenario.admin, { bindingId, documentIds: [first.documentId] });
+    const outcome = await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
 
     expect(outcome).toMatchObject({
       ok: true,
@@ -493,14 +599,62 @@ describe("an Admin narrowing named documents", () => {
     ]);
   });
 
+  it("reviews the findings of the groups it was given as narrowed, by this Admin — and no finding the Admin was not shown", async () => {
+    const scenario = await arrange();
+    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+    const answered = await findingIn(scenario.workspaceId, first.documentId);
+    // The health finding of the same document, in a group this narrowing was never handed.
+    const unopened = await findingIn(scenario.workspaceId, first.documentId, {
+      category: "special-category",
+      ruleId: "health-condition",
+    });
+    const siblings = await findingIn(scenario.workspaceId, second.documentId);
+
+    await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+
+    // No reason: the act takes none, and the ledger row it wrote says what was done.
+    expect(await reviewOf(scenario.workspaceId, answered)).toEqual({
+      review_state: "narrowed",
+      reviewed: true,
+      reviewed_by: `human:${scenario.admin.userId}`,
+      review_reason: null,
+    });
+    // The document went to Restricted with it, and its health finding is still nobody's review:
+    // a widening is held against this column, and a row must not say a review nobody took.
+    expect(await reviewOf(scenario.workspaceId, unopened)).toEqual(UNREVIEWED);
+    expect(await reviewOf(scenario.workspaceId, siblings)).toEqual(UNREVIEWED);
+  });
+
+  it("leaves a span an Admin already kept in text as kept, inside a group it narrows", async () => {
+    const scenario = await arrange();
+    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const kept = await findingIn(scenario.workspaceId, first.documentId);
+    await keepAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+    // Raised by a later run, so the group the Admin narrows holds a kept span and a new one.
+    const raisedSince = await findingIn(scenario.workspaceId, first.documentId, {
+      charStart: 40,
+      charEnd: 48,
+    });
+
+    await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+
+    expect(await reviewOf(scenario.workspaceId, kept)).toMatchObject({
+      review_state: "kept-in-text",
+      review_reason: BUSINESS_FACT,
+    });
+    expect(await reviewOf(scenario.workspaceId, raisedSince)).toMatchObject({
+      review_state: "narrowed",
+    });
+  });
+
   it("queues one index run with the reason narrowed, however many documents it took", async () => {
     const scenario = await arrange();
     const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
 
-    const outcome = await narrowAs(scenario.admin, {
-      bindingId,
-      documentIds: [first.documentId, second.documentId],
-    });
+    const outcome = await narrowAs(scenario.admin, bindingId, [
+      findingGroupIn(first.documentId),
+      findingGroupIn(second.documentId),
+    ]);
 
     expect(typeof (outcome.ok ? outcome.value.jobId : undefined)).toBe("string");
     // One run for the binding and never one per document: the run's subject is the binding.
@@ -512,12 +666,10 @@ describe("an Admin narrowing named documents", () => {
   it("answers the run a keep already queued for the binding, and queues no second one", async () => {
     const scenario = await arrange();
     const { bindingId, first } = await bindingWithTwoDocuments(scenario);
-    const kept = await findingIn(scenario.workspaceId, first.documentId);
-    const keep = await acting(scenario.admin, (principal, tx) =>
-      keepInText(principal, tx, { bindingId, findingIds: [kept], reason: BUSINESS_FACT }),
-    );
+    await findingIn(scenario.workspaceId, first.documentId);
+    const keep = await keepAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
 
-    const outcome = await narrowAs(scenario.admin, { bindingId, documentIds: [first.documentId] });
+    const outcome = await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
 
     const queuedByTheKeep = keep.ok ? keep.value.jobId : undefined;
     expect(typeof queuedByTheKeep).toBe("string");
@@ -533,7 +685,11 @@ describe("an Admin narrowing named documents", () => {
     const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
     const named = [first.documentId, second.documentId].toSorted();
 
-    const outcome = await narrowAs(scenario.admin, { bindingId, documentIds: named });
+    const outcome = await narrowAs(
+      scenario.admin,
+      bindingId,
+      named.map((documentId) => findingGroupIn(documentId)),
+    );
 
     const batchId = outcome.ok ? outcome.value.batchId : undefined;
     expect(typeof batchId).toBe("string");
@@ -552,7 +708,7 @@ describe("an Admin narrowing named documents", () => {
 
     const page = await pageIncluding(scenario.workspaceId, citing.iri);
 
-    const outcome = await narrowAs(scenario.admin, { bindingId, documentIds: [first.documentId] });
+    const outcome = await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
 
     expect(outcome).toMatchObject({
       ok: true,
@@ -576,7 +732,7 @@ describe("an Admin narrowing named documents", () => {
     const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
     const spanOf = (documentId: string) => `${documentId}/chars:0-8`;
 
-    await narrowAs(scenario.admin, { bindingId, documentIds: [first.documentId] });
+    await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
 
     const narrowed = await acting(scenario.viewer, (principal, tx) =>
       passageAt(principal, tx, spanOf(first.documentId)),
@@ -592,9 +748,7 @@ describe("an Admin narrowing named documents", () => {
     const scenario = await arrange();
     const { bindingId, first } = await bindingWithTwoDocuments(scenario);
 
-    const outcome = await narrowAs(scenario.admin, {
-      bindingId,
-      documentIds: [first.documentId],
+    const outcome = await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)], {
       sensitivity: "Public",
     });
 
@@ -622,9 +776,7 @@ describe("an Admin narrowing named documents", () => {
       publishedAt: new Date("2026-09-01T09:00:00.000Z"),
     });
 
-    const outcome = await narrowAs(scenario.admin, {
-      bindingId,
-      documentIds: [held.documentId],
+    const outcome = await narrowAs(scenario.admin, bindingId, [findingGroupIn(held.documentId)], {
       sensitivity: "Internal",
     });
 
@@ -637,10 +789,10 @@ describe("an Admin narrowing named documents", () => {
     const { bindingId, first } = await bindingWithTwoDocuments(scenario);
     const elsewhere = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
 
-    const outcome = await narrowAs(scenario.admin, {
-      bindingId,
-      documentIds: [first.documentId, elsewhere.documentId],
-    });
+    const outcome = await narrowAs(scenario.admin, bindingId, [
+      findingGroupIn(first.documentId),
+      findingGroupIn(elsewhere.documentId),
+    ]);
 
     expect(outcome).toEqual({ ok: false, error: "no-such-document" });
     expect(await chunkClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Internal"]);
@@ -653,10 +805,9 @@ describe("an Admin narrowing named documents", () => {
     const scenario = await arrange();
     const { bindingId, first } = await bindingWithTwoDocuments(scenario);
 
-    const outcome = await narrowAs(personOf(scenario), {
-      bindingId,
-      documentIds: [first.documentId],
-    });
+    const outcome = await narrowAs(personOf(scenario), bindingId, [
+      findingGroupIn(first.documentId),
+    ]);
 
     expect(outcome).toEqual({ ok: false, error: "role-forbids" });
     expect(await chunkClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Internal"]);
@@ -670,6 +821,27 @@ const reprocessAsAdmin = (
   reason: ReprocessBindingInput["reason"],
 ) =>
   acting(scenario.admin, (principal, tx) => reprocessBinding(principal, tx, { bindingId, reason }));
+
+describe("a bulk act handed no finding group at all", () => {
+  it("refuses a keep as malformed, because an empty keep would still queue a run", async () => {
+    const scenario = await arrange();
+    const { bindingId } = await bindingWithTwoDocuments(scenario);
+
+    expect(await keepAs(scenario.admin, bindingId, [])).toEqual({ ok: false, error: "malformed" });
+    expect(await jobsOf(scenario.workspaceId)).toEqual([]);
+  });
+
+  it("refuses a narrowing as malformed, because it names no document to narrow", async () => {
+    const scenario = await arrange();
+    const { bindingId } = await bindingWithTwoDocuments(scenario);
+
+    expect(await narrowAs(scenario.admin, bindingId, [])).toEqual({
+      ok: false,
+      error: "malformed",
+    });
+    expect(await jobsOf(scenario.workspaceId)).toEqual([]);
+  });
+});
 
 describe("the reprocess that follows a review", () => {
   it("takes the findings nobody has marked away with the chunks, so a span the rules no longer raise does not linger", async () => {
@@ -689,7 +861,7 @@ describe("the reprocess that follows a review", () => {
   it("leaves a span an Admin kept in text where it was — its id, its restore and its review — and takes the unmarked span beside it", async () => {
     const scenario = await arrange();
 
-    const { bindingId, kept, left } = await keepingTwoSpansOfThree(scenario);
+    const { bindingId, kept, left } = await keepingTwoGroupsOfThree(scenario);
     const outcome = await reprocessAsAdmin(scenario, bindingId, "rule-change");
 
     // Two kept, one left: the count the act answers is the rows that went, and one did.
