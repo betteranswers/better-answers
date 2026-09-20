@@ -179,12 +179,16 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **finding** — what the pre-scan found in one source document: a category (bank details, date of
   birth, home address, personal contact, special category, …), offsets into the normalised text,
   the rule and detector version that fired. Counted per category; never a class, never a value.
+  Born **unreviewed**; a review leaves it *kept in text* or *narrowed*, with the acting Admin and
+  the instant.
 - **keep in text** — an Admin's bulk act over named *findings* of one binding: each span restored
-  with one reason because it is the company's own business fact, and the run that lets them back
-  into the document queued with them. The always set alone, one ledger row per span.
+  with one reason because it is the company's own business fact and reviewed as *kept in text*,
+  and the run that lets them back into the document queued with them. The always set alone, one
+  ledger row per span.
 - **narrow these documents** — an Admin's bulk act over named *source documents* of one binding:
-  each takes a class of its own, its chunk copies are rewritten and the *cascade* runs from the
-  concepts citing them. One ledger row per document; it never widens.
+  each takes a class of its own, its chunk copies are rewritten, the *cascade* runs from the
+  concepts citing them, and the run that puts the binding back through the index is queued with
+  them. One ledger row per document; it never widens.
 - **redaction seam** — the one place a document's text is read for what must be withheld and
   the placeholders are written in, ahead of chunking, extraction and every model call, so that
   no derived store and no model ever holds the value.

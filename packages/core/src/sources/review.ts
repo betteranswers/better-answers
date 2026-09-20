@@ -3,6 +3,7 @@ import {
   REDACTION_ALWAYS_TIER,
   SENSITIVITIES,
   SENSITIVITY_DEFAULT,
+  type FINDING_REVIEW_STATES,
 } from "@better-answers/schema";
 
 import { narrower, type Sensitivity } from "../access/index.ts";
@@ -41,11 +42,17 @@ import { restoreFinding } from "./findings.ts";
  *   facts — its sort code on its own supplier form — which restores each through S0's act and
  *   queues the `index` run that will let them back into the text;
  * - **narrow these documents**, an Admin taking whole documents down to a narrower class
- *   rather than span by span, which rewrites their chunk copies and runs the visibility
- *   cascade outward from the concepts citing them.
+ *   rather than span by span, which rewrites their chunk copies, runs the visibility cascade
+ *   outward from the concepts citing them and queues the `index` run with reason *narrowed*.
  *
  * Both are Admin-only and refuse before a row is written; each writes its ledger rows inside
  * the caller's transaction, bare, so a rejected event aborts the act that wrote it.
+ *
+ * **A keep is a review, and it leaves its mark on the finding** (the S0 spec, the `finding`
+ * family: the app updates the review columns through the slice's acts). It moves the spans it
+ * was given to *kept in text*, with the acting Admin, the instant and the batch's reason — the
+ * column a widening is held against while special-category findings are unreviewed (ADR 0013,
+ * ADR 0020; the block is S4's).
  */
 
 /**
@@ -217,6 +224,20 @@ const FINDINGS_UNDER = `SELECT f.id, f.tier
       WHERE f.workspace_id = $1 AND d.binding_id = $2 AND f.id = ANY($3::text[])
         FOR UPDATE OF f`;
 
+/** The state a keep leaves a finding at, in the finding table's own closed words. */
+const KEPT_IN_TEXT = "kept-in-text" satisfies (typeof FINDING_REVIEW_STATES)[number];
+
+/**
+ * The review's mark on the spans a keep restored. The Admin, the instant and the reason are
+ * copied off the restore columns S0's act wrote a statement ago rather than derived a second
+ * time, so the review and the restore it rests on can never name two actors, two instants or
+ * two spellings of one reason.
+ */
+const KEPT_IN_TEXT_REVIEW = `UPDATE finding
+        SET review_state = $3, reviewed_by = restored_by,
+            reviewed_at = restored_at, review_reason = restore_reason
+      WHERE workspace_id = $1 AND id = ANY($2::text[])`;
+
 /**
  * **Keep in text**: an Admin restores named spans of one binding as business facts, and the
  * `index` run that will put them back into the document's text is queued with them.
@@ -224,8 +245,9 @@ const FINDINGS_UNDER = `SELECT f.id, f.tier
  * Each span goes through S0's own restore act rather than a second statement over the same
  * columns, so the row the restore writes, the actor derivation and the reason's bound are one
  * implementation; the batch id this act mints is handed to each, so the N ledger rows read as
- * the one act they were. The job is queued last, inside the same transaction: a run queued
- * for restores that did not land would index the document unchanged.
+ * the one act they were. The review's mark follows the restores in one statement over the
+ * spans named, and the job is queued last, inside the same transaction: a run queued for
+ * restores that did not land would index the document unchanged.
  *
  * **Every refusal is decided before the first span moves.** The batch is one transaction and
  * a caller reads one word off it, so a keep that restored two spans and then answered
@@ -280,6 +302,10 @@ export const keepInText = async (
     });
     if (!restored.ok) return err(restored.error);
   }
+  const reviewed = await attempt(() =>
+    tx.query(KEPT_IN_TEXT_REVIEW, [workspaceId, named, KEPT_IN_TEXT]),
+  );
+  if (!reviewed.ok) return err(reviewed.error);
 
   const queued = await enqueueJobIn(admin, tx, {
     workspaceId,
@@ -336,6 +362,12 @@ export type DocumentsNarrowed = {
   readonly sensitivity: Sensitivity;
   /** The id the N ledger rows share; `undefined` when the act narrowed one document. */
   readonly batchId: string | undefined;
+  /**
+   * The `index` run standing for the binding when the act ended: this act's own, with the
+   * reason *narrowed*, or the run already queued for it, which answers its own id and keeps
+   * the reason it was queued with (the queue's rule: one queued run per binding).
+   */
+  readonly jobId: string;
   /** The concepts the first level of the cascade rewrote, by IRI. */
   readonly concepts: readonly string[];
   /** The compositions the second level rewrote. */
@@ -362,6 +394,12 @@ type DocumentRow = { readonly id: string; readonly sensitivity: string | null };
  * every concept citing one of these documents re-derived, and every composition including one
  * of those concepts after it. The order is outward from the documents, and it is one
  * transaction, so no reader sees a level that has moved beside one that has not.
+ *
+ * **The `index` run is queued last, with the reason *narrowed*** — the fifth of the five
+ * things that put a binding back through the index (the S1 spec, *The queue*). The chunk
+ * copies are already right when the act commits, so the run is not what narrows a reader's
+ * view; it is the worker's own pass over a binding whose documents moved, ending in the
+ * re-copy that settles a race with a run already in flight.
  *
  * **The workspace's cascade lock is taken at the head**, as a binding's narrowing takes it:
  * two cascades in one workspace that met through a shared concept would each hold its own
@@ -446,5 +484,23 @@ export const narrowDocuments = async (
 
   const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { bindingId, documentIds }));
   if (!cascaded.ok) return err(cascaded.error);
-  return ok({ bindingId, documentIds, sensitivity: next, batchId, ...cascaded.value });
+
+  // Last, as a keep queues its own: a run queued for a narrowing that did not land would put
+  // the binding back through the index for nothing. One run whatever the count, because the
+  // run's subject is the binding; a run already queued for it answers its own id.
+  const queued = await enqueueJobIn(admin, tx, {
+    workspaceId,
+    kind: INDEX_KIND,
+    subjectId: bindingId,
+    reason: "narrowed",
+  });
+  if (!queued.ok) return err(queued.error);
+  return ok({
+    bindingId,
+    documentIds,
+    sensitivity: next,
+    batchId,
+    jobId: queued.value.jobId,
+    ...cascaded.value,
+  });
 };

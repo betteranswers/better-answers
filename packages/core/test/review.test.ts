@@ -61,22 +61,52 @@ const findingIn = async (
     return row.id;
   });
 
-/** The three restore columns of one finding, as the superuser reads them off the row. */
-const restoreOf = async (workspaceId: string, findingId: string) => {
+/** The columns the two acts write on one finding, as the superuser reads them off the row. */
+const marksOf = async (workspaceId: string, findingId: string) => {
   const found = await db().pool.query<{
+    review_state: string;
+    reviewed_at: Date | null;
+    reviewed_by: string | null;
+    review_reason: string | null;
     restored_at: Date | null;
     restored_by: string | null;
     restore_reason: string | null;
   }>(
-    "SELECT restored_at, restored_by, restore_reason FROM finding WHERE workspace_id = $1 AND id = $2",
+    `SELECT review_state, reviewed_at, reviewed_by, review_reason,
+            restored_at, restored_by, restore_reason
+       FROM finding WHERE workspace_id = $1 AND id = $2`,
     [workspaceId, findingId],
   );
-  const row = found.rows[0];
+  return found.rows[0];
+};
+
+/** The three restore columns of one finding. */
+const restoreOf = async (workspaceId: string, findingId: string) => {
+  const row = await marksOf(workspaceId, findingId);
   return {
     restored: row?.restored_at instanceof Date,
     restored_by: row?.restored_by ?? null,
     restore_reason: row?.restore_reason ?? null,
   };
+};
+
+/** The review's own columns of one finding. */
+const reviewOf = async (workspaceId: string, findingId: string) => {
+  const row = await marksOf(workspaceId, findingId);
+  return {
+    review_state: row?.review_state ?? null,
+    reviewed: row?.reviewed_at instanceof Date,
+    reviewed_by: row?.reviewed_by ?? null,
+    review_reason: row?.review_reason ?? null,
+  };
+};
+
+/** A finding as the seam leaves it: nobody has looked, so the review's columns hold nothing. */
+const UNREVIEWED = {
+  review_state: "unreviewed",
+  reviewed: false,
+  reviewed_by: null,
+  review_reason: null,
 };
 
 /** The class each chunk of a document carries, oldest ordinal first. */
@@ -300,17 +330,26 @@ describe("the review read of a binding's findings", () => {
   });
 });
 
+/**
+ * The keep both of its cases below are read off: the Admin keeps one span in each document of
+ * the binding and leaves a third, in the first document, that nobody selected.
+ */
+const keepingTwoSpansOfThree = async (scenario: Scenario) => {
+  const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+  const kept = await findingIn(scenario.workspaceId, first.documentId);
+  const alsoKept = await findingIn(scenario.workspaceId, second.documentId);
+  const left = await findingIn(scenario.workspaceId, first.documentId);
+  const outcome = await acting(scenario.admin, (principal, tx) =>
+    keepInText(principal, tx, { bindingId, findingIds: [kept, alsoKept], reason: BUSINESS_FACT }),
+  );
+  return { bindingId, kept, alsoKept, left, outcome };
+};
+
 describe("an Admin keeping named spans in the text", () => {
   it("restores every one of them under a batch id and queues one index run to let them back in", async () => {
     const scenario = await arrange();
-    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
-    const kept = await findingIn(scenario.workspaceId, first.documentId);
-    const alsoKept = await findingIn(scenario.workspaceId, second.documentId);
-    const left = await findingIn(scenario.workspaceId, first.documentId);
 
-    const outcome = await acting(scenario.admin, (principal, tx) =>
-      keepInText(principal, tx, { bindingId, findingIds: [kept, alsoKept], reason: BUSINESS_FACT }),
-    );
+    const { bindingId, kept, alsoKept, left, outcome } = await keepingTwoSpansOfThree(scenario);
 
     expect(outcome).toMatchObject({ ok: true, value: { bindingId, findingIds: [kept, alsoKept] } });
     expect(await restoreOf(scenario.workspaceId, kept)).toEqual({
@@ -337,6 +376,23 @@ describe("an Admin keeping named spans in the text", () => {
     expect(await jobsOf(scenario.workspaceId)).toEqual([
       { kind: "index", reason: "restored", subject_id: bindingId },
     ]);
+  });
+
+  it("marks every span it kept as reviewed — kept in text, by this Admin, for the batch's reason — and no other", async () => {
+    const scenario = await arrange();
+
+    const { kept, alsoKept, left } = await keepingTwoSpansOfThree(scenario);
+
+    const keptInText = {
+      review_state: "kept-in-text",
+      reviewed: true,
+      reviewed_by: `human:${scenario.admin.userId}`,
+      review_reason: BUSINESS_FACT,
+    };
+    expect(await reviewOf(scenario.workspaceId, kept)).toEqual(keptInText);
+    expect(await reviewOf(scenario.workspaceId, alsoKept)).toEqual(keptInText);
+    // The span nobody selected is still nobody's review: the widening block reads this column.
+    expect(await reviewOf(scenario.workspaceId, left)).toEqual(UNREVIEWED);
   });
 
   it("keeps one span on its own with no batch id, because there is no batch to name", async () => {
@@ -436,6 +492,41 @@ describe("an Admin narrowing named documents", () => {
     ]);
   });
 
+  it("queues one index run with the reason narrowed, however many documents it took", async () => {
+    const scenario = await arrange();
+    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+
+    const outcome = await narrowAs(scenario.admin, {
+      bindingId,
+      documentIds: [first.documentId, second.documentId],
+    });
+
+    expect(typeof (outcome.ok ? outcome.value.jobId : undefined)).toBe("string");
+    // One run for the binding and never one per document: the run's subject is the binding.
+    expect(await jobsOf(scenario.workspaceId)).toEqual([
+      { kind: "index", reason: "narrowed", subject_id: bindingId },
+    ]);
+  });
+
+  it("answers the run a keep already queued for the binding, and queues no second one", async () => {
+    const scenario = await arrange();
+    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const kept = await findingIn(scenario.workspaceId, first.documentId);
+    const keep = await acting(scenario.admin, (principal, tx) =>
+      keepInText(principal, tx, { bindingId, findingIds: [kept], reason: BUSINESS_FACT }),
+    );
+
+    const outcome = await narrowAs(scenario.admin, { bindingId, documentIds: [first.documentId] });
+
+    const queuedByTheKeep = keep.ok ? keep.value.jobId : undefined;
+    expect(typeof queuedByTheKeep).toBe("string");
+    expect(outcome).toMatchObject({ ok: true, value: { jobId: queuedByTheKeep } });
+    // One queued run per binding is the queue's rule, and the run keeps the reason it has.
+    expect(await jobsOf(scenario.workspaceId)).toEqual([
+      { kind: "index", reason: "restored", subject_id: bindingId },
+    ]);
+  });
+
   it("writes one row per document under one batch id when it narrows two", async () => {
     const scenario = await arrange();
     const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
@@ -511,6 +602,7 @@ describe("an Admin narrowing named documents", () => {
     expect(
       await batchedRowsOf(db().pool, scenario.workspaceId, "sources.document.narrowed"),
     ).toEqual([]);
+    expect(await jobsOf(scenario.workspaceId)).toEqual([]);
   });
 
   it("refuses a class wider than the binding's, over a document whose own class is wider still", async () => {
