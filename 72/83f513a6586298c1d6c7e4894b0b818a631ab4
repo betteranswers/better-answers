@@ -1,0 +1,9 @@
+docs/operations/BUILD_CACHE.md
+  ai_agent 7-8,15-50,56-58,64,66-74,76-79,84-87,90-92,99-100,102,104,106,108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7283f513a6586298c1d6c7e4894b0b818a631ab4",
+  "prompts": {}
+}
