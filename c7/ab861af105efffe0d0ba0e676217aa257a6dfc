@@ -1,0 +1,73 @@
+apps/worker/src/better_answers_worker/schema_view.py
+  ai_agent 10,12,471
+packages/schema/migrations/meta/_journal.json
+  ai_agent 277-283
+apps/worker/tests/test_pipeline_index.py
+  ai_agent 166-183,203,205-212,214,231,296-297,528-530,582,587-607,611-613,628-629,631,638-763
+apps/worker/src/better_answers_worker/pipeline/catalogue.py
+  ai_agent 11,14-15,30-32,45-51,54-56,58,236-273,287-295,302
+apps/worker/tests/fixtures/conversion/rate-card.pdf
+  ai_agent 1-74
+apps/worker/tests/test_pipeline_landed.py
+  ai_agent 20-41,45,47,52-53,55-58,65-66,68,71,127-223,293-294,304-305,309-315,427-429,431,483-486,496,499-525,527-560,562-585,588,593,595,599-622,627-792
+apps/worker/src/better_answers_worker/pipeline/__init__.py
+  ai_agent 19-24,62-72,76-77,80,86,97-98,102,104-105,107,118,123,127-128,133,138
+packages/schema/src/boundary-schemas.ts
+  ai_agent 82,717-729,744
+apps/worker/src/better_answers_worker/pipeline/run.py
+  ai_agent 28-35,51,58,86-91,100-107,137-138,146
+apps/worker/src/better_answers_worker/pipeline/landed.py
+  ai_agent 35-38,45,54-60,65-89,166-179,187-190,195,225-241,243,263,280-298,303-304,311,313-324,327-351,357,366-367,372-373,382-383,398-399,407-410,416,423-431,442-461,467
+packages/schema/test/rls.test.ts
+  ai_agent 2367-2368,2375-2392,2395
+packages/schema/migrations/meta/0039_snapshot.json
+  ai_agent 1-5398
+packages/schema/src/source-tables.ts
+  ai_agent 117-132,295-307,346-363
+packages/core/test/answering.test.ts
+  ai_agent 10,26-33,271,280,431,476,504-773
+packages/schema/test/factory.ts
+  ai_agent 743-745
+apps/worker/tests/fixtures/conversion/scanned-invoice.pdf
+  ai_agent 1-79
+packages/core/src/answering/index.ts
+  ai_agent 4,19-27,99-114,123-145,271-291,304-306,309-326,478-502,515-524,605-617,622,676-677
+packages/core/package.json
+  ai_agent 24-25
+apps/worker/tests/fixtures/conversion/delivery-terms.txt
+  ai_agent 1-28
+packages/schema/test/source-catalogue.test.ts
+  ai_agent 82-94,388-432
+apps/worker/src/better_answers_worker/pipeline/converter.py
+  ai_agent 1-213
+apps/worker/tests/test_image.py
+  ai_agent 87-92,99,174-195,675-805,1170-1194,1496-1564
+apps/api/tests/mcp-surface.test.ts
+  ai_agent 105-111,179-195
+apps/api/tests/invisibility.test.ts
+  ai_agent 7-12,27-32,101-141,165-173,175-177,234-424
+apps/worker/pyproject.toml
+  ai_agent 81-101
+apps/worker/tests/fixtures/conversion/README.md
+  ai_agent 1-42
+packages/core/test/suite-documents.ts
+  ai_agent 1-122
+apps/api/src/mcp/entries/index.ts
+  ai_agent 56-82,87,95,148
+docs/specs/s1-one-uploaded-document-to-a-cited-passage.md
+  ai_agent 108
+packages/schema/migrations/0039_the-quarantine-error.sql
+  ai_agent 1-2
+packages/core/test/visibility.test.ts
+  ai_agent 1411,1428-1433
+apps/worker/uv.lock
+  ai_agent 110,112,138,140,491-505,947-957
+CONTEXT.md
+  ai_agent 232-245
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c7ab861af105efffe0d0ba0e676217aa257a6dfc",
+  "prompts": {}
+}
