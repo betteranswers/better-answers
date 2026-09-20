@@ -301,10 +301,10 @@ def test_the_version_string_is_the_rule_version_and_the_detector_pin() -> None:
     written = VERSION_STRING
 
     assert written == (
-        "2:presidio-2.2.364+gliner-0.2.29+torch-2.14.0"
+        "3:presidio-2.2.364+gliner-0.2.29+torch-2.14.0"
         "+spacy-3.8.16+en-core-web-sm-3.8.0+gliner-multi-pii-v1"
     )
-    assert RULE_VERSION == "2"
+    assert RULE_VERSION == "3"
     assert VERSION_STRING.count(":") == 1
     assert VERSION_STRING.split(":") == [RULE_VERSION, DETECTOR_PIN]
 
@@ -320,10 +320,10 @@ def test_the_rule_version_is_bumped_with_the_table_it_stands_for() -> None:
     # consumer-domain list or a recogniser changes. Edit a descriptor or a domain
     # without bumping it and this literal stops matching: they are changed together or
     # the suite is red.
-    digest = "cece7ac3477cc58d1eb4b20be5c32c7f721d7435c416d17f567a0cba02c8849b"
+    digest = "5b20e4baed2c0a147492e0695f18b25b630ab22f28a926b5ad48321fd998bf6c"
 
     assert descriptor_digest() == digest
-    assert RULE_VERSION == "2"
+    assert RULE_VERSION == "3"
 
 
 def test_the_consumer_domain_list_carries_its_date_and_its_source() -> None:

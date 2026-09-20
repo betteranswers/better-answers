@@ -33,6 +33,12 @@ are literals (`[TEST9]`). The two markdown documents' were read out of the seam 
 September 2026 at `rule_version` 1 and the converted fixtures' on 20 September 2026 at
 `rule_version` 2, each at the detector pin this tier ships; a case that asked the seam
 or the converter what it answered would agree with either answering anything.
+
+**`rule_version` 3 moved none of them** (T-179, 20/09/2026), and that is worth a line
+rather than a silent re-date: the rule that moved took `health` and `condition` out of
+the cue list, and every document below is withheld from at the always tier — a sort code
+beside an account number, and one person's name under an erasure request. A rule change
+that left these literals alone is a rule change that reached nothing this file is about.
 """
 
 from collections.abc import Iterator, Mapping, Sequence
@@ -423,7 +429,7 @@ def test_the_memo_is_versioned_by_the_seams_own_rule_version_and_detector_pin() 
     reason.
     """
     assert MEMO_VERSION.startswith(f"{RULE_VERSION}:{DETECTOR_PIN}")
-    assert MEMO_VERSION.startswith("2:presidio-2.2.364+gliner-0.2.29+torch-2.14.0+")
+    assert MEMO_VERSION.startswith("3:presidio-2.2.364+gliner-0.2.29+torch-2.14.0+")
 
 
 # -- the two copies --------------------------------------------------------------------

@@ -39,21 +39,18 @@ rule say *not when the span is inside a fence*, is a later rule and lands only i
 first client's documents show the class is worth the risk of suppressing a true
 positive. Until then the reviewer sees it and keeps it in text.
 
-**The second known false-positive class, and the more expensive one: an ordinary
-sentence carrying a health *word*.** `HealthCueRecogniser` reads the special-category
-descriptor's `context` tuple as its cue list and raises **the whole sentence** around
-any token whose lemma is one of them, and two of the five — `health` and `condition` —
-are ordinary words of a bid library. So *Our Health and Safety policy is reviewed
-annually* and *this condition of contract* are each withheld entire as `[withheld]`,
-and because the category narrows, the document they sit in lands **Restricted**
-whatever its binding's class. That is the always tier, which no binding switches off,
-so it is the one false positive an Admin cannot undo by changing a rule: the reviewer's
-only road back is the per-span restore, story 4's act. The cost is stated here rather
-than answered here — the cues, the thresholds and every answer this suite reads are
-exactly what they were — because narrowing a cue is a recall decision about
-special-category data and is **T-179's**, which is the ticket that removes this class.
-Until it lands, a bid library on the always-on tier loses its health and safety policy
-to a word.
+**The health cue list, and why it is medical.** `HealthCueRecogniser` reads the
+special-category descriptor's `context` tuple as its cue list and raises **the whole
+sentence** around any token whose lemma is one of them, at the tier no binding switches
+off and with the document narrowed to Restricted behind it. Two of the five words were
+`health` and `condition` until T-179, which are ordinary words of a bid library: a
+safety policy and a condition of contract were each withheld entire, and the reviewer's
+only road back was the per-span restore, story 4's act, one span at a time. The list is
+the three medical words now, and the page carries the pair that proves the detection
+both ways (`[TEST7]`) — a genuine disclosure withheld by offset and a safety policy kept
+by offset, in the same section of the same page. What the three words reach is a case of
+its own below, on a page of this suite's own: the fixture's answers are the model's, and
+a sentence added to that page moves them.
 
 **Why the first name on the page is not `[person A]`.** The letters are a permutation
 the binding's seed draws, and a name takes the letter at the index its first appearance
@@ -77,6 +74,7 @@ from better_answers_worker.redaction import Redaction, redact
 from better_answers_worker.redaction.pins import VERSION_STRING
 from planted_page import (
     A_CONSUMER_ADDRESS,
+    A_HEALTH_AND_SAFETY_SENTENCE,
     A_HEALTH_SENTENCE,
     A_PLANTED_JOB_TITLE,
     AN_ADDRESS_AROUND_A_NAME,
@@ -426,6 +424,61 @@ def test_a_health_cue_withholds_its_sentence_and_narrows_the_document(
     assert sentences == [A_HEALTH_SENTENCE]
     assert on_a_plain_binding.verdict == "Restricted"
     assert A_HEALTH_SENTENCE not in on_a_plain_binding.text
+
+
+def test_an_ordinary_sentence_carrying_a_health_word_is_kept_on_every_binding(
+    on_a_plain_binding: Redaction,
+    with_nothing_switchable_on: Redaction,
+    on_an_hr_shaped_binding: Redaction,
+    page: str,
+) -> None:
+    # The cue list's other half (`[TEST7]`), and the half that costs most to get wrong.
+    # *Health* and *condition* are ordinary words of a bid library — a safety policy, a
+    # condition of contract — and a cue list holding them withholds the sentence around
+    # each of them and narrows the document to Restricted for it. That is the always
+    # tier, which no binding switches off, so the reviewer's only road back would be the
+    # per-span restore, one span at a time (`T-179`). The proof is by offset rather than
+    # by string: a finding claiming any part of this sentence is a placeholder written
+    # across it whatever the whole of it still matches. Every binding this suite holds
+    # is asked, in the order they switch rules on — none, the default, all — because
+    # *on every binding* is what the always tier's cost makes worth saying, and a rule a
+    # binding switches on is a rule whose span could cover this sentence.
+    opened = page.index(A_HEALTH_AND_SAFETY_SENTENCE)
+    closed = opened + len(A_HEALTH_AND_SAFETY_SENTENCE)
+
+    for found in (
+        with_nothing_switchable_on,
+        on_a_plain_binding,
+        on_an_hr_shaped_binding,
+    ):
+        assert [
+            finding
+            for finding in found.findings
+            if finding.start < closed and opened < finding.end
+        ] == []
+        assert A_HEALTH_AND_SAFETY_SENTENCE in found.text
+
+
+def test_a_cue_is_the_lemma_of_the_word_a_document_wrote_and_not_its_spelling() -> None:
+    # The three words the list keeps, written as a document writes them rather than as
+    # the descriptor spells them: a plural and a capital letter are the same word once
+    # the rule reads spaCy's lemmas and folds the case, which is why the list holds
+    # *sickness* and *medication* and not a column of their forms. The page is this
+    # test's own — the fixture's answers are the model's and a sentence added there
+    # moves them — and the third sentence is the other direction (`[TEST7]`): a bid
+    # library's own dates are no cue, so nothing is taken from it.
+    found = redact(
+        "Sickness absence is logged by the site office.\n\n"
+        "Her medications were changed in the spring.\n\n"
+        "The framework agreement was signed on 14 March 2024.",
+        THE_SAFE_SET,
+        NO_SUPPRESSIONS,
+        SEED,
+    )
+
+    assert "Sickness absence is logged by the site office." not in found.text
+    assert "Her medications were changed in the spring." not in found.text
+    assert "The framework agreement was signed on 14 March 2024." in found.text
 
 
 def test_a_page_with_no_special_category_cue_narrows_nothing() -> None:

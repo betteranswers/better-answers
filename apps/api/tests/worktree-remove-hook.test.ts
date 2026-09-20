@@ -1,21 +1,19 @@
-import { spawnSync } from "node:child_process";
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
+import { writeUnder } from "@better-answers/devtools/throwaway-tree";
+import {
+  hookScript,
+  recordsItsArgv,
+  repositoryHolding,
+  runHook,
+  scratchRoot,
+  stubsOnPath,
+  worktreeUnder,
+  type HookRun,
+} from "./worktree-hooks.ts";
 
 /**
  * The removal half of the worktree hooks, run for real over a throwaway repository and a
@@ -34,13 +32,12 @@ import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools
  * has to read it from that registry, and no test here may reach the owner's real one.
  */
 
-const hook = path.resolve(import.meta.dirname, "../../../.claude/hooks/worktree-remove-hook.sh");
+const hook = hookScript("worktree-remove-hook");
 
 /** What the stub registry calls the worktree's index — an id no real registry would hold. */
 const REPO_ID = "local/throwaway-0f0f0f0f";
 
-const scratch = mkdtempSync(path.join(tmpdir(), "worktree-remove-hook-"));
-afterAll(() => rmSync(scratch, { recursive: true, force: true }));
+const scratch = scratchRoot("worktree-remove-hook");
 
 /**
  * A repository with one commit on `main`, and a worktree of it on a branch of its own.
@@ -52,14 +49,11 @@ afterAll(() => rmSync(scratch, { recursive: true, force: true }));
  * the last case below stands on.
  */
 const worktreeOf = (name: string): { readonly root: string; readonly worktree: string } => {
-  const root = throwawayRepository(path.join(scratch, `${name}-root`));
-  writeUnder(root, "README.md", "# throwaway\n");
-  writeUnder(root, ".gitignore", ".scratch\n");
-  gitIn(root, "add", "-A");
-  gitIn(root, "commit", "-q", "-m", "tracked");
-  const worktree = path.join(scratch, `${name}-worktree`);
-  gitIn(root, "worktree", "add", "-q", "-b", `t-${name}`, worktree);
-  return { root, worktree };
+  const root = repositoryHolding(path.join(scratch, `${name}-root`), {
+    "README.md": "# throwaway\n",
+    ".gitignore": ".scratch\n",
+  });
+  return { root, worktree: worktreeUnder(scratch, root, name) };
 };
 
 /**
@@ -67,35 +61,18 @@ const worktreeOf = (name: string): { readonly root: string; readonly worktree: s
  * asked for the registry, and appends every command line it is given to `log`.
  */
 const stubJcodemunch = (name: string, worktree: string, log: string): string => {
-  const bin = path.join(scratch, `${name}-bin`);
-  mkdirSync(bin);
   const registry = JSON.stringify([{ repo_id: REPO_ID, source_root: realpathSync(worktree) }]);
-  const file = path.join(bin, "jcodemunch-mcp");
-  writeFileSync(
-    file,
-    [
-      "#!/usr/bin/env bash",
-      `printf '%s\\n' "$*" >> '${log}'`,
-      `[ "$1" = list-repos ] && printf '%s' '${registry}'`,
-      "exit 0",
-      "",
-    ].join("\n"),
-  );
-  chmodSync(file, 0o755);
-  return bin;
+  return stubsOnPath(path.join(scratch, `${name}-bin`), {
+    "jcodemunch-mcp": recordsItsArgv(log, [`[ "$1" = list-repos ] && printf '%s' '${registry}'`]),
+  });
 };
-
-type Run = { readonly status: number | null; readonly stderr: string };
 
 /** The hook, given `worktree` the way Claude Code gives it: one JSON object on stdin. */
-const removeHook = (worktree: string, bin: string): Run => {
-  const result = spawnSync("bash", [hook], {
-    encoding: "utf8",
+const removeHook = (worktree: string, bin: string): HookRun =>
+  runHook(hook, {
     input: JSON.stringify({ worktree_path: worktree }),
-    env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env["PATH"] ?? ""}` },
+    env: { PATH: `${bin}${path.delimiter}${process.env["PATH"] ?? ""}` },
   });
-  return { status: result.status, stderr: result.stderr };
-};
 
 /** The command lines the stub was given, in order. */
 const argvLines = (log: string): readonly string[] =>

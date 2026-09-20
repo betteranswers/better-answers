@@ -1,22 +1,20 @@
 import { spawnSync } from "node:child_process";
-import {
-  chmodSync,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, symlinkSync } from "node:fs";
 import path from "node:path";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
+import { gitIn, writeUnder } from "@better-answers/devtools/throwaway-tree";
+import {
+  hookScript,
+  recordsItsArgv,
+  repositoryHolding,
+  runHook,
+  scratchRoot,
+  stubsOnPath,
+  worktreeUnder,
+  type HookRun,
+} from "./worktree-hooks.ts";
 
 /**
  * The upstream stage of worktree provisioning, run over a throwaway clone and a worktree of
@@ -42,10 +40,9 @@ import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools
  * a primary with nothing to link.
  */
 
-const script = path.resolve(import.meta.dirname, "../../../.claude/hooks/provision-worktree.sh");
+const script = hookScript("provision-worktree");
 
-const scratch = mkdtempSync(path.join(tmpdir(), "provision-worktree-"));
-afterAll(() => rmSync(scratch, { recursive: true, force: true }));
+const scratch = scratchRoot("provision-worktree");
 
 /**
  * This repository's own `.scratch` ignore pattern, read from the root `.gitignore` rather
@@ -68,15 +65,10 @@ const scratchIgnorePattern = (): string => {
 
 /** An origin with one commit on `main`, and a clone of it holding installed skills. */
 const clonedPrimary = (name: string): string => {
-  const origin = throwawayRepository(path.join(scratch, `${name}-origin`));
-  writeUnder(
-    origin,
-    ".gitignore",
-    `.claude/skills/*\n.agents/\ntasks/AGENTS.md\n${scratchIgnorePattern()}\n`,
-  );
-  writeUnder(origin, "skills-lock.json", '{ "version": 1, "skills": {} }\n');
-  gitIn(origin, "add", "-A");
-  gitIn(origin, "commit", "-q", "-m", "tracked");
+  const origin = repositoryHolding(path.join(scratch, `${name}-origin`), {
+    ".gitignore": `.claude/skills/*\n.agents/\ntasks/AGENTS.md\n${scratchIgnorePattern()}\n`,
+    "skills-lock.json": '{ "version": 1, "skills": {} }\n',
+  });
   const primary = path.join(scratch, `${name}-primary`);
   gitIn(scratch, "clone", "-q", origin, primary);
   writeUnder(primary, ".agents/skills/hono/SKILL.md", "# hono\n");
@@ -101,20 +93,15 @@ const stubInstallers = (
   name: string,
   extra: Readonly<Record<string, string>> = {},
 ): { readonly bin: string; readonly home: string } => {
-  const bin = path.join(scratch, `${name}-bin`);
-  mkdirSync(bin);
-  for (const [tool, body] of Object.entries({ pnpm: "exit 0\n", uv: "exit 0\n", ...extra })) {
-    const file = path.join(bin, tool);
-    writeFileSync(file, `#!/usr/bin/env bash\n${body}`);
-    chmodSync(file, 0o755);
-  }
+  const bin = stubsOnPath(path.join(scratch, `${name}-bin`), {
+    pnpm: "exit 0\n",
+    uv: "exit 0\n",
+    ...extra,
+  });
   const home = path.join(scratch, `${name}-home`);
   mkdirSync(home);
   return { bin, home };
 };
-
-/** A stub that appends the command line it was given to `log` and says yes. */
-const recordsItsArgv = (log: string): string => `printf '%s\\n' "$*" >> '${log}'\nexit 0\n`;
 
 const TOOL = "jcodemunch-mcp";
 
@@ -131,23 +118,20 @@ const pathWithoutJcodemunch = (bin: string): string =>
       .filter((directory) => directory !== "" && !existsSync(path.join(directory, TOOL))),
   ].join(path.delimiter);
 
-type Run = { readonly status: number | null; readonly stderr: string };
-
 const provision = (
   name: string,
   worktree: string,
   extra: Readonly<Record<string, string>> = {},
-): Run => {
+): HookRun => {
   const { bin, home } = stubInstallers(name, extra);
-  const result = spawnSync("bash", [script, worktree], {
-    encoding: "utf8",
-    env: { ...process.env, HOME: home, PATH: pathWithoutJcodemunch(bin) },
+  return runHook(script, {
+    argv: [worktree],
+    env: { HOME: home, PATH: pathWithoutJcodemunch(bin) },
   });
-  return { status: result.status, stderr: result.stderr };
 };
 
 /** The script exited zero — and when it did not, what it said is the failure's message. */
-const ready = (run: Run): void => {
+const ready = (run: HookRun): void => {
   if (run.status !== 0) {
     throw new Error(`provision-worktree.sh exited ${String(run.status)}:\n${run.stderr}`);
   }
@@ -165,8 +149,7 @@ const upstreamOf = (worktree: string): string | undefined => {
 describe("the upstream stage of worktree provisioning (T-099)", () => {
   it("unsets the upstream a worktree added against origin/main was given, and says so", () => {
     const primary = clonedPrimary("tracking");
-    const worktree = path.join(scratch, "tracking-worktree");
-    gitIn(primary, "worktree", "add", "-q", "-b", "t-tracking", worktree, "origin/main");
+    const worktree = worktreeUnder(scratch, primary, "tracking", "origin/main");
     expect(upstreamOf(worktree)).toBe("origin/main");
 
     const run = provision("tracking", worktree);
@@ -178,8 +161,7 @@ describe("the upstream stage of worktree provisioning (T-099)", () => {
 
   it("leaves a branch that tracks nothing alone, and says that on the same line", () => {
     const primary = clonedPrimary("untracked");
-    const worktree = path.join(scratch, "untracked-worktree");
-    gitIn(primary, "worktree", "add", "-q", "-b", "t-untracked", worktree);
+    const worktree = worktreeUnder(scratch, primary, "untracked");
     expect(upstreamOf(worktree)).toBeUndefined();
 
     const run = provision("untracked", worktree);
@@ -192,9 +174,7 @@ describe("the upstream stage of worktree provisioning (T-099)", () => {
 describe("the jCodeMunch stage of worktree provisioning (T-181)", () => {
   /** A provisioned worktree of a primary that has skills to give, and its argv log. */
   const worktreeOf = (name: string): { readonly worktree: string; readonly log: string } => {
-    const primary = clonedPrimary(name);
-    const worktree = path.join(scratch, `${name}-worktree`);
-    gitIn(primary, "worktree", "add", "-q", "-b", `t-${name}`, worktree);
+    const worktree = worktreeUnder(scratch, clonedPrimary(name), name);
     return { worktree, log: path.join(scratch, `${name}-argv`) };
   };
 
@@ -237,9 +217,7 @@ describe("the scratch stage of worktree provisioning", () => {
   ): { readonly primary: string; readonly worktree: string } => {
     const primary = clonedPrimary(name);
     writeUnder(primary, ".scratch/v01-spec/map.md", "# the map\n");
-    const worktree = path.join(scratch, `${name}-worktree`);
-    gitIn(primary, "worktree", "add", "-q", "-b", `t-${name}`, worktree);
-    return { primary, worktree };
+    return { primary, worktree: worktreeUnder(scratch, primary, name) };
   };
 
   it("links the worktree's .scratch at the primary's, so a relative pointer resolves", () => {
@@ -278,8 +256,7 @@ describe("the scratch stage of worktree provisioning", () => {
 
   it("says a primary with no .scratch has nothing to link, and provisions the worktree anyway", () => {
     const primary = clonedPrimary("no-scratch");
-    const worktree = path.join(scratch, "no-scratch-worktree");
-    gitIn(primary, "worktree", "add", "-q", "-b", "t-no-scratch", worktree);
+    const worktree = worktreeUnder(scratch, primary, "no-scratch");
 
     const run = provision("no-scratch", worktree);
 
