@@ -91,7 +91,7 @@ This server runs the **front door** surface: three tools reach every jCodeMunch 
 
 **Announce your model once per session** so the server can size its answers: `announce_model { "model": "<your-model-id>" }`.
 
-**From a worktree, two indexes.** jCodeMunch reads the worktree's own index, which the create hook builds, so it sees this branch's uncommitted edits. GitNexus reads the main checkout's, taken at its last `analyze`, which runs in the main checkout only — the runner is absent from a worktree — after every merge to `main`. So `detect_changes` from a worktree takes `repo: "better-answers"` **and** `worktree: <the worktree's absolute path>`; and an `impact` that answers *ambiguous* is re-run by `target_uid` before its risk counts. Prose is in neither index — jCodeMunch indexes no markdown and GitNexus holds headings only — so a search across documents is a shell `grep`, with that reason said.
+**From a worktree, two indexes.** jCodeMunch reads the worktree's own index, which the create hook builds, so it sees this branch's uncommitted edits. GitNexus reads the main checkout's, taken at its last `analyze`, which runs in the main checkout only — the runner is absent from a worktree — after every merge to `main`. So `detect_changes` from a worktree takes `repo: "better-answers"` **and** `worktree: <the worktree's absolute path>`; and an `impact` that answers *ambiguous* is re-run by `target_uid` before its risk counts. `rename` has no `worktree:` parameter: it reads **and writes** the main checkout's files, and its answer names no tree. So from a worktree `rename` stays a dry run (`dry_run: true`, its default) — its edit list names the sites, by the main checkout's line numbers; each is applied in the worktree with `Edit`; and a jCodeMunch `search_text` for the old name, which sees what this branch added since the last `analyze`, comes back empty before the rename counts as done. Prose is in neither index — jCodeMunch indexes no markdown and GitNexus holds headings only — so a search across documents is a shell `grep`, with that reason said.
 
 <!-- gitnexus:start -->
 <!-- gitnexus:keep -->
@@ -113,7 +113,7 @@ This project is indexed by GitNexus as **better-answers**. Use the GitNexus MCP 
 
 - NEVER edit a function, class, or method without first running `impact` on it.
 - NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
+- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph. From a worktree it stays a dry run and its edits are applied by hand: *From a worktree, two indexes*, above.
 - NEVER commit changes without running `detect_changes()` to check affected scope.
 
 ## Resources
@@ -129,9 +129,9 @@ This project is indexed by GitNexus as **better-answers**. Use the GitNexus MCP 
 
 | Task | Read this skill file |
 |------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus-impact-analysis/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus-refactoring/SKILL.md` |
 
 <!-- gitnexus:keep -->
 <!-- gitnexus:end -->
