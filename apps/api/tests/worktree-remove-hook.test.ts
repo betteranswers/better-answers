@@ -7,6 +7,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -41,15 +42,24 @@ const REPO_ID = "local/throwaway-0f0f0f0f";
 const scratch = mkdtempSync(path.join(tmpdir(), "worktree-remove-hook-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
-/** A repository with one commit on `main`, and a worktree of it on a branch of its own. */
-const worktreeOf = (name: string): string => {
+/**
+ * A repository with one commit on `main`, and a worktree of it on a branch of its own.
+ *
+ * The `.gitignore` carries `.scratch` without a trailing slash, which is what this
+ * repository's own carries and why: a worktree's `.scratch` is a symlink, and git reads a
+ * symlink as a file, so `.scratch/` would leave it untracked. That pattern's own case is in
+ * `provision-worktree.test.ts`, against the root `.gitignore`; here it is the precondition
+ * the last case below stands on.
+ */
+const worktreeOf = (name: string): { readonly root: string; readonly worktree: string } => {
   const root = throwawayRepository(path.join(scratch, `${name}-root`));
   writeUnder(root, "README.md", "# throwaway\n");
+  writeUnder(root, ".gitignore", ".scratch\n");
   gitIn(root, "add", "-A");
   gitIn(root, "commit", "-q", "-m", "tracked");
   const worktree = path.join(scratch, `${name}-worktree`);
   gitIn(root, "worktree", "add", "-q", "-b", `t-${name}`, worktree);
-  return worktree;
+  return { root, worktree };
 };
 
 /**
@@ -93,7 +103,7 @@ const argvLines = (log: string): readonly string[] =>
 
 describe("the jCodeMunch index a removed worktree leaves behind (T-181)", () => {
   it("drops the index of the worktree it removes, so no indexed root outlives its path", () => {
-    const worktree = worktreeOf("removed");
+    const { worktree } = worktreeOf("removed");
     const log = path.join(scratch, "removed-argv");
     const bin = stubJcodemunch("removed", worktree, log);
 
@@ -106,7 +116,7 @@ describe("the jCodeMunch index a removed worktree leaves behind (T-181)", () => 
   });
 
   it("keeps the index of a worktree holding work, which it keeps on disk too", () => {
-    const worktree = worktreeOf("kept");
+    const { worktree } = worktreeOf("kept");
     writeFileSync(path.join(worktree, "half-done.txt"), "work in progress\n");
     const log = path.join(scratch, "kept-argv");
     const bin = stubJcodemunch("kept", worktree, log);
@@ -117,5 +127,19 @@ describe("the jCodeMunch index a removed worktree leaves behind (T-181)", () => 
     expect(existsSync(worktree)).toBe(true);
     expect(argvLines(log)).toEqual([]);
     expect(run.stderr).toContain("keeping");
+  });
+
+  it("removes a worktree whose only extra is the .scratch link, and the notes it points at stay", () => {
+    const { root, worktree } = worktreeOf("scratch-link");
+    writeUnder(root, ".scratch/v01-spec/map.md", "# the map\n");
+    symlinkSync(path.join(root, ".scratch"), path.join(worktree, ".scratch"));
+    const log = path.join(scratch, "scratch-link-argv");
+    const bin = stubJcodemunch("scratch-link", worktree, log);
+
+    const run = removeHook(worktree, bin);
+
+    expect(run.status).toBe(0);
+    expect(existsSync(worktree)).toBe(false);
+    expect(readFileSync(path.join(root, ".scratch/v01-spec/map.md"), "utf8")).toBe("# the map\n");
   });
 });

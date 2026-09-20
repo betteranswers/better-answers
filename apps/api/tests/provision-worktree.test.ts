@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -33,6 +34,12 @@ import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools
  * root at provisioning, so the first file an agent edits there is registered in the
  * worktree's index rather than resolved into the primary checkout's. Its three cases are
  * the stage's three outcomes — indexed, no tool on the machine, and an index that failed.
+ *
+ * The third describe is the scratch stage: the worktree's `.scratch` is a symlink into the
+ * primary checkout's, so the relative pointers the ADRs, specs and discovery tickets carry
+ * resolve in a worktree too. Its cases are the link itself, the `.gitignore` pattern that
+ * keeps the link out of `git status`, the second run that leaves an existing one alone, and
+ * a primary with nothing to link.
  */
 
 const script = path.resolve(import.meta.dirname, "../../../.claude/hooks/provision-worktree.sh");
@@ -40,10 +47,33 @@ const script = path.resolve(import.meta.dirname, "../../../.claude/hooks/provisi
 const scratch = mkdtempSync(path.join(tmpdir(), "provision-worktree-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
+/**
+ * This repository's own `.scratch` ignore pattern, read from the root `.gitignore` rather
+ * than written out here: the throwaway tree then ignores exactly what this repository
+ * ignores, so a pattern narrowed back to `.scratch/` — which matches a directory and never
+ * the symlink git reads as a file — fails the case below instead of passing against a copy
+ * of itself.
+ */
+const scratchIgnorePattern = (): string => {
+  const ignore = path.resolve(import.meta.dirname, "../../../.gitignore");
+  const pattern = readFileSync(ignore, "utf8")
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .find((line) => line === ".scratch" || line === ".scratch/");
+  if (pattern === undefined) {
+    throw new Error(`${ignore} carries no \`.scratch\` pattern, so nothing here is being proved.`);
+  }
+  return pattern;
+};
+
 /** An origin with one commit on `main`, and a clone of it holding installed skills. */
 const clonedPrimary = (name: string): string => {
   const origin = throwawayRepository(path.join(scratch, `${name}-origin`));
-  writeUnder(origin, ".gitignore", ".claude/skills/*\n.agents/\ntasks/AGENTS.md\n");
+  writeUnder(
+    origin,
+    ".gitignore",
+    `.claude/skills/*\n.agents/\ntasks/AGENTS.md\n${scratchIgnorePattern()}\n`,
+  );
   writeUnder(origin, "skills-lock.json", '{ "version": 1, "skills": {} }\n');
   gitIn(origin, "add", "-A");
   gitIn(origin, "commit", "-q", "-m", "tracked");
@@ -197,5 +227,64 @@ describe("the jCodeMunch stage of worktree provisioning (T-181)", () => {
     expect(run.status).toBe(1);
     expect(run.stderr).toContain(`jcodemunch index: FAILED — run ${TOOL} index`);
     expect(run.stderr).toContain("provision-worktree: incomplete");
+  });
+});
+
+describe("the scratch stage of worktree provisioning", () => {
+  /** A primary holding one discovery note, and an unprovisioned worktree of it. */
+  const treesWithScratch = (
+    name: string,
+  ): { readonly primary: string; readonly worktree: string } => {
+    const primary = clonedPrimary(name);
+    writeUnder(primary, ".scratch/v01-spec/map.md", "# the map\n");
+    const worktree = path.join(scratch, `${name}-worktree`);
+    gitIn(primary, "worktree", "add", "-q", "-b", `t-${name}`, worktree);
+    return { primary, worktree };
+  };
+
+  it("links the worktree's .scratch at the primary's, so a relative pointer resolves", () => {
+    const { primary, worktree } = treesWithScratch("linked");
+    const link = path.join(worktree, ".scratch");
+
+    const run = provision("linked", worktree);
+
+    ready(run);
+    expect(run.stderr).toContain(`scratch: linked to ${realpathSync(primary)}/.scratch`);
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(realpathSync(link)).toBe(realpathSync(path.join(primary, ".scratch")));
+    expect(readFileSync(path.join(link, "v01-spec/map.md"), "utf8")).toBe("# the map\n");
+  });
+
+  it("leaves the link out of git status, which is what keeps the remove hook reading no work", () => {
+    const { worktree } = treesWithScratch("ignored");
+
+    ready(provision("ignored", worktree));
+
+    // The link is there and git says nothing about it. Asserted together, because a status
+    // that is empty because nothing was linked proves the pattern nothing at all.
+    expect(lstatSync(path.join(worktree, ".scratch")).isSymbolicLink()).toBe(true);
+    expect(gitIn(worktree, "status", "--porcelain")).toBe("");
+  });
+
+  it("leaves a .scratch already there alone, which is what makes a second run a no-op", () => {
+    const { worktree } = treesWithScratch("second-run");
+    ready(provision("second-run", worktree));
+
+    const run = provision("second-run-again", worktree);
+
+    ready(run);
+    expect(run.stderr).toContain("scratch: already here — left alone");
+  });
+
+  it("says a primary with no .scratch has nothing to link, and provisions the worktree anyway", () => {
+    const primary = clonedPrimary("no-scratch");
+    const worktree = path.join(scratch, "no-scratch-worktree");
+    gitIn(primary, "worktree", "add", "-q", "-b", "t-no-scratch", worktree);
+
+    const run = provision("no-scratch", worktree);
+
+    ready(run);
+    expect(run.stderr).toContain(`scratch: none at ${realpathSync(primary)} — nothing to link`);
+    expect(existsSync(path.join(worktree, ".scratch"))).toBe(false);
   });
 });

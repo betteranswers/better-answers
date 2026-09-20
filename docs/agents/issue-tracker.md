@@ -74,6 +74,8 @@ Supporting artefacts alongside the map, following `v01-spec`: `research/` (findi
 
 `.scratch/` is git-ignored working material, not a deliverable. A decision that survives moves out — into `CONTEXT.md` for a word, `docs/adr/` for a decision, ordna for work. A `.scratch/` ticket is **not** authoritative once its decision has landed in an ADR; where the two disagree, the ADR wins.
 
+In a worktree, `.scratch` is a symlink into the primary checkout's, made by `.claude/hooks/provision-worktree.sh`, so every `.scratch/<effort>/…` pointer in an ADR, a spec or a ticket resolves there too. The one folder is shared and writable: a note an agent claims or resolves through the link is read by every other session at once, and it survives the worktree being removed.
+
 ## PRs as a request surface
 
 Off. Pull requests are not part of the triage queue.

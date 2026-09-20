@@ -47,7 +47,11 @@ deploy/wizard-41.env
 
 # client material and the local planning map — never in the repository
 .planning/
-.scratch/
+# `.scratch` carries no trailing slash because a worktree's is a symlink into the primary
+# checkout's (.claude/hooks/provision-worktree.sh), and git reads a symlink as a file: the
+# pattern `.scratch/` would match the primary's directory and leave every worktree's link
+# untracked, which the remove hook reads as work to keep and `git add -A` would commit.
+.scratch
 .lavish/
 15-user-feedback.md
 old-suggested-schema.md

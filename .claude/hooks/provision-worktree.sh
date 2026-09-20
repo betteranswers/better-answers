@@ -8,7 +8,7 @@ set -euo pipefail
 # .claude/hooks/worktree-create-hook.sh for every worktree Claude Code creates; runnable
 # by hand after `git worktree add`, which fires no hook.
 #
-# Five stages, each reporting on its own line and none stopping the next:
+# Six stages, each reporting on its own line and none stopping the next:
 #   upstream         — the branch tracks nothing until someone says so
 #   pnpm install     — the TypeScript workspaces
 #   uv sync          — the Python worker
@@ -16,6 +16,7 @@ set -euo pipefail
 #   skills           — .claude/hooks/provision-skills.sh: the installed, ignored agent
 #                      tooling (`.agents/`, `.claude/skills/*`, each workspace's
 #                      `.claude/skills/*`, `tasks/AGENTS.md`)
+#   scratch          — the primary checkout's `.scratch`, linked
 #
 # `git worktree add -b <branch> <path> origin/main` sets the new branch to track
 # `origin/main`, silently: a bare `git push` from the worktree then aims at `main`, and
@@ -45,6 +46,29 @@ set -euo pipefail
 # `actionlint` has in lefthook.yml — while an index that was attempted and failed is a
 # stage failure like any other. .claude/hooks/worktree-remove-hook.sh drops the index
 # again when it removes the worktree.
+#
+# `.scratch` is linked, never copied — the opposite of the skills stage's reasoning, for
+# three reasons a copy cannot answer. It is 1.2 GB across 45,256 files (measured
+# 20/09/2026), so a copy per worktree is out. It is living context rather than static
+# material: the Coordinator writes a note into it while a worktree is open, and a copy is
+# stale from that moment. And a note an agent writes through the link outlives the
+# worktree, where a copy is deleted with it. The cost, which is real: the link is
+# read-write and shared, so every agent in every worktree writes into the one unversioned
+# folder the primary checkout holds — there is no per-worktree `.scratch` to lose work in,
+# and none to keep work private in either.
+#
+# The link cannot bloat the worktree's jCodeMunch index, for two independent reasons, so
+# the stage sits last only because a link is the cheapest thing here and not because the
+# order protects anything: `jcodemunch-mcp index` walks a directory symlink only under
+# `--follow-symlinks`, which this script does not pass, and `.gitignore` names `.scratch`
+# besides. Measured 20/09/2026 over a throwaway tree: 3 files indexed, then the 45,256-file
+# `.scratch` linked into it and re-indexed — 0 new files, and 0 again for a symlinked
+# directory that no ignore pattern covered.
+#
+# That `.gitignore` pattern carries no trailing slash on purpose. Git reads a symlink as a
+# file, so `.scratch/` would match the primary's directory and leave every worktree's link
+# showing as `?? .scratch`: .claude/hooks/worktree-remove-hook.sh would then keep each
+# worktree as one holding untracked work, and a `git add -A` would commit the link.
 #
 # Nothing is copied from `.env.local`: no workspace, test or compose file reads it
 # (checked 02/09/2026), and tests reach Postgres through Testcontainers. If that
@@ -131,6 +155,28 @@ fi
 
 # --- skills: the installed agent tooling, copied from the primary checkout ---
 bash "$(dirname "${BASH_SOURCE[0]}")/provision-skills.sh" "$WORKTREE_PATH" || STATUS=1
+
+# --- scratch: the primary checkout's, linked so a `.scratch/<effort>/…` pointer resolves ---
+# The primary is the working tree beside the directory `--git-common-dir` names, the way
+# provision-skills.sh finds it; the link is absolute, because a worktree made by hand can
+# sit anywhere and a relative link would have to guess how far up the primary is.
+COMMON_DIR="$(git -C "$WORKTREE_PATH" rev-parse --path-format=absolute --git-common-dir)"
+PRIMARY_PATH="$(cd "$(dirname "$COMMON_DIR")" && pwd -P)"
+SCRATCH_LINK="$WORKTREE_PATH/.scratch"
+if [ "$PRIMARY_PATH" = "$WORKTREE_PATH" ]; then
+  echo "  scratch: this is the primary checkout — nothing to link" >&2
+# `-L` as well as `-e`, so a link whose target has gone is left alone rather than reported
+# as absent and then failed over by `ln`.
+elif [ -e "$SCRATCH_LINK" ] || [ -L "$SCRATCH_LINK" ]; then
+  echo "  scratch: already here — left alone" >&2
+elif [ ! -d "$PRIMARY_PATH/.scratch" ]; then
+  echo "  scratch: none at $PRIMARY_PATH — nothing to link" >&2
+elif ln -s "$PRIMARY_PATH/.scratch" "$SCRATCH_LINK"; then
+  echo "  scratch: linked to $PRIMARY_PATH/.scratch" >&2
+else
+  echo "  scratch: FAILED to link — run ln -s \"$PRIMARY_PATH/.scratch\" \"$SCRATCH_LINK\" by hand" >&2
+  STATUS=1
+fi
 
 echo "provision-worktree: $([ $STATUS -eq 0 ] && echo ready || echo incomplete)" >&2
 exit $STATUS
