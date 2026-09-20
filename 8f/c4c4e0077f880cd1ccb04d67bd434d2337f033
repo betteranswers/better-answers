@@ -1,0 +1,13 @@
+apps/api/tests/provision-worktree.test.ts
+  ai_agent 2,5,7-17,43,45,68-71,96-100,125,127-129,134,152,164,177,220,259
+apps/api/tests/worktree-hooks.ts
+  ai_agent 1-129
+apps/api/tests/worktree-remove-hook.test.ts
+  ai_agent 1,4,6-16,35,40,52-56,65-67,71-72,74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "8fc4c4e0077f880cd1ccb04d67bd434d2337f033",
+  "prompts": {}
+}
