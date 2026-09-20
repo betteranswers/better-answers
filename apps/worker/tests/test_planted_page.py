@@ -15,6 +15,7 @@ import pytest
 
 from planted_page import (
     A_CONSUMER_ADDRESS,
+    A_HEALTH_AND_SAFETY_SENTENCE,
     A_PLANTED_JOB_TITLE,
     FIXTURE_PAGE,
     PLANTED_SPANS,
@@ -38,6 +39,17 @@ def test_every_span_the_declaration_plants_is_on_the_page_once() -> None:
         # per-category counts beside it cannot describe, because the seam raises both
         # and the declaration claims one.
         assert page.count(planted) == 1, f"{category}: {planted!r}"
+
+
+def test_the_sentence_planted_to_be_kept_is_on_the_page_once() -> None:
+    # The negative half of the declaration, read against the page's own bytes: a
+    # sentence the suite proves untouched has to be on the page at all to be
+    # untouched, and a second copy of it would let that proof read one copy while the
+    # seam withheld the other. Held here for the same reason the planted spans are — the
+    # suite that loads a detector is the expensive place to learn a literal was retyped.
+    page = FIXTURE_PAGE.read_text(encoding="utf-8")
+
+    assert page.count(A_HEALTH_AND_SAFETY_SENTENCE) == 1
 
 
 def test_a_span_goes_when_its_binding_switches_its_tier_on_and_not_before() -> None:

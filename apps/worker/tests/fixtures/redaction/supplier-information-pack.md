@@ -43,6 +43,8 @@ on her personal mobile, 07700 900123.
 
 ## Workforce
 
+Our Health and Safety policy is reviewed annually, and no condition of contract in this pack departs from it.
+
 One of our supervisors was on long-term sick leave following a cancer diagnosis, which is why the programme slipped by six weeks.
 
 The insurer's claim record for the same member of staff quotes NHS number 999 000 0018.
