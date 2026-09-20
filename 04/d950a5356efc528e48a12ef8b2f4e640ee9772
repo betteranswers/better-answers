@@ -1,0 +1,35 @@
+packages/schema/src/source-tables.ts
+  ai_agent 117-132,295-307,346-363
+packages/schema/test/factory.ts
+  ai_agent 743-745
+packages/schema/test/source-catalogue.test.ts
+  ai_agent 82-94,388-432
+packages/schema/test/rls.test.ts
+  ai_agent 2367-2368,2375-2392,2395
+packages/schema/migrations/meta/_journal.json
+  ai_agent 277-283
+docs/specs/s1-one-uploaded-document-to-a-cited-passage.md
+  ai_agent 108
+CONTEXT.md
+  ai_agent 237-245
+apps/worker/src/better_answers_worker/pipeline/run.py
+  ai_agent 58,86-91,100-107,137-138
+apps/worker/tests/test_pipeline_index.py
+  ai_agent 166-183,203,205-212,214,231,296-297,528-530,587-588,590-595,601-607,611-613,629,638-763
+packages/schema/migrations/0039_the-quarantine-error.sql
+  ai_agent 1-2
+packages/schema/migrations/meta/0039_snapshot.json
+  ai_agent 1-5398
+packages/schema/src/boundary-schemas.ts
+  ai_agent 82,717-729,744
+apps/worker/src/better_answers_worker/schema_view.py
+  ai_agent 10,12,471
+apps/worker/src/better_answers_worker/pipeline/catalogue.py
+  ai_agent 14-16,30-32,239-255,264-270,287-295,302
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "04d950a5356efc528e48a12ef8b2f4e640ee9772",
+  "prompts": {}
+}
