@@ -53,6 +53,12 @@ export type RestoreFindingInput = {
   readonly findingId: string;
   /** Why this span is a business fact — a sentence an Admin typed, never a fixed word. */
   readonly reason: string;
+  /**
+   * The id shared by the ledger rows of a bulk act this restore is one span of — S1's *keep
+   * in text*, which restores the spans an Admin selected together (ADR 0014 rule 4: N rows
+   * sharing one batch id, never one row hiding N). Absent for a restore taken on its own.
+   */
+  readonly batchId?: string | undefined;
 };
 
 /**
@@ -145,6 +151,7 @@ export const restoreFinding = async (
     act: FINDING_ACTS.restored,
     subjectId: findingId.data,
     detail: { findingId: findingId.data },
+    batchId: input.batchId,
   });
   return ok({ findingId: findingId.data, auditEventId, restoredAt: stamped.restoredAt });
 };

@@ -567,6 +567,8 @@ export type BindingReprocessed = {
   readonly jobId: string;
   /** How many chunk rows went — what that run has to put back. */
   readonly chunks: number;
+  /** How many finding rows went with them — what the seam will raise again. */
+  readonly findings: number;
 };
 
 /**
@@ -584,6 +586,14 @@ export type BindingReprocessed = {
  * is answered, and a refusal handed back with the chunks already gone would be a caller's
  * transaction it has to remember to abort. Read the other way round: no path here takes a
  * binding's passages away without the work that replaces them already being on the queue.
+ *
+ * **The findings go with the chunks.** A finding's id is a minted ULID and the worker holds
+ * INSERT on the table and nothing else (ADR 0020), so a run writes every span it found again
+ * whether the seam ran or the memo answered — and a binding whose rows were left standing
+ * would come back from a second run holding each of its findings twice. The run that follows
+ * this one starts from none, which is what makes it idempotent. The statement is this act's
+ * because the wipe is: a caller that took the chunks and left the findings would be half a
+ * reprocess.
  *
  * **The LMDB directory is not this act's.** The engine's store for this binding sits on the
  * worker's own volume, and the worker removes it at the head of the `index` run this enqueues
@@ -621,9 +631,22 @@ export const reprocessBinding = async (
     ]),
   );
   if (!wiped.ok) return err(wiped.error);
+  // Reached through the document, because a finding is keyed to one and carries no binding of
+  // its own — the subquery rather than a join, so the statement is a delete over one table.
+  const raised = await attempt(() =>
+    tx.query(
+      `DELETE FROM finding
+        WHERE workspace_id = $1
+          AND document_id IN (SELECT id FROM source_document
+                               WHERE workspace_id = $1 AND binding_id = $2)`,
+      [workspaceId, bindingId],
+    ),
+  );
+  if (!raised.ok) return err(raised.error);
   return ok({
     bindingId: bindingId,
     jobId: queued.value.jobId,
     chunks: wiped.value.rowCount ?? 0,
+    findings: raised.value.rowCount ?? 0,
   });
 };

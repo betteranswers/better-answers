@@ -179,6 +179,12 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **finding** — what the pre-scan found in one source document: a category (bank details, date of
   birth, home address, personal contact, special category, …), offsets into the normalised text,
   the rule and detector version that fired. Counted per category; never a class, never a value.
+- **keep in text** — an Admin's bulk act over named *findings* of one binding: each span restored
+  with one reason because it is the company's own business fact, and the run that lets them back
+  into the document queued with them. The always set alone, one ledger row per span.
+- **narrow these documents** — an Admin's bulk act over named *source documents* of one binding:
+  each takes a class of its own, its chunk copies are rewritten and the *cascade* runs from the
+  concepts citing them. One ledger row per document; it never widens.
 - **redaction seam** — the one place a document's text is read for what must be withheld and
   the placeholders are written in, ahead of chunking, extraction and every model call, so that
   no derived store and no model ever holds the value.
@@ -286,11 +292,11 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   if needed, named individuals). Set on the binding, carried with sensitivity onto every chunk and
   source entity, and applied with *published* on every read and traversal hop. Distinct from
   sensitivity (how confidential) and from trust (how reliable).
-- **cascade** — the re-derivation an Admin's narrowing of a binding, or override of a concept's
-  class, sets off inside the same act: first every concept citing the binding's evidence, then
-  every composition including one of those concepts — two levels, the second reading what the first
-  wrote, never a third — so a guide never reaches a reader its includes would not. _Avoid_:
-  recompute (one level's work, not the whole), propagation.
+- **cascade** — the re-derivation an Admin's narrowing of a binding or of named documents of one,
+  or override of a concept's class, sets off inside the same act: first every concept citing the
+  evidence that moved, then every composition including one of those concepts — two levels, the
+  second reading what the first wrote, never a third — so a guide never reaches a reader its
+  includes would not. _Avoid_: recompute (one level's work, not the whole), propagation.
 - **class override** — an Admin's recorded act that sets a concept's class — sensitivity and
   audience — whatever its evidence and its kind's floor derive: one row per concept, the latest
   standing, one audit event, and the *cascade* run inside the same act. The one act that may widen
