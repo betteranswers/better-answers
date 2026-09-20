@@ -7,9 +7,9 @@ knowledge of what the app's journal built, stamped with the migration id it was
 generated from and with that migration's journal instant, which is what the
 migrator writes into `drizzle.__drizzle_migrations.created_at`."""
 
-MIGRATION_ID = "0038_the-suppression-read"
+MIGRATION_ID = "0039_the-quarantine-error"
 
-MIGRATION_WHEN = 1789741389846
+MIGRATION_WHEN = 1789939160615
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -468,6 +468,7 @@ TABLES: dict[str, dict[str, str]] = {
         "gone_at": "timestamp with time zone",
         "outcome": "text",
         "sensitivity": "text",
+        "quarantine_error": "text",
     },
     "public.subject_request": {
         "workspace_id": "text NOT NULL",

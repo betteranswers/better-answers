@@ -53,11 +53,38 @@ const passage = z.object({
   sensitivity: z.string(),
 });
 
+/**
+ * A hit is a union by knowledge layer (CONTEXT.md, *hit*; T-134), discriminated on `layer`
+ * so a host reads which arm a line came from rather than guessing it from which keys are
+ * present. The bundles arm is a concept with its trust word and IRI; the sources arm is a
+ * document nothing on the map covers, with the class it is offered under and the wire
+ * locator `open` takes. The marker *Not company knowledge* is the human rendering's and is
+ * no field here: every hit of the sources layer wears it by being one.
+ */
+const hit = z.discriminatedUnion("layer", [
+  z.object({
+    layer: z.literal("bundles"),
+    iri: z.string(),
+    kind: z.string(),
+    title: z.string(),
+    trust,
+    bundle: z.string(),
+    tags: z.array(z.string()),
+  }),
+  z.object({
+    layer: z.literal("sources"),
+    kind: z.literal("document"),
+    title: z.string(),
+    locator: z.string(),
+    sensitivity: z.string(),
+  }),
+]);
+
 const findEntry = defineEntry({
   name: "find",
   title: "Find in the company's knowledge",
   description:
-    "Search the company's knowledge and return a preview of what matches: one line per hit with its kind, title and trust state. Use `open` to read a hit in full.",
+    "Search the company's knowledge and return a preview of what matches: one line per hit. A concept carries its kind, title and trust state; a document nothing on the map covers carries its title, the class it is held under and the marker 'Not company knowledge'. Use `open` to read a hit in full — a concept by its IRI, a document by the locator on its line.",
   scopes: ["knowledge:read"],
   input: z.object({
     query: z.string().min(1).max(500).describe("What to look for, in the person's own words."),
@@ -65,16 +92,7 @@ const findEntry = defineEntry({
   }),
   output: z.object({
     query: z.string(),
-    hits: z.array(
-      z.object({
-        iri: z.string(),
-        kind: z.string(),
-        title: z.string(),
-        trust,
-        bundle: z.string(),
-        tags: z.array(z.string()),
-      }),
-    ),
+    hits: z.array(hit),
   }),
   annotations: {
     readOnlyHint: true,
@@ -127,7 +145,7 @@ const openEntry = defineEntry({
   name: "open",
   title: "Open a concept, or the passage a citation rests on",
   description:
-    "The verbatim fetch: a concept by its IRI (from a `find` hit or an `ask` citation) — its frontmatter, body, relations, trust state and evidence — or the passage a citation rests on, by its locator. Give one of the two. Quote what comes back; do not summarise it.",
+    "The verbatim fetch: a concept by its IRI (from a `find` hit or an `ask` citation) — its frontmatter, body, relations, trust state and evidence, each evidence item with the locator that opens it — or the passage itself by that locator, which a document hit and a citation both carry. Give one of the two. Quote what comes back; do not summarise it.",
   scopes: ["knowledge:read"],
   input: z
     .object({

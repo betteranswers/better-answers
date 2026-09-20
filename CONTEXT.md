@@ -229,6 +229,20 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   those keys. _Avoid_: ingest trace (the draft's word).
 - **landed copy** — a source document's bytes as the platform holds them in the object store: the
   original and the normalised redacted text, under one document key.
+- **converter** — what turns a landed copy's bytes into the document's normalised text, before the
+  redaction seam sees a word of it. One per media type, chosen once (ADR 0013), because the text it
+  writes is the address space every locator and every content hash is read against. _Avoid_: parser
+  — the nightly audit's word, for a different thing.
+- **quarantined** — how a run left a source document it reached and could not read: no normalised
+  copy, no chunks, and the word on its catalogue row beside the *quarantine error*. A page with no
+  text layer, an encrypted file, a truncated upload and a conversion that ran past its own ceiling
+  are all this one outcome; it is never a failed run, and the run lands the binding's other
+  documents and finishes. Its opposite on that row is **converted**, and a row carrying neither is
+  a document no run has been over yet.
+- **quarantine error** — the name of what refused a document, on the row beside *quarantined* and
+  meaningless without it. It is a name and never a sentence, so the same refusal reads the same on
+  every row and a binding's documents can be counted by it — which is what an Admin deciding
+  whether the platform needs OCR is reading. A document no run has quarantined has none.
 - **chunk** — one unit of a source document's normalised redacted text that the chunk index holds,
   keyed by its document and its ordinal, carrying its binding's visibility — its sensitivity, its
   audience and whether it is published. Never the original text.

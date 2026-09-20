@@ -25,8 +25,14 @@ signal the cap is read against (ADR 0025), and the job row is where all three go
    document, declared against the chunk index — which is also how a span that no longer
    exists leaves it, because the engine converges the table to what this run declared.
 5. *The records and the re-copy*, in a second scoped transaction: the findings, the
-   catalogue rows, and last of all the visibility of every row the run wrote, re-read
-   from the binding and the document as they now stand.
+   catalogue rows, the *quarantined* word on each document the converter could not read,
+   and last of all the visibility of every row the run wrote, re-read from the binding
+   and the document as they now stand.
+
+**A document the run could not read is not a failed run.** Conversion is fanned one
+component per document, each under a ceiling of its own, so an unreadable upload and a
+conversion that sticks are both that document's quarantine — the run lands its
+neighbours and finishes.
 
 **Two connections and neither is the other's.** The reads and the records run on this
 tier's psycopg connection inside transactions scoped to the workspace; the engine's rows
@@ -42,13 +48,14 @@ from .. import queue
 from ..config import Bootstrap
 from ..log import logger
 from .catalogue import (
+    quarantine_catalogue,
     read_binding,
     reconcile_catalogue,
     recopy_visibility,
     record_findings,
 )
 from .host import Host, IndexRun
-from .landed import redact_landed_copies
+from .landed import SEAM_MS_PER_PAGE, TIMEOUT_MARGIN_MS, redact_landed_copies
 from .objects import Bucket, LandedCopies
 from .rows import CHUNK_TABLE, rows_of
 
@@ -76,7 +83,12 @@ class IndexOutcome:
 
 
 def index_binding(
-    bootstrap: Bootstrap, run: IndexRun, *, copies: LandedCopies | None = None
+    bootstrap: Bootstrap,
+    run: IndexRun,
+    *,
+    copies: LandedCopies | None = None,
+    ms_per_page: int = SEAM_MS_PER_PAGE,
+    margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> IndexOutcome:
     """Index one binding's landed copies, and say what the run did.
 
@@ -84,6 +96,14 @@ def index_binding(
     external service this run reaches: a suite replaces it behind this interface and
     everything else it drives is the code that ships. Left unsaid, the run opens the
     platform's own bucket from the bootstrap the deploy unit gave the process.
+
+    **The two ceiling figures are the run's, and they are parameters for the same reason
+    the store is.** Every document's conversion is given S0's milliseconds a page times
+    its pages plus a fixed margin, and what the shipped figures are is
+    `pipeline/landed.py`'s to say — this only carries them down. A caller names them
+    when the answer under test is *what the run does when a document runs past its
+    ceiling*, which no document can be made to do from outside, since the shipped
+    allowance is thirty-three seconds against a conversion that costs milliseconds.
 
     **The seed a name's pseudonym is drawn from is the binding's id.** The seam takes a
     per-binding seed so that one person is written as the same letter throughout a
@@ -114,6 +134,8 @@ def index_binding(
                 store,
                 binding.rules_in_force,
                 run.binding_id,
+                ms_per_page=ms_per_page,
+                margin_ms=margin_ms,
             )
             rows = rows_of(run, landed.documents, binding.visibility_of)
             chunks = host.land_rows(run, CHUNK_TABLE, rows)
@@ -121,6 +143,7 @@ def index_binding(
             with queue.scoped(connection, run.workspace_id) as cursor:
                 record_findings(cursor, run, landed.documents)
                 reconcile_catalogue(cursor, landed.documents)
+                quarantine_catalogue(cursor, landed.quarantined)
                 recopy_visibility(cursor, run, [str(row["id"]) for row in rows])
 
         outcome = IndexOutcome(

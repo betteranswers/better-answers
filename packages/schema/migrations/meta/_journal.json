@@ -274,6 +274,13 @@
       "when": 1789741389846,
       "tag": "0038_the-suppression-read",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1789939160615,
+      "tag": "0039_the-quarantine-error",
+      "breakpoints": true
     }
   ]
 }

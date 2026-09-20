@@ -79,6 +79,19 @@ const insertDocumentWith = (column: string, word: string) =>
       original_key, ${column})
    VALUES ($1, $2, $3, $4, 'The handbook', 'text/markdown', 1024, 'documents/x/original', '${word}')`;
 
+/**
+ * The same document with the run's two quarantine columns set together, either of them NULL.
+ * They are written as one statement because the CHECK between them is what is under test:
+ * a name means nothing without the word beside it.
+ */
+const insertDocumentOutcome = (outcome: string | null, quarantineError: string | null) =>
+  `INSERT INTO source_document
+     (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size,
+      original_key, outcome, quarantine_error)
+   VALUES ($1, $2, $3, $4, 'The handbook', 'text/markdown', 1024, 'documents/x/original',
+           ${outcome === null ? "NULL" : `'${outcome}'`},
+           ${quarantineError === null ? "NULL" : `'${quarantineError}'`})`;
+
 /** The same document at a size the caller names, which the bind act's own statement fixes. */
 const insertDocumentSized = (bytes: number) =>
   `INSERT INTO source_document
@@ -369,6 +382,54 @@ describe("the catalogue a run reconciles", () => {
           "source_document_byte_size_check",
         ],
         empty: ADMITTED,
+      });
+    });
+  });
+
+  it("carries a quarantine error only on a document it also calls quarantined", async () => {
+    await withBindings(async (client) => {
+      // The name of what refused the document, on the row beside the word (`CONTEXT.md`,
+      // *quarantine error*). The two travel together or neither means anything: a name with
+      // no word is a row claiming a failure it does not record, and the word with no name is
+      // the row an Admin cannot count by — which is the whole reason the column exists, since
+      // a binding's share of documents quarantined *for want of OCR* is what decides whether
+      // the platform buys OCR at all.
+      const quarantined = await admits(
+        client,
+        insertDocumentOutcome("quarantined", "NeedsOcrError"),
+        [WORKSPACE, ulid(), UPLOAD_BINDING, ulid()],
+      );
+      // Both halves of the pair, each refused by the same CHECK: a name on a document
+      // that converted, and a name on a document no run has been over.
+      const refusals = [
+        await probe(client, insertDocumentOutcome("converted", "NeedsOcrError"), [
+          WORKSPACE,
+          ulid(),
+          UPLOAD_BINDING,
+          ulid(),
+        ]),
+        await probe(client, insertDocumentOutcome(null, "NeedsOcrError"), [
+          WORKSPACE,
+          ulid(),
+          UPLOAD_BINDING,
+          ulid(),
+        ]),
+      ];
+      // And the word alone still lands. A run that could not name what refused a document
+      // still says it could not read it; the column is nullable for exactly that row.
+      const wordAlone = await admits(client, insertDocumentOutcome("quarantined", null), [
+        WORKSPACE,
+        ulid(),
+        UPLOAD_BINDING,
+        ulid(),
+      ]);
+      expect({ quarantined, refusals, wordAlone }).toEqual({
+        quarantined: ADMITTED,
+        refusals: [
+          "source_document_quarantine_error_check",
+          "source_document_quarantine_error_check",
+        ],
+        wordAlone: ADMITTED,
       });
     });
   });

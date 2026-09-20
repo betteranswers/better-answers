@@ -114,6 +114,23 @@ export const DOCUMENT_OUTCOMES = ["converted", "quarantined"] as const;
 export const DOCUMENT_CONVERTED_OUTCOME = "converted" satisfies (typeof DOCUMENT_OUTCOMES)[number];
 
 /**
+ * What a run writes on a document it reached and could not read. It is the one word the
+ * *quarantine error* column is allowed to sit beside, which is why the CHECK below names this
+ * constant rather than spelling the word a second time.
+ */
+export const DOCUMENT_QUARANTINED_OUTCOME =
+  "quarantined" satisfies (typeof DOCUMENT_OUTCOMES)[number];
+
+/**
+ * A **quarantine error** is a name and never a sentence (`CONTEXT.md`): one token, nothing
+ * inside it that whitespace would split. That is what makes the column countable, which is the
+ * only thing it is for — an Admin deciding whether the platform needs OCR reads a `GROUP BY`
+ * over it, and prose would give every row a group of its own. Which names exist is a
+ * converter's business and moves with the converters, so this is a shape and not a word set.
+ */
+export const QUARANTINE_ERROR = /^\S+$/u;
+
+/**
  * The **rules in force** on a binding, as the column's keys write them: the two tiers of the
  * glossary's *redaction rule* a binding switches, `default-on` and `default-off`, written
  * with an underscore because these are keys inside a value and not words of the glossary.
@@ -276,6 +293,19 @@ export const sourceDocument = withRLS(
     /** How the last run left it. NULL means no run has been over it yet. */
     outcome: text("outcome"),
     /**
+     * The **quarantine error** (`CONTEXT.md`): the name of what refused this document, beside
+     * the word that says it was refused. A converter's own class name — `NeedsOcrError`,
+     * `EncryptedError`, `MalformedError` — or the deadline's, and never a sentence and never a
+     * line of the document: the same refusal has to read the same on every row, because what
+     * an Admin deciding whether the platform needs OCR is reading is a *count* of the
+     * documents one binding quarantined for want of it.
+     *
+     * NULL unless `outcome` is *quarantined*, held by the CHECK below rather than by whichever
+     * tier happens to write the row. Nullable even then: a run that could not name what
+     * refused a document still records that it could not read it.
+     */
+    quarantineError: text("quarantine_error"),
+    /**
      * The document's **own** class, narrower than its binding's or nothing at all. NULL is the
      * ordinary case and means *the binding's*; a word here is the seam's special-category
      * verdict or an Admin's narrowing. The derivation folds the narrower of the two, so this
@@ -312,6 +342,25 @@ export const sourceDocument = withRLS(
     check(
       "source_document_sensitivity_check",
       sql.raw(`sensitivity IS NULL OR sensitivity IN (${listed(SENSITIVITIES)})`),
+    ),
+    // The two quarantine columns travel together. A name with no word is a row recording a
+    // failure it does not declare, and neither tier's boundary can be the thing that stops it:
+    // the app writes this table on a bind and a review, the worker on every reconcile, and
+    // `worker_rt` holds UPDATE on the table by grant (migration 0037). So the rule is the
+    // database's. Written against the word rather than against a list of errors, because what
+    // may refuse a document is a converter's business and changes with the converters.
+    //
+    // `IS NOT DISTINCT FROM` and not `=`, for the reason the rules-in-force shape above gives:
+    // NULL is a fact on `outcome` — *no run has been over this document* — and `outcome =
+    // 'quarantined'` is SQL NULL there, which makes the whole disjunction NULL, and a CHECK
+    // worth NULL passes. Written with `=` this constraint admitted exactly the row it exists
+    // to refuse, and the case beside it in `test/source-catalogue.test.ts` is what said so.
+    check(
+      "source_document_quarantine_error_check",
+      sql.raw(
+        "quarantine_error IS NULL OR outcome IS NOT DISTINCT FROM" +
+          ` '${DOCUMENT_QUARANTINED_OUTCOME}'`,
+      ),
     ),
     // A file has a size, and an empty one has none of it. A negative size would be a byte
     // count nothing measured, and the cap the bind act enforces reads this column back.
