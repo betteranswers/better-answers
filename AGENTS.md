@@ -93,6 +93,28 @@ This server runs the **front door** surface: three tools reach every jCodeMunch 
 
 **From a worktree, two indexes.** jCodeMunch reads the worktree's own index, which the create hook builds, so it sees this branch's uncommitted edits. GitNexus reads the main checkout's, taken at its last `analyze`, which runs in the main checkout only — the runner is absent from a worktree — after every merge to `main`. So `detect_changes` from a worktree takes `repo: "better-answers"` **and** `worktree: <the worktree's absolute path>`; and an `impact` that answers *ambiguous* is re-run by `target_uid` before its risk counts. `rename` has no `worktree:` parameter: it reads **and writes** the main checkout's files, and its answer names no tree. So from a worktree `rename` stays a dry run (`dry_run: true`, its default) — its edit list names the sites, by the main checkout's line numbers; each is applied in the worktree with `Edit`; and a jCodeMunch `search_text` for the old name, which sees what this branch added since the last `analyze`, comes back empty before the rename counts as done. Prose is in neither index — jCodeMunch indexes no markdown and GitNexus holds headings only — so a search across documents is a shell `grep`, with that reason said.
 
+## Doc Exploration Policy
+
+Always use jDocMunch-MCP tools for documentation navigation. Never fall back to Read for doc exploration.
+**Exception:** Use `Read` when you need exact line numbers for `Edit`.
+
+**Start any session:**
+1. `doc_list_repos` — check what's indexed. If your docs aren't there: `index_local { "path": "." }`
+
+**Finding content:**
+- keyword/topic search -> `search_sections` (returns summaries only)
+- browse structure -> `get_toc` (flat) or `get_toc_tree` (nested)
+- single document -> `get_document_outline`
+
+**Reading content:**
+- one section -> `get_section` (full content via byte-range)
+- multiple sections -> `get_sections` (batch)
+- section + context -> `get_section_context` (ancestors + children)
+
+**Maintenance:**
+- broken internal links -> `get_broken_links`
+- code/doc coverage gap -> `get_doc_coverage`
+
 <!-- gitnexus:start -->
 <!-- gitnexus:keep -->
 # Code Intelligence Policy
