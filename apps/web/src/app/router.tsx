@@ -99,15 +99,14 @@ const screenRoutes: AnyRoute[] = SCREENS.map((screen) =>
  * The history is a parameter because a test drives the router without a browser: assigning
  * one after construction relies on the router re-reading a property it never promised to.
  */
-export const createAppRouter = (history?: RouterHistory) =>
-  createRouter({
+export const createAppRouter = (history?: RouterHistory) => {
+  const options = {
     routeTree: rootRoute.addChildren([
       signInRoute,
       chooseWorkspaceRoute,
       noWorkspaceRoute,
       shellRoute.addChildren([indexRoute, ...screenRoutes]),
     ]),
-    ...(history === undefined ? {} : { history }),
     // One boundary for every route, rather than one per screen: a screen that throws is a
     // bug, and a bug is not a thing a screen knows something extra about. The router's own
     // default puts the error's message and a "Show Error" toggle on the page, which is a
@@ -115,7 +114,12 @@ export const createAppRouter = (history?: RouterHistory) =>
     // It sits on the router rather than on the shell so the three screens outside the frame
     // are covered too. No `defaultOnCatch`: there is nowhere in the browser to send the error.
     defaultErrorComponent: FailedScreen,
-  });
+  };
+  // Two calls rather than one with a conditional spread: `exactOptionalPropertyTypes` makes
+  // `history: undefined` a different thing from an absent `history`, and the router reads an
+  // absent one as "make a browser history" — which is what a browser wants and a test does not.
+  return history === undefined ? createRouter(options) : createRouter({ ...options, history });
+};
 
 export const router = createAppRouter();
 

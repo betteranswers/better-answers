@@ -453,7 +453,12 @@
       }
     },
     {
-      "files": ["**/*.test.ts", "**/*.test.tsx", "**/test/**"],
+      // `**/e2e/**` is here because a Playwright spec is a test and is named `.spec.ts`:
+      // Playwright's runner claims that suffix, so the three globs beside it — written for
+      // Vitest — leave the browser suite under production rules. A spec reads a harness
+      // route's JSON and asserts its shape (`apps/web/e2e/sign-in.spec.ts`), which is the
+      // same act a Vitest test is relaxed for, against a route this repository owns.
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/test/**", "**/e2e/**"],
       "rules": {
         "anti-slop/no-chained-type-assertions": "off",
         "anti-slop/no-conditional-empty-object-spread": "off",
