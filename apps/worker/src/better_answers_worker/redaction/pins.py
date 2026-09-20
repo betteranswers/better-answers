@@ -65,8 +65,13 @@ GLINER_MODEL_ID_MEASURED = "knowledgator/gliner-pii-base-v1.0"
 #: from readers entitled to it. Version 3 is the health cue list, which held *health*
 #: and *condition* until T-179: a safety policy and a condition of contract were each
 #: withheld whole and narrowed their document to Restricted, at the tier no binding
-#: switches off.
-RULE_VERSION = "3"
+#: switches off. Version 4 is the word-boundary rule on the windows a long page is put
+#: to the model in (`T-177`): before it a window began wherever the overlap subtraction
+#: landed, so the model was shown a fragment of a word and answered for it — a
+#: `person-name` over half a word, and every later pseudonym letter shifted. The rule
+#: changes nothing about which spans are raised on this repository's fixture page and
+#: moves five of their scores, which is a moved answer and so a moved version.
+RULE_VERSION = "4"
 
 #: Two spellings, one name: a pin is written in the hyphens a package name uses,
 #: because a slash would read as a path and an underscore as a second spelling of one

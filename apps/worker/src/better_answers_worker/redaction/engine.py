@@ -47,6 +47,7 @@ from presidio_analyzer import (
     RecognizerRegistry,
     RecognizerResult,
 )
+from presidio_analyzer.chunkers import CharacterBasedTextChunker, TextChunk
 from presidio_analyzer.nlp_engine import NlpArtifacts, NlpEngineProvider
 from presidio_analyzer.predefined_recognizers import (
     GLiNERRecognizer,
@@ -143,6 +144,68 @@ RECOGNISERS: Mapping[str, Callable[[CategoryDescriptor], EntityRecognizer]] = (
 )
 
 
+class WholeWordWindows(CharacterBasedTextChunker):
+    """The windows a long page is put to the model in, each beginning on a whole word.
+
+    Presidio reads a long text to GLiNER in overlapping windows of characters. Its own
+    word for one is a *chunk*, which this repository's glossary has already spent on
+    the unit of normalised text the chunk index holds — a thing this seam runs ahead of
+    and never produces — so they are windows here. Its chunker extends a window's
+    **end** forward to the next space or newline, so a window never ends inside a word.
+    The next window's start is then that end minus the overlap, a plain subtraction
+    that lands wherever it lands, which on a page of English is inside a word most of
+    the time.
+
+    A window that begins inside a word is a page the model reads with a fragment at the
+    front of it, and a zero-shot name model answers for the fragment at full
+    confidence. On the fixture page at 2,664 characters it answers `bers` — the tail of
+    *numbers* — as a person at 0.947, and T-168 measured `gned` inside *resigned* at
+    0.946 and `gen Sarkar` in place of *Imogen Sarkar* on the page it had then. Neither
+    is a harmless miss: a fragment inside an officers block writes `[withheld]` across
+    half a word, and one outside takes a pseudonym letter of its own and shifts every
+    later letter, which is how `Imogen Sarkar` became `[person C]`.
+
+    **The one rule is that a window's start obeys the boundary its end already obeys**:
+    it is retracted to the beginning of the word it landed in, so no window edge falls
+    inside a word in either direction. The other option the ticket left open — a
+    post-pass that drops or widens a span whose own edges fall inside a word — is ruled
+    out by the same measurements, because the two defects want opposite treatments of
+    it. Dropping loses `gen Sarkar`, a real name the page carries three times, and
+    under-redaction is the failure this seam exists to prevent; widening turns `gned`
+    into a `person-name` finding over *resigned* and writes a pseudonym across an
+    ordinary verb. Taking the boundary out of the word is the one option of the three
+    that does neither, because it removes the fragment rather than deciding what to do
+    with it. What it does not do is make a page answer the same at every length: the
+    model still reads a page that begins mid-sentence differently, and `T-177`'s suite
+    records two whole-word answers that move with the length. Those are the model's and
+    not a boundary's, and no rule about where a window starts reaches them.
+
+    A window's size and its overlap stay Presidio's own defaults and are deliberately
+    not declared here. They are the detector's numbers and not this repository's rule,
+    so a release that moved them moves `DETECTOR_PIN`, which is the half of the version
+    string that exists to say a detector's answers may have moved under us.
+    """
+
+    def chunk(self, text: str) -> list[TextChunk]:
+        """Presidio's windows, each pulled back to the start of the word it began in."""
+        windows: list[TextChunk] = []
+        for window in super().chunk(text):
+            start = self._word_containing(text, window.start)
+            windows.append(
+                TextChunk(text=text[start : window.end], start=start, end=window.end)
+            )
+        return windows
+
+    def _word_containing(self, text: str, at: int) -> int:
+        # The same boundary characters the end of a window is extended to, read off the
+        # chunker rather than spelled again, so the two edges cannot come to disagree
+        # about what a word is.
+        start = at
+        while start > 0 and text[start - 1] not in self.boundary_chars:
+            start -= 1
+        return start
+
+
 class ModelRecogniser(EntityRecognizer):
     """GLiNER, asked for the labels the table maps and for nothing else.
 
@@ -155,6 +218,11 @@ class ModelRecogniser(EntityRecognizer):
     out of the document. So the analyzer's list is narrowed here to the entities the
     mapping actually covers, and the model is never asked a question the mapping has no
     answer for.
+
+    The second thing this wrapper settles is what the model is shown rather than what
+    it is asked: a long page reaches it in windows, and the windows are
+    `WholeWordWindows` rather than the default, so none of them begins mid-word and no
+    answer of the model's is part of one (`T-177`).
     """
 
     def __init__(
@@ -165,6 +233,7 @@ class ModelRecogniser(EntityRecognizer):
             map_location="cpu",
             threshold=threshold,
             entity_mapping=dict(labels),
+            text_chunker=WholeWordWindows(),
         )
         super().__init__(
             supported_entities=sorted(set(labels.values())),
