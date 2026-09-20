@@ -175,10 +175,19 @@ class WholeWordWindows(CharacterBasedTextChunker):
     into a `person-name` finding over *resigned* and writes a pseudonym across an
     ordinary verb. Taking the boundary out of the word is the one option of the three
     that does neither, because it removes the fragment rather than deciding what to do
-    with it. What it does not do is make a page answer the same at every length: the
-    model still reads a page that begins mid-sentence differently, and `T-177`'s suite
-    records two whole-word answers that move with the length. Those are the model's and
-    not a boundary's, and no rule about where a window starts reaches them.
+    with it.
+
+    What it does not do is make a page answer the same at every length, and the further
+    rule that might was built and measured rather than reasoned about: retract a start
+    to the sentence, or to the line, that it landed in. That rule is real — it brings
+    two of T-168's four lengths level with the clean one, which this one does not — and
+    it is not taken, because of what it costs the page the seam actually reads. Under
+    it the whole page loses the officers block's `job-title 'second registered officer'`
+    and gains a `person-name` over *One of our supervisors*, a phrase that is nobody and
+    that takes a pseudonym letter in reading order all the same. It also leaves a fourth
+    length differing. The four-length table for every rule measured is the docblock of
+    `tests/test_redaction_windows.py`; what is left after this rule is whole-word drift
+    with a page's length, and it is open rather than closed.
 
     A window's size and its overlap stay Presidio's own defaults and are deliberately
     not declared here. They are the detector's numbers and not this repository's rule,
