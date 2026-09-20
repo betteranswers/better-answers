@@ -42,4 +42,4 @@ Commits go on the ticket's branch, one message in the repository's prose shape e
 
 ## Environment
 
-A Docker daemon (every suite starts a Testcontainers Postgres, the core suites a Garage), `uv`, `pnpm`, Playwright's Chromium for the web (`pnpm --filter @better-answers/web exec playwright install chromium`), a warm `HF_HOME` for the detector's weights, and `git-filter-repo` at the version `apps/api/Dockerfile` pins. The buildx cache is bounded by the builder's own garbage-collection policy, written where the builder reads it.
+A Docker daemon (every suite starts a Testcontainers Postgres, the core suites a Garage), `uv`, `pnpm`, Playwright's Chromium for the web (`pnpm --filter @better-answers/web exec playwright install chromium`), a warm `HF_HOME` for the detector's weights, and `git-filter-repo` at the version `apps/api/Dockerfile` pins. The buildx cache is bounded by the builder's own garbage-collection policy, written where the builder reads it — where that is, and how to read the cache, is `docs/operations/BUILD_CACHE.md`.
