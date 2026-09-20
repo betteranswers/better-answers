@@ -1,0 +1,17 @@
+apps/worker/src/better_answers_worker/redaction/pins.py
+  ai_agent 68-78
+apps/worker/src/better_answers_worker/redaction/engine.py
+  ai_agent 147-162,165-210,215-217,221-223,225-258,285-287,298
+CONTEXT.md
+  ai_agent 249-255
+docs/adr/0020-personal-data-is-withheld-at-the-seam-before-any-store-and-erased-from-every-copy-by-routine.md
+  ai_agent 106,110,112-116
+docs/adr/README.md
+  ai_agent 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "64b847483147887df793f76c005337746b99e330",
+  "prompts": {}
+}
