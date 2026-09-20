@@ -62,8 +62,11 @@ GLINER_MODEL_ID_MEASURED = "knowledgator/gliner-pii-base-v1.0"
 #: holds a digest of the table and the list beside it, so the three cannot move apart.
 #: Version 2 is the consumer-domain list: before it, every email address the built-in
 #: matched was personal contact, so a supplier's own corporate address was withheld
-#: from readers entitled to it.
-RULE_VERSION = "2"
+#: from readers entitled to it. Version 3 is the health cue list, which held *health*
+#: and *condition* until T-179: a safety policy and a condition of contract were each
+#: withheld whole and narrowed their document to Restricted, at the tier no binding
+#: switches off.
+RULE_VERSION = "3"
 
 #: Two spellings, one name: a pin is written in the hyphens a package name uses,
 #: because a slash would read as a path and an underscore as a second spelling of one

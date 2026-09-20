@@ -291,7 +291,7 @@ def test_the_memo_is_versioned_by_the_seams_own_rule_version_and_detector_pin() 
     rests on.
     """
     assert f"{RULE_VERSION}:{DETECTOR_PIN}" == MEMO_VERSION
-    assert MEMO_VERSION.startswith("2:presidio-2.2.364+gliner-0.2.29+torch-2.14.0+")
+    assert MEMO_VERSION.startswith("3:presidio-2.2.364+gliner-0.2.29+torch-2.14.0+")
 
 
 # -- the two copies --------------------------------------------------------------------
