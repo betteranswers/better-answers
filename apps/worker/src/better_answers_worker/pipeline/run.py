@@ -25,8 +25,14 @@ signal the cap is read against (ADR 0025), and the job row is where all three go
    document, declared against the chunk index — which is also how a span that no longer
    exists leaves it, because the engine converges the table to what this run declared.
 5. *The records and the re-copy*, in a second scoped transaction: the findings, the
-   catalogue rows, and last of all the visibility of every row the run wrote, re-read
-   from the binding and the document as they now stand.
+   catalogue rows, the *quarantined* word on each document the converter could not read,
+   and last of all the visibility of every row the run wrote, re-read from the binding
+   and the document as they now stand.
+
+**A document the run could not read is not a failed run.** Conversion is fanned one
+component per document, each under a ceiling of its own, so an unreadable upload and a
+conversion that sticks are both that document's quarantine — the run lands its
+neighbours and finishes.
 
 **Two connections and neither is the other's.** The reads and the records run on this
 tier's psycopg connection inside transactions scoped to the workspace; the engine's rows
@@ -42,6 +48,7 @@ from .. import queue
 from ..config import Bootstrap
 from ..log import logger
 from .catalogue import (
+    quarantine_catalogue,
     read_binding,
     reconcile_catalogue,
     recopy_visibility,
@@ -121,6 +128,7 @@ def index_binding(
             with queue.scoped(connection, run.workspace_id) as cursor:
                 record_findings(cursor, run, landed.documents)
                 reconcile_catalogue(cursor, landed.documents)
+                quarantine_catalogue(cursor, landed.quarantined)
                 recopy_visibility(cursor, run, [str(row["id"]) for row in rows])
 
         outcome = IndexOutcome(

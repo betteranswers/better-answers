@@ -549,17 +549,26 @@ def test_a_special_category_verdict_narrows_the_document_and_every_row_cut_from_
     ]
 
 
-def test_a_document_this_tier_cannot_convert_is_left_exactly_as_the_bind_act_left_it(
+def test_a_document_this_tier_cannot_read_is_quarantined_on_its_own_catalogue_row(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     """The engine catches a component's failure and lets the run finish, which is what
     fanning a document per component is for — so an unreadable upload is its own failure
-    and never the binding's. The run answers the documents it read; the one it could not
-    is simply absent, and its catalogue row keeps every null the bind act left on it.
+    and never the binding's. The run lands the neighbour, writes *quarantined* on
+    the row of the one it could not read, and finishes.
 
-    It is deliberately **not** written as *quarantined*: naming the failure per document
-    needs the error's own name beside it, which the run has no way to learn, and that is
-    the next ticket's line rather than a word this one writes on a guess.
+    **The word goes on the row and the error's name goes in the log.** The catalogue has
+    one column for how a run left a document — *converted* or *quarantined*, null until
+    a run has been over it — and what the row therefore says is the fact the Sources
+    screen reads: this document has no passages and it is not waiting for a run. Which
+    converter refused it, and why, rides the run's own log line and
+    `LandedRun.quarantined`; a column for the name is a migration the S1 spec's schema
+    section does not carry.
+
+    Everything else on the row stays null. The hash, the normalised copy's key and the
+    version string are facts about text that does not exist, and a run that wrote them
+    would be saying it had converted a document it could not read. `last_seen` does
+    move: the run found the document at the source, and only reading it failed.
     """
     connection, dsn = database
     workspace_id = seed_the_binding(
@@ -584,9 +593,9 @@ def test_a_document_this_tier_cannot_convert_is_left_exactly_as_the_bind_act_lef
         "content_hash": None,
         "normalised_key": None,
         "redaction_version": None,
-        "outcome": None,
+        "outcome": "quarantined",
         "sensitivity": None,
-        "seen_again": False,
+        "seen_again": True,
     }
     assert [
         row["source_document_id"] for row in chunk_rows_of(connection, workspace_id)

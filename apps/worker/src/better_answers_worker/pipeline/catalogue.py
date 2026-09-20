@@ -8,11 +8,11 @@ opened, which is why those carry the workspace scope as a session setting — an
 below are read and written in transactions of the run's own, where the scope is
 transaction-local as it is everywhere else in this tier.
 
-**The run reads three things and writes three.** It reads the binding's rules in force
+**The run reads three things and writes four.** It reads the binding's rules in force
 and its three permission fields, the documents the binding yielded, and the suppressions
 standing over each of them; it writes the findings the seam raised, the catalogue row
-each document's run reconciled, and — last of all — the visibility of every row it
-landed.
+each document's run reconciled, the *quarantined* word on each document it could not
+read, and — last of all — the visibility of every row it landed.
 
 **The last statement is the one with a race in it.** The app rewrites a chunk row's
 visibility on a publish and on either narrowing, in the act's own transaction, and the
@@ -40,14 +40,20 @@ from psycopg import Cursor
 
 from ..ids import ulid
 from .host import IndexRun
-from .landed import LandedDocument, ReadDocument, Suppression, suppression_of
+from .landed import (
+    LandedDocument,
+    QuarantinedDocument,
+    ReadDocument,
+    Suppression,
+    suppression_of,
+)
 from .rows import SENSITIVITY_ORDER, Visibility
 
-#: The word a run writes on a document it converted. The other word the column admits —
-#: *quarantined* — is written by the ticket that can name which document failed and why;
-#: a run has no way to learn either, so it writes nothing at all on a document it did
-#: not read rather than a word it would be guessing at.
+#: The two words the column admits, and the whole of what a run says about how it left a
+#: document. *converted* is the normalised copy and its chunks; *quarantined* is a
+#: document the run reached and could not read.
 CONVERTED_OUTCOME = "converted"
+QUARANTINED_OUTCOME = "quarantined"
 
 #: How the normalised copy's key is derived when the catalogue row does not carry one
 #: yet. The column is null until a run has converted the document, and the shape is the
@@ -223,6 +229,32 @@ def _version_halves(version: str) -> tuple[str, str]:
     """
     rule_version, _, detector_pin = version.partition(":")
     return rule_version, detector_pin
+
+
+def quarantine_catalogue(
+    cursor: Cursor[Any], documents: Sequence[QuarantinedDocument]
+) -> None:
+    """Write *quarantined* on each document the run reached and could not read.
+
+    **The word goes on the row and the error's name goes in the log.** The catalogue has
+    one column for how a run left a document and the S1 spec gives it no second one, so
+    what the row carries is the fact an Admin's screen reads — *this document has no
+    passages and it is not waiting for a run* — and `redact_landed_copies` writes the
+    converter's own class name beside the document's id where an operator asking *why*
+    reads it. A column for the name is a migration nobody has taken, and this module
+    does not invent one.
+
+    Nothing else on the row moves. The hash, the normalised copy's key and the version
+    string are facts about text that does not exist, and a run that wrote them would be
+    saying it had converted a document it could not read. `last_seen` does move: the run
+    found the document at the source, and only reading it failed.
+    """
+    for document in documents:
+        cursor.execute(
+            "UPDATE source_document SET outcome = %(outcome)s, last_seen = now()"
+            " WHERE id = %(id)s",
+            {"outcome": QUARANTINED_OUTCOME, "id": document.source_document_id},
+        )
 
 
 def reconcile_catalogue(cursor: Cursor[Any], documents: Sequence[ReadDocument]) -> None:
