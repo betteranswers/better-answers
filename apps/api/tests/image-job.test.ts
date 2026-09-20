@@ -50,6 +50,14 @@ const input = (step: ImageStep, name: string): string => {
   return typeof value === "string" ? value : "";
 };
 
+/** Whether a step runs an action — asked by the action's name and never by its pin. */
+const runs = (step: ImageStep | undefined, action: string): boolean =>
+  (step?.uses ?? "").startsWith(`${action}@`);
+
+/** The image job's step that runs an action. */
+const stepUsing = (action: string): ImageStep | undefined =>
+  imageJob().steps.find((step) => runs(step, action));
+
 /** The step handed an image id is the step that runs a leg's probe against it. */
 const probeStepAt = (steps: readonly ImageStep[]): number =>
   steps.findIndex((step) => step.env?.[IMAGE_ID_VARIABLE] !== undefined);
@@ -144,6 +152,32 @@ describe("the job that probes every image it pushes", () => {
     ]);
   });
 
+  it("attests the digest it pushed beside the image, never around it", () => {
+    // A referrer keyed by the pushed digest, where the inline `provenance` both exports
+    // refuse, above, would make the tag an index (`T-219`). The why of each term — last,
+    // never swallowed, no storage record — is written beside the step in `build.yml`; what
+    // is held here is that the subject is read off the two steps that made it: the name the
+    // metadata step tagged, and the digest the push step reported.
+    const steps = imageJob().steps;
+    const pushed = steps.find((step) => input(step, "outputs").includes("push=true"));
+    const attested = steps.at(-1);
+    const meta = stepUsing("docker/metadata-action");
+
+    expect(runs(attested, "actions/attest-build-provenance")).toBe(true);
+    expect(pushed?.id).toEqual("build");
+    expect(meta === undefined ? "" : input(meta, "images")).toEqual(
+      "ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}",
+    );
+    expect(attested?.with).toEqual({
+      "subject-name": "ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}",
+      "subject-digest": "${{ steps.build.outputs.digest }}",
+      "push-to-registry": true,
+      "create-storage-record": false,
+    });
+    expect(attested?.["continue-on-error"]).toBeUndefined();
+    expect(attested?.if).toBeUndefined();
+  });
+
   it("keeps each leg's layers under a scope of its own, so no leg evicts another", () => {
     // A `type=gha` cache with no `scope=` is written under `buildkit` for everyone, and a
     // scope holds one manifest: three legs exporting `mode=max` to one scope overwrote each
@@ -169,13 +203,19 @@ describe("the job that probes every image it pushes", () => {
     // `packages: write` is the one token here worth stealing. It is the image job's alone —
     // the caller's narrowing, where it used to be `check.yml`'s own — and that job never
     // pushes git, so its checkout leaves nothing in `.git/config` for three Dockerfiles and
-    // two suites to read (`T-211`).
-    const checkout = imageJob().steps.find((step) =>
-      (step.uses ?? "").startsWith("actions/checkout@"),
-    );
+    // two suites to read (`T-211`). The attestation brought two more and they are the same
+    // job's for the same reason: `id-token: write` mints the token a signing certificate is
+    // asked for with, `attestations: write` stores what was signed, and `check` — which
+    // runs the suites — is given neither (`T-219`).
+    const checkout = stepUsing("actions/checkout");
 
     expect(buildWorkflow().permissions).toEqual({ contents: "read" });
-    expect(imageJob().permissions).toEqual({ contents: "read", packages: "write" });
+    expect(imageJob().permissions).toEqual({
+      contents: "read",
+      packages: "write",
+      attestations: "write",
+      "id-token": "write",
+    });
     expect(checkout?.with?.["persist-credentials"]).toBe(false);
   });
 
@@ -186,9 +226,7 @@ describe("the job that probes every image it pushes", () => {
     // serialising the runs, a tag every run writes ends on whichever finished last — so the
     // only tag is the commit's own, and `release.yml` resolves that one
     // (`deploy-tree.test.ts` holds its half).
-    const meta = imageJob().steps.find((step) =>
-      (step.uses ?? "").startsWith("docker/metadata-action@"),
-    );
+    const meta = stepUsing("docker/metadata-action");
     const tags = (meta === undefined ? "" : input(meta, "tags"))
       .split("\n")
       .map((tag) => tag.trim())
@@ -241,8 +279,7 @@ describe("the job that probes every image it pushes", () => {
     // on every pull request while the run stays green — so the order is read here rather
     // than trusted to the comment beside each step.
     const steps = checkWorkflow().jobs.check.steps;
-    const at = (action: string): number =>
-      steps.findIndex((step) => (step.uses ?? "").startsWith(`${action}@`));
+    const at = (action: string): number => steps.findIndex((step) => runs(step, action));
     const builderAt = at("docker/setup-buildx-action");
     const credentialsAt = at("crazy-max/ghaction-github-runtime");
     const checkedAt = steps.findIndex((step) => (step.run ?? "").includes("pnpm check"));
