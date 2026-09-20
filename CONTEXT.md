@@ -247,12 +247,11 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   keyed by its document and its ordinal, carrying its binding's visibility — its sensitivity, its
   audience and whether it is published. Never the original text.
 - **window** — one run of a document's text the redaction seam puts to the detector's model in a
-  single call, because the model reads less at once than a document holds. A window begins where a
-  heading does, so what the model is shown of one heading's text is decided by that text and not by
-  how much sits above it (ADR 0020, T-177). It is an argument to a model and nothing else: it is
-  never stored, never addressed by a locator, and no finding's offsets are counted inside one — a
-  finding's offsets are the document's. _Avoid_: chunk — the index's unit above, which this seam
-  runs ahead of and never produces; the model reads windows, the index holds chunks.
+  single call, because the model reads less at once than a document holds. It is an argument to a
+  model and nothing else: never stored, never addressed by a locator, and no finding's offsets are
+  counted inside one — a finding's offsets are the document's. Where its edges fall is a rule, and
+  the rule is ADR 0020's. _Avoid_: chunk — the index's unit above, which this seam runs ahead of
+  and never produces; the model reads windows, the index holds chunks.
 - **locator** — the address of a passage inside a source document, written whole as
   `<source document id>/chars:<start>-<end>`: the document it is in, then the span, whose offsets
   are counted in Unicode code points into the document's normalised redacted text and versioned by

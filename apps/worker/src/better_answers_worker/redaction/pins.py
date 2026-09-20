@@ -70,12 +70,12 @@ GLINER_MODEL_ID_MEASURED = "knowledgator/gliner-pii-base-v1.0"
 #: put its edge inside a word — the model was shown a fragment and answered for it, a
 #: `person-name` over half a word, and every later pseudonym letter shifted — and made
 #: what the model saw of one paragraph depend on how much text sat above it. A window
-#: now begins where a heading does. On this repository's fixture page the rule raises
-#: **the same twenty-four spans under the same categories**, gaining none and losing
-#: none; fourteen of them carry a different score, the largest move being `job-title`
+#: now begins where the document itself begins something — a heading, then a paragraph,
+#: then nothing. On this repository's planted page the rule raises **the same
+#: twenty-four spans under the same categories**, gaining none and losing none;
+#: fourteen of them carry a different score, the largest move being `job-title`
 #: *second registered officer* from 0.778 to 0.726. A moved score is a moved answer, so
 #: it is a moved version.
-
 RULE_VERSION = "4"
 
 #: Two spellings, one name: a pin is written in the hyphens a package name uses,

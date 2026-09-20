@@ -39,6 +39,7 @@ and its key is the version string rather than anything held here (ADR 0036).
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
+from itertools import pairwise
 from types import MappingProxyType
 
 from presidio_analyzer import (
@@ -158,8 +159,8 @@ RECOGNISERS: Mapping[str, Callable[[CategoryDescriptor], EntityRecognizer]] = (
 WINDOWS_A_RUN_IS_READ_WHOLE_IN = 2
 
 
-class HeadingWindows(CharacterBasedTextChunker):
-    """The windows a page is put to the model in, each beginning where a heading does.
+class AnchoredWindows(CharacterBasedTextChunker):
+    """The windows a page is put to the model in, each anchored on the page's own shape.
 
     Presidio reads a long text to GLiNER in overlapping windows of characters. Its own
     word for one is a *chunk*, which this repository's glossary has already spent on the
@@ -186,28 +187,37 @@ class HeadingWindows(CharacterBasedTextChunker):
     in the same clothes — a name gained anywhere takes a pseudonym letter in reading
     order and shifts every later one.
 
-    **The one rule is that a window begins where a heading begins.** The run of text
-    under one heading is read whole up to `WINDOWS_A_RUN_IS_READ_WHOLE_IN` windows, and
-    stepped inside itself past that, each step landing on a whole word. No window
-    reaches back over a heading. So what the model is shown for a heading's text is
-    decided by
-    that text and by nothing before it, no window edge falls inside a word in either
-    direction, and a page with no heading in it is one run read exactly as the word rule
-    read it. A heading is what every converter emits, so the anchor is content the
-    document carries and not a count of characters into it.
+    **The one rule is that a window begins where the document itself begins something.**
+    A run under a heading is read whole up to `WINDOWS_A_RUN_IS_READ_WHOLE_IN` windows.
+    A run past that is cut at the blank lines between its paragraphs, and each paragraph
+    that fits is read whole. Only a paragraph that does not fit is stepped through by a
+    count, and both its edges are held to a whole word even there. So the anchor is
+    always the largest piece of its own shape the document offers — heading, then
+    paragraph, then nothing — and what the model is shown of one piece is decided by
+    that piece and not by how much text sits above it.
 
-    Three rules were built and measured before this one, and their four-length table is
-    the docblock of `tests/test_redaction_windows.py`. A whole-word start alone removes
-    the fragments and leaves the drift, gaining a name at three of the four lengths. A
-    sentence start and a line start each level two of the four and cost the whole page
-    the officers block's `job-title 'second registered officer'` while gaining a
-    `person-name` over *One of our supervisors*, a phrase that is nobody. This rule is
-    the only one of the four under which every length answers what the whole page
-    answers in the runs they share, and the only one that costs the whole page's own
-    answer nothing at all: measured against the word rule it gains no finding and loses
-    none. It is also cheaper — 13 windows against 16, and 840 ms a page against 1,011 ms
-    on the machine both were timed on, where T-122 recorded 2,841 ms for the same call
-    in the image.
+    That order is what carries the guarantee off a page with headings and onto one
+    without. A heading-less text is one run, cut at its paragraphs; a text under a
+    single heading with a great deal below it is the same. Only a document that is one
+    unbroken paragraph longer than the ceiling has no anchor left, and there the count
+    returns — an honest floor rather than an exception, because there is no boundary in
+    such a text to hold to.
+
+    Five rules were built and measured before this one, and the table is the docblock of
+    `tests/test_redaction_windows.py`. A whole-word start alone removes the fragments
+    and leaves the drift. A sentence start and a line start each level two of the four
+    lengths and cost the whole page the officers block's `job-title 'second registered
+    officer'` while gaining a `person-name` over *One of our supervisors*, a phrase that
+    is nobody. Anchoring on headings alone levels every length of a page that has them
+    and leaves a heading-less one drifting. Taking a blank line as an anchor everywhere
+    — inside a short run as well — levels both and costs the planted page a true
+    `job-title`, gains it the word *Finance* as one and reads *One of our supervisors*
+    as a person, at 27 windows and 1,282 ms. This rule is the only one that levels every
+    text measured and costs no answer anything: against the page's answer on `main` it
+    gains no finding and loses none, on the planted page and on the heading-less fixture
+    alike. It is also cheaper than what it replaced — 14 windows against 16, 867 ms a
+    page against 1,011 ms on the machine both were timed on, where T-122 recorded
+    2,841 ms for the same call in the image.
 
     A window's size and its overlap stay Presidio's own defaults and are deliberately
     not declared here. They are the detector's numbers and not this repository's rule,
@@ -218,7 +228,7 @@ class HeadingWindows(CharacterBasedTextChunker):
     """
 
     def chunk(self, text: str) -> list[TextChunk]:
-        """One run of text per heading, each read whole or stepped inside itself."""
+        """One run per heading, cut at its paragraphs only when it is too long."""
         if not text:
             return []
         windows: list[TextChunk] = []
@@ -226,22 +236,62 @@ class HeadingWindows(CharacterBasedTextChunker):
             windows.extend(self._windows_in(text, begins, ends))
         return windows
 
+    def _read_whole_to(self) -> int:
+        return self.chunk_size * WINDOWS_A_RUN_IS_READ_WHOLE_IN
+
     def _runs_under_each_heading(self, text: str) -> list[tuple[int, int]]:
         # The start of the text opens a run whether or not it is a heading, so a page
         # carrying none is one run and a preamble above the first heading is its own.
-        begins = sorted(
-            {0}
-            | {
-                at
-                for at, character in enumerate(text)
-                if character == "#" and (at == 0 or text[at - 1] == "\n")
-            }
-        )
+        begins = sorted({0} | self._headings_in(text))
         return list(zip(begins, [*begins[1:], len(text)], strict=True))
 
+    def _headings_in(self, text: str) -> set[int]:
+        # The anchor is the character a converter wrote and not a parsed heading: this
+        # seam is not a Markdown reader and must not become one. The one thing it does
+        # read is a fence, because `anydoc` and `pdf-inspector` both emit them and a
+        # `#` inside one is a comment in somebody's sample code, not a heading — a run
+        # opened there would be a boundary the document does not have.
+        headings: set[int] = set()
+        fenced = False
+        at = 0
+        for line in text.splitlines(keepends=True):
+            if line.lstrip().startswith(("```", "~~~")):
+                fenced = not fenced
+            elif not fenced and line.startswith("#"):
+                headings.add(at)
+            at += len(line)
+        return headings
+
     def _windows_in(self, text: str, begins: int, ends: int) -> list[TextChunk]:
-        if ends - begins <= self.chunk_size * WINDOWS_A_RUN_IS_READ_WHOLE_IN:
+        if ends - begins <= self._read_whole_to():
             return [TextChunk(text=text[begins:ends], start=begins, end=ends)]
+        # A run too long to read whole is cut where the document says it may be — at
+        # the blank lines between its paragraphs — before it is cut anywhere else, so
+        # that a page carrying one heading and a great deal under it is still anchored
+        # on its own structure rather than on a count from the top.
+        cuts = [begins, *self._paragraphs_in(text, begins, ends), ends]
+        windows: list[TextChunk] = []
+        for opens, closes in pairwise(cuts):
+            if closes - opens <= self._read_whole_to():
+                windows.append(
+                    TextChunk(text=text[opens:closes], start=opens, end=closes)
+                )
+            else:
+                windows.extend(self._stepped_through(text, opens, closes))
+        return windows
+
+    def _paragraphs_in(self, text: str, begins: int, ends: int) -> list[int]:
+        starts: list[int] = []
+        at = text.find("\n\n", begins)
+        while at != -1 and at + 2 < ends:
+            starts.append(at + 2)
+            at = text.find("\n\n", at + 2)
+        return starts
+
+    def _stepped_through(self, text: str, begins: int, ends: int) -> list[TextChunk]:
+        # The last resort, and the only place a window's edge is still decided by a
+        # count: one paragraph longer than the ceiling, which carries no boundary of
+        # its own to anchor on. Both edges are held to a whole word even here.
         windows: list[TextChunk] = []
         start = begins
         while start < ends:
@@ -282,7 +332,7 @@ class ModelRecogniser(EntityRecognizer):
     answer for.
 
     The second thing this wrapper settles is what the model is shown rather than what
-    it is asked: a page reaches it in windows, and the windows are `HeadingWindows`
+    it is asked: a page reaches it in windows, and the windows are `AnchoredWindows`
     rather than the default, so none of them begins inside a word and none is decided by
     how much text sits above it (`T-177`).
     """
@@ -295,7 +345,7 @@ class ModelRecogniser(EntityRecognizer):
             map_location="cpu",
             threshold=threshold,
             entity_mapping=dict(labels),
-            text_chunker=HeadingWindows(),
+            text_chunker=AnchoredWindows(),
         )
         super().__init__(
             supported_entities=sorted(set(labels.values())),
