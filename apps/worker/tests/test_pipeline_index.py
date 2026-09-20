@@ -163,6 +163,24 @@ def normalised_key_of(document_id: str) -> str:
     return f"documents/{document_id.lower()}/normalised"
 
 
+#: Two of the converter's own fixtures, read rather than copied: they are the same
+#: documents the landed suite converts and quarantines, and a second copy here would be
+#: a second thing to keep in step with the converters. What the second one converts to
+#: is `tests/test_pipeline_landed.py`'s literal, repeated here because this suite
+#: asserts the chunk row the run landed out of it.
+CONVERSION_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "conversion"
+A_SCANNED_PDF = (CONVERSION_FIXTURES / "scanned-invoice.pdf").read_bytes()
+A_RATE_CARD_PDF = (CONVERSION_FIXTURES / "rate-card.pdf").read_bytes()
+A_RATE_CARD_CONVERTED = (
+    "# Rate card\n\n"
+    "## Rates hold for the quarter.\n\n"
+    "|Service|Day rate|\n"
+    "|---|---|\n"
+    "|Survey|450|\n"
+    "|Report|300|\n"
+)
+
+
 def a_bucket_holding_the_three() -> ABucket:
     return ABucket(
         {
@@ -182,9 +200,18 @@ def seed_the_binding(
     audience_groups: list[str] | None = None,
     published_at: str | None = None,
     media_type: str = "text/markdown",
+    media_types: Mapping[str, str] | None = None,
 ) -> str:
-    """A provisioned workspace holding one binding and the documents a case names."""
+    """A provisioned workspace holding one binding and the documents a case names.
+
+    `media_type` is what every document is catalogued under and `media_types` names the
+    ones that differ — which is how a case says *this document arrived as a PDF* without
+    a statement of its own. Setup goes through the factory: a case that reached past
+    it with an `UPDATE` would be writing the table under test by a road the bind act
+    never takes.
+    """
     workspace_id = seed_partitioned_workspace(connection)
+    named = media_types or {}
     with connection.cursor() as cursor:
         seed_source_binding(
             cursor,
@@ -201,7 +228,7 @@ def seed_the_binding(
                 workspace_id=workspace_id,
                 binding_id=BINDING,
                 document_id=document_id,
-                media_type=media_type,
+                media_type=named.get(document_id, media_type),
                 original_key=original_key_of(document_id),
             )
     connection.commit()
@@ -266,8 +293,8 @@ def catalogue_rows_of(
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT id, content_hash, normalised_key, redaction_version, outcome,"
-            " sensitivity, last_seen > first_seen AS seen_again FROM source_document"
-            " WHERE workspace_id = %s ORDER BY id",
+            " quarantine_error, sensitivity, last_seen > first_seen AS seen_again"
+            " FROM source_document WHERE workspace_id = %s ORDER BY id",
             (workspace_id,),
         )
         return by_column(cursor)
@@ -498,6 +525,9 @@ def test_the_catalogue_row_is_reconciled_and_the_copy_lands_beside_the_original(
             "normalised_key": normalised_key_of(AN_INVOICE_ID),
             "redaction_version": THE_VERSION,
             "outcome": "converted",
+            # A document that converted carries no quarantine error, and the database
+            # would refuse one here: the name and the word travel together.
+            "quarantine_error": None,
             "sensitivity": None,
             "seen_again": True,
         }
@@ -554,32 +584,34 @@ def test_a_document_this_tier_cannot_read_is_quarantined_on_its_own_catalogue_ro
 ) -> None:
     """The engine catches a component's failure and lets the run finish, which is what
     fanning a document per component is for — so an unreadable upload is its own failure
-    and never the binding's. The run lands the neighbour, writes *quarantined* on
-    the row of the one it could not read, and finishes.
+    and never the binding's. The run lands the neighbour, writes *quarantined* and the
+    name of what refused it on the row of the one it could not read, and finishes.
 
-    **The word goes on the row and the error's name goes in the log.** The catalogue has
-    one column for how a run left a document — *converted* or *quarantined*, null until
-    a run has been over it — and what the row therefore says is the fact the Sources
-    screen reads: this document has no passages and it is not waiting for a run. Which
-    converter refused it, and why, rides the run's own log line and
-    `LandedRun.quarantined`; a column for the name is a migration the S1 spec's schema
-    section does not carry.
+    **The word and the name are both the row's**, because what an Admin deciding whether
+    the platform needs OCR reads is a count of one binding's documents quarantined *for
+    want of OCR* — and a count is a `GROUP BY` over a column, not a search of a log. The
+    two travel together or neither means anything, which is the database's rule and not
+    this tier's: `source_document_quarantine_error_check` refuses a name on a row that
+    does not also carry the word.
 
     Everything else on the row stays null. The hash, the normalised copy's key and the
     version string are facts about text that does not exist, and a run that wrote them
     would be saying it had converted a document it could not read. `last_seen` does
     move: the run found the document at the source, and only reading it failed.
+
+    The name is the converter's own class name, written down here rather than read
+    back: this document's bytes are markdown under a PDF media type, and
+    `pdf-inspector` refuses bytes that are not a PDF with a plain `ValueError`. That is
+    a coarser name than the case below it gets, and deliberately left as the library
+    gives it — inventing a finer one here would be this tier telling an Admin something
+    no converter said.
     """
     connection, dsn = database
     workspace_id = seed_the_binding(
-        connection, documents=(AN_INVOICE_ID, A_SICK_NOTE_ID)
+        connection,
+        documents=(AN_INVOICE_ID, A_SICK_NOTE_ID),
+        media_types={A_SICK_NOTE_ID: "application/pdf"},
     )
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "UPDATE source_document SET media_type = 'application/pdf' WHERE id = %s",
-            (A_SICK_NOTE_ID,),
-        )
-    connection.commit()
 
     outcome = index_binding(
         bootstrap_for(dsn, tmp_path),
@@ -594,12 +626,141 @@ def test_a_document_this_tier_cannot_read_is_quarantined_on_its_own_catalogue_ro
         "normalised_key": None,
         "redaction_version": None,
         "outcome": "quarantined",
+        "quarantine_error": "ValueError",
         "sensitivity": None,
         "seen_again": True,
     }
     assert [
         row["source_document_id"] for row in chunk_rows_of(connection, workspace_id)
     ] == [AN_INVOICE_ID]
+
+
+def test_a_pdf_with_no_text_layer_names_ocr_on_its_row_which_is_what_an_admin_counts(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """The refusal the whole column exists for. Docling left the route as S4's trigger
+    and what replaced it is a number an Admin reads — *OCR is reached for when a
+    binding's share of documents quarantined for want of OCR is one an Admin will not
+    accept* (ADR 0013, amended 20/09/2026) — so `NeedsOcrError` has to be a value on the
+    row that a count can be taken over, distinct from every other way a document can
+    fail to convert.
+
+    Which is the whole of what this case adds over the one above it: both quarantine,
+    and the rows say *different things about why*.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(
+        connection,
+        documents=(AN_INVOICE_ID, A_SICK_NOTE_ID),
+        media_types={A_SICK_NOTE_ID: "application/pdf"},
+    )
+    bucket = a_bucket_holding_the_three()
+    bucket.objects[original_key_of(A_SICK_NOTE_ID)] = A_SCANNED_PDF
+
+    outcome = index_binding(
+        bootstrap_for(dsn, tmp_path), run_for(workspace_id), copies=bucket
+    )
+
+    assert outcome.documents == 1
+    quarantined = catalogue_rows_of(connection, workspace_id)[1]
+    assert (quarantined["outcome"], quarantined["quarantine_error"]) == (
+        "quarantined",
+        "NeedsOcrError",
+    )
+    assert [
+        row["source_document_id"] for row in chunk_rows_of(connection, workspace_id)
+    ] == [AN_INVOICE_ID]
+
+
+def test_a_document_that_ran_past_its_ceiling_lands_the_deadline_on_its_row(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """The third way a document is quarantined, and the row cannot tell it from the
+    other two by anything but this column: a conversion that never came back leaves no
+    converter refusal to record, so the name on the row is the deadline's own.
+
+    The ceiling is the run's, and this case names it because no document can be made to
+    breach the shipped one — thirty-three seconds for a page against a conversion that
+    costs milliseconds. With it at nothing every document runs past it, which is what
+    makes the reading machine-independent: a case that waited for a genuinely slow
+    document would be a case about whichever laptop ran it.
+
+    **The run still finishes**, which is the half that matters beyond the row. It lands
+    no chunks, writes no normalised copy and answers an outcome — a binding whose
+    documents all ran past their ceiling is a binding with nothing in it, not a job that
+    failed.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
+    bucket = a_bucket_holding_the_three()
+
+    outcome = index_binding(
+        bootstrap_for(dsn, tmp_path),
+        run_for(workspace_id),
+        copies=bucket,
+        ms_per_page=0,
+        margin_ms=0,
+    )
+
+    assert (outcome.documents, outcome.chunks) == (0, 0)
+    quarantined = catalogue_rows_of(connection, workspace_id)[0]
+    assert (quarantined["outcome"], quarantined["quarantine_error"]) == (
+        "quarantined",
+        "DeadlineExceededError",
+    )
+    assert quarantined["normalised_key"] is None
+    assert bucket.writes == []
+    assert chunk_rows_of(connection, workspace_id) == []
+
+
+def test_a_document_quarantined_by_one_run_and_read_by_the_next_loses_its_error(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """The recovery path, and the other way round from the three cases above it: a
+    run that reads a document it once could not must take the name off the row with
+    the word.
+
+    It is not tidiness. The name and the word travel together by a CHECK, so a reconcile
+    that left `NeedsOcrError` under *converted* would be refused — inside the run's own
+    scoped transaction, taking the findings and every other catalogue row down with it.
+    A document that recovered would break the run that recovered it, which is the exact
+    opposite of *it is never a failed run*.
+
+    The recovery staged here is **the bytes changing at the source**, which is the one
+    that needs no row rewritten: the document stays catalogued as a PDF across both
+    runs, and between them the object store stops holding markdown under that key and
+    starts holding a real PDF. That is a scan re-uploaded with a text layer, and it is
+    also the shape a converter upgrade takes from this row's point of view — the same
+    document, read this time.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(
+        connection,
+        documents=(AN_INVOICE_ID,),
+        media_types={AN_INVOICE_ID: "application/pdf"},
+    )
+    bootstrap = bootstrap_for(dsn, tmp_path)
+    bucket = a_bucket_holding_the_three()
+
+    index_binding(bootstrap, run_for(workspace_id), copies=bucket)
+    quarantined = catalogue_rows_of(connection, workspace_id)[0]
+
+    bucket.objects[original_key_of(AN_INVOICE_ID)] = A_RATE_CARD_PDF
+    outcome = index_binding(bootstrap, run_for(workspace_id), copies=bucket)
+
+    assert (quarantined["outcome"], quarantined["quarantine_error"]) == (
+        "quarantined",
+        "ValueError",
+    )
+    assert outcome.documents == 1
+    reconciled = catalogue_rows_of(connection, workspace_id)[0]
+    assert (reconciled["outcome"], reconciled["quarantine_error"]) == (
+        "converted",
+        None,
+    )
+    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+        A_RATE_CARD_CONVERTED
+    ]
 
 
 def test_a_suppression_standing_over_a_document_is_read_off_the_table_and_kept_out(
