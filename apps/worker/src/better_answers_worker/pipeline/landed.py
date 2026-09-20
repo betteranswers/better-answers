@@ -156,6 +156,13 @@ class RedactedDocument:
     #: same only for the types that pass through. A hash holds no value, so keeping one
     #: here asks nothing of ADR 0020 that the redacted text does not already ask.
     content_hash: str
+    #: The restored findings the seam withheld all the same because an erasure request
+    #: names them (`redaction.Redaction.overridden`) — locations, as every finding is.
+    #: Carried on the memoised value so that a run the memo answered says it as fully
+    #: as the run that first read the document. No default, as the hash above has none:
+    #: a stored answer that predates the field must fail to load rather than read as
+    #: *no kept span was overridden*, which is the one thing it cannot know.
+    overridden: tuple[Finding, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -281,6 +288,7 @@ def landed(
         verdict=answer.verdict,
         version=answer.version,
         content_hash=hashlib.sha256(normalised.encode(TEXT_ENCODING)).hexdigest(),
+        overridden=tuple(answer.overridden),
     )
 
 

@@ -192,7 +192,9 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **keep in text** — an Admin's bulk act over named *finding groups* of one binding: every span
   of each group restored with one reason because it is the company's own business fact and
   reviewed as *kept in text*, and the run that lets them back into the document queued with
-  them. The always set alone, one ledger row per span.
+  them. The always set alone, one ledger row per span. An *erasure request* outranks it: a kept
+  span a request names is **overridden by the erasure** — it stays withheld, and the review says
+  so beside its group. (Not a *class override*, which is an Admin's act on a concept's class.)
 - **narrow these documents** — an Admin's bulk act over named *finding groups* of one binding,
   taken on the *source documents* they sit in: each document takes a class of its own, its chunk
   copies are rewritten, the named groups' unreviewed findings are reviewed as *narrowed* — and

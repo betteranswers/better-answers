@@ -335,6 +335,7 @@ def test_the_seam_answers_an_outcome_of_plain_numbers_and_opens_the_bindings_sto
         "documents": 0,
         "chunks": 0,
         "lmdb_bytes": outcome.lmdb_bytes,
+        "restores_overridden_by_erasure": [],
     }
     assert outcome.lmdb_bytes > 0
     assert (tmp_path / workspace_id / "binding-one").is_dir()

@@ -2548,7 +2548,7 @@ describe("the derivation's tables under app_rt", () => {
  * The **finding** (`CONTEXT.md`; ADR 0020, the S0 spec's tier boundary): what the seam found
  * in one source document, written by the worker and reviewed by the app. A tenant table like
  * any other, so the zero-rows proof is stated here in its words — and the grant is the whole
- * of the boundary between the two tiers (`[SEC3]`): the worker's role holds INSERT, and SELECT
+ * of the boundary between the two tiers: the worker's role holds INSERT, and SELECT
  * on the five columns that say which span a row is and the one that says it was restored
  * (migration 0041; ADR 0020, amended 2026-09-20). So a compromised worker can record what it
  * withheld and learn that an Admin let a span back, and can never read a category, a reason, a

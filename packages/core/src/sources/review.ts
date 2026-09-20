@@ -1,4 +1,5 @@
 import {
+  boundarySchemas,
   FINDING_UNREVIEWED_STATE,
   INDEX_KIND,
   REDACTION_ALWAYS_TIER,
@@ -6,6 +7,7 @@ import {
   SENSITIVITY_DEFAULT,
   type FINDING_REVIEW_STATES,
 } from "@better-answers/schema";
+import { z } from "zod";
 
 import { narrower, type Sensitivity } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
@@ -20,7 +22,7 @@ import {
   type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { enqueueJobIn } from "../runs/index.ts";
+import { enqueueJobIn, latestIndexOutcomeIn, type JobOutcome } from "../runs/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { adminOnBinding, bindingNamed } from "./admin-binding.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
@@ -86,6 +88,25 @@ export type FindingGroup = {
   readonly specialCategory: boolean;
   /** How many spans of this category and rule that document holds. */
   readonly found: number;
+  /**
+   * **How many of this group's kept spans are withheld all the same, because an erasure
+   * request names them** — as of the binding's last finished `index` run.
+   *
+   * An erasure outranks a restore (ADR 0020, amended 2026-09-20): a suppression raises the
+   * tier of the very finding an Admin may have kept, so a keep over such a span succeeds —
+   * its ledger row, its review, its run — and changes nothing a reader sees. Only the worker
+   * can know it happened, because a finding holds no value and the request's identifiers are
+   * matched against the text; the run says which spans on its outcome row and this read
+   * counts them per group, never naming one.
+   *
+   * **What the screen is owed.** Where this is above nought, say beside the group that a span
+   * kept in text stays withheld because a person asked to be erased from the document — a
+   * keep that silently did nothing is the defect this figure exists to close. It is a
+   * reading of the **last finished run**: while a run is queued or claimed (the keep itself
+   * queues one) it still says what the run before found, so it is shown with the run's state
+   * and not instead of it. A binding no run has finished over reads nought throughout.
+   */
+  readonly overriddenByErasure: number;
 };
 
 export type FindingsOfRefusal = RoleRefusal | "malformed" | "no-such-binding" | Error;
@@ -140,16 +161,70 @@ const BROKEN_CLASS = new Error("a source document's class is not one the visibil
  *
  * The ordering is the screen's — category, then rule, then the document — so two calls over
  * unchanged rows answer the same list and a caller never sorts what the store can.
+ *
+ * The four arrays are the spans the binding's last finished run said an erasure overrode,
+ * each by the document, the rule and the two offsets that are what a finding is. A span is
+ * counted only while an Admin's restore stands on its row: the figure is about kept spans,
+ * and the run's word about any other is not this read's to repeat.
  */
 const FINDING_GROUPS = `SELECT d.id AS "documentId", d.title,
             d.sensitivity AS "documentSensitivity", b.sensitivity AS "bindingSensitivity",
-            f.category, f.rule_id AS "ruleId", f.tier, count(*)::int AS found
+            f.category, f.rule_id AS "ruleId", f.tier, count(*)::int AS found,
+            count(*) FILTER (
+              WHERE f.restored_at IS NOT NULL
+                AND (f.document_id, f.rule_id, f.char_start, f.char_end) IN
+                    (SELECT * FROM unnest($3::text[], $4::text[], $5::int[], $6::int[]))
+            )::int AS "overriddenByErasure"
        FROM finding f
        JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
        JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
       WHERE f.workspace_id = $1 AND d.binding_id = $2
       GROUP BY d.id, d.title, d.sensitivity, b.sensitivity, f.category, f.rule_id, f.tier
       ORDER BY f.category, f.rule_id, d.title, d.id`;
+
+/**
+ * The key an `index` run's outcome carries the kept spans an erasure overrode under — the
+ * worker's word, spelled as `apps/worker`'s `IndexOutcome.as_row` spells it. Always a list on
+ * a run that knows the figure; absent on one that predates it, which reads as none.
+ */
+const OVERRIDDEN_KEY = "restores_overridden_by_erasure";
+
+/**
+ * One span as a run's outcome names it: a finding's identity, each part held to the shape its
+ * own column holds, read off the finding's boundary rather than written a second time (ADR
+ * 0028). The keys are the worker's, which is why they are spelled as the row spells them.
+ */
+const FINDING_COLUMNS = boundarySchemas.finding.select.shape;
+const OVERRIDDEN_SPAN = z.object({
+  document_id: FINDING_COLUMNS.documentId,
+  rule_id: FINDING_COLUMNS.ruleId,
+  char_start: FINDING_COLUMNS.charStart,
+  char_end: FINDING_COLUMNS.charEnd,
+});
+
+/** What a run's list answers when it is there and is not a list of spans. */
+const UNREADABLE_RUN = new Error(
+  "the binding's last index run names the kept spans an erasure overrode in a shape the review cannot read",
+);
+
+/**
+ * The spans one outcome names, each a finding's identity — or a failure, never a guess.
+ *
+ * **Absent is nought and unreadable is an error.** A binding no run has finished over, and a
+ * run that carries no such key, have nothing to say and the figure is nought. A key that is
+ * there and is not a list of spans is the other thing entirely: nought would tell an Admin
+ * that every keep is showing, which is exactly the false comfort this figure exists to end —
+ * so *I cannot tell* fails the read, as `bundleHealth` reads an outcome it cannot parse as a
+ * mismatch rather than as health.
+ */
+const overriddenSpansOf = (
+  outcome: JobOutcome | null,
+): Result<ReadonlyArray<z.infer<typeof OVERRIDDEN_SPAN>>, Error> => {
+  const listed = outcome?.[OVERRIDDEN_KEY];
+  if (listed === undefined) return ok([]);
+  const spans = z.array(OVERRIDDEN_SPAN).safeParse(listed);
+  return spans.success ? ok(spans.data) : err(UNREADABLE_RUN);
+};
 
 type GroupRow = Omit<FindingGroup, "specialCategory" | "sensitivity"> & {
   readonly documentSensitivity: string | null;
@@ -178,7 +253,22 @@ export const findingsOf = async (
   const standing = await bindingNamed(acting.value, tx, { columns: "1", lock: "none" });
   if (!standing.ok) return err(standing.error);
 
-  const grouped = await attempt(() => tx.query<GroupRow>(FINDING_GROUPS, [workspaceId, bindingId]));
+  const lastRun = await latestIndexOutcomeIn(principal, tx, { bindingId });
+  if (!lastRun.ok) return err(lastRun.error);
+  const named = overriddenSpansOf(lastRun.value);
+  if (!named.ok) return err(named.error);
+  const overridden = named.value;
+
+  const grouped = await attempt(() =>
+    tx.query<GroupRow>(FINDING_GROUPS, [
+      workspaceId,
+      bindingId,
+      overridden.map((span) => span.document_id),
+      overridden.map((span) => span.rule_id),
+      overridden.map((span) => span.char_start),
+      overridden.map((span) => span.char_end),
+    ]),
+  );
   if (!grouped.ok) return err(grouped.error);
 
   const groups: FindingGroup[] = [];

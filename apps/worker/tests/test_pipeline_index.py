@@ -349,6 +349,10 @@ def test_the_loop_claims_an_index_job_runs_it_and_finishes_it_with_its_three_fig
     assert row[:4] == ("index", "done", bootstrap.worker_id, True)
     assert (row[4]["documents"], row[4]["chunks"]) == (0, 0)
     assert row[4]["lmdb_bytes"] > 0
+    # The list crosses the queue's own finish as it is: present, and empty on a run in
+    # which no kept span was overridden — which is how the app tells it from a run that
+    # predates the figure.
+    assert row[4]["restores_overridden_by_erasure"] == []
 
 
 # -- the rows --------------------------------------------------------------------------
@@ -382,6 +386,7 @@ def test_every_column_of_the_chunk_rows_one_run_lands(
         "documents": 1,
         "chunks": 1,
         "lmdb_bytes": outcome.lmdb_bytes,
+        "restores_overridden_by_erasure": [],
     }
     assert chunk_rows_of(connection, workspace_id) == [
         {
@@ -858,7 +863,7 @@ def test_a_span_an_admin_restored_is_back_in_the_text_after_the_next_run(
     to the memoised function beside the suppressions — so the run *keep in text* queues
     is the run that lets the span back.
 
-    Held both ways (`[TEST7]`): withheld before the restore and in the text after it.
+    Held both ways: withheld before the restore and in the text after it.
     And the row is where the Admin left it: the same id, still restored, still reviewed
     — the second run found the span again and wrote nothing over it.
     """
@@ -901,6 +906,80 @@ def test_a_span_an_admin_restored_is_back_in_the_text_after_the_next_run(
     ]
 
 
+#: The invoice's one `bank-details` span as the seam cuts it, which is what a request
+#: has to name for the suppression pass to reach it: an identifier is matched against
+#: the text a finding claimed. A sole trader's own account on their own invoice — kept
+#: in text by an Admin as a business fact, until the person it belongs to asks to be
+#: erased.
+THE_INVOICES_ACCOUNT_AS_FOUND = "20-00-00 and the account number is 12345678"
+
+
+def test_a_kept_span_an_erasure_names_stays_withheld_and_the_run_says_which(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """An erasure outranks a restore, and only this tier can know that it did: a finding
+    holds no value, so which kept spans a request names is a fact the seam has and the
+    app has not. The run's outcome is the road it already writes, and it says which —
+    the document, the rule and the two offsets, which is what a finding is and nothing
+    of what it holds — so the review can tell an Admin that a span they kept is
+    withheld all the same, rather than leave a keep that silently did nothing.
+
+    Held both ways: under the restore alone the account is in the text and
+    the run names no span; once a request names it, it is withheld and the run names it.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
+    bootstrap = bootstrap_for(dsn, tmp_path)
+    index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    with connection.cursor() as cursor:
+        seed_restore(
+            cursor,
+            workspace_id=workspace_id,
+            document_id=AN_INVOICE_ID,
+            rule_id="UK_BANK_ACCOUNT",
+            char_start=54,
+            char_end=97,
+        )
+    connection.commit()
+
+    kept = index_binding(
+        bootstrap,
+        run_for(workspace_id, "restored"),
+        copies=a_bucket_holding_the_three(),
+    )
+    shown = [row["content"] for row in chunk_rows_of(connection, workspace_id)]
+
+    with connection.cursor() as cursor:
+        seed_suppression(
+            cursor,
+            workspace_id=workspace_id,
+            document_id=AN_INVOICE_ID,
+            identifiers={
+                "emails": [],
+                "names": [],
+                "other": [THE_INVOICES_ACCOUNT_AS_FOUND],
+            },
+        )
+    connection.commit()
+    erased = index_binding(
+        bootstrap, run_for(workspace_id, "wiped"), copies=a_bucket_holding_the_three()
+    )
+
+    assert shown == [AN_INVOICE]
+    assert kept.as_row()["restores_overridden_by_erasure"] == []
+    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+        AN_INVOICE_REDACTED
+    ]
+    assert erased.as_row()["restores_overridden_by_erasure"] == [
+        {
+            "document_id": AN_INVOICE_ID,
+            "rule_id": "UK_BANK_ACCOUNT",
+            "char_start": 54,
+            "char_end": 97,
+        }
+    ]
+
+
 # -- the wipe --------------------------------------------------------------------------
 
 
@@ -909,7 +988,7 @@ def read_afresh_in(written: str) -> list[int]:
 
     Off the run's own log line, which is the figure an operator has for whether a run
     did work or recognised that it had none. It is read here rather than taken off the
-    outcome because the outcome is the job row's three figures and this is not one of
+    outcome because the outcome is the job row's own figures and this is not one of
     them: the job row says what the binding holds, and this says what the run had to do
     to say so.
     """

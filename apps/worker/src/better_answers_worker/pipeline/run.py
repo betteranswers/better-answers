@@ -5,9 +5,12 @@ into, what the detector found, how the redacted text is split and which columns 
 row carries all live beneath it, and none of the engine's types reach past it — which is
 what makes the exit cost of the engine one directory rather than a rewrite (ADR 0036).
 
-The outcome carries three figures and no content: how many documents the run saw, how
-many chunks it landed, and how much disk the binding's store is using. The third is the
-signal the cap is read against (ADR 0025), and the job row is where all three go.
+The outcome carries three figures and one list, and no content: how many documents the
+run saw, how many chunks it landed, how much disk the binding's store is using — the
+signal the cap is read against (ADR 0025) — and which spans an Admin kept in text that
+an erasure request overrode, each by its document, its rule and its two offsets (ADR
+0020, amended 2026-09-20). The list is the one fact here only this tier can know, and
+the job row is the road it already has to the app.
 
 **The order of a run, and why it is that order.**
 
@@ -66,19 +69,51 @@ WIPED_REASON = "wiped"
 
 
 @dataclass(frozen=True, slots=True)
+class OverriddenRestore:
+    """One span an Admin kept in text that this run withheld all the same, because an
+    erasure request names it: the document, the rule and the two offsets — what a
+    finding is, and nothing of what it holds.
+    """
+
+    document_id: str
+    rule_id: str
+    char_start: int
+    char_end: int
+
+
+@dataclass(frozen=True, slots=True)
 class IndexOutcome:
     """What one index run found, in the shape the job row carries."""
 
     documents: int
     chunks: int
     lmdb_bytes: int
+    #: The kept spans an erasure overrode, which only this tier can know: a finding
+    #: holds no value, so which of them a request names is the seam's fact and nobody
+    #: else's. The job row is the one road a run already has to the app, and the review
+    #: reads it off the binding's last finished run — so a keep that did nothing says
+    #: why.
+    restores_overridden_by_erasure: tuple[OverriddenRestore, ...] = ()
 
     def as_row(self) -> dict[str, Any]:
-        """The outcome as the job row holds it: counts and sizes, never content."""
+        """The outcome as the job row holds it: counts, sizes and the ids the counts
+        were taken at — never content. The list is always written, empty when no kept
+        span was overridden, so a reader can tell a run that found none from a run that
+        predates the figure.
+        """
         return {
             "documents": self.documents,
             "chunks": self.chunks,
             "lmdb_bytes": self.lmdb_bytes,
+            "restores_overridden_by_erasure": [
+                {
+                    "document_id": span.document_id,
+                    "rule_id": span.rule_id,
+                    "char_start": span.char_start,
+                    "char_end": span.char_end,
+                }
+                for span in self.restores_overridden_by_erasure
+            ],
         }
 
 
@@ -150,6 +185,16 @@ def index_binding(
             documents=len(landed.documents),
             chunks=chunks,
             lmdb_bytes=host.lmdb_bytes(run),
+            restores_overridden_by_erasure=tuple(
+                OverriddenRestore(
+                    document_id=document.source_document_id,
+                    rule_id=finding.rule_id,
+                    char_start=finding.start,
+                    char_end=finding.end,
+                )
+                for document in landed.documents
+                for finding in document.redacted.overridden
+            ),
         )
     return _finished(outcome, run)
 

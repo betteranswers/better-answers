@@ -73,6 +73,11 @@ class Redaction:
     sentence, an officer's name inside the address they are care of — because each is
     a rule's own answer and the Admin reviewing them is owed both. Only one of any such
     pair is written out of `text`, which is a separate decision and this binding's.
+
+    `overridden` are the restored findings the seam withheld all the same because an
+    erasure request names them. It is answered because nothing else can say it: a
+    finding holds no value, so which kept spans a request reaches is known only to the
+    pass that read the text — and an Admin whose keep did nothing is owed the reason.
     """
 
     text: str
@@ -80,6 +85,7 @@ class Redaction:
     counts: Mapping[str, int]
     verdict: str | None
     version: str
+    overridden: tuple[Finding, ...]
 
 
 def redact(
@@ -130,9 +136,9 @@ def redact(
     # own span out. An erasure outranks the restore — the suppressed finding *is* the
     # one that was restored, tier raised and nothing else moved — so a restore never
     # reaches a span a request named.
-    left_in = restored_among(findings, restores) - suppressed_among(
-        findings, text, suppressions
-    )
+    restored = restored_among(findings, restores)
+    erased = suppressed_among(findings, text, suppressions)
+    left_in = restored - erased
     withheld = without_overlaps(
         [
             finding
@@ -146,6 +152,11 @@ def redact(
         counts=_counted(findings),
         verdict=_verdict_of(findings),
         version=VERSION_STRING,
+        # In reading order and off the findings themselves, so two runs over the same
+        # marks and the same requests answer the same tuple.
+        overridden=tuple(
+            finding for finding in findings if finding in restored and finding in erased
+        ),
     )
 
 

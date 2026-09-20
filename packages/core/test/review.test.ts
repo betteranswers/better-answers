@@ -93,6 +93,43 @@ const findingGroupIn = (
   ...overrides,
 });
 
+/** The rule a seeded finding is raised under, as a run's outcome names it. */
+const SORT_CODE_RULE = { rule_id: "sort-code-with-account-number" };
+
+/**
+ * One `index` run over a binding as the worker leaves its row when it finishes: *done*, at an
+ * instant, with the outcome's four figures — the last of them the kept spans an erasure
+ * request overrode, each by the document, the rule and the two offsets.
+ */
+const finishedIndexRun = (
+  workspaceId: string,
+  bindingId: string,
+  finishedAt: string,
+  overridden: ReadonlyArray<{
+    readonly document_id: string;
+    readonly rule_id: string;
+    readonly char_start: number;
+    readonly char_end: number;
+  }>,
+) =>
+  seededBy(db(), (seed) =>
+    seed.job({
+      workspaceId,
+      kind: "index",
+      subjectId: bindingId,
+      reason: "bound",
+      status: "done",
+      attempts: 1,
+      finishedAt: new Date(finishedAt),
+      outcome: {
+        documents: 2,
+        chunks: 2,
+        lmdb_bytes: 8192,
+        restores_overridden_by_erasure: [...overridden],
+      },
+    }),
+  );
+
 /** A second group of the always set, for the span or the group a case leaves alone. */
 const NATIONAL_INSURANCE = { category: "government-id", ruleId: "national-insurance-number" };
 
@@ -259,6 +296,7 @@ describe("the review read of a binding's findings", () => {
           tier: "always",
           specialCategory: false,
           found: 2,
+          overriddenByErasure: 0,
         },
         {
           documentId: second.documentId,
@@ -269,6 +307,7 @@ describe("the review read of a binding's findings", () => {
           tier: "always",
           specialCategory: false,
           found: 1,
+          overriddenByErasure: 0,
         },
         {
           documentId: first.documentId,
@@ -279,6 +318,7 @@ describe("the review read of a binding's findings", () => {
           tier: "always",
           specialCategory: false,
           found: 1,
+          overriddenByErasure: 0,
         },
       ],
     });
@@ -293,10 +333,12 @@ describe("the review read of a binding's findings", () => {
 
     // The whole field list, spelled out: a column added to the read is a decision this case
     // makes somebody take, and `char_start`, `char_end` and any text are what it keeps out.
+    // `overriddenByErasure` is a count like `found`: the run names the spans, the read does not.
     expect(read.ok ? Object.keys(read.value[0] ?? {}).toSorted() : []).toEqual([
       "category",
       "documentId",
       "found",
+      "overriddenByErasure",
       "ruleId",
       "sensitivity",
       "specialCategory",
@@ -349,6 +391,108 @@ describe("the review read of a binding's findings", () => {
     const read = await findingsAs(scenario.admin, bindingId);
 
     expect(read.ok ? read.value.map((group) => group.sensitivity) : []).toEqual(["Restricted"]);
+  });
+
+  it("says how many of a group's kept spans the last finished run withheld all the same, because an erasure request names them", async () => {
+    // Only the worker knows which kept spans a request names — a finding holds no value —
+    // and it says so on its run's outcome, by the document, the rule and the two offsets.
+    // The read counts them per group, off **this binding's last finished** run: not the older
+    // run below, which named the sibling document's kept span, not the failed one after it,
+    // not a later run over another binding, and not the run the keep has just queued.
+    const scenario = await arrange();
+    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+    await findingIn(scenario.workspaceId, first.documentId, { charStart: 54, charEnd: 97 });
+    await findingIn(scenario.workspaceId, first.documentId, { charStart: 120, charEnd: 128 });
+    await findingIn(scenario.workspaceId, second.documentId, { charStart: 54, charEnd: 97 });
+    await finishedIndexRun(scenario.workspaceId, bindingId, "2026-09-20T10:00:00.000Z", [
+      { ...SORT_CODE_RULE, document_id: second.documentId, char_start: 54, char_end: 97 },
+    ]);
+    await finishedIndexRun(scenario.workspaceId, bindingId, "2026-09-20T11:00:00.000Z", [
+      { ...SORT_CODE_RULE, document_id: first.documentId, char_start: 54, char_end: 97 },
+    ]);
+    const elsewhere = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
+    await finishedIndexRun(
+      scenario.workspaceId,
+      elsewhere.bindingId,
+      "2026-09-20T13:00:00.000Z",
+      [],
+    );
+    // A later run that failed says what went wrong and not what the binding holds.
+    await seededBy(db(), (seed) =>
+      seed.job({
+        workspaceId: scenario.workspaceId,
+        kind: "index",
+        subjectId: bindingId,
+        reason: "rule-change",
+        status: "failed",
+        attempts: 1,
+        finishedAt: new Date("2026-09-20T12:00:00.000Z"),
+        outcome: { error: "TimeoutError" },
+      }),
+    );
+    await keepAs(scenario.admin, bindingId, [
+      findingGroupIn(first.documentId),
+      findingGroupIn(second.documentId),
+    ]);
+
+    const read = await findingsAs(scenario.admin, bindingId);
+
+    expect(
+      read.ok
+        ? read.value.map((group) => ({
+            documentId: group.documentId,
+            found: group.found,
+            overriddenByErasure: group.overriddenByErasure,
+          }))
+        : [],
+    ).toEqual([
+      { documentId: first.documentId, found: 2, overriddenByErasure: 1 },
+      // The same rule and the same offsets in another document are another finding.
+      { documentId: second.documentId, found: 1, overriddenByErasure: 0 },
+    ]);
+  });
+
+  it("fails, rather than read nought, over a run whose list of kept spans it cannot read", async () => {
+    // Nought would tell an Admin that every keep is showing — the false comfort the figure
+    // exists to end — so a list that is there and is not a list of spans fails the read.
+    const scenario = await arrange();
+    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    await findingIn(scenario.workspaceId, first.documentId);
+    await seededBy(db(), (seed) =>
+      seed.job({
+        workspaceId: scenario.workspaceId,
+        kind: "index",
+        subjectId: bindingId,
+        reason: "bound",
+        status: "done",
+        attempts: 1,
+        finishedAt: new Date("2026-09-20T11:00:00.000Z"),
+        outcome: {
+          documents: 1,
+          restores_overridden_by_erasure: [{ document_id: first.documentId }],
+        },
+      }),
+    );
+
+    const read = await findingsAs(scenario.admin, bindingId);
+
+    expect(read.ok).toBe(false);
+    expect(read.ok ? undefined : read.error).toBeInstanceOf(Error);
+  });
+
+  it("counts a span the run named only while an Admin's keep stands on it", async () => {
+    // The run's list is the worker's word about spans, and the review's figure is about
+    // *kept* spans: a row nobody restored is not one, whatever an outcome row says of it.
+    const scenario = await arrange();
+    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    await findingIn(scenario.workspaceId, first.documentId, { charStart: 54, charEnd: 97 });
+    await finishedIndexRun(scenario.workspaceId, bindingId, "2026-09-20T11:00:00.000Z", [
+      { ...SORT_CODE_RULE, document_id: first.documentId, char_start: 54, char_end: 97 },
+    ]);
+
+    const read = await findingsAs(scenario.admin, bindingId);
+
+    expect(read.ok ? read.value.map((group) => group.overriddenByErasure) : []).toEqual([0]);
   });
 
   it.each([

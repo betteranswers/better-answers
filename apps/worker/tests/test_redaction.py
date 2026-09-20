@@ -698,7 +698,7 @@ def restore_of(found: Redaction, page: str, span: str, tier: str = "always") -> 
 def test_a_restored_span_is_left_in_the_text_and_is_still_the_finding_it_was(
     on_a_plain_binding: Redaction, page: str
 ) -> None:
-    # Both ways (`[TEST7]`): withheld on the control and in the text under the restore,
+    # Both ways: withheld on the control and in the text under the restore,
     # on a binding whose only difference is the restore. And a finding and a withholding
     # stay two things — the row an Admin reviewed is still raised and still counted, so
     # the review, the publish totals and the erasure map read what they read before.
@@ -769,3 +769,10 @@ def test_an_erasure_outranks_a_restore(
 
     assert "Rosalind Petheridge" in officers_block(restored.text)
     assert "Rosalind Petheridge" not in erased.text
+    # And the seam says which restore it overrode, because nothing else can: a finding
+    # holds no value, so only the pass that read the text knows a request named it.
+    assert restored.overridden == ()
+    assert [
+        Restore(rule_id=finding.rule_id, start=finding.start, end=finding.end)
+        for finding in erased.overridden
+    ] == [in_the_block]
