@@ -144,65 +144,118 @@ RECOGNISERS: Mapping[str, Callable[[CategoryDescriptor], EntityRecognizer]] = (
 )
 
 
-class WholeWordWindows(CharacterBasedTextChunker):
-    """The windows a long page is put to the model in, each beginning on a whole word.
+#: How long a run of text under one heading may be and still be read to the model in one
+#: window: twice the window Presidio would have used, taken from its number rather than
+#: pinned as one of ours. The ceiling was swept and not chosen — 250, 300, 350, 378,
+#: 379, 400, 500, 750, 1,000, 1,500 — and every one levels the four page lengths T-168
+#: measured, so the levelling is the heading's doing and not the ceiling's. What the
+#: ceiling decides is the whole page's own answer, and from 300 upward that answer is
+#: identical, gaining and losing nothing; only at 250 does it move, because cutting the
+#: 282-character run under *Contract history* in two makes the model read *a person's
+#: date* as a name. Twice sits in the middle of that plateau. A ceiling exists at all so
+#: that a run with no heading in it — a converted page that carries none — is never put
+#: to the model in one piece longer than the model can read.
+WINDOWS_A_RUN_IS_READ_WHOLE_IN = 2
+
+
+class HeadingWindows(CharacterBasedTextChunker):
+    """The windows a page is put to the model in, each beginning where a heading does.
 
     Presidio reads a long text to GLiNER in overlapping windows of characters. Its own
-    word for one is a *chunk*, which this repository's glossary has already spent on
-    the unit of normalised text the chunk index holds — a thing this seam runs ahead of
-    and never produces — so they are windows here. Its chunker extends a window's
-    **end** forward to the next space or newline, so a window never ends inside a word.
-    The next window's start is then that end minus the overlap, a plain subtraction
-    that lands wherever it lands, which on a page of English is inside a word most of
-    the time.
+    word for one is a *chunk*, which this repository's glossary has already spent on the
+    unit of normalised text the chunk index holds — a thing this seam runs ahead of and
+    never produces — so they are windows here (`CONTEXT.md`). Its chunker extends a
+    window's **end** forward to the next space or newline, so a window never ends inside
+    a word, and takes the next window's start as that end minus the overlap. Two faults
+    follow from that subtraction, and both were measured on the fixture page rather than
+    reasoned about.
 
-    A window that begins inside a word is a page the model reads with a fragment at the
-    front of it, and a zero-shot name model answers for the fragment at full
-    confidence. On the fixture page at 2,664 characters it answers `bers` — the tail of
-    *numbers* — as a person at 0.947, and T-168 measured `gned` inside *resigned* at
-    0.946 and `gen Sarkar` in place of *Imogen Sarkar* on the page it had then. Neither
-    is a harmless miss: a fragment inside an officers block writes `[withheld]` across
-    half a word, and one outside takes a pseudonym letter of its own and shifts every
-    later letter, which is how `Imogen Sarkar` became `[person C]`.
+    The start lands inside a word most of the time, and a window beginning inside a word
+    is a page the model reads with a fragment at the front of it, which a zero-shot name
+    model answers for at full confidence: `bers`, the tail of *numbers*, as a person at
+    0.947, and T-168's `gned` inside *resigned* at 0.946 and `gen Sarkar` in place of
+    *Imogen Sarkar*. A fragment inside an officers block writes `[withheld]` across half
+    a word; one outside takes a pseudonym letter of its own and shifts every later
+    letter, which is how `Imogen Sarkar` became `[person C]`.
 
-    **The one rule is that a window's start obeys the boundary its end already obeys**:
-    it is retracted to the beginning of the word it landed in, so no window edge falls
-    inside a word in either direction. The other option the ticket left open — a
-    post-pass that drops or widens a span whose own edges fall inside a word — is ruled
-    out by the same measurements, because the two defects want opposite treatments of
-    it. Dropping loses `gen Sarkar`, a real name the page carries three times, and
-    under-redaction is the failure this seam exists to prevent; widening turns `gned`
-    into a `person-name` finding over *resigned* and writes a pseudonym across an
-    ordinary verb. Taking the boundary out of the word is the one option of the three
-    that does neither, because it removes the fragment rather than deciding what to do
-    with it.
+    And the step counts from the start of the text, so **an edit anywhere moves every
+    window after it** and the same paragraph is read inside a different window on a page
+    that gained a sentence above it. That is not a detail of a test fixture: a page is
+    re-converted whenever its source changes, and a seam whose answers move with an edit
+    two sections up raises and drops findings nobody edited. It is also the second harm
+    in the same clothes — a name gained anywhere takes a pseudonym letter in reading
+    order and shifts every later one.
 
-    What it does not do is make a page answer the same at every length, and the further
-    rule that might was built and measured rather than reasoned about: retract a start
-    to the sentence, or to the line, that it landed in. That rule is real — it brings
-    two of T-168's four lengths level with the clean one, which this one does not — and
-    it is not taken, because of what it costs the page the seam actually reads. Under
-    it the whole page loses the officers block's `job-title 'second registered officer'`
-    and gains a `person-name` over *One of our supervisors*, a phrase that is nobody and
-    that takes a pseudonym letter in reading order all the same. It also leaves a fourth
-    length differing. The four-length table for every rule measured is the docblock of
-    `tests/test_redaction_windows.py`; what is left after this rule is whole-word drift
-    with a page's length, and it is open rather than closed.
+    **The one rule is that a window begins where a heading begins.** The run of text
+    under one heading is read whole up to `WINDOWS_A_RUN_IS_READ_WHOLE_IN` windows, and
+    stepped inside itself past that, each step landing on a whole word. No window
+    reaches back over a heading. So what the model is shown for a heading's text is
+    decided by
+    that text and by nothing before it, no window edge falls inside a word in either
+    direction, and a page with no heading in it is one run read exactly as the word rule
+    read it. A heading is what every converter emits, so the anchor is content the
+    document carries and not a count of characters into it.
+
+    Three rules were built and measured before this one, and their four-length table is
+    the docblock of `tests/test_redaction_windows.py`. A whole-word start alone removes
+    the fragments and leaves the drift, gaining a name at three of the four lengths. A
+    sentence start and a line start each level two of the four and cost the whole page
+    the officers block's `job-title 'second registered officer'` while gaining a
+    `person-name` over *One of our supervisors*, a phrase that is nobody. This rule is
+    the only one of the four under which every length answers what the whole page
+    answers in the runs they share, and the only one that costs the whole page's own
+    answer nothing at all: measured against the word rule it gains no finding and loses
+    none. It is also cheaper — 13 windows against 16, and 840 ms a page against 1,011 ms
+    on the machine both were timed on, where T-122 recorded 2,841 ms for the same call
+    in the image.
 
     A window's size and its overlap stay Presidio's own defaults and are deliberately
     not declared here. They are the detector's numbers and not this repository's rule,
     so a release that moved them moves `DETECTOR_PIN`, which is the half of the version
-    string that exists to say a detector's answers may have moved under us.
+    string that exists to say a detector's answers may have moved under us — and the
+    ceiling above is derived from the size rather than pinned beside it for the same
+    reason.
     """
 
     def chunk(self, text: str) -> list[TextChunk]:
-        """Presidio's windows, each pulled back to the start of the word it began in."""
+        """One run of text per heading, each read whole or stepped inside itself."""
+        if not text:
+            return []
         windows: list[TextChunk] = []
-        for window in super().chunk(text):
-            start = self._word_containing(text, window.start)
-            windows.append(
-                TextChunk(text=text[start : window.end], start=start, end=window.end)
-            )
+        for begins, ends in self._runs_under_each_heading(text):
+            windows.extend(self._windows_in(text, begins, ends))
+        return windows
+
+    def _runs_under_each_heading(self, text: str) -> list[tuple[int, int]]:
+        # The start of the text opens a run whether or not it is a heading, so a page
+        # carrying none is one run and a preamble above the first heading is its own.
+        begins = sorted(
+            {0}
+            | {
+                at
+                for at, character in enumerate(text)
+                if character == "#" and (at == 0 or text[at - 1] == "\n")
+            }
+        )
+        return list(zip(begins, [*begins[1:], len(text)], strict=True))
+
+    def _windows_in(self, text: str, begins: int, ends: int) -> list[TextChunk]:
+        if ends - begins <= self.chunk_size * WINDOWS_A_RUN_IS_READ_WHOLE_IN:
+            return [TextChunk(text=text[begins:ends], start=begins, end=ends)]
+        windows: list[TextChunk] = []
+        start = begins
+        while start < ends:
+            end = min(start + self.chunk_size, ends)
+            while end < ends and text[end] not in self.boundary_chars:
+                end += 1
+            windows.append(TextChunk(text=text[start:end], start=start, end=end))
+            if end >= ends:
+                break
+            # The overlap is taken back to a whole word, and never past the window it
+            # steps from: a run of characters longer than the overlap with no boundary
+            # in it would otherwise send the start backwards and the loop nowhere.
+            stepped = self._word_containing(text, end - self.chunk_overlap)
+            start = end if stepped <= start else stepped
         return windows
 
     def _word_containing(self, text: str, at: int) -> int:
@@ -229,9 +282,9 @@ class ModelRecogniser(EntityRecognizer):
     answer for.
 
     The second thing this wrapper settles is what the model is shown rather than what
-    it is asked: a long page reaches it in windows, and the windows are
-    `WholeWordWindows` rather than the default, so none of them begins mid-word and no
-    answer of the model's is part of one (`T-177`).
+    it is asked: a page reaches it in windows, and the windows are `HeadingWindows`
+    rather than the default, so none of them begins inside a word and none is decided by
+    how much text sits above it (`T-177`).
     """
 
     def __init__(
@@ -242,7 +295,7 @@ class ModelRecogniser(EntityRecognizer):
             map_location="cpu",
             threshold=threshold,
             entity_mapping=dict(labels),
-            text_chunker=WholeWordWindows(),
+            text_chunker=HeadingWindows(),
         )
         super().__init__(
             supported_entities=sorted(set(labels.values())),

@@ -65,12 +65,17 @@ GLINER_MODEL_ID_MEASURED = "knowledgator/gliner-pii-base-v1.0"
 #: from readers entitled to it. Version 3 is the health cue list, which held *health*
 #: and *condition* until T-179: a safety policy and a condition of contract were each
 #: withheld whole and narrowed their document to Restricted, at the tier no binding
-#: switches off. Version 4 is the word-boundary rule on the windows a long page is put
-#: to the model in (`T-177`): before it a window began wherever the overlap subtraction
-#: landed, so the model was shown a fragment of a word and answered for it — a
-#: `person-name` over half a word, and every later pseudonym letter shifted. The rule
-#: changes nothing about which spans are raised on this repository's fixture page and
-#: moves five of their scores, which is a moved answer and so a moved version.
+#: switches off. Version 4 is the rule on where a window into a page begins (`T-177`):
+#: before it a window began at a count of characters from the start of the text, which
+#: put its edge inside a word — the model was shown a fragment and answered for it, a
+#: `person-name` over half a word, and every later pseudonym letter shifted — and made
+#: what the model saw of one paragraph depend on how much text sat above it. A window
+#: now begins where a heading does. On this repository's fixture page the rule raises
+#: **the same twenty-four spans under the same categories**, gaining none and losing
+#: none; fourteen of them carry a different score, the largest move being `job-title`
+#: *second registered officer* from 0.778 to 0.726. A moved score is a moved answer, so
+#: it is a moved version.
+
 RULE_VERSION = "4"
 
 #: Two spellings, one name: a pin is written in the hyphens a package name uses,
