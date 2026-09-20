@@ -24,6 +24,17 @@ What a caller reaches for:
   with `Bucket` the estate's own implementation of it.
 """
 
+import os
+
+# Ahead of every import beneath it, and the order is the whole of it: the engine's core
+# looks for this once, as it is imported, and calls its usage gateway for the life of
+# the process if it was not there — the record is the docblock on
+# `tests/test_pipeline_usage_tracking.py`. A package runs before any module beneath it
+# and the tier-wide ban keeps every import of the engine beneath this one, so here is
+# ahead of all of them. It covers the process the image, the deploy unit and the CI
+# runner did not start. Written and never read, so it is not the config module's.
+os.environ["COCOINDEX_DISABLE_USAGE_TRACKING"] = "1"
+
 from .chunks import (
     CHUNK_SIZE_BYTES,
     Chunk,

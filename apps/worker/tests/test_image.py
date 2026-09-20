@@ -105,7 +105,7 @@ from typing import Any, cast
 import pytest
 
 from conftest import DAEMON_SKIP_REASON
-from deploy_unit import PLATFORM_COMPOSE, worker_service
+from deploy_unit import worker_environment, worker_service
 from planted_page import (
     FINDINGS_BY_CATEGORY,
     FIXTURE_PAGE,
@@ -423,25 +423,6 @@ def pinned_model_ids() -> tuple[str, ...]:
     prove presence and never absence.
     """
     return (_pin("GLINER_MODEL_ID"), _pin("GLINER_MODEL_ID_MEASURED"))
-
-
-def worker_environment(name: str) -> str:
-    """One value the worker's deploy unit puts in its environment, by that name.
-
-    The location of this tier's caches and stores is the deploy unit's to state — the
-    same reason ``check.yml`` sets ``HF_HOME`` for its own job — so what the image sets
-    is held against this rather than against a literal written here twice.
-    """
-    # `re.findall` answers `list[Any]`, so the value is narrowed on the statement it is
-    # returned from and never carried as `Any` (§ TYPES (Python)).
-    found = re.findall(rf"^\s+{name}:\s+(\S+)", worker_service(), re.M)
-    if len(found) != 1:
-        message = (
-            f"expected one {name} in the worker service of {PLATFORM_COMPOSE},"
-            f" found {len(found)}"
-        )
-        raise RuntimeError(message)
-    return str(found[0]).strip('"')
 
 
 def worker_mounts_over(path: str) -> list[str]:
@@ -1373,10 +1354,10 @@ def test_the_runner_refuses_the_engines_gateway_call_the_way_the_image_does() ->
     with what ships.
 
     **This covers the runner and not a laptop.** ``uv run --frozen check`` sets nothing,
-    so a developer running this tier's gate makes the same calls the run recorded above
-    counted. That is `T-204` rather than a line here: the tier's own runner is the only
-    place it could go, and whether it is worth going there at all is a ruling nobody has
-    made.
+    and neither does one suite run by file, so neither is covered from out here. What
+    covers them is the pipeline package, which sets the variable ahead of its own
+    import of the engine (`T-204`); ``tests/test_pipeline_usage_tracking.py`` holds that
+    against the same line of the compose file, and says why no later line would do.
     """
     declared = [
         line
