@@ -46,3 +46,21 @@ One correction rides with this. This ADR's principal is `{workspace, user, role}
 ## Amendment — 2026-09-03, the surface's address (T-045, ADR 0034)
 
 "`mcp.<domain>/mcp`" reads **`app.<domain>/mcp`**: the MCP surface answers on the product's own origin, and every access token's audience is that URL (ADR 0034). Nothing else changes — the four entries, the principal from the token, the per-call revocation check and the growth by token scope all stand.
+
+## Amendment — 2026-09-21, `find`'s hit is a union by knowledge layer and `open` takes a wire locator (T-134, landed 2026-09-20)
+
+Recorded on the day after the build, because a shipped behaviour that contradicts an ADR is an amendment and never a quiet edit to its body.
+
+**Where the decision above says `find` is "a preview of hits by kind, bundle, type and tags", read: a preview whose hit is a union by knowledge layer.** That sentence describes one arm of two. The 2026-08-31 amendment above repeats it — "`find` … already returns hits by kind, bundle, type and tags" — and reads the same way. The entry's name, its scope and its place on the surface do not move; what moves is what one line of the preview may be.
+
+**Two hits, discriminated by the layer they come from.** A **concept hit** carries `layer: "bundles"` and the fields it always carried — IRI, kind, title, trust word, bundle, tags. A **document hit** carries `layer: "sources"`, the one kind word *document*, the document's title, the chunk's own span as the wire locator `open` takes, and the sensitivity word it is offered under; the human rendering leads it with the marker *Not company knowledge*. The marker is the rendering's and never a field, because every hit of that layer wears it by being one, and a field would be a second opinion a caller could disagree with. `kind` cannot be the discriminator — a concept's kind is whatever OKF type the file declares, an open set (ADR 0026) — so the layer is named outright, which is how `CONTEXT.md` types a hit in the first place.
+
+**A document stands alone only where no visible concept cites it** (ADR 0016). The sources arm leaves out a document a concept this reader may see rests on, so the preview never offers raw evidence beside the company's own answer to the same thing. A withheld unit is not a hit, not a count and not a hint, on either arm.
+
+**The caller's limit is the union's, not each arm's.** A reader asking for five hits is asking to be handed five things; running both arms to five would hand them ten off one argument, twice the context the host budgeted for. The concept arm takes the limit and the document arm takes what is left, so a query the concepts answer in full offers no document.
+
+**Until S2, the two arms rank separately.** Each is ranked by its own read — the concepts by the index's order, the documents by the parser's rank — and the concepts come **first**, because a concept is the company's answer and a raw passage is what there was no answer for. One ranking *across* the two layers is S2's: it needs a score the arms share, and a merge invented here would be an ordering nothing could hold to. A session opening this ADR before S2's `/to-spec` reads the separate ranking as the question S2 closes, not as a shape to preserve.
+
+**`open` by locator is the second door, and it takes one.** Where the decision above says "the passage a citation rests on by locator, one or many", read **one**: the entry takes an IRI or a locator, exactly one of the two, and a locator answers the passage — locator, source title, text, sensitivity word — or *not found*. A wire locator now reaches the caller from two places rather than one: a citation, as before, and a document hit's own line. And **`open` by IRI renders each evidence item's wire locator**, so a concept read in full names the addresses its evidence opens at and the next call opens one.
+
+Everything else in this ADR and its amendments stands — the four entries, the principal from the token, the per-call revocation check, no workspace argument on any entry, and the growth by token scope.
