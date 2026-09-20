@@ -1,0 +1,11 @@
+apps/web/src/app/router.tsx
+  ai_agent 102-103,117-122
+.oxlintrc.json
+  ai_agent 456-461
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ddec1728df2fa3d1e2796ae35489e3ce624ec630",
+  "prompts": {}
+}
