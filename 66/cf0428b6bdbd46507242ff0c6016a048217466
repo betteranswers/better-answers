@@ -1,0 +1,21 @@
+apps/worker/tests/test_pipeline_landed.py
+  ai_agent 294
+apps/worker/tests/test_redaction_windows.py
+  ai_agent 1-171
+apps/worker/src/better_answers_worker/redaction/pins.py
+  ai_agent 68-74
+docs/adr/0020-personal-data-is-withheld-at-the-seam-before-any-store-and-erased-from-every-copy-by-routine.md
+  ai_agent 105-114
+docs/adr/README.md
+  ai_agent 28
+apps/worker/tests/test_redaction_descriptors.py
+  ai_agent 304,307,322-325,329
+apps/worker/src/better_answers_worker/redaction/engine.py
+  ai_agent 50,147-208,221-225,236
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "66cf0428b6bdbd46507242ff0c6016a048217466",
+  "prompts": {}
+}
