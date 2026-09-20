@@ -814,6 +814,12 @@ def _build_command(
     starts containers from what this returns. ``--quiet`` is not asked of that arm
     because it is not the id's source there: buildx writes the id to ``--iidfile``,
     which is a file this run owns rather than a line to be picked out of a build log.
+
+    ``scope=`` on both halves, and it is the leg's own name. The backend's default is
+    ``buildkit`` for everyone and one scope holds one manifest, so this build and
+    ``build.yml``'s three legs were four writers of one index (`T-211`). The leg is
+    read out of that workflow's matrix, so the name here is the name its leg writes
+    under, and a pull request's build reads what that leg wrote on ``main``.
     """
     if builder is None:
         return [
@@ -831,9 +837,9 @@ def _build_command(
         "--builder",
         builder,
         "--cache-from",
-        "type=gha",
+        f"type=gha,scope={leg['tier']}",
         "--cache-to",
-        "type=gha,mode=max",
+        f"type=gha,mode=max,scope={leg['tier']}",
         "--load",
         "--iidfile",
         str(iidfile),
@@ -1410,8 +1416,17 @@ def test_a_runner_builds_through_buildx_and_a_laptop_builds_as_it_always_did() -
     and neither needs a daemon: what this holds is that the fallback is *exactly* the
     command that ran before the cache existed, and that the cached arm carries all four
     of the things it cannot work without.
+
+    Both halves of the cache name the leg's own scope. With no ``scope=`` the backend
+    writes under ``buildkit`` for everyone and one scope holds one manifest, so this
+    build and ``build.yml``'s three legs were four writers overwriting each other
+    (`T-211`); the api's probe says the same and passes its own tier.
     """
-    leg = {"dockerfile": "apps/worker/Dockerfile", "context": "apps/worker"}
+    leg = {
+        "tier": "worker",
+        "dockerfile": "apps/worker/Dockerfile",
+        "context": "apps/worker",
+    }
     written_to = Path("/tmp/the-id-this-build-wrote")
 
     assert _build_command(leg, builder="the-container-builder", iidfile=written_to) == [
@@ -1421,9 +1436,9 @@ def test_a_runner_builds_through_buildx_and_a_laptop_builds_as_it_always_did() -
         "--builder",
         "the-container-builder",
         "--cache-from",
-        "type=gha",
+        "type=gha,scope=worker",
         "--cache-to",
-        "type=gha,mode=max",
+        "type=gha,mode=max,scope=worker",
         "--load",
         "--iidfile",
         "/tmp/the-id-this-build-wrote",

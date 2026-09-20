@@ -2,7 +2,7 @@
 
 **Operational reference, not a page of the docs site.** This file lives in `docs/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
 
-A development machine's cache, not the estate's. Nothing deployed builds images — `RELEASES.md` promotes digests a runner built — so the only build cache to bound is on the machine that runs `check`. It is bounded by a garbage-collection policy the builder reads at startup, and by nothing a person runs.
+Two caches, neither the estate's. Nothing deployed builds images — `RELEASES.md` promotes digests a runner built — so the build caches to bound are the two that build: a development machine's, bounded by a garbage-collection policy the builder reads at startup and by nothing a person runs, and the runner's, bounded by GitHub's quota and read in *The runner's cache* at the foot of this file. Every section between is the development machine's.
 
 ## Where the policy lives
 
@@ -63,3 +63,25 @@ Setting `builder.gc`'s `defaultReservedSpace`, `defaultMaxUsedSpace` and `defaul
 Unnecessary for a ceiling — `maxUsedSpace` works in `daemon.json` on Engine 29.7.2, per-rule and as a default.
 
 If one is ever wanted for another reason: it leaves nothing in the local image store without `--load`, and the image-contents suites pass `--load` only on the arm they take when the builder can export a cache — a runner's, never a laptop's (`apps/api/tests/image-probe.ts`, `apps/worker/tests/test_image.py`). On a laptop they run `docker build --quiet` and start a container from the id it prints, and a *selected* container builder leaves no such image. Create it, and name it with `--builder` on the builds that want it.
+
+## The runner's cache
+
+BuildKit's `type=gha` backend, kept in the repository's Actions cache beside the pnpm store, uv's cache and the detector's weights. No policy bounds it: GitHub holds **10 GB per repository** and, once past it, evicts least-recently-used entries of every kind until the total is back under — so a build cache over its share evicts `check.yml`'s weights entry along with its own layers.
+
+**One scope per image, and the scope is the leg's name: `api`, `worker`, `backup`.** A scope holds one manifest, and a `type=gha` line with no `scope=` writes under `buildkit` for everyone — every writer then overwrites the one index, and each run builds cold whichever images wrote before the last. The writers are `build.yml`'s three legs and the two image-contents suites `check.yml` runs on a pull request (`apps/api/tests/image-probe.ts`, which builds `api` and `backup`; `apps/worker/tests/test_image.py`, which builds `worker`), each passing the leg's name out of `build.yml`'s matrix. `apps/api/tests/image-job.test.ts` refuses a bare `type=gha` in the workflow, and each suite holds its own argv as a literal.
+
+An Actions cache is readable from the ref that wrote it and from the base branch, never from a sibling. A pull request therefore reads what `main`'s legs wrote and `main` never reads a pull request's; what a pull request writes costs quota and warms only its own later pushes.
+
+**Two commits' runs can write one scope at once.** `build.yml`'s concurrency group is per commit (`T-211`), so nothing serialises the runs any more, and a burst of pushes has several legs exporting to `scope=worker` together. The last index written wins. That is the collision above in a milder form: every writer of a scope built the same image, so the manifest left standing is a manifest for the right image and the next run reads it warm — what it costs is the losing runs' layers, left unreferenced until eviction takes them. It shows as blob growth after a burst with no matching gain in warm runs, and the six runs measured after `T-211` are where to look for it first.
+
+Read it with:
+
+```
+gh cache list --limit 100 --sort size_in_bytes --order desc
+gh cache list --key index- --json key,ref,createdAt
+gh api repos/{owner}/{repo}/actions/cache/usage
+```
+
+The second is the one that shows a collision. A manifest's key is `index-<scope>-…`, so healthy is one `index-api-`, `index-worker-` and `index-backup-` family per ref, and **any `index-buildkit-` entry newer than 20/09/2026 is an unscoped writer**. Layers are `buildkit-blob-…`, keyed by digest and shared across scopes, so the blob total is the number to hold against the quota — read it from the third command, not by summing the first, which stops at its `--limit`.
+
+Measured 20/09/2026, before the scopes (`T-211`): 13.5 GB held, 12.07 GB of it blobs, every index under `buildkit`, the worker leg cold on 47% of runs at 9.19 min against 2.70 warm.

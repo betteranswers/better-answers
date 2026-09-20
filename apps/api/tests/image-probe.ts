@@ -351,7 +351,11 @@ const matrixLegSchema = z.object({
 
 export type MatrixLeg = z.infer<typeof matrixLegSchema>;
 
+/** A `permissions:` block, at whichever scope it was written: a scope and what it may do. */
+const permissionsSchema = z.record(z.string(), z.string());
+
 const imageJobSchema = z.object({
+  permissions: permissionsSchema.optional(),
   strategy: z.object({ matrix: z.object({ include: z.array(matrixLegSchema) }) }),
   steps: z.array(workflowStepSchema),
 });
@@ -365,6 +369,8 @@ export const readWorkflow = <Shape>(name: string, schema: z.ZodType<Shape>): Sha
   schema.parse(parse(readFileSync(path.join(repositoryRoot, ".github/workflows", name), "utf8")));
 
 const buildWorkflowSchema = z.object({
+  concurrency: z.object({ group: z.string() }),
+  permissions: permissionsSchema.optional(),
   jobs: z.object({
     check: z.object({ with: z.record(z.string(), z.unknown()).optional() }),
     image: imageJobSchema,
