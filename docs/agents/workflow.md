@@ -37,8 +37,10 @@ Commits go on the ticket's branch, one message in the repository's prose shape e
 
 | When | What | Who |
 | --- | --- | --- |
-| The attempt's end | each touched workspace's `check` (`pnpm --filter <workspace> check`; `cd apps/worker && uv run --frozen check`) and the root gates named ahead of `check:workspaces` in the root `package.json` (`node scripts/check.mjs format:check lint jscpd knip`), with `IMAGE_PROBE_DEFERRED=true` so neither tier's image-contents suite builds an image | the agent |
-| The PR | root `check` in full on the runner (`.github/workflows/check.yml`) | CI, the arbiter |
+| The attempt's end | each touched workspace's `lint` and `typecheck` (the worker's `ruff` and `mypy`); the suites the ticket names or touched, by file (`pnpm --filter <workspace> exec vitest run <file>…`; `cd apps/worker && uv run --frozen pytest <file>…`), with `IMAGE_PROBE_DEFERRED=true` so neither tier's image-contents suite builds an image; and the root gates named ahead of `check:workspaces` in the root `package.json` (`node scripts/check.mjs format:check lint jscpd knip`) | the agent |
+| The PR | root `check` in full on the runner (`.github/workflows/check.yml`) — the one place a whole workspace suite runs | CI, the arbiter |
+
+A whole workspace suite is CI's because several agents' suites on one machine take `packages/core`'s and `apps/api`'s 60 s test budgets past their limit: 29 failures on 19/09/2026, every one a timeout, each file green alone. A regression outside the ticket's files shows on the PR's run and is fixed on the same branch.
 
 ## Environment
 
