@@ -9,6 +9,7 @@ import {
   passageAt,
   reprocessBinding,
   type NarrowDocumentsInput,
+  type ReprocessBindingInput,
 } from "../src/sources/index.ts";
 import {
   bindingHolding,
@@ -662,24 +663,80 @@ describe("an Admin narrowing named documents", () => {
   });
 });
 
+/** The reprocess as the Admin's act, for the reason the case is about. */
+const reprocessAsAdmin = (
+  scenario: Scenario,
+  bindingId: string,
+  reason: ReprocessBindingInput["reason"],
+) =>
+  acting(scenario.admin, (principal, tx) => reprocessBinding(principal, tx, { bindingId, reason }));
+
 describe("the reprocess that follows a review", () => {
-  it("takes the binding's findings away with its chunks, so the next run starts from none", async () => {
+  it("takes the findings nobody has marked away with the chunks, so a span the rules no longer raise does not linger", async () => {
     const scenario = await arrange();
     const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId);
     await findingIn(scenario.workspaceId, first.documentId, { category: "government-id" });
     await findingIn(scenario.workspaceId, second.documentId);
 
-    const outcome = await acting(scenario.admin, (principal, tx) =>
-      reprocessBinding(principal, tx, { bindingId, reason: "rule-change" }),
-    );
+    const outcome = await reprocessAsAdmin(scenario, bindingId, "rule-change");
 
-    // A finding's id is a minted ULID and the worker holds INSERT alone, so rows left standing
-    // would come back doubled from the run this queues.
     expect(outcome).toMatchObject({ ok: true, value: { chunks: 2, findings: 3 } });
     expect(await findingCountOf(scenario.workspaceId, first.documentId)).toBe(0);
     expect(await findingCountOf(scenario.workspaceId, second.documentId)).toBe(0);
   });
+
+  it("leaves a span an Admin kept in text where it was — its id, its restore and its review — and takes the unmarked span beside it", async () => {
+    const scenario = await arrange();
+
+    const { bindingId, kept, left } = await keepingTwoSpansOfThree(scenario);
+    const outcome = await reprocessAsAdmin(scenario, bindingId, "rule-change");
+
+    // Two kept, one left: the count the act answers is the rows that went, and one did.
+    expect(outcome).toMatchObject({ ok: true, value: { findings: 1 } });
+    expect(await restoreOf(scenario.workspaceId, kept)).toEqual({
+      restored: true,
+      restored_by: `human:${scenario.admin.userId}`,
+      restore_reason: BUSINESS_FACT,
+    });
+    expect(await reviewOf(scenario.workspaceId, kept)).toMatchObject({
+      review_state: "kept-in-text",
+    });
+    expect(await marksOf(scenario.workspaceId, left)).toBeUndefined();
+  });
+
+  it.each([
+    [
+      "restored through S0's act on its own, and so never reviewed",
+      { restoredAt: new Date("2026-09-12T10:00:00.000Z"), restoreReason: BUSINESS_FACT },
+      "restoredBy",
+    ],
+    [
+      "reviewed as narrowed, and never restored",
+      { reviewState: "narrowed", reviewedAt: new Date("2026-09-12T10:00:00.000Z") },
+      "reviewedBy",
+    ],
+  ] as const)(
+    "spares a finding %s — either mark alone is an Admin's act",
+    async (_how, marks, actorColumn) => {
+      const scenario = await arrange();
+      const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+      const marked = await seededBy(db(), async (seed) => {
+        const row = await seed.finding({
+          workspaceId: scenario.workspaceId,
+          documentId: first.documentId,
+          ...marks,
+          [actorColumn]: `human:${scenario.admin.userId}`,
+        });
+        return row.id;
+      });
+
+      const outcome = await reprocessAsAdmin(scenario, bindingId, "wiped");
+
+      expect(outcome).toMatchObject({ ok: true, value: { findings: 0 } });
+      expect(await marksOf(scenario.workspaceId, marked)).toBeDefined();
+    },
+  );
 
   it("leaves another binding's findings where they are", async () => {
     const scenario = await arrange();
@@ -687,9 +744,7 @@ describe("the reprocess that follows a review", () => {
     const elsewhere = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
     await findingIn(scenario.workspaceId, elsewhere.documentId);
 
-    await acting(scenario.admin, (principal, tx) =>
-      reprocessBinding(principal, tx, { bindingId, reason: "rule-change" }),
-    );
+    await reprocessAsAdmin(scenario, bindingId, "rule-change");
 
     expect(await findingCountOf(scenario.workspaceId, elsewhere.documentId)).toBe(1);
   });

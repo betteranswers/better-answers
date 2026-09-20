@@ -3,6 +3,7 @@ import {
   BINDING_PUBLISHED_STATE,
   boundarySchemas,
   CONNECTOR_UPLOAD,
+  FINDING_UNREVIEWED_STATE,
   INDEX_KIND,
   JOB_DONE_STATUS,
   SENSITIVITY_DEFAULT,
@@ -548,8 +549,8 @@ export type ReprocessBindingInput = {
   /**
    * Why this binding is being indexed again, in the queue's own words for an index run —
    * the caller's to say, because the caller is the act this one rides in: the erasure
-   * routine's *wiped*, an edit to the rules in force's *rule-change*, a finding restored
-   * into a document's *restored*.
+   * routine's *wiped*, an edit to the rules in force's *rule-change*. A keep and a narrowing
+   * queue their own run and take no row away, so neither comes through here.
    */
   readonly reason: IndexReason;
 };
@@ -567,7 +568,7 @@ export type BindingReprocessed = {
   readonly jobId: string;
   /** How many chunk rows went — what that run has to put back. */
   readonly chunks: number;
-  /** How many finding rows went with them — what the seam will raise again. */
+  /** How many finding rows went with them — the unmarked ones; a reviewed or restored row stays. */
   readonly findings: number;
 };
 
@@ -587,13 +588,19 @@ export type BindingReprocessed = {
  * transaction it has to remember to abort. Read the other way round: no path here takes a
  * binding's passages away without the work that replaces them already being on the queue.
  *
- * **The findings go with the chunks.** A finding's id is a minted ULID and the worker holds
- * INSERT on the table and nothing else (ADR 0020), so a run writes every span it found again
- * whether the seam ran or the memo answered — and a binding whose rows were left standing
- * would come back from a second run holding each of its findings twice. The run that follows
- * this one starts from none, which is what makes it idempotent. The statement is this act's
- * because the wipe is: a caller that took the chunks and left the findings would be half a
- * reprocess.
+ * **The findings nobody has marked go with the chunks, and a marked one stays** (ADR 0020,
+ * amended 2026-09-20). What an Admin did about a span is not the reprocess's to take: a
+ * restore is what the next run lets the span back in by, a review is what a widening is held
+ * against, and a wipe that took either would have every rule change un-say the review of the
+ * whole binding. The unmarked rows do go, because a span the rules no longer raise has no run
+ * left to account for it, and the worker cannot delete. The statement is this act's because
+ * the wipe is.
+ *
+ * A row left standing is not doubled by the run this queues because a finding is the same
+ * finding on every run that finds it — the amendment's unique key over the document, the rule
+ * and the offsets, which the worker's insert steps over. **That key is not in the tree at this
+ * commit**: it and the worker's half land after migration 0039, on this ticket, and until they
+ * do a spared row comes back from the next run with an unmarked twin beside it.
  *
  * **The LMDB directory is not this act's.** The engine's store for this binding sits on the
  * worker's own volume, and the worker removes it at the head of the `index` run this enqueues
@@ -633,13 +640,15 @@ export const reprocessBinding = async (
   if (!wiped.ok) return err(wiped.error);
   // Reached through the document, because a finding is keyed to one and carries no binding of
   // its own — the subquery rather than a join, so the statement is a delete over one table.
+  // Either mark alone spares the row: a restore taken on its own leaves the review where it was.
   const raised = await attempt(() =>
     tx.query(
       `DELETE FROM finding
         WHERE workspace_id = $1
+          AND review_state = $3 AND restored_at IS NULL
           AND document_id IN (SELECT id FROM source_document
                                WHERE workspace_id = $1 AND binding_id = $2)`,
-      [workspaceId, bindingId],
+      [workspaceId, bindingId, FINDING_UNREVIEWED_STATE],
     ),
   );
   if (!raised.ok) return err(raised.error);

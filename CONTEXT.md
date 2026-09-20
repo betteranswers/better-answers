@@ -180,7 +180,11 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   birth, home address, personal contact, special category, …), offsets into the normalised text,
   the rule and detector version that fired. Counted per category; never a class, never a value.
   Born **unreviewed**; a review leaves it *kept in text* or *narrowed*, with the acting Admin and
-  the instant.
+  the instant. **Marked** once an Admin has reviewed or restored it, *unmarked* until then. **The
+  same finding on every run that finds it**: the document, the rule and the offsets are what it
+  is, for as long as the document's content stands, so what an Admin decided about it stands on
+  every later run. The detector's score and version are one run's reading of it, never part of
+  what it is.
 - **keep in text** — an Admin's bulk act over named *findings* of one binding: each span restored
   with one reason because it is the company's own business fact and reviewed as *kept in text*,
   and the run that lets them back into the document queued with them. The always set alone, one
