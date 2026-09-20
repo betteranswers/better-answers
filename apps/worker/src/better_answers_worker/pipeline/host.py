@@ -33,7 +33,6 @@ workspace exhausts Postgres long before the estate has ten busy workspaces.
 """
 
 import asyncio
-import os
 import shutil
 import threading
 from collections import OrderedDict
@@ -185,11 +184,6 @@ class Host:
         self._pools: dict[str, asyncpg.Pool] = {}
         self._environments: OrderedDict[str, coco.Environment] = OrderedDict()
         self._providers: dict[str, coco.ContextProvider] = {}
-        # The engine's core reads this once, from the process environment, when its
-        # runtime first starts; there is no setting on the API for it. The deploy unit
-        # sets it too, and this line is what makes a process started without it still
-        # leave one shape on stdout rather than two.
-        os.environ["RUST_LOG"] = self._engine.rust_log
 
     def __enter__(self) -> "Host":
         return self

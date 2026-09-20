@@ -58,7 +58,12 @@ dependencies = [
     # run that proved the value, with its date, the engine version and both arms, is
     # the docblock on `apps/worker/tests/test_image.py`'s
     # `test_the_image_stops_the_engine_calling_its_gateway_and_the_deploy_unit_agrees`.
-    # Bumping this pin re-runs that probe and re-dates that record in the same commit.
+    # A process none of the three started — this tier's gate on a laptop — is covered by
+    # the pipeline package setting it ahead of its import of the engine, because the
+    # core looks once, as it is imported, and reads `RUST_LOG` the same way; the run
+    # that proved *when* is the docblock on
+    # `apps/worker/tests/test_pipeline_engine_environment.py`.
+    # Bumping this pin re-runs both probes and re-dates both records in the same commit.
     "cocoindex==1.0.22",
     # The driver the engine's Postgres target acquires its own connections through, and
     # the one the pipeline's per-workspace pool is built from. It is named here rather

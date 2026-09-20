@@ -24,6 +24,29 @@ What a caller reaches for:
   with `Bucket` the estate's own implementation of it.
 """
 
+import os
+
+# Ahead of every import beneath it, and the order is the whole of it: the engine's core
+# reads both of these once, as it is imported, and a line anywhere downstream of that
+# sets a variable nothing reads again — the record is the docblock on
+# `tests/test_pipeline_engine_environment.py`. A package runs before any module beneath
+# it and the tier-wide ban keeps every import of the engine beneath this one, so here is
+# ahead of all of them, and ahead of the config module ever being asked for anything —
+# which is why neither value is that module's, and why the second line is the one look
+# at the environment this tier takes outside it.
+#
+# Without the first the core calls its usage gateway for the life of the process. The
+# deploy unit, the image and the CI runner set it for the processes they start; this
+# covers the ones they did not, and a box that says otherwise does not win.
+#
+# Without the second the core installs a tracing subscriber at `info` and writes its own
+# non-JSON shape to stdout, and this variable is the only thing that quiets it — so the
+# tier that has one logger states the level here as well as in the deploy file, and one
+# JSON shape leaves the process. A box that set a louder one is an operator reading the
+# engine's own lines, and keeps it; one that set it to nothing has said nothing.
+os.environ["COCOINDEX_DISABLE_USAGE_TRACKING"] = "1"
+os.environ["RUST_LOG"] = os.environ.get("RUST_LOG") or "warn"
+
 from .chunks import (
     CHUNK_SIZE_BYTES,
     Chunk,

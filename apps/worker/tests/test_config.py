@@ -13,7 +13,6 @@ from better_answers_worker.config import (
     CONCURRENT_RUNS,
     LMDB_MAP_BYTES,
     MAX_INFLIGHT_COMPONENTS,
-    RUST_LOG,
     BootstrapError,
     read_bootstrap,
 )
@@ -51,18 +50,17 @@ def test_the_bootstrap_carries_the_object_store_the_compose_file_hands_both_tier
 
 def test_the_engines_defaults_come_from_the_box_and_not_from_the_engine() -> None:
     """The engine's own defaults are sized for a machine this estate does not have — an
-    initial map of four gigabytes that doubles on demand, a thousand components in
-    flight at once and a core that prints at `info`. Each is stated here instead.
+    initial map of four gigabytes that doubles on demand and a thousand components in
+    flight at once. Each is stated here instead. The level its core prints at is not
+    this module's: the core takes it from the environment as it is imported, which is
+    ahead of anything here, and `tests/test_pipeline_engine_environment.py` holds it.
     """
-    read = read_bootstrap(
-        {**COMPLETE, "LMDB_MAX_BYTES_PER_BINDING": "4294967296", "RUST_LOG": "warn"}
-    )
+    read = read_bootstrap({**COMPLETE, "LMDB_MAX_BYTES_PER_BINDING": "4294967296"})
 
     assert read.engine.lmdb_dir == "/data/worker/lmdb"
     assert read.engine.lmdb_map_bytes == 4_294_967_296
     assert read.engine.max_inflight_components == 4
     assert read.engine.concurrent_runs == 1
-    assert read.engine.rust_log == "warn"
 
 
 def test_the_constants_are_the_numbers_this_tier_settled_on() -> None:
@@ -72,14 +70,6 @@ def test_the_constants_are_the_numbers_this_tier_settled_on() -> None:
     assert LMDB_MAP_BYTES == 4_294_967_296
     assert MAX_INFLIGHT_COMPONENTS == 4
     assert CONCURRENT_RUNS == 1
-    assert RUST_LOG == "warn"
-
-
-def test_a_louder_rust_log_on_the_box_wins_over_the_tiers_own_level() -> None:
-    """The level is stated in two places on purpose — the deploy file and this module —
-    and the box is the one an operator can reach without a release.
-    """
-    assert read_bootstrap({**COMPLETE, "RUST_LOG": "debug"}).engine.rust_log == "debug"
 
 
 def test_more_than_one_concurrent_run_is_refused_rather_than_quietly_reduced() -> None:
@@ -117,12 +107,11 @@ def test_a_missing_bootstrap_value_is_named_rather_than_implied() -> None:
         assert owed in named
 
 
-def test_the_compose_file_gives_the_worker_the_two_variables_this_wave_reads() -> None:
-    """The deploy unit's side of the same pair (`[TEST7]`): the module reads them and
-    the box sets them, and a variable read by a module no box fills is a worker that
-    refuses to start on the estate and passes every test here.
+def test_the_compose_file_gives_the_worker_the_variable_this_wave_reads() -> None:
+    """The deploy unit's side of the same pair (`[TEST7]`): the module reads it and the
+    box sets it, and a variable read by a module no box fills is a worker that refuses
+    to start on the estate and passes every test here.
     """
     worker = worker_service()
 
     assert re.search(r"^\s+LMDB_DIR:\s+/data/worker/lmdb\s", worker, re.M) is not None
-    assert re.search(r"^\s+RUST_LOG:\s+warn\s", worker, re.M) is not None

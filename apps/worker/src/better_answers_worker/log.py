@@ -15,7 +15,8 @@ stdout for no gain.
 
 The engine's *core* is a third case and is not a Python logger at all: it installs its
 own subscriber inside its Rust runtime and reads `RUST_LOG` to decide what to print. The
-deploy unit sets that variable and the pipeline's host sets it too.
+deploy unit sets that variable, and the pipeline package sets it too ahead of its import
+of the engine, which is the only moment the core reads it.
 """
 
 import logging
