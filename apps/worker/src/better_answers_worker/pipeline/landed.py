@@ -32,14 +32,17 @@ original is never written: it is the evidence an erasure map is read from and a
 re-detection is re-run over.
 
 **One component per document** (`mount_each`), which is what makes a document's failure
-its own rather than the run's. The per-document timeout, the quarantine of a document
-the converter cannot read and the memory measurement rest on that and arrive with T-130.
+its own rather than the run's. Two things rest on that and arrive with T-130: a document
+the converter cannot read is *quarantined* on its own catalogue row and never a run
+failure, and each document's conversion carries a **cooperative timeout of its own**, so
+a conversion that sticks is that document's quarantine rather than the binding's.
 """
 
 import hashlib
 import threading
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 
 import cocoindex as coco
 
@@ -48,24 +51,42 @@ from ..redaction import redact
 from ..redaction.engine import Finding
 from ..redaction.pins import VERSION_STRING
 from .chunks import CHUNK_SIZE_BYTES, Chunk, split_into_chunks
+from .converter import (
+    CONVERTER_PIN,
+    TEXT_ENCODING,
+    UnreadableError,
+    converted,
+    pages_of,
+)
 from .host import LANDED_APP, Host, IndexRun
 from .objects import LandedCopies
 
 #: What invalidates every memo entry in every binding: this repository's rule version
-#: and the pin it decided with, joined as the finding rows and the document's own column
-#: carry them. Taken from the seam's own constant rather than composed again here, so a
-#: detector that moves cannot move in one place and not the other.
-MEMO_VERSION = VERSION_STRING
+#: and the pin it decided with, and beside them the converters that wrote the text the
+#: seam read. Taken from each module's own constant rather than composed again here, so
+#: a detector or a converter that moves cannot move in one place and not the other.
+#:
+#: **The converters belong in this key and not on the document's row.** A converter's
+#: output is the span address space, so an upgrade misses the memo for every document of
+#: its media type and is a reprocess somebody chose rather than a drift nobody saw. The
+#: catalogue's `redaction_version` column keeps the seam's string alone, which is what a
+#: locator's offsets are read against once the text exists.
+MEMO_VERSION = f"{VERSION_STRING}+{CONVERTER_PIN}"
 
-#: The media types this tier converts today, which is the two that need no conversion at
-#: all: the bytes are the normalised text already. `.docx` and PDF arrive with T-130.
-PASSED_THROUGH = ("text/markdown", "text/plain")
+#: What S0 measured the seam at, per page, on the worker image (`T-122`, 11/09/2026;
+#: `tests/test_image.py`'s docblock carries the three readings and the machine). The
+#: **slowest** of them is the one taken, because this number is a ceiling and not a
+#: budget: a timeout cut from the fastest reading would quarantine documents a busier
+#: box could have read.
+SEAM_MS_PER_PAGE = 2841
 
-#: How the bytes of a passed-through document are read. One encoding and not a guess:
-#: the bind act takes what a reader uploaded and a document that is not valid UTF-8 is
-#: one this tier cannot read, which is the same answer as a media type it cannot
-#: convert.
-TEXT_ENCODING = "utf-8"
+#: What is added to every document's ceiling whatever its length: the one-off model load
+#: the first document of a process pays (6351-7137 ms in the same readings), the
+#: conversion in front of the seam, and the engine's own work around both. Thirty
+#: seconds is four times the slowest load recorded, which is the margin's whole job —
+#: nothing here is measured against it, and a document that needs more than its pages
+#: plus this is a document the run gives up on rather than holds the binding for.
+TIMEOUT_MARGIN_MS = 30_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,16 +164,35 @@ class ReadDocument:
 
 
 @dataclass(frozen=True, slots=True)
+class QuarantinedDocument:
+    """One document the run could not read, and the name of what refused it.
+
+    The name is a converter's own class name — `NeedsOcrError`, `EncryptedError`,
+    `MalformedError`, `DeadlineExceededError` — and never a line of the document. It is
+    what an Admin reads to tell a scan from a corrupt upload, and what decides whether a
+    binding's share of documents quarantined *for want of OCR* is one they will accept.
+    """
+
+    source_document_id: str
+    error: str
+
+
+@dataclass(frozen=True, slots=True)
 class LandedRun:
     """What one pass over a binding's landed copies read.
 
     `read_afresh` is how many of them the seam actually ran over; the rest were answered
     out of the memo. It is the figure that says whether a run did work or recognised
     that it had none, and the one a case about the memo can hold.
+
+    `quarantined` is the other half of the binding: the documents the run reached and
+    could not read. They are answered rather than raised, because an exception here
+    would make one unreadable upload the whole binding's failure.
     """
 
     documents: tuple[ReadDocument, ...]
     read_afresh: int
+    quarantined: tuple[QuarantinedDocument, ...] = ()
 
 
 class _Readings:
@@ -182,23 +222,25 @@ class _Readings:
 _READINGS = _Readings()
 
 
-def _converted(body: bytes, media_type: str) -> str:
-    """A landed copy's bytes as the document's normalised text.
+def timeout_for(
+    pages: int,
+    *,
+    ms_per_page: int = SEAM_MS_PER_PAGE,
+    margin_ms: int = TIMEOUT_MARGIN_MS,
+) -> timedelta:
+    """How long one document of this many pages is given, conversion and seam together.
 
-    Markdown and plain text are the normalised text already, so the offsets a locator
-    carries are offsets into what the reader uploaded. A type this tier cannot convert
-    is named in the refusal rather than left to fail somewhere inside the seam, because
-    the ticket that adds the other converters turns this refusal into the document's
-    *quarantine* on its catalogue row and needs to know which document and which type.
+    S0's milliseconds per page times the document's pages plus a fixed margin, which is
+    the whole of it. Per **document** and not per run, because a run's ceiling would let
+    one stuck conversion take the binding with it — and per **page** because the seam's
+    cost is the page's, so a ceiling that ignored length would be generous to a note and
+    mean to a contract.
+
+    Both figures are parameters with the shipped constants as defaults: what a case
+    about the ceiling needs is to shrink it, and a case that reached inside this
+    function to do that would be a case about something else.
     """
-    if media_type not in PASSED_THROUGH:
-        message = f"this tier converts no {media_type} document yet"
-        raise ValueError(message)
-    try:
-        return body.decode(TEXT_ENCODING)
-    except UnicodeDecodeError as cause:
-        message = f"a {media_type} document that is not {TEXT_ENCODING}"
-        raise ValueError(message) from cause
+    return timedelta(milliseconds=ms_per_page * pages + margin_ms)
 
 
 @coco.fn(memo=True)
@@ -218,7 +260,7 @@ def landed(
     rules and the detector that decided.
     """
     _READINGS.read_one()
-    normalised = _converted(body, media_type)
+    normalised = converted(body, media_type)
     answer = redact(
         normalised,
         dict(rules_in_force),
@@ -235,39 +277,84 @@ def landed(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _Wave:
+    """Everything one pass over a binding holds that is the same for every document.
+
+    One value rather than six arguments, and it travels as one from the main function
+    to each component. The document and its bytes are the only thing that differs per
+    component, which is exactly what `mount_each` keys on — so this is the other half of
+    that split, stated once instead of restated in every signature it passes through.
+    Plain types throughout, as everything crossing this package's seams is.
+    """
+
+    rules_in_force: tuple[tuple[str, bool], ...]
+    seed: str
+    version: str
+    chunk_size: int
+    ms_per_page: int
+    margin_ms: int
+
+
 @coco.fn
 async def _one_document(
     landing: tuple[LandedDocument, bytes],
     read: dict[str, ReadDocument],
-    rules_in_force: tuple[tuple[str, bool], ...],
-    seed: str,
-    version: str,
-    chunk_size: int,
+    refused: dict[str, str],
+    wave: _Wave,
 ) -> None:
     """One document's whole passage through this wave, as its own component.
 
     The memoised call is the middle of it: the bytes were read before the component was
     mounted and the normalised copy is written after the answer comes back, so neither
     end of the store is inside the memo. The document and its bytes arrive as one value
-    because `mount_each` keys one value per item; everything after them is the run's and
+    because `mount_each` keys one value per item; the wave beside them is the run's and
     is the same for every document in it.
+
+    **Three things are caught here and two of them are the same fact.** A converter that
+    refuses the document and a ceiling the document ran past are both *this document is
+    not going to be read*, and both are answered into `refused` under the name of what
+    refused it rather than raised — an exception at this point would make one unreadable
+    upload the whole binding's failure, which is the one thing fanning a component per
+    document exists to prevent.
+
+    **The pages are counted before the ceiling is set and before the call is made.** A
+    PDF's page count comes out of its own header in single-digit milliseconds; taking it
+    from a conversion would mean knowing how long to allow only once the conversion the
+    allowance is for had already returned.
     """
     document, body = landing
-    answer = await coco.use_mount(
-        landed,
-        body,
-        document.media_type,
-        rules_in_force,
-        document.suppressions,
-        seed,
-        version,
-    )
+    try:
+        pages = pages_of(body, document.media_type)
+    except UnreadableError as refusal:
+        refused[document.source_document_id] = refusal.name
+        return
+
+    ceiling = timeout_for(pages, ms_per_page=wave.ms_per_page, margin_ms=wave.margin_ms)
+    try:
+        with coco.timeout(ceiling):
+            answer = await coco.use_mount(
+                landed,
+                body,
+                document.media_type,
+                wave.rules_in_force,
+                document.suppressions,
+                wave.seed,
+                wave.version,
+            )
+    except UnreadableError as refusal:
+        refused[document.source_document_id] = refusal.name
+        return
+    except coco.DeadlineExceededError as expiry:
+        refused[document.source_document_id] = type(expiry).__name__
+        return
+
     read[document.source_document_id] = ReadDocument(
         source_document_id=document.source_document_id,
         normalised_key=document.normalised_key,
         redacted=answer,
         chunks=split_into_chunks(
-            document.source_document_id, answer.text, chunk_size=chunk_size
+            document.source_document_id, answer.text, chunk_size=wave.chunk_size
         ),
     )
 
@@ -276,16 +363,14 @@ async def _one_document(
 async def _every_document(
     landings: tuple[tuple[LandedDocument, bytes], ...],
     read: dict[str, ReadDocument],
-    rules_in_force: tuple[tuple[str, bool], ...],
-    seed: str,
-    version: str,
-    chunk_size: int,
+    refused: dict[str, str],
+    wave: _Wave,
 ) -> int:
     """Fan the binding's documents, one component each.
 
     One per document and not one for the binding, because a document's conversion is
-    where the next ticket puts its timeout and its quarantine — and a failure can only
-    be one document's if the work was one document's to begin with.
+    where its timeout and its quarantine live — and a failure can only be one
+    document's if the work was one document's to begin with.
     """
     await coco.mount_each(
         _one_document,
@@ -294,10 +379,8 @@ async def _every_document(
             for document, body in landings
         ],
         read,
-        rules_in_force,
-        seed,
-        version,
-        chunk_size,
+        refused,
+        wave,
     )
     return len(landings)
 
@@ -312,6 +395,8 @@ def redact_landed_copies(
     *,
     chunk_size: int = CHUNK_SIZE_BYTES,
     memo_version: str = MEMO_VERSION,
+    ms_per_page: int = SEAM_MS_PER_PAGE,
+    margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> LandedRun:
     """Read this binding's landed copies, redact them and cut them into chunks.
 
@@ -319,21 +404,31 @@ def redact_landed_copies(
     key covers a document's actual bytes: a landed copy replaced under the same key is
     read again rather than answered from a memo entry that was about different text. The
     normalised copies go out afterwards, one write per document per run.
+
+    A document the converter refused, or one that ran past its own ceiling, comes back
+    on `quarantined` with the error's name and is logged here by name and document. The
+    run goes on and answers the rest.
     """
     with_bytes = tuple(
         (document, copies.read(document.original_key)) for document in documents
     )
     read: dict[str, ReadDocument] = {}
+    refused: dict[str, str] = {}
     before = _READINGS.taken()
     coco.App(
         host.app_config(run, LANDED_APP),
         _every_document,
         with_bytes,
         read,
-        tuple(sorted(rules_in_force.items())),
-        seed,
-        memo_version,
-        chunk_size,
+        refused,
+        _Wave(
+            rules_in_force=tuple(sorted(rules_in_force.items())),
+            seed=seed,
+            version=memo_version,
+            chunk_size=chunk_size,
+            ms_per_page=ms_per_page,
+            margin_ms=margin_ms,
+        ),
     ).update_blocking()
     answered = tuple(
         read[document.source_document_id]
@@ -344,11 +439,31 @@ def redact_landed_copies(
         copies.write(
             document.normalised_key, document.redacted.text.encode(TEXT_ENCODING)
         )
-    outcome = LandedRun(documents=answered, read_afresh=_READINGS.taken() - before)
+    quarantined = tuple(
+        QuarantinedDocument(
+            source_document_id=document.source_document_id,
+            error=refused[document.source_document_id],
+        )
+        for document in documents
+        if document.source_document_id in refused
+    )
+    outcome = LandedRun(
+        documents=answered,
+        read_afresh=_READINGS.taken() - before,
+        quarantined=quarantined,
+    )
+    for refusal in quarantined:
+        logger.warning(
+            "the run could not read a document and quarantined it",
+            binding_id=run.binding_id,
+            source_document_id=refusal.source_document_id,
+            error=refusal.error,
+        )
     logger.info(
         "the binding's landed copies were read",
         binding_id=run.binding_id,
         documents=len(answered),
         read_afresh=outcome.read_afresh,
+        quarantined=len(quarantined),
     )
     return outcome

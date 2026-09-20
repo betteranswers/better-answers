@@ -740,6 +740,9 @@ export const testData = (client: pg.PoolClient): TestData => {
       lastModified: null,
       goneAt: null,
       outcome: DOCUMENT_CONVERTED_OUTCOME,
+      // A document that converted has no quarantine error, and the CHECK would refuse one:
+      // the seeded document is the ordinary one, so it carries the null the column means.
+      quarantineError: null,
       // The binding's class is the document's unless a document is narrowed on its own.
       sensitivity: null,
       ...overrides,

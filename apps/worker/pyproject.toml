@@ -78,6 +78,27 @@ dependencies = [
     # already holds and nothing here walks a bucket. Read from PyPI on 11/09/2026;
     # Apache-2.0.
     "boto3==1.43.92",
+    # The two converters, one per media type (ADR 0013, amended 20/09/2026). `anydoc`
+    # answers a `.docx` as GitHub-flavoured Markdown; `pdf-inspector` answers a PDF as
+    # Markdown and classifies its pages first. Both are Rust extensions with no model in
+    # them, which is what *no model* asks for — *pure Python* was that rule's proxy and
+    # cocoindex above is itself a Rust extension. PDF is `pdf-inspector`'s alone:
+    # `anydoc` bundles its own build of that engine, the two outputs differ, and a media
+    # type has one converter because its output is the span address space.
+    #
+    # Each name and version joins the memoised function's version
+    # (`pipeline/converter.py`), so a bump here misses the memo for its media type and is
+    # a reprocess somebody chose. Versions read from PyPI's release metadata on
+    # 20/09/2026; both MIT, which is the arm this repository takes (ADR 0027). The wheels
+    # are abi3 — `cp310-abi3` for `anydoc` and `cp38-abi3` for `pdf-inspector` — over
+    # manylinux_2_17 on x86_64 and aarch64 and macOS arm64, which is every machine this
+    # repository builds on.
+    #
+    # Bumping either pin re-runs the first act on the worker image and re-dates its
+    # readings: `apps/worker/tests/test_image.py`'s
+    # `test_both_converters_hold_on_the_image_under_the_engines_own_runtime`.
+    "firecrawl-anydoc==0.2.4",
+    "pdf-inspector==1.22.0",
 ]
 
 [project.scripts]
