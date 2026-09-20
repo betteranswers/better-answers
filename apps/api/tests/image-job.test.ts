@@ -33,6 +33,7 @@ import {
 } from "./image-probe.ts";
 
 const checkWorkflowSchema = z.object({
+  concurrency: z.object({ group: z.string() }),
   on: z.object({
     workflow_call: z.object({
       inputs: z.record(z.string(), z.record(z.string(), z.unknown())),
@@ -90,6 +91,28 @@ describe("the job that probes every image it pushes", () => {
     expect(steps.filter((step) => (step.if ?? "").includes("matrix.tier"))).toEqual([]);
   });
 
+  it("installs for a node probe the workspace it runs in, and nothing beside it", () => {
+    // A leg runs one test file, and a whole-monorepo install to do it brought the web app
+    // and the design system along on two legs of every run (`T-211`). The filter is a
+    // literal in a step every node leg shares, so what is held is that it names the one
+    // workspace every node probe names — a probe in another workspace fails here, where it
+    // would otherwise fail on `main` with nothing installed. The trailing `...` is pnpm's
+    // "and what it depends on", which is how `@better-answers/schema` still arrives.
+    const install = imageJob().steps.find((step) => (step.run ?? "").startsWith("pnpm install"));
+    const installed = /--filter (\S+?)\.\.\.(?:\s|$)/.exec(install?.run ?? "")?.[1];
+    const probedIn = new Set(
+      matrixLegs()
+        .filter((leg) => leg["probe-toolchain"] === "node")
+        .map((leg) => /--filter (\S+)/.exec(leg.probe ?? "")?.[1]),
+    );
+
+    expect(install?.run).toContain("--frozen-lockfile");
+    // The name is written down once here, so moving the filter and the probes together to
+    // a workspace that cannot run them is a change this case sees.
+    expect(installed).toEqual("@better-answers/api");
+    expect([...probedIn]).toEqual([installed]);
+  });
+
   it("hands every probe the id of the build it loaded, under the name every probe reads", () => {
     const steps = imageJob().steps;
     const probed = steps[probeStepAt(steps)];
@@ -119,6 +142,75 @@ describe("the job that probes every image it pushes", () => {
       [false, false],
       [false, false],
     ]);
+  });
+
+  it("keeps each leg's layers under a scope of its own, so no leg evicts another", () => {
+    // A `type=gha` cache with no `scope=` is written under `buildkit` for everyone, and a
+    // scope holds one manifest: three legs exporting `mode=max` to one scope overwrote each
+    // other, and the worker leg built cold on 47% of runs (`T-211`, measured 20/09/2026).
+    // The scope is the leg's own name out of the matrix — what both tiers' probes pass
+    // too — so a bare `type=gha` on either half is refused here rather than measured later.
+    const halves = imageJob().steps.flatMap((step) =>
+      ["cache-from", "cache-to"].flatMap((name) => {
+        const value = input(step, name);
+        return value === "" ? [] : [{ name, value }];
+      }),
+    );
+    const unscoped = halves.filter(
+      (half) => !half.value.split(",").includes("scope=${{ matrix.tier }}"),
+    );
+
+    expect(halves.map((half) => half.name)).toContain("cache-to");
+    expect(halves.length).toBeGreaterThan(2);
+    expect(unscoped).toEqual([]);
+  });
+
+  it("gives the registry token to the job that pushes, and leaves no git credential beside it", () => {
+    // `packages: write` is the one token here worth stealing. It is the image job's alone —
+    // the caller's narrowing, where it used to be `check.yml`'s own — and that job never
+    // pushes git, so its checkout leaves nothing in `.git/config` for three Dockerfiles and
+    // two suites to read (`T-211`).
+    const checkout = imageJob().steps.find((step) =>
+      (step.uses ?? "").startsWith("actions/checkout@"),
+    );
+
+    expect(buildWorkflow().permissions).toEqual({ contents: "read" });
+    expect(imageJob().permissions).toEqual({ contents: "read", packages: "write" });
+    expect(checkout?.with?.["persist-credentials"]).toBe(false);
+  });
+
+  it("builds every commit in a group of its own, under the one tag no other run writes", () => {
+    // A group holds one running and one pending run, and a third arrival cancels the
+    // pending one: under `build-main` a burst of pushes built its first and its last, and 6
+    // of 20 runs were cancelled seconds after they were created (`T-211`). With no group
+    // serialising the runs, a tag every run writes ends on whichever finished last — so the
+    // only tag is the commit's own, and `release.yml` resolves that one
+    // (`deploy-tree.test.ts` holds its half).
+    const meta = imageJob().steps.find((step) =>
+      (step.uses ?? "").startsWith("docker/metadata-action@"),
+    );
+    const tags = (meta === undefined ? "" : input(meta, "tags"))
+      .split("\n")
+      .map((tag) => tag.trim())
+      .filter((tag) => tag !== "");
+
+    expect(buildWorkflow().concurrency.group).toEqual("build-${{ github.sha }}");
+    expect(tags).toEqual(["type=sha,prefix=sha-"]);
+  });
+
+  it("lets the `check` a commit's build calls neither wait on nor displace another commit's", () => {
+    // `check.yml`'s group is evaluated in the caller's context and holds across runs
+    // (`T-040`), so a per-commit group on `build.yml` alone moves the cancellation down a
+    // level: three pushes inside one `check` and the second run's pending `check` is
+    // displaced, taking the images it gates with it. A pull request keeps its ref, which is
+    // what lets a newer push cancel the run it supersedes; and the group stays different
+    // from the caller's, because a called workflow in its caller's group waits on itself.
+    const group = checkWorkflow().concurrency.group;
+
+    expect(group).toEqual(
+      "check-${{ github.event_name == 'pull_request' && github.ref || github.sha }}",
+    );
+    expect(group).not.toEqual(buildWorkflow().concurrency.group);
   });
 
   it("stands the probes down only where the caller of `check.yml` probes the images itself", () => {

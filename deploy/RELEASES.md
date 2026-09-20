@@ -2,6 +2,8 @@
 
 One row per run of the `release` workflow: when, who, the two digests the platform stack now runs, and what the release rode on (`pre-client: any green build` before the first client's data is on the box; the drill report or the hotfix reason after — Q7's switch, enforced in the workflow). **The previous row is the rollback**: RUNBOOK.md page 6 runs `release` again with that row's digests. Nothing edits this file by hand except to correct a row the workflow wrote wrongly — or, while the workflow's Coolify call is unreachable (the Access debt recorded 04/09/2026), to append the row an on-box promotion made in its place; either edit says so in its commit.
 
+**What blank inputs promote** (`T-211`, 20/09/2026): the image of `main`'s head commit, by its `sha-<short>` tag — every commit gets one, and there is no `:main` tag. A head with no image is refused by name and nothing older is promoted in its place. That is the state a release leaves behind, because the row it pushes is a commit no build runs for: a second release with nothing merged between passes the digests — the row above has them — or follows a dispatched `build` on `main`.
+
 Standing release note, true of every row: the app refuses to start unless `PUBLIC_URL`, `AGENT_HOSTNAME` and `APEX_HOSTNAME` are set on the `api` resource and all three hostnames differ, the derived `app.` one included (ADR 0034). The `worker` service is behind the `pipeline` compose profile until `T-006`; its digest is set so the file interpolates, and nothing runs it.
 
 | When (UTC) | By | api | worker | Rode on |

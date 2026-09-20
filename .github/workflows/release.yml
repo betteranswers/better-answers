@@ -1,9 +1,16 @@
 # Promote a pair of image digests to PRODUCTION. A person runs this; nothing else deploys production
 # (ADR 0022). The `production` environment carries a required reviewer.
 #
-# THE DIGESTS. Blank inputs mean "the last build": the digests `build.yml` pushed under the `main`
-# tag, read back from ghcr.io — staging is on demand and never stands (ADR 0024), so there is no
-# "digest staging runs" to default to (ticket 79 A1, Q7). Every digest is passed between steps
+# THE DIGESTS. Blank inputs mean "the head of main": the digests `build.yml` pushed under that
+# commit's `sha-<short>` tag, read back from ghcr.io — staging is on demand and never stands
+# (ADR 0024), so there is no "digest staging runs" to default to (ticket 79 A1, Q7). There is no
+# `:main` tag to read (`T-211`): every commit builds in a group of its own, and a tag every run
+# wrote would name whichever finished last. WHEN THE HEAD HAS NO IMAGE — its build still
+# running, or red, or the head is the row a release just pushed, which no build runs for
+# because a GITHUB_TOKEN push starts no workflow — this REFUSES and names the commit. It never
+# reaches back for an older image: the ways on are to wait for that build, to dispatch `build`
+# on main, or to pass the digests, which is what page 6's rollback does with the row above.
+# Every digest is passed between steps
 # through `env:` and matched against `^sha256:[0-9a-f]{64}$` on its own before anything is
 # PATCHed — never interpolated into a shell line (ticket 79 SEC10).
 #
@@ -30,10 +37,10 @@ on:
   workflow_dispatch:
     inputs:
       api_digest:
-        description: "ghcr.io/…/api digest (sha256:…) — blank = what the last build pushed as :main"
+        description: "ghcr.io/…/api digest (sha256:…) — blank = the image of main's head commit (its sha-<short> tag); refused if that commit has none"
         required: false
       worker_digest:
-        description: "ghcr.io/…/worker digest (sha256:…) — blank = what the last build pushed as :main"
+        description: "ghcr.io/…/worker digest (sha256:…) — blank = the image of main's head commit (its sha-<short> tag); refused if that commit has none"
         required: false
       rehearsed_by:
         description: "Once CLIENT_DATA_ON_BOX is set: the drill report this release rides on (drills/drill-<stamp>.md), or `hotfix: <reason>`"
@@ -87,7 +94,17 @@ jobs:
           OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
-          last_build() { docker buildx imagetools inspect "ghcr.io/${OWNER}/$1:main" --format '{{.Manifest.Digest}}'; }
+          # The checkout above is `main`, so this is the default branch's head, and its tag is
+          # cut to the seven characters `build.yml`'s `type=sha,prefix=sha-` cuts it to.
+          head="$(git rev-parse HEAD)"
+          tag="sha-${head:0:7}"
+          # The refusal goes to stderr: inside `$(…)` stdout is the digest, and `set -e` ends
+          # the step on the `return 1` — a supplied digest never reaches this at all.
+          last_build() {
+            docker buildx imagetools inspect "ghcr.io/${OWNER}/$1:${tag}" --format '{{.Manifest.Digest}}' && return
+            echo "::error::main's head ${head} has no ghcr.io/${OWNER}/$1:${tag} — its build is still running, or red, or the head is a release's own row. No older image is promoted in its place: wait for that build, dispatch \`build\` on main, or pass the digests" >&2
+            return 1
+          }
           api="${IN_API:-$(last_build api)}"
           worker="${IN_WORKER:-$(last_build worker)}"
           echo "api=${api}" >> "$GITHUB_OUTPUT"
@@ -131,6 +148,8 @@ jobs:
         run: |
           set -euo pipefail
           rode="${REHEARSED_BY:-pre-client: any green build}"
+          # The backticks are the row's markdown and reach the file as themselves.
+          # shellcheck disable=SC2016
           printf '| %s | %s | `%s` | `%s` | %s |\n' "$(date -u +%FT%TZ)" "${ACTOR}" "${API_DIGEST}" "${WORKER_DIGEST}" "${rode}" >> deploy/RELEASES.md
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

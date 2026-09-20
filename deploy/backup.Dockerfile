@@ -23,9 +23,14 @@
 FROM pgvector/pgvector:0.8.6-pg18-trixie@sha256:78bf48b801e792f99e3ac62b5036fd3876e9be48afda16c1e331af1c75ceb2ff
 RUN apt-get update && apt-get install -y --no-install-recommends cron git openssh-client curl jq unzip ca-certificates \
  && rm -rf /var/lib/apt/lists/*
+# The two `# renovate:` lines are read by `renovate.json`'s custom manager: its `dockerfile`
+# manager sees `FROM` alone, and a version fetched by name aged in silence (`T-211`). Each
+# sits directly above its `ARG`, which is the shape the manager's match string takes.
+# renovate: datasource=github-releases depName=rclone/rclone
 ARG RCLONE_VERSION=v1.75.0
 RUN curl -fsSLo /tmp/rclone.zip "https://downloads.rclone.org/${RCLONE_VERSION}/rclone-${RCLONE_VERSION}-linux-amd64.zip" \
  && unzip -j /tmp/rclone.zip '*/rclone' -d /usr/local/bin && chmod +x /usr/local/bin/rclone && rm /tmp/rclone.zip
+# renovate: datasource=github-releases depName=FiloSottile/age
 ARG AGE_VERSION=v1.3.2
 RUN curl -fsSL "https://github.com/FiloSottile/age/releases/download/${AGE_VERSION}/age-${AGE_VERSION}-linux-amd64.tar.gz" \
  | tar -xz --strip-components=1 -C /usr/local/bin age/age age/age-keygen

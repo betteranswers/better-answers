@@ -13,6 +13,15 @@
 # Postgres is never built here and never will be: it is the official pgvector image, pinned by
 # digest in `packages/schema/src/postgres-image.ts` (ADR 0032).
 #
+# EVERY COMMIT GETS ITS IMAGE (`T-211`). A run's concurrency group is its own commit, so runs
+# neither queue behind nor cancel each other, and the one tag a run writes is that commit's
+# `sha-<short>` — a name no other run writes. There is no `:main` tag: with nothing serialising
+# the runs it would end on whichever finished last. `release.yml` resolves the head of `main`
+# by its `sha-` tag and refuses when that commit has no image yet. Until 20/09/2026 the group
+# was `build-main`, and GitHub holds one running and one pending run in a group and cancels
+# the pending one a third displaces: a burst of pushes built its first and its last, and 6 of
+# 20 runs were cancelled within seconds of being created.
+#
 # Action versions read from each repository's latest release on 03/09/2026, and every `uses:`
 # names the commit SHA that tag resolved to on the same day (`T-040`) — the reason
 # is in check.yml's header, and this is the job that would pay for a moving tag: it holds a
@@ -24,13 +33,18 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Per commit, so the only runs that ever share a group are two dispatches of one commit, and
+# the second of those waits rather than racing the first to the same tag. `check.yml`'s own
+# group is per commit for a called run for the same reason, and never this one's name.
 concurrency:
-  group: build-main
+  group: build-${{ github.sha }}
   cancel-in-progress: false
 
+# What every job here gets unless it asks for more. `packages: write` is asked for by the one
+# job that pushes, below: the narrowing of `check` is then this file's, where it used to rest
+# on `check.yml` declaring `contents: read` for itself.
 permissions:
   contents: read
-  packages: write
 
 jobs:
   # An image is never pushed from a red tree. This is the same `check` every pull request
@@ -49,6 +63,9 @@ jobs:
 
   image:
     needs: check
+    permissions:
+      contents: read
+      packages: write
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
@@ -82,6 +99,11 @@ jobs:
             probe-toolchain: node
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # This job holds `packages: write` and then runs three Dockerfiles and two suites.
+          # It never pushes git, so the token is not left in `.git/config` for them to read
+          # (`release.yml` does push git, and keeps the default).
+          persist-credentials: false
       # Before build-push-action, always: the default `docker` driver cannot export a build
       # cache, so `cache-to: type=gha` fails the build outright with "Cache export is not
       # supported for the docker driver". This step is what gives the job a buildkit driver
@@ -94,11 +116,17 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         id: meta
+        # Seven is the action's default, stated here so that it is this file's number: it is
+        # half of an agreement with `release.yml`, and a bump to the action must not move it.
+        env:
+          DOCKER_METADATA_SHORT_SHA_LENGTH: "7"
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}
+          # The commit's own tag and no other, cut to the length above, which `release.yml`
+          # cuts to as well to find the head of `main` (`apps/api/tests/deploy-tree.test.ts`
+          # holds the two to one number).
           tags: |
             type=sha,prefix=sha-
-            type=raw,value=main
       # The toolchain a probe command runs on, installed for the legs that declare it and
       # for no others. The condition is `matrix.probe-toolchain` and never `matrix.tier`:
       # a step that named an image would turn this job back into a list of images, and a
@@ -112,8 +140,12 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
+      # The workspace every node probe runs in, and what it depends on — that is what the
+      # trailing `...` says. A leg runs one test file, and a whole-monorepo install brought the
+      # web app and the design system along to run it (`T-211`). The filter is a literal, so
+      # `image-job.test.ts` holds it to the workspace the node probes name.
       - if: matrix.probe-toolchain == 'node'
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter @better-answers/api...
       # The worker's probe is a pytest file, so its leg brings uv. Same action and same
       # commit as `check.yml`'s, and the same `uv sync --frozen` against the same lockfile,
       # because this is the same suite run against one of its files.
@@ -150,7 +182,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # Read only. The cache is exported by the pushing step below, which resolves every
           # layer this one produced; exporting from both would upload one build's cache twice.
-          cache-from: type=gha
+          cache-from: type=gha,scope=${{ matrix.tier }}
       # With no id the probe would build an image of its own and read that, and the leg
       # would push something nothing read — so the leg stops here instead.
       - name: the image is read before it ships
@@ -178,8 +210,15 @@ jobs:
           sbom: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # The scope is the leg's name. The backend's default is `buildkit` for everyone and
+          # one scope holds one manifest, so three legs sharing it overwrote each other and
+          # the worker leg built cold on 47% of runs (`T-211`, measured 20/09/2026). Both
+          # tiers' probes pass the same name, so a pull request's build reads what this leg
+          # wrote — one way only, an Actions cache being readable from its own ref and from
+          # the base branch. `apps/api/tests/image-job.test.ts` refuses a bare `type=gha`; the
+          # quota, the scopes and how to read them are `docs/operations/BUILD_CACHE.md`.
+          cache-from: type=gha,scope=${{ matrix.tier }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.tier }}
       # The digest, in the run's summary, in the form the deploy unit's env var takes — so a
       # person promoting a build copies it from here rather than reading it out of a log. A
       # probed leg says it twice, once from each export, because "tested" is a claim about a

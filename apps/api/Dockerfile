@@ -110,6 +110,11 @@ FROM base AS runtime
 # this image should carry is the tool and not the means of getting it, and
 # `apps/api/tests/image.test.ts` reads the version back out of the built image, so a purge
 # that took the tool with it is red rather than quiet.
+#
+# The `# renovate:` line is read by `renovate.json`'s custom manager and sits directly above
+# the `ARG` it describes (`T-211`). `check.yml` installs the runner's copy at whatever this
+# line pins, so a bump here moves the image and the runner together.
+# renovate: datasource=pypi depName=git-filter-repo
 ARG GIT_FILTER_REPO_VERSION=2.47.0
 RUN apt-get update \
  && apt-get install -y --no-install-recommends wget git python3 python3-pip \

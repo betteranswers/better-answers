@@ -37,19 +37,27 @@ on:
 #
 # This block is evaluated in the caller's context, so `check-refs/heads/main` was one group
 # holding every push to main with `cancel-in-progress: true` — and build.yml asks for the
-# opposite in its own group (`build-main`, `cancel-in-progress: false`) because an image is
-# worth building for every commit that lands. Two fast pushes and the second run cancelled the
-# first run's `check` job, taking the images it gates with it (`T-040`).
+# opposite, because an image is worth building for every commit that lands. Two fast pushes
+# and the second run cancelled the first run's `check` job, taking the images it gates with
+# it (`T-040`).
 #
-# The condition holds whichever value a called run reads: GitHub documents `github.event_name`
-# as "the name of the event that triggered the workflow run" without saying, for a reusable
-# workflow, whether that is the caller's event or `workflow_call` — and neither of those is
-# `pull_request`. Only a run triggered directly by a pull request cancels, either way.
+# Not cancelling was half of it. A group holds one running and one pending job whatever
+# `cancel-in-progress` says, and a third arrival cancels the pending one — so under one group
+# for `main`, three pushes inside one `check` would still lose the second commit's images.
+# build.yml's group is per commit (`T-211`) and a called run's is too: the group is the ref for
+# a pull request, which is what lets a newer push find the run it supersedes, and the commit
+# for everything else.
+#
+# Both conditions hold whichever value a called run reads: GitHub documents
+# `github.event_name` as "the name of the event that triggered the workflow run" without
+# saying, for a reusable workflow, whether that is the caller's event or `workflow_call` — and
+# neither of those is `pull_request`. Only a run triggered directly by a pull request takes the
+# ref and cancels, either way.
 #
 # The group must also stay different from build.yml's: a called workflow that waits on its
-# caller's group waits on itself.
+# caller's group waits on itself. `apps/api/tests/image-job.test.ts` holds both groups.
 concurrency:
-  group: check-${{ github.ref }}
+  group: check-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:

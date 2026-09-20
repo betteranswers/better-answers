@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { GARAGE_IMAGE } from "@better-answers/core/store/objects";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
@@ -31,6 +32,20 @@ const deployScripts = (): readonly string[] =>
   readdirSync(path.join(repositoryRoot, "deploy"))
     .filter((file) => file.endsWith(".sh"))
     .sort();
+
+/** `renovate.json`, in the fields that decide whether a custom manager runs and what it reads. */
+const renovateSchema = z.object({
+  enabledManagers: z.array(z.string()),
+  customManagers: z
+    .array(
+      z.object({
+        customType: z.string(),
+        managerFilePatterns: z.array(z.string()),
+        matchStrings: z.array(z.string()),
+      }),
+    )
+    .default([]),
+});
 
 /** The service names of a compose file: two-space-indented keys under `services:`. */
 const composeServices = (file: string): readonly { name: string; body: string }[] => {
@@ -459,6 +474,84 @@ describe("the deploy tree (T-005)", () => {
     expect(release).toContain("CLIENT_DATA_ON_BOX");
     expect(read("deploy/RELEASES.md")).toContain("| When (UTC) | By | api | worker | Rode on |");
     expect(read(`${operationsDocuments}/RUNBOOK.md`)).toContain("RELEASES.md");
+  });
+
+  it("promotes the image of main's head commit, and refuses by name when that commit has none", () => {
+    // Two files and one agreement: `build.yml` tags every image with its commit and with
+    // nothing else, and blank inputs to `release.yml` resolve the tag of the commit it
+    // checked out. A `:main` tag was one name every per-commit run would race to write, and
+    // falling back to it would promote an older image without saying so (`T-211`).
+    const release = read(".github/workflows/release.yml");
+    const build = read(".github/workflows/build.yml");
+
+    expect(build).toContain("type=sha,prefix=sha-");
+    expect(build).not.toContain("type=raw");
+    expect(release).toMatch(/ref: main\n/);
+    expect(release).toContain('head="$(git rev-parse HEAD)"');
+    // How many characters of the commit the tag carries is one number in two files.
+    // `build.yml` states it rather than inheriting the action's default, so a bump to that
+    // action cannot part the tag a build writes from the tag a release looks for.
+    const cutTo = /DOCKER_METADATA_SHORT_SHA_LENGTH: "(\d+)"/.exec(build)?.[1];
+    expect(cutTo).toEqual("7");
+    expect(release).toContain(`tag="sha-\${head:0:${cutTo ?? ""}}"`);
+    expect(release).toContain('"ghcr.io/${OWNER}/$1:${tag}"');
+    expect(release).not.toMatch(/ghcr\.io\/\$\{OWNER\}\/[^"\s]*:main\b/);
+    // The refusal names the commit, and goes to stderr: inside `$(…)` stdout is the digest.
+    expect(release).toMatch(/echo "::error::[^"\n]*\$\{head\}[^"\n]*" >&2\n\s+return 1/);
+    expect(read("deploy/RELEASES.md")).toContain("`sha-<short>`");
+  });
+
+  it("annotates every version an image fetches by name, so Renovate's custom manager reads it", () => {
+    // Renovate's `dockerfile` manager reads `FROM` and nothing else, so a version an image
+    // curls or pips in aged in silence — and `check.yml` reads the rewrite tool's pin back out
+    // of `apps/api/Dockerfile`, so an ageing pin there is a rewrite proved against an ageing
+    // tool (`T-211`). Three halves, each silent alone: the manager is listed in
+    // `enabledManagers`, which is an allow-list; its file pattern selects the Dockerfile; and
+    // its match string captures the pin. The Dockerfiles are `build.yml`'s own list.
+    const renovate = renovateSchema.parse(JSON.parse(read("renovate.json")));
+    const manager = renovate.customManagers.find((candidate) => candidate.customType === "regex");
+    // Renovate reads a pattern between slashes as a regular expression and anything else as
+    // a glob. Only the first is read the same way here, so only the first is accepted.
+    const patterns = manager?.managerFilePatterns ?? [];
+    expect(patterns.filter((pattern) => !/^\/.+\/$/.test(pattern))).toEqual([]);
+    const selects = patterns.map((pattern) => new RegExp(pattern.slice(1, -1)));
+    const dockerfiles = [
+      ...read(".github/workflows/build.yml").matchAll(/^\s+dockerfile: (\S+)$/gm),
+    ]
+      .map((match) => match[1] ?? "")
+      .sort();
+
+    const pinned = dockerfiles.flatMap((file) =>
+      [...read(file).matchAll(/^ARG (\w+_VERSION)=(\S+)$/gm)].map(
+        (match) => `${file}: ${match[1] ?? ""}=${match[2] ?? ""}`,
+      ),
+    );
+    const readByRenovate = dockerfiles.flatMap((file) =>
+      selects.some((pattern) => pattern.test(file))
+        ? (manager?.matchStrings ?? []).flatMap((matchString) =>
+            [...read(file).matchAll(new RegExp(matchString, "g"))].map((match) => ({
+              pin: `${file}: ${/ARG (\w+_VERSION)=/.exec(match[0])?.[1] ?? ""}=${match.groups?.["currentValue"] ?? ""}`,
+              from: `${match.groups?.["datasource"] ?? ""} ${match.groups?.["depName"] ?? ""}`,
+            })),
+          )
+        : [],
+    );
+
+    // The other direction: an annotation that lost its `ARG`, or drifted a line away from
+    // it, matches nothing and says nothing.
+    const annotated = dockerfiles.flatMap((file) => [
+      ...read(file).matchAll(/^# renovate: /gm),
+    ]).length;
+
+    expect(renovate.enabledManagers).toContain("custom.regex");
+    expect(dockerfiles.length).toBeGreaterThan(2);
+    expect(annotated).toEqual(readByRenovate.length);
+    expect(readByRenovate.map((dependency) => dependency.pin)).toEqual(pinned);
+    expect(readByRenovate.map((dependency) => dependency.from)).toEqual([
+      "pypi git-filter-repo",
+      "github-releases rclone/rclone",
+      "github-releases FiloSottile/age",
+    ]);
   });
 
   it("has no staging job in build.yml: staging is brought up by the drill procedure", () => {
