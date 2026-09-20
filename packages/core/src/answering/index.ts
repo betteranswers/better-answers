@@ -1,6 +1,7 @@
 import type { Frontmatter, FrontmatterValue } from "../concepts/index.ts";
 import { citedSource, conceptByIri, findConcepts, type OpenedConcept } from "../concepts/index.ts";
 import { err, isPersonActor, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
+import { findPassages, passageAt, type LocatorRefusal } from "../sources/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
 /**
@@ -15,10 +16,15 @@ import type { Tx } from "../store/postgres/index.ts";
  * reads the concept index** (T-052), through the concepts slice's own read — a slice
  * reaches another only through its `index.ts` (ADR 0029 rule 4), and `concept_index` is
  * the concepts slice's table. `find` previews the concepts the reader may see (T-055),
- * `open` by *locator* answers not found — a passage needs the source catalogue, which is
- * B7's — `ask` a refuse verdict naming the concepts its terms resolve to, and
- * `giveFeedback` a receipt. Every function takes the Principal first and runs on the
- * transaction that resolved it.
+ * `ask` a refuse verdict naming the concepts its terms resolve to, and `giveFeedback` a
+ * receipt. Every function takes the Principal first and runs on the transaction that
+ * resolved it.
+ *
+ * T-134 folds the **document layer** into the two reads, through the sources slice's own
+ * doors and no statement of its own (ADR 0029 rule 4): `find` is the union of the concept
+ * arm and `findPassages`, and `open` by locator is `passageAt`. Every predicate stays where
+ * T-133 put it — inside those statements, once — so this slice composes hits and never
+ * decides who may see one, and the MCP surface over it is no side door.
  */
 
 /** The trust tiers and states a unit carries (CONTEXT.md, *trust words the reader sees*). */
@@ -90,7 +96,22 @@ const ukLongDate = (iso: string): string => {
   });
 };
 
-export type FindHit = {
+/**
+ * The marker a document wears where nothing on the map covers it (CONTEXT.md, *hit*,
+ * *unmapped passage*). Stated once and read by both renderings, so a preview and an answer
+ * can never mark the same thing with two different words.
+ */
+export const NOT_COMPANY_KNOWLEDGE = "Not company knowledge";
+
+/**
+ * A hit from the bundles layer: the concept itself, with the trust word a reader judges it
+ * by and the IRI `open` takes. Its fields are what they were before the union; `layer` is
+ * the discriminator the union needs and the only thing added. `kind` cannot be that
+ * discriminator — a concept's kind is whatever OKF type the file declares, an open set — so
+ * the layer is named outright, which is how the glossary types a hit in the first place.
+ */
+export type ConceptHit = {
+  readonly layer: "bundles";
   readonly iri: string;
   readonly kind: string;
   readonly title: string;
@@ -98,6 +119,29 @@ export type FindHit = {
   readonly bundle: string;
   readonly tags: readonly string[];
 };
+
+/**
+ * A hit from the sources layer: one matching chunk of a document no visible concept cites
+ * (ADR 0016), carrying the document's title, the chunk's own span as the wire locator `open`
+ * takes, and the class the reader is being offered it under. Its `kind` is the one word
+ * *document*, because a chunk is not a unit the reader asked for — the document is.
+ *
+ * It carries no marker field: every hit of this layer is *not company knowledge* by being
+ * one, so the marker is the rendering's and never a column a caller could disagree with.
+ */
+export type DocumentHit = {
+  readonly layer: "sources";
+  readonly kind: "document";
+  readonly title: string;
+  readonly locator: string;
+  readonly sensitivity: string;
+};
+
+/**
+ * One hit, typed by its knowledge layer (CONTEXT.md, *hit*). The graph layer returns none
+ * of its own: a walk's answer is a concept, and that is the bundles arm.
+ */
+export type FindHit = ConceptHit | DocumentHit;
 
 export type FindResult = {
   readonly query: string;
@@ -224,10 +268,27 @@ const tagsOf = (frontmatter: Frontmatter): readonly string[] => {
 };
 
 /**
- * The preview (ADR 0018): the concepts matching the query that this caller may see, each
- * as a hit — kind, title, trust — through the concepts slice's own read, which shares
- * `open`'s SELECT and its predicate. **A withheld concept is not a hit, not a count and
- * not a hint** (ADR 0016); ranking is B9's.
+ * The preview (ADR 0018): what this caller may see of the query, as a union by knowledge
+ * layer (T-134) — the concepts matching it through the concepts slice's own read, which
+ * shares `open`'s SELECT and its predicate, and the documents matching it through the
+ * sources slice's `findPassages`, which already leaves out a document a concept this
+ * reader may see cites (ADR 0016: a document stands alone only when no concept covers it).
+ * **A withheld unit is not a hit, not a count and not a hint** (ADR 0016), on either arm.
+ *
+ * **The two arms rank separately until S2.** Each is ranked by its own read — the concepts
+ * by the index's order, the documents by the parser's rank — and the concepts come **first**,
+ * because a concept is the company's answer and a raw passage is what there was no answer
+ * for. One ranking *across* the two layers is S2's: it needs a score the arms share, and a
+ * merge invented here would be an ordering nothing could hold to.
+ *
+ * **The caller's limit is the union's, not each arm's.** A reader asking for five hits is
+ * asking to be handed five things, and running both arms to five would hand them ten —
+ * twice the context an MCP host budgeted for, off one argument. So the concept arm takes the
+ * limit and the document arm takes what is left: not a merge, because the precedence is the
+ * one already decided above rather than a score, and the arm that yields is always the same
+ * one. A query the concepts answer in full offers no document, which is the right answer to
+ * *show me five things* and the same answer ADR 0016 gives — no total, no cursor, and no
+ * *more where that came from*.
  *
  * `now` is the platform's instant for every hit's trust reading (ADR 0040) — one read,
  * shared across the batch, from the caller's own Clock; never read here.
@@ -240,16 +301,29 @@ export const find = async (
 ): Promise<Result<FindResult, Error>> => {
   const found = await findConcepts(principal, tx, input);
   if (!found.ok) return err(found.error);
+  const room = Math.max(input.limit - found.value.length, 0);
+  const passages = await findPassages(principal, tx, input.query, room);
+  if (!passages.ok) return err(passages.error);
   return ok({
     query: input.query,
-    hits: found.value.map((concept) => ({
-      iri: concept.iri,
-      kind: concept.kind,
-      title: concept.title,
-      trust: trustOf(concept, now),
-      bundle: bundleOf(concept.path),
-      tags: tagsOf(concept.frontmatter),
-    })),
+    hits: [
+      ...found.value.map((concept): ConceptHit => ({
+        layer: "bundles",
+        iri: concept.iri,
+        kind: concept.kind,
+        title: concept.title,
+        trust: trustOf(concept, now),
+        bundle: bundleOf(concept.path),
+        tags: tagsOf(concept.frontmatter),
+      })),
+      ...passages.value.map((hit): DocumentHit => ({
+        layer: "sources",
+        kind: "document",
+        title: hit.title,
+        locator: hit.locator,
+        sensitivity: hit.sensitivity,
+      })),
+    ],
   });
 };
 
@@ -401,11 +475,31 @@ const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
 };
 
 /**
- * The verbatim fetch (ADR 0018). A concept by IRI is a real read over `concept_index`
- * through the read predicate; **a concept this caller may not see answers exactly as one
- * nobody minted does** — `found: false` with the IRI echoed back — because the predicate is
- * in the statement's WHERE clause and a withheld row is not a row that came back (user
- * story 13). A locator answers not found until the source catalogue exists (B7).
+ * The one refusal `passageAt` answers with, held as the parser's own type rather than a bare
+ * string: were that word ever to become another, this would stop compiling rather than
+ * quietly send every refused locator down the error arm.
+ */
+const PASSAGE_NOT_FOUND: LocatorRefusal = "not-found";
+
+/**
+ * The verbatim fetch (ADR 0018), in its two forms.
+ *
+ * **A concept by IRI** is a real read over `concept_index` through the read predicate;
+ * **a concept this caller may not see answers exactly as one nobody minted does** —
+ * `found: false` with the IRI echoed back — because the predicate is in the statement's
+ * WHERE clause and a withheld row is not a row that came back (user story 13). The
+ * evidence it projects carries each cited span's **wire locator**, which is the string the
+ * other form takes: a citation and a passage are one address (CONTEXT.md, *locator*), so a
+ * reader who opens a concept can open what it rests on with the next call and nothing in
+ * between.
+ *
+ * **A passage by locator** is `passageAt` and no other door (T-133). That read applies the
+ * reader's predicate inside its own statement, once, so a malformed address, an unknown
+ * document, a span past the end of the text and a row this reader may not see all reach
+ * here as the same one word and leave as the same *not found*. Telling any of them apart
+ * is what would let a reader learn the shape of the workspace by probing addresses, so the
+ * arm below reads the refusal and never a reason. A store failure is not a refusal and
+ * stays an error.
  *
  * `now` is the platform's instant for the trust reading below (ADR 0040): the caller's
  * own Clock, read once and handed in, never read here — which is what lets a test move
@@ -418,7 +512,16 @@ export const open = async (
   input: OpenInput,
   now: Date,
 ): Promise<Result<OpenResult, Error>> => {
-  if (input.iri === undefined) return ok({ found: false, locator: input.locator });
+  if (input.iri === undefined) {
+    const passage = await passageAt(principal, tx, input.locator);
+    if (!passage.ok) {
+      return passage.error === PASSAGE_NOT_FOUND
+        ? ok({ found: false, locator: input.locator })
+        : err(passage.error);
+    }
+    const { locator, title, text, sensitivity } = passage.value;
+    return ok({ found: true, passage: { locator, source: title, text, sensitivity } });
+  }
 
   const concept = await conceptByIri(principal, tx, input.iri);
   if (!concept.ok) return err(concept.error);
@@ -499,13 +602,24 @@ export const giveFeedback = async (
   input: FeedbackInput,
 ): Promise<Result<FeedbackReceipt, never>> => ok({ outcome: "received", feedback: input });
 
+/**
+ * One hit as its reader sees it: what it is, what it is called, the word it is offered
+ * under and the address the next call opens it at.
+ *
+ * The two layers read as one shape with one word swapped — a concept wears its trust word
+ * and its IRI, a document the marker with its sensitivity word and its wire locator — so a
+ * reader scanning the list is reading one column of words and not two kinds of line.
+ */
+const findLine = (hit: FindHit): string =>
+  hit.layer === "bundles"
+    ? `${hit.kind} · ${hit.title} · ${trustWords(hit.trust)} · ${hit.iri}`
+    : `${hit.kind} · ${hit.title} · ${NOT_COMPANY_KNOWLEDGE} · ${hit.sensitivity} · ${hit.locator}`;
+
 /** The human rendering of a preview — one line per hit, never the JSON. */
 export const renderFind = (result: FindResult): string =>
   result.hits.length === 0
     ? "Nothing in the company's knowledge matches that."
-    : result.hits
-        .map((hit) => `${hit.kind} · ${hit.title} · ${trustWords(hit.trust)} · ${hit.iri}`)
-        .join("\n");
+    : result.hits.map(findLine).join("\n");
 
 /** The human rendering of a concept or a passage, derived from its structured form. */
 export const renderOpen = (result: OpenResult): string => {
@@ -559,7 +673,8 @@ export const renderAnswer = (result: AnswerResult): string => {
   const citations = result.citations.map((c, i) => `[${i + 1}] ${c.iri} — ${c.url}`).join("\n");
   const unmapped = result.unmappedPassages
     .map(
-      (p) => `Not company knowledge · ${p.sensitivity}\n> ${p.text}\n— ${p.source} (${p.locator})`,
+      (p) =>
+        `${NOT_COMPANY_KNOWLEDGE} · ${p.sensitivity}\n> ${p.text}\n— ${p.source} (${p.locator})`,
     )
     .join("\n\n");
   const lines = [verdict, `_${mapWords(result.map)}_`];

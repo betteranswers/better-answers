@@ -1408,6 +1408,7 @@ describe("find", () => {
         query: "expenses",
         hits: [
           {
+            layer: "bundles",
             iri: visible.iri,
             kind: "Policy",
             title: "Expenses policy",
@@ -1424,9 +1425,12 @@ describe("find", () => {
         ],
       },
     });
-    expect(admin.ok && admin.value.hits.map((hit) => hit.iri).toSorted()).toEqual(
-      [visible.iri, withheld.iri].toSorted(),
-    );
+    // Only the bundles arm has an IRI, and this proof is about which concepts each reader
+    // may see; the sources arm is `find`'s other half and is proved in `answering.test.ts`.
+    expect(
+      admin.ok &&
+        admin.value.hits.flatMap((hit) => (hit.layer === "bundles" ? [hit.iri] : [])).toSorted(),
+    ).toEqual([visible.iri, withheld.iri].toSorted());
   });
 
   it("lets ask name the concepts the reader may see that its question's terms resolve to, and never a withheld one — as a refusal, since nothing drafts yet", async () => {

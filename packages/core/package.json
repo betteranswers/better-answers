@@ -21,7 +21,8 @@
     "./store/graph": "./src/store/graph/index.ts",
     "./store/objects": "./src/store/objects/index.ts",
     "./testing/objects": "./test/suite-objects.ts",
-    "./testing/bundle-root": "./test/bundle-root.ts"
+    "./testing/bundle-root": "./test/bundle-root.ts",
+    "./testing/documents": "./test/suite-documents.ts"
   },
   "scripts": {
     "lint": "oxlint --config ../../.oxlintrc.json .",
