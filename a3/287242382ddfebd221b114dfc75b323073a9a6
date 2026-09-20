@@ -1,0 +1,23 @@
+apps/worker/tests/test_image.py
+  s_76834b2fe19bf1::t_594f1bb829e653 109-115
+  s_76834b2fe19bf1::t_b3b6be0d820c79 87-108,116-118
+apps/worker/tests/test_redaction_windows.py
+  s_76834b2fe19bf1::t_80b9956e5b6039 118-122
+  s_76834b2fe19bf1::t_1eff5e72d75f08 284-294
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a3287242382ddfebd221b114dfc75b323073a9a6",
+  "prompts": {},
+  "sessions": {
+    "s_76834b2fe19bf1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3978e665-a0d3-4ce5-b180-4ce3a4ca0cbe",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
