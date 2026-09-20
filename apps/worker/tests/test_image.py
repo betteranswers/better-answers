@@ -84,12 +84,19 @@ in its own docblock. To re-take the two figures the image can still answer — t
 seam under the pin, and that model's detector alone — ``uv run --frozen pytest
 tests/test_image.py -k measured --log-cli-level=INFO``.
 
+**What the converters cost, and what they are worth** (`T-130`): the first act of that
+ticket, and its four readings, are the docblock on
+``test_both_converters_hold_on_the_image_under_the_engines_own_runtime`` below — with
+the memory the 1.5 GB cap is read against (ADR 0024) beside them, because the only place
+that figure can be taken is a container running the seam and the converter together.
+
 **Sequenced before `T-006`.** The image runs a ``CMD`` that exits with a message
 today: there is no work loop, so a wrong image is currently harmless. The moment
 ``T-006`` puts a loop in it, a wrong image stops being harmless, and a probe written
 afterwards is a probe written to pass.
 """
 
+import base64
 import json
 import logging
 import os
@@ -164,9 +171,28 @@ HOST_IMPORTS = (
     "boto3",
 )
 
-#: What the container is asked to import: the tier's own modules, the detector's and the
-#: host's.
-PROBED_IMPORTS = REQUIRED_IMPORTS + DETECTOR_IMPORTS + HOST_IMPORTS
+#: The two converters, one per media type (ADR 0013, amended 20/09/2026): `anydoc` for
+#: `.docx` and `pdf-inspector` for PDF. They are asked for by module name and installed
+#: under distribution names that differ from it — `firecrawl-anydoc` ships `anydoc` —
+#: which is the same reason the detector's libraries are asked for this way: what
+#: matters is what the image can import when a job hands it a document, and a lockfile
+#: that resolved the wrong thing would still build, still start and still claim.
+CONVERTER_IMPORTS = (
+    "anydoc",
+    "pdf_inspector",
+)
+
+#: The same two by the names `pyproject.toml` pins them under, which is the other half
+#: of the pair: the module says what the image can import and the distribution says what
+#: version it imported.
+CONVERTER_DISTRIBUTIONS = (
+    "firecrawl-anydoc",
+    "pdf-inspector",
+)
+
+#: What the container is asked to import: the tier's own modules, the detector's, the
+#: host's and the converters'.
+PROBED_IMPORTS = REQUIRED_IMPORTS + DETECTOR_IMPORTS + HOST_IMPORTS + CONVERTER_IMPORTS
 
 #: The module the build runs to fetch the weights. It is named here and in the
 #: Dockerfile and nowhere else, so the module cannot move without both moving.
@@ -646,6 +672,137 @@ sys.stdout.write(json.dumps({
 """
 
 
+#: The two fixtures the converter probe is handed, out of the suite's own directory and
+#: base64 into the container's environment. The image carries no `tests/` (a case above
+#: holds that), so a fixture reaches a container as bytes or not at all.
+CONVERSION_FIXTURES = WORKSPACE / "tests" / "fixtures" / "conversion"
+PROBED_FIXTURES = ("expenses-policy.docx", "rate-card.pdf")
+
+#: What the two converters may add to the worker's peak RSS between them, in megabytes.
+#: The first act's pass rule, and the one figure on this page that is a ceiling rather
+#: than a record: the worker holds 1.5 GB on a 4 GB box with the detector's torch
+#: already inside it (ADR 0024), so a converter that wanted a hundred megabytes of its
+#: own would be a converter that had to be weighed against the detector rather than
+#: added beside it.
+CONVERTERS_MAY_ADD_MB = 100
+
+# The fourth container's probe: both converters, called from inside a memoised function
+# under the engine's own runtime, twice over the same bytes. It answers what each
+# fixture converted to, whether the two passes agreed, and what the pair added to the
+# process's high-water mark — which is three of the first act's four readings, taken
+# where they count. The fourth, the control against `pypdf`, is the one reading this
+# container cannot take: `pypdf` is deliberately not in the image, and its comparison is
+# the record in this file's docblock.
+#
+# `ru_maxrss` is kilobytes on Linux and the container is Linux, which is the whole of
+# why the division below is by 1024 and not by a million.
+CONVERTER_PROBE = """
+import base64, json, os, resource, sys, tempfile
+
+import cocoindex as coco
+from better_answers_worker.pipeline import converted
+
+def peak_mb():
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+
+@coco.fn(memo=True)
+def convert(body: bytes, media_type: str, version: str) -> str:
+    return converted(body, media_type)
+
+@coco.fn
+async def one(landing, read, version):
+    name, body, media_type = landing
+    read[name] = await coco.use_mount(convert, body, media_type, version)
+
+@coco.fn
+async def every(landings, read, version) -> int:
+    await coco.mount_each(
+        one, [(one_of[0], one_of) for one_of in landings], read, version
+    )
+    return len(landings)
+
+def pass_over(landings, store, version):
+    read = {}
+    coco.App(
+        coco.AppConfig(
+            name="converters",
+            environment=coco.Environment(
+                coco.Settings(db_path=store), name="converters:" + version
+            ),
+        ),
+        every,
+        landings,
+        read,
+        version,
+    ).update_blocking()
+    return read
+
+landings = tuple(
+    (name, base64.b64decode(body), media_type)
+    for name, body, media_type in json.loads(os.environ["PROBE_FIXTURES"])
+)
+before = peak_mb()
+with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
+    once = pass_over(landings, first, "once")
+    twice = pass_over(landings, second, "twice")
+after = peak_mb()
+
+sys.stdout.write(json.dumps({
+    "converted": once,
+    "deterministic": once == twice,
+    "added_mb": after - before,
+}))
+"""
+
+
+@dataclass(frozen=True)
+class Conversion:
+    """What one container answered about the two converters it carries."""
+
+    converted: Mapping[str, str]
+    deterministic: bool
+    added_mb: float
+
+
+def probed_fixtures() -> list[list[str]]:
+    """The fixtures the converter probe is handed, each with its media type and bytes.
+
+    The media types are spelled here rather than imported from `pipeline.converter`,
+    which is the one place they otherwise live: **this file imports nothing from `src`
+    in-process**, for the reason `pyproject.toml`'s mutmut settings give — an import
+    would put every mutant of this tier's source through a container build. They are
+    derived from each fixture's own suffix so that the pair cannot drift into naming one
+    file by two types.
+    """
+    by_suffix = {
+        ".docx": (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ),
+        ".pdf": "application/pdf",
+    }
+    return [
+        [
+            name,
+            base64.b64encode((CONVERSION_FIXTURES / name).read_bytes()).decode("ascii"),
+            by_suffix[Path(name).suffix],
+        ]
+        for name in PROBED_FIXTURES
+    ]
+
+
+def _read_conversion(stdout: str) -> Conversion:
+    # Narrowed on the statement after the read, like the two below it
+    # (§ TYPES (Python)).
+    answered = _answered(stdout)
+    return Conversion(
+        converted={
+            str(name): str(text) for name, text in answered["converted"].items()
+        },
+        deterministic=bool(answered["deterministic"]),
+        added_mb=float(answered["added_mb"]),
+    )
+
+
 @dataclass(frozen=True)
 class ImageContents:
     """What one container answered about the image it was started from."""
@@ -1010,6 +1167,31 @@ def test_the_image_carries_every_library_the_detector_runs_on(
     assert set(contents.imports) == set(PROBED_IMPORTS)
 
 
+def test_the_image_carries_both_converters_at_the_versions_this_tier_pins(
+    contents: ImageContents,
+) -> None:
+    # A media type has one converter, so an image missing one of these converts nothing
+    # of that type at all — every `.docx` or every PDF a client uploads is quarantined,
+    # the run still finishes and the only thing that says so is a catalogue column. The
+    # same reading as the two lists above, for the half of the image that turns bytes
+    # into the text a citation addresses.
+    assert {
+        name: contents.imports[name] for name in CONVERTER_IMPORTS
+    } == dict.fromkeys(CONVERTER_IMPORTS, True)
+    # And both are pinned exactly (`[DEPS1]`), read off the manifest the build installs
+    # from. A converter's output is the span address space, so a range here would let
+    # the text every locator is an offset into move without anybody choosing it — which
+    # is the same reason both versions are part of the memoised function's own.
+    pinned = {
+        _distribution_name(each): each
+        for each in _requirements("project", "dependencies")
+    }
+    assert [pinned.get(name) for name in CONVERTER_DISTRIBUTIONS] == [
+        "firecrawl-anydoc==0.2.4",
+        "pdf-inspector==1.22.0",
+    ]
+
+
 def test_the_image_carries_every_library_the_host_composes(
     contents: ImageContents,
 ) -> None:
@@ -1309,6 +1491,77 @@ def test_what_the_seam_costs_per_page_is_measured_on_the_image_and_never_budgete
     assert measured.pinned_model == _pin("GLINER_MODEL_ID")
     assert measured.seam_ms > 0
     assert measured.pinned_ms > 0
+
+
+def test_both_converters_hold_on_the_image_under_the_engines_own_runtime(
+    image: str,
+) -> None:
+    """T-130's first act, re-run where it counts rather than recorded and trusted.
+
+    Three of the four readings the act is passed on are taken here, on the image, with
+    the network refused, from inside a memoised function under the engine's runtime —
+    which is the one place any of them mean anything, because a converter that is fine
+    in a laptop's venv and segfaults under the engine's Rust core is exactly the failure
+    prototype 52 found for torch. The run finishes; the same bytes give the same text
+    twice; the pair adds less than a hundred megabytes to the process's peak RSS.
+
+    The fourth reading is the one a container cannot take. `pypdf` is the control the
+    converters' fidelity is judged against and it is deliberately **not** in the image,
+    so that comparison is the record below and is re-run by hand off the image.
+
+    **The readings, 20 September 2026**, on an Apple M4 Pro (14 cores, 24 GB) under
+    Docker Desktop 29.4, so the container is `linux/arm64` where `build.yml` builds
+    `linux/amd64` and the two are not one number. `firecrawl-anydoc` 0.2.4,
+    `pdf-inspector` 1.22.0, `cocoindex` 1.0.22, over eight fixtures — the two committed
+    beside this suite, a PDF with no text layer, and five text PDFs of the kind a client
+    holds: two columns, a table, a form, long prose and a headed contract. Three
+    containers, minutes apart:
+
+    * **The run finished** in all three, with no crash and every fixture answered.
+    * **Peak RSS added by the two converters together: 32.2, 31.7, 33.8 MB**, over a
+      process holding the engine and nothing else at 44.8, 44.8 and 44.8 MB. Under the
+      hundred the act allows, and by a margin that is not close.
+    * **The same bytes gave the same text twice**, for all eight fixtures, in all three
+      containers.
+    * **No fixture lost a word `pypdf` keeps.** Run off the image against `pypdf` for
+      the seven PDFs and `python-docx` for the `.docx`, comparing word sets: the set
+      each control kept and the converter did not was empty every time.
+    * Conversion of all eight, twice over, took **127, 125 and 151 ms** in total —
+      which is why the per-document timeout is cut from the seam's cost and not from
+      this one.
+
+    **The memory the 1.5 GB cap is read against, same three containers.** The seam
+    beside the converters, in one process, over the fixture page: peak RSS **2966.8,
+    2970.8 and 2975.2 MB**, of which the converters are the thirty-odd megabytes above
+    and every other byte is the detector — torch, GLiNER and `mdeberta-v3-base` — as S0
+    left it. That is a figure for S4 to read against ADR 0024's cap and this ticket has
+    no lever on it: the converters could be removed entirely and it would move by one
+    per cent.
+    """
+    if not DOCKER_ANSWERS:
+        pytest.skip(DAEMON_SKIP_REASON)
+
+    answered = _read_conversion(
+        _run_the_image(
+            image,
+            {"PROBE_FIXTURES": json.dumps(probed_fixtures())},
+            probe=CONVERTER_PROBE,
+            network="none",
+        )
+    )
+
+    assert answered.deterministic, "the same bytes must give the same text twice"
+    assert answered.added_mb < CONVERTERS_MAY_ADD_MB
+    # The tables, which are the thing a converter that flattened its layout would lose
+    # and a full-text search would then never find. The whole of each fixture's text is
+    # a literal in `tests/test_pipeline_landed.py`, which is where it belongs: this file
+    # imports nothing from `src` in-process, for the reason `pyproject.toml`'s mutmut
+    # settings give.
+    assert "| Hotel | 120 |" in answered.converted["expenses-policy.docx"]
+    assert "|Survey|450|" in answered.converted["rate-card.pdf"]
+    logging.getLogger(__name__).info(
+        "the converters added %.1f MB to the image's peak RSS", answered.added_mb
+    )
 
 
 def test_the_container_runs_as_the_uid_that_owns_this_tiers_volumes(

@@ -50,12 +50,19 @@ class CategoryDescriptor:
 
 
 DESCRIPTORS: tuple[CategoryDescriptor, ...] = (
+    # This category's context is its cue list as well: the one place on this table where
+    # a word is the detection rather than a boost on one. So every word here is medical
+    # and none is a word a bid library writes about its own business — *health* in a
+    # safety policy, *condition* in a condition of contract. An ordinary word costs the
+    # whole sentence around it and the document's class, at the one tier no binding
+    # switches off, and the reviewer's only road back from there is the per-span
+    # restore, one span at a time.
     CategoryDescriptor(
         category="special-category",
         tier="always",
         raised_by=("HEALTH_CUE",),
         threshold=0.5,
-        context=("health", "diagnosis", "condition", "medication", "sickness"),
+        context=("diagnosis", "medication", "sickness"),
         placeholder="[withheld]",
         narrows_to="Restricted",
     ),

@@ -1,0 +1,28 @@
+Delivery terms for the Northgate depot.
+
+Orders received before eleven in the morning are picked the same working day.
+Anything later is picked the next. The depot does not pick on a Saturday and the
+gate is locked from noon.
+
+Pallets are counted in and counted out. A short delivery is raised on the day it
+is noticed and never at the end of the month, because a pallet nobody counted is
+a pallet nobody can find.
+
+Payment is thirty days from the end of the month in which the invoice falls. The
+sort code is 20-00-00 and the account number is 12345678. Remittance advice goes
+to the accounts inbox and not to the depot.
+
+Returns are accepted within fourteen days on the original pallet. A pallet that
+arrives broken is photographed before it is unloaded, and the photograph is the
+record the claim rests on.
+
+Fuel is charged at cost and reviewed each quarter. A change to the rate is given
+in writing one full month before it takes effect, so that a quotation already
+given holds to the price it was given at.
+
+Pallets left on site beyond the fourteen days are collected on the next run to
+the depot and charged at the standing rate. A pallet the driver cannot reach is
+not a pallet the driver collected, and the note says so.
+
+These terms hold for the length of the agreement and are read with the schedule
+rather than instead of it.

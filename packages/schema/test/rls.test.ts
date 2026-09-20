@@ -2364,16 +2364,35 @@ describe("the derivation's tables under app_rt", () => {
       // The two S1 hands back, and only as far as a run needs them: the binding is read so a
       // run can copy its class and audience onto the rows it writes, and the catalogue row is
       // read and written back because the hash, the normalised copy's key, the redaction
-      // version, the outcome word and the last-seen stamp are all a run's own findings.
+      // version, the outcome word, the quarantine error and the last-seen stamp are all a
+      // run's own findings.
       const binding = await client.query("SELECT id FROM source_binding");
       const document = await client.query("SELECT id FROM source_document");
       await client.query(
         "UPDATE source_document SET last_seen = now(), outcome = 'converted' WHERE id = $1",
         [seeded.document.id],
       );
-      expect({ binding: binding.rows, document: document.rows }).toEqual({
+      // Both words a run may write, because the grant is the table's and the second one was
+      // added after it: a column the worker cannot write is a document quarantined with
+      // nothing on its row to say by what, and nothing else in this estate would notice.
+      await client.query(
+        `UPDATE source_document
+            SET outcome = 'quarantined', quarantine_error = 'NeedsOcrError'
+          WHERE id = $1`,
+        [seeded.document.id],
+      );
+      const quarantined = await client.query(
+        "SELECT outcome, quarantine_error FROM source_document WHERE id = $1",
+        [seeded.document.id],
+      );
+      expect({
+        binding: binding.rows,
+        document: document.rows,
+        quarantined: quarantined.rows,
+      }).toEqual({
         binding: [{ id: seeded.binding.id }],
         document: [{ id: seeded.document.id }],
+        quarantined: [{ outcome: "quarantined", quarantine_error: "NeedsOcrError" }],
       });
 
       // And no further, each refusal beside the path it fences (`[SEC3]`).

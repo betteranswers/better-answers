@@ -97,6 +97,18 @@ A_HEALTH_SENTENCE = (
     "diagnosis, which is why the programme slipped by six weeks."
 )
 
+#: The sentence beside it, planted to be **kept**. It carries two words a health cue
+#: list is tempted by — *Health* and *condition* — and discloses nothing about anybody,
+#: which is the ordinary shape of a bid library's safety paragraph. It is declared here
+#: rather than in the suite that reads it because what it proves is the same thing the
+#: list above proves and in the same place: a span the always tier takes out of a page
+#: cannot be taken back by any binding, so the sentences that tier leaves alone are as
+#: much a property of this page as the sentences it withholds.
+A_HEALTH_AND_SAFETY_SENTENCE = (
+    "Our Health and Safety policy is reviewed annually, and no condition of contract "
+    "in this pack departs from it."
+)
+
 #: Every span the recall set is made of, as the category it must be raised under and the
 #: literal the fixture planted.
 PLANTED_SPANS: tuple[tuple[str, str], ...] = (

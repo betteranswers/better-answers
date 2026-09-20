@@ -102,7 +102,13 @@ const result = async (response: Response): Promise<Rpc> => {
   return (body["result"] ?? {}) as Rpc;
 };
 
-type Tool = { name: string; annotations?: Rpc; inputSchema: { properties?: Rpc } & Rpc };
+type Tool = {
+  name: string;
+  /** What a host reads to learn the entry: prose, in the glossary's words (ADR 0018). */
+  description?: string;
+  annotations?: Rpc;
+  inputSchema: { properties?: Rpc } & Rpc;
+};
 
 const listTools = async (client: TestClient, token: string): Promise<Tool[]> =>
   ((await result(await modern(client, token, "tools/list")))["tools"] ?? []) as Tool[];
@@ -168,6 +174,25 @@ describe("era-independent", () => {
       }
       expect(JSON.stringify(tool.inputSchema)).not.toContain("x-mcp-header");
     }
+  });
+
+  it("describes the two reads in the glossary's words, so a host is told what a document hit is and how to open it (T-134)", async () => {
+    const { client, token } = await connect();
+
+    const described = new Map(
+      (await listTools(client, token)).map((tool) => [tool.name, tool.description ?? ""]),
+    );
+
+    // The entry's description is the only place a host learns the surface's vocabulary, so
+    // the two words the document layer turns on have to be in it: the marker a reader must
+    // not mistake for the company's answer, and the address the next call takes.
+    expect(described.get("find")).toContain("Not company knowledge");
+    expect(described.get("find")).toContain("locator");
+    expect(described.get("open")).toContain("locator");
+    // *Hit* and *concept* are the glossary's; *result* and *document chunk* are the words
+    // CONTEXT.md tells us to avoid, and a description is prose a model reads as instruction.
+    expect(described.get("find")).toContain("hit");
+    expect(described.get("find")?.toLowerCase()).not.toContain("chunk");
   });
 
   it("answers open with structured content and a human rendering that is not the JSON, alike for absent and foreign IRIs (§9 4, 7)", async () => {

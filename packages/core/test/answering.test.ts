@@ -7,6 +7,7 @@ import {
   giveFeedback,
   mapWords,
   NOT_ANSWERED,
+  NOT_COMPANY_KNOWLEDGE,
   open,
   renderAnswer,
   renderFeedback,
@@ -22,6 +23,14 @@ import {
 } from "../src/answering/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
+import {
+  codePointsOf,
+  documentLanded,
+  groupSeeded,
+  PUBLISHED_AT,
+  type DocumentShape,
+  type LandedDocument,
+} from "./suite-documents.ts";
 import { postgresForSuite, readingAs } from "./suite-postgres.ts";
 
 /**
@@ -259,6 +268,7 @@ describe("the preview's rendering", () => {
         query: "expenses",
         hits: [
           {
+            layer: "bundles",
             iri: "https://better-answers.com/c/01A",
             kind: "Policy",
             title: "Expenses",
@@ -267,6 +277,7 @@ describe("the preview's rendering", () => {
             tags: [],
           },
           {
+            layer: "bundles",
             iri: "https://better-answers.com/c/01B",
             kind: "Guide",
             title: "Travel",
@@ -417,7 +428,7 @@ describe("what the slice's four acts answer", () => {
     expectTypeOf(giveFeedback).returns.resolves.toEqualTypeOf<Result<FeedbackReceipt, never>>();
   });
 
-  it("answers a search with the query it was asked and no hits, until the index is read", async () => {
+  it("answers a search with the query it was asked and no hits, where neither arm matches", async () => {
     const reader = await arrange();
 
     const found = await acting(reader, (principal, tx) =>
@@ -462,7 +473,7 @@ describe("what the slice's four acts answer", () => {
     expect(receipt).toEqual({ ok: true, value: { outcome: "received", feedback } });
   });
 
-  it("answers a passage by locator as not found, until the source catalogue exists", async () => {
+  it("answers a locator that is no address as not found, echoing back what it was asked with", async () => {
     const reader = await arrange();
 
     const opened = await acting(reader, (principal, tx) =>
@@ -488,5 +499,277 @@ describe("what the slice's four acts answer", () => {
     ).rejects.toThrow("the transaction did not commit");
 
     expect(answered?.ok).toBe(false);
+  });
+});
+
+/**
+ * The document layer folded into the two reads (T-134). The sources slice's own suite
+ * (`passages.test.ts`) holds `findPassages` and `passageAt` to the predicate and to the
+ * agreement's spans; what is proved here is the **composition** and nothing else: that a
+ * document arrives beside a concept as a hit of its own layer, that its wire locator is the
+ * string `open` takes, and that every way a locator can fail leaves by the one door as the
+ * one word. Each expected passage is written down here rather than sliced out of the seeded
+ * text, so an assertion can disagree with the code it is about.
+ */
+describe("the two knowledge layers a search and a fetch reach", () => {
+  const now = new Date("2026-09-08T12:00:00.000Z");
+
+  /** The one word every arm of the arrangement carries, so a single query reaches them all. */
+  const QUERY = "kingfisher";
+
+  const INVOICE_TITLE = "The bid library's invoice";
+  const INVOICE_TEXT = "The kingfisher invoice was settled in March.";
+  const HANDBOOK_TITLE = "The covered handbook";
+  const HANDBOOK_TEXT = "The kingfisher handbook explains the rule.";
+  const CONCEPT_TITLE = "Kingfisher policy";
+  const CONCEPT_BODY = "The kingfisher rule is stated here.";
+
+  const documentHolding = (workspaceId: string, shape: DocumentShape): Promise<LandedDocument> =>
+    documentLanded(db().pool, workspaceId, shape);
+
+  /**
+   * A published concept resting on that document, cited in both the places a real write fills:
+   * the `sources[]` entry the file carries, whose locator is the document's wire address, and
+   * the `concept_evidence` row derived from it. The two agree, because a search's exclusion
+   * reads the row and `open`'s evidence reads the file, and a suite that let them differ would
+   * prove the two halves of one citation against each other.
+   */
+  const conceptResting = async (workspaceId: string, document: LandedDocument): Promise<string> => {
+    const client = await db().pool.connect();
+    try {
+      const seed = testData(client);
+      const indexed = await seed.conceptIndex({
+        workspaceId,
+        kind: "Policy",
+        title: CONCEPT_TITLE,
+        body: CONCEPT_BODY,
+        frontmatter: {
+          title: CONCEPT_TITLE,
+          type: "Policy",
+          sources: [{ resource: HANDBOOK_TITLE, locator: document.locator, title: HANDBOOK_TITLE }],
+        },
+        publishedAt: PUBLISHED_AT,
+        sensitivity: "Internal",
+      });
+      await seed.evidence({
+        workspaceId,
+        sourceDocumentId: document.documentId,
+        locator: document.locator,
+        resource: HANDBOOK_TITLE,
+      });
+      await seed.conceptEvidence({
+        workspaceId,
+        iri: indexed.iri,
+        sourceDocumentId: document.documentId,
+        locator: document.locator,
+      });
+      return indexed.iri;
+    } finally {
+      client.release();
+    }
+  };
+
+  const searching = (reader: Awaited<ReturnType<typeof arrange>>, limit = 10) =>
+    acting(reader, (principal, tx) => find(principal, tx, { query: QUERY, limit }, now));
+
+  const opening = (reader: Awaited<ReturnType<typeof arrange>>, locator: string) =>
+    acting(reader, (principal, tx) => open(principal, tx, { locator }, now));
+
+  /**
+   * One hit waiting on each layer: an invoice nothing on the map covers, and a handbook a
+   * concept this reader may see rests on — so the concept is the bundles arm's one hit and
+   * the handbook is the document the sources arm must leave out (ADR 0016).
+   */
+  const aDocumentEachWay = async (reader: Awaited<ReturnType<typeof arrange>>) => {
+    const invoice = await documentHolding(reader.workspaceId, {
+      title: INVOICE_TITLE,
+      text: INVOICE_TEXT,
+    });
+    const handbook = await documentHolding(reader.workspaceId, {
+      title: HANDBOOK_TITLE,
+      text: HANDBOOK_TEXT,
+    });
+    return { invoice, handbook, iri: await conceptResting(reader.workspaceId, handbook) };
+  };
+
+  it("previews a document on its own line, marked as what it is, beside the concept that has an answer", async () => {
+    const reader = await arrange();
+    const { invoice, iri } = await aDocumentEachWay(reader);
+
+    const found = await searching(reader);
+
+    // The concept arm first, then the document arm — the two rank separately until S2 — and
+    // the handbook is not offered at all: a concept this reader may see already covers it
+    // (ADR 0016), so what they should be reading is the concept.
+    expect(found).toEqual({
+      ok: true,
+      value: {
+        query: QUERY,
+        hits: [
+          {
+            layer: "bundles",
+            iri,
+            kind: "Policy",
+            title: CONCEPT_TITLE,
+            trust: unchecked,
+            bundle: "knowledge",
+            tags: [],
+          },
+          {
+            layer: "sources",
+            kind: "document",
+            title: INVOICE_TITLE,
+            locator: invoice.locator,
+            sensitivity: "Internal",
+          },
+        ],
+      },
+    });
+    expect(found.ok && renderFind(found.value)).toBe(
+      [
+        `Policy · ${CONCEPT_TITLE} · Unchecked · ${iri}`,
+        `document · ${INVOICE_TITLE} · ${NOT_COMPANY_KNOWLEDGE} · Internal · ${invoice.locator}`,
+      ].join("\n"),
+    );
+  });
+
+  it("hands back the number of hits it was asked for and never that many per layer, the concepts taking the room first", async () => {
+    const reader = await arrange();
+    const { invoice, iri } = await aDocumentEachWay(reader);
+
+    const [ofOne, ofTwo] = await Promise.all([searching(reader, 1), searching(reader, 2)]);
+
+    // A reader who asked for one thing is handed one thing, not one per layer: the concept
+    // takes the room, because it is the company's answer, and the document waits for a
+    // reader who asked for more. Two arms run to the caller's limit would be twice the
+    // context an MCP host budgeted for, off one argument.
+    expect(ofOne.ok && ofOne.value.hits).toEqual([
+      expect.objectContaining({ layer: "bundles", iri }),
+    ]);
+    expect(ofTwo.ok && ofTwo.value.hits).toEqual([
+      expect.objectContaining({ layer: "bundles", iri }),
+      expect.objectContaining({ layer: "sources", locator: invoice.locator }),
+    ]);
+  });
+
+  it("opens the passage a hit's own locator addresses, with the document it is in and the word it is held under", async () => {
+    const reader = await arrange();
+    const invoice = await documentHolding(reader.workspaceId, {
+      title: INVOICE_TITLE,
+      text: INVOICE_TEXT,
+    });
+
+    const opened = await opening(reader, invoice.locator);
+
+    expect(opened).toEqual({
+      ok: true,
+      value: {
+        found: true,
+        passage: {
+          locator: invoice.locator,
+          source: INVOICE_TITLE,
+          text: "The kingfisher invoice was settled in March.",
+          sensitivity: "Internal",
+        },
+      },
+    });
+    expect(opened.ok && renderOpen(opened.value)).toBe(
+      [
+        "> The kingfisher invoice was settled in March.",
+        "",
+        `— ${INVOICE_TITLE} (${invoice.locator}) · Internal`,
+      ].join("\n"),
+    );
+  });
+
+  it("answers a withheld, an unpublished, a malformed and an out-of-range locator with the one word, and offers none of them as a hit", async () => {
+    const reader = await arrange();
+    const visible = await documentHolding(reader.workspaceId, {
+      title: INVOICE_TITLE,
+      text: INVOICE_TEXT,
+    });
+    const unpublished = await documentHolding(reader.workspaceId, {
+      title: "The binding still under review",
+      text: HANDBOOK_TEXT,
+      publishedAt: null,
+    });
+    // A group of this workspace that the reader is not in: the binding is for it alone.
+    const groupId = await groupSeeded(db().pool, reader.workspaceId);
+    const elsewhere = await documentHolding(reader.workspaceId, {
+      title: "The bid team's own file",
+      text: HANDBOOK_TEXT,
+      audienceGroups: [groupId],
+    });
+    // Well formed, this document's own, and past the end of its text — the case the parser
+    // cannot answer, because it has no text in front of it.
+    const pastTheEnd = `${visible.documentId}/chars:0-${codePointsOf(INVOICE_TEXT) + 1}`;
+
+    const [underReview, outsideTheAudience, nonsense, tooFar, found] = await Promise.all([
+      opening(reader, unpublished.locator),
+      opening(reader, elsewhere.locator),
+      opening(reader, "not an address at all"),
+      opening(reader, pastTheEnd),
+      searching(reader),
+    ]);
+
+    expect(underReview).toEqual({
+      ok: true,
+      value: { found: false, locator: unpublished.locator },
+    });
+    expect(outsideTheAudience).toEqual({
+      ok: true,
+      value: { found: false, locator: elsewhere.locator },
+    });
+    expect(nonsense).toEqual({
+      ok: true,
+      value: { found: false, locator: "not an address at all" },
+    });
+    expect(tooFar).toEqual({ ok: true, value: { found: false, locator: pastTheEnd } });
+    // Not a hit, not a count and not a hint (ADR 0016): the two this reader may not reach are
+    // simply absent from the preview, which is the answer a workspace holding nothing gives.
+    expect(found.ok && found.value.hits).toEqual([
+      {
+        layer: "sources",
+        kind: "document",
+        title: INVOICE_TITLE,
+        locator: visible.locator,
+        sensitivity: "Internal",
+      },
+    ]);
+  });
+
+  it("renders each evidence item's wire locator when a concept is opened, and opens the passage at it", async () => {
+    const reader = await arrange();
+    const handbook = await documentHolding(reader.workspaceId, {
+      title: HANDBOOK_TITLE,
+      text: HANDBOOK_TEXT,
+    });
+    const iri = await conceptResting(reader.workspaceId, handbook);
+
+    const concept = await acting(reader, (principal, tx) => open(principal, tx, { iri }, now));
+
+    expect(concept.ok && concept.value.found && concept.value.concept?.evidence).toEqual([
+      { locator: handbook.locator, source: HANDBOOK_TITLE },
+    ]);
+    expect(concept.ok && renderOpen(concept.value)).toContain(
+      `- ${HANDBOOK_TITLE} (${handbook.locator})`,
+    );
+
+    // The address the concept handed over is the address the next call opens: one string for
+    // a citation and a passage alike (CONTEXT.md, *locator*).
+    const passage = await opening(reader, handbook.locator);
+
+    expect(passage).toEqual({
+      ok: true,
+      value: {
+        found: true,
+        passage: {
+          locator: handbook.locator,
+          source: HANDBOOK_TITLE,
+          text: "The kingfisher handbook explains the rule.",
+          sensitivity: "Internal",
+        },
+      },
+    });
   });
 });

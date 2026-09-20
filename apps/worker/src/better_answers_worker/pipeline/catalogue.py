@@ -8,10 +8,11 @@ opened, which is why those carry the workspace scope as a session setting — an
 below are read and written in transactions of the run's own, where the scope is
 transaction-local as it is everywhere else in this tier.
 
-**The run reads three things and writes three.** It reads the binding's rules in force
+**The run reads three things and writes four.** It reads the binding's rules in force
 and its three permission fields, the documents the binding yielded, and the suppressions
 standing over each of them; it writes the findings the seam raised, the catalogue row
-each document's run reconciled, and — last of all — the visibility of every row it
+each document's run reconciled, the *quarantined* word and the name of what refused it
+on each document it could not read, and — last of all — the visibility of every row it
 landed.
 
 **The last statement is the one with a race in it.** The app rewrites a chunk row's
@@ -26,8 +27,9 @@ and rewrites them itself.
 
 **What each grant is for.** The binding and the catalogue are SELECT and the catalogue
 is also UPDATE, because the hash, the normalised copy's key, the version, the outcome
-word and the last-seen stamp are a run's own findings (migration 0037). The suppression
-is SELECT alone (migration 0038). The finding is INSERT alone (migration 0024): the
+word, the quarantine error and the last-seen stamp are a run's own findings (migration
+0037; the grant is the table's, so migration 0039's column arrived inside it). The
+suppression is SELECT alone (migration 0038). The finding is INSERT alone (0024): the
 detector runs here and the review of what it found is an Admin's act, so a run records a
 span it withheld and can neither read the table back nor mark one reviewed.
 """
@@ -40,14 +42,20 @@ from psycopg import Cursor
 
 from ..ids import ulid
 from .host import IndexRun
-from .landed import LandedDocument, ReadDocument, Suppression, suppression_of
+from .landed import (
+    LandedDocument,
+    QuarantinedDocument,
+    ReadDocument,
+    Suppression,
+    suppression_of,
+)
 from .rows import SENSITIVITY_ORDER, Visibility
 
-#: The word a run writes on a document it converted. The other word the column admits —
-#: *quarantined* — is written by the ticket that can name which document failed and why;
-#: a run has no way to learn either, so it writes nothing at all on a document it did
-#: not read rather than a word it would be guessing at.
+#: The two words the column admits, and the whole of what a run says about how it left a
+#: document. *converted* is the normalised copy and its chunks; *quarantined* is a
+#: document the run reached and could not read.
 CONVERTED_OUTCOME = "converted"
+QUARANTINED_OUTCOME = "quarantined"
 
 #: How the normalised copy's key is derived when the catalogue row does not carry one
 #: yet. The column is null until a run has converted the document, and the shape is the
@@ -225,6 +233,44 @@ def _version_halves(version: str) -> tuple[str, str]:
     return rule_version, detector_pin
 
 
+def quarantine_catalogue(
+    cursor: Cursor[Any], documents: Sequence[QuarantinedDocument]
+) -> None:
+    """Write *quarantined* and the **quarantine error** on each document the run reached
+    and could not read.
+
+    **Both go on the row, and the name is the point of the pair.** The word says the
+    document has no passages and is not waiting for a run, which is what a Sources
+    screen reads; the name says what refused it, which is what an Admin deciding
+    whether the platform needs OCR counts — *this binding quarantined nine documents*
+    *and seven of them say `NeedsOcrError`* is a `GROUP BY` over this column and
+    nothing a log could answer (ADR 0013, amended 20/09/2026). The two travel together
+    or neither means anything, and that rule is the database's:
+    `source_document_quarantine_error_check` refuses a name on a row not also
+    carrying the word, so a statement here that wrote one without the other is
+    refused rather than stored.
+
+    The name is the converter's own class name, passed through as it arrived. This
+    module neither shortens it nor prettifies it: a name this tier invented would be an
+    Admin told something no converter said.
+
+    Nothing else on the row moves. The hash, the normalised copy's key and the version
+    string are facts about text that does not exist, and a run that wrote them would be
+    saying it had converted a document it could not read. `last_seen` does move: the run
+    found the document at the source, and only reading it failed.
+    """
+    for document in documents:
+        cursor.execute(
+            "UPDATE source_document SET outcome = %(outcome)s,"
+            " quarantine_error = %(error)s, last_seen = now() WHERE id = %(id)s",
+            {
+                "outcome": QUARANTINED_OUTCOME,
+                "error": document.error,
+                "id": document.source_document_id,
+            },
+        )
+
+
 def reconcile_catalogue(cursor: Cursor[Any], documents: Sequence[ReadDocument]) -> None:
     """Write back what the run found about each document it read.
 
@@ -238,12 +284,22 @@ def reconcile_catalogue(cursor: Cursor[Any], documents: Sequence[ReadDocument]) 
 
     A document the run did not read is not named here at all, and its row keeps every
     null the bind act left on it.
+
+    **The quarantine error is cleared here, and that is the recovery path.** A document
+    quarantined by one run and converted by the next — a converter upgraded, a scan
+    re-uploaded with a text layer, a stuck conversion that finished this time — would
+    otherwise carry the old name under the new word, which
+    `source_document_quarantine_error_check` refuses. The statement would fail inside
+    the run's scoped transaction and take the whole catalogue write down with it, so
+    a document that recovered would break the run that recovered it. The name belongs
+    to the word beside it: a document that converted has none.
     """
     for document in documents:
         cursor.execute(
             "UPDATE source_document SET content_hash = %(content_hash)s,"
             " normalised_key = %(normalised_key)s,"
             " redaction_version = %(version)s, outcome = %(outcome)s,"
+            " quarantine_error = NULL,"
             " last_seen = now(),"
             # The verdict is cast at every mention because a run that narrowed nothing
             # binds null here, and a bare null parameter is a parameter Postgres has no

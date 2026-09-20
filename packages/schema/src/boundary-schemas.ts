@@ -79,6 +79,7 @@ import {
   CONNECTORS,
   DESTINATIONS,
   DOCUMENT_OUTCOMES,
+  QUARANTINE_ERROR,
   RETENTION_CLASSES,
   RULES_IN_FORCE_KEYS,
   sourceBinding,
@@ -713,6 +714,19 @@ export const sourceBindingUpdate = createUpdateSchema(sourceBinding, sourceBindi
  * writes, the size is a whole number of bytes, and the two closed word sets are the boundary's.
  * The document's own class is the same closed set as a binding's, because it is the same word
  * meaning the same thing; its nullability is the column's, and null means *the binding's*.
+ *
+ * The **quarantine error** is held to being a *name*: one token, no whitespace in it. That is
+ * the whole of what the glossary claims for it and the whole of what makes it useful — an
+ * Admin's OCR decision is a count of one binding's documents grouped by this column, and a
+ * sentence written here instead of a name would give every row a group of its own. Which names
+ * exist is a converter's business and changes with the converters, so there is no word set to
+ * hold it to; that it is not prose is the part this schema can say.
+ *
+ * And it says it to the app alone. The tier that actually writes this column today is the
+ * worker, on its own psycopg connection, which passes through no schema of this package's —
+ * so the rule that the name may only stand beside *quarantined* is the CHECK's and could not
+ * have been this refinement's. What lands here is the shape the app must send if it ever
+ * writes one.
  */
 const sourceDocumentRefinements = {
   workspaceId,
@@ -727,6 +741,7 @@ const sourceDocumentRefinements = {
   contentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
   redactionVersion: (schema: z.ZodString) => schema.trim().min(1),
   outcome: (schema: z.ZodString) => schema.pipe(z.enum(DOCUMENT_OUTCOMES)),
+  quarantineError: (schema: z.ZodString) => schema.regex(QUARANTINE_ERROR),
   sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
 };
 

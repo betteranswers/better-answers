@@ -16,9 +16,14 @@ Kingdom shape a bid library is full of and none of them shipped by anybody:
 * a **health cue at sentence level**. The span is the sentence and never the word,
   because a cue withheld out of its sentence leaves the sentence saying it anyway. The
   cues are the special-category descriptor's own context lemmas, matched against
-  spaCy's lemmas rather than the surface form, so *diagnosed* and *diagnosis* are one
-  rule; widening the cue list is an edit to that descriptor and a bump of the rule
-  version, which is the point of declaring it there.
+  spaCy's lemmas and folded to lower case rather than read off the surface form, so
+  *Sickness* and *medications* are the words *sickness* and *medication* — a noun's
+  inflections and its capital letter, and that alone: *diagnosed* lemmatises to
+  *diagnose*, which is a cue only if that verb is on the list. Every word on the list
+  is medical, because a cue here is the detection and not evidence for one, and an
+  ordinary word of a bid library costs the sentence around it and the document's class
+  at the tier no binding switches off (T-179). Moving the list is an edit to that
+  descriptor and a bump of the rule version, which is the point of declaring it there.
 * a **home address**, which in the United Kingdom is recognised from the postcode
   outward. A postcode on its own is worth almost nothing — Presidio scores it 0.1, and
   a company's own registered office is an address and not a home one — so the rule is
