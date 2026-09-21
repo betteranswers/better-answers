@@ -133,9 +133,10 @@ jobs:
       #
       # The builder first. The driver a plain daemon answers with builds straight into its
       # own image store and can export a cache nowhere, so `--cache-to` on it fails the
-      # build outright rather than being ignored. That was proved when the probes exported;
-      # whether that driver can read the cache was never run, so the step stays and the
-      # probes stay on the builder they were measured on. This creates a container-driver
+      # build outright rather than being ignored. It cannot read one either, and that
+      # failure is quiet: `--cache-from type=gha` on it logs `unknown cache importer: gha`,
+      # builds every layer cold and exits 0 (run 35602449161, 21/09/2026), so without this
+      # step the probes would be green and cold for ever. This creates a container-driver
       # builder and makes it the current one. The worker's suite probes for exactly that
       # before it asks for the cache and builds the way it always did when it finds no such
       # builder — a laptop, and this workflow before this line.

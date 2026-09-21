@@ -918,12 +918,14 @@ SHARED_CACHE_URLS = ("ACTIONS_RESULTS_URL", "ACTIONS_CACHE_URL")
 #: nowhere: it builds straight into the daemon's image store, so a build handed
 #: `--cache-to` on it stops with an error rather than ignoring the flag. Every other
 #: driver — the container one a runner's setup step creates — can. This suite stopped
-#: exporting at `T-223` and the refusal stays, on less than proof. Whether that driver
-#: can *read* a `type=gha` cache was never run here: Docker says it carries the backend
-#: only over the containerd image store (*Cache storage backends*, read 21/09/2026),
-#: which is a sentence about the backend and not a build. So the arm stays on the
-#: builder it was measured on, and the name stays the export's — the half that was
-#: proved.
+#: exporting at `T-223` and the refusal stays, because that driver cannot read the cache
+#: either — and says so more quietly. Run on three fresh runners on 21/09/2026 (run
+#: 35602449161; Engine 28.0.4 on `overlay2`, buildx v0.37.0): handed `--cache-from
+#: type=gha` it answered `ERROR: unknown cache importer: gha`, carried on, built every
+#: layer cold and exited 0, where the container builder beside it read six layers of
+#: six. The export stops the build; the import only wastes it, so without this refusal
+#: a pull request's build would be cold for ever and stay green. The name stays the
+#: export's.
 DRIVER_WITHOUT_AN_EXPORT = "docker"
 
 
