@@ -156,8 +156,8 @@ def main() -> int:
 
     bootstrap = read_bootstrap()
 
-    # Bare statements before the first scoped block: on a plain connection the first
-    # would open a transaction that turns every later block into a savepoint.
+    # In autocommit: the bare stamp read and workspace list below would, on a plain
+    # connection, open a transaction turning every scoped block into a savepoint.
     with queue.connected(bootstrap.database_url) as connection:
         stamped = False
         while True:

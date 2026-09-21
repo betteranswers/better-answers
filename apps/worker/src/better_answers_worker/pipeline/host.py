@@ -112,8 +112,8 @@ class Host:
         )
 
     def remove_binding_directory(self, run: IndexRun) -> None:
-        # Evicted before the directory goes: removing it under an open handle leaves the
-        # engine writing into a store nothing can read.
+        # Evicted before the directory goes: removing it under an open handle would
+        # leave the engine writing into a store nothing can read.
         self.evict(run)
         shutil.rmtree(self.binding_directory(run), ignore_errors=True)
 

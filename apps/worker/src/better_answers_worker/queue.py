@@ -38,8 +38,6 @@ def scoped(
 
 
 def connected(database_url: str) -> psycopg.Connection:
-    # Autocommit, or psycopg opens a transaction on the first statement and every
-    # `scoped` block becomes a savepoint inside one nothing commits.
     return psycopg.connect(database_url, autocommit=True)
 
 
