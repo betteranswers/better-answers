@@ -34,7 +34,7 @@ reviews:
     - `CODING_RULES.md` — the constitution. Rules are tagged. Cite the
       tag when a finding rests on a rule; the title rule (a test title says what the system does
       for whom), the comment rule (a comment says why, never what or what happened) and
-      the tag rule (a rule tag never appears in source, deploy, a Dockerfile or CI) are
+      the tag rule (a rule tag is written only in a rules file, a review finding or a gate's failure message) are
       cited by review alone, so cite them when they are the finding. The gate rule (a lint
       rule, a tool in `check` or a hook command lands with a functional test of where it
       fires and where it stays silent), the empty-suite rule (a suite that can run nothing fails) and

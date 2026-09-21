@@ -135,9 +135,9 @@ over-the-ceiling fixture, the same five citations, the same directive cases — 
 moved in one language and not the other is a red suite rather than a quiet divergence.
 
 The Python check runs under bare `python3` and imports only the standard library, so a fresh
-clone can run it before `uv sync`. ruff and mypy read it under `python/ruff.toml` and this
-workspace's `lint:python` and `typecheck:python`, run from the worker's locked environment —
-the one Python toolchain the repository installs.
+clone can run it before `uv sync`. ruff reads it under `python/ruff.toml` and mypy under
+`--strict`, through this workspace's `lint:python` and `typecheck:python`, run from the
+worker's locked environment — the one Python toolchain the repository installs.
 
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted
 

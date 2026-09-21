@@ -105,7 +105,7 @@ A directive or pragma, a licence or lift notice, and a copy-detection fence are 
 
 ### [COMMENT2] A rule tag is written in a rules file, a review finding or a gate's failure message
 
-Those three places and nowhere else. A tag in source, a test, a document, a deploy file, a Dockerfile, a CI workflow or a workspace's config is a pointer a reader cannot follow and a citation nothing keeps true: write the rule in words instead, or delete the sentence. `apps/api/tests/coding-rules-tags.test.ts` holds it — tags are defined only in rules files and are well-formed, a tag in a gate's message is defined, and a tag anywhere else fails. The ADR and spec files that cited a rule when that test was written are a frozen list it does not read for undefined tags; the list only ever shrinks, and a file created after it fails like any other.
+Those three places and nowhere else, bar the frozen list below. A tag in source, a test, a document, a deploy file, a Dockerfile, a CI workflow or a workspace's config is a pointer a reader cannot follow and a citation nothing keeps true: write the rule in words instead, or delete the sentence. `apps/api/tests/coding-rules-tags.test.ts` holds it — tags are defined only in rules files and are well-formed, a tag in a gate's message is defined, and a tag anywhere else fails. The ADR and spec files that cited a rule when that test was written are a frozen list it does not read for undefined tags; the list only ever shrinks, and a file created after it fails like any other.
 
 ## GLOSSARY
 
