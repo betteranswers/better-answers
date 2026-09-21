@@ -137,3 +137,11 @@ Instants cross every wire as ISO-8601 text and no transformer is mounted.
   the suite lines that change with no behaviour change. No type-only route for the words, or
   more than about a quarter of those suites rewritten, and the constructor is dropped: the
   vocabulary, the crossing, the roads and the root stand without it.
+
+## Amendment — 2026-09-21, the tails are three: `narrowBinding` queues no run (T-232)
+
+This record counts four acts that return `enqueueJobIn`'s word after their rows have landed.
+There are three — `keepInText`, `narrowDocuments` and `reprocessBinding`; `bindUpload`'s tail
+throws already. `narrowBinding` calls no `enqueueJobIn`: its one answer after its writes is the
+cascade's `Error`, which the door's rollback covers. Read *four acts* and *the four tails* above
+as these three. T-232 and the S1 spec say the same; nothing else in the decision moves.
