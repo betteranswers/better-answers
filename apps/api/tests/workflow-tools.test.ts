@@ -146,8 +146,15 @@ const suiteStep = (runner: Runner): Step => {
 /** `1.2` or `1.2.3` anywhere in a line — what a restated pin looks like. */
 const VERSION_LITERAL = /\d+\.\d+/;
 
-/** A step's own condition, which would take the install off some of the job's legs. */
-const STEP_CONDITION = /^ {8}if:/m;
+/**
+ * A step's own condition, or `""` when it has none — what decides whether this run reaches
+ * the step at all. A condition is the first key of a step as often as it is the second, and
+ * the two spellings mean the same thing, so both are read.
+ */
+const STEP_CONDITION = /^(?: {6}- | {8})if:\s*(?<condition>.+?)\s*$/m;
+
+const conditionOf = (step: Step): string =>
+  STEP_CONDITION.exec(step.body)?.groups?.["condition"] ?? "";
 
 describe.each(RUNS_THE_SUITE)(
   "the tools $file installs for the suite it runs (T-124, T-224)",
@@ -159,11 +166,18 @@ describe.each(RUNS_THE_SUITE)(
       ).toBeLessThan(suiteStep(runner).at);
     });
 
-    it("installs it on every leg of the job, not some of them", () => {
+    it("installs it wherever the suite runs, and on no narrower a condition", () => {
+      // Until 21/09/2026 this read "the install step carries no `if:` at all", because the
+      // suite step carried none either and any condition on the install was a leg of the
+      // job reaching the erasure routine's git step without the tool. Then `check.yml`
+      // gained two lanes (the process review): the docs lane runs no workspace suite, so
+      // the install is off it — correctly, and the rule that says so is the general one
+      // this always meant. The two conditions being the SAME string is what matters; a
+      // condition on the install that the suite does not share is the old failure back.
       expect(
-        STEP_CONDITION.test(installStep(runner).body),
-        "the install step carries an `if:`, so some leg of this job reaches the erasure routine's git step without the tool — which is the failure the step was added for, narrowed rather than fixed.",
-      ).toBe(false);
+        conditionOf(installStep(runner)),
+        `the rewrite tool is installed on a narrower condition than \`${runner.suiteCommand}\` runs on, so some run of this job reaches the erasure routine's git step without it.`,
+      ).toEqual(conditionOf(suiteStep(runner)));
     });
   },
 );

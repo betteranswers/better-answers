@@ -48,11 +48,72 @@ permissions:
   contents: read
 
 jobs:
+  # HAS THIS EXACT COMMIT ALREADY BEEN CHECKED? The merge queue tests a commit on a
+  # merge-group ref and then fast-forwards `main` to that very commit, so the tree this run
+  # is about and the tree the queue tested are the same bytes — and on 21/09/2026 the
+  # process review measured what that repetition costs: three conflict-free pull requests
+  # paid eleven minutes of `check` each on their branch and then ten minutes and three
+  # seconds again here, on trees nothing had touched in between.
+  #
+  # The question is asked of the runs API and it is exact: a run of `check.yml`, triggered
+  # by `merge_group`, whose head is this commit, which concluded success. Nothing weaker
+  # would do — a run of another workflow, or of this one on a pull request's merge ref, is a
+  # run against a different tree. `gh` rather than a third-party action because
+  # `apps/api/tests/workflow-pins.test.ts` pins every `uses:` in this directory and an
+  # action for one API call is a tenth thing to keep pinned.
+  #
+  # EVERY WAY OF NOT KNOWING IS `no`. An API that errors, a token that cannot read, a body
+  # this cannot parse: each leaves the verdict at `no` and `check` runs as it always did.
+  # The step therefore cannot fail — which matters, because the two conditions below give
+  # the images to a `check` that passed and to nothing else, so a gate that went red would
+  # leave a commit on `main` with no image and `release.yml` refusing to promote it.
+  already-checked:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # This job's alone, and the only scope it has: it reads this repository's own workflow
+    # runs. It checks nothing out, so it asks for no `contents` — the workflow default above
+    # is replaced, not added to.
+    permissions:
+      actions: read
+    outputs:
+      verdict: ${{ steps.ask.outputs.verdict }}
+    steps:
+      - name: a successful merge-group run of check for this commit
+        id: ask
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          verdict=no
+          # The query filters and the jq filters again on the two fields that need no
+          # interpolation; the head sha is compared in the shell, so nothing this run did
+          # not put there is ever spliced into a jq program.
+          if heads="$(gh api --method GET \
+            "repos/${REPOSITORY}/actions/workflows/check.yml/runs" \
+            -f "head_sha=${COMMIT}" -f event=merge_group -f status=success \
+            --jq '[.workflow_runs[] | select(.event == "merge_group" and .conclusion == "success") | .head_sha] | join(" ")')"; then
+            case " ${heads} " in
+              *" ${COMMIT} "*) verdict=yes ;;
+            esac
+          else
+            echo "::notice::the workflow-runs API did not answer, so this commit is checked here"
+          fi
+          echo "already checked by the merge queue: ${verdict} (${COMMIT})"
+          echo "verdict=${verdict}" >> "$GITHUB_OUTPUT"
+
   # An image is never pushed from a red tree. This is the same `check` every pull request
   # runs, CALLED and not copied, so there is exactly one definition of what `check` is
   # (AGENTS.md: one command, every workspace). `check.yml` has no push trigger of its own for
-  # main precisely so a push runs it once — here — rather than twice in two workflows.
+  # main precisely so a push runs it once — here — rather than twice in two workflows, and
+  # zero times when the queue already ran it against these exact bytes.
+  #
+  # `!cancelled()` and not `success()`: only a verdict of `yes` stands the suite down, and a
+  # gate job that failed to answer has no verdict at all — so a broken gate runs `check`
+  # rather than skipping it.
   check:
+    needs: already-checked
+    if: ${{ !cancelled() && needs.already-checked.outputs.verdict != 'yes' }}
     uses: ./.github/workflows/check.yml
     with:
       # The image job below builds each image once, loads it and runs that image's contents
@@ -63,7 +124,26 @@ jobs:
       images-probed-by-the-caller: true
 
   image:
-    needs: check
+    needs: [already-checked, check]
+    # THE IMAGE SHIPS FROM A CHECKED TREE AND NOTHING ELSE, and the condition has to say so
+    # in full. A job skipped by its own `if:` makes every dependant skip unless the
+    # dependant says otherwise, so `check` standing down would take the images with it and
+    # leave this commit with no `sha-` tag for `release.yml` to promote — which is why
+    # `!cancelled()` is here. But `!cancelled()` on its own is the opposite mistake: it runs
+    # this job after a `check` that FAILED. So having said it, the condition then names by
+    # hand the only two conclusions that may ship an image — `check` succeeded, or `check`
+    # was skipped and the gate above is the reason it was skipped. A failed gate has no
+    # verdict, a failed `check` is neither, and both leave this false (the process review,
+    # 21/09/2026; `apps/api/tests/docs-lane.test.ts` holds the string).
+    #
+    # NOTHING HERE ASKS WHAT LANE ANYTHING WAS IN. Every commit gets its image, a docs-only
+    # one included — the header above says why, and the legs are warm.
+    if: >-
+      ${{ !cancelled()
+      && (needs.check.result == 'success'
+      || (needs.check.result == 'skipped'
+      && needs.already-checked.result == 'success'
+      && needs.already-checked.outputs.verdict == 'yes')) }}
     # The last two are the attestation's, at the foot of this job, and no other job's:
     # `id-token` mints the OIDC token a Sigstore signing certificate is asked for with, and
     # `attestations` stores what was signed (`T-219`).
