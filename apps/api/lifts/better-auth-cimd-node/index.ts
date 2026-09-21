@@ -5,29 +5,8 @@ import type { Readable } from "node:stream";
 
 import { isPublicRoutableHost } from "@better-auth/core/utils/host";
 
-/**
- * `fetchClientMetadataResource` from `@better-auth/cimd/node` 1.7.2, lifted and fixed.
- *
- * Upstream hands Node's `https.request` a custom `lookup` that always calls back in the
- * single-address form `(err, address, family)`. Since Node 20, `autoSelectFamily`
- * (Happy Eyeballs, RFC 8305) is on by default and calls `lookup` with `{ all: true }`,
- * expecting an array; Node reads `.address` off `undefined` and throws
- * `ERR_INVALID_IP_ADDRESS` before a packet leaves the machine, so every CIMD
- * authorization fails `invalid_client`. Issue better-auth/better-auth#10810; fix PR
- * #10730 (against `next`). Removal condition in `THIRD_PARTY_NOTICES.md`.
- *
- * The SSRF policy ADR 0009 owns lives here, in the same code that replaces the lookup:
- * https only; GET/HEAD only; every resolved address refused if it is not public-routable
- * (private, loopback, link-local, CGNAT/shared address space, documentation, multicast
- * and the tunnel forms that embed one of those); the answer pinned for the connection
- * with the original hostname kept as Host and SNI; a redirect returned, never followed
- * (cap 0 — a location to a private address is therefore never fetched); a timeout; a
- * response cap; a per-host answer cache so a rebinding resolver cannot swap the address
- * between two fetches of the same host inside a window.
- *
- * Dependencies are parameters: the test injects a resolver and
- * a request function; production takes Node's.
- */
+// Upstream's `lookup` answers in the single-address form Happy Eyeballs cannot read, and the
+// SSRF policy lives beside the replacement rather than above it.
 
 const BODY_FORBIDDEN_RESPONSE_STATUSES = new Set([204, 205, 304]);
 
@@ -125,8 +104,8 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
   // Bounded: a flood of distinct client hostnames evicts the oldest entry, never grows.
   const hostCache = new Map<string, { readonly pinned: LookedUpAddress; readonly until: number }>();
   const HOST_CACHE_ENTRIES = 1024;
-  // Node's resolver cannot be cancelled: a lookup that outlives the deadline keeps
-  // running, so the number in flight is bounded and the excess is refused outright.
+  // Node's resolver cannot be cancelled: a lookup that outlives the deadline keeps running,
+  // so the number in flight is bounded.
   const MAX_INFLIGHT_LOOKUPS = 32;
   let inFlight = 0;
 
@@ -167,9 +146,8 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
     if (signal.aborted) {
       throw new CimdTransportError("timeout", `metadata fetch exceeded ${timeoutMs} ms`);
     }
-    // The slot is held until the resolver itself settles — a lookup the caller stopped
-    // waiting for is still running, and still counts. The resolver is started inside a
-    // settled promise so a synchronous throw releases the slot like a rejection.
+    // A lookup the caller stopped waiting for is still running, and still counts; a settled
+    // promise makes a synchronous throw release the slot.
     inFlight += 1;
     const resolving = Promise.resolve().then(() => lookup(hostname));
     resolving.then(

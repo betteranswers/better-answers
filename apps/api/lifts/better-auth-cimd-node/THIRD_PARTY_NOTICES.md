@@ -3,7 +3,7 @@
 Upstream: https://github.com/better-auth/better-auth, package `@better-auth/cimd` 1.7.2, file `packages/cimd/src/node.ts` (published as `dist/node.mjs`).
 Upstream commit (tag `v1.7.2`): `ba12fcdfa774ca27d417079dbac0b1b5894ccaf2`.
 Snapshot digest (sha256 of the published `dist/node.mjs` this lift was written against): `905c3227fd0d3509a1ff2acf905a43f4bf5865c689c20770224d25c554e819b1`.
-Licence: MIT (`[APP4]`, ADR 0027; the notice text is below).
+Licence: MIT (ADR 0027; the notice text is below).
 Lifted: 2026-09-01, T-004. Audited by the T-004 builder against prototype 61's fix (`.scratch/v01-spec/prototypes/61-claude-connector/src/cimd-fetch.ts`) and research 80 F7.
 
 ## Why it is lifted
@@ -20,7 +20,7 @@ Upstream's transport answers Node's `lookup` in the single-address form only. Si
 
 Remove this directory and import `fetchClientMetadataResource` from `@better-auth/cimd/node` when a released `@better-auth/cimd` carries better-auth/better-auth#10730 (or an equivalent fix that answers `{ all: true }`). The SSRF additions beyond upstream — the timeout, the response cap, the per-host cache — stay with the platform: if upstream still lacks them at removal, they wrap the upstream transport instead.
 
-## The test a refresh must pass (`[APP4]`)
+## The test a refresh must pass, because a lift is contract-tested and never trusted
 
 `apps/api/tests/cimd-fetch.test.ts` — the refusal paths (scheme, method, every non-public address class, timeout, cap, redirect not followed) and the two lookup shapes.
 

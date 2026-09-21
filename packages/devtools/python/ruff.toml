@@ -1,0 +1,8 @@
+target-version = "py313"
+
+[lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN"]
+
+[lint.per-file-ignores]
+# The gate is a script, and what it prints is the finding a reader acts on.
+"comment_gate.py" = ["T20"]

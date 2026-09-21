@@ -13,7 +13,7 @@ the hosted product at `better-answers.com`.
 | Better Answers repository (mounted, read-only) | `better-answers/` | Product definition, glossary, UX and accessibility rules, the reader-facing word set, Control Centre's six screens |
 | `docs/vision.md` | in that repo | The one-line positioning, the three knowledge layers, who uses it |
 | `CONTEXT.md` | in that repo | The **domain glossary** — the source of truth for every word on a screen |
-| `CODING_RULES.md` | in that repo | `[UX1]` disclosure model, `[UX2]` latency and keyboard budget, `[A11Y1]` WCAG 2.2 AA + GOV.UK semantics |
+| `CODING_RULES.md` | in that repo | the disclosure model — what is needed first, then more, then the action; the latency budget and a keystroke on every common action; WCAG 2.2 AA + GOV.UK semantics |
 | `docs/adr/0001–0027` | in that repo | Answer contract (0016), citation markers (0015), the write path (0012), trust derivation (0019), open-core (0027) |
 | Styling brief (from the user) | — | "better-auth, Vercel, Linear" — the visual register |
 
@@ -113,7 +113,7 @@ so the substrate and the content agree. One grid per screen, masked away from re
 hues — green `#137a52`, amber `#a55d09`, red `#c0362c`, violet `#6741c4` — appear only as a
 50-level tint plus a 700-level word, behind a label that already says the same thing.
 Dark theme is a full alias flip on `[data-theme="dark"]`, page `#0b0c0e`. Never a gradient,
-never a coloured left border, never colour as the only signal (`[UX1]`, `[A11Y1]`).
+never a coloured left border, never colour as the only signal (the disclosure model, WCAG 2.2 AA).
 
 **Type.** Geist for everything, Geist Mono for identity and machine strings (IRIs, commit
 hashes, actor ids, citation markers, tabular figures). Only three weights ship: 400, 500,
@@ -175,7 +175,7 @@ shadow change.
 `--accent-600` edge. Keyboard order is the DOM order.
 
 **Motion.** 80–240ms, one curve (`cubic-bezier(.2,0,.13,1)`), fades and 4px rises only. No
-bounce, no spring, no parallax, no entrance choreography. Answers stream (`[UX2]`) — that
+bounce, no spring, no parallax, no entrance choreography. Answers stream (the latency and keyboard budget) — that
 is the only continuous motion in the product. `prefers-reduced-motion` collapses everything
 to 1ms.
 
@@ -183,7 +183,7 @@ to 1ms.
 (`rgba(11,12,14,.44)` + 2px blur) and a sticky bar backdrop. Nowhere else — no frosted
 cards, no translucent panels.
 
-**Disclosure, not layers.** `[UX1]`: first view shows what is needed to judge, one
+**Disclosure, not layers.** Show what is needed first, then more, then the action: first view shows what is needed to judge, one
 disclosure reveals more, the action sits beside it. Two levels for a Viewer, never three.
 A modal exists only for an irreversible act.
 
@@ -209,7 +209,7 @@ import { MagnifyingGlass } from "@phosphor-icons/react";   // application
 
 Rules: regular weight everywhere; bold for an active nav item; fill only inside a solid
 accent chip; **never duotone**. An icon never carries meaning alone — it accompanies a label
-or an `aria-label` (`[A11Y1]`). One family only, no second set, no emoji, no Unicode
+or an `aria-label` (WCAG 2.2 AA). One family only, no second set, no emoji, no Unicode
 pictographs. Glyphs actually used: `magnifying-glass`, `tray`, `database`, `graph`,
 `question`, `users`, `pulse`, `book-open`, `chat-text`, `copy`, `flag`, `check-circle`,
 `warning`, `sliders-horizontal`, `funnel`, `plus`, `download-simple`,
@@ -256,14 +256,14 @@ streaming. We own meaning — the trust words, the citation unit, the register, 
 and every word on a screen. Where the two meet, take theirs and skin it. The auth screens
 are the platform's own, on the auth module's hooks over the better-auth client (ADR 0033,
 amended 2026-09-05); the client says *organization* throughout and the module's word map
-says *workspace*; that map is not optional (`[GLOSSARY1]`).
+says *workspace*; that map is not optional (`CONTEXT.md` is the glossary).
 
 The seven product-specific components the set used to hold are the ones to rebuild first on
 top of a registry primitive, because nothing off the shelf carries their meaning:
 **`TrustTag`** (the closed set of trust words, `CONTEXT.md` and ADR 0019),
 **`Citation`** (concept, source, locator, passage on one disclosure, ADR 0015),
 **`CoverageBar`**, **`SummaryList`** and **`Details`** (GOV.UK *semantics* without the
-GOV.UK brand, `[A11Y1]`), **`Icon`** (the Phosphor substitution in one file) and
+GOV.UK brand, WCAG 2.2 AA), **`Icon`** (the Phosphor substitution in one file) and
 **`Frame`** (the blueprint object with its registration marks).
 
 ### Foundation cards

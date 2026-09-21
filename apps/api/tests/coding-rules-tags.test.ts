@@ -7,16 +7,18 @@ import { describe, expect, it } from "vitest";
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 
 const RULE_TAG = /\[(?<tag>[A-Z][A-Z0-9]*[A-Z][0-9]+)\]/g;
-
 const RULE_HEADING = /^#{2,3}\s+\[(?<tag>[A-Z][A-Z0-9]*[A-Z][0-9]+)\]/gm;
 
 const NOT_TEXT = /\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|pdf|zip|gz|sqlite)$/i;
-
 const OUTSIDE = [".scratch/", ".cubic/"];
 
+// Reading a tracked symlink would follow it to a directory and throw; whatever it points at
+// is walked on its own account.
 const isLink = (file: string): boolean =>
   lstatSync(path.join(repositoryRoot, file)).isSymbolicLink();
 
+// `--others --exclude-standard` sees a new file before it is added, so the walk reads the
+// tree a commit would carry.
 const treeFiles = (): readonly string[] =>
   execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], {
     cwd: repositoryRoot,
@@ -33,46 +35,103 @@ const read = (file: string): string => readFileSync(path.join(repositoryRoot, fi
 
 const isRulesFile = (file: string): boolean => path.basename(file) === "CODING_RULES.md";
 
-const isTest = (file: string): boolean =>
-  /(^|\/)(tests?|e2e)\//.test(file) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(file);
-
-const isDocument = (file: string): boolean =>
-  file === "CONTEXT.md" ||
-  (file.endsWith(".md") && file.startsWith("docs/")) ||
-  /(^|\/)(readme\.md|SKILL\.md|THIRD_PARTY_NOTICES\.md)$/i.test(file);
-
-const GATES_PRINTING_A_TAG = new Set([
+// Each of these prints the rule it holds in the message a reader hits, so the reader reaches
+// the rule without asking.
+const GATES_PRINTING_A_TAG: readonly string[] = [
+  "apps/worker/tests/conftest.py",
+  "packages/devtools/lint-rules/rules/comment-only-the-why.ts",
+  "packages/devtools/lint-rules/rules/import-direction.ts",
+  "packages/devtools/lint-rules/rules/mcp-entry-no-workspace-argument.ts",
   "packages/devtools/python/comment_gate.py",
   "packages/devtools/src/comment-density.ts",
-]);
+];
 
-const isAllowedLocation = (file: string): boolean =>
-  isRulesFile(file) ||
-  GATES_PRINTING_A_TAG.has(file) ||
-  file.startsWith("docs/adr/") ||
-  file.startsWith("docs/specs/") ||
-  file === "cubic.yaml" ||
-  file === ".oxlintrc.json" ||
-  file.startsWith("packages/devtools/lint-rules/") ||
-  isTest(file) ||
-  isDocument(file);
-
-const CITED_NOWHERE_ELSE: Readonly<Record<string, string>> = {
-  APP1: "the tier runs from source or it does not start: Node resolves the `.ts` extension every intra-repository import carries, and the workspace's own package.json and tsconfig are what declare it, where a tag may not be written",
-  AUDIT6:
-    "the migration that creates audit_event and its refusal tests are the schema package's; they hold the rule without naming the tag",
-  AUDIT7: "the caller-minted id test is its slice's, and holds the rule without naming the tag",
-  WEB5: "the failed-screen component test and its browser spec hold the rule — the frame, its landmarks and the way out survive a screen that throws — and they hold it without naming the tag",
-};
+// The list only shrinks, so a document written after this walk names its rule in words or
+// fails here.
+const FROZEN: readonly string[] = [
+  "docs/adr/0001-type-vocabulary-authoritative-in-bundle.md",
+  "docs/adr/0002-concept-and-bundle-identity.md",
+  "docs/adr/0003-one-tenant-bundle-of-atom-concepts.md",
+  "docs/adr/0004-guides-and-compositions-are-platform-records.md",
+  "docs/adr/0005-own-app-two-tiers-parts-lifted-by-contract.md",
+  "docs/adr/0006-hono-server-and-vite-spa-not-nextjs.md",
+  "docs/adr/0007-plain-postgres-and-app-owned-migrations.md",
+  "docs/adr/0008-trpc-inside-openapi-and-mcp-outside.md",
+  "docs/adr/0009-better-auth-in-process-identity-provider.md",
+  "docs/adr/0010-typed-relations-on-concepts.md",
+  "docs/adr/0011-knowledge-layers-and-the-minting-rule.md",
+  "docs/adr/0012-the-concept-write-path.md",
+  "docs/adr/0013-sources-bound-by-origin-reach-and-destination.md",
+  "docs/adr/0014-records-attach-by-iri-versioned-where-edited-audited-in-one-ledger.md",
+  "docs/adr/0015-a-composition-cites-its-concept-by-a-footnote-labelled-by-the-include.md",
+  "docs/adr/0016-an-answer-asserts-concepts-only-found-by-traversal-and-served-as-one-contract.md",
+  "docs/adr/0017-every-answer-is-a-retained-correctable-record-and-an-answer-is-minted-only-at-a-gate-a-person-runs.md",
+  "docs/adr/0018-one-mcp-surface-of-five-entries-the-principal-from-the-token-grown-by-scope.md",
+  "docs/adr/0019-trust-is-derived-from-the-file-told-in-fixed-words-and-moved-only-by-a-check.md",
+  "docs/adr/0020-personal-data-is-withheld-at-the-seam-before-any-store-and-erased-from-every-copy-by-routine.md",
+  "docs/adr/0021-the-graph-is-neo4j-community-on-one-instance-tenanted-by-rule-written-in-generations-and-never-a-hard-dependency.md",
+  "docs/adr/0022-two-stacks-deployed-by-digest-every-irreplaceable-byte-encrypted-off-host-erasures-replayed-on-restore.md",
+  "docs/adr/0023-the-graph-is-apache-age-inside-the-platform-postgres.md",
+  "docs/adr/0024-the-forge-is-bare-git-repositories-the-app-writes-and-two-4gb-boxes-run-v01.md",
+  "docs/adr/0025-a-signal-is-a-query-over-rows-the-platform-already-keeps.md",
+  "docs/adr/0026-kinds-emerge-from-the-concepts-no-vocabulary-file-a-link-is-the-relation.md",
+  "docs/adr/0027-better-answers-is-open-core-under-apache-2-0-the-hosted-service-is-the-product-copyleft-is-run-only.md",
+  "docs/adr/0028-a-boundary-schema-is-generated-from-its-table-a-refinement-only-narrows-and-a-parity-test-proves-it.md",
+  "docs/adr/0029-the-tier-is-apps-over-packages-business-logic-is-a-library-of-capability-slices-over-four-store-doors.md",
+  "docs/adr/0030-the-mcp-surface-stays-mcp-sdk-v2-in-the-typescript-tier-behind-one-fetch-shaped-seam.md",
+  "docs/adr/0031-the-tier-contract-is-six-agreements-in-three-forms-fixtured-in-one-language-neutral-directory-both-suites-read.md",
+  "docs/adr/0032-the-graph-is-plain-tables-under-rls-the-substrate-is-one-journal-one-role-seam-one-definer-function.md",
+  "docs/adr/0033-the-ui-kit-is-tailwind-v4-through-the-design-system-bridge-with-three-registries-that-own-behaviour.md",
+  "docs/adr/0034-one-origin-for-the-product-and-the-authorization-server.md",
+  "docs/adr/0035-a-person-has-one-id-minted-by-the-platform-revoked-in-two-scopes-and-erased-to-a-per-workspace-pseudonym.md",
+  "docs/adr/0036-the-worker-composes-cocoindexs-building-blocks-and-writes-only-what-the-engine-has-no-block-for.md",
+  "docs/adr/0037-a-reader-facing-screen-has-a-latency-budget-lists-under-a-second-actions-under-100-ms-optimistically-answers-streamed.md",
+  "docs/adr/0038-the-people-data-model-groups-flat-and-entra-aligned-access-requests-answered-neutrally-and-the-ledger-founded-as-an-append-only-tenant-table.md",
+  "docs/adr/0039-an-audience-is-a-word-and-a-group-id-array-on-every-readable-unit-combined-by-intersection-with-everyone-the-identity-an-empty-intersection-forcing-restricted-and-an-implicit-group-a-group-row-nothing-here-mints.md",
+  "docs/adr/0040-the-clock-is-a-kernel-value-the-api-constructs-once-at-boot-and-hands-to-every-act-that-reads-time-a-rows-own-timestamp-stays-the-databases-now-and-the-worker-is-handed-no-clock.md",
+  "docs/adr/0041-a-secret-belongs-to-one-of-seven-credential-classes-the-bootstrap-class-comes-from-the-deploy-unit-and-the-other-six-are-rows-under-the-envelope.md",
+  "docs/adr/0042-the-product-ships-an-accessibility-statement-because-the-buyers-are-uk-public-bodies-for-whom-it-is-law.md",
+  "docs/adr/0043-an-act-is-what-an-entry-may-ask-core-to-do-admitted-before-its-body-runs-refusing-in-classed-words-that-cross-every-transport-as-themselves-in-a-transaction-only-its-opener-rolls-back.md",
+  "docs/adr/0044-a-chunks-visibility-is-read-from-its-binding-and-its-document-never-copied-onto-its-row.md",
+  "docs/adr/README.md",
+  "docs/specs/T-004.md",
+  "docs/specs/T-006.md",
+  "docs/specs/T-015.md",
+  "docs/specs/T-022.md",
+  "docs/specs/T-045.md",
+  "docs/specs/T-046.md",
+  "docs/specs/T-048.md",
+  "docs/specs/T-063.md",
+  "docs/specs/T-064.md",
+  "docs/specs/T-120.md",
+  "docs/specs/T-121.md",
+  "docs/specs/T-122.md",
+  "docs/specs/T-123.md",
+  "docs/specs/T-124.md",
+  "docs/specs/T-125.md",
+  "docs/specs/T-126.md",
+  "docs/specs/T-127.md",
+  "docs/specs/T-128.md",
+  "docs/specs/T-129.md",
+  "docs/specs/T-131.md",
+  "docs/specs/T-133.md",
+  "docs/specs/T-168.md",
+  "docs/specs/T-225.md",
+  "docs/specs/coding-rules-one-form-and-the-comment-strip.md",
+  "docs/specs/s0-redaction-seam-and-erasure.md",
+  "docs/specs/s1-acts-ahead-of-the-first-procedures.md",
+  "docs/specs/s1-one-uploaded-document-to-a-cited-passage.md",
+  "docs/specs/s4-a-chunks-visibility-is-read-not-copied.md",
+  "docs/specs/s4-one-memo-the-detectors.md",
+  "docs/specs/s4-the-roles-surface-read-back-and-the-contracts-digest.md",
+  "docs/specs/v01-route.md",
+];
 
 type Citation = { readonly file: string; readonly line: number; readonly tag: string };
-
-const STRUCK = /~~[^~\n]+~~/g;
 
 const citationsIn = (file: string): readonly Citation[] =>
   read(file)
     .split("\n")
-    .map((text) => (file.startsWith("docs/adr/") ? text.replace(STRUCK, "") : text))
     .flatMap((text, index) =>
       [...text.matchAll(RULE_TAG)].flatMap((match) => {
         const tag = match.groups?.["tag"];
@@ -94,189 +153,73 @@ const definedTags = (): ReadonlyMap<string, string> =>
 
 const cite = ({ file, line, tag }: Citation): string => `${file}:${line} cites [${tag}]`;
 
-const TESTS_CITING_A_TAG: readonly string[] = [
-  "apps/api/tests/adr-index.test.ts",
-  "apps/api/tests/auth-instance.ts",
-  "apps/api/tests/backup-image.test.ts",
-  "apps/api/tests/better-auth-endpoints.test.ts",
-  "apps/api/tests/check-scripts.test.ts",
-  "apps/api/tests/cimd-fetch.test.ts",
-  "apps/api/tests/coding-rules-tags.test.ts",
-  "apps/api/tests/config.test.ts",
-  "apps/api/tests/delete-user.test.ts",
-  "apps/api/tests/deploy-tree.test.ts",
-  "apps/api/tests/harness-control.ts",
-  "apps/api/tests/harness.ts",
-  "apps/api/tests/hostnames.test.ts",
-  "apps/api/tests/image-job.test.ts",
-  "apps/api/tests/image.test.ts",
-  "apps/api/tests/invitation-shape.test.ts",
-  "apps/api/tests/lefthook-config.test.ts",
-  "apps/api/tests/lint-rules.test.ts",
-  "apps/api/tests/local.ts",
-  "apps/api/tests/no-ambient-clock.test.ts",
-  "apps/api/tests/oauth-flow.test.ts",
-  "apps/api/tests/ops.test.ts",
-  "apps/api/tests/postgres.ts",
-  "apps/api/tests/provision-skills.test.ts",
-  "apps/api/tests/provision-worktree.test.ts",
-  "apps/api/tests/routes-list.test.ts",
-  "apps/api/tests/serve.ts",
-  "apps/api/tests/workflow-pins.test.ts",
-  "apps/api/tests/workflow-tools.test.ts",
-  "apps/web/e2e/accessibility-gate.spec.ts",
-  "apps/web/e2e/browser.ts",
-  "apps/web/e2e/frame.spec.ts",
-  "apps/web/e2e/harness.ts",
-  "apps/web/e2e/routes.spec.ts",
-  "apps/web/e2e/sign-in.spec.ts",
-  "apps/web/test/api-client.test.tsx",
-  "apps/web/test/browser-suite-skill.test.ts",
-  "apps/web/test/failed-screen.test.tsx",
-  "apps/web/test/folder-case.test.ts",
-  "apps/web/test/frame.test.tsx",
-  "apps/web/test/lint-rules.test.ts",
-  "apps/web/test/playwright-config.test.ts",
-  "apps/worker/tests/bundles.py",
-  "apps/worker/tests/conftest.py",
-  "apps/worker/tests/factories.py",
-  "apps/worker/tests/pg_harness.py",
-  "apps/worker/tests/test_cocoindex_ban.py",
-  "apps/worker/tests/test_concept_file.py",
-  "apps/worker/tests/test_config.py",
-  "apps/worker/tests/test_document_chunk_contract.py",
-  "apps/worker/tests/test_image.py",
-  "apps/worker/tests/test_links.py",
-  "apps/worker/tests/test_log_bridge.py",
-  "apps/worker/tests/test_monkeypatch_guard.py",
-  "apps/worker/tests/test_pipeline_host.py",
-  "apps/worker/tests/test_pipeline_index.py",
-  "apps/worker/tests/test_pipeline_landed.py",
-  "apps/worker/tests/test_pytest_options.py",
-  "apps/worker/tests/test_redaction.py",
-  "apps/worker/tests/test_redaction_contract.py",
-  "apps/worker/tests/test_redaction_descriptors.py",
-  "apps/worker/tests/test_redaction_weights.py",
-  "apps/worker/tests/test_work_loop.py",
-  "packages/core/test/access-requests.test.ts",
-  "packages/core/test/answering.test.ts",
-  "packages/core/test/audit.test.ts",
-  "packages/core/test/bundle-root.test.ts",
-  "packages/core/test/bundle.ts",
-  "packages/core/test/concepts.test.ts",
-  "packages/core/test/contract-fixture.ts",
-  "packages/core/test/document-chunk.contract.test.ts",
-  "packages/core/test/dpia.test.ts",
-  "packages/core/test/erasure-map.test.ts",
-  "packages/core/test/erasure-rehearsal.test.ts",
-  "packages/core/test/erasure-replay.test.ts",
-  "packages/core/test/erasure-routine.test.ts",
-  "packages/core/test/erasure.test.ts",
-  "packages/core/test/findings.test.ts",
-  "packages/core/test/git.test.ts",
-  "packages/core/test/graph-ops.test.ts",
-  "packages/core/test/graph.test.ts",
-  "packages/core/test/import-direction.test.ts",
-  "packages/core/test/invisibility.test.ts",
-  "packages/core/test/kernel.test.ts",
-  "packages/core/test/llm-routes.test.ts",
-  "packages/core/test/members.test.ts",
-  "packages/core/test/passages.test.ts",
-  "packages/core/test/principal.test.ts",
-  "packages/core/test/queue.contract.test.ts",
-  "packages/core/test/reconciler.test.ts",
-  "packages/core/test/redaction.contract.test.ts",
-  "packages/core/test/runs.test.ts",
-  "packages/core/test/sources.test.ts",
-  "packages/core/test/suggestions.test.ts",
-  "packages/core/test/suite-postgres.ts",
-  "packages/core/test/visibility-columns.contract.test.ts",
-  "packages/core/test/visibility.test.ts",
-  "packages/core/test/worker-process.ts",
-  "packages/core/test/workspace-with-bundle.ts",
-  "packages/core/test/workspaces.test.ts",
-  "packages/devtools/test/jscpd.test.ts",
-  "packages/devtools/test/knip.test.ts",
-  "packages/devtools/test/mutant-probe.test.ts",
-  "packages/devtools/test/mutation-summary.test.ts",
-  "packages/devtools/test/throwaway-tree.test.ts",
-  "packages/devtools/test/vitest-runner-patch.test.ts",
-  "packages/schema/test/boundary-schemas.test.ts",
-  "packages/schema/test/chunk-columns.test.ts",
-  "packages/schema/test/factory.ts",
-  "packages/schema/test/harness.ts",
-  "packages/schema/test/job-kinds.test.ts",
-  "packages/schema/test/llm-route-scenario.ts",
-  "packages/schema/test/migration-ownership.test.ts",
-  "packages/schema/test/rls.test.ts",
-  "packages/schema/test/source-catalogue.test.ts",
-  "packages/schema/test/table-ownership.test.ts",
-  "packages/schema/test/testing.ts",
-  "packages/schema/test/warm-postgres.test.ts",
-  "packages/schema/test/warm-postgres.ts",
-  "packages/schema/test/worker-schema-view.test.ts",
-];
+const isAllowedLocation = (file: string): boolean =>
+  isRulesFile(file) || GATES_PRINTING_A_TAG.includes(file) || FROZEN.includes(file);
 
-const baselineDrift = (
-  baseline: readonly string[],
-): { readonly unlisted: readonly string[]; readonly stale: readonly string[] } => {
-  const citing = new Set(
-    treeFiles()
-      .filter(isTest)
-      .filter((file) => citationsIn(file).length > 0),
-  );
-  const listed = new Set(baseline);
-  return {
-    unlisted: [...citing].filter((file) => !listed.has(file)).sort(),
-    stale: baseline.filter((file) => !citing.has(file)).sort(),
-  };
-};
-
-const whileATestFileHolds = <T>(contents: string, read: () => T): T => {
-  const proof = path.join(repositoryRoot, "apps/api/tests/tag-baseline-proof.txt");
-  writeFileSync(proof, contents);
+// The walk reads `git ls-files --others`, so a written file is seen as a committed one; the
+// `finally` keeps the next suite from reading it.
+const whileAFileHolds = <T>(contents: string, taken: () => T): T => {
+  const written = path.join(repositoryRoot, "apps/api/tests/tag-location-proof.txt");
+  writeFileSync(written, contents);
   try {
-    return read();
+    return taken();
   } finally {
-    rmSync(proof, { force: true });
+    rmSync(written, { force: true });
   }
 };
 
-describe("rule tags against the rules files that define them (T-078)", () => {
-  it("defines every tag the tree cites, and cites each one only where a rule may be cited", () => {
-    const defined = definedTags();
-    const citations = treeFiles().flatMap(citationsIn);
+describe("where a rule tag may be written", () => {
+  it("finds one only in a rules file, a gate's failure message, or a frozen document", () => {
+    const stray = treeFiles()
+      .filter((file) => !isAllowedLocation(file))
+      .flatMap(citationsIn);
 
     expect(
-      citations.filter(({ tag }) => !defined.has(tag)).map(cite),
-      "a tag is cited that no rules file defines. Either the rule was retired — then the citation is rewritten in words pointing at the ADR that records the retirement — or the heading in the rules file lost its tag.",
-    ).toEqual([]);
-
-    expect(
-      citations.filter(({ file }) => !isAllowedLocation(file)).map(cite),
-      "a rule tag is cited in source, a deploy file, a Dockerfile, a CI workflow or a workspace's config. [COMMENT2]: write the constraint in words or delete the comment; the tag stays in the rules files, ADRs, specs, cubic.yaml, the lint config and the documents, and in a test only while TESTS_CITING_A_TAG still lists that file.",
+      stray.map(cite),
+      "a rule tag is written outside the three places one belongs. Write the rule in words where the reader meets it, or delete the sentence; never swap the tag for a restatement of the rule's own wording.",
     ).toEqual([]);
   });
 
-  it("finds every defined tag cited outside its own file, or listed with the reason it is not", () => {
-    const defined = definedTags();
-    const citedElsewhere = new Set(
+  it("refuses a tag written into a file the tree has just gained", () => {
+    const [aDefinedTag] = [...definedTags().keys()];
+    expect(aDefinedTag).toBeDefined();
+    const strayFiles = (): readonly string[] =>
       treeFiles()
+        .filter((file) => !isAllowedLocation(file))
         .flatMap(citationsIn)
-        .filter(({ file, tag }) => defined.get(tag) !== file)
-        .map(({ tag }) => tag),
+        .map(({ file }) => file);
+
+    const before = new Set(strayFiles());
+    const after = whileAFileHolds(
+      `A note that cites [${aDefinedTag}] rather than the rule.\n`,
+      strayFiles,
     );
 
-    const uncited = [...defined.keys()].filter((tag) => !citedElsewhere.has(tag)).sort();
-    const listed = Object.keys(CITED_NOWHERE_ELSE).sort();
+    expect([...new Set(after)].filter((file) => !before.has(file))).toEqual([
+      "apps/api/tests/tag-location-proof.txt",
+    ]);
+  });
+});
+
+describe("the tags a gate prints and the rules files that define them", () => {
+  it("defines every tag a gate's failure message names", () => {
+    const defined = definedTags();
+    const printed = GATES_PRINTING_A_TAG.flatMap(citationsIn);
+
+    expect(printed.length).toBeGreaterThan(0);
+    expect(
+      printed.filter(({ tag }) => !defined.has(tag)).map(cite),
+      "a gate prints a tag no rules file defines. Either the rule was retired and the message is rewritten in words, or the heading in the rules file lost its tag.",
+    ).toEqual([]);
+  });
+
+  it("defines every tag a rules file cites in another rule's body", () => {
+    const defined = definedTags();
+    const cited = treeFiles().filter(isRulesFile).flatMap(citationsIn);
 
     expect(
-      uncited.filter((tag) => !listed.includes(tag)),
-      "a defined tag is cited nowhere outside its own rules file. Cite it where it is applied — a test, an ADR, a spec, cubic.yaml — or add it to CITED_NOWHERE_ELSE with the reason it is judged in review alone.",
-    ).toEqual([]);
-    expect(
-      listed.filter((tag) => !uncited.includes(tag)),
-      "a tag listed in CITED_NOWHERE_ELSE is now cited outside its own file. Remove the entry: the reason it carried has stopped being true.",
+      cited.filter(({ tag }) => !defined.has(tag)).map(cite),
+      "a rules file points at a rule no rules file defines. The rule was retired: say in words what the sentence needs, or delete the cross-reference with it.",
     ).toEqual([]);
   });
 
@@ -292,35 +235,13 @@ describe("rule tags against the rules files that define them (T-078)", () => {
   });
 });
 
-describe("the tests that still cite a rule tag, held to a baseline that only shrinks (T-182)", () => {
-  it("admits a citation in the tests frozen on 2026-09-12 and in no other", () => {
-    const { unlisted, stale } = baselineDrift(TESTS_CITING_A_TAG);
+describe("the two lists this walk reads a file past", () => {
+  it("names a file the tree still carries in every entry of both", () => {
+    const tracked = new Set(treeFiles());
 
     expect(
-      unlisted,
-      "a test cites a rule tag and TESTS_CITING_A_TAG does not list it. [COMMENT2]: a test says what it holds in words, in its docblock — the constraint, the trade-off, the rule's own sentence — never the tag. The baseline is a ratchet and only shrinks, so it is never widened to admit a new citation.",
+      [...FROZEN, ...GATES_PRINTING_A_TAG].filter((file) => !tracked.has(file)),
+      "a listed file is gone from the tree. Both lists only shrink, so an entry leaves with the file it named; a stale one is where the next citation could land unseen.",
     ).toEqual([]);
-    expect(
-      stale,
-      "a file TESTS_CITING_A_TAG lists no longer cites a rule tag. Remove its entry in the commit that took the last tag out: the list is exact both ways, so a stale entry is a place the next citation could land unseen.",
-    ).toEqual([]);
-  });
-
-  it("refuses a tag written into a test after the baseline was frozen", () => {
-    const unlisted = whileATestFileHolds(
-      "A test that cites [TEST7] rather than saying what it holds in words.\n",
-      () => baselineDrift(TESTS_CITING_A_TAG).unlisted,
-    );
-
-    expect(unlisted).toEqual(["apps/api/tests/tag-baseline-proof.txt"]);
-  });
-
-  it("refuses a baseline entry whose test has stopped citing a tag", () => {
-    const stale = whileATestFileHolds(
-      "A test that says in words what it holds, and names no tag.\n",
-      () => baselineDrift([...TESTS_CITING_A_TAG, "apps/api/tests/tag-baseline-proof.txt"]).stale,
-    );
-
-    expect(stale).toEqual(["apps/api/tests/tag-baseline-proof.txt"]);
   });
 });

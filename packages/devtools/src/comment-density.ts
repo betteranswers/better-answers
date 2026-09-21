@@ -34,6 +34,11 @@ export const clocArgv = (paths: readonly string[]): readonly string[] => [
   "--quiet",
 
   "--skip-uniqueness",
+
+  // The per-file guard drops the file it fires on and writes prose after the JSON, so the
+  // count is short and the parse fails.
+  "--timeout",
+  "0",
   `--exclude-dir=${NEVER_WALKED.join(",")}`,
   ...paths,
 ];

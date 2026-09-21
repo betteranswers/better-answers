@@ -4,7 +4,8 @@
   // Both plugins live in packages/devtools, which is imported and never deployed (ADR 0029).
   // A `better-answers` rule names the rule it holds in the message it prints, so a reader who
   // hits it reaches the rule without asking, and lands with a functional test over a throwaway
-  // tree ([CHECK1]; apps/api/tests/lint-rules.test.ts is the test).
+  // tree — every gate is run rather than remembered, and apps/api/tests/lint-rules.test.ts
+  // is that test.
   "jsPlugins": [
     {
       "name": "anti-slop",
@@ -60,8 +61,8 @@
     // A guard the type already makes unreachable — a `=== undefined` on a value typed
     // `T | null`, a `?? ""` behind a string, a literal compared with itself — refuses a value
     // the boundary refused, and it is worse than dead: a fault behind it stays green, because
-    // the branch reads as cover and covers nothing. One guard per condition, at the boundary
-    // ([DESIGN4]); the fix is the guard removed or the type corrected, never a disable at the
+    // the branch reads as cover and covers nothing. One guard per condition, at the boundary;
+    // the fix is the guard removed or the type corrected, never a disable at the
     // site. Type-aware, and outside `correctness` — oxlint files it under `nursery`, which no
     // category in this file holds — so it is named. It sees the guard the *type* excludes; the
     // guard a sibling runtime check masks is the scheduled mutation report's to find. The one
@@ -97,7 +98,7 @@
     "anti-slop/require-safety-comment-for-type-assertion": "warn",
     "anti-slop/no-runtime-typeof": "off",
     "anti-slop/no-shape-in-symbol-names": "off",
-    // T-004 (ADR 0018, [SEC2]): every MCP entry carries its annotations, and none takes
+    // T-004 (ADR 0018): every MCP entry carries its annotations, and none takes
     // a workspace, bundle or tenant argument.
     "better-answers/mcp-entry-annotations": "error",
     "better-answers/mcp-entry-no-workspace-argument": "error",
@@ -201,21 +202,22 @@
       //
       // Filenames are kebab-case, so a component's file reads the same on a case-insensitive
       // and a case-sensitive filesystem and a rename is never a no-op commit. This is the
-      // file half of [WEB3]; oxlint 1.80 has no rule for a directory's own name, so the
-      // folder half is walked by a test in the workspace instead.
+      // file half of the kebab-case rule; oxlint 1.80 has no rule for a directory's own
+      // name, so the folder half is walked by a test in the workspace instead.
       //
       // `no-restricted-imports` carries the SPA's import shape — three zones and the
-      // direction app → features → shared, never back, and no feature reaching another
-      // ([WEB1]). oxlint 1.80 has no
-      // `import/no-restricted-paths`, so a layering zone cannot be expressed as "this directory
-      // may not reach that one"; it is expressed instead as a convention a glob *can* read — a
-      // relative import stays inside its own directory, and anything that crosses one is written
+      // direction app → features → shared, never back, and no feature reaching another.
+      // oxlint 1.80 has no `import/no-restricted-paths`, so a layering zone cannot be
+      // expressed as "this directory may not reach that one"; it is expressed instead as a
+      // convention a glob *can* read — a relative import stays inside its own directory, and
+      // anything that crosses one is written
       // `@/<zone>/…` (the path alias in `apps/web/tsconfig.json` and `vite.config.ts`). The
       // overrides after this one then name zones rather than counting `../`.
       //
       // Testing-library and jest-dom rules: not enabled, because oxlint 1.80 ships neither
       // plugin (checked against `node_modules/oxlint/configuration_schema.json`, 03/09/2026);
-      // the component suites are held by review and by `[TEST1]` instead.
+      // the component suites are held by review and by functional tests through the
+      // interface instead.
       "files": ["apps/web/**"],
       "rules": {
         "unicorn/filename-case": ["error", { "case": "kebabCase" }],
@@ -340,7 +342,7 @@
     },
     {
       // ADR 0006's one exception, as one line of configuration: this file, `AppRouter`, and
-      // `import type` ([WEB4], the api is a type and in one file).
+      // `import type` — the api is a type, in one file.
       // Everything else the shared override bans stays banned, so a value import
       // of `AppRouter` fails here and an `import type` of it fails in every other file.
       "files": ["apps/web/src/shared/api/trpc.ts"],
@@ -383,7 +385,7 @@
     },
     {
       // T-037 — the SPA's identity feature is the one directory in `apps/web` that may name
-      // `better-auth` ([WEB2]), which is the same shape `apps/api/src/auth/` has on the other side
+      // `better-auth`, which is the same shape `apps/api/src/auth/` has on the other side
       // (ADR 0009): one directory owns the library, and everything above it
       // speaks screens, workspaces and roles rather than endpoints. The product signs a
       // person in by posting to Better Auth, so *somewhere* has to know its client; what
@@ -439,7 +441,7 @@
       // relaxation is proved beside the rule's own cases in apps/api/tests/lint-rules.test.ts.
       //
       // What is *not* relaxed: every import rule above, `no-console`, the anti-slop rules
-      // that catch a widened type, and `[A11Y1]` itself — a screen carries the WCAG 2.2 AA
+      // that catch a widened type, and accessibility itself — a screen carries the WCAG 2.2 AA
       // line and is tested with a keyboard and a screen reader whatever a primitive does.
       // Meaning stays ours: a trust word, a citation unit or a register decision never comes
       // out of this directory.

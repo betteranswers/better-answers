@@ -22,7 +22,7 @@ A harness that answers only one way says nothing. Before any verdict from a prob
 - **The same line's opposite** is the best pair: One expression, two verdicts, is a harness that discriminates.
 - **`testsCompleted` is nonzero** before a row is called a survivor. A row with `testsCompleted: 0` was never run — the runner resolved its covering tests to nothing. The cause was the runner: a mutant that throws while its module loads — an emptied act family, an emptied MCP entry — fails every test file that imports it before one test runs. It is fixed by the patch under `patches/`, which reports the file's failure to load as the kill it is.
 
-Equivalence has two classes, and only one is a proof. *Behaviourally identical, argued from the code* — the mutant cannot produce a different statement, row or value. *Nothing observable at this seam* — the two functions differ, and no caller, driver or fixture in this tree can reach the difference. Label the second as the second: a test written with a bespoke fixture purely to move the number is the report inverting the rule, and `[TEST6]` says a falling score is never a gate.
+Equivalence has two classes, and only one is a proof. *Behaviourally identical, argued from the code* — the mutant cannot produce a different statement, row or value. *Nothing observable at this seam* — the two functions differ, and no caller, driver or fixture in this tree can reach the difference. Label the second as the second: a test written with a bespoke fixture purely to move the number is the report inverting the rule: a falling score is a task, never a failed build.
 
 ## Waiting on a long run
 

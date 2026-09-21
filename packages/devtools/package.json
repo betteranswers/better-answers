@@ -14,7 +14,10 @@
     "./throwaway-tree": "./src/throwaway-tree.ts"
   },
   "scripts": {
-    "lint": "oxlint --config ../../.oxlintrc.json .",
+    "lint": "node ../../scripts/check.mjs lint:ts lint:python lint:python-format",
+    "lint:ts": "oxlint --config ../../.oxlintrc.json .",
+    "lint:python": "cd ../../apps/worker && uv run --frozen ruff check ../../packages/devtools/python",
+    "lint:python-format": "cd ../../apps/worker && uv run --frozen ruff format --check ../../packages/devtools/python",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "node ../../scripts/check.mjs lint typecheck test"
