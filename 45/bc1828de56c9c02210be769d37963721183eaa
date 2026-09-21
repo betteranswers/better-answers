@@ -1,0 +1,29 @@
+packages/devtools/package.json
+  s_c56f1a31cc620f::t_9d2c8f205e0a5a 21-23
+packages/devtools/python/ruff.toml
+  s_c56f1a31cc620f::t_01dc3d4b1b302c 4
+apps/api/tests/coding-rules-tags.test.ts
+  s_c56f1a31cc620f::t_1739554008b3a6 217-218,224-226,234-236
+  s_c56f1a31cc620f::t_d8de655b5d8dbe 228-229,237
+  s_c56f1a31cc620f::t_f66c2578c1d9a5 146-147,156-160
+  s_c56f1a31cc620f::t_e05e7250e27625 49
+  s_c56f1a31cc620f::t_f916ab245c7d09 241-245,260,263-270
+  s_c56f1a31cc620f::t_9e4e4a048c410f 227,230-233
+  s_c56f1a31cc620f::t_fa86601be5ef64 247-248,253,257-259,261
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "45bc1828de56c9c02210be769d37963721183eaa",
+  "prompts": {},
+  "sessions": {
+    "s_c56f1a31cc620f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8ac1ca55-d3f6-48b9-8be8-5a25b6a547f2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
