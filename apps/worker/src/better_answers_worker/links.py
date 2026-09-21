@@ -40,6 +40,8 @@ def _blank(text: str) -> str:
 
 
 def _blanked_spans(body: str) -> str:
+    # A scanner, because the body is tenant input: a long unmatched run of backticks
+    # would cost a backtracking regular expression quadratic time.
     runs = list(_BACKTICK_RUN.finditer(body))
 
     queued: dict[int, list[int]] = {}

@@ -156,6 +156,8 @@ class AnchoredWindows(CharacterBasedTextChunker):
                 break
 
             stepped = self._word_containing(text, end - self.chunk_overlap)
+            # Never past the window it steps from: a run longer than the overlap with no
+            # boundary would send the start backwards and the loop nowhere.
             start = end if stepped <= start else stepped
         return windows
 

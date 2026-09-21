@@ -677,6 +677,8 @@ def _run_the_image(
     if network is not None:
         arguments += ["--network", network]
 
+    # By name and never by value: `--env NAME` takes the value out of this process's
+    # environment, so a derived list never reaches another user's `ps`.
     for name in environment:
         arguments += ["--env", name]
     arguments += [image, "python", "-c", probe]
@@ -713,6 +715,8 @@ def image() -> Iterator[str]:
 
     supplied = os.environ.get(IMAGE_ID_VARIABLE, "").strip()
 
+    # Run by id, never tagged: the daemon is shared, so two worktrees running `check`
+    # at once would overwrite the tag and read each other's image.
     built_here = _build_the_image(matrix_leg("worker")) if not supplied else None
     try:
         yield built_here or supplied

@@ -231,6 +231,8 @@ def recopy_visibility(
 ) -> int:
     if not chunk_ids:
         return 0
+    # One statement, not read-then-write: the binding and document must be seen at this
+    # instant; reading them into Python moves the race one statement on.
     cursor.execute(
         'UPDATE "index".chunk AS chunk SET published_at = binding.published_at,'
         " audience = binding.audience, audience_groups = binding.audience_groups,"

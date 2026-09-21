@@ -112,6 +112,8 @@ class Host:
         )
 
     def remove_binding_directory(self, run: IndexRun) -> None:
+        # Evicted before the directory goes: removing it under an open handle would
+        # leave the engine writing into a store nothing can read.
         self.evict(run)
         shutil.rmtree(self.binding_directory(run), ignore_errors=True)
 
@@ -176,6 +178,8 @@ class Host:
     ) -> int:
         declared = tuple(rows)
         app = coco.App(self.app_config(run, CHUNKS_APP), declare_rows, table, declared)
+        # From the caller's thread, never the host's loop: the blocking form of an
+        # update never returns when it is called from inside that loop.
         landed = app.update_blocking()
         return int(landed) if isinstance(landed, int) else len(declared)
 

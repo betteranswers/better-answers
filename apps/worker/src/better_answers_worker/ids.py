@@ -12,6 +12,8 @@ _RANDOM_CHARACTERS = 16
 
 
 def ulid() -> str:
+    # The time half is public by design: an id from here is unique and sortable, never
+    # confidential.
     milliseconds = time.time_ns() // 1_000_000
     stamp = "".join(
         _ALPHABET[(milliseconds >> shift) & 0b11111]
