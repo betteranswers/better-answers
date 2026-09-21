@@ -43,6 +43,10 @@ function RouteRow(properties: { readonly route: WorkspaceRoute }) {
       {route.purpose === FIXED_PURPOSE ? (
         <>
           <p className="mt-2">
+            {/*
+              Nothing here is a second pane, a modal or a tooltip: a reader can lose the
+              outline without losing the meaning.
+            */}
             <Badge variant="outline">Fixed</Badge>{" "}
             {route.dimensions === null ? null : (
               <span className="text-muted-foreground">{route.dimensions} dimensions</span>

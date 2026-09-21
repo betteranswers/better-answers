@@ -34,6 +34,10 @@ export function Frame() {
         Skip to the screen
       </a>
 
+      {/*
+        A fixed rail and a 320px viewport cannot both be honoured; WCAG's reflow criterion
+        says which gives, so the rail stacks below this breakpoint.
+      */}
       <header className="flex shrink-0 flex-col gap-6 border-b border-border bg-sidebar px-4 py-5 md:w-sidebar md:border-r md:border-b-0">
         <p className="font-mono font-medium tracking-tight text-foreground">better-answers</p>
 

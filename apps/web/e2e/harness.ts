@@ -77,5 +77,7 @@ export const signIn = async (page: Page, api: APIRequestContext, email: string):
   await code.fill(sixDigits);
   await page.getByRole("button", { name: "Sign in" }).click();
 
+  // Wait for the screen to be left, not just the click: navigating away cancels the request
+  // in flight and no session is set.
   await expect(code).toHaveCount(0);
 };

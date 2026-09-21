@@ -19,6 +19,7 @@ describe("the SPA's folders", () => {
   it("names every folder under its source in kebab-case, whatever the filesystem's case rules", () => {
     const folders = foldersUnder(source);
 
+    // A walk that found nothing would pass the filter below while checking nothing.
     expect(folders.length).toBeGreaterThan(0);
     expect(folders.filter((folder) => !KEBAB_CASE.test(path.basename(folder)))).toEqual([]);
   });
