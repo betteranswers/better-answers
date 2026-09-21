@@ -82,6 +82,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: uv sync --frozen
         working-directory: apps/worker
+      # Stryker runs the whole suite of the workspace it is mutating before it runs a single
+      # mutant — the initial test run — so both legs reach the erasure routine's git step:
+      # `core` through the erasure suite itself, `api` through the rehearsal's. Neither can
+      # run without `git-filter-repo`, and no `if:` here, because both legs need it. Why the
+      # install is an action of its own, and why its version is read rather than written, is
+      # said once where it lives.
+      - uses: ./.github/actions/git-filter-repo
       # The previous run's mutant results — or, after an overrun, the cancelled leg's own — so
       # a file nobody touched is not re-tested.
       # A cache entry is written once and never overwritten, so a fixed key would pin the first
