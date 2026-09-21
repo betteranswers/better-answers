@@ -45,7 +45,7 @@ Every store this platform deploys is the real thing in a test, never a stand-in:
 
 ### [TEST4] Build test state through a factory
 
-A factory returns a domain object. A raw `INSERT` appears inside a factory and nowhere else, so that a tier which cannot import the other's factories still has the compliant path. `apps/api/tests/postgres.ts` and `apps/worker/tests/pg_harness.py` are the two this tree has.
+A factory returns a domain object. A raw `INSERT` appears inside a factory module and nowhere else, so that a tier which cannot import the other's factories still has the compliant path.
 
 ```python
 # BAD — in the test
@@ -77,7 +77,7 @@ Reviewer: what a test asserts, and in what order, nothing but a person can see.
 
 ### [TEST9] Write the expected value down
 
-The expected value is a literal, a worked example or the specification's own figure — never the code under test called a second time. Spell a constant the test needs in the test; read a value too long to spell from a fixture file.
+The expected value is a literal, a worked example or the spec's own figure — never the code under test called a second time. Spell a constant the test needs in the test; read a value too long to spell from a fixture file.
 
 ```ts
 // BAD — agrees with every implementation, including a wrong one
@@ -126,6 +126,8 @@ Reviewer: no scan can tell a definition from an implementation detail, nor wheth
 ## TYPES
 
 ### [TYPES1] Turn `strict` and `noUncheckedIndexedAccess` on
+
+An indexed read is `T | undefined` until the code narrows it.
 
 ### [TYPES2] Parse every boundary with zod
 
@@ -221,7 +223,7 @@ The migration that creates `audit_event` revokes `UPDATE` and `DELETE` from the 
 
 ### [AUDIT7] Mint the row's id before the write
 
-The writer mints a ULID through the kernel minter, and the column has no database default, so a governed write mints its id before its git commit and the commit carries it: a ledger row and a commit join on one id.
+The writer mints a ULID through the kernel minter, and the column has no database default, so a governed write mints its id before its git commit: a ledger row and a commit join on one id.
 
 ### [AUDIT8] Keep a read, a run and a health check out of the ledger
 

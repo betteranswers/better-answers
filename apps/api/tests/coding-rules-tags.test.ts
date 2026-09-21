@@ -236,6 +236,7 @@ describe("the tags a gate prints and the rules files that define them", () => {
     const at = (text: string): Citation => ({ file: aGate ?? "", line: 1, tag: "TEST3", text });
 
     expect(isAllowedCitation(at(`raise AssertionError("${spelled}: our own code")`))).toBe(true);
+    expect(isAllowedCitation(at(`const message = \`over the ceiling (${spelled}).\`;`))).toBe(true);
     expect(isAllowedCitation(at(`# the ${spelled} this file holds`))).toBe(false);
   });
 

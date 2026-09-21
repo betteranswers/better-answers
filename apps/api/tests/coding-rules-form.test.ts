@@ -262,6 +262,17 @@ describe("the form every coding rule is written in", () => {
     ).toEqual([]);
   });
 
+  it("gives every rule a body under its title", () => {
+    const bare = everyRule()
+      .filter((rule) => countWords(rule.prose) === 0)
+      .map((rule) => `${rule.file}:${rule.line} [${rule.tag}]`);
+
+    expect(
+      bare,
+      "a rule is a title and nothing else. The body is the part of the form that is not optional: say what the rule asks for, or fold the title into the rule that already says it.",
+    ).toEqual([]);
+  });
+
   it(`holds every rule to ${RULE_BUDGET} words of prose, snippets free`, () => {
     const over = everyRule()
       .filter((rule) => !OVER_BUDGET.includes(rule.tag))
