@@ -6,6 +6,8 @@ import { restoreFinalNewline } from "./journal-newline.ts";
 
 const packageRoot = path.resolve(import.meta.dirname, "..");
 
+// No `--` before the extras: pnpm passes one through as an argument of its own, and
+// drizzle-kit refuses it.
 const { status, error } = spawnSync("drizzle-kit", ["generate", ...process.argv.slice(2)], {
   cwd: packageRoot,
   stdio: "inherit",

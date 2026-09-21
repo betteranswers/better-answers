@@ -107,6 +107,8 @@ export const CONCEPT_STABLE_STATUS = "stable" satisfies (typeof PUBLISHED_STATUS
 
 export const CONTENT_HASH = /^[0-9a-f]{64}$/;
 
+// No CHECK over the stored jsonb: Postgres renders a numeric in full, so a bound there would
+// refuse payloads the boundary passed.
 export const CONCEPT_FRONTMATTER_MAX = 64_000;
 
 export const conceptIdentity = withRLS(
@@ -127,6 +129,8 @@ export const conceptIdentity = withRLS(
   ],
 );
 
+// Every cross-table key names the workspace beside the id: a foreign-key check bypasses
+// row-level security and would confirm another tenant's row.
 const identityKey = (
   table: { readonly workspaceId: AnyPgColumn; readonly iri: AnyPgColumn },
   name: string,

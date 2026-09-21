@@ -27,6 +27,8 @@ export const user = pgTable("user", {
   image: text("image"),
   createdAt: stamp("created_at").defaultNow().notNull(),
 
+  // Better Auth stamps this on every insert and update before the row reaches Drizzle, so the
+  // builder carries no `$onUpdate` of its own.
   updatedAt: stamp("updated_at").defaultNow().notNull(),
 
   credentialsRevokedAt: stamp("credentials_revoked_at"),

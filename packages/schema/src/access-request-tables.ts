@@ -22,6 +22,8 @@ export const accessRequest = withRLS(
       .notNull()
       .references(() => workspace.id, { onDelete: "cascade" }),
 
+    // No cascade on either person reference or the invitation: the platform never deletes a
+    // `user` row, so one promises a path that does not exist.
     requesterId: text("requester_id")
       .notNull()
       .references(() => user.id),
