@@ -388,6 +388,13 @@ export const CROSS_OWNER_TABLE_ACCESS = [
       "The worker claims a job, keeps its lease alive and writes what the job found — through the claim/lease/heartbeat SQL functions, which are SECURITY INVOKER, so the worker's own privileges and the transaction's workspace scope are what reach the row (ADR 0005, ADR 0031).",
   },
   {
+    table: "public.job",
+    by: "sources",
+    access: "read",
+    reason:
+      "The publish act reads the status of the binding's latest `index` run, by subject, inside its own transaction: the worker holds SELECT alone on `source_binding`, so the run's own row is the only place the tier doing the work can say where it got to, and only *done* lets a publish through (ADR 0013, amended 2026-09-11). One column of one row, by the statement in `packages/core/src/sources/binding.ts`. The review read's other question of the same table — what the latest finished run found — goes through the runs slice's own door (`latestIndexOutcomeIn`), because an outcome is read through the queue's boundary and a status word is not.",
+  },
+  {
     table: "public.concept_index",
     by: WORKER,
     access: "read",
