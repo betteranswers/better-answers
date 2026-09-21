@@ -213,9 +213,12 @@ class AnchoredWindows(CharacterBasedTextChunker):
     — inside a short run as well — levels both and costs the planted page a true
     `job-title`, gains it the word *Finance* as one and reads *One of our supervisors*
     as a person, at 27 windows and 1,282 ms. This rule is the only one that levels every
-    text measured and costs no answer anything: against the page's answer on `main` it
-    gains no finding and loses none, on the planted page and on the heading-less fixture
-    alike. It is also cheaper than what it replaced — 14 windows against 16, 867 ms a
+    text measured, and what it does to each page's own answer is the right thing rather
+    than nothing: against `main` the planted page keeps its twenty-four spans exactly,
+    and the heading-less one **loses two and gains none** — `person-name` over *driver*,
+    which is already the `job-title` it stays, and `person-name` over `'ives broken'`,
+    the tail of *arrives broken*, which is the mid-word fragment this ticket exists to
+    kill. It is also cheaper than what it replaced — 14 windows against 16, 867 ms a
     page against 1,011 ms on the machine both were timed on, where T-122 recorded
     2,841 ms for the same call in the image.
 

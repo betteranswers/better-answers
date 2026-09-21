@@ -36,22 +36,28 @@ a paragraph, which that fixture's fourth paragraph — 661 characters — is the
 | Presidio's own, on `main` | no | no | the reference |
 | a whole-word start | no | no | unchanged |
 | a sentence or a line start | no | not measured | loses one, gains one |
-| a heading start | yes | **no** | unchanged |
+| a heading start | yes | **no** | planted unchanged |
 | a blank line anchoring everywhere | yes | yes | loses one, gains two |
-| this rule | **yes** | **yes** | unchanged |
+| this rule | **yes** | **yes** | planted unchanged; depot loses two wrong ones |
 
-Each cell in the last column that is not *unchanged* is spelled out below. A sentence or
-a line start loses the officers block's `job-title [1363,1388)` and gains a
-`person-name` at `[2144,2166)`. A blank line everywhere loses `job-title 'supervisors'`,
-gains `job-title 'Finance'` — the heading word read as a role — and that same
-`person-name [2144,2166)`.
+Each cell in the last column is spelled out below. A sentence or a line start loses the
+officers block's `job-title [1363,1388)` and gains a `person-name` at `[2144,2166)`. A
+blank line everywhere loses `job-title 'supervisors'`, gains `job-title 'Finance'` — the
+heading word read as a role — and the same `person-name [2144,2166)`. **This rule leaves
+the planted page's twenty-four spans exactly as `main` raises them and takes two off
+the heading-less one, gaining nothing**: `person-name [818,824)` over *driver*, which
+is already the `job-title` it stays, and `person-name [1212,1223)` over `'ives broken'`,
+the tail of *arrives broken* — the mid-word fragment this ticket exists to kill. It does
+not leave that page unchanged, and the change is the point of it.
 
 The rejected rows are kept because each was built and run. A heading start alone is the
 rule this one replaces and it levels only a page that has headings: on the heading-less
-fixture it raises `job-title 'driver'` at two of the eight lengths and not at the other
-six. Taking a blank line as an anchor everywhere levels both and costs the planted page
-a true `job-title` while reading the heading word *Finance* as one and *One of our
-supervisors* as a person, at 27 windows and 1,282 ms against this rule's 14 and 867 ms.
+fixture it reads *driver* at `[777,783)` as a `person-name` at six of the eight lengths
+and as a `job-title` at the other two — a name gained is this ticket's second harm, so
+that row is the harm and not a wobble. Taking a blank line as an anchor everywhere
+levels both and costs the planted page a true `job-title` while reading the heading word
+*Finance* as one and *One of our supervisors* as a person, at 27 windows and 1,282 ms
+against this rule's 14 and 867 ms.
 
 **Why twice a window.** The ceiling was swept rather than chosen: 250, 300, 350, 378,
 379, 400, 500, 750, 1000, 1500. Every one levels the planted page's four lengths, so the
@@ -150,7 +156,22 @@ THE_PEOPLE_EVERY_LENGTH_STILL_NAMES = frozenset(
 
 #: What the heading-less fixture plants, which every one of its lengths must still find.
 THE_DEPOT_MANAGER = "Marguerite Ashdown"
-THE_DEPOT_SORT_CODE = "20-00-00 and the account number is 12345678"
+THE_DEPOT_SORT_CODE = "00-00-00 and the account number is 12345678"
+
+#: Everything the seam raises on that fixture, by category and offset, written down.
+#: Presidio's own chunker raises these six and **two more**: `person-name` at
+#: `[818,824)`, reading *driver* as a person as well as the role it already is, and
+#: `person-name` at `[1212,1223)` — `'ives broken'`, the tail of *arrives broken*, which
+#: is the mid-word fragment this ticket exists to kill. So the rule takes two wrong
+#: answers off this page and adds none; it does not leave the page unchanged.
+THE_DEPOT_FIXTURES_ANSWER: tuple[tuple[str, int, int], ...] = (
+    ("person-name", 227, 245),
+    ("job-title", 253, 266),
+    ("home-address", 323, 361),
+    ("personal-contact", 402, 434),
+    ("bank-details", 562, 605),
+    ("job-title", 818, 824),
+)
 
 
 def whole_page() -> str:
@@ -387,7 +408,13 @@ def test_a_page_with_no_heading_answers_the_same_at_every_length() -> None:
 
 
 def test_a_page_with_no_heading_still_finds_what_it_plants() -> None:
-    # What keeps the equality above from being an agreement between eight empty lists.
+    # What keeps the equality above from being an agreement between eight empty lists,
+    # and what the rule does to this page's own answer. Presidio's chunker raises these
+    # six and two more — `person-name [818,824)` over *driver*, which is already the
+    # role it is, and `person-name [1212,1223)` over `'ives broken'`, the tail of
+    # *arrives broken* — so the rule takes two wrong answers off the page and adds none.
+    # Written down rather than compared against a second chunker built here, which is
+    # how the planted page's answer is held too.
     text = heading_less_page()
 
     found = [text[f.start : f.end] for f in detect(text)]
@@ -395,6 +422,10 @@ def test_a_page_with_no_heading_still_finds_what_it_plants() -> None:
     assert THE_DEPOT_MANAGER in found
     assert THE_DEPOT_SORT_CODE in found
     assert partial_spans_on(text) == []
+    assert (
+        tuple((f.category, f.start, f.end) for f in detect(text))
+        == THE_DEPOT_FIXTURES_ANSWER
+    )
 
 
 def test_every_length_still_names_the_people_the_page_names() -> None:

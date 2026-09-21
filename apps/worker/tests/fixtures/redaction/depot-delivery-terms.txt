@@ -9,7 +9,7 @@ home address is 41 Colliers Row, Netherfield, DE55 7QX, and she answers on her
 personal email, marguerite.ashdown@hotmail.co.uk, when the depot line is closed.
 
 Payment is thirty days from the end of the month in which the invoice falls. The
-sort code is 20-00-00 and the account number is 12345678. Remittance advice goes
+sort code is 00-00-00 and the account number is 12345678. Remittance advice goes
 to the accounts inbox and not to the depot, because an advice that reaches the
 depot is an advice nobody reconciles, and the ledger is the record the claim
 rests on rather than the note a driver was handed at the gate. Pallets are

@@ -73,9 +73,9 @@ GLINER_MODEL_ID_MEASURED = "knowledgator/gliner-pii-base-v1.0"
 #: now begins where the document itself begins something — a heading, then a paragraph,
 #: then nothing. On this repository's planted page the rule raises **the same
 #: twenty-four spans under the same categories**, gaining none and losing none;
-#: fourteen of them carry a different score, the largest move being `job-title`
-#: *second registered officer* from 0.778 to 0.726. A moved score is a moved answer, so
-#: it is a moved version.
+#: fourteen of them carry a different score, the largest move being `job-title` *Data
+#: Protection Officer* from 0.950 to 0.892. A moved score is a moved answer, so it is a
+#: moved version.
 RULE_VERSION = "4"
 
 #: Two spellings, one name: a pin is written in the hyphens a package name uses,
