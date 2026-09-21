@@ -2,8 +2,9 @@
 
 The package is one module from the outside. Its one public function takes the
 normalised text of a document, the rules in force on its binding, the suppressions that
-apply to it and a per-binding seed, and answers the redacted text with the findings,
-the counts, the narrowing verdict and the version string. It reads nothing but its
+apply to it, a per-binding seed and the spans of it an Admin restored, and answers the
+redacted text with the findings, the counts, the narrowing verdict and the version
+string. It reads nothing but its
 arguments and memoises nothing: the memoised wrap around it belongs to the pipeline,
 and a seam that cached anything of its own would be a second cache with a second
 lifetime. The analyzer it runs is brought up once per process, which is a resource and
@@ -38,7 +39,10 @@ from .engine import (
 from .officers import raised_by_the_block_rule
 from .pins import VERSION_STRING
 from .pseudonyms import normalised, pseudonyms_for, written_as
-from .suppressions import raised_by_a_suppression
+from .restores import Restore, restored_among
+from .suppressions import raised_by_a_suppression, suppressed_among
+
+__all__ = ["Redaction", "Restore", "redact"]
 
 #: Each tier a binding can switch, as the key it is switched by on `source_binding` and
 #: what an unconfigured binding does with it. The always tier is not here because it is
@@ -69,6 +73,11 @@ class Redaction:
     sentence, an officer's name inside the address they are care of — because each is
     a rule's own answer and the Admin reviewing them is owed both. Only one of any such
     pair is written out of `text`, which is a separate decision and this binding's.
+
+    `overridden` are the restored findings the seam withheld all the same because an
+    erasure request names them. It is answered because nothing else can say it: a
+    finding holds no value, so which kept spans a request reaches is known only to the
+    pass that read the text — and an Admin whose keep did nothing is owed the reason.
     """
 
     text: str
@@ -76,6 +85,7 @@ class Redaction:
     counts: Mapping[str, int]
     verdict: str | None
     version: str
+    overridden: tuple[Finding, ...]
 
 
 def redact(
@@ -83,6 +93,7 @@ def redact(
     rules_in_force: Mapping[str, bool],
     suppressions: Sequence[Mapping[str, Sequence[str]]],
     seed: str,
+    restores: Sequence[Restore] = (),
 ) -> Redaction:
     """One document's text, with what its binding withholds written out of it.
 
@@ -93,7 +104,9 @@ def redact(
     `subject_request` row holds, and `seed` is the binding's own, from which a name's
     pseudonym is drawn. Both are taken here and given effect by the rules that read
     them: a suppressed identifier is raised at the always tier, and a name is written
-    as a stable letter.
+    as a stable letter. `restores` are the findings of this document an Admin let back
+    into the text, each by its rule and its two offsets (`restores.py`); a document
+    nobody restored a span of passes none.
 
     Plain types in and plain types out, and nothing read that was not passed in.
     """
@@ -117,8 +130,21 @@ def redact(
     # withholds, because a span left in the text stands in for nothing: a name that lost
     # its run of characters to a home address the binding had switched off used to leave
     # the pair of them on the page together (T-145).
+    # A restored finding is taken out of what is withheld before the overlap is settled,
+    # and for the same reason a switched-off one is: a span left in the text stands in
+    # for nothing, so an unrestored finding over the same characters still writes its
+    # own span out. An erasure outranks the restore — the suppressed finding *is* the
+    # one that was restored, tier raised and nothing else moved — so a restore never
+    # reaches a span a request named.
+    restored = restored_among(findings, restores)
+    erased = suppressed_among(findings, text, suppressions)
+    left_in = restored - erased
     withheld = without_overlaps(
-        [finding for finding in findings if _in_force(finding.tier, rules_in_force)]
+        [
+            finding
+            for finding in findings
+            if _in_force(finding.tier, rules_in_force) and finding not in left_in
+        ]
     )
     return Redaction(
         text=_written(text, withheld, letters),
@@ -126,6 +152,11 @@ def redact(
         counts=_counted(findings),
         verdict=_verdict_of(findings),
         version=VERSION_STRING,
+        # In reading order and off the findings themselves, so two runs over the same
+        # marks and the same requests answer the same tuple.
+        overridden=tuple(
+            finding for finding in findings if finding in restored and finding in erased
+        ),
     )
 
 

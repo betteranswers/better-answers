@@ -2548,13 +2548,39 @@ describe("the derivation's tables under app_rt", () => {
  * The **finding** (`CONTEXT.md`; ADR 0020, the S0 spec's tier boundary): what the seam found
  * in one source document, written by the worker and reviewed by the app. A tenant table like
  * any other, so the zero-rows proof is stated here in its words — and the grant is the whole
- * of the boundary between the two tiers (`[SEC3]`): the worker's role holds INSERT alone, so
- * a compromised worker can record what it withheld and can never read a workspace's findings
- * back, stamp a review, or take away the record of a span.
+ * of the boundary between the two tiers: the worker's role holds INSERT, SELECT on the five
+ * columns that say which span a row is and the one that says it was restored (migration 0041),
+ * and SELECT and UPDATE on the five that are a run's own **reading** of a span — its category,
+ * tier and score and the version pair that read it (migration 0042; ADR 0020, amended
+ * 2026-09-21). So a compromised worker can record what it withheld, refresh its own reading of
+ * a span it finds again and learn that an Admin let one back, and can never read a reason, a
+ * reviewer or a review, stamp one, move a span, or take away the record of one.
  *
  * The table never holds the value it found — offsets, a category and a score, and nothing a
  * personal detail could sit in. `boundary-schemas.test.ts` writes that column set down.
  */
+/** One name as a run records it: the statement up to its conflict clause. */
+const RECORD_A_NAME = `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
+                                           char_start, char_end, score, rule_version, detector_pin)
+                       VALUES ($1, $2, $3, 'person-name', $4, 'PERSON', $5, $6, 0.97, 'r2', 'd2')`;
+
+/**
+ * The worker's conflict clause, as `apps/worker`'s `record_findings` writes it (migration 0042):
+ * a span found again has its reading refreshed — never its id, its span or an Admin's marks —
+ * a restored row keeps the tier it was restored at, and a reading that has not moved writes
+ * nothing.
+ */
+const REFRESH_THE_READING = `ON CONFLICT (workspace_id, document_id, rule_id, char_start, char_end)
+  DO UPDATE SET category = EXCLUDED.category,
+                tier = CASE WHEN finding.restored_at IS NULL THEN EXCLUDED.tier ELSE finding.tier END,
+                score = EXCLUDED.score,
+                rule_version = EXCLUDED.rule_version,
+                detector_pin = EXCLUDED.detector_pin
+  WHERE (finding.category, finding.score, finding.rule_version, finding.detector_pin)
+        IS DISTINCT FROM
+        (EXCLUDED.category, EXCLUDED.score, EXCLUDED.rule_version, EXCLUDED.detector_pin)
+     OR (finding.restored_at IS NULL AND finding.tier IS DISTINCT FROM EXCLUDED.tier)`;
+
 describe("the finding under both runtime roles", () => {
   it("returns zero rows on a missing scope and only the scoped tenant's findings otherwise", async () => {
     await withRollback(db.pool, async (client) => {
@@ -2569,7 +2595,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("lets the worker record a finding and refuses it every road back to one (migration 0023)", async () => {
+  it("lets the worker record a finding and refuses it every road to what an Admin wrote on one (migrations 0024, 0032, 0041, 0042)", async () => {
     // Migration 0000 hands both runtime roles the DML on every new `public` table by default
     // privilege, so the substrate revokes and grants INSERT back alone. The served path is
     // written without RETURNING on purpose: INSERT is the whole of what the worker holds, and
@@ -2589,9 +2615,47 @@ describe("the finding under both runtime roles", () => {
       );
 
       await refusesEach(client, [
+        // Column by column, because the grant is: what a run may read is which span a row is
+        // and whether it was restored, and every other column is a refusal of its own.
         [
-          "SELECT 1 FROM finding LIMIT 1",
-          "the worker never reviews a finding, so it never reads one back",
+          "SELECT restore_reason FROM finding",
+          "a reason is a sentence an Admin typed and may name a person, and the run needs only that the span was restored",
+        ],
+        [
+          "SELECT restored_by FROM finding",
+          "who restored a span is the review's business and the ledger's, never the run's",
+        ],
+        [
+          "SELECT review_state, reviewed_by, reviewed_at, review_reason FROM finding",
+          "the worker never reviews a finding, so it never reads a review back",
+        ],
+        [
+          "SELECT id FROM finding",
+          "a finding's id is the ledger's subject and nothing a run names",
+        ],
+        ["SELECT * FROM finding", "every column is more than the eleven the two grants name"],
+        // The refresh reaches a run's own reading of a span and stops there. Each of these is
+        // an UPDATE of a column migration 0042 does not name, so it is refused on the column.
+        [
+          "UPDATE finding SET restored_at = NULL, restored_by = NULL, restore_reason = NULL",
+          "a worker that could clear a restore could withhold again a span an Admin let back, at nobody's word",
+        ],
+        [
+          "UPDATE finding SET char_start = 0, char_end = 1",
+          "the offsets are what a finding is, and a row moved to another span is another finding wearing this one's review",
+        ],
+        [
+          "UPDATE finding SET document_id = document_id, rule_id = rule_id",
+          "the document and the rule are what a finding is as well",
+        ],
+        ["UPDATE finding SET id = id", "the id is the ledger's subject, minted once"],
+        [
+          "UPDATE finding SET workspace_id = workspace_id",
+          "the tenant a row belongs to is the first part of what a finding is",
+        ],
+        [
+          "UPDATE finding SET review_reason = NULL",
+          "a reason is an Admin's sentence, and a worker that could write one could put words in their mouth",
         ],
         [
           "UPDATE finding SET review_state = 'narrowed'",
@@ -2635,6 +2699,221 @@ describe("the finding under both runtime roles", () => {
         "SELECT document_id, review_state FROM finding",
       );
       expect(recorded.rows).toEqual([{ document_id: document.id, review_state: "unreviewed" }]);
+    });
+  });
+
+  it("serves the worker which spans of a document were restored, and only its own tenant's", async () => {
+    // The whole of what the restore read is for (migration 0041): the run gathers a document's
+    // restored spans beside its suppressions and hands them to the memoised function, which
+    // leaves them in the text. The six columns are the statement below, word for word.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const document = await seed.sourceDocument({ workspaceId: WS_A });
+      const restored = {
+        restoredAt: new Date("2026-09-20T10:00:00.000Z"),
+        restoredBy: `human:${WS_A}`,
+        restoreReason: "the company's own sort code",
+      };
+      await seed.finding({
+        workspaceId: WS_A,
+        documentId: document.id,
+        charStart: 12,
+        charEnd: 20,
+        ...restored,
+      });
+      await seed.finding({
+        workspaceId: WS_A,
+        documentId: document.id,
+        charStart: 40,
+        charEnd: 48,
+      });
+      // The other tenant's restored span, on a document the statement below also names: what
+      // keeps it out of the answer is the row-level policy and nothing in the WHERE clause.
+      const theirs = await seed.sourceDocument({ workspaceId: WS_B });
+      await seed.finding({
+        workspaceId: WS_B,
+        documentId: theirs.id,
+        charStart: 12,
+        charEnd: 20,
+        ...restored,
+      });
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const spans = await client.query(
+        `SELECT workspace_id, document_id, rule_id, char_start, char_end FROM finding
+          WHERE document_id = ANY($1) AND restored_at IS NOT NULL`,
+        [[document.id, theirs.id]],
+      );
+
+      expect(spans.rows).toEqual([
+        {
+          workspace_id: WS_A,
+          document_id: document.id,
+          rule_id: "sort-code-with-account-number",
+          char_start: 12,
+          char_end: 20,
+        },
+      ]);
+    });
+  });
+
+  it("holds one row per span, so a second run's insert lands nothing and leaves an Admin's mark where it stood", async () => {
+    // A finding is the same finding on every run that finds it: the document, the rule and the
+    // two offsets (migration 0040). The second insert below is the worker's own statement, run
+    // as the worker, and it is the **targeted** form — served because migration 0041 grants
+    // SELECT on exactly the columns the target names, and preferred because it steps over this
+    // key and no other: a primary-key collision is still an error rather than a silence.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const document = await seed.sourceDocument({ workspaceId: WS_A });
+      const marked = await seed.finding({
+        workspaceId: WS_A,
+        documentId: document.id,
+        charStart: 12,
+        charEnd: 20,
+        restoredAt: new Date("2026-09-20T10:00:00.000Z"),
+        restoredBy: `human:${WS_A}`,
+        restoreReason: "the company's own sort code",
+      });
+      const again = `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
+                                          char_start, char_end, score, rule_version, detector_pin)
+                     VALUES ($1, $2, $3, 'bank-details', 'always', 'sort-code-with-account-number',
+                             12, 20, 0.91, 'r2', 'd2')`;
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const targeted = await client.query(
+        `${again} ON CONFLICT (workspace_id, document_id, rule_id, char_start, char_end) DO NOTHING`,
+        [WS_A, ulid(), document.id],
+      );
+      const untargeted = await client.query(`${again} ON CONFLICT DO NOTHING`, [
+        WS_A,
+        ulid(),
+        document.id,
+      ]);
+      await refusesEach(client, [
+        [
+          again,
+          "the same span under the same rule is the same finding, and a bare insert of it is a run that would double the binding's rows",
+          [WS_A, ulid(), document.id],
+          /finding_span_key/,
+        ],
+      ]);
+
+      expect([targeted.rowCount, untargeted.rowCount]).toEqual([0, 0]);
+      await client.query("RESET ROLE");
+      const held = await client.query<{ id: string; restore_reason: string; rule_version: string }>(
+        "SELECT id, restore_reason, rule_version FROM finding WHERE document_id = $1",
+        [document.id],
+      );
+      // One row, the one the Admin marked — its id, its reason, and the reading of the run
+      // that first found it: the second run's score and version are not what the span is.
+      expect(held.rows).toEqual([
+        { id: marked.id, restore_reason: "the company's own sort code", rule_version: "1" },
+      ]);
+    });
+  });
+
+  it("lets a run refresh its own reading of a span it finds again, and nothing an Admin wrote on it", async () => {
+    // The worker's own statement, run as the worker (migration 0042). A span found again is the
+    // same finding, and what a run knows about it — its category, its tier, its score and the
+    // version pair that read it — is refreshed, so the review reads the last run and not the
+    // first. The id, the span and both of an Admin's marks are not in the SET and cannot be:
+    // the grant names five columns and these are none of them.
+    //
+    // Two rows, because the tier has one exception. A **reviewed** name an erasure has since
+    // raised reads *always* afterwards. A **restored** one keeps the tier it was restored at
+    // whatever the run now reads: only the always set is restorable, the row's own CHECK says
+    // so, and a refresh that moved it would abort the run that made it.
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const document = await seed.sourceDocument({ workspaceId: WS_A });
+      const reviewed = {
+        reviewedBy: `human:${WS_A}`,
+        reviewedAt: new Date("2026-09-20T10:00:00.000Z"),
+      };
+      const narrowed = await seed.finding({
+        workspaceId: WS_A,
+        documentId: document.id,
+        category: "person-name",
+        tier: "default-off",
+        ruleId: "PERSON",
+        charStart: 12,
+        charEnd: 20,
+        score: 0.5,
+        reviewState: "narrowed",
+        ...reviewed,
+      });
+      const restored = await seed.finding({
+        workspaceId: WS_A,
+        documentId: document.id,
+        category: "person-name",
+        tier: "always",
+        ruleId: "PERSON",
+        charStart: 40,
+        charEnd: 48,
+        score: 0.5,
+        reviewState: "kept-in-text",
+        ...reviewed,
+        reviewReason: "the company's own director",
+        restoredAt: new Date("2026-09-20T10:00:00.000Z"),
+        restoredBy: `human:${WS_A}`,
+        restoreReason: "the company's own director",
+      });
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const refresh = (tier: string, charStart: number, charEnd: number) =>
+        client.query(`${RECORD_A_NAME} ${REFRESH_THE_READING}`, [
+          WS_A,
+          ulid(),
+          document.id,
+          tier,
+          charStart,
+          charEnd,
+        ]);
+      const raised = await refresh("always", 12, 20);
+      const lowered = await refresh("default-off", 40, 48);
+      // The same reading again is a row nothing is written to: a second run changes no row.
+      const unmoved = await refresh("always", 12, 20);
+      await refusesEach(client, [
+        [
+          `${RECORD_A_NAME}
+           ON CONFLICT (workspace_id, document_id, rule_id, char_start, char_end) DO UPDATE
+             SET review_state = 'unreviewed', reviewed_by = NULL, reviewed_at = NULL`,
+          "a refresh that named a review column would be the UPDATE migration 0024 revoked, arriving through an insert",
+          [WS_A, ulid(), document.id, "always", 12, 20],
+        ],
+      ]);
+
+      expect([raised.rowCount, lowered.rowCount, unmoved.rowCount]).toEqual([1, 1, 0]);
+      await client.query("RESET ROLE");
+      const held = await client.query(
+        `SELECT id, tier, score, rule_version, detector_pin, review_state, restore_reason
+           FROM finding WHERE document_id = $1 ORDER BY char_start`,
+        [document.id],
+      );
+      expect(held.rows).toEqual([
+        {
+          id: narrowed.id,
+          tier: "always",
+          score: 0.97,
+          rule_version: "r2",
+          detector_pin: "d2",
+          review_state: "narrowed",
+          restore_reason: null,
+        },
+        {
+          id: restored.id,
+          tier: "always",
+          score: 0.97,
+          rule_version: "r2",
+          detector_pin: "d2",
+          review_state: "kept-in-text",
+          restore_reason: "the company's own director",
+        },
+      ]);
     });
   });
 

@@ -12,12 +12,14 @@ exists to prevent. Nothing beneath `landed` is memoised, and the chunk step abov
 not memoised either: splitting redacted text is cheap, and a second memo over it would
 be a second copy of the text the first one holds.
 
-**The rules in force and the suppressions are arguments and never a change key.** They
-belong to the memo key because they change the answer, and they are per document because
-an erasure request reaches the documents it names — so one person asking to be erased
-re-reads the documents that mention them and leaves the rest of the binding alone. A
-change key would do the opposite: it would put every memo entry in every binding out of
-date, and the next run would read the whole library to answer for one person.
+**The rules in force, the suppressions and the restores are arguments and never a change
+key.** They belong to the memo key because they change the answer, and the last two are
+per document because an erasure request reaches the documents it names and an Admin's
+restore is of one span of one document — so one person asking to be erased, or one keep
+in text, re-reads the documents it touches and leaves the rest of the binding alone
+(ADR 0020, amended 2026-09-20: "keyed on the finding"). A change key would do the
+opposite: it would put every memo entry in every binding out of date, and the next run
+would read the whole library to answer for one person.
 
 **The version is an argument too.** The engine's own `version=` takes an integer, and
 what has to invalidate a memo here is the pair `rule_version:detector_pin` — the string
@@ -47,7 +49,7 @@ from datetime import timedelta
 import cocoindex as coco
 
 from ..log import logger
-from ..redaction import redact
+from ..redaction import Restore, redact
 from ..redaction.engine import Finding
 from ..redaction.pins import VERSION_STRING
 from .chunks import CHUNK_SIZE_BYTES, Chunk, split_into_chunks
@@ -127,6 +129,9 @@ class LandedDocument:
     original_key: str
     normalised_key: str
     suppressions: tuple[Suppression, ...] = ()
+    #: The findings of this document an Admin let back into the text, each by its rule
+    #: and its two offsets and in that order, because this value is part of a memo key.
+    restores: tuple[Restore, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,6 +156,13 @@ class RedactedDocument:
     #: same only for the types that pass through. A hash holds no value, so keeping one
     #: here asks nothing of ADR 0020 that the redacted text does not already ask.
     content_hash: str
+    #: The restored findings the seam withheld all the same because an erasure request
+    #: names them (`redaction.Redaction.overridden`) — locations, as every finding is.
+    #: Carried on the memoised value so that a run the memo answered says it as fully
+    #: as the run that first read the document. No default, as the hash above has none:
+    #: a stored answer that predates the field must fail to load rather than read as
+    #: *no kept span was overridden*, which is the one thing it cannot know.
+    overridden: tuple[Finding, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -249,6 +261,7 @@ def landed(
     media_type: str,
     rules_in_force: tuple[tuple[str, bool], ...],
     suppressions: tuple[Suppression, ...],
+    restores: tuple[Restore, ...],
     seed: str,
     version: str,
 ) -> RedactedDocument:
@@ -256,8 +269,8 @@ def landed(
 
     Everything the answer depends on is an argument, which is the whole of why the memo
     key means anything: the bytes, the type they are in, what the binding withholds, who
-    has asked to be erased from this document, the binding's seed and the version of the
-    rules and the detector that decided.
+    has asked to be erased from this document, which of its spans an Admin restored, the
+    binding's seed and the version of the rules and the detector that decided.
     """
     _READINGS.read_one()
     normalised = converted(body, media_type)
@@ -266,6 +279,7 @@ def landed(
         dict(rules_in_force),
         [suppression.as_set() for suppression in suppressions],
         seed,
+        restores,
     )
     return RedactedDocument(
         text=answer.text,
@@ -274,6 +288,7 @@ def landed(
         verdict=answer.verdict,
         version=answer.version,
         content_hash=hashlib.sha256(normalised.encode(TEXT_ENCODING)).hexdigest(),
+        overridden=tuple(answer.overridden),
     )
 
 
@@ -339,6 +354,7 @@ async def _one_document(
                 document.media_type,
                 wave.rules_in_force,
                 document.suppressions,
+                document.restores,
                 wave.seed,
                 wave.version,
             )

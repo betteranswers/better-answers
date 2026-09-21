@@ -3,10 +3,10 @@ import {
   check,
   doublePrecision,
   foreignKey,
-  index,
   integer,
   primaryKey,
   text,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 import { ACTOR_ID_PATTERN } from "./actor-id.ts";
@@ -19,8 +19,19 @@ import { withRLS } from "./with-rls.ts";
  * document — one row per span — as the sources slice's own record. The worker writes it and
  * the app reviews it, which is the tier boundary the S0 spec draws: the detector runs in the
  * worker, the review of a finding is an Admin's act, and `worker_rt` therefore holds INSERT
- * on this table and nothing else — granted in its substrate migration, with a refusal test
- * per road it does not hold, as every cross-tier grant in this package carries.
+ * on this table, SELECT on the columns that say which span a row is and whether it was
+ * restored (migration 0041), and SELECT and UPDATE on the five that are a run's own reading of
+ * a span (migration 0042) — and nothing else: each granted in a substrate migration, with a
+ * refusal test per road it does not hold, as every cross-tier grant in this package carries.
+ *
+ * **A finding is the same finding on every run that finds it** (ADR 0020, amended 2026-09-20):
+ * the document, the rule and the two offsets are what it is, and they are unique. A run's
+ * insert finds a span it has found before and refreshes **its reading and nothing else** —
+ * the category, the tier, the score and the version pair are the last run's — so the row an
+ * Admin reviewed or restored keeps its id and its marks through every reprocess. A row whose
+ * version pair is not its document's `redaction_version` is therefore a span the last run did
+ * not raise, and the app's reads leave it out. One exception, which the restore's own CHECK
+ * below makes: a restored row keeps the tier it was restored at.
  *
  * **It never holds the value.** A category, a tier, a rule id, two offsets into the
  * normalised text and a score — there is no column a name, an address, an account number or
@@ -33,7 +44,8 @@ import { withRLS } from "./with-rls.ts";
  * **Two acts leave their mark here** and neither is the worker's: the review — *kept in
  * text* or *narrowed*, with the acting Admin and the instant — and, for the always set
  * alone, the restore of one span with a reason (`sources.finding.restored`). The reprocess
- * that lets a restored span back into the text is S1's, keyed on the finding.
+ * that lets a restored span back into the text is S1's, keyed on the finding: the run reads
+ * which spans were restored and hands them to the memoised function as an argument.
  */
 
 /**
@@ -102,9 +114,17 @@ export const finding = withRLS(
       foreignColumns: [sourceDocument.workspaceId, sourceDocument.id],
       name: "finding_document_fk",
     }).onDelete("cascade"),
-    // The review's own read: every finding in one document, which is what a review screen
-    // and the publish dialog's counts both open with.
-    index("finding_workspace_id_document_id_idx").on(table.workspaceId, table.documentId),
+    // What a finding is, as a key: one row per span per rule per document. Its two leading
+    // columns are also the review's own read — every finding in one document, which is what a
+    // review screen and the publish dialog's counts both open with — so the index that stood
+    // on that pair alone is this one's prefix and went with migration 0040.
+    uniqueIndex("finding_span_key").on(
+      table.workspaceId,
+      table.documentId,
+      table.ruleId,
+      table.charStart,
+      table.charEnd,
+    ),
     check("finding_tier_check", sql.raw(`tier IN (${listed(REDACTION_TIERS)})`)),
     check(
       "finding_review_state_check",

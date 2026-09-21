@@ -3,6 +3,7 @@ import {
   BINDING_PUBLISHED_STATE,
   boundarySchemas,
   CONNECTOR_UPLOAD,
+  FINDING_UNREVIEWED_STATE,
   INDEX_KIND,
   JOB_DONE_STATUS,
   SENSITIVITY_DEFAULT,
@@ -27,6 +28,7 @@ import { putObject, type ObjectDoor } from "../store/objects/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { adminOnBinding, bindingNamed } from "./admin-binding.ts";
 import { dpiaInputFor, REDACTION_CATEGORIES } from "./dpia.ts";
+import { raisedByTheLastRun } from "./findings.ts";
 
 /**
  * The **bind**: an Admin's own file becomes a source binding, a catalogued document, a ledger
@@ -435,12 +437,14 @@ const LATEST_INDEX_RUN = `SELECT status FROM job
 /**
  * How many spans of each category this binding's documents hold. Joined through the catalogue
  * rather than read off a column, because a finding belongs to a document and a binding is what
- * the Admin is publishing.
+ * the Admin is publishing. Of the binding's **last run's** reading: a span the rules have since
+ * dropped is still a row, and a total that counted it would put on the ledger a figure no run
+ * stands behind.
  */
 const FINDINGS_BY_CATEGORY = `SELECT f.category, count(*)::int AS found
     FROM finding f
     JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
-   WHERE f.workspace_id = $1 AND d.binding_id = $2
+   WHERE f.workspace_id = $1 AND d.binding_id = $2 AND ${raisedByTheLastRun("f", "d")}
    GROUP BY f.category`;
 
 /**
@@ -548,8 +552,8 @@ export type ReprocessBindingInput = {
   /**
    * Why this binding is being indexed again, in the queue's own words for an index run —
    * the caller's to say, because the caller is the act this one rides in: the erasure
-   * routine's *wiped*, an edit to the rules in force's *rule-change*, a finding restored
-   * into a document's *restored*.
+   * routine's *wiped*, an edit to the rules in force's *rule-change*. A keep and a narrowing
+   * queue their own run and take no row away, so neither comes through here.
    */
   readonly reason: IndexReason;
 };
@@ -567,6 +571,8 @@ export type BindingReprocessed = {
   readonly jobId: string;
   /** How many chunk rows went — what that run has to put back. */
   readonly chunks: number;
+  /** How many finding rows went with them — the unmarked ones; a reviewed or restored row stays. */
+  readonly findings: number;
 };
 
 /**
@@ -584,6 +590,18 @@ export type BindingReprocessed = {
  * is answered, and a refusal handed back with the chunks already gone would be a caller's
  * transaction it has to remember to abort. Read the other way round: no path here takes a
  * binding's passages away without the work that replaces them already being on the queue.
+ *
+ * **The findings nobody has marked go with the chunks, and a marked one stays** (ADR 0020,
+ * amended 2026-09-20). What an Admin did about a span is not the reprocess's to take: a
+ * restore is what the next run lets the span back in by, a review is what a widening is held
+ * against, and a wipe that took either would have every rule change un-say the review of the
+ * whole binding. The unmarked rows do go, because a span the rules no longer raise has no run
+ * left to account for it, and the worker cannot delete. The statement is this act's because
+ * the wipe is.
+ *
+ * A row left standing is not doubled by the run this queues, because a finding is the same
+ * finding on every run that finds it: the document, the rule and the two offsets are unique on
+ * the row (migration 0040), and the worker's insert steps over a span it has found before.
  *
  * **The LMDB directory is not this act's.** The engine's store for this binding sits on the
  * worker's own volume, and the worker removes it at the head of the `index` run this enqueues
@@ -621,9 +639,24 @@ export const reprocessBinding = async (
     ]),
   );
   if (!wiped.ok) return err(wiped.error);
+  // Reached through the document, because a finding is keyed to one and carries no binding of
+  // its own — the subquery rather than a join, so the statement is a delete over one table.
+  // Either mark alone spares the row: a restore taken on its own leaves the review where it was.
+  const raised = await attempt(() =>
+    tx.query(
+      `DELETE FROM finding
+        WHERE workspace_id = $1
+          AND review_state = $3 AND restored_at IS NULL
+          AND document_id IN (SELECT id FROM source_document
+                               WHERE workspace_id = $1 AND binding_id = $2)`,
+      [workspaceId, bindingId, FINDING_UNREVIEWED_STATE],
+    ),
+  );
+  if (!raised.ok) return err(raised.error);
   return ok({
     bindingId: bindingId,
     jobId: queued.value.jobId,
     chunks: wiped.value.rowCount ?? 0,
+    findings: raised.value.rowCount ?? 0,
   });
 };

@@ -1,0 +1,57 @@
+-- Custom migration (hand-written SQL; ADR 0032).
+-- A run refreshes its own reading of a span it finds again, and nothing else on the row (ADR
+-- 0020, amended 2026-09-21).
+--
+-- Hand-written rather than generated because a grant is not a column: `drizzle-kit generate`
+-- writes the DDL its schema file reaches and nothing about who may reach a table afterwards,
+-- so every cross-tier privilege in this package is written here beside the sentence that
+-- explains it — as migrations 0020, 0024, 0030, 0032, 0037, 0038 and 0041 each are.
+--
+-- **What migration 0040 left behind.** A finding is unique on its document, its rule and its
+-- two offsets, and the run's insert stepped over a span it had found before — `DO NOTHING`. So
+-- a known row kept the category, the tier, the score and the version pair of the **first** run
+-- that found it, for ever: a name an erasure had since raised to the always tier still read
+-- *default-off*; a span a new rule version raised at the always tier could not be kept in
+-- text, because the keep is decided off the row; and a span the rules no longer raise at all
+-- went on being counted, on the review and in the totals a publish writes to the ledger,
+-- because nothing on the row said which run had last seen it.
+--
+-- **The five columns that are a run's own reading.** `category`, `tier`, `score`,
+-- `rule_version` and `detector_pin` are what the detector answered — they are five of the
+-- eleven columns migration 0032 already lets this role INSERT, and none of them is anything
+-- an Admin writes. The insert becomes `ON CONFLICT (…) DO UPDATE` over exactly these, so a
+-- row carries the reading of the last run that raised it; and a row whose version pair is not
+-- its document's `redaction_version` is then, exactly, a span the last run did not raise,
+-- which is what the app's reads leave out.
+--
+-- **UPDATE, and SELECT beside it, column by column.** PostgreSQL asks SELECT of every column a
+-- `DO UPDATE` reads — the `EXCLUDED` references and the WHERE that keeps an unmoved reading
+-- from being written at all — so the read is what the write is made of rather than a second
+-- road, as migration 0037's note says of the chunk.
+--
+-- **What 0041 said, superseded here rather than edited there.** 0041 withheld `category`,
+-- `tier` and `score` as "a workspace's map of what kind of personal data sits where", and
+-- `rule_version` and `detector_pin` as "the reading of the run that first found the span".
+-- The second sentence is the defect this migration closes. The first was true and weighed
+-- wrong: this tier reads every document's original bytes and computes that map on every run,
+-- so reading its own last answer back tells it nothing it does not already hold — while the
+-- app, reading a first answer for ever, was told something false. A landed migration is a
+-- record of what ran, so the sentence stays where it is and the correction is this file.
+--
+-- **What stays shut, which is what 0024 revoked UPDATE to protect.** The grant names five
+-- columns and the seven an Admin writes are none of them: a worker that names `review_state`,
+-- `reviewed_by`, `reviewed_at`, `review_reason`, `restored_at`, `restored_by` or
+-- `restore_reason` in a SET — in a plain UPDATE or arriving through the insert's conflict
+-- clause — is refused on the **column**, so it still cannot mark a special-category span
+-- reviewed or clear a restore. Nor can it move a row: `workspace_id`, `id`, `document_id`,
+-- `rule_id`, `char_start` and `char_end` are what a finding *is*, and a row moved to another
+-- span would be another finding wearing this one's review. SELECT stays withheld on six of
+-- those seven — all but `restored_at` (0041) — and on `id`. DELETE stays revoked.
+--
+-- The served refresh, the unmoved reading that writes nothing, the restored row that keeps
+-- the tier it was restored at, and every refusal above are proved as `worker_rt` itself in
+-- `packages/schema/test/rls.test.ts`; the worker's read and write are recorded in the
+-- table-ownership map beside this grant (`packages/schema/src/table-ownership.ts`).
+GRANT SELECT (category, tier, score, rule_version, detector_pin) ON "finding" TO worker_rt;
+--> statement-breakpoint
+GRANT UPDATE (category, tier, score, rule_version, detector_pin) ON "finding" TO worker_rt;

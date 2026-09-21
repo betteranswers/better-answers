@@ -340,19 +340,26 @@ const recomputeConceptVisibility = async (
  * IRIs answered, so the act can carry them to the second level. Takes the transaction
  * rather than a door, so a failure aborts the act (the kernel's result convention, rule
  * 5): a recompute that half-landed would be exactly the leak the synchronous rule closes.
+ *
+ * **Named documents narrow the level, they do not widen it.** A binding's narrowing moved
+ * every document it holds, so it names none and the level is the binding's whole evidence;
+ * S1's *narrow these documents* moved some of them, and the concepts that cite the rest have
+ * nothing to re-derive from. The binding is still in the predicate either way, so a document
+ * id of another binding reaches nothing.
  */
 export const recomputeVisibilitySourcedFrom = async (
   principal: Principal,
   tx: Tx,
-  input: { readonly bindingId: string },
+  input: { readonly bindingId: string; readonly documentIds?: readonly string[] | undefined },
 ): Promise<readonly string[]> => {
   const citing = await tx.query<{ iri: string }>(
     `SELECT DISTINCT ce.iri
        FROM concept_evidence ce
        JOIN source_document d ON d.workspace_id = ce.workspace_id AND d.id = ce.source_document_id
       WHERE ce.workspace_id = ${scopeClause(1)} AND d.binding_id = $2
+        AND ($3::text[] IS NULL OR d.id = ANY($3::text[]))
       ORDER BY ce.iri`,
-    [scopeParameter(principal), input.bindingId],
+    [scopeParameter(principal), input.bindingId, input.documentIds ?? null],
   );
   const moved: string[] = [];
   for (const { iri } of citing.rows) {

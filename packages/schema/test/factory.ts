@@ -271,6 +271,14 @@ const partitionExists = async (client: pg.PoolClient, workspaceId: string): Prom
   return found.rowCount === 1;
 };
 
+/**
+ * How many findings this process has seeded at a span of the factory's own choosing, and how
+ * long each such span is. Held here and not inside `testData`, because a suite opens a factory
+ * per seeding and two of them seeding one document would each start counting at nought.
+ */
+let seededSpans = 0;
+const SEEDED_SPAN_LENGTH = 8;
+
 export const testData = (client: pg.PoolClient): TestData => {
   const workspace: TestData["workspace"] = (overrides = {}) => {
     const id = overrides.id ?? ulid();
@@ -736,7 +744,9 @@ export const testData = (client: pg.PoolClient): TestData => {
       originalKey: `documents/${ulid().toLowerCase()}/original`,
       normalisedKey: `documents/${ulid().toLowerCase()}/normalised`,
       contentHash: "c".repeat(64),
-      redactionVersion: "1",
+      // The pair a seeded finding carries by default, so that a finding seeded under a seeded
+      // document reads as the last run's and a case about one it dropped says so by a version.
+      redactionVersion: "1:presidio-test",
       lastModified: null,
       goneAt: null,
       outcome: DOCUMENT_CONVERTED_OUTCOME,
@@ -754,13 +764,18 @@ export const testData = (client: pg.PoolClient): TestData => {
   const finding: TestData["finding"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const documentId = overrides.documentId ?? (await sourceDocument({ workspaceId })).id;
+    // A finding is one span of one rule in one document, and the three are unique together
+    // (migration 0040): two findings seeded in one document under one rule are two spans, so a
+    // span nobody placed starts where the last one this process seeded ended.
+    const charStart = seededSpans * SEEDED_SPAN_LENGTH;
+    seededSpans += 1;
     return insertRow(client, "finding", {
       id: ulid(),
       category: "bank-details",
       tier: REDACTION_ALWAYS_TIER,
       ruleId: "sort-code-with-account-number",
-      charStart: 0,
-      charEnd: 8,
+      charStart,
+      charEnd: charStart + SEEDED_SPAN_LENGTH,
       score: 0.85,
       ruleVersion: "1",
       detectorPin: "presidio-test",

@@ -1,11 +1,12 @@
 import {
   boundarySchemas,
+  INDEX_KIND,
+  JOB_DONE_STATUS,
   JOB_KIND_DESCRIPTORS,
   JOB_QUEUED_STATUS,
   NIGHTLY_AUDIT_KIND,
   ROLES,
   type FULL_REBUILD_KIND,
-  type INDEX_KIND,
   type INDEX_REASONS,
   type JOB_KINDS,
   type JOB_STATUSES,
@@ -424,6 +425,42 @@ export const jobById = async (
 };
 
 type OutcomeRow = { readonly outcome: OutcomeColumn };
+
+/**
+ * What the **latest finished** `index` run over one binding found, read **inside the caller's
+ * transaction** — or nothing, where no run over it has finished yet.
+ *
+ * A run's outcome is the one road the worker already has to the app (ADR 0005: the control
+ * plane is rows), so a fact only that tier can know reaches a read here and nowhere else.
+ * *Finished* is *done* and nothing looser: a run still queued or claimed has found nothing
+ * yet, and one that failed or was poisoned says what went wrong and not what the binding
+ * holds. Latest by when it finished, the id breaking a tie.
+ *
+ * Admin only, as every read of an outcome is: a run's row names documents and counts what
+ * was found in them. The outcome is handed back as the boundary reads it (ADR 0028) and the
+ * caller picks its own keys out of it, because what an `index` run's figures mean is the
+ * sources slice's to say and not the queue's.
+ */
+export const latestIndexOutcomeIn = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: { readonly bindingId: string },
+): Promise<Result<JobOutcome | null, RoleRefusal | Error>> => {
+  const admin = requireAdmin(principal);
+  if (!admin.ok) return err(admin.error);
+
+  const read = await attempt(() =>
+    tx.query<OutcomeRow>(
+      `SELECT outcome FROM job
+        WHERE workspace_id = $1 AND kind = $2 AND subject_id = $3 AND status = $4
+        ORDER BY finished_at DESC, id DESC LIMIT 1`,
+      [admin.value.workspaceId, INDEX_KIND, input.bindingId, JOB_DONE_STATUS],
+    ),
+  );
+  if (!read.ok) return err(read.error);
+  const row = read.value.rows[0];
+  return row === undefined ? ok(null) : outcomeOf(row.outcome);
+};
 
 /**
  * The four lists a nightly audit's outcome carries, every one of which must be empty for a

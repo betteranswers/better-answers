@@ -31,17 +31,27 @@ import re
 from collections.abc import Callable, Iterator, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 import psycopg
 import pytest
 
 from better_answers_worker import loop, queue
 from better_answers_worker.ids import ulid
-from better_answers_worker.pipeline import IndexRun, index_binding
+from better_answers_worker.pipeline import (
+    IndexRun,
+    ReadDocument,
+    RedactedDocument,
+    index_binding,
+)
+from better_answers_worker.pipeline.catalogue import record_findings
+from better_answers_worker.redaction.engine import Finding
 from better_answers_worker.redaction.pins import DETECTOR_PIN, RULE_VERSION
 from factories import (
+    seed_finding,
     seed_job,
+    seed_narrowed,
+    seed_restore,
     seed_source_binding,
     seed_source_document,
     seed_suppression,
@@ -348,6 +358,10 @@ def test_the_loop_claims_an_index_job_runs_it_and_finishes_it_with_its_three_fig
     assert row[:4] == ("index", "done", bootstrap.worker_id, True)
     assert (row[4]["documents"], row[4]["chunks"]) == (0, 0)
     assert row[4]["lmdb_bytes"] > 0
+    # The list crosses the queue's own finish as it is: present, and empty on a run in
+    # which no kept span was overridden — which is how the app tells it from a run that
+    # predates the figure.
+    assert row[4]["restores_overridden_by_erasure"] == []
 
 
 # -- the rows --------------------------------------------------------------------------
@@ -381,6 +395,7 @@ def test_every_column_of_the_chunk_rows_one_run_lands(
         "documents": 1,
         "chunks": 1,
         "lmdb_bytes": outcome.lmdb_bytes,
+        "restores_overridden_by_erasure": [],
     }
     assert chunk_rows_of(connection, workspace_id) == [
         {
@@ -800,6 +815,427 @@ def test_a_suppression_standing_over_a_document_is_read_off_the_table_and_kept_o
     ]
 
 
+# -- a finding across runs, and the restore --------------------------------------------
+
+
+def marked_rows_of(
+    connection: psycopg.Connection, workspace_id: str
+) -> list[dict[str, Any]]:
+    """Every finding, its id and what an Admin wrote on it, as the owner reads it."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT id, document_id, rule_id, char_start, char_end, review_state,"
+            " restored_at IS NOT NULL AS restored"
+            " FROM finding WHERE workspace_id = %s ORDER BY document_id, char_start",
+            (workspace_id,),
+        )
+        return by_column(cursor)
+
+
+def test_a_second_run_lands_no_second_finding_row_and_moves_none(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """A finding is the same finding on every run that finds it: the document, the rule
+    and the two offsets are unique (migration 0040), and the run's insert steps over a
+    span it has found before. So a binding indexed again for any reason holds each span
+    once, under the id it was first given — which is the id the ledger names when an
+    Admin restores it, and the reason the insert leaves the row alone rather than
+    writing it again.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(
+        connection, documents=(AN_INVOICE_ID, A_SICK_NOTE_ID)
+    )
+    bootstrap = bootstrap_for(dsn, tmp_path)
+
+    index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    first = marked_rows_of(connection, workspace_id)
+    written = readings_of(connection, workspace_id)
+    index_binding(
+        bootstrap,
+        run_for(workspace_id, "narrowed"),
+        copies=a_bucket_holding_the_three(),
+    )
+
+    assert [(row["rule_id"], row["char_start"], row["char_end"]) for row in first] == [
+        ("UK_BANK_ACCOUNT", 54, 97),
+        ("HEALTH_CUE", 63, 131),
+        ("JOB_TITLE", 67, 76),
+    ]
+    assert marked_rows_of(connection, workspace_id) == first
+    # And not one row was written to, which the transaction that last wrote each says: a
+    # reading that has not moved is not written again, so a second run changes no row.
+    assert readings_of(connection, workspace_id) == written
+
+
+class ASpan(TypedDict):
+    """A finding as a run is told of one: the rule that raised it, and two offsets."""
+
+    rule_id: str
+    char_start: int
+    char_end: int
+
+
+#: The delivery note's one name, *Priya Raman*, as the seam cuts it.
+HER_NAME: ASpan = {"rule_id": "PERSON", "char_start": 25, "char_end": 36}
+
+
+def readings_of(
+    connection: psycopg.Connection, workspace_id: str
+) -> list[dict[str, Any]]:
+    """Every finding's id and the five columns that are a run's own reading of it, with
+    the transaction that last wrote the row — which is how a case tells a row a run left
+    alone from one it wrote the same values to."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT id, category, tier, score, rule_version, detector_pin,"
+            " xmin::text AS written_by"
+            " FROM finding WHERE workspace_id = %s ORDER BY document_id, char_start",
+            (workspace_id,),
+        )
+        return by_column(cursor)
+
+
+def test_a_span_an_older_run_left_is_read_again_and_all_five_of_its_reading_move(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """A finding is the same finding on every run that finds it, and what a run knows
+    about it is the **last** run's: its category, its tier, its score and the version
+    pair that read it (migration 0042). A row that kept its first reading for ever would
+    have the review show a tier the seam no longer acts on, refuse a keep the rules now
+    admit, and give the app no way to tell a span the rules still raise from one they
+    have dropped — a row's pair against its document's is that test, and it only means
+    anything if every run writes the pair.
+
+    The older run's reading is wrong in all five, on purpose: each is a column the
+    refresh names, and one left out of it is one this case finds still wrong.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
+    with connection.cursor() as cursor:
+        older = seed_finding(
+            cursor,
+            workspace_id=workspace_id,
+            document_id=AN_INVOICE_ID,
+            category="government-identifier",
+            tier="default-on",
+            rule_id="UK_BANK_ACCOUNT",
+            char_start=54,
+            char_end=97,
+        )
+    connection.commit()
+
+    index_binding(
+        bootstrap_for(dsn, tmp_path),
+        run_for(workspace_id),
+        copies=a_bucket_holding_the_three(),
+    )
+
+    (row,) = readings_of(connection, workspace_id)
+    # The pair on the row is the string on its document, joined at one colon: that
+    # equality is how the app tells a span the last run raised from one it dropped.
+    (catalogued,) = catalogue_rows_of(connection, workspace_id)
+    assert catalogued["redaction_version"] == (
+        f"{row['rule_version']}:{row['detector_pin']}"
+    )
+    assert {key: row[key] for key in row if key != "written_by"} == {
+        "id": older["id"],
+        "category": "bank-details",
+        "tier": "always",
+        "score": pytest.approx(0.55),
+        "rule_version": RULE_VERSION,
+        "detector_pin": DETECTOR_PIN,
+    }
+
+
+def test_a_restored_span_keeps_its_id_its_marks_and_the_tier_it_was_restored_at(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """The refresh reaches a run's own reading and nothing an Admin wrote: the id the
+    ledger names, the restore and the review are where they were after a run that moved
+    everything else on the row. And the tier has its one exception — only the always set
+    is restorable, the row's own CHECK says so, so a restored row keeps the tier it was
+    restored at whatever the run now reads, and the run that found it does not abort.
+
+    The span is the delivery note's name, which this binding's rules read at the tier a
+    binding switches off: restored here as an older run's officer-block reading left it.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(A_DELIVERY_NOTE_ID,))
+    with connection.cursor() as cursor:
+        seed_finding(
+            cursor,
+            workspace_id=workspace_id,
+            document_id=A_DELIVERY_NOTE_ID,
+            category="person-name",
+            tier="always",
+            **HER_NAME,
+        )
+        kept = seed_restore(
+            cursor,
+            workspace_id=workspace_id,
+            document_id=A_DELIVERY_NOTE_ID,
+            **HER_NAME,
+        )
+    connection.commit()
+
+    index_binding(
+        bootstrap_for(dsn, tmp_path),
+        run_for(workspace_id),
+        copies=a_bucket_holding_the_three(),
+    )
+
+    assert [
+        row for row in marked_rows_of(connection, workspace_id) if row["restored"]
+    ] == [
+        {
+            "id": kept["id"],
+            "document_id": A_DELIVERY_NOTE_ID,
+            **HER_NAME,
+            "review_state": "kept-in-text",
+            "restored": True,
+        }
+    ]
+    (refreshed,) = [
+        row for row in readings_of(connection, workspace_id) if row["id"] == kept["id"]
+    ]
+    assert (
+        refreshed["tier"],
+        refreshed["rule_version"],
+        refreshed["detector_pin"],
+    ) == (
+        "always",
+        RULE_VERSION,
+        DETECTOR_PIN,
+    )
+
+
+def test_a_name_an_erasure_has_since_raised_reads_always_after_the_next_run(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """Two real runs with a real change of reading between them. The first reads her
+    name at the tier a binding switches off; an Admin reviews it; a person asks to be
+    erased, and the second run raises the same span to the tier nobody switches off. The
+    row is the same row — its id and its review untouched — and it now says *always*,
+    which is what the review shows and what a keep is decided off.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(A_DELIVERY_NOTE_ID,))
+    bootstrap = bootstrap_for(dsn, tmp_path)
+
+    index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    with connection.cursor() as cursor:
+        reviewed = seed_narrowed(
+            cursor,
+            workspace_id=workspace_id,
+            document_id=A_DELIVERY_NOTE_ID,
+            **HER_NAME,
+        )
+        seed_suppression(
+            cursor, workspace_id=workspace_id, document_id=A_DELIVERY_NOTE_ID
+        )
+    connection.commit()
+    index_binding(
+        bootstrap,
+        run_for(workspace_id, "wiped"),
+        copies=a_bucket_holding_the_three(),
+    )
+
+    assert reviewed["tier"] == "default-off"
+    assert [
+        (row["id"], row["review_state"])
+        for row in marked_rows_of(connection, workspace_id)
+        if row["rule_id"] == "PERSON"
+    ] == [(reviewed["id"], "narrowed")]
+    assert [
+        row["tier"]
+        for row in readings_of(connection, workspace_id)
+        if row["id"] == reviewed["id"]
+    ] == ["always"]
+
+
+def test_the_insert_steps_over_a_known_span_and_over_no_other_collision(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """The run's insert names the finding's own key as its conflict target, and that is
+    a choice with a consequence: `ON CONFLICT DO NOTHING` with no target steps over
+    *any* unique collision, so an id minted twice would land nothing and say nothing — a
+    span the seam raised, silently never recorded. With the target named, the one
+    collision the statement forgives is the one it means to: the same span found again.
+
+    So the id of a row the first run wrote is handed to the insert again, on a span no
+    run has seen. That is a primary-key collision and nothing else, and it has to be an
+    error. The id is a parameter of the insert for this reason and no other, as the
+    run's two ceiling figures are of the run.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
+    bootstrap = bootstrap_for(dsn, tmp_path)
+    index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    taken = marked_rows_of(connection, workspace_id)[0]["id"]
+    another_span = ReadDocument(
+        source_document_id=AN_INVOICE_ID,
+        normalised_key=normalised_key_of(AN_INVOICE_ID),
+        redacted=RedactedDocument(
+            text="",
+            findings=(
+                Finding(
+                    category="bank-details",
+                    tier="always",
+                    rule_id="UK_BANK_ACCOUNT",
+                    start=0,
+                    end=7,
+                    score=0.55,
+                ),
+            ),
+            counts=(("bank-details", 1),),
+            verdict=None,
+            version=THE_VERSION,
+            content_hash=sha256_of(AN_INVOICE),
+            overridden=(),
+        ),
+        chunks=(),
+    )
+
+    with (
+        queue.connected(bootstrap.database_url) as worker,
+        pytest.raises(
+            psycopg.errors.UniqueViolation, match="finding_workspace_id_id_pk"
+        ),
+        queue.scoped(worker, workspace_id) as cursor,
+    ):
+        record_findings(
+            cursor, run_for(workspace_id), [another_span], mint=lambda: taken
+        )
+
+    assert [row["id"] for row in marked_rows_of(connection, workspace_id)] == [taken]
+
+
+def test_a_span_an_admin_restored_is_back_in_the_text_after_the_next_run(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """The run reads which spans of each document were restored off the `finding` table
+    itself, through the six columns migration 0041 grants and no other, and hands them
+    to the memoised function beside the suppressions — so the run *keep in text* queues
+    is the run that lets the span back.
+
+    Held both ways: withheld before the restore and in the text after it.
+    And the row is where the Admin left it: the same id, still restored, still reviewed
+    — the second run found the span again and wrote nothing over it.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
+    bootstrap = bootstrap_for(dsn, tmp_path)
+
+    index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    withheld = [row["content"] for row in chunk_rows_of(connection, workspace_id)]
+
+    with connection.cursor() as cursor:
+        kept = seed_restore(
+            cursor,
+            workspace_id=workspace_id,
+            document_id=AN_INVOICE_ID,
+            rule_id="UK_BANK_ACCOUNT",
+            char_start=54,
+            char_end=97,
+        )
+    connection.commit()
+
+    bucket = a_bucket_holding_the_three()
+    index_binding(bootstrap, run_for(workspace_id, "restored"), copies=bucket)
+
+    assert withheld == [AN_INVOICE_REDACTED]
+    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+        AN_INVOICE
+    ]
+    assert bucket.objects[normalised_key_of(AN_INVOICE_ID)] == AN_INVOICE.encode()
+    assert marked_rows_of(connection, workspace_id) == [
+        {
+            "id": kept["id"],
+            "document_id": AN_INVOICE_ID,
+            "rule_id": "UK_BANK_ACCOUNT",
+            "char_start": 54,
+            "char_end": 97,
+            "review_state": "kept-in-text",
+            "restored": True,
+        }
+    ]
+
+
+#: The invoice's one `bank-details` span as the seam cuts it, which is what a request
+#: has to name for the suppression pass to reach it: an identifier is matched against
+#: the text a finding claimed. A sole trader's own account on their own invoice — kept
+#: in text by an Admin as a business fact, until the person it belongs to asks to be
+#: erased.
+THE_INVOICES_ACCOUNT_AS_FOUND = "20-00-00 and the account number is 12345678"
+
+
+def test_a_kept_span_an_erasure_names_stays_withheld_and_the_run_says_which(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """An erasure outranks a restore, and only this tier can know that it did: a finding
+    holds no value, so which kept spans a request names is a fact the seam has and the
+    app has not. The run's outcome is the road it already writes, and it says which —
+    the document, the rule and the two offsets, which is what a finding is and nothing
+    of what it holds — so the review can tell an Admin that a span they kept is
+    withheld all the same, rather than leave a keep that silently did nothing.
+
+    Held both ways: under the restore alone the account is in the text and
+    the run names no span; once a request names it, it is withheld and the run names it.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
+    bootstrap = bootstrap_for(dsn, tmp_path)
+    index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    with connection.cursor() as cursor:
+        seed_restore(
+            cursor,
+            workspace_id=workspace_id,
+            document_id=AN_INVOICE_ID,
+            rule_id="UK_BANK_ACCOUNT",
+            char_start=54,
+            char_end=97,
+        )
+    connection.commit()
+
+    kept = index_binding(
+        bootstrap,
+        run_for(workspace_id, "restored"),
+        copies=a_bucket_holding_the_three(),
+    )
+    shown = [row["content"] for row in chunk_rows_of(connection, workspace_id)]
+
+    with connection.cursor() as cursor:
+        seed_suppression(
+            cursor,
+            workspace_id=workspace_id,
+            document_id=AN_INVOICE_ID,
+            identifiers={
+                "emails": [],
+                "names": [],
+                "other": [THE_INVOICES_ACCOUNT_AS_FOUND],
+            },
+        )
+    connection.commit()
+    erased = index_binding(
+        bootstrap, run_for(workspace_id, "wiped"), copies=a_bucket_holding_the_three()
+    )
+
+    assert shown == [AN_INVOICE]
+    assert kept.as_row()["restores_overridden_by_erasure"] == []
+    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+        AN_INVOICE_REDACTED
+    ]
+    assert erased.as_row()["restores_overridden_by_erasure"] == [
+        {
+            "document_id": AN_INVOICE_ID,
+            "rule_id": "UK_BANK_ACCOUNT",
+            "char_start": 54,
+            "char_end": 97,
+        }
+    ]
+
+
 # -- the wipe --------------------------------------------------------------------------
 
 
@@ -808,7 +1244,7 @@ def read_afresh_in(written: str) -> list[int]:
 
     Off the run's own log line, which is the figure an operator has for whether a run
     did work or recognised that it had none. It is read here rather than taken off the
-    outcome because the outcome is the job row's three figures and this is not one of
+    outcome because the outcome is the job row's own figures and this is not one of
     them: the job row says what the binding holds, and this says what the run had to do
     to say so.
     """

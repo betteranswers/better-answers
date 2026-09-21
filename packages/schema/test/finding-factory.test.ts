@@ -147,6 +147,25 @@ describe("the finding factory's default category", () => {
   });
 });
 
+describe("the finding factory's default span", () => {
+  it("is a span of its own, so two findings seeded in one document under one rule are two rows", async () => {
+    // A finding is unique on its document, its rule and its two offsets (migration 0040), and
+    // a suite opens a factory per seeding — so the span nobody placed is counted per process
+    // and never per factory, which is the only reading under which the second seeding below
+    // lands at all.
+    const spans = await withRollback(db.pool, async (client) => {
+      const first = await testData(client).finding();
+      const second = await testData(client).finding({
+        workspaceId: first.workspaceId,
+        documentId: first.documentId,
+      });
+      return [first, second].map((row) => row.charEnd - row.charStart);
+    });
+
+    expect(spans).toEqual([8, 8]);
+  });
+});
+
 describe("the category words this package's tests spell by hand", () => {
   it("names only categories the redaction agreement declares, in every file of the test tree", () => {
     const written = categoryWordsInTheTestTree();

@@ -229,6 +229,119 @@ def seed_suppression(
     return _returning_row(cursor)
 
 
+def seed_finding(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    document_id: str,
+    category: str,
+    tier: str,
+    rule_id: str,
+    char_start: int,
+    char_end: int,
+    score: float = 0.1,
+    rule_version: str = "1",
+    detector_pin: str = "an-older-pin",
+) -> dict[str, Any]:
+    """One span as **an older run** left it: read under rules and a detector this tree
+    no longer ships, and so under a version pair no run here will write.
+
+    What a case needs it for is the run that finds the span again. The reading — the
+    category, the tier, the score and the pair — is whatever the case says the older run
+    made of it, and the defaults are an old pair and a score no shipped recogniser
+    answers, so a row still carrying them after a run is a row that run did not touch.
+    """
+    cursor.execute(
+        "INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,"
+        " char_start, char_end, score, rule_version, detector_pin)"
+        " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
+        (
+            workspace_id,
+            ulid(),
+            document_id,
+            category,
+            tier,
+            rule_id,
+            char_start,
+            char_end,
+            score,
+            rule_version,
+            detector_pin,
+        ),
+    )
+    return _returning_row(cursor)
+
+
+def seed_narrowed(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    document_id: str,
+    rule_id: str,
+    char_start: int,
+    char_end: int,
+) -> dict[str, Any]:
+    """An Admin's *narrow these documents* as it leaves one finding's row: reviewed as
+    narrowed, by them, at an instant, with no reason — the act takes none. The app's act
+    and never this tier's, written here for the case that needs a review standing on a
+    row a run is about to find again.
+    """
+    cursor.execute(
+        "UPDATE finding SET review_state = 'narrowed', reviewed_by = %(admin)s,"
+        " reviewed_at = now()"
+        " WHERE workspace_id = %(workspace_id)s AND document_id = %(document_id)s"
+        " AND rule_id = %(rule_id)s AND char_start = %(char_start)s"
+        " AND char_end = %(char_end)s RETURNING *",
+        {
+            "admin": f"human:{ulid()}",
+            "workspace_id": workspace_id,
+            "document_id": document_id,
+            "rule_id": rule_id,
+            "char_start": char_start,
+            "char_end": char_end,
+        },
+    )
+    return _returning_row(cursor)
+
+
+def seed_restore(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    document_id: str,
+    rule_id: str,
+    char_start: int,
+    char_end: int,
+) -> dict[str, Any]:
+    """An Admin's *keep in text* as it leaves one finding's row: restored and reviewed.
+
+    The act is the app's and this tier never takes it, so a case that needs a restored
+    span standing over a document writes what the act writes, here, on the owner's
+    connection. The finding is named as a run is told of it — the document, the rule and
+    the two offsets, which is what the row is unique on — and both of the act's marks
+    land, because the row's own CHECKs tie a reason to a restore and an actor to a
+    review and a row carrying half of either is one no act could have written.
+    """
+    cursor.execute(
+        "UPDATE finding SET restored_at = now(), restored_by = %(admin)s,"
+        " restore_reason = %(reason)s, review_state = 'kept-in-text',"
+        " reviewed_by = %(admin)s, reviewed_at = now(), review_reason = %(reason)s"
+        " WHERE workspace_id = %(workspace_id)s AND document_id = %(document_id)s"
+        " AND rule_id = %(rule_id)s AND char_start = %(char_start)s"
+        " AND char_end = %(char_end)s RETURNING *",
+        {
+            "admin": f"human:{ulid()}",
+            "reason": "The account is the company's own, printed on every invoice.",
+            "workspace_id": workspace_id,
+            "document_id": document_id,
+            "rule_id": rule_id,
+            "char_start": char_start,
+            "char_end": char_end,
+        },
+    )
+    return _returning_row(cursor)
+
+
 def seed_concept_identity(
     cursor: Cursor[Any],
     *,

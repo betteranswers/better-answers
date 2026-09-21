@@ -8,12 +8,12 @@ opened, which is why those carry the workspace scope as a session setting — an
 below are read and written in transactions of the run's own, where the scope is
 transaction-local as it is everywhere else in this tier.
 
-**The run reads three things and writes four.** It reads the binding's rules in force
-and its three permission fields, the documents the binding yielded, and the suppressions
-standing over each of them; it writes the findings the seam raised, the catalogue row
-each document's run reconciled, the *quarantined* word and the name of what refused it
-on each document it could not read, and — last of all — the visibility of every row it
-landed.
+**The run reads four things and writes four.** It reads the binding's rules in force
+and its three permission fields, the documents the binding yielded, the suppressions
+standing over each of them, and the spans of each an Admin restored; it writes the
+findings the seam raised, the catalogue row each document's run reconciled, the
+*quarantined* word and the name of what refused it on each document it could not read,
+and — last of all — the visibility of every row it landed.
 
 **The last statement is the one with a race in it.** The app rewrites a chunk row's
 visibility on a publish and on either narrowing, in the act's own transaction, and the
@@ -29,18 +29,24 @@ and rewrites them itself.
 is also UPDATE, because the hash, the normalised copy's key, the version, the outcome
 word, the quarantine error and the last-seen stamp are a run's own findings (migration
 0037; the grant is the table's, so migration 0039's column arrived inside it). The
-suppression is SELECT alone (migration 0038). The finding is INSERT alone (0024): the
-detector runs here and the review of what it found is an Admin's act, so a run records a
-span it withheld and can neither read the table back nor mark one reviewed.
+suppression is SELECT alone (migration 0038). The finding is INSERT (0024, 0032) and
+SELECT on six columns (0041), and SELECT and UPDATE on the five that are a run's own
+reading of a span (0042; ADR 0020, amended 2026-09-20 and 2026-09-21): the detector runs
+here and the review of what it found is an Admin's act, so a run records a span it
+withheld, refreshes its own reading of one it finds again, and reads back one thing of
+an Admin's — which spans were restored, each by the document, the rule and the two
+offsets that are what a finding is. It reads no reason, no reviewer and no review, and
+it can mark nothing.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from psycopg import Cursor
 
 from ..ids import ulid
+from ..redaction import Restore
 from .host import IndexRun
 from .landed import (
     LandedDocument,
@@ -110,9 +116,9 @@ def read_binding(cursor: Cursor[Any], run: IndexRun) -> BindingRun | None:
         (run.binding_id,),
     )
     catalogued = cursor.fetchall()
-    suppressions = _suppressions_by_document(
-        cursor, [str(row[0]) for row in catalogued]
-    )
+    document_ids = [str(row[0]) for row in catalogued]
+    suppressions = _suppressions_by_document(cursor, document_ids)
+    restores = _restores_by_document(cursor, document_ids)
 
     return BindingRun(
         visibility=Visibility(
@@ -133,6 +139,7 @@ def read_binding(cursor: Cursor[Any], run: IndexRun) -> BindingRun | None:
                     normalised_key_of(str(row[0])) if row[3] is None else str(row[3])
                 ),
                 suppressions=suppressions.get(str(row[0]), ()),
+                restores=restores.get(str(row[0]), ()),
             )
             for row in catalogued
         ),
@@ -181,10 +188,43 @@ def _suppressions_by_document(
     return gathered
 
 
+def _restores_by_document(
+    cursor: Cursor[Any], document_ids: Sequence[str]
+) -> Mapping[str, tuple[Restore, ...]]:
+    """The spans of each of these documents an Admin restored, in span order.
+
+    Read off the finding's own row, which is where the act wrote it, and by the road a
+    suppression takes: gathered inside the run's scoped transaction, held no longer than
+    the run, and handed to the memoised function as an argument — so a restore moves
+    that one document's memo key and no other's. The statement names the columns the
+    grant serves and no more (migration 0041): that a span was restored, never why or by
+    whom. The order is the statement's, as a document's suppressions are ordered by
+    theirs, so two runs over the same marks build the same memo key.
+    """
+    if not document_ids:
+        return {}
+    cursor.execute(
+        "SELECT document_id, rule_id, char_start, char_end FROM finding"
+        " WHERE document_id = ANY(%s) AND restored_at IS NOT NULL"
+        " ORDER BY document_id, char_start, char_end, rule_id",
+        (list(document_ids),),
+    )
+    gathered: dict[str, tuple[Restore, ...]] = {}
+    for document_id, rule_id, char_start, char_end in cursor.fetchall():
+        named = Restore(rule_id=str(rule_id), start=int(char_start), end=int(char_end))
+        gathered[str(document_id)] = (*gathered.get(str(document_id), ()), named)
+    return gathered
+
+
 def record_findings(
-    cursor: Cursor[Any], run: IndexRun, documents: Sequence[ReadDocument]
+    cursor: Cursor[Any],
+    run: IndexRun,
+    documents: Sequence[ReadDocument],
+    *,
+    mint: Callable[[], str] = ulid,
 ) -> int:
-    """Write every span the seam withheld, as the rows an Admin will review.
+    """Write every span the seam raised, as the rows an Admin will review. The answer is
+    how many rows landed or moved.
 
     A finding is a location and never a quotation — the category, the tier, the rule
     that raised it, the span in code points into the text the seam was **given**, the
@@ -194,11 +234,38 @@ def record_findings(
     The id is minted here, as the self-scheduled audit's job id is: the app's own
     boundary holds this column to the shape the platform mints, so a derived id would be
     a row no restore act could ever name.
+
+    **A span found before has its reading refreshed, and nothing else on its row.** A
+    finding is the same finding on every run that finds it — the document, the rule and
+    the two offsets, unique on the row (migration 0040) — so a binding indexed again
+    holds each span once, under the id the ledger may already name and with whatever an
+    Admin wrote on it. What a run knows about a span is the **last** run's: the
+    category, the tier, the score and the version pair are written again (migration
+    0042), so the review shows the tier the seam acts on, a keep is decided off it, and
+    a row whose pair is not its document's `redaction_version` is a span the last run
+    did not raise — which is how the app leaves it out. The id, the span and an Admin's
+    two marks are not in the SET and could not be: the grant names five columns.
+
+    **Two things the clause does beside the refresh.** A restored row keeps the tier it
+    was restored at, because only the always set is restorable and the row's own CHECK
+    says so — a refresh that moved it would abort the run that made it. And a reading
+    that has not moved is not written again, so a second run over an unchanged binding
+    changes no row.
+
+    The conflict target is named — its five columns are five of the six migration 0041
+    lets this tier read, which PostgreSQL asks of a target — so the statement answers
+    *this* key and no other: a collision on the primary key is still an error, where an
+    untargeted form would swallow it in silence.
+
+    `mint` is a parameter with the shipped minter as its default for that sentence's
+    sake: the difference between the two forms shows only when an id is minted twice,
+    which no caller can arrange from outside, and a case that reached into this module
+    to arrange it would be a case about something else.
     """
     rows = [
         (
             run.workspace_id,
-            ulid(),
+            mint(),
             document.source_document_id,
             finding.category,
             finding.tier,
@@ -216,10 +283,24 @@ def record_findings(
     cursor.executemany(
         "INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,"
         " char_start, char_end, score, rule_version, detector_pin)"
-        " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        " ON CONFLICT (workspace_id, document_id, rule_id, char_start, char_end)"
+        " DO UPDATE SET category = EXCLUDED.category,"
+        "   tier = CASE WHEN finding.restored_at IS NULL"
+        "               THEN EXCLUDED.tier ELSE finding.tier END,"
+        "   score = EXCLUDED.score,"
+        "   rule_version = EXCLUDED.rule_version,"
+        "   detector_pin = EXCLUDED.detector_pin"
+        " WHERE (finding.category, finding.score,"
+        "        finding.rule_version, finding.detector_pin)"
+        "       IS DISTINCT FROM"
+        "       (EXCLUDED.category, EXCLUDED.score,"
+        "        EXCLUDED.rule_version, EXCLUDED.detector_pin)"
+        "    OR (finding.restored_at IS NULL"
+        "        AND finding.tier IS DISTINCT FROM EXCLUDED.tier)",
         rows,
     )
-    return len(rows)
+    return cursor.rowcount
 
 
 def _version_halves(version: str) -> tuple[str, str]:

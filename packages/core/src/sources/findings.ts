@@ -49,10 +49,33 @@ const FINDING_ID = boundarySchemas.finding.select.shape.id;
  */
 const RESTORE_REASON = boundarySchemas.finding.insert.shape.restoreReason;
 
+/**
+ * **A finding the last run raised**, as a clause over a `finding` row and the `source_document`
+ * row it sits in — the aliases are the statement's own, as the access module's clause takes its.
+ *
+ * A run writes the version pair it read under onto every span it raises, new or found again
+ * (migration 0042), and the same string onto the document's catalogue row. So a row whose pair
+ * is not its document's `redaction_version` is a span **the last run did not raise**: the
+ * rules or the detector moved on and no longer find it, and the row still stands because the
+ * worker holds no DELETE and an Admin's mark may be on it. Every read that counts findings
+ * and every act taken over a finding group leaves such a row out, so what a reviewer is shown,
+ * what they act on and what a publish writes to the ledger are all of the last run's reading.
+ * A document no run has reconciled carries no version and so no finding of it is current —
+ * which is a document no run has raised anything in.
+ */
+export const raisedByTheLastRun = (finding: string, document: string): string =>
+  `${finding}.rule_version || ':' || ${finding}.detector_pin = ${document}.redaction_version`;
+
 export type RestoreFindingInput = {
   readonly findingId: string;
   /** Why this span is a business fact — a sentence an Admin typed, never a fixed word. */
   readonly reason: string;
+  /**
+   * The id shared by the ledger rows of a bulk act this restore is one span of — S1's *keep
+   * in text*, which restores the spans an Admin selected together (ADR 0014 rule 4: N rows
+   * sharing one batch id, never one row hiding N). Absent for a restore taken on its own.
+   */
+  readonly batchId?: string | undefined;
 };
 
 /**
@@ -145,6 +168,7 @@ export const restoreFinding = async (
     act: FINDING_ACTS.restored,
     subjectId: findingId.data,
     detail: { findingId: findingId.data },
+    batchId: input.batchId,
   });
   return ok({ findingId: findingId.data, auditEventId, restoredAt: stamped.restoredAt });
 };

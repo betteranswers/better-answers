@@ -388,6 +388,13 @@ export const CROSS_OWNER_TABLE_ACCESS = [
       "The worker claims a job, keeps its lease alive and writes what the job found — through the claim/lease/heartbeat SQL functions, which are SECURITY INVOKER, so the worker's own privileges and the transaction's workspace scope are what reach the row (ADR 0005, ADR 0031).",
   },
   {
+    table: "public.job",
+    by: "sources",
+    access: "read",
+    reason:
+      "The publish act reads the status of the binding's latest `index` run, by subject, inside its own transaction: the worker holds SELECT alone on `source_binding`, so the run's own row is the only place the tier doing the work can say where it got to, and only *done* lets a publish through (ADR 0013, amended 2026-09-11). One column of one row, by the statement in `packages/core/src/sources/binding.ts`. The review read's other question of the same table — what the latest finished run found — goes through the runs slice's own door (`latestIndexOutcomeIn`), because an outcome is read through the queue's boundary and a status word is not.",
+  },
+  {
     table: "public.concept_index",
     by: WORKER,
     access: "read",
@@ -397,9 +404,9 @@ export const CROSS_OWNER_TABLE_ACCESS = [
   {
     table: "public.finding",
     by: WORKER,
-    access: "write",
+    access: "read and write",
     reason:
-      "The detector runs in the worker and the review of what it found is an Admin's act, so the worker records a span it withheld and holds INSERT alone — no SELECT, no UPDATE, no DELETE, each refusal a test of its own (ADR 0020). A worker that could read this table would hold a workspace's map of where its personal data sits; one that could update it could mark a special-category span reviewed. No lint sees across a process boundary, which is why the grant and this entry are both written down.",
+      "The detector runs in the worker and the review of what it found is an Admin's act, so the worker records a span it withheld — INSERT on the detector's own columns (migrations 0024, 0032) — and reads back one thing: which spans of a document an Admin restored, through SELECT on the five columns that say which span a row is and on `restored_at`, and on no other column (migration 0041; ADR 0020, amended 2026-09-20). The restored spans are an argument to the one memoised function a run converts through, as a document's suppressions are, so a restore re-reads that one document and the seam leaves the span in the text; the same five columns are the conflict target of the run's insert, which is what keeps a second run from doubling a binding's findings and an Admin's mark on the row it was made on. On that conflict the run refreshes its own reading of the span — category, tier, score and the version pair — through SELECT and UPDATE on exactly those five columns (migration 0042; ADR 0020, amended 2026-09-21), so the review reads the last run and a row whose version pair is not its document's is a span the last run did not raise. No DELETE, no UPDATE of a span or of anything an Admin wrote, and every withheld column a refusal test of its own: a worker that could read a reason would read a sentence an Admin typed about a person, one that could update a review column could mark a special-category span reviewed, and one that could clear a restore could withhold again what an Admin let back. No lint sees across a process boundary, which is why the grant and this entry are both written down.",
   },
   {
     table: "public.suppression",

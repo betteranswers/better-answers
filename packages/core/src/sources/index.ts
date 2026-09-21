@@ -17,13 +17,10 @@ import {
   type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import {
-  openingACascadeOverHeldGroups,
-  recomputeVisibilitySourcedFrom,
-} from "../concepts/index.ts";
-import { recomputeCompositionsIncluding } from "../guides/index.ts";
+import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { adminOnBinding } from "./admin-binding.ts";
+import { cascadeOverEvidence } from "./cascade.ts";
 
 /**
  * Slice: **sources** — bindings, the source catalogue, the publish and sensitivity gates,
@@ -49,6 +46,14 @@ import { adminOnBinding } from "./admin-binding.ts";
  * the always set back into a document with a reason, and the **DPIA input** (`dpia.ts`), a
  * binding's contribution to a data protection impact assessment as a typed document and its
  * hash. Both are the sources slice's because the finding and the binding are its records.
+ *
+ * Over the findings, the **review** (`review.ts`): `findingsOf`, the read that groups a
+ * binding's findings by category × rule with counts and the document each sits in and carries
+ * no value and no offset; and the two bulk acts an Admin takes over that list — *keep in
+ * text*, which restores named spans through S0's act under one batch id and queues the `index`
+ * run that lets them back into the document, and *narrow these documents*, which takes named
+ * documents down to a class of their own, rewrites their chunk copies and runs the cascade
+ * from the concepts citing them, one ledger row per document under one batch id.
  *
  * Beside the act, the slice's address arithmetic: a chunk's derived id, the wire locator's
  * parse and the span it cuts, all pure and all held to the document-chunk agreement. And over
@@ -87,6 +92,20 @@ export {
   type FindingRestoreRefusal,
   type RestoreFindingInput,
 } from "./findings.ts";
+export {
+  findingsOf,
+  keepInText,
+  narrowDocuments,
+  type DocumentsNarrowed,
+  type FindingGroup,
+  type FindingGroupKey,
+  type FindingsOfRefusal,
+  type KeepInTextInput,
+  type KeepInTextRefusal,
+  type KeptInText,
+  type NarrowDocumentsInput,
+  type NarrowDocumentsRefusal,
+} from "./review.ts";
 export {
   dpiaInputFor,
   NOT_RECORDED,
@@ -285,11 +304,7 @@ export const narrowBinding = async (
     subjectId: bindingId,
     detail: { bindingId, sensitivity: next.sensitivity, audience: next.audience },
   });
-  const cascaded = await attempt(async () => {
-    const concepts = await recomputeVisibilitySourcedFrom(admin, tx, { bindingId });
-    const compositions = await recomputeCompositionsIncluding(admin, tx, { iris: concepts });
-    return { concepts, compositions };
-  });
+  const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { bindingId }));
   if (!cascaded.ok) return err(cascaded.error);
   return ok({ bindingId, auditEventId, visibility: next, ...cascaded.value });
 };

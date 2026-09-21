@@ -179,6 +179,29 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
 - **finding** — what the pre-scan found in one source document: a category (bank details, date of
   birth, home address, personal contact, special category, …), offsets into the normalised text,
   the rule and detector version that fired. Counted per category; never a class, never a value.
+  Born **unreviewed**; a review leaves it *kept in text* or *narrowed*, with the acting Admin and
+  the instant. **Marked** once an Admin has reviewed or restored it, *unmarked* until then. **The
+  same finding on every run that finds it**: the document, the rule and the offsets are what it
+  is, for as long as the document's content stands, so what an Admin decided about it stands on
+  every later run. Its category, tier, score and version are a run's **reading** of it — the last
+  run's — never part of what it is. A finding the last run did not raise, because the rules moved
+  on, is no longer shown to a reviewer, acted on or counted at a publish.
+- **finding group** — the unit of the review: one document's *findings* of one category, raised
+  by one rule at one tier, with how many there are. It is what the review lists and what the two
+  bulk acts below are taken over; it names no span and carries no value, so a reviewer acts on
+  what was found without ever being shown it. _Avoid_: group on its own (a *group* is members).
+- **keep in text** — an Admin's bulk act over named *finding groups* of one binding: every span
+  of each group restored with one reason because it is the company's own business fact and
+  reviewed as *kept in text*, and the run that lets them back into the document queued with
+  them. The always set alone, one ledger row per span. An *erasure request* outranks it: a kept
+  span a request names is **overridden by the erasure** — it stays withheld, and the review says
+  so beside its group. (Not a *class override*, which is an Admin's act on a concept's class.)
+- **narrow these documents** — an Admin's bulk act over named *finding groups* of one binding,
+  taken on the *source documents* they sit in: each document takes a class of its own, its chunk
+  copies are rewritten, the named groups' unreviewed findings are reviewed as *narrowed* — and
+  no finding the Admin was not shown — the *cascade* runs from the concepts citing the
+  documents, and the run that puts the binding back through the index is queued with them. One
+  ledger row per document; it never widens.
 - **redaction seam** — the one place a document's text is read for what must be withheld and
   the placeholders are written in, ahead of chunking, extraction and every model call, so that
   no derived store and no model ever holds the value.
@@ -306,11 +329,11 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   if needed, named individuals). Set on the binding, carried with sensitivity onto every chunk and
   source entity, and applied with *published* on every read and traversal hop. Distinct from
   sensitivity (how confidential) and from trust (how reliable).
-- **cascade** — the re-derivation an Admin's narrowing of a binding, or override of a concept's
-  class, sets off inside the same act: first every concept citing the binding's evidence, then
-  every composition including one of those concepts — two levels, the second reading what the first
-  wrote, never a third — so a guide never reaches a reader its includes would not. _Avoid_:
-  recompute (one level's work, not the whole), propagation.
+- **cascade** — the re-derivation an Admin's narrowing of a binding or of named documents of one,
+  or override of a concept's class, sets off inside the same act: first every concept citing the
+  evidence that moved, then every composition including one of those concepts — two levels, the
+  second reading what the first wrote, never a third — so a guide never reaches a reader its
+  includes would not. _Avoid_: recompute (one level's work, not the whole), propagation.
 - **class override** — an Admin's recorded act that sets a concept's class — sensitivity and
   audience — whatever its evidence and its kind's floor derive: one row per concept, the latest
   standing, one audit event, and the *cascade* run inside the same act. The one act that may widen
