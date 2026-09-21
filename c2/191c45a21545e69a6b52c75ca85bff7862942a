@@ -1,0 +1,43 @@
+apps/api/tests/lint-rules.test.ts
+  s_c56f1a31cc620f::t_8f2f9f18a1d2e0 142-143
+apps/api/tests/mcp-surface.test.ts
+  s_c56f1a31cc620f::t_aad4de1fed6ae4 278-279
+apps/api/tests/backup-image.test.ts
+  s_c56f1a31cc620f::t_27845b5e83130c 68-69
+apps/api/src/ops/http-fetch.ts
+  s_c56f1a31cc620f::t_9f54f27bcb9608 3-4
+apps/api/src/auth/routes.ts
+  s_c56f1a31cc620f::t_9f54f27bcb9608 97
+  s_c56f1a31cc620f::t_446ec7d2b9f6c6 98
+apps/api/src/trpc/base.ts
+  s_c56f1a31cc620f::t_9f54f27bcb9608 40-41
+apps/api/tests/routes-list.test.ts
+  s_c56f1a31cc620f::t_780363e54b3239 190-191
+apps/api/tests/ops.test.ts
+  s_c56f1a31cc620f::t_ca7384600a0fe3 31-32
+apps/api/tests/oauth-flow.test.ts
+  s_c56f1a31cc620f::t_b5c5c6aab6bb1a 621
+  s_c56f1a31cc620f::t_6edb27bab8aa9d 622
+apps/api/src/auth/auth.ts
+  s_c56f1a31cc620f::t_d4e6b1e94829a4 225-226
+  s_c56f1a31cc620f::t_9f54f27bcb9608 332-333
+  s_c56f1a31cc620f::t_b4cbf76565cef3 306-307
+  s_c56f1a31cc620f::t_585b438b826e23 366-367
+  s_c56f1a31cc620f::t_366a75cfd81c97 205-206
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c2191c45a21545e69a6b52c75ca85bff7862942a",
+  "prompts": {},
+  "sessions": {
+    "s_c56f1a31cc620f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8ac1ca55-d3f6-48b9-8be8-5a25b6a547f2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
