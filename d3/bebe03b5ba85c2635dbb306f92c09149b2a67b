@@ -1,0 +1,26 @@
+.github/workflows/check.yml
+  s_8fbf54266b50d0::t_e8e2279a7e129b 138-139
+  s_8fbf54266b50d0::t_cc4bd154a682d5 136-137
+docs/operations/BUILD_CACHE.md
+  s_8fbf54266b50d0::t_be8bb65780eef7 75-76
+apps/api/tests/image-probe.ts
+  s_8fbf54266b50d0::t_daf0cfe5e6a374 141-147
+apps/worker/tests/test_image.py
+  s_8fbf54266b50d0::t_bfebf3a616d341 921-928
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d3bebe03b5ba85c2635dbb306f92c09149b2a67b",
+  "prompts": {},
+  "sessions": {
+    "s_8fbf54266b50d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6627d8a1-82ed-4761-808f-0cc813ca3112",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
