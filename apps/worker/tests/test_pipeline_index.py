@@ -64,6 +64,7 @@ from test_pipeline_host import (
     bootstrap_for,
     seed_partitioned_workspace,
 )
+from test_upload_media_types_contract import read_upload_media_types
 
 #: The binding every run below is for, spelled rather than minted: it is the seed a
 #: name's pseudonym is drawn from, so a binding whose id moved between two runs would
@@ -685,6 +686,53 @@ def test_a_pdf_with_no_text_layer_names_ocr_on_its_row_which_is_what_an_admin_co
     assert [
         row["source_document_id"] for row in chunk_rows_of(connection, workspace_id)
     ] == [AN_INVOICE_ID]
+
+
+@pytest.mark.parametrize(
+    "media_type",
+    [outside["media_type"] for outside in read_upload_media_types()["outside"]],
+)
+def test_a_media_type_the_agreement_places_outside_the_list_is_quarantined_on_its_row(
+    database: tuple[psycopg.Connection, str], tmp_path: Path, media_type: str
+) -> None:
+    """The upload-media-types agreement's seeded half (ADR 0031): the very types the
+    app's suite sees refused at the bind act, arriving here on a catalogue row anyway —
+    which is what a drifted allow-list would look like from this side.
+
+    The bytes are the sick note's markdown, which this tier reads without complaint
+    under its own media type. Under a type with no converter they are **not converted
+    at all**: the row says *quarantined* and names `UnsupportedMediaType`, no
+    normalised copy is written, and the neighbour lands as if nothing had happened. A
+    dispatch that fell through to whichever converter the bytes resemble would land
+    two documents here.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(
+        connection,
+        documents=(AN_INVOICE_ID, A_SICK_NOTE_ID),
+        media_types={A_SICK_NOTE_ID: media_type},
+    )
+    bucket = a_bucket_holding_the_three()
+
+    outcome = index_binding(
+        bootstrap_for(dsn, tmp_path), run_for(workspace_id), copies=bucket
+    )
+
+    unconverted = catalogue_rows_of(connection, workspace_id)[1]
+    assert {
+        "documents": outcome.documents,
+        "outcome": unconverted["outcome"],
+        "quarantine_error": unconverted["quarantine_error"],
+        "normalised_key": unconverted["normalised_key"],
+    } == {
+        "documents": 1,
+        "outcome": "quarantined",
+        "quarantine_error": "UnsupportedMediaType",
+        "normalised_key": None,
+    }
+    assert {
+        row["source_document_id"] for row in chunk_rows_of(connection, workspace_id)
+    } == {AN_INVOICE_ID}
 
 
 def test_a_document_that_ran_past_its_ceiling_lands_the_deadline_on_its_row(

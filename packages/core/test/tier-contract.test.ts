@@ -26,7 +26,7 @@ import { ulid } from "../src/kernel/index.ts";
  * is the mechanism; deduplicating it away would delete the test.
  */
 
-const SPOKEN_CONTRACT_VERSION = 8;
+const SPOKEN_CONTRACT_VERSION = 9;
 const SPOKEN_AGREEMENTS = {
   "concept-file": "fixtured",
   "concept-inbox": "sql-function",
@@ -37,6 +37,7 @@ const SPOKEN_AGREEMENTS = {
   "llm-routing": "sql-function",
   queue: "sql-function",
   redaction: "fixtured",
+  "upload-media-types": "fixtured",
   "visibility-columns": "fixtured",
 } as const;
 /** Files the manifest does not have to list. */

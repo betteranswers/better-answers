@@ -61,6 +61,7 @@ from .chunks import (
 )
 from .converter import (
     CONVERTER_PIN,
+    CONVERTERS,
     DOCX_MEDIA_TYPE,
     OCR_ANSWER,
     PASSED_THROUGH,
@@ -94,6 +95,7 @@ __all__ = [
     "CHUNKS_APP",
     "CHUNK_SIZE_BYTES",
     "CHUNK_TABLE",
+    "CONVERTERS",
     "CONVERTER_PIN",
     "DOCX_MEDIA_TYPE",
     "ENVIRONMENTS_HELD",

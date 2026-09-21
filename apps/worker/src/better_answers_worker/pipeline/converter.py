@@ -35,7 +35,10 @@ The name it carries is the converter's own — `NeedsOcrError`, `EncryptedError`
 Per-document isolation is `mount_each`'s and lives one module up.
 """
 
+from collections.abc import Callable, Mapping
+from functools import partial
 from importlib import metadata
+from types import MappingProxyType
 from typing import Literal
 
 import anydoc
@@ -160,13 +163,12 @@ def converted(body: bytes, media_type: str) -> str:
     act read off the upload — so a file renamed to `.docx` is refused by `anydoc` rather
     than half-converted by whichever converter its bytes resemble.
     """
-    if media_type in PASSED_THROUGH:
-        return _decoded(body, media_type)
-    if media_type == DOCX_MEDIA_TYPE:
-        return _docx(body)
-    if media_type == PDF_MEDIA_TYPE:
-        return _pdf(body)
-    raise UnreadableError("UnsupportedMediaType", f"this tier converts no {media_type}")
+    converter = CONVERTERS.get(media_type)
+    if converter is None:
+        raise UnreadableError(
+            "UnsupportedMediaType", f"this tier converts no {media_type}"
+        )
+    return converter(body)
 
 
 def _decoded(body: bytes, media_type: str) -> str:
@@ -211,3 +213,22 @@ def _classified(body: bytes) -> pdf_inspector.PdfClassification:
         return pdf_inspector.classify_pdf_bytes(body)
     except Exception as cause:  # every refusal is one quarantine
         raise _unreadable_from(cause) from cause
+
+
+#: A media type's one converter, which is the whole of `converted`'s dispatch — so its
+#: keys are the whole of what this tier converts, and they are what the
+#: `upload-media-types` agreement holds to the app's allow-list (ADR 0031,
+#: `contracts/upload-media-types/`). A list written beside an `if` chain would be a
+#: second list, free to drift from the chain it described; a type is converted here if
+#: and only if it is a key here. It sits below the three converters because it holds the
+#: functions themselves.
+CONVERTERS: Mapping[str, Callable[[bytes], str]] = MappingProxyType(
+    {
+        **{
+            media_type: partial(_decoded, media_type=media_type)
+            for media_type in PASSED_THROUGH
+        },
+        DOCX_MEDIA_TYPE: _docx,
+        PDF_MEDIA_TYPE: _pdf,
+    }
+)
