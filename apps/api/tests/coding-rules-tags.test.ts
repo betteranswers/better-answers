@@ -46,15 +46,10 @@ const GATES_PRINTING_A_TAG: readonly string[] = [
   "packages/devtools/src/comment-density.ts",
 ];
 
-// The list only shrinks, so a document written after this walk names its rule in words or
-// fails here.
+// Only files that carry one, so the list holds no slot a later citation could land in.
 const FROZEN: readonly string[] = [
-  "docs/adr/0001-type-vocabulary-authoritative-in-bundle.md",
-  "docs/adr/0002-concept-and-bundle-identity.md",
-  "docs/adr/0003-one-tenant-bundle-of-atom-concepts.md",
   "docs/adr/0004-guides-and-compositions-are-platform-records.md",
   "docs/adr/0005-own-app-two-tiers-parts-lifted-by-contract.md",
-  "docs/adr/0006-hono-server-and-vite-spa-not-nextjs.md",
   "docs/adr/0007-plain-postgres-and-app-owned-migrations.md",
   "docs/adr/0008-trpc-inside-openapi-and-mcp-outside.md",
   "docs/adr/0009-better-auth-in-process-identity-provider.md",
@@ -62,7 +57,6 @@ const FROZEN: readonly string[] = [
   "docs/adr/0011-knowledge-layers-and-the-minting-rule.md",
   "docs/adr/0012-the-concept-write-path.md",
   "docs/adr/0013-sources-bound-by-origin-reach-and-destination.md",
-  "docs/adr/0014-records-attach-by-iri-versioned-where-edited-audited-in-one-ledger.md",
   "docs/adr/0015-a-composition-cites-its-concept-by-a-footnote-labelled-by-the-include.md",
   "docs/adr/0016-an-answer-asserts-concepts-only-found-by-traversal-and-served-as-one-contract.md",
   "docs/adr/0017-every-answer-is-a-retained-correctable-record-and-an-answer-is-minted-only-at-a-gate-a-person-runs.md",
@@ -72,7 +66,6 @@ const FROZEN: readonly string[] = [
   "docs/adr/0021-the-graph-is-neo4j-community-on-one-instance-tenanted-by-rule-written-in-generations-and-never-a-hard-dependency.md",
   "docs/adr/0022-two-stacks-deployed-by-digest-every-irreplaceable-byte-encrypted-off-host-erasures-replayed-on-restore.md",
   "docs/adr/0023-the-graph-is-apache-age-inside-the-platform-postgres.md",
-  "docs/adr/0024-the-forge-is-bare-git-repositories-the-app-writes-and-two-4gb-boxes-run-v01.md",
   "docs/adr/0025-a-signal-is-a-query-over-rows-the-platform-already-keeps.md",
   "docs/adr/0026-kinds-emerge-from-the-concepts-no-vocabulary-file-a-link-is-the-relation.md",
   "docs/adr/0027-better-answers-is-open-core-under-apache-2-0-the-hosted-service-is-the-product-copyleft-is-run-only.md",
@@ -86,20 +79,16 @@ const FROZEN: readonly string[] = [
   "docs/adr/0035-a-person-has-one-id-minted-by-the-platform-revoked-in-two-scopes-and-erased-to-a-per-workspace-pseudonym.md",
   "docs/adr/0036-the-worker-composes-cocoindexs-building-blocks-and-writes-only-what-the-engine-has-no-block-for.md",
   "docs/adr/0037-a-reader-facing-screen-has-a-latency-budget-lists-under-a-second-actions-under-100-ms-optimistically-answers-streamed.md",
-  "docs/adr/0038-the-people-data-model-groups-flat-and-entra-aligned-access-requests-answered-neutrally-and-the-ledger-founded-as-an-append-only-tenant-table.md",
-  "docs/adr/0039-an-audience-is-a-word-and-a-group-id-array-on-every-readable-unit-combined-by-intersection-with-everyone-the-identity-an-empty-intersection-forcing-restricted-and-an-implicit-group-a-group-row-nothing-here-mints.md",
   "docs/adr/0040-the-clock-is-a-kernel-value-the-api-constructs-once-at-boot-and-hands-to-every-act-that-reads-time-a-rows-own-timestamp-stays-the-databases-now-and-the-worker-is-handed-no-clock.md",
   "docs/adr/0041-a-secret-belongs-to-one-of-seven-credential-classes-the-bootstrap-class-comes-from-the-deploy-unit-and-the-other-six-are-rows-under-the-envelope.md",
   "docs/adr/0042-the-product-ships-an-accessibility-statement-because-the-buyers-are-uk-public-bodies-for-whom-it-is-law.md",
   "docs/adr/0043-an-act-is-what-an-entry-may-ask-core-to-do-admitted-before-its-body-runs-refusing-in-classed-words-that-cross-every-transport-as-themselves-in-a-transaction-only-its-opener-rolls-back.md",
-  "docs/adr/0044-a-chunks-visibility-is-read-from-its-binding-and-its-document-never-copied-onto-its-row.md",
   "docs/adr/README.md",
   "docs/specs/T-004.md",
   "docs/specs/T-006.md",
   "docs/specs/T-015.md",
   "docs/specs/T-022.md",
   "docs/specs/T-045.md",
-  "docs/specs/T-046.md",
   "docs/specs/T-048.md",
   "docs/specs/T-063.md",
   "docs/specs/T-064.md",
@@ -116,14 +105,10 @@ const FROZEN: readonly string[] = [
   "docs/specs/T-131.md",
   "docs/specs/T-133.md",
   "docs/specs/T-168.md",
-  "docs/specs/T-225.md",
   "docs/specs/coding-rules-one-form-and-the-comment-strip.md",
   "docs/specs/s0-redaction-seam-and-erasure.md",
   "docs/specs/s1-acts-ahead-of-the-first-procedures.md",
   "docs/specs/s1-one-uploaded-document-to-a-cited-passage.md",
-  "docs/specs/s4-a-chunks-visibility-is-read-not-copied.md",
-  "docs/specs/s4-one-memo-the-detectors.md",
-  "docs/specs/s4-the-roles-surface-read-back-and-the-contracts-digest.md",
   "docs/specs/v01-route.md",
 ];
 
@@ -158,8 +143,8 @@ const isAllowedLocation = (file: string): boolean =>
 
 // The walk reads `git ls-files --others`, so a written file is seen as a committed one; the
 // `finally` keeps the next suite from reading it.
-const whileAFileHolds = <T>(contents: string, taken: () => T): T => {
-  const written = path.join(repositoryRoot, "apps/api/tests/tag-location-proof.txt");
+const whileAFileNamed = <T>(relative: string, contents: string, taken: () => T): T => {
+  const written = path.join(repositoryRoot, relative);
   writeFileSync(written, contents);
   try {
     return taken();
@@ -167,6 +152,12 @@ const whileAFileHolds = <T>(contents: string, taken: () => T): T => {
     rmSync(written, { force: true });
   }
 };
+
+const whileAFileHolds = <T>(contents: string, taken: () => T): T =>
+  whileAFileNamed("apps/api/tests/tag-location-proof.txt", contents, taken);
+
+const whileARulesFileHolds = <T>(contents: string, taken: () => T): T =>
+  whileAFileNamed("apps/api/tests/CODING_RULES.md", contents, taken);
 
 describe("where a rule tag may be written", () => {
   it("finds one only in a rules file, a gate's failure message, or a frozen document", () => {
@@ -223,25 +214,59 @@ describe("the tags a gate prints and the rules files that define them", () => {
     ).toEqual([]);
   });
 
-  it("reads tags from every rules file, and the tags it reads look like tags", () => {
-    const defined = definedTags();
-    const files = new Set(defined.values());
+  it("reads tags from every rules file", () => {
+    const files = new Set(definedTags().values());
 
     expect(files).toContain("CODING_RULES.md");
     expect(files).toContain("apps/api/CODING_RULES.md");
     expect(files).toContain("apps/web/CODING_RULES.md");
     expect(files).toContain("apps/worker/CODING_RULES.md");
-    expect([...defined.keys()].every((tag) => /^[A-Z][A-Z0-9]*[A-Z][0-9]+$/.test(tag))).toBe(true);
+  });
+
+  it("reads a well-formed heading as a definition and a malformed one as none", () => {
+    const heading = (tag: string, title: string): string => `## [${tag}] ${title}\n\n`;
+    const before = new Set(definedTags().keys());
+    const after = whileARulesFileHolds(
+      heading("PROBE1", "A family of two capitals, then a number") +
+        heading("Probe2", "Lower case inside the family") +
+        heading("PROBE", "No number") +
+        heading("P1", "One letter"),
+      () => new Set(definedTags().keys()),
+    );
+
+    expect([...after].filter((tag) => !before.has(tag))).toEqual(["PROBE1"]);
   });
 });
 
+const PROOF = "apps/api/tests/tag-location-proof.txt";
+
+const citingNothing = (list: readonly string[]): readonly string[] =>
+  list.filter((file) => citationsIn(file).length === 0);
+
 describe("the two lists this walk reads a file past", () => {
+  const listed = [...FROZEN, ...GATES_PRINTING_A_TAG];
+
   it("names a file the tree still carries in every entry of both", () => {
     const tracked = new Set(treeFiles());
 
     expect(
-      [...FROZEN, ...GATES_PRINTING_A_TAG].filter((file) => !tracked.has(file)),
+      listed.filter((file) => !tracked.has(file)),
       "a listed file is gone from the tree. Both lists only shrink, so an entry leaves with the file it named; a stale one is where the next citation could land unseen.",
     ).toEqual([]);
+  });
+
+  it("names a file that still cites a tag in every entry of both", () => {
+    expect(
+      citingNothing(listed),
+      "a listed file cites no tag any more. Remove its entry in the commit that took the last one out: an entry whose file carries none is a slot the next citation lands in unseen.",
+    ).toEqual([]);
+  });
+
+  it("refuses an entry whose file has shed its last tag", () => {
+    const shed = whileAFileHolds("A document that names its rule in words.\n", () =>
+      citingNothing([...listed, PROOF]),
+    );
+
+    expect(shed).toEqual([PROOF]);
   });
 });
