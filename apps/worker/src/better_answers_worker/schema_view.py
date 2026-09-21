@@ -1,3 +1,5 @@
+# Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
+
 MIGRATION_ID = "0042_the-reading-refresh"
 
 MIGRATION_WHEN = 1789951291377
