@@ -31,7 +31,7 @@ import re
 from collections.abc import Callable, Iterator, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 import psycopg
 import pytest
@@ -48,7 +48,9 @@ from better_answers_worker.pipeline.catalogue import record_findings
 from better_answers_worker.redaction.engine import Finding
 from better_answers_worker.redaction.pins import DETECTOR_PIN, RULE_VERSION
 from factories import (
+    seed_finding,
     seed_job,
+    seed_narrowed,
     seed_restore,
     seed_source_binding,
     seed_source_document,
@@ -848,6 +850,7 @@ def test_a_second_run_lands_no_second_finding_row_and_moves_none(
 
     index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
     first = marked_rows_of(connection, workspace_id)
+    written = readings_of(connection, workspace_id)
     index_binding(
         bootstrap,
         run_for(workspace_id, "narrowed"),
@@ -860,6 +863,195 @@ def test_a_second_run_lands_no_second_finding_row_and_moves_none(
         ("JOB_TITLE", 67, 76),
     ]
     assert marked_rows_of(connection, workspace_id) == first
+    # And not one row was written to, which the transaction that last wrote each says: a
+    # reading that has not moved is not written again, so a second run changes no row.
+    assert readings_of(connection, workspace_id) == written
+
+
+class ASpan(TypedDict):
+    """A finding as a run is told of one: the rule that raised it, and two offsets."""
+
+    rule_id: str
+    char_start: int
+    char_end: int
+
+
+#: The delivery note's one name, *Priya Raman*, as the seam cuts it.
+HER_NAME: ASpan = {"rule_id": "PERSON", "char_start": 25, "char_end": 36}
+
+
+def readings_of(
+    connection: psycopg.Connection, workspace_id: str
+) -> list[dict[str, Any]]:
+    """Every finding's id and the five columns that are a run's own reading of it, with
+    the transaction that last wrote the row — which is how a case tells a row a run left
+    alone from one it wrote the same values to."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT id, category, tier, score, rule_version, detector_pin,"
+            " xmin::text AS written_by"
+            " FROM finding WHERE workspace_id = %s ORDER BY document_id, char_start",
+            (workspace_id,),
+        )
+        return by_column(cursor)
+
+
+def test_a_span_an_older_run_left_is_read_again_and_all_five_of_its_reading_move(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """A finding is the same finding on every run that finds it, and what a run knows
+    about it is the **last** run's: its category, its tier, its score and the version
+    pair that read it (migration 0042). A row that kept its first reading for ever would
+    have the review show a tier the seam no longer acts on, refuse a keep the rules now
+    admit, and give the app no way to tell a span the rules still raise from one they
+    have dropped — a row's pair against its document's is that test, and it only means
+    anything if every run writes the pair.
+
+    The older run's reading is wrong in all five, on purpose: each is a column the
+    refresh names, and one left out of it is one this case finds still wrong.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
+    with connection.cursor() as cursor:
+        older = seed_finding(
+            cursor,
+            workspace_id=workspace_id,
+            document_id=AN_INVOICE_ID,
+            category="government-identifier",
+            tier="default-on",
+            rule_id="UK_BANK_ACCOUNT",
+            char_start=54,
+            char_end=97,
+        )
+    connection.commit()
+
+    index_binding(
+        bootstrap_for(dsn, tmp_path),
+        run_for(workspace_id),
+        copies=a_bucket_holding_the_three(),
+    )
+
+    (row,) = readings_of(connection, workspace_id)
+    # The pair on the row is the string on its document, joined at one colon: that
+    # equality is how the app tells a span the last run raised from one it dropped.
+    (catalogued,) = catalogue_rows_of(connection, workspace_id)
+    assert catalogued["redaction_version"] == (
+        f"{row['rule_version']}:{row['detector_pin']}"
+    )
+    assert {key: row[key] for key in row if key != "written_by"} == {
+        "id": older["id"],
+        "category": "bank-details",
+        "tier": "always",
+        "score": pytest.approx(0.55),
+        "rule_version": RULE_VERSION,
+        "detector_pin": DETECTOR_PIN,
+    }
+
+
+def test_a_restored_span_keeps_its_id_its_marks_and_the_tier_it_was_restored_at(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """The refresh reaches a run's own reading and nothing an Admin wrote: the id the
+    ledger names, the restore and the review are where they were after a run that moved
+    everything else on the row. And the tier has its one exception — only the always set
+    is restorable, the row's own CHECK says so, so a restored row keeps the tier it was
+    restored at whatever the run now reads, and the run that found it does not abort.
+
+    The span is the delivery note's name, which this binding's rules read at the tier a
+    binding switches off: restored here as an older run's officer-block reading left it.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(A_DELIVERY_NOTE_ID,))
+    with connection.cursor() as cursor:
+        seed_finding(
+            cursor,
+            workspace_id=workspace_id,
+            document_id=A_DELIVERY_NOTE_ID,
+            category="person-name",
+            tier="always",
+            **HER_NAME,
+        )
+        kept = seed_restore(
+            cursor,
+            workspace_id=workspace_id,
+            document_id=A_DELIVERY_NOTE_ID,
+            **HER_NAME,
+        )
+    connection.commit()
+
+    index_binding(
+        bootstrap_for(dsn, tmp_path),
+        run_for(workspace_id),
+        copies=a_bucket_holding_the_three(),
+    )
+
+    assert [
+        row for row in marked_rows_of(connection, workspace_id) if row["restored"]
+    ] == [
+        {
+            "id": kept["id"],
+            "document_id": A_DELIVERY_NOTE_ID,
+            **HER_NAME,
+            "review_state": "kept-in-text",
+            "restored": True,
+        }
+    ]
+    (refreshed,) = [
+        row for row in readings_of(connection, workspace_id) if row["id"] == kept["id"]
+    ]
+    assert (
+        refreshed["tier"],
+        refreshed["rule_version"],
+        refreshed["detector_pin"],
+    ) == (
+        "always",
+        RULE_VERSION,
+        DETECTOR_PIN,
+    )
+
+
+def test_a_name_an_erasure_has_since_raised_reads_always_after_the_next_run(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """Two real runs with a real change of reading between them. The first reads her
+    name at the tier a binding switches off; an Admin reviews it; a person asks to be
+    erased, and the second run raises the same span to the tier nobody switches off. The
+    row is the same row — its id and its review untouched — and it now says *always*,
+    which is what the review shows and what a keep is decided off.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(A_DELIVERY_NOTE_ID,))
+    bootstrap = bootstrap_for(dsn, tmp_path)
+
+    index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    with connection.cursor() as cursor:
+        reviewed = seed_narrowed(
+            cursor,
+            workspace_id=workspace_id,
+            document_id=A_DELIVERY_NOTE_ID,
+            **HER_NAME,
+        )
+        seed_suppression(
+            cursor, workspace_id=workspace_id, document_id=A_DELIVERY_NOTE_ID
+        )
+    connection.commit()
+    index_binding(
+        bootstrap,
+        run_for(workspace_id, "wiped"),
+        copies=a_bucket_holding_the_three(),
+    )
+
+    assert reviewed["tier"] == "default-off"
+    assert [
+        (row["id"], row["review_state"])
+        for row in marked_rows_of(connection, workspace_id)
+        if row["rule_id"] == "PERSON"
+    ] == [(reviewed["id"], "narrowed")]
+    assert [
+        row["tier"]
+        for row in readings_of(connection, workspace_id)
+        if row["id"] == reviewed["id"]
+    ] == ["always"]
 
 
 def test_the_insert_steps_over_a_known_span_and_over_no_other_collision(

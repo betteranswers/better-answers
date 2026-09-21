@@ -27,7 +27,7 @@ import type { Tx } from "../store/postgres/index.ts";
 import { adminOnBinding, bindingNamed } from "./admin-binding.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
 import { REDACTION_CATEGORIES } from "./dpia.ts";
-import { restoreFinding } from "./findings.ts";
+import { raisedByTheLastRun, restoreFinding } from "./findings.ts";
 
 /**
  * The **review** of what the redaction seam found in one binding (ADR 0020; the S1 spec,
@@ -162,6 +162,9 @@ const BROKEN_CLASS = new Error("a source document's class is not one the visibil
  * The ordering is the screen's — category, then rule, then the document — so two calls over
  * unchanged rows answer the same list and a caller never sorts what the store can.
  *
+ * Only findings **the binding's last run raised** are counted (`raisedByTheLastRun`): a span
+ * the rules have since dropped is still a row, and the review shows the last run's reading.
+ *
  * The four arrays are the spans the binding's last finished run said an erasure overrode,
  * each by the document, the rule and the two offsets that are what a finding is. A span is
  * counted only while an Admin's restore stands on its row: the figure is about kept spans,
@@ -178,7 +181,7 @@ const FINDING_GROUPS = `SELECT d.id AS "documentId", d.title,
        FROM finding f
        JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
        JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
-      WHERE f.workspace_id = $1 AND d.binding_id = $2
+      WHERE f.workspace_id = $1 AND d.binding_id = $2 AND ${raisedByTheLastRun("f", "d")}
       GROUP BY d.id, d.title, d.sensitivity, b.sensitivity, f.category, f.rule_id, f.tier
       ORDER BY f.category, f.rule_id, d.title, d.id`;
 
@@ -365,13 +368,16 @@ export type KeptInText = {
  * The spans of this binding that fall in the groups named, with the group each falls in — the
  * act's membership question in one statement, because it is about the batch rather than about
  * a span: a keep is one transaction, and a batch naming a group this binding holds no span of
- * lands none of it. Oldest id first, which is the order the spans are restored and their ledger rows land in.
+ * lands none of it. Of the spans **the last run raised**, as the review read counts them: an
+ * act over a group acts on what the group showed, and never on a span the rules have dropped.
+ * Oldest id first, which is the order the spans are restored and their ledger rows land in.
  */
 const FINDINGS_OF_GROUPS = `SELECT f.id, f.document_id AS "documentId", f.category,
             f.rule_id AS "ruleId", f.tier
        FROM finding f
        JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
-      WHERE f.workspace_id = $1 AND d.binding_id = $2 AND ${findingGroupClause("f", 3)}
+      WHERE f.workspace_id = $1 AND d.binding_id = $2 AND ${raisedByTheLastRun("f", "d")}
+        AND ${findingGroupClause("f", 3)}
       ORDER BY f.id
         FOR UPDATE OF f`;
 
@@ -560,7 +566,8 @@ const NARROWED = "narrowed" satisfies (typeof FINDING_REVIEW_STATES)[number];
 
 /**
  * The review's mark a narrowing leaves: on the **unreviewed findings of the groups it was
- * handed**, the acting Admin and the database's own instant (ADR 0040), and no reason, because
+ * handed that the last run raised** — the rows the review showed, and no span the rules have
+ * since dropped — the acting Admin and the database's own instant (ADR 0040), and no reason, because
  * the act takes none. Never on a finding of another group of the same document — a widening is
  * held against this column while special-category findings are unreviewed (ADR 0013, ADR 0020),
  * and a narrowing taken from a home-address group that marked the health finding beside it
@@ -569,7 +576,10 @@ const NARROWED = "narrowed" satisfies (typeof FINDING_REVIEW_STATES)[number];
  */
 const NARROWED_REVIEW = `UPDATE finding f
         SET review_state = $2, reviewed_by = $3, reviewed_at = now()
-      WHERE f.workspace_id = $1 AND f.review_state = $4 AND ${findingGroupClause("f", 5)}`;
+       FROM source_document d
+      WHERE f.workspace_id = $1 AND f.review_state = $4 AND ${findingGroupClause("f", 5)}
+        AND d.workspace_id = f.workspace_id AND d.id = f.document_id
+        AND ${raisedByTheLastRun("f", "d")}`;
 
 /**
  * **Narrow these documents**: an Admin takes the documents of named finding groups of one

@@ -28,6 +28,7 @@ import { putObject, type ObjectDoor } from "../store/objects/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { adminOnBinding, bindingNamed } from "./admin-binding.ts";
 import { dpiaInputFor, REDACTION_CATEGORIES } from "./dpia.ts";
+import { raisedByTheLastRun } from "./findings.ts";
 
 /**
  * The **bind**: an Admin's own file becomes a source binding, a catalogued document, a ledger
@@ -436,12 +437,14 @@ const LATEST_INDEX_RUN = `SELECT status FROM job
 /**
  * How many spans of each category this binding's documents hold. Joined through the catalogue
  * rather than read off a column, because a finding belongs to a document and a binding is what
- * the Admin is publishing.
+ * the Admin is publishing. Of the binding's **last run's** reading: a span the rules have since
+ * dropped is still a row, and a total that counted it would put on the ledger a figure no run
+ * stands behind.
  */
 const FINDINGS_BY_CATEGORY = `SELECT f.category, count(*)::int AS found
     FROM finding f
     JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
-   WHERE f.workspace_id = $1 AND d.binding_id = $2
+   WHERE f.workspace_id = $1 AND d.binding_id = $2 AND ${raisedByTheLastRun("f", "d")}
    GROUP BY f.category`;
 
 /**

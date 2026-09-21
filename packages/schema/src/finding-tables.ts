@@ -19,16 +19,19 @@ import { withRLS } from "./with-rls.ts";
  * document — one row per span — as the sources slice's own record. The worker writes it and
  * the app reviews it, which is the tier boundary the S0 spec draws: the detector runs in the
  * worker, the review of a finding is an Admin's act, and `worker_rt` therefore holds INSERT
- * on this table and — since migration 0041 — SELECT on the columns that say which span a row
- * is and whether it was restored, and nothing else: each granted in a substrate migration,
- * with a refusal test per road it does not hold, as every cross-tier grant in this package
- * carries.
+ * on this table, SELECT on the columns that say which span a row is and whether it was
+ * restored (migration 0041), and SELECT and UPDATE on the five that are a run's own reading of
+ * a span (migration 0042) — and nothing else: each granted in a substrate migration, with a
+ * refusal test per road it does not hold, as every cross-tier grant in this package carries.
  *
  * **A finding is the same finding on every run that finds it** (ADR 0020, amended 2026-09-20):
  * the document, the rule and the two offsets are what it is, and they are unique. A run's
- * insert steps over a span it has found before, so the row an Admin reviewed or restored
- * keeps its id and its marks through every reprocess; the score and the version pair are one
- * run's reading of it and never part of it.
+ * insert finds a span it has found before and refreshes **its reading and nothing else** —
+ * the category, the tier, the score and the version pair are the last run's — so the row an
+ * Admin reviewed or restored keeps its id and its marks through every reprocess. A row whose
+ * version pair is not its document's `redaction_version` is therefore a span the last run did
+ * not raise, and the app's reads leave it out. One exception, which the restore's own CHECK
+ * below makes: a restored row keeps the tier it was restored at.
  *
  * **It never holds the value.** A category, a tier, a rule id, two offsets into the
  * normalised text and a score — there is no column a name, an address, an account number or

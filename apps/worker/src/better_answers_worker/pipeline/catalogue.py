@@ -30,11 +30,13 @@ is also UPDATE, because the hash, the normalised copy's key, the version, the ou
 word, the quarantine error and the last-seen stamp are a run's own findings (migration
 0037; the grant is the table's, so migration 0039's column arrived inside it). The
 suppression is SELECT alone (migration 0038). The finding is INSERT (0024, 0032) and
-SELECT on six columns and no other (0041; ADR 0020, amended 2026-09-20): the detector
-runs here and the review of what it found is an Admin's act, so a run records a span it
-withheld and reads back one thing — which spans were restored, each by the document, the
-rule and the two offsets that are what a finding is. It reads no category, no reason, no
-reviewer and no review, and it can mark nothing.
+SELECT on six columns (0041), and SELECT and UPDATE on the five that are a run's own
+reading of a span (0042; ADR 0020, amended 2026-09-20 and 2026-09-21): the detector runs
+here and the review of what it found is an Admin's act, so a run records a span it
+withheld, refreshes its own reading of one it finds again, and reads back one thing of
+an Admin's — which spans were restored, each by the document, the rule and the two
+offsets that are what a finding is. It reads no reason, no reviewer and no review, and
+it can mark nothing.
 """
 
 from collections.abc import Callable, Mapping, Sequence
@@ -221,8 +223,8 @@ def record_findings(
     *,
     mint: Callable[[], str] = ulid,
 ) -> int:
-    """Write every span the seam raised that no run has written before, as the rows an
-    Admin will review. The answer is how many rows landed.
+    """Write every span the seam raised, as the rows an Admin will review. The answer is
+    how many rows landed or moved.
 
     A finding is a location and never a quotation — the category, the tier, the rule
     that raised it, the span in code points into the text the seam was **given**, the
@@ -233,15 +235,26 @@ def record_findings(
     boundary holds this column to the shape the platform mints, so a derived id would be
     a row no restore act could ever name.
 
-    **A span found before is stepped over, and its row is left exactly as it stands.**
-    A finding is the same finding on every run that finds it — the document, the rule
-    and the two offsets, unique on the row (migration 0040) — so a binding indexed again
+    **A span found before has its reading refreshed, and nothing else on its row.** A
+    finding is the same finding on every run that finds it — the document, the rule and
+    the two offsets, unique on the row (migration 0040) — so a binding indexed again
     holds each span once, under the id the ledger may already name and with whatever an
-    Admin wrote on it. `DO NOTHING` and never `DO UPDATE`: the score and the version
-    pair are one run's reading, and this tier holds no UPDATE to write a newer one with.
+    Admin wrote on it. What a run knows about a span is the **last** run's: the
+    category, the tier, the score and the version pair are written again (migration
+    0042), so the review shows the tier the seam acts on, a keep is decided off it, and
+    a row whose pair is not its document's `redaction_version` is a span the last run
+    did not raise — which is how the app leaves it out. The id, the span and an Admin's
+    two marks are not in the SET and could not be: the grant names five columns.
+
+    **Two things the clause does beside the refresh.** A restored row keeps the tier it
+    was restored at, because only the always set is restorable and the row's own CHECK
+    says so — a refresh that moved it would abort the run that made it. And a reading
+    that has not moved is not written again, so a second run over an unchanged binding
+    changes no row.
+
     The conflict target is named — its five columns are five of the six migration 0041
-    lets this tier read, which PostgreSQL asks of a target — so the statement steps over
-    *this* key and no other: a collision on the primary key is still an error, where the
+    lets this tier read, which PostgreSQL asks of a target — so the statement answers
+    *this* key and no other: a collision on the primary key is still an error, where an
     untargeted form would swallow it in silence.
 
     `mint` is a parameter with the shipped minter as its default for that sentence's
@@ -272,7 +285,19 @@ def record_findings(
         " char_start, char_end, score, rule_version, detector_pin)"
         " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
         " ON CONFLICT (workspace_id, document_id, rule_id, char_start, char_end)"
-        " DO NOTHING",
+        " DO UPDATE SET category = EXCLUDED.category,"
+        "   tier = CASE WHEN finding.restored_at IS NULL"
+        "               THEN EXCLUDED.tier ELSE finding.tier END,"
+        "   score = EXCLUDED.score,"
+        "   rule_version = EXCLUDED.rule_version,"
+        "   detector_pin = EXCLUDED.detector_pin"
+        " WHERE (finding.category, finding.score,"
+        "        finding.rule_version, finding.detector_pin)"
+        "       IS DISTINCT FROM"
+        "       (EXCLUDED.category, EXCLUDED.score,"
+        "        EXCLUDED.rule_version, EXCLUDED.detector_pin)"
+        "    OR (finding.restored_at IS NULL"
+        "        AND finding.tier IS DISTINCT FROM EXCLUDED.tier)",
         rows,
     )
     return cursor.rowcount

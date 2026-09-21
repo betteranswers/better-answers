@@ -454,6 +454,19 @@ const runEndedAt = async (
   await runOver(workspaceId, bindingId, status, at);
 };
 
+/**
+ * The catalogue row as a run leaves it: the version string of the rules and the detector that
+ * last read the document. The worker's write and never an act of this tier, so it is made as
+ * the superuser, as the run's own row above is — a document bound by the real act carries no
+ * version until a run has been over it.
+ */
+const reconciledUnder = async (workspaceId: string, documentId: string, version: string) => {
+  await db().pool.query(
+    "UPDATE source_document SET redaction_version = $3 WHERE workspace_id = $1 AND id = $2",
+    [workspaceId, documentId, version],
+  );
+};
+
 /** The binding's two columns a publish writes, read as the superuser. */
 const publishStateOf = async (pool: pg.Pool, workspaceId: string, bindingId: string) => {
   const read = await pool.query<{ published_at: Date | null; state: string }>(
@@ -581,7 +594,20 @@ describe("an Admin publishes a binding", () => {
         charStart: 16,
         charEnd: 24,
       });
+      // And one the rules have since dropped: still a row, because the worker cannot delete,
+      // under the version pair of the older run that raised it. The totals a publish writes
+      // to the ledger are of what the binding's last run found, so it is not among them.
+      await seed.finding({
+        workspaceId: scenario.workspaceId,
+        documentId,
+        category: "bank-details",
+        tier: "always",
+        charStart: 30,
+        charEnd: 38,
+        ruleVersion: "0",
+      });
     });
+    await reconciledUnder(scenario.workspaceId, documentId, "1:presidio-test");
 
     const published = await publishedHandbook(scenario, bindingId);
 

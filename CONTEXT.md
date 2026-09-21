@@ -183,8 +183,9 @@ are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** 
   the instant. **Marked** once an Admin has reviewed or restored it, *unmarked* until then. **The
   same finding on every run that finds it**: the document, the rule and the offsets are what it
   is, for as long as the document's content stands, so what an Admin decided about it stands on
-  every later run. The detector's score and version are one run's reading of it, never part of
-  what it is.
+  every later run. Its category, tier, score and version are a run's **reading** of it — the last
+  run's — never part of what it is. A finding the last run did not raise, because the rules moved
+  on, is no longer shown to a reviewer, acted on or counted at a publish.
 - **finding group** — the unit of the review: one document's *findings* of one category, raised
   by one rule at one tier, with how many there are. It is what the review lists and what the two
   bulk acts below are taken over; it names no span and carries no value, so a reviewer acts on

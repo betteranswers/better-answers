@@ -744,7 +744,9 @@ export const testData = (client: pg.PoolClient): TestData => {
       originalKey: `documents/${ulid().toLowerCase()}/original`,
       normalisedKey: `documents/${ulid().toLowerCase()}/normalised`,
       contentHash: "c".repeat(64),
-      redactionVersion: "1",
+      // The pair a seeded finding carries by default, so that a finding seeded under a seeded
+      // document reads as the last run's and a case about one it dropped says so by a version.
+      redactionVersion: "1:presidio-test",
       lastModified: null,
       goneAt: null,
       outcome: DOCUMENT_CONVERTED_OUTCOME,
