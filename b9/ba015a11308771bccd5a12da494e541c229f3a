@@ -1,0 +1,33 @@
+.oxlintrc.json
+  s_a38d2840827d6c::t_caa5f20090f6e5 25
+  s_a38d2840827d6c::t_c8ff51cdcf871f 349,355
+  s_a38d2840827d6c::t_6866aabc00981d 3
+  s_a38d2840827d6c::t_e59c3b006cfcff 335-348,350-354,356-358
+packages/core/test/environment-lint.test.ts
+  s_a38d2840827d6c::t_6662d224561202 35
+  s_a38d2840827d6c::t_e028c6458f6977 42-48,50-51,53-54,56,58-63,65-70
+  s_a38d2840827d6c::t_12a47800c78afa 9,22,31,34,36,49,52,64,73-78,80,91,95,97,99
+  s_a38d2840827d6c::t_d2989380c127ea 93-94
+  s_a38d2840827d6c::t_8f338958c3348e 1-8,10-21,23-30,32-33,37-41,55,57,71-72,79,81-90,92,96,98,100-103
+packages/core/src/store/git/index.ts
+  s_a38d2840827d6c::t_7841a774236d1b 91-92,98,110
+  s_a38d2840827d6c::t_5e5116862425b1 94-97
+  s_a38d2840827d6c::t_4e61e926d01829 93
+  s_a38d2840827d6c::t_c2b5a228a855e0 513
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b9ba015a11308771bccd5a12da494e541c229f3a",
+  "prompts": {},
+  "sessions": {
+    "s_a38d2840827d6c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bcafdd87-9a23-47ee-b85e-27d4f2a91450",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
