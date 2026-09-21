@@ -1,0 +1,38 @@
+docs/adr/0013-sources-bound-by-origin-reach-and-destination.md
+  s_4b2596be4b2cd4::t_b5ae303e6d91fe 96-99
+  s_4b2596be4b2cd4::t_99dd632b1206d2 8
+  s_4b2596be4b2cd4::t_3a57247c966a8a 33
+docs/adr/0041-a-secret-belongs-to-one-of-seven-credential-classes-the-bootstrap-class-comes-from-the-deploy-unit-and-the-other-six-are-rows-under-the-envelope.md
+  s_4b2596be4b2cd4::t_61a734457725e0 1-9,11-12,15,21,23-39
+  s_4b2596be4b2cd4::t_048671b75c995e 22
+  s_4b2596be4b2cd4::t_9b47f09f4d5f01 10,13-14,16-20
+docs/adr/0030-the-mcp-surface-stays-mcp-sdk-v2-in-the-typescript-tier-behind-one-fetch-shaped-seam.md
+  s_4b2596be4b2cd4::t_03a9ec8e7456b2 83
+  s_4b2596be4b2cd4::t_239e673f883954 179-182
+docs/adr/0042-the-product-ships-an-accessibility-statement-because-the-buyers-are-uk-public-bodies-for-whom-it-is-law.md
+  s_4b2596be4b2cd4::t_8f51950c1dbc01 1-24
+CODING_RULES.md
+  s_4b2596be4b2cd4::t_3e0c63a990bcbe 5
+  s_4b2596be4b2cd4::t_a11a1acb88118f 143
+  s_4b2596be4b2cd4::t_46b2237fb27b12 225
+docs/adr/README.md
+  s_4b2596be4b2cd4::t_966c447ac86823 49-50
+  s_4b2596be4b2cd4::t_71a4c85e3420e8 21
+  s_4b2596be4b2cd4::t_5caf353a1f9d70 38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "302a1fcdd629f7a855b86c6650dc143b8f5bb809",
+  "prompts": {},
+  "sessions": {
+    "s_4b2596be4b2cd4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "530626fa-9b4e-49a1-9226-d5e115e7967d",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
