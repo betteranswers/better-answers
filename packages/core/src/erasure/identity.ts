@@ -30,6 +30,8 @@ export type ErasureSubject = {
 
   readonly personId: string | null;
 
+  // The subject's own resolved addresses, never the identifiers an Admin typed: the deletes
+  // keyed by these reach past every fence.
   readonly emails: readonly string[];
 
   readonly pseudonym: string;

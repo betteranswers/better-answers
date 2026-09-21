@@ -76,6 +76,8 @@ export const withScope = async <T>(
     return work(client, platform);
   });
 
+// A session lock outlives the connection's return to the pool, so it takes its own connection
+// and an explicit unlock.
 export const withSessionLock = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -119,6 +121,8 @@ const MEMBERSHIP_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS per
      JOIN "user" u ON u.id = m.user_id
     WHERE m.workspace_id = $1 AND m.user_id = $2`;
 
+// Both rows held, or a revocation lands between the read and the commit; never on the
+// boundary read, which every request runs.
 const MEMBERSHIP_QUERY_HELD = `${MEMBERSHIP_QUERY} FOR SHARE OF m, u`;
 
 const isRole = (value: string): value is Role => ROLES.some((role) => role === value);

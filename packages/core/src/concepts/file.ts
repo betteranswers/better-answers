@@ -16,6 +16,8 @@ export type FrontmatterValue =
 
 export type Frontmatter = Readonly<Record<string, FrontmatterValue>>;
 
+// Keys the platform derives or mints: hashing one would let recording a check move the hash
+// that check was taken against.
 const UNHASHED_KEYS: ReadonlySet<string> = new Set([
   "generated",
   "verified",

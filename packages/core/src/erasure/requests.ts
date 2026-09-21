@@ -62,6 +62,8 @@ export const monthsOn = (from: Date, months: number): Date => {
   return landed;
 };
 
+// A statutory deadline moved later is one already missed, so a short month clamps back;
+// packages/schema/test/factory.ts seeds the same clamp.
 export const dueDateOf = (clockStartedAt: Date): Date => monthsOn(clockStartedAt, 1);
 
 export const deadlineOf = (request: Pick<SubjectRequest, "dueAt" | "extendedTo">): Date =>
