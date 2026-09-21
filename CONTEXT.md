@@ -543,8 +543,12 @@ to it by IRI and never restates it (ADR 0014).
 - **audit event** — the record of one act by an Admin or the platform — what was done, to what, by
   whom, when, with what confirmations — in the one append-only *ledger*. Every event belongs to
   one of four families — **people**, **knowledge**, **sources**, **platform** — named as the first
-  word of its act, `family.subject.verb`; runs, the *answer audit*, *signals* and spend are their
-  own records and never audit events. _Avoid_: log.
+  word of its *ledger act*, `family.subject.verb`; runs, the *answer audit*, *signals* and spend are
+  their own records and never audit events. _Avoid_: log.
+- **ledger act** — the name an *audit event* is recorded under, `family.subject.verb`
+  (`sources.binding.published`), declared by the part of the platform that performs it and never a
+  free string (`[AUDIT2]`). One *act* may write more than one, and a read writes none (ADR 0043).
+  _Avoid_: event type, action name.
 - **ledger** — the one append-only record of every *audit event* a workspace keeps, written in
   the same act it records. _Avoid_: audit log, event log.
 - **erasure request** — a person's request that their personal data leave the platform: what was
@@ -652,6 +656,34 @@ to it by IRI and never restates it (ADR 0014).
   identity set with the platform-level role, a third principal kind beside a user and the
   platform, audited under their own id. Never a workspace *role*; *Admin* is the highest role a
   workspace has.
+- **act** — what an entry — a screen's call, an MCP entry, an ops command, the reconciler's tick —
+  may ask the platform to do as a *principal*: one thing, a **read** or a **write**, answered with
+  its value or with a *refusal*. Reading a binding's findings is an act as much as publishing the
+  binding is. Where the *ledger* records an act, its *audit event* lands with it, under its
+  *ledger act* (ADR 0043). _Avoid_: action, operation, command, use case; endpoint and procedure
+  (a transport's words for how an act is reached).
+- **step (of an act)** — a part of an act that runs only inside the act that called it and never
+  on its own: writing the *audit event*, queueing a *job*, reading whether a person holds every
+  audience group. It is handed the principal its act admitted, judges no *admission* and has no
+  *refusal* of its own — a step that cannot do its part fails the whole act, and nothing of the
+  act lands. _Avoid_: helper, sub-act, inner act.
+- **admission** — the judgement of whether a *principal* may perform an *act* at all, made before
+  the act does anything: from the principal's kind, a person's role, the purpose a *platform
+  principal* acts for, and what was asked — never from a stored row. Whether the thing named
+  exists, or is in a state to be acted on, is the act's own question, and its answer is a
+  *refusal* of another class. _Avoid_: authorisation (the sign-in server's word), permission
+  check, guard.
+- **refusal** — an act's answer when it will not do what was asked: one hyphenated **refusal
+  word** naming what refused (`role-forbids`, `no-such-binding`, `already-published`) — something
+  the caller can act on, where a failure is something to log and try again. A word means one thing
+  wherever it appears and belongs to one of seven **classes**, by what the caller can do about it:
+  *unauthenticated* (sign in again), *forbidden* (someone with the authority must do it), *absent*
+  (name something that exists), *malformed* (fix the shape of what was sent), *inapplicable*
+  (well-formed, but not something this act applies to), *conflict* (the state moved: read again
+  and decide again), *precondition* (something else comes first). A word reaches a screen, an
+  agent and an operator as itself; once shipped it is never removed and never changes class, so a
+  client that has never met a word can still act on its class (ADR 0043). _Avoid_: error (a
+  failure, not a refusal), rejection, denial, error code.
 - **revoke credentials** — the one revocation act, in two scopes. *In a workspace*: a workspace
   Admin ends every session and token a person holds there, by an instant on the membership row
   the resolver refuses against; nothing outside that workspace changes, and the Admin never
