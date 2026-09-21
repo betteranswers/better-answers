@@ -1,0 +1,19 @@
+docs/specs/s4-the-roles-surface-read-back-and-the-contracts-digest.md
+  s_2d2203e457a251::t_23eadaef006022 116-120,154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "92384ff5065657ce62255567b92c88749e879413",
+  "prompts": {},
+  "sessions": {
+    "s_2d2203e457a251": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe3e0651-9854-446f-a8b2-03dd6bc90d60",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
