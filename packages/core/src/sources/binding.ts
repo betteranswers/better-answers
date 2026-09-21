@@ -283,6 +283,8 @@ export type BindingPublished = {
   readonly dpiaHash: string;
 };
 
+// The job row, not source_binding.state: the worker holds only SELECT on that table and cannot
+// write its progress there.
 const LATEST_INDEX_RUN = `SELECT status FROM job
     WHERE workspace_id = $1 AND kind = $2 AND subject_id = $3
     ORDER BY enqueued_at DESC, id DESC

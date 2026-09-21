@@ -140,6 +140,8 @@ export type RevokeWorkspaceTokensInput = {
   readonly at: Date;
 };
 
+// Sessions are deliberately untouched: a browser session belongs to the person, not to one
+// workspace, so ending it would reach another tenant.
 export const revokeWorkspaceTokens = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

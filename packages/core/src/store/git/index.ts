@@ -98,6 +98,8 @@ const git = async (
     readonly raw?: boolean;
   } = {},
 ): Promise<string> => {
+  // LC_ALL=C keeps messages English for the compare-and-swap match below; env replaces rather
+  // than extends, so the spread is what keeps PATH.
   const child = run("git", ["--git-dir", gitDir, ...arguments_], {
     env: { ...process.env, ...options.env, LC_ALL: "C" },
     maxBuffer: 64 * 1024 * 1024,
@@ -304,6 +306,8 @@ const carries = (line: string, needles: readonly string[]): boolean => {
   return needles.some((needle) => lowered.includes(needle.toLowerCase()));
 };
 
+// git grep exits 1 both for no match and for an object it could not read; only the silent one
+// means nobody is named.
 const blobsNaming = async (
   gitDir: string,
   needles: readonly string[],
@@ -372,6 +376,8 @@ export type CommitRead = {
 const TRAILER_LINE = /^([A-Za-z][A-Za-z-]*): (.+)$/;
 
 const trailersOf = (message: string) => {
+  // The last paragraph, never the first match: isSubjectLine keeps a forged trailer out at the
+  // write door, and this is the read half.
   const block = message.trimEnd().split("\n\n").at(-1) ?? "";
   return Object.fromEntries(
     block.split("\n").flatMap((line) => {
@@ -566,6 +572,8 @@ export const rewriteHistory = async (
     ]);
     const moved = await commitMapOf(gitDir, started);
 
+    // The reflog first: an entry in it is a reference, and gc prunes nothing something still
+    // refers to.
     await git(gitDir, ["reflog", "expire", "--expire=now", "--all"]);
     await git(gitDir, ["gc", "--prune=now", "--quiet"]);
     return { moved };

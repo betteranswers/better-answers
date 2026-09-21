@@ -121,6 +121,8 @@ export const conceptVisibilityFrom = async (
         );
   const override = await overrideOf(principal, tx, concept.iri);
 
+  // After the bindings, never before: taking this row first is the one order that deadlocks
+  // with a narrowing.
   const row =
     concept.onTheRow === true
       ? await tx.query<VisibilityRow>(
@@ -143,6 +145,8 @@ export const conceptVisibilityFrom = async (
 
 type IndexVisibilityRow = VisibilityRow & { readonly workspace_id: string; readonly kind: string };
 
+// Every act that cascades takes this at its head; without it two narrowings each hold what
+// the other wants.
 const serialisingCascades = async (principal: Principal, tx: Tx): Promise<void> => {
   await tx.query(
     `SELECT pg_advisory_xact_lock(hashtext('visibility-cascade'), hashtext(${scopeClause(1)}))`,
@@ -162,6 +166,8 @@ export const openingACascadeOverHeldGroups = async (
   return groups.value;
 };
 
+// Row first, citations after, the opposite order to conceptVisibilityFrom: waiting on the row
+// is what makes a re-write's citations the ones read.
 const recomputeConceptVisibility = async (
   principal: Principal,
   tx: Tx,

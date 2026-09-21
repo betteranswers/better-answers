@@ -470,6 +470,8 @@ export const writeConceptVisibility = async (
   );
 };
 
+// The readable predicate goes on every node and edge of a path, not only the endpoints:
+// filtering the ends alone leaks the middle.
 const walkStatement = (outward: boolean): string => {
   const [source, sink] = outward ? ["from_uid", "to_uid"] : ["to_uid", "from_uid"];
   return `WITH RECURSIVE live AS (
@@ -576,6 +578,8 @@ export type SweptGeneration = {
   readonly edges: number;
 };
 
+// gen IS NOT NULL spares the source partition, and a missing generation row answers NULL, so
+// an unknown live generation sweeps nothing.
 const SWEEP = `WITH live AS (
     SELECT live_gen FROM graph_generation WHERE workspace_id = $1
   ),

@@ -40,6 +40,8 @@ export type ErasurePrincipal = PlatformPrincipal & {
 
 export const ERASURE: ErasurePrincipal = { kind: "platform", actorId: ERASURE_ACTOR };
 
+// deploy/backup.sh takes the same advisory lock by this number; change one and a dump runs
+// beside an erasure.
 const DUMP_LOCK = 41;
 
 const ERASURE_ACTS = declareActs("people", {
@@ -71,6 +73,8 @@ export type ErasureRun = {
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
+// Months are calendar months, as deploy/backup.sh's interval writes them;
+// packages/schema/test/factory.ts spells the same four and moves with this.
 const BEYOND_USE = { hourlyHours: 48, dailyDays: 30, weeklyWeeks: 8, monthlyMonths: 6 } as const;
 
 export const beyondUseFrom = (anchoredAt: Date) => ({
@@ -351,6 +355,8 @@ export const runErasure = async (
     if (namedInTheBundle(map) && addresses.inTheBundle.length === 0) return err("no-address");
 
     const rewritten = await attempt(() =>
+      // The lock spans the rewrite and the rows naming its commits: a reconciler tick between
+      // them meets a head its watermark cannot reach.
       withRepositoryLockAs(platform, doors.git, workspaceId, async () => {
         const { moved } = await rewriteHistory(platform, doors.git, workspaceId, {
           addresses: addresses.inTheBundle,
@@ -415,6 +421,8 @@ export const runErasure = async (
 
     const standsAt = standingCompletion ?? completedAt;
 
+    // Written before the completion commits: a run that leaves no copy loses the erasure to
+    // every restore from a dump older than the request.
     const copied = await attempt(() =>
       writeReplayCopy(platform, doors.objects, {
         workspaceId,

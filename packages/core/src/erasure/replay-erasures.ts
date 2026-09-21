@@ -71,6 +71,8 @@ export const erasureRequestsSince = async (
   if (!held.ok) return err(held.error);
 
   const found: ReplayableErasure[] = [];
+  // One scoped transaction per workspace: erasure_request sits under row-level security, and an
+  // unscoped read of it answers nothing.
   for (const workspaceId of held.value) {
     const read = await attempt(() =>
       withScope(platform, door, workspaceId, (tx: Tx) =>
