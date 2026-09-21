@@ -1,0 +1,56 @@
+docs/adr/0031-the-tier-contract-is-six-agreements-in-three-forms-fixtured-in-one-language-neutral-directory-both-suites-read.md
+  ai_agent 69
+docs/adr/0013-sources-bound-by-origin-reach-and-destination.md
+  s_4b2596be4b2cd4::t_cd01d11c42626a 8
+  s_4b2596be4b2cd4::t_0d29dd384b1dd8 33
+docs/operations/RUNBOOK.md
+  ai_agent 59
+docs/operations/SECRETS.md
+  s_4b2596be4b2cd4::t_7ac2b1e5bf131b 35
+  s_4b2596be4b2cd4::t_53b0d832fc0a42 11
+docs/adr/0022-two-stacks-deployed-by-digest-every-irreplaceable-byte-encrypted-off-host-erasures-replayed-on-restore.md
+  s_4b2596be4b2cd4::t_a0ce71d92b696f 102
+CONTEXT.md
+  s_4b2596be4b2cd4::t_ee25da6a44949b 640
+docs/adr/0041-a-secret-belongs-to-one-of-seven-credential-classes-the-bootstrap-class-comes-from-the-deploy-unit-and-the-other-six-are-rows-under-the-envelope.md
+  s_4b2596be4b2cd4::t_11ef8a17f512ac 10
+  s_4b2596be4b2cd4::t_e78bae42a6ca4b 28
+  s_4b2596be4b2cd4::t_711be5790df479 34-36
+  s_4b2596be4b2cd4::t_9ec45b4331901c 37
+  s_4b2596be4b2cd4::t_a243865b7e04eb 8
+  s_4b2596be4b2cd4::t_bbde3a0aeb751f 12-17
+  s_4b2596be4b2cd4::t_f2af054c060eb6 21
+  s_4b2596be4b2cd4::t_f9b0831da6b34d 23
+  s_4b2596be4b2cd4::t_fffda16c8ce9a3 29
+docs/adr/0042-the-product-ships-an-accessibility-statement-because-the-buyers-are-uk-public-bodies-for-whom-it-is-law.md
+  s_4b2596be4b2cd4::t_04310b67f68c07 14
+  s_4b2596be4b2cd4::t_9dcad5dde25fd7 8
+  s_4b2596be4b2cd4::t_8d729fa82c456a 10-12
+docs/adr/0030-the-mcp-surface-stays-mcp-sdk-v2-in-the-typescript-tier-behind-one-fetch-shaped-seam.md
+  s_4b2596be4b2cd4::t_7640e8eb575295 182-184
+  s_4b2596be4b2cd4::t_ac5cabce2c79e7 83
+docs/adr/README.md
+  s_4b2596be4b2cd4::t_879a5b03d601e2 30
+  s_4b2596be4b2cd4::t_256f9d568f1ffb 49
+  s_4b2596be4b2cd4::t_ce5ca3d15b275b 50
+  s_4b2596be4b2cd4::t_8c55b6fe694f28 38
+CODING_RULES.md
+  s_4b2596be4b2cd4::t_6d755b4897c1ee 145
+  s_4b2596be4b2cd4::t_add32b0405cdfb 225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "aa9ec4b10f3bb23c845edb3e47d98cc98f9d50e3",
+  "prompts": {},
+  "sessions": {
+    "s_4b2596be4b2cd4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "530626fa-9b4e-49a1-9226-d5e115e7967d",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
