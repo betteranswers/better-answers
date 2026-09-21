@@ -36,8 +36,6 @@ describe("the build an image probe runs", () => {
       "the-container-builder",
       "--cache-from",
       "type=gha,scope=api",
-      "--cache-to",
-      "type=gha,mode=max,scope=api",
       "--load",
       "--iidfile",
       "/tmp/the-id-this-build-wrote",
@@ -61,21 +59,46 @@ describe("the build an image probe runs", () => {
   it("keeps each image's layers under a scope of its own, so neither evicts the other", () => {
     const cached = { builder: "the-container-builder", iidfile: "/tmp/the-id-this-build-wrote" };
 
-    // A `type=gha` cache with no `scope=` is written under `buildkit`, and a scope holds one
-    // manifest: two images exporting `mode=max` to one scope overwrite each other, and the
-    // run after them reads a cache made for the other image and builds cold. Nothing in a
+    // A `type=gha` cache with no `scope=` is read from under `buildkit`, and a scope holds
+    // one manifest: `build.yml`'s legs each write their own, so a probe reading any scope
+    // but its own leg's reads a cache made for another image and builds cold. Nothing in a
     // single run says so — the second of two runs is where it shows.
     expect(buildCommand(BACKUP, cached)).toContain("type=gha,scope=backup");
-    expect(buildCommand(BACKUP, cached)).toContain("type=gha,mode=max,scope=backup");
     expect(buildCommand(API, cached)).not.toContain("type=gha,scope=backup");
+  });
+
+  it("reads the shared cache and exports nothing to it", () => {
+    const cached = { builder: "the-container-builder", iidfile: "/tmp/the-id-this-build-wrote" };
+
+    // The second image's argv whole, as the first's is above: between them, every build this
+    // workspace's probes run. Neither has a `--cache-to` or a `mode=max` in it (`T-223`) —
+    // `buildCommand` says why a pull request's export warmed nothing `main` could read, and
+    // `docs/operations/BUILD_CACHE.md` has what it cost. The export is `build.yml`'s, held
+    // by `image-job.test.ts`.
+    expect(buildCommand(BACKUP, cached)).toEqual([
+      "docker",
+      "buildx",
+      "build",
+      "--builder",
+      "the-container-builder",
+      "--cache-from",
+      "type=gha,scope=backup",
+      "--load",
+      "--iidfile",
+      "/tmp/the-id-this-build-wrote",
+      "--file",
+      "deploy/backup.Dockerfile",
+      "deploy",
+    ]);
   });
 
   it("refuses the daemon's own builder for a cached build and takes a container one", () => {
     // A driver is not a detail here. The `docker` driver builds into the daemon's own store
     // and has nowhere to put an export, so a build handed `--cache-to` on it stops with an
-    // error; the container driver a runner's setup step creates is the one that can. Every
-    // machine with Docker answers this question, and a reading that said yes to the daemon's
-    // own builder would turn every laptop's build into a failure.
+    // error; the container driver a runner's setup step creates is the one that can. The
+    // probes only read now (`T-223`) and the refusal stays — `DRIVER_WITHOUT_AN_EXPORT`
+    // says on what. Every machine with Docker answers this question, and a reading that
+    // said yes to the daemon's own builder would turn every laptop's build into a failure.
     expect(
       builderThatCanExport(
         "Name:          builder-1c0ffee\n" +
@@ -103,7 +126,7 @@ describe("the build an image probe runs", () => {
   });
 
   it("asks the daemon nothing on a machine without the cache credentials", async () => {
-    // A builder that can export is no use without somewhere to export to, and the
+    // A builder that can reach a cache is no use without a cache to reach, and the
     // credentials are the half that is missing on every machine but a runner mid-job. So
     // they are read first and the daemon is never asked — asserted by making the ask itself
     // a failure, because nothing is also what a machine with no Docker at all would answer

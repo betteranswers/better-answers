@@ -99,10 +99,6 @@ ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 COPY --from=build /app/.venv /app/.venv
-# The project is installed into the venv editable, so the tier's source is read from here —
-# including `schema_view.py`, the committed, generated view of the app's schema the worker
-# reads and never migrates (ADR 0032).
-COPY src src
 
 # The weights the build fetched, at the path the deploy unit already names, owned by the
 # user that reads them. `HF_HUB_OFFLINE` is the fence over them: the seam loads what is
@@ -130,6 +126,20 @@ ENV HF_HOME=/data/worker/hf-cache \
     HF_HUB_OFFLINE=1 \
     TLDEXTRACT_CACHE=/data/worker/tldextract-cache \
     COCOINDEX_DISABLE_USAGE_TRACKING=1
+
+# The project is installed into the venv editable, so the tier's source is read from here —
+# including `schema_view.py`, the committed, generated view of the app's schema the worker
+# reads and never migrates (ADR 0032).
+#
+# Last of this stage's copies, and on purpose (`T-223`). BuildKit re-runs every instruction
+# below the first one whose input moved, and a `COPY` it re-runs is a new layer even when
+# every byte it copies is the same. This line is the one a source edit moves, and it stood
+# above the weights: each edit re-made a layer of about 950 MB, which a pull request's ref
+# and then `main` each wrote to a 10 GB cache. Below the venv, the weights and the suffix
+# list, an edit outside `redaction/` re-makes this layer and nothing else — the build
+# stage says what an edit inside it costs, and why. `apps/worker/tests/test_image.py`
+# holds the order, since no container started from the image can tell the two apart.
+COPY src src
 
 USER worker
 
