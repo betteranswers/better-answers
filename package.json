@@ -14,6 +14,8 @@
     "check:docs:web": "pnpm --filter @better-answers/web exec vitest run test/browser-suite-skill.test.ts",
     "jscpd": "node scripts/jscpd.mjs",
     "mutant-probe": "node scripts/mutant-probe.mjs",
+    "strip-comments": "node scripts/strip-comments.mjs",
+    "comment-only-proof": "node scripts/comment-only-proof.mjs",
     "lint": "oxlint",
     "knip": "knip",
     "format": "oxfmt",
@@ -23,7 +25,9 @@
     "mutation": "pnpm -r --if-present run mutation"
   },
   "devDependencies": {
+    "@ast-grep/cli": "0.45.3",
     "@types/node": "24.13.3",
+    "esbuild": "0.28.2",
     "jscpd": "5.1.2",
     "knip": "6.34.0",
     "lefthook": "2.1.12",

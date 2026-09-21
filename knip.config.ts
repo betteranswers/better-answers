@@ -53,6 +53,12 @@ const config: KnipConfig = {
   ignoreBinaries: ["uv"],
 
   workspaces: {
+    ".": {
+      // A spawned binary is no edge for knip to follow; the strip script resolves ast-grep's
+      // through the module graph.
+      ignoreDependencies: ["@ast-grep/cli"],
+    },
+
     "apps/api": {
       ignore: [
         // A verbatim third-party snapshot (ADR 0027): edited upstream and never here, which

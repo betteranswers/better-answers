@@ -5,13 +5,16 @@ packages:
   - apps/web
   - packages/*
 
-# Postinstall scripts run for esbuild alone — vite and drizzle-kit need its platform
-# binary. The other three are optional native accelerations we do not take. lefthook is
-# `false` for a different reason: its postinstall would wire a hook into `.git`, and that is
-# the root `prepare` script's job, where it is visible — `lefthook.yml`'s header says so.
+# Postinstall scripts run for two packages, each because the script is what puts the
+# platform binary where the caller reaches it — esbuild for vite and drizzle-kit, ast-grep
+# for the strip script the root `strip-comments` runs. The other three are optional native
+# accelerations we do not take. lefthook is `false` for a different reason: its postinstall
+# would wire a hook into `.git`, and that is the root `prepare` script's job, where it is
+# visible — `lefthook.yml`'s header says so.
 # `false` rather than no entry at all: pnpm 11 makes an undecided build script a hard error
 # (`ERR_PNPM_IGNORED_BUILDS`, exit 1), so silence here would fail every fresh install.
 allowBuilds:
+  '@ast-grep/cli': true
   cpu-features: false
   esbuild: true
   lefthook: false
