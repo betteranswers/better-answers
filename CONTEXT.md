@@ -637,7 +637,7 @@ to it by IRI and never restates it (ADR 0014).
   anew. _Avoid_: suspend, ban, deactivate.
 - **agent token** — a **share agent's** credential: binding-scoped, minted and revoked by an Admin,
   checked in the api before any request body is read, and good only for the `/agent/v1` routes a
-  share agent uses to push documents in from a company's own network (ADR 0008 amendment, `[SEC1]`'s
+  share agent uses to push documents in from a company's own network (ADR 0008 amendment, ADR 0041's
   *agent* class). Not a personal token (a person's own bearer for Claude Code and scripts) and not an
   OAuth access token. _Avoid_: api key, service account.
 
