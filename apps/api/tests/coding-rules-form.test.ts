@@ -10,8 +10,7 @@ const ROOT_FILE = "CODING_RULES.md";
 const ROOT_BUDGET = 2500;
 const RULE_BUDGET = 80;
 
-// A rule over the budget is listed here and nowhere else; the list only shrinks, which the
-// last case in this file enforces by failing an entry whose rule now fits.
+// The list only shrinks: the last case here fails an entry whose rule now fits.
 const OVER_BUDGET: readonly string[] = ["SEC3"];
 
 const ADVERBS: ReadonlySet<string> = new Set(["Never", "Always", "Only"]);
@@ -39,6 +38,7 @@ const IMPERATIVES: ReadonlySet<string> = new Set([
   "Land",
   "Log",
   "Meet",
+  "Migrate",
   "Mint",
   "Mock",
   "Mutate",
@@ -55,7 +55,9 @@ const IMPERATIVES: ReadonlySet<string> = new Set([
   "Take",
   "Test",
   "Title",
+  "Triage",
   "Turn",
+  "Type",
   "Widen",
   "Write",
 ]);
@@ -160,13 +162,16 @@ const rulesFiles = (): readonly string[] =>
 const everyRule = (): readonly Rule[] =>
   rulesFiles().flatMap((file) => rulesIn(file, withoutFences(read(file))));
 
+// Spelled in two halves, so the tag scan does not read a fixture as a citation.
+const spelled = (family: string, number: string): string => `[${family}${number}]`;
+
 describe("the parser this form test reads a rules file with", () => {
   const FIXTURE = [
     "# Coding rules — a fixture",
     "",
     "## FAMILY",
     "",
-    "### [FIX1] Write the expected value down",
+    `### ${spelled("FIX", "1")} Write the expected value down`,
     "",
     "One two three.",
     "Reviewer: four five.",
@@ -175,7 +180,7 @@ describe("the parser this form test reads a rules file with", () => {
     "// six seven eight nine ten eleven, and T-001 on 2026-09-21 (ADR 0029)",
     "```",
     "",
-    "### [FIX2] Deep modules at clean seams",
+    `### ${spelled("FIX", "2")} Deep modules at clean seams`,
     "",
     "Twelve T-002 thirteen.",
     "",

@@ -7,7 +7,7 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers �
 - `docs/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block; a block goes to `/to-spec` before its build and `/to-tickets` after.
 - `CONTEXT.md` — the glossary. Name things in code, tests, docs and commits with its words.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open and where each lands here; read before adding a key, convention or feature that relates to the knowledge layer.
-- `CODING_RULES.md` — the constitution: every rule that binds work in this repo. A workspace's own rules live in `apps/api/CODING_RULES.md`, `apps/web/CODING_RULES.md` and `apps/worker/CODING_RULES.md`.
+- `CODING_RULES.md` — the constitution: every rule that binds work in this repo. A directory's own rules live beside it, in `apps/api/CODING_RULES.md`, `apps/web/CODING_RULES.md`, `apps/worker/CODING_RULES.md` and `deploy/CODING_RULES.md`.
 - `docs/adr/` — why the architecture is the way it is. Start at `docs/adr/README.md`, the one-line live-conclusion index (a row moves, in the same commit, when the live conclusion moves). Read the ADR a change touches before touching it; a change that contradicts one is a new ADR, never a quiet edit.
 
 ## Layout

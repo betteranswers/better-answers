@@ -32,7 +32,8 @@ EXEMPT_OPENING = re.compile(
 CITATIONS = (
     ("a ticket id", re.compile(r"\bT-\d+\b")),
     ("an ADR number", re.compile(r"\bADR[ -]?\d+\b", re.IGNORECASE)),
-    ("a rule tag", re.compile(r"\[[A-Z]{2,}\d+\]")),
+    # A family may carry a digit, so the letters around it are what the shape reads.
+    ("a rule tag", re.compile(r"\[[A-Z][A-Z0-9]*[A-Z][0-9]+\]")),
     ("a date", re.compile(r"\b\d{4}-\d{2}-\d{2}\b")),
     ("a date", re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b")),
 )

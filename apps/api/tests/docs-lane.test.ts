@@ -72,6 +72,11 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     inTheLane: "check:docs:api",
   },
   {
+    file: "apps/api/tests/coding-rules-form.test.ts",
+    reads: "the five CODING_RULES.md files, for the form every rule in them is written in",
+    inTheLane: "check:docs:api",
+  },
+  {
     file: "apps/api/tests/coding-rules-tags.test.ts",
     reads: "every tracked text file, so every CODING_RULES.md, CONTEXT.md and docs/**/*.md",
     inTheLane: "check:docs:api",
