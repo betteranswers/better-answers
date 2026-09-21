@@ -178,7 +178,7 @@ Where a unit lives is decided by **minting**.
   does. *Public* is not *published*.
 - **effective class** — the class a source document is actually read at: the narrower of its
   binding's class and the document's own, where it has one — the seam's special-category verdict
-  or an Admin's narrowing. Every chunk of the document carries it and a narrowing is checked
+  or an Admin's narrowing. Every chunk of the document is read at it and a narrowing is checked
   against it, so a document's own class only ever takes visibility away. _Avoid_: folded class,
   derived class (a *concept's* class is derived, from its evidence).
 - **finding** — what the pre-scan found in one source document: a category (bank details, date of
@@ -189,8 +189,10 @@ Where a unit lives is decided by **minting**.
   same finding on every run that finds it**: the document, the rule and the offsets are what it
   is, for as long as the document's content stands, so what an Admin decided about it stands on
   every later run. Its category, tier, score and version are a run's **reading** of it — the last
-  run's — never part of what it is. A finding the last run did not raise, because the rules moved
-  on, is no longer shown to a reviewer, acted on or counted at a publish.
+  run's — never part of what it is. Its tier is the tier it is withheld at on its binding now: its
+  rule's, raised to *always* by the officer-block rule or by an erasure request that names it. A
+  finding the last run did not raise, because the rules moved on, is no longer shown to a
+  reviewer, acted on or counted at a publish.
 - **finding group** — the unit of the review: one document's *findings* of one category, raised
   by one rule at one tier, with how many there are. It is what the review lists and what the two
   bulk acts below are taken over; it names no span and carries no value, so a reviewer acts on
@@ -220,7 +222,14 @@ Where a unit lives is decided by **minting**.
   and the like for the rest, `[person A]` for a pseudonymised name. The latter two are **typed
   placeholders** — each names the class of data taken, one word per category — where the always
   set has the one neutral word for everything in it, so that a reader is never told what class of
-  data the document held.
+  data the document held. It is the word a *withholding* writes.
+- **withholding** — what one binding does with one *finding* on one run: *withheld* or *left in
+  the text*, at a tier, for one **reason**, the first of these that holds — *overridden by the
+  erasure* (a request names it and an Admin had kept it) · *erasure* (a request names it) ·
+  *restored* · *switched off* · *in force*. Beside the reason, how it was **written**: under its
+  own placeholder, under another finding's, or not at all — a withheld finding inside a longer
+  withheld span is written under that span's word and is no less withheld. A finding is never
+  rewritten by a withholding. _Avoid_: decision, detection.
 - **relation** — a link from one concept to another as the map holds it: the two kinds, the
   section and the sentence around the link (`LINKS_TO`); the kind of a relation is read from
   the sentence, never from a predicate list (ADR 0026). *Supersedes*, a composition's citation
@@ -272,9 +281,8 @@ Where a unit lives is decided by **minting**.
   every row and a binding's documents can be counted by it — which is what an Admin deciding
   whether the platform needs OCR is reading. A document no run has quarantined has none.
 - **chunk** — one unit of a source document's normalised redacted text that the chunk index holds,
-  keyed by its document and its ordinal, carrying the visibility its binding and its document give
-  it — its sensitivity, the narrower of the binding's class and the document's own, its audience
-  and whether it is published. Never the original text.
+  keyed by its document and its ordinal, read at the visibility its binding and its document give
+  it — its *effective class*, its audience and whether it is published. Never the original text.
 - **window** — one run of a document's text the redaction seam puts to the detector's model in a
   single call, because the model reads less at once than a document holds. It is an argument to a
   model and nothing else: never stored, never addressed by a locator, and no finding's offsets are
