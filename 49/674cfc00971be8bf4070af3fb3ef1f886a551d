@@ -1,0 +1,59 @@
+CODING_RULES.md
+  s_4b2596be4b2cd4::t_715e8263add0dc 53
+  s_4b2596be4b2cd4::t_db7b0fb653fa6d 15
+  s_4b2596be4b2cd4::t_0b3e6ffdcc7108 154
+  s_4b2596be4b2cd4::t_75adb5eac69ac7 11
+  s_4b2596be4b2cd4::t_2c4ddf569e03b0 230
+  s_4b2596be4b2cd4::t_5f45fa3be0ccdc 101
+  s_4b2596be4b2cd4::t_29efe870359de0 143
+  s_4b2596be4b2cd4::t_eb20fce54d8d87 235
+  s_4b2596be4b2cd4::t_b8277aa8cdd721 120
+  s_4b2596be4b2cd4::t_7fa7fe7bc229d5 65
+  s_4b2596be4b2cd4::t_9c97af94b94349 111
+  s_4b2596be4b2cd4::t_ff34c8fc6ebc08 209-210
+  s_4b2596be4b2cd4::t_243338820ef770 39-40
+  s_4b2596be4b2cd4::t_ef48a5c0701946 19
+  s_4b2596be4b2cd4::t_8fb9d76d3c4a78 227-229
+  s_4b2596be4b2cd4::t_6a268426eb2ff9 161
+  s_4b2596be4b2cd4::t_3cac4b6efd0440 215
+  s_4b2596be4b2cd4::t_64e5b3d386c5a1 251-252
+  s_4b2596be4b2cd4::t_e6fcdefedefdb7 81
+  s_4b2596be4b2cd4::t_2230cb6527d78a 219
+  s_4b2596be4b2cd4::t_5c3a4b80d1690a 153
+  s_4b2596be4b2cd4::t_cab3e9be8ab910 253
+  s_4b2596be4b2cd4::t_14c9a40e1cce57 5-6
+  s_4b2596be4b2cd4::t_885aa089570f0d 135
+  s_4b2596be4b2cd4::t_9cc1939f701390 144-145
+  s_4b2596be4b2cd4::t_86d5676be4bfc9 157-159
+  s_4b2596be4b2cd4::t_3ec02c7ea72427 73
+  s_4b2596be4b2cd4::t_5af7eb9df6a519 121,127
+  s_4b2596be4b2cd4::t_d7fd6b0e46e184 45
+  s_4b2596be4b2cd4::t_44b0468e5a1e6c 136
+  s_4b2596be4b2cd4::t_4f8f3f03fa6569 203
+  s_4b2596be4b2cd4::t_5c0e9e9199c034 57
+  s_4b2596be4b2cd4::t_663bc2a86cd7da 69
+  s_4b2596be4b2cd4::t_d328e88614d032 241
+docs/operations/RUNBOOK.md
+  s_4b2596be4b2cd4::t_6c0eb57a28b002 59
+docs/adr/0022-two-stacks-deployed-by-digest-every-irreplaceable-byte-encrypted-off-host-erasures-replayed-on-restore.md
+  s_4b2596be4b2cd4::t_1212e8c51d54b6 99-101,103-104
+  s_4b2596be4b2cd4::t_265faeb3d39a2b 102
+docs/adr/README.md
+  ai_agent 30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "49674cfc00971be8bf4070af3fb3ef1f886a551d",
+  "prompts": {},
+  "sessions": {
+    "s_4b2596be4b2cd4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "530626fa-9b4e-49a1-9226-d5e115e7967d",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
