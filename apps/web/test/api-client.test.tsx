@@ -10,21 +10,10 @@ import { Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
 import { TRPC_ENDPOINT, useTRPC } from "@/shared/api/trpc.ts";
 
-/**
- * The SPA's one typed client, through the seam a screen crosses: the options proxy a
- * component reads out of React context, in the tree `main.tsx` composes.
- *
- * Nothing here talks to a server. What the api answers is the api suite's and the browser
- * suite's; what this file holds is that the client exists, that the provider is above the
- * router, and that `routes.list`'s input and output arrive in the browser with no generated
- * file between the two workspaces (ADR 0006, amended 2026-09-02).
- */
-
 afterEach(cleanup);
 
 type ListProcedure = ReturnType<typeof useTRPC>["routes"]["list"];
 
-/** A stand-in for the screen T-038 builds: it reads the api client the way that screen will. */
 function RoutesProbe() {
   const api = useTRPC();
   const options = api.routes.list.queryOptions();
@@ -55,8 +44,6 @@ describe("the query provider above the router", () => {
     const router = createAppRouter(createMemoryHistory({ initialEntries: ["/system"] }));
     await router.load();
 
-    // The composition `main.tsx` mounts: the provider outside, the router and every screen
-    // it renders inside. A provider below the router could not wrap this tree.
     render(
       <Providers>
         <RouterProvider router={router} />
@@ -71,11 +58,6 @@ describe("the query provider above the router", () => {
 
 describe("the path the client and the api agree on", () => {
   it("is the path apps/api mounts its router at, and there is only one of it", () => {
-    // The SPA cannot import `TRPC_ENDPOINT`: a value import from the api is the runtime edge
-    // ADR 0006's amendment refuses. So the constant's source file is read instead, and more
-    // than one declaration is a failure — the shape `[DEPS2]` sets out and
-    // `apps/worker/tests/pg_harness.py` already uses for `POSTGRES_IMAGE`. A mount moved
-    // without moving the client fails here rather than in a browser.
     const source = readFileSync(
       path.join(import.meta.dirname, "../../api/src/trpc/mount.ts"),
       "utf8",
@@ -89,10 +71,6 @@ describe("the path the client and the api agree on", () => {
 
 describe("routes.list's types crossing from apps/api", () => {
   it("takes no input, because the workspace is the session's and never an argument", () => {
-    // Read through a conditional rather than asserted directly: `toEqualTypeOf` constrains
-    // its argument to `{}`, and the whole point of this assertion is that the input is
-    // absent. It is written both ways round, so it fails on a widened input as well as a
-    // narrowed one: a `workspaceId` argument appearing on the procedure fails this line.
     type NoInput = [inferInput<ListProcedure>] extends [void | undefined]
       ? [void | undefined] extends [inferInput<ListProcedure>]
         ? true
@@ -104,18 +82,6 @@ describe("routes.list's types crossing from apps/api", () => {
   it("answers one route per purpose, with the words a screen shows", () => {
     type Route = inferOutput<ListProcedure>[number];
 
-    // Written down here rather than imported: apps/web reaches apps/api and nothing else,
-    // and the one type-only import it takes is AppRouter (shared/api/trpc.ts). Importing
-    // WorkspaceRoute from @better-answers/core/llm would open a web→core edge this
-    // workspace does not have, so the expected shape is spelled out as a literal instead.
-    //
-    // readonly is part of the assertion: toEqualTypeOf compares modifiers, so this fails
-    // against a source type missing readonly just as it would against a wrong field type.
-    // If this fails, check the modifiers before the field list.
-    //
-    // One whole-type assertion, not five field-by-field ones: field-by-field is what let
-    // retentionTail cross the wire unasserted. This form fails on a field added, removed
-    // or retyped on either side, which is what proves both directions rather than one.
     type ExpectedRoute = {
       readonly purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
       readonly provider: string | null;

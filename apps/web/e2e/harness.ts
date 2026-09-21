@@ -1,16 +1,5 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 
-/**
- * The api's own test harness, reached over HTTP (`apps/api/tests/harness-control.ts`).
- * Every browser test provisions through this — a workspace with its first Admin, a person
- * with no membership, a second membership, a revocation — and reads the six-digit code
- * from the captured email transport, which is the only place a code may be read from
- * (`[LOG1]` forbids the app's logger from ever holding one).
- *
- * The paths are the harness's and exist only in front of the browser suite's server;
- * nothing in `apps/api/src` serves them.
- */
-
 const HARNESS = "/__harness";
 
 export type Provisioned = {
@@ -22,7 +11,7 @@ export type Provisioned = {
 export type Person = {
   readonly id: string;
   readonly email: string;
-  /** What the shell shows for a person; the seeded default, since nobody has typed one. */
+
   readonly name: string;
 };
 
@@ -43,7 +32,6 @@ export const addMember = (
   input: { workspaceId: string; userId: string; role: "Admin" | "Editor" | "Viewer" },
 ) => ask<{ added: boolean }>(api, "/members", input);
 
-/** End a membership, as the People screen will one day (T-027). */
 export const removeMember = async (
   api: APIRequestContext,
   input: { workspaceId: string; userId: string },
@@ -55,37 +43,20 @@ export const removeMember = async (
 export const revokeCredentials = (api: APIRequestContext, userId: string) =>
   ask<{ revoked: boolean }>(api, "/revocations", { userId });
 
-/** One purpose's choice, as a test seeds it and the System screen will one day write it. */
 export type SeedRoute = {
   readonly purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
   readonly provider: string;
   readonly model: string;
 };
 
-/**
- * The routes a workspace has chosen (T-038). A purpose left out of the list is a purpose with
- * no route, which the screen has to show rather than omit — so this seeds what it is given and
- * nothing else.
- */
 export const seedRoutes = (
   api: APIRequestContext,
   input: { workspaceId: string; routes: readonly SeedRoute[] },
 ) => ask<{ seeded: number }>(api, "/routes", input);
 
-/** An address nobody else in the run will use, so a code read back is this test's. */
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 
-/**
- * The way from the top of the shell to the screen itself, by keyboard.
- *
- * Every screen's suite makes the same claim about it — the first Tab reaches the skip link,
- * Enter follows it, and focus lands on the screen's own region — because that is the route a
- * reader who does not use a mouse takes past the navigation, and it has to survive whatever
- * each screen puts on the page. The screens differ in what they assert *next*: the routes
- * card has no controls, so the traversal stops there; the failed screen carries one, so its
- * suite tabs on to it.
- */
 export const skipLinkReachesTheScreen = async (page: Page): Promise<void> => {
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();
@@ -93,10 +64,6 @@ export const skipLinkReachesTheScreen = async (page: Page): Promise<void> => {
   await expect(page.getByRole("main")).toBeFocused();
 };
 
-/**
- * Sign a person in through the product's own screen — the two steps a person takes, not a
- * cookie set from outside — and stop on whatever screen the sign-in led to.
- */
 export const signIn = async (page: Page, api: APIRequestContext, email: string): Promise<void> => {
   await page.getByLabel("Email address").fill(email);
   await page.getByRole("button", { name: "Send code" }).click();
@@ -109,7 +76,6 @@ export const signIn = async (page: Page, api: APIRequestContext, email: string):
 
   await code.fill(sixDigits);
   await page.getByRole("button", { name: "Sign in" }).click();
-  // Wait for the screen to be left, not just for the click: a test that navigated away
-  // here would cancel the request in flight and then wonder why it had no session.
+
   await expect(code).toHaveCount(0);
 };

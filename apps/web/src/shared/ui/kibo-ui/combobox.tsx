@@ -74,9 +74,6 @@ export const Combobox = ({
   onOpenChange: controlledOnOpenChange,
   ...props
 }: ComboboxProps) => {
-  // `onChange` enters by conditional spread (arrival edit, `THIRD_PARTY_NOTICES.md`): the
-  // hook's `onChange?:` slot does not admit an explicit `undefined` under
-  // `exactOptionalPropertyTypes`, while `prop?:` does.
   const [value, onValueChange] = useControllableState({
     defaultProp: defaultValue ?? "",
     prop: controlledValue,
@@ -117,7 +114,6 @@ export const ComboboxTrigger = ({ children, ...props }: ComboboxTriggerProps) =>
   const ref = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    // Create a ResizeObserver to detect width changes
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const newWidth = (entry.target as HTMLElement).offsetWidth;
@@ -131,7 +127,6 @@ export const ComboboxTrigger = ({ children, ...props }: ComboboxTriggerProps) =>
       resizeObserver.observe(ref.current);
     }
 
-    // Clean up the observer when component unmounts
     return () => {
       resizeObserver.disconnect();
     };
@@ -183,9 +178,8 @@ export const ComboboxInput = ({
     defaultProp: defaultValue ?? inputValue,
     prop: controlledValue,
     onChange: (newValue) => {
-      // Sync with context state
       setInputValue(newValue);
-      // Call external onChange if provided
+
       controlledOnValueChange?.(newValue);
     },
   });

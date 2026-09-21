@@ -19,7 +19,6 @@ import {
 } from "@better-answers/core/store/postgres";
 import { workspacesHeldBy } from "@better-answers/core/workspaces";
 
-/** The identity provider's own acts (the partition on a self-serve create) are the platform's. */
 const PLATFORM_PRINCIPAL: PlatformPrincipal = {
   kind: "platform",
   actorId: "process:better-answers-identity",
@@ -58,48 +57,19 @@ import {
 } from "./constants.ts";
 import { accessControl, creatorRole, roles } from "./roles.ts";
 
-/**
- * Better Auth, run in process, as the identity provider and the OAuth 2.1
- * authorization server (ADR 0009): the email-code login, the organisation model mapped
- * onto `workspace`, `@better-auth/oauth-provider` with CIMD client discovery and the
- * lifted Node transport, the JWT plugin's keys, its own limiter database-backed. This
- * file is the one place `better-auth` and `@better-auth/*` are configured; nothing
- * outside `apps/api/src/auth/` imports them (ADR 0009, lint-enforced).
- *
- * Prototype 61's three silent traps are each a line here with the trap named beside
- * it, and `apps/api/tests/oauth-flow.test.ts` holds each as a regression.
- */
-
-/** An endpoint as Better Auth's own plugin type declares one. */
 type AuthEndpoint = NonNullable<BetterAuthPlugin["endpoints"]>[string];
 
-/** A plugin with its `/oauth2/authorize` endpoint at Better Auth's own `Endpoint`, every other exactly as declared. */
 type WidenedAuthorize<P extends { readonly endpoints: object }> = Omit<P, "endpoints"> & {
   readonly endpoints: Omit<P["endpoints"], "oauth2Authorize"> & {
     readonly oauth2Authorize: AuthEndpoint;
   };
 };
 
-/**
- * The OAuth provider plugin, typed so `betterAuth` will accept it.
- *
- * `@better-auth/oauth-provider@1.7.2` writes the OpenAPI parameters of its
- * `/oauth2/authorize` endpoint as literals carrying `items?: undefined`, and
- * `exactOptionalPropertyTypes` refuses `undefined` where Better Auth's own
- * `OpenAPIParameter` declares `items?: { type: OpenAPISchemaType }`. That one endpoint
- * fails `BetterAuthPlugin`, so the whole plugin does, so `betterAuth`'s option type falls
- * back to its constraint — and with it goes every inferred `auth.api.*` endpoint this tier
- * calls by name and every field of `auth.options` its suites read. Widening the one
- * endpoint keeps the other thirty-one, and every other plugin, exactly as declared.
- */
 const widenAuthorize = <P extends { readonly endpoints: object }>(plugin: P): WidenedAuthorize<P> =>
-  // SAFETY: nothing about the value changes — the result is the plugin the library built,
-  // read at Better Auth's own `BetterAuthPlugin["endpoints"]` element type instead of at the
-  // literal whose OpenAPI metadata that very type and this flag disagree about. The endpoint
-  // is one the library constructed and satisfies at runtime; only its declaration differs.
+  // SAFETY: the endpoint is the library's own construction and satisfies this at runtime;
+  // only its declaration differs.
   plugin as WidenedAuthorize<P>;
 
-/** One email, as the sign-in page needs to send it. The transport is injected: SMTP becomes a credential row later, and nothing here reads it. */
 export type EmailMessage = {
   readonly to: string;
   readonly subject: string;
@@ -107,16 +77,12 @@ export type EmailMessage = {
 };
 export type EmailSender = (message: EmailMessage) => Promise<void>;
 
-/** The seam the CIMD plugin fetches metadata documents through; production takes the lift. */
 type ClientMetadataFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 type AuthDependencies = {
   readonly database: pg.Pool;
   readonly door: PostgresDoor;
-  /**
-   * The one origin (ADR 0034): where the SPA is served, so where sign-in and the picker
-   * are screens; where the authorization server issues from; where consent is rendered.
-   */
+
   readonly publicUrl: string;
   readonly mcpUrl: string;
   readonly secret: string;
@@ -125,7 +91,6 @@ type AuthDependencies = {
   readonly logger: Logger;
 };
 
-/** The identity set as the adapter sees it: model name → table. */
 const identitySchema = {
   user,
   session,
@@ -145,7 +110,6 @@ const identitySchema = {
   rateLimit,
 };
 
-/** The audit fields every sign-in, pick, consent, issue, refresh and revocation carries (grilling Q12). */
 type AuditEvent =
   | "auth.sign_in"
   | "auth.workspace_pick"
@@ -164,6 +128,7 @@ const AUDITED_PATHS = {
 
 const auditedEvent = (path: string): AuditEvent | undefined => {
   if (!Object.hasOwn(AUDITED_PATHS, path)) return undefined;
+
   // SAFETY: `hasOwn` just proved `path` is one of AUDITED_PATHS' own keys.
   return AUDITED_PATHS[path as keyof typeof AUDITED_PATHS];
 };
@@ -178,7 +143,6 @@ const mintedClaims = z.object({
   azp: z.string().optional(),
 });
 
-/** The three roles Better Auth's own endpoints may write; its owner/admin/member defaults are refused. */
 const isPlatformRole = (role: string | undefined): boolean =>
   role === undefined || (ROLES as readonly string[]).includes(role);
 
@@ -212,21 +176,6 @@ const clientIdOfQuery = (query: string | undefined): string | undefined =>
 export const createAuth = (deps: AuthDependencies) => {
   const audit = deps.logger.child({ module: "auth" });
 
-  /**
-   * The workspaces a person holds — the one membership read the three identity paths
-   * below share, and the workspaces slice's function rather than SQL written here:
-   * `member` is a table this module does not own, and the ownership map
-   * (`packages/schema`, ADR 0029) is where the fact is recorded.
-   *
-   * The two failures answer differently. A store failure is rethrown, because a read
-   * that did not happen is not an answer and the identity provider's own endpoints turn
-   * a throw into a 500. A `malformed` id — Better Auth handing back an id the boundary
-   * does not accept as a person id — fails closed to no workspace, which is what the raw
-   * query answered for one and what every caller here treats safely: the picker, a
-   * refusal to consent, no active workspace set. It is logged rather than swallowed,
-   * because the slice's refusal is a fact about the identity set that an operator wants
-   * to see, and "holds none" alone would hide it.
-   */
   const membershipsOf = async (userId: string): Promise<readonly string[]> => {
     const held = await workspacesHeldBy(PLATFORM_PRINCIPAL, deps.door, userId);
     if (held.ok) return held.value;
@@ -238,7 +187,6 @@ export const createAuth = (deps: AuthDependencies) => {
     return [];
   };
 
-  /** The one workspace a person holds, when it is exactly one. */
   const soleOf = (held: readonly string[]): string | undefined =>
     held.length === 1 ? held[0] : undefined;
   const soleMembershipOf = async (userId: string): Promise<string | undefined> =>
@@ -248,31 +196,16 @@ export const createAuth = (deps: AuthDependencies) => {
   return betterAuth({
     appName: "Better Answers",
     baseURL: deps.publicUrl,
-    // The RFC 8414 document sits at the apex, where a host looks for the issuer's.
+
     basePath: "/",
     secret: deps.secret,
     database: drizzleAdapter(db, { provider: "pg", schema: identitySchema }),
-    // One exact origin, no wildcard: the SPA is served from `baseURL`'s own origin, so
-    // every POST it makes — sign-in, the pick, the OAuth resume — carries an `Origin` the
-    // check already trusts (ADR 0034; two entries before T-045, when the product and the
-    // issuer were two hosts). Stated rather than left to the library's push of `baseURL`,
-    // so the list is read here and not inferred. A host still posts to `/oauth2/token`
-    // with no cookie at all, and the check does not run on a cookie-less request.
+
     trustedOrigins: [deps.publicUrl],
-    // The JWT plugin's `/token` and `set-auth-jwt` are for services without an OAuth
-    // flow; under an OAuth provider both must be off (Better Auth, "OAuth Provider Mode").
+
     disabledPaths: ["/token"],
     user: {
-      // No `deleteUser` block, and that absence is a decision: the user row is the
-      // person id every record names a person by, `member.user_id` is a foreign key to
-      // it, and the ledger's actor will be it — so a person deleting their own row would
-      // reach a workspace's memberships and orphan an actor. Ending what a person holds
-      // is *revoke credentials* in its two scopes; erasing what is about them is the
-      // erasure routine's pseudonymisation, which keeps the id (ADR 0020, ADR 0035).
-      // Left off, the endpoint answers 404, which `tests/delete-user.test.ts` proves
-      // against a signed-in person rather than against this line.
       additionalFields: {
-        // ADR 0018's revocation instant; written by the platform, never by the person.
         credentialsRevokedAt: { type: "date", required: false, input: false },
       },
     },
@@ -284,57 +217,20 @@ export const createAuth = (deps: AuthDependencies) => {
       customRules: { ...BETTER_AUTH_RATE_LIMIT.customRules },
     },
     advanced: {
-      // Per-IP limits key on the tunnel's header alone (grilling Q8).
       ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
       database: {
-        /**
-         * The platform's one minter, handed to the library, so a person's user id, their
-         * session id and the rows the organisation plugin writes all carry the shape the
-         * workspace id already has (ADR 0035). Three facts about this library, verified
-         * against the installed version by the staff review T-063 records — written here
-         * so nobody re-derives them:
-         *
-         * 1. Nothing secret comes from here. Session tokens, authorisation codes, client
-         *    secrets and a token's `jti` are produced by the library's own random-string
-         *    paths, which this option does not reach — and a ULID, whose first ten
-         *    characters are the minting time, would be a poor secret.
-         * 2. The organisation plugin creates members and invitations through the adapter,
-         *    so both get a minted id.
-         * 3. The adapter drops a caller-supplied id unless it is forced, so an id minted
-         *    ahead of time is never sent through Better Auth's API. The platform's own
-         *    direct SQL writes are a different path and mint their own.
-         *
-         * The `size` hint the library passes for its variable-length ids is ignored by
-         * design: a ULID is 26 characters or it is not one, and nothing that asks for a
-         * size here is an id the platform reads.
-         */
         generateId: () => ulid(),
       },
-      // Stated, because the library's default for this option is `NODE_ENV === "test"`:
-      // left unset, the origin check — the whole of the CSRF fence in front of sign-in,
-      // the pick and the resume — is off under every test runner, and the suite that
-      // believed it was proving the fence would be proving nothing. `false` is the same
-      // answer in every environment, which is what a fence has to be.
+
       disableOriginCheck: false,
-      // No cookie domain and no cross-subdomain setting: the session cookie is the
-      // library's own `__Secure-`-prefixed host-only cookie on the one origin (ADR 0034).
-      // Before T-045 it was scoped to the apex so that a session made on `app.` answered
-      // the flow on `mcp.`, which sent the product's bearer to every subdomain of the
-      // estate, present and future. `__Host-` is the written trigger for the day a
-      // subdomain of the apex is served by anything but this process.
     },
     databaseHooks: {
       session: {
         create: {
-          // A person in exactly one workspace never sees the picker: the workspace is
-          // their active one from the moment the session exists, so `/me` and a fresh
-          // OAuth session both read it (ADR 0009's 2026-08-27 amendment). A person in
-          // none or several has none active, and the picker decides.
           before: async (session) => {
             const only = await soleMembershipOf(session.userId);
             if (only === undefined) return;
-            // The organisation plugin's session field is `activeOrganizationId` (mapped
-            // to the `active_workspace_id` column); set the field, not the column.
+
             return { data: { ...session, activeOrganizationId: only } };
           },
         },
@@ -345,15 +241,13 @@ export const createAuth = (deps: AuthDependencies) => {
         const event = auditedEvent(ctx.path);
         if (event === undefined) return;
         const returned = ctx.context.returned;
-        // Better Auth answers a browser flow step by *throwing* a redirect (an APIError
-        // with a 3xx status); that is the success path, not a refusal.
+
         const redirected =
           returned instanceof APIError && returned.statusCode >= 300 && returned.statusCode < 400;
         const refused = !redirected && (returned instanceof APIError || returned instanceof Error);
         const body = bodyFields.safeParse(ctx.body ?? {});
         const fields = body.success ? body.data : {};
-        // The endpoint may not have loaded the session onto the context; read it
-        // from the request's cookie when it has not.
+
         const session = ctx.context.session ?? (await getSessionFromCtx(ctx));
 
         let principal = session?.user.id;
@@ -363,7 +257,6 @@ export const createAuth = (deps: AuthDependencies) => {
         let clientId = fields.client_id ?? clientIdOfQuery(fields.oauth_query);
 
         if (event === "auth.token_issue" && !refused) {
-          // The response we just minted: decode, never verify or log the token itself.
           const issued = tokenResponse.safeParse(returned);
           const claims = issued.success
             ? mintedClaims.safeParse(decodeJwt(issued.data.access_token))
@@ -393,10 +286,7 @@ export const createAuth = (deps: AuthDependencies) => {
               : event === "auth.consent" && fields.accept === false
                 ? "declined"
                 : "ok",
-            // The issued token's `jti` on an issue or a refresh — never the token. A
-            // revocation carries none: the revoked refresh token is opaque and stored
-            // hashed, so there is no `jti` to read; the audit slice threads it by
-            // `client_id` and principal.
+
             token_id: tokenId ?? null,
           },
           name,
@@ -409,18 +299,9 @@ export const createAuth = (deps: AuthDependencies) => {
         ac: accessControl,
         roles,
         creatorRole,
-        // Platform-provisioned workspaces (grilling Q11): a person never creates one.
-        // `provisionWorkspace` (packages/core/workspaces) is the act; this flag is the
-        // "self-serve later" switch.
+
         allowUserToCreateOrganization: false,
-        // Stated, not left to the library's default. Unset, the plugin decides whether an
-        // invitation id is opaque by looking at which id generator is installed, and a
-        // custom one switches that heuristic off — so accepting, rejecting or reading an
-        // invitation by id would quietly stop asking for a verified address the moment the
-        // minter above was handed over. A ULID sorts and carries its minting time, so an
-        // invitation id is a poor proof of who the invitation is for; the verified address
-        // is the proof, and T-027's accept page rests on this line rather than on a guess
-        // about the shape of an id.
+
         requireEmailVerificationOnInvitation: true,
 
         schema: {
@@ -428,14 +309,6 @@ export const createAuth = (deps: AuthDependencies) => {
           member: {
             fields: { organizationId: "workspaceId" },
             additionalFields: {
-              // Revocation's workspace scope (ADR 0035), declared here so the library and
-              // the platform agree the column exists: an Admin's revocation in one
-              // workspace is refused there and nowhere else. Written by the platform,
-              // never by the person — the twin of the user row's instant above. It is
-              // also kept out of response bodies, which the user row's twin need not be:
-              // a member list is other people's rows, and when a colleague was revoked
-              // is nobody else's business. Nothing of ours reads it through the library
-              // — the resolver reads the column in its own SQL.
               credentialsRevokedAt: {
                 type: "date",
                 required: false,
@@ -448,33 +321,23 @@ export const createAuth = (deps: AuthDependencies) => {
           session: { fields: { activeOrganizationId: "activeWorkspaceId" } },
         },
         organizationHooks: {
-          // The day the switch above flips, a workspace created through Better Auth's
-          // own endpoint still gets its partition. Not the atomic act — Better Auth's
-          // hook runs after its own writes with no transaction handle (verified in
-          // `plugins/organization/routes/crud-org.mjs`); the atomic act is the platform's.
           afterCreateOrganization: async ({ organization }) => {
             await withScope(PLATFORM_PRINCIPAL, deps.door, organization.id, async (tx) => {
               await tx.query("SELECT create_workspace_partition($1)", [organization.id]);
             });
           },
-          // Better Auth merges its owner/admin/member defaults into any roles map, so
-          // its own endpoints could otherwise assign or invite a role outside the three.
-          // The database CHECK on `member.role` is the fence; these give a clean 400
-          // instead of a constraint violation.
+
           beforeAddMember: async ({ member }) => {
             refuseForeignRole(member.role);
           },
           beforeUpdateMemberRole: async ({ newRole }) => {
             refuseForeignRole(newRole);
           },
-          // No invitation can be accepted until the People screen ships its accept page
-          // (T-027, after T-005 wires email), so none is created: an emailed invitation
-          // with no way to accept it would only sit pending. Membership today is the
-          // platform's act.
+
           beforeCreateInvitation: async () => {
             throw invitationsNotYet();
           },
-          // Nor accepted: a row created before this fence, or by hand, adds no membership.
+
           beforeAcceptInvitation: async () => {
             throw invitationsNotYet();
           },
@@ -496,53 +359,24 @@ export const createAuth = (deps: AuthDependencies) => {
       }),
       widenAuthorize(
         oauthProvider({
-          // The three pages of the flow, all on the one origin (ADR 0034) and all named
-          // absolutely: the redirect's `Location` and the continue endpoint's answer are the
-          // configured string verbatim, and `auth/routes.ts` and the SPA's picker both read
-          // that answer as a URL rather than resolving a path against whatever origin they
-          // happen to be on. None carries a query of its own: the signed query is appended
-          // with an unconditional `?`, and a second one would corrupt the signature.
           loginPage: `${deps.publicUrl}/sign-in`,
-          // Consent is this tier's own page, outside the product's shell; on the same
-          // origin as the product because the closed client list plus PKCE bounds what a
-          // script in the shell could do with it (ADR 0034), and with a navigation-only
-          // fence on its POST (`auth/routes.ts`).
+
           consentPage: `${deps.publicUrl}/consent`,
           scopes: [...OAUTH_SCOPES],
           accessTokenExpiresIn: ACCESS_TOKEN_LIFETIME_SECONDS,
           refreshTokenExpiresIn: REFRESH_TOKEN_LIFETIME_SECONDS,
-          // RFC 8707: the token is bound to the MCP URL the person typed (research 80
-          // row 25: the row must exist before a connector can authorise).
+
           resources: [deps.mcpUrl],
-          // CIMD only (research 80 F2): dynamic registration stays at its default, off.
-          // Trap 1 (prototype 61): a CIMD-discovered client is persisted with the
-          // *registration* scopes, and claude.ai appends `offline_access` whenever the
-          // metadata advertises it — leave it out here and every connection dies on
-          // `invalid_scope`.
+
           clientRegistrationDefaultScopes: [...OAUTH_SCOPES],
           clientRegistrationAllowedScopes: [...OAUTH_SCOPES],
-          // Trap 2: a client is linked to the resources it may ask for; without the link
-          // the `resource` claude.ai sends is refused with `invalid_target`.
+
           clientRegistrationDefaultResources: [deps.mcpUrl],
           clientRegistrationAllowedResources: [deps.mcpUrl],
           postLogin: {
-            // The SPA's picker, absolute for the same reason as `loginPage` above.
             page: `${deps.publicUrl}/choose-workspace`,
-            // ADR 0018's `workspace` claim: the active workspace, or no token at all.
+
             consentReferenceId: async ({ session, user: person }) => {
-              // One read, and the claim is checked against it. The session object here may
-              // predate `shouldRedirect`'s write for a sole-membership session, so the
-              // sole-membership fallback is read the same way; and the active workspace is
-              // taken only if the person still holds it, because a `workspace` claim is a
-              // statement the platform makes about them at the moment of minting.
-              //
-              // The inner of two fences, and never the load-bearing one. A consent posted
-              // to the product's own page resolves the Principal first and answers 401 to
-              // a person whose membership has ended (`auth/routes.ts`; the flow test
-              // "mints no code for a person whose membership ended…"), and the resolver
-              // refuses a lost claim on every later call. What this line covers is Better
-              // Auth's own `/oauth2/consent`, which that page's fence does not sit in
-              // front of (adversarial pass, T-077).
               const held = await membershipsOf(person.id);
               const stillActive = activeWorkspaceOf(session);
               const active =
@@ -557,22 +391,15 @@ export const createAuth = (deps: AuthDependencies) => {
               }
               return active;
             },
-            // True sends the person to the picker: more than one membership and none
-            // active, or an active one they no longer hold. A person in exactly one
-            // workspace never gets here with none active — the session-create hook above
-            // set it before the session existed (ADR 0009's 2026-08-27 amendment).
+
             shouldRedirect: async ({ session, user: person }) => {
               const held = await membershipsOf(person.id);
               const active = activeWorkspaceOf(session);
               if (active !== undefined && held.includes(active)) return false;
-              // A session made before the person's one membership existed: the
-              // session-create hook could not set it, so it is set here, once, as the
-              // platform's own write to the identity set.
+
               const only = soleOf(held);
               if (only !== undefined) {
                 await withIdentityWrite(PLATFORM_PRINCIPAL, deps.door, (tx) =>
-                  // `updated_at = now()`: the database's instant, ADR 0040's own shape for a
-                  // row's timestamp — this platform write moves it the way a library write does.
                   tx.query(
                     "UPDATE session SET active_workspace_id = $1, updated_at = now() WHERE id = $2",
                     [only, session.id],
@@ -583,8 +410,7 @@ export const createAuth = (deps: AuthDependencies) => {
               return true;
             },
           },
-          // The claims ADR 0018 asserts: `{workspace, user}`. `role` is deliberately
-          // absent — it is read per call, in the same transaction as the read.
+
           customAccessTokenClaims: async ({ user: person, referenceId }) => ({
             workspace: referenceId ?? null,
             user: person?.id ?? null,
@@ -595,11 +421,7 @@ export const createAuth = (deps: AuthDependencies) => {
         fetchClientMetadataResource: deps.fetchClientMetadataResource,
         metadataProfile: "mcp-2026-07-28",
         metadataRevalidationInterval: "60m",
-        // The closed client list. Refused before the document is fetched, so a client
-        // the list does not name costs no round trip and leaves no row. Consent's place
-        // on the product's origin rests on this line (ADR 0034): with only `claude.ai`
-        // admitted, a code obtained by any script in the shell can land only at Claude's
-        // own redirect, bound to a PKCE verifier no script holds.
+
         isMetadataDocumentUrlAllowed: (clientIdUrl) =>
           (CIMD_ALLOWED_CLIENT_HOSTS as readonly string[]).includes(
             URL.parse(clientIdUrl)?.hostname ?? "",
@@ -615,7 +437,6 @@ const sessionWorkspace = z.object({
   activeOrganizationId: z.string().nullish(),
 });
 
-/** The organisation plugin's active id on a session object, read without a cast. */
 const activeWorkspaceOf = (session: Session): string | undefined => {
   const parsed = sessionWorkspace.safeParse(session);
   const active = parsed.success ? parsed.data.activeOrganizationId : undefined;

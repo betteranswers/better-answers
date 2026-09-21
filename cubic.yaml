@@ -31,20 +31,19 @@ reviews:
     - `CONTEXT.md` — the glossary. Every domain word has one settled meaning.
       A new domain word is settled here BEFORE it appears in code; a diff that
       introduces a domain term absent from the glossary is a finding.
-    - `CODING_RULES.md` — the constitution. Rules are tagged (`[DESIGN]`,
-      `[TEST]`, `[CHECK]`, `[SEC]`, `[AUDIT]`, `[DEPS1]`, `[COMMENT1]`, `[LOG1]`…). Cite the
-      tag when a finding rests on a rule; `[TEST5]` (a test title says what the system does
-      for whom), `[COMMENT1]` (a comment says why, never what or what happened) and
-      `[COMMENT2]` (a rule tag never appears in source, deploy, a Dockerfile or CI) are
-      cited by review alone, so cite them when they are the finding. `[CHECK1]` (a lint
+    - `CODING_RULES.md` — the constitution. Rules are tagged. Cite the
+      tag when a finding rests on a rule; the title rule (a test title says what the system does
+      for whom), the comment rule (a comment says why, never what or what happened) and
+      the tag rule (a rule tag is written only in a rules file, a review finding or a gate's failure message) are
+      cited by review alone, so cite them when they are the finding. The gate rule (a lint
       rule, a tool in `check` or a hook command lands with a functional test of where it
-      fires and where it stays silent), `[CHECK2]` (a suite that can run nothing fails) and
-      `[CHECK3]` (one run of `check` names every failure, so a manifest never chains its
+      fires and where it stays silent), the empty-suite rule (a suite that can run nothing fails) and
+      the one-run rule (one run of `check` names every failure, so a manifest never chains its
       steps with `&&`) bind any diff that touches a lint rule, a workspace's scripts or its
       test configuration.
     - `apps/api/CODING_RULES.md`, `apps/web/CODING_RULES.md` and
       `apps/worker/CODING_RULES.md` — workspace rules. Apply a workspace's own file to
-      changes in it; `[WEB]` is the browser package's family.
+      changes in it; the `WEB` prefix is the browser package's family.
     - `docs/adr/` — the architecture decision records; `docs/adr/README.md` is the
       one-line live conclusion of each and the list to read first. A change that
       contradicts an ADR is a NEW ADR in the same pull request, never a quiet edit.
@@ -55,7 +54,7 @@ reviews:
     1. Deep modules. Much behaviour behind a small interface. A wide interface
        over thin behaviour is a finding even when the code is correct.
     2. Comments say WHY, never WHAT. History belongs in git and in ADRs.
-    3. Every version introduced is read from the vendor on the day (`[DEPS1]`).
+    3. Every version introduced is read from the vendor on the day.
        A version that appears without evidence of being read is a finding.
     4. Tests go through the module's interface against real infrastructure.
        Module mocking is banned and lint-enforced.
@@ -126,10 +125,10 @@ reviews:
     # Cubic enables five agents per repository across every source, and a sixth
     # is dropped with no error, so the two rules below cost the generic slots
     # they replaced. The generic API-auth agent was absorbed here rather than
-    # deleted: tenant scoping and request validation are what `[SEC2]` is for.
+    # deleted: tenant scoping and request validation are what the Principal rule is for.
     - name: A Principal on every tenant-data call
       description: |-
-        Rule `[SEC2]`, "A Principal on every call". Every `packages/core` function that reads or writes tenant data takes a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter; transports build it, business logic checks the role, the role's action threshold and the read predicate (published, sensitivity, audience) beside the data access.
+        Rule "A Principal on every call". Every `packages/core` function that reads or writes tenant data takes a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter; transports build it, business logic checks the role, the role's action threshold and the read predicate (published, sensitivity, audience) beside the data access.
 
         Flag a function that reaches a table, a store door or the graph and takes no `Principal` first, or takes one later in its parameter list, or takes a bare `workspaceId` string in place of one. Flag a transport that trusts a user-supplied workspace, organisation or account identifier instead of deriving it from the verified session or bearer token, and flag a request body accepted without runtime validation.
 
@@ -148,7 +147,7 @@ reviews:
 
         A transport verifies a bearer token and builds a `Principal`. Nothing behind that seam knows which library minted the token. Flag any `better-auth` or `@better-auth/*` import outside the auth module, and flag the subtler leak no lint rule sees: a Better Auth type, interface or object shape re-exported, aliased, structurally copied, or embedded in a `Principal`, a context object or a function signature that crosses into `packages/core` or into the web client. A session object passed onward where a `Principal` belongs is the same finding.
 
-        Rule `[DESIGN3]` governs seams generally. A seam is introduced only where something already varies across it — a second store, a second provider — so a seam built for one implementation with no second in sight is a finding. Dependencies arrive as parameters and results are returned rather than written as side effects.
+        Rule "One adapter is a hypothetical seam; two is a real one" governs seams generally. A seam is introduced only where something already varies across it — a second store, a second provider — so a seam built for one implementation with no second in sight is a finding. Dependencies arrive as parameters and results are returned rather than written as side effects.
       include:
         - apps/api/**
         - apps/web/**

@@ -11,13 +11,6 @@ import {
   type Lookup,
 } from "../lifts/better-auth-cimd-node/index.ts";
 
-/**
- * The lift's contract test (`[APP4]`): the Node 20+ fix — the socket's `{ all: true }`
- * lookup answered with an array — and the SSRF policy ADR 0009 owns, each refusal
- * its own test (`[SEC3]`). No network: the resolver and the request function are the
- * transport's parameters, replaced here with in-memory ones (`[TEST3]`).
- */
-
 type LookupOptions = { readonly all?: boolean };
 type LookupCallback = (
   error: Error | null,
@@ -25,7 +18,6 @@ type LookupCallback = (
   family?: number,
 ) => void;
 
-/** What the fake `https.request` records: the options it was handed and the lookup it ran. */
 type Observed = {
   lookupAnswers: unknown[];
   headers: Readonly<Record<string, string>>;
@@ -38,7 +30,6 @@ const resolvesTo =
   async () =>
     answers;
 
-/** A request function that answers with `status`, `body` and `headers`, exercising the lookup both ways. */
 const answering = (
   observed: Observed,
   response: {
@@ -63,7 +54,7 @@ const answering = (
     const lookup = options.lookup as
       | ((h: string, o: LookupOptions, cb: LookupCallback) => void)
       | undefined;
-    // Node 20+ under autoSelectFamily asks for all addresses; older Node for one.
+
     lookup?.("ignored", { all: true }, (_error, address) => observed.lookupAnswers.push(address));
     lookup?.("ignored", {}, (_error, address, family) =>
       observed.lookupAnswers.push([address, family]),
@@ -94,14 +85,6 @@ const answering = (
 
 const observe = (): Observed => ({ lookupAnswers: [], headers: {}, servername: undefined });
 
-/**
- * A fetcher whose resolver never answers, and a count of the requests it made anyway.
- *
- * Both the deadline and the in-flight cap are about what happens while a lookup hangs, and
- * the assertion that matters for each is the same one: the request was never made. The
- * request here throws as well as counting, so a fetcher that reached it fails loudly rather
- * than hanging on a socket the suite never opened.
- */
 const neverResolving = (
   timeoutMs: number,
 ): {
@@ -286,8 +269,6 @@ describe("the SSRF policy", () => {
   it("bounds the resolves in flight: a lookup the caller stopped waiting for still holds its slot", async () => {
     const { fetcher, requests } = neverResolving(10);
 
-    // Thirty-two distinct hosts time out but never settle; the thirty-third is refused
-    // at once, without waiting on the deadline.
     for (let n = 0; n < 32; n += 1) {
       expect(await refusal(fetcher, `https://host-${n}.example/doc`)).toBe("timeout");
     }

@@ -1,18 +1,6 @@
 import { GLOBAL_TABLE_NAMES_BEYOND_IDENTITY } from "./counter-tables.ts";
 import { IDENTITY_SET } from "./identity-tables.ts";
 
-/**
- * The one place a reviewer looks to see which tables are outside the tenant guarantee,
- * and why each one is (T-015's spec, `docs/specs/T-015.md`). A tenant
- * table is every table `src/` declares minus these; adding an entry is a visible diff
- * carrying a reason, and no pattern ever matches a new table quietly.
- *
- * The two arrays this is built from stay where their owners need them — `IDENTITY_SET`
- * beside Better Auth's declarations, `GLOBAL_TABLE_NAMES_BEYOND_IDENTITY` beside the
- * counters — and the RLS coverage test asserts the union both ways against this record
- * so a name can neither gain an exemption without a reason nor keep one
- * after its array drops it.
- */
 export const RLS_EXEMPTIONS = {
   "public.user": "Read by id or email at sign-in, before any workspace is known.",
   "public.session": "Read by session token; the read is what resolves a principal at all.",
@@ -40,7 +28,6 @@ export const RLS_EXEMPTIONS = {
     "The pre-authentication per-IP and per-email counter: no workspace exists yet to scope it by.",
 } satisfies Record<string, string>;
 
-/** The union the two source arrays declare — what the exemption record must equal. */
 export const EXEMPT_TABLE_NAMES: readonly string[] = [
   ...IDENTITY_SET,
   ...GLOBAL_TABLE_NAMES_BEYOND_IDENTITY,

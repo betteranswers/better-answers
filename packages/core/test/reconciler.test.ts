@@ -34,26 +34,10 @@ import { bindingHolding } from "./sourced-concept.ts";
 import { readingAs } from "./suite-postgres.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
-/**
- * The reconciler through the concepts slice's entry point (`[TEST1]`), against real
- * Postgres and a real bare repository: the crash window between a governed write's commit
- * and its rows made **recoverable**, not merely detectable (ADR 0012's 2026-09-06
- * amendment; T-006 spec, *The reconciler*).
- *
- * Every head-ahead state here is provoked **through the live handler**: a trigger the test
- * installs on `bundle_commit` makes the act's own transaction fail after its commit has
- * landed, which is the window's shape exactly — git one commit ahead of what Postgres knows,
- * no partial rows — with no hook inside the act. The claims are that the replay lands what
- * the act would have, oldest first and in order, that it is idempotent on the trailer ids,
- * that it is the platform's act and never a person's, and that both kinds of governed write
- * come back: a person's own commit and an Admin's acceptance.
- */
-
 const { db, arrange } = suiteWithBundles();
 
 let written = 0;
 
-/** A person's write, each one its own concept: a Guideline, titled for the test that made it. */
 const guideline = (
   title: string,
   overrides: Partial<WriteConceptInput> = {},
@@ -81,12 +65,6 @@ const landed = async (scenario: Scenario, principal: UserPrincipal, input: Write
   return result.value;
 };
 
-/**
- * The crash window, opened on purpose: while this stands, every `bundle_commit` insert is
- * refused, so an act commits to the bundle and then loses its whole transaction — the ledger
- * row, the index row, the commit row and the delta together. Removed by the function it
- * hands back, after which the rows can land again.
- */
 const openTheWindow = async (): Promise<() => Promise<void>> => {
   await db().pool.query(
     `CREATE FUNCTION crash_in_the_window() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -101,7 +79,6 @@ const openTheWindow = async (): Promise<() => Promise<void>> => {
   };
 };
 
-/** An act made inside the window: its commit lands, its rows do not, and the act says so. */
 const inTheWindow = async <T extends { readonly ok: boolean }>(
   act: () => Promise<T>,
 ): Promise<T> => {
@@ -113,7 +90,6 @@ const inTheWindow = async <T extends { readonly ok: boolean }>(
   }
 };
 
-/** A person's write made inside the window, and the bundle's history once it has closed. */
 const writeInTheWindow = async (
   scenario: Scenario,
   principal: UserPrincipal,
@@ -132,7 +108,6 @@ const reconciled = async (scenario: Scenario): Promise<Reconciled> => {
   return result.value;
 };
 
-/** The chain `bundle_commit` records, oldest first: each commit with the parent it names. */
 const recordedChain = async (
   workspaceId: string,
 ): Promise<readonly (readonly [string, string | null])[]> => {
@@ -143,10 +118,6 @@ const recordedChain = async (
   return rows.rows.map((row) => [row.sha, row.parent_sha] as const);
 };
 
-/**
- * Everything a replay lands, read as the superuser so no policy hides a row — one list, so
- * "a second run changed nothing" is one comparison over every table the act touches.
- */
 const rowsOf = async (workspaceId: string) => {
   const read = await db().pool.query<{ kind: string; key: string; value: string }>(
     `SELECT 'identity' AS kind, iri AS key, merge_key AS value
@@ -173,7 +144,6 @@ const rowsOf = async (workspaceId: string) => {
   return read.rows;
 };
 
-/** The ledger rows the reconciler wrote, in the shape a reader of the signal wants. */
 const replayedEvents = async (workspaceId: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
     "SELECT id, actor, subject_id, subject_kind, batch_id, detail FROM audit_event WHERE workspace_id = $1 AND act = 'platform.reconciler.replayed' ORDER BY id",
@@ -182,7 +152,6 @@ const replayedEvents = async (workspaceId: string) => {
   return found.rows;
 };
 
-/** The IRI a commit's file carries — the one identity a commit does carry. */
 const iriOfFile = async (scenario: Scenario, sha: string, path: string): Promise<string> => {
   const parsed = parseConceptFile(
     await fileAtCommit(scenario.git, scenario.workspaceId, sha, path),
@@ -205,7 +174,6 @@ const conceptRow = async (workspaceId: string, iri: string) => {
   return found.rows[0];
 };
 
-/** What became of one suggestion: its status, who decided it, and what it landed on. */
 const decisionOf = async (suggestionId: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
     "SELECT status, decider, reason, target_iri FROM suggestion WHERE id = $1",
@@ -219,7 +187,7 @@ describe("a commit whose rows were lost", () => {
     const scenario = await arrange();
     const input = guideline("Travel");
     const history = await writeInTheWindow(scenario, scenario.editor, input);
-    // The window's shape, before anything is recovered: one commit, no rows at all.
+
     expect(history).toHaveLength(1);
     expect(await recordedChain(scenario.workspaceId)).toEqual([]);
     const sha = history[0] ?? "";
@@ -235,8 +203,7 @@ describe("a commit whose rows were lost", () => {
       skipped: [],
       stopped: undefined,
     });
-    // What the act would have landed: the identity, the index row at the commit, the commit
-    // row joined to the ledger on the trailer's id, and the concept on the map.
+
     expect(await recordedChain(scenario.workspaceId)).toEqual([[sha, null]]);
     const iri = await iriOfFile(scenario, sha, input.path);
     expect(await conceptRow(scenario.workspaceId, iri)).toEqual({
@@ -245,14 +212,12 @@ describe("a commit whose rows were lost", () => {
       title: "Travel",
       content_hash: contentHashOf(input.frontmatter, input.body, input.path),
       commit_sha: sha,
-      // The file carries the status the act named, so the replay reads it back.
+
       status: "stable",
-      // The class is not in the commit, so the replay lands the most restrictive of the
-      // three: a widening is an Admin's recorded act, never a recovery's guess.
+
       sensitivity: "Restricted",
       audience: "everyone",
-      // Nor is the merge key: a person's creation carries none, so ADR 0003's derivation
-      // — the kind and the normalised title — is what the identity row gets.
+
       merge_key: "Guideline:travel",
     });
     const commitRow = await db().pool.query<Record<string, unknown>>(
@@ -276,10 +241,6 @@ describe("a commit whose rows were lost", () => {
 
     await reconciled(scenario);
 
-    // The git author and the `Actor:` trailer are the person's, as the act wrote them; the
-    // ledger row is the reconciler's own — under the commit's `Audit:` id, so the commit row
-    // and the ledger still join on one id (ADR 0014 rule 4) — and no row of the person's
-    // act exists, because that act never landed and the replay is not a re-authorization.
     const facts = await commitFacts(scenario.git, scenario.workspaceId, sha);
     expect(facts.author).toBe("Grace Editor <grace@acme.invalid>");
     expect(facts.trailers["Actor"]).toBe(actorIdOf(scenario.editor));
@@ -299,7 +260,7 @@ describe("a commit whose rows were lost", () => {
             "# Leave\n\nBook through the platform, and claim within a month.",
             "knowledge/guidelines/leave-2.md",
           ),
-          // The file cites nothing and the rows hold no citation: the two agree.
+
           evidenceAgrees: true,
         },
       },
@@ -328,10 +289,6 @@ describe("a commit whose rows were lost", () => {
       guideline("Sickness"),
     );
 
-    // The window has closed and a person writes on. Their commit lands on the orphan and
-    // their rows are refused by the parent key — a row may not name a commit the rows do not
-    // know — so the write joins the missed suffix rather than landing ahead of it, and the
-    // caller hears the store's own failure, never a refusal word.
     const behind = await writeConcept(
       scenario.editor,
       doorsOf(scenario),
@@ -349,7 +306,7 @@ describe("a commit whose rows were lost", () => {
       [history[0], null],
       [history[1], history[0]],
     ]);
-    // Two commits in one run: one bulk act, N rows sharing one batch id (`[AUDIT1]`).
+
     const events = await replayedEvents(scenario.workspaceId);
     expect(events.map((event) => event["subject_id"])).toEqual(history);
     expect(new Set(events.map((event) => event["batch_id"])).size).toBe(1);
@@ -373,10 +330,6 @@ describe("a commit whose rows were lost", () => {
     expect(again).toMatchObject({ watermark: orphan, replayed: [], skipped: [] });
     expect(await rowsOf(scenario.workspaceId)).toEqual(before);
 
-    // The watermark misled: the replayed commit's row made to read as older than the one
-    // before it, so the scan starts one commit early and meets a commit that already has
-    // its rows. Idempotency is the trailer id's and not the watermark's — skipped, never
-    // re-written, never an error.
     await db().pool.query(
       "UPDATE bundle_commit SET committed_at = committed_at - interval '1 day' WHERE workspace_id = $1 AND sha = $2",
       [scenario.workspaceId, orphan],
@@ -396,8 +349,6 @@ describe("a commit whose rows were lost, carrying what the replay has to read of
 
     const run = await reconciled(scenario);
 
-    // The commit is the whole of what the replay has, so the file has to carry every fact
-    // the row is built from — the title as much as the type and the status.
     expect(run.stopped).toBeUndefined();
     expect(run.replayed).toEqual([sha]);
     const iri = await iriOfFile(scenario, sha, input.path);
@@ -440,9 +391,7 @@ describe("a re-write whose rows were lost", () => {
     const run = await reconciled(scenario);
 
     expect(run).toMatchObject({ watermark: first.sha, replayed: [history[1]] });
-    // The merge key and the class are the concept's own — read off the row the creation
-    // landed, and re-derived from citations the file agrees with (none, here) — and the
-    // content is the commit's.
+
     expect(await conceptRow(scenario.workspaceId, first.iri)).toEqual({
       path: input.path,
       kind: "Guideline",
@@ -478,8 +427,7 @@ describe("a re-write whose rows were lost", () => {
     expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
       sensitivity: "Internal",
     });
-    // Two commits lost in one window: a re-write whose sources stand as they were, then one
-    // that adds a citation to a document under the Restricted binding.
+
     const [, unchanged = null] = await writeInTheWindow(scenario, scenario.editor, {
       ...input,
       iri: first.iri,
@@ -500,10 +448,6 @@ describe("a re-write whose rows were lost", () => {
 
     const run = await reconciled(scenario);
 
-    // The first replays at the class its citations derive; the second's file cites what its
-    // rows do not, so the evidence rows the commit lost cannot be recovered and the class the
-    // standing citations derive is the wider one — fail-closed is Restricted, and the ledger
-    // row says which of the two each commit was.
     expect(run).toMatchObject({ replayed: history.slice(1), stopped: undefined });
     expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
       commit_sha: history[2],
@@ -530,8 +474,7 @@ describe("a re-write whose rows were lost", () => {
       body,
       expects: { head: first.sha },
     });
-    // Before the tick, the Admin narrows the binding: the concept is Restricted now, and the
-    // Editor who made the lost commit could not re-write it live any more.
+
     const narrowed = await readingAs(db().runtimePool, scenario.admin, (admin, tx) =>
       narrowBinding(admin, tx, {
         bindingId: binding.bindingId,
@@ -543,8 +486,6 @@ describe("a re-write whose rows were lost", () => {
 
     const run = await reconciled(scenario);
 
-    // The act was authorised when its commit was made; the replay lands it under the
-    // platform, whose read of the row has no predicate, at the class the evidence derives.
     expect(run).toMatchObject({ replayed: [history[1]], stopped: undefined });
     expect(await conceptRow(scenario.workspaceId, first.iri)).toMatchObject({
       content_hash: contentHashOf(input.frontmatter, body, input.path),
@@ -556,7 +497,6 @@ describe("a re-write whose rows were lost", () => {
 
 let proposed = 0;
 
-/** One suggestion's payload: a Guideline of its own, titled for the test that raised it. */
 const requestFor = (
   title: string,
   overrides: Partial<SuggestionRequest> = {},
@@ -573,7 +513,6 @@ const requestFor = (
   };
 };
 
-/** A person's *edit* raised and opened: the one suggestion's id, and what its summary resolved. */
 const raised = async (scenario: Scenario, request: SuggestionRequest) => {
   const set = await submitSuggestionSet(
     scenario.editor,
@@ -590,7 +529,6 @@ const raised = async (scenario: Scenario, request: SuggestionRequest) => {
   return { suggestionId: item.suggestionId, target: item.target };
 };
 
-/** The Admin's acceptance, made inside the window: its commit lands, its rows do not. */
 const acceptInTheWindow = async (
   scenario: Scenario,
   item: { readonly suggestionId: string; readonly target: string | null },
@@ -601,8 +539,7 @@ const acceptInTheWindow = async (
     }),
   );
   expect(outcomes.ok && outcomes.value.map((outcome) => outcome.outcome.ok)).toEqual([false]);
-  // The window's shape for an acceptance: a commit carrying the `Suggestion:` trailer, and
-  // a suggestion still waiting for the decision the transaction lost.
+
   const history = await bundleHistory(scenario.git, scenario.workspaceId);
   const sha = history.at(-1) ?? "";
   const facts = await commitFacts(scenario.git, scenario.workspaceId, sha);
@@ -621,9 +558,7 @@ describe("an acceptance whose rows were lost", () => {
     const run = await reconciled(scenario);
 
     expect(run).toMatchObject({ replayed: [sha], stopped: undefined });
-    // The decision lands through the same rows and the same marker as the live act, from
-    // the payload the decision was made from: the merge key is the payload's, the decider
-    // the Admin the `Actor:` trailer names, and the target the concept the commit minted.
+
     const iri = await iriOfFile(scenario, sha, request.path);
     expect(await decisionOf(item.suggestionId)).toEqual({
       status: "accepted",
@@ -638,7 +573,7 @@ describe("an acceptance whose rows were lost", () => {
       merge_key: request.mergeKey,
       content_hash: contentHashOf(request.frontmatter, request.body, request.path),
     });
-    // The ledger row is the reconciler's; the acceptance's own row never existed.
+
     expect(await replayedEvents(scenario.workspaceId)).toHaveLength(1);
     const accepted = await db().pool.query(
       "SELECT 1 FROM audit_event WHERE workspace_id = $1 AND act = 'knowledge.suggestion.accepted'",
@@ -652,8 +587,7 @@ describe("an acceptance whose rows were lost", () => {
     const request = requestFor("Hot desking");
     const item = await raised(scenario, request);
     const sha = await acceptInTheWindow(scenario, item);
-    // Between the crash and the replay, an Admin declines what the lost transaction would
-    // have accepted: the row is still waiting, so the decline lands.
+
     const declined = await declineSuggestion(scenario.admin, doorsOf(scenario), {
       suggestionId: item.suggestionId,
       reason: "decided again after the outage",
@@ -662,9 +596,6 @@ describe("an acceptance whose rows were lost", () => {
 
     const run = await reconciled(scenario);
 
-    // The bundle holds the file, so the rows hold the concept — a map that disagreed with
-    // the bundle would be the one thing derived rows must never be — while the decision is
-    // the one somebody made, not re-made: no payload was left to decide from.
     expect(run).toMatchObject({ replayed: [sha], stopped: undefined });
     expect(await decisionOf(item.suggestionId)).toMatchObject({
       status: "declined",
@@ -674,7 +605,7 @@ describe("an acceptance whose rows were lost", () => {
     const iri = await iriOfFile(scenario, sha, request.path);
     expect(await conceptRow(scenario.workspaceId, iri)).toMatchObject({
       title: "Hot desking",
-      // No payload and no concept to read a key off: ADR 0003's derivation.
+
       merge_key: "Guideline:hot desking",
     });
   });
@@ -691,8 +622,6 @@ describe("what the reconciler refuses", () => {
       workspaceId: scenario.workspaceId,
     });
 
-    // A repository and a database that disagree about the past: no replay makes that right,
-    // and pretending the recorded commit was never there would be a hole scan by another name.
     expect(refused).toEqual({ ok: false, error: "history-diverged" });
     expect(await rowsOf(scenario.workspaceId)).toEqual(before);
   });
@@ -738,9 +667,7 @@ describe("a commit the rows cannot take", () => {
     const scenario = await arrange();
     const first = guideline("Fuel");
     const written = await landed(scenario, scenario.editor, first);
-    // T-052's own crash shape: a second concept at a path the index already holds commits,
-    // and the path index refuses its row — the one post-commit refusal the live act makes,
-    // and a commit no replay can land, because the index refuses the same row again.
+
     const clash = await writeConcept(
       scenario.editor,
       doorsOf(scenario),
@@ -748,7 +675,7 @@ describe("a commit the rows cannot take", () => {
     );
     expect(clash).toEqual({ ok: false, error: "path-taken" });
     const [, orphan = null] = await bundleHistory(scenario.git, scenario.workspaceId);
-    // And a person writes on behind it, refused by the parent key as before.
+
     const behind = await writeConcept(
       scenario.editor,
       doorsOf(scenario),
@@ -761,10 +688,6 @@ describe("a commit the rows cannot take", () => {
 
     const run = await reconciled(scenario);
 
-    // Stopped at the commit the index refuses, with the sha and the refusal word a person
-    // can act on; nothing after it attempted, because its row would name an unrecorded
-    // parent. `[TEST8]`, `[AUDIT1]`: the ledger row was written before the index refused,
-    // and rolled back with the act rather than never reached.
     expect(run).toEqual({
       workspaceId: scenario.workspaceId,
       head: history[2],
@@ -781,9 +704,7 @@ describe("a commit the rows cannot take", () => {
     const scenario = await arrange();
     const input = guideline("Bridges");
     const written = await landed(scenario, scenario.editor, input);
-    // The concept's own file, committed at another path through the door — a rename the live
-    // act never makes (ADR 0012: a rename is a governed move that rewrites inbound links),
-    // so nothing but a hand-forged commit can put one on the ref.
+
     const moved = await commit(scenario.editor, scenario.git, {
       path: "knowledge/guidelines/bridges-moved.md",
       content: await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path),
@@ -810,7 +731,7 @@ describe("a commit the rows cannot take", () => {
 
   it("stops at a commit the governed write did not make, rather than guessing what it meant", async () => {
     const scenario = await arrange();
-    // A commit through the door itself, carrying a file outside the renderer's grammar.
+
     const made = await commit(scenario.editor, scenario.git, {
       path: "knowledge/manifest.yaml",
       content: "name: acme\n",
@@ -847,29 +768,10 @@ describe("the fence", () => {
 
     await Promise.all([act, run]);
 
-    // One registry for both entries: the reconciler's lock is the live write's lock, which
-    // is what keeps the prefix invariant true through a replay.
     expect(order).toEqual(["act in", "act out", "reconciler out"]);
   });
 });
 
-/**
- * This case builds three workspaces in one act — the periodic pass has to carry a bundle
- * left behind, a bundle current and a bundle gone, together, each landing on its own
- * outcome — so it is the slowest thing in this workspace and not an accident. Measured
- * 49.4 s alone in `packages/core`'s own six-fork suite, beside the batch's two load loops
- * (12/09/2026; Apple M4 Pro, 14 cores, 24 GiB; Docker VM 6 CPUs, 6144 MiB) — the slowest
- * case in the workspace by 16 s over the next (`rebuild-equivalence.test.ts`, 33.7 s).
- * Under a root `check`, contending with every other workspace's suite for the same six VM
- * CPUs, this workspace's summed test time rose from 2003.9 s to 2749.2 s and 2796.5 s — a
- * contention factor of ×1.37–1.40 — which puts the case's real need at about 68 s; it cut
- * the config's 60 s `testTimeout` at 60013 ms and 60012 ms on two separate root-check
- * runs, the only failure in either (T-140). The case shells out to nothing — three
- * `arrange()`s, one `removeRepository`, one windowed write, one `reconcileEveryWorkspace`
- * — so the allowance is the case's own and not standing in for a subprocess it starts.
- * Ninety seconds leaves it clear of the measured 68 s need with margin against another
- * few points of contention, without raising the file's other cases off their 60 s default.
- */
 const PERIODIC_HEAD_CHECK_ALLOWANCE_MS = 90_000;
 
 describe("the periodic head check's pass", () => {
@@ -895,7 +797,7 @@ describe("the periodic head check's pass", () => {
         ok: true,
         value: { head: null, replayed: [] },
       });
-      // One bundle's refusal is that bundle's fact, and the others were not left behind.
+
       expect(outcomes.get(missing.workspaceId)).toEqual({ ok: false, error: "no-such-repository" });
     },
     PERIODIC_HEAD_CHECK_ALLOWANCE_MS,
@@ -911,7 +813,7 @@ describe("reconciler hits", () => {
       scenario.editor,
       guideline("Trains", { expects: { head: first } }),
     );
-    // Nothing has been replayed, so there is nothing to count: the signal reads zero rows.
+
     expect(await reconcilerHits(RECONCILER, scenario.postgres, scenario)).toEqual({
       ok: true,
       value: [],
@@ -922,13 +824,13 @@ describe("reconciler hits", () => {
     const hits = await reconcilerHits(RECONCILER, scenario.postgres, scenario);
     expect(hits.ok).toBe(true);
     if (!hits.ok) return;
-    // One hit per commit landed, keyed by the commit's own `Audit:` id, sharing the run's batch.
+
     expect(hits.value.map((hit) => hit.commitSha)).toEqual(history);
     const facts = await commitFacts(scenario.git, scenario.workspaceId, first);
     expect(hits.value[0]?.auditEventId).toBe(facts.trailers["Audit"]);
     expect(hits.value[0]?.batchId).not.toBeNull();
     expect(hits.value[1]?.batchId).toBe(hits.value[0]?.batchId);
-    // From an instant after the run: the rows are all older, so the window holds none.
+
     const later = new Date(Date.now() + 60_000);
     expect(
       await reconcilerHits(RECONCILER, scenario.postgres, { ...scenario, since: later }),
@@ -961,7 +863,6 @@ describe("a concept file read back", () => {
 
     const read = parseConceptFile(renderConceptFile(frontmatter, body));
 
-    // The body comes back as the renderer normalised it, which is what the hash is over.
     expect(read).toEqual({
       ok: true,
       value: { frontmatter, body: "# Heading\n\nA line.\nAnother.\n" },
@@ -978,11 +879,9 @@ describe("a concept file read back", () => {
     ["a list mixing strings and entries", '---\n"tags":\n  - "a"\n  - "k": 1\n---\n\n'],
     ["an object where a scalar goes", '---\n"title": {"a": 1}\n---\n\n'],
     ["an item outside a list", '---\n  - "a"\n---\n\n'],
-    // The renderer writes each key once; a second `iri` or `type` would otherwise be the
-    // one a hand-forged commit chose, quietly winning over the first.
+
     ["a key written twice", '---\n"title": "one"\n"title": "two"\n---\n\n'],
-    // The renderer writes an empty list as ` []` on the key's line; a bare key is a field
-    // the file says nothing about, and reading it as empty would replay a clearing.
+
     ["a key with no value and no items beneath it", '---\n"tags":\n"title": "x"\n---\n\n'],
     ["a bare key at the end of the frontmatter", '---\n"title": "x"\n"tags":\n---\n\n'],
   ])("refuses what the renderer never wrote — %s", (_shape, file) => {

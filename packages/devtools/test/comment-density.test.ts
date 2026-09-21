@@ -2,6 +2,7 @@ import {
   CEILING,
   WRAPPER_EXECUTABLE,
   armOf,
+  clocArgv,
   clocOver,
   measure,
   overTheCeiling,
@@ -42,6 +43,10 @@ describe("the line counter reads what the ceiling is measured on", () => {
 
     expect(counted[0]?.comment).toBe(1);
     expect(counted[0]?.code).toBe(2);
+  });
+
+  it("gives the counter no per-file guard, which drops the file it fires on and breaks the JSON", () => {
+    expect(clocArgv(["packages"]).join(" ")).toContain("--timeout 0");
   });
 
   it("walks past a workspace's markdown and JSON, which the strip never touched", () => {

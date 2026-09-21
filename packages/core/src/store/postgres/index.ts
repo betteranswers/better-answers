@@ -13,59 +13,20 @@ import type {
   WorkspaceId,
 } from "../../kernel/index.ts";
 
-/**
- * The Postgres door: the handle, the transaction helper, and the RLS session setter.
- *
- * Four openers, and which one a call uses says who is behind it: `withScope` and
- * `withIdentityWrite`/`withIdentityRead` for the platform's own acts; `withPrincipal` for
- * the transport, which builds a Principal from a credential at the request boundary; and
- * `withMembership` for a slice that owns an act's transaction and holds a Principal already
- * (T-052's governed write), which re-reads the membership in the transaction it opens.
- *
- * `SET LOCAL app.workspace_id` from the `Principal` on every transaction. RLS with
- * `FORCE ROW LEVEL SECURITY`, the non-owner `app_rt` role and default-deny
- * (`pgTable.withRLS()`) is the tenancy **guarantee**; this door is ergonomics over it
- * (ADR 0029). Drizzle exposes no query lifecycle hook, so there is no interception
- * pattern to port — the guarantee lives in the database.
- *
- * ADR 0029 rule 2 — `store` imports only `kernel` (and the schema package, which is
- * not `core`). No store file imports another store file.
- */
-
-/** The handle: one pool, connected as the runtime role (`app_rt` in every estate). */
 export type PostgresDoor = {
   readonly pool: pg.Pool;
 };
 
 export const openPostgres = (pool: pg.Pool): PostgresDoor => ({ pool });
 
-/**
- * How a statement names the workspace a Principal of **either kind** acts in — the one idiom,
- * in one place, for every tenant read or write that takes a `Principal` rather than a
- * `UserPrincipal`. A user principal's workspace is named outright, so a disagreement with
- * the transaction's scope is refused by the policy rather than read; the platform principal
- * carries none, so the scope alone says which workspace the statement reaches, and an
- * unscoped transaction resolves to the NULL the policy refuses. `scopeClause(at)` renders
- * the term over the placeholder `$at`, which `scopeParameter` fills — a pair, like
- * `readableClause` and `readableParameters`, because the two have to move together.
- */
 export const scopeClause = (at: number): string =>
   `COALESCE($${at}::text, (select current_workspace_id()))`;
 
 export const scopeParameter = (principal: Principal): string | null =>
   principal.kind === "user" ? principal.workspaceId : null;
 
-/**
- * One transaction's client. Narrow on purpose: a slice runs statements on it and
- * nothing else — it cannot commit, release or open a second transaction.
- */
 export type Tx = Pick<pg.PoolClient, "query">;
 
-/**
- * What a read through a `Tx` may be typed as: the driver's own constraint on a result row.
- * It lives here because pg lives here — a slice that reads rows generically says what shape
- * it expects in the driver's terms, and never by spelling a dictionary of its own.
- */
 export type TxRow = pg.QueryResultRow;
 
 const rollbackQuietly = async (client: pg.PoolClient): Promise<void> => {
@@ -78,9 +39,7 @@ const rollbackQuietly = async (client: pg.PoolClient): Promise<void> => {
 
 const commit = async (client: pg.PoolClient): Promise<void> => {
   const answer = await client.query("COMMIT");
-  // In an aborted transaction Postgres answers COMMIT with the tag ROLLBACK and no
-  // error, so a statement failure the work caught would otherwise be reported as
-  // success over rows that never landed. The tag is the only place the abort shows.
+
   if (answer.command !== "COMMIT") {
     throw new Error(
       `the transaction did not commit: Postgres answered "${answer.command}" — a failed statement was caught inside the work, and nothing landed`,
@@ -106,13 +65,6 @@ const transaction = async <T>(
   }
 };
 
-/**
- * Run `work` inside one transaction scoped to `workspaceId`, as the platform. The
- * setter every tenant read goes through; `withPrincipal` is the door a person's call
- * uses, this is for the platform's own acts — provisioning, the identity provider's
- * hooks — where a platform principal, not a person, is behind the call: the platform
- * principal is the first argument, and the act is audited under its id.
- */
 export const withScope = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -124,29 +76,6 @@ export const withScope = async <T>(
     return work(client, platform);
   });
 
-/**
- * Hold one of Postgres's **session-scoped** advisory locks for the whole of `work`, on a
- * connection of its own, and give it back however `work` ends.
- *
- * The transaction-scoped twin — `pg_advisory_xact_lock`, which the visibility cascade takes —
- * is the right lock for a thing that happens inside one transaction, because Postgres
- * releases it at the commit whatever the code does. This one is for the opposite shape: a
- * routine that spans several transactions and must exclude something outside the database
- * for all of them. The erasure routine is the caller, and the thing it excludes is the
- * hourly dump, which try-locks the same key before it runs (ADR 0022; `deploy/backup.sh`).
- *
- * **Its own connection, and an explicit unlock.** A session lock outlives every transaction
- * on the connection that took it, so it also outlives that connection's return to the pool:
- * releasing without unlocking would hand the next borrower a lock nobody meant them to hold,
- * and the dump would wait for ever. The connection is dedicated so that the work's own
- * transactions are free to open and commit on other connections while this one does nothing
- * but hold the key.
- *
- * **The platform principal is the first argument and the body does not read it**, as the git
- * door's `withRepositoryLockAs` does not read its own: a lock the whole estate waits behind
- * is the platform's to take, and the type is what says so at every call site — a person's
- * Principal cannot reach this function, whatever a slice meant to do with it.
- */
 export const withSessionLock = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -166,35 +95,12 @@ export const withSessionLock = async <T>(
   }
 };
 
-/**
- * Run `work` inside one transaction with no scope, as the platform: a write to the
- * identity set (ADR 0009), which no workspace scope reaches — revoking a person's
- * credentials, for one. Never a tenant read: an unscoped transaction sees zero tenant
- * rows by construction.
- */
 export const withIdentityWrite = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
   work: (tx: Tx, platform: PlatformPrincipal) => Promise<T>,
 ): Promise<T> => transaction(door, (client) => work(client, platform));
 
-/**
- * The read twin: one unscoped transaction, as the platform, over the identity set — the
- * reads that happen *before* a workspace is known and so cannot be scoped, the picker's
- * "which workspaces does this person hold" among them (ADR 0035). Its own name rather
- * than `withIdentityWrite`'s, because a caller reading this file should be able to tell
- * which of the two a statement is; and its own door rather than the raw pool, so that
- * every statement in a slice still reaches Postgres through a door with the principal it
- * is made under in its hand (ADR 0029's amendment).
- *
- * Never a tenant read: an unscoped transaction sees zero tenant rows by construction,
- * which is the guarantee, not an omission.
- *
- * The body is its twin's, deliberately, and the `jscpd:ignore` fence around it is that
- * decision said again where the copy-paste gate can read it: the two are one implementation
- * under two names on purpose, so that a statement says which of them it is, and they have to
- * be able to part — the day a read takes a read-only transaction, only this one changes.
- */
 /* jscpd:ignore-start */
 export const withIdentityRead = async <T>(
   platform: PlatformPrincipal,
@@ -203,17 +109,6 @@ export const withIdentityRead = async <T>(
 ): Promise<T> => transaction(door, (client) => work(client, platform));
 /* jscpd:ignore-end */
 
-/**
- * The one resolve query (ADR 0018, ADR 0035, ADR 0038): the member row, the person's
- * revocation instant, this membership's, and every group they are in here. All of it
- * comes back in the one statement — a revocation and a group membership each cost no
- * second round trip on the path every call takes.
- *
- * The group ids are re-read on every call rather than carried on a credential (ADR 0009),
- * which is what lets an Admin's *add to group* take effect on the person's next request;
- * the subquery runs inside the scope this transaction has already set, so the policy on
- * `group_member` is a second fence behind the workspace the join already names.
- */
 const MEMBERSHIP_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS person_revoked_at,
             m.credentials_revoked_at AS membership_revoked_at,
             COALESCE((SELECT array_agg(gm.group_id ORDER BY gm.group_id)
@@ -224,33 +119,10 @@ const MEMBERSHIP_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS per
      JOIN "user" u ON u.id = m.user_id
     WHERE m.workspace_id = $1 AND m.user_id = $2`;
 
-/**
- * The same read, holding the membership row until the transaction ends — what an act's own
- * door uses and the request boundary does not.
- *
- * `FOR SHARE OF m, u` is what turns "we checked" into "it cannot have changed since": a
- * revocation is an UPDATE of one of these two rows — the membership for a workspace Admin's
- * scope, the person for the operator's — so it either commits before this read and is seen,
- * or waits behind the lock until the act commits, in which case its instant is after the act
- * and governs the acts that follow it. **Both** rows are held, because holding the membership
- * alone would leave revoke-everywhere free to land mid-act. Without the lock, READ COMMITTED
- * would let either revocation land between the read and the COMMIT, and the rows would be
- * written for a credential ended microseconds earlier.
- *
- * It is not on the boundary's read, deliberately: that runs on every request, and a shared
- * row lock per request would make the People screen's writes queue behind ordinary traffic.
- * Only an act that writes under an authority it read earlier needs to hold it.
- */
 const MEMBERSHIP_QUERY_HELD = `${MEMBERSHIP_QUERY} FOR SHARE OF m, u`;
 
 const isRole = (value: string): value is Role => ROLES.some((role) => role === value);
 
-/**
- * What the resolve query returns: the member row's role, revocation's two instants — the
- * person's, written by the operator's act, and this membership's, written by an Admin of
- * this workspace and reaching no other — and the ids of the groups they are in here,
- * empty when they are in none.
- */
 type MembershipRow = {
   readonly role: string;
   readonly person_revoked_at: Date | null;
@@ -258,24 +130,6 @@ type MembershipRow = {
   readonly group_ids: readonly string[];
 };
 
-/**
- * The Principal resolver — the deep module of T-004.
- *
- * Opens one transaction, sets its scope from the claims, reads the member row and
- * revocation's two instants — the person's `user.credentials_revoked_at` and this
- * membership's `member.credentials_revoked_at` — in that transaction, and runs `work`
- * in the same transaction with the Principal it built. So the role is resolved **in
- * the same transaction as the read it authorises**, every failure is a refusal (the
- * transaction rolls back; there is no default role), and the Principal cannot outlive
- * the request because it exists only inside `work`.
- *
- * Refusals: no member row for the pair; a credential issued before either instant,
- * which is one word, `credentials-revoked`, for both scopes, so the People screen
- * shows one outcome and the refusal says nothing about whether the person belongs
- * anywhere else (ADR 0035); a credential carrying a role the member row disagrees
- * with; a member row whose role is not one of the three; claims that fail the
- * boundary's shape. Each is its own test in `packages/core/test/principal.test.ts`.
- */
 export const withPrincipal = async <T>(
   door: PostgresDoor,
   claims: Claims,
@@ -284,9 +138,7 @@ export const withPrincipal = async <T>(
   const workspaceId = boundarySchemas.workspace.select.shape.id.safeParse(claims.workspaceId);
   const userId = boundarySchemas.user.select.shape.id.safeParse(claims.userId);
   if (!workspaceId.success || !userId.success) return err("malformed-claims");
-  // Read once, before anything is awaited: `claims.issuedAt` is a `Date`, which is mutable,
-  // so the instant the Principal carries and the instant the refusal is judged against have
-  // to be the same number rather than two reads of an object a caller still holds.
+
   const credentialIssuedAtMs = claims.issuedAt.getTime();
 
   return resolveScoped(
@@ -297,8 +149,7 @@ export const withPrincipal = async <T>(
     (row) => {
       const refusal = refuse(row, credentialIssuedAtMs);
       if (!refusal.ok) return refusal;
-      // The boundary's own extra: a credential that names a role the row disagrees with.
-      // The act's door has no claims to disagree with, which is why this arm is here.
+
       return claims.role === undefined || claims.role === refusal.value.role
         ? refusal
         : err("role-disagrees");
@@ -307,31 +158,6 @@ export const withPrincipal = async <T>(
   );
 };
 
-/**
- * The second principal-scoped door (T-052): open a transaction for a Principal a caller
- * **already holds**, re-reading the membership inside it.
- *
- * `withPrincipal` above is the transport's — it builds a Principal from a credential at the
- * request boundary. This one is a slice's, for the act that cannot use the transport's
- * transaction because it owns its own: the governed write commits to git first and then
- * writes its rows, and those rows land in a transaction the slice opens after the commit
- * (ADR 0012; T-006 spec, *The governed write*). Handing that act the transport's transaction
- * would mean holding a transaction open across a git commit, and opening it under `withScope`
- * would mean writing a person's act under the platform's authority.
- *
- * So the role is resolved **in the same transaction as the writes it authorises**, exactly as
- * it is at the request boundary, and the act re-checks its own role threshold against the
- * `principal` this door hands back rather than the one it was called with.
- *
- * **It judges authority at time-of-act, by the boundary's own rule.** The membership row is
- * read under a shared lock and every refusal the boundary makes is made again here: the
- * membership gone, a role that moved, and — the one this door exists for — either revocation
- * instant now cutting the credential this act rides on. That last is judged against the
- * Principal's `credentialIssuedAtMs` and never against "an instant is set", because revocation
- * ends what was *issued* and a fresh sign-in mints anew (ADR 0035). With the lock, a
- * revocation cannot land between this read and the act's COMMIT, which is what makes ADR
- * 0012's *impossible by construction* a construction rather than a hope.
- */
 export const withMembership = async <T>(
   principal: UserPrincipal,
   door: PostgresDoor,
@@ -345,21 +171,13 @@ export const withMembership = async <T>(
     (row) => {
       const refusal = refuse(row, principal.credentialIssuedAtMs);
       if (!refusal.ok) return refusal;
-      // The role the act was authorised at, against the role the row holds now. Checked
-      // after the shared refusals, so a revoked person hears one word and not two.
+
       return refusal.value.role === principal.role ? refusal : err("role-disagrees");
     },
     work,
     MEMBERSHIP_QUERY_HELD,
   );
 
-/**
- * What both principal-scoped doors are: one transaction, its scope set before any other
- * statement, the membership read inside it, and `work` run with the Principal that read
- * built — never with one a caller composed. The two differ only in what they refuse the row
- * for, which is the callback; the body is theirs jointly, because a second copy of it is a
- * second place the scope could be set late or the commit tag go unread.
- */
 const resolveScoped = async <T>(
   door: PostgresDoor,
   workspaceId: WorkspaceId,
@@ -386,9 +204,7 @@ const resolveScoped = async <T>(
       workspaceId,
       userId,
       role: resolved.value.role,
-      // Parsed at the boundary rather than asserted (ADR 0028): the column is a foreign
-      // key to a group the platform minted, so a value of another shape is a broken
-      // database and the throw the caller sees is the truthful answer to it.
+
       groups: resolved.value.group_ids.map((id) => boundarySchemas.group.select.shape.id.parse(id)),
       credentialIssuedAtMs,
     };
@@ -403,33 +219,16 @@ const resolveScoped = async <T>(
   }
 };
 
-/**
- * A membership row once its role has been read as one of the three: what `refuse` hands
- * back instead of the raw row, so a caller's own extra refusal, and `resolveScoped` after
- * it, both read the narrowed role — never a second `isRole` asking a question `refuse`
- * already answered, because the type crosses the callback that the narrowing could not.
- */
 type ResolvedMember = MembershipRow & { readonly role: Role };
 
-/**
- * The refusals a membership row decides for **any** caller, from the row and the instant the
- * credential was issued at. Both doors make them: at the request boundary against the claims'
- * instant, and inside an act's own transaction against the same instant carried on the
- * Principal, so a revocation is judged the same way wherever it is met. The row it hands
- * back on success carries its role narrowed to `Role`, so nothing downstream re-asks `isRole`.
- */
 const refuse = (
   row: MembershipRow | undefined,
   credentialIssuedAtMs: number,
 ): Result<ResolvedMember, PrincipalRefusal> => {
   if (row === undefined) return err("not-a-member");
-  // The one place the row's `role` — text, as the query returns it — becomes a `Role`: the
-  // narrowing the Principal's type needs, made once, here, and carried out on the value
-  // this returns. It is not a second refusal of what `member_role_check`
-  // (`identity-tables.ts`) already keeps out of the column, and no row the database
-  // accepted can reach the arm; the word is what a reader of a broken row would hear.
+
   if (!isRole(row.role)) return err("role-unknown");
-  // Either instant refuses, with the one word: revoked everywhere, or revoked here.
+
   for (const revokedAt of [row.person_revoked_at, row.membership_revoked_at]) {
     if (revokedAt !== null && credentialIssuedAtMs < revokedAt.getTime()) {
       return err("credentials-revoked");
@@ -438,7 +237,6 @@ const refuse = (
   return ok({ ...row, role: row.role });
 };
 
-/** A fixed-window rule: at most `max` events per `windowMs`. */
 export type CounterRule = {
   readonly windowMs: number;
   readonly max: number;
@@ -446,7 +244,7 @@ export type CounterRule = {
 
 export type CounterOutcome = {
   readonly allowed: boolean;
-  /** Seconds until the window turns over — the `Retry-After` a refusal carries. */
+
   readonly retryAfterSeconds: number;
 };
 
@@ -461,14 +259,6 @@ const outcome = (count: number, rule: CounterRule, start: Date, now: Date): Coun
   ),
 });
 
-/**
- * One statement on the pre-authentication counter: upsert `(scope, key, window)` with
- * `count + 1` and read the count back. Global table, no scope needed — there is no
- * workspace before authentication.
- *
- * `now` has no default (ADR 0040): a default here would be this door reading the ambient
- * clock on a caller's behalf, so every caller passes the api's own Clock's reading.
- */
 export const consumeIngress = async (
   door: PostgresDoor,
   scope: "ip" | "email",
@@ -477,8 +267,7 @@ export const consumeIngress = async (
   now: Date,
 ): Promise<CounterOutcome> => {
   const start = windowStart(rule, now);
-  // One statement: the key's expired windows go as its current one is counted, so the
-  // table holds at most one live row per key and never becomes the load it sheds.
+
   const counted = await door.pool.query<{ count: number }>(
     `WITH swept AS (
        DELETE FROM ingress_counter WHERE scope = $1 AND key = $2 AND window_start < $3
@@ -488,18 +277,10 @@ export const consumeIngress = async (
      RETURNING count`,
     [scope, key, start],
   );
-  // An upsert's RETURNING always yields exactly one row; Postgres guarantees it, not the
-  // type, so `?? 1` is a fallback the type asks for and this statement never reaches.
+
   return outcome(counted.rows[0]?.count ?? 1, rule, start, now);
 };
 
-/**
- * One statement on the per-token counter, inside the tool call's own transaction
- * (ADR 0018: a Postgres counter per `(token, window)`). The row carries the
- * workspace id, so RLS keeps one workspace's tokens from ever reading another's.
- *
- * `now` has no default (ADR 0040), for the same reason `consumeIngress`'s does not.
- */
 export const consumeCall = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -508,8 +289,7 @@ export const consumeCall = async (
   now: Date,
 ): Promise<CounterOutcome> => {
   const start = windowStart(rule, now);
-  // The token's expired windows go as its current one is counted, so a workspace holds
-  // at most one live row per token and the counter never becomes the load it sheds.
+
   const counted = await tx.query<{ count: number }>(
     `WITH swept AS (
        DELETE FROM mcp_call_counter WHERE token_id = $2 AND window_start < $3
@@ -519,14 +299,10 @@ export const consumeCall = async (
      RETURNING count`,
     [principal.workspaceId, tokenId, start],
   );
-  // Same guarantee as `consumeIngress`'s upsert above: RETURNING always yields one row.
+
   return outcome(counted.rows[0]?.count ?? 1, rule, start, now);
 };
 
-/**
- * A workspace's config row by key; `undefined` when unset. RLS already scopes the read;
- * the predicate says so in the statement: the Principal, first.
- */
 export const readWorkspaceConfig = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -539,12 +315,6 @@ export const readWorkspaceConfig = async (
   return found.rows[0]?.value;
 };
 
-/**
- * Which of `names` exist as tables in `public` — a catalogue read, not a tenant read, so
- * it runs outside any scope. The estate's restore commands ask this before acting: a
- * slice whose tables are absent has not landed, and "not built" is an answer the drill
- * records rather than a silence (T-005; `apps/api/src/ops/index.ts`).
- */
 export const tablesPresent = async (
   door: PostgresDoor,
   names: readonly string[],

@@ -2,26 +2,6 @@ import { readOxlintConfig } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
-/**
- * The SPA's rules, run rather than remembered (`[CHECK1]`): the layering zones (`[WEB1]` — app → features
- * → shared, never back, and no feature reaching another), the one directory that names
- * Better Auth (`[WEB2]`), kebab-case filenames (`[WEB3]`'s file half), and ADR 0006's one
- * exception — `AppRouter` as an `import type` in the client-instance file and nowhere else
- * (`[WEB4]`).
- *
- * Each rule is applied to a throwaway tree, so the assertion is as much about where the rule
- * stays silent as where it fires. The tree, the run and the reading of the report are the
- * devtools runner's, so a linter that could not run cannot read here as a rule that stayed
- * quiet. The zones themselves are per-glob `no-restricted-imports` overrides because oxlint
- * 1.80 has no `import/no-restricted-paths`.
- */
-
-/**
- * The SPA's overrides, in the order the real config declares them — which matters, because a
- * later override replaces an earlier one's configuration of the same rule and the zones are
- * built on exactly that. The react-doctor override over `apps/web/**` is left out by the
- * filter: it sets neither of the two rules under test.
- */
 const webOverrides = () =>
   readOxlintConfig().overrides.filter(
     (override) =>
@@ -30,22 +10,10 @@ const webOverrides = () =>
         override.rules?.["unicorn/filename-case"] !== undefined),
   );
 
-// The five the SPA owns. A sixth added without a case below would be run by this suite and
-// asserted by nothing, which is the failure a rule test exists to prevent.
 if (webOverrides().length !== 5) {
   throw new Error(`expected five apps/web overrides, found ${webOverrides().length}`);
 }
 
-/**
- * Lint a tree (path → source) under the SPA's real overrides, and name the paths oxlint
- * reported a diagnostic against.
- *
- * The smoke case is a file whose name `unicorn/filename-case` must refuse, and the one path
- * that must come back for it. Nothing below is allowed to read a silence as "the rule stayed
- * quiet" until oxlint has answered it: an oxlint that cannot run, one whose config it
- * refused, or one whose reporter changed would otherwise turn every assertion in this file
- * into a tautology that passes.
- */
 const { flagged } = oxlintOver(
   JSON.stringify({ plugins: ["typescript", "unicorn", "import"], overrides: webOverrides() }),
   {
@@ -123,10 +91,6 @@ describe("better-auth is named in the identity feature and nowhere else", () => 
       "apps/web/src/app/reaches-the-library.ts": probe("@better-auth/oauth-provider/client"),
     });
 
-    // One glob and no carve-out: the registry's auth files that once sat under `shared/`
-    // left with `@better-auth-ui/*` (T-046), so `shared/ui/` reaching for `better-auth` is
-    // refused like anywhere else, and the scoped `@better-auth/*` client plugin is allowed
-    // in the module and nowhere else.
     expect(refused).toEqual([
       "apps/web/src/app/reaches-the-library.ts",
       "apps/web/src/features/routes/reaches-the-library.ts",
@@ -191,10 +155,6 @@ describe("ADR 0006's one exception \u2014 AppRouter as a type, in one file", () 
   });
 
   it("lets a second api type into the client-instance file, because what the rule bans is runtime coupling", () => {
-    // Where the rule deliberately stays silent. oxlint 1.80 ignores `allowImportNames` beside
-    // `allowTypeImports`, so this file's exception is `import type`-only rather than
-    // `AppRouter`-only — which is the guarantee ADR 0006's amendment states, since a type
-    // erases at build time whatever it is called. A value import is still refused, above.
     const refused = flagged({
       "apps/web/src/shared/api/trpc.ts": `import type { TrpcContext } from "@better-answers/api/trpc";\nexport type Kept = TrpcContext;\n`,
     });

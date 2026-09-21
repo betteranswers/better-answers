@@ -27,26 +27,11 @@ import {
   staged,
 } from "./bundle.ts";
 
-/**
- * The git door through its own interface (`[TEST1]`), against a real bare repository and no
- * Postgres: what it will put a file at, what one commit's index may see, what a git failure
- * after the precondition comes back as, and what the per-repository lock keeps in order.
- *
- * `concepts.test.ts` proves the same door through an act, which is where the governed write's
- * two-store claims belong. These are the claims a caller of the door can make and an act
- * cannot: the concepts slice narrows a path before the door ever sees one, catches nothing
- * after the precondition, and holds the lock around work of its own.
- */
-
 const bundles = bundlesForSuite();
 
-/**
- * A Principal for a workspace with no membership behind it: the door reads `workspaceId` off
- * it and derives the repository from that, so this suite needs no identity set to run.
- */
 const memberOf = (workspaceId: string): UserPrincipal => ({
   kind: "user",
-  // Parsed at the boundary rather than asserted (ADR 0028), exactly as the resolver does it.
+
   workspaceId: boundarySchemas.workspace.select.shape.id.parse(workspaceId),
   userId: boundarySchemas.user.select.shape.id.parse(ulid()),
   role: "Editor",
@@ -60,7 +45,6 @@ type Bundle = {
   readonly workspaceId: string;
 };
 
-/** A workspace's bare repository with no commits in it — where every test here opens. */
 const arrange = async (): Promise<Bundle> => {
   const workspaceId = ulid();
   const door = bundles();
@@ -81,17 +65,11 @@ const requestFor = (overrides: Partial<CommitRequest> = {}): CommitRequest => ({
   ...overrides,
 });
 
-/** The sha of a commit that was supposed to land; the throw is what a test reads instead of a fallback. */
 const shaOf = (committed: Awaited<ReturnType<typeof commit>>): string => {
   if (!committed.ok) throw new Error(`the commit was refused: ${String(committed.error)}`);
   return committed.value.sha;
 };
 
-/**
- * `openGit` is the door's one constructor, and where a root is checked (ADR 0024): each shape
- * below is its own case because each is its own clause of the guard, the way the bundle-path
- * guard's shapes are below.
- */
 describe("opening the git door", () => {
   it("refuses an empty root at open", () => {
     expect(openGit("")).toEqual({ ok: false, error: "root-not-absolute" });
@@ -108,12 +86,6 @@ describe("opening the git door", () => {
   });
 });
 
-/**
- * The path is what decides where a governed write lands in the bundle's object graph, and it
- * arrives as a caller's string. `..`, a leading slash and an empty segment are each their own
- * case here because each is its own clause of the guard, and a guard proven by one shape is a
- * guard that can lose the others quietly.
- */
 describe("what the git door will put a file at", () => {
   it.each([
     ["climbs out of the bundle", "../escape.md"],
@@ -122,8 +94,7 @@ describe("what the git door will put a file at", () => {
     ["carries an empty segment", "knowledge//expenses.md"],
     ["carries a bare current-directory segment", "knowledge/./expenses.md"],
     ["is empty", ""],
-    // A control character is a name no OKF tool reads back and a line git's own listings
-    // would quote; the reader takes NUL-delimited listings and the door admits none.
+
     ["carries a tab", "knowledge/ex\tpenses.md"],
     ["carries a newline", "knowledge/ex\npenses.md"],
   ])(
@@ -182,22 +153,14 @@ describe("one commit's index", () => {
 
     await commit(bundle.principal, bundle.door, requestFor());
 
-    // A commit that staged in the repository's own index would leave that index behind for
-    // the next act to read — which is what makes one act's tree another act's business.
     expect(await staged(bundle.door, bundle.workspaceId)).toEqual([]);
   });
 });
 
-/**
- * The arm below the precondition: git refused something after this door decided the write was
- * the caller's to make. A ref that moved is the stale precondition again and is told apart by
- * what git says about it; everything else is the store's failure and comes back as an Error.
- */
 describe("a git failure after the precondition passed", () => {
   it("reads a ref it could not lock as the stale precondition it is", async () => {
     const bundle = await arrange();
-    // git's own lock file, as a writer that never finished would leave it: `update-ref`
-    // refuses the move, and its words are what this door reads the refusal off.
+
     await writeFile(
       path.join(bundle.door.root, `${bundle.workspaceId}.git`, "refs/heads/main.lock"),
       "",
@@ -211,8 +174,6 @@ describe("a git failure after the precondition passed", () => {
   it("hands back the store's own failure when git refuses the write for anything else", async () => {
     const bundle = await arrange();
 
-    // A path this door's guard admits and git's object graph will not hold: no refusal word
-    // covers it, so the caller gets the Error to log rather than a word to show a person.
     const failed = await commit(bundle.principal, bundle.door, requestFor({ path: ".git/config" }));
 
     expect(failed.ok).toBe(false);
@@ -257,7 +218,6 @@ describe("the message the git door composes", () => {
   });
 });
 
-/** Resolve on demand, so a test decides when the work inside a lock is allowed to finish. */
 const gate = (): { readonly waited: Promise<void>; readonly open: () => void } => {
   let open = (): void => {};
   const waited = new Promise<void>((resolve) => {
@@ -266,7 +226,6 @@ const gate = (): { readonly waited: Promise<void>; readonly open: () => void } =
   return { waited, open: () => open() };
 };
 
-/** Let every queued microtask and immediate run, so an act that was free to start has started. */
 const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
 describe("the per-repository lock", () => {
@@ -290,8 +249,7 @@ describe("the per-repository lock", () => {
     first.open();
     await a;
     await secondStarted.waited;
-    // The third act arrives while the second still holds the lock and the first has already
-    // run its cleanup: an entry cleared by anyone but its own owner would let this one past.
+
     const c = withRepositoryLock(bundle.principal, bundle.door, async () => {
       order.push("c");
     });
@@ -304,21 +262,10 @@ describe("the per-repository lock", () => {
   });
 });
 
-/**
- * The platform reading a workspace's history, as the erasure map's git arm does: the routine
- * runs under the platform principal and names the workspace beside it, which is this door's
- * shape for every entry a platform makes (`commitsAfter`, `readCommit`).
- */
 const PLATFORM: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-erasure" };
 
-/** The subject of these three cases: an address a file carries and an address that authored. */
 const SUBJECT_EMAIL = "priya@example.invalid";
 
-/**
- * One commit whose file names Priya the way a concept file does — `human:<email>` (ADR 0019)
- * — and whose author line is somebody else's, so the two arms are told apart by the needle
- * rather than by the commit.
- */
 const bundleNamingPriya = async (): Promise<{ bundle: Bundle; sha: string }> => {
   const bundle = await arrange();
   const written = await commit(
@@ -347,8 +294,6 @@ describe("what a bundle's history names", () => {
   it("answers the commit whose author line carries the needle, and no file", async () => {
     const { bundle, sha } = await bundleNamingPriya();
 
-    // `AUTHOR` is `Ada Editor <ada@acme.invalid>` and no file here says so, which is the
-    // whole difference between a person a bundle's files name and one its history authored.
     const found = await historyNaming(PLATFORM, bundle.door, bundle.workspaceId, [AUTHOR.email]);
 
     expect(found).toEqual({ blobs: [], authors: [sha] });
@@ -367,16 +312,6 @@ describe("what a bundle's history names", () => {
     });
   });
 
-  /**
-   * The pair to the case above, and the reason it is a pair rather than one assertion: **both
-   * answers leave `git grep` exiting 1.** A needle nobody's file carries exits 1 in silence; an
-   * object git cannot read exits 1 having written `error: … unable to read …` to stderr and
-   * matched nothing. A door that read the status alone would answer *no file names this person*
-   * for a store that never looked, and an erasure would complete over it.
-   *
-   * A removed object rather than a nonexistent revision, because a caller cannot hand this
-   * entry one: the revisions are `rev-list --all`'s own and never an argument.
-   */
   it("hands back the store's failure when git could not read an object, rather than answering that nobody is named", async () => {
     const { bundle, sha } = await bundleNamingPriya();
     await objectRemovedFrom(bundle.door, bundle.workspaceId, `${sha}:knowledge/expenses.md`);
@@ -387,12 +322,6 @@ describe("what a bundle's history names", () => {
   });
 });
 
-/**
- * `git show <commit>:<path>` answers a path the tree does not hold and a commit the repository
- * does not with **the same words and the same status** — `fatal: path '<path>' does not exist
- * in '<sha>'`, exit 128, for both — so the door cannot classify the failure by reading it. What
- * tells the two apart is a second question, and these two cases are why one is asked.
- */
 describe("the file this door reads back at a commit", () => {
   it("answers nothing for a path the commit's tree does not hold, because that is a fair question", async () => {
     const { bundle, sha } = await bundleNamingPriya();
@@ -405,11 +334,6 @@ describe("the file this door reads back at a commit", () => {
   it("refuses a commit the repository does not hold, rather than calling it an absent file", async () => {
     const { bundle } = await bundleNamingPriya();
 
-    // A row naming a commit this bundle has never held is a repository and a database that
-    // disagree about the past. Read as *no file there*, step 4 of the erasure routine skips the
-    // row and reports a check carried that nothing carried.
-    // Matched on the commit rather than on git's words: which of them says *not a tree object*
-    // is the binary's business, and what a reader of this failure needs is the sha the row named.
     await expect(
       fileAt(PLATFORM, bundle.door, bundle.workspaceId, "0".repeat(40), "knowledge/expenses.md"),
     ).rejects.toThrow(/0{40}/);

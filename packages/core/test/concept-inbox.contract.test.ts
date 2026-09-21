@@ -6,20 +6,6 @@ import { testData, withRollback } from "@better-answers/schema/testing";
 import { contractFixture } from "./contract-fixture.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
-/**
- * The concept-inbox agreement's TypeScript half (ADR 0031): the fixture in
- * `contracts/concept-inbox/` is the contract, and this suite proves this tier reads the
- * database's three inbox functions the way the fixture says — submitting a set is one
- * call, the summary re-renders against `concept_identity` every time it is asked for, and
- * the payload is out of reach everywhere but the acceptance path. The Python half runs the
- * same cases in `apps/worker/tests/test_tier_contract.py`.
- *
- * The refusals are held by **SQLSTATE and not by message text**, because the message is
- * the server's prose and the code is the agreement: `42501` is what a role with no
- * privilege and a definer function with no scope both answer, and both tiers read it off
- * their own driver.
- */
-
 const fixtureSchema = z.object({
   workspaces: z.array(z.object({ id: z.string(), name: z.string() })),
   concepts: z.array(
@@ -65,7 +51,6 @@ const fixture = contractFixture("concept-inbox", fixtureSchema);
 
 const db = postgresForSuite();
 
-/** The fixture's workspaces and the concepts its merge keys resolve against. */
 const seedFixture = async (client: Parameters<Parameters<typeof withRollback>[1]>[0]) => {
   const seed = testData(client);
   for (const workspace of fixture.workspaces) await seed.workspace(workspace);
@@ -84,7 +69,6 @@ const seedFixture = async (client: Parameters<Parameters<typeof withRollback>[1]
   }
 };
 
-/** Submit the fixture's set as the role and in the scope the fixture names. */
 const submitFixtureSet = async (client: Parameters<Parameters<typeof withRollback>[1]>[0]) => {
   await client.query(`SET LOCAL ROLE ${fixture.set.role}`);
   await client.query("SELECT set_config('app.workspace_id', $1, true)", [fixture.set.workspace_id]);
@@ -115,9 +99,6 @@ describe("the concept-inbox agreement", () => {
         [fixture.set.set_id],
       );
 
-      // The whole set at once and in the fixture's order: the summary's own promise is
-      // that every item resolves the way the fixture says, so asserting item by item would
-      // let a row the function never returned pass unnoticed.
       expect(summary.rows).toEqual(
         fixture.expect_summary.map((expected) => ({
           suggestion_id: expected.suggestion_id,

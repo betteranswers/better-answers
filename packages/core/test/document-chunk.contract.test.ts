@@ -6,28 +6,6 @@ import { ULID } from "@better-answers/schema";
 import { chunkIdOf, parseLocator, spanText } from "../src/sources/index.ts";
 import { contractFixture, documentChunkRow } from "./contract-fixture.ts";
 
-/**
- * The document-chunk agreement's TypeScript half (ADR 0031, ADR 0036): the fixture in
- * `contracts/document-chunk/` is the contract — a normalised text and a binding's fields in,
- * the chunk rows out, and the passage a locator opens — and this suite holds this tier's two
- * pure helpers to it. The Python half is `apps/worker/tests/test_document_chunk_contract.py`,
- * where the same file is read by the tier that produces the rows.
- *
- * **Why this agreement exists at all.** The two tiers index a string differently: Python by
- * code point, JavaScript by UTF-16 unit. A locator's offsets are code points (`CONTEXT.md`,
- * *locator*), so the fixture's text carries an astral character before a cited span and both
- * tiers are held to one answer for it. A test that only asserted an offset against itself
- * would pass on both sides and still let a passage come back one character out.
- *
- * What this tier can hold today is the address arithmetic: the derived chunk id, the wire
- * locator's parse and the span cut out of the text. The splitter that produces the rows is
- * the worker's (T-129) and `passageAt`, which cuts the same span out of the covering rows
- * under the read predicate, is T-133's; both are held to this same file when they land.
- *
- * Neither half holds the other's literals (`[TEST9]`): each expected value is the fixture's
- * own, and each tier asserts against its own code.
- */
-
 const openCase = z.object({
   case: z.string().min(1),
   wire: z.string(),
@@ -119,10 +97,6 @@ describe("the chunk id the fixture derives from a document and an ordinal", () =
     const pattern = new RegExp(fixture.chunk_id.pattern);
 
     for (const { source_document_id, id } of fixture.chunk_id.cases) {
-      // A chunk id is computed from an address (ADR 0036's stable id) and never minted, so
-      // the shape the platform mints must refuse it — while the document half it is built
-      // from is exactly that shape. Confusing the two would let a row key stand where an
-      // id belongs, which is what the id-shape agreement exists to stop.
       expect({ id, shaped: pattern.test(id), minted: ULID.test(id) }).toEqual({
         id,
         shaped: true,
@@ -218,10 +192,6 @@ describe("the passage a locator opens", () => {
   });
 
   it("cuts by code points, where this tier's own slice would take the wrong characters", () => {
-    // The one assertion the astral character is in the fixture for. `String.prototype.slice`
-    // counts UTF-16 units, so every span after the astral character is a unit out — the
-    // passage starts one character early and ends one character short. Nothing in this suite
-    // is allowed to pass by accident of both sides making the same mistake.
     const cited = fixture.open.filter(
       (each) => each.expect === "passage" && each.passage !== undefined,
     );
@@ -273,9 +243,6 @@ describe("the passage a locator opens", () => {
   });
 
   it("leaves a well-shaped locator for the read to refuse, and never guesses at the parser", () => {
-    // A span past the end of the text and a document this workspace does not hold are both
-    // well-formed addresses. A parser that refused them would be answering a question it has
-    // neither the text nor the rows to answer; the read answers both with the same word.
     const atTheRead = fixture.open.filter((each) => each.refused_by === "the read");
 
     expect(atTheRead.length).toBeGreaterThan(0);

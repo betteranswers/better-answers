@@ -12,15 +12,6 @@ import {
   type UserPrincipal,
 } from "../src/kernel/index.ts";
 
-/**
- * The kernel's vocabulary through the interface every slice reads it by
- * (`@better-answers/core/kernel`, `[TEST1]`): the actor a record names, the word a
- * role-guarded act refuses with, the one `try`/`catch` every slice entry point wraps its
- * external library in, and the reading of a store's constraint names into a slice's own
- * words. All pure — no store, no container.
- */
-
-/** The ids come through the boundary, so the brands are earned rather than asserted. */
 const PERSON_ID = "01JQ0000000000000000000PER";
 const person = (role: UserPrincipal["role"]): UserPrincipal => ({
   kind: "user",
@@ -50,8 +41,8 @@ describe("the actor a record names", () => {
     expectTypeOf<"human:01JQ">().toExtend<ActorId>();
     expectTypeOf<"process:better-answers-erasure">().toExtend<ActorId>();
     expectTypeOf<"better-answers-import/1.2">().toExtend<ActorId>();
-    // A hand-composed string is not an actor id: only the kernel's own forms are.
-    // @ts-expect-error — the shape is the guarantee `[AUDIT3]` rests on.
+
+    // @ts-expect-error — an actor id no code minted is the shape the audit trail rests on.
     const composed: ActorId = "priya@example.com";
     expect(composed).toBe("priya@example.com");
   });
@@ -75,13 +66,7 @@ describe("the guard on an act only an Admin may perform", () => {
   });
 });
 
-/**
- * `attempt` is the one `try`/`catch` in the repository, so what a driver or an SDK raises
- * has to come back as an Error whatever shape it was thrown in — a caller reads `.message`
- * off the value it is handed and has nowhere else to look.
- */
 describe("the one try/catch every slice entry point wraps its library in", () => {
-  /** The two fields a caller reads off the normalised Error, and whether it is one at all. */
   const errorOfThrown = async (
     thrown: unknown,
   ): Promise<{ isError: boolean; message: string; cause: unknown }> => {
@@ -97,8 +82,6 @@ describe("the one try/catch every slice entry point wraps its library in", () =>
   };
 
   it("hands back the driver's own Error, so the class and the fields it carries survive", async () => {
-    // `refusalFor` reads `.constraint` off this very object, so the Error a slice sees has
-    // to be the one the driver threw and never a copy of its message.
     const thrown = Object.assign(new TypeError("deadlock detected"), {
       constraint: "member_pkey",
     });
@@ -156,8 +139,6 @@ describe("reading a store's constraint names into a slice's words", () => {
   });
 
   it("answers for the constraint that was violated, not one whose name it contains", () => {
-    // `member_pkey` is a substring of `member_pkey_v2`, so a search over the text alone
-    // would answer the wrong word for whichever the map happened to list first.
     const overlapping = { member_pkey: "one", member_pkey_v2: "the other" } as const;
     const violation = Object.assign(
       new Error('duplicate key value violates unique constraint "member_pkey_v2"'),
@@ -174,8 +155,7 @@ describe("the shape of a name a store can hand back", () => {
     expect(
       isPortablePath("erasures/01JQ0000000000000000000WSP/01JQ00000000000000000ERQ.json"),
     ).toBe(true);
-    // A dot inside a segment is part of a name; only a segment that is nothing but dots is
-    // the thing a filesystem reads as a place rather than a name.
+
     expect(isPortablePath(".hidden/..trailing/a..b")).toBe(true);
   });
 
@@ -200,8 +180,7 @@ describe("the shape of a name a store can hand back", () => {
     expect(isPortablePath("knowledge/expenses\t.md")).toBe(false);
     expect(isPortablePath("knowledge/expenses\n.md")).toBe(false);
     expect(isPortablePath("knowledge/expenses\u007f.md")).toBe(false);
-    // The boundary both ways: 0x1f is refused and 0x20 — a space — is an ordinary character in
-    // a name every tool here reads back, so the rule is about control and not about tidiness.
+
     expect(isPortablePath("knowledge/expenses\u001f.md")).toBe(false);
     expect(isPortablePath("knowledge/travel expenses.md")).toBe(true);
   });

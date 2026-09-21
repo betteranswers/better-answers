@@ -9,44 +9,16 @@ import {
 import { oxlintOver, type Tree } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
-/**
- * ADR 0029's five import-direction rules are one rule in the repository's own oxlint
- * plugin, `better-answers/import-direction`: it places the importer and the target in a
- * zone by their position under `packages/core` and refuses what the ADR's matrix refuses,
- * with the rule number in the message. A rule nobody has run is a convention, so this test
- * runs it where each refusal fires and where its counterpart stays silent (`[CHECK1]`,
- * `[TEST7]`), and then over the real tree twice: once to show every directory under
- * `packages/core/src` classifies to the zone the ADR gives it, and once to show the tree
- * as committed lints clean under the rule.
- *
- * The rule's severity is read out of the real `.oxlintrc.json` and the plugin is resolved
- * from the repository rather than copied, so the suite cannot pass while the config that
- * switches the rule on is broken. The tree and the oxlint run are the devtools runner's,
- * which is what stops this suite reading a linter that could not run as a rule that stayed
- * quiet: an empty output satisfies every silent assertion below, so an empty output has to
- * be impossible unless the rule was silent.
- */
-
 const RULE = "better-answers/import-direction";
 const CORE = "packages/core";
 
 const config = readOxlintConfig();
 
-/**
- * The severity the base `rules` block runs the rule at. A restatement would pass while the
- * real config carried the rule as a warning, or not at all.
- */
 const severity = config.rules[RULE];
 if (severity === undefined) {
   throw new Error(`.oxlintrc.json's base rules block no longer switches ${RULE} on.`);
 }
 
-/**
- * The manifest a throwaway core carries: the name the rule keys on, and an `exports` map
- * naming the faces the cases below reach. Written here rather than copied from the real
- * manifest, so the case for a face the map does not name stays a case on the day the real
- * map gains that face.
- */
 const MANIFEST = JSON.stringify({
   name: "@better-answers/core",
   exports: {
@@ -64,13 +36,11 @@ const MANIFEST = JSON.stringify({
   },
 });
 
-/** `files` under a throwaway core that carries the manifest above. */
 const coreTree = (files: Tree): Tree => ({ [`${CORE}/package.json`]: MANIFEST, ...files });
 
 const importOf = (specifier: string): string =>
   `import * as reached from "${specifier}";\nexport const probe = reached;\n`;
 
-/** One file at `file` importing `specifier`, in a throwaway core. */
 const importing = (file: string, specifier: string): Tree =>
   coreTree({ [file]: importOf(specifier) });
 
@@ -86,9 +56,6 @@ const AUDIT = `${CORE}/src/audit/index.ts`;
 const TEST = `${CORE}/test/concepts.test.ts`;
 const ROOT_FILE = `${CORE}/probe.ts`;
 
-// The smoke case: the rule's own subject, with the one path that must come back. Until
-// oxlint answers this the way the config says it will, no silence below means anything —
-// and the plugin specifier is proved to load by the same case.
 const lint = oxlintOver(
   JSON.stringify({
     jsPlugins: config.jsPlugins.map((plugin) => ({
@@ -102,8 +69,6 @@ const lint = oxlintOver(
 
 describe("the rule fires, naming the ADR 0029 rule it holds", () => {
   it.each([
-    // Rule 5 — nothing in core imports a transport or a transport's dependency, from a slice,
-    // a test, or a file at the package root that sits in no zone.
     ["5", "a slice importing hono", SLICE, "hono"],
     ["5", "a slice importing a hono subpath", SLICE, "hono/streaming"],
     ["5", "a slice importing the node adapter", SLICE, "@hono/node-server"],
@@ -117,7 +82,7 @@ describe("the rule fires, naming the ADR 0029 rule it holds", () => {
     ["5", "a slice importing node:https", SLICE, "node:https"],
     ["5", "a test importing hono", TEST, "hono"],
     ["5", "a file at the package root importing hono", ROOT_FILE, "hono"],
-    // Rule 4 — a cross-directory import lands on the target's own index.ts.
+
     ["4", "a slice reaching a sibling's internal file", SLICE, "../guides/renderer.ts"],
     [
       "4",
@@ -147,7 +112,7 @@ describe("the rule fires, naming the ADR 0029 rule it holds", () => {
       SLICE,
       "@better-answers/core/guides/renderer.ts",
     ],
-    // Rule 4 — the face is an entry of the exports map.
+
     ["4", "a slice reaching a face the map does not name", SLICE, "../store/objects/index.ts"],
     ["4", "a slice reaching a sibling the map does not name", SLICE, "../sources/index.ts"],
     [
@@ -164,18 +129,18 @@ describe("the rule fires, naming the ADR 0029 rule it holds", () => {
       SLICE,
       "@better-answers/core/sources",
     ],
-    // Rule 4 — nothing imports erasure.
+
     ["4", "a slice importing erasure's face", SLICE, "../erasure/index.ts"],
     ["4", "a slice importing erasure by its directory", SLICE, "../erasure"],
     ["4", "a slice importing erasure's internal", SLICE, "../erasure/replay.ts"],
     ["4", "a slice importing erasure by self-reference", SLICE, "@better-answers/core/erasure"],
-    // Rule 1 — kernel imports nothing else in core, and an internal is no exception.
+
     ["1", "kernel importing a slice's face", KERNEL, "../concepts/index.ts"],
     ["1", "kernel importing a slice's internal", KERNEL, "../concepts/inbox.ts"],
     ["1", "kernel importing access's face", KERNEL, "../access/index.ts"],
     ["1", "kernel importing a door's face", KERNEL, "../store/postgres/index.ts"],
     ["1", "kernel importing a layer's face", KERNEL, "../audit/index.ts"],
-    // Rule 2 — access and the doors import only kernel; store/graph alone also imports access.
+
     ["2", "access importing a door's face", ACCESS, "../store/postgres/index.ts"],
     ["2", "access importing a slice's face", ACCESS, "../concepts/index.ts"],
     ["2", "the postgres door importing access", POSTGRES_DOOR, "../../access/index.ts"],
@@ -184,7 +149,7 @@ describe("the rule fires, naming the ADR 0029 rule it holds", () => {
     ["2", "a door importing another door", GRAPH_DOOR, "../postgres/index.ts"],
     ["2", "a door importing the store barrel", POSTGRES_DOOR, "../index.ts"],
     ["2", "the store barrel importing a door", STORE_BARREL, "./postgres/index.ts"],
-    // Rule 3 — llm and audit import kernel, access and the doors; never a slice, never each other.
+
     ["3", "audit importing llm", AUDIT, "../llm/index.ts"],
     ["3", "llm importing audit", LLM, "../audit/index.ts"],
     ["3", "llm importing a slice's face", LLM, "../concepts/index.ts"],
@@ -229,7 +194,7 @@ describe("the rule fires, naming the ADR 0029 rule it holds", () => {
 describe("the rule stays silent where the ADR allows the import", () => {
   it.each([
     ["a slice importing a sibling's face", SLICE, "../guides/index.ts"],
-    // The compiler refuses the extensionless form; the rule judges the direction, not the form.
+
     ["a slice importing a sibling by its directory", SLICE, "../guides"],
     ["a slice importing a door's face", SLICE, "../store/postgres/index.ts"],
     ["a slice importing a layer's face", SLICE, "../audit/index.ts"],
@@ -296,7 +261,6 @@ describe("the rule stays silent where the ADR allows the import", () => {
 
 const coreRoot = path.join(repositoryRoot, CORE);
 
-/** Every directory under `packages/core/src`, relative to it with `/`, deepest last. */
 const sourceDirectories = (under = ""): readonly string[] =>
   readdirSync(path.join(coreRoot, "src", under), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -305,11 +269,6 @@ const sourceDirectories = (under = ""): readonly string[] =>
       return [dir, ...sourceDirectories(dir)];
     });
 
-/**
- * The zone ADR 0029 gives a directory: three names fixed, two layers, everything else a
- * slice, and everything under `store/` a door. This is the test's half of the pair: the
- * rule's table is proved against the tree, and the tree against the table.
- */
 const zoneOf = (dir: string): string => {
   const [first] = dir.split("/");
   if (first === "kernel" || first === "access") return first;
@@ -325,11 +284,6 @@ describe("the zones and the real tree", () => {
     expect(directories.length).toBeGreaterThan(0);
   });
 
-  // An internal file of another directory fires from every zone — as a direction refusal
-  // from kernel, as an internal from the rest — and either message names the importer's
-  // zone, which is how a directory's classification is read off a run. So every directory
-  // the tree has classifies, and to the zone the ADR gives it: a new slice or door needs no
-  // line anywhere.
   it.each(directories)("places src/%s in its zone", (dir) => {
     const target = dir.startsWith("kernel") ? "src/access/predicate.ts" : "src/kernel/actor.ts";
     const specifier = path.posix.relative(`src/${dir}`, target);
@@ -346,7 +300,6 @@ describe("the zones and the real tree", () => {
     expect(existsSync(path.join(coreRoot, "src", named, "index.ts"))).toBe(true);
   });
 
-  /** The committed `packages/core` — its manifest, `src/` and `test/` — as a throwaway tree. */
   const committedCore = (): Tree => {
     const files = (under: string): readonly string[] =>
       readdirSync(path.join(coreRoot, under), { withFileTypes: true }).flatMap((entry) =>
@@ -369,13 +322,6 @@ describe("the zones and the real tree", () => {
   });
 });
 
-/**
- * The override this rule replaced. With it gone, the base `**\/*.ts` override's bans reach
- * core with no restatement — which is the point of deleting it, and is proved here rather
- * than remembered: an override that set `no-restricted-imports` over core again would
- * replace the base override's patterns for those files, and the drizzle-zod ban would go
- * quiet there without any test noticing.
- */
 describe("the base import bans reach packages/core unrestated", () => {
   it("has no override in .oxlintrc.json setting no-restricted-imports over packages/core", () => {
     const over = config.overrides

@@ -1,13 +1,3 @@
-/**
- * Control Centre's six screens, in the order `CONTEXT.md` lists them under *screen (of
- * Control Centre)*. The navigation and the routes are both built from this one list, so a
- * screen cannot be in the frame and missing from the router, or the other way round.
- *
- * `summary` is what the screen is for, said in the glossary's words — *workspace*, *map*,
- * *concept*, *suggestion*, *role*, *route*. It is the same sentence whether the screen is
- * built or not, because what a screen is for does not depend on whether it exists yet.
- */
-
 export const SCREENS = [
   {
     id: "sources",
@@ -49,12 +39,6 @@ export const SCREENS = [
   },
 ] as const;
 
-/**
- * A screen's id is read off the list rather than declared beside it. A second declaration
- * would let an id exist with no screen behind it — a name that is valid everywhere and
- * reaches nothing — which is the failure a two-way membership check would otherwise have to
- * catch.
- */
 export type Screen = (typeof SCREENS)[number];
 export type ScreenId = Screen["id"];
 

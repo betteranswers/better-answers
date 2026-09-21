@@ -1,27 +1,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-/**
- * The repository's own `.oxlintrc.json`, read as a value.
- *
- * Three suites — the api's rules, the SPA's zones and core's import direction — each run
- * oxlint over a throwaway tree under the *real* config rather than a restatement of it, so
- * that a suite cannot pass while the config it is describing is broken. Each of them was
- * reading the file the same way, and three readers of one file drift: the comment-stripping
- * regex below is the part that would have gone wrong quietly, because a reader that misses a
- * comment throws on JSON it cannot parse in one suite and not the other two.
- */
-
-/** The repository root, from this package's own location in it. */
 export const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 
-/**
- * How oxlint writes a rule's setting: a severity on its own, or a severity followed by the
- * rule's own options, whose shape is that rule's and not this module's to know.
- */
 type RuleSetting = string | readonly [string, ...unknown[]];
 
-/** The shape the suites read out of the config. Every field is one they assert on. */
 export type OxlintConfig = {
   readonly rules: Readonly<Record<string, RuleSetting>>;
   readonly overrides: readonly {
@@ -29,30 +12,16 @@ export type OxlintConfig = {
     readonly rules?: Readonly<Record<string, RuleSetting>>;
   }[];
   readonly jsPlugins: readonly { readonly name: string; readonly specifier: string }[];
-  /** The built-in plugin list and the options block: a rule run alone still needs both. */
+
   readonly plugins: readonly string[];
   readonly options?: Readonly<Record<string, unknown>>;
-  /**
-   * The severity each category runs at. A rule the `rules` block does not name is held by its
-   * category, which is what the config's own adoption convention leans on: a rule is switched
-   * on by *deleting* the line that switched it off. A suite that could only read the `rules`
-   * block could not reach those rules at all.
-   */
+
   readonly categories: Readonly<Record<string, string>>;
 };
 
-/**
- * The config, with its comments removed.
- *
- * oxlint accepts JSONC and the repository's config uses it: every rule in there carries the
- * reason it is on. `JSON.parse` does not, so the `//` lines are stripped before the parse —
- * whole-line comments only, which is the form the config uses, and the form that cannot
- * swallow a `//` inside a string such as a URL.
- */
 export const readOxlintConfig = (): OxlintConfig =>
-  // SAFETY: the shape asserted is this repository's own config file. A key that stopped
-  // being there fails in the suite that names it, and a file that is not JSON at all throws
-  // in the parse itself — neither can reach a caller as a quietly empty config.
+  // SAFETY: a key that stopped being there fails the suite that names it, and a file that is
+  // not JSON throws in the parse itself.
   JSON.parse(
     readFileSync(path.join(repositoryRoot, ".oxlintrc.json"), "utf8").replaceAll(
       /^\s*\/\/.*$/gm,
@@ -60,22 +29,10 @@ export const readOxlintConfig = (): OxlintConfig =>
     ),
   ) as OxlintConfig;
 
-/** An override the search matched on its file list, so whether it has one is settled. */
 type GlobbedOverride = OxlintConfig["overrides"][number] & {
   readonly files: readonly string[];
 };
 
-/**
- * The override declaring exactly `glob`, or a throw naming it.
- *
- * A suite that read `undefined` here would build a throwaway config missing the very rule it
- * is about to assert on, and then read oxlint's silence as the rule staying quiet.
- *
- * The search is what settles `files`: an override is matched *by* the list holding `glob`, so
- * the one this answers with has one. The predicate says that to the type, which leaves the
- * throw below as the single condition — and lets a caller pass the override straight back into
- * an override literal without restating a `files` that cannot be missing.
- */
 export const oxlintOverrideFor = (glob: string): GlobbedOverride => {
   const found = readOxlintConfig().overrides.find(
     (override): override is GlobbedOverride => override.files?.includes(glob) === true,

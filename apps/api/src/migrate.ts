@@ -7,11 +7,6 @@ import { migrationsFolder } from "@better-answers/schema";
 import { requireBootstrap } from "./config.ts";
 import { logger } from "./logger.ts";
 
-/**
- * The `migrate` one-shot of the platform stack: it runs to completion before `app`
- * starts, and `app` before `worker` (ADR 0007's deploy order). Migrations are
- * forward-only — a rollback is the previous image digest (ADR 0022).
- */
 const bootstrap = requireBootstrap("migrations");
 const database = drizzle(bootstrap.databaseUrl);
 

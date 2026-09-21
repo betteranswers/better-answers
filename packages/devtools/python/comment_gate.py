@@ -11,7 +11,7 @@ from pathlib import Path
 
 WORD_LIMIT = 25
 
-# Deleting one of these changes what another tool does, so text alone decides.
+
 EXEMPT_OPENING = re.compile(
     r"^(?:!"
     r"|type:"
@@ -51,7 +51,7 @@ CITES = (
 
 DOCSTRING_HOLDERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 
-# Nobody here wrote these, and a vendored tree is thousands of findings nobody reads.
+
 NEVER_WALKED = frozenset(
     {
         ".git",
@@ -66,8 +66,6 @@ NEVER_WALKED = frozenset(
 )
 
 
-# Tokens, not quotes: a `#` inside a string is not a comment, and a reader sees touching
-# `#` lines as one paragraph.
 def _comment_blocks(source: str) -> list[tuple[int, str]]:
     lines = source.splitlines()
     blocks: list[tuple[int, str]] = []
@@ -79,8 +77,7 @@ def _comment_blocks(source: str) -> list[tuple[int, str]]:
             continue
         row, column = found.start
         text = found.string.lstrip("#")
-        # Dropped before grouping, never after: a directive between two paragraphs would
-        # otherwise lend them its exemption.
+
         if EXEMPT_OPENING.match(text.strip()):
             if start is not None:
                 blocks.append((start, "\n".join(parts)))
@@ -105,8 +102,6 @@ def _comment_blocks(source: str) -> list[tuple[int, str]]:
     return blocks
 
 
-# A docstring is a comment here: it is the form this tier's narrative voice takes, and
-# no ruff rule caps one or forbids one.
 def _docstrings(source: str) -> list[tuple[int, str]]:
     found: list[tuple[int, str]] = []
     for node in ast.walk(ast.parse(source)):
@@ -159,7 +154,7 @@ def main(argv: list[str]) -> int:
     for path in files:
         try:
             findings.extend(_findings(path, path.read_text(encoding="utf8")))
-        # A file this cannot parse is a gate that read nothing, never a clean tree.
+
         except (SyntaxError, tokenize.TokenError, UnicodeDecodeError) as refused:
             print(f"comment_gate: {path} could not be read: {refused}", file=sys.stderr)
             return 2

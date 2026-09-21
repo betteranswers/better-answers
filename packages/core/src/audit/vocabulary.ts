@@ -13,55 +13,14 @@ import type { z } from "zod";
 
 import type { Role } from "../kernel/index.ts";
 
-/**
- * The ledger's vocabulary: the four families, the shape of an act's name, the kinds a
- * detail field may have, and the declaration every slice makes before it may write
- * (ADR 0035; ADR 0038). The doors that write the rows are `index.ts`'s; this module has
- * no store and no transaction, only words and the rules they are held to.
- */
-
 type AuditEventRow = z.infer<typeof boundarySchemas.auditEvent.select>;
 
-/**
- * The four families — people · knowledge · sources · platform — the one closed list in
- * the vocabulary, read off the boundary that narrows to it (ADR 0028: the boundary is the
- * source of application-level types).
- */
 export type Family = AuditEventRow["family"];
 
-/**
- * An act's name, `family.subject.verb`, over one family or any: `ActName<"people">` is
- * every act whose first word is *people*. The subject is the record acted on and the
- * verb what happened — `people.member.role_changed`, `knowledge.suggestion.accepted`,
- * `sources.binding.published`, `platform.reconciler.replayed`.
- */
 export type ActName<F extends Family = Family> = Extract<AuditEventRow["act"], `${F}.${string}`>;
 
-/** A detail field's value: one scalar, never a nested object (the boundary holds that). */
 export type DetailValue = string | number | boolean;
 
-/**
- * What a detail field may be, named by kind rather than by type, so that a declaration
- * reads as the rule it is held to: an **id** is the minter's shape and never an email; a
- * **role** is one of the three words; a **flag** is an act's confirmation; an **iri** is a
- * concept's platform-minted key (ADR 0002); a **gitSha** is a commit's object name and a
- * **contentHash** the canonical hash of what a check confirmed (ADR 0014) — two kinds and
- * not one, because they are two different lengths over two different things and a field
- * that accepted either would accept a commit where a content hash belongs; a **count** is
- * how many of something an act touched; a **sensitivity** is one of the three class words
- * and an **audience** one of the two audience words, so a narrowing and an override say
- * what they decided in the glossary's own vocabulary (ADR 0039). A kind for a person's name
- * or contact does not exist, which is how the ledger stays a table an erasure never
- * rewrites; a kind an act needs and this list lacks is added here, with the act that needs
- * it. Each kind's check runs on every write.
- *
- * A kind written with a trailing `?` — **id?** so far — is that kind *or absent*: the field
- * may be left out of a row's detail, and is checked exactly as its kind when it is there.
- * The one act that needs it is the subject request's, whose detail carries the person id
- * where the subject holds a login and nothing at all where they hold none (T-123): a null
- * standing in for a person would be a value the ledger does not have a word for, and a
- * second act for the second case would be one act name for one thing that happened.
- */
 const isId = (value: DetailValue) => typeof value === "string" && ULID.test(value);
 
 export const DETAIL_KINDS = {
@@ -80,16 +39,11 @@ export const DETAIL_KINDS = {
 } as const;
 
 export type DetailKind = keyof typeof DETAIL_KINDS;
-/** The fields a declared act's detail carries, each named with its kind. */
+
 export type DetailShape = Readonly<Record<string, DetailKind>>;
 
-/** The kinds written with a trailing `?`: a field of one may be left out of a detail. */
 type OptionalDetailKind = Extract<DetailKind, `${string}?`>;
 
-/**
- * Whether a kind was written with the `?` — the runtime half of the type above, and the one
- * question the write path asks before it calls a field missing.
- */
 export const isOptionalKind = (kind: DetailKind): boolean => kind.endsWith("?");
 
 type DetailValueOf<K extends DetailKind> = K extends "role"
@@ -100,10 +54,6 @@ type DetailValueOf<K extends DetailKind> = K extends "role"
       ? number
       : string;
 
-/**
- * The detail a row of one declared act carries: the shape's fields, each at its kind's type,
- * and a field whose kind ends in `?` optional rather than required.
- */
 export type DetailOf<Shape extends DetailShape> = {
   readonly [
     Field in keyof Shape as Shape[Field] extends OptionalDetailKind ? never : Field
@@ -114,11 +64,6 @@ export type DetailOf<Shape extends DetailShape> = {
   ]?: DetailValueOf<Shape[Field]>;
 };
 
-/**
- * A declared act: its name and the shape of the detail every row of it carries. Made by
- * `act` and registered by `declareActs`; the doors accept one of these and never a string,
- * so an act that was not declared cannot be written.
- */
 export type Act<Name extends ActName = ActName, Shape extends DetailShape = DetailShape> = {
   readonly name: Name;
   readonly detail: Shape;
@@ -129,14 +74,6 @@ export const act = <Name extends ActName, const Shape extends DetailShape>(
   detail: Shape,
 ): Act<Name, Shape> => ({ name, detail });
 
-/**
- * A record that is never a ledger row, so an act may not name it as its subject: runs,
- * the answer audit (ADR 0017), signals, alerts and spend (ADR 0025), backup runs and health
- * checks, the inbox — each is its own record family with its own table. An event with no
- * workspace — a sign-in, a token issued or refused — is a log line until an identity-set
- * ledger exists (T-028), and is kept out by the ledger being a tenant table rather than by
- * this list.
- */
 const NEVER_A_SUBJECT: ReadonlySet<string> = new Set([
   "run",
   "answer_audit",
@@ -149,7 +86,6 @@ const NEVER_A_SUBJECT: ReadonlySet<string> = new Set([
   "inbox",
 ]);
 
-/** One slice's declaration: the family it declared under and the acts it declared. */
 export type Declaration = {
   readonly family: Family;
   readonly acts: readonly ActName[];
@@ -170,17 +106,6 @@ const declarationRefusal = (family: Family, name: string): string | undefined =>
   return undefined;
 };
 
-/**
- * Declare a slice's acts against one family. Runs when the slice's module loads, so a
- * declaration that breaks a rule fails the first test that imports the slice rather than
- * the first act that reaches production: the name must be `family.subject.verb` under the
- * family it is declared under, may not name a record that is never a ledger row, and may
- * be declared once in the whole tree — an act belongs to one slice. Every name is checked
- * before any is registered, so a refused declaration registers nothing.
- *
- * The declaration is also registered, so one test can walk every slice's acts and hold
- * the family prefix both ways (`packages/core/test/audit.test.ts`).
- */
 export const declareActs = <F extends Family, const Acts extends Record<string, Act<ActName<F>>>>(
   family: F,
   acts: Acts,
@@ -195,8 +120,6 @@ export const declareActs = <F extends Family, const Acts extends Record<string, 
   return acts;
 };
 
-/** Every declaration made so far, in the order the slices loaded. */
 export const declarations = (): readonly Declaration[] => [...declared];
 
-/** Whether an act was declared — the doors' runtime half of "a declared act and nothing else". */
 export const isDeclared = (name: string): boolean => declaredNames.has(name);

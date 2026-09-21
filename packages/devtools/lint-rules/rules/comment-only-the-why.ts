@@ -4,7 +4,6 @@ import type { Comment, Fix, Fixer, Range } from "@oxlint/plugins";
 
 const WORD_LIMIT = 25;
 
-// Deleting one of these changes what another tool does, so text alone decides.
 const EXEMPT_OPENING =
   /^(?:!|\/\s*<reference\b|eslint-|oxlint-|@ts-|@vitest-environment\b|@license\b|prettier-ignore\b|oxfmt-ignore\b|biome-ignore\b|jscpd:ignore|v8 ignore\b|c8 ignore\b|istanbul ignore\b|SPDX-License-Identifier\b|Copyright\b)/;
 
@@ -33,15 +32,12 @@ const startsItsOwnLine = (text: string, comment: Comment): boolean => {
   return true;
 };
 
-// A reader sees touching `//` lines as one paragraph, so eight short lines are not eight
-// passes.
 const blocksIn = (text: string, comments: readonly Comment[]): readonly (readonly Comment[])[] => {
   const blocks: Comment[][] = [];
   let open: Comment[] | undefined;
   for (const comment of comments) {
     if (comment.type === "Shebang") continue;
-    // Dropped before grouping, never after: a directive between two paragraphs would
-    // otherwise lend them its exemption.
+
     if (EXEMPT_OPENING.test(proseOf(comment).trim())) {
       open = undefined;
       continue;
@@ -90,7 +86,7 @@ export const commentOnlyTheWhyRule = defineRule({
           const prose = block.map(proseOf).join("\n");
           const loc = { start: first.loc.start, end: last.loc.end };
           const range: Range = [first.range[0], last.range[1]];
-          // Nothing here knows the shorter comment to rewrite it into, so the offer is the cut.
+
           const fix = (fixer: Fixer): Fix => fixer.removeRange(range);
           const cited = CITATIONS.map((citation) => ({
             what: citation.what,

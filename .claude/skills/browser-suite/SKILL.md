@@ -6,7 +6,7 @@ user-invocable: true
 
 # The browser suite
 
-`apps/web`'s interface is the **served build driven by a browser** (`[TEST1]`), so a fact about a
+`apps/web`'s interface is the **served build driven by a browser**, so a fact about a
 screen is read here and a screen is never asserted against its source. Everything below is what
 the suite already is; `apps/web/e2e/routes.spec.ts` is the fullest worked example.
 
@@ -49,7 +49,7 @@ was testing.
 
 ## The harness's acts
 
-State is built through the api's harness over HTTP (`[TEST4]`, `[TEST2]`), from
+State is built through the api's harness over HTTP, from
 `apps/web/e2e/harness.ts`, using the `request` fixture. Nothing writes a row itself and nothing
 sets a cookie from outside.
 
@@ -74,13 +74,13 @@ holding one.
 - **Wait with auto-retrying matchers.** `await expect(…).toBeVisible()`, `.toHaveURL()`,
   `.toHaveCount(0)`. Where a navigation must complete before the next act, assert the thing that
   proves the screen was left.
-- **Title says what the system does for whom** (`[TEST5]`) — "a member of two workspaces picks
+- **Title says what the system does for whom** — "a member of two workspaces picks
   one, and everything after is scoped to the pick", not "picker test".
 - **Comment the why** — the constraint, the trade-off, the gotcha; the assertion says the what.
 
 ## The accessibility gate
 
-`[A11Y1]` is WCAG 2.2 AA tested with a keyboard and a screen reader, and the suite carries that as
+The accessibility rule is WCAG 2.2 AA tested with a keyboard and a screen reader, and the suite carries that as
 three things, of which automated rules are only one:
 
 - **An `AxeBuilder` pass** (`@axe-core/playwright`) over `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`
@@ -118,7 +118,7 @@ pnpm --filter @better-answers/web run build && \
   pnpm --filter @better-answers/web exec playwright test e2e/routes.spec.ts --project chromium
 ```
 
-`test.only` is allowed while debugging and refused under CI by `forbidOnly` (`[CHECK2]`): the
+`test.only` is allowed while debugging and refused under CI by `forbidOnly`: the
 specs import `test` from the fixture module, so oxlint's vitest rules never see them and this is
 the only fence — a focused spec left behind would run alone and report the suite green.
 `apps/web/test/playwright-config.test.ts` holds it both ways. Take the `.only` out before

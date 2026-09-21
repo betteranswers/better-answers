@@ -96,13 +96,16 @@ A branch may run only the suites it touches — four worktrees consolidating can
 
 ## COMMENT
 
-### [COMMENT1] Comments explain why
+### [COMMENT1] Comment only the why
 
-A comment carries the reason a reader cannot infer from the code: a constraint, a trade-off, a gotcha. What the code does is said by the code; what happened to it is said by git and ADRs. Nothing can read a comment's intent, so this one is the reviewer's — and it is the fix `[COMMENT2]`'s test prescribes when a tag has to leave a file, which is where the two are read together.
+A comment gives a reason the code cannot: a constraint, a trade-off, a gotcha. It never says what the code does, what it used to do, or which ticket, decision or rule asked for it. A file opens with code, not an essay.
+Reviewer: if a comment restates the code, narrates history or cites a ticket or decision, ask for it to be removed.
 
-### [COMMENT2] A rule tag is cited where rules are made, kept, reviewed or proved
+A directive or pragma, a licence or lift notice, and a copy-detection fence are comments this rule leaves alone. The two conditions a scan can read — a block of 25 words at most, and no ticket id, date, rule tag or ADR number in it — are held by `pnpm comment-gate:ts` and `pnpm comment-gate:python`, and the ratio of comment lines to code lines by `pnpm comment-density`: 0.10 in a workspace's source, 0.05 in its tests. All three run in `check`.
 
-A tag such as `[SEC2]` appears in the rules files, an ADR, a spec or a ticket, `cubic.yaml`, a lint rule's line or message — and in a document a reader follows to the rule: the glossary, a note under `docs/`, a package readme, a notices file. It never appears in source, a deploy file, a Dockerfile, a CI workflow, a test, or a workspace's config: a comment there carries the constraint, the trade-off or the gotcha in words (`[COMMENT1]`) or is deleted, and is never replaced tag-for-sentence. `apps/api/tests/coding-rules-tags.test.ts` holds this both ways (`[TEST7]`): every tag cited in the tree is defined in a rules file and sits in one of those places, and every defined tag is cited outside its own file or is named in the test with the reason it is not. The tests are met by a ratchet rather than by one pass: the 105 that cited a tag when this rule changed on 2026-09-11 are frozen there as a baseline that only shrinks, so a citation in a test the baseline does not list is refused, and a file that sheds its last tag loses its entry in the same commit (T-182). A tag struck in an ADR's body (`~~…~~`, the index's convention for a superseded sentence) is history, not a citation.
+### [COMMENT2] A rule tag is written in a rules file, a review finding or a gate's failure message
+
+Those three places and nowhere else, bar the frozen list below. A tag in source, a test, a document, a deploy file, a Dockerfile, a CI workflow or a workspace's config is a pointer a reader cannot follow and a citation nothing keeps true: write the rule in words instead, or delete the sentence. `apps/api/tests/coding-rules-tags.test.ts` holds it — tags are defined only in rules files and are well-formed, a tag in a gate's message is defined, and a tag anywhere else fails. The ADR and spec files that cited a rule when that test was written are a frozen list it does not read for undefined tags; the list only ever shrinks, and a file created after it fails like any other.
 
 ## GLOSSARY
 

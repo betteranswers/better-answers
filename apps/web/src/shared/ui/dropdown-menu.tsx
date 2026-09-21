@@ -70,9 +70,7 @@ function DropdownMenuItem({
 function DropdownMenuCheckboxItem({
   className,
   children,
-  // `checked` stays inside the spread (arrival edit, `THIRD_PARTY_NOTICES.md`): re-passing
-  // a destructured optional prop by name writes `boolean | undefined` into a slot that
-  // `exactOptionalPropertyTypes` keeps as `CheckedState`-only.
+
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.CheckboxItem>) {
   return (

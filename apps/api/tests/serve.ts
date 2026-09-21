@@ -7,39 +7,11 @@ import { logger } from "../src/logger.ts";
 import { harnessControl } from "./harness-control.ts";
 import { startApp } from "./harness.ts";
 
-/**
- * The app, listening, for a caller that cannot be given a `Request` — the browser suite in
- * `apps/web/e2e`, and the dev loop when someone wants to look at the running product.
- *
- * It is the same app every endpoint test drives: the server factory over a Testcontainers
- * Postgres, with the email transport capturing codes and the CIMD document served in
- * process (`[TEST3]`). Nothing here builds a second version of it: `[APP2]` keeps
- * `createServer` the tier's one server, and a suite that wanted its own would be building
- * a second app to prove the first.
- *
- * The port is an argument rather than an environment variable, because the caller that
- * needs it is the one that must choose it, and `[SEC1]` keeps `src/config.ts` the tier's
- * only reader of the environment.
- */
-
 const port = Number(process.argv[2]);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("the browser suite's app needs a port as its one argument");
 }
 
-/**
- * `app.` is the loopback here, because that is the hostname a browser on this machine can
- * actually reach and the fence in `ingress/hostnames.ts` matches on the `Host` it arrives
- * with. Which hostname carries which path is proven in `tests/hostnames.test.ts`; this
- * suite is about what a browser does with the screens and the flow `app.` serves.
- *
- * The one origin is told to the app rather than left to the harness's default, because
- * Better Auth sends a person signing in to `${publicUrl}/sign-in`, issues from it and
- * renders consent on it, and this estate's product is on a loopback http port rather than
- * an https hostname (ADR 0034). One product host is what makes the consent flow provable
- * here at all: sign-in, authorize, consent and the code's redirect all happen on the
- * origin the browser is already on.
- */
 const app = await startApp({
   webRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
   publicUrl: `http://127.0.0.1:${port}`,
@@ -50,11 +22,6 @@ const app = await startApp({
   },
 });
 
-/**
- * The harness's own control surface in front of the app, so a browser test can provision a
- * workspace and read a captured code. It is mounted here and never in `createServer`: the
- * server the deploy unit builds has no idea these paths exist.
- */
 const listening = serve(
   { fetch: withHarnessControl().fetch, port, hostname: "127.0.0.1" },
   (address) => {
@@ -69,15 +36,11 @@ function withHarnessControl(): Hono {
   return outer;
 }
 
-// Without this, a port already in use is an unhandled `error` event and a stack trace with
-// the port nowhere in it; Playwright then reports only that its server never came up.
 listening.on("error", (cause: Error) => {
   logger.error({ port, reason: cause.message }, "the browser suite's app could not listen");
   process.exit(1);
 });
 
-// Playwright ends the run by signalling this process; the database it started goes with it
-// rather than waiting for the container reaper.
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     listening.close(() => {

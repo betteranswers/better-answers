@@ -1,29 +1,3 @@
-"""The redaction seam: what a document's text must not carry past this point.
-
-The package is one module from the outside. Its one public function takes the
-normalised text of a document, the rules in force on its binding, the suppressions that
-apply to it, a per-binding seed and the spans of it an Admin restored, and answers the
-redacted text with the findings, the counts, the narrowing verdict and the version
-string. It reads nothing but its
-arguments and memoises nothing: the memoised wrap around it belongs to the pipeline,
-and a seam that cached anything of its own would be a second cache with a second
-lifetime. The analyzer it runs is brought up once per process, which is a resource and
-not a memo — `engine.py` says why at length.
-
-**A finding and a withholding are two different things.** Every span the rules raise is
-a finding, whatever the binding says, because a finding is the row an Admin reviews and
-the evidence the erasure map is read from. What the binding decides is which of those
-findings are written out of the text: the always tier always, the two switchable tiers
-as the binding's own column says. So a name left in the text on a bid library is still
-a finding, and switching that tier on later withholds it without re-detecting anything.
-
-**The placeholder follows the tier the finding was raised at, not its category.** The
-always tier has one neutral word for everything in it, because a typed placeholder for
-that set would tell the audience what class of data the document held; the two
-switchable tiers say what was taken, because a reader has to know that a way of
-reaching somebody was removed rather than a name.
-"""
-
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -44,16 +18,12 @@ from .suppressions import raised_by_a_suppression, suppressed_among
 
 __all__ = ["Redaction", "Restore", "redact"]
 
-#: Each tier a binding can switch, as the key it is switched by on `source_binding` and
-#: what an unconfigured binding does with it. The always tier is not here because it is
-#: not switchable: that is the whole of what "always" means.
+
 SWITCHABLE_TIERS: Mapping[str, tuple[str, bool]] = MappingProxyType(
     {"default-on": ("default_on", True), "default-off": ("default_off", False)}
 )
 
-#: The one word the always tier is written out as, taken from the declarations rather
-#: than spelled again here. Every category in that tier declares the same word, and a
-#: table where they did not would be a table that could not keep this promise.
+
 ALWAYS_PLACEHOLDER = next(
     iter({item.placeholder for item in DESCRIPTORS if item.tier == ALWAYS_TIER})
 )
@@ -61,25 +31,6 @@ ALWAYS_PLACEHOLDER = next(
 
 @dataclass(frozen=True, slots=True)
 class Redaction:
-    """What the seam answers: one document read two ways, and what it cost to read it.
-
-    `text` is the document with every withheld span replaced; `findings` are offsets
-    into the text the seam was **given**, whose length differs from `text` by every
-    placeholder written. `verdict` is the sensitivity this document must be narrowed
-    to, or nothing when no finding narrows it, and `version` is what rides on every
-    finding row so a re-detection can tell what moved.
-
-    Two findings may claim the same run of characters — a job title inside a health
-    sentence, an officer's name inside the address they are care of — because each is
-    a rule's own answer and the Admin reviewing them is owed both. Only one of any such
-    pair is written out of `text`, which is a separate decision and this binding's.
-
-    `overridden` are the restored findings the seam withheld all the same because an
-    erasure request names them. It is answered because nothing else can say it: a
-    finding holds no value, so which kept spans a request reaches is known only to the
-    pass that read the text — and an Admin whose keep did nothing is owed the reason.
-    """
-
     text: str
     findings: tuple[Finding, ...]
     counts: Mapping[str, int]
@@ -95,47 +46,13 @@ def redact(
     seed: str,
     restores: Sequence[Restore] = (),
 ) -> Redaction:
-    """One document's text, with what its binding withholds written out of it.
 
-    `rules_in_force` is the shape of the `source_binding` column: a flag per switchable
-    tier, and a key it does not carry takes the safe set's answer, so a binding nobody
-    configured withholds more rather than less. `suppressions` are the identifier sets
-    of the erasure requests that reach this document, each of them the shape the
-    `subject_request` row holds, and `seed` is the binding's own, from which a name's
-    pseudonym is drawn. Both are taken here and given effect by the rules that read
-    them: a suppressed identifier is raised at the always tier, and a name is written
-    as a stable letter. `restores` are the findings of this document an Admin let back
-    into the text, each by its rule and its two offsets (`restores.py`); a document
-    nobody restored a span of passes none.
-
-    Plain types in and plain types out, and nothing read that was not passed in.
-    """
-    # Two post-passes over one detection, each of which only ever raises a tier, so the
-    # order those two run in cannot change the answer. What their placement does decide
-    # is that both have spoken before any run of characters is settled on one finding:
-    # the officer-block rule outranks the tier a binding switches, and a pass that ran
-    # after the run was settled would find the name it meant to raise already gone.
-    # Every span the rules raise stays a finding here, whatever the binding says and
-    # whatever else claims the same characters, because a finding is the row an Admin
-    # reviews rather than a claim on the text.
     findings = raised_by_a_suppression(
         raised_by_the_block_rule(detect(text), text), text, suppressions
     )
-    # The letters are drawn over every name the document holds, whatever tier it ended
-    # at: a name that gives up its place in the queue when it is withheld would move
-    # everybody met after it onto a different letter, and a suppression has to change
-    # the output for the person it names and for nobody else.
+
     letters = pseudonyms_for(_names_in(text, findings), seed)
-    # And the overlap is settled last, over the findings this binding actually
-    # withholds, because a span left in the text stands in for nothing: a name that lost
-    # its run of characters to a home address the binding had switched off used to leave
-    # the pair of them on the page together (T-145).
-    # A restored finding is taken out of what is withheld before the overlap is settled,
-    # and for the same reason a switched-off one is: a span left in the text stands in
-    # for nothing, so an unrestored finding over the same characters still writes its
-    # own span out. An erasure outranks the restore — the suppressed finding *is* the
-    # one that was restored, tier raised and nothing else moved — so a restore never
-    # reaches a span a request named.
+
     restored = restored_among(findings, restores)
     erased = suppressed_among(findings, text, suppressions)
     left_in = restored - erased
@@ -152,8 +69,6 @@ def redact(
         counts=_counted(findings),
         verdict=_verdict_of(findings),
         version=VERSION_STRING,
-        # In reading order and off the findings themselves, so two runs over the same
-        # marks and the same requests answer the same tuple.
         overridden=tuple(
             finding for finding in findings if finding in restored and finding in erased
         ),
@@ -169,9 +84,7 @@ def _in_force(tier: str, rules_in_force: Mapping[str, bool]) -> bool:
 
 
 def _names_in(text: str, findings: Sequence[Finding]) -> tuple[str, ...]:
-    # Every person-name finding, in reading order and whatever tier it ended up at, so
-    # that the queue a letter is drawn from is the document's and neither the binding's
-    # nor an erasure request's.
+
     return tuple(
         text[finding.start : finding.end]
         for finding in findings
@@ -189,10 +102,7 @@ def _placeholder_of(finding: Finding, name: str, letters: Mapping[str, str]) -> 
 
 
 def _written(text: str, withheld: Sequence[Finding], letters: Mapping[str, str]) -> str:
-    # Right to left, so that every offset still points at the same character when its
-    # span is reached: a replacement changes the length of everything after it. The name
-    # a placeholder is chosen by is read out of the text the seam was given, never out
-    # of the text being written, whose spans have already moved.
+
     redacted = text
     for finding in sorted(withheld, key=lambda it: it.start, reverse=True):
         redacted = (

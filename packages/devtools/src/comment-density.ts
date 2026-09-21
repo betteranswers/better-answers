@@ -8,10 +8,8 @@ export const CEILING = { source: 0.1, test: 0.05 } as const;
 
 export type Arm = keyof typeof CEILING;
 
-// The strip's scope; a workspace's markdown and JSON would otherwise move its ratio.
 const MEASURED_LANGUAGES = new Set(["TypeScript", "Python"]);
 
-// Nobody here wrote these, and a vendored tree would set the ratio for the workspace holding it.
 const NEVER_WALKED = [
   ".venv",
   "__pycache__",
@@ -26,7 +24,6 @@ const NEVER_WALKED = [
 
 const TEST_DIRECTORIES = new Set(["e2e", "test", "tests"]);
 
-// A colocated test is a test wherever it sits, so the tighter ceiling reaches it too.
 const TEST_FILE = /(^test_|[._](test|spec)\.)/;
 
 export const CLOC_EXECUTABLE = { package: "cloc", path: ["lib", "cloc"] } as const;
@@ -35,8 +32,13 @@ export const clocArgv = (paths: readonly string[]): readonly string[] => [
   "--json",
   "--by-file",
   "--quiet",
-  // Without it a file with a twin elsewhere is counted once, and an arm loses its lines.
+
   "--skip-uniqueness",
+
+  // The per-file guard drops the file it fires on and writes prose after the JSON, so the
+  // count is short and the parse fails.
+  "--timeout",
+  "0",
   `--exclude-dir=${NEVER_WALKED.join(",")}`,
   ...paths,
 ];
@@ -54,9 +56,9 @@ type ClocEntry = {
   readonly comment?: unknown;
 };
 
-// Filtered here and not on the command line: cloc has no flag that selects a language.
 export const countedIn = (output: string): readonly Counted[] => {
   const parsed: unknown = JSON.parse(output);
+
   // SAFETY: cloc's by-file JSON contract, which the runner's smoke case proves still holds.
   const report = parsed as Readonly<Record<string, ClocEntry>>;
   return Object.entries(report)
@@ -86,7 +88,6 @@ export type Measured = {
   readonly ratio: number;
 };
 
-// The deepest match, so a workspace nested inside another takes its own lines.
 const workspaceOf = (file: string, workspaces: readonly string[]): string | undefined => {
   const relative = file.replace(/^\.\//, "");
   return [...workspaces]
@@ -140,14 +141,11 @@ export const countOver = (cwd: string, paths: readonly string[]): readonly Count
     }),
   );
 
-// Reached from this package's root, the one path the runner resolves; a move breaks on the
-// existence check rather than reading as a silent tool.
 export const WRAPPER_EXECUTABLE = {
   package: "@better-answers/devtools",
   path: ["..", "..", "scripts", "comment-density.mjs"],
 } as const;
 
-/** cloc over a throwaway tree, built form for the runner. */
 export const clocOver = (
   paths: readonly string[],
   smoke: { readonly tree: Tree; readonly counted: number },

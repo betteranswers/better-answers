@@ -3,13 +3,6 @@ import { describe, expect, it } from "vitest";
 
 import { createTokenVerifier } from "../src/auth/index.ts";
 
-/**
- * The bearer verifier through its interface: the audience check is ours (research 80
- * row 24 — the SDK never wires it), so a token minted for another resource, by another
- * issuer, expired, or without the surface's claims is refused, and a rotated key is
- * read once more before a token is turned away.
- */
-
 const ISSUER = "https://app.example.test";
 const AUDIENCE = `${ISSUER}/mcp`;
 
@@ -44,7 +37,6 @@ const mint = async (
     .setExpirationTime(options.expiresIn ?? "1h")
     .sign(privateKey);
 
-/** A verifier that has published exactly these keys and nothing else. */
 const verifierPublishing = (
   ...keys: readonly Awaited<ReturnType<typeof keyed>>["jwk"][]
 ): ReturnType<typeof createTokenVerifier> =>
@@ -54,14 +46,6 @@ const verifierPublishing = (
     jwks: async () => ({ keys: [...keys] }),
   });
 
-/**
- * What the verifier threw for `token`, or `undefined` if it accepted it.
- *
- * Every refusal below asserts the same thing about a different token — the token is the
- * case — so the unwrapping is shared and the assertion stays in the test. An acceptance
- * comes back as `undefined` and fails that assertion, so a verifier that let a bad token
- * through cannot read here as a refusal.
- */
 const refusalOf = async (
   verifier: ReturnType<typeof createTokenVerifier>,
   token: string,

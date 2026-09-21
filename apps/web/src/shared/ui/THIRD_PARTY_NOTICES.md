@@ -1,13 +1,13 @@
 # Registry components in `apps/web/src/shared/ui/`
 
 ADR 0033 takes shadcn, Kibo UI and Vercel AI Elements as **source into this repository**, and
-says a registry component carries the same notice obligation as any lift (`[APP4]`, ADR 0027).
+says a registry component carries the same notice obligation as any lift (ADR 0027).
 This file is that notice. It covers every file under this directory; the tokens, the stylesheet
 and the Tailwind bridge these components read are `packages/design-system`'s and are ours.
 
 Installed **3 September 2026** with `shadcn@4.20.1` and `ai-elements@1.9.0`. A shadcn registry
-item carries no version of its own, so the pin is the CLI, the registry URL and the date
-(`[DEPS1]`); `apps/web/components.json` holds the URLs so a refresh lands in the same places.
+item carries no version of its own, so the pin is the CLI, the registry URL and the date;
+`apps/web/components.json` holds the URLs so a refresh lands in the same places.
 
 T-037 added two more items on the same day with the same CLI — `input` and `label`.
 
@@ -29,7 +29,7 @@ Upstream repositories: [shadcn-ui/ui](https://github.com/shadcn-ui/ui) (MIT),
 [vercel/ai-elements](https://github.com/vercel/ai-elements) (Apache-2.0). A shadcn registry item
 carries no commit or version of its own — this is the whole reason the item digest stands in for
 one — so there is no upstream commit to record, and the CLI version and the date are the rest of
-the pin (`[DEPS1]`).
+the pin.
 
 | File | Registry item | Item digest | File digest |
 | --- | --- | --- | --- |
@@ -92,7 +92,7 @@ and these two files were what it was quietly excusing):
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA
-line (`[A11Y1]`) and are tested with a keyboard and a screen reader.
+line and are tested with a keyboard and a screen reader.
 
 ## Refreshing this directory
 
@@ -107,8 +107,8 @@ line (`[A11Y1]`) and are tested with a keyboard and a screen reader.
    in `.oxlintrc.json` and no others, `tsc --noEmit` (which is what catches the extensionless
    imports coming back), the component and lint-rule suites, the production build, and the
    Playwright browser suite against the api-served build. A screen that renders any of these
-   components also carries its own WCAG 2.2 AA check with a keyboard and a screen reader
-   (`[A11Y1]`); that check is the screen's, not this file's.
+   components also carries its own WCAG 2.2 AA check with a keyboard and a screen reader;
+   that check is the screen's, not this file's.
 
 ## Notice text
 

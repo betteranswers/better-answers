@@ -26,8 +26,6 @@ describe("the app's health endpoint", () => {
   });
 
   it("tells the deploy unit the app is unhealthy when the platform database cannot be reached", async () => {
-    // `worker` waits on `app` being healthy, so an app that cannot reach Postgres
-    // must fail its healthcheck rather than let the stack come up around it.
     const unreachable = new Pool({
       connectionString: "postgresql://nobody@127.0.0.1:1/nothing",
       connectionTimeoutMillis: 1_000,
@@ -45,12 +43,6 @@ describe("the app's health endpoint", () => {
   });
 
   it("tells the deploy unit the app is unhealthy when the database answers but the identity provider could not start", async () => {
-    // A reachable database with no journal applied: Better Auth's eager init (its
-    // resource row, its keys) fails while `select 1` still answers.
-    // Dropped after, and dropped before in case a crashed run left it: the mutation run
-    // replays this file hundreds of times against one warm cluster, and a database left
-    // behind made every replay fail at `CREATE DATABASE` — 441 mutants in run 34168928594
-    // read as killed by this test for that reason alone, not by any assertion here.
     await app.database.superuser.query("DROP DATABASE IF EXISTS unmigrated");
     await app.database.superuser.query("CREATE DATABASE unmigrated");
     const connection = new URL(String(app.database.superuser.options.connectionString));

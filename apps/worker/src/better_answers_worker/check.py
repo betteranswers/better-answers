@@ -1,9 +1,3 @@
-"""The worker's gate: `uv run --frozen check`, which the root `check` runs (AGENTS.md).
-
-Run from `apps/worker/`. Every step runs even when an earlier one fails, so one command
-reports every problem rather than the first.
-"""
-
 import subprocess
 import sys
 

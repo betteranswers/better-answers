@@ -7,31 +7,13 @@ import { withMembership, withScope, type Tx } from "../src/store/postgres/index.
 import { abortTheTransaction } from "./suite-postgres.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
-/**
- * The principal `pnpm ops graph-rebuild` runs under: the platform acting as itself, with no
- * person behind it and no workspace of its own. It is the whole reason the enqueue takes a
- * `Principal` rather than a person's — the drill runs from cron inside a container, and work
- * that outlives a session runs under a platform principal, never a live one.
- */
 const graphMaintenance: PlatformPrincipal = {
   kind: "platform",
   actorId: "process:better-answers-graph",
 };
 
-/**
- * The runs slice through its own interface (`[TEST1]`): what the app may put on the
- * worker's queue, who may put it there, and what the platform can say afterwards about the
- * two parsers agreeing.
- *
- * The worker's side of these rows — claiming, running, finishing — is the queue agreement's
- * (`contracts/queue/`) and the worker's own suite's. What is proved here is the app's half:
- * that a job lands as the row the database will hand out, that an Editor cannot queue one,
- * and that `bundleHealth` reads the latest finished audit and nothing else.
- */
-
 const { db, arrange } = suiteWithBundles();
 
-/** The nightly audit as cron queues it — the platform's road — and the id a person reads back. */
 const auditQueuedByCron = async (
   scenario: Awaited<ReturnType<typeof arrange>>,
 ): Promise<string> => {
@@ -43,11 +25,6 @@ const auditQueuedByCron = async (
   return cron.value.jobId;
 };
 
-/**
- * A nightly audit that found nothing, in the shape the worker writes (`ParseFindings.as_row`
- * in `apps/worker`): the count, and the four lists a bundle is healthy only when all are
- * empty.
- */
 const NOTHING_FOUND = {
   checked: 1,
   mismatched: [],
@@ -56,10 +33,6 @@ const NOTHING_FOUND = {
   missing_file: [],
 } as const;
 
-/**
- * An outcome written past the boundary — as the worker's finish function would take it, the
- * column being JSONB and the function the database's — onto a job the factory finished.
- */
 const outcomeWrittenRaw = async (workspaceId: string, jobId: string, outcome: unknown) => {
   await db().pool.query("UPDATE job SET outcome = $3 WHERE workspace_id = $1 AND id = $2", [
     workspaceId,
@@ -68,11 +41,9 @@ const outcomeWrittenRaw = async (workspaceId: string, jobId: string, outcome: un
   ]);
 };
 
-/** A nightly audit over three files that found nothing, finished at this instant. */
 const foundNothingOn = (workspaceId: string, at: string) =>
   finishedAudit(workspaceId, { ...NOTHING_FOUND, checked: 3 }, new Date(at));
 
-/** What the worker would have written when it finished an audit, as the app sees it. */
 const finishedAudit = async (
   workspaceId: string,
   outcome: Readonly<Record<string, unknown>>,
@@ -146,8 +117,6 @@ describe("what the app puts on the worker's queue", () => {
   });
 
   it("queues for the platform, which names the workspace because it holds none of its own", async () => {
-    // `pnpm ops graph-rebuild` has no session to resolve, so the workspace is the argument
-    // and the scope is set from it — the Postgres door's own shape for a platform act.
     const scenario = await arrange();
 
     const queued = await enqueueJob(graphMaintenance, scenario.postgres, {
@@ -165,8 +134,6 @@ describe("what the app puts on the worker's queue", () => {
   });
 
   it("refuses a person who names another tenant's workspace, rather than quietly using their own", async () => {
-    // A caller that named another tenant has the wrong idea; handing it a job in its own
-    // workspace would bury that, and RLS would have refused the row anyway.
     const scenario = await arrange();
     const elsewhere = await arrange();
 
@@ -219,30 +186,16 @@ describe("what the app puts on the worker's queue", () => {
   });
 });
 
-/**
- * The binding an `index` run is about. The queue carries a subject as text and nothing more
- * — what a kind is about differs by kind, and a binding's existence is `source_binding`'s to
- * enforce and not the queue's — so a literal here is the whole arrangement.
- */
 const BINDING = "01K4Q9F3V8YXP7R2M6ZKWC3TDS";
 
-/** A second binding, so the run key can be shown to be one per subject and not one per kind. */
 const ANOTHER_BINDING = "01K4Q9F3V8YXP7R2M6ZKWC3TDT";
 
-/** The upload act's job: this binding through the seam and into the index, because it was bound. */
 const boundJob = (workspaceId: string) =>
   ({ workspaceId, kind: "index", subjectId: BINDING, reason: "bound" }) as const;
 
-/**
- * One transaction opened the way an act opens one, with the enqueue riding inside it — the
- * shape every caller of `enqueueJobIn` has (the upload act, S0's erasure routine) reduced to
- * the part these tests are about. The platform's road, because the role gate has its own test
- * below and these are about the transaction.
- */
 const actOf = <T>(scenario: Scenario, work: (tx: Tx) => Promise<T>): Promise<T> =>
   withScope(graphMaintenance, scenario.postgres, scenario.workspaceId, (tx) => work(tx));
 
-/** Every job row this workspace holds, in the columns the enqueue decides. */
 const jobsIn = async (workspaceId: string) =>
   (
     await db().pool.query(
@@ -251,7 +204,6 @@ const jobsIn = async (workspaceId: string) =>
     )
   ).rows;
 
-/** The upload act's job on the queue, and its id — the row every run-key test enqueues behind. */
 const queuedBound = async (scenario: Scenario): Promise<string> => {
   const first = await actOf(scenario, (tx) =>
     enqueueJobIn(graphMaintenance, tx, boundJob(scenario.workspaceId)),
@@ -260,21 +212,16 @@ const queuedBound = async (scenario: Scenario): Promise<string> => {
   return first.value.jobId;
 };
 
-/** The reason each of this workspace's queued jobs carries, in enqueue order. */
 const reasonsIn = async (workspaceId: string): Promise<readonly string[]> =>
   (await jobsIn(workspaceId)).map((row: { reason: string }) => row.reason);
 
 describe("an act that lands its rows and its job in one transaction", () => {
   it("rolls back with the act it rode in, so nothing is queued for work that never landed", async () => {
-    // `[TEST8]`: the act's transaction is the thing under test, so its outcome is asserted
-    // beside the rows. The enqueue landed its row and the act failed afterwards, which is the
-    // whole reason this form takes a transaction rather than a door.
     const scenario = await arrange();
 
     const act = actOf(scenario, async (tx) => {
       const enqueued = await enqueueJobIn(graphMaintenance, tx, boundJob(scenario.workspaceId));
-      // The act's own next statement fails from here on — an upload whose object write, ledger
-      // row or document row went wrong after the job was queued.
+
       await abortTheTransaction(tx);
       return enqueued;
     });
@@ -284,10 +231,6 @@ describe("an act that lands its rows and its job in one transaction", () => {
   });
 
   it("answers the first job's id for a binding already queued, and the act it rides in still commits", async () => {
-    // The run key's answer. A bare INSERT would have raised on the partial unique index and
-    // aborted the caller's transaction, which is the one thing an enqueue riding inside
-    // somebody else's act must never do — so the act goes on after the second enqueue and the
-    // test asserts that it did.
     const scenario = await arrange();
     const firstJobId = await queuedBound(scenario);
 
@@ -301,7 +244,7 @@ describe("an act that lands its rows and its job in one transaction", () => {
     });
 
     expect(second).toEqual({ ok: true, value: { jobId: firstJobId } });
-    // One row, still carrying the reason the first enqueue gave it: the second changed nothing.
+
     expect(await jobsIn(scenario.workspaceId)).toEqual([
       {
         id: firstJobId,
@@ -314,11 +257,6 @@ describe("an act that lands its rows and its job in one transaction", () => {
   });
 
   it("takes a wipe onto the job already queued, and keeps it there when a later reason arrives", async () => {
-    // The one reason the queued job cannot cover for its successor: the worker removes the
-    // binding's directory only on a run whose reason is `wiped` (ADR 0036's pairing), so a
-    // wipe enqueued behind a queued `bound` run must become that run's reason, or the chunk
-    // rows go and the LMDB stays. The other way round, a `restored` behind a queued wipe is
-    // covered — a wipe rebuilds everything — so the wipe stays. Both ways, the pair.
     const scenario = await arrange();
     const firstJobId = await queuedBound(scenario);
 
@@ -336,8 +274,6 @@ describe("an act that lands its rows and its job in one transaction", () => {
   });
 
   it("queues a second binding on its own, because the run key is one per subject", async () => {
-    // The other half of the pair above (`[TEST7]`): the rule is one queued run per binding,
-    // never one per kind, so a workspace binding two files queues two jobs.
     const scenario = await arrange();
 
     const firstJobId = await queuedBound(scenario);
@@ -377,9 +313,6 @@ describe("an act that lands its rows and its job in one transaction", () => {
   ])(
     "refuses %s with the word malformed, rather than aborting the act with a CHECK",
     async (_what, asked) => {
-      // Each is a row one of the descriptor-derived CHECKs would refuse. The word is what the
-      // caller can act on; the aborted transaction is what it gets if this arm is missed, and
-      // it would take the act's own rows down with it.
       const scenario = await arrange();
 
       const refused = await actOf(scenario, (tx) =>
@@ -395,8 +328,6 @@ describe("an act that lands its rows and its job in one transaction", () => {
   );
 
   it("gates the enqueue on the role the kind's descriptor names", async () => {
-    // Per kind and read off the descriptor, never hard-coded: every kind today names Admin,
-    // and S8's Editor write is a record changed rather than this arm rewritten.
     const scenario = await arrange();
 
     const editor = await withMembership(scenario.editor, scenario.postgres, (_fresh, tx) =>
@@ -459,10 +390,9 @@ describe("waiting on a job somebody queued", () => {
         outcome: null,
       },
     });
-    // Nothing terminal yet, which is what keeps a `--wait` polling.
+
     expect(JOB_IS_OVER).not.toContain(waiting.ok ? waiting.value.status : "queued");
 
-    // And once a worker has finished it, the same read carries what it found.
     await finishedAudit(
       scenario.workspaceId,
       { checked: 2, mismatched: [] },
@@ -478,8 +408,6 @@ describe("waiting on a job somebody queued", () => {
   });
 
   it("hands back the store's failure, never the value, for a finished job whose outcome is not the shape the queue agreement admits", async () => {
-    // The finish functions take any JSONB; the boundary is what holds the agreement, and a
-    // nested outcome — the one place content could hide — is refused on the way out.
     const scenario = await arrange();
     const jobId = await auditQueuedByCron(scenario);
     await finishedAudit(
@@ -503,9 +431,6 @@ describe("waiting on a job somebody queued", () => {
   });
 
   it("answers a person polling in their own workspace, whichever road queued the job", async () => {
-    // The two roads meet on one row: cron queues the audit as the platform, and the
-    // workspace's own Admin reads that job back through their membership. A `--wait` on the
-    // ops command and a person asking after the same job are one read, not two.
     const scenario = await arrange();
     const jobId = await auditQueuedByCron(scenario);
 
@@ -525,10 +450,6 @@ describe("waiting on a job somebody queued", () => {
   });
 
   it("refuses a Viewer and an Editor, because an audit's outcome names the bundle's files", async () => {
-    // `bundleHealth`'s gate, for the material it has it for: a finished audit's outcome lists
-    // every file whose hash disagreed with its row, and no other read in this slice shows a
-    // member below Admin the shape of the bundle. Scope does not decide it — every member of
-    // the workspace passes the policy — so the role is checked in front of the read.
     const scenario = await arrange();
     const asking = { workspaceId: scenario.workspaceId, jobId: await auditQueuedByCron(scenario) };
 
@@ -539,15 +460,12 @@ describe("waiting on a job somebody queued", () => {
         asked: { ok: false, error: "role-forbids" },
       });
     }
-    // The two roads that may read it are unaffected: the workspace's Admin, and the platform
-    // principal the ops command's `--wait` polls under, which has no role to check at all.
+
     expect((await jobById(scenario.admin, scenario.postgres, asking)).ok).toBe(true);
     expect((await jobById(graphMaintenance, scenario.postgres, asking)).ok).toBe(true);
   });
 
   it("says no-such-job for an id this workspace never held, rather than an empty answer", async () => {
-    // A caller polling an id it was never given has the wrong id or the wrong workspace; a
-    // null would let it poll that mistake until its timeout.
     const scenario = await arrange();
     const elsewhere = await arrange();
     const queued = await enqueueJob(graphMaintenance, elsewhere.postgres, {
@@ -574,7 +492,7 @@ describe("waiting on a job somebody queued", () => {
 describe("what the platform can say about the two parsers agreeing", () => {
   it("says never-audited until an audit has finished", async () => {
     const scenario = await arrange();
-    // A job that is only queued has found nothing yet, so it says nothing about health.
+
     await enqueueJob(scenario.admin, scenario.postgres, {
       workspaceId: scenario.workspaceId,
       kind: "nightly-audit",
@@ -628,8 +546,6 @@ describe("what the platform can say about the two parsers agreeing", () => {
   ])(
     "says mismatched, never healthy, over an outcome it cannot read as clean — %s",
     async (_shape, outcome) => {
-      // The fail-closed reading of "I cannot tell" is the one that puts a person in front
-      // of the bundle; a worker that wrote a shape this cannot read is itself the finding.
       const scenario = await arrange();
       const jobId = await auditQueuedByCron(scenario);
       await finishedAudit(

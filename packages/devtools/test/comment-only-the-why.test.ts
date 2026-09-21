@@ -14,8 +14,6 @@ const FILE = "probe.ts";
 
 const OXLINT = { package: "oxlint", path: ["bin", "oxlint"] } as const;
 
-// The plugin is loaded from the repository rather than restated, so a suite cannot pass
-// while the file that declares the rule is broken.
 const specifier = (): string => {
   const plugin = readOxlintConfig().jsPlugins.find((one) => one.name === "better-answers");
   if (plugin === undefined)
@@ -23,8 +21,6 @@ const specifier = (): string => {
   return path.join(repositoryRoot, plugin.specifier);
 };
 
-// The rule is in no config the root lint reads until the strip lands, so the severity here
-// is this suite's rather than the tree's.
 const CONFIG = JSON.stringify({
   jsPlugins: [{ name: "better-answers", specifier: specifier() }],
   rules: { [RULE]: "error" },
@@ -32,13 +28,10 @@ const CONFIG = JSON.stringify({
 
 const holding = (comment: string): Tree => ({ [FILE]: `${comment}export const keep = 1;\n` });
 
-// Split so vitest does not read this suite's own environment off the fixture below.
 const ENVIRONMENT_DOCBLOCK = `/** @vitest-${"environment"} happy-dom */\n`;
 
-// Spelled in two halves, so the tag scan does not read a fixture as a citation.
 const tag = (family: string, number: string): string => `[${family}${number}]`;
 
-// Twenty-nine words, counted by hand: the rule's own split is the subject here.
 const OVER_THE_CEILING =
   "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty then ten more words after that one here now";
 
@@ -115,8 +108,6 @@ describe("the comment rule stays silent where a comment earns its place", () => 
 });
 
 describe("the rule's fix", () => {
-  // The runner answers with the report, not the rewrite. A linter that never ran leaves the
-  // text alone, so both halves fail.
   const fixed = (tree: Tree): string => {
     const directory = mkdtempSync(path.join(tmpdir(), "comment-fix-"));
     writeUnder(directory, ".oxlintrc.json", CONFIG);

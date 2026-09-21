@@ -9,15 +9,6 @@ import { MCP_TOKEN_RULE } from "../src/auth/constants.ts";
 import { connectAsHost } from "./flow.ts";
 import { startApp, type TestApp, type TestClient } from "./harness.ts";
 
-/**
- * The MCP half of research 80 §9's host-agnostic conformance test (assertions 1–18),
- * run against the real handler with a token the real flow minted, on both protocol
- * eras: the 2026-07-28 envelope claude.ai's authenticated runtime sends and the bare
- * 2025-11-25 `initialize` its unauthenticated pre-flight sends. Plus T-004's own
- * lines: annotations on every entry, no workspace argument, structured `open`, the
- * per-call revocation check, and the per-token counter's 429.
- */
-
 let app: TestApp;
 
 beforeAll(async () => {
@@ -37,7 +28,6 @@ const ENVELOPE = {
   "io.modelcontextprotocol/clientInfo": { name: "Anthropic/ClaudeAI", version: "1.0.0" },
 };
 
-/** A 2026-era call: the `_meta` envelope in the body, the version and method mirrored into headers. */
 const modern = async (
   client: TestClient,
   token: string,
@@ -68,7 +58,6 @@ const modern = async (
   });
 };
 
-/** A 2025-era call: no envelope, no method headers — what the pre-flight and the legacy runtime send. */
 const legacy = async (
   client: TestClient,
   token: string,
@@ -89,7 +78,6 @@ const legacy = async (
 const rpc = async (response: Response): Promise<Rpc> => {
   const type = response.headers.get("content-type") ?? "";
   if (type.includes("text/event-stream")) {
-    // A streamed answer: the last `data:` frame is the result.
     const frames = (await response.text()).split("\n").filter((line) => line.startsWith("data:"));
     return JSON.parse(frames.at(-1)?.slice("data:".length) ?? "{}") as Rpc;
   }
@@ -104,7 +92,7 @@ const result = async (response: Response): Promise<Rpc> => {
 
 type Tool = {
   name: string;
-  /** What a host reads to learn the entry: prose, in the glossary's words (ADR 0018). */
+
   description?: string;
   annotations?: Rpc;
   inputSchema: { properties?: Rpc } & Rpc;
@@ -183,14 +171,10 @@ describe("era-independent", () => {
       (await listTools(client, token)).map((tool) => [tool.name, tool.description ?? ""]),
     );
 
-    // The entry's description is the only place a host learns the surface's vocabulary, so
-    // the two words the document layer turns on have to be in it: the marker a reader must
-    // not mistake for the company's answer, and the address the next call takes.
     expect(described.get("find")).toContain("Not company knowledge");
     expect(described.get("find")).toContain("locator");
     expect(described.get("open")).toContain("locator");
-    // *Hit* and *concept* are the glossary's; *result* and *document chunk* are the words
-    // CONTEXT.md tells us to avoid, and a description is prose a model reads as instruction.
+
     expect(described.get("find")).toContain("hit");
     expect(described.get("find")?.toLowerCase()).not.toContain("chunk");
   });
@@ -252,7 +236,7 @@ describe("era-independent", () => {
 
     const refused = await modern(client, token, "tools/list");
     expect(refused.status).toBe(401);
-    // The wire carries the one generic message; the reason is the server's alone.
+
     const challenge = refused.headers.get("www-authenticate") ?? "";
     expect(challenge).toContain('error="invalid_token"');
     expect(challenge).not.toContain("credentials-revoked");
@@ -289,10 +273,7 @@ describe("era-independent", () => {
 
   it("counts every call against the token and answers 429 with one sentence past the ceiling (ADR 0018)", async () => {
     const { client, token } = await connect();
-    // The counter is a fixed window aligned to the clock, so a burst of exactly max + 1
-    // calls may straddle a boundary and never be refused (about one run in twenty). Up to
-    // 2·max + 1 calls put max + 1 into one window whatever the clock does; the first
-    // refusal is the answer asserted on.
+
     let refused: Response | undefined;
     const enough = 2 * MCP_TOKEN_RULE.max + 1;
     for (let call = 0; call < enough && refused === undefined; call += 1) {
@@ -315,7 +296,7 @@ describe("the 2026-07-28 leg", () => {
 
     expect(discovered["supportedVersions"]).toContain(MODERN);
     expect((discovered["capabilities"] as Rpc)["tools"]).toBeDefined();
-    // Tools only (ADR 0008; ADR 0030's clarification): no concept is a resource in v0.1.
+
     expect((discovered["capabilities"] as Rpc)["resources"]).toBeUndefined();
     expect(discovered["resultType"]).toBe("complete");
     expect(discovered["ttlMs"]).toBeDefined();

@@ -8,30 +8,6 @@ import { testData, withRollback } from "@better-answers/schema/testing";
 import { contractFixture } from "./contract-fixture.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
-/**
- * The queue agreement's TypeScript half (ADR 0031, ADR 0005): the fixture in
- * `contracts/queue/` is the contract, and this suite proves this tier reads the database's
- * four claim-protocol functions the way the fixture says — the oldest claimable job first,
- * a lapsed lease claimable again and never lost, a heartbeat that keeps a lease only for
- * the claimant, and attempts reaching the ceiling poisoning a job rather than spending
- * another one on it. The Python half runs the same cases in
- * `apps/worker/tests/test_tier_contract.py`.
- *
- * Both tiers claim: the worker on its loop, and the app for the ops command that runs a
- * rebuild in the foreground. That is what makes this an agreement rather than one tier's
- * helper, and it is why the fixture's claims name a role each — and, from `contract_version`
- * 7, a `kinds` array each: a claimant reaches only the kinds it passes, in both arms of the
- * claim, and a subject has one job claimed under a live lease and one waiting behind it.
- */
-
-/**
- * Which job a fixture case is about, and why the case is there: for which workspace, under
- * which id, what to do — its `kind`, and the `reason` a kind that carries one was enqueued
- * for — and about which subject (`CONTEXT.md`, *job*). A job the fixture seeds and an enqueue
- * it expects the queue to refuse name a job the same way, so the fields they share are
- * declared here once and each array adds only what is its own: the lifecycle a seeded row
- * starts in, the SQLSTATE a refusal must answer with.
- */
 const jobCaseSchema = z.object({
   why: z.string(),
   workspace_id: z.string(),
@@ -95,14 +71,8 @@ const fixture = contractFixture("queue", fixtureSchema);
 
 const db = postgresForSuite();
 
-/** Seconds as an interval literal, which is how both tiers hand a lease to the function. */
 const seconds = (count: number): string => `${count} seconds`;
 
-/**
- * The fixture's workspaces and jobs, as the container's superuser. The two relative
- * instants become absolute here — that is how the fixture advances time without a suite
- * waiting for a lease to lapse.
- */
 const seedFixture = async (client: pg.PoolClient) => {
   const seed = testData(client);
   for (const workspace of fixture.workspaces) await seed.workspace(workspace);
@@ -129,11 +99,6 @@ const seedFixture = async (client: pg.PoolClient) => {
   }
 };
 
-/**
- * One enqueue the queue must refuse, answered with the SQLSTATE that refused it. A failed
- * statement aborts the transaction it happened in, so the probe runs against a savepoint it
- * can come back to.
- */
 const refusedEnqueue = async (
   client: pg.PoolClient,
   refused: (typeof fixture.refused_enqueues)[number],
@@ -155,10 +120,6 @@ const refusedEnqueue = async (
   return "admitted";
 };
 
-/**
- * Push a lease thirty seconds into the past, as the superuser: how the fixture lapses a
- * lease part-way through a sequence of claims without a suite waiting a minute for one.
- */
 const lapseLeases = async (client: pg.PoolClient, jobIds: readonly string[]) => {
   if (jobIds.length === 0) return;
   await client.query(
@@ -167,7 +128,6 @@ const lapseLeases = async (client: pg.PoolClient, jobIds: readonly string[]) => 
   );
 };
 
-/** Run one statement as the fixture's role, in the fixture's scope ('' = none). */
 const asRoleInScope = async (
   client: pg.PoolClient,
   where: { readonly role: string; readonly workspace_id: string },
@@ -181,9 +141,6 @@ describe("the queue agreement", () => {
     await withRollback(db().pool, async (client) => {
       await seedFixture(client);
 
-      // The run key first, while the jobs it collides with are still queued: a second
-      // queued job for a subject that already has one is the database's refusal, which is
-      // what lets an enqueue read the waiting job's id back instead of landing a duplicate.
       const enqueues: { readonly why: string; readonly sqlstate: string }[] = [];
       for (const refused of fixture.refused_enqueues) {
         enqueues.push({ why: refused.why, sqlstate: await refusedEnqueue(client, refused) });
@@ -195,9 +152,6 @@ describe("the queue agreement", () => {
         })),
       );
 
-      // The claims in order and the whole list at once: the agreement is about which job
-      // goes next, so asserting one at a time would let a claim the function never made
-      // pass unnoticed.
       const claimed: { readonly why: string; readonly ids: readonly string[] }[] = [];
       for (const claim of fixture.claims) {
         await lapseLeases(client, claim.lapse_first ?? []);
@@ -238,8 +192,6 @@ describe("the queue agreement", () => {
         fixture.calls.map((call) => ({ why: call.why, answer: call.expect })),
       );
 
-      // What every job was left as, read back as the superuser: a poisoning and a lapsed
-      // lease are facts about a row, and the row is where the fixture says to look.
       const rows = await client.query<{
         workspace_id: string;
         id: string;
@@ -264,23 +216,6 @@ describe("the queue agreement", () => {
   });
 });
 
-/**
- * The kinds the fixture exercises, held to the kinds the descriptors declare.
- *
- * A kind is declared once — `JOB_KIND_DESCRIPTORS` — and the row's three CHECKs are written
- * off that list (`packages/schema/test/job-kinds.test.ts`). This agreement is the other half
- * of the same list: a kind this queue carries is a kind both tiers must have claimed a job
- * of, so the fixture's kinds and the descriptors are one list and not two. Left apart, a
- * descriptor could land with no case to exercise it — the seeded rows would satisfy the kind
- * CHECK by coincidence and nothing would say the agreement had not caught up.
- *
- * Held both ways (`[TEST7]`), and between two sources neither of which derives from the
- * other (`[TEST9]`): the exercised kinds are read off `contracts/queue/cases.json` as it
- * sits on disk, the declared ones off the schema package. The enum in the fixture schema
- * refuses an undeclared kind where it is parsed, so a `kind` no descriptor names fails the
- * file's load; what the assertion below adds is the direction no parse can see, a kind
- * declared and never put through the claim protocol.
- */
 describe("the kinds the queue agreement exercises", () => {
   it("are the kinds the descriptors declare, neither more nor fewer", () => {
     const exercised = new Set<string>([

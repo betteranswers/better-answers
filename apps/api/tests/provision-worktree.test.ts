@@ -16,41 +16,10 @@ import {
   type HookRun,
 } from "./worktree-hooks.ts";
 
-/**
- * The upstream stage of worktree provisioning, run over a throwaway clone and a worktree of
- * it (T-099, `[CHECK1]`).
- *
- * `git worktree add -b <branch> <path> origin/main` sets the new branch to track
- * `origin/main`, silently, so a bare `git push` from the worktree aims at `main`.
- * `.claude/hooks/provision-worktree.sh` unsets it and says so on its own line, and does
- * nothing — saying that too — for a branch that tracks nothing. The other stages are the
- * installs; they are stubbed on PATH here, because what this proves is a fact about a
- * branch's configuration and not about pnpm. The skills stage runs for real over a primary
- * that has skills to give, so the script reaches its last line and its exit is read.
- *
- * The second describe is the jCodeMunch stage (T-181): the worktree is indexed as its own
- * root at provisioning, so the first file an agent edits there is registered in the
- * worktree's index rather than resolved into the primary checkout's. Its three cases are
- * the stage's three outcomes — indexed, no tool on the machine, and an index that failed.
- *
- * The third describe is the scratch stage: the worktree's `.scratch` is a symlink into the
- * primary checkout's, so the relative pointers the ADRs, specs and discovery tickets carry
- * resolve in a worktree too. Its cases are the link itself, the `.gitignore` pattern that
- * keeps the link out of `git status`, the second run that leaves an existing one alone, and
- * a primary with nothing to link.
- */
-
 const script = hookScript("provision-worktree");
 
 const scratch = scratchRoot("provision-worktree");
 
-/**
- * This repository's own `.scratch` ignore pattern, read from the root `.gitignore` rather
- * than written out here: the throwaway tree then ignores exactly what this repository
- * ignores, so a pattern narrowed back to `.scratch/` — which matches a directory and never
- * the symlink git reads as a file — fails the case below instead of passing against a copy
- * of itself.
- */
 const scratchIgnorePattern = (): string => {
   const ignore = path.resolve(import.meta.dirname, "../../../.gitignore");
   const pattern = readFileSync(ignore, "utf8")
@@ -63,7 +32,6 @@ const scratchIgnorePattern = (): string => {
   return pattern;
 };
 
-/** An origin with one commit on `main`, and a clone of it holding installed skills. */
 const clonedPrimary = (name: string): string => {
   const origin = repositoryHolding(path.join(scratch, `${name}-origin`), {
     ".gitignore": `.claude/skills/*\n.agents/\ntasks/AGENTS.md\n${scratchIgnorePattern()}\n`,
@@ -78,17 +46,6 @@ const clonedPrimary = (name: string): string => {
   return primary;
 };
 
-/**
- * A `pnpm` and a `uv` ahead of the real ones on PATH, each saying yes and doing nothing,
- * plus whatever else the case hands over as `<tool> -> <bash body>`.
- *
- * The script puts `$HOME/Library/pnpm` and `$HOME/.local/bin` ahead of the PATH it was
- * given — the hook's PATH is not always a login shell's — which would put the machine's own
- * pnpm ahead of the stub, so the run gets an empty HOME as well and finds only the stub.
- * The empty HOME is also what keeps a run off this machine's own state: jCodeMunch keeps
- * its indexes under `$HOME`, so even a real one reached by accident would write into the
- * scratch home this file removes rather than into the owner's.
- */
 const stubInstallers = (
   name: string,
   extra: Readonly<Record<string, string>> = {},
@@ -105,11 +62,6 @@ const stubInstallers = (
 
 const TOOL = "jcodemunch-mcp";
 
-/**
- * The stubs first, then this machine's PATH with every directory holding a real
- * `jcodemunch-mcp` dropped. The case that asks what provisioning does without the tool
- * needs it genuinely absent, and the owner's own copy sits on the inherited PATH.
- */
 const pathWithoutJcodemunch = (bin: string): string =>
   [
     bin,
@@ -130,7 +82,6 @@ const provision = (
   });
 };
 
-/** The script exited zero — and when it did not, what it said is the failure's message. */
 const ready = (run: HookRun): void => {
   if (run.status !== 0) {
     throw new Error(`provision-worktree.sh exited ${String(run.status)}:\n${run.stderr}`);
@@ -172,7 +123,6 @@ describe("the upstream stage of worktree provisioning (T-099)", () => {
 });
 
 describe("the jCodeMunch stage of worktree provisioning (T-181)", () => {
-  /** A provisioned worktree of a primary that has skills to give, and its argv log. */
   const worktreeOf = (name: string): { readonly worktree: string; readonly log: string } => {
     const worktree = worktreeUnder(scratch, clonedPrimary(name), name);
     return { worktree, log: path.join(scratch, `${name}-argv`) };
@@ -211,7 +161,6 @@ describe("the jCodeMunch stage of worktree provisioning (T-181)", () => {
 });
 
 describe("the scratch stage of worktree provisioning", () => {
-  /** A primary holding one discovery note, and an unprovisioned worktree of it. */
   const treesWithScratch = (
     name: string,
   ): { readonly primary: string; readonly worktree: string } => {
@@ -238,8 +187,6 @@ describe("the scratch stage of worktree provisioning", () => {
 
     ready(provision("ignored", worktree));
 
-    // The link is there and git says nothing about it. Asserted together, because a status
-    // that is empty because nothing was linked proves the pattern nothing at all.
     expect(lstatSync(path.join(worktree, ".scratch")).isSymbolicLink()).toBe(true);
     expect(gitIn(worktree, "status", "--porcelain")).toBe("");
   });

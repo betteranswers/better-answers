@@ -1,16 +1,3 @@
-"""The second parser, and the hash over what it reads (`[TEST1]`: the module entry
-point).
-
-What is asserted here is what this tier can know on its own: that the grammar the app's
-renderer writes round-trips, that a file outside that grammar is refused rather than
-guessed at, and that the hash carries exactly what ADR 0014 says it carries. That the
-two tiers agree on a *number* is the concept-file agreement's (ADR 0031): the fixture in
-`contracts/concept-file/` holds both canonicalisers to one text and one hash, in
-`test_tier_contract.py` here — and the nightly audit reporting zero mismatches over a
-bundle the app itself wrote is `test_work_loop.py` and the cross-tier
-rebuild-equivalence test in `packages/core`.
-"""
-
 import pytest
 
 from better_answers_worker.concept_file import (
@@ -24,8 +11,6 @@ from better_answers_worker.concept_file import (
 )
 from bundles import render_concept_file
 
-# A locator is whatever scalar the file wrote — a page reference as text, a bare page
-# number as a number — and both have to survive the round trip.
 SOURCES: list[SourceEntry] = [
     {"resource": "./receipts.md", "locator": "p.4"},
     {"resource": "https://example.invalid/handbook", "locator": 4},
@@ -69,15 +54,9 @@ def test_reads_back_every_shape_the_renderer_writes() -> None:
             "a list of strings and objects at once",
             '---\n"s":\n  - "a"\n  - "k": "v"\n---\n\nb',
         ),
-        # The renderer writes each key once; a second `iri` or `type` would otherwise be
-        # the one a hand-forged commit chose, quietly winning over the first.
         ("a key written twice", '---\n"t": "one"\n"t": "two"\n---\n\nbody'),
-        # JSON has no such values and the app's parser refuses the text; a reader that
-        # took them would read a file the app could never have written.
         ("a number that is not a number", '---\n"n": NaN\n---\n\nbody'),
         ("an infinity", '---\n"n": -Infinity\n---\n\nbody'),
-        # The renderer writes an empty list as ` []` on the key's line: a bare key is a
-        # field the file says nothing about, not one it says is empty.
         ("a key with no value and no items", '---\n"tags":\n"t": "x"\n---\n\nbody'),
         (
             "a bare key at the end of the frontmatter",
@@ -86,18 +65,14 @@ def test_reads_back_every_shape_the_renderer_writes() -> None:
     ],
 )
 def test_refuses_a_file_the_renderer_never_wrote(why: str, content: str) -> None:
-    # The app's parser answers `malformed` to exactly these, and the reconciler stops at
-    # such a commit rather than guessing; a reader that accepted more would agree with
-    # the app about files the app never wrote, which is what makes the cross-check
-    # worthless.
+
     with pytest.raises(MalformedConceptFileError):
         parse_concept_file(content)
     assert why
 
 
 def test_leaves_the_trust_and_identity_keys_out_of_the_hash() -> None:
-    # A check of its own recording must not move the hash, or *Checked* becomes *Changed
-    # since checked* on the very next read (ADR 0014).
+
     plain: Frontmatter = {"title": "Expenses", "type": "Policy"}
     trusted: Frontmatter = {
         **plain,
@@ -114,9 +89,7 @@ def test_leaves_the_trust_and_identity_keys_out_of_the_hash() -> None:
 
 
 def test_reduces_a_citation_to_its_resolved_resource_and_locator() -> None:
-    # A source's title moving leaves a check standing; a swapped source un-checks it
-    # (ADR 0019). Two spellings of one path are one citation, which is what the
-    # resolution is for.
+
     relative: Frontmatter = {
         "sources": [{"resource": "./receipts.md", "locator": "p.4", "title": "A"}]
     }
@@ -133,10 +106,7 @@ def test_reduces_a_citation_to_its_resolved_resource_and_locator() -> None:
 
 
 def test_writes_a_numeric_locator_the_way_the_other_tier_writes_it() -> None:
-    # The one place the two languages disagree by default: JavaScript has one number
-    # type and writes `4`, Python writes `4.0` for the same value read out of a file. A
-    # disagreement here would read as a mismatched concept and send somebody looking at
-    # the bundle instead of at the reducer.
+
     page_four: list[SourceEntry] = [{"resource": "/a.md", "locator": 4}]
     numeric: Frontmatter = {"sources": page_four}
 
@@ -146,10 +116,7 @@ def test_writes_a_numeric_locator_the_way_the_other_tier_writes_it() -> None:
 
 
 def test_hashes_a_list_of_objects_whichever_order_their_keys_came_in() -> None:
-    # A vendor's list, preserved verbatim in the file and canonicalised for the hash
-    # (RFC 8785): the order a producer wrote an object's keys in is not content. The
-    # number itself, and every number shape, are the concept-file agreement's
-    # (`contracts/concept-file/cases.json`, held in `test_tier_contract.py`).
+
     body = "Expenses are claimed within thirty days."
     as_written: list[SourceEntry] = [
         {"name": "Ada", "role": "finance"},
@@ -168,8 +135,7 @@ def test_hashes_a_list_of_objects_whichever_order_their_keys_came_in() -> None:
 
 
 def test_sorts_keys_and_writes_them_without_insignificant_whitespace() -> None:
-    # RFC 8785's canonicalisation for the one shape a concept's frontmatter can hold —
-    # sorted keys, no whitespace — because the hash needs an order nobody chose.
+
     unsorted: Frontmatter = {"b": 1, "a": "two", "C": True}
 
     assert (

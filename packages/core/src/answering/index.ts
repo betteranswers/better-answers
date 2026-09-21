@@ -4,30 +4,6 @@ import { err, isPersonActor, ok, type Result, type UserPrincipal } from "../kern
 import { findPassages, passageAt, type LocatorRefusal } from "../sources/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
-/**
- * Slice: **answering** — find, ask and open. Retrieval, traversal, citation, answer
- * records, question sets, feedback, corrections, answer tests, the promotion gate, usage
- * (ADRs 0016, 0017).
- *
- * T-004 lands the **contracts** the MCP surface serves and the human renderings
- * derived from them (ADR 0018: the text of every result is the human rendering, never
- * the JSON; ADR 0030: `open` returns structured content; ADR 0016: the one answer
- * contract, verdict first). The bodies are B9's, with one exception: **`open` by IRI
- * reads the concept index** (T-052), through the concepts slice's own read — a slice
- * reaches another only through its `index.ts` (ADR 0029 rule 4), and `concept_index` is
- * the concepts slice's table. `find` previews the concepts the reader may see (T-055),
- * `ask` a refuse verdict naming the concepts its terms resolve to, and `giveFeedback` a
- * receipt. Every function takes the Principal first and runs on the transaction that
- * resolved it.
- *
- * T-134 folds the **document layer** into the two reads, through the sources slice's own
- * doors and no statement of its own (ADR 0029 rule 4): `find` is the union of the concept
- * arm and `findPassages`, and `open` by locator is `passageAt`. Every predicate stays where
- * T-133 put it — inside those statements, once — so this slice composes hits and never
- * decides who may see one, and the MCP surface over it is no side door.
- */
-
-/** The trust tiers and states a unit carries (CONTEXT.md, *trust words the reader sees*). */
 export type TrustTier = "unverified" | "machine-confirmed" | "human-reviewed";
 export type TrustStatus =
   | "current"
@@ -36,17 +12,16 @@ export type TrustStatus =
   | "draft"
   | "deprecated";
 
-/** The two riders that may follow *Checked by* and never change the tier (CONTEXT.md). */
 export type TrustRider = "imported" | "source-moved-on";
 
 export type Trust = {
   readonly tier: TrustTier;
   readonly status: TrustStatus;
-  /** The named person of a human review; null otherwise. */
+
   readonly checkedBy: string | null;
-  /** ISO date of the latest check; null when unchecked. */
+
   readonly checkedAt: string | null;
-  /** A check recorded before the platform, or one whose source moved on since; null otherwise. */
+
   readonly rider: TrustRider | null;
 };
 
@@ -55,10 +30,6 @@ const RIDER_WORDS = {
   "source-moved-on": " · source moved on",
 } satisfies Record<TrustRider, string>;
 
-/**
- * The reader's words for a trust state — these and no others (CONTEXT.md). A status
- * other than *current* names itself; a current unit names its tier.
- */
 export const trustWords = (trust: Trust): string => {
   switch (trust.status) {
     case "changed-since-checked":
@@ -83,11 +54,10 @@ export const trustWords = (trust: Trust): string => {
   }
 };
 
-/** UK long form: "3 March 2026". */
 const ukLongDate = (iso: string): string => {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  // A fixed zone, so the same instant reads the same on every machine.
+
   return date.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
@@ -96,20 +66,8 @@ const ukLongDate = (iso: string): string => {
   });
 };
 
-/**
- * The marker a document wears where nothing on the map covers it (CONTEXT.md, *hit*,
- * *unmapped passage*). Stated once and read by both renderings, so a preview and an answer
- * can never mark the same thing with two different words.
- */
 export const NOT_COMPANY_KNOWLEDGE = "Not company knowledge";
 
-/**
- * A hit from the bundles layer: the concept itself, with the trust word a reader judges it
- * by and the IRI `open` takes. Its fields are what they were before the union; `layer` is
- * the discriminator the union needs and the only thing added. `kind` cannot be that
- * discriminator — a concept's kind is whatever OKF type the file declares, an open set — so
- * the layer is named outright, which is how the glossary types a hit in the first place.
- */
 export type ConceptHit = {
   readonly layer: "bundles";
   readonly iri: string;
@@ -120,15 +78,6 @@ export type ConceptHit = {
   readonly tags: readonly string[];
 };
 
-/**
- * A hit from the sources layer: one matching chunk of a document no visible concept cites
- * (ADR 0016), carrying the document's title, the chunk's own span as the wire locator `open`
- * takes, and the class the reader is being offered it under. Its `kind` is the one word
- * *document*, because a chunk is not a unit the reader asked for — the document is.
- *
- * It carries no marker field: every hit of this layer is *not company knowledge* by being
- * one, so the marker is the rendering's and never a column a caller could disagree with.
- */
 export type DocumentHit = {
   readonly layer: "sources";
   readonly kind: "document";
@@ -137,10 +86,6 @@ export type DocumentHit = {
   readonly sensitivity: string;
 };
 
-/**
- * One hit, typed by its knowledge layer (CONTEXT.md, *hit*). The graph layer returns none
- * of its own: a walk's answer is a concept, and that is the bundles arm.
- */
 export type FindHit = ConceptHit | DocumentHit;
 
 export type FindResult = {
@@ -148,14 +93,8 @@ export type FindResult = {
   readonly hits: readonly FindHit[];
 };
 
-/**
- * An OKF frontmatter value, as the concepts slice defines it: the scalars, string lists and
- * `sources[]` objects a concept file carries. Re-exported rather than restated, so the view
- * and the row can never disagree about what a file may hold.
- */
 export type { Frontmatter, FrontmatterSource, FrontmatterValue } from "../concepts/index.ts";
 
-/** The structured form of a concept — what `open` returns and a view renders. */
 export type ConceptView = {
   readonly iri: string;
   readonly frontmatter: Frontmatter;
@@ -165,7 +104,6 @@ export type ConceptView = {
   readonly evidence: readonly { readonly locator: string; readonly source: string }[];
 };
 
-/** The passage a citation rests on, fetched by its locator (ADR 0018: `open`'s second form). */
 export type PassageView = {
   readonly locator: string;
   readonly source: string;
@@ -173,21 +111,10 @@ export type PassageView = {
   readonly sensitivity: string;
 };
 
-/** What `open` is asked for: a concept by IRI, or a passage by locator, never both. */
 export type OpenInput =
   | { readonly iri: string; readonly locator?: undefined }
   | { readonly locator: string; readonly iri?: undefined };
 
-/**
- * What `open` answers. The success case names a concept or a passage; the type allows
- * both keys optionally so the wire schema (one object with two optional fields) and
- * this type agree — exactly one is ever present, and `renderOpen` reads whichever is.
- *
- * Each optional key admits `undefined` as well as absence, which is the agreement stated
- * exactly: an optional field on the wire schema is a key that may be *sent* as `undefined`,
- * and under `exactOptionalPropertyTypes` a bare `?:` would be the narrower promise that it
- * is only ever missing — a promise the surface that renders this cannot make.
- */
 export type OpenResult =
   | {
       readonly found: true;
@@ -200,19 +127,11 @@ export type OpenResult =
       readonly locator?: string | undefined;
     };
 
-/** The map's state, as the answer carries it (ADR 0016, 2026-08-29 amendment): never a count. */
 export type MapState =
   | { readonly state: "live" }
   | { readonly state: "as_of"; readonly at: string }
   | { readonly state: "unavailable_since"; readonly since: string };
 
-/**
- * The one answer contract (ADR 0016), folded: `verdict` first — ok · warn · refuse for
- * the caller's role — then text, citations, conflicts (both values with their
- * evidence), structured coverage, and the map's state. A *refuse* carries no prose:
- * its text is the one sentence for absent, unpublished and withheld alike, and the
- * unmapped passages beside it.
- */
 export type AnswerResult = {
   readonly verdict: "ok" | "warn" | "refuse";
   readonly text: string;
@@ -226,16 +145,10 @@ export type AnswerResult = {
   readonly map: MapState;
 };
 
-/** The one sentence for absent, unpublished and withheld alike (ADR 0016). */
 export const NOT_ANSWERED = "Not answered from the company's knowledge.";
 
 export type FeedbackReason = "wrong" | "out-of-date" | "incomplete" | "should-not-have-shown";
 
-/**
- * A reader's verdict on one answer, never the platform's: helpful, or a flag with a reason
- * (CONTEXT.md, *feedback*). `detail` admits `undefined` as well as absence: the flag arrives
- * through a wire schema whose optional field is a key that may be sent as `undefined`.
- */
 export type FeedbackInput =
   | { readonly iri: string; readonly verdict: "helpful" }
   | {
@@ -250,49 +163,13 @@ export type FeedbackReceipt = {
   readonly feedback: FeedbackInput;
 };
 
-/**
- * The four acts answer a `Result` (the kernel's result convention, `kernel/result.ts`).
- * `giveFeedback` still declares `never` for its error: B9's body reads no store yet, so there
- * is nothing that can fail and no refusal word to name. `find`, `open` and `ask` read the
- * concept index now, so their unions carry the store's own Error — the shape the
- * convention's rule 3 promised would not change when a body arrived, and did not.
- */
-
-/** The bundle a concept's path sits in: its root directory, `knowledge/` today (ADR 0002). */
 const bundleOf = (path: string): string => path.split("/")[0] ?? path;
 
-/** A concept's `tags` as OKF's list of strings; anything else is no tags. */
 const tagsOf = (frontmatter: Frontmatter): readonly string[] => {
   const tags = frontmatter["tags"];
   return Array.isArray(tags) ? tags.filter((tag) => typeof tag === "string") : [];
 };
 
-/**
- * The preview (ADR 0018): what this caller may see of the query, as a union by knowledge
- * layer (T-134) — the concepts matching it through the concepts slice's own read, which
- * shares `open`'s SELECT and its predicate, and the documents matching it through the
- * sources slice's `findPassages`, which already leaves out a document a concept this
- * reader may see cites (ADR 0016: a document stands alone only when no concept covers it).
- * **A withheld unit is not a hit, not a count and not a hint** (ADR 0016), on either arm.
- *
- * **The two arms rank separately until S2.** Each is ranked by its own read — the concepts
- * by the index's order, the documents by the parser's rank — and the concepts come **first**,
- * because a concept is the company's answer and a raw passage is what there was no answer
- * for. One ranking *across* the two layers is S2's: it needs a score the arms share, and a
- * merge invented here would be an ordering nothing could hold to.
- *
- * **The caller's limit is the union's, not each arm's.** A reader asking for five hits is
- * asking to be handed five things, and running both arms to five would hand them ten —
- * twice the context an MCP host budgeted for, off one argument. So the concept arm takes the
- * limit and the document arm takes what is left: not a merge, because the precedence is the
- * one already decided above rather than a score, and the arm that yields is always the same
- * one. A query the concepts answer in full offers no document, which is the right answer to
- * *show me five things* and the same answer ADR 0016 gives — no total, no cursor, and no
- * *more where that came from*.
- *
- * `now` is the platform's instant for every hit's trust reading (ADR 0040) — one read,
- * shared across the batch, from the caller's own Clock; never read here.
- */
 export const find = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -327,26 +204,6 @@ export const find = async (
   });
 };
 
-/**
- * The trust a concept's row and its latest check project to (ADR 0019): a check by a person
- * earns *human-reviewed*, one by the platform or an agent *machine-confirmed*, and no check
- * at all is *Unchecked*. The status word wins over the tier when it is not *current*, and a
- * check whose hash is not the concept's own reads *Changed since checked* — which is what
- * makes the hash on the verification row load-bearing rather than decorative.
- *
- * An imported check carries no hash and so never reads *Changed since checked*; it carries
- * the *imported* rider instead, which never moves the tier.
- *
- * **Only a *stable* or a *deprecated* concept reaches this.** The read this projects is
- * `conceptByIri`, whose predicate takes only rows with a `published_at`, and the index table
- * holds `published_at IS NOT NULL` and a published status to be the same fact — so *draft*
- * and *removed* are statuses no projection here can be handed, and there is no arm for them.
- *
- * **The word outlives the arm.** *Draft* stays a `TrustStatus` and `trustWords` still renders
- * it: the union is the reader's trust vocabulary (`CONTEXT.md`, *these words and no others*),
- * which the MCP entry's `trust.status` publishes, and not a list of what this one projection
- * emits. Narrowing it here would be a change to what the wire may say, decided at the wire.
- */
 const trustOf = (concept: OpenedConcept, now: Date): Trust => {
   const { check } = concept;
   const checkedAt = check === undefined ? null : check.at.toISOString();
@@ -361,10 +218,7 @@ const trustOf = (concept: OpenedConcept, now: Date): Trust => {
   const status: TrustStatus =
     concept.status === "deprecated"
       ? "deprecated"
-      : // *Out of date* comes from `stale_after` **alone** and absence means no shelf life
-        // (ADR 0019) — the reader is told the fact has expired before they are told the
-        // text moved, because a shelf life is a statement about the fact itself.
-        pastShelfLife(concept.frontmatter["stale_after"], now)
+      : pastShelfLife(concept.frontmatter["stale_after"], now)
         ? "out-of-date"
         : moved
           ? "changed-since-checked"
@@ -372,62 +226,25 @@ const trustOf = (concept: OpenedConcept, now: Date): Trust => {
   return { tier, status, checkedBy: check?.actor ?? null, checkedAt, rider };
 };
 
-/**
- * `stale_after`'s two forms and no others (ADR 0019): a **date**, or a **datetime with an
- * offset**. The grammar is checked before anything is parsed, because `new Date` is not a
- * validator — it accepts an offsetless datetime and reads it as local time, and it accepts
- * plenty that is not a date at all. A value outside the grammar carries no shelf life, which
- * is the same answer as absence, and absence means no shelf life.
- */
 const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const OFFSET_DATETIME = /^(\d{4})-(\d{2})-(\d{2})T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
-/**
- * Midnight UTC on a date, or nothing when the calendar has no such day. `Date.UTC` rolls an
- * impossible day forward — `2026-02-30` comes back as March — and remaps a year below 100
- * into the 1900s, so the fields are set on a date object and read back: `setUTCFullYear`
- * takes the year as written.
- */
 const utcMidnight = (year: number, month: number, day: number): number | undefined => {
-  // Epoch UTC time is already 00:00:00.000, and setUTCFullYear touches only the calendar
-  // fields, so there is no time-of-day left to zero once it has run.
   const at = new Date(0);
   at.setUTCFullYear(year, month - 1, day);
-  // The three clauses are one statement — the calendar has this day — and, with the two
-  // grammars above the only callers, no single clause can be the only one to fail: `month`
-  // and `day` arrive as two-digit integers, so a month outside 1–12 moves the year as well
-  // as the month, and a day the month does not have moves the month as well as the day (a
-  // day of at most 99 never rolls a whole year on its own). Forcing any one clause, or
-  // turning an `&&` into `||`, therefore changes no answer: the survivors Stryker reports
-  // on this line are equivalent by that argument, not untested
-  // (docs/research/t-107-lost-kills.md), and no test is owed to them.
+
   const same =
     at.getUTCFullYear() === year && at.getUTCMonth() === month - 1 && at.getUTCDate() === day;
   return same ? at.getTime() : undefined;
 };
 
-/** A day in milliseconds — the span a date-only shelf life lasts through. */
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-/**
- * Whether a concept's shelf life has run out.
- *
- * A date alone means the concept is out of date **after that day**, not during it: `2026-03-01`
- * is a shelf life that lasts through the first of March, so the comparison is against the end
- * of that day in UTC — which is also the form the emitter writes one back in (ADR 0019). A
- * datetime names the instant itself.
- */
 const pastShelfLife = (staleAfter: FrontmatterValue | undefined, now: Date): boolean => {
   if (typeof staleAfter !== "string") return false;
 
   const datetime = OFFSET_DATETIME.exec(staleAfter);
   if (datetime !== null) {
-    // The grammar holds the shape and the calendar holds the day; only then is it parsed.
-    // This guard is load-bearing, not a sibling's echo: `new Date` does not reject every
-    // impossible calendar day in this position the way it rejects an out-of-range month —
-    // `new Date("2026-02-30T00:00:00Z")` parses as 2 March, it does not throw or go
-    // Invalid — so without `utcMidnight`'s own check first, a stale-after date that never
-    // existed would be silently read as a different, real one.
     const day = utcMidnight(Number(datetime[1]), Number(datetime[2]), Number(datetime[3]));
     if (day === undefined) return false;
     const instant = new Date(staleAfter);
@@ -437,33 +254,18 @@ const pastShelfLife = (staleAfter: FrontmatterValue | undefined, now: Date): boo
   const date = CALENDAR_DATE.exec(staleAfter);
   if (date === null) return false;
   const midnight = utcMidnight(Number(date[1]), Number(date[2]), Number(date[3]));
-  // Unlike the offset-datetime branch above, there is no second parse to fall back to
-  // here: even without this check, `undefined + ONE_DAY_MS` is `NaN`, and every
-  // comparison with `NaN` is `false` — the same answer this guard gives directly.
+
   return midnight !== undefined && midnight + ONE_DAY_MS <= now.getTime();
 };
 
-/**
- * What a concept's `sources[]` frontmatter entry projects to in a view (`CONTEXT.md`,
- * *evidence*). **The file's own list is what `open` shows**: it is the concept's own
- * projection of what it rests on, readable by anyone who may read the concept. Which of
- * that evidence the reader may *open* is the evidence pane's question, answered by the
- * concepts slice's `evidencePaneOf` through the predicate on each binding (T-055), and
- * not restated here.
- */
 const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
   const sources = concept.frontmatter["sources"];
   if (!Array.isArray(sources)) return [];
-  // **The same reader the hash uses** (`citedSource`), so the view and the hash can never
-  // disagree about what a file cites — a view that dropped an entry the hash still counted
-  // would show a reader less evidence than the check confirmed. A `title` is shown in
-  // preference to the resource where an object entry carries one, because that is what a
-  // reader recognises; the legacy string form has none.
+
   return sources.flatMap((entry) => {
     const cited = citedSource(entry);
     if (cited === undefined) return [];
-    // A string entry has no "title" property either way — the check exists for the type
-    // (an object entry's `["title"]` access), not because the two branches ever differ.
+
     const title = typeof entry === "string" ? undefined : entry["title"];
     return [
       {
@@ -474,38 +276,8 @@ const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
   });
 };
 
-/**
- * The one refusal `passageAt` answers with, held as the parser's own type rather than a bare
- * string: were that word ever to become another, this would stop compiling rather than
- * quietly send every refused locator down the error arm.
- */
 const PASSAGE_NOT_FOUND: LocatorRefusal = "not-found";
 
-/**
- * The verbatim fetch (ADR 0018), in its two forms.
- *
- * **A concept by IRI** is a real read over `concept_index` through the read predicate;
- * **a concept this caller may not see answers exactly as one nobody minted does** —
- * `found: false` with the IRI echoed back — because the predicate is in the statement's
- * WHERE clause and a withheld row is not a row that came back (user story 13). The
- * evidence it projects carries each cited span's **wire locator**, which is the string the
- * other form takes: a citation and a passage are one address (CONTEXT.md, *locator*), so a
- * reader who opens a concept can open what it rests on with the next call and nothing in
- * between.
- *
- * **A passage by locator** is `passageAt` and no other door (T-133). That read applies the
- * reader's predicate inside its own statement, once, so a malformed address, an unknown
- * document, a span past the end of the text and a row this reader may not see all reach
- * here as the same one word and leave as the same *not found*. Telling any of them apart
- * is what would let a reader learn the shape of the workspace by probing addresses, so the
- * arm below reads the refusal and never a reason. A store failure is not a refusal and
- * stays an error.
- *
- * `now` is the platform's instant for the trust reading below (ADR 0040): the caller's
- * own Clock, read once and handed in, never read here — which is what lets a test move
- * the shelf-life comparison to either side of a fixed `stale_after` without racing the
- * real clock.
- */
 export const open = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -534,10 +306,7 @@ export const open = async (
       iri: found.iri,
       frontmatter: found.frontmatter,
       body: found.body,
-      // Typed relations are derived in the graph and are never a key on the file (ADR
-      // 0010). The edges exist (T-053's delta); the read that projects them into `open`
-      // is the answering slice's own later work (B9), so this stays empty rather than
-      // half-read.
+
       relations: [],
       trust: trustOf(found, now),
       evidence: evidenceOf(found),
@@ -545,10 +314,6 @@ export const open = async (
   });
 };
 
-/**
- * The words of a question worth asking the index about: four letters or more, case-folded,
- * each once, and no more than a handful — a resolution, not a ranking (B9's).
- */
 const termsOf = (question: string): readonly string[] =>
   [...new Set(question.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}'-]{3,}/gu) ?? [])].slice(
     0,
@@ -558,17 +323,6 @@ const termsOf = (question: string): readonly string[] =>
 const ASK_TERMS_AT_MOST = 8;
 const ASK_HITS_PER_TERM = 5;
 
-/**
- * The question answered as far as the knowledge layer reaches today (ADR 0016: verdict
- * first): **a refusal, naming the concepts it would rest on**. Nothing drafts an answer until
- * B9, so the verdict is *refuse* and the text the one sentence — but the question's terms are
- * resolved over `concept_index` through the same read `find` makes, with the read predicate
- * in its WHERE clause, and each concept found is a citation: the IRI, and the IRI again for
- * the URL, since a concept's IRI is a URL on the apex (ADR 0002) and the app's own page for a
- * concept is B9's to name. So *invisible through `ask`* is a fact about a real read: a
- * withheld concept is no citation, no count and no hint, and the refusal a Viewer hears is
- * the refusal an unrelated question gets.
- */
 export const ask = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -602,26 +356,16 @@ export const giveFeedback = async (
   input: FeedbackInput,
 ): Promise<Result<FeedbackReceipt, never>> => ok({ outcome: "received", feedback: input });
 
-/**
- * One hit as its reader sees it: what it is, what it is called, the word it is offered
- * under and the address the next call opens it at.
- *
- * The two layers read as one shape with one word swapped — a concept wears its trust word
- * and its IRI, a document the marker with its sensitivity word and its wire locator — so a
- * reader scanning the list is reading one column of words and not two kinds of line.
- */
 const findLine = (hit: FindHit): string =>
   hit.layer === "bundles"
     ? `${hit.kind} · ${hit.title} · ${trustWords(hit.trust)} · ${hit.iri}`
     : `${hit.kind} · ${hit.title} · ${NOT_COMPANY_KNOWLEDGE} · ${hit.sensitivity} · ${hit.locator}`;
 
-/** The human rendering of a preview — one line per hit, never the JSON. */
 export const renderFind = (result: FindResult): string =>
   result.hits.length === 0
     ? "Nothing in the company's knowledge matches that."
     : result.hits.map(findLine).join("\n");
 
-/** The human rendering of a concept or a passage, derived from its structured form. */
 export const renderOpen = (result: OpenResult): string => {
   if (!result.found) {
     return result.iri === undefined
@@ -651,7 +395,6 @@ export const renderOpen = (result: OpenResult): string => {
   ].join("\n");
 };
 
-/** The map's fixed phrases (CONTEXT.md, *map*): the context header line, never a verdict. */
 export const mapWords = (map: MapState): string => {
   switch (map.state) {
     case "live":
@@ -663,7 +406,6 @@ export const mapWords = (map: MapState): string => {
   }
 };
 
-/** The human rendering of an answer — verdict first, then the map's context line (ADR 0016). */
 export const renderAnswer = (result: AnswerResult): string => {
   const verdict = {
     ok: "**Answered from the company's knowledge.**",

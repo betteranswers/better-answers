@@ -23,33 +23,6 @@ import {
 } from "@better-answers/devtools/throwaway-tree";
 import { afterAll, describe, expect, it } from "vitest";
 
-/**
- * The skills stage of worktree provisioning, run over a throwaway primary checkout and a
- * worktree of it (T-083, `[CHECK1]`).
- *
- * A `git worktree add` checks out tracked files only, and the agent tooling this repository
- * runs on is installed and ignored (ADR 0027): `.agents/skills/`, the symlinks under
- * `.claude/skills/` that point into it, the plugin skills that live there directly, the
- * skills each workspace keeps beside its own code (`apps/api/.claude/skills/` and its
- * siblings, the tier's skills `AGENTS.md` names), and `tasks/AGENTS.md`.
- * `.claude/hooks/provision-skills.sh` copies them from the primary checkout — the one
- * `git rev-parse --git-common-dir` names — and is the stage `provision-worktree.sh` runs
- * after the installs. It is run here rather than read, because
- * everything it promises is about a filesystem: what was copied, what was left alone, and
- * whether a link that was right in one tree is still right in the other.
- *
- * The primary checkout is a throwaway git repository shaped like this one where it matters:
- * one skill tracked under `.claude/skills/`, the rest installed and ignored, two of them under
- * a workspace's own `.claude/skills/`. Nothing here touches the real checkout or its worktrees.
- *
- * The tree is not the runner's flat record of file contents run by a package's binary: this
- * tool is a repository script, and what it is proved over is a git repository with a worktree
- * and symlinks. It is built from the devtools' throwaway repository instead, and the runner's
- * two fences are kept by hand — every exit but zero is read with what the script wrote
- * (`ready`), and the copy case above is the smoke case that proves the reporter before any
- * silence is read as a stage staying quiet.
- */
-
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const script = path.join(repositoryRoot, ".claude/hooks/provision-skills.sh");
 
@@ -58,10 +31,6 @@ afterAll(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-/**
- * A relative symlink from `<under>/<name>` into `.agents/skills/<name>` — `under` is the
- * root's `.claude/skills` unless a workspace's is named, whose links climb two levels more.
- */
 const linkSkill = (
   root: string,
   name: string,
@@ -82,14 +51,10 @@ const IGNORE = [
 ].join("\n");
 
 const TRACKED_SKILL = "# browser-suite\n\nThe one skill this repository wrote.\n";
-/** Two skills a workspace keeps beside its code, installed and ignored like the root's. */
+
 const API_SKILL = "# trpc-router — the api's, co-located\n";
 const WORKER_SKILL = "# cocoindex — the worker's, co-located\n";
 
-/**
- * A primary checkout: one commit holding the tracked skill, the ignore block and the
- * manifest, then the installed tooling on top, untracked and ignored.
- */
 const primaryCheckout = (name: string, installed: boolean): string => {
   const root = throwawayRepository(path.join(scratch, name));
   write(root, ".gitignore", IGNORE);
@@ -127,7 +92,6 @@ const provision = (worktree: string, env: Readonly<Record<string, string>> = {})
   return { status: result.status, stderr: result.stderr };
 };
 
-/** Every path under `root`, relative, with what it is — enough to prove a tree unchanged. */
 const snapshot = (root: string): readonly string[] => {
   const walk = (directory: string): string[] =>
     readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -143,7 +107,6 @@ const snapshot = (root: string): readonly string[] => {
 
 const isSymlink = (file: string): boolean => lstatSync(file).isSymbolicLink();
 
-/** The stage exited zero — and when it did not, what it said is the failure's message. */
 const ready = (run: Run): void => {
   if (run.status !== 0) {
     throw new Error(`provision-skills.sh exited ${String(run.status)}:\n${run.stderr}`);
@@ -174,7 +137,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
 
   it("copies a skill link as a link, still relative, resolving inside the worktree", () => {
     const primary = primaryCheckout("links-primary", true);
-    // A link straight to a file: what it points at is not a directory, and still resolves.
+
     linkSkill(primary, "guide", "../../.agents/skills/hono/SKILL.md");
     const worktree = worktreeOf(primary, "links-worktree");
 
@@ -214,7 +177,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
 
   it("fails, naming the link, when a workspace's skill link dangles", () => {
     const primary = primaryCheckout("workspace-dangling-primary", true);
-    // The root's link shape, two levels short from a workspace: it reaches nothing there.
+
     linkSkill(primary, "gone", "../../.agents/skills/gone", "apps/web/.claude/skills");
     const worktree = worktreeOf(primary, "workspace-dangling-worktree");
 
@@ -227,7 +190,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
   it("never overwrites what the checkout already carries", () => {
     const primary = primaryCheckout("tracked-primary", true);
     const worktree = worktreeOf(primary, "tracked-worktree");
-    // An uncommitted edit in the primary: the worktree's copy is its checkout's, not this.
+
     write(primary, ".claude/skills/browser-suite/SKILL.md", "# edited in the primary\n");
 
     const run = provision(worktree);
@@ -242,8 +205,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
     const primary = primaryCheckout("later-primary", true);
     const worktree = worktreeOf(primary, "later-worktree");
     ready(provision(worktree));
-    // Installed on the primary afterwards: a new skill and its link, at the root and in a
-    // workspace. The worktree's `.agents` is already there, so a copy of it whole would skip both.
+
     write(primary, ".agents/skills/later/SKILL.md", "# later\n");
     linkSkill(primary, "later");
     linkSkill(primary, "later-too", "../../../../.agents/skills/later", "apps/web/.claude/skills");
@@ -277,8 +239,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
 
   it("fails, naming the link, when a skill link would not resolve inside the worktree", () => {
     const primary = primaryCheckout("absolute-primary", true);
-    // An absolute link works in the primary and points a worktree back at the primary's
-    // files — the one thing a copied link must never do.
+
     linkSkill(primary, "absolute", path.join(primary, ".agents/skills/hono"));
     const worktree = worktreeOf(primary, "absolute-worktree");
 
@@ -300,7 +261,6 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
   });
 
   describe("when the primary checkout has no skills to give", () => {
-    /** What the stub installer does when asked: restore the lock, refuse, or say yes and do nothing. */
     type Installer = "installs" | "refuses" | "installs nothing";
 
     const executable = (file: string, lines: readonly string[]): void => {
@@ -308,11 +268,6 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
       chmodSync(file, 0o755);
     };
 
-    /**
-     * An `npx` and an `ordna` ahead of the real ones on PATH, so the fallback's reinstall is
-     * observed and never reaches the network or the machine's own ordna. The `npx` stub
-     * records what it was asked and plays the installer as told; `ordna` writes the guide.
-     */
     const stubInstallers = (name: string, installer: Installer): string => {
       const bin = path.join(scratch, `${name}-bin`);
       mkdirSync(bin);
@@ -338,10 +293,6 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
       return bin;
     };
 
-    /**
-     * A worktree of a primary that never installed anything, provisioned with the stubs on
-     * PATH — the primary's other contents, if any, are the caller's to add first.
-     */
     const bare = (name: string, installer: Installer): { worktree: string; run: Run } => {
       const primary = primaryCheckout(`${name}-primary`, false);
       const worktree = worktreeOf(primary, `${name}-worktree`);
@@ -373,8 +324,6 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
     });
 
     it("still copies what the primary does have before reinstalling the rest", () => {
-      // A primary with a plugin skill and the ordna guide but no installed skills: the two
-      // it has are copied, and only the skills are reinstalled.
       const primary = primaryCheckout("partial-primary", false);
       write(primary, ".claude/skills/gitnexus/SKILL.md", "# gitnexus\n");
       write(primary, "tasks/AGENTS.md", "# the primary's guide\n");
@@ -404,15 +353,6 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
   });
 });
 
-/**
- * The skills this repository wrote, in this checkout rather than a throwaway one (T-081).
- *
- * They are the two entries `.gitignore` re-includes under `.claude/skills/`, and everything
- * that makes them reach a session is a fact about the tree: tracked, so a fresh clone has
- * them; a relative link or a directory, so a worktree does too. Read here, over the real
- * checkout rather than a throwaway one, because the failure they are exposed to is silence: a
- * skill that is tracked, correct and offered to nobody fails nothing else.
- */
 describe("the skills this repository wrote (T-081)", () => {
   const tracked = (directory: string): readonly string[] => {
     const listed = spawnSync("git", ["-C", repositoryRoot, "ls-files", directory], {
@@ -426,8 +366,7 @@ describe("the skills this repository wrote (T-081)", () => {
     const link = path.join(repositoryRoot, ".claude/skills/better-answers-design");
 
     expect(isSymlink(link)).toBe(true);
-    // Relative and inward, which is the one shape the stage above will carry into a worktree:
-    // an absolute link would point every worktree back at this checkout's own files.
+
     expect(readlinkSync(link)).toBe("../../packages/design-system");
     expect(readFileSync(path.join(link, "SKILL.md"), "utf8")).toContain(
       "name: better-answers-design",

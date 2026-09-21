@@ -11,24 +11,8 @@ import { useSendVerificationOtp, useSignInEmailOtp } from "./auth-hooks.ts";
 import { AuthScreen, Outcome } from "./auth-screen.tsx";
 import { carriedFlow, safeReturnPath } from "./carried-flow.ts";
 
-/**
- * Sign in with a six-digit code, in two steps: the address, then the code sent to it.
- * There is no password, no sign-up and no social provider anywhere on this screen,
- * because there is none in the product (ADR 0009): a person exists because an Admin
- * added them to a workspace.
- *
- * The two acts are the module's own mutations (`auth-hooks.ts`) over Better Auth's
- * endpoints; the words are the platform's. Every outcome the person could not predict is said in a sentence —
- * that a code was sent, that it did not work, that too many have been asked for — and
- * each sits in a live region so a screen reader hears it.
- *
- * WCAG 2.2 AA, checked with a keyboard and a screen reader.
- */
-
-/** How long a code lasts, as the api mints it (`EMAIL_CODE_LIFETIME_SECONDS`). */
 const CODE_LIFETIME = "five minutes";
 
-/** What the counters answer with when an address has been asked about too often. */
 const TOO_MANY_REQUESTS = 429;
 
 const TOO_MANY =
@@ -53,15 +37,7 @@ export function SignInScreen() {
   const sendCode = useSendVerificationOtp();
   const signIn = useSignInEmailOtp();
 
-  /**
-   * Where a signed-in person goes. A host's OAuth flow is carried on to the picker, which
-   * is the screen that resumes it; an ended session returns the person to the address they
-   * were reading; anyone else lands in the shell.
-   */
   const landAfterSignIn = () => {
-    // Everything in the cache was read as whoever was here before — including the refusal
-    // that sent this person to sign in. Left in place, the shell would read that refusal
-    // again and send them straight back.
     queryClient.clear();
     const carried = carriedFlow(search);
     if (carried !== "") {

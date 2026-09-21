@@ -12,26 +12,16 @@ import { createServer } from "./server.ts";
 const bootstrap = requireBootstrap("the app");
 const identity = requireIdentityBootstrap("the app");
 const database = new Pool({ connectionString: bootstrap.databaseUrl });
-// The one Clock this process holds, constructed once at boot and handed on explicitly to
-// every act that reads time (ADR 0040) — never read ambiently past this line.
+
 const clock = systemClock();
 
 type EmailMessage = { readonly to: string; readonly subject: string; readonly text: string };
 
-/**
- * Without `SMTP_URL` — the dev loop, the test harness — a code request fails loudly
- * here rather than writing a code anywhere a log could hold it.
- */
 const failWithoutTransport = async (message: EmailMessage): Promise<void> => {
   logger.error({ to_domain: message.to.split("@")[1] ?? null }, "no email transport is configured");
   throw new Error("no email transport is configured");
 };
 
-/**
- * The from address is derived from the apex rather than declared, the way `app.` is
- * derived from `PUBLIC_URL` (T-039): the apex is the domain the mail provider verified,
- * and a second declaration could only disagree with it.
- */
 const sendOverSmtp = (smtpUrl: string): ((message: EmailMessage) => Promise<void>) => {
   const transport = createTransport(smtpUrl);
   const from = `Better Answers <no-reply@${identity.hostnames.apex}>`;
@@ -67,18 +57,11 @@ serve(
   },
 );
 
-// The reconciler's trigger (ADR 0012, amended 2026-09-06): only where there are bundles
-// to open. Without a root the process still serves — nothing in it writes a bundle either
-// — and the line says so rather than leaving a silent gap in the recovery path.
 if (bootstrap.gitStoreDir === undefined) {
   logger.warn("no repositories' root is configured (GIT_STORE_DIR): the head check is not running");
 } else {
   const reconciler = startReconciler({ database, gitStoreDir: bootstrap.gitStoreDir, clock });
   if (!reconciler.ok) {
-    // An absent key, above, is a deployment with no bundles to check and is said as such; a
-    // key that names a root the git door refuses — not absolute, or no such directory — is
-    // a misconfiguration, and a misconfiguration is a boot failure in `requireBootstrap`'s
-    // own shape: one line saying why, then a non-zero exit (ADR 0024).
     logger.error(
       { reason: reconciler.error, git_store_dir: bootstrap.gitStoreDir },
       "the app cannot start: the head check's repositories' root was refused",

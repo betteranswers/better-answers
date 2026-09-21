@@ -1,11 +1,5 @@
 import type { ESTree } from "@oxlint/plugins";
 
-/**
- * Where an MCP entry is declared: `defineEntry({ … })` (the platform's helper, config
- * first) and `<server>.registerTool(name, { … }, cb)` (the SDK's API, config second).
- * Both rules read the config object literal off either call; a config that is not a
- * literal is reported, because a rule that cannot see the shape cannot hold the line.
- */
 export type EntryCall = {
   readonly kind: "defineEntry" | "registerTool";
   readonly config: ESTree.Expression | ESTree.SpreadElement | undefined;
@@ -27,7 +21,6 @@ export const entryCallOf = (node: ESTree.CallExpression): EntryCall | undefined 
   return undefined;
 };
 
-/** oxlint's object property node: the interface is `ObjectProperty`, its discriminator `"Property"`. */
 export const propertyName = (
   property: ESTree.ObjectProperty | ESTree.SpreadElement,
 ): string | undefined => {

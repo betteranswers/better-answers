@@ -4,16 +4,8 @@ import type { ESTree } from "@oxlint/plugins";
 
 import { entryCallOf, findProperty, propertyName } from "../shared/entry-calls.ts";
 
-/**
- * No MCP entry takes a workspace, bundle or tenant argument (ADR 0018, `[SEC2]`): the
- * principal comes from the token and never from an argument. The rule reads the
- * entry's input schema — `defineEntry`'s `input` or `registerTool`'s `inputSchema`,
- * as `z.object({ … })` or a raw shape — and refuses any key that names one of the
- * three. The functional test over the emitted `inputSchema` holds it at runtime.
- */
 const FORBIDDEN = ["workspace", "bundle", "tenant"];
 
-/** Methods that wrap a schema and return one — the shape is on the object they hang off. */
 const WRAPPERS = new Set(["refine", "superRefine", "transform", "describe", "brand", "readonly"]);
 
 const shapeOf = (value: ESTree.Node): ESTree.ObjectExpression | undefined => {
@@ -27,12 +19,12 @@ const shapeOf = (value: ESTree.Node): ESTree.ObjectExpression | undefined => {
   ) {
     return undefined;
   }
-  // z.object({ … }) — the first argument is the shape.
+
   if (callee.property.name === "object") {
     const [shape] = value.arguments;
     return shape !== undefined && shape.type === "ObjectExpression" ? shape : undefined;
   }
-  // `z.object({…}).refine(…)` and friends: unwrap to the object they narrow.
+
   if (WRAPPERS.has(callee.property.name)) return shapeOf(callee.object);
   return undefined;
 };
@@ -69,8 +61,6 @@ export const mcpEntryNoWorkspaceArgumentRule = defineRule({
         if (input === undefined) return;
         const shape = shapeOf(input.value);
         if (shape === undefined) {
-          // Opaque either way. The one `registerTool` that mounts the `ENTRIES` array
-          // carries a disable comment naming the runtime test that fences it.
           context.report({ node: input, messageId: "opaque" });
           return;
         }

@@ -58,7 +58,7 @@ C4Container
 - **Postgres is four things in one resource.** The identity set Better Auth owns, isolated by key not scope; the tenant tables under `FORCE ROW LEVEL SECURITY` with `current_workspace_id()` as the one policy seam; the graph as plain tables under the same policy (ADR 0032, no AGE, no per-workspace role); and `index.chunk`, list-partitioned per workspace, the one table both tiers write into — the worker its rows, the app its DDL (ADR 0007).
 - **The git store is written by one process.** The api commits through the git binary under a per-repository lock held from the precondition through the Postgres COMMIT, so `bundle_commit` is a prefix of git history (ADR 0012). The worker mounts the same directory read-only and reads at the commit on the run row (ADR 0024).
 - **The per-binding LMDB is a store the contract names** (ADR 0005, 2026-08-27). It holds memoised output, which is personal data; it is disposable — a wipe is paired with deleting the binding's chunk rows in the app's transaction, because the LMDB is the engine's record of what to delete (ADR 0036, amended 2026-09-10; probe 4).
-- **The web talks tRPC only.** The one exception, invitation-accept on the Better Auth client, arrives with P1. Uploads are a tRPC mutation over `splitLink`, never a second HTTP route (S1; `[APP5]`).
+- **The web talks tRPC only.** The one exception, invitation-accept on the Better Auth client, arrives with P1. Uploads are a tRPC mutation over `splitLink`, never a second HTTP route (S1).
 
 ## The tier contract
 

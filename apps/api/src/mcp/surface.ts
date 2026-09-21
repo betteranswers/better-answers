@@ -34,26 +34,6 @@ import { bearerOf } from "../auth/verify.ts";
 import { clientIpOf, tooManyRequests } from "../ingress/limits.ts";
 import { ENTRIES } from "./entries/index.ts";
 
-/**
- * The MCP surface behind one fetch-shaped seam (ADR 0030): `(Request) => Response`,
- * mounted in Hono, authentication resolved before the handler and the Principal
- * passed in. No `@modelcontextprotocol/*` type crosses into `packages/core`.
- *
- * Per request: a request with no bearer at all pays the per-IP counter first (the 401
- * flood never reaches a signature check); a bearer is verified (signature, issuer,
- * audience, expiry, the required scope); the Principal is resolved once in a short
- * transaction that also counts the call against the token and reads the workspace's
- * `tools/list` TTL — a refused resolve is a 401 the host answers by re-authorising
- * (the reason goes to the log, never to the wire), a passed ceiling a 429; then
- * `createMcpHandler` serves both protocol eras from one tool factory
- * (`legacy: "stateless"`, the SDK's default and load-bearing: claude.ai's
- * unauthenticated pre-flight speaks 2025-11-25 only). The move to `legacy: "reject"`
- * is conditioned on `server/discover` having been observed from every host on the
- * conformance list (research 80 F1) — never on a date. Every `tools/call` then runs
- * under its own `withPrincipal`, so the role is read in the same transaction as the
- * read the entry does.
- */
-
 export type McpSurfaceDependencies = {
   readonly door: PostgresDoor;
   readonly verifier: OAuthTokenVerifier;
@@ -61,14 +41,13 @@ export type McpSurfaceDependencies = {
   readonly mcpUrl: string;
   readonly logger: Logger;
   readonly serverVersion: string;
-  /** This process's Clock (ADR 0040): one reading per call, for the counters and the entries. */
+
   readonly clock: Clock;
 };
 
 const CEILING_MESSAGE =
   "This connection has made too many calls this minute; an Admin can raise the ceiling in System.";
 
-/** The one wording every refused bearer gets; the reason is the log's. */
 const refused = (): OAuthError =>
   new OAuthError(OAuthErrorCode.InvalidToken, "the bearer was refused");
 
@@ -88,8 +67,7 @@ export const createMcpSurface = (
       { name: "better-answers", version: deps.serverVersion },
       {
         capabilities: { tools: {} },
-        // A real TTL, `cacheScope: "private"` because the list varies by the token's
-        // scopes (research 80 row 8; F5). The number is the workspace's config row.
+
         cacheHints: {
           "tools/list": { ttlMs, cacheScope: "private" },
           "server/discover": { ttlMs, cacheScope: "private" },
@@ -139,7 +117,6 @@ export const createMcpSurface = (
       log.warn({ event: "mcp.handler_error", message: error.message }, "handler error"),
   });
 
-  /** The 401 flood is per IP, before any signature work. */
   const flooded = async (request: Request): Promise<Response | undefined> => {
     const flood = await consumeIngress(
       deps.door,
@@ -154,7 +131,6 @@ export const createMcpSurface = (
   return async (request: Request): Promise<Response> => {
     const authorization = request.headers.get("authorization");
     if (authorization === null || !/^Bearer\s+\S+$/i.test(authorization)) {
-      // No bearer to verify: the pre-flight that draws the challenge, or a flood.
       return (
         (await flooded(request)) ??
         bearerAuthChallengeResponse(
@@ -171,8 +147,6 @@ export const createMcpSurface = (
         requiredScopes: [MCP_REQUIRED_SCOPE],
       });
     } catch (cause) {
-      // Trap 3 (prototype 61): the challenge advertises the whole surface's scopes;
-      // the guard above enforces only the one every entry needs.
       return (await flooded(request)) ?? bearerAuthChallengeResponse(cause, challengeOptions);
     }
 

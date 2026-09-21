@@ -9,41 +9,13 @@ import {
 import { oxlintOver, type Tree } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
-/**
- * The repository's lint rules, run rather than remembered (`[CHECK1]`). Two families, two
- * runners.
- *
- * The rules T-004 adds, each an override or a plugin rule: ADR 0009's better-auth ban, ADR
- * 0030's MCP-type ban over `packages/core` (since T-117 the transport list of the
- * `better-answers/import-direction` rule, which keys on a manifest naming the core package,
- * so that case's tree carries one), and the two MCP plugin rules — every entry carries
- * `annotations`, no entry takes a workspace argument.
- *
- * The three rules T-069 adds, each a line in the base `rules` block: no two tests in one
- * describe block carry the same title, no block is empty, and no promise floats.
- *
- * The type-aware rules T-080 adopts, none of them a line in that block: a rule the config does
- * not name is carried by the `correctness` category, and deleting the line that switched it off
- * is how this repository turns one on.
- *
- * Each is applied to a throwaway tree so the assertion is as much about where the rule stays
- * silent as where it fires.
- *
- * The tree and the oxlint run are the devtools runner's, which is what makes a silence here
- * mean something: a linter that could not run — a moved binary, a plugin that failed to
- * load, a config oxlint refused — reports nothing, and nothing satisfies every assertion
- * below.
- */
-
 const probe = (specifier: string): string =>
   `import * as probe from "${specifier}";\nexport const keep = probe;\n`;
 
 const config = readOxlintConfig();
 
-/** Lint `files` (path → source) under the repo's real config, returning oxlint's output. */
 const { output: lint } = oxlintOver(
   JSON.stringify({
-    // The plugin is resolved from the repo, not copied.
     jsPlugins: config.jsPlugins.map((plugin) => ({
       ...plugin,
       specifier: path.join(repositoryRoot, plugin.specifier),
@@ -54,9 +26,6 @@ const { output: lint } = oxlintOver(
     overrides: [oxlintOverrideFor("**/*.ts"), oxlintOverrideFor("apps/api/src/auth/**")],
   }),
   {
-    // The identity ban's own subject, under the glob it fires in and the one it does not.
-    // Until oxlint answers this the way the config says it will, no silence below means
-    // anything — and the plugin specifiers above are proved to load by the same case.
     tree: {
       "apps/api/src/mcp/probe.ts": probe("better-auth"),
       "apps/api/src/auth/probe.ts": probe("better-auth"),
@@ -65,19 +34,6 @@ const { output: lint } = oxlintOver(
   },
 );
 
-/**
- * The severity `name` runs at, read out of `.oxlintrc.json` rather than restated here — a
- * restatement would pass while the real config carried the rule as a warning, or not at all.
- *
- * A rule the `rules` block names carries its own setting, its options and all. A rule it does
- * not name is held by the `correctness` category, which is what adoption looks like in that
- * file: a type-aware rule is turned on by *deleting* the line that switched it off. A reader
- * that insisted on a line could not prove those rules at all, and the day one of them is
- * switched back off its line reappears, this returns `"off"`, and the firing case below fails.
- *
- * A name that is no rule at all still fails loudly rather than reading as adopted: oxlint
- * reports nothing for a rule it does not know, and the runner's smoke case refuses to build.
- */
 const severityOf = (name: string): (typeof config.rules)[string] => {
   const named = config.rules[name];
   if (named !== undefined) return named;
@@ -89,15 +45,6 @@ const severityOf = (name: string): (typeof config.rules)[string] => {
   return correctness;
 };
 
-/**
- * A runner over exactly one of the repository's base rules. The plugin list and the options
- * block travel with it, because a rule from a plugin oxlint was not told to load is a rule
- * that stays silent, and the type-aware rules need the options block to run at all.
- *
- * The overrides do not travel with it — the react plugin one names a specifier that cannot
- * resolve from a temporary directory — so the runner refuses instead to build over a rule any
- * override switches off, which is the only way an override could make these cases lie.
- */
 const ruleRunner = (
   name: string,
   smoke: { readonly tree: Tree; readonly flagged: readonly string[] },
@@ -118,7 +65,6 @@ const ruleRunner = (
   ).output;
 };
 
-/** A vitest file whose one describe block holds `titles`, each test carrying an assertion. */
 const suiteOf = (...titles: readonly string[]): string =>
   `describe("the workspace door", () => {\n${titles
     .map((title) => `  it("${title}", () => {\n    expect(door).toBeDefined();\n  });`)
@@ -159,7 +105,6 @@ describe("no two tests in one describe block carry the same title", () => {
   });
 });
 
-/** A module whose one function swallows a rollback failure, with `body` as its catch block. */
 const swallow = (body: string): string =>
   `export const rollbackQuietly = async (client: Client): Promise<void> => {\n  try {\n    await client.query("ROLLBACK");\n  } catch {${body}}\n};\n`;
 
@@ -194,12 +139,6 @@ describe("no block is empty, and a swallowed error is a commented decision", () 
   });
 });
 
-/**
- * A tree the type-aware linter can build a program from. `tsgolint` reads a `tsconfig.json`
- * to type the files it lints, so a type-aware rule over a tree without one has nothing to
- * say — which would read as the rule staying silent. `include` is the program's, so a case
- * about a path outside `src` names the directory that holds it.
- */
 const typedTree = (files: Tree, include: readonly string[] = ["src"]): Tree => ({
   "tsconfig.json": JSON.stringify({
     compilerOptions: { target: "esnext", module: "esnext", strict: true, noEmit: true },
@@ -208,7 +147,6 @@ const typedTree = (files: Tree, include: readonly string[] = ["src"]): Tree => (
   ...files,
 });
 
-/** A module calling `revoke`, which returns a promise, in the way `call` writes it. */
 const callsRevoke = (call: string): string =>
   `const revoke = async (): Promise<void> => {};\n\nexport const act = async (): Promise<void> => {\n  ${call}\n};\n`;
 
@@ -239,23 +177,12 @@ describe("no promise floats — an unawaited call is awaited or `void`", () => {
   });
 });
 
-/**
- * A module reading a session the reader answers as a record or `null`, refusing it with
- * `guard` — the shape the tRPC base had when T-102 switched the rule on.
- */
 const refusesSession = (guard: string): string =>
   `type Session = { readonly id: string };\nconst readSession = (): Session | null => null;\n\nexport const sessionId = (): string => {\n  const session = readSession();\n  if (${guard}) return "";\n  return session.id;\n};\n`;
 
 const UNNECESSARY_CONDITION = "typescript/no-unnecessary-condition";
 const REGISTRY_ZONE = "apps/web/src/shared/ui/**";
 
-/**
- * The registry override, narrowed to the one rule under test. `ruleRunner` refuses a rule an
- * override re-sets, because a runner that dropped the override would prove the rule somewhere
- * it no longer holds; this runner carries the override instead and proves the zone both ways.
- * The other rules that override relaxes stay out, so a plugin the throwaway config never loads
- * is never named in it.
- */
 const registryZone = (): OxlintConfig["overrides"][number] => {
   const override = oxlintOverrideFor(REGISTRY_ZONE);
   const setting = override.rules?.[UNNECESSARY_CONDITION];
@@ -265,7 +192,7 @@ const registryZone = (): OxlintConfig["overrides"][number] => {
   };
 };
 
-describe("one guard per condition — a value the type refused is not refused again ([DESIGN4])", () => {
+describe("one guard per condition — a value the type refused is not refused again", () => {
   const twice = typedTree({
     "src/twice.ts": refusesSession("session === null || session === undefined"),
   });
@@ -312,23 +239,6 @@ describe("one guard per condition — a value the type refused is not refused ag
   });
 });
 
-/**
- * The type-aware rules this repository carries without a line of their own.
- *
- * A rule joins this table by being turned on alone, run over the whole tree and finding
- * nothing; its `"off"` line is then deleted, leaving the `correctness` category to say what
- * severity it holds. One rule of the family is not here, because its pass did fire, and
- * `.oxlintrc.json` still names it with what it found.
- *
- * A table rather than a block each, because blocks differing only in a string literal are
- * copies of one test. Each pair is the source the rule must name, and the source that does the
- * same work the way the rule asks for.
- *
- * The firing sources are written to be *typed*, not to type-check: a rule that refuses an
- * operation TypeScript itself refuses — `no-unsafe-unary-minus` is the one — can only be shown
- * by source the checker would reject, and the type-aware linter types a tree without judging
- * it.
- */
 const ADOPTED = [
   {
     rule: "typescript/await-thenable",
@@ -404,20 +314,8 @@ const ADOPTED = [
   },
 ] as const;
 
-/** The half of a rule's config name oxlint prints in its report: `typescript(unbound-method)`. */
 const reportedName = (rule: string): string => rule.slice(rule.indexOf("/") + 1);
 
-/**
- * oxlint under the repository's `categories` block alone, with no `rules` key at all.
- *
- * `ruleRunner` switches its rule on itself, so what its cases prove is that the rule fires —
- * not that this repository turned it on. For a rule adopted by deleting its line those are
- * different claims, and the gap between them is exactly where an adoption could be false: a
- * rule oxlint files under some category other than `correctness` would pass every firing and
- * silent case below while the tree ran without it. This runner asks only the question the
- * config answers by itself, which is whether the category holds the rule; the line's absence
- * is `severityOf`'s half, and the two together are the claim.
- */
 const lintUnderCategories = oxlintOver(
   JSON.stringify({
     plugins: config.plugins,
@@ -469,7 +367,6 @@ describe("ADR 0009 — the identity provider stays behind its seam", () => {
 describe("ADR 0030 — no MCP library type crosses into packages/core", () => {
   it("refuses @modelcontextprotocol/server inside packages/core and allows it in apps/api", () => {
     const output = lint({
-      // The import-direction rule keys on the manifest's name, never the path (ADR 0029).
       "packages/core/package.json": JSON.stringify({ name: "@better-answers/core" }),
       "packages/core/src/probe.ts": probe("@modelcontextprotocol/server"),
       "apps/api/src/mcp/probe.ts": probe("@modelcontextprotocol/server"),

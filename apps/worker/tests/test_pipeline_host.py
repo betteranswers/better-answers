@@ -1,18 +1,3 @@
-"""The pipeline's host: one pool per workspace, Environments in a bounded cache
-(`[TEST1]`, `[TEST2]`, `[TEST4]`, `[TEST7]`, `[TEST9]`).
-
-Driven through `better_answers_worker.pipeline`'s own interface, against a real Postgres
-on the pinned image, because everything these cases are about is what the database does
-to a statement the engine ran on a connection the host handed it.
-
-**The role matters more here than anywhere else in this suite.** `index`.`chunk` forces
-row-level security, and a superuser bypasses that by design — so a case that proved the
-pool's scope as the container's superuser would pass with the scope removed. Every pool
-these cases open therefore connects as a login role that is a member of ``worker_rt``
-and is nothing else, which is the shape the deploy unit gives the worker: the runtime
-role, never the owner.
-"""
-
 import asyncio
 import re
 from collections.abc import Iterator
@@ -35,10 +20,6 @@ from better_answers_worker.pipeline import (
 from factories import seed_workspace
 from pg_harness import migrated_postgres_at
 
-#: The login role the cases connect as. `worker_rt` is NOLOGIN — roles are cluster-wide
-#: and LOGIN is the estate's provisioning act, never a migration's (migration 0000) — so
-#: the case provisions the login half itself and inherits the runtime role's privileges
-#: through membership, exactly as `WORKER_DATABASE_URL` does in the compose file.
 WORKER_LOGIN = "worker_login_under_test"
 WORKER_PASSWORD = "worker-login-under-test"
 
@@ -51,16 +32,6 @@ def chunk_row(
     content: str = "Expenses are claimed within sixty days.",
     ordinal: int = 0,
 ) -> dict[str, Any]:
-    """One chunk row, carrying every column `CHUNK_TABLE` declares.
-
-    The table these cases land into is the shipping one, not a description of it
-    written here, because nothing in this suite is about the chunk table's shape. What
-    is under test is the pool's scope, the cache's bound and what a drop leaves behind,
-    and each of those needs a real row in the real table and nothing more. The row's own
-    derivation (`rows.py`'s `chunk_rows`) is held to the `document-chunk` agreement in
-    its own suite, so the values here are only what makes a row legal: a fixture, never
-    an expected value the cases below read back.
-    """
     return {
         "id": chunk_id,
         "workspace_id": workspace_id,
@@ -78,12 +49,10 @@ def chunk_row(
     }
 
 
+# jscpd:ignore-start
 @pytest.fixture(name="database")
 def a_migrated_database() -> Iterator[tuple[psycopg.Connection, str]]:
-    """A migrated throwaway Postgres, and a DSN on it for the worker's runtime role."""
     with migrated_postgres_at() as (connection, conninfo):
-        # `CREATE ROLE` takes no parameters, so the two names are spelled into the
-        # statement; both are constants of this module and neither comes from a row.
         connection.execute(
             f"CREATE ROLE \"{WORKER_LOGIN}\" LOGIN PASSWORD '{WORKER_PASSWORD}'"
             " IN ROLE worker_rt"
@@ -92,14 +61,10 @@ def a_migrated_database() -> Iterator[tuple[psycopg.Connection, str]]:
         yield connection, as_role(conninfo, WORKER_LOGIN, WORKER_PASSWORD)
 
 
-def as_role(conninfo: str, role: str, password: str) -> str:
-    """The same address, reached as another role.
+# jscpd:ignore-end
 
-    Testcontainers hands back a URL carrying the superuser's own credentials, and a pool
-    that connected with them would bypass row-level security — which is the one thing
-    these cases exist to hold. So the user info is replaced rather than appended: a URL
-    with two sets of credentials is not a URL.
-    """
+
+def as_role(conninfo: str, role: str, password: str) -> str:
     replaced, count = re.subn(r"//[^@/]*@", f"//{role}:{password}@", conninfo, count=1)
     if count != 1:
         message = f"expected credentials in the harness's conninfo, found {count}"
@@ -108,12 +73,6 @@ def as_role(conninfo: str, role: str, password: str) -> str:
 
 
 def seed_partitioned_workspace(connection: psycopg.Connection) -> str:
-    """A workspace with its chunk partition, as the app's own provisioning leaves it.
-
-    The partition is the lifecycle function's and the function refuses a transaction
-    that is not scoped to the workspace it names, so the scope is set here for the same
-    reason the app sets it.
-    """
     workspace_id = str(seed_workspace(connection.cursor())["id"])
     with connection.cursor() as cursor:
         cursor.execute(
@@ -141,8 +100,6 @@ def bootstrap_for(dsn: str, lmdb_dir: Path) -> Bootstrap:
 
 
 def chunk_ids(connection: psycopg.Connection, workspace_id: str) -> list[str]:
-    """Every chunk id the workspace holds, read as the owner so the read itself proves
-    nothing about the scope — only the write under test does."""
     with connection.cursor() as cursor:
         cursor.execute(
             'SELECT id FROM "index".chunk WHERE workspace_id = %s ORDER BY id',
@@ -164,19 +121,6 @@ def chunk_indexes(connection: psycopg.Connection, workspace_id: str) -> list[str
 def test_the_pools_scope_lets_a_chunk_row_land_and_a_pool_without_it_is_refused(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """The engine's Postgres target takes its own connections out of the pool and runs
-    the upsert on them bare, outside any transaction the worker opened — so what carries
-    the workspace past `index`.`chunk`'s `WITH CHECK` is a setting on the *session*, and
-    a transaction-local one would be gone before the statement ran.
-
-    The pair is held both ways (`[TEST7]`): the host's pool lands the row, and a pool of
-    the same size and the same role without the scope is refused by the policy.
-
-    **The served half takes two connections in turn and not one**, because a scope
-    applied once when a connection opens is wiped by the reset asyncpg runs when that
-    connection goes back to the pool. A run lands many rows over many checkouts, so a
-    case that acquired once would pass against a pool whose second row is refused.
-    """
     connection, dsn = database
     workspace_id = seed_partitioned_workspace(connection)
     row = chunk_row(
@@ -201,7 +145,7 @@ def test_the_pools_scope_lets_a_chunk_row_land_and_a_pool_without_it_is_refused(
         try:
             async with pool.acquire() as held:
                 await held.execute(statement, *values)
-            # Back to the pool and out again — the same connection, reset in between.
+
             async with pool.acquire() as again:
                 await again.execute(statement, *_second(values))
         finally:
@@ -224,22 +168,12 @@ def test_the_pools_scope_lets_a_chunk_row_land_and_a_pool_without_it_is_refused(
 
 
 def _second(values: tuple[Any, ...]) -> tuple[Any, ...]:
-    """The same row under a second id, for the second checkout."""
     return ("chunk-two", *values[1:])
 
 
 def test_dropping_one_bindings_state_leaves_the_table_its_indexes_and_every_row(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """Every target the pipeline declares is user-managed, so the engine owns the rows
-    it wrote and never the table (ADR 0007, ADR 0036) — and dropping one binding's state
-    reverts nothing in Postgres at all, not even the rows that binding's own run landed.
-
-    That is why the wipe is two acts across two tiers: the app deletes the binding's
-    chunk rows in its own transaction and the worker removes the binding's directory.
-    A drop that had deleted its own rows would make the pairing prudent; this case is
-    what says it is necessary.
-    """
     connection, dsn = database
     workspace_id = seed_partitioned_workspace(connection)
 
@@ -285,13 +219,6 @@ def test_dropping_one_bindings_state_leaves_the_table_its_indexes_and_every_row(
 def test_the_environment_cache_holds_its_bound_and_drops_the_oldest_binding(
     tmp_path: Path,
 ) -> None:
-    """An Environment is an open LMDB handle and a named one has no close of its own, so
-    a host that kept one per binding it ever saw would accumulate handles for the life
-    of the process. The cache is bounded and the least recently used binding goes first.
-
-    No database: opening a binding opens its LMDB and nothing else, and the pool is not
-    built until a run asks for one.
-    """
     workspace_id = "01M2Q3R4S5T6V7W8X9YZAB0000"
     touched = ("binding-one", "binding-two", "binding-one", "binding-three")
 
@@ -305,26 +232,17 @@ def test_the_environment_cache_holds_its_bound_and_drops_the_oldest_binding(
                     workspace_id=workspace_id, binding_id=binding_id, reason="bound"
                 )
             )
-        # `binding-two` is the oldest touch, so it is the one that left.
+
         assert host.held_bindings() == ("binding-one", "binding-three")
 
 
 def test_the_bound_the_host_holds_by_default_is_the_one_the_module_states() -> None:
-    """Written down rather than read back off the host (`[TEST9]`): a bound that moved
-    by accident would agree with a case that asked the host what its bound was.
-    """
     assert ENVIRONMENTS_HELD == 4
 
 
 def test_the_seam_answers_an_outcome_of_plain_numbers_and_opens_the_bindings_store(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """`index_binding` is the whole of what the rest of the tier sees of the engine: a
-    run of plain fields in, three numbers out, and the binding's store opened on the
-    way. The documents and the chunks are what the waves after this one fill in; the
-    shape they fill is settled here, because the registry and the job row both bind
-    to it.
-    """
     connection, dsn = database
     workspace_id = seed_partitioned_workspace(connection)
     run = IndexRun(workspace_id=workspace_id, binding_id="binding-one", reason="bound")
@@ -344,10 +262,6 @@ def test_the_seam_answers_an_outcome_of_plain_numbers_and_opens_the_bindings_sto
 def test_a_bindings_lmdb_size_is_readable_after_its_run(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """The size of a binding's LMDB is the signal the outcome row carries (ADR 0025) and
-    the number the 4 GB per-binding cap is read against, so it is read off the binding's
-    own directory after the run rather than estimated from what the run did.
-    """
     connection, dsn = database
     workspace_id = seed_partitioned_workspace(connection)
     run = IndexRun(workspace_id=workspace_id, binding_id="binding-one", reason="bound")

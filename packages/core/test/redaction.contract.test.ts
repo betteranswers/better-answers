@@ -12,27 +12,6 @@ import {
 import { REDACTION_CATEGORIES } from "../src/sources/index.ts";
 import { contractFixture } from "./contract-fixture.ts";
 
-/**
- * The redaction agreement's TypeScript half (ADR 0031, ADR 0020): the fixture in
- * `contracts/redaction/` is the contract — the category list, the placeholder word per tier
- * and category, the special-category narrowing and the shape of the version string — and this
- * suite proves this tier reads it as the rows it keeps. The Python half runs the same
- * agreement against the tier that produces it, in `apps/worker/tests/test_redaction_contract.py`.
- *
- * **The fixture is the contract, and this tier is the reader.** The detector runs in the
- * worker and the review of a finding is an Admin's act (the S0 spec, *The tier boundary*), so
- * what this half can hold the fixture to is what the app stores and shows: the tier word on a
- * `finding` row, the class a special-category finding narrows a document to, the two keys a
- * binding's rules in force carry — and, since T-126, the category list the app itself declares,
- * because the DPIA input has to name the categories a binding can raise and no category list
- * belongs in a migration. T-121's category descriptors are held to the same file from the other
- * side, which is why nothing here derives from a detector that does not exist yet.
- *
- * Neither half holds the other's literals. This one asserts against this tier's own boundary
- * schemas, the way the id-shape half asserts against `ULID_PATTERN`: a fixture the app cannot
- * store is a fixture the app has not been taught, and that failure is the point.
- */
-
 const category = z.object({
   category: z.string().min(1),
   tier: z.string().min(1),
@@ -84,8 +63,7 @@ describe("the redaction agreement's tiers", () => {
     expect(fixture.tiers.filter((tier) => !tier.switchable).map((tier) => tier.tier)).toEqual([
       REDACTION_ALWAYS_TIER,
     ]);
-    // The other way: an unswitchable tier has no key on a binding, and a switchable one has
-    // exactly the key this tier's column carries.
+
     expect(
       fixture.tiers.filter((tier) => tier.binding_key === null).map((tier) => tier.tier),
     ).toEqual([REDACTION_ALWAYS_TIER]);
@@ -98,11 +76,7 @@ describe("the redaction agreement's tiers", () => {
     const switchable = fixture.tiers.flatMap((tier) =>
       tier.binding_key === null ? [] : [tier.binding_key],
     );
-    // A whole binding, not a partial one: the Admin's own name for the source and its
-    // connector are the two columns `source_binding` defaults nothing for, so an object
-    // without them is refused for being incomplete rather than for its rules. They are
-    // written here rather than seeded, because this suite reads the boundary and never
-    // opens a database.
+
     const binding = {
       workspaceId: "01J6AAAAAAAAAAAAAAAAAAAAAA",
       id: "01J6VVVVVVVVVVVVVVVVVVVVVV",
@@ -112,8 +86,7 @@ describe("the redaction agreement's tiers", () => {
     };
 
     expect(boundarySchemas.sourceBinding.insert.safeParse(binding).success).toBe(true);
-    // A tier the fixture does not switch is a key the column does not carry: the always set
-    // written as a rule in force is refused, which is what makes *policy* mean policy.
+
     expect(
       boundarySchemas.sourceBinding.insert.safeParse({
         ...binding,
@@ -136,9 +109,6 @@ describe("the redaction agreement's categories", () => {
   });
 
   it("withholds the always set under one neutral word, and never uses that word elsewhere", () => {
-    // A typed placeholder for the always set would tell the audience what class of data the
-    // document holds, which is the thing the always set exists to keep back (the S0 spec,
-    // *The seam*). So the word is the same for all three, and it is nobody else's.
     for (const { category: named, tier, placeholder } of fixture.categories) {
       expect({ named, placeholder }).toEqual({
         named,
@@ -161,10 +131,6 @@ describe("the redaction agreement's categories", () => {
   });
 
   it("narrows a document to Restricted for a special-category finding and for no other", () => {
-    // The narrowing verdict, both ways (`[TEST7]`): a special-category finding narrows, and a
-    // category that narrows is a special-category one. The class is one this tier's boundary
-    // takes on the binding the document came from — a verdict naming a class the platform
-    // cannot store would be a document narrowed to nothing.
     expect(SENSITIVITIES).toContain(fixture.narrows_to);
     expect(
       boundarySchemas.sourceBinding.select.shape.sensitivity.safeParse(fixture.narrows_to).success,
@@ -181,10 +147,6 @@ describe("the redaction agreement's categories", () => {
 
 describe("the category list the app declares and the agreement's own", () => {
   it("declares every category the agreement names, at the tier and the flag the agreement gives it", () => {
-    // The app's list lives in the `sources` slice because nothing imports `contracts/` (ADR
-    // 0031) and no category list belongs in a migration (`packages/schema/src/finding-tables.ts`).
-    // This is the seam that keeps the two from drifting: a rule change lands in the agreement,
-    // and a list the app forgot to grow fails here rather than in a DPIA nobody re-read.
     for (const { category, tier, special_category } of fixture.categories) {
       const declared = REDACTION_CATEGORIES.find((entry) => entry.category === category);
 
@@ -196,8 +158,6 @@ describe("the category list the app declares and the agreement's own", () => {
   });
 
   it("declares no category the agreement does not name, so the two lists are one list", () => {
-    // The pair the other way (`[TEST7]`): a category in the app and not in the fixture is a
-    // word no worker raises and no DPIA input should print, and the equality is what says so.
     expect(REDACTION_CATEGORIES.map((entry) => entry.category).toSorted()).toEqual(
       fixture.categories.map((entry) => entry.category).toSorted(),
     );
@@ -217,9 +177,6 @@ describe("the redaction agreement's version string", () => {
   });
 
   it("is the two columns a finding carries, joined by the separator the agreement names", () => {
-    // Built from this tier's own row rather than from a copy of the fixture's samples: the
-    // version string is `rule_version` and `detector_pin` as a `finding` holds them, and the
-    // re-baselining of evidence resting on a re-detection is keyed on it.
     const row = { ruleVersion: "3", detectorPin: "presidio-2.2.364+gliner-multi-pii-v1" };
     const parsed = boundarySchemas.finding.insert
       .pick({ ruleVersion: true, detectorPin: true })

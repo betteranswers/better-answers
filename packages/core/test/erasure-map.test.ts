@@ -26,40 +26,18 @@ import {
   type Scenario,
 } from "./workspace-with-bundle.ts";
 
-/**
- * The **erasure map** through the slice's own face (`[TEST1]`), against real Postgres and a
- * real bare repository: what the platform holds about one subject, family by family, over an
- * exhaustive union — and what it says about a subject it holds nothing about.
- *
- * Three sentences this suite is here to hold. The union is closed, so a store family added
- * without a finder does not compile. Every family answers, so an empty store is an entry with
- * no locations and never a missing entry. And the map is computed **in one workspace's
- * scope**, so a person who belongs to two of them is never mapped across both.
- */
-
 const { db, arrange } = suiteWithBundles();
 
-/**
- * The expected values below are written from what the arrange returns, never from a second
- * call to the thing under test (`[TEST9]`).
- */
 const identifiersOf = (email: string): SubjectIdentifiers => ({
   emails: [email],
   names: ["Priya Anand"],
   other: ["ACME-4471"],
 });
 
-/** The concept file the bundle carries: a person named the way ADR 0019 names one in a file. */
 const CONCEPT_PATH = "knowledge/expenses.md";
 const conceptFileNaming = (email: string): string =>
   `---\ngenerated:\n  by: human:${email}\n---\n\nExpenses are claimed within thirty days.\n`;
 
-/**
- * Sessions, linked accounts and verification codes are Better Auth's own writes, so the test
- * factory holds none — `workspaces.test.ts` seeds a session the same way, to prove that
- * provisioning ends it. Everything else in this suite is built through the factory
- * (`[TEST4]`).
- */
 const identityRowsFor = async (userId: string, email: string) => {
   const sessionId = ulid();
   const accountId = ulid();
@@ -81,13 +59,6 @@ const identityRowsFor = async (userId: string, email: string) => {
   return { sessionId, accountId, verificationId: await verificationFor(email) };
 };
 
-/**
- * One verification code for one address, and nothing else beside it.
- *
- * It is separate from the three above because it is the one row of the identity set keyed by
- * an **address** rather than by a person, which is the whole of what the case below is about:
- * an address can be seeded for somebody this platform holds no user row for at all.
- */
 const verificationFor = async (identifier: string): Promise<string> => {
   const verificationId = ulid();
   const superuser = await db().pool.connect();
@@ -102,7 +73,6 @@ const verificationFor = async (identifier: string): Promise<string> => {
   return verificationId;
 };
 
-/** The request as the slice reads it back — the row an Admin recorded, identifier set and all. */
 const requestFor = async (
   scenario: Scenario,
   overrides: { readonly personId?: string | null; readonly identifiers: SubjectIdentifiers },
@@ -121,13 +91,11 @@ const requestFor = async (
   return read.value;
 };
 
-/** The map as the routine computes it: the platform principal, in this workspace's scope. */
 const mapOf = (scenario: Scenario, request: SubjectRequest): Promise<ErasureMap> =>
   withScope(bootstrap, scenario.postgres, scenario.workspaceId, (tx, platform) =>
     erasureMapOf(platform, tx, scenario.git, request),
   );
 
-/** One governed write by the subject themselves, so their address is in a file and an author line. */
 const conceptFileBy = async (
   scenario: Scenario,
   principal: UserPrincipal,
@@ -147,15 +115,9 @@ const conceptFileBy = async (
   return written.value.sha;
 };
 
-/** The families and what each named, so a test about locations is not a test about categories. */
 const locationsOf = (map: ErasureMap): readonly (readonly [ErasureFamily, readonly string[]])[] =>
   map.map((entry) => [entry.family, entry.locations] as const);
 
-/**
- * A workspace holding everything one member's erasure would have to reach: a concept file
- * they wrote and authored, the commit's ledger row, a check they made, an invitation to their
- * address, and their session, linked account and verification code.
- */
 const workspaceHoldingAMember = async () => {
   const scenario = await arrange();
   const email = addressOf("priya");
@@ -191,9 +153,6 @@ describe("the erasure map's union", () => {
 
     const families = (await mapOf(scenario, request)).map((entry) => entry.family);
 
-    // Both ways (`[TEST7]`): every family of the union has an entry, and every entry names a
-    // family of the union. One direction finds the store nobody searched, the other the entry
-    // for a store the union does not hold.
     expect(ERASURE_FAMILIES.filter((family) => !families.includes(family))).toEqual([]);
     expect(families.filter((family) => !ERASURE_FAMILIES.includes(family))).toEqual([]);
     expect(families).toEqual([
@@ -215,10 +174,6 @@ describe("the erasure map's union", () => {
       find: () => Promise.resolve([]),
     };
 
-    // Eight of the nine families is not a registry over the union: the ninth would be a store
-    // the routine never searched and the access answer never mentioned. Held at compile time
-    // first — `tsc --noEmit` over `test/` is a step of this workspace's own `check` — and this
-    // is the runtime half for a reader without the compiler.
     // @ts-expect-error — `source-document` has no descriptor here.
     const withoutADocumentFinder: Record<ErasureFamily, ErasureFamilyDescriptor> = {
       "concept-file": findsNothing,
@@ -276,9 +231,6 @@ describe("the erasure map for a member", () => {
 
     const named = (await mapOf(held.scenario, held.request)).flatMap((entry) => entry.locations);
 
-    // The file says "Expenses are claimed within thirty days." and the session came from
-    // 203.0.113.7 on Mozilla/5.0. A location names where the platform holds the person; a
-    // reply under Article 15 built from one therefore carries no third party's data.
     expect(named.some((location) => location.includes("Expenses are claimed"))).toBe(false);
     expect(named.some((location) => location.includes("203.0.113.7"))).toBe(false);
     expect(named.some((location) => location.includes("Mozilla/5.0"))).toBe(false);
@@ -297,8 +249,6 @@ describe("the erasure map for a subject with no user row", () => {
 
     const map = await mapOf(scenario, request);
 
-    // Nine entries with nothing in them, never eight entries and a silence: a reader has to be
-    // able to tell a store that holds nothing about this person from a store nobody asked.
     expect(locationsOf(map)).toEqual([
       ["concept-file", []],
       ["bundle-commit", []],
@@ -342,8 +292,7 @@ describe("the erasure map in one workspace's scope", () => {
         inviterId: elsewhere.admin.userId,
       }),
     }));
-    // The same person writes a concept file in the other workspace's bundle, so the git arm
-    // has something to find there and must not.
+
     const elsewherePrincipal = await principalFor(db(), elsewhere.workspaceId, person.id);
     const shaElsewhere = await conceptFileBy(elsewhere, elsewherePrincipal, email, elsewhere.git);
     const request = await requestFor(here, {
@@ -371,26 +320,12 @@ describe("the erasure map in one workspace's scope", () => {
   });
 });
 
-/**
- * The second fence, and the one the workspace scope cannot give.
- *
- * The identifier set is how an Admin says **who the request is about** — a contact address for
- * somebody who never signed in, or the address a member signs in by — so it is a search key for
- * the subject's person and not a list of rows to fetch. The identity set carries no
- * `workspace_id` and row-level security reaches none of it, so an identity family matched on the
- * set itself would hand an Admin any stranger's rows for the cost of one extra line on a request
- * about a genuine member. The families are therefore read by the person the map **found**, and
- * `verification` — the one keyed by an address rather than by a person — by the addresses those
- * users hold and no other. The workspace-fenced families still search the whole set, because
- * what they can reach is this workspace's own records either way.
- */
 describe("the erasure map for an address in the set the subject does not own", () => {
   it("names the subject's own verification code and never the stranger's the set also carries", async () => {
     const here = await arrange();
     const email = addressOf("priya");
     const person = await memberOf(db().pool, here.workspaceId, email);
-    // An address with no user row, no membership and no workspace behind it: somebody this
-    // platform knows only because a request about another person named them.
+
     const notTheirs = addressOf("a-stranger");
     const theirs = await verificationFor(email);
     await verificationFor(notTheirs);
@@ -401,8 +336,6 @@ describe("the erasure map for an address in the set the subject does not own", (
 
     const map = await mapOf(here, request);
 
-    // One location, and it is the subject's own row: the stranger's code is not in the answer,
-    // so no reply under Article 15 can carry a line about a person who never asked for one.
     expect(map.find((entry) => entry.family === "identity-verification")?.locations).toEqual([
       theirs,
     ]);
@@ -416,14 +349,6 @@ describe("the access answer", () => {
 
     const answer: AccessAnswer = accessAnswerOf(map);
 
-    // The whole answer against one literal (`[TEST9]`), because what this test is for is what
-    // the answer does **not** carry: the file says "Expenses are claimed within thirty days.",
-    // the session came from 203.0.113.7 on Mozilla/5.0 and the person's own address is on the
-    // user row — and none of the three can be here, where every field is written down. A reply
-    // built from this therefore carries no third party's data.
-    //
-    // `document-text` is not in the categories: `source-document` named nothing, and a category
-    // no location evidences is not a category the platform tells the person it holds.
     expect(answer).toEqual({
       categories: [
         "actor-id",
@@ -476,9 +401,6 @@ describe("the access answer", () => {
     });
     const map = await mapOf(scenario, request);
 
-    // The map answered nine families with no locations; the answer is where the platform holds
-    // the person, so nine nothings are one nothing. The person is told the platform holds them
-    // nowhere and under no category — not handed a list of stores they have to read.
     expect(map).toHaveLength(9);
     expect(accessAnswerOf(map)).toEqual({ categories: [], locations: [] });
   });

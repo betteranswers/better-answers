@@ -19,30 +19,8 @@ import { SystemScreen } from "./screens/system-screen.tsx";
 import { UnbuiltScreen } from "./screens/unbuilt-screen.tsx";
 import { UnknownScreen } from "./unknown-screen.tsx";
 
-/**
- * The router. Routes are declared in code rather than generated from a file tree, because
- * the six screens are one list (`shared/screens.ts`) that the navigation reads too, and a
- * generated tree would put the same six names in a second place.
- *
- * The api serves this shell for any address on `app.` it does not answer itself (ADR 0006,
- * amended 2026-09-02), so an address that is not a screen reaches the router rather than
- * the authorization server's 404; `notFoundComponent` is what answers it.
- *
- * Two levels below the root, because the product has two kinds of address. The **shell**
- * carries Control Centre's frame and everything a member of a workspace reads. The three
- * screens beside it — sign-in, the picker, the refused screen — stand outside it: a person
- * reading one of them has no workspace yet, and a frame around them would offer six
- * screens that would all refuse (T-037).
- */
-
-/**
- * The screens with something behind them. Everything else in `SCREENS` renders the unbuilt
- * screen, so a screen becomes built by being added here and in no other place.
- */
 const BUILT_SCREENS = new Map<ScreenId, () => ReactElement>([["system", SystemScreen]]);
 
-// Nothing sits between the root and its outlet: the auth module's hooks close over its own
-// client and the app's one query cache (T-046), so there is no provider to mount here.
 const rootRoute = createRootRoute({
   component: Outlet,
   notFoundComponent: UnknownScreen,
@@ -66,7 +44,6 @@ const noWorkspaceRoute = createRoute({
   component: NoWorkspaceScreen,
 });
 
-/** The shell: a route with no address of its own, so every screen under it wears the frame. */
 const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "shell",
@@ -74,8 +51,6 @@ const shellRoute = createRoute({
   notFoundComponent: UnknownScreen,
 });
 
-// Control Centre has no home of its own: the frame's first screen is System, and `/`
-// carries the reader there rather than rendering a page that exists only to be left.
 const indexRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/",
@@ -95,10 +70,6 @@ const screenRoutes: AnyRoute[] = SCREENS.map((screen) =>
   }),
 );
 
-/**
- * The history is a parameter because a test drives the router without a browser: assigning
- * one after construction relies on the router re-reading a property it never promised to.
- */
 export const createAppRouter = (history?: RouterHistory) => {
   const options = {
     routeTree: rootRoute.addChildren([
@@ -107,17 +78,10 @@ export const createAppRouter = (history?: RouterHistory) => {
       noWorkspaceRoute,
       shellRoute.addChildren([indexRoute, ...screenRoutes]),
     ]),
-    // One boundary for every route, rather than one per screen: a screen that throws is a
-    // bug, and a bug is not a thing a screen knows something extra about. The router's own
-    // default puts the error's message and a "Show Error" toggle on the page, which is a
-    // reader-facing stack trace; this one replaces it (`apps/web/src/app/failed-screen.tsx`).
-    // It sits on the router rather than on the shell so the three screens outside the frame
-    // are covered too. No `defaultOnCatch`: there is nowhere in the browser to send the error.
+
     defaultErrorComponent: FailedScreen,
   };
-  // Two calls rather than one with a conditional spread: `exactOptionalPropertyTypes` makes
-  // `history: undefined` a different thing from an absent `history`, and the router reads an
-  // absent one as "make a browser history" — which is what a browser wants and a test does not.
+
   return history === undefined ? createRouter(options) : createRouter({ ...options, history });
 };
 

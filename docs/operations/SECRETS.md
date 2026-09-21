@@ -4,11 +4,11 @@
 
 **This is the public half.** It states *which classes of secret exist*, *what rule each obeys* and *how each rotates*. The estate's own inventory — which value lives on which box at which path, who holds the escrow, and the bus factor per row — is **not published**: it is `.planning/estate/SECRETS.md`, outside the repository, because a public operational map of a running estate helps only an attacker (ADR 0027, ticket 79 Q10; ticket 77's acceptance line). Everything a reader needs to *run their own* deployment is here and in the compose files, the Dockerfiles, `deploy/host-setup.sh` and `deploy/wizard-41.sh`.
 
-No secret is ever in git. Bootstrap secrets (`[SEC1]`) live in the orchestrator's per-resource encrypted env and are read once by the typed config module. The orchestrator writes a resource's `.env` in plaintext to its workdir on the production host — accepted, and it is why a disk image or snapshot of that host is itself a secret.
+No secret is ever in git. Bootstrap secrets live in the orchestrator's per-resource encrypted env and are read once by the typed config module. The orchestrator writes a resource's `.env` in plaintext to its workdir on the production host — accepted, and it is why a disk image or snapshot of that host is itself a secret.
 
 ## The classes
 
-ADR 0041 fixes the seven classes and `[SEC1]` keeps the rule that they are never mixed in one scope. What each is for and where it is read is written here today, which record should own that gloss being unsettled (ADR 0041):
+ADR 0041 fixes the seven classes and the secrets-seam rule keeps the rule that they are never mixed in one scope. What each is for and where it is read is written here today, which record should own that gloss being unsettled (ADR 0041):
 
 | Class | What it is for | Where it is read |
 | --- | --- | --- |
@@ -16,7 +16,7 @@ ADR 0041 fixes the seven classes and `[SEC1]` keeps the rule that they are never
 | **ingestion** | a connector's credential for one source binding | the credentials provider, decrypted per run and injected through the control plane (ADR 0005) |
 | **acting** | writing back into a connected system as the user, approval-gated | not in v0.1; the class is reserved so its scope is a boundary, not a naming convention |
 | **agent** | a share agent's binding-scoped token on `/agent/v1` | checked in the app before any body is read (ADR 0008) |
-| **LLM provider** | a model route's API key, per workspace and purpose | the credentials provider; never logged, never in an `llm_call` row (`[LOG1]`) |
+| **LLM provider** | a model route's API key, per workspace and purpose | the credentials provider; never logged, never in an `llm_call` row |
 | **repository** | the git store's own keys — the mirror deploy key, the per-run read path | root-only on the host, mounted read-only into the service that needs it |
 | **object store** | the bucket credentials, in three grades: **write-and-list** on the host, **read** for the drill, **admin** (delete, lifecycle, governance bypass) never on any box; and the backup **`age` identity** — public half in the stores resource's env, private half in escrow **and resident on VPC 2** (§ The backup identity) | the write-and-list pair from env; the admin credential from escrow only; the identity from a root-only file on VPC 2 |
 
@@ -27,7 +27,7 @@ ADR 0041 fixes the seven classes and `[SEC1]` keeps the rule that they are never
 Every class has a rotation path, and every path is written down before the credential is created:
 
 - **A secret appears in exactly one env per box.** The config module's key list *is* the inventory's first column, and a missing key **fails the boot** — a secret that is quietly absent is worse than one that is loudly missing.
-- **Nothing here is ever logged** — not by the logger, not by the exporter, not on an `llm_call` row (`[LOG1]`).
+- **Nothing here is ever logged** — not by the logger, not by the exporter, not on an `llm_call` row.
 - **Every credential class has a documented rotation** — reissue at the provider, swap, redeploy, revoke the old — and a rotation that requires downtime says so.
 - **Rotation on compromise is a runbook page, not a decision.** Host compromise rotates every host-side credential; a database compromise rotates the envelope key and re-wraps every workspace data key (ADR 0005).
 - **Backups are encrypted client-side with `age`**; the private half is escrowed and resident on VPC 2 (§ The backup identity). Rotating that identity mints a new keypair and re-encrypts nothing: existing copies expire on their own lifecycle (`BACKUPS.md`).

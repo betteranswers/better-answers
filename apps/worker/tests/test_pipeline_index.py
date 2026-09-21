@@ -1,30 +1,3 @@
-"""One index run end to end: the rows it lands, the records it writes and the
-visibility it re-copies before it finishes (`[TEST1]`, `[TEST2]`, `[TEST3]`,
-`[TEST4]`, `[TEST7]`, `[TEST9]`).
-
-Driven through `better_answers_worker.pipeline`'s own seam and through the work loop's
-registry, against a real Postgres on the pinned image and a real engine and detector.
-Nothing of this tier is replaced; the one thing that is, is the estate's object store,
-behind the two-method adapter the pipeline reaches it through — a bucket could not say
-which key was read and which was written any more clearly than a dictionary does.
-
-**The role every run connects as.** `index`.`chunk` forces row-level security and a
-superuser bypasses it by design, so the runs below open Postgres as a login role that is
-a member of `worker_rt` and is nothing else — the shape the deploy unit gives the
-worker. That is also what holds the grants honest: the suppression read is migration
-0038's, the finding insert migration 0024's, and the catalogue's update migration
-0037's, and a run connected as the owner would prove none of them. Rows are **read back
-on the owner connection**, so a verification read never stands in for the write under
-test.
-
-**What is written down here, and why it is not derived.** The redacted text of every
-document, the findings' categories, tiers, rule ids and spans, each chunk row's id, span
-and wire locator, and the content hash of each original are literals (`[TEST9]`). They
-were read out of the seam and the splitter on 11 September 2026 at `rule_version` 1 and
-the detector pin this tier ships; a case that asked the code what it answered would
-agree with code that answered anything.
-"""
-
 import hashlib
 import json
 import re
@@ -66,14 +39,9 @@ from test_pipeline_host import (
 )
 from test_upload_media_types_contract import read_upload_media_types
 
-#: The binding every run below is for, spelled rather than minted: it is the seed a
-#: name's pseudonym is drawn from, so a binding whose id moved between two runs would
-#: re-read every document for a reason no case is about.
 BINDING = "01M2B1ND1NGAAAAAAAAAAAAAAA"
 
-#: An invoice carrying a sort code beside an account number, which the seam raises as
-#: one `bank-details` span at the tier no binding can switch off (ADR 0027: every value
-#: invented).
+
 AN_INVOICE_ID = "01M2Q3R4S5T6V7W8X9YZAB0001"
 AN_INVOICE = (
     "Invoice 2026-041 is due on receipt.\n\n"
@@ -87,8 +55,7 @@ AN_INVOICE_REDACTED = (
 )
 THE_ACCOUNT_NUMBER = "12345678"
 
-#: A note naming a health condition, which the seam raises as a special-category finding
-#: and answers with the verdict that narrows the document to Restricted.
+
 A_SICK_NOTE_ID = "01M2Q3R4S5T6V7W8X9YZAB0002"
 A_SICK_NOTE = (
     "Cover for the depot is arranged until the end of the quarter.\n\n"
@@ -98,9 +65,7 @@ A_SICK_NOTE_REDACTED = (
     "Cover for the depot is arranged until the end of the quarter.\n\n[withheld]\n"
 )
 
-#: A delivery note naming one person. Under the safe set a name is a finding and not a
-#: withholding, so this document's redacted text is its own — until an erasure request
-#: names her, which raises her span to the always tier and writes her out.
+
 A_DELIVERY_NOTE_ID = "01M2Q3R4S5T6V7W8X9YZAB0003"
 A_DELIVERY_NOTE = (
     "Deliveries are booked by Priya Raman on 0161 496 0000.\n\n"
@@ -111,25 +76,15 @@ A_DELIVERY_NOTE_SUPPRESSED = (
     "The depot opens at seven.\n"
 )
 
-#: The version string every finding row and every reconciled document carries, as its
-#: two columns hold it — the pair the seam answers with, split once.
+
 THE_VERSION = f"{RULE_VERSION}:{DETECTOR_PIN}"
 
 
 def sha256_of(text: str) -> str:
-    """The hash the catalogue row carries, over the normalised text before the seam."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 class ABucket:
-    """The estate's object store as a dictionary of the bytes under each key.
-
-    The adapter's own interface and not boto3's: what these cases need to see is which
-    key was read, which was written and what the bytes became (`[TEST3]`). `on_write` is
-    the one hook a case uses to land a narrowing in the middle of a run, at the moment
-    the run has read the binding and has not yet written a row.
-    """
-
     def __init__(
         self,
         objects: Mapping[str, bytes],
@@ -154,7 +109,6 @@ class ABucket:
 
 @pytest.fixture(name="database")
 def a_migrated_database() -> Iterator[tuple[psycopg.Connection, str]]:
-    """A migrated throwaway Postgres, and a DSN on it for the worker's runtime role."""
     with migrated_postgres_at() as (connection, conninfo):
         connection.execute(
             f"CREATE ROLE \"{WORKER_LOGIN}\" LOGIN PASSWORD '{WORKER_PASSWORD}'"
@@ -165,20 +119,13 @@ def a_migrated_database() -> Iterator[tuple[psycopg.Connection, str]]:
 
 
 def original_key_of(document_id: str) -> str:
-    """Where the bind act put the bytes, inside the workspace's own prefix."""
     return f"documents/{document_id.lower()}/original"
 
 
 def normalised_key_of(document_id: str) -> str:
-    """Where a run puts the normalised redacted text, beside the original."""
     return f"documents/{document_id.lower()}/normalised"
 
 
-#: Two of the converter's own fixtures, read rather than copied: they are the same
-#: documents the landed suite converts and quarantines, and a second copy here would be
-#: a second thing to keep in step with the converters. What the second one converts to
-#: is `tests/test_pipeline_landed.py`'s literal, repeated here because this suite
-#: asserts the chunk row the run landed out of it.
 CONVERSION_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "conversion"
 A_SCANNED_PDF = (CONVERSION_FIXTURES / "scanned-invoice.pdf").read_bytes()
 A_RATE_CARD_PDF = (CONVERSION_FIXTURES / "rate-card.pdf").read_bytes()
@@ -213,14 +160,6 @@ def seed_the_binding(
     media_type: str = "text/markdown",
     media_types: Mapping[str, str] | None = None,
 ) -> str:
-    """A provisioned workspace holding one binding and the documents a case names.
-
-    `media_type` is what every document is catalogued under and `media_types` names the
-    ones that differ — which is how a case says *this document arrived as a PDF* without
-    a statement of its own. Setup goes through the factory: a case that reached past
-    it with an `UPDATE` would be writing the table under test by a road the bind act
-    never takes.
-    """
     workspace_id = seed_partitioned_workspace(connection)
     named = media_types or {}
     with connection.cursor() as cursor:
@@ -255,15 +194,6 @@ def run_for(workspace_id: str, reason: str = "bound") -> IndexRun:
 
 
 def by_column(cursor: psycopg.Cursor[Any]) -> list[dict[str, Any]]:
-    """What a cursor just selected, each row keyed by the column it came from.
-
-    The keys are the cursor's own description rather than a list written beside the
-    statement, so a `SELECT` and its reader cannot disagree about which value is which —
-    a column added in the middle of the list would otherwise shift every assertion below
-    it by one and still pass a length check. Each caller keeps its own `SELECT`: the
-    column list is the thing a case is explicit about (`[TEST9]`), and one query serving
-    two tables would take that away.
-    """
     assert cursor.description is not None
     names = [column.name for column in cursor.description]
     return [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
@@ -272,8 +202,6 @@ def by_column(cursor: psycopg.Cursor[Any]) -> list[dict[str, Any]]:
 def chunk_rows_of(
     connection: psycopg.Connection, workspace_id: str
 ) -> list[dict[str, Any]]:
-    """Every chunk row the workspace holds, read as the owner so the read itself proves
-    nothing about the scope — only the write under test does (R4)."""
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT id, workspace_id, content, published_at, sensitivity, audience,"
@@ -311,27 +239,9 @@ def catalogue_rows_of(
         return by_column(cursor)
 
 
-# -- the registry ----------------------------------------------------------------------
-#
-# That the table holds this kind at all, and that a claim filtered by it leaves another
-# process's kind alone, are the work-loop suite's own cases beside the dispatch they are
-# about. What is here is the run the dispatch reaches.
-
-
 def test_the_loop_claims_an_index_job_runs_it_and_finishes_it_with_its_three_figures(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """The host is unchanged: it claims, stamps the claimant and the heartbeat, and
-    finishes the row with whatever the handler answered. What the handler answers is the
-    outcome the index run made — how many documents it saw, how many chunks it landed
-    and how much disk the binding's store is using, which is the signal the per-binding
-    cap is read against (ADR 0025).
-
-    A binding with no documents, so the run reaches no object store: what this case is
-    about is the dispatch and the row, and a run that read bytes would be proving the
-    pipeline twice. The loop itself runs as the worker's runtime role, which is also
-    what says the role may read the schema stamp it refuses to claim without.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=())
     with connection.cursor() as cursor:
@@ -359,27 +269,13 @@ def test_the_loop_claims_an_index_job_runs_it_and_finishes_it_with_its_three_fig
     assert row[:4] == ("index", "done", bootstrap.worker_id, True)
     assert (row[4]["documents"], row[4]["chunks"]) == (0, 0)
     assert row[4]["lmdb_bytes"] > 0
-    # The list crosses the queue's own finish as it is: present, and empty on a run in
-    # which no kept span was overridden — which is how the app tells it from a run that
-    # predates the figure.
+
     assert row[4]["restores_overridden_by_erasure"] == []
-
-
-# -- the rows --------------------------------------------------------------------------
 
 
 def test_every_column_of_the_chunk_rows_one_run_lands(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """The row is the run's whole output, so every column of it is written down here:
-    the derived id, the ordinal the splitter sat the row at, the span in code points,
-    the full wire locator a citation carries, the redacted content, and the three
-    permission fields copied from the binding narrowed by the document (ADR 0031's
-    visibility columns).
-
-    The document carries no class of its own, so the row takes its binding's — the
-    ordinary case, and the one a narrowing has to be able to move.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(
         connection,
@@ -420,10 +316,6 @@ def test_every_column_of_the_chunk_rows_one_run_lands(
 def test_the_rows_of_a_binding_published_to_named_groups_carry_the_group_ids(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """A document has no audience of its own, so the word and its group-id array are
-    copies and never folds — and the array rides on the row beside the word, because the
-    predicate that reads it runs in SQL against the row and has nothing else to test.
-    """
     connection, dsn = database
     groups = ["01M2GR0PAAAAAAAAAAAAAAAAAA", "01M2GR0PBBBBBBBBBBBBBBBBBB"]
     workspace_id = seed_the_binding(
@@ -445,21 +337,9 @@ def test_the_rows_of_a_binding_published_to_named_groups_carry_the_group_ids(
     ]
 
 
-# -- the findings, the catalogue and the copies ----------------------------------------
-
-
 def test_the_findings_land_as_the_rows_an_admin_will_review(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """This block is the first writer of S0's table, and `worker_rt` holds INSERT on it
-    and nothing else (migration 0024) — so the run connects as that role and the rows
-    appear, which is the grant proved by use rather than by assertion.
-
-    A finding is a location and never a quotation: the category, the tier, the rule that
-    raised it, the span in code points into the text the seam was **given**, the score
-    and the two halves of the version string. Born unreviewed, because reviewing one is
-    an Admin's act and no run takes it.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(
         connection, documents=(AN_INVOICE_ID, A_SICK_NOTE_ID)
@@ -496,11 +376,6 @@ def test_the_findings_land_as_the_rows_an_admin_will_review(
             DETECTOR_PIN,
             "unreviewed",
         ),
-        # *team lead*, wholly inside the health span above and on a tier this binding
-        # leaves off: the seam keeps every span its rules raise as a finding, whatever
-        # else claims the same characters, because a finding is the row an Admin reviews
-        # and not a claim on the text. The score is the model's, so it is held to a
-        # tolerance a second machine class can meet (0.9593 on arm64, 18/09/2026).
         (
             A_SICK_NOTE_ID,
             "job-title",
@@ -519,15 +394,6 @@ def test_the_findings_land_as_the_rows_an_admin_will_review(
 def test_the_catalogue_row_is_reconciled_and_the_copy_lands_beside_the_original(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """What a run reconciles is exactly what it found: the hash of the text it read
-    **before** the seam ran — a hash holds no value, so it is the fact a later run
-    compares against to answer *unchanged* — the key of the normalised copy it wrote,
-    the version the seam decided with, the outcome word and when it last saw the item.
-
-    The copy is written under the document's own normalised key and the original is read
-    and never written, because the original is the evidence an erasure map is read from
-    and a re-detection is re-run over.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
     bucket = a_bucket_holding_the_three()
@@ -541,8 +407,6 @@ def test_the_catalogue_row_is_reconciled_and_the_copy_lands_beside_the_original(
             "normalised_key": normalised_key_of(AN_INVOICE_ID),
             "redaction_version": THE_VERSION,
             "outcome": "converted",
-            # A document that converted carries no quarantine error, and the database
-            # would refuse one here: the name and the word travel together.
             "quarantine_error": None,
             "sensitivity": None,
             "seen_again": True,
@@ -560,17 +424,10 @@ def test_the_catalogue_row_is_reconciled_and_the_copy_lands_beside_the_original(
     )
 
 
+# jscpd:ignore-start
 def test_a_special_category_verdict_narrows_the_document_and_every_row_cut_from_it(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """A health-shaped document lands Restricted whatever its binding's class, and the
-    narrowing reaches the rows in the same run: the document's own class is the fold's
-    other half, so a run that wrote the verdict and left the rows at the binding's word
-    would serve the passage it had just narrowed.
-
-    Its sibling under the same binding is untouched, which is the other half of the
-    pair: the verdict is one document's and never the binding's.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(
         connection, documents=(AN_INVOICE_ID, A_SICK_NOTE_ID)
@@ -581,6 +438,7 @@ def test_a_special_category_verdict_narrows_the_document_and_every_row_cut_from_
         run_for(workspace_id),
         copies=a_bucket_holding_the_three(),
     )
+    # jscpd:ignore-end
 
     assert [
         (row["id"], row["sensitivity"])
@@ -598,30 +456,6 @@ def test_a_special_category_verdict_narrows_the_document_and_every_row_cut_from_
 def test_a_document_this_tier_cannot_read_is_quarantined_on_its_own_catalogue_row(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """The engine catches a component's failure and lets the run finish, which is what
-    fanning a document per component is for — so an unreadable upload is its own failure
-    and never the binding's. The run lands the neighbour, writes *quarantined* and the
-    name of what refused it on the row of the one it could not read, and finishes.
-
-    **The word and the name are both the row's**, because what an Admin deciding whether
-    the platform needs OCR reads is a count of one binding's documents quarantined *for
-    want of OCR* — and a count is a `GROUP BY` over a column, not a search of a log. The
-    two travel together or neither means anything, which is the database's rule and not
-    this tier's: `source_document_quarantine_error_check` refuses a name on a row that
-    does not also carry the word.
-
-    Everything else on the row stays null. The hash, the normalised copy's key and the
-    version string are facts about text that does not exist, and a run that wrote them
-    would be saying it had converted a document it could not read. `last_seen` does
-    move: the run found the document at the source, and only reading it failed.
-
-    The name is the converter's own class name, written down here rather than read
-    back: this document's bytes are markdown under a PDF media type, and
-    `pdf-inspector` refuses bytes that are not a PDF with a plain `ValueError`. That is
-    a coarser name than the case below it gets, and deliberately left as the library
-    gives it — inventing a finer one here would be this tier telling an Admin something
-    no converter said.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(
         connection,
@@ -654,16 +488,6 @@ def test_a_document_this_tier_cannot_read_is_quarantined_on_its_own_catalogue_ro
 def test_a_pdf_with_no_text_layer_names_ocr_on_its_row_which_is_what_an_admin_counts(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """The refusal the whole column exists for. Docling left the route as S4's trigger
-    and what replaced it is a number an Admin reads — *OCR is reached for when a
-    binding's share of documents quarantined for want of OCR is one an Admin will not
-    accept* (ADR 0013, amended 20/09/2026) — so `NeedsOcrError` has to be a value on the
-    row that a count can be taken over, distinct from every other way a document can
-    fail to convert.
-
-    Which is the whole of what this case adds over the one above it: both quarantine,
-    and the rows say *different things about why*.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(
         connection,
@@ -695,17 +519,6 @@ def test_a_pdf_with_no_text_layer_names_ocr_on_its_row_which_is_what_an_admin_co
 def test_a_media_type_the_agreement_places_outside_the_list_is_quarantined_on_its_row(
     database: tuple[psycopg.Connection, str], tmp_path: Path, media_type: str
 ) -> None:
-    """The upload-media-types agreement's seeded half (ADR 0031): the very types the
-    app's suite sees refused at the bind act, arriving here on a catalogue row anyway —
-    which is what a drifted allow-list would look like from this side.
-
-    The bytes are the sick note's markdown, which this tier reads without complaint
-    under its own media type. Under a type with no converter they are **not converted
-    at all**: the row says *quarantined* and names `UnsupportedMediaType`, no
-    normalised copy is written, and the neighbour lands as if nothing had happened. A
-    dispatch that fell through to whichever converter the bytes resemble would land
-    two documents here.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(
         connection,
@@ -738,21 +551,6 @@ def test_a_media_type_the_agreement_places_outside_the_list_is_quarantined_on_it
 def test_a_document_that_ran_past_its_ceiling_lands_the_deadline_on_its_row(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """The third way a document is quarantined, and the row cannot tell it from the
-    other two by anything but this column: a conversion that never came back leaves no
-    converter refusal to record, so the name on the row is the deadline's own.
-
-    The ceiling is the run's, and this case names it because no document can be made to
-    breach the shipped one — thirty-three seconds for a page against a conversion that
-    costs milliseconds. With it at nothing every document runs past it, which is what
-    makes the reading machine-independent: a case that waited for a genuinely slow
-    document would be a case about whichever laptop ran it.
-
-    **The run still finishes**, which is the half that matters beyond the row. It lands
-    no chunks, writes no normalised copy and answers an outcome — a binding whose
-    documents all ran past their ceiling is a binding with nothing in it, not a job that
-    failed.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
     bucket = a_bucket_holding_the_three()
@@ -779,23 +577,6 @@ def test_a_document_that_ran_past_its_ceiling_lands_the_deadline_on_its_row(
 def test_a_document_quarantined_by_one_run_and_read_by_the_next_loses_its_error(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """The recovery path, and the other way round from the three cases above it: a
-    run that reads a document it once could not must take the name off the row with
-    the word.
-
-    It is not tidiness. The name and the word travel together by a CHECK, so a reconcile
-    that left `NeedsOcrError` under *converted* would be refused — inside the run's own
-    scoped transaction, taking the findings and every other catalogue row down with it.
-    A document that recovered would break the run that recovered it, which is the exact
-    opposite of *it is never a failed run*.
-
-    The recovery staged here is **the bytes changing at the source**, which is the one
-    that needs no row rewritten: the document stays catalogued as a PDF across both
-    runs, and between them the object store stops holding markdown under that key and
-    starts holding a real PDF. That is a scan re-uploaded with a text layer, and it is
-    also the shape a converter upgrade takes from this row's point of view — the same
-    document, read this time.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(
         connection,
@@ -829,15 +610,6 @@ def test_a_document_quarantined_by_one_run_and_read_by_the_next_loses_its_error(
 def test_a_suppression_standing_over_a_document_is_read_off_the_table_and_kept_out(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """The run gathers what each document must keep out from the `suppression` table
-    itself, under its own workspace scope and through the SELECT migration 0038 grants —
-    rather than being handed a set on the job row, which would write an erased person's
-    identifiers into a queue row that outlives the run.
-
-    Held both ways (`[TEST7]`): with no suppression standing, the name is a finding at
-    the tier a binding switches off and the text keeps it; with one standing, the same
-    span is raised to the tier no binding switches off and the text loses it.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(A_DELIVERY_NOTE_ID,))
     bootstrap = bootstrap_for(dsn, tmp_path)
@@ -863,13 +635,9 @@ def test_a_suppression_standing_over_a_document_is_read_off_the_table_and_kept_o
     ]
 
 
-# -- a finding across runs, and the restore --------------------------------------------
-
-
 def marked_rows_of(
     connection: psycopg.Connection, workspace_id: str
 ) -> list[dict[str, Any]]:
-    """Every finding, its id and what an Admin wrote on it, as the owner reads it."""
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT id, document_id, rule_id, char_start, char_end, review_state,"
@@ -883,13 +651,6 @@ def marked_rows_of(
 def test_a_second_run_lands_no_second_finding_row_and_moves_none(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """A finding is the same finding on every run that finds it: the document, the rule
-    and the two offsets are unique (migration 0040), and the run's insert steps over a
-    span it has found before. So a binding indexed again for any reason holds each span
-    once, under the id it was first given — which is the id the ledger names when an
-    Admin restores it, and the reason the insert leaves the row alone rather than
-    writing it again.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(
         connection, documents=(AN_INVOICE_ID, A_SICK_NOTE_ID)
@@ -911,29 +672,22 @@ def test_a_second_run_lands_no_second_finding_row_and_moves_none(
         ("JOB_TITLE", 67, 76),
     ]
     assert marked_rows_of(connection, workspace_id) == first
-    # And not one row was written to, which the transaction that last wrote each says: a
-    # reading that has not moved is not written again, so a second run changes no row.
+
     assert readings_of(connection, workspace_id) == written
 
 
 class ASpan(TypedDict):
-    """A finding as a run is told of one: the rule that raised it, and two offsets."""
-
     rule_id: str
     char_start: int
     char_end: int
 
 
-#: The delivery note's one name, *Priya Raman*, as the seam cuts it.
 HER_NAME: ASpan = {"rule_id": "PERSON", "char_start": 25, "char_end": 36}
 
 
 def readings_of(
     connection: psycopg.Connection, workspace_id: str
 ) -> list[dict[str, Any]]:
-    """Every finding's id and the five columns that are a run's own reading of it, with
-    the transaction that last wrote the row — which is how a case tells a row a run left
-    alone from one it wrote the same values to."""
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT id, category, tier, score, rule_version, detector_pin,"
@@ -947,17 +701,6 @@ def readings_of(
 def test_a_span_an_older_run_left_is_read_again_and_all_five_of_its_reading_move(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """A finding is the same finding on every run that finds it, and what a run knows
-    about it is the **last** run's: its category, its tier, its score and the version
-    pair that read it (migration 0042). A row that kept its first reading for ever would
-    have the review show a tier the seam no longer acts on, refuse a keep the rules now
-    admit, and give the app no way to tell a span the rules still raise from one they
-    have dropped — a row's pair against its document's is that test, and it only means
-    anything if every run writes the pair.
-
-    The older run's reading is wrong in all five, on purpose: each is a column the
-    refresh names, and one left out of it is one this case finds still wrong.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
     with connection.cursor() as cursor:
@@ -980,8 +723,7 @@ def test_a_span_an_older_run_left_is_read_again_and_all_five_of_its_reading_move
     )
 
     (row,) = readings_of(connection, workspace_id)
-    # The pair on the row is the string on its document, joined at one colon: that
-    # equality is how the app tells a span the last run raised from one it dropped.
+
     (catalogued,) = catalogue_rows_of(connection, workspace_id)
     assert catalogued["redaction_version"] == (
         f"{row['rule_version']}:{row['detector_pin']}"
@@ -999,15 +741,6 @@ def test_a_span_an_older_run_left_is_read_again_and_all_five_of_its_reading_move
 def test_a_restored_span_keeps_its_id_its_marks_and_the_tier_it_was_restored_at(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """The refresh reaches a run's own reading and nothing an Admin wrote: the id the
-    ledger names, the restore and the review are where they were after a run that moved
-    everything else on the row. And the tier has its one exception — only the always set
-    is restorable, the row's own CHECK says so, so a restored row keeps the tier it was
-    restored at whatever the run now reads, and the run that found it does not abort.
-
-    The span is the delivery note's name, which this binding's rules read at the tier a
-    binding switches off: restored here as an older run's officer-block reading left it.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(A_DELIVERY_NOTE_ID,))
     with connection.cursor() as cursor:
@@ -1058,20 +791,16 @@ def test_a_restored_span_keeps_its_id_its_marks_and_the_tier_it_was_restored_at(
     )
 
 
+# jscpd:ignore-start
 def test_a_name_an_erasure_has_since_raised_reads_always_after_the_next_run(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """Two real runs with a real change of reading between them. The first reads her
-    name at the tier a binding switches off; an Admin reviews it; a person asks to be
-    erased, and the second run raises the same span to the tier nobody switches off. The
-    row is the same row — its id and its review untouched — and it now says *always*,
-    which is what the review shows and what a keep is decided off.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(A_DELIVERY_NOTE_ID,))
     bootstrap = bootstrap_for(dsn, tmp_path)
 
     index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    # jscpd:ignore-end
     with connection.cursor() as cursor:
         reviewed = seed_narrowed(
             cursor,
@@ -1105,17 +834,6 @@ def test_a_name_an_erasure_has_since_raised_reads_always_after_the_next_run(
 def test_the_insert_steps_over_a_known_span_and_over_no_other_collision(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """The run's insert names the finding's own key as its conflict target, and that is
-    a choice with a consequence: `ON CONFLICT DO NOTHING` with no target steps over
-    *any* unique collision, so an id minted twice would land nothing and say nothing — a
-    span the seam raised, silently never recorded. With the target named, the one
-    collision the statement forgives is the one it means to: the same span found again.
-
-    So the id of a row the first run wrote is handed to the insert again, on a span no
-    run has seen. That is a primary-key collision and nothing else, and it has to be an
-    error. The id is a parameter of the insert for this reason and no other, as the
-    run's two ceiling figures are of the run.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
     bootstrap = bootstrap_for(dsn, tmp_path)
@@ -1159,23 +877,16 @@ def test_the_insert_steps_over_a_known_span_and_over_no_other_collision(
     assert [row["id"] for row in marked_rows_of(connection, workspace_id)] == [taken]
 
 
+# jscpd:ignore-start
 def test_a_span_an_admin_restored_is_back_in_the_text_after_the_next_run(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """The run reads which spans of each document were restored off the `finding` table
-    itself, through the six columns migration 0041 grants and no other, and hands them
-    to the memoised function beside the suppressions — so the run *keep in text* queues
-    is the run that lets the span back.
-
-    Held both ways: withheld before the restore and in the text after it.
-    And the row is where the Admin left it: the same id, still restored, still reviewed
-    — the second run found the span again and wrote nothing over it.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
     bootstrap = bootstrap_for(dsn, tmp_path)
 
     index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    # jscpd:ignore-end
     withheld = [row["content"] for row in chunk_rows_of(connection, workspace_id)]
 
     with connection.cursor() as cursor:
@@ -1210,31 +921,18 @@ def test_a_span_an_admin_restored_is_back_in_the_text_after_the_next_run(
     ]
 
 
-#: The invoice's one `bank-details` span as the seam cuts it, which is what a request
-#: has to name for the suppression pass to reach it: an identifier is matched against
-#: the text a finding claimed. A sole trader's own account on their own invoice — kept
-#: in text by an Admin as a business fact, until the person it belongs to asks to be
-#: erased.
 THE_INVOICES_ACCOUNT_AS_FOUND = "20-00-00 and the account number is 12345678"
 
 
+# jscpd:ignore-start
 def test_a_kept_span_an_erasure_names_stays_withheld_and_the_run_says_which(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """An erasure outranks a restore, and only this tier can know that it did: a finding
-    holds no value, so which kept spans a request names is a fact the seam has and the
-    app has not. The run's outcome is the road it already writes, and it says which —
-    the document, the rule and the two offsets, which is what a finding is and nothing
-    of what it holds — so the review can tell an Admin that a span they kept is
-    withheld all the same, rather than leave a keep that silently did nothing.
-
-    Held both ways: under the restore alone the account is in the text and
-    the run names no span; once a request names it, it is withheld and the run names it.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
     bootstrap = bootstrap_for(dsn, tmp_path)
     index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    # jscpd:ignore-end
     with connection.cursor() as cursor:
         seed_restore(
             cursor,
@@ -1284,18 +982,7 @@ def test_a_kept_span_an_erasure_names_stays_withheld_and_the_run_says_which(
     ]
 
 
-# -- the wipe --------------------------------------------------------------------------
-
-
 def read_afresh_in(written: str) -> list[int]:
-    """How many documents each run in this output read for itself.
-
-    Off the run's own log line, which is the figure an operator has for whether a run
-    did work or recognised that it had none. It is read here rather than taken off the
-    outcome because the outcome is the job row's own figures and this is not one of
-    them: the job row says what the binding holds, and this says what the run had to do
-    to say so.
-    """
     return [
         int(line["read_afresh"])
         for line in (json.loads(one) for one in written.splitlines() if one.strip())
@@ -1308,39 +995,12 @@ def test_the_wipe_reason_empties_the_bindings_store_before_the_run_reads_anythin
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """The wipe is two acts across the two tiers that hold the two stores: the app
-    deletes the binding's chunk rows in its own transaction, and the worker removes the
-    binding's directory at the start of the `index` job that deletion enqueued. It has
-    to be the run's *first* act: everything the binding knows about its own documents
-    lives in that directory, so a wipe taken after the documents were read is a wipe
-    that read the answers it was enqueued to throw away.
-
-    Two observables, and each answers half of the sentence.
-
-    **That the store went** is the files: a store removed and reopened is new files, and
-    the pair is the two reasons (`[TEST7]`) — after a *rule-change* run every file the
-    first run left is the same file, and after a *wiped* run not one of them is. A file
-    planted in the directory by hand goes with it, which is what says the directory
-    itself was removed rather than a store emptied through the engine.
-
-    **That it went first** is what the run then had to do. A binding whose store is
-    intact answers out of it and reads nothing afresh; a binding whose store has just
-    been removed has nothing to answer out of and runs the detector over every document
-    again. That figure is the run's own log line, which is where an operator reads it.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
     bootstrap = bootstrap_for(dsn, tmp_path)
     binding_directory = tmp_path / workspace_id / BINDING
 
     def files_now() -> dict[str, tuple[int, int]]:
-        """Every file in the binding's store by name, and which file it is: the inode
-        and the instant that inode last changed, as a pair. The pair rather than the
-        number, because ext4 hands a freed inode number straight back to the next file
-        made — the CI runner's filesystem, 19/09/2026 — so after a wipe a new file can
-        carry the number an old one had, where APFS never reuses one and let the number
-        alone pass here. A file that stayed keeps both; a file made in its place shares
-        at most the number."""
         return {
             str(path.relative_to(binding_directory)): (
                 path.stat().st_ino,
@@ -1351,7 +1011,6 @@ def test_the_wipe_reason_empties_the_bindings_store_before_the_run_reads_anythin
         }
 
     def inodes_of(files: dict[str, tuple[int, int]]) -> dict[str, int]:
-        """By inode alone: what a run that kept the store leaves as it was."""
         return {name: inode for name, (inode, _) in files.items()}
 
     index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
@@ -1385,24 +1044,9 @@ def test_the_wipe_reason_empties_the_bindings_store_before_the_run_reads_anythin
     assert chunk_rows_of(connection, workspace_id)[0]["content"] == AN_INVOICE_REDACTED
 
 
-# -- the re-copy -----------------------------------------------------------------------
-
-
 def test_the_runs_last_statement_recopy_takes_a_narrowing_that_landed_mid_run(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """Two writers, one source: the run copies the binding's fields onto every row it
-    lands, and the app rewrites them on a publish and on either narrowing. They can
-    disagree only in a race — a run that read the binding before a narrowing committed
-    and upserted its rows after it — and the run's own last statement settles it,
-    re-reading both rows as they now stand and writing the fold onto every row the run
-    wrote.
-
-    The narrowing is committed from a second connection at the moment the run writes the
-    normalised copy: the binding has been read, the detector has answered, and not one
-    row has landed. Without the re-copy the rows would stand at the class the run set
-    out with, which is the class an Admin has just taken away.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
 
@@ -1431,11 +1075,6 @@ def test_the_runs_last_statement_recopy_takes_a_narrowing_that_landed_mid_run(
 def test_the_recopy_reaches_the_rows_of_this_run_and_leaves_another_bindings_alone(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
-    """The statement is aimed at the rows the run wrote and at nothing else, so a second
-    binding's rows keep the fields its own run gave them. The pair matters because the
-    statement joins the binding and the document rather than naming a class: an aim one
-    row too wide would rewrite a neighbouring binding's visibility from this binding's.
-    """
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
     another = ulid()
@@ -1472,11 +1111,6 @@ def test_the_recopy_reaches_the_rows_of_this_run_and_leaves_another_bindings_alo
 def test_the_worker_login_the_runs_connect_as_is_the_runtime_role_and_not_the_owner(
     database: tuple[psycopg.Connection, str],
 ) -> None:
-    """Written down because every case above rests on it: a run that connected as the
-    container's superuser would bypass row-level security by design and would pass with
-    the workspace scope taken out. The DSN the cases hand the bootstrap carries the
-    login role provisioned `IN ROLE worker_rt` and nothing else.
-    """
     _connection, dsn = database
 
     assert re.search(rf"//{WORKER_LOGIN}:", dsn) is not None

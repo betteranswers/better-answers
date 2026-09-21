@@ -1,15 +1,3 @@
-"""pytest's own options, read as values (`[CHECK2]`).
-
-Two of pytest's defaults let a suite report success for running less than it claims. A
-marker the suite never declared is a typo that silently marks nothing —
-`@pytest.mark.slwo` skips no test and fails no run. And an expected failure that passes
-is a bug that was fixed and an `xfail` that outlived it, reported as `xpass` and counted
-as success.
-
-Both are settings rather than behaviour, so the seam is the manifest. Prior art in the
-other tier: `apps/api/tests/check-scripts.test.ts`.
-"""
-
 import tomllib
 from pathlib import Path
 
@@ -17,7 +5,6 @@ WORKER_ROOT = Path(__file__).resolve().parents[1]
 
 
 def pytest_options() -> dict[str, object]:
-    """The `[tool.pytest.ini_options]` table, as pytest itself reads it."""
     text = (WORKER_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     tool = tomllib.loads(text)["tool"]
     assert isinstance(tool, dict), "pyproject.toml has no [tool] table"

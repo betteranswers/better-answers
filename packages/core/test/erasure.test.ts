@@ -17,22 +17,13 @@ import { ledgerRowsOf } from "./sourced-concept.ts";
 import { readingAs, seedingWith, whileWritesAreRefused } from "./suite-postgres.ts";
 import { suiteWithBundles } from "./workspace-with-bundle.ts";
 
-/**
- * The erasure slice's first act, through the slice's own face (`[TEST1]`) against real
- * Postgres: an Admin records a *subject request* on a person's behalf, its row and its
- * ledger row land together or not at all, the identifier set is the Admin's to read, and
- * the one-month clock runs from the instant the Admin gives it.
- */
-
 const { db, arrange } = suiteWithBundles();
 
-/** Receipt, and the later instant identity was confirmed — the ICO's pause, in literals. */
 const RECEIVED_AT = new Date("2026-03-31T09:15:00.000Z");
 const CONFIRMED_AT = new Date("2026-04-02T11:00:00.000Z");
-/** One month on from the clock's start, not from receipt: the whole point of the pause. */
+
 const DUE_AT = new Date("2026-05-02T11:00:00.000Z");
 
-/** What a subject gave: three identifiers across the set's three kinds. */
 const IDENTIFIERS: SubjectIdentifiers = {
   emails: ["priya@example.invalid"],
   names: ["Priya Anand"],
@@ -50,7 +41,6 @@ const requestOf = (
   ...overrides,
 });
 
-/** Record the request as this person, the way a transport would — one transaction, one act. */
 const recordingAs = (
   person: UserPrincipal,
   input: RecordSubjectRequestInput,
@@ -63,7 +53,6 @@ const readingRequestAs = (
 ): Promise<Result<SubjectRequest, ReadSubjectRequestRefusal>> =>
   readingAs(db().pool, person, (principal, tx) => subjectRequestFor(principal, tx, id));
 
-/** Every subject request in the workspace, as the superuser: the columns the act writes. */
 const requestRowsIn = async (workspaceId: string) => {
   const read = await db().pool.query(
     `SELECT id, person_id, identifiers, kind, received_at, clock_started_at, due_at,
@@ -74,14 +63,9 @@ const requestRowsIn = async (workspaceId: string) => {
   return read.rows;
 };
 
-/** A person who holds a login, so a request may name them by the one person id (ADR 0035). */
 const personWithALogin = (): Promise<string> =>
   seedingWith(db().pool, async (seed) => (await seed.user()).id);
 
-/**
- * A workspace whose Admin has recorded one request about a person who holds a login — the
- * arrange both the write and the read are read against, so neither says it twice.
- */
 const workspaceWithARequest = async () => {
   const scenario = await arrange();
   const subject = await personWithALogin();
@@ -109,8 +93,7 @@ describe("recording a subject request", () => {
         answer: null,
       },
     ]);
-    // The detail says who and how many, and nothing a subject wrote down (`[AUDIT5]`): the
-    // three identifiers above are counted here and named nowhere.
+
     expect(
       await ledgerRowsOf(db().pool, scenario.workspaceId, "people.subject_request.received"),
     ).toEqual([
@@ -159,9 +142,7 @@ describe("recording a subject request", () => {
     );
 
     expect(recorded.ok).toBe(true);
-    // The column and not the answer: the row is what the erasure map's finders match on, what
-    // a suppression is written from and what the replay copy carries into a restore, so an
-    // identifier that kept its spaces here is a subject whose own identifier finds nothing.
+
     expect(await requestRowsIn(scenario.workspaceId)).toMatchObject([
       { identifiers: { emails: ["priya@example.invalid"], names: ["Priya Anand"], other: [] } },
     ]);
@@ -170,8 +151,6 @@ describe("recording a subject request", () => {
   it("leaves no request when the ledger refuses the act's event", async () => {
     const scenario = await arrange();
 
-    // The ledger door rejects rather than answering a value, and the act calls it bare, so
-    // the rejection aborts the transaction the request row landed in (`[AUDIT1]`).
     await whileWritesAreRefused(db().pool, "audit_event", async () => {
       await expect(recordingAs(scenario.admin, requestOf())).rejects.toThrow(
         /the store refused a write to audit_event/,
@@ -207,9 +186,6 @@ describe("recording a subject request", () => {
   it("lets the table refuse a clock started before the request arrived, and lands nothing", async () => {
     const scenario = await arrange();
 
-    // The order is the table's own `subject_request_clock_check`, and the act lets it speak
-    // rather than second-guessing it; the aborted transaction is what the opener reports
-    // (`[TEST8]`), so the value the act returned is not the thing to assert here.
     await expect(
       recordingAs(
         scenario.admin,
@@ -231,15 +207,13 @@ describe("the clock", () => {
   });
 
   it("answers the target month's last day where that month has no such day", () => {
-    // A day February does not have would otherwise land in March — three days late on a
-    // statutory deadline, in the one direction the clock must never move.
     expect(dueDateOf(new Date("2026-01-31T09:00:00.000Z"))).toEqual(
       new Date("2026-02-28T09:00:00.000Z"),
     );
     expect(dueDateOf(new Date("2026-01-30T09:00:00.000Z"))).toEqual(
       new Date("2026-02-28T09:00:00.000Z"),
     );
-    // A 31st into a 30-day month, so the rule is not read as being about February.
+
     expect(dueDateOf(new Date("2026-08-31T09:00:00.000Z"))).toEqual(
       new Date("2026-09-30T09:00:00.000Z"),
     );
@@ -300,7 +274,7 @@ describe("reading a subject request", () => {
         answer: null,
       },
     });
-    // Restricted personal data of a suppression's class: no other role reaches the set.
+
     for (const person of [scenario.editor, scenario.viewer]) {
       expect(await readingRequestAs(person, requestId)).toEqual({
         ok: false,

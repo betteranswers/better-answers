@@ -1,26 +1,3 @@
-"""One declared descriptor per redaction category, and the tables derived from them.
-
-Everything the seam does with a category is read off the declarations below: which
-recogniser's answer raises it, how sure that answer has to be, the words the context
-enhancer boosts on, the word written in place of the span, and whether a finding
-narrows the document. The analyzer's registry and the entity table derive from this
-one table, so a rule change is one record and one bump rather than an edit in four
-places; the `redaction` agreement under `contracts/` is what the table is held to, and
-the review screen's category list is the same record again.
-
-The tier a category names is the tier it is *ordinarily* raised at, and one rule
-outranks it: a name inside an officers block is raised at the always tier whatever a
-binding says. The placeholder follows the tier a finding was raised at, never the
-category — which is why such a name is withheld with its block instead of standing in
-as a pseudonym.
-
-Thresholds are policy rather than tuning. 0.6 is the floor of the band a finding is
-worth putting in front of a reviewer at all; the always set drops below it because no
-binding switches that set off and a miss there is the expensive direction; the
-default-off tier asks for more, because rewriting a name into a pseudonym costs the
-reader something and it is the tier a bid library least wants applied by accident.
-"""
-
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -28,18 +5,6 @@ from types import MappingProxyType
 
 @dataclass(frozen=True, slots=True)
 class CategoryDescriptor:
-    """One category of the agreement, with everything the seam needs to raise it.
-
-    `raised_by` is the entity name each recogniser answers with — Presidio's own where
-    a built-in raises the category, ours where one of the six recognisers does — and
-    it is a tuple because a category can be reached two ways: personal contact is an
-    email address or a telephone number, and a government identifier is an NHS number
-    or a National Insurance number. `context` is the lemmas Presidio's context
-    enhancer boosts a score on when they sit near the span, which is what "in context"
-    means in the spec: a date beside *date of birth* is a finding and a bare date is
-    not.
-    """
-
     category: str
     tier: str
     raised_by: tuple[str, ...]
@@ -50,13 +15,6 @@ class CategoryDescriptor:
 
 
 DESCRIPTORS: tuple[CategoryDescriptor, ...] = (
-    # This category's context is its cue list as well: the one place on this table where
-    # a word is the detection rather than a boost on one. So every word here is medical
-    # and none is a word a bid library writes about its own business — *health* in a
-    # safety policy, *condition* in a condition of contract. An ordinary word costs the
-    # whole sentence around it and the document's class, at the one tier no binding
-    # switches off, and the reviewer's only road back from there is the per-span
-    # restore, one span at a time.
     CategoryDescriptor(
         category="special-category",
         tier="always",
@@ -131,15 +89,10 @@ DESCRIPTORS: tuple[CategoryDescriptor, ...] = (
     ),
 )
 
-#: The one category the rules above it speak about by name: the officer-block pass
-#: raises it, a suppression raises it, and it is the only category written out as a
-#: stable letter rather than as its declared word. Named here beside the declarations
-#: rather than spelled in each of those three places.
+
 A_PERSON_NAME = "person-name"
 
-#: The table an analyzer's answer is read through: the inverse of `raised_by`, derived
-#: rather than declared a second time, because a mapping written by hand beside the
-#: declarations is the copy that stops agreeing with them.
+
 CATEGORY_BY_ENTITY: Mapping[str, str] = MappingProxyType(
     {
         entity: descriptor.category

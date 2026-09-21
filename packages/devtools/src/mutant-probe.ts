@@ -5,26 +5,6 @@ import path from "node:path";
 
 import { flagValues } from "./flags.ts";
 
-/**
- * One hand-applied mutation, run against a suite, restored whatever happened.
- *
- * A mutation-triage session applies a mutant by hand to ask the suite a question — does
- * this line's opposite die? — and two sessions left the mutant behind with the suite green,
- * because their loops restored on the happy path and a crash mid-loop restores nothing. So
- * the loop is a script: apply, run, read the verdict, and restore in a `finally` that an
- * interrupt, a crashed suite and a thrown error all reach. Then the `src` diff-stat against
- * `HEAD`, so the operator reads the tree clean before staging anything, and a non-zero exit
- * when it is not.
- *
- * The mutation is pinned to the source text — a line number and the text that must be on
- * it — so a probe written against one revision refuses to run against another rather than
- * mutating whatever moved there. The suite is the workspace's own vitest — the one on the bin
- * path of the directory holding the file's nearest manifest — with an optional filter; a
- * verdict is only read when every test file ran, because a file that failed to collect asked
- * the mutant nothing, and a suite that collected nothing killed nothing.
- */
-
-/** One verdict the probe can reach. What kept it from one is said on stderr, not here. */
 type Verdict = "killed" | "survived" | "timed out";
 
 type Mutation = {
@@ -39,10 +19,8 @@ type Mutation = {
 const USAGE =
   "usage: mutant-probe --file <path> --line <n> --from <text> --to <text> [--suite <vitest filter>] [--timeout-ms <n>]";
 
-/** How long the whole suite may take under the mutation before the verdict is `timed out`. */
 const DEFAULT_TIMEOUT_MS = 600_000;
 
-/** After a SIGTERM to the suite's process group, how long before the group is SIGKILLed. */
 const GRACE_MS = 2_000;
 
 type Parsed = { readonly mutation: Mutation } | { readonly refused: string };
@@ -76,7 +54,6 @@ const parseArgv = (argv: readonly string[]): Parsed => {
   };
 };
 
-/** The directory holding the nearest `package.json` above `file`: the workspace whose suite runs. */
 const workspaceOf = (file: string): string | undefined => {
   let directory = path.dirname(file);
   while (!existsSync(path.join(directory, "package.json"))) {
@@ -87,7 +64,6 @@ const workspaceOf = (file: string): string | undefined => {
   return directory;
 };
 
-/** What one git command answered: its exit status, and both streams as one text. */
 type GitAnswer = { readonly status: number | null; readonly out: string };
 
 const gitSync = (cwd: string, args: readonly string[]): GitAnswer => {
@@ -95,19 +71,11 @@ const gitSync = (cwd: string, args: readonly string[]): GitAnswer => {
   return { status: result.status, out: `${result.stdout}${result.stderr}` };
 };
 
-/**
- * The vitest the workspace's own `test` script runs: pnpm's shim on the workspace's bin path,
- * not vitest's entry module. The shim exports a `NODE_PATH` that reaches pnpm's hoisted
- * store, and a suite that resolves a platform binary through it — the type-aware linter the
- * import-direction suite runs — fails to collect when vitest is started any other way, which
- * would read as a kill the mutation never earned.
- */
 const vitestShimFor = (workspace: string): string | undefined => {
   const shim = path.join(workspace, "node_modules", ".bin", "vitest");
   return existsSync(shim) ? shim : undefined;
 };
 
-/** The mutated file's text, or the reason the mutation does not fit the source. */
 const applyTo = (
   original: string,
   mutation: Mutation,
@@ -151,7 +119,6 @@ type SuiteOutcome =
   | { readonly kind: "interrupted" }
   | { readonly kind: "did not run"; readonly detail: string };
 
-/** What vitest's JSON reporter writes, read for the three numbers the verdict needs. */
 type VitestReport = {
   readonly numTotalTests?: number;
   readonly numFailedTests?: number;
@@ -163,9 +130,9 @@ type VitestReport = {
 const readReport = (file: string): VitestReport | undefined => {
   if (!existsSync(file)) return undefined;
   const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
-  // SAFETY: vitest's JSON reporter writes one object; the three fields read off it are
-  // optional here and checked before use, so a reporter that changed shape reads as a suite
-  // that did not run rather than as a verdict.
+
+  // SAFETY: every field read off the report is checked, so a reporter that changed shape
+  // reads as a suite that never ran.
   return typeof parsed === "object" && parsed !== null ? (parsed as VitestReport) : undefined;
 };
 
@@ -177,12 +144,6 @@ const killGroup = (pid: number, signal: NodeJS.Signals): void => {
   }
 };
 
-/**
- * Run the workspace's vitest under the mutation and read how it ended. The suite's own
- * output goes to stderr, so stdout carries only the verdict and the diff-stat. The child is
- * its own process group, so a timeout or an interrupt reaches vitest's workers too — a worker
- * stuck in a mutated loop answers no message from its parent.
- */
 const runSuite = (
   workspace: string,
   shim: string,
@@ -203,7 +164,7 @@ const runSuite = (
       ],
       { cwd: workspace, stdio: ["ignore", 2, 2], detached: true },
     );
-    /** Stop the suite: its whole group is asked, then told. */
+
     const stopSuite = (): void => {
       const pid = child.pid;
       if (pid === undefined) return;
@@ -249,8 +210,6 @@ const runSuite = (
           detail: `vitest exited ${code === null ? `on ${String(signal)}` : String(code)} having run no test`,
         });
       } else if (!report.success && report.numFailedTests === 0) {
-        // A red run with no red test: a file failed to collect, so its tests never asked
-        // the mutant anything. Neither verdict is earned.
         resolve({
           kind: "did not run",
           detail: `${String(report.numFailedTestSuites ?? "some")} of ${String(report.numTotalTestSuites ?? "the")} test files failed to run, and no test failed`,
@@ -274,11 +233,6 @@ const complain = (line: string): void => {
   process.stderr.write(`mutant-probe: ${line}\n`);
 };
 
-/**
- * The probe, start to finish: the exit code is the process's. Zero is a verdict over a
- * tree left clean; 1 is a verdict over a tree that is not, or a suite that did not run; 2 is
- * a refusal before anything was touched; 130 is an interrupt, restored.
- */
 export const mutantProbe = async (argv: readonly string[]): Promise<number> => {
   const parsed = parseArgv(argv);
   if ("refused" in parsed) {
@@ -299,8 +253,6 @@ export const mutantProbe = async (argv: readonly string[]): Promise<number> => {
   }
   const relative = path.relative(workspace, mutation.file);
 
-  // The refusal that keeps a probe from restoring over someone's edit: the file is tracked
-  // and matches the index, or nothing here runs.
   if (gitSync(workspace, ["ls-files", "--error-unmatch", "--", relative]).status !== 0) {
     complain(
       `${mutation.file} is not tracked by git, so a restore could not be checked against HEAD`,
@@ -364,7 +316,6 @@ export const mutantProbe = async (argv: readonly string[]): Promise<number> => {
     }
   }
 
-  // The tree the operator is about to stage from, read before they read it.
   const stat = gitSync(workspace, ["diff", "--stat", "HEAD", "--", "src"]);
   if (stat.status !== 0) {
     complain(`git diff --stat failed:\n${stat.out}`);

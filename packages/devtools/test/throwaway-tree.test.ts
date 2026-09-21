@@ -3,25 +3,8 @@ import { describe, expect, it } from "vitest";
 import { oxlintOver, runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import type { Tool, Tree } from "@better-answers/devtools/throwaway-tree";
 
-/**
- * The runner every gate's functional test runs its tool through (`[CHECK1]`).
- *
- * It is what stands between "the rule stayed silent" and "the tool never ran", so this suite
- * is mostly about the second reading being impossible. A suite that swallows a non-zero exit
- * into an empty string cannot tell them apart, and under that shape a missing binary, a
- * config the tool refused or a plugin that failed to load turns every "it fires here"
- * assertion into a tautology that passes.
- *
- * oxlint is the tool under test because it is in this package's dependency tree and it
- * exercises the awkward case honestly: it exits 1 both for a diagnostic and for a
- * configuration it could not parse, and it writes the second to stdout. Exit codes alone
- * therefore cannot tell the two apart, which is why a smoke case is part of the interface
- * rather than advice.
- */
-
 const oxlint: Tool["executable"] = { package: "oxlint", path: ["bin", "oxlint"] };
 
-/** A file whose name oxlint's `unicorn/filename-case` rule refuses. */
 const CAMEL_CASE_FILE = "routeTable.ts";
 const KEBAB_CASE_FILE = "route-table.ts";
 const SOURCE = "export const keep = 1;\n";
@@ -33,7 +16,6 @@ const kebabCaseConfig = JSON.stringify({
 
 const smokeTree: Tree = { [CAMEL_CASE_FILE]: SOURCE };
 
-/** oxlint's own "I found something" exit; anything else means it did not run. */
 const FOUND_SOMETHING = [1];
 
 const reportsAFileAndPosition = (output: string): boolean => /^[^\s:]+:\d+:\d+:/m.test(output);
@@ -65,16 +47,12 @@ describe("a tool that cannot run is never mistaken for a tool that found nothing
   });
 
   it("refuses a configuration the tool could not parse, rather than reading its silence as a quiet rule", () => {
-    // The case exit codes cannot catch: oxlint answers a broken config with the same exit it
-    // uses for a diagnostic, and says so on stdout. Only the smoke case tells them apart.
     expect(() =>
       runsOverThrowawayTree(oxlintTool({ scaffold: { ".oxlintrc.json": "{ not json" } })),
     ).toThrow(/oxlint/);
   });
 
   it("re-throws an exit the tool was not told to tolerate, carrying what the tool wrote", () => {
-    // The smoke case is the runner's first call, so an exit the tool was not told to
-    // tolerate is refused before a caller ever holds the runner.
     expect(() => runsOverThrowawayTree(oxlintTool({ foundSomething: [] }))).toThrow(
       /exit 1[\s\S]*filename-case/,
     );
@@ -102,9 +80,6 @@ describe("a tool that ran hands back what it reported", () => {
   });
 
   it("runs the tool in the environment the caller named, which is how a child finds a binary the tree has no node_modules for", () => {
-    // oxlint spawns `tsgolint` for its type-aware rules and reads `OXLINT_TSGOLINT_PATH` to
-    // find it. Pointed at nothing, it says so and names the path — so the path coming back
-    // is proof the caller's environment reached the child rather than being dropped.
     expect(() =>
       runsOverThrowawayTree(
         oxlintTool({

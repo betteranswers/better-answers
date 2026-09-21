@@ -13,39 +13,10 @@ import type {
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
-/**
- * The group half of the **members** slice: what an Admin does to a *group*
- * (`CONTEXT.md`) — make one, rename it, delete it, put a person in or take them out, and
- * list what the workspace holds. Owns `group` and `group_member` (ADR 0038).
- *
- * **Every act takes the transaction the Principal was resolved in**, not a door. That is
- * ADR 0018's shape and not an ergonomics choice: `withPrincipal` reads the member row and
- * builds the Principal inside one transaction, so an act that opened a second one would
- * be authorised by a role read somewhere else. It is also what makes the cross-workspace
- * refusal free — the transaction's scope is the caller's own workspace, so another
- * workspace's group id resolves to no row and the act answers `no-such-group`.
- *
- * **A refusal is a row count, never a caught constraint violation.** A violation aborts
- * the caller's transaction, and an act that turned one into a word would hand back a
- * refusal the caller could act on while nothing it did could ever commit. So the unique
- * name is `ON CONFLICT … DO NOTHING`, the membership is read before the row that
- * references it, and every act's refusals are decided by what came back. A violation that
- * happens anyway — two Admins renaming to the same name in the same instant — stays the
- * store's `Error`, and the opener refuses the commit (the kernel's result convention).
- *
- * **The ledger row is written last, bare, in the same transaction**: last, because an
- * event for an act the row count refused would be a lie; bare — never inside `attempt` —
- * because the door's rejection has to abort this transaction rather than become a value
- * the act might not read. That rejection is the one thing that leaves an act here as a
- * rejection rather than a `Result`, and it is rule 5 of the kernel's result convention.
- */
-
 type GroupRow = z.infer<typeof boundarySchemas.group.select>;
 
-/** Where a group came from (ADR 0038), read off the boundary that narrows to the pair. */
 export type GroupOrigin = GroupRow["origin"];
 
-/** One row of the Groups screen: the group, and how many people are in it. */
 export type GroupSummary = {
   readonly id: GroupId;
   readonly name: string;
@@ -53,14 +24,6 @@ export type GroupSummary = {
   readonly memberCount: number;
 };
 
-/**
- * The slice's acts on the ledger (ADR 0038). The **group** is every act's subject, the
- * person an id in the detail, so `subject_kind` and `subject_id` index everything about
- * one group in one read. A group's name is in none of them: the detail's kinds are id,
- * role and flag, and a group named after a person would carry that person's name into a
- * table an erasure never rewrites. What the group is called now is on the row; that it
- * was renamed, and by whom, is the ledger's.
- */
 const GROUP_ACTS = declareActs("people", {
   created: act("people.group.created", {}),
   renamed: act("people.group.renamed", {}),
@@ -74,9 +37,8 @@ const GROUP_NAME = boundarySchemas.group.insert.shape.name;
 const GROUP_ORIGIN = boundarySchemas.group.select.shape.origin;
 const PERSON_ID = boundarySchemas.user.select.shape.id;
 
-/** What every act refuses before it reads anything: the role, and an argument of the wrong shape. */
 type GuardRefusal = RoleRefusal | "malformed";
-/** What an act that names a group adds: this workspace holds no group of that id. */
+
 type TargetRefusal = GuardRefusal | "no-such-group";
 
 export type CreateGroupInput = { readonly name: string };
@@ -92,14 +54,8 @@ export type GroupMemberInput = { readonly groupId: string; readonly userId: stri
 export type AddToGroupRefusal = TargetRefusal | "not-a-member" | "already-in-group" | Error;
 export type RemoveFromGroupRefusal = TargetRefusal | "not-in-group" | Error;
 
-/** What an act acts on: the Admin performing it, and the group they named. */
 type GroupTarget = { readonly admin: AdminUserPrincipal; readonly groupId: GroupId };
 
-/**
- * The guard and the boundary in one step, for the four acts that name a group: an Editor
- * or a Viewer gets the one refusal word (`kernel/role.ts`) and an id of another shape gets
- * `malformed`, both before any statement runs.
- */
 const groupTarget = (
   principal: UserPrincipal,
   groupId: string,
@@ -111,13 +67,6 @@ const groupTarget = (
   return ok({ admin: admin.value, groupId: parsed.data });
 };
 
-/**
- * Which word a statement that changed nothing deserves. Two acts write a statement that
- * can come back empty for either of two reasons, and only a second read tells them apart:
- * the workspace holds the group, so the act's own word applies, or it does not, and the
- * word is `no-such-group` — the same word a group id nobody holds gets, so an Admin of
- * another workspace learns nothing from asking.
- */
 const nothingChanged = async <Own extends string>(
   tx: Tx,
   { admin, groupId }: GroupTarget,
@@ -140,9 +89,7 @@ export const createGroup = async (
 ): Promise<Result<{ groupId: GroupId }, CreateGroupRefusal>> => {
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);
-  // The whole row through the boundary at once, as provisioning does: the id is minted
-  // here (nothing else may choose it), the name comes back trimmed, and the origin is the
-  // Admin-curated word — nothing in this ticket mints the audience-minted kind (ADR 0038).
+
   const row = boundarySchemas.group.insert.safeParse({
     id: ulid(),
     workspaceId: admin.value.workspaceId,
@@ -160,8 +107,7 @@ export const createGroup = async (
     ),
   );
   if (!made.ok) return err(made.error);
-  // `DO NOTHING` answers no row rather than raising, so the workspace already holding the
-  // name is a word the caller can act on and the transaction is still alive to hear it.
+
   if (made.value.rows[0] === undefined) return err("name-taken");
 
   await record(admin.value, tx, {
@@ -195,8 +141,7 @@ export const renameGroup = async (
     ),
   );
   if (!renamed.ok) return err(renamed.error);
-  // Nothing was renamed either because the group is not this workspace's, or because
-  // another group of it already holds the name the `NOT EXISTS` looked for.
+
   if (renamed.value.rowCount === 0)
     return err(await nothingChanged(tx, target.value, "name-taken"));
 
@@ -218,9 +163,6 @@ export const deleteGroup = async (
   if (!target.ok) return err(target.error);
   const { admin, groupId } = target.value;
 
-  // The memberships go with it, by the foreign key's cascade rather than by a second
-  // statement here. Anything whose audience still names the id becomes *more* restricted,
-  // never less: the read predicate is fail-closed, and the warning is a screen's (ADR 0038).
   const deleted = await attempt(() =>
     tx.query(`DELETE FROM "group" WHERE workspace_id = $1 AND id = $2 RETURNING id`, [
       admin.workspaceId,
@@ -239,7 +181,6 @@ export const deleteGroup = async (
   return ok({ groupId });
 };
 
-/** What the two membership acts act on: a group target, and the person named beside it. */
 type MembershipTarget = GroupTarget & { readonly userId: UserId };
 
 const membershipTarget = (
@@ -262,9 +203,6 @@ export const addToGroup = async (
   if (!target.ok) return err(target.error);
   const { admin, groupId, userId } = target.value;
 
-  // Both preconditions in one read, because both are foreign keys on the row below and a
-  // violated key would abort the caller's transaction instead of answering a word. The
-  // membership is another owner's table, which the table-ownership map records.
   const known = await attempt(() =>
     tx.query<{ holds_group: boolean; is_member: boolean }>(
       `SELECT EXISTS (SELECT 1 FROM "group" WHERE workspace_id = $1 AND id = $2) AS holds_group,
@@ -273,8 +211,7 @@ export const addToGroup = async (
     ),
   );
   if (!known.ok) return err(known.error);
-  // `SELECT EXISTS(...), EXISTS(...)` with no `FROM` always answers exactly one row, so
-  // `row` is never undefined; the `?.` below is for the type, not a real absent row.
+
   const row = known.value.rows[0];
   if (row?.holds_group !== true) return err("no-such-group");
   if (!row.is_member) return err("not-a-member");
@@ -315,8 +252,7 @@ export const removeFromGroup = async (
     ),
   );
   if (!removed.ok) return err(removed.error);
-  // Nothing was removed either because the group is not this workspace's, or because the
-  // person was never in it.
+
   if (removed.value.rowCount === 0) {
     return err(await nothingChanged(tx, target.value, "not-in-group"));
   }
@@ -330,20 +266,6 @@ export const removeFromGroup = async (
   return ok({ groupId, userId });
 };
 
-/**
- * Whether every id named is a group this workspace holds — what an act that writes an
- * audience asks before it names one (ADR 0039): a narrowing or an override naming a group
- * nobody minted would be an audience no caller could ever be in, and the act answers a
- * word for that rather than landing a row the predicate reads as *nobody*. A read of the
- * slice's own table, in the caller's transaction; the ids are the boundary's shape already,
- * or the caller would not hold a `GroupId`. Empty is vacuously true: *everyone* names none.
- *
- * **An Admin's question, refused to anyone else before the table is read**: its callers are
- * the Admin acts that write an audience, and which groups a workspace holds is what an
- * audience is written against — the same reason `listGroups` is an Admin's — so an Editor
- * reaching this would have an existence oracle over the group table that no verb of this
- * slice grants them.
- */
 export const holdsEveryGroup = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -360,11 +282,6 @@ export const holdsEveryGroup = async (
   return ok(found.rows[0]?.held === distinct.length);
 };
 
-/**
- * The workspace's groups with their member counts, by name — the Groups screen's rows.
- * A read, so it writes no ledger row; Admin-only like every other verb here, because who
- * is in which group is what an audience is written against.
- */
 export const listGroups = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -387,9 +304,7 @@ export const listGroups = async (
         ORDER BY g.name`,
       [admin.value.workspaceId],
     );
-    // Parsed at the boundary rather than asserted (ADR 0028), inside the attempt, so a
-    // column that is not what it says comes back as the store's Error and never as a row
-    // the screen would draw. `count(*)` arrives as a bigint, which pg hands over as text.
+
     return rows.rows.map((row) => ({
       id: GROUP_ID.parse(row.id),
       name: row.name,

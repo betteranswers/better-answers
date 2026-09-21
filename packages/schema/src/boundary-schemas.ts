@@ -96,43 +96,17 @@ import {
 import { ULID } from "./ulid.ts";
 import { workspace } from "./workspace-table.ts";
 
-/**
- * The boundary schemas (ADR 0028): generated from the tables, refined only to narrow,
- * every refinement a callback in the generating call's second argument — except
- * `chunk.embedding`, the documented `customType` exception, whose refinement is a
- * plain schema because a callback on a custom column throws at module evaluation.
- * The registry is what the five parity assertions walk; the **schemas here, not the
- * tables, are the source of application-level types** (the brand survives `z.infer`).
- *
- * The identity set's tables (ADR 0009, 2026-09-01) are written by Better Auth alone,
- * so their boundaries are the unrefined generation — the table's own shape — except
- * where the platform reads a column and narrows it: `member.role` to the three roles,
- * the user and workspace ids to the platform's brands, and the ids of `user`, `session`,
- * `member` and `invitation` to the one shape the minter mints (ADR 0035, T-074). The
- * OAuth tables stay unrefined: the library keys one of them by a hash of the token the
- * row stands for, so their ids are not the platform's to narrow.
- */
-
 const workspaceId = (schema: z.ZodString) => schema.regex(ULID).brand<"WorkspaceId">();
 const userId = (schema: z.ZodString) => schema.regex(ULID).brand<"UserId">();
-/**
- * A group's id, on the group row and on every membership that names it: platform-minted,
- * so T-006's `audience_groups` refinement can assume the shape (ADR 0038). The brand is
- * where the kernel's `GroupId` comes from, as `WorkspaceId` and `UserId` do.
- */
+
 const groupId = (schema: z.ZodString) => schema.regex(ULID).brand<"GroupId">();
-/** A source binding's id — the minter's shape, as a document's `binding_id` names one (ADR 0013). */
+
 const bindingId = (schema: z.ZodString) => schema.regex(ULID).brand<"BindingId">();
-/** A composition's id — the minter's shape, as an include's `composition_id` names one. */
+
 const compositionId = (schema: z.ZodString) => schema.regex(ULID).brand<"CompositionId">();
-/**
- * An id of the identity set the platform reads or writes: one shape, the minter's
- * (`ulid.ts`, ADR 0035). The OAuth tables are deliberately left unnarrowed — the library
- * keys one of them by a hash of the token it stands for, which is not a minted id.
- */
+
 const identityId = (schema: z.ZodString) => schema.regex(ULID);
 
-/** The unrefined generation, for a table whose shape is its boundary. */
 const plain = <TTable extends PgTable>(table: TTable) =>
   ({
     table,
@@ -157,10 +131,7 @@ const llmRouteRefinements = {
   provider: (schema: z.ZodString) => schema.trim().min(1),
   model: (schema: z.ZodString) => schema.trim().min(1),
   dimensions: (schema: z.ZodNumber) => schema.int().positive(),
-  // The retention tail is the provider's own sentence, so it is held to being a sentence and
-  // nothing more: a DPIA that printed whitespace would be a document saying nothing where it
-  // has to say what the processor keeps. It stays nullable — a route nobody has read the
-  // provider's terms for has no tail, and that is a different fact from a tail of nothing.
+
   retentionTail: (schema: z.ZodString) => schema.trim().min(1),
 };
 
@@ -186,42 +157,16 @@ export const workspaceConfigUpdate = createUpdateSchema(
   workspaceConfigRefinements,
 );
 
-/**
- * The three visibility columns every readable unit narrows alike, so its classes are one
- * fact across `index.chunk`, `concept_index`, `composition`, the graph rows and the binding
- * they derive from (ADR 0023, ADR 0039): *sensitivity* to the glossary's closed set — the
- * column stays text so the set is the boundary's to narrow, exactly as ADR 0028 intends —
- * *audience* to the closed pair, and *audience_groups* to platform-minted group ids, at
- * least one when the array is there at all.
- *
- * The tie between the word and the array — *everyone* over no array, *groups* over a
- * non-empty one — is the row's own CHECK (`AUDIENCE_CHECK`) and deliberately not a second
- * refinement over the object: the governed write parses the index row's insert schema with
- * the commit's sha omitted, and zod refuses `.omit()` over an object that carries a
- * refinement. One rule in one place, proved against the row in `test/rls.test.ts`, beats two
- * that could disagree.
- */
 const readableUnit = {
   sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
   audience: (schema: z.ZodString) => schema.pipe(z.enum(AUDIENCES)),
   audienceGroups: (schema: z.ZodArray<z.ZodString>) => z.array(groupId(schema.element)).min(1),
 };
 
-/**
- * A chunk as the boundary reads it: the three visibility columns above, the vector that is not
- * there yet, and the address of the document text the row is a unit of — the document's id, the
- * span's locator, the splitter's ordinal and the span as two offsets, each nullable exactly as
- * its column is and each narrowed to what it can be. An offset counts Unicode code points from
- * the start of the document's normalised redacted text, so it is a whole number and never
- * negative.
- */
 const chunkRefinements = {
   id: (schema: z.ZodString) => schema.trim().min(1),
   workspaceId,
-  // The customType exception: a plain schema, never a callback (ADR 0028). The
-  // length narrows to what the column's vector(N) accepts, and the schema carries its own
-  // nullability because a plain schema replaces the generated field wholesale — the column is
-  // nullable now that nothing embeds until S8, and a row with no vector has to parse.
+
   embedding: z.array(z.number()).length(EMBEDDING_DIMENSIONS).nullable(),
   embeddingRouteId: (schema: z.ZodString) => schema.trim().min(1),
   ...readableUnit,
@@ -233,18 +178,12 @@ const chunkRefinements = {
   charEnd: (schema: z.ZodNumber) => schema.int().nonnegative(),
 };
 
-// The full-text column is the database's own (migration 0037), so it is refined on the read
-// form alone: a plain schema short-circuits drizzle-zod's shape conditions, which is exactly
-// what keeps a generated column out of the insert and update forms below, and it is optional
-// because no read this platform writes asks for it — it is matched against in SQL.
 export const chunkSelect = createSelectSchema(chunk, {
   ...chunkRefinements,
   search: z.string().optional(),
 });
 export const chunkInsert = createInsertSchema(chunk, chunkRefinements);
-// A plain schema replaces the generated field wholesale — the update generation's
-// `.optional()` included — so the update form carries its own optional copy;
-// without it an update would demand an embedding.
+
 export const chunkUpdate = createUpdateSchema(chunk, {
   ...chunkRefinements,
   embedding: chunkRefinements.embedding.optional(),
@@ -263,7 +202,7 @@ const memberRefinements = {
   id: identityId,
   workspaceId,
   userId,
-  // The platform's three roles and no other (CONTEXT.md, *role (of a person)*).
+
   role: (schema: z.ZodString) => schema.pipe(z.enum(ROLES)),
 };
 
@@ -287,8 +226,7 @@ const groupRefinements = {
   id: groupId,
   workspaceId,
   name: (schema: z.ZodString) => schema.trim().min(1),
-  // The closed pair (ADR 0038); the column stays text so the set is the boundary's to
-  // narrow, exactly as `chunk.sensitivity` is.
+
   origin: (schema: z.ZodString) => schema.pipe(z.enum(GROUP_ORIGINS)),
 };
 
@@ -296,8 +234,6 @@ export const groupSelect = createSelectSchema(group, groupRefinements);
 export const groupInsert = createInsertSchema(group, groupRefinements);
 export const groupUpdate = createUpdateSchema(group, groupRefinements);
 
-// Keyed by workspace, group and person, and carrying nothing else about the person: a
-// membership says who may see what, never what they may do (ADR 0038).
 const groupMemberRefinements = { workspaceId, groupId, userId };
 
 export const groupMemberSelect = createSelectSchema(groupMember, groupMemberRefinements);
@@ -324,21 +260,8 @@ export const ingressCounterSelect = createSelectSchema(ingressCounter, ingressCo
 export const ingressCounterInsert = createInsertSchema(ingressCounter, ingressCounterRefinements);
 export const ingressCounterUpdate = createUpdateSchema(ingressCounter, ingressCounterRefinements);
 
-/**
- * The ledger's actor, narrowed to the three forms the kernel's `ActorId` names — the one
- * pattern `actor-id.ts` writes, so a refinement here and a CHECK on a row are held to the
- * same characters. Re-exported, because the package's callers have always read it here.
- */
 export { ACTOR_ID } from "./actor-id.ts";
 
-/**
- * The detail a row carries: ids and role words, and an act's confirmations as typed
- * fields — one flat object of scalars. What each declared act's detail names is the audit
- * slice's business; the boundary holds the container to a shape an email or a prompt has
- * no nested place to hide in. JSON `null` stays accepted because the column accepts it —
- * `jsonb NOT NULL` refuses SQL NULL, not the JSON value — and the parity suite holds a
- * refinement to the column's own nullability; the audit slice's doors never write one.
- */
 const detail = z.union([
   z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
   z.null(),
@@ -355,8 +278,6 @@ const auditEventRefinements = {
   batchId: (schema: z.ZodString) => schema.regex(ULID),
 };
 
-// `family` and `subject_kind` are generated columns: drizzle-zod leaves them out of the
-// insert and update forms, so their narrowing belongs to the select form alone.
 export const auditEventSelect = createSelectSchema(auditEvent, {
   ...auditEventRefinements,
   family: (schema: z.ZodString) => schema.pipe(z.enum(FAMILIES)),
@@ -365,12 +286,6 @@ export const auditEventSelect = createSelectSchema(auditEvent, {
 export const auditEventInsert = createInsertSchema(auditEvent, auditEventRefinements);
 export const auditEventUpdate = createUpdateSchema(auditEvent, auditEventRefinements);
 
-/**
- * The *access request* (ADR 0038): the requester and the decider are person ids, the
- * invitation the minter's shape, the status the closed set, and the reason a sentence of
- * why — non-empty and bounded, because the surface that writes one is open to any signed-in
- * person and an unbounded field would be storage a stranger chooses the size of.
- */
 const accessRequestRefinements = {
   id: (schema: z.ZodString) => schema.regex(ULID).brand<"AccessRequestId">(),
   workspaceId,
@@ -385,59 +300,17 @@ export const accessRequestSelect = createSelectSchema(accessRequest, accessReque
 export const accessRequestInsert = createInsertSchema(accessRequest, accessRequestRefinements);
 export const accessRequestUpdate = createUpdateSchema(accessRequest, accessRequestRefinements);
 
-/**
- * A concept's IRI (ADR 0002): the platform-minted key every record about a concept attaches
- * by, branded so a path or a title cannot be passed where one belongs. The brand is where
- * the kernel's `ConceptIri` comes from, as `WorkspaceId` and `GroupId` are.
- */
 const conceptIri = (schema: z.ZodString) => schema.regex(IRI).brand<"ConceptIri">();
 
-/**
- * A concept's frontmatter as the row holds it: OKF's scalars and string lists, plus the one
- * shape the spec defines as a list of objects — **`sources[]`**, whose entries carry
- * `resource` (required), `id`, `title`, `author`, `usage_count` and `last_modified`, and the
- * platform's `locator` beside them (`docs/okf-v02.md`). One level of nesting and no more, so
- * the file's shape survives the round trip and a value with somewhere to hide does not.
- *
- * JSON `null` stays accepted for the container because the column accepts it (`jsonb NOT
- * NULL` refuses SQL NULL, not the JSON value) and the parity suite holds the refinement to
- * the column's own nullability; the write path never stores one.
- */
-/**
- * One list-of-objects entry: a flat object of scalars, whatever key it sits under, with at
- * least one key. The renderer writes an entry as its keys' lines under a list dash, so an
- * empty object has no line to be written as and would come back off the file as nothing —
- * a shape the parser refuses — and refusing it here, before the commit, is what keeps a
- * replay from ever meeting it.
- */
 const frontmatterEntry = z
   .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
   .refine((entry) => Object.keys(entry).length > 0, {
     message: "a list entry carries at least one key",
   });
 
-/**
- * Whether one `sources[]` entry names the resource it cites — **asked of the one reader**
- * (`citedSourceOf`), never of a second copy of its rules. OKF requires `resource` and the hash
- * reduces every entry to a `(resource, locator)` pair (ADR 0019), so what this refuses and
- * what the hash reduces are the same judgement by construction: an entry the reader cannot
- * read is an entry with nothing to cite.
- */
 const namesAResource = (entry: z.infer<typeof frontmatterEntry> | string): boolean =>
   citedSourceOf(entry) !== undefined;
 
-/**
- * The one shape a concept's frontmatter has, **exported** — because the row is not the only
- * place it appears: `open` serves it on the MCP surface, whose output schema has to accept
- * exactly what the row can hold. Two copies of this union would be a wire that refuses a
- * concept the database accepted, which is how the api's typecheck found the second copy.
- *
- * **The resource requirement is `sources`' alone.** Every other key is preserved verbatim
- * (ADR 0019), unknown keys and their nested values included, so a concept that carries some
- * other list of objects — a vendor's, a future spec's — is a concept this refuses to lose.
- * The requirement is a refinement over the whole record rather than over the entry type,
- * because the entry type has no idea which key it sits under.
- */
 export const conceptFrontmatter = z
   .record(
     z.string(),
@@ -451,12 +324,6 @@ export const conceptFrontmatter = z
     ]),
   )
   .superRefine((value, context) => {
-    // The bound `submit_suggestion_set` also holds, **in the units it counts**. Frontmatter
-    // is open — every key preserved verbatim (ADR 0019) — so nothing about its shape says
-    // how large it may be, and a producer who chose that would be choosing how much the
-    // platform stores. Counted by iteration rather than `.length`, because `.length` counts
-    // UTF-16 code units and Postgres's `char_length` counts characters: an astral character
-    // is two there and one here, and two numbers for one bound is the defect this pair had.
     let characters = 0;
     for (const _ of JSON.stringify(value)) characters += 1;
     if (characters > CONCEPT_FRONTMATTER_MAX) {
@@ -498,33 +365,12 @@ export const conceptIdentityUpdate = createUpdateSchema(
   conceptIdentityRefinements,
 );
 
-/**
- * The concept index (ADR 0012): the derived row per concept. The two hashes are narrowed to
- * their own shapes — a git object name and the canonical-form SHA-256 — so a row can never
- * hold one where the other belongs, and the three visibility columns are narrowed exactly as
- * `index.chunk`'s are, because the read predicate is tested against them (ADR 0023).
- */
-/**
- * A concept's file, wherever a row holds one: the derived index row, and the payload an
- * acceptance would commit. Narrowed once, so a payload the boundary accepts is a payload the
- * index row's boundary will accept too — otherwise a suggestion could be stored that nobody
- * could ever accept, and the refusal would land on the Admin deciding it.
- *
- * The path is a place in the bundle's concept area and nothing else: the manifest at the
- * bundle root is platform-reserved (ADR 0002), and a row pointing at it would be claiming a
- * file the format does not read as a concept.
- */
 const conceptFileRefinements = {
   path: (schema: z.ZodString) => schema.regex(CONCEPT_PATH),
   title: (schema: z.ZodString) => schema.trim().min(1),
   frontmatter: (schema: z.ZodType) => schema.pipe(frontmatter),
 };
 
-/**
- * The OKF `type` a file carries, under whichever column name its table gives it: `kind` on
- * the index row, which is the folded word the type vocabulary counts, and `concept_kind` on
- * a payload, where the bare word would read as the *suggestion's* kind.
- */
 const conceptKind = (schema: z.ZodString) => schema.trim().min(1);
 
 const conceptIndexRefinements = {
@@ -542,12 +388,6 @@ export const conceptIndexSelect = createSelectSchema(conceptIndex, conceptIndexR
 export const conceptIndexInsert = createInsertSchema(conceptIndex, conceptIndexRefinements);
 export const conceptIndexUpdate = createUpdateSchema(conceptIndex, conceptIndexRefinements);
 
-/**
- * A bundle commit (ADR 0012): the sha and its parent are git object names, the audit event
- * id is the minter's shape — the id the act minted before the commit and the commit carries
- * in its `Audit:` trailer — and the actor is the ledger's own actor shape, so the trailer and
- * the row cannot say different things about who acted.
- */
 const bundleCommitRefinements = {
   workspaceId,
   sha: (schema: z.ZodString) => schema.regex(GIT_SHA),
@@ -594,7 +434,6 @@ export const conceptVerificationUpdate = createUpdateSchema(
   conceptVerificationRefinements,
 );
 
-/** A citation: the concept by IRI, the evidence by the key `evidence` itself carries. */
 const conceptEvidenceRefinements = {
   workspaceId,
   iri: conceptIri,
@@ -615,11 +454,6 @@ export const conceptEvidenceUpdate = createUpdateSchema(
   conceptEvidenceRefinements,
 );
 
-/**
- * A recorded Admin override (ADR 0039): the class and audience narrowed as every readable
- * unit's are, the Admin in the ledger's actor form, and the ledger row's id in the minter's
- * shape — the row half of *an audit event and a row*.
- */
 const conceptClassOverrideRefinements = {
   workspaceId,
   iri: conceptIri,
@@ -641,31 +475,10 @@ export const conceptClassOverrideUpdate = createUpdateSchema(
   conceptClassOverrideRefinements,
 );
 
-/**
- * What a binding's **rules in force** may hold: the two switchable tiers, both of them, each
- * a boolean, and nothing else. The narrowing is `outcome`'s and the identifier set's — the
- * callback and the `.pipe()` over the generated column schema — and the reason is the seam's:
- * this value is the argument the redaction seam runs on, so a key the seam has never heard of
- * would be a rule a person believes they set and nothing reads.
- *
- * Strict, and every key required. A tier that arrived unannounced would be switched off by
- * whatever the seam does with a key it does not know, and a tier left out would be a binding
- * whose answer to *is this withheld?* is undefined — which is why the column's default states
- * the safe set rather than leaving it to be filled in later. A third tier is a word added to
- * `RULES_IN_FORCE_KEYS`, a migration and a rule in the seam, never a key in somebody's
- * `jsonb`; the keys are read off the constant so the default, the table's CHECK and this
- * schema cannot drift apart.
- *
- * JSON `null` stays accepted here for the reason `detail`'s and `identifiers`' do — `jsonb
- * NOT NULL` refuses SQL NULL and not the JSON value, and assertion 3 holds a refinement to
- * the column's own nullability. The table's `source_binding_rules_in_force_check` refuses it
- * one layer down, because a binding whose rules are the JSON null withholds by no rule at all.
- */
 const rulesInForce = z.union([
-  // SAFETY: the entries are built by mapping `RULES_IN_FORCE_KEYS` itself, so the keys are
-  // exactly that tuple's members and each value is the one boolean schema;
-  // `Object.fromEntries` is what loses that on the way out, not the code that feeds it.
   z.strictObject(
+    // SAFETY: `Object.fromEntries` loses what the mapping guarantees — that tuple's members
+    // as keys, the one boolean schema as each value.
     Object.fromEntries(RULES_IN_FORCE_KEYS.map((key) => [key, z.boolean()])) as Record<
       (typeof RULES_IN_FORCE_KEYS)[number],
       z.ZodBoolean
@@ -674,18 +487,6 @@ const rulesInForce = z.union([
   z.null(),
 ]);
 
-/**
- * A source binding as the derivation reads it (ADR 0013, ADR 0039): the three visibility
- * columns narrowed as every readable unit's are, its id the minter's shape, and the rules in
- * force the bounded shape above (ADR 0020).
- *
- * The four closed word sets are the boundary's to narrow, as every closed set on a text column
- * in this file is (ADR 0028) — and the destination is narrowed **as a set**: at least one
- * word, each one of the three, because a binding feeding nothing is a source the platform can
- * never answer from. The name is held to being a name and nothing more: what an Admin calls
- * their source is not this boundary's business, but a binding the Sources screen would list as
- * a blank line is.
- */
 const sourceBindingRefinements = {
   workspaceId,
   id: bindingId,
@@ -703,31 +504,6 @@ export const sourceBindingSelect = createSelectSchema(sourceBinding, sourceBindi
 export const sourceBindingInsert = createInsertSchema(sourceBinding, sourceBindingRefinements);
 export const sourceBindingUpdate = createUpdateSchema(sourceBinding, sourceBindingRefinements);
 
-/**
- * A source document as the derivation reads it and as a run reconciles it: its id is what
- * `evidence` names, narrowed exactly as `evidence.source_document_id` is, and its binding is
- * the minter's shape.
- *
- * The catalogue's own columns are narrowed to what each is: the two **landed-copy keys** are
- * object-store keys and held to being non-empty — they are addresses of bytes the platform
- * put there, never locators, which are spans — the hash is the one digest shape this platform
- * writes, the size is a whole number of bytes, and the two closed word sets are the boundary's.
- * The document's own class is the same closed set as a binding's, because it is the same word
- * meaning the same thing; its nullability is the column's, and null means *the binding's*.
- *
- * The **quarantine error** is held to being a *name*: one token, no whitespace in it. That is
- * the whole of what the glossary claims for it and the whole of what makes it useful — an
- * Admin's OCR decision is a count of one binding's documents grouped by this column, and a
- * sentence written here instead of a name would give every row a group of its own. Which names
- * exist is a converter's business and changes with the converters, so there is no word set to
- * hold it to; that it is not prose is the part this schema can say.
- *
- * And it says it to the app alone. The tier that actually writes this column today is the
- * worker, on its own psycopg connection, which passes through no schema of this package's —
- * so the rule that the name may only stand beside *quarantined* is the CHECK's and could not
- * have been this refinement's. What lands here is the shape the app must send if it ever
- * writes one.
- */
 const sourceDocumentRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.trim().min(1),
@@ -749,17 +525,6 @@ export const sourceDocumentSelect = createSelectSchema(sourceDocument, sourceDoc
 export const sourceDocumentInsert = createInsertSchema(sourceDocument, sourceDocumentRefinements);
 export const sourceDocumentUpdate = createUpdateSchema(sourceDocument, sourceDocumentRefinements);
 
-/**
- * A **finding** (ADR 0020): a span the seam withheld, located and never quoted. The document
- * is narrowed exactly as `evidence.source_document_id` is; the two closed word sets are the
- * boundary's to narrow; the offsets are whole numbers and the score is the detector's own
- * range; and the two actors are the ledger's own actor shape, so whoever reviewed and
- * whoever restored read here as they do on the audit row that records the act.
- *
- * The category is held to being non-empty and nothing more, on purpose: which categories
- * exist is the `redaction` agreement's, which nothing imports (ADR 0031), and a second copy
- * of the list here would be a second thing to bump when a rule lands.
- */
 const findingRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.regex(ULID),
@@ -783,32 +548,11 @@ export const findingSelect = createSelectSchema(finding, findingRefinements);
 export const findingInsert = createInsertSchema(finding, findingRefinements);
 export const findingUpdate = createUpdateSchema(finding, findingRefinements);
 
-/**
- * What a **subject request's identifier set** may hold: three lists of identifiers, one per
- * kind, and nothing else. The shape is the narrowing, exactly as `outcome`'s is — but the
- * reason is the other way round. An outcome is bounded so a person's details cannot get in;
- * this column is where a person's details are the point, so it is bounded so that the words
- * a subject gave cannot arrive as a shape no finder can walk and no bound can measure.
- *
- * Strict, so a fourth kind of identifier is a word added to `SUBJECT_IDENTIFIER_KINDS` and a
- * finder written for it, never a key that arrives in somebody's `jsonb` and is silently
- * never searched. All three kinds are required for the same reason: a finder reads its own
- * arm without asking whether it is there. The keys are read off the constant so the closed
- * list, the CHECK the table carries and this schema cannot drift apart.
- *
- * JSON `null` stays accepted for the same reason `detail`'s does — `jsonb NOT NULL` refuses
- * SQL NULL, not the JSON value, and the parity suite holds a refinement to the column's own
- * nullability. It is the one way off the shape this schema does not refuse, and the table's
- * `subject_request_identifiers_check` refuses it there instead, because a request whose
- * identifier set is the JSON null names nobody.
- */
 const subjectIdentifier = z.string().trim().min(1).max(SUBJECT_IDENTIFIER_MAX);
 const subjectIdentifierList = z.array(subjectIdentifier).max(SUBJECT_IDENTIFIERS_MAX);
 const subjectIdentifiers = z.union([
-  // SAFETY: the entries are built by mapping `SUBJECT_IDENTIFIER_KINDS` itself, so the keys
-  // are exactly that tuple's members and each value is the one list schema above;
-  // `Object.fromEntries` is what loses that on the way out, not the code that feeds it.
   z.strictObject(
+    // SAFETY: as above — that tuple's members as keys, the one list schema as each value.
     Object.fromEntries(
       SUBJECT_IDENTIFIER_KINDS.map((kind) => [kind, subjectIdentifierList]),
     ) as Record<(typeof SUBJECT_IDENTIFIER_KINDS)[number], typeof subjectIdentifierList>,
@@ -816,16 +560,6 @@ const subjectIdentifiers = z.union([
   z.null(),
 ]);
 
-/**
- * A **subject request** (ADR 0020, ADR 0035): the id is the minter's shape, the kind is the
- * closed pair, and the person id — where the subject has one — is the one person id and
- * never an address. The identifier set is the bounded shape above.
- *
- * `person_id` is narrowed and stays nullable, which is the whole of candidate 2 of the
- * architecture pass: a member is named by id, and a person the company's files name who
- * never signed in is named by the set alone. The answer is held to being non-empty and
- * nothing more — it is the platform's own document, not a stranger's field.
- */
 const subjectRequestRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.regex(ULID),
@@ -839,29 +573,12 @@ export const subjectRequestSelect = createSelectSchema(subjectRequest, subjectRe
 export const subjectRequestInsert = createInsertSchema(subjectRequest, subjectRequestRefinements);
 export const subjectRequestUpdate = createUpdateSchema(subjectRequest, subjectRequestRefinements);
 
-/**
- * What an **erasure request's actions** may hold: one flat object per store family — what
- * was done there and how it went. The narrowing is `outcome`'s and so is the reason: this is
- * a record of what the routine did about a person, and a shape with nowhere nested to hide
- * would have to be rewritten by the next erasure if a name could reach it. The family names
- * are the erasure map's, held to being strings and nothing more, because the typed union
- * that lists them is the slice's and a second copy here would be a second place to change.
- *
- * JSON `null` stays accepted for the reason `detail`'s does; the table's own CHECK is what
- * refuses it, since a routine's record written as `null` is no record at all.
- */
 const erasureAction = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 const erasureActions = z.union([
   z.record(z.string(), z.record(z.string(), erasureAction)),
   z.null(),
 ]);
 
-/**
- * An **erasure request** (ADR 0020, ADR 0035): the id and the subject request it answers are
- * the minter's shape, and so is the *erasure pseudonym* — the one value a rewritten history
- * is joined on, which a hand-composed id would make un-undoable. The report is held to being
- * non-empty and nothing more: it is a document in fixed words, not a field.
- */
 const erasureRequestRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.regex(ULID),
@@ -875,12 +592,6 @@ export const erasureRequestSelect = createSelectSchema(erasureRequest, erasureRe
 export const erasureRequestInsert = createInsertSchema(erasureRequest, erasureRequestRefinements);
 export const erasureRequestUpdate = createUpdateSchema(erasureRequest, erasureRequestRefinements);
 
-/**
- * A **suppression** (ADR 0020): the routine it was written by and the document it stands over
- * are the minter's shape and the document's own, and the identifiers are the request's set —
- * the same bounded shape, because this row is a copy of it and a second narrowing would be a
- * second thing the reprocess could disagree with.
- */
 const suppressionRefinements = {
   workspaceId,
   erasureRequestId: (schema: z.ZodString) => schema.regex(ULID),
@@ -892,7 +603,6 @@ export const suppressionSelect = createSelectSchema(suppression, suppressionRefi
 export const suppressionInsert = createInsertSchema(suppression, suppressionRefinements);
 export const suppressionUpdate = createUpdateSchema(suppression, suppressionRefinements);
 
-/** A composition (ADR 0004, ADR 0015): a readable unit, its id the minter's shape. */
 const compositionRefinements = {
   workspaceId,
   id: compositionId,
@@ -903,10 +613,6 @@ export const compositionSelect = createSelectSchema(composition, compositionRefi
 export const compositionInsert = createInsertSchema(composition, compositionRefinements);
 export const compositionUpdate = createUpdateSchema(composition, compositionRefinements);
 
-/**
- * An include (ADR 0015): its id is the label a citation marker carries, non-empty; its place
- * a non-negative ordinal; the concept it names an IRI.
- */
 const compositionIncludeRefinements = {
   workspaceId,
   compositionId,
@@ -928,12 +634,6 @@ export const compositionIncludeUpdate = createUpdateSchema(
   compositionIncludeRefinements,
 );
 
-/**
- * A graph label: the partition's closed set, or the prefixed source-entity form (ADR 0032).
- * The prefix arm is the boundary's whole rule for a source-entity label until the lift that
- * writes them lands its closed set (B7); the tie between the label family and `gen` is the
- * insert schemas' own cross-field refinement below, mirroring each table's CHECK.
- */
 const graphLabel = (labels: readonly string[]) => (schema: z.ZodString) =>
   schema.refine(
     (label) =>
@@ -941,14 +641,6 @@ const graphLabel = (labels: readonly string[]) => (schema: z.ZodString) =>
     { message: "a graph label is one of the closed set, or wears the source-entity prefix" },
   );
 
-/**
- * The label family and the generation held together, as the tables' CHECKs hold them —
- * refused here so the invalid pair never reaches an INSERT. A prefixed source-entity label
- * carries no `gen` on either table; a closed **node** label is a bundle-and-record row and
- * must carry one; a closed **edge** label is admitted in either partition, because the
- * source-entity partition's own edges wear closed labels (`IS_CONCEPT`, `SAME_AS` — ADR
- * 0026's amendment).
- */
 type GraphRowInput = { readonly label: string; readonly gen?: number | null };
 
 const sourceEntityCarriesNoGen = (row: GraphRowInput): boolean =>
@@ -957,7 +649,6 @@ const sourceEntityCarriesNoGen = (row: GraphRowInput): boolean =>
 const closedNodeLabelCarriesGen = (row: GraphRowInput): boolean =>
   row.label.startsWith(SOURCE_ENTITY_LABEL_PREFIX) || (row.gen !== null && row.gen !== undefined);
 
-/** A generation: the rebuild counter's value, from 1 — `gen` and `live_gen` alike. */
 const generation = (schema: z.ZodNumber) => schema.int().positive();
 
 const graphGenerationRefinements = {
@@ -978,14 +669,8 @@ export const graphGenerationUpdate = createUpdateSchema(
   graphGenerationRefinements,
 );
 
-/** A graph row's text — a uid, a kind: non-empty, because an empty one names nothing. */
 const graphKey = (schema: z.ZodString) => schema.trim().min(1);
 
-/**
- * The graph rows (ADR 0032): what a node and an edge narrow alike — the label's rule is
- * per table, the visibility columns exactly `concept_index`'s, because the read predicate
- * is tested against them.
- */
 const graphRow = {
   workspaceId,
   gen: generation,
@@ -1027,14 +712,6 @@ export const graphEdgeInsert = createInsertSchema(graphEdge, graphEdgeRefinement
 );
 export const graphEdgeUpdate = createUpdateSchema(graphEdge, graphEdgeRefinements);
 
-/**
- * What a **job's outcome** may hold: counts, and the ids and paths the counts were taken at
- * — a scalar, a list of scalars, or a list of flat objects, which is the auditor's
- * `{path, expected, actual}` triple and nothing deeper. The shape is the narrowing: an
- * email, a person's name, a prompt or a concept's body has no nested place to hide in one,
- * and an outcome that held one would have to be rewritten on erasure — which a record of
- * what a run found never is. JSON `null` stays accepted because the column accepts it.
- */
 const outcomeScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 const outcome = z.union([
   z.record(
@@ -1044,26 +721,12 @@ const outcome = z.union([
   z.null(),
 ]);
 
-/**
- * A **job** on the worker's queue (ADR 0005's control plane of rows): the id is the
- * minter's shape, the three closed word sets are the boundary's to narrow, and the counts
- * are whole numbers. `claimed_by` is a worker id — the container's hostname by default —
- * so it is held to being non-empty and nothing more: what a deploy unit calls its worker is
- * not this boundary's business.
- *
- * The subject is held to being a subject. Which kinds must name one is the row's rule, because
- * it is a rule about a pair of columns; that the one a kind names is not whitespace is this
- * boundary's, and it has to be, because the row's CHECK tests for NULL and a string of spaces
- * is not NULL. Without it an `index` job could be enqueued about no binding at all and the
- * worker would claim it and find nothing to index.
- */
 const jobRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.regex(ULID),
   subjectId: (schema: z.ZodString) => schema.trim().min(1),
   kind: (schema: z.ZodString) => schema.pipe(z.enum(JOB_KINDS)),
-  // Every reason any kind may carry. Which kind may carry which is the row's rule, because
-  // it is a rule about a pair of columns and a column's boundary sees one column.
+
   reason: (schema: z.ZodString) => schema.pipe(z.enum(JOB_REASONS)),
   status: (schema: z.ZodString) => schema.pipe(z.enum(JOB_STATUSES)),
   attempts: (schema: z.ZodNumber) => schema.int().nonnegative(),
@@ -1076,12 +739,6 @@ export const jobSelect = createSelectSchema(job, jobRefinements);
 export const jobInsert = createInsertSchema(job, jobRefinements);
 export const jobUpdate = createUpdateSchema(job, jobRefinements);
 
-/**
- * A **suggestion** (ADR 0012): the two actors are the ledger's own actor shape, so a
- * proposer and a decider read the same way wherever they appear; the target is a concept
- * IRI, because a resolved target is a concept and never a path; and the reason is bounded,
- * since the surface that writes one is open to any member of the workspace.
- */
 const suggestionRefinements = {
   workspaceId,
   id: (schema: z.ZodString) => schema.regex(ULID),
@@ -1098,19 +755,13 @@ export const suggestionSelect = createSelectSchema(suggestion, suggestionRefinem
 export const suggestionInsert = createInsertSchema(suggestion, suggestionRefinements);
 export const suggestionUpdate = createUpdateSchema(suggestion, suggestionRefinements);
 
-/**
- * A **concept write request** — a suggestion's payload: the file above, plus what it means
- * it for and what it was written against. There is deliberately **no IRI**: identity is the
- * acceptance's to resolve from the merge key (ADR 0012).
- */
 const conceptWriteRequestRefinements = {
   workspaceId,
   suggestionId: (schema: z.ZodString) => schema.regex(ULID),
   mergeKey: (schema: z.ZodString) => schema.trim().min(1),
   ...conceptFileRefinements,
   conceptKind,
-  // The bound the column holds, held here too, so a payload too large to store is refused
-  // where a caller can be told rather than by the row it never reached.
+
   body: (schema: z.ZodString) => schema.max(SUGGESTION_BODY_MAX),
   baseContentHash: (schema: z.ZodString) => schema.regex(CONTENT_HASH),
 };
@@ -1128,7 +779,6 @@ export const conceptWriteRequestUpdate = createUpdateSchema(
   conceptWriteRequestRefinements,
 );
 
-/** One entry per table this package owns — the parity test's registry (ADR 0028). */
 export const boundarySchemas = {
   workspace: {
     table: workspace,

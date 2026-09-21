@@ -6,32 +6,12 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-/**
- * The patch under `patches/` on `@stryker-mutator/vitest-runner`, run rather than read
- * (`[CHECK1]`; T-107).
- *
- * A mutant that throws while its module loads fails every test file that imports it before
- * one test runs, and the unpatched runner reads a file with no test tasks as nothing run:
- * the mutant is reported survived with `testsCompleted: 0` — thirty-nine such rows in run
- * 34168928594, every one a survivor no test was ever run against. The patch reports the
- * file's failure to load as one failed test named for the file, so the mutant is killed
- * with the error it caused.
- *
- * Stryker is run over a throwaway workspace with one source file whose mutants take the
- * three shapes the report must tell apart: a plain kill (a test's assertion fails), a
- * survivor (no test reaches the difference — the negative control the triage method asks
- * for, so a run that kills everything cannot pass here), and the kill the patch makes (the
- * module refuses to load). Every expected row is written down (`[TEST9]`). A patch that
- * stopped applying — an upgrade of the runner drops it — reads as the third row surviving
- * with no test, which is the failure this file exists to catch.
- */
-
 const require = createRequire(import.meta.url);
 const packageRoot = (name: string): string => path.dirname(require.resolve(`${name}/package.json`));
 
 const strykerRoot = packageRoot("@stryker-mutator/core");
 const runnerRoot = packageRoot("@stryker-mutator/vitest-runner");
-/** The vitest the runner itself loads, so the suite and the runner share one instance. */
+
 const vitestRoot = path.dirname(
   createRequire(path.join(runnerRoot, "package.json")).resolve("vitest/package.json"),
 );
@@ -99,9 +79,8 @@ const rowsOf = (root: string): readonly Row[] => {
   const parsed: unknown = JSON.parse(
     readFileSync(path.join(root, "reports/mutation.json"), "utf8"),
   );
-  // SAFETY: Stryker's JSON reporter writes the mutation-testing report, whose one file here
-  // is the source written above; the rows are read by mutator, replacement and line, and a
-  // report of another shape fails the assertions below rather than passing them.
+
+  // SAFETY: a report of another shape fails the assertions below rather than passing them.
   const report = parsed as { readonly files: Record<string, { readonly mutants: readonly Row[] }> };
   return Object.values(report.files).flatMap((file) => file.mutants);
 };
@@ -139,32 +118,23 @@ describe("the vitest runner's patch, run over a throwaway workspace (T-107)", ()
       }
       const rows = rowsOf(root);
 
-      // A plain kill: the function's body emptied, so ACTS is undefined and the assertion fails.
       expect(rowAt(rows, 3, "BlockStatement", "{}")).toMatchObject({
         status: "Killed",
         testsCompleted: 1,
         statusReason: expect.stringContaining("undefined"),
       });
-      // A survivor: the refusal never fires, and no test asks for a family that is refused.
+
       expect(rowAt(rows, 4, "ConditionalExpression", "false")).toMatchObject({
         status: "Survived",
         testsCompleted: 1,
       });
-      // The patch's kill: the family emptied at the call the module makes while loading,
-      // so the suite's one file fails before its test runs — read as a kill, with the
-      // error the module threw, and not as no test run.
+
       expect(rowAt(rows, 8, "StringLiteral", '""')).toMatchObject({
         status: "Killed",
         testsCompleted: 1,
         statusReason: expect.stringContaining("is not a family"),
       });
     } finally {
-      // spawnSync guarantees only that the top-level stryker process has exited: it forks
-      // workers to run each mutant's tests, with `root` as their cwd, and nothing here waits
-      // on those. One that outlives the CLI leaves an extra entry under `root`, which makes
-      // the final rmdir fail ENOTEMPTY — and fs.rmSync retries ENOTEMPTY only when given both
-      // maxRetries and retryDelay, since force alone suppresses "does not exist" and nothing
-      // else.
       rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });

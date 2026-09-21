@@ -22,43 +22,6 @@ import {
   visibilitySuite,
 } from "./sourced-concept.ts";
 
-/**
- * The passage a locator opens, over real chunk rows (`[TEST2]`, `[TEST4]`): `passageAt`
- * resolves a wire locator to the rows of `index.chunk` covering its span, under the read
- * predicate applied once in the same statement, and cuts the span's text out of them.
- *
- * The agreement it is held to is `contracts/document-chunk/cases.json` (ADR 0031), whose
- * pure half — the derived id, the locator's parse, the span cut out of a text — is
- * `document-chunk.contract.test.ts`. Here the same document's three rows are **seeded** and
- * the same six `open` cases are asked of the read, because the two halves of the agreement
- * can only disagree where a row stands between them: a tier that counted UTF-16 units would
- * cut a passage one character early and one short, and the fixture's astral character is
- * what makes that visible.
- *
- * Every expected passage is a literal (`[TEST9]`) — the agreement's own, written down in
- * `cases.json`, never the fixture's text sliced here to produce the value it is compared to.
- *
- * The refusals are one word. A locator the parser will not read, a span past the end of the
- * text, a document this workspace does not hold and a row this reader may not see all answer
- * *not found*, and the pair both ways (`[TEST7]`) is the Admin who does see the withheld row
- * getting the passage from the same locator. A span covered by two rows of which the reader
- * may see only one is refused **whole** and by the same word, either way round, because the
- * predicate sits inside the covering-rows query and a row withheld is a row that never came
- * back: serving the readable half would say where the withheld part of the document begins.
- *
- * Beside it, `findPassages`: the search over the same rows, whose own pair both ways is the
- * document a concept cites — withheld from the reader who may see that concept, because a
- * document stands alone only when nothing covering it does (ADR 0016), and handed to the
- * reader who may not. The answer is a list and only a list: no total, no count and nothing
- * else a reader could learn the shape of the workspace from.
- *
- * And last `previewChunks`, the Admin's review list, whose own pair both ways (`[TEST7]`) is
- * the binding still under review: its rows are there for the preview, which leaves the
- * published arm out, and not there for the two reads that carry it — for the same Admin, in
- * the same workspace, on the same arrangement. The arms it keeps are proved too, because a
- * road that reaches earlier must not also reach wider.
- */
-
 const fixtureSchema = z.object({
   locator: z.object({ not_found: z.string().min(1) }),
   document: z.object({
@@ -82,18 +45,10 @@ const NOT_FOUND = fixture.locator.not_found;
 
 const { db, arrange, reading } = visibilitySuite();
 
-/** A literal the test writes down (`[TEST9]`): a published instant, never the wall clock. */
 const PUBLISHED = new Date("2026-09-11T09:00:00.000Z");
 
-/** The title the agreement's document is catalogued under, which a passage is served with. */
 const INVOICE_TITLE = "The bid library's invoice";
 
-/**
- * The agreement's document and its three chunk rows, as a run would have landed them: the
- * binding and the document carry the fixture's own ids, and every row names all five address
- * columns, because `seed.chunk` leaves them NULL for the suites that want the visibility
- * columns alone.
- */
 const seedTheAgreementsDocument = (workspaceId: string): Promise<void> =>
   seededBy(db(), async (seed) => {
     const binding = await seed.sourceBinding({
@@ -125,13 +80,6 @@ const seedTheAgreementsDocument = (workspaceId: string): Promise<void> =>
     }
   });
 
-/**
- * One document of this workspace whose whole text is a single chunk row; its id.
- *
- * The binding and its chunk copy carry the same three visibility columns, which is what a run
- * lands (ADR 0023): a search reads the chunk's copy and never the binding's row, so a suite
- * that set the two apart would be proving something no writer can produce.
- */
 const documentWithOneChunk = (
   workspaceId: string,
   what: {
@@ -139,9 +87,9 @@ const documentWithOneChunk = (
     readonly text: string;
     readonly charEnd: number;
     readonly sensitivity: string;
-    /** The groups the binding is for; absent is *everyone*, which is what most rows carry. */
+
     readonly audienceGroups?: readonly string[];
-    /** When the binding was published; `null` is a binding still under review. */
+
     readonly publishedAt?: Date | null;
   },
 ): Promise<string> =>
@@ -178,25 +126,12 @@ const documentWithOneChunk = (
     return held.id;
   });
 
-/** One chunk row of a two-row document: the text it holds, where it ends, and its class. */
 type StraddledRow = {
   readonly text: string;
   readonly charEnd: number;
   readonly sensitivity: string;
 };
 
-/**
- * One document of this workspace whose text is partitioned across two chunk rows; its id.
- *
- * The trailing row starts exactly where the leading row ends, because that partition is what
- * a span crossing the boundary is answered from (ADR 0031): a seeder that left a gap would be
- * arranging the refusal the test then went on to assert.
- *
- * Each row carries a class of its own, which is what lets one row of a span be withheld while
- * the other is served — a read of a chunk reads the copy on the row and never the binding's
- * (ADR 0023), so the binding is left at the factory's class rather than claiming one its two
- * rows disagree about.
- */
 const documentWithTwoChunks = (
   workspaceId: string,
   what: {
@@ -233,12 +168,6 @@ const documentWithTwoChunks = (
     return held.id;
   });
 
-/**
- * The staff handbook as a run lands it when its text runs past one chunk: the same sentence
- * the search suite below holds as one row, here partitioned across two, and a span that starts
- * inside the leading row and ends inside the trailing one — answerable from the two rows
- * together and from neither of them alone.
- */
 const STRADDLED_TITLE = "The staff handbook";
 const STRADDLED_LEADING = { text: "The holiday policy ", charEnd: 19 } as const;
 const STRADDLED_TRAILING = { text: "grants twenty-eight days.", charEnd: 44 } as const;
@@ -248,15 +177,8 @@ const BOARD_TITLE = "The board's note";
 const BOARD_TEXT = "The board's note on the bid.";
 const BOARD_CHAR_END = 28;
 
-/**
- * What a search is asked, in the words a person would type. Two bare words with a space
- * between them is prose, not a tsquery: `to_tsquery` raises a syntax error on it, which is
- * why the read parses a caller's words with `websearch_to_tsquery` and this suite asks with
- * words that would have broken the other one.
- */
 const QUERY = "holiday policy";
 
-/** The documents a search runs over, each one chunk: the text and the span it occupies. */
 const HANDBOOK = {
   title: "The staff handbook",
   text: "The holiday policy grants twenty-eight days.",
@@ -278,7 +200,6 @@ const DRAFT = {
   charEnd: 46,
 } as const;
 
-/** One hit as the read hands it over, from the document it names and the text it landed as. */
 const hitOn = (
   documentId: string,
   what: { readonly title: string; readonly charEnd: number },
@@ -290,14 +211,6 @@ const hitOn = (
   sensitivity,
 });
 
-/**
- * The passage this person opens at a wire locator, or the one word they were refused with.
- *
- * The act alone, as `searching` and `previewing` below are the act alone for the other two
- * reads: what a passage is expected to be stays written out in full at every assertion, in
- * that assertion's own literals (`[TEST9]`), because that is the thing under test and a
- * helper that carried it would be the suite agreeing with itself.
- */
 const opening = (person: UserPrincipal, wire: string): Promise<Passage | LocatorRefusal | Error> =>
   reading(person, async (reader, tx) => {
     const read = await passageAt(reader, tx, wire);
@@ -332,9 +245,7 @@ describe("the passage a wire locator opens", () => {
 
   it("answers a span running from one chunk row into the next as one passage, at the narrower of their classes", async () => {
     const scenario = await arrange();
-    // Two rows partitioning one text, the second narrowed on its own row: a straddle has to
-    // join the rows' content in ordinal order, offset the span by the first row's start, and
-    // answer the narrower class of the rows it actually read.
+
     const documentId = await documentWithTwoChunks(scenario.workspaceId, {
       title: STRADDLED_TITLE,
       leading: { ...STRADDLED_LEADING, sensitivity: "Internal" },
@@ -370,9 +281,6 @@ describe("the passage a wire locator opens", () => {
       return read.rows;
     });
 
-    // The stored word and the derived one are one address or they are two (ADR 0031): a read
-    // that composes a hit's locator from three columns and a row that carries a fourth would
-    // drift apart silently, and this is the assertion that will not let them.
     expect(rows.length).toBe(document.chunks.length);
     expect(rows.map((row) => row.locator)).toEqual(
       rows.map((row) => `${row.source_document_id}/chars:${row.char_start}-${row.char_end}`),
@@ -402,8 +310,6 @@ describe("what a passage read refuses", () => {
       answered[what] = await opening(scenario.viewer, wire);
     }
 
-    // One word for all four, so a reader learns nothing from the difference between a locator
-    // that is wrong, a passage that is not there and a passage they may not see.
     expect(answered).toEqual({
       withheld: NOT_FOUND,
       absent: NOT_FOUND,
@@ -414,12 +320,7 @@ describe("what a passage read refuses", () => {
 
   it("refuses a straddle whole when either its leading or its trailing row is withheld, and serves the Admin who reaches both from the same locator", async () => {
     const scenario = await arrange();
-    // The same two-row document narrowed on opposite rows, because a straddle withheld in
-    // part leaves the read by two different roads: with the trailing row gone the rows that
-    // did come back reach short of the span's end, and with the leading row gone the first
-    // row that came back starts past the span's start. Neither Viewer is served the half of
-    // the span they may see, because a readable prefix would say where the withheld part of
-    // the document begins.
+
     const narrowedTrailing = await documentWithTwoChunks(scenario.workspaceId, {
       title: STRADDLED_TITLE,
       leading: { ...STRADDLED_LEADING, sensitivity: "Internal" },
@@ -440,8 +341,6 @@ describe("what a passage read refuses", () => {
       "the Admin, leading row narrowed": await opening(scenario.admin, atNarrowedLeading),
     };
 
-    // The refusal is the one word an absent and a malformed locator answer with, and the
-    // Admin reading the identical address is what makes it the predicate and not an absence.
     expect(answered).toEqual({
       "the Viewer, trailing row withheld": NOT_FOUND,
       "the Viewer, leading row withheld": NOT_FOUND,
@@ -481,7 +380,6 @@ describe("what a passage read refuses", () => {
   });
 });
 
-/** The hits a search hands this person, or the error it refused with. */
 const searching = (person: UserPrincipal, limit = 10): Promise<readonly PassageHit[] | Error> =>
   reading(person, async (reader, tx) => {
     const found = await findPassages(reader, tx, QUERY, limit);
@@ -499,9 +397,7 @@ describe("the passages a search finds", () => {
       ...MANUAL,
       sensitivity: "Internal",
     });
-    // The concept rests on the handbook and on a Restricted binding's document, so it derives
-    // the narrower of the two classes (ADR 0023) and stands Restricted: the Admin may see it,
-    // the Viewer may not. Both may see the handbook's chunk, which is what makes this a pair.
+
     const boardroom = await bindingHolding(db(), scenario.workspaceId, {
       sensitivity: "Restricted",
     });
@@ -510,13 +406,9 @@ describe("the passages a search finds", () => {
     const viewer = await searching(scenario.viewer);
     const admin = await searching(scenario.admin);
 
-    // A document stands alone only when no concept this reader may see covers it (ADR 0016).
-    // The Admin, who may see the concept, is offered the concept instead; the Viewer, for whom
-    // the concept is not there at all, is offered the document. The same row, two answers, and
-    // the difference is one predicate rather than two reads.
     expect(viewer).toEqual([hitOn(manual, MANUAL), hitOn(handbook, HANDBOOK)]);
     expect(admin).toEqual([hitOn(manual, MANUAL)]);
-    // The caller's limit is the caller's: the higher-ranked hit and nothing after it.
+
     expect(await searching(scenario.viewer, 1)).toEqual([hitOn(manual, MANUAL)]);
   });
 
@@ -532,9 +424,6 @@ describe("the passages a search finds", () => {
     const outside = await searching(scenario.viewer);
     const inside = await searching(scenario.editor);
 
-    // The empty list and nothing beside it (`[TEST7]`, ADR 0016's *no totals anywhere*): no
-    // count, no total and no *some results were withheld*, because each of those would tell a
-    // reader outside the audience that there was something to be outside of.
     expect(outside).toEqual([]);
     expect(inside).toEqual([hitOn(minutes, MINUTES)]);
   });
@@ -552,9 +441,6 @@ describe("the passages a search finds", () => {
       answered.push({ role: reader.role, found: await searching(reader) });
     }
 
-    // The published arm has no door for any role, the Admin's included — the class arm is the
-    // only one that reads the role. An unpublished binding's chunks are reached by the review
-    // list alone, and that is `previewChunks`, not this read.
     expect(answered).toEqual([
       { role: "Viewer", found: [] },
       { role: "Editor", found: [] },
@@ -563,21 +449,14 @@ describe("the passages a search finds", () => {
   });
 });
 
-/**
- * The binding the Sources screen reviews and the rows a run landed under it, at ids this suite
- * writes down rather than mints, so the addresses and the order the preview answers in are
- * literals (`[TEST9]`) instead of values read back out of the arrangement.
- */
 const REVIEW_BINDING = "01M2B1ND1NGREV13WAAAAAAAAA";
 const TERMS = "01M2D0CREV13WAAAAAAAAAAAA1";
 const ANNEX = "01M2D0CREV13WAAAAAAAAAAAA2";
 
-/** The second binding, for the two arms the preview keeps; its documents sort in this order. */
 const ARMS_BINDING = "01M2B1ND1NGARMSAAAAAAAAAAA";
 const BOARD_DOC = "01M2D0CARMSAAAAAAAAAAAAAA1";
 const GROUP_DOC = "01M2D0CARMSAAAAAAAAAAAAAA2";
 
-/** One document of a binding under review and the rows the splitter would have written for it. */
 type ReviewedDocument = {
   readonly id: string;
   readonly title: string;
@@ -588,20 +467,11 @@ type ReviewedDocument = {
     readonly charEnd: number;
     readonly content: string;
     readonly sensitivity?: string;
-    /** The groups the row is for; absent is *everyone*, which is what most rows carry. */
+
     readonly audienceGroups?: readonly string[];
   }[];
 };
 
-/**
- * A binding still under review, its documents and their chunk rows.
- *
- * `published_at` is null on the binding **and** on every chunk copy, which is the state a
- * review list exists for: a run writes the binding's three visibility columns onto its chunks
- * (ADR 0023), so a suite that set the two apart would be arranging something no writer can
- * produce. Every row names all five address columns, because `seed.chunk` leaves them NULL and
- * would otherwise mint a binding id of its own.
- */
 const bindingUnderReview = (
   workspaceId: string,
   bindingId: string,
@@ -644,11 +514,6 @@ const bindingUnderReview = (
     }
   });
 
-/**
- * The binding under review this suite previews: two documents, three rows, every one of them
- * matching the words `findPassages` is asked with, so the search's empty answer below is the
- * published arm and never a query that had nothing to match in the first place.
- */
 const seedTheBindingUnderReview = (workspaceId: string): Promise<void> =>
   bindingUnderReview(workspaceId, REVIEW_BINDING, [
     {
@@ -686,7 +551,6 @@ const seedTheBindingUnderReview = (workspaceId: string): Promise<void> =>
     },
   ]);
 
-/** The review list this person is handed, or the one word they were refused with. */
 const previewing = (
   person: UserPrincipal,
   bindingId: string,
@@ -705,9 +569,6 @@ describe("the review list a binding is previewed with", () => {
     const viewer = await previewing(scenario.viewer, REVIEW_BINDING);
     const editor = await previewing(scenario.editor, REVIEW_BINDING);
 
-    // The rows in the order the screen lists them, each with the address it will open at once
-    // the binding is published — composed from the row's three columns, never read out of its
-    // own `locator` column, so the two cannot drift apart unnoticed (ADR 0031).
     expect(admin).toEqual([
       {
         id: "01M2D0CREV13WAAAAAAAAAAAA1#000000",
@@ -728,12 +589,10 @@ describe("the review list a binding is previewed with", () => {
         content: "The annex to the holiday policy.",
       },
     ]);
-    // The role is decided before anything is read, so neither of the other two learns whether
-    // the binding exists, let alone what is under it.
+
     expect(viewer).toBe("role-forbids");
     expect(editor).toBe("role-forbids");
-    // The shape is decided after the role and before the read, as every act on this slice
-    // decides it: an Admin asking with something that is not a binding id gets the other word.
+
     expect(await previewing(scenario.admin, "not-a-binding-id")).toBe("malformed");
   });
 
@@ -745,10 +604,6 @@ describe("the review list a binding is previewed with", () => {
     const found = await searching(scenario.admin);
     const opened = await opening(scenario.admin, `${TERMS}/chars:0-33`);
 
-    // The pair both ways (`[TEST7]`) on one arrangement and one person: three rows for the
-    // preview, which leaves the published arm out, and nothing at all for the two reads that
-    // carry it. Were the preview ever to grow that arm the first expectation would fail; were
-    // either read ever to lose it, the other two would.
     expect(previewed).toHaveLength(3);
     expect(found).toEqual([]);
     expect(opened).toBe(NOT_FOUND);
@@ -790,10 +645,6 @@ describe("the review list a binding is previewed with", () => {
 
     const admin = await previewing(scenario.admin, ARMS_BINDING);
 
-    // The clause reads the role in its class arm alone: `Restricted` has a door for an Admin
-    // and the audience has none, for any role. Dropping the published arm therefore reaches
-    // earlier without reaching wider — an Admin outside a group is still outside it, and the
-    // Editor inside it is who this second row would be shown to were it ever published.
     expect(admin).toEqual([
       {
         id: "01M2D0CARMSAAAAAAAAAAAAAA1#000000",

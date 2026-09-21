@@ -15,52 +15,10 @@ import { objectStoreForSuite } from "./suite-objects.ts";
 import { addressOf, seedingWith } from "./suite-postgres.ts";
 import { memberOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
-/**
- * **The replay's reading half** (ADR 0022; the S0 spec, *The two ops commands*): what
- * `replay-erasures --since` has to know before it can run anything — which erasures completed
- * after the dump the estate has just restored, read from the restored rows **and** from the
- * replay copies in a store the dump is not part of, and the re-creation of a request whose
- * rows the dump predates.
- *
- * Four sentences this suite is here to hold.
- *
- * A request is found **whichever of the two holds it**, and a request both hold is one
- * request: the union is de-duplicated by erasure request id and ordered by completion so a
- * command's lines are the same lines on every run.
- *
- * A restore from a dump older than the request re-creates the pair from the copy **with the
- * copy's own pseudonym**, so the routine that runs next finds the id this workspace's history
- * was already rewritten to. A second pseudonym would leave one person with two names for one
- * erasure and a history rewritten twice.
- *
- * An object store that cannot be listed is an **error**, never an empty set: an estate whose
- * copies are unreachable knows nothing about the erasures owed, and answering *none* would let
- * `api` turn healthy over every one of them.
- *
- * And a second replay of the same request **changes nothing but the ledger**, which is the
- * idempotence the whole of ADR 0022's replay rests on.
- */
-
 const { db, arrange } = suiteWithBundles();
 
-/**
- * A real Garage, because the copies this reads are objects under the platform's own prefix and
- * `[TEST3]` refuses a stand-in for a store as it refuses one for Postgres: what a restore has
- * to do is list a bucket it has just synced back and read what it finds there.
- */
 const objects = objectStoreForSuite();
 
-/**
- * **The suite's one timeline.** Every test shares one Postgres, and the union this reads is the
- * *platform's* — every workspace's rows, because a replay is the estate's act and not one
- * tenant's. So a test that asserted on the whole union would be asserting on the rows its
- * neighbours seeded.
- *
- * The instants below are what makes each test's window its own: they run forward in declaration
- * order, and each test's `since` is later than every completion the tests before it left behind.
- * A leftover from an earlier test is therefore behind the window rather than inside it, which is
- * exactly what `--since` is for. Literals throughout (`[TEST9]`), never a reading of the clock.
- */
 const BEHIND_THE_WINDOW = new Date("2026-06-01T00:00:00.000Z");
 const NOTHING_AFTER = new Date("2026-06-02T00:00:00.000Z");
 
@@ -93,20 +51,13 @@ const AFTER_THE_STOP_AT = new Date("2026-06-20T00:00:00.000Z");
 const BY_ADDRESS_SINCE = new Date("2026-06-21T00:00:00.000Z");
 const BY_ADDRESS_AT = new Date("2026-06-22T00:00:00.000Z");
 
-/** The one actor every act of a replay is booked to (`[AUDIT4]`, the platform's own id). */
 const ERASURE_ACTOR = "process:better-answers-erasure";
 
-/** The act a replayed erasure writes, spelled out here rather than read off the module. */
 const REPLAYED = "platform.erasure.replayed";
 
-/**
- * Two ids written down rather than minted, so the tie-break the union promises — completion
- * first, then id — is assertable at all. Crockford's base32, as `ULID` requires.
- */
 const FIRST_ID = "01K0000000000000000000000A";
 const SECOND_ID = "01K0000000000000000000000B";
 
-/** The doors a replay takes, with its clock pinned to a literal instant (ADR 0040). */
 const doorsFor = (scenario: Scenario, at: Date) => ({
   git: scenario.git,
   postgres: scenario.postgres,
@@ -114,7 +65,6 @@ const doorsFor = (scenario: Scenario, at: Date) => ({
   clock: { now: () => at },
 });
 
-/** What an arrangement hands back: the two ids the replay is keyed by, and the first run's id. */
 type Erased = {
   readonly subjectRequestId: string;
   readonly erasureRequestId: string;
@@ -122,11 +72,6 @@ type Erased = {
   readonly email: string;
 };
 
-/**
- * Who one seeded erasure is about. The two the spec names: a member, who holds a login and a
- * person id, and a person the company's files name who never signed in and is named by the
- * identifier set alone (`CONTEXT.md`, *subject request*).
- */
 type Subject = {
   readonly name: string;
   readonly other: readonly string[];
@@ -140,11 +85,6 @@ const NEVER_SIGNED_IN: Subject = {
   holdsALogin: false,
 };
 
-/**
- * One erasure the restored **rows** hold: the pair of rows a dump taken after the request
- * carries, seeded through the factory (`[TEST4]`) rather than by running the routine, because
- * what this arranges is a dump's contents and not a run.
- */
 const completedInTheRows = async (
   workspaceId: string,
   completedAt: Date,
@@ -157,7 +97,7 @@ const completedInTheRows = async (
     const request = await seed.subjectRequest({
       workspaceId,
       kind: "erasure",
-      // `null` is a whole answer here and not an absence: the subject who never signed in.
+
       personId: person?.id ?? null,
       identifiers: { emails: [email], names: [subject.name], other: [...subject.other] },
     });
@@ -178,7 +118,6 @@ const completedInTheRows = async (
   });
 };
 
-/** The replay as the command reaches it; a refusal here is the arrangement failing, not the answer. */
 const replaying = async (
   scenario: Scenario,
   at: Date,
@@ -189,11 +128,6 @@ const replaying = async (
   return replayed.value;
 };
 
-/**
- * The routine run once for real, so the store holds the copy it writes. The rows are already
- * completed when it runs, so the copy carries that completion and not this run's clock — which
- * is what makes every instant in this suite a literal.
- */
 const leavingAReplayCopy = async (scenario: Scenario, erased: Erased, at: Date): Promise<void> => {
   const run = await runErasure(ERASURE, doorsFor(scenario, at), {
     workspaceId: scenario.workspaceId,
@@ -202,10 +136,6 @@ const leavingAReplayCopy = async (scenario: Scenario, erased: Erased, at: Date):
   if (!run.ok) throw new Error(`the arrangement's routine refused: ${String(run.error)}`);
 };
 
-/**
- * The dump taken **before** the request: the subject request goes and the erasure request with
- * it (the key cascades), so the only trace of the erasure left in the estate is the copy.
- */
 const asIfTheDumpPredatedIt = async (workspaceId: string, erased: Erased): Promise<void> => {
   await db().pool.query("DELETE FROM subject_request WHERE workspace_id = $1 AND id = $2", [
     workspaceId,
@@ -213,7 +143,6 @@ const asIfTheDumpPredatedIt = async (workspaceId: string, erased: Erased): Promi
   ]);
 };
 
-/** The erasure request rows this workspace holds, as the superuser, oldest id first. */
 const erasureRowsIn = async (workspaceId: string) => {
   const read = await db().pool.query<{
     id: string;
@@ -230,7 +159,6 @@ const erasureRowsIn = async (workspaceId: string) => {
   return read.rows;
 };
 
-/** The subject request rows this workspace holds, as the superuser. */
 const subjectRowsIn = async (workspaceId: string) => {
   const read = await db().pool.query<{
     id: string;
@@ -249,7 +177,6 @@ const subjectRowsIn = async (workspaceId: string) => {
   return read.rows;
 };
 
-/** The ids the union names in this workspace, in the order it answered them. */
 const idsFor = (
   set: readonly { readonly workspaceId: string; readonly erasureRequestId: string }[],
   workspaceId: string,
@@ -271,7 +198,7 @@ describe("the set of erasures a restore must replay", () => {
     if (!set.ok) throw new Error(`the set refused: ${String(set.error)}`);
     expect(idsFor(set.value, scenario.workspaceId)).toEqual([]);
     expect(replayed).toEqual({ ok: true, value: [] });
-    // Nothing ran, so nothing is on the ledger: a replay of nothing is not an act.
+
     expect(await ledgerRowsOf(db().pool, scenario.workspaceId, REPLAYED)).toEqual([]);
   });
 
@@ -286,15 +213,14 @@ describe("the set of erasures a restore must replay", () => {
         workspaceId: scenario.workspaceId,
         subjectRequestId: erased.subjectRequestId,
         erasureRequestId: erased.erasureRequestId,
-        // The completion the dump carried, which a replay never moves.
+
         completedAt: FROM_THE_ROWS_AT,
-        // The rows carried it, so nothing was re-created from a copy.
+
         fromReplayCopy: false,
         auditEventId: replayed[0]?.auditEventId ?? "",
       },
     ]);
-    // One row per act and target, its subject the erasure request replayed (`[AUDIT1]`), and a
-    // detail of ids and a flag with nothing about the person on it (`[AUDIT5]`).
+
     const ledger = await ledgerRowsOf(db().pool, scenario.workspaceId, REPLAYED);
     expect(ledger).toEqual([
       {
@@ -312,8 +238,7 @@ describe("the set of erasures a restore must replay", () => {
 
   it("answers oldest completion first, and by id where two completed at one instant", async () => {
     const scenario = await arrange();
-    // The later completion is seeded first, so the order below is the union's and not the
-    // order the rows happen to have been written in.
+
     await completedInTheRows(scenario.workspaceId, IN_ORDER_SECOND_AT);
     await completedInTheRows(scenario.workspaceId, IN_ORDER_FIRST_AT, {
       erasureRequestId: SECOND_ID,
@@ -344,7 +269,7 @@ describe("the set of erasures a restore must replay", () => {
 
     if (!copies.ok) throw new Error(`the copies refused: ${String(copies.error)}`);
     if (!set.ok) throw new Error(`the set refused: ${String(set.error)}`);
-    // Both halves name it — the store's copy and the restored row — and the union names it once.
+
     expect(idsFor(copies.value, scenario.workspaceId)).toEqual([erased.erasureRequestId]);
     expect(idsFor(set.value, scenario.workspaceId)).toEqual([erased.erasureRequestId]);
   });
@@ -362,8 +287,7 @@ describe("a request whose rows the dump predates", () => {
 
     expect(replayed.map((one) => one.erasureRequestId)).toEqual([erased.erasureRequestId]);
     expect(replayed[0]?.fromReplayCopy).toBe(true);
-    // The pair is back, keyed as the copy names it and carrying the pseudonym this workspace's
-    // history was already rewritten to — a second one would be a second name for one person.
+
     const [row] = await erasureRowsIn(scenario.workspaceId);
     expect(row?.id).toEqual(erased.erasureRequestId);
     expect(row?.subject_request_id).toEqual(erased.subjectRequestId);
@@ -377,8 +301,7 @@ describe("a request whose rows the dump predates", () => {
       names: ["Priya Anand"],
       other: [],
     });
-    // The request is open again rather than answered: the routine completes it, and the clock
-    // the dump carried is gone with the row, so the copy's own completion is what dates it.
+
     expect(subject?.answered_at).toBeNull();
     expect(subject?.received_at).toEqual(FROM_THE_COPY_AT);
   });
@@ -395,8 +318,7 @@ describe("a request whose rows the dump predates", () => {
 
     expect(replayed.map((one) => one.erasureRequestId)).toEqual([erased.erasureRequestId]);
     const [subject] = await subjectRowsIn(scenario.workspaceId);
-    // The copy leaves the person id out where the subject holds none, so the row it re-creates
-    // names nobody either — and the identifier set is the whole of who the request is about.
+
     expect(subject?.person_id).toBeNull();
     expect(subject?.identifiers).toEqual({
       emails: [erased.email],
@@ -413,8 +335,7 @@ describe("an object store a restore cannot read", () => {
     const scenario = await arrange();
     const erased = await completedInTheRows(scenario.workspaceId, UNREACHABLE_AT);
     await leavingAReplayCopy(scenario, erased, UNREACHABLE_AT);
-    // A door onto a store nothing is listening at: the estate's bucket has not been synced back
-    // yet, or the store is down, and either way the copies cannot be listed.
+
     const unreachable = openObjects({
       endpoint: "http://127.0.0.1:1",
       region: "garage",
@@ -434,28 +355,18 @@ describe("an object store a restore cannot read", () => {
 
       expect(copies.ok).toBe(false);
       expect(replayed.ok).toBe(false);
-      // Nothing ran: a store that cannot be listed stops the restore before the first routine.
+
       expect(await ledgerRowsOf(db().pool, scenario.workspaceId, REPLAYED)).toEqual([]);
     } finally {
       closeObjects(unreachable.value);
     }
 
-    // The other way round (`[TEST7]`): the same request, over the store that answers, is found.
     const found = await replayCopiesSince(ERASURE, objects().door, UNREACHABLE_SINCE);
     if (!found.ok) throw new Error(`the copies refused: ${String(found.error)}`);
     expect(idsFor(found.value, scenario.workspaceId)).toEqual([erased.erasureRequestId]);
   });
 });
 
-/**
- * **The sentence `recordTheReplay`'s docblock rests on** (S0's review, round 3). That row is
- * written in a transaction of its own, after the routine has committed and released
- * `pg_advisory_lock(41)`, so a run that dies between the two leaves an erasure re-applied with
- * nothing in the ledger saying the estate re-applied it. What makes that the cheaper failure —
- * and the only one available, there being no transaction left open to fold the row into — is
- * that the operator's recovery is to run the same command again, and a second run **re-applies
- * nothing**. This is where that claim is held rather than asserted.
- */
 describe("a second replay of the same request", () => {
   it("changes nothing but the ledger", async () => {
     const scenario = await arrange();
@@ -467,18 +378,12 @@ describe("a second replay of the same request", () => {
     const second = await replaying(scenario, TWICE_AT, TWICE_SINCE);
 
     expect(second.map((one) => one.erasureRequestId)).toEqual([erased.erasureRequestId]);
-    // The row the first replay left, unmoved: the same pseudonym, the same completion, the same
-    // report — which is what makes a restore that is run twice a restore run once.
+
     expect(await erasureRowsIn(scenario.workspaceId)).toEqual(after);
-    // And the request itself, which is the row a replay from a copy *writes*: a second pass
-    // re-creates nothing and moves no clock, so an operator who reran the command after a
-    // failure has re-applied an erasure that was already applied and changed no row doing it.
+
     expect(await subjectRowsIn(scenario.workspaceId)).toEqual(subjects);
     const ledger = await ledgerRowsOf(db().pool, scenario.workspaceId, REPLAYED);
-    // One row per run and never one per request: two restores of one workspace are two
-    // occasions on which the estate re-applied an erasure, and a ledger that recorded the
-    // second as already known would record what the platform believes and not what it did.
-    // It is also what repairs the gap above — the run that lost its row lands one here.
+
     expect(ledger.map((row) => row.subject_id)).toEqual([
       erased.erasureRequestId,
       erased.erasureRequestId,
@@ -490,10 +395,7 @@ describe("a second replay of the same request", () => {
 describe("a request whose routine will not run", () => {
   it("stops the replay where it stands, rather than carrying on to the ones behind it", async () => {
     const scenario = await arrange();
-    // A workspace whose rows a dump carries and whose **repository** the restore has not put
-    // back: the erasure routine rewrites a history that is not there, and fails. This is what
-    // the estate looks like when the git store is restored after the replay instead of before
-    // it, which is the ordering ADR 0022 gains this ticket's amendment for.
+
     const stranded = await seedingWith(db().pool, (seed) => seed.workspace());
     const first = await completedInTheRows(stranded.id, STOPS_AT);
     const second = await completedInTheRows(scenario.workspaceId, AFTER_THE_STOP_AT);
@@ -503,37 +405,19 @@ describe("a request whose routine will not run", () => {
     });
 
     expect(replayed.ok).toBe(false);
-    // The refusal names the request it stopped at, because an operator reads it halfway through
-    // a restore and has to know where the estate stands.
+
     if (replayed.ok) throw new Error("the replay did not stop");
     expect(String(replayed.error)).toContain(first.erasureRequestId);
     expect(String(replayed.error)).toContain("after replaying 0");
-    // It stopped where the routine met the missing history, not at the boundary: an id this
-    // slice refused to read would be the arrangement failing and not the sentence under test.
+
     expect(String(replayed.error)).toContain("not a git repository");
-    // And the one behind it did not run: a restore that skipped a failure and carried on would
-    // hand `api` a healthy estate with one erasure undone.
+
     expect(await ledgerRowsOf(db().pool, scenario.workspaceId, REPLAYED)).toEqual([]);
     expect(await ledgerRowsOf(db().pool, stranded.id, REPLAYED)).toEqual([]);
     expect(second.erasureRequestId).not.toEqual(first.erasureRequestId);
   });
 });
 
-/**
- * The copy is a **replay's input**, so it carries the person the routine acted on rather than
- * the person the request named — and the two are not always one.
- *
- * An Admin may record an erasure for somebody they hold a contact address for and no login to
- * point at, leaving `person_id` null because that is what they knew; the map then resolves the
- * subject from the identifier set and step 5 pseudonymises a real user row. A copy written from
- * the request's own column would re-create, on a restore from a dump older than the request, a
- * request that names nobody — and the routine that ran from it would be answering for an erasure
- * it could no longer see the person in. The completion's ledger detail is built from the map for
- * the same reason.
- *
- * It is last in the file because its window is the last one: the instants run forward in
- * declaration order, and a completion this leaves behind must be ahead of every `since` above.
- */
 describe("the replay copy for a request named by address alone", () => {
   it("carries the person the map found, and not the nobody the request's own column names", async () => {
     const scenario = await arrange();
@@ -543,7 +427,7 @@ describe("the replay copy for a request named by address alone", () => {
       seed.subjectRequest({
         workspaceId: scenario.workspaceId,
         kind: "erasure",
-        // A whole answer and not an absence: the Admin had an address and no login.
+
         personId: null,
         identifiers: { emails: [email], names: ["Priya Anand"], other: [] },
       }),
