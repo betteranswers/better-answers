@@ -44,8 +44,8 @@ function RouteRow(properties: { readonly route: WorkspaceRoute }) {
         <>
           <p className="mt-2">
             {/*
-              Nothing here is a second pane, a modal or a tooltip: a reader can lose the
-              outline without losing the meaning.
+              Nothing here is a second pane, a modal or a tooltip; the badge's outline is
+              decoration a reader can lose without losing the meaning.
             */}
             <Badge variant="outline">Fixed</Badge>{" "}
             {route.dimensions === null ? null : (
