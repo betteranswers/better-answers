@@ -1,0 +1,119 @@
+.claude/skills/browser-suite/SKILL.md
+  s_c56f1a31cc620f::t_1675a0f7f0d6d7 52
+  s_c56f1a31cc620f::t_237a0aa966d3e3 9
+  s_c56f1a31cc620f::t_96f1d6b38d2c9c 121
+  s_c56f1a31cc620f::t_d184f78ae8f6d4 77
+  s_c56f1a31cc620f::t_6cde3cf37e5b43 83
+packages/devtools/lifts/anti-slop/THIRD_PARTY_NOTICES.md
+  s_c56f1a31cc620f::t_b8857533389a15 12
+  s_c56f1a31cc620f::t_87343e1b28e08c 65
+packages/devtools/python/ruff.toml
+  s_c56f1a31cc620f::t_282b904ba5c4f0 1-8
+docs/operations/SECRETS.md
+  s_c56f1a31cc620f::t_defeb45a134f29 7
+  s_c56f1a31cc620f::t_3281f0700ebe5a 19
+  s_c56f1a31cc620f::t_9df3b980bc59ac 11
+  s_c56f1a31cc620f::t_c0ba174ad669f6 30
+apps/web/src/shared/ui/THIRD_PARTY_NOTICES.md
+  s_c56f1a31cc620f::t_9d7ff64d98671a 10
+  s_c56f1a31cc620f::t_e6a1241cc1f4b5 4
+  s_c56f1a31cc620f::t_52628c78da5219 32
+  s_c56f1a31cc620f::t_bb2acdd91a492f 95
+  s_c56f1a31cc620f::t_ded2421a6054a1 110-111
+CODING_RULES.md
+  s_c56f1a31cc620f::t_15b95ed9ba7941 99,101-102,104,106-108
+package.json
+  s_c56f1a31cc620f::t_124fc0292e8e28 8
+apps/api/lifts/better-auth-cimd-node/index.ts
+  s_c56f1a31cc620f::t_3da192537d40b6 8-9
+  s_c56f1a31cc620f::t_3378f14936b0c4 107-108
+  s_c56f1a31cc620f::t_daf3113d3b6511 149-150
+cubic.yaml
+  s_c56f1a31cc620f::t_655b01c5d6bce2 128
+  s_c56f1a31cc620f::t_fbedbbac5d9c5b 131
+  s_c56f1a31cc620f::t_1fa3b2196854e3 57
+  s_c56f1a31cc620f::t_24332f3eee36c9 34-43,46
+  s_c56f1a31cc620f::t_7fa7600c21abbb 150
+docs/architecture/c4-containers.md
+  s_c56f1a31cc620f::t_8d42aa91c487a0 61
+CONTEXT.md
+  s_c56f1a31cc620f::t_88e8eaee216833 335
+  s_c56f1a31cc620f::t_cef2f96c2d0e22 96
+  s_c56f1a31cc620f::t_6f822d14a9ca74 656
+  s_c56f1a31cc620f::t_09bb7ac2e7c21a 714
+  s_c56f1a31cc620f::t_ba486f73c27b33 564
+  s_c56f1a31cc620f::t_1f518c6757b946 72
+docs/agents/mutation-triage.md
+  s_c56f1a31cc620f::t_5a0beefd464b31 25
+packages/devtools/src/comment-density.ts
+  s_c56f1a31cc620f::t_f8cb0be1e2934d 37,40-41
+  s_c56f1a31cc620f::t_5178302e6aa91d 38-39
+packages/design-system/readme.md
+  s_c56f1a31cc620f::t_f52c03dee96619 116
+  s_c56f1a31cc620f::t_9cdfac4ca8cdbd 178
+  s_c56f1a31cc620f::t_9ff2c9ae69e9ab 186
+  s_c56f1a31cc620f::t_cfb8f376220361 212
+  s_c56f1a31cc620f::t_09eb67a593ff18 266
+  s_c56f1a31cc620f::t_f5e15ca7aa20ad 259
+  s_c56f1a31cc620f::t_118069e036ed52 16
+apps/api/tests/coding-rules-tags.test.ts
+  s_c56f1a31cc620f::t_5006a7680918ad 159-160
+  s_c56f1a31cc620f::t_5700fa1e42ddd6 20,38-44,47,51-128,156-157,161-163,165,167,171-175,178-179,183-185,188,201-202,204-209,211-212,238-240,243-244
+  s_c56f1a31cc620f::t_beb87f4cd476f8 216-219,221-222
+  s_c56f1a31cc620f::t_252c8889df2c6f 21
+  s_c56f1a31cc620f::t_b155c278bba009 186,190-195,198-200
+  s_c56f1a31cc620f::t_41832af6f48e99 15-16
+  s_c56f1a31cc620f::t_4969afff83d966 49-50
+docs/okf-v02.md
+  s_c56f1a31cc620f::t_2c7e4695dfe25d 41
+  s_c56f1a31cc620f::t_c1b99b1c8fc0a3 21
+.oxlintrc.json
+  s_c56f1a31cc620f::t_e9be3a12bfcd55 205-206
+  s_c56f1a31cc620f::t_3e0fde1b6b375a 444
+  s_c56f1a31cc620f::t_624cd2784d9474 212-213
+  s_c56f1a31cc620f::t_f5c83cfe79136e 211
+  s_c56f1a31cc620f::t_81165059767112 64-65
+  s_c56f1a31cc620f::t_8dbcf29f3db419 345
+  s_c56f1a31cc620f::t_43d3e16dc36a8f 388
+  s_c56f1a31cc620f::t_d9e59576c491ee 219-220
+  s_c56f1a31cc620f::t_f8bf41c8a45fe2 101
+  s_c56f1a31cc620f::t_3cdf1a67bd8185 209
+  s_c56f1a31cc620f::t_6046fcd104de66 7-8
+  s_c56f1a31cc620f::t_2bcc7dcdcb4a96 210
+packages/devtools/test/comment-density.test.ts
+  s_c56f1a31cc620f::t_f2609ffbbed7cf 5
+  s_c56f1a31cc620f::t_15f7b9250cfa36 48-51
+docs/operations/BACKUPS.md
+  s_c56f1a31cc620f::t_db0fc6abcd9562 31
+packages/devtools/README.md
+  s_c56f1a31cc620f::t_bb403d9833cf56 153-155
+  s_c56f1a31cc620f::t_e749efc8f4bc40 108-117
+  s_c56f1a31cc620f::t_37a63f9ee752a4 83
+  s_c56f1a31cc620f::t_4761a47036c2e0 74
+  s_c56f1a31cc620f::t_0d1b32415e6935 94-96
+  s_c56f1a31cc620f::t_238e55e781c756 92
+  s_c56f1a31cc620f::t_97b16693f235b9 146-148
+packages/devtools/package.json
+  s_c56f1a31cc620f::t_ff93f5c521cf3e 17-20
+apps/api/lifts/better-auth-cimd-node/THIRD_PARTY_NOTICES.md
+  s_c56f1a31cc620f::t_b4839bc63647c7 6
+  s_c56f1a31cc620f::t_0a99ea193f6879 23
+docs/architecture/c4-components-api.md
+  s_c56f1a31cc620f::t_fcc06672e14886 66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "260207c29387c44d966fbaace750b5548bc373c2",
+  "prompts": {},
+  "sessions": {
+    "s_c56f1a31cc620f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8ac1ca55-d3f6-48b9-8be8-5a25b6a547f2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
