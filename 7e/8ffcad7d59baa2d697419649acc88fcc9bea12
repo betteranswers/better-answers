@@ -1,0 +1,19 @@
+CONTEXT.md
+  s_2d2203e457a251::t_78b8168341b9ec 270-272
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7e8ffcad7d59baa2d697419649acc88fcc9bea12",
+  "prompts": {},
+  "sessions": {
+    "s_2d2203e457a251": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe3e0651-9854-446f-a8b2-03dd6bc90d60",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
