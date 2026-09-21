@@ -9,8 +9,8 @@ still draft.
 Three knowledge layers, named and never aggregated: **sources** (evidence — connected and
 indexed, or referenced and read live) → **bundles** (OKF concepts: the curated map) → **graph** (derived from the bundles
 and records; queryable). **Records** are what the platform itself keeps — guides,
-compositions, usage, bindings, audit — citing concepts, never restating them; their families
-are fixed by ADR 0014 (ticket 16). Where a unit lives is decided by **minting** (ADR 0011).
+compositions, usage, bindings, audit — citing concepts, never restating them. 
+Where a unit lives is decided by **minting**.
 
 - **knowledge layer** — one of sources, bundles, graph. Records are not a layer.
 - **minting** — deciding where a unit of knowledge lives: a concept when a company with no
@@ -803,12 +803,12 @@ to it by IRI and never restates it (ADR 0014).
 
 ## The route
 
-How the work from the foundation to a finished v0.1 is cut and ordered (T-112, 09/09/2026).
+How the work from the foundation to a finished v0.1 is cut and ordered.
 
 - **route spec** — the one document that holds the way to a finished v0.1: the `/to-spec` head
   over the vision's v0.1 row, then the *blocks* in order, each with its edges and the obligations
-  it carries, and a status table that is the product frontier every session reads first. Never
-  ticketed; each block is specced and ticketed from it. A Wayfinder map is charted only for a
+  it carries, and a status table that is the product frontier every session reads first. 
+  Each block is specced and ticketed from it. A Wayfinder map is charted only for a
   destination the route spec does not already hold. _Avoid_: roadmap, plan, master spec.
 - **block** — one section of the route spec: a destination a session can pick, about a page — the
   ADRs and words it rests on, what in the tree it builds on, what it must carry, its blocking
@@ -818,16 +818,9 @@ How the work from the foundation to a finished v0.1 is cut and ordered (T-112, 0
 - **strand** — one chain of blocks the route spec orders by their edges, worked in parallel with the
   other: the *knowledge strand* (a document to a passage, an answer, the producer) and the
   *records strand* (guides, suggestions). A block belongs to one strand; a cross-strand edge is
-  stated on the block. Not a *lane*, which is a queue the tracker keeps (`docs/agents/issue-tracker.md`).
+  stated on the block.
   _Avoid_: lane, track, path (the write path, the answer path).
-- **hygiene lane** — the off-route queue: an ordna task tagged `hygiene` that `/triage` has judged
-  worth doing and that belongs to no block, picked when a route block is blocked or a session is
-  short. A finding — from a gate, a mutation run, a review or an agent's attempt at a ticket —
-  enters the tracker tagged `needs-triage` and reaches this lane only through `/triage`; it never
-  lands here directly and never charts a map (amended 19/09/2026; until then a finding was cut
-  straight to the lane, and 39 of 62 such tasks were the ticket's own work). _Avoid_: tech debt,
-  chores, follow-ups.
 - **Coordinator** — the one session that owns a `/goal` over a set of ordna tasks and works it
   to its end state: it dispatches each task to an agent with a context of its own — in a
   worktree, beside others in parallel — reads what comes back, and decides what runs next.
-  Settled 19/09/2026 in the workflow grill. _Avoid_: orchestrator, ralph.
+   _Avoid_: orchestrator, ralph.

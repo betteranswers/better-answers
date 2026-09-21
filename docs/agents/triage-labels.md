@@ -23,8 +23,4 @@ ordna list -t ready-for-agent
 
 Retagging an existing task means editing its `tags` list — ordna's CLI has no `tag` subcommand, so a retag goes through the task's frontmatter via `ordna` (or the TUI, `ordna board`). Keep the domain tags already in use (`gate`, `docs`, `build`, `ops`, `spike`, `licensing`) alongside the triage tag; they answer different questions.
 
-`wontfix` is a tag, not a status — ordna's statuses are exactly `todo` · `doing` · `done`, and a task nobody will do stays `todo` tagged `wontfix` rather than being forced to `done`.
-
-On a **discovery** ticket in `.scratch/<effort>/issues/`, the same five strings go on the `Status:` line alongside `claimed`/`resolved`.
-
-Edit the right-hand column to match whatever vocabulary you actually use.
+`wontfix` is a tag, not a status — add the tag and then update the status to `archived`.

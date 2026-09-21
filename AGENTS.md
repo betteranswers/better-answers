@@ -1,11 +1,11 @@
 # AGENTS.md
 
-A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers — **sources** (evidence) → **bundles** (OKF concepts: the curated map) → **graph** (derived) — and **records** (guides, compositions, usage, bindings, audit) the platform keeps over them, citing concepts. The destination this repo builds towards: `docs/vision.md`. Two runtime tiers sharing four stores — Postgres, an object store, a git repository per workspace, and the graph as Postgres tables under RLS — and never code. The way to v0.1 is the **route spec**, `docs/specs/v01-route.md`; the map it was cut from (`.scratch/v01-spec/map.md`) is resolved and closed.
+A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers — **sources** (evidence) → **bundles** (OKF concepts: the curated map) → **graph** (derived) — and **records** (guides, compositions, usage, bindings, audit) the platform keeps over them, citing concepts. The destination this repo builds towards: `docs/vision.md`. Two runtime tiers sharing four stores — Postgres, an object store, a git repository per workspace, and the graph as Postgres tables under RLS. The way to v0.1 is the **route spec**, `docs/specs/v01-route.md`; the map it was cut from (`.scratch/v01-spec/map.md`) is resolved and closed.
 
 ## Read first
 
-- `docs/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block; a block goes to `/to-spec` before its build and `/to-tickets` after; a Wayfinder map is charted only for a destination the route does not hold.
-- `CONTEXT.md` — the glossary. Name things in code, tests, docs and commits with its words; a new domain word is settled there *before* it appears in code.
+- `docs/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block; a block goes to `/to-spec` before its build and `/to-tickets` after.
+- `CONTEXT.md` — the glossary. Name things in code, tests, docs and commits with its words.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open and where each lands here; read before adding a key, convention or feature that relates to the knowledge layer.
 - `CODING_RULES.md` — the constitution: every rule that binds work in this repo. A workspace's own rules live in `apps/api/CODING_RULES.md`, `apps/web/CODING_RULES.md` and `apps/worker/CODING_RULES.md`.
 - `docs/adr/` — why the architecture is the way it is. Start at `docs/adr/README.md`, the one-line live-conclusion index (updated in the same commit as any ADR change). Read the ADR a change touches before touching it; a change that contradicts one is a new ADR, never a quiet edit.
@@ -16,36 +16,36 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers �
 
 | Path | What it is |
 | --- | --- |
-| `apps/api/` | The one TypeScript deployable — Hono on Node 24. Transports only: tRPC, the MCP surface, the authorization server and the SPA's static build on one origin (ADR 0034), the `pnpm ops` commands and the reconciler's tick. No app↔worker HTTP — the control plane is rows (ADR 0005). OpenAPI is generated and unmounted (T-014); `/agent/v1` is unbuilt |
-| `apps/web/` | Vite React single-page app; talks to `apps/api/` over tRPC only — the one exception, invitation-accept on the Better Auth client, arrives with the route's P1 |
-| `apps/worker/` | Python 3.13 knowledge worker (uv): the work loop, the nightly parser audit and the full rebuild. Connectors, conversion, indexing and extraction arrive with the route's S1 onward, composing cocoindex (ADR 0036) |
+| `apps/api/` | The one TypeScript deployable — Hono on Node 24. Transports only: tRPC, the MCP surface, the authorization server and the SPA's static build on one origin, the `pnpm ops` commands and the reconciler's tick. No app↔worker HTTP — the control plane is rows |
+| `apps/web/` | Vite React single-page app; talks to `apps/api/` over tRPC only |
+| `apps/worker/` | Python 3.13 knowledge worker (uv): the work loop, the nightly parser audit and the full rebuild. Connectors, conversion, indexing and extraction arrive with the route's S1 onward, composing cocoindex |
 | `packages/core/` | The business logic `apps/api` calls — capability slices over four store doors. Transport-agnostic, and lint-enforced as such |
-| `packages/devtools/` | The repository's own gate tooling — the throwaway-tree runner every gate's test runs its tool through, the lint rules, the anti-slop lift, the mutation probe and summary; its README lists them. Imported, never deployed |
+| `packages/devtools/` | The repository's own gate tooling — the throwaway-tree runner every gate's test runs its tool through, the lint rules, the anti-slop lift, the mutation probe and summary; its README lists them. |
 | `packages/` | The rest of the shared TypeScript: `schema`, `design-system` |
-| `contracts/` | The tier contract's language-neutral fixtures — both tiers' suites read it, nothing imports it (ADR 0031) |
+| `contracts/` | The tier contract's language-neutral fixtures — both tiers' suites read it, nothing imports it |
 | `docs/adr/` | Architecture decision records |
 | `docs/architecture/` | The C4 diagrams — context, containers, three component views, deployment, three flows — a reading of the tree, redrawn by `/c4-architecture` after any review that moves the shape; its README maps each route block to the containers and components it touches |
 | `docs/specs/` | `<ticket>.md` is a ticket's spec and `v01-route.md` the route |
 | `docs/operations/` | Public-facing ops documents; non-public facing documents are under `.planning/estate/` |
 | ordna | The work queue — tasks as git namespace refs (`refs/ordna/tasks/<id>`), not files |
 | `deploy/` | Compose files and deployment configuration |
-| `.cubic/wiki/` | Cubic's generated wiki: orientation only, never authority (`docs/agents/code-review.md`) |
+| `.cubic/wiki/` | Cubic's generated wiki |
 
-Commands, versions and scripts are read from each workspace's `package.json` or `pyproject.toml`; this file does not repeat them. Every workspace exposes `check` (lint, types, tests) unless a test names it as having nothing to run; one `check` runs every step it has and names all that failed, and the root `check` runs them all.
+Commands, versions and scripts are read from each workspace's `package.json` or `pyproject.toml`. Every workspace exposes `check` (lint, types, tests) unless a test names it as having nothing to run; one `check` runs every step it has and names all that failed, and the root `check` runs them all.
 
 ## Skills
 
-`/to-spec` before a block's build and `/to-tickets` after; `/implement` for every ticket, end to end (`docs/agents/workflow.md`); `/grilling` and `/domain-modeling` for any design conversation; `/codebase-design` when shaping a module; `/tdd` for red–green work; `/writing-for-agents` when editing any file; `/diagnosing-bugs` for anything broken or slow; `/browser-suite` for any Playwright spec under `apps/web/e2e/`; `/better-answers-design` for anything a person will look at; the api's tRPC skills under `apps/api/.claude/skills/` for any procedure, link or adapter in `apps/api/` (the transport rule in `apps/api/CODING_RULES.md`); `/c4-architecture` when an architecture review has moved the shape and the diagrams must say so. Other skills are available, co-located where they are most often utilised e.g., `apps/worker/.claude/skills/`, `apps/web/.claude/skills/`. If a task has a skill associated to it, use it to ensure best practice e.g., coolify and Hono skills for deployment, cocoindex for pipeline, better-auth for authentication etc.
+`/grill-with-docs` and `/domain-modeling` for any design conversation; `/codebase-design` when shaping a module; `/tdd` for red–green work; `/writing-for-agents` when editing ANY file; `/diagnosing-bugs` for anything broken or slow; `/browser-suite` for any Playwright spec under `apps/web/e2e/`; `/better-answers-design` for anything a person will look at; the api's tRPC skills under `apps/api/.claude/skills/` for any procedure, link or adapter in `apps/api/`; `/c4-architecture` when an architecture review has moved the shape and the diagrams must say so. Other skills are available, co-located where they are most often utilised e.g., `apps/worker/.claude/skills/`, `apps/web/.claude/skills/`. If a task has a skill associated to it, use it to ensure best practice e.g., coolify and hono skills for deployment, cocoindex for worker/pipeline, better-auth for authentication etc.
 
 ## Agent skills
 
 ### Issue tracker
 
-Build tasks live in **ordna** (`storage: namespace` — git blobs at `refs/ordna/tasks/<id>`, no files on disk; use the `ordna` CLI), cut from a block of the route spec; wayfinding maps and their tickets live as markdown under `.scratch/<effort>/`. A body edit or a new task is pushed to **origin first**, then set locally: an open board auto-fetches every minute and reverts a local-only ref. Procedure in `docs/agents/issue-tracker.md`.
+Build tasks live in **ordna** (`storage: namespace` — git blobs at `refs/ordna/tasks/<id>`, no files on disk; use the `ordna` CLI), cut from a block of the route spec. A body edit or a new task is pushed to **origin first**, then set locally: an open board auto-fetches every minute and reverts a local-only ref. Procedure in `docs/agents/issue-tracker.md`.
 
 ### Workflow
 
-A set of ordna tickets is built under one `/goal` in one session, the Coordinator: one agent per ticket runs `/implement` end to end and fixes what its own `/code-review` finds; one PR per ticket into `main`, CI's root `check` the arbiter. The steps, the goal's shape and what `check` runs where are `docs/agents/workflow.md`.
+A set of ordna tickets is built under one `/goal` in one session, the Coordinator: one agent per ticket runs `/implement` end to end and fixes what its own `/code-review` finds; PR into `main`, CI's root `check` the arbiter. The steps, the goal's shape and what `check` runs where are `docs/agents/workflow.md`.
 
 ### Triage labels
 
@@ -61,7 +61,7 @@ A survivor is a hypothesis until a probe answers it: controls both ways, the who
 
 ### Code review
 
-Cubic reviews every PR and its findings are triaged through the `cubic` MCP on the PR threads, one commit per round, three rounds at most — **paused since 10/09/2026** at the plan's limit, the substitute being the `/code-review` that ends every agent's `/implement` and CI on the ticket's PR (`docs/agents/workflow.md`); GitNexus gates every edit and commit; the wiki orients and never decides. The loop is `docs/agents/code-review.md` — read it before opening a PR.
+Cubic reviews every PR and its findings are triaged through the `cubic` MCP on the PR threads, one commit per round, three rounds at most — **paused since 10/09/2026** at the plan's limit. GitNexus gates every edit and commit. The loop is `docs/agents/code-review.md` — read it before opening a PR.
 
 ## Code Exploration Policy
 
@@ -91,7 +91,7 @@ This server runs the **front door** surface: three tools reach every jCodeMunch 
 
 **Announce your model once per session** so the server can size its answers: `announce_model { "model": "<your-model-id>" }`.
 
-**From a worktree, two indexes.** jCodeMunch reads the worktree's own index, which the create hook builds, so it sees this branch's uncommitted edits. GitNexus reads the main checkout's, taken at its last `analyze`, which runs in the main checkout only — the runner is absent from a worktree — after every merge to `main`. So `detect_changes` from a worktree takes `repo: "better-answers"` **and** `worktree: <the worktree's absolute path>`; and an `impact` that answers *ambiguous* is re-run by `target_uid` before its risk counts. `rename` has no `worktree:` parameter: it reads **and writes** the main checkout's files, and its answer names no tree. So from a worktree `rename` stays a dry run (`dry_run: true`, its default) — its edit list names the sites, by the main checkout's line numbers; each is applied in the worktree with `Edit`; and a jCodeMunch `search_text` for the old name, which sees what this branch added since the last `analyze`, comes back empty before the rename counts as done. Prose is in neither index — jCodeMunch indexes no markdown and GitNexus holds headings only — so a search across documents is a shell `grep`, with that reason said.
+**From a worktree, two indexes.** jCodeMunch reads the worktree's own index, which the create hook builds, so it sees this branch's uncommitted edits. GitNexus reads the main checkout's, taken at its last `analyze`, which runs in the main checkout only — the runner is absent from a worktree — after every merge to `main`. So `detect_changes` from a worktree takes `repo: "better-answers"` **and** `worktree: <the worktree's absolute path>`; and an `impact` that answers *ambiguous* is re-run by `target_uid` before its risk counts. `rename` has no `worktree:` parameter: it reads **and writes** the main checkout's files, and its answer names no tree. So from a worktree `rename` stays a dry run (`dry_run: true`, its default) — its edit list names the sites, by the main checkout's line numbers; each is applied in the worktree with `Edit`; and a jCodeMunch `search_text` for the old name, which sees what this branch added since the last `analyze`, comes back empty before the rename counts as done.
 
 ## Doc Exploration Policy
 
@@ -117,13 +117,13 @@ Always use jDocMunch-MCP tools for documentation navigation. Never fall back to 
 
 <!-- gitnexus:start -->
 <!-- gitnexus:keep -->
-# Code Intelligence Policy
+## Code Intelligence Policy
 
 This project is indexed by GitNexus as **better-answers**. Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner.
 
-## Always Do
+### Always Do
 
 - **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
 - **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
@@ -131,14 +131,14 @@ This project is indexed by GitNexus as **better-answers**. Use the GitNexus MCP 
 - When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
 - For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
 
-## Never Do
+### Never Do
 
 - NEVER edit a function, class, or method without first running `impact` on it.
 - NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
 - NEVER rename symbols with find-and-replace — use `rename` which understands the call graph. From a worktree it stays a dry run and its edits are applied by hand: *From a worktree, two indexes*, above.
 - NEVER commit changes without running `detect_changes()` to check affected scope.
 
-## Resources
+### Resources
 
 | Resource | Use for |
 |----------|---------|
@@ -147,7 +147,7 @@ This project is indexed by GitNexus as **better-answers**. Use the GitNexus MCP 
 | `gitnexus://repo/better-answers/processes` | All execution flows |
 | `gitnexus://repo/better-answers/process/{name}` | Step-by-step execution trace |
 
-## CLI
+### CLI
 
 | Task | Read this skill file |
 |------|---------------------|
