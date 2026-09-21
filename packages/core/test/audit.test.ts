@@ -30,7 +30,7 @@ const loadEveryEntryPoint = async (): Promise<void> => {
   );
   for (const relative of Object.values(manifest.exports)) {
     const file = pathToFileURL(path.resolve(path.dirname(PACKAGE_JSON), relative)).href;
-    await import(file);
+    await import(/* @vite-ignore */ file);
   }
 };
 
@@ -123,8 +123,7 @@ describe("the declared-acts walk", () => {
 
   it("refuses an act declared under a family that is not its first word", () => {
     expect(() =>
-      // @ts-expect-error — a people act cannot be declared as a platform act; held at
-
+      // @ts-expect-error — the runtime half of what the type already refuses.
       declareActs("platform", { added: act("people.member.added", {}) }),
     ).toThrow(/not a platform act/);
   });
@@ -398,6 +397,8 @@ describe("the first door — record, the actor derived from the Principal", () =
         subjectId: adminUserId,
         detail: { adminUserId: "priya@example.invalid", role: "Admin", confirmed: true },
       }),
+      // The end anchor tells this message from the optional kind's, which is this plus ", or
+      // absent"; unanchored, both read green.
     ).rejects.toThrow(/adminUserId is not an id$/);
     await expect(
       write({

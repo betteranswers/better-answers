@@ -126,6 +126,8 @@ describe("the graph under concurrent read load", () => {
     });
     if (!queued.ok) throw new Error(`the rebuild was not queued: ${String(queued.error)}`);
 
+    // The whole hop's wall clock, boot included: over-counting is the safe direction for a
+    // promise.
     const started = performance.now();
     await runWorkerOnce(db().connectionUri, bundles().root, "graph-budget");
     const wallClockMs = performance.now() - started;

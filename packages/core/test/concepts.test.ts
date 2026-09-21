@@ -182,6 +182,8 @@ describe("a governed write", () => {
       ].join("\n"),
     );
 
+    // Written down, never computed here: an expectation this act's own hash produced would
+    // agree with any canonicalisation at all, the Python tier's included.
     expect(written.contentHash).toBe(
       "16f6c6993084b35862434bc90dece1fb2c2669cbddc21c910bdcd95bef0dcecc",
     );
@@ -722,6 +724,8 @@ describe("the map a governed write leaves behind", () => {
   it("keeps mapping an Editor's links past long unmatched backtick runs in the body", async () => {
     const scenario = await arrange();
 
+    // The middle paragraph's size and shape are what a rescanning pairing chokes on: many
+    // distinct unpaired lengths, then many paired short runs.
     const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
       body: [
         "# Details",
@@ -1072,6 +1076,8 @@ describe("what a re-write of an existing concept may not move", () => {
   });
 });
 
+// Bound here, never Postgres's now(): issuance is stamped by this process, and a second clock
+// would order events milliseconds apart by drift.
 const REVOCATIONS = {
   here: {
     statement:
@@ -1338,6 +1344,8 @@ describe("the per-repository lock", () => {
     const scenario = await arrange();
     await landed(scenario, writeFor());
 
+    // A failure the act meets inside the lock; one decided before the lock is taken would
+    // prove nothing about releasing it.
     const failed = await write(scenario, scenario.editor, writeFor({ expects: { head: null } }));
     expect(failed).toEqual({ ok: false, error: "stale-precondition" });
 

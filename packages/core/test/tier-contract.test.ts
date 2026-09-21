@@ -15,6 +15,8 @@ import { boundarySchemas, ULID_PATTERN } from "@better-answers/schema";
 
 import { ulid } from "../src/kernel/index.ts";
 
+// Version and agreements hardcoded on purpose, never read from a shared constant: that is
+// what fails a tier not yet taught a contract change.
 const SPOKEN_CONTRACT_VERSION = 9;
 const SPOKEN_AGREEMENTS = {
   "concept-file": "fixtured",

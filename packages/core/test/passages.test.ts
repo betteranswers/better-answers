@@ -177,6 +177,8 @@ const BOARD_TITLE = "The board's note";
 const BOARD_TEXT = "The board's note on the bid.";
 const BOARD_CHAR_END = 28;
 
+// Two bare words on purpose: to_tsquery raises a syntax error on prose, so this query breaks
+// a read that drops websearch_to_tsquery.
 const QUERY = "holiday policy";
 
 const HANDBOOK = {
@@ -514,6 +516,8 @@ const bindingUnderReview = (
     }
   });
 
+// Both documents hold a chunk matching the words the search asks, so the empty answer below
+// is the published arm, not an unmatched query.
 const seedTheBindingUnderReview = (workspaceId: string): Promise<void> =>
   bindingUnderReview(workspaceId, REVIEW_BINDING, [
     {

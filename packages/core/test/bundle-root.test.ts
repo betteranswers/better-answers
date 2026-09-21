@@ -26,6 +26,8 @@ const PLATFORM: PlatformPrincipal = {
 
 const WORKSPACE = "01K4TEARDOWN000000000000";
 
+// What lets the case go red: a teardown that never waits has finished several times over
+// before the second write lands.
 const ACT_PAUSE_MS = 250;
 
 const OBJECTS_NOBODY_WAITS_FOR = 400;

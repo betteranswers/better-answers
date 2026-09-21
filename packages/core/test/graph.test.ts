@@ -336,6 +336,8 @@ describe("the delta a second commit runs", () => {
   it("keeps an inbound link's denormalised kind in step when the target's own kind moves", async () => {
     const { scenario, product, policy } = await linkedPair();
 
+    // The target lands first: a newly mapped concept re-derives every file naming it, which
+    // would carry the new kind whether or not the sync ran.
     await land(scenario, deltaOf(product));
     await land(scenario, deltaOf(policy));
 

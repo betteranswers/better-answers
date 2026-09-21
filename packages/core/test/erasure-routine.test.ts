@@ -63,6 +63,8 @@ const BEYOND_USE = {
   monthly: "2026-12-01T12:00:00.000Z",
 } as const;
 
+// This day tells a day count from a calendar interval: six months on is 28 February, 183
+// days on 2 March.
 const ANCHORED_ON_A_31ST = new Date("2026-08-31T12:00:00.000Z");
 
 const BEYOND_USE_FROM_THE_31ST = {

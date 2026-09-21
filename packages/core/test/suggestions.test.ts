@@ -668,8 +668,7 @@ describe("declining a suggestion", () => {
 
     const nothing = await declineSuggestion(scenario.admin, doorsOf(scenario), {
       suggestionId,
-      // @ts-expect-error — the column is nullable and the boundary mirrors it, so JSON's
-
+      // @ts-expect-error — the column is nullable, so JSON's null parses; the runtime half of what the type says.
       reason: null,
     });
 
@@ -1297,8 +1296,7 @@ describe("what the inbox refuses before it does any work", () => {
       { postgres: scenario.postgres },
       {
         kind: "edit",
-        // @ts-expect-error — a payload is the file an acceptance would commit, and JSON's
-
+        // @ts-expect-error — null is not a frontmatter mapping; the runtime half of what the type says.
         requests: [requestFor({ frontmatter: null })],
       },
     );
