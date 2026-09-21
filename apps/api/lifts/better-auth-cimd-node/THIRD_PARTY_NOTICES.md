@@ -20,7 +20,7 @@ Upstream's transport answers Node's `lookup` in the single-address form only. Si
 
 Remove this directory and import `fetchClientMetadataResource` from `@better-auth/cimd/node` when a released `@better-auth/cimd` carries better-auth/better-auth#10730 (or an equivalent fix that answers `{ all: true }`). The SSRF additions beyond upstream — the timeout, the response cap, the per-host cache — stay with the platform: if upstream still lacks them at removal, they wrap the upstream transport instead.
 
-## The test a refresh must pass, because a lift is contract-tested and never trusted
+## The test a refresh must pass
 
 `apps/api/tests/cimd-fetch.test.ts` — the refusal paths (scheme, method, every non-public address class, timeout, cap, redirect not followed) and the two lookup shapes.
 

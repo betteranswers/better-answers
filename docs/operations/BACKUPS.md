@@ -28,7 +28,7 @@ Everything in `dumps/` is **client-side encrypted with `age`** before upload; th
 | Store | Kind | Why not | Rebuilt by | Budget |
 | --- | --- | --- | --- | --- |
 | The graph (plain tables inside Postgres, ADR 0032) | copied | rides the Postgres dump above — no separate job | `dumps/pg/` | with every dump | as Postgres | yes — source entities from redacted text | `pg_restore`; the rebuild is a repair path, drilled monthly on one workspace |
-| Worker LMDBs (`/data/worker/lmdb/<binding>`) | **personal data on disk** | memoised extraction output; disposable by design (the engine's own store, never rebuilt here; ADR 0005); capped at 4 GB per binding, wiped and reprocessed over it | reprocessing the binding | priced by the extraction plan |
+| Worker LMDBs (`/data/worker/lmdb/<binding>`) | **personal data on disk** | memoised extraction output; disposable by design (ADR 0005); capped at 4 GB per binding, wiped and reprocessed over it | reprocessing the binding | priced by the extraction plan |
 | Worker trees (`/data/worker/trees`) | personal data on disk | checkouts of the bare repositories at a commit | `git clone` from `/data/git` (mounted read-only) | minutes |
 | `/data/backup/staging` | personal data on disk | the local copy before upload — deleted on verified upload; anything older than 24 h is deleted by the next job | — | — |
 | HF cache, embedding models | rebuildable | public model weights | re-download on first warm | minutes |

@@ -18,7 +18,7 @@ Read before proposing any key, writing convention or feature that touches a conc
 
 | The spec is silent on | What the spec and Google's sample do instead | Where it lives here | Ruled by |
 | --- | --- | --- | --- |
-| Supersession — no field, no edge | `status: deprecated` keeps the file; the acme sample names the successor in prose and a link; neo4j-okf infers "one deterministic replacement" from links at query time | A deprecated concept stays in the bundle for history and reproducibility and is not surfaced to new work; **the successor carries the lineage** — a `sources[]` entry or a *Supersedes* line on the new concept, as Google's sample does — and the graph derives the edge from that backward link; the deprecated file changes only its `status` (Liam, 26/08/2026) | Ticket 23 fixes the exact form; never an extension key (concept files stay spec-pure) |
+| Supersession — no field, no edge | `status: deprecated` keeps the file; the acme sample names the successor in prose and a link; neo4j-okf infers "one deterministic replacement" from links at query time | A deprecated concept stays in the bundle for history and reproducibility and is not surfaced to new work; **the successor carries the lineage** — a `sources[]` entry or a *Supersedes* line on the new concept, as Google's sample does — and the graph derives the edge from that backward link; the deprecated file changes only its `status` (Liam, 26/08/2026) | Ticket 23 fixes the exact form; never an extension key |
 | Conflicting claims | Not modelled; neo4j-okf: "conflict *detection* is a query; resolution is human" | `conflict` records raised at extraction, never resolved by the pipeline; the answer path shows both values with their sources | ADR 0003 amendment; ADR 0014 (`conflict` records); ticket 20 |
 | Context (a claim true only in one setting) | Prose and links | A claim that differs by context is a separate concept (atom-boundary rule) linked to the context it holds in; the graph carries the edge | ADR 0003 |
 | Temporal reasoning beyond `generated.at`, `verified.at`, `stale_after`, `sources[].last_modified` | None — no valid-from, no as-of | Git history plus deprecated concepts kept; "as of" queries are graph/records work beyond v0.1 | Fog |
@@ -38,7 +38,7 @@ Read before proposing any key, writing convention or feature that touches a conc
 - **OKF targets the data layer.** The bundle is the substrate any AI system reads and writes: structured, contextual, portable, machine-readable, and readable by a person in any editor. System-agnostic, so a client can adopt new AI tools against it with confidence.
 - **Two knowledge layers on OKF.** The bundle (concepts, graph-*shaped* through its links) and the graph built on top (queryable, traversable, reasoned over). Everything the spec leaves open is met in the graph and in records — never with keys in the file. The spec's silence on supersession is a boundary, not a gap.
 - **Simplicity is the reason OKF is here.** If a planned feature or piece of infrastructure needs a concept file to carry more than the spec plus `iri` and `locator`, the approach is probably over-complicated; re-evaluate before proceeding.
-- **The file is written for a company with no platform** (the bundle-alone test) and to the spec (spec-pure concept files).
+- **The file is written for a company with no platform** and to the spec.
 
 ## Assumed but not in the spec
 

@@ -4,8 +4,7 @@
   // Both plugins live in packages/devtools, which is imported and never deployed (ADR 0029).
   // A `better-answers` rule names the rule it holds in the message it prints, so a reader who
   // hits it reaches the rule without asking, and lands with a functional test over a throwaway
-  // tree — every gate is run rather than remembered, and apps/api/tests/lint-rules.test.ts
-  // is that test.
+  // tree (apps/api/tests/lint-rules.test.ts is the test).
   "jsPlugins": [
     {
       "name": "anti-slop",
@@ -202,22 +201,21 @@
       //
       // Filenames are kebab-case, so a component's file reads the same on a case-insensitive
       // and a case-sensitive filesystem and a rename is never a no-op commit. This is the
-      // file half of the kebab-case rule; oxlint 1.80 has no rule for a directory's own
-      // name, so the folder half is walked by a test in the workspace instead.
+      // file half of the kebab-case rule; oxlint 1.80 has no rule for a directory's own name, so the
+      // folder half is walked by a test in the workspace instead.
       //
       // `no-restricted-imports` carries the SPA's import shape — three zones and the
       // direction app → features → shared, never back, and no feature reaching another.
-      // oxlint 1.80 has no `import/no-restricted-paths`, so a layering zone cannot be
-      // expressed as "this directory may not reach that one"; it is expressed instead as a
-      // convention a glob *can* read — a relative import stays inside its own directory, and
-      // anything that crosses one is written
+      // oxlint 1.80 has no
+      // `import/no-restricted-paths`, so a layering zone cannot be expressed as "this directory
+      // may not reach that one"; it is expressed instead as a convention a glob *can* read — a
+      // relative import stays inside its own directory, and anything that crosses one is written
       // `@/<zone>/…` (the path alias in `apps/web/tsconfig.json` and `vite.config.ts`). The
       // overrides after this one then name zones rather than counting `../`.
       //
       // Testing-library and jest-dom rules: not enabled, because oxlint 1.80 ships neither
       // plugin (checked against `node_modules/oxlint/configuration_schema.json`, 03/09/2026);
-      // the component suites are held by review and by functional tests through the
-      // interface instead.
+      // the component suites are held by review and by the interface rule instead.
       "files": ["apps/web/**"],
       "rules": {
         "unicorn/filename-case": ["error", { "case": "kebabCase" }],
@@ -342,7 +340,7 @@
     },
     {
       // ADR 0006's one exception, as one line of configuration: this file, `AppRouter`, and
-      // `import type` — the api is a type, in one file.
+      // `import type` (the api is a type and in one file).
       // Everything else the shared override bans stays banned, so a value import
       // of `AppRouter` fails here and an `import type` of it fails in every other file.
       "files": ["apps/web/src/shared/api/trpc.ts"],

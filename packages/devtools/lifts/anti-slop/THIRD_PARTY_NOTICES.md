@@ -9,7 +9,7 @@ Snapshot digest, taken 2026-09-05 and covering the lifted files alone — this f
 of them: `58a028870935703e13ecbd947104f111d4a43cec522613e8803088ebf7f56879`. Reproduced from
 this directory by
 `find . -type f ! -name THIRD_PARTY_NOTICES.md | LC_ALL=C sort | xargs shasum -a 256 | shasum -a 256`.
-Licence: MIT (ADR 0027; read from the upstream `LICENSE` on 2026-09-05, from the source and never from memory;
+Licence: MIT (ADR 0027; read from the upstream `LICENSE` on 2026-09-05;
 the notice text is below).
 Lifted: 2026-08 at repository set-up, as `app/tools/anti-slop/`. Moved unchanged to
 `apps/api/tools/anti-slop/` by T-021 and here by T-065 — a lift is imported and never
@@ -62,7 +62,7 @@ taken and not a ref to diff against. A refresh therefore compares source:
    the same commit.
 4. Record the new digest, the new commit and the date here.
 
-## The test a refresh must pass, because a lift is contract-tested and never trusted
+## The test a refresh must pass
 
 The repository's `check`. Every TypeScript workspace runs `oxlint --config
 ../../.oxlintrc.json .`, which loads this plugin and runs all fifteen rules over that

@@ -69,7 +69,7 @@ Where a unit lives is decided by **minting**.
   gate (ADR 0012). Not a connector, which carries documents rather than making knowledge.
 - **consumer** — an agent or a person that **reads** knowledge and must tolerate what it did not
   expect: an unknown kind, a concept it cannot see, a map that is a moment behind. Every consumer
-  reads through the same predicate and the same audit as any other, on a Principal of its own. Not a client
+  reads through the same predicate and the same audit as any other. Not a client
   (connected), which is the host a consumer arrives through.
 - **Term** — a concept whose subject is *what a word means in this company*, kept in a glossary
   domain: how a kind, a product name or a piece of company language is defined, read by the
@@ -92,8 +92,8 @@ Where a unit lives is decided by **minting**.
   refers to a concept in another.
 - **verify (a concept)** — a human or an agent confirming a concept against its sources in
   the platform, recorded on the concept as a spec `verified` event (`by`, `at`); the content it
-  confirmed is kept platform-side on the verification record, never as a key in the file
-  (concept files stay spec-pure). A human verifier earns *human-reviewed*; an agent earns *machine-confirmed*.
+  confirmed is kept platform-side on the verification record, never as a key in the file.
+  A human verifier earns *human-reviewed*; an agent earns *machine-confirmed*.
   A platform capability, not a repository workflow.
 - **changed since checked** — the state of a concept whose content changed after its
   most recent `verified` event; shown as such, with the earlier event kept, until a human or
@@ -332,7 +332,7 @@ Where a unit lives is decided by **minting**.
 - **extraction template** — the instruction for extracting concepts from one *kind of document*:
   which kinds a document of that kind evidences, and how a claim, its evidence and its locator are
   written for the file. Chosen per document kind in the extraction plan, versioned, and written for
-  the concept file and never for the surface that will read it (the bundle-alone test). There is no design-time
+  the concept file and never for the surface that will read it. There is no design-time
   check against a vocabulary, because there is no vocabulary file (ADR 0026). Not a *template* (a
   platform-shipped guide definition).
 - **publish (a binding)** — the recorded Admin act that lets a binding's chunks and source entities
@@ -711,7 +711,7 @@ to it by IRI and never restates it (ADR 0014).
   OAuth access token. _Avoid_: api key, service account.
 
 - **role (of a person)** — what a person may do on every surface, a **level** never a job title:
-  **Admin**, **Editor** or **Viewer** in v0.1 (the role on the Principal every call carries; Liam, 27/08/2026 — the
+  **Admin**, **Editor** or **Viewer** in v0.1 (the Principal every call carries; Liam, 27/08/2026 — the
   platform is agnostic about who a bid writer is). Editors and Admins check concepts, run
   question sets and save Answers from history; Viewers ask, flag and suggest. _Avoid_: Bid
   writer, Sales (as role names). A guide definition sets, per role, the default layer

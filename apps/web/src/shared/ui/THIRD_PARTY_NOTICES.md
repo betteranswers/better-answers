@@ -6,8 +6,8 @@ This file is that notice. It covers every file under this directory; the tokens,
 and the Tailwind bridge these components read are `packages/design-system`'s and are ours.
 
 Installed **3 September 2026** with `shadcn@4.20.1` and `ai-elements@1.9.0`. A shadcn registry
-item carries no version of its own, so the pin is the CLI, the registry URL and the date
-(versions come from the source, never from memory); `apps/web/components.json` holds the URLs so a refresh lands in the same places.
+item carries no version of its own, so the pin is the CLI, the registry URL and the date;
+`apps/web/components.json` holds the URLs so a refresh lands in the same places.
 
 T-037 added two more items on the same day with the same CLI — `input` and `label`.
 
@@ -29,7 +29,7 @@ Upstream repositories: [shadcn-ui/ui](https://github.com/shadcn-ui/ui) (MIT),
 [vercel/ai-elements](https://github.com/vercel/ai-elements) (Apache-2.0). A shadcn registry item
 carries no commit or version of its own — this is the whole reason the item digest stands in for
 one — so there is no upstream commit to record, and the CLI version and the date are the rest of
-the pin, versions coming from the source and never from memory.
+the pin.
 
 | File | Registry item | Item digest | File digest |
 | --- | --- | --- | --- |

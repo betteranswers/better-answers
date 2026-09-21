@@ -63,4 +63,4 @@ C4Component
 
 ## The skills that bind a change here
 
-A seam sketch touching `apps/api/` names the skill under `apps/api/.claude/skills/` it follows — router, validators, links, non-JSON content types, error handling, subscriptions — and the rule that transport work follows the tier's own tRPC skills binds the build the same way. No second HTTP route is opened beside tRPC for a shape a skill already covers; S1's upload goes over `splitLink` on `isNonJsonSerializable`, and S2's answer stream is a tRPC subscription whose iterable closes over no transaction (probe 2).
+A seam sketch touching `apps/api/` names the skill under `apps/api/.claude/skills/` it follows — router, validators, links, non-JSON content types, error handling, subscriptions — and the tRPC skills rule binds the build the same way. No second HTTP route is opened beside tRPC for a shape a skill already covers; S1's upload goes over `splitLink` on `isNonJsonSerializable`, and S2's answer stream is a tRPC subscription whose iterable closes over no transaction (probe 2).

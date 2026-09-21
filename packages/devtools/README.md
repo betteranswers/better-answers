@@ -80,7 +80,7 @@ line, and runs the script over files.
 The repository's own rules: the ones that hold a rule in `CODING_RULES.md` or an ADR rather
 than a generic hygiene pattern. Loaded by `.oxlintrc.json` as a `jsPlugins` specifier. Each
 rule carries its rule line in the message it prints and lands with a functional test through
-the runner, because a gate is run and never remembered.
+the runner.
 
 Three rules today. The two MCP entry rules hold ADR 0018's line at the declaration and are
 run by `apps/api/tests/lint-rules.test.ts`. `import-direction` holds all five of ADR 0029's
@@ -91,9 +91,8 @@ both ways and over the committed tree.
 
 ## The comment gate — three parts, all in root `check`
 
-The two conditions a scan can read on a comment that gives a reason — a block is 25 words at
-most and cites no ticket id, date, rule tag or ADR number — held by a rule for TypeScript, a
-check for Python and a density
+The comment rule's two conditions — a comment block is 25 words at most and cites no ticket id,
+date, rule tag or ADR number — held by a rule for TypeScript, a check for Python and a density
 ceiling per workspace. Directives and notices are exempt by their opening text everywhere, and
 a directive is dropped before blocks are grouped so it cannot lend a paragraph its exemption.
 Each part carries the rule in the message it prints, and each is proven through the runner
@@ -105,16 +104,9 @@ above, both ways.
 | `python/comment_gate.py` | `pnpm comment-gate:python` | `test/comment-gate-python.test.ts` |
 | `src/comment-density.ts`, behind `scripts/comment-density.mjs` | `pnpm comment-density` | `test/comment-density.test.ts` |
 
-All three are steps of the root `check`, ahead of the tiers, and each landed green with no
-baseline the day the comment strip cleared the tree. The lint rule sits in a config of its own
-rather than in the root one because oxlint switches a plugin rule on from a config's `rules`
-block and from nowhere on the command line — `--deny` does not reach one — and that config
-walks past the anti-slop lift, which is edited upstream and never here.
-
-`python/comment_gate.py` is linted and format-checked by the worker's locked ruff, under
-`python/ruff.toml`, through this workspace's own `lint:python` and `lint:python-format`. It is
-the one Python file outside `apps/worker`, and the worker's environment is the one Python
-toolchain the repository installs.
+All three are root `check` steps, ahead of the tiers, and landed green with no baseline. The
+lint rule sits in a config of its own because oxlint switches a plugin rule on from a config's
+`rules` block and from nowhere on the command line — `--deny` does not reach one.
 
 The counter is **cloc**, pinned at `2.6.0-cloc`, which carries upstream cloc `2.06` — the
 number a behaviour is compared against. **Read the pin off the registry's `latest` tag and
@@ -143,13 +135,12 @@ over-the-ceiling fixture, the same five citations, the same directive cases — 
 moved in one language and not the other is a red suite rather than a quiet divergence.
 
 The Python check runs under bare `python3` and imports only the standard library, so a fresh
-clone can run it before `uv sync`. It is still ruff's to read, under `python/ruff.toml` and
-this workspace's `lint:python`: the worker's locked environment is the one Python toolchain
-the repository installs, so the linter is reached by running it from there.
+clone can run it before `uv sync`. ruff and mypy read it under `python/ruff.toml` and this
+workspace's `lint:python` and `typecheck:python`, run from the worker's locked environment —
+the one Python toolchain the repository installs.
 
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted
 
 A verbatim third-party snapshot under ADR 0027, with its provenance, licence and notice text
-in `lifts/anti-slop/THIRD_PARTY_NOTICES.md`, where the test a refresh must pass is written.
-It is edited upstream, never here, which is why it is excluded from this repository's linter,
-formatter and compiler.
+in `lifts/anti-slop/THIRD_PARTY_NOTICES.md`. It is edited upstream, never here,
+which is why it is excluded from this repository's linter, formatter and compiler.
