@@ -1,0 +1,62 @@
+docs/adr/README.md
+  ai_agent 30
+docs/operations/RUNBOOK.md
+  ai_agent 59
+docs/adr/0022-two-stacks-deployed-by-digest-every-irreplaceable-byte-encrypted-off-host-erasures-replayed-on-restore.md
+  s_4b2596be4b2cd4::t_1212e8c51d54b6 99-101,103-104
+  s_4b2596be4b2cd4::t_fc94f6278cb2ba 102
+CODING_RULES.md
+  s_4b2596be4b2cd4::t_ef48a5c0701946 19
+  s_4b2596be4b2cd4::t_243338820ef770 39-40
+  s_4b2596be4b2cd4::t_7d07f710d28a1b 53
+  s_4b2596be4b2cd4::t_663bc2a86cd7da 69
+  s_4b2596be4b2cd4::t_44b0468e5a1e6c 138
+  s_4b2596be4b2cd4::t_eb20fce54d8d87 237
+  s_4b2596be4b2cd4::t_14c9a40e1cce57 5-6
+  s_4b2596be4b2cd4::t_2c4ddf569e03b0 232
+  s_4b2596be4b2cd4::t_8de2a927cac432 243
+  s_4b2596be4b2cd4::t_e6fcdefedefdb7 81
+  s_4b2596be4b2cd4::t_885aa089570f0d 137
+  s_4b2596be4b2cd4::t_ff34c8fc6ebc08 211-212
+  s_4b2596be4b2cd4::t_2230cb6527d78a 221
+  s_4b2596be4b2cd4::t_75adb5eac69ac7 11
+  s_4b2596be4b2cd4::t_29efe870359de0 145
+  s_4b2596be4b2cd4::t_598f14bfdd0f90 147
+  s_4b2596be4b2cd4::t_9cc1939f701390 146
+  s_4b2596be4b2cd4::t_25d6d4bd9ba446 155
+  s_4b2596be4b2cd4::t_3cac4b6efd0440 217
+  s_4b2596be4b2cd4::t_f538389a9eda61 255-261
+  s_4b2596be4b2cd4::t_3ec02c7ea72427 73
+  s_4b2596be4b2cd4::t_9c97af94b94349 111
+  s_4b2596be4b2cd4::t_64e5b3d386c5a1 253
+  s_4b2596be4b2cd4::t_0b3e6ffdcc7108 156
+  s_4b2596be4b2cd4::t_4f8f3f03fa6569 205
+  s_4b2596be4b2cd4::t_86d5676be4bfc9 159-161
+  s_4b2596be4b2cd4::t_5c0e9e9199c034 57
+  s_4b2596be4b2cd4::t_7fa7fe7bc229d5 65
+  s_4b2596be4b2cd4::t_5af7eb9df6a519 129
+  s_4b2596be4b2cd4::t_8fb9d76d3c4a78 229-231
+  s_4b2596be4b2cd4::t_db7b0fb653fa6d 15
+  s_4b2596be4b2cd4::t_6a268426eb2ff9 163
+  s_4b2596be4b2cd4::t_5f45fa3be0ccdc 101
+  s_4b2596be4b2cd4::t_3c99484d1bae38 120-122
+  s_4b2596be4b2cd4::t_d7fd6b0e46e184 45
+docs/adr/0031-the-tier-contract-is-six-agreements-in-three-forms-fixtured-in-one-language-neutral-directory-both-suites-read.md
+  s_4b2596be4b2cd4::t_e1a19c6db03860 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "dd4542ee8d85257217d6bbf53cd0d367227a71ed",
+  "prompts": {},
+  "sessions": {
+    "s_4b2596be4b2cd4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "530626fa-9b4e-49a1-9226-d5e115e7967d",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
