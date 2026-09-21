@@ -53,6 +53,8 @@ def chunk_row(
 @pytest.fixture(name="database")
 def a_migrated_database() -> Iterator[tuple[psycopg.Connection, str]]:
     with migrated_postgres_at() as (connection, conninfo):
+        # `CREATE ROLE` takes no parameters, so the names are spelled into the
+        # statement; both are constants here and neither comes from a row.
         connection.execute(
             f"CREATE ROLE \"{WORKER_LOGIN}\" LOGIN PASSWORD '{WORKER_PASSWORD}'"
             " IN ROLE worker_rt"

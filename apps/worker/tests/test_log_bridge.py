@@ -13,7 +13,8 @@ logging.getLogger("cocoindex.connectors.postgres").warning("a library wrote this
 
 
 def lines_of(script: str) -> list[dict[str, Any]]:
-
+    # A child process and not a captured stream: logging is global, so a captured buffer
+    # would read pytest's own handlers rather than the tier's.
     finished = subprocess.run(
         [sys.executable, "-c", script],
         capture_output=True,

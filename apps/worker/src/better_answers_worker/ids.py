@@ -12,6 +12,7 @@ _RANDOM_CHARACTERS = 16
 
 
 def ulid() -> str:
+    # It mints ids, never secrets: the time half is public by design.
     milliseconds = time.time_ns() // 1_000_000
     stamp = "".join(
         _ALPHABET[(milliseconds >> shift) & 0b11111]

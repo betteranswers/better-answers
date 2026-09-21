@@ -231,6 +231,8 @@ def recopy_visibility(
 ) -> int:
     if not chunk_ids:
         return 0
+    # One statement and not a read then a write: reading the rows into Python and
+    # writing them back has the same race, one statement on.
     cursor.execute(
         'UPDATE "index".chunk AS chunk SET published_at = binding.published_at,'
         " audience = binding.audience, audience_groups = binding.audience_groups,"
