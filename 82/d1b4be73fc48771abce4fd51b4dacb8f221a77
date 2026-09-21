@@ -1,0 +1,19 @@
+packages/schema/migrations/0042_the-reading-refresh.sql
+  s_76834b2fe19bf1::t_b640d6420638ec 1-41,43-47,50-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "82d1b4be73fc48771abce4fd51b4dacb8f221a77",
+  "prompts": {},
+  "sessions": {
+    "s_76834b2fe19bf1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3978e665-a0d3-4ce5-b180-4ce3a4ca0cbe",
+        "model": "unknown"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
