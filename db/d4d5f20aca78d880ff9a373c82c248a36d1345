@@ -1,0 +1,62 @@
+scripts/strip-comments.mjs
+  s_c56f1a31cc620f::t_fcc9131d82bee8 167-174
+  s_c56f1a31cc620f::t_c062383401c4f0 39-40
+  s_c56f1a31cc620f::t_5cfa44e114086d 101-102,108
+  s_c56f1a31cc620f::t_c264953bc236d1 7-8,11-12
+  s_c56f1a31cc620f::t_cd1ad0482f2cb8 99-100
+  s_c56f1a31cc620f::t_0b5583f428db96 23
+  s_c56f1a31cc620f::t_437d88d9315658 38
+  s_c56f1a31cc620f::t_0fc62b2b337618 152,154
+  s_c56f1a31cc620f::t_d3d5430078da27 1-6,9-10,13-22,24-36,42-98,103-107,109-128,131-151,153,155-162,165-166,175-198
+  s_c56f1a31cc620f::t_c8e9111baa32c5 37,41
+  s_c56f1a31cc620f::t_8b67f829f3f464 129-130
+  s_c56f1a31cc620f::t_73cf01ebaf5f6e 163-164
+pnpm-workspace.yaml
+  s_c56f1a31cc620f::t_6f9258e7832a6a 8-13,17
+scripts/comment-only-proof.mjs
+  s_c56f1a31cc620f::t_04714125295256 62
+  s_c56f1a31cc620f::t_f42b0a2dfc328d 122,128-135,138
+  s_c56f1a31cc620f::t_f7952bf6a0abb4 45-49
+  s_c56f1a31cc620f::t_f700b742010554 127,136
+  s_c56f1a31cc620f::t_fcc9131d82bee8 185-191
+  s_c56f1a31cc620f::t_be654e8be82cbc 8-9
+  s_c56f1a31cc620f::t_d6fa0857b25c1e 196-199
+  s_c56f1a31cc620f::t_423152e7d44cc0 283-284,290
+  s_c56f1a31cc620f::t_74fc2c44655c00 3
+  s_c56f1a31cc620f::t_d6061430917d4e 75-76,79,81-82,86,88-89,91
+  s_c56f1a31cc620f::t_48999e402dc0fc 119-120
+  s_c56f1a31cc620f::t_6074ce0c0745a9 144-152
+  s_c56f1a31cc620f::t_f4a789c18d3b4d 1-2,4-7,10-44,50-61,63-74,77-78,80,83-85,87,90,92-101,103-118,121,123-126,137,139-143,153-184,192-195,200-282,285-289,291-303
+  s_c56f1a31cc620f::t_971f2249397c40 102
+scripts/worker-python.mjs
+  s_c56f1a31cc620f::t_e0c823b5092e5d 1-11
+pnpm-lock.yaml
+  ai_agent 14-16,20-22,374-422,5493-5524
+package.json
+  s_c56f1a31cc620f::t_b332c79238475c 17-18
+  s_c56f1a31cc620f::t_13f5b5314b7a71 28,30
+scripts/strip_python_comments.py
+  s_c56f1a31cc620f::t_7c37718a13c26a 1-60
+scripts/comment_only_normalize.py
+  s_c56f1a31cc620f::t_d720a4c45eac97 1-32,35-63
+  s_c56f1a31cc620f::t_038be535f78738 33-34
+knip.config.ts
+  s_c56f1a31cc620f::t_7528b9e208a1f0 56,59-61
+  s_c56f1a31cc620f::t_d817f3be4362b8 57-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "dbd4d5f20aca78d880ff9a373c82c248a36d1345",
+  "prompts": {},
+  "sessions": {
+    "s_c56f1a31cc620f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8ac1ca55-d3f6-48b9-8be8-5a25b6a547f2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
