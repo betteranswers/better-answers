@@ -1,0 +1,19 @@
+packages/schema/src/table-ownership.ts
+  s_76834b2fe19bf1::t_504777bf334ad2 391-396
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "adc99b442cf049a0b77f2e15853b30c2f8e88661",
+  "prompts": {},
+  "sessions": {
+    "s_76834b2fe19bf1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3978e665-a0d3-4ce5-b180-4ce3a4ca0cbe",
+        "model": "unknown"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
