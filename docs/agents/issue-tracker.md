@@ -74,7 +74,7 @@ What this task accomplishes.
 Anything that doesn't fit elsewhere.
 
 ## Progress
-Append-only log of what has happened so far.
+Append-only: one entry per landing, three lines (`docs/agents/workflow.md`).
 ```
 
 The `Acceptance Criteria` checkboxes (`- [ ]` / `- [x]`) are the source of truth for AC progress — they are parsed structurally.
