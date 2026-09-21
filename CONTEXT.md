@@ -176,6 +176,11 @@ Where a unit lives is decided by **minting**.
   by audience), **Public** (already published by the company; still narrowed by audience). Only
   *Restricted* reaches a reader. Independent of trust: trust never gates viewing, sensitivity
   does. *Public* is not *published*.
+- **effective class** — the class a source document is actually read at: the narrower of its
+  binding's class and the document's own, where it has one — the seam's special-category verdict
+  or an Admin's narrowing. Every chunk of the document carries it and a narrowing is checked
+  against it, so a document's own class only ever takes visibility away. _Avoid_: folded class,
+  derived class (a *concept's* class is derived, from its evidence).
 - **finding** — what the pre-scan found in one source document: a category (bank details, date of
   birth, home address, personal contact, special category, …), offsets into the normalised text,
   the rule and detector version that fired. Counted per category; never a class, never a value.
