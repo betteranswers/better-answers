@@ -1,0 +1,9 @@
+apps/api/CODING_RULES.md
+  ai_agent 5-8,15-18,32-37,43-45,52-57,68-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "8950d998f2adcb6e95e8505a181582ccc7e04305",
+  "prompts": {}
+}
