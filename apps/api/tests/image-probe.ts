@@ -325,7 +325,14 @@ export const readTheImage = async (
 
 /** A workflow step, in the fields a probe's wiring is read out of. */
 export const workflowStepSchema = z.object({
+  /** What a later step reads this one's outputs by — `steps.<id>.outputs`. */
+  id: z.string().optional(),
   if: z.string().optional(),
+  /**
+   * Absent unless a step's failure is to be swallowed, which is a decision about that step.
+   * A boolean or the expression that answers one.
+   */
+  "continue-on-error": z.union([z.boolean(), z.string()]).optional(),
   /** The action a step runs, at the pin it runs — read by prefix, never by version. */
   uses: z.string().optional(),
   run: z.string().optional(),

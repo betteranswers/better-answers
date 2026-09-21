@@ -301,10 +301,10 @@ def test_the_version_string_is_the_rule_version_and_the_detector_pin() -> None:
     written = VERSION_STRING
 
     assert written == (
-        "3:presidio-2.2.364+gliner-0.2.29+torch-2.14.0"
+        "4:presidio-2.2.364+gliner-0.2.29+torch-2.14.0"
         "+spacy-3.8.16+en-core-web-sm-3.8.0+gliner-multi-pii-v1"
     )
-    assert RULE_VERSION == "3"
+    assert RULE_VERSION == "4"
     assert VERSION_STRING.count(":") == 1
     assert VERSION_STRING.split(":") == [RULE_VERSION, DETECTOR_PIN]
 
@@ -319,11 +319,14 @@ def test_the_rule_version_is_bumped_with_the_table_it_stands_for() -> None:
     # `rule_version` is one constant bumped whenever a rule, the category table, the
     # consumer-domain list or a recogniser changes. Edit a descriptor or a domain
     # without bumping it and this literal stops matching: they are changed together or
-    # the suite is red.
+    # the suite is red. The converse is not an equality, and version 4 is the case that
+    # shows it: the word-boundary rule on the model's windows (`T-177`) moved the
+    # detector's answers without touching a descriptor or a domain, so the digest below
+    # is the same digest version 3 stood for and the version beside it has still moved.
     digest = "5b20e4baed2c0a147492e0695f18b25b630ab22f28a926b5ad48321fd998bf6c"
 
     assert descriptor_digest() == digest
-    assert RULE_VERSION == "3"
+    assert RULE_VERSION == "4"
 
 
 def test_the_consumer_domain_list_carries_its_date_and_its_source() -> None:
