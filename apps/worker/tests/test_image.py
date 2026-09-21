@@ -917,7 +917,13 @@ SHARED_CACHE_URLS = ("ACTIONS_RESULTS_URL", "ACTIONS_CACHE_URL")
 #: The driver a plain daemon answers with, and the one driver that can export a cache
 #: nowhere: it builds straight into the daemon's image store, so a build handed
 #: `--cache-to` on it stops with an error rather than ignoring the flag. Every other
-#: driver — the container one a runner's setup step creates — can.
+#: driver — the container one a runner's setup step creates — can. This suite stopped
+#: exporting at `T-223` and the refusal stays, on less than proof. Whether that driver
+#: can *read* a `type=gha` cache was never run here: Docker says it carries the backend
+#: only over the containerd image store (*Cache storage backends*, read 21/09/2026),
+#: which is a sentence about the backend and not a build. So the arm stays on the
+#: builder it was measured on, and the name stays the export's — the half that was
+#: proved.
 DRIVER_WITHOUT_AN_EXPORT = "docker"
 
 
@@ -944,7 +950,7 @@ def _builder_that_can_export(inspected: str) -> str | None:
 
 
 def _shared_cache_builder() -> str | None:
-    """The builder this machine may export a ``type=gha`` cache to, or ``None``.
+    """The builder this machine may read a ``type=gha`` cache through, or ``None``.
 
     Two questions in this order and both must answer. The credentials are asked for
     first because they are what a laptop never has and because the answer costs
@@ -977,19 +983,26 @@ def _build_command(
     """The argv that builds this tier's image, with the shared cache or without it.
 
     A pure function of the two things that decide it, so that both commands can be read
-    on any machine and neither has to be run to be held. Four flags make the cached arm
-    what it is: the two halves of the cache, ``mode=max`` so every layer of a
-    multi-stage build is exported and not only the last stage's, and ``--load``, which
-    the container driver needs before the image is in the daemon at all — the suite
-    starts containers from what this returns. ``--quiet`` is not asked of that arm
-    because it is not the id's source there: buildx writes the id to ``--iidfile``,
-    which is a file this run owns rather than a line to be picked out of a build log.
+    on any machine and neither has to be run to be held. Two flags make the cached arm
+    what it is: ``--cache-from``, and ``--load``, which the container driver needs
+    before the image is in the daemon at all — the suite starts containers from what
+    this returns. ``--quiet`` is not asked of that arm because it is not the id's
+    source there: buildx writes the id to ``--iidfile``, which is a file this run owns
+    rather than a line to be picked out of a build log.
 
-    ``scope=`` on both halves, and it is the leg's own name. The backend's default is
+    ``scope=`` on the import, and it is the leg's own name. The backend's default is
     ``buildkit`` for everyone and one scope holds one manifest, so this build and
     ``build.yml``'s three legs were four writers of one index (`T-211`). The leg is
     read out of that workflow's matrix, so the name here is the name its leg writes
     under, and a pull request's build reads what that leg wrote on ``main``.
+
+    No ``--cache-to``, and that is the arm's point rather than an omission (`T-223`).
+    This arm runs on a pull request and nowhere else — a run ``build.yml`` calls leaves
+    the probe to its own ``image`` job — and an Actions cache written from a pull
+    request's ref is readable from that ref alone. An export here warmed only the same
+    pull request's later pushes and was paid for out of the one quota every ref shares
+    — ``docs/operations/BUILD_CACHE.md`` has what it cost. The export is
+    ``build.yml``'s alone.
     """
     if builder is None:
         return [
@@ -1008,8 +1021,6 @@ def _build_command(
         builder,
         "--cache-from",
         f"type=gha,scope={leg['tier']}",
-        "--cache-to",
-        f"type=gha,mode=max,scope={leg['tier']}",
         "--load",
         "--iidfile",
         str(iidfile),
@@ -1382,6 +1393,32 @@ def test_the_build_fetches_the_weights_by_running_the_module_that_names_them(
     assert contents.hf_home in dockerfile
 
 
+def test_the_runtime_stage_copies_the_source_last() -> None:
+    """A source edit re-makes the source's own layer and nothing heavier (`T-223`).
+
+    BuildKit re-runs every instruction below the first one whose input moved, and a
+    ``COPY`` it re-runs is a new layer even when every byte it copies is the same. With
+    ``COPY src src`` above the weights' ``COPY``, an edit to any file under ``src``
+    re-made the weights layer — about 950 MB — and a 10 GB cache was handed it again.
+    The image is the same image either way, so no container started from it can tell
+    the two orders apart: the order is in the file alone, and this reads it there. It
+    needs no daemon, so it runs where the contents probes stand down.
+
+    The weights' path is the deploy unit's own answer, so a copy that stopped naming it
+    fails here rather than leaving nothing above the source to be ordered against.
+    """
+    runtime = DOCKERFILE.read_text("utf-8").rpartition("\nFROM ")[2]
+    copies = [line.split() for line in runtime.splitlines() if line.startswith("COPY ")]
+    out_of_the_build = [words for words in copies if words[1] == "--from=build"]
+
+    assert copies[-1:] == [["COPY", "src", "src"]]
+    assert copies[:-1] == out_of_the_build
+    assert {words[-1] for words in out_of_the_build} >= {
+        "/app/.venv",
+        worker_environment("HF_HOME"),
+    }
+
+
 def test_the_image_redacts_the_fixture_with_its_network_refused_and_fetches_nothing(
     image: str,
 ) -> None:
@@ -1680,13 +1717,16 @@ def test_a_runner_builds_through_buildx_and_a_laptop_builds_as_it_always_did() -
     unreachable and asking for it fails the build rather than skipping it, so the
     choice is made once, here, and the argv is the whole of it. Both arms are literals
     and neither needs a daemon: what this holds is that the fallback is *exactly* the
-    command that ran before the cache existed, and that the cached arm carries all four
-    of the things it cannot work without.
+    command that ran before the cache existed, and that the cached arm carries the two
+    things it cannot work without and nothing that writes.
 
-    Both halves of the cache name the leg's own scope. With no ``scope=`` the backend
+    The import names the leg's own scope. With no ``scope=`` the backend reads and
     writes under ``buildkit`` for everyone and one scope holds one manifest, so this
     build and ``build.yml``'s three legs were four writers overwriting each other
     (`T-211`); the api's probe says the same and passes its own tier.
+
+    And the literal has no ``--cache-to`` in it (`T-223`): ``_build_command`` says why,
+    and ``build.yml``'s leg is the one writer this scope has left.
     """
     leg = {
         "tier": "worker",
@@ -1703,8 +1743,6 @@ def test_a_runner_builds_through_buildx_and_a_laptop_builds_as_it_always_did() -
         "the-container-builder",
         "--cache-from",
         "type=gha,scope=worker",
-        "--cache-to",
-        "type=gha,mode=max,scope=worker",
         "--load",
         "--iidfile",
         "/tmp/the-id-this-build-wrote",

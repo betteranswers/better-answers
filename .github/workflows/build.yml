@@ -221,8 +221,10 @@ jobs:
           # the worker leg built cold on 47% of runs (`T-211`, measured 20/09/2026). Both
           # tiers' probes pass the same name, so a pull request's build reads what this leg
           # wrote — one way only, an Actions cache being readable from its own ref and from
-          # the base branch. `apps/api/tests/image-job.test.ts` refuses a bare `type=gha`; the
-          # quota, the scopes and how to read them are `docs/operations/BUILD_CACHE.md`.
+          # the base branch. The probes export nothing for that reason, so this leg is its
+          # scope's one writer (`T-223`). `apps/api/tests/image-job.test.ts` refuses a bare
+          # `type=gha`; the quota, the scopes and how to read them are
+          # `docs/operations/BUILD_CACHE.md`.
           cache-from: type=gha,scope=${{ matrix.tier }}
           cache-to: type=gha,mode=max,scope=${{ matrix.tier }}
       # The digest, in the run's summary, in the form the deploy unit's env var takes — so a

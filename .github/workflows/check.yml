@@ -125,15 +125,20 @@ jobs:
       # `pnpm check` builds the worker image, and on a fresh runner every layer of that
       # build is cold — the step that fetches the detector's weights above all, which is
       # over a gigabyte and is paid again on every run. The two steps here are what let
-      # that build read and write a layer cache that outlives the runner; they sit last
-      # because the step below is the only one that uses them.
+      # that build read a layer cache that outlives the runner; they sit last because the
+      # step below is the only one that uses them. Read, and not write: what a pull request
+      # exports lands on its own ref, which `main` and every other pull request cannot
+      # read, so the probes pass `--cache-from` alone and the cache they read is the one
+      # `build.yml`'s legs wrote on `main` (`T-223`).
       #
       # The builder first. The driver a plain daemon answers with builds straight into its
       # own image store and can export a cache nowhere, so `--cache-to` on it fails the
-      # build outright rather than being ignored. This creates a container-driver builder
-      # and makes it the current one. The worker's suite probes for exactly that before it
-      # asks for the cache and builds the way it always did when it finds no such builder —
-      # a laptop, and this workflow before this line.
+      # build outright rather than being ignored. That was proved when the probes exported;
+      # whether that driver can read the cache was never run, so the step stays and the
+      # probes stay on the builder they were measured on. This creates a container-driver
+      # builder and makes it the current one. The worker's suite probes for exactly that
+      # before it asks for the cache and builds the way it always did when it finds no such
+      # builder — a laptop, and this workflow before this line.
       #
       # That cache needs no key of its own, which is why there is no second key here beside
       # the weights one above. BuildKit keys a layer by what goes into it, and the weights

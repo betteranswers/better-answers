@@ -137,6 +137,12 @@ const SHARED_CACHE_URLS = ["ACTIONS_RESULTS_URL", "ACTIONS_CACHE_URL"] as const;
  * `--cache-to` stops with an error rather than ignoring the flag — `build.yml` carries the
  * message it stops with, which is why its own job creates a builder before it builds
  * anything. Every other driver, the container one that step creates above all, can.
+ *
+ * The probes stopped exporting at `T-223` and the refusal stays, on less than proof. Whether
+ * that driver can *read* a `type=gha` cache was never run here: Docker says it carries the
+ * backend only over the containerd image store (*Cache storage backends*, read 21/09/2026),
+ * which is a sentence about the backend and not a build. So the arm stays on the builder it
+ * was measured on, and the name stays the export's — the half that was proved.
  */
 const DRIVER_WITHOUT_AN_EXPORT = "docker";
 
@@ -171,19 +177,20 @@ export const builderThatCanExport = (inspected: string): string | undefined => {
 };
 
 /**
- * The builder this machine may export a `type=gha` cache to, or nothing.
+ * The builder this machine may read a `type=gha` cache through, or nothing.
  *
  * Two questions in this order and both must answer. The credentials are asked for first
  * because they are what a laptop never has and because the answer costs nothing; only then
  * is the daemon asked which builder it would use. Either question coming back empty is the
  * plain build, because both ways of getting the cached arm wrong cost more than never
- * asking for it. With no credentials at all buildx drops both halves and builds uncached
- * without saying so — exit 0 and no cache step in the log, probed by hand on buildx
- * v0.36.1 against Docker 29.7.2 — so the flags would be a claim to a cache nothing wrote
- * to. With credentials it cannot use, the build stops outright: `failed to configure gha
- * cache exporter: token is malformed`, and a runner whose token this suite half-read is a
- * red run rather than a slow one. The daemon is a parameter so that the order can be proved
- * without one.
+ * asking for it. Both were probed by hand on buildx v0.36.1 against Docker 29.7.2, while
+ * this arm still exported as well as read (`T-223` took the export away, and neither was
+ * probed again for the import alone). With no credentials at all buildx dropped both
+ * halves and built uncached without saying so — exit 0 and no cache step in the log — so
+ * the flag would be a claim to a cache nothing read. With credentials it could not use,
+ * the build stopped outright: `failed to configure gha cache exporter: token is
+ * malformed`, and a runner whose token this suite half-read is a red run rather than a
+ * slow one. The daemon is a parameter so that the order can be proved without one.
  */
 export const sharedCacheBuilder = async (
   environment: BuildEnvironment,
@@ -199,14 +206,22 @@ export const sharedCacheBuilder = async (
  * The argv that builds this image, with the shared cache or without it.
  *
  * A pure function of the two things that decide it, so that both commands can be read on any
- * machine and neither has to be run to be held. Five flags make the cached arm what it is:
- * the two halves of the cache, `mode=max` so every layer of a multi-stage build is exported
- * and not only the last stage's, `--load`, which the container driver needs before the image
- * is in the daemon at all — the probes start containers from what this returns — and a
- * `scope=` on both halves. The scope is the leg's name because the backend's default is
- * `buildkit` for everyone: one scope holds one manifest, so the two images this workspace
- * builds would each overwrite the other's export, and every run after them would read a
- * cache made for the other image and build cold — a clash no single run can show.
+ * machine and neither has to be run to be held. Three things make the cached arm what it is:
+ * `--cache-from`, `--load`, which the container driver needs before the image is in the
+ * daemon at all — the probes start containers from what this returns — and a `scope=` on
+ * the import. The scope is the leg's name because the backend's default is `buildkit` for
+ * everyone and one scope holds one manifest: `build.yml`'s legs each write their own, so
+ * the name here is the name that leg writes under on `main`, and a probe that read any
+ * other would read a cache made for another image and build cold — a clash no single run
+ * can show.
+ *
+ * There is no `--cache-to`, and that is the point of the arm rather than an omission
+ * (`T-223`). This arm runs on a pull request and nowhere else — a run `build.yml` calls
+ * defers the probes to its own `image` job — and an Actions cache written from a pull
+ * request's ref is readable from that ref alone, never from `main` or a sibling. An export
+ * here therefore warmed only the same pull request's later pushes and was paid for out of
+ * the one quota every ref shares — `docs/operations/BUILD_CACHE.md` has what it cost. The
+ * export is `build.yml`'s alone.
  *
  * `--quiet` is not asked of that arm because it is not the id's source there: buildx writes
  * the id to `--iidfile`, a file this run owns rather than a line to be picked out of a build
@@ -227,8 +242,6 @@ export const buildCommand = (
     choice.builder,
     "--cache-from",
     `type=gha,scope=${image.tier}`,
-    "--cache-to",
-    `type=gha,mode=max,scope=${image.tier}`,
     "--load",
     "--iidfile",
     choice.iidfile,
