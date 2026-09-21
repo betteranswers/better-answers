@@ -219,6 +219,16 @@ describe("the tags a gate prints and the rules files that define them", () => {
     ).toEqual([]);
   });
 
+  it("defines every tag a rules file cites in another rule's body", () => {
+    const defined = definedTags();
+    const cited = treeFiles().filter(isRulesFile).flatMap(citationsIn);
+
+    expect(
+      cited.filter(({ tag }) => !defined.has(tag)).map(cite),
+      "a rules file points at a rule no rules file defines. The rule was retired: say in words what the sentence needs, or delete the cross-reference with it.",
+    ).toEqual([]);
+  });
+
   it("exempts a gate only where the tag sits in the message it prints", () => {
     const [aGate] = GATES_PRINTING_A_TAG;
     expect(aGate).toBeDefined();

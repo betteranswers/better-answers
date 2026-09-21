@@ -44,6 +44,7 @@ const IMPERATIVES: ReadonlySet<string> = new Set([
   "Mutate",
   "Name",
   "Own",
+  "Parse",
   "Pin",
   "Read",
   "Rebuild",

@@ -125,35 +125,37 @@ Reviewer: no scan can tell a definition from an implementation detail, nor wheth
 
 ## TYPES
 
-### [TYPES1] Turn `strict` and `noUncheckedIndexedAccess` on, and parse every boundary with zod
+### [TYPES1] Turn `strict` and `noUncheckedIndexedAccess` on
 
-Input, environment and tool schemas are parsed at the boundary they enter through.
+### [TYPES2] Parse every boundary with zod
 
-### [TYPES2] Choose a type over an enum
+Input, environment and tool schemas are parsed where they enter.
+
+### [TYPES3] Choose a type over an enum
 
 An `enum` does not compile here. A union of string literals says the same thing and erases.
 
-### [TYPES3] Never widen a type with `as`
+### [TYPES4] Never widen a type with `as`
 
 A chained assertion and a widen-then-assert are refused in source. An assertion that survives carries the comment saying why it is sound.
 
-### [TYPES4] Never mutate a parameter
+### [TYPES5] Never mutate a parameter
 
 Return a new value. What a caller passed in is the caller's.
 
-### [TYPES5] Return an error as a `Result`, and catch only around a library
+### [TYPES6] Return an error as a `Result`, and catch only around a library
 
 Wrap an external library's throw through `normalizeError`. No `catch` is empty: a swallowed error carries the reason it is safe to lose.
 
-### [TYPES6] Suffix a money or a time value with its unit
+### [TYPES7] Suffix a money or a time value with its unit
 
 `timeoutMs`, `priceCents`.
 
-### [TYPES7] Import statically
+### [TYPES8] Import statically
 
 A dynamic `import()` hides a dependency from every tool that reads the graph.
 
-### [TYPES8] Type every public Python signature
+### [TYPES9] Type every public Python signature
 
 mypy runs strict over `src` and `tests`, and an untyped signature does not lint.
 
