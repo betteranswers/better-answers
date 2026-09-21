@@ -1,0 +1,67 @@
+packages/core/test/upload-media-types.contract.test.ts
+  s_78419176f30797::t_51980cbd317fa1 1-57
+apps/worker/tests/test_upload_media_types_contract.py
+  s_78419176f30797::t_76c33e9383db54 56-62,68-69,71
+  s_78419176f30797::t_46711fa89f9841 1-2,6,14-16,20-55,63-67,70
+  s_78419176f30797::t_9275c58eb3b23a 3-5,7-13,17-19
+apps/worker/tests/test_pipeline_index.py
+  s_78419176f30797::t_52ccbe1fe1989f 67
+  s_78419176f30797::t_bb0347eec9945c 691-722,724-727,729-732,736-737
+  s_78419176f30797::t_ac0c927e6d8b13 723,728,733-735
+contracts/manifest.json
+  s_78419176f30797::t_5e84fade2cea38 2
+  s_78419176f30797::t_c53f9dff8df525 13-14
+  s_78419176f30797::t_11dd488ef05241 24-25
+apps/worker/tests/test_tier_contract.py
+  s_78419176f30797::t_fb13ecd67a2b0e 20
+  s_78419176f30797::t_32cbe3b2fd55d0 31
+packages/core/src/sources/binding.ts
+  s_78419176f30797::t_ee1d0dc94e1f34 58-62
+packages/core/test/tier-contract.test.ts
+  s_78419176f30797::t_7a6b4001570c4f 40
+  s_78419176f30797::t_d69eb386acacd3 29
+packages/core/test/sources.test.ts
+  s_78419176f30797::t_408daa08ecdd66 3
+  s_78419176f30797::t_c65718c6f64881 42-51
+  s_78419176f30797::t_2a9c8c6c3bfaba 18
+  s_78419176f30797::t_9075ddf3901592 332-335
+  s_78419176f30797::t_ee19e5374123cd 336-339
+packages/core/test/contract-fixture.ts
+  s_78419176f30797::t_54b4cd6b12235e 45-58
+apps/worker/src/better_answers_worker/pipeline/converter.py
+  s_78419176f30797::t_af5ee3029d3063 166-171
+  s_78419176f30797::t_85035c411e354e 38-39,41
+  s_78419176f30797::t_8f5d6f06a88aaa 218-224
+  s_78419176f30797::t_cdd27e0389d5bf 216-217,225-234
+docs/adr/README.md
+  s_78419176f30797::t_ec9ec0a80d5e35 39
+contracts/upload-media-types/cases.json
+  s_78419176f30797::t_1ae33c3c66b2b0 16
+  s_78419176f30797::t_b8b0a7948dc890 1-11,13-15,17-19
+  s_78419176f30797::t_0c09e3431e0fed 12
+apps/worker/src/better_answers_worker/pipeline/__init__.py
+  s_78419176f30797::t_67104f5f199f52 64
+  s_78419176f30797::t_a2b2c001a2540f 98
+contracts/README.md
+  s_78419176f30797::t_236e8c2d58dea6 5
+  s_78419176f30797::t_9070a3a56382ff 13
+docs/adr/0031-the-tier-contract-is-six-agreements-in-three-forms-fixtured-in-one-language-neutral-directory-both-suites-read.md
+  s_78419176f30797::t_0e9e6c17748ce9 22
+  s_78419176f30797::t_e943aa394f0d99 54-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "64f735d509fc1be651f9d316476f1978007f15e3",
+  "prompts": {},
+  "sessions": {
+    "s_78419176f30797": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "258adea7-4c94-40df-b02b-5198b39d1258",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
