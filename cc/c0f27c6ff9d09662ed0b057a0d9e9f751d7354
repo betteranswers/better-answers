@@ -1,0 +1,28 @@
+apps/api/tests/workflow-tools.test.ts
+  s_c017111907e283::t_98807ea044f43b 179
+  s_c017111907e283::t_161ac4920ef140 7,11-15,17-18,50,54,56,58,60-62,78-79,90,139-140,142,155-156,160-161,163,167-169
+  s_c017111907e283::t_c489f8e5c29164 1,16,20-32,35,40,46-49,51-53,55,57,59,63-77,93-95,116-121,126-129,136-138,141,149-154,157-159,162,164-166,170-171,173,176-177,183-184,188-189,202-235
+.github/workflows/mutation.yml
+  s_c017111907e283::t_8f71ba43d4bb03 85-90
+  s_c017111907e283::t_0997e71d6621a6 91
+.github/actions/git-filter-repo/action.yml
+  s_c017111907e283::t_fe4fcfc41a60d6 1-56
+.github/workflows/check.yml
+  s_c017111907e283::t_9accf1b44af278 121-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ccc0f27c6ff9d09662ed0b057a0d9e9f751d7354",
+  "prompts": {},
+  "sessions": {
+    "s_c017111907e283": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5eb29723-6734-495e-b12a-b5b8a28eb143",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
