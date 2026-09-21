@@ -88,6 +88,14 @@ const repositoryPath = (door: GitDoor, workspaceId: string): string =>
 const bundleOf = (door: GitDoor, principal: UserPrincipal): string =>
   repositoryPath(door, principal.workspaceId);
 
+// `env` replaces rather than extends, so the spread keeps PATH; `LC_ALL=C` keeps git's
+// messages English for the compare-and-swap match below.
+const childEnvironment = (added: Readonly<Record<string, string>> = {}): NodeJS.ProcessEnv => ({
+  ...process.env,
+  ...added,
+  LC_ALL: "C",
+});
+
 const git = async (
   gitDir: string,
   arguments_: readonly string[],
@@ -98,10 +106,8 @@ const git = async (
     readonly raw?: boolean;
   } = {},
 ): Promise<string> => {
-  // LC_ALL=C keeps messages English for the compare-and-swap match below; env replaces rather
-  // than extends, so the spread is what keeps PATH.
   const child = run("git", ["--git-dir", gitDir, ...arguments_], {
-    env: { ...process.env, ...options.env, LC_ALL: "C" },
+    env: childEnvironment(options.env),
     maxBuffer: 64 * 1024 * 1024,
   });
   if (options.input !== undefined) {
@@ -504,7 +510,7 @@ const mailmapFor = (addresses: readonly string[], pseudonym: string): string =>
 const filterRepo = async (gitDir: string, arguments_: readonly string[]): Promise<void> => {
   await run("git", ["filter-repo", ...arguments_], {
     cwd: gitDir,
-    env: { ...process.env, LC_ALL: "C" },
+    env: childEnvironment(),
     maxBuffer: 64 * 1024 * 1024,
   });
 };
