@@ -1,0 +1,40 @@
+apps/web/playwright.config.ts
+  s_c56f1a31cc620f::t_54380e477f8e59 19
+apps/web/e2e/harness.ts
+  s_c56f1a31cc620f::t_f8ef012bb07087 80-81
+apps/web/test/api-client.test.tsx
+  s_c56f1a31cc620f::t_32ff6a71a50660 74-75
+apps/web/src/features/auth/sign-out-button.tsx
+  s_c56f1a31cc620f::t_db7b3baa1dfc14 20-21
+apps/web/src/features/auth/choose-workspace-screen.tsx
+  s_c56f1a31cc620f::t_63d713ad126337 85-86
+apps/web/src/app/providers.tsx
+  s_c56f1a31cc620f::t_cf17ee643cb77d 8-9
+apps/web/src/app/frame.tsx
+  s_c56f1a31cc620f::t_3a2981511d18c0 37-38,40
+  s_c56f1a31cc620f::t_f6975fbc3bf746 39
+apps/web/src/features/routes/routes-card.tsx
+  s_c56f1a31cc620f::t_504f94d1e25df1 46-49
+apps/web/src/features/auth/carried-flow.ts
+  s_c56f1a31cc620f::t_a6c7062038c7b0 6
+apps/web/test/folder-case.test.ts
+  s_c56f1a31cc620f::t_edb849c491c281 22
+apps/web/test/api-seam.test.ts
+  s_c56f1a31cc620f::t_c9e5b44d6cc515 28-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e0d6516e451fc91599566f83d33257390dafb9d2",
+  "prompts": {},
+  "sessions": {
+    "s_c56f1a31cc620f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8ac1ca55-d3f6-48b9-8be8-5a25b6a547f2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
