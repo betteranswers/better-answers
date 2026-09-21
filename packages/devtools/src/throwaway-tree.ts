@@ -163,6 +163,8 @@ export const oxlintOver = (
   const expected = [...smoke.flagged].sort();
   const run = runsOverThrowawayTree({
     executable: { package: "oxlint", path: ["bin", "oxlint"] },
+    // Pinned, never left to oxlint: under Actions it picks the annotation reporter, whose
+    // lines `pathsIn` cannot read, and every rule then looks silent.
     argv: ["--config", ".oxlintrc.json", "--format=unix", "."],
     scaffold: { ".oxlintrc.json": configJson },
     env: { OXLINT_TSGOLINT_PATH: tsgolintPath() },

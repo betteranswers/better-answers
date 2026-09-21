@@ -135,6 +135,8 @@ describe("the vitest runner's patch, run over a throwaway workspace (T-107)", ()
         statusReason: expect.stringContaining("is not a family"),
       });
     } finally {
+      // A forked stryker worker outliving the CLI leaves an entry here, and rmSync retries
+      // ENOTEMPTY only when given both maxRetries and retryDelay.
       rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
     }
   });

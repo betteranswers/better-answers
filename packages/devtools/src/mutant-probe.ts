@@ -71,6 +71,8 @@ const gitSync = (cwd: string, args: readonly string[]): GitAnswer => {
   return { status: result.status, out: `${result.stdout}${result.stderr}` };
 };
 
+// pnpm's shim, not vitest's entry: its NODE_PATH reaches the hoisted store, and a suite
+// that fails to collect reads as a kill.
 const vitestShimFor = (workspace: string): string | undefined => {
   const shim = path.join(workspace, "node_modules", ".bin", "vitest");
   return existsSync(shim) ? shim : undefined;
@@ -162,6 +164,8 @@ const runSuite = (
         `--outputFile.json=${reportFile}`,
         ...(mutation.suite === undefined ? [] : [mutation.suite]),
       ],
+      // Its own process group, so a timeout or an interrupt reaches vitest's workers: one
+      // stuck in a mutated loop answers no message from its parent.
       { cwd: workspace, stdio: ["ignore", 2, 2], detached: true },
     );
 

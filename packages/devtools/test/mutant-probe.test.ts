@@ -13,6 +13,8 @@ const script = path.join(repositoryRoot, "scripts/mutant-probe.mjs");
 
 const scratch = mkdtempSync(path.join(tmpdir(), "mutant-probe-"));
 afterAll(() => {
+  // The interrupted case's child can still be spawning git as this runs, and rmSync retries
+  // ENOTEMPTY only when given both maxRetries and retryDelay.
   rmSync(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 

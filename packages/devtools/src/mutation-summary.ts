@@ -53,6 +53,8 @@ const spanText = (source: string, location: ReportMutant["location"]): string =>
 
 const identity = (placed: Placed): string =>
   [placed.file, placed.mutant.mutatorName, placed.mutant.replacement ?? "", placed.text].join(
+    // Written as an escape: a raw NUL byte would make this file binary to git. No part of
+    // an identity can contain one.
     "\u0000",
   );
 
@@ -73,6 +75,8 @@ const byIdentity = (report: Report): ReadonlyMap<string, readonly Placed[]> => {
     if (group === undefined) groups.set(key, [placed]);
     else group.push(placed);
   }
+  // Position order, never the report's: Stryker's mutant order moves between runs, and a
+  // survivor paired with the wrong occurrence reads as a lost kill.
   for (const group of groups.values()) group.sort(byPlace);
   return groups;
 };
