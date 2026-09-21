@@ -668,7 +668,7 @@ describe("declining a suggestion", () => {
 
     const nothing = await declineSuggestion(scenario.admin, doorsOf(scenario), {
       suggestionId,
-      // @ts-expect-error — null parses at the boundary; a decline with no reason is refused anyway.
+      // @ts-expect-error — the column is nullable, so JSON's null parses; the runtime half of what the type says.
       reason: null,
     });
 

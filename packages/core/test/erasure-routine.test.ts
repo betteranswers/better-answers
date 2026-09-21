@@ -781,8 +781,6 @@ describe("the git step", () => {
     expect(await bundleCommitRowsIn(scenario.workspaceId)).toEqual(rows);
   });
 
-  // Without the subject's own address, the routine completes, reports and books its ledger
-  // event with it still in every blob and every author line.
   it("rewrites the address the subject's own user row carries when the request names them by id alone", async () => {
     const { scenario, email, subjectRequestId } = await bundleNamingThePerson({ byIdAlone: true });
     const before = await everyObjectOf(scenario.git, scenario.workspaceId);

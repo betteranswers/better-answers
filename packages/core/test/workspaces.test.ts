@@ -92,8 +92,8 @@ describe("provisioning a workspace", () => {
       "SELECT key FROM workspace_config WHERE workspace_id = $1",
       [id],
     );
-    // The written-down name, never the constant that wrote it: read back through that, this
-    // would agree with any name.
+    // The MCP transport looks this row up by the literal string; the key read back through
+    // its own constant would agree with any name.
     expect(written.rows).toEqual([{ key: "mcp.tools_list_ttl_ms" }]);
   });
 

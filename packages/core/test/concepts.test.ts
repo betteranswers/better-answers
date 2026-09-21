@@ -1187,8 +1187,6 @@ describe("authority that moved while the act was in flight", () => {
       let waiting: Promise<unknown> = Promise.resolve();
       try {
         const pid = await backendPidOf(revoker);
-        // The door's own callback: the seam that lets a test hold the act's transaction open
-        // while the revocation waits.
         await withMembership(scenario.editor, scenario.postgres, async () => {
           waiting = revoke(revoker, scenario, scope).then(() => {
             settled = true;

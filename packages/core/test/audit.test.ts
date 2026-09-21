@@ -123,7 +123,7 @@ describe("the declared-acts walk", () => {
 
   it("refuses an act declared under a family that is not its first word", () => {
     expect(() =>
-      // @ts-expect-error — a people act cannot be declared as a platform act.
+      // @ts-expect-error — the runtime half of what the type already refuses.
       declareActs("platform", { added: act("people.member.added", {}) }),
     ).toThrow(/not a platform act/);
   });
@@ -390,8 +390,6 @@ describe("the first door — record, the actor derived from the Principal", () =
     const { door, workspaceId, adminUserId } = await provisioned();
     const write = writingIn(door, workspaceId);
 
-    // The end anchor tells this message from the optional kind's, which is this plus ", or
-    // absent"; unanchored, both read green.
     await expect(
       write({
         id: ulid(),
@@ -399,6 +397,8 @@ describe("the first door — record, the actor derived from the Principal", () =
         subjectId: adminUserId,
         detail: { adminUserId: "priya@example.invalid", role: "Admin", confirmed: true },
       }),
+      // The end anchor tells this message from the optional kind's, which is this plus ", or
+      // absent"; unanchored, both read green.
     ).rejects.toThrow(/adminUserId is not an id$/);
     await expect(
       write({
