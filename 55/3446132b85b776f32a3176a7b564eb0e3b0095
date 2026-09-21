@@ -1,0 +1,25 @@
+docs/adr/0041-a-secret-belongs-to-one-of-seven-credential-classes-the-bootstrap-class-comes-from-the-deploy-unit-and-the-other-six-are-rows-under-the-envelope.md
+  s_4b2596be4b2cd4::t_ca66268e423b06 34
+docs/operations/SECRETS.md
+  s_4b2596be4b2cd4::t_7128acf54f1e9b 11
+CODING_RULES.md
+  s_4b2596be4b2cd4::t_3d3a301a441ecf 120
+  s_4b2596be4b2cd4::t_b153c1b2ef0369 137
+  s_4b2596be4b2cd4::t_1af3506335f40e 53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "553446132b85b776f32a3176a7b564eb0e3b0095",
+  "prompts": {},
+  "sessions": {
+    "s_4b2596be4b2cd4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "530626fa-9b4e-49a1-9226-d5e115e7967d",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
