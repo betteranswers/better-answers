@@ -25,6 +25,8 @@ describe("the AppRouter seam", () => {
       .filter((line) => line.includes("/apps/api/src/auth/"))
       .map((line) => path.basename(line));
 
+    // The positive control: with this line gone, an empty list would read as a narrowed seam
+    // rather than a filter that has rotted.
     expect(authFiles).toContain("verify.ts");
 
     const intruders = authFiles.filter((file) => file !== "verify.ts" && file !== "constants.ts");

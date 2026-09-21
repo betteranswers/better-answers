@@ -16,6 +16,7 @@ export default defineConfig({
 
     url: `${baseURL}/health`,
 
+    // A cold Testcontainers Postgres pulls its image before it answers anything.
     timeout: 240_000,
     stdout: "pipe",
     stderr: "pipe",

@@ -71,6 +71,8 @@ describe("the path the client and the api agree on", () => {
 
 describe("routes.list's types crossing from apps/api", () => {
   it("takes no input, because the workspace is the session's and never an argument", () => {
+    // `toEqualTypeOf` constrains its argument, so absence is asserted through a conditional,
+    // written both ways round so a widened input fails it too.
     type NoInput = [inferInput<ListProcedure>] extends [void | undefined]
       ? [void | undefined] extends [inferInput<ListProcedure>]
         ? true

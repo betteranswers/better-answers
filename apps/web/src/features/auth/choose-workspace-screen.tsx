@@ -82,6 +82,8 @@ export function ChooseWorkspaceScreen() {
     }
     if (sole !== undefined) openSoleWorkspace();
 
+    // Adding `openSoleWorkspace` to the deps re-runs this on every render and resumes a flow
+    // that is already resuming.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [decided, signedOut, held.length, workspaces.isError, sole?.id, active, carried, navigate]);
 

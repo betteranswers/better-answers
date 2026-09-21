@@ -17,6 +17,8 @@ export function SignOutButton(properties: { readonly variant?: "default" | "outl
       disabled={signOut.isPending}
       onClick={() => {
         signOut.mutate(undefined, {
+          // On settle, not success: whatever the server said, this browser is done with the
+          // session the person asked to leave.
           onSettled: () => {
             queryClient.clear();
             void navigate({ href: "/sign-in", replace: true });

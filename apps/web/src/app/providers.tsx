@@ -5,6 +5,8 @@ import { createQueryClient } from "@/shared/api/query-client.ts";
 import { createApiClient, TRPCProvider } from "@/shared/api/trpc.ts";
 
 export function Providers(properties: { readonly children: ReactNode }) {
+  // A module-scope client is one cache shared by every render in the process, so a second
+  // test render would see the first one's data.
   const [queryClient] = useState(createQueryClient);
   const [apiClient] = useState(createApiClient);
 
