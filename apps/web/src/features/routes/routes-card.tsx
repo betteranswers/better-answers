@@ -43,6 +43,7 @@ function RouteRow(properties: { readonly route: WorkspaceRoute }) {
       {route.purpose === FIXED_PURPOSE ? (
         <>
           <p className="mt-2">
+            {/* The outline is decoration: a reader who cannot see it loses nothing. */}
             <Badge variant="outline">Fixed</Badge>{" "}
             {route.dimensions === null ? null : (
               <span className="text-muted-foreground">{route.dimensions} dimensions</span>
