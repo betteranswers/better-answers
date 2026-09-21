@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "vitest", "import"],
+  "plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "vitest", "import", "node"],
   "jsPlugins": [
     {
       "name": "anti-slop",
@@ -22,6 +22,7 @@
   },
   "rules": {
     "no-console": "error",
+    "node/no-process-env": "error",
     "import/no-cycle": "error",
     "no-empty": ["error", { "allowEmptyCatch": false }],
     "vitest/no-identical-title": "error",
@@ -330,6 +331,30 @@
         "anti-slop/no-unsafe-dictionary-type": "off",
         "anti-slop/no-widen-then-assert": "off",
         "anti-slop/require-safety-comment-for-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["apps/api/src/config.ts", "apps/web/playwright.config.ts"],
+      "rules": {
+        "node/no-process-env": "off"
+      }
+    },
+    {
+      "files": ["packages/core/src/store/git/index.ts"],
+      "rules": {
+        "node/no-process-env": "off"
+      }
+    },
+    {
+      "files": ["scripts/**", "packages/devtools/src/**"],
+      "rules": {
+        "node/no-process-env": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/test/**", "**/tests/**", "**/e2e/**"],
+      "rules": {
+        "node/no-process-env": "off"
       }
     }
   ],
