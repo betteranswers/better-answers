@@ -12,8 +12,6 @@ This repo is **single-context**: one root `CONTEXT.md` and one `docs/adr/`. The 
 - **`CODING_RULES.md`** — the constitution. A workspace's own rules live in `apps/api/CODING_RULES.md`, `apps/web/CODING_RULES.md` and `apps/worker/CODING_RULES.md`; read a workspace's file too when changing it.
 - **`docs/okf-v02.md`** — read before adding a key, convention or feature that touches a concept file.
 
-If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
-
 ## File structure
 
 ```
@@ -44,8 +42,6 @@ When your output names a domain concept (in a task title, a refactor proposal, a
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
 
 > _Contradicts ADR-0007 (event-sourced orders) — but worth reopening because…_
-
-`AGENTS.md` sharpens this: a change that contradicts an ADR is **a new ADR, never a quiet edit**. Where an ADR and a `.scratch/` ticket disagree, the ADR wins — several `.scratch/v01-spec/issues/` tickets still carry text superseded by ADRs 0023, 0024 and 0026.
 
 ## Where an amendment lands
 
