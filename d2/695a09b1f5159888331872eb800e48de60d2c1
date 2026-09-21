@@ -1,0 +1,28 @@
+docs/specs/s1-one-uploaded-document-to-a-cited-passage.md
+  s_82ea3058e1cb04::t_969d7bdce62959 160
+docs/adr/README.md
+  s_82ea3058e1cb04::t_4eba3ba998f162 51
+CONTEXT.md
+  s_82ea3058e1cb04::t_e0a65a386673c4 546-551
+  s_82ea3058e1cb04::t_4a9a7b63945604 659-686
+docs/specs/s1-acts-ahead-of-the-first-procedures.md
+  s_82ea3058e1cb04::t_86615e77bae50b 1-106
+docs/adr/0043-an-act-is-what-an-entry-may-ask-core-to-do-admitted-before-its-body-runs-refusing-in-classed-words-that-cross-every-transport-as-themselves-in-a-transaction-only-its-opener-rolls-back.md
+  s_82ea3058e1cb04::t_9993600f317ba1 1-139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d2695a09b1f5159888331872eb800e48de60d2c1",
+  "prompts": {},
+  "sessions": {
+    "s_82ea3058e1cb04": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6990079c-83ce-4991-8159-3924cd65ae62",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
