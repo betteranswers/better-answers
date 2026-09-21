@@ -8,7 +8,7 @@ No secret is ever in git. Bootstrap secrets (`[SEC1]`) live in the orchestrator'
 
 ## The classes
 
-`[SEC1]` fixes seven credential classes, never mixed in one scope:
+ADR 0041 fixes the seven classes and `[SEC1]` keeps the rule that they are never mixed in one scope. What each is for and where it is read is written here today, which record should own that gloss being unsettled (ADR 0041):
 
 | Class | What it is for | Where it is read |
 | --- | --- | --- |
@@ -32,7 +32,7 @@ Every class has a rotation path, and every path is written down before the crede
 - **Rotation on compromise is a runbook page, not a decision.** Host compromise rotates every host-side credential; a database compromise rotates the envelope key and re-wraps every workspace data key (ADR 0005).
 - **Backups are encrypted client-side with `age`**; the private half is escrowed and resident on VPC 2 (§ The backup identity). Rotating that identity mints a new keypair and re-encrypts nothing: existing copies expire on their own lifecycle (`BACKUPS.md`).
 - **Escrow has two holders before the first client goes live**, under a written instruction, and the recovery path is exercised in the first drill. Who they are is estate detail and is not published.
-- **Access decisions are audit-logged** (`[SEC1]`), and tokens are stored hashed with a lookup prefix, expire, and are revocable.
+- **Access decisions are audit-logged** (ADR 0041), and tokens are stored hashed with a lookup prefix, expire, and are revocable.
 
 ## The backup identity
 

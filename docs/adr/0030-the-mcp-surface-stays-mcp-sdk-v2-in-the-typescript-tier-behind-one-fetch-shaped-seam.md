@@ -80,7 +80,7 @@ under **their** consent, with credentials we never hold. The Claude platform is 
 **We therefore never build outbound connectors to third-party SaaS, no outbound OAuth client
 machinery, no field mapping or sync engine, no outbound scheduler or webhook fan-out, no
 per-destination rendering, and no connector directory of our own.** The **acting** credential
-class (`[SEC1]`) is for acts on our own estate and for the ingestion side; it is never a
+class (~~`[SEC1]`~~ ADR 0041 — the 2026-09-21 amendment below) is for acts on our own estate and for the ingestion side; it is never a
 credential for writing into a customer's other systems. What we build instead is a read surface
 good enough that an assistant can carry our knowledge anywhere, plus one way to send a correction
 back — which is what ADR 0018 already describes.
@@ -176,3 +176,9 @@ answers live in a briefing under `.scratch/`, not in the ADR tree, so an agent r
 `docs/adr/` reads a true document and reaches a stale conclusion. `T-001` swept the ADRs against
 each other and left this one to a build task; that deferral was reasonable and it is also how the
 gap survived.
+
+## Amendment — 2026-09-21, the credential class list is ADR 0041's, not `[SEC1]`'s (T-184)
+
+A citation repointed, no change of decision. This ADR names the **acting** class as `[SEC1]`'s. The coding-rules audit of 21 September 2026 found that class list to be a decision recorded as a rule with nothing checking it, and moved it to **ADR 0041**, which carries the seven classes unchanged. The citation above is struck in the index's convention and repointed there. What this ADR decides about the acting class — that it is for acts on our own estate and the ingestion side, and never for writing into a customer's other systems — is untouched and stays this ADR's.
+
+The same audit found that `docs/operations/SECRETS.md` glosses *acting* incompatibly, as "writing back into a connected system as the user, approval-gated". ADR 0041 records that conflict and settles neither side, so this ADR's sentence stands as written and is contested. Settling it is a decision of its own, and it will amend whichever of the two records loses.
