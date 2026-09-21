@@ -38,6 +38,8 @@ const blocksIn = (text: string, comments: readonly Comment[]): readonly (readonl
   for (const comment of comments) {
     if (comment.type === "Shebang") continue;
 
+    // Dropped before grouping, never after: a directive between two paragraphs would
+    // otherwise lend them its exemption.
     if (EXEMPT_OPENING.test(proseOf(comment).trim())) {
       open = undefined;
       continue;

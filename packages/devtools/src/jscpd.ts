@@ -16,6 +16,8 @@ export type JscpdConfig = {
   readonly ignore: readonly string[];
 };
 
+// A command line, never jscpd's own config file: it reports a config it could not parse,
+// then scans on its defaults and exits zero.
 export const jscpdArgv = (config: JscpdConfig): readonly string[] => [
   "--min-lines",
   String(config.minLines),
@@ -26,6 +28,8 @@ export const jscpdArgv = (config: JscpdConfig): readonly string[] => [
   "--format",
   config.formats.join(","),
 
+  // Omitted, never passed empty: jscpd reads an empty ignore as every path, and a tree it
+  // scanned nothing of looks clean.
   ...(config.ignore.length > 0 ? ["--ignore", config.ignore.join(",")] : []),
   "--reporters",
   "console",

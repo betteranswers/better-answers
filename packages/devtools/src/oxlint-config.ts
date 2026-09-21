@@ -24,6 +24,8 @@ export const readOxlintConfig = (): OxlintConfig =>
   // not JSON throws in the parse itself.
   JSON.parse(
     readFileSync(path.join(repositoryRoot, ".oxlintrc.json"), "utf8").replaceAll(
+      // Whole-line comments only: a wider match would swallow a `//` inside a string, such
+      // as a URL.
       /^\s*\/\/.*$/gm,
       "",
     ),

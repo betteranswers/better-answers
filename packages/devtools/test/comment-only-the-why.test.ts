@@ -28,8 +28,10 @@ const CONFIG = JSON.stringify({
 
 const holding = (comment: string): Tree => ({ [FILE]: `${comment}export const keep = 1;\n` });
 
+// Split so vitest does not read this suite's own environment off the fixture.
 const ENVIRONMENT_DOCBLOCK = `/** @vitest-${"environment"} happy-dom */\n`;
 
+// Spelled in two halves, so the tag scan does not read a fixture as a citation.
 const tag = (family: string, number: string): string => `[${family}${number}]`;
 
 const OVER_THE_CEILING =

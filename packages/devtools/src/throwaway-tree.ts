@@ -98,6 +98,8 @@ export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
 
+        // Not hermetic: a tool spawned without PATH, HOME and a temporary directory fails
+        // for reasons unrelated to the rule under test.
         env: { ...process.env, ...tool.env },
       });
     } catch (cause) {
@@ -163,6 +165,8 @@ export const oxlintOver = (
   const expected = [...smoke.flagged].sort();
   const run = runsOverThrowawayTree({
     executable: { package: "oxlint", path: ["bin", "oxlint"] },
+    // Pinned, never left to oxlint: under Actions it picks the annotation reporter, whose
+    // lines `pathsIn` cannot read, and every rule then looks silent.
     argv: ["--config", ".oxlintrc.json", "--format=unix", "."],
     scaffold: { ".oxlintrc.json": configJson },
     env: { OXLINT_TSGOLINT_PATH: tsgolintPath() },

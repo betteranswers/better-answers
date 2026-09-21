@@ -12,6 +12,7 @@ const OVER_THE_CEILING =
 
 const TOO_LONG = `# ${OVER_THE_CEILING}\n`;
 
+// Spelled in two halves, so the tag scan does not read a fixture as a citation.
 const tag = (family: string, number: string): string => `[${family}${number}]`;
 
 const gate: Tool = {

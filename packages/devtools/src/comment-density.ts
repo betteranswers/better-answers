@@ -33,6 +33,7 @@ export const clocArgv = (paths: readonly string[]): readonly string[] => [
   "--by-file",
   "--quiet",
 
+  // Without it cloc counts a file with a twin elsewhere once, and an arm loses its lines.
   "--skip-uniqueness",
 
   // The per-file guard drops the file it fires on and writes prose after the JSON, so the
