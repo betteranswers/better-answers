@@ -53,8 +53,8 @@ const spanText = (source: string, location: ReportMutant["location"]): string =>
 
 const identity = (placed: Placed): string =>
   [placed.file, placed.mutant.mutatorName, placed.mutant.replacement ?? "", placed.text].join(
-    // Any printable character can sit inside a part, so a printable separator would let two
-    // different mutants read as one.
+    // Written as an escape: a raw NUL byte would make this file binary to git. No part of
+    // an identity can contain one.
     "\u0000",
   );
 

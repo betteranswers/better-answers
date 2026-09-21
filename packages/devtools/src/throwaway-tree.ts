@@ -98,8 +98,6 @@ export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
 
-        // Not hermetic: a tool spawned without PATH, HOME and a temporary directory fails
-        // for reasons unrelated to the rule under test.
         env: { ...process.env, ...tool.env },
       });
     } catch (cause) {

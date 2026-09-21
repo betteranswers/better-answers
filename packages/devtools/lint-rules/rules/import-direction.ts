@@ -91,8 +91,6 @@ const readManifest = (root: string): CorePackage | null => {
   return { root, entries, faces: new Set(entries.values()) };
 };
 
-// Found by the nearest manifest's name, never a path segment, so a throwaway tree and the
-// real tree classify alike.
 const packageOf = (directory: string): CorePackage | null => {
   const known = packages.get(directory);
   if (known !== undefined) return known;
@@ -181,8 +179,6 @@ export const importDirectionRule = defineRule({
       const reached = placeOf(pkg, target);
       if (reached === undefined || reached.dir === importer.dir) return;
 
-      // Direction before face: a kernel file reaching a slice's internal has broken
-      // direction, and importing the face instead would not mend it.
       const { reaches, rule, clause } = ZONES[importer.zone];
       const allowed =
         reaches.has(reached.zone) || (importer.dir === GRAPH_DOOR && reached.zone === "access");
