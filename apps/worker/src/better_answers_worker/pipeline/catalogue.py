@@ -37,7 +37,7 @@ rule and the two offsets that are what a finding is. It reads no category, no re
 reviewer and no review, and it can mark nothing.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -215,7 +215,11 @@ def _restores_by_document(
 
 
 def record_findings(
-    cursor: Cursor[Any], run: IndexRun, documents: Sequence[ReadDocument]
+    cursor: Cursor[Any],
+    run: IndexRun,
+    documents: Sequence[ReadDocument],
+    *,
+    mint: Callable[[], str] = ulid,
 ) -> int:
     """Write every span the seam raised that no run has written before, as the rows an
     Admin will review. The answer is how many rows landed.
@@ -237,13 +241,18 @@ def record_findings(
     pair are one run's reading, and this tier holds no UPDATE to write a newer one with.
     The conflict target is named — its five columns are five of the six migration 0041
     lets this tier read, which PostgreSQL asks of a target — so the statement steps over
-    *this* key and no other — a collision on the primary key is still an
-    error, where the untargeted form would swallow it in silence.
+    *this* key and no other: a collision on the primary key is still an error, where the
+    untargeted form would swallow it in silence.
+
+    `mint` is a parameter with the shipped minter as its default for that sentence's
+    sake: the difference between the two forms shows only when an id is minted twice,
+    which no caller can arrange from outside, and a case that reached into this module
+    to arrange it would be a case about something else.
     """
     rows = [
         (
             run.workspace_id,
-            ulid(),
+            mint(),
             document.source_document_id,
             finding.category,
             finding.tier,

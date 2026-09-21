@@ -38,7 +38,14 @@ import pytest
 
 from better_answers_worker import loop, queue
 from better_answers_worker.ids import ulid
-from better_answers_worker.pipeline import IndexRun, index_binding
+from better_answers_worker.pipeline import (
+    IndexRun,
+    ReadDocument,
+    RedactedDocument,
+    index_binding,
+)
+from better_answers_worker.pipeline.catalogue import record_findings
+from better_answers_worker.redaction.engine import Finding
 from better_answers_worker.redaction.pins import DETECTOR_PIN, RULE_VERSION
 from factories import (
     seed_job,
@@ -853,6 +860,63 @@ def test_a_second_run_lands_no_second_finding_row_and_moves_none(
         ("JOB_TITLE", 67, 76),
     ]
     assert marked_rows_of(connection, workspace_id) == first
+
+
+def test_the_insert_steps_over_a_known_span_and_over_no_other_collision(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    """The run's insert names the finding's own key as its conflict target, and that is
+    a choice with a consequence: `ON CONFLICT DO NOTHING` with no target steps over
+    *any* unique collision, so an id minted twice would land nothing and say nothing — a
+    span the seam raised, silently never recorded. With the target named, the one
+    collision the statement forgives is the one it means to: the same span found again.
+
+    So the id of a row the first run wrote is handed to the insert again, on a span no
+    run has seen. That is a primary-key collision and nothing else, and it has to be an
+    error. The id is a parameter of the insert for this reason and no other, as the
+    run's two ceiling figures are of the run.
+    """
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
+    bootstrap = bootstrap_for(dsn, tmp_path)
+    index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    taken = marked_rows_of(connection, workspace_id)[0]["id"]
+    another_span = ReadDocument(
+        source_document_id=AN_INVOICE_ID,
+        normalised_key=normalised_key_of(AN_INVOICE_ID),
+        redacted=RedactedDocument(
+            text="",
+            findings=(
+                Finding(
+                    category="bank-details",
+                    tier="always",
+                    rule_id="UK_BANK_ACCOUNT",
+                    start=0,
+                    end=7,
+                    score=0.55,
+                ),
+            ),
+            counts=(("bank-details", 1),),
+            verdict=None,
+            version=THE_VERSION,
+            content_hash=sha256_of(AN_INVOICE),
+            overridden=(),
+        ),
+        chunks=(),
+    )
+
+    with (
+        queue.connected(bootstrap.database_url) as worker,
+        pytest.raises(
+            psycopg.errors.UniqueViolation, match="finding_workspace_id_id_pk"
+        ),
+        queue.scoped(worker, workspace_id) as cursor,
+    ):
+        record_findings(
+            cursor, run_for(workspace_id), [another_span], mint=lambda: taken
+        )
+
+    assert [row["id"] for row in marked_rows_of(connection, workspace_id)] == [taken]
 
 
 def test_a_span_an_admin_restored_is_back_in_the_text_after_the_next_run(
