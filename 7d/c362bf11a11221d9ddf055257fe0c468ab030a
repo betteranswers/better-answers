@@ -1,0 +1,25 @@
+renovate.json
+  s_c56f1a31cc620f::t_7871073fe21029 24
+packages/devtools/README.md
+  s_c56f1a31cc620f::t_b4c53c9b03bb82 113-120
+pnpm-lock.yaml
+  ai_agent 306-307,3701-3702,8252
+packages/devtools/package.json
+  s_c56f1a31cc620f::t_ca9ca249f7dcbe 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7dc362bf11a11221d9ddf055257fe0c468ab030a",
+  "prompts": {},
+  "sessions": {
+    "s_c56f1a31cc620f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8ac1ca55-d3f6-48b9-8be8-5a25b6a547f2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
