@@ -25,7 +25,7 @@
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@types/node": "24.13.3",
-    "cloc": "2.11.0",
+    "cloc": "2.6.0-cloc",
     "jscpd": "5.1.2",
     "knip": "6.34.0",
     "oxlint": "1.80.0",

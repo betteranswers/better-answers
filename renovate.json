@@ -21,6 +21,7 @@
     { "matchManagers": ["docker-compose", "dockerfile"], "groupName": "images", "pinDigests": true },
     { "matchManagers": ["github-actions"], "groupName": "actions", "pinDigests": true },
     { "matchManagers": ["npm"], "matchDepTypes": ["devDependencies"], "groupName": "npm dev" },
+    { "matchManagers": ["npm"], "matchPackageNames": ["cloc"], "followTag": "latest", "description": "cloc's npm redistribution renumbered itself to follow upstream, so its highest version (2.11.0, December 2022, upstream 1.96) is three years older than its `latest` tag (2.6.0-cloc, June 2025, upstream 2.06) and sorts above it. Renovate would offer that as an upgrade every week; following the tag is the publisher's own answer to which release is current, and the only ordering of this package's versions that means anything" },
     { "matchManagers": ["pep621"], "groupName": "python" },
     { "matchPackageNames": ["apache/age", "postgres"], "matchUpdateTypes": ["major"], "enabled": false, "description": "A Postgres or AGE major is an upgrade drill, not a bump (ADR 0023): the platform image is built from AGE's release for one Postgres major, and the graph rides the dump. Neo4j and Forgejo are gone (ADRs 0023, 0024)" }
   ],

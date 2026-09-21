@@ -303,8 +303,8 @@ importers:
         specifier: 24.13.3
         version: 24.13.3
       cloc:
-        specifier: 2.11.0
-        version: 2.11.0
+        specifier: 2.6.0-cloc
+        version: 2.6.0-cloc
       jscpd:
         specifier: 5.1.2
         version: 5.1.2
@@ -3698,8 +3698,8 @@ packages:
     resolution: {integrity: sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==}
     engines: {node: '>=12'}
 
-  cloc@2.11.0:
-    resolution: {integrity: sha512-+mxuCHo7ESOQadlsyMjmPZ4hGBtvQzmNGHfLdBNvXKbnRhtmOTslU4XF2cyFSaOCHaaF26ba2CGjU6lpeIFB0w==}
+  cloc@2.6.0-cloc:
+    resolution: {integrity: sha512-fCHPvFN6I7WmC005u99WqLxqWnWhEra0YCppc2k8lpRZrPFIEaHaNxgJ+funlSRIZMSIOqxwpt7pmEKDPFCz2g==}
     hasBin: true
 
   clsx@2.1.1:
@@ -8249,7 +8249,7 @@ snapshots:
       strip-ansi: 6.0.1
       wrap-ansi: 7.0.0
 
-  cloc@2.11.0: {}
+  cloc@2.6.0-cloc: {}
 
   clsx@2.1.1: {}
 

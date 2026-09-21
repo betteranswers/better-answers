@@ -110,9 +110,14 @@ before then is a red branch nobody can make green. The lint rule sits in a confi
 because oxlint switches a plugin rule on from a config's `rules` block and from nowhere on the
 command line — `--deny` does not reach one.
 
-The counter is **cloc**, as the npm package `cloc` pins it: `2.11.0` is the redistribution's
-version and the tool inside it reports `1.96`, which is the number to compare a behaviour
-against. It was taken over `scc`, which the tooling research picked on semantics, because scc
+The counter is **cloc**, pinned at `2.6.0-cloc`, which carries upstream cloc `2.06` — the
+number a behaviour is compared against. **Read the pin off the registry's `latest` tag and
+never off the highest version.** The npm redistribution renumbered itself partway through its
+life to follow upstream, so `2.11.0` is its biggest number, was published in December 2022 and
+carries cloc `1.96`, while `2.6.0-cloc` is three years newer; `renovate.json` follows the tag
+for this one package for that reason, because every other ordering of these versions is a lie.
+
+cloc was taken over `scc`, which the tooling research picked on semantics, because scc
 publishes no npm or PyPI distribution and every tool this repository installs arrives through
 pnpm or uv. cloc agrees with scc where the choice mattered: a Python docstring is comment, and
 `{/* … */}` in TSX is invisible to both — the lint rule is what caps those. `--skip-uniqueness`
