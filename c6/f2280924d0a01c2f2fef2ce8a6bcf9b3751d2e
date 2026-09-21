@@ -1,0 +1,27 @@
+docs/adr/0041-a-secret-belongs-to-one-of-seven-credential-classes-the-bootstrap-class-comes-from-the-deploy-unit-and-the-other-six-are-rows-under-the-envelope.md
+  s_4b2596be4b2cd4::t_a243865b7e04eb 8
+  s_4b2596be4b2cd4::t_f9b0831da6b34d 26
+  s_4b2596be4b2cd4::t_e78bae42a6ca4b 31-33
+  s_4b2596be4b2cd4::t_ba0ce325473e17 24
+docs/adr/0042-the-product-ships-an-accessibility-statement-because-the-buyers-are-uk-public-bodies-for-whom-it-is-law.md
+  s_4b2596be4b2cd4::t_9dcad5dde25fd7 8
+  s_4b2596be4b2cd4::t_04310b67f68c07 10,14
+docs/adr/README.md
+  s_4b2596be4b2cd4::t_86d7a9c2ce2ae6 50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c6f2280924d0a01c2f2fef2ce8a6bcf9b3751d2e",
+  "prompts": {},
+  "sessions": {
+    "s_4b2596be4b2cd4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "530626fa-9b4e-49a1-9226-d5e115e7967d",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
