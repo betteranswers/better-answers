@@ -192,7 +192,7 @@ const registryZone = (): OxlintConfig["overrides"][number] => {
   };
 };
 
-describe("one guard per condition — a value the type refused is not refused again ([DESIGN4])", () => {
+describe("one guard per condition — a value the type refused is not refused again", () => {
   const twice = typedTree({
     "src/twice.ts": refusesSession("session === null || session === undefined"),
   });

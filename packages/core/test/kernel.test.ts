@@ -42,7 +42,7 @@ describe("the actor a record names", () => {
     expectTypeOf<"process:better-answers-erasure">().toExtend<ActorId>();
     expectTypeOf<"better-answers-import/1.2">().toExtend<ActorId>();
 
-    // @ts-expect-error — the shape is the guarantee `[AUDIT3]` rests on.
+    // @ts-expect-error — an actor id no code minted is the shape the audit trail rests on.
     const composed: ActorId = "priya@example.com";
     expect(composed).toBe("priya@example.com");
   });

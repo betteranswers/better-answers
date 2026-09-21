@@ -180,7 +180,7 @@ describe("the identity set", () => {
     ]);
   });
 
-  it("refuses the worker role on every identity-set table and the counters (migration 0005, [SEC3])", async () => {
+  it("refuses the worker role on every identity-set table and the counters (migration 0005)", async () => {
     const refused = [
       ...IDENTITY_SET.filter((name) => name !== "public.workspace"),
       "public.ingress_counter",

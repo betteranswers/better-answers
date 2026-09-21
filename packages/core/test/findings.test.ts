@@ -212,7 +212,7 @@ describe("what the restore act refuses", () => {
 });
 
 describe("the restore and its ledger row land or fail together", () => {
-  it("leaves the finding unrestored when the ledger refuses the event (`[AUDIT1]`)", async () => {
+  it("leaves the finding unrestored when the ledger refuses the event", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
 

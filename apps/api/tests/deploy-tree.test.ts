@@ -84,7 +84,7 @@ describe("the deploy tree (T-005)", () => {
     }
   });
 
-  it("builds the backup image on the one pinned database image, so pg_dump never skews from the server ([DEPS2])", () => {
+  it("builds the backup image on the one pinned database image, so pg_dump never skews from the server", () => {
     expect(read("deploy/backup.Dockerfile")).toContain(`FROM ${POSTGRES_IMAGE}`);
   });
 
