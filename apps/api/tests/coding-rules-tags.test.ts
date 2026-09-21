@@ -145,11 +145,7 @@ const CITED_NOWHERE_ELSE: Readonly<Record<string, string>> = {
   AUDIT6:
     "the migration that creates audit_event and its refusal tests are the schema package's; they hold the rule without naming the tag",
   AUDIT7: "the caller-minted id test is its slice's, and holds the rule without naming the tag",
-  AUDIT8:
-    "the declared-acts walk refuses an act whose subject names one of these records, and holds the rule without naming the tag",
   WEB5: "the failed-screen component test and its browser spec hold the rule — the frame, its landmarks and the way out survive a screen that throws — and they hold it without naming the tag",
-  WRK2: "one logger, one config module is the worker's shape; a reviewer reads it off the tree, and no test or ADR needs to name it",
-  WRK4: "mypy strict over src and tests, and ruff's ANN rules, hold it on every run; what enforces it is the workspace's own configuration, where a tag may not be written",
 };
 
 type Citation = { readonly file: string; readonly line: number; readonly tag: string };
