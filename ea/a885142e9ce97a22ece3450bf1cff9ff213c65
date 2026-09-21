@@ -1,0 +1,36 @@
+docs/agents/workflow.md
+  s_78419176f30797::t_22a8743fa88d92 39
+  s_78419176f30797::t_4e48ba21c954aa 25
+  s_78419176f30797::t_395107a2e6eedc 40-41
+  s_78419176f30797::t_f941ae313c18fb 14
+  s_78419176f30797::t_a8a5f358bd1972 17
+  s_78419176f30797::t_3d987c5419e745 26
+  s_78419176f30797::t_51e998c90aeef2 30
+contracts/README.md
+  s_78419176f30797::t_43e91c3c048f30 13
+  s_78419176f30797::t_16dd821f07bd30 5
+docs/agents/issue-tracker.md
+  s_78419176f30797::t_986bd3d7294476 77
+docs/adr/README.md
+  s_78419176f30797::t_df2ecb8781568b 6
+  s_78419176f30797::t_c22661dfe4d010 41
+  s_78419176f30797::t_5f1520efa8cfdb 5
+AGENTS.md
+  s_78419176f30797::t_f37f2e071bbfe4 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "eaa885142e9ce97a22ece3450bf1cff9ff213c65",
+  "prompts": {},
+  "sessions": {
+    "s_78419176f30797": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "258adea7-4c94-40df-b02b-5198b39d1258",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
