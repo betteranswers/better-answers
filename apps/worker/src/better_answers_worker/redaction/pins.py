@@ -65,8 +65,18 @@ GLINER_MODEL_ID_MEASURED = "knowledgator/gliner-pii-base-v1.0"
 #: from readers entitled to it. Version 3 is the health cue list, which held *health*
 #: and *condition* until T-179: a safety policy and a condition of contract were each
 #: withheld whole and narrowed their document to Restricted, at the tier no binding
-#: switches off.
-RULE_VERSION = "3"
+#: switches off. Version 4 is the rule on where a window into a page begins (`T-177`):
+#: before it a window began at a count of characters from the start of the text, which
+#: put its edge inside a word — the model was shown a fragment and answered for it, a
+#: `person-name` over half a word, and every later pseudonym letter shifted — and made
+#: what the model saw of one paragraph depend on how much text sat above it. A window
+#: now begins where the document itself begins something — a heading, then a paragraph,
+#: then nothing. On this repository's planted page the rule raises **the same
+#: twenty-four spans under the same categories**, gaining none and losing none;
+#: fourteen of them carry a different score, the largest move being `job-title` *Data
+#: Protection Officer* from 0.950 to 0.892. A moved score is a moved answer, so it is a
+#: moved version.
+RULE_VERSION = "4"
 
 #: Two spellings, one name: a pin is written in the hyphens a package name uses,
 #: because a slash would read as a path and an underscore as a second spelling of one

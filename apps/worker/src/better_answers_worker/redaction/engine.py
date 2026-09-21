@@ -39,6 +39,7 @@ and its key is the version string rather than anything held here (ADR 0036).
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
+from itertools import pairwise
 from types import MappingProxyType
 
 from presidio_analyzer import (
@@ -47,6 +48,7 @@ from presidio_analyzer import (
     RecognizerRegistry,
     RecognizerResult,
 )
+from presidio_analyzer.chunkers import CharacterBasedTextChunker, TextChunk
 from presidio_analyzer.nlp_engine import NlpArtifacts, NlpEngineProvider
 from presidio_analyzer.predefined_recognizers import (
     GLiNERRecognizer,
@@ -143,6 +145,182 @@ RECOGNISERS: Mapping[str, Callable[[CategoryDescriptor], EntityRecognizer]] = (
 )
 
 
+#: How long a run of text under one heading may be and still be read to the model in one
+#: window: twice the window Presidio would have used, taken from its number rather than
+#: pinned as one of ours. The ceiling was swept and not chosen — 250, 300, 350, 378,
+#: 379, 400, 500, 750, 1,000, 1,500 — and every one levels the four page lengths T-168
+#: measured, so the levelling is the heading's doing and not the ceiling's. What the
+#: ceiling decides is the whole page's own answer, and from 300 upward that answer is
+#: identical, gaining and losing nothing; only at 250 does it move, because cutting the
+#: 282-character run under *Contract history* in two makes the model read *a person's
+#: date* as a name. Twice sits in the middle of that plateau. A ceiling exists at all so
+#: that a run with no heading in it — a converted page that carries none — is never put
+#: to the model in one piece longer than the model can read.
+WINDOWS_A_RUN_IS_READ_WHOLE_IN = 2
+
+
+class AnchoredWindows(CharacterBasedTextChunker):
+    """The windows a page is put to the model in, each anchored on the page's own shape.
+
+    Presidio reads a long text to GLiNER in overlapping windows of characters. Its own
+    word for one is a *chunk*, which this repository's glossary has already spent on the
+    unit of normalised text the chunk index holds — a thing this seam runs ahead of and
+    never produces — so they are windows here (`CONTEXT.md`). Its chunker extends a
+    window's **end** forward to the next space or newline, so a window never ends inside
+    a word, and takes the next window's start as that end minus the overlap. Two faults
+    follow from that subtraction, and both were measured on the fixture page rather than
+    reasoned about.
+
+    The start lands inside a word most of the time, and a window beginning inside a word
+    is a page the model reads with a fragment at the front of it, which a zero-shot name
+    model answers for at full confidence: `bers`, the tail of *numbers*, as a person at
+    0.947, and T-168's `gned` inside *resigned* at 0.946 and `gen Sarkar` in place of
+    *Imogen Sarkar*. A fragment inside an officers block writes `[withheld]` across half
+    a word; one outside takes a pseudonym letter of its own and shifts every later
+    letter, which is how `Imogen Sarkar` became `[person C]`.
+
+    And the step counts from the start of the text, so **an edit anywhere moves every
+    window after it** and the same paragraph is read inside a different window on a page
+    that gained a sentence above it. That is not a detail of a test fixture: a page is
+    re-converted whenever its source changes, and a seam whose answers move with an edit
+    two sections up raises and drops findings nobody edited. It is also the second harm
+    in the same clothes — a name gained anywhere takes a pseudonym letter in reading
+    order and shifts every later one.
+
+    **The one rule is that a window begins where the document itself begins something.**
+    A run under a heading is read whole up to `WINDOWS_A_RUN_IS_READ_WHOLE_IN` windows.
+    A run past that is cut at the blank lines between its paragraphs, and each paragraph
+    that fits is read whole. Only a paragraph that does not fit is stepped through by a
+    count, and both its edges are held to a whole word even there. So the anchor is
+    always the largest piece of its own shape the document offers — heading, then
+    paragraph, then nothing — and what the model is shown of one piece is decided by
+    that piece and not by how much text sits above it.
+
+    That order is what carries the guarantee off a page with headings and onto one
+    without. A heading-less text is one run, cut at its paragraphs; a text under a
+    single heading with a great deal below it is the same. Only a document that is one
+    unbroken paragraph longer than the ceiling has no anchor left, and there the count
+    returns — an honest floor rather than an exception, because there is no boundary in
+    such a text to hold to.
+
+    Five rules were built and measured before this one, and the table is the docblock of
+    `tests/test_redaction_windows.py`. A whole-word start alone removes the fragments
+    and leaves the drift. A sentence start and a line start each level two of the four
+    lengths and cost the whole page the officers block's `job-title 'second registered
+    officer'` while gaining a `person-name` over *One of our supervisors*, a phrase that
+    is nobody. Anchoring on headings alone levels every length of a page that has them
+    and leaves a heading-less one drifting. Taking a blank line as an anchor everywhere
+    — inside a short run as well — levels both and costs the planted page a true
+    `job-title`, gains it the word *Finance* as one and reads *One of our supervisors*
+    as a person, at 27 windows and 1,282 ms. This rule is the only one that levels every
+    text measured, and what it does to each page's own answer is the right thing rather
+    than nothing: against `main` the planted page keeps its twenty-four spans exactly,
+    and the heading-less one **loses two and gains none** — `person-name` over *driver*,
+    which is already the `job-title` it stays, and `person-name` over `'ives broken'`,
+    the tail of *arrives broken*, which is the mid-word fragment this ticket exists to
+    kill. It is also cheaper than what it replaced — 14 windows against 16, 867 ms a
+    page against 1,011 ms on the machine both were timed on, where T-122 recorded
+    2,841 ms for the same call in the image.
+
+    A window's size and its overlap stay Presidio's own defaults and are deliberately
+    not declared here. They are the detector's numbers and not this repository's rule,
+    so a release that moved them moves `DETECTOR_PIN`, which is the half of the version
+    string that exists to say a detector's answers may have moved under us — and the
+    ceiling above is derived from the size rather than pinned beside it for the same
+    reason.
+    """
+
+    def chunk(self, text: str) -> list[TextChunk]:
+        """One run per heading, cut at its paragraphs only when it is too long."""
+        if not text:
+            return []
+        windows: list[TextChunk] = []
+        for begins, ends in self._runs_under_each_heading(text):
+            windows.extend(self._windows_in(text, begins, ends))
+        return windows
+
+    def _read_whole_to(self) -> int:
+        return self.chunk_size * WINDOWS_A_RUN_IS_READ_WHOLE_IN
+
+    def _runs_under_each_heading(self, text: str) -> list[tuple[int, int]]:
+        # The start of the text opens a run whether or not it is a heading, so a page
+        # carrying none is one run and a preamble above the first heading is its own.
+        begins = sorted({0} | self._headings_in(text))
+        return list(zip(begins, [*begins[1:], len(text)], strict=True))
+
+    def _headings_in(self, text: str) -> set[int]:
+        # The anchor is the character a converter wrote and not a parsed heading: this
+        # seam is not a Markdown reader and must not become one. The one thing it does
+        # read is a fence, because `anydoc` and `pdf-inspector` both emit them and a
+        # `#` inside one is a comment in somebody's sample code, not a heading — a run
+        # opened there would be a boundary the document does not have.
+        headings: set[int] = set()
+        fenced = False
+        at = 0
+        for line in text.splitlines(keepends=True):
+            if line.lstrip().startswith(("```", "~~~")):
+                fenced = not fenced
+            elif not fenced and line.startswith("#"):
+                headings.add(at)
+            at += len(line)
+        return headings
+
+    def _windows_in(self, text: str, begins: int, ends: int) -> list[TextChunk]:
+        if ends - begins <= self._read_whole_to():
+            return [TextChunk(text=text[begins:ends], start=begins, end=ends)]
+        # A run too long to read whole is cut where the document says it may be — at
+        # the blank lines between its paragraphs — before it is cut anywhere else, so
+        # that a page carrying one heading and a great deal under it is still anchored
+        # on its own structure rather than on a count from the top.
+        cuts = [begins, *self._paragraphs_in(text, begins, ends), ends]
+        windows: list[TextChunk] = []
+        for opens, closes in pairwise(cuts):
+            if closes - opens <= self._read_whole_to():
+                windows.append(
+                    TextChunk(text=text[opens:closes], start=opens, end=closes)
+                )
+            else:
+                windows.extend(self._stepped_through(text, opens, closes))
+        return windows
+
+    def _paragraphs_in(self, text: str, begins: int, ends: int) -> list[int]:
+        starts: list[int] = []
+        at = text.find("\n\n", begins)
+        while at != -1 and at + 2 < ends:
+            starts.append(at + 2)
+            at = text.find("\n\n", at + 2)
+        return starts
+
+    def _stepped_through(self, text: str, begins: int, ends: int) -> list[TextChunk]:
+        # The last resort, and the only place a window's edge is still decided by a
+        # count: one paragraph longer than the ceiling, which carries no boundary of
+        # its own to anchor on. Both edges are held to a whole word even here.
+        windows: list[TextChunk] = []
+        start = begins
+        while start < ends:
+            end = min(start + self.chunk_size, ends)
+            while end < ends and text[end] not in self.boundary_chars:
+                end += 1
+            windows.append(TextChunk(text=text[start:end], start=start, end=end))
+            if end >= ends:
+                break
+            # The overlap is taken back to a whole word, and never past the window it
+            # steps from: a run of characters longer than the overlap with no boundary
+            # in it would otherwise send the start backwards and the loop nowhere.
+            stepped = self._word_containing(text, end - self.chunk_overlap)
+            start = end if stepped <= start else stepped
+        return windows
+
+    def _word_containing(self, text: str, at: int) -> int:
+        # The same boundary characters the end of a window is extended to, read off the
+        # chunker rather than spelled again, so the two edges cannot come to disagree
+        # about what a word is.
+        start = at
+        while start > 0 and text[start - 1] not in self.boundary_chars:
+            start -= 1
+        return start
+
+
 class ModelRecogniser(EntityRecognizer):
     """GLiNER, asked for the labels the table maps and for nothing else.
 
@@ -155,6 +333,11 @@ class ModelRecogniser(EntityRecognizer):
     out of the document. So the analyzer's list is narrowed here to the entities the
     mapping actually covers, and the model is never asked a question the mapping has no
     answer for.
+
+    The second thing this wrapper settles is what the model is shown rather than what
+    it is asked: a page reaches it in windows, and the windows are `AnchoredWindows`
+    rather than the default, so none of them begins inside a word and none is decided by
+    how much text sits above it (`T-177`).
     """
 
     def __init__(
@@ -165,6 +348,7 @@ class ModelRecogniser(EntityRecognizer):
             map_location="cpu",
             threshold=threshold,
             entity_mapping=dict(labels),
+            text_chunker=AnchoredWindows(),
         )
         super().__init__(
             supported_entities=sorted(set(labels.values())),

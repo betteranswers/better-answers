@@ -84,6 +84,38 @@ in its own docblock. To re-take the two figures the image can still answer — t
 seam under the pin, and that model's detector alone — ``uv run --frozen pytest
 tests/test_image.py -k measured --log-cli-level=INFO``.
 
+**Re-recorded on 21 September 2026** (`T-177`, acceptance line 4), because the page the
+figure is taken over grew and the rule the figure measures changed. The page is the same
+fixture the suite reads, now **503 words, 3,107 bytes** where T-122 timed 405 words and
+2,488; the seam now anchors a window on the page's own shape rather than stepping by a
+count. Same machine class as T-122's — an Apple M4 Pro (14 cores, 24 GB) under Docker
+Desktop, ``linux/arm64`` where ``build.yml`` builds ``linux/amd64`` — and, as then, a
+host shared with other agents' builds and suites. Three readings, minutes apart, each
+the median of three runs in one container:
+
+* ``redact()``, the whole seam, under the pin — **4447, 4345, 5022 ms per page**, over a
+  load of 13078, 15961, 7514 ms paid once per process.
+* That same model's detector alone — **5829, 4250, 3013 ms per page**.
+
+**Read these against the load and not against T-122's first line.** The one-off load is
+work no rule of ours touches, and it has gone from 6351-7137 ms to 7514-15961 — better
+than twice, on the same machine class — so this host was carrying more than T-122's was,
+and the difference between the two dates is not a difference between two rules. The
+detector-alone figure again lands *above* the whole seam in one reading, which the call
+graph forbids and which T-122 recorded as the same tell. Off the image, where both rules
+could be timed back to back in one process, the rule this ticket lands is the faster of
+the two: 867 ms a page against 1,011.
+
+What the arithmetic would give, changed nowhere and recorded for the owner:
+``landed.py`` takes ``SEAM_MS_PER_PAGE`` as the **slowest** of the three readings and
+``BYTES_PER_PAGE`` as the page a reading was taken over, so on these numbers they would
+read 5022 and 3107 rather than 2841 and 2488, and ``TIMEOUT_MARGIN_MS`` — four times the
+slowest load — 64 s rather than 30. A one-page document's ceiling would go from 32.8 s
+to about 68.9 s, the **longer** direction. Nothing here moves a constant of `T-130`'s: a
+production
+ceiling cut from a contended laptop is a worse ceiling than the one it replaced, and a
+re-read on a quiet host is what should move it.
+
 **What the converters cost, and what they are worth** (`T-130`): the first act of that
 ticket, and its four readings, are the docblock on
 ``test_both_converters_hold_on_the_image_under_the_engines_own_runtime`` below — with
