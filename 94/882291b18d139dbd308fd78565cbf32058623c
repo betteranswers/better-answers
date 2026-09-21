@@ -1,0 +1,23 @@
+packages/devtools/README.md
+  s_c56f1a31cc620f::t_484f51da97aa1e 138-140
+cubic.yaml
+  s_c56f1a31cc620f::t_b953e1cf060879 37
+CODING_RULES.md
+  s_c56f1a31cc620f::t_ea3b166b4fd179 108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "94882291b18d139dbd308fd78565cbf32058623c",
+  "prompts": {},
+  "sessions": {
+    "s_c56f1a31cc620f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8ac1ca55-d3f6-48b9-8be8-5a25b6a547f2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
