@@ -187,6 +187,8 @@ describe("what the routes list refuses", () => {
     const client = app.client("203.0.113.60");
     const statuses: number[] = [];
 
+    // The window is wall-clock aligned, so a burst straddling a boundary starts its count
+    // again: ask until refused, not a fixed number.
     for (let attempt = 0; attempt <= TRPC_IP_RULE.max * 2 + 1; attempt += 1) {
       const status = (await listRoutes(client)).status;
       statuses.push(status);

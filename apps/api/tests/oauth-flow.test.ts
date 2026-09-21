@@ -618,6 +618,8 @@ describe("the audit logs (Q12)", () => {
 });
 
 describe("the limits", () => {
+  // The windows are wall-clock aligned, so a loop may straddle a boundary; 2·max + 1 puts
+  // max + 1 into one window.
   const untilRefused = async (send: () => Promise<Response>, max: number): Promise<number[]> => {
     const statuses: number[] = [];
     for (let attempt = 0; attempt < 2 * max + 1; attempt += 1) statuses.push((await send()).status);

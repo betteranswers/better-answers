@@ -94,6 +94,8 @@ const sameOriginOnly = (publicUrl: string): MiddlewareHandler => {
   };
 };
 
+// Consent shares the product's origin, so a script's fetch passes the check above; only a
+// document navigation follows the redirect.
 const navigationOnly: MiddlewareHandler = async (context, next) => {
   if (context.req.method === "POST" && context.req.header("sec-fetch-dest") !== "document") {
     return context.html(

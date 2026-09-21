@@ -139,6 +139,8 @@ describe("no block is empty, and a swallowed error is a commented decision", () 
   });
 });
 
+// tsgolint types what it lints from this tsconfig; without one a type-aware rule is
+// silent and every case asserting silence passes.
 const typedTree = (files: Tree, include: readonly string[] = ["src"]): Tree => ({
   "tsconfig.json": JSON.stringify({
     compilerOptions: { target: "esnext", module: "esnext", strict: true, noEmit: true },

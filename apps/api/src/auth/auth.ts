@@ -202,7 +202,8 @@ export const createAuth = (deps: AuthDependencies) => {
     database: drizzleAdapter(db, { provider: "pg", schema: identitySchema }),
 
     trustedOrigins: [deps.publicUrl],
-
+    // The JWT plugin's /token is for services without an OAuth flow; under an OAuth
+    // provider the library asks for it off.
     disabledPaths: ["/token"],
     user: {
       additionalFields: {
@@ -221,7 +222,8 @@ export const createAuth = (deps: AuthDependencies) => {
       database: {
         generateId: () => ulid(),
       },
-
+      // The library defaults this to NODE_ENV === "test": unset, the fence is off under
+      // every test runner and the suites asserting it still pass.
       disableOriginCheck: false,
     },
     databaseHooks: {
@@ -301,7 +303,8 @@ export const createAuth = (deps: AuthDependencies) => {
         creatorRole,
 
         allowUserToCreateOrganization: false,
-
+        // Unset, the plugin reads the id generator to decide, and a custom minter
+        // switches that heuristic off, dropping the verification ask.
         requireEmailVerificationOnInvitation: true,
 
         schema: {
@@ -326,7 +329,8 @@ export const createAuth = (deps: AuthDependencies) => {
               await tx.query("SELECT create_workspace_partition($1)", [organization.id]);
             });
           },
-
+          // Better Auth merges its owner/admin/member defaults into any roles map, so its
+          // own endpoints could otherwise assign a role outside the three.
           beforeAddMember: async ({ member }) => {
             refuseForeignRole(member.role);
           },
@@ -359,6 +363,8 @@ export const createAuth = (deps: AuthDependencies) => {
       }),
       widenAuthorize(
         oauthProvider({
+          // No page may carry a query of its own: the signed query is appended with an
+          // unconditional ?, and a second breaks the signature.
           loginPage: `${deps.publicUrl}/sign-in`,
 
           consentPage: `${deps.publicUrl}/consent`,
