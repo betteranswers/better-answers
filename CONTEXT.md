@@ -267,8 +267,9 @@ Where a unit lives is decided by **minting**.
   every row and a binding's documents can be counted by it — which is what an Admin deciding
   whether the platform needs OCR is reading. A document no run has quarantined has none.
 - **chunk** — one unit of a source document's normalised redacted text that the chunk index holds,
-  keyed by its document and its ordinal, carrying its binding's visibility — its sensitivity, its
-  audience and whether it is published. Never the original text.
+  keyed by its document and its ordinal, carrying the visibility its binding and its document give
+  it — its sensitivity, the narrower of the binding's class and the document's own, its audience
+  and whether it is published. Never the original text.
 - **window** — one run of a document's text the redaction seam puts to the detector's model in a
   single call, because the model reads less at once than a document holds. It is an argument to a
   model and nothing else: never stored, never addressed by a locator, and no finding's offsets are
