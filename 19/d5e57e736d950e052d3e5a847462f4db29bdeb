@@ -1,0 +1,26 @@
+CODING_RULES.md
+  s_a38d2840827d6c::t_45ce6239e96118 48
+  s_a38d2840827d6c::t_1d443f734205b2 130-131
+  s_a38d2840827d6c::t_565eae089579a1 80
+  s_a38d2840827d6c::t_c5293bbaa49468 226
+apps/api/tests/coding-rules-tags.test.ts
+  s_a38d2840827d6c::t_68b09efa9a44b5 238
+apps/api/tests/coding-rules-form.test.ts
+  s_a38d2840827d6c::t_cc2271d1f84d20 265-275
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "19d5e57e736d950e052d3e5a847462f4db29bdeb",
+  "prompts": {},
+  "sessions": {
+    "s_a38d2840827d6c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bcafdd87-9a23-47ee-b85e-27d4f2a91450",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
