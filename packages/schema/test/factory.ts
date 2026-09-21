@@ -286,6 +286,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   const chunk: TestData["chunk"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     if (!(await partitionExists(client, workspaceId))) {
+      // The lifecycle function refuses a workspace the transaction is not scoped to.
       const previous = await client.query("SELECT current_workspace_id() AS ws");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
       await client.query("SELECT create_workspace_partition($1)", [workspaceId]);
@@ -676,6 +677,8 @@ export const testData = (client: pg.PoolClient): TestData => {
     const receivedAt = overrides.receivedAt ?? new Date();
     const clockStartedAt = overrides.clockStartedAt ?? receivedAt;
 
+    // `dueDateOf` in `packages/core/src/erasure/requests.ts` runs the same month rule in its
+    // own lines; change one and change this.
     const dayAsked = clockStartedAt.getUTCDate();
     const dueAt = new Date(clockStartedAt);
     dueAt.setUTCDate(1);
@@ -708,6 +711,8 @@ export const testData = (client: pg.PoolClient): TestData => {
       overrides.subjectRequestId ?? (await subjectRequest({ workspaceId, kind: "erasure" })).id;
     const anchoredAt = overrides.anchoredAt ?? new Date();
 
+    // `beyondUseFrom` in `packages/core/src/erasure/routine.ts`, over `monthsOn` in the same
+    // slice, spells the same four lifetimes; change one and change this.
     const outFrom = (milliseconds: number) => new Date(anchoredAt.getTime() + milliseconds);
     const hour = 60 * 60 * 1000;
     const dayAsked = anchoredAt.getUTCDate();

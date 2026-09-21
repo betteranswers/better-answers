@@ -6,6 +6,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+// Far future, and the offsets below only move forward: the minter keeps the latest
+// millisecond, so an earlier instant proves the fallback.
 const FAR_FUTURE = Date.parse("2099-01-01T00:00:00.000Z");
 const at = (offsetMs: number) => {
   vi.useFakeTimers();
