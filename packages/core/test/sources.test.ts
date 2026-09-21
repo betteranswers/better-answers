@@ -1,5 +1,6 @@
 import type pg from "pg";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { readableClause, readableParameters } from "../src/access/index.ts";
 import { attempt, type UserPrincipal } from "../src/kernel/index.ts";
@@ -14,6 +15,7 @@ import {
 } from "../src/sources/index.ts";
 import { getObject, listObjects } from "../src/store/objects/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
+import { contractFixture, mediaTypeOutside } from "./contract-fixture.ts";
 import { chunkUnder, ledgerRowsOf, groupNamed, seededBy } from "./sourced-concept.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import { readingAs, whileWritesAreRefused } from "./suite-postgres.ts";
@@ -36,6 +38,16 @@ import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange } = suiteWithBundles();
 const store = objectStoreForSuite();
+
+/**
+ * The media types the `upload-media-types` agreement places outside the allow-list (ADR 0031),
+ * which is all this suite reads of it: the admitted list is held to `UPLOAD_MEDIA_TYPES` by
+ * the pure half, `upload-media-types.contract.test.ts`.
+ */
+const typesOutsideTheAgreement = contractFixture(
+  "upload-media-types",
+  z.object({ outside: z.array(mediaTypeOutside).min(1) }),
+).outside;
 
 /** The two doors the bind takes: Postgres for its rows, the object store for its bytes. */
 const doorsOf = (scenario: Scenario) => ({ postgres: scenario.postgres, objects: store().door });
@@ -317,7 +329,14 @@ describe("an Admin binds an upload", () => {
   it.each([
     ["a spreadsheet", "application/vnd.ms-excel"],
     ["an image", "image/png"],
-    ["Word's older format", "application/msword"],
+    // The upload-media-types agreement's seeded half (ADR 0031). The two above are this
+    // suite's own; these are the types the file both tiers read places outside the list —
+    // Word's older format among them — so a type refused here is the very type the worker's
+    // suite sees quarantined on its row.
+    ...typesOutsideTheAgreement.map((outside) => [
+      `${outside.media_type}, which the agreement both tiers read places outside the list`,
+      outside.media_type,
+    ]),
   ])(
     "refuses %s, a media type outside the allow-list, before a byte is read",
     async (_case, mediaType) => {

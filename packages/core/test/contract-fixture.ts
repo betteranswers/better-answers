@@ -42,3 +42,17 @@ export const documentChunkRow = z.object({
   locator: z.string().min(1),
   content: z.string().min(1),
 });
+
+/**
+ * One media type outside the allow-list, as the `upload-media-types` agreement's `cases.json`
+ * writes it.
+ *
+ * Two suites parse that file too — the pure half, `upload-media-types.contract.test.ts`, which
+ * holds the allow-list to the admitted types, and the seeded half, `sources.test.ts`, which
+ * offers each of these to the bind act and reads the refusal back. Both read this entry whole,
+ * so its shape is stated here once; the admitted list is the pure half's alone.
+ */
+export const mediaTypeOutside = z.object({
+  media_type: z.string().min(1),
+  why: z.string().min(1),
+});

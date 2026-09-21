@@ -55,6 +55,11 @@ const originalKeyOf = (documentId: string): string =>
  * this list is refused at the bind rather than discovered by a run that cannot convert it,
  * because a binding whose one document can never be converted is a source that will never
  * answer anything and an Admin should hear so while they still have the file.
+ *
+ * The worker's converter dispatches on the same four and neither tier can import the other's
+ * list, so both are held to the `upload-media-types` agreement (ADR 0031,
+ * `contracts/upload-media-types/`): admitting a type is a change to that file, to this list
+ * and to the worker's dispatch in one commit.
  */
 export const UPLOAD_MEDIA_TYPES = [
   "text/markdown",
