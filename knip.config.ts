@@ -94,6 +94,7 @@ const config: KnipConfig = {
         "@better-answers/devtools",
         "@stryker-mutator/core",
         "@stryker-mutator/vitest-runner",
+        "cloc",
         "jscpd",
       ],
     },

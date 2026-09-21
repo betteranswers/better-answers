@@ -81,18 +81,20 @@ const packageRoot = (from: ReturnType<typeof createRequire>, name: string): stri
   return directory;
 };
 
-const resolveExecutable = (tool: Tool): string => {
+// Exported so a suite proving what a tool writes spawns the binary this helper would, and
+// a second resolution never drifts from it.
+export const executableOf = (executable: Tool["executable"]): string => {
   const from = createRequire(import.meta.url);
-  const root = packageRoot(from, tool.executable.package);
+  const root = packageRoot(from, executable.package);
   if (root === undefined) {
     throw new Error(
-      `\`${tool.executable.package}\` is not in @better-answers/devtools's dependency tree, so its binary cannot be resolved. Declare it as a devDependency of packages/devtools.`,
+      `\`${executable.package}\` is not in @better-answers/devtools's dependency tree, so its binary cannot be resolved. Declare it as a devDependency of packages/devtools.`,
     );
   }
-  const binary = path.join(root, ...tool.executable.path);
+  const binary = path.join(root, ...executable.path);
   if (!existsSync(binary)) {
     throw new Error(
-      `${tool.executable.package}: the package is installed but carries no executable at ${tool.executable.path.join("/")} (looked at ${binary}).`,
+      `${executable.package}: the package is installed but carries no executable at ${executable.path.join("/")} (looked at ${binary}).`,
     );
   }
   return binary;
@@ -142,7 +144,7 @@ export const throwawayRepository = (root: string): string => {
  * would answer every question with silence.
  */
 export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
-  const binary = resolveExecutable(tool);
+  const binary = executableOf(tool.executable);
 
   const run: RunOverTree = (tree) => {
     const directory = mkdtempSync(path.join(tmpdir(), "throwaway-tree-"));

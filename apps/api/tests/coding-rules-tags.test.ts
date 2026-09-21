@@ -113,6 +113,13 @@ const isDocument = (file: string): boolean =>
   (file.endsWith(".md") && file.startsWith("docs/")) ||
   /(^|\/)(readme\.md|SKILL\.md|THIRD_PARTY_NOTICES\.md)$/i.test(file);
 
+// The comment gate's two other halves, which print the rule they hold the way the lint
+// rule beside them does.
+const GATES_PRINTING_A_TAG = new Set([
+  "packages/devtools/python/comment_gate.py",
+  "packages/devtools/src/comment-density.ts",
+]);
+
 /**
  * Where `[COMMENT2]` lets a tag be written. The rules files, ADRs, specs and `cubic.yaml`
  * are where rules are made and reviewed against; the lint config and the plugin rules are
@@ -127,6 +134,7 @@ const isDocument = (file: string): boolean =>
  */
 const isAllowedLocation = (file: string): boolean =>
   isRulesFile(file) ||
+  GATES_PRINTING_A_TAG.has(file) ||
   file.startsWith("docs/adr/") ||
   file.startsWith("docs/specs/") ||
   file === "cubic.yaml" ||

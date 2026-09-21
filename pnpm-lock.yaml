@@ -302,6 +302,9 @@ importers:
       '@types/node':
         specifier: 24.13.3
         version: 24.13.3
+      cloc:
+        specifier: 2.11.0
+        version: 2.11.0
       jscpd:
         specifier: 5.1.2
         version: 5.1.2
@@ -3694,6 +3697,10 @@ packages:
   cliui@8.0.1:
     resolution: {integrity: sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==}
     engines: {node: '>=12'}
+
+  cloc@2.11.0:
+    resolution: {integrity: sha512-+mxuCHo7ESOQadlsyMjmPZ4hGBtvQzmNGHfLdBNvXKbnRhtmOTslU4XF2cyFSaOCHaaF26ba2CGjU6lpeIFB0w==}
+    hasBin: true
 
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
@@ -8241,6 +8248,8 @@ snapshots:
       string-width: 4.2.3
       strip-ansi: 6.0.1
       wrap-ansi: 7.0.0
+
+  cloc@2.11.0: {}
 
   clsx@2.1.1: {}
 
