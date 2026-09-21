@@ -1,6 +1,6 @@
 # Code review: Cubic on the PR, GitNexus and the wiki in the session
 
-**Paused (10/09/2026).** Cubic's plan limit is reached, so the review loop below runs no PR until further notice. Until it resumes: a ticket is one PR into `main` (`docs/agents/workflow.md`), reviewed by the `/code-review` that ends the agent's `/implement` — its findings fixed before the commit — and by CI's root `check` on the PR.
+**Paused (10/09/2026).** Cubic's plan limit is reached, so the review loop below runs no PR until further notice.
 
 Three tools touch review here. Each has one job; the loop below is how a build session uses them without re-arguing the same finding five times.
 
