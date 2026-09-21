@@ -1,0 +1,77 @@
+apps/web/src/shared/ui/THIRD_PARTY_NOTICES.md
+  s_c56f1a31cc620f::t_6c3f3605f42ddc 32
+  s_c56f1a31cc620f::t_9873a171b36d5b 10
+  s_c56f1a31cc620f::t_a7e0542f448dc7 9
+docs/architecture/c4-containers.md
+  s_c56f1a31cc620f::t_6c8e0cdba7c49a 61
+docs/okf-v02.md
+  s_c56f1a31cc620f::t_b2bf0f8cf9baa8 41
+  s_c56f1a31cc620f::t_908eef0d1220bf 21
+.oxlintrc.json
+  s_c56f1a31cc620f::t_6b46ca693c6498 7
+  s_c56f1a31cc620f::t_2d015cbb03f06b 218
+  s_c56f1a31cc620f::t_8ed13af7daca6c 343
+  s_c56f1a31cc620f::t_60f974bcbf1aa0 209-212
+  s_c56f1a31cc620f::t_4e647781b7d4dd 204-205
+docs/architecture/c4-components-api.md
+  s_c56f1a31cc620f::t_bb8ee6f2037fef 66
+packages/devtools/README.md
+  s_c56f1a31cc620f::t_fd8a8938681418 145-146
+  s_c56f1a31cc620f::t_39e5469261bfe5 94-95
+  s_c56f1a31cc620f::t_cf26e2a0ac19b9 107-109
+  s_c56f1a31cc620f::t_d3d3737a87cdd0 83
+  s_c56f1a31cc620f::t_7a284b26179e60 138-140
+apps/api/lifts/better-auth-cimd-node/THIRD_PARTY_NOTICES.md
+  s_c56f1a31cc620f::t_f29e525c8ea860 23
+packages/design-system/readme.md
+  s_c56f1a31cc620f::t_e23dfbdd915d23 259
+  s_c56f1a31cc620f::t_c786525aa6252e 266
+  s_c56f1a31cc620f::t_6c523ea4a3c8f0 16
+  s_c56f1a31cc620f::t_97b1b788d4cf46 212
+  s_c56f1a31cc620f::t_c3429268183363 116
+  s_c56f1a31cc620f::t_86e0dbe284461d 178
+  s_c56f1a31cc620f::t_1c64930180aa28 186
+docs/operations/BACKUPS.md
+  s_c56f1a31cc620f::t_a127df8b8d9fbe 31
+cubic.yaml
+  s_c56f1a31cc620f::t_40c57e085ac322 46
+  s_c56f1a31cc620f::t_924521cfa64a6e 131
+  s_c56f1a31cc620f::t_cb451431031ef2 150
+  s_c56f1a31cc620f::t_dd66053ccd8094 34-43
+.claude/skills/browser-suite/SKILL.md
+  s_c56f1a31cc620f::t_3fd903a6827c24 77
+  s_c56f1a31cc620f::t_a2514c0cfd3e19 52
+  s_c56f1a31cc620f::t_68eb312d57d988 121
+  s_c56f1a31cc620f::t_f516ed36bcb12f 9
+docs/operations/SECRETS.md
+  s_c56f1a31cc620f::t_6ad72b1217f812 7
+  s_c56f1a31cc620f::t_f3ab3e6484e15d 11
+  s_c56f1a31cc620f::t_b19368ee74d6d3 19
+  s_c56f1a31cc620f::t_6a6017b1318ac6 30
+packages/devtools/lifts/anti-slop/THIRD_PARTY_NOTICES.md
+  s_c56f1a31cc620f::t_070f8335526df4 65
+  s_c56f1a31cc620f::t_84f3dcb090bfa3 12
+CONTEXT.md
+  s_c56f1a31cc620f::t_5a003f17bba355 95-96
+  s_c56f1a31cc620f::t_1c2b839f7337da 335
+  s_c56f1a31cc620f::t_a6bbd4936e20a8 72
+  s_c56f1a31cc620f::t_c05abd5eb306c3 714
+docs/agents/mutation-triage.md
+  s_c56f1a31cc620f::t_3942b1dd49ab0a 25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "174fccbbaac5bb4e9dbc64cfe1eeaa4a19539adf",
+  "prompts": {},
+  "sessions": {
+    "s_c56f1a31cc620f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8ac1ca55-d3f6-48b9-8be8-5a25b6a547f2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
