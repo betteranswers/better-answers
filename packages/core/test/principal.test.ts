@@ -15,36 +15,26 @@ import {
 import { bootstrap } from "./platform.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
-/**
- * The Principal resolver through its interface (`[TEST1]`): claims in, a Principal
- * alive inside one scoped transaction, or a refusal. Every refusal path is its own
- * test (`[SEC3]`): the resolver is the guard every tenant read stands behind, so what
- * it refuses is the substance.
- *
- * Seeding runs as the superuser through the factory and is committed, because the
- * resolver opens its own transaction on the runtime pool (`app_rt`, RLS applied).
- */
-
 const db = postgresForSuite();
 
 type Seeded = {
   workspaceId: string;
   userId: string;
   otherWorkspaceId: string;
-  /** The ids of the groups the person was put in, in each workspace. */
+
   groupIds: { here: readonly string[]; there: readonly string[] };
 };
 
 const seedMembership = async (
   overrides: {
     role?: "Admin" | "Editor" | "Viewer";
-    /** The person-level instant: revoked everywhere. */
+
     revokedAt?: Date;
-    /** The membership instant in the first workspace: revoked there and only there. */
+
     revokedHereAt?: Date;
-    /** Give the person a membership in the second workspace too. */
+
     memberOfBoth?: boolean;
-    /** How many groups of each workspace they are in — the second only when a member of both. */
+
     groupsEach?: number;
   } = {},
 ): Promise<Seeded> => {
@@ -116,8 +106,7 @@ describe("the Principal resolver", () => {
       userId: seeded.userId,
       role: "Editor",
       groups: [],
-      // The credential's own instant, carried so that an act which opens a later transaction
-      // judges revocation the same way this resolve just did (T-052).
+
       credentialIssuedAtMs: claims.issuedAt.getTime(),
     });
     expect(resolved.value.scope).toBe(seeded.workspaceId);
@@ -148,7 +137,6 @@ describe("the Principal resolver", () => {
     );
     expect(before).toEqual({ ok: false, error: "credentials-revoked" });
 
-    // A credential minted after the revocation is the person's fresh sign-in.
     const after = await withPrincipal(
       door,
       claimsFor(seeded, { issuedAt: new Date("2026-09-01T12:00:01Z") }),
@@ -167,7 +155,7 @@ describe("the Principal resolver", () => {
       claimsFor(seeded, { issuedAt: new Date("2026-09-03T11:59:59Z") }),
       async () => "reached",
     );
-    // The same word as the person-level scope: the People screen shows one outcome.
+
     expect(before).toEqual({ ok: false, error: "credentials-revoked" });
 
     const after = await withPrincipal(
@@ -179,9 +167,6 @@ describe("the Principal resolver", () => {
   });
 
   it("hands the caller the ids of every group they are in here, and an empty list when they are in none", async () => {
-    // ADR 0009: groups are re-read per call, not carried on a credential, so an Admin's
-    // *add to group* reaches the person on their next request rather than their next
-    // sign-in. The resolver reads them in the same one statement as the role.
     const grouped = await seedMembership({ role: "Editor", groupsEach: 2 });
     const alone = await seedMembership({ role: "Editor" });
     const door = openPostgres(db().runtimePool);
@@ -212,8 +197,7 @@ describe("the Principal resolver", () => {
       claimsFor(seeded, { issuedAt, workspaceId: seeded.otherWorkspaceId }),
       async (principal) => principal,
     );
-    // The other workspace's group, and only it: a group is a set of one workspace's
-    // members, so the group this person is in here never reaches the Principal there.
+
     expect(there).toEqual({
       ok: true,
       value: {
@@ -279,8 +263,6 @@ describe("the Principal resolver", () => {
   );
 
   it("lets a credential issued at the revocation's own instant through, because revocation ends what came before it", async () => {
-    // The boundary the two ±1s tests above straddle and neither stands on. Revocation ends
-    // what was *issued* (ADR 0035), and a credential minted at the instant itself was not.
     const revokedAt = new Date("2026-09-05T09:00:00.000Z");
     const seeded = await seedMembership({ revokedAt, revokedHereAt: revokedAt });
     const door = openPostgres(db().runtimePool);
@@ -337,22 +319,13 @@ describe("the Principal resolver", () => {
   });
 });
 
-/**
- * `member.role` is held to the three by a CHECK constraint, so a row outside them is a
- * database that has stopped agreeing with the code — which is the only thing `role-unknown`
- * is for. Dropping the constraint for the length of the test is how that database is
- * reached; the copy this suite runs against is its own, and the constraint goes back on
- * from the definition the database held, so the three roles are never written here.
- */
 const withRoleOutsideTheThree = async (
   seeded: Seeded,
   work: () => Promise<void>,
 ): Promise<void> => {
   const pool = db().pool;
   const key = [seeded.workspaceId, seeded.userId];
-  // Read the role back rather than assuming which one the arrange chose, so the restore puts
-  // this row where it was and touches no other: the constraint goes back on over a table this
-  // helper corrupted in exactly one place.
+
   const before = await pool.query<{ role: string }>(
     "SELECT role FROM member WHERE workspace_id = $1 AND user_id = $2",
     key,
@@ -401,8 +374,6 @@ describe("a workspace's config", () => {
     const seeded = await seedMembership();
     const door = openPostgres(db().runtimePool);
 
-    // The unset key is the ordinary case, not the exceptional one: the MCP surface reads a
-    // TTL this way and falls back to its default, inside the bearer gate's own transaction.
     const resolved = await withPrincipal(door, claimsFor(seeded), (principal, tx) =>
       readWorkspaceConfig(principal, tx, `unset-${ulid()}`),
     );
@@ -428,18 +399,12 @@ describe("the catalogue read the estate's restore commands make", () => {
 });
 
 describe("a transaction a caught failure aborted", () => {
-  // `[TEST8]`: the failure is provoked inside the work and the assertion is on the
-  // transaction's outcome, because Postgres aborts the transaction whatever the work
-  // does with the caught rejection — an opener that read only the work's value would
-  // report success for a transaction that rolled back.
   it("rejects a person's call at commit instead of reporting success", async () => {
     const seeded = await seedMembership();
     const door = openPostgres(db().runtimePool);
 
     await expect(
       withPrincipal(door, claimsFor(seeded), async (_principal, tx) => {
-        // The refused statement aborts the transaction; `attempt` catches the
-        // rejection, so the work runs on and returns as though nothing failed.
         await attempt(() => tx.query("SELECT no_such_function()"));
         return "reached";
       }),
@@ -470,9 +435,9 @@ describe("the counters", () => {
       await consumeCall(principal, tx, "jti-1", rule, at),
       await consumeCall(principal, tx, "jti-1", rule, at),
       await consumeCall(principal, tx, "jti-1", rule, at),
-      // Another token in the same window has its own count.
+
       await consumeCall(principal, tx, "jti-2", rule, at),
-      // The next window starts fresh.
+
       await consumeCall(principal, tx, "jti-1", rule, new Date("2026-09-01T10:01:00Z")),
     ]);
 

@@ -1,11 +1,3 @@
-"""The worker suite's test-data factory (`[TEST4]`).
-
-Tests state what their scenario needs and get domain rows back as dicts read from
-``RETURNING *``; the SQL and the defaults live here. Inserts run as whatever role and
-scope the cursor currently holds — seeding as the superuser and asserting as
-``app_rt`` is the suites' pattern, not this module's concern.
-"""
-
 import json
 import re
 import secrets
@@ -13,15 +5,9 @@ from typing import Any
 
 from psycopg import Cursor
 
-# The tier's own minter, imported rather than copied: the conformance suite holds this
-# very function to `contracts/id-shape/cases.json`, and a second implementation here
-# would prove the copy instead of the code the nightly audit's self-scheduling uses.
 from better_answers_worker.ids import ulid
 from pg_harness import REPO_ROOT
 
-# The vector width (`[DEPS2]`) — the one packages/schema/src/index-tables.ts exports,
-# read from that file so the two tiers cannot drift; one match or refuse, as
-# pg_harness reads the image pin.
 _DIMENSIONS_SOURCE = REPO_ROOT / "packages" / "schema" / "src" / "index-tables.ts"
 
 
@@ -55,8 +41,7 @@ def seed_workspace(
     name: str = "Test workspace",
 ) -> dict[str, Any]:
     identifier = workspace_id or ulid()
-    # `slug` is Better Auth's organisation column (ADR 0009, 2026-09-01): unique, never
-    # read by the worker, so the id itself is the slug here.
+
     cursor.execute(
         "INSERT INTO workspace (id, name, slug) VALUES (%s, %s, %s) RETURNING *",
         (identifier, name, f"ws-{identifier.lower()}"),
@@ -102,12 +87,6 @@ def seed_source_binding(
     published_at: str | None = None,
     rules_in_force: dict[str, bool] | None = None,
 ) -> dict[str, Any]:
-    """A binding an Admin made, with the three permission fields a run copies onto rows.
-
-    Internal and unpublished rather than the column's own Restricted default, because
-    the ordinary binding a suite wants is one whose class a document can narrow — a
-    seeded Restricted binding would make every narrowing case a no-op and prove nothing.
-    """
     cursor.execute(
         "INSERT INTO source_binding (workspace_id, id, name, connector, sensitivity,"
         " audience, audience_groups, published_at, rules_in_force)"
@@ -145,12 +124,6 @@ def seed_source_document(
     normalised_key: str | None = None,
     sensitivity: str | None = None,
 ) -> dict[str, Any]:
-    """One item the bind act catalogued, before any run has been over it.
-
-    The four columns a run reconciles — the hash, the normalised copy's key, the
-    redaction version and the outcome — are left as the bind act leaves them, which is
-    null, because a suite about the reconcile has to be able to see them move.
-    """
     identifier = document_id or ulid()
     cursor.execute(
         "INSERT INTO source_document (workspace_id, id, binding_id, source_system_id,"
@@ -179,12 +152,6 @@ def seed_suppression(
     document_id: str,
     identifiers: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
-    """What one erasure request said this document must keep out.
-
-    The row's two keys are real, so the request the routine ran and the subject request
-    it answers are written first rather than left to a deferral the caller would have to
-    remember — the same shape `seed_concept_index` takes with its bundle commit.
-    """
     subject_request_id = ulid()
     erasure_request_id = ulid()
     cursor.execute(
@@ -243,14 +210,6 @@ def seed_finding(
     rule_version: str = "1",
     detector_pin: str = "an-older-pin",
 ) -> dict[str, Any]:
-    """One span as **an older run** left it: read under rules and a detector this tree
-    no longer ships, and so under a version pair no run here will write.
-
-    What a case needs it for is the run that finds the span again. The reading — the
-    category, the tier, the score and the pair — is whatever the case says the older run
-    made of it, and the defaults are an old pair and a score no shipped recogniser
-    answers, so a row still carrying them after a run is a row that run did not touch.
-    """
     cursor.execute(
         "INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,"
         " char_start, char_end, score, rule_version, detector_pin)"
@@ -281,11 +240,6 @@ def seed_narrowed(
     char_start: int,
     char_end: int,
 ) -> dict[str, Any]:
-    """An Admin's *narrow these documents* as it leaves one finding's row: reviewed as
-    narrowed, by them, at an instant, with no reason — the act takes none. The app's act
-    and never this tier's, written here for the case that needs a review standing on a
-    row a run is about to find again.
-    """
     cursor.execute(
         "UPDATE finding SET review_state = 'narrowed', reviewed_by = %(admin)s,"
         " reviewed_at = now()"
@@ -313,15 +267,6 @@ def seed_restore(
     char_start: int,
     char_end: int,
 ) -> dict[str, Any]:
-    """An Admin's *keep in text* as it leaves one finding's row: restored and reviewed.
-
-    The act is the app's and this tier never takes it, so a case that needs a restored
-    span standing over a document writes what the act writes, here, on the owner's
-    connection. The finding is named as a run is told of it — the document, the rule and
-    the two offsets, which is what the row is unique on — and both of the act's marks
-    land, because the row's own CHECKs tie a reason to a restore and an actor to a
-    review and a row carrying half of either is one no act could have written.
-    """
     cursor.execute(
         "UPDATE finding SET restored_at = now(), restored_by = %(admin)s,"
         " restore_reason = %(reason)s, review_state = 'kept-in-text',"
@@ -349,11 +294,6 @@ def seed_concept_identity(
     iri: str,
     merge_key: str,
 ) -> dict[str, Any]:
-    """A concept's identity: the IRI the platform minted, and the merge key it holds.
-
-    What an acceptance resolves a suggestion's target against (ADR 0002, ADR 0012), so
-    the inbox conformance suite needs one before a merge key can resolve to anything.
-    """
     cursor.execute(
         "INSERT INTO concept_identity (workspace_id, iri, merge_key)"
         " VALUES (%s, %s, %s) RETURNING *",
@@ -370,11 +310,6 @@ def seed_concept_index(
     path: str,
     content_hash: str,
 ) -> dict[str, Any]:
-    """A concept's derived row, with the bundle commit it names.
-
-    The index row's key to its commit is real, so the commit is written first here
-    rather than left to a deferral the caller would have to remember.
-    """
     sha = secrets.token_hex(20)
     cursor.execute(
         "INSERT INTO bundle_commit (workspace_id, sha, audit_event_id, actor)"
@@ -406,17 +341,6 @@ def seed_job(
     claimed_by: str | None = None,
     lease_expires_in_seconds: int | None = None,
 ) -> dict[str, Any]:
-    """One job on the worker's queue, at whatever point of its life a caller needs.
-
-    The two instants are given as offsets in seconds and become absolute here, so a
-    suite can arrange a lapsed lease or an old enqueue without waiting for either to
-    happen. A job that names a claimant is given a claim instant and a heartbeat too,
-    because the row's own CHECK ties `claimed_by` to `claimed_at`.
-
-    `subject_id` is what the job is about — the binding an index run is for — under a
-    biconditional CHECK: a kind whose descriptor names a subject must be given one,
-    and a kind whose descriptor names none must not.
-    """
     held = None if claimed_by is None else "now() - interval '1 second'"
     lease = (
         "NULL"

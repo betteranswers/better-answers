@@ -7,18 +7,6 @@ import { mountedPaths } from "../src/auth/index.ts";
 import { HOSTNAME_SURFACES } from "../src/ingress/hostnames.ts";
 import { authAsServerBuildsIt } from "./auth-instance.ts";
 
-/**
- * The hostname fence's catch-all under review (T-039).
- *
- * `ingress/hostnames.ts`'s last entry hands `/*` — everything Better Auth mounts at
- * the wildcard — to `app.` without enumerating it, because the set is the
- * plugin list's and a Better Auth upgrade adds to it. That is deliberate, and it means
- * an upgrade can widen the public surface with nobody reading the diff. This suite is
- * the review point: `better-auth-endpoints.txt` is the set as last reviewed, held as
- * plain text so it reads in a PR diff, and the test rebuilds the set and names what
- * was added and what was removed.
- */
-
 const SNAPSHOT = path.join(import.meta.dirname, "better-auth-endpoints.txt");
 
 const HEADER = `\
@@ -56,26 +44,14 @@ const HEADER = `\
 # because they are reachable.
 `;
 
-/** A comment line and a blank line are the header; every other line is one path. */
 const readSnapshot = (): readonly string[] =>
   readFileSync(SNAPSHOT, "utf8")
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line !== "" && !line.startsWith("#"));
 
-/**
- * The instance `createServer` builds, built the same way — the same `createAuth` with the
- * same options — because which endpoints exist is decided by the plugin list and
- * `basePath`, both of which live in `auth.ts`. `auth-instance.ts` builds it and says why
- * the options are written out rather than reached for; the guard against a build that
- * carries *no* table is the second test below, not a live connection.
- */
 const { auth, database } = authAsServerBuildsIt();
 
-/**
- * The paths the OAuth flow and the session actually drive (`oauth-flow.test.ts`). A
- * list without them is not this app's instance.
- */
 const DRIVEN_BY_THE_FLOW = [
   "/oauth2/authorize",
   "/oauth2/consent",
@@ -88,7 +64,6 @@ const DRIVEN_BY_THE_FLOW = [
   "/organization/set-active",
 ] as const;
 
-/** The catch-all: the entry this snapshot is the review point for. */
 const CATCH_ALL = HOSTNAME_SURFACES.at(-1);
 
 afterAll(async () => {
@@ -99,17 +74,12 @@ describe("what Better Auth mounts behind the fence's catch-all (ADR 0022, T-039)
   it("mounts exactly the set the committed snapshot names", () => {
     const mounted = mountedPaths(auth);
 
-    // The test runner's own switch, not the app's configuration: `UPDATE_…=1` rewrites
-    // the file so the next commit carries the diff a reviewer reads.
     if (process.env["UPDATE_BETTER_AUTH_ENDPOINTS"] === "1") {
       writeFileSync(SNAPSHOT, `${HEADER}${mounted.join("\n")}\n`);
     }
 
     const reviewed = readSnapshot();
-    // Sorted and each path once, before membership is compared at all: the comparison
-    // below is set-shaped, so a hand-edited file with a duplicate or an out-of-order
-    // line would pass while breaking the invariant the header states — and the next
-    // refresh would produce a diff nobody could read (Cubic round 1).
+
     expect(
       reviewed,
       "tests/better-auth-endpoints.txt is not sorted, or names a path twice. Refresh it rather than editing it by hand.",
@@ -125,9 +95,6 @@ describe("what Better Auth mounts behind the fence's catch-all (ADR 0022, T-039)
   });
 
   it("refuses to agree with an empty snapshot, so a build that mounts nothing cannot pass", () => {
-    // Both sides of the comparison above come from this one build, so a build that had
-    // lost its plugins — or its endpoint table entirely — would agree with a snapshot
-    // someone had refreshed to match it, and the review point would go quiet.
     const mounted = mountedPaths(auth);
 
     expect(mounted.length).toBeGreaterThan(0);
@@ -136,22 +103,12 @@ describe("what Better Auth mounts behind the fence's catch-all (ADR 0022, T-039)
   });
 
   it("mounts nothing under the share agent's surface, which the catch-all never reaches", () => {
-    // ADR 0022: `agent.` is "open and routed only to /agent/v1/*". The fence gives that
-    // prefix to `agent.` alone and the catch-all to `app.`, so a Better Auth
-    // path under it would be a path the fence hands to the wrong hostname — and one
-    // that `agent.`, whose surface has no session, would carry.
-    //
-    // Both the committed file and the rebuilt set, so an upgrade that mounted one fails
-    // here on the same run it fails the diff, not on the run after the refresh.
     for (const mounted of [...readSnapshot(), ...mountedPaths(auth)]) {
       expect(mounted.startsWith("/agent/v1")).toBe(false);
     }
   });
 
   it("is named by the catch-all entry it reviews, and names that entry back", () => {
-    // [TEST7]: one direction finds the fence entry that stopped saying where its set is
-    // reviewed, the other the snapshot that stopped saying which fence it is the review
-    // point for. Either alone leaves a reader at one end of the pair with nowhere to go.
     expect(CATCH_ALL?.paths).toEqual(["/*"]);
     expect(CATCH_ALL?.reason).toContain("better-auth-endpoints.txt");
     expect(readFileSync(SNAPSHOT, "utf8")).toContain("ingress/hostnames.ts");

@@ -15,13 +15,6 @@ import { z } from "zod";
 
 import type { Claims } from "@better-answers/core/kernel";
 
-/**
- * The two credential paths reduced to `Claims` (the resolver's input): an OAuth bearer
- * verified in process against Better Auth's own JWKS, and a Better Auth cookie session.
- * Nothing past this file knows which library minted either (ADR 0009).
- */
-
-/** The claim set prototype 61 observed on the wire: `{workspace, user}` and no role. */
 const accessTokenClaims = z.object({
   jti: z.string().min(1),
   iat: z.number(),
@@ -39,7 +32,6 @@ export type VerifiedBearer = {
   readonly tokenId: string;
 };
 
-/** What the surface reads back out of `authInfo.extra` — parsed, never cast. */
 const bearerExtra = z.object({
   tokenId: z.string().min(1),
   claims: z.object({
@@ -59,13 +51,6 @@ export type JwksSource = () => Promise<JSONWebKeySet>;
 const invalid = (message: string): OAuthError =>
   new OAuthError(OAuthErrorCode.InvalidToken, message);
 
-/**
- * An `OAuthTokenVerifier` (the SDK's seam) over jose: signature against the JWKS the
- * authorization server publishes, `iss`, **`aud` equal to the MCP URL exactly** (the
- * audience check is ours — research 80 row 24 found the SDK never wires it), `exp`.
- * The key set is read in process and re-read once when a token names a `kid` it does
- * not hold, which is what a rotation looks like from here.
- */
 export const createTokenVerifier = (options: {
   readonly issuer: string;
   readonly audience: string;
@@ -84,7 +69,7 @@ export const createTokenVerifier = (options: {
       return await jwtVerify(token, await currentKeys(), verifyOptions);
     } catch (cause) {
       if (!(cause instanceof joseErrors.JWKSNoMatchingKey)) throw cause;
-      // A `kid` this process has not seen: read the set once more before refusing.
+
       return jwtVerify(token, await currentKeys(true), verifyOptions);
     }
   };
@@ -130,7 +115,6 @@ export const createTokenVerifier = (options: {
   };
 };
 
-/** The Better Auth session shape this module reads; the active workspace is the organisation plugin's field. */
 const sessionShape = z.object({
   user: z.object({ id: z.string().min(1) }),
   session: z.object({
@@ -139,11 +123,6 @@ const sessionShape = z.object({
   }),
 });
 
-/**
- * What Better Auth's `getSession` answers, as far as this module reads it. The active
- * workspace is absent, `null` or a string — three states the library's own type carries and
- * this one has to admit, because the reader is handed `auth.api.getSession` itself.
- */
 type SessionRecord = {
   readonly user: { readonly id: string };
   readonly session: {
@@ -153,11 +132,6 @@ type SessionRecord = {
 };
 export type SessionReader = (headers: Headers) => Promise<SessionRecord | null>;
 
-/**
- * The cookie-session path: a signed-in person with an active workspace becomes the
- * same `Claims` a bearer does, and goes through the same resolver. No active
- * workspace is no claims — the picker has not been passed.
- */
 export const sessionClaims = async (
   readSession: SessionReader,
   headers: Headers,

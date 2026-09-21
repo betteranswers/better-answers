@@ -5,35 +5,14 @@ import { readMembership } from "@better-answers/core/workspaces";
 
 import { router, workspaceProcedure } from "./base.ts";
 
-/**
- * The tier's tRPC router and nothing else — its HTTP mount lives in `mount.ts`, because
- * `AppRouter` is the one type `apps/web` imports (ADR 0006's one exception) and every
- * module this file reaches rides along into the SPA's program. Nothing here may name
- * `Auth` or touch the auth barrel; the runtime coupling stays zero.
- */
-
-/**
- * A slice answers a store failure rather than throwing it (the kernel's result
- * convention); a transport is where it becomes a status a client understands. The cause
- * is kept so the tier's logger has the driver's own error, and the message says what
- * could not be done rather than why, which is the client's business and not the store's.
- */
 const storeFailed = (what: string, cause: Error): TRPCError =>
   new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `${what} could not be read`, cause });
 
 export const appRouter = router({
   session: router({
-    /**
-     * Who the shell is looking at: the workspace, the person and their role (T-037). It is
-     * the same read every other procedure makes on its way in — the cookie session into
-     * Claims into the resolver — so an ended session, a revoked credential or a membership
-     * that has gone answers `UNAUTHORIZED` here before the shell can name anyone.
-     */
     membership: workspaceProcedure.query(async ({ ctx }) => {
       const read = await readMembership(ctx.principal, ctx.tx);
-      // The two refusals are a session pointing at rows that no longer exist, which is
-      // the same thing to a reader as a session that has ended. A store failure is not
-      // that, and is never told to a client as a signed-out session.
+
       if (!read.ok) {
         const { error } = read;
         if (error instanceof Error) throw storeFailed("the membership", error);
@@ -43,7 +22,6 @@ export const appRouter = router({
     }),
   }),
   routes: router({
-    /** A workspace's model routes, one row per purpose. Read-only: editing is a later ticket. */
     list: workspaceProcedure.query(async ({ ctx }) => {
       const listed = await listRoutes(ctx.principal, ctx.tx);
       if (!listed.ok) throw storeFailed("the workspace's routes", listed.error);

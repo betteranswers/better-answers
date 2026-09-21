@@ -1,41 +1,3 @@
-"""The full rebuild: the whole map derived again, beside the live one, and flipped.
-
-A generation exists **for full rebuilds only** (ADR 0023): an ordinary edit's delta
-lands in the app's own commit transaction and mints nothing. A rebuild happens for one
-of six reasons — first sync, route change, reconciler, erasure, upgrade, drill — and
-writes generation ``N+1`` beside the live ``N``, invisible to every read, until one row
-update makes it live. Nothing here deletes the old generation: sweeping it is the app's
-(`graph-sweep`, T-058), and the worker holds no DELETE on either row table to do it
-with.
-
-**From bundle plus records, and the split is the point.** The body and the frontmatter
-come from the file at the bundle's head — that is what makes this a derivation from the
-bundle rather than a copy of the app's own rows. The identity, the path, the folded
-kind, the status, the published instant and the three visibility columns come from the
-`concept_index` row: the records' derived visibility is the app's, derived in the act's
-own transaction from the bindings a concept's evidence came from (ADR 0039), and a
-worker that re-derived it would be a second opinion about who may read a concept. So
-this copies those columns exactly and re-derives nothing.
-
-**A mismatch stamps anyway** (ADR 0023): a file whose hash disagrees with its row is
-rebuilt from the file it is, and counted in the outcome exactly as the nightly audit
-counts it. A rebuild that refused would leave the map at the last generation and the
-workspace with no way forward; a rebuild that stamped silently would lose the one signal
-that says the two parsers have parted.
-
-The whole thing is one transaction, so a rebuild that dies halfway leaves the live
-generation exactly where it was.
-
-**The generation row is taken first, before the bundle or a record is read.** The app's
-delta takes the same row lock as it lands an edit (`liveGeneration` in the graph door,
-the ``INSERT … ON CONFLICT DO UPDATE`` this tier's `live_generation` copies), so the two
-orders are the only two: a write that got there first has committed its rows before this
-reads them, or it waits behind this rebuild and lands its delta in the generation this
-rebuild flips live. A rebuild that read first and locked afterwards would build ``N+1``
-from records a concurrent write had not yet committed, and that write, landing in ``N``
-while the rebuild waited, would be lost the moment ``N+1`` went live.
-"""
-
 from dataclasses import dataclass
 from typing import Any
 
@@ -49,10 +11,6 @@ from .links import CONCEPT_NODE_LABEL, LINKS_TO_LABEL, ResolvedTarget, outgoing_
 
 @dataclass(frozen=True, slots=True)
 class ConceptRecord:
-    """One concept as the records hold it — every column the rebuild copies rather than
-    derives.
-    """
-
     iri: str
     path: str
     kind: str
@@ -66,12 +24,6 @@ class ConceptRecord:
 
 @dataclass
 class RebuildOutcome(ParseFindings):
-    """What the rebuild wrote, and what it noticed on the way.
-
-    The findings are the audit's own, because a rebuild reads the same files and can
-    disagree with the index the same four ways; what it adds is what it built.
-    """
-
     generation: int = 0
     nodes: int = 0
     edges: int = 0
@@ -109,14 +61,6 @@ def _records(cursor: psycopg.Cursor, workspace_id: str) -> list[ConceptRecord]:
 
 
 def live_generation(cursor: psycopg.Cursor, workspace_id: str) -> int:
-    """The workspace's live generation, created at 1 if absent.
-
-    The same statement the app's delta builder uses (`liveGeneration` in the graph
-    door): the no-op ``DO UPDATE`` is what makes one statement both the create and the
-    read. A workspace whose map has never been written gets its generation row here, and
-    the rebuild then writes generation 2 beside an empty generation 1 — which is right,
-    because an empty live generation is what "no map yet" is.
-    """
     cursor.execute(
         "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, 1)"
         " ON CONFLICT (workspace_id) DO UPDATE SET live_gen = graph_generation.live_gen"
@@ -132,10 +76,8 @@ def live_generation(cursor: psycopg.Cursor, workspace_id: str) -> int:
 def run_rebuild(
     cursor: psycopg.Cursor, git_store_dir: str, workspace_id: str
 ) -> RebuildOutcome:
-    """Write the next generation from the bundle and the records, then flip it live."""
     outcome = RebuildOutcome()
-    # The row lock before any read — see the module docblock: what a write beside this
-    # rebuild has committed is what this rebuild reads, or the write waits for the flip.
+
     live = live_generation(cursor, workspace_id)
     outcome.generation = live + 1
 
@@ -179,9 +121,6 @@ def run_rebuild(
 
         content = files.get(record.path)
         if content is None:
-            # The record stands and its node is written from it; there is no file to
-            # derive an edge from, which is a fact about the bundle and is counted as
-            # one.
             outcome.missing_file.append(record.path)
             continue
         try:
@@ -192,8 +131,6 @@ def run_rebuild(
         outcome.checked += 1
         actual = content_hash_of(frontmatter, body, record.path)
         if actual != record.content_hash:
-            # A mismatch stamps anyway (ADR 0023): the file is what the map is derived
-            # from, and refusing would leave the workspace with no way forward.
             outcome.note_mismatch(record.path, record.content_hash, actual)
 
         for edge in outgoing_edges(
@@ -229,9 +166,6 @@ def run_rebuild(
             )
             outcome.edges += 1
 
-    # The flip: one row update, at the end, in the same transaction as everything above
-    # — so every read moves to the rebuilt map at one instant, and a rebuild that died
-    # halfway moved nothing.
     cursor.execute(
         "UPDATE graph_generation SET live_gen = %s WHERE workspace_id = %s",
         (outcome.generation, workspace_id),

@@ -15,23 +15,6 @@ import { testData } from "@better-answers/schema/testing";
 import { connectAsHost } from "./flow.ts";
 import { openTestGit, startApp, type TestApp, type TestClient } from "./harness.ts";
 
-/**
- * The invisibility criterion through the highest surface that exists (T-055; T-006 spec,
- * *Testing Decisions* seam 2): a concept written **through the governed write**, citing a
- * document under a Restricted binding, is invisible to a Viewer through `find`, `ask` and
- * `open` by IRI on the MCP surface — with a token the real flow minted — indistinguishably
- * from one that never existed: no hit, no count, no hint, and `open`'s refusal the same
- * shape as not-found. The Admin's token, which may see it, is the proof it is there. The
- * graph walk and the footnote read are proved at the slice seam
- * (`packages/core/test/invisibility.test.ts`).
- *
- * Beside it, the **document layer** through the same entries (T-134): a document nothing on
- * the map covers previewed as a hit of its own layer and opened by its wire locator, and the
- * four ways a locator answers nothing — withheld, under review, no address, past the end —
- * arriving as the one word in the one shape. The predicate is the sources slice's, applied
- * where T-133 put it; the surface hands the answer over and adds nothing.
- */
-
 let app: TestApp;
 
 beforeAll(async () => {
@@ -44,22 +27,14 @@ afterAll(async () => {
 
 type Rpc = Readonly<Record<string, unknown>>;
 
-/** A JSON value narrowed to an object with string keys — the shape every frame and field here is read as. */
 const isRpc = (value: unknown): value is Rpc =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** The value as an object, or an empty one: a missing field reads as nothing rather than throwing. */
 const rpcOf = (value: unknown): Rpc => (isRpc(value) ? value : {});
 
-/** The value's object items, or none. */
 const rpcListOf = (value: unknown): readonly Rpc[] =>
   Array.isArray(value) ? value.filter(isRpc) : [];
 
-/**
- * One tool call as a host makes it, and its result — the last frame of a streamed answer,
- * or the JSON body. Written for this suite's three reads alone; the protocol's own
- * conformance is `mcp-surface.test.ts`'s.
- */
 const called = async (client: TestClient, token: string, name: string, args: Rpc): Promise<Rpc> => {
   const headers = new Headers({ "content-type": "application/json" });
   headers.set("accept", "application/json, text/event-stream");
@@ -85,7 +60,6 @@ const structured = (result: Rpc): Rpc => rpcOf(result["structuredContent"]);
 
 const rendered = (result: Rpc): string => String(rpcOf(rpcListOf(result["content"])[0])["text"]);
 
-/** The Principal a transport would resolve for this person, for the act that needs one held. */
 const principalFor = async (workspaceId: string, userId: string): Promise<UserPrincipal> => {
   const resolved = await withPrincipal(
     openPostgres(app.database.pool),
@@ -98,13 +72,6 @@ const principalFor = async (workspaceId: string, userId: string): Promise<UserPr
 
 const TITLE = "Board remuneration";
 
-/**
- * What an arrange still has to say about a concept it writes. The four an arrange never
- * varies are filled here: a Note, by this workspace's Admin, onto an empty head, stable —
- * so every concept these suites stand a proof on is written the one governed way, against a
- * real bare repository, and the class its row carries is the derivation's rather than a
- * value a test chose.
- */
 type ConceptWrite = Omit<
   Parameters<typeof writeConcept>[2],
   "kind" | "author" | "expects" | "status"
@@ -131,7 +98,6 @@ const conceptWrittenIn = async (
   return written.value.iri;
 };
 
-/** What this person needs to reach the surface as a host does: a client, and a token the real flow minted. */
 const clientAndTokenFor = async (person: { readonly email: string }) => ({
   client: app.client(),
   token: (
@@ -139,11 +105,6 @@ const clientAndTokenFor = async (person: { readonly email: string }) => ({
   ).accessToken,
 });
 
-/**
- * The arrange: a workspace, a Viewer in it, a Restricted binding with one document, and a
- * stable concept citing that document — written by the Admin through the governed write
- * against a real bare repository, so the class the row carries is the derivation's.
- */
 const restrictedSourcedConcept = async () => {
   const workspace = await app.provision();
   const viewer = await app.person();
@@ -209,8 +170,7 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
     expect(rendered(asked)).toBe(rendered(unrelated));
     expect(JSON.stringify(asked)).not.toContain("remuneration is reviewed");
     expect(JSON.stringify(asked)).not.toContain("better-answers.com/c/");
-    // The positive control: the concept is there, and a reader who may see it is told so —
-    // a refusal still, since nothing drafts an answer yet (B9), naming what it would rest on.
+
     expect(structured(seen)).toMatchObject({ verdict: "refuse", citations: [{ iri }] });
     expect(rendered(seen)).toContain(iri);
   });
@@ -232,10 +192,6 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
   });
 });
 
-/**
- * The document layer through the same surface (T-134). The word every arm carries, so one
- * query reaches the concept and the standalone document alike.
- */
 const QUERY = "kingfisher";
 const INVOICE_TITLE = "The bid library's invoice";
 const INVOICE_TEXT = "The kingfisher invoice was settled in March.";
@@ -243,13 +199,6 @@ const COVERED_TITLE = "The covered handbook";
 const COVERED_TEXT = "The kingfisher handbook explains the rule.";
 const COVERING_TITLE = "Kingfisher policy";
 
-/**
- * The arrange for the document layer: a workspace with an Admin and a Viewer, four landed
- * documents — one standing alone, one a visible concept covers, one still under review, one
- * for a group the Viewer is not in — and the concept itself, written through the governed
- * write with the covered document's **wire locator** in its `sources[]`, which is the same
- * string `open` takes.
- */
 const documentsAndTheConceptOverThem = async () => {
   const workspace = await app.provision();
   const viewer = await app.person();
@@ -297,13 +246,6 @@ const documentsAndTheConceptOverThem = async () => {
   };
 };
 
-/**
- * The document layer over MCP (T-134): a search's hit is a union by knowledge layer, and
- * `open` takes the wire locator a hit or a citation carries. The connector applies no
- * predicate of its own — every refusal below is the sources slice's, reached through the
- * same entries the app reads — so what is proved here is that the surface hands them over
- * unchanged, with a token the real flow minted.
- */
 describe("the document layer through the MCP entries", () => {
   it("previews a document as a hit of its own layer, marked Not company knowledge, beside the concept — and never a document that concept covers", async () => {
     const { iri, standalone, viewer } = await documentsAndTheConceptOverThem();
@@ -334,8 +276,7 @@ describe("the document layer through the MCP entries", () => {
         sensitivity: "Internal",
       },
     ]);
-    // One line per hit, in the reader's words and never the JSON (ADR 0018): the document's
-    // carries its kind, its title, the marker, the sensitivity word and the wire locator.
+
     expect(rendered(found)).toBe(
       [
         `Note · ${COVERING_TITLE} · Unchecked · ${iri}`,
@@ -382,10 +323,6 @@ describe("the document layer through the MCP entries", () => {
       called(viewer.client, viewer.token, "open", { locator: pastTheEnd }),
     ]);
 
-    // The one shape and the one sentence for all four — a row this reader may not see, a
-    // binding nobody has published, a string that is no address and a span past the end of
-    // the text — each echoing back only what it was asked with. A reader who could tell any
-    // of them apart would learn what the workspace holds by guessing addresses.
     for (const [answer, locator] of [
       [outside, elsewhere.locator],
       [review, underReview.locator],
@@ -407,8 +344,6 @@ describe("the document layer through the MCP entries", () => {
     ]);
     expect(rendered(concept)).toContain(`- ${COVERED_TITLE} (${covered.locator})`);
 
-    // The address the concept handed over is the address the next call opens: one string for
-    // a citation and a passage alike (CONTEXT.md, *locator*).
     const passage = await called(viewer.client, viewer.token, "open", {
       locator: covered.locator,
     });

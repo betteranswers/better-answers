@@ -1,12 +1,3 @@
-"""The derivation, branch by branch (`[TEST1]`: the module entry point).
-
-Every case here is a sentence of the docblock over `LINK_DEFINITION` in
-`packages/core/src/store/graph/index.ts`, asserted on this side of the seam. That the
-two sides *agree* is the cross-tier rebuild-equivalence test's to prove; what this file
-does is say, in one place, what each branch is supposed to do — so a failure names the
-rule that broke rather than reporting that two generations differ.
-"""
-
 from better_answers_worker.concept_file import Frontmatter
 from better_answers_worker.links import (
     DERIVED_FROM_LABEL,
@@ -33,9 +24,6 @@ def edges(
     by_path: dict[str, ResolvedTarget] | None = None,
     by_iri: dict[str, ResolvedTarget] | None = None,
 ) -> list[OutgoingEdge]:
-    """The derivation, as the rebuild calls it: a file and the index rows it resolves
-    against.
-    """
     return outgoing_edges(
         iri=IRI,
         kind=kind,
@@ -65,8 +53,7 @@ def test_derives_one_edge_from_every_link_form_and_none_from_an_undefined_label(
 
 
 def test_an_image_holds_its_ordinal_and_derives_nothing() -> None:
-    # A transclusion shows a resource; it does not assert between concepts. Its ordinal
-    # stands so that removing the `!` later renumbers no neighbour.
+
     body = f"![a picture]({OTHER_IRI}) then [a link]({OTHER_IRI})."
 
     derived = edges(
@@ -77,8 +64,7 @@ def test_an_image_holds_its_ordinal_and_derives_nothing() -> None:
 
 
 def test_a_link_inside_a_code_span_or_a_fence_derives_nothing() -> None:
-    # Quotation, not assertion: code derives no edge, defines no label, names no section
-    # and enters no sentence.
+
     body = (
         f"A span `[quoted]({OTHER_IRI})` and a real [one]({OTHER_IRI}).\n\n"
         f"```\n[fenced]({OTHER_IRI})\n```\n"
@@ -89,7 +75,7 @@ def test_a_link_inside_a_code_span_or_a_fence_derives_nothing() -> None:
     )
 
     assert len(derived) == 1
-    # The blanked span leaves spaces, and the sentence collapses them.
+
     assert derived[0].sentence == "A span and a real one."
 
 
@@ -109,8 +95,7 @@ def test_a_heading_names_the_section_and_the_sentence_is_cut_around_the_link() -
 
 
 def test_an_iri_target_makes_its_edge_whether_or_not_the_concept_has_landed() -> None:
-    # A link to not-yet-written knowledge is legal; the edge dangles and the walk's node
-    # join keeps it off every path.
+
     derived = edges(f"Pointing at [nothing yet]({UNLANDED_IRI}).")
 
     assert [(edge.to_uid, edge.to_kind) for edge in derived] == [(UNLANDED_IRI, None)]

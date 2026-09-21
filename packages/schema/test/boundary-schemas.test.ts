@@ -25,13 +25,6 @@ import { createInsertSchema, createSelectSchema, createUpdateSchema } from "../s
 import { type MigratedPostgres, withRollback } from "./harness.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
-/**
- * ADR 0028's five assertions, over the registry, against a real Postgres
- * (`[TEST2]`). Assertion 4 is what makes "a refinement only narrows" a test rather
- * than a convention: every row the refined insert schema accepts must be accepted by
- * the table itself.
- */
-
 const WS_ID = "01J6AAAAAAAAAAAAAAAAAAAAAA";
 const USER_ID = "01J6CCCCCCCCCCCCCCCCCCCCCC";
 const MEMBER_ID = "01J6DDDDDDDDDDDDDDDDDDDDDD";
@@ -42,31 +35,30 @@ const AUDIT_EVENT_ID = "01J6GGGGGGGGGGGGGGGGGGGGGG";
 const BATCH_ID = "01J6HHHHHHHHHHHHHHHHHHHHHH";
 const ACCESS_REQUEST_ID = "01J6KKKKKKKKKKKKKKKKKKKKKK";
 const NOW = new Date("2026-09-01T00:00:00Z");
-// The one form a concept IRI has: the bare apex, `/c/`, a minted id (ADR 0002's amendments).
+
 const CONCEPT_IRI = "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM";
 const CONTENT_SHA256 = "a".repeat(64);
 const COMMIT_SHA = "b".repeat(40);
 const SUGGESTION_SET_ID = "01J6RRRRRRRRRRRRRRRRRRRRRR";
 const SUGGESTION_ID = "01J6SSSSSSSSSSSSSSSSSSSSSS";
 const BINDING_ID = "01J6VVVVVVVVVVVVVVVVVVVVVV";
-// The document the evidence row below locates into, catalogued under the binding above.
+
 const DOCUMENT_ID = "01J6NNNNNNNNNNNNNNNNNNNNNN";
 const COMPOSITION_ID = "01J6WWWWWWWWWWWWWWWWWWWWWW";
-// A span the seam withheld in the document above.
+
 const FINDING_ID = "01J6XXXXXXXXXXXXXXXXXXXXXX";
-// The two subject requests below: the member's, and the one recorded on behalf of a person
-// the company's files name who never signed in.
+
 const SUBJECT_REQUEST_ID = "01J6YYYYYYYYYYYYYYYYYYYYYY";
 const STRANGER_REQUEST_ID = "01J6YYYYYYYYYYYYYYYYYYYYY2";
-// A third: the member's erasure request, which the running routine below belongs to.
+
 const MEMBER_ERASURE_ID = "01J6YYYYYYYYYYYYYYYYYYYYY3";
-// The month the clock runs, and the two further months an Article 12 extension may add.
+
 const DUE = new Date("2026-10-01T00:00:00Z");
 const EXTENDED = new Date("2026-12-01T00:00:00Z");
-// The two routines below, and the opaque id the first of them rewrote a history to.
+
 const ERASURE_REQUEST_ID = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
 const ERASURE_PSEUDONYM = "01J6ZZZZZZZZZZZZZZZZZZZZZ2";
-// The four tiers' beyond-use dates, out from the anchor: 48 hours, 30 days, 8 weeks, 6 months.
+
 const BEYOND_USE = {
   hourly: new Date("2026-09-03T00:00:00Z"),
   daily: new Date("2026-10-01T00:00:00Z"),
@@ -74,7 +66,6 @@ const BEYOND_USE = {
   monthly: new Date("2027-03-01T00:00:00Z"),
 };
 
-/** Rows each refined insert schema accepts — assertion 4's input. */
 const acceptedRows = {
   workspace: [{ id: WS_ID, name: "Workspace A", slug: "workspace-a" }],
   user: [{ id: USER_ID, name: "A person", email: "person@example.invalid" }],
@@ -89,8 +80,7 @@ const acceptedRows = {
     },
   ],
   workspaceConfig: [{ workspaceId: WS_ID, key: "mcp.tools_list_ttl_ms", value: "300000" }],
-  // The membership carries the workspace-scoped revocation instant (ADR 0035); one row
-  // only, because `member_workspace_id_user_id_uidx` allows a person one membership here.
+
   member: [
     {
       id: MEMBER_ID,
@@ -101,10 +91,9 @@ const acceptedRows = {
       credentialsRevokedAt: NOW,
     },
   ],
-  // Admin-curated, the only kind anything mints; the pair is closed at the boundary.
+
   group: [{ id: GROUP_ID, workspaceId: WS_ID, name: "HR team", origin: "admin-curated" }],
-  // Keyed by the workspace, the group and the person, and carrying nothing else: the row
-  // that says what somebody may see, never what they may do.
+
   groupMember: [{ workspaceId: WS_ID, groupId: GROUP_ID, userId: USER_ID }],
   session: [
     { id: SESSION_ID, expiresAt: NOW, token: "session-token", updatedAt: NOW, userId: USER_ID },
@@ -179,8 +168,7 @@ const acceptedRows = {
   rateLimit: [{ id: "limit-1", key: "ip:203.0.113.1", count: 1, lastRequest: 1 }],
   mcpCallCounter: [{ workspaceId: WS_ID, tokenId: "jti-1", windowStart: NOW, count: 1 }],
   ingressCounter: [{ scope: "ip", key: "203.0.113.1", windowStart: NOW, count: 1 }],
-  // One row per actor form the boundary admits — a person by person id, the platform, an
-  // agent — the third carrying a batch id; `family` and `subject_kind` are the database's.
+
   auditEvent: [
     {
       id: AUDIT_EVENT_ID,
@@ -208,9 +196,7 @@ const acceptedRows = {
       batchId: BATCH_ID,
     },
   ],
-  // A waiting request and a decided one: the second carries the whole decision — the
-  // decider, the instant and the invitation approve minted — which the row's own CHECK
-  // holds together.
+
   accessRequest: [
     {
       id: ACCESS_REQUEST_ID,
@@ -241,11 +227,7 @@ const acceptedRows = {
       bindingId: "binding-1",
     },
   ],
-  // A binding narrowed to Admins over no array, and one for named groups — the two whole
-  // shapes of the audience pair (ADR 0039), so the array refinement is proved on the column.
-  // The first says nothing about redaction and takes the column's safe set; the second is the
-  // HR-shaped binding of the S0 spec, where the default-off tier is switched on and a person's
-  // name is withheld — one flip, which is the whole of what the column is for.
+
   sourceBinding: [
     {
       workspaceId: WS_ID,
@@ -269,16 +251,13 @@ const acceptedRows = {
       rulesInForce: { default_on: true, default_off: true },
       name: "The HR handbook",
       connector: "upload",
-      // One destination and a mirror's retention, so the fixture proves the set's floor and a
-      // class that is not an upload's are both accepted — the words S4's connectors will use.
+
       destination: ["graph"],
       retentionClass: "mirror",
       state: "published",
     },
   ],
-  // The two ends of a document's life: one the bind act landed and no run has been over —
-  // no normalised copy, no hash, no version string, no outcome, and no class of its own — and
-  // one a run converted and an Admin narrowed, which is the whole catalogue filled in.
+
   sourceDocument: [
     {
       workspaceId: WS_ID,
@@ -310,9 +289,7 @@ const acceptedRows = {
       sensitivity: "Restricted",
     },
   ],
-  // Three findings in the document above: one as the seam wrote it, one an Admin narrowed
-  // the document on, and one always-set span an Admin restored with a reason — the three
-  // whole shapes the review and restore CHECKs admit.
+
   finding: [
     {
       workspaceId: WS_ID,
@@ -361,10 +338,7 @@ const acceptedRows = {
       restoreReason: "the officer block is on the company's own filing",
     },
   ],
-  // Two subject requests: a member's access request, answered inside the month, and an
-  // erasure request recorded on behalf of a person the company's files name who never signed
-  // in — no person id, the identifier set alone, the clock started when the Admin confirmed
-  // identity rather than at receipt, and the month extended by two.
+
   subjectRequest: [
     {
       workspaceId: WS_ID,
@@ -404,9 +378,7 @@ const acceptedRows = {
       dueAt: DUE,
     },
   ],
-  // Two routines: one still running — the lock taken, the dates computed, no store touched
-  // and no report — and one that finished, with what each store family did and the words the
-  // report was written in.
+
   erasureRequest: [
     {
       workspaceId: WS_ID,
@@ -439,8 +411,7 @@ const acceptedRows = {
       report: "Backup copies taken before 2026-09-01 are beyond use.",
     },
   ],
-  // One suppression, in the document the finding above located a span in: what the reprocess
-  // must keep out of every derived store next time that document is converted.
+
   suppression: [
     {
       workspaceId: WS_ID,
@@ -449,11 +420,11 @@ const acceptedRows = {
       identifiers: { emails: ["person@example.invalid"], names: ["A person"], other: [] },
     },
   ],
-  // The citation: the concept above, the evidence row above by its own key.
+
   conceptEvidence: [
     { workspaceId: WS_ID, iri: CONCEPT_IRI, sourceDocumentId: DOCUMENT_ID, locator: "p.4#para-2" },
   ],
-  // An Admin's override to named groups, booked to the ledger row above.
+
   conceptClassOverride: [
     {
       workspaceId: WS_ID,
@@ -495,7 +466,7 @@ const acceptedRows = {
       audience: "everyone",
     },
   ],
-  // A bundle's first commit, whose parent is NULL, and the one after it.
+
   bundleCommit: [
     {
       workspaceId: WS_ID,
@@ -521,8 +492,7 @@ const acceptedRows = {
       contentVersion: "2026-03-01",
     },
   ],
-  // A check the platform made, which carries its hash, and one carried in with a bundle,
-  // which carries none — the CHECK that ties `origin` to `content_hash` (ADR 0019).
+
   conceptVerification: [
     {
       id: "01J6PPPPPPPPPPPPPPPPPPPPPP",
@@ -543,8 +513,7 @@ const acceptedRows = {
     },
   ],
   graphGeneration: [{ workspaceId: WS_ID, liveGen: 1 }],
-  // One row per partition (ADR 0032): a bundle-and-record node in the live generation,
-  // and a source entity, which carries no generation and wears the prefixed label.
+
   graphNode: [
     {
       workspaceId: WS_ID,
@@ -565,9 +534,7 @@ const acceptedRows = {
       audience: "everyone",
     },
   ],
-  // A LINKS_TO with the four link columns; a named edge, which may carry none of them; and
-  // the source-entity partition's own closed-label edge — `IS_CONCEPT` at `gen` NULL (ADR
-  // 0026's amendment), which the edge schemas must keep accepting.
+
   graphEdge: [
     {
       workspaceId: WS_ID,
@@ -607,9 +574,7 @@ const acceptedRows = {
       audience: "everyone",
     },
   ],
-  // A queued audit, which carries no reason, and a rebuild that ran and reported what it
-  // found — the two ends of a job's life, so the fixture proves the boundary accepts one
-  // before anything has claimed it and after it has finished, outcome and all.
+
   job: [
     { workspaceId: WS_ID, id: "01J6J1AAAAAAAAAAAAAAAAAAAA", kind: "nightly-audit" },
     {
@@ -624,13 +589,11 @@ const acceptedRows = {
       leaseExpiresAt: NOW,
       heartbeatAt: NOW,
       finishedAt: NOW,
-      // Counts, and the paths the counts were taken at: the whole of what an outcome may
-      // hold, in the auditor's own shape.
+
       outcome: { checked: 2, mismatched: [{ path: "knowledge/expenses.md" }], unparsed: [] },
     },
   ],
-  // One waiting and one accepted: the decision CHECK's two whole shapes, so the fixture
-  // proves the boundary accepts a suggestion before its decision and after it.
+
   suggestion: [
     {
       workspaceId: WS_ID,
@@ -651,8 +614,7 @@ const acceptedRows = {
       decidedAt: NOW,
     },
   ],
-  // The payload of the waiting one: a merge key and no IRI at all, because identity is
-  // the acceptance's to resolve (ADR 0012).
+
   conceptWriteRequest: [
     {
       workspaceId: WS_ID,
@@ -671,7 +633,6 @@ const acceptedRows = {
 const registryNames = Object.keys(boundarySchemas) as (keyof typeof boundarySchemas)[];
 const forms = ["select", "insert", "update"] as const;
 
-/** The unrefined generation of a registered table — what assertions 2 and 3 compare against. */
 const unrefinedFor = (
   name: keyof typeof boundarySchemas,
 ): Record<(typeof forms)[number], z.ZodObject> => {
@@ -694,8 +655,6 @@ describe("1 — every table has a boundary", () => {
   });
 
   it("has an accepted row for every registered table, and no row for an unregistered one", () => {
-    // Both directions (`[TEST7]`): assertion 4 walks the fixture; a table with no
-    // fixture would never be proved, and a fixture with no table is a stale claim.
     expect(Object.keys(acceptedRows).toSorted()).toEqual(registryNames.toSorted());
   });
 });
@@ -722,10 +681,6 @@ describe("3 — optionality and nullability agree, per key, at runtime", () => {
           boundarySchemas[name].table,
         );
         for (const [key, refinedField] of Object.entries<z.ZodType>(refinedShape)) {
-          // The customType exception (ADR 0028): drizzle-zod emits z.any() for a
-          // custom column, which accepts the null/undefined the column itself
-          // refuses — the generated side is the wrong witness there, and assertion 4
-          // carries the whole burden.
           if (columns[key]?.dataType === "custom") continue;
           const unrefinedField = unrefinedShape[key];
           if (unrefinedField === undefined) throw new Error(`no generated field for ${key}`);
@@ -759,18 +714,14 @@ describe("4 — a refinement only narrows, proved against the column", () => {
     await withRollback(db.pool, async (client) => {
       const database = drizzle(client);
       let accepted = 0;
-      // Explicit insert order, never the registry's key order: every FK target comes
-      // before its referrer, and index.chunk is list-partitioned so its workspace
-      // partition exists first (ADR 0028 assertion 4's note) — created through the
-      // one lifecycle function, which requires the transaction scoped to it.
+
       const insertOrder = [
         "workspace",
         "user",
         "llmRoute",
         "workspaceConfig",
         "member",
-        // Both group tables come after `member`: `group_member`'s composite key names the
-        // membership pair, so the membership has to be there before a group row can.
+
         "group",
         "groupMember",
         "session",
@@ -790,40 +741,30 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "ingressCounter",
         "auditEvent",
         "accessRequest",
-        // The identity comes before the index row and the check, which name it by the
-        // composite key `(workspace_id, iri)`.
+
         "conceptIdentity",
         "conceptIndex",
         "bundleCommit",
-        // The binding before the document it yielded, and both before the evidence that
-        // locates into that document: a piece of evidence names a document the platform
-        // recorded, by the composite key owner D5 settled, so the catalogue has to be there
-        // before a citation of it can be.
+
         "sourceBinding",
         "sourceDocument",
         "evidence",
         "conceptVerification",
-        // The generation row before the rows that stamp it — not a key, but the reading
-        // order a walk binds — and edges after the nodes they run between.
+
         "graphGeneration",
         "graphNode",
         "graphEdge",
-        // A job names only its workspace, so it needs nothing but that row.
+
         "job",
-        // The suggestion before its payload, which names it by the composite key, and
-        // after the identity its accepted row resolved to.
+
         "suggestion",
         "conceptWriteRequest",
-        // The findings after the document whose spans they locate; the citation after the
-        // identity and the evidence row its key names; the override after the identity; the
-        // composition before the include that names it and the concept it includes.
+
         "finding",
-        // The subject request names a person id where the subject has one, so it needs the
-        // identity row above and nothing else; the erasure request keys to the subject
-        // request by the pair, so it comes after.
+
         "subjectRequest",
         "erasureRequest",
-        // The suppression names both the routine above and the document above it.
+
         "suppression",
         "conceptEvidence",
         "conceptClassOverride",
@@ -850,22 +791,17 @@ describe("4 — a refinement only narrows, proved against the column", () => {
 });
 
 describe("the rejection half: a violated refinement never reaches Postgres", () => {
-  // No database here on purpose — the whole point is that the parse refuses the row
-  // client-side, before any INSERT exists to fail.
   const rejectedRows = {
     workspace: [
       { id: "not-a-ulid", name: "Workspace A", slug: "a" },
       { id: WS_ID, name: "   ", slug: "a" },
     ],
-    // A route with no width, and a retention tail of whitespace: the DPIA prints the
-    // provider's sentence, and a blank one is a document that says nothing where it has to
-    // say what the processor keeps.
+
     llmRoute: [
       { ...acceptedRows.llmRoute[0], dimensions: 0 },
       { ...acceptedRows.llmRoute[0], retentionTail: "   " },
     ],
-    // The identity ids the platform reads: one shape, the minter's (ADR 0035). Better
-    // Auth's own default id and a hand-composed key are both refused at the boundary.
+
     user: [{ ...acceptedRows.user[0], id: "kEyIkQBmQ1EnBJnUvKMR6nSFXlQKUcuJ" }],
     member: [
       { ...acceptedRows.member[0], role: "owner" },
@@ -873,9 +809,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
     ],
     session: [{ ...acceptedRows.session[0], id: "kEyIkQBmQ1EnBJnUvKMR6nSFXlQKUcuJ" }],
     invitation: [{ ...acceptedRows.invitation[0], id: "invitation-1" }],
-    // An id that is not the minter's, a nameless group, and a third origin: the pair is
-    // closed at the boundary, so the day a surface mints an implicit group it adds the
-    // word here and nowhere else.
+
     group: [
       { ...acceptedRows.group[0], id: "group-1" },
       { ...acceptedRows.group[0], name: "   " },
@@ -888,9 +822,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
     workspaceConfig: [{ ...acceptedRows.workspaceConfig[0], key: "  " }],
     ingressCounter: [{ ...acceptedRows.ingressCounter[0], scope: "user-agent" }],
     mcpCallCounter: [{ ...acceptedRows.mcpCallCounter[0], count: -1 }],
-    // The ledger's refusals: an id not the minter's; an act outside the four families, or
-    // with a segment missing; an actor that is an email, a bare person id or a display
-    // name; a nested detail, where a name or a prompt would have somewhere to hide.
+
     auditEvent: [
       { ...acceptedRows.auditEvent[0], id: "audit-1" },
       { ...acceptedRows.auditEvent[0], act: "billing.invoice.sent" },
@@ -901,9 +833,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.auditEvent[0], detail: { person: { name: "Priya" } } },
       { ...acceptedRows.auditEvent[2], batchId: "batch-1" },
     ],
-    // The queue's refusals: an id not the minter's; a reason that is blank, whitespace or
-    // longer than a sentence of why; a fourth status; a requester named by address rather
-    // than by person id.
+
     accessRequest: [
       { ...acceptedRows.accessRequest[0], id: "request-1" },
       { ...acceptedRows.accessRequest[0], reason: "" },
@@ -919,10 +849,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       },
       { ...acceptedRows.chunk[0], sensitivity: "Secret" },
     ],
-    // The graph's refusals: a generation before the first, a label outside the closed set
-    // that wears no source-entity prefix, a class outside the three — and the label family
-    // parted from its partition: a source-entity label inside a generation on either
-    // table, and a closed node label carrying none.
+
     graphGeneration: [{ ...acceptedRows.graphGeneration[0], liveGen: 0 }],
     graphNode: [
       { ...acceptedRows.graphNode[0], label: "Widget" },
@@ -937,17 +864,13 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.graphEdge[0], fromUid: "   " },
       { ...acceptedRows.graphEdge[1], label: "source-entity:mentions" },
     ],
-    // The queue's refusals: a fifth kind, a proposer that is an address rather than an
-    // actor, and a reason longer than the column carries.
+
     suggestion: [
       { ...acceptedRows.suggestion[0], kind: "merge" },
       { ...acceptedRows.suggestion[0], proposer: "ada@acme.invalid" },
       { ...acceptedRows.suggestion[0], reason: "x".repeat(SUGGESTION_REASON_MAX + 1) },
     ],
-    // The finding's refusals: a fourth tier and a fourth review state, both word sets being
-    // closed; an offset that is not a whole number and a span of no length; a score outside
-    // the detector's range; a category that is only whitespace; an Admin named by address
-    // rather than by person id; and a reason longer than the column carries.
+
     finding: [
       { ...acceptedRows.finding[0], tier: "sometimes" },
       { ...acceptedRows.finding[1], reviewState: "dismissed" },
@@ -959,10 +882,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.finding[1], reviewReason: "x".repeat(FINDING_REASON_MAX + 1) },
       { ...acceptedRows.finding[2], restoreReason: "x".repeat(FINDING_REASON_MAX + 1) },
     ],
-    // The binding's rules in force, every way the two switchable tiers can be broken: a third
-    // key — *always* named, which is the one a binding may not switch — one of the two left
-    // out, and a value that is neither a yes nor a no. Each would be a rule a person believes
-    // they set and the seam never reads, because this value is the seam's whole argument.
+
     sourceBinding: [
       {
         ...acceptedRows.sourceBinding[1],
@@ -970,11 +890,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       },
       { ...acceptedRows.sourceBinding[1], rulesInForce: { default_on: true } },
       { ...acceptedRows.sourceBinding[1], rulesInForce: { default_on: true, default_off: "no" } },
-      // And the binding's four closed word sets, each broken the one way it can be: a
-      // connector the platform has no code for — the roster's other words are S4's, and one
-      // admitted today is a binding no run could claim — a nameless binding the Sources screen
-      // would list as a blank line, a destination store nobody can name, a binding feeding
-      // nothing at all, a retention class outside the three, and a state outside the four.
+
       { ...acceptedRows.sourceBinding[0], connector: "sharepoint" },
       { ...acceptedRows.sourceBinding[0], name: "   " },
       { ...acceptedRows.sourceBinding[0], destination: ["chunk-index", "warehouse"] },
@@ -982,11 +898,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.sourceBinding[0], retentionClass: "forever" },
       { ...acceptedRows.sourceBinding[0], state: "reviewing" },
     ],
-    // The catalogue's refusals: a source-system id of whitespace, which is the key a reconcile
-    // finds a row by; a title a passage would be served under blank; a negative byte count;
-    // both landed-copy keys blank, because a key is the address of bytes and an empty one
-    // addresses none; a hash that is not the one digest shape this platform writes; a run
-    // outcome outside the two words; and a document class outside the three.
+
     sourceDocument: [
       { ...acceptedRows.sourceDocument[0], sourceSystemId: "   " },
       { ...acceptedRows.sourceDocument[0], title: "   " },
@@ -1000,27 +912,12 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.sourceDocument[1], outcome: "skipped" },
       { ...acceptedRows.sourceDocument[1], sensitivity: "Secret" },
     ],
-    // The job's subject, T-127's carry-forward: the row's CHECK requires a subject for the
-    // kinds whose descriptor names one, and a string of spaces is not NULL, so a subject of
-    // whitespace would pass the CHECK and reach the worker as an `index` job about no binding.
-    // The boundary is where that is a malformed job rather than an admitted one.
+
     job: [
       { ...acceptedRows.job[0], subjectId: "   " },
       { ...acceptedRows.job[0], subjectId: "" },
     ],
-    // The subject request's refusals. A third kind — the pair is closed, so the day the
-    // platform answers a portability request it adds the word to `SUBJECT_REQUEST_KINDS` and
-    // nowhere else — a person named by address rather than by the one person id (ADR 0035),
-    // and an answer that is only whitespace.
-    //
-    // Then the identifier set, every way its bounded shape can be broken: a fourth kind of
-    // identifier, one of the three missing, a kind that is a string rather than a list of
-    // them, an entry that is an object, an entry that is only whitespace, an entry longer
-    // than the bound, more entries than the bound, and the set absent altogether. The bound
-    // matters because this is the one column of the erasure slice a person's own words fill
-    // — an Admin types what the subject gave — and the set is copied into the replay copy,
-    // every suppression and every finder's argument, so an unbounded one is storage chosen
-    // by whoever asks.
+
     subjectRequest: [
       { ...acceptedRows.subjectRequest[0], kind: "portability" },
       { ...acceptedRows.subjectRequest[0], personId: "priya@example.invalid" },
@@ -1054,16 +951,8 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
           other: [],
         },
       },
-      // A set written as the JSON `null` is not here: `jsonb NOT NULL` refuses SQL NULL and
-      // not the JSON value, so the generated column schema takes it and assertion 3 holds
-      // the refinement to that. It is refused one layer down, by the table's own CHECK, and
-      // `rls.test.ts` is where that refusal is written.
     ],
-    // The erasure request's refusals: a pseudonym that is not the minter's shape — the one
-    // thing a rewritten history is joined on, so a hand-composed one would be a rewrite
-    // nobody could undo — an empty report, and a store's actions nested deeper than the flat
-    // object per family, which is the shape that keeps a person's name out of the record of
-    // what was done about them.
+
     erasureRequest: [
       { ...acceptedRows.erasureRequest[0], pseudonym: `erasure-${USER_ID}` },
       { ...acceptedRows.erasureRequest[1], report: "   " },
@@ -1072,8 +961,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
         actions: { git: { rewritten: { commits: ["abc123"] } } },
       },
     ],
-    // The suppression carries the same identifier set as the request it was written from, so
-    // it is refused the same ways: a fourth kind of identifier, and an entry over the bound.
+
     suppression: [
       {
         ...acceptedRows.suppression[0],
@@ -1084,9 +972,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
         identifiers: { emails: ["x".repeat(SUBJECT_IDENTIFIER_MAX + 1)], names: [], other: [] },
       },
     ],
-    // The payload's refusals: the bundle's manifest, which is not a concept file — and the
-    // two columns a producer fills at a size of its own choosing, each held to its bound,
-    // so a compromised one cannot fill a tenant's storage a suggestion at a time.
+
     conceptWriteRequest: [
       { ...acceptedRows.conceptWriteRequest[0], path: "knowledge/manifest.yaml" },
       { ...acceptedRows.conceptWriteRequest[0], body: "x".repeat(SUGGESTION_BODY_MAX + 1) },
@@ -1106,17 +992,6 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
   }
 });
 
-/**
- * The claim the `finding` table is built on (ADR 0020): **it never holds the value**. A
- * category, a tier, a rule id, two offsets and a score locate a span; they do not quote it.
- * That is what makes a finding safe to keep for as long as the document lives, safe to put
- * on a review screen, and nothing an erasure has to rewrite.
- *
- * The whole column set is written down here as a literal (`[TEST9]`) rather than asserted by
- * a rule about names, because there is no rule that could tell a column holding a postcode
- * from one holding a rule id. A column that could carry a value has to be added to this list
- * by hand, in the same diff — which is the review the claim actually needs.
- */
 describe("what a finding may hold", () => {
   it("has exactly these columns, and not one a personal detail could sit in", () => {
     expect(Object.keys(boundarySchemas.finding.select.shape).toSorted()).toEqual(
@@ -1144,20 +1019,7 @@ describe("what a finding may hold", () => {
   });
 });
 
-/**
- * The **rules in force** a binding carries (ADR 0020; the S0 spec, *The seam*): the unit is
- * the tier and never the category, and the two keys on the column are the two tiers a binding
- * switches.
- *
- * The correspondence between the glossary's three words and these two keys is written down
- * here rather than derived in `src/`, because deriving it would mean `source-tables.ts`
- * importing the tier list from `finding-tables.ts`, which already imports the document table
- * from `source-tables.ts` — a cycle for a fact that fits in one assertion. Both halves are
- * asserted: the keys are exactly the switchable tiers, and *always* is exactly the one with
- * no key (`[TEST7]`), so a fourth tier or a renamed one fails here and nowhere else.
- */
 describe("the rules in force a binding carries", () => {
-  /** A tier's word as the column writes it: the same word, with the separator a key takes. */
   const asKey = (tier: string) => tier.replaceAll("-", "_");
   const keyed: readonly string[] = RULES_IN_FORCE_KEYS;
 
@@ -1166,8 +1028,7 @@ describe("the rules in force a binding carries", () => {
     expect(RULES_IN_FORCE_KEYS).toEqual(
       REDACTION_TIERS.filter((tier) => tier !== REDACTION_ALWAYS_TIER).map(asKey),
     );
-    // The other way: the tier with no key is the always set, because no binding switches it
-    // off and a switch for it would be a policy tier that is not policy.
+
     expect(REDACTION_TIERS.filter((tier) => !keyed.includes(asKey(tier)))).toEqual([
       REDACTION_ALWAYS_TIER,
     ]);
@@ -1182,16 +1043,6 @@ describe("the rules in force a binding carries", () => {
   });
 });
 
-/**
- * Who a subject request is about (the architecture pass of 10/09/2026, candidate 2): **the
- * subject is an identifier set, not only a person id**. A member has both; a person the
- * company's files name who never signed in has the set alone, and the boundary has to take
- * that row or the platform can only answer the people who happen to hold a login.
- *
- * Absent and null are asserted apart because they are different sentences from a caller —
- * the act that omits the column and the act that writes the subject's absence down — and a
- * refinement that narrowed the column to a string would take one and refuse the other.
- */
 describe("who a subject request is about", () => {
   const stranger = acceptedRows.subjectRequest[1];
 
@@ -1213,14 +1064,9 @@ describe("who a subject request is about", () => {
 });
 
 describe("the frontmatter bound's unit", () => {
-  /** A frontmatter of one astral character repeated — two UTF-16 code units each. */
   const astral = (characters: number) => ({ a: "\u{1D11E}".repeat(characters) });
 
   it("counts the characters `char_length` counts, not the units JavaScript measures", () => {
-    // The bound is enforced in `submit_suggestion_set`, which measures the caller's own JSON
-    // text with `char_length` — characters. Measuring UTF-16 code units here would make one
-    // bound into two numbers, and the gap between them is a payload the boundary refuses and
-    // the database would have taken, or the other way about.
     const inside = astral(CONCEPT_FRONTMATTER_MAX - 100);
     expect(JSON.stringify(inside).length).toBeGreaterThan(CONCEPT_FRONTMATTER_MAX);
     expect(conceptFrontmatter.safeParse(inside).success).toBe(true);
@@ -1230,14 +1076,9 @@ describe("the frontmatter bound's unit", () => {
 });
 
 describe("the customType exception, per shape", () => {
-  // The plain schema replaces the generated field wholesale — the column's
-  // nullability and update's .optional() included — so each shape is constructed
-  // on its own and each carries its own proof (ADR 0028, 2026-09-01 amendment).
   const tooShort = Array.from({ length: EMBEDDING_DIMENSIONS - 1 }, () => 0);
 
   it("chunk.select requires an embedding of the route's width", () => {
-    // A read form names every nullable column rather than leaving it out, which is why the
-    // document, the locator and the span appear here as the nulls a row without them carries.
     const row = {
       ...acceptedRows.chunk[0],
       publishedAt: null,

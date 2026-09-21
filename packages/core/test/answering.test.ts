@@ -33,21 +33,8 @@ import {
 } from "./suite-documents.ts";
 import { postgresForSuite, readingAs } from "./suite-postgres.ts";
 
-/**
- * The slice's four acts and the human renderings derived from them (`[TEST1]`): the reader's
- * words and no others (CONTEXT.md, *trust words the reader sees*, *map*, *feedback*), the
- * answer's verdict-first shape with its map line (ADR 0016), and `open`'s two forms (ADR
- * 0018). Every expected string is written down rather than derived from the module, so an
- * assertion can disagree with the code it is about.
- */
-
 const db = postgresForSuite();
 
-/**
- * A workspace with one reader in it. The acts take a Principal and the transaction it was
- * resolved in, so even the ones whose bodies read nothing yet are called the way a transport
- * calls them, over a real database, rather than over a value a test composed.
- */
 const arrange = async (): Promise<{ readonly workspaceId: string; readonly userId: string }> => {
   const client = await db().pool.connect();
   try {
@@ -60,7 +47,6 @@ const arrange = async (): Promise<{ readonly workspaceId: string; readonly userI
   }
 };
 
-/** Run an act as that reader, inside one transaction, the way a transport would. */
 const acting = <T>(
   reader: { readonly workspaceId: string; readonly userId: string },
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
@@ -383,8 +369,7 @@ describe("open's and feedback's renderings", () => {
     expect(renderOpen({ found: false, iri: "https://better-answers.com/c/01C" })).toBe(
       "No concept at https://better-answers.com/c/01C.",
     );
-    // A wire result that named neither, which the type allows so the schema and this type
-    // agree: the reader is told which of the two forms answered nothing, not shown a blank.
+
     expect(renderOpen({ found: false })).toBe("No passage at that locator.");
     expect(renderOpen({ found: true })).toBe("Nothing to show.");
   });
@@ -414,14 +399,9 @@ describe("open's and feedback's renderings", () => {
 });
 
 describe("what the slice's four acts answer", () => {
-  /** A literal the test writes down (`[TEST9]`), never the wall clock (ADR 0040): nothing
-   * these reads turn on which instant it is. */
   const now = new Date("2026-09-08T12:00:00.000Z");
 
   it("hands every caller an outcome to read, never one to catch", () => {
-    // `open` (T-052), `find` and `ask` (T-055) read a store now, so their unions have widened
-    // to carry the store's own Error — the shape the convention's rule 3 promised would not
-    // change when a body arrived, and did not.
     expectTypeOf(find).returns.resolves.toEqualTypeOf<Result<FindResult, Error>>();
     expectTypeOf(open).returns.resolves.toEqualTypeOf<Result<OpenResult, Error>>();
     expectTypeOf(ask).returns.resolves.toEqualTypeOf<Result<AnswerResult, Error>>();
@@ -487,10 +467,6 @@ describe("what the slice's four acts answer", () => {
     const reader = await arrange();
     let answered: Result<OpenResult, Error> | undefined;
 
-    // A failed statement leaves the transaction aborted, so the read that follows really
-    // does fail — the store failure `open` has to tell apart from an absent concept, which
-    // it answers with `found: false`. `[TEST8]`: the opener's rejection is asserted first,
-    // because a transaction that answered COMMIT with ROLLBACK landed nothing either way.
     await expect(
       acting(reader, async (principal, tx) => {
         await tx.query("SELECT 1 / 0").catch(() => undefined);
@@ -502,19 +478,9 @@ describe("what the slice's four acts answer", () => {
   });
 });
 
-/**
- * The document layer folded into the two reads (T-134). The sources slice's own suite
- * (`passages.test.ts`) holds `findPassages` and `passageAt` to the predicate and to the
- * agreement's spans; what is proved here is the **composition** and nothing else: that a
- * document arrives beside a concept as a hit of its own layer, that its wire locator is the
- * string `open` takes, and that every way a locator can fail leaves by the one door as the
- * one word. Each expected passage is written down here rather than sliced out of the seeded
- * text, so an assertion can disagree with the code it is about.
- */
 describe("the two knowledge layers a search and a fetch reach", () => {
   const now = new Date("2026-09-08T12:00:00.000Z");
 
-  /** The one word every arm of the arrangement carries, so a single query reaches them all. */
   const QUERY = "kingfisher";
 
   const INVOICE_TITLE = "The bid library's invoice";
@@ -527,13 +493,6 @@ describe("the two knowledge layers a search and a fetch reach", () => {
   const documentHolding = (workspaceId: string, shape: DocumentShape): Promise<LandedDocument> =>
     documentLanded(db().pool, workspaceId, shape);
 
-  /**
-   * A published concept resting on that document, cited in both the places a real write fills:
-   * the `sources[]` entry the file carries, whose locator is the document's wire address, and
-   * the `concept_evidence` row derived from it. The two agree, because a search's exclusion
-   * reads the row and `open`'s evidence reads the file, and a suite that let them differ would
-   * prove the two halves of one citation against each other.
-   */
   const conceptResting = async (workspaceId: string, document: LandedDocument): Promise<string> => {
     const client = await db().pool.connect();
     try {
@@ -575,11 +534,6 @@ describe("the two knowledge layers a search and a fetch reach", () => {
   const opening = (reader: Awaited<ReturnType<typeof arrange>>, locator: string) =>
     acting(reader, (principal, tx) => open(principal, tx, { locator }, now));
 
-  /**
-   * One hit waiting on each layer: an invoice nothing on the map covers, and a handbook a
-   * concept this reader may see rests on — so the concept is the bundles arm's one hit and
-   * the handbook is the document the sources arm must leave out (ADR 0016).
-   */
   const aDocumentEachWay = async (reader: Awaited<ReturnType<typeof arrange>>) => {
     const invoice = await documentHolding(reader.workspaceId, {
       title: INVOICE_TITLE,
@@ -598,9 +552,6 @@ describe("the two knowledge layers a search and a fetch reach", () => {
 
     const found = await searching(reader);
 
-    // The concept arm first, then the document arm — the two rank separately until S2 — and
-    // the handbook is not offered at all: a concept this reader may see already covers it
-    // (ADR 0016), so what they should be reading is the concept.
     expect(found).toEqual({
       ok: true,
       value: {
@@ -639,10 +590,6 @@ describe("the two knowledge layers a search and a fetch reach", () => {
 
     const [ofOne, ofTwo] = await Promise.all([searching(reader, 1), searching(reader, 2)]);
 
-    // A reader who asked for one thing is handed one thing, not one per layer: the concept
-    // takes the room, because it is the company's answer, and the document waits for a
-    // reader who asked for more. Two arms run to the caller's limit would be twice the
-    // context an MCP host budgeted for, off one argument.
     expect(ofOne.ok && ofOne.value.hits).toEqual([
       expect.objectContaining({ layer: "bundles", iri }),
     ]);
@@ -693,15 +640,14 @@ describe("the two knowledge layers a search and a fetch reach", () => {
       text: HANDBOOK_TEXT,
       publishedAt: null,
     });
-    // A group of this workspace that the reader is not in: the binding is for it alone.
+
     const groupId = await groupSeeded(db().pool, reader.workspaceId);
     const elsewhere = await documentHolding(reader.workspaceId, {
       title: "The bid team's own file",
       text: HANDBOOK_TEXT,
       audienceGroups: [groupId],
     });
-    // Well formed, this document's own, and past the end of its text — the case the parser
-    // cannot answer, because it has no text in front of it.
+
     const pastTheEnd = `${visible.documentId}/chars:0-${codePointsOf(INVOICE_TEXT) + 1}`;
 
     const [underReview, outsideTheAudience, nonsense, tooFar, found] = await Promise.all([
@@ -725,8 +671,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
       value: { found: false, locator: "not an address at all" },
     });
     expect(tooFar).toEqual({ ok: true, value: { found: false, locator: pastTheEnd } });
-    // Not a hit, not a count and not a hint (ADR 0016): the two this reader may not reach are
-    // simply absent from the preview, which is the answer a workspace holding nothing gives.
+
     expect(found.ok && found.value.hits).toEqual([
       {
         layer: "sources",
@@ -755,8 +700,6 @@ describe("the two knowledge layers a search and a fetch reach", () => {
       `- ${HANDBOOK_TITLE} (${handbook.locator})`,
     );
 
-    // The address the concept handed over is the address the next call opens: one string for
-    // a citation and a passage alike (CONTEXT.md, *locator*).
     const passage = await opening(reader, handbook.locator);
 
     expect(passage).toEqual({

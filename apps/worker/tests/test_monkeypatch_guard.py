@@ -1,10 +1,3 @@
-"""The `monkeypatch` guard, proved where it fires and where it stays quiet (`[TEST3]`).
-
-A guard nobody has run is a convention, not a rule, so both readings are held: a patch
-of this tier's own code is refused, and a patch of a third-party attribute — how an
-external service is kept out of a test — still works.
-"""
-
 import os
 
 import pytest

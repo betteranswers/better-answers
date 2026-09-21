@@ -2,24 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ULID_PATTERN, ulid } from "../src/index.ts";
 
-/**
- * The platform's one minter, as every caller of it sees it. No database and no clock of
- * its own beyond the fake one: what is asserted here is the shape a reader of an id
- * sees, the order two ids minted at two instants sort in, and that two ids are never
- * the same — including the hard case, two ids minted inside one millisecond.
- *
- * Every fake instant below is in the far future, and they only move forward through the
- * file. The minter keeps the latest millisecond it has seen so that ids stay ordered
- * when a clock steps backwards; a test that froze the clock at an instant earlier than
- * a previous test's real-time mint would take that path and prove the fallback instead
- * of what it says it proves.
- */
-
 afterEach(() => {
   vi.useRealTimers();
 });
 
-/** Well past any wall clock this suite will run under, so the mint uses the frozen time. */
 const FAR_FUTURE = Date.parse("2099-01-01T00:00:00.000Z");
 const at = (offsetMs: number) => {
   vi.useFakeTimers();
@@ -67,7 +53,7 @@ describe("the minter, for anything that keeps an id", () => {
     const muchLater = ulid();
 
     expect([muchLater, earlier, later].toSorted()).toEqual([earlier, later, muchLater]);
-    // The time halves differ, so it is the clock and not the monotonic counter ordering them.
+
     expect(new Set([earlier, later, muchLater].map((id) => id.slice(0, 10))).size).toBe(3);
   });
 });

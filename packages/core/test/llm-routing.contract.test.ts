@@ -6,14 +6,6 @@ import { testData, withRollback } from "@better-answers/schema/testing";
 import { contractFixture } from "./contract-fixture.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
-/**
- * The llm-routing agreement's TypeScript half (ADR 0031): the fixture in
- * `contracts/llm-routing/` is the contract, and this suite proves this tier reads the
- * database's `llm_route_for` the way the fixture says — one route per workspace per
- * purpose, resolved by the database, zero rows on a missing scope. The Python half
- * runs the same cases in `apps/worker/tests/test_tier_contract.py`.
- */
-
 const purpose = z.enum(["extraction", "enrichment", "answering", "judging", "embedding"]);
 const fixtureSchema = z.object({
   workspaces: z.array(z.object({ id: z.string(), name: z.string() })),

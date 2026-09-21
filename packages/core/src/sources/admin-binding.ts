@@ -12,27 +12,8 @@ import {
 } from "../kernel/index.ts";
 import type { Tx, TxRow } from "../store/postgres/index.ts";
 
-/**
- * The head of an Admin's act on a binding it is handed the id of: the two refusals every one
- * of them decides before it reads a row, in the order it decides them.
- *
- * The role first, so a person who may not act learns nothing from the id they asked with —
- * not whether a binding of that shape could exist, not whether this workspace holds one. Then
- * the shape, against the binding table's own id column schema, so no act carries a caller's
- * string as far as a statement. Past both there is an Admin and a binding id, and the act can
- * begin.
- *
- * It is written once because every act on a binding opens this way — the DPIA input
- * (`dpia.ts`), the review list (`passages.ts`), the publish and the reprocess (`binding.ts`)
- * and the narrowing (`index.ts`) — and the same decision taken in two places is a decision
- * that can come apart. The narrowing has a third refusal, a class and an audience that are no
- * pair; that one is its own and it decides it after this head, so the order written here is
- * the order every act on a binding keeps.
- */
-
 const BINDING_ID = boundarySchemas.sourceBinding.select.shape.id;
 
-/** The Admin acting, the workspace they act in, and the binding they named. */
 export type ActingOnBinding = {
   readonly admin: AdminUserPrincipal;
   readonly workspaceId: string;
@@ -50,40 +31,12 @@ export const adminOnBinding = (
   return ok({ admin: admin.value, workspaceId: admin.value.workspaceId, bindingId: named.data });
 };
 
-/** How an act wants the binding read: the columns it needs, and whether it means to write. */
 type BindingRead = {
-  /**
-   * The columns off the row this act needs, as it would write them after `SELECT` — its own
-   * literal and never a string a caller handed in. An act that needs no column and only
-   * whether the row is there asks for `1`.
-   */
   readonly columns: string;
-  /**
-   * `for-update` for an act that goes on to write the binding or the rows derived from it, so
-   * two of them queue rather than both reading the row and both acting on what they read.
-   * `none` for a read, which has nothing to serialise against.
-   */
+
   readonly lock: "for-update" | "none";
 };
 
-/**
- * The head continued to the binding itself: the row this workspace holds at that id, or
- * `no-such-binding`.
- *
- * The columns and the lock are each act's own, because what they need off the row and whether
- * they mean to write differ — the publish takes the published instant under a lock, the
- * reprocess takes no column and only the lock, the DPIA input takes three columns and no lock.
- * What none of them may decide differently is written here: that a binding is found by its
- * workspace **and** its id and never by the id alone, which is the isolation the whole slice
- * rests on, and that a workspace holding no row at that id is `no-such-binding` rather than an
- * empty answer a caller has to interpret.
- *
- * It takes the head's own answer rather than the Principal, so an act that must decide
- * something between the two — the publish, which refuses a missing confirmation before it asks
- * the database anything — keeps that refusal in its own order. That answer is the first
- * parameter, the place the Principal it carries sits on every other tenant read — the
- * constitution's *a Principal on every call* shape, held by the review of 19/09/2026.
- */
 export const bindingNamed = async <Row extends TxRow>(
   acting: ActingOnBinding,
   tx: Tx,

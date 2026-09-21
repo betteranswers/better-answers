@@ -5,15 +5,6 @@ import type pg from "pg";
 
 import * as publicEntry from "../src/index.ts";
 
-/**
- * The worker's view of the schema, generated and committed (ADR 0032): these
- * functions run the journal's result through `pg_catalog` and render the Python
- * module the worker imports, carrying the migration id (the worker's schema stamp). The drift
- * test regenerates and fails in both directions — a stale committed view, and any
- * table in the migrated database the declarations do not know (a hand-written
- * migration that added a table `src/` never declared).
- */
-
 export type ColumnRow = {
   readonly schema: string;
   readonly table: string;
@@ -22,7 +13,6 @@ export type ColumnRow = {
   readonly notNull: boolean;
 };
 
-/** Every table the migrated database holds, partitions excluded. */
 export const introspect = async (client: pg.Pool | pg.PoolClient): Promise<ColumnRow[]> => {
   const result = await client.query(
     String.raw`SELECT n.nspname AS schema, c.relname AS table, a.attname AS column,
@@ -43,7 +33,6 @@ export const introspect = async (client: pg.Pool | pg.PoolClient): Promise<Colum
   }));
 };
 
-/** The tables `src/` declares — the set the migrated database must not exceed. */
 export const declaredTableNames = (): Set<string> => {
   const names = new Set<string>();
   for (const value of Object.values(publicEntry)) {
@@ -55,7 +44,6 @@ export const declaredTableNames = (): Set<string> => {
   return names;
 };
 
-/** Fails on the table the declarations do not know — drift's second direction. */
 export const assertNoUndeclaredTables = (rows: readonly ColumnRow[]): void => {
   const declared = declaredTableNames();
   const undeclared = [...new Set(rows.map((row) => `${row.schema}.${row.table}`))].filter(
@@ -69,15 +57,6 @@ export const assertNoUndeclaredTables = (rows: readonly ColumnRow[]): void => {
   }
 };
 
-/**
- * Renders the committed Python module — ruff-format-stable by construction.
- *
- * Two stamps, not one. `MIGRATION_ID` is the tag a person reads; `MIGRATION_WHEN` is the
- * journal's `when` for that same migration, which is what drizzle's migrator writes into
- * `drizzle.__drizzle_migrations.created_at`. The tag never reaches that table — it holds a
- * hash and an instant — so `when` is the only fact the worker's stamp check can compare
- * against the database it is about to claim from before it claims anything.
- */
 export const renderWorkerSchemaView = (
   rows: readonly ColumnRow[],
   migration: { readonly tag: string; readonly when: number },

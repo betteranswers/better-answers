@@ -7,25 +7,6 @@ import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { signIn } from "./flow.ts";
 import { APP_HOSTNAME, startApp, type TestApp, type TestClient } from "./harness.ts";
 
-/**
- * `routes.list` from the outside (`[TEST1]`, `[APP3]`): a person signs in with a code
- * the way the product's sign-in does, and asks the tRPC endpoint for their
- * workspace's routes. What the procedure refuses is the substance (`[SEC3]`), so
- * every refusal the path can produce has its own test here.
- *
- * One refusal cannot be produced from this seat: `role-disagrees` fires when a
- * credential carries a role the member row contradicts, and a cookie session carries
- * no role claim at all (ADR 0018's 2026-08-31 amendment — the role is read per call,
- * in the same transaction as the read). It is demonstrated where it can be, at the
- * resolver's own seam (`packages/core/test/principal.test.ts`), and it reaches the
- * wire through the same single mapping every refusal below takes.
- */
-
-// Built from the mount's own constant rather than written out, so this suite drives the path
-// the server actually serves. `apps/web` cannot import that constant — a value import from the
-// api is the runtime edge ADR 0006's amendment refuses — so it asserts the same declaration by
-// reading this file's source (`[DEPS2]`, `apps/web/test/api-client.test.tsx`). Between the two,
-// a mount moved without its client fails a test rather than a browser.
 const TRPC_ROUTES_LIST = `${TRPC_ENDPOINT}/routes.list`;
 
 const routeShape = z.object({
@@ -34,8 +15,7 @@ const routeShape = z.object({
   model: z.string().nullable(),
   dimensions: z.number().nullable(),
   fixed: z.boolean(),
-  // The provider's own retention sentence, which the DPIA input prints for this route (the S0
-  // spec, *The DPIA input*): the wire carries it, so the shape this suite parses names it.
+
   retentionTail: z.string().nullable(),
 });
 const answered = z.object({ result: z.object({ data: z.array(routeShape) }) });
@@ -51,7 +31,6 @@ afterAll(async () => {
   await app.stop();
 });
 
-/** The routes a workspace has chosen, seeded as the System screen will one day write them. */
 const seedRoutes = async (workspaceId: string): Promise<void> => {
   const client = await app.database.superuser.connect();
   try {
@@ -62,7 +41,6 @@ const seedRoutes = async (workspaceId: string): Promise<void> => {
   }
 };
 
-/** A signed-in browser: the code request, the code from the captured email, no OAuth flow. */
 const signedInClient = async (email: string): Promise<TestClient> => {
   const client = app.client(undefined, APP_HOSTNAME);
   await signIn(app, client, email);
@@ -74,10 +52,8 @@ const listRoutes = (client: TestClient): Promise<Response> => client.fetch(TRPC_
 const refusalOf = async (response: Response): Promise<string> =>
   refused.parse(await response.json()).error.message;
 
-/** The role fence the migration installed, named once so nothing restates its SQL. */
 const MEMBER_ROLE_CHECK = "member_role_check";
 
-/** A constraint exactly as the database holds it, so it can be put back as it was. */
 const constraintDefinition = async (name: string): Promise<string> => {
   const found = await app.database.superuser.query<{ definition: string }>(
     "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = $1",
@@ -147,8 +123,6 @@ describe("what the routes list refuses", () => {
   });
 
   it("refuses a signed-in person who has not yet picked a workspace", async () => {
-    // Two memberships: the session-create hook sets no active workspace, and the
-    // picker has not been passed.
     const first = await app.provision();
     const second = await app.provision();
     const person = await app.person();
@@ -174,9 +148,7 @@ describe("what the routes list refuses", () => {
 
   it("refuses a session issued before the person's credentials were revoked", async () => {
     const workspace = await app.provision();
-    // The act ends every session made before the instant it names, so the session
-    // that must survive to be refused by the resolver is one made after the
-    // revocation ran and before the instant it wrote.
+
     await app.revokeCredentials(workspace.admin.id, new Date(Date.now() + 60_000));
     const client = await signedInClient(workspace.admin.email);
 
@@ -192,10 +164,7 @@ describe("what the routes list refuses", () => {
     const { superuser } = app.database;
     const where = "workspace_id = $1 AND user_id = $2";
     const member = [workspace.workspaceId, workspace.admin.id];
-    // The database's CHECK is what keeps this row out of an estate; the resolver
-    // refuses it anyway, and the only way to ask it is to stand the fence down. The
-    // fence is read from the catalogue and put back verbatim, so this test can never
-    // leave the migration's constraint behind as a paraphrase of itself.
+
     const definition = await constraintDefinition(MEMBER_ROLE_CHECK);
     try {
       await superuser.query(`ALTER TABLE "member" DROP CONSTRAINT "${MEMBER_ROLE_CHECK}"`);
@@ -217,8 +186,7 @@ describe("what the routes list refuses", () => {
   it("refuses a flood from one address before it can spend a session lookup each", async () => {
     const client = app.client("203.0.113.60");
     const statuses: number[] = [];
-    // The window is wall-clock aligned, so a burst that straddles a boundary starts
-    // its count again: ask until refused rather than a fixed number of times.
+
     for (let attempt = 0; attempt <= TRPC_IP_RULE.max * 2 + 1; attempt += 1) {
       const status = (await listRoutes(client)).status;
       statuses.push(status);
@@ -226,7 +194,7 @@ describe("what the routes list refuses", () => {
     }
 
     expect(statuses).toContain(429);
-    // Another address is unaffected: the ceiling is per client, not global.
+
     expect((await listRoutes(app.client("203.0.113.61"))).status).toBe(401);
   });
 

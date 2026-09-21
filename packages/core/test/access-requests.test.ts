@@ -20,20 +20,8 @@ import { bootstrap, seedPerson } from "./platform.ts";
 import { asSliceRelative, coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 import { abortTheTransaction, postgresForSuite, whileWritesAreRefused } from "./suite-postgres.ts";
 
-/**
- * The *access request* through the members slice's entry point (`[TEST1]`), against real
- * Postgres: the ask a non-member makes at the auth boundary, the two decisions an Admin
- * takes and the queue they read — each with what it refuses beside what it serves.
- *
- * The claim this suite exists for is the one ADR 0038 makes: **the surface can never be
- * used to enumerate workspaces**. That is only a claim until a real workspace, an unknown
- * slug, a membership and a waiting request are all here to answer identically, which is why
- * the seam is the slice's entry point over a real database and not a unit of anything.
- */
-
 const db = postgresForSuite();
 
-/** A provisioned workspace, its first Admin, and the slug a colleague would pass on. */
 type Workspace = { readonly id: string; readonly slug: string; readonly adminUserId: string };
 
 const provision = async (name: string): Promise<Workspace> => {
@@ -52,10 +40,8 @@ const provision = async (name: string): Promise<Workspace> => {
 
 const door = () => openPostgres(db().runtimePool);
 
-/** A person on the identity set who belongs to no workspace — every requester here. */
 const outsider = (): Promise<string> => seedPerson(db().pool);
 
-/** Add a person to a workspace at a role, and hand back their person id. */
 const memberAt = async (workspaceId: string, role: Role): Promise<string> => {
   const client = await db().pool.connect();
   try {
@@ -67,7 +53,6 @@ const memberAt = async (workspaceId: string, role: Role): Promise<string> => {
   }
 };
 
-/** Run `work` in one transaction as this person's Principal, and unwrap the resolve. */
 const as = async <T>(
   workspaceId: string,
   userId: string,
@@ -78,7 +63,6 @@ const as = async <T>(
   return resolved.value;
 };
 
-/** Every access-request row of a workspace, oldest first, as the superuser reads them. */
 const requestRows = async (workspaceId: string) => {
   const rows = await db().pool.query<{
     id: string;
@@ -96,7 +80,6 @@ const requestRows = async (workspaceId: string) => {
   return rows.rows;
 };
 
-/** Every ledger row about one subject, as the superuser reads them. */
 const eventsAbout = async (subjectId: string) => {
   const rows = await db().pool.query<{
     act: string;
@@ -109,7 +92,6 @@ const eventsAbout = async (subjectId: string) => {
   return rows.rows;
 };
 
-/** A workspace with one waiting request on it, which is the footing both decisions share. */
 const withOneWaitingRequest = async (name: string) => {
   const workspace = await provision(name);
   const requester = await outsider();
@@ -148,8 +130,7 @@ describe("asking to join a workspace", () => {
         invitation_id: null,
       },
     ]);
-    // The one caller of the actor-naming door (`[AUDIT4]`): the row is the requester's act,
-    // made under the platform principal, so the actor is the person and never the platform.
+
     expect(await eventsAbout(rows[0]?.id ?? "")).toEqual([
       {
         act: "people.request.asked",
@@ -161,8 +142,6 @@ describe("asking to join a workspace", () => {
   });
 
   it("answers one acknowledgement for a real slug, an unknown one, an already-member and a second ask", async () => {
-    // ADR 0038's anti-enumeration rule as a functional test: four different truths, one
-    // answer, and a row written in exactly one of them.
     const workspace = await provision("Neutral");
     const requester = await outsider();
     const ask = (slug: string, requesterId: string) =>
@@ -175,11 +154,10 @@ describe("asking to join a workspace", () => {
 
     const answers = [real, unknown, alreadyMember, secondAsk];
     expect(answers).toEqual(answers.map(() => ({ ok: true, value: { acknowledged: true } })));
-    // One row, from the first ask alone — the member wrote none and the second ask was
-    // refused by the partial unique index, whose refusal the acknowledgement covers.
+
     const rows = await requestRows(workspace.id);
     expect(rows.map((row) => row.requester_id)).toEqual([requester]);
-    // And the second ask's event went with its transaction: one act, not two.
+
     expect(await eventsAbout(rows[0]?.id ?? "")).toHaveLength(1);
   });
 
@@ -197,13 +175,6 @@ describe("asking to join a workspace", () => {
   });
 
   it("leaves nothing behind when the person asking is on no identity row, and says so to nobody", async () => {
-    // `[AUDIT1]`'s fail-together proof for this slice: the ledger row is written before the
-    // request row, so the foreign key refusing a person nobody minted comes *after* the
-    // event — which proves the event rolled back with the act rather than never having run.
-    //
-    // And the answer is the acknowledgement, not a refusal: the foreign key can only fail
-    // where the slug resolved, so a caller free to name a person who does not exist would
-    // otherwise read "this workspace is real" off the difference.
     const workspace = await provision("Ghost");
     const nobody = ulid();
     const ask = (slug: string) =>
@@ -218,7 +189,7 @@ describe("asking to join a workspace", () => {
     expect(asked).toEqual({ ok: true, value: { acknowledged: true } });
     expect(asked).toEqual(await ask(`no-such-workspace-${ulid().toLowerCase()}`));
     expect(await requestRows(workspace.id)).toEqual([]);
-    // Read as the superuser, so a row that survived could not hide behind the policy.
+
     const events = await db().pool.query("SELECT 1 FROM audit_event WHERE actor = $1", [
       `human:${nobody}`,
     ]);
@@ -244,10 +215,6 @@ describe("asking to join a workspace", () => {
     const workspace = await provision("Unsaved");
     const requester = await outsider();
 
-    // The slug resolved, the person is no member and the ledger row went in — and the
-    // request row itself is what the store refuses. The acknowledgement covers the four
-    // cases ADR 0038 names and this is none of them: answering it here would tell somebody
-    // they were all set for a request nobody kept.
     const asked = await whileWritesAreRefused(db().pool, "access_request", () =>
       requestAccess(bootstrap, door(), {
         slug: workspace.slug,
@@ -258,8 +225,7 @@ describe("asking to join a workspace", () => {
 
     expect(asked).toEqual({ ok: false, error: expect.any(Error) });
     expect(await requestRows(workspace.id)).toEqual([]);
-    // The ledger row is written first inside the transaction, so its absence is what proves
-    // the act rolled back rather than never having reached the row (`[AUDIT1]`).
+
     const events = await db().pool.query("SELECT 1 FROM audit_event WHERE actor = $1", [
       `human:${requester}`,
     ]);
@@ -270,7 +236,7 @@ describe("asking to join a workspace", () => {
 describe("approving a request", () => {
   it("mints the invitation to the requester's address at the role the Admin chose, and records it", async () => {
     const { workspace, requester, requestId } = await withOneWaitingRequest("Approve");
-    // The platform's instant, pinned (ADR 0040), so the expiry below is a date written down.
+
     const decidedAt = new Date("2031-06-15T09:30:00.000Z");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
@@ -294,9 +260,6 @@ describe("approving a request", () => {
     });
     expect(rows[0]?.decided_at).toBeInstanceOf(Date);
 
-    // The invitation is a row this act wrote itself, never Better Auth's endpoint: to the
-    // requester's own address, at the chosen role, pending, and expiring at the plugin's
-    // own default (`[DEPS1]`, pinned by apps/api/tests/invitation-shape.test.ts).
     const invitation = await db().pool.query<{
       email: string;
       role: string;
@@ -319,8 +282,7 @@ describe("approving a request", () => {
       inviter_id: workspace.adminUserId,
       workspace_id: workspace.id,
     });
-    // Forty-eight hours after the decision — the plugin's default, spelled as the date it
-    // makes rather than derived from the constant the act reads.
+
     expect(invitation.rows[0]?.expires_at).toEqual(new Date("2031-06-17T09:30:00.000Z"));
 
     expect(await eventsAbout(requestId)).toEqual([
@@ -406,19 +368,12 @@ describe("approving a request", () => {
       ),
     ).rejects.toThrow(/did not commit/);
 
-    // An approved request never exists without the invitation it names, so the store
-    // refusing the invitation leaves the request exactly where it was.
     expect(approved).toEqual({ ok: false, error: expect.any(Error) });
     expect(await requestRows(workspace.id)).toMatchObject([{ status: "waiting" }]);
   });
 });
 
-/**
- * The one refusal each decision reads out of its argument alone, and the two failures the
- * store can hand it. Neither is a fact about the workspace, and neither may arrive as one.
- */
 describe("what a decision refuses and what it passes on", () => {
-  /** Each decision as one call; every act's error is a refusal word or the store's Error. */
   type Decision = (
     principal: UserPrincipal,
     tx: Tx,
@@ -440,9 +395,6 @@ describe("what a decision refuses and what it passes on", () => {
       decide(principal, tx, "' OR true --"),
     );
 
-    // `no-such-request` is a fact about this workspace; a string of no known form is a fact
-    // about the request, and the two are not interchangeable — nor is either a string this
-    // act hands to a statement as if the platform had minted it.
     expect(refused).toEqual({ ok: false, error: "malformed" });
     expect(await requestRows(workspace.id)).toMatchObject([{ status: "waiting" }]);
   });
@@ -453,8 +405,6 @@ describe("what a decision refuses and what it passes on", () => {
       const { workspace, requestId } = await withOneWaitingRequest(`Unlandable${verb}`);
       let decided: unknown;
 
-      // The row is claimed and held, the event is written, and the update that lands the
-      // decision is what the store refuses — the arm no failing read reaches.
       await expect(
         whileWritesAreRefused(db().pool, "access_request", () =>
           as(workspace.id, workspace.adminUserId, async (principal, tx) => {
@@ -493,8 +443,6 @@ describe("declining a request", () => {
       },
     ]);
 
-    // The partial unique index holds only the waiting rows, so a declined person may ask
-    // again — and the second ask is a row of its own.
     const again = await requestAccess(bootstrap, door(), {
       slug: workspace.slug,
       requesterId: requester,
@@ -519,9 +467,6 @@ describe("declining a request", () => {
   });
 
   it("never commits a decision whose transaction met a failed statement", async () => {
-    // `[TEST8]`: the abort is provoked inside the work, so the assertion is on the
-    // transaction's outcome first — the opener refuses to report a COMMIT Postgres
-    // answered with ROLLBACK — and on the act's value second.
     const { workspace, requestId } = await withOneWaitingRequest("Aborted");
     let declined: Awaited<ReturnType<typeof declineRequest>> | undefined;
 
@@ -588,8 +533,6 @@ describe("the Admin's queue", () => {
     const { workspace } = await withOneWaitingRequest("Unqueued");
     let listed: Result<unknown, unknown> | undefined;
 
-    // An empty queue is what an Admin acts on — nobody is waiting — so a read that met the
-    // store failing and answered one would have the Admin close a screen full of people.
     await expect(
       as(workspace.id, workspace.adminUserId, async (principal, tx) => {
         await abortTheTransaction(tx);
@@ -597,8 +540,6 @@ describe("the Admin's queue", () => {
       }),
     ).rejects.toThrow(/did not commit/);
 
-    // In the store's own words, and not in a failure of the reading after it: a caller
-    // shown the second would look for the defect in the platform rather than the database.
     expect(listed).toEqual({ ok: false, error: expect.any(Error) });
     expect(listed?.ok === false ? String(listed.error) : "").toContain(
       "current transaction is aborted",
@@ -607,9 +548,7 @@ describe("the Admin's queue", () => {
 
   it("hands the Admin a row the boundary cannot read rather than a queue that omits it", async () => {
     const { workspace, requestId } = await withOneWaitingRequest("Unreadable");
-    // `access_request.id` is text with no CHECK, so only the read's own parse holds a row
-    // to the ULID the boundary promises; a row that fails it must reach the Admin as the
-    // failure it is, not as a shorter queue.
+
     await db().pool.query("UPDATE access_request SET id = $2 WHERE id = $1", [
       requestId,
       "not-a-ulid",
@@ -623,12 +562,6 @@ describe("the Admin's queue", () => {
   });
 });
 
-/**
- * The tenant boundary and the role, held per verb — the T-027 house pattern. An Editor and a
- * Viewer are refused with the kernel's one word; an Admin of another workspace is refused as
- * an Admin whose scope simply does not hold the row, which is the policy answering rather
- * than a check anybody wrote.
- */
 describe("who may decide", () => {
   type Verb = (
     principal: UserPrincipal,
@@ -667,8 +600,6 @@ describe("who may decide", () => {
         verb(principal, tx, requestId),
       );
 
-      // Their own queue is empty and the other workspace's request is not a row they can
-      // name: a list answers nothing, a decision answers that there is no such request.
       expect(reached).toEqual(
         name === "list" ? { ok: true, value: [] } : { ok: false, error: "no-such-request" },
       );
@@ -681,14 +612,8 @@ describe("the actor-naming door", () => {
   it.skipIf(sourceTreeIsInstrumented())(
     "is called by the request act and by nothing else in the tree",
     async () => {
-      // `[AUDIT4]`: the second door takes an explicit actor, and the *access request* is its
-      // one caller — the act whose maker holds no Principal. A second caller would be a second
-      // place a row could be booked to somebody other than the person making the call, which
-      // is the whole thing the door's type exists to stop; the count is held here because the
-      // criterion is this ticket's.
       const call = /\brecordFor\(/;
-      // Proved to bite before its silence is read as innocence — and proved to leave the
-      // door's own declaration alone, which is `export const recordFor = <A…>(` and no call.
+
       expect(call.test("await recordFor(platform, tx, event);")).toBe(true);
       expect(call.test("export const recordFor = <A extends Act>(")).toBe(false);
       expect(call.test("import { record } from '../audit/index.ts';")).toBe(false);

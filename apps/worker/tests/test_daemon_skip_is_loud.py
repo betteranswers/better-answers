@@ -1,17 +1,3 @@
-"""`pytest_terminal_summary`'s loud line when a run skipped every daemon case.
-
-`test_image.py`'s `image` fixture skips off CI when no Docker daemon answered
-(`DAEMON_SKIP_REASON`, `conftest.py`), and those skipped cases are the only proof the
-worker image holds what it claims. A run that skipped all of them and said nothing
-would report green having shown nothing, so the hook writes one line naming how many
-skipped and why — and only that.
-
-Driven directly against a stub reporter and stub reports, in both directions: with
-the reason recorded the line is written, and with no such reason the reporter is left
-exactly as it was. No Docker daemon needed either way, because nothing here starts a
-container — the hook is a pure read of `terminalreporter.stats`.
-"""
-
 from dataclasses import dataclass, field
 
 from conftest import DAEMON_SKIP_REASON, pytest_terminal_summary
@@ -19,15 +5,11 @@ from conftest import DAEMON_SKIP_REASON, pytest_terminal_summary
 
 @dataclass
 class _StubReport:
-    """The one field the hook reads off a real `pytest.TestReport`."""
-
     longreprtext: str = ""
 
 
 @dataclass
 class _StubReporter:
-    """The two things the hook touches on a real `pytest.TerminalReporter`."""
-
     stats: dict[str, list[_StubReport]] = field(default_factory=dict)
     lines: list[str] = field(default_factory=list)
 

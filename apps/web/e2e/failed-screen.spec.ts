@@ -1,21 +1,6 @@
 import { expect, test } from "./browser.ts";
 import { anAddress, provision, seedRoutes, signIn, skipLinkReachesTheScreen } from "./harness.ts";
 
-/**
- * A screen that throws over the served build: the frame stands, the navigation still works,
- * and what a reader is left with passes axe.
- *
- * **How the screen is made to throw.** Every screen the product has today handles a read
- * that was refused — the routes card says so in words, and the shell sends a person whose
- * session has ended back to sign-in — so a revocation reaches a handled state and never the
- * boundary. What is not handled, because no screen can defend against it, is an answer of
- * the wrong *shape*: the card's list arrives as an object, and the card throws while it is
- * being drawn. The lie is told at the network, in the browser, exactly as the component
- * suite tells it (`test/failed-screen.test.tsx`); nothing test-only is built into the app,
- * and the bundle under test is the production build the api serves.
- */
-
-/** What the api never sends and the card cannot render: an object where the list should be. */
 const NOT_A_LIST = { why: "the api answered a shape the routes card cannot render" };
 
 const ROUTES_LIST = "routes.list";
@@ -32,8 +17,6 @@ test("a screen that throws leaves the frame, the navigation and an accessible wa
     routes: [{ purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" }],
   });
 
-  // The api's own answer is fetched and then edited, so every other procedure in the batch —
-  // the shell's membership read among them — arrives exactly as the server wrote it.
   await page.route("**/trpc/**", async (route) => {
     const answered = await route.fetch();
     const procedures = decodeURIComponent(new URL(route.request().url()).pathname)
@@ -44,9 +27,7 @@ test("a screen that throws leaves the frame, the navigation and an accessible wa
       return;
     }
     const answers: unknown = await answered.json();
-    // Batched calls answer as an array in the order the path names them; a lone call answers
-    // as one object. Both shapes reach here, because batching depends on what a screen asks
-    // for in one tick and is not this test's to pin.
+
     const broken = Array.isArray(answers)
       ? answers.map((answer, index) =>
           procedures[index] === ROUTES_LIST ? { result: { data: NOT_A_LIST } } : answer,
@@ -59,7 +40,6 @@ test("a screen that throws leaves the frame, the navigation and an accessible wa
   await signIn(page, request, email);
   await page.goto("/system");
 
-  // What happened, and nothing of what threw: no message, no name, no stack.
   await expect(
     page.getByRole("heading", { level: 1, name: "This screen could not be shown" }),
   ).toBeVisible();
@@ -68,28 +48,17 @@ test("a screen that throws leaves the frame, the navigation and an accessible wa
   await expect(everything).not.toContainText("TypeError");
   await expect(everything).not.toContainText("is not a function");
 
-  // The frame is still the frame: its three landmarks, and the person it says is reading.
   await expect(page.getByRole("banner")).toBeVisible();
   await expect(page.getByRole("region", { name: "You" })).toBeVisible();
   const navigation = page.getByRole("navigation", { name: "Control Centre" });
   await expect(navigation.getByRole("link")).toHaveCount(6);
 
-  // The way out is reachable by keyboard: the skip link, then the screen region, then the
-  // first control in it. Nothing between the reader and the retry needs a mouse.
   await skipLinkReachesTheScreen(page);
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Try this screen again" })).toBeFocused();
 
-  // Asked for here rather than left to the fixture, because the test carries on to another
-  // screen below: what has to be audited is the one that threw. The keyboard traversal above
-  // is the other half of what a reader is left with.
   await passesTheAccessibilityGate();
 
-  // The navigation still navigates, which is the whole point of the boundary sitting inside
-  // the outlet: one screen is lost and the other five are read as usual. Eight lines the
-  // frame's own spec also walks, carried rather than folded: there it is the claim, here it
-  // is what has to still be true after a screen threw, and a helper would leave neither
-  // reader able to see what the other test meant.
   /* jscpd:ignore-start */
   await navigation.getByRole("link", { name: "Knowledge" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Knowledge" })).toBeVisible();

@@ -19,39 +19,6 @@ const addressIn = (answer: ResumeAnswer): string | undefined => {
   return typeof next === "string" && next !== "" ? next : undefined;
 };
 
-/**
- * The workspace picker — a screen this platform writes, on the module's own hooks
- * (`auth-hooks.ts`, T-046 slice 2). Its heading is the platform's word, read straight
- * from `workspace-words.ts`.
- *
- * It answers three shapes of visit:
- *
- * - **A member of several workspaces** chooses one, and everything after is scoped to it.
- * - **A member of exactly one** is never asked: the screen makes that workspace active if
- *   the session has not already — a session made before the membership existed has not —
- *   and carries them on.
- * - **A member of none** is sent to the refused screen; there is nothing here to pick and
- *   nothing to create. There is no create-workspace control on this screen or anywhere
- *   else in the product: workspaces are platform-provisioned (T-004 judgement call 1).
- *
- * A fourth shape, distinct from those three and added deliberately rather than as an
- * amendment to them (T-062, owner, 2026-09-05): **a workspace-list read that ends in
- * error** is its own outcome, said in words, with one act — try again — and it never
- * reads as membership in nothing. Only the workspace-list query is read this way; a
- * session-query error already reads as signed-out and sends the person to sign in, which
- * is the truthful outcome there.
- *
- * A visit carrying a host's signed query resumes the authorization through Better Auth's
- * continue endpoint and follows where it says — consent, on the authorization server's own
- * origin. A visit without one lands in the shell.
- *
- * Every outcome is said in words, including the two that are nobody's fault: a pick the
- * platform refused, and a resume that answered with nowhere to go. A screen that went
- * quiet would leave a person looking at a list of buttons that had stopped working.
- *
- * WCAG 2.2 AA: the choices are buttons in a list, in DOM order, each naming
- * its workspace; the outcome of a pick is announced in a live region.
- */
 export function ChooseWorkspaceScreen() {
   const navigate = useNavigate();
   const search = useRouterState({ select: (state) => state.location.searchStr });
@@ -61,7 +28,7 @@ export function ChooseWorkspaceScreen() {
   const workspaces = useListOrganizations();
   const pick = useSetActiveOrganization();
   const resume = useOAuthContinue();
-  /** The resume answered, and named nowhere to go. Held so the screen can say so. */
+
   const [wentNowhere, setWentNowhere] = useState(false);
 
   const signedOut = !session.isPending && (session.data === null || session.data === undefined);
@@ -70,28 +37,18 @@ export function ChooseWorkspaceScreen() {
   const active = session.data?.session.activeOrganizationId ?? undefined;
   const settled = !session.isPending && !workspaces.isPending;
 
-  /**
-   * Resume the host's flow, or land in the shell. Better Auth answers the continue
-   * endpoint with the address the person goes to next, on the authorization server's
-   * origin — a whole-page navigation, because consent is a page this product does not
-   * render and must not be rendered inside.
-   */
   const goOn = () => {
     if (carried === "") {
       void navigate({ href: "/", replace: true });
       return;
     }
-    // The signed query is not passed here: the OAuth client plugin's own request hook
-    // reads it off this screen's address and attaches it as `oauth_query`, which is why
-    // every screen in the walk keeps the query whole.
+
     resume.mutate(
       { postLogin: true },
       {
         onSuccess: (answer) => {
           const next = addressIn(answer);
           if (next === undefined) {
-            // The flow cannot be resumed and the person is not told to wait for something
-            // that will not happen. They are signed in, so the product is still theirs.
             setWentNowhere(true);
             return;
           }
@@ -101,22 +58,16 @@ export function ChooseWorkspaceScreen() {
     );
   };
 
-  /** Make the one workspace active if it is not, then go on. */
   const openSoleWorkspace = () => {
     if (sole === undefined) return;
     if (active !== undefined) {
       goOn();
       return;
     }
-    // A session made before this membership existed carries no active workspace, and the
-    // person still has nothing to choose between. Choosing for them is the whole of the
-    // "a person in one workspace never sees a picker" promise (user story 3).
+
     pick.mutate({ organizationId: sole.id }, { onSuccess: goOn });
   };
 
-  // The visits that ask the person nothing. Kept in one effect so the screen has one place
-  // where it decides it has no question, and so a redraw cannot ask twice: the mutations'
-  // own pending states are part of the condition.
   const decided = settled && !pick.isPending && !resume.isPending && !wentNowhere;
   useEffect(() => {
     if (!decided) return;
@@ -124,16 +75,13 @@ export function ChooseWorkspaceScreen() {
       void navigate({ href: `/sign-in${carried}`, replace: true });
       return;
     }
-    // A list that ended in error also holds nothing, and is not the no-membership shape:
-    // the list is unread, not empty, and the person is not sent to the refused screen for
-    // a fact the platform does not yet have.
+
     if (held.length === 0 && !workspaces.isError) {
       void navigate({ href: "/no-workspace", replace: true });
       return;
     }
     if (sole !== undefined) openSoleWorkspace();
-    // `openSoleWorkspace` closes over this render's mutations; re-running the effect on a
-    // new identity for it would resume a flow that is already resuming.
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [decided, signedOut, held.length, workspaces.isError, sole?.id, active, carried, navigate]);
 
@@ -169,8 +117,6 @@ export function ChooseWorkspaceScreen() {
   }
 
   if (workspaces.isError) {
-    // The list itself, not a pick or a resume: its own outcome, so a network failure is
-    // never told as "you belong to nothing" (T-062).
     return (
       <AuthScreen title={WORKSPACE_WORDS.organizations}>
         <Outcome tone="refused">Your workspaces could not be read. Try again.</Outcome>
@@ -189,9 +135,6 @@ export function ChooseWorkspaceScreen() {
   }
 
   if (held.length < 2) {
-    // One workspace, none, or no session: the effect above is carrying the person on, and
-    // this is what they read while it does — unless the pick that carries them was
-    // refused, which is said rather than left as a screen that never moves.
     return (
       <AuthScreen title={WORKSPACE_WORDS.organizations}>
         {refused ? (

@@ -6,13 +6,6 @@ import { lastMigration } from "../src/journal.ts";
 import { startMigratedPostgres } from "../test/harness.ts";
 import { assertNoUndeclaredTables, introspect, renderWorkerSchemaView } from "./worker-view.ts";
 
-/**
- * `pnpm --filter @better-answers/schema run generate:worker-view` — runs the journal
- * against a throwaway Postgres (the pinned image) and writes the worker's committed
- * schema view. CI never runs this; it regenerates in the drift test and fails on any
- * difference, so a schema PR that forgets this step cannot merge.
- */
-
 const here = path.dirname(fileURLToPath(import.meta.url));
 const viewPath = path.resolve(
   here,

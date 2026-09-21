@@ -26,53 +26,21 @@ import { NOT_BUILT, parseSince, runOps, type OpsIo } from "../src/ops/index.ts";
 import { APP_HOSTNAME, openTestGit, PUBLIC_URL, type TestApp } from "./harness.ts";
 import { servedApp } from "./suite-app.ts";
 
-/**
- * The `pnpm ops` commands the estate's restore scripts call (ADR 0022, T-005), run against a
- * real, migrated Postgres and the app itself. What is held is the contract the scripts
- * rely on — `0` did it, `1` stop, `3` not built — on the schema as it stands today, and,
- * for the *not built* answer the journal has now overtaken, on a database of this cluster
- * the journal has never been applied to (`opsBeforeTheJournal` below).
- */
-
 type Run = { readonly exitCode: number; readonly lines: readonly string[] };
 
-/**
- * The instants the erasures below complete at, and the `--since` each replay is given.
- *
- * They are pinned and separated on purpose. The set a replay is owed is read across *every*
- * workspace — the restore is the platform's, not one tenant's — so two cases that both erased
- * "now" would each find the other's request. Each case therefore erases at an instant of its
- * own and asks for the window that holds only that one, which is also how a dump stamp works.
- */
 const FROM_THE_ROWS_AT = new Date("2026-06-01T12:00:00.000Z");
 const FROM_THE_ROWS_SINCE = "2026-05-31T00:00:00Z";
 const FROM_THE_COPY_AT = new Date("2026-07-01T12:00:00.000Z");
 const FROM_THE_COPY_SINCE = "2026-06-15T00:00:00Z";
-/**
- * The instant the replay of that one runs at, pinned because it is what the re-created request
- * completes at: a row restored from a copy carries no completion, and cannot — the table's own
- * check ties `completed_at` to a `report`, and the copy holds no report. So the routine
- * completes it on the run that actually happened, which is this one.
- */
+
 const REPLAYED_AT = new Date("2026-07-15T09:00:00.000Z");
-/** The rehearsal's own, later than both, so the two replay cases never find its request. */
+
 const REHEARSED_AT = new Date("2026-08-01T12:00:00.000Z");
 
-/**
- * The four beyond-use dates from `REHEARSED_AT`, worked out by hand as the core suites do
- * (`[TEST9]`): what makes the file the command wrote the *routine's* report rather than
- * something this command composed for a file.
- */
 const BEYOND_USE =
   "2026-08-03T12:00:00.000Z · 2026-08-31T12:00:00.000Z · " +
   "2026-09-26T12:00:00.000Z · 2027-02-01T12:00:00.000Z";
 
-/**
- * A real Garage, because the two erasure commands open the object door and `[TEST3]` refuses a
- * stand-in for a store as it refuses one for Postgres. It is core's own suite helper, reached
- * through `@better-answers/core/testing/objects` the way `@better-answers/schema/testing` is:
- * the helper resolves its own `testcontainers` from core, so this workspace gains no dependency.
- */
 const objects = objectStoreForSuite();
 
 const ioFor = (app: TestApp, stdin = ""): OpsIo & { readonly lines: string[] } => {
@@ -87,9 +55,7 @@ const ioFor = (app: TestApp, stdin = ""): OpsIo & { readonly lines: string[] } =
     appHostname: APP_HOSTNAME,
     gitStoreDir: app.gitStoreDir,
     objects: objects().door,
-    // The real thing, on a real path: what is under test is that the command hands the report
-    // to its writer rather than composing a file of its own, and a writer that kept the body in
-    // memory would prove the first half and not the second.
+
     writeReport: async (file, body) => {
       await writeFile(file, body, "utf8");
     },
@@ -108,12 +74,6 @@ const ops = async (
   return { exitCode, lines: io.lines };
 };
 
-/**
- * The same run with part of the io replaced — a store the image was never told about, a root
- * that is not there, a clock pinned to an instant. Every refusal below is a misconfigured image
- * or a store that did not come back, and both are reached by changing what the process was
- * given rather than by changing what the command does.
- */
 const opsWith = async (
   app: TestApp,
   argv: readonly string[],
@@ -125,18 +85,6 @@ const opsWith = async (
   return { exitCode, lines: io.lines };
 };
 
-/**
- * The same run, against the one database on this cluster the journal has never been applied
- * to — the cluster's own `postgres`, whose `public` holds no table at all.
- *
- * Both *absent* answers below — the replay's *nothing was ever recorded here* and a slice
- * command's *not built* — are decided by a catalogue read, and what they stand for is an
- * image running a command against a database its migrations have not reached: a restore that
- * calls the replay mid-journal, or an estate a step behind. T-120 landed the erasure
- * families, so the migrated database this file otherwise runs against can no longer show
- * either branch; they are shown here against a real, genuinely empty database rather than
- * against a table dropped or faked to make the branch reachable.
- */
 const opsBeforeTheJournal = async (app: TestApp, argv: readonly string[]): Promise<Run> => {
   const uri = new URL(app.database.connectionUri);
   uri.pathname = "/postgres";
@@ -148,10 +96,6 @@ const opsBeforeTheJournal = async (app: TestApp, argv: readonly string[]): Promi
   }
 };
 
-/**
- * A map of two concepts and the link between them in the live generation, and a rebuild's
- * leftovers in a second generation beside it — what the two graph commands are asked about.
- */
 const mapped = async (app: TestApp, workspaceId: string): Promise<void> => {
   const client = await app.database.superuser.connect();
   try {
@@ -165,12 +109,10 @@ const mapped = async (app: TestApp, workspaceId: string): Promise<void> => {
   }
 };
 
-/** The one line a graph command answers with, as JSON. */
 const answered = (run: Run): unknown => JSON.parse(run.lines[0] ?? "");
 
 type QueuedJob = { id: string; kind: string; reason: string | null; status: string };
 
-/** Every job on a workspace's queue, read as the superuser so no policy can hide one. */
 const jobsOf = async (app: TestApp, workspaceId: string): Promise<readonly QueuedJob[]> => {
   const found = await app.database.superuser.query<QueuedJob>(
     "SELECT id, kind, reason, status FROM job WHERE workspace_id = $1",
@@ -179,12 +121,6 @@ const jobsOf = async (app: TestApp, workspaceId: string): Promise<readonly Queue
   return found.rows;
 };
 
-/**
- * The four doors an erasure runs over in this suite, with the clock pinned so a report's dates
- * are literals. The pool is the app's runtime role and not the superuser: `pnpm ops` connects
- * with `DATABASE_URL`, so an erasure that needed a grant the app's role has not got would pass
- * here and fail on a drill.
- */
 const erasureDoors = (app: TestApp, at: Date) => ({
   git: openTestGit(app),
   postgres: openPostgres(app.database.pool),
@@ -192,12 +128,6 @@ const erasureDoors = (app: TestApp, at: Date) => ({
   clock: { now: () => at },
 });
 
-/**
- * One erasure, completed at `at`, in a workspace of its own — arranged through the erasure
- * slice rather than through the commands below, so what each case asserts is the command's
- * answer and not another command's. This is what a dump taken before `at` would have undone,
- * and what the replay is owed.
- */
 const erasedAt = async (
   app: TestApp,
   at: Date,
@@ -214,7 +144,6 @@ const erasedAt = async (
 
 type LedgerRow = { act: string; actor: string; subject_id: string };
 
-/** A workspace's ledger, read as the superuser so no policy can hide a row from an assertion. */
 const ledgerOf = async (app: TestApp, workspaceId: string): Promise<readonly LedgerRow[]> => {
   const found = await app.database.superuser.query<LedgerRow>(
     "SELECT act, actor, subject_id FROM audit_event WHERE workspace_id = $1 ORDER BY at, id",
@@ -223,21 +152,11 @@ const ledgerOf = async (app: TestApp, workspaceId: string): Promise<readonly Led
   return found.rows;
 };
 
-/** A file in a directory of this run's own, for `--report <file>`. */
 const reportPath = async (): Promise<string> =>
   path.join(await mkdtemp(path.join(tmpdir(), "ops-rehearsal-")), "erasure-report.txt");
 
-/**
- * The worker's end of the job, as a test stands in for it: the row this command queued,
- * moved to a status it never leaves. The queue's own `claim_job` takes the oldest claimable
- * job rather than one named by id — it is the worker's protocol and the queue agreement is
- * where it is proved — so a test that wants *this* job finished moves this job's row, and
- * what is under test here is the command's reading of a status it did not write.
- */
 const finishTheJob = async (app: TestApp, workspaceId: string, status: string): Promise<void> => {
   for (let attempt = 0; attempt < 400; attempt += 1) {
-    // The row's own CHECK ties an outcome to the two finishes and to nothing else, so the
-    // stand-in writes one exactly where the worker would.
     const moved = await app.database.superuser.query(
       `UPDATE job SET status = $2, finished_at = now(),
               outcome = CASE WHEN $2 IN ('done', 'failed') THEN '{"generation": 2}'::jsonb END
@@ -262,14 +181,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
   it("answers usage, not a guess, to no command or an unknown one", async () => {
     expect((await ops(app(), [])).exitCode).toBe(2);
     expect((await ops(app(), ["make-it-so"])).exitCode).toBe(2);
-    expect((await ops(app(), ["graph-counts"])).exitCode).toBe(2); // no --workspace
-    expect((await ops(app(), ["replay-erasures"])).exitCode).toBe(2); // no --since
+    expect((await ops(app(), ["graph-counts"])).exitCode).toBe(2);
+    expect((await ops(app(), ["replay-erasures"])).exitCode).toBe(2);
   });
 
   it("reads through the -- separator pnpm forwards, and does not read it as a command", async () => {
-    // `pnpm ops replay-erasures …` arrives as `-- replay-erasures …` (first drill, 04/09/2026).
-    // Run where the replay's own answer is *done*, so what is held here is the parse — the
-    // command ran and said its piece — and not the verdict the two tests below hold.
     const run = await opsBeforeTheJournal(app(), [
       "--",
       "replay-erasures",
@@ -279,7 +195,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     expect(run.exitCode).toBe(0);
     expect(run.lines.join("\n")).toContain("replayed 0 erasures");
-    expect((await ops(app(), ["--"])).exitCode).toBe(2); // a bare separator is still no command
+    expect((await ops(app(), ["--"])).exitCode).toBe(2);
   });
 
   describe("replay-erasures — mandatory in every restore, never quietly a no-op", () => {
@@ -296,9 +212,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("is done with nothing replayed when the table is there and no erasure followed the dump", async () => {
-      // Later than every erasure this file arranges, so the answer is the *empty set* over a
-      // migrated schema — which is a different fact from the case above, where the table the
-      // set would be read from does not exist. A restore reads the same word for both.
       const run = await opsWith(app(), ["replay-erasures", "--since", "2026-12-01T00:00:00Z"], {});
 
       expect(run.exitCode).toBe(0);
@@ -318,8 +231,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           "completed 2026-06-01T12:00:00.000Z, read from the restored rows",
         "replay-erasures: done — replayed 1 erasure since 2026-05-31T00:00:00.000Z",
       ]);
-      // The act is the platform's own (`[AUDIT4]`), its subject the erasure request replayed
-      // (`[AUDIT1]`), and it sits beside the rehearsal that arranged this one.
+
       expect(await ledgerOf(app(), erased.workspaceId)).toContainEqual({
         act: "platform.erasure.replayed",
         actor: "process:better-answers-erasure",
@@ -329,9 +241,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("re-applies one the restored rows do not hold at all, from its replay copy alone", async () => {
       const erased = await erasedAt(app(), FROM_THE_COPY_AT);
-      // A dump older than the request: the erasure happened, its copy is in the object store,
-      // and neither row is in what came back. Deleted as the superuser because this is the
-      // restore's own state and not an act the platform has.
+
       await app().database.superuser.query("DELETE FROM erasure_request WHERE workspace_id = $1", [
         erased.workspaceId,
       ]);
@@ -344,10 +254,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
 
       expect(run.exitCode).toBe(0);
-      // The completion is **this run's**, not the first run's, and the line says so honestly:
-      // the copy carries no report and the table refuses a completion without one, so the row
-      // it re-creates is completed by the routine that actually ran here. The erasure request's
-      // own id is the first run's, which is what a ledger row from before the dump joins on.
+
       expect(run.lines).toEqual([
         `replay-erasures: ${erased.erasureRequestId} in workspace ${erased.workspaceId} — ` +
           "completed 2026-07-15T09:00:00.000Z, re-created from its replay copy",
@@ -357,8 +264,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "SELECT id, pseudonym FROM erasure_request WHERE workspace_id = $1",
         [erased.workspaceId],
       );
-      // The copy's own pseudonym, not a second one: a subject with two names for one erasure is
-      // a subject the ledger rows from before the restore no longer resolve to.
+
       expect(restored.rows).toEqual([
         { id: erased.erasureRequestId, pseudonym: expect.any(String) },
       ]);
@@ -385,8 +291,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("refuses an object store that will not answer, rather than reading silence as nothing owed", async () => {
-      // The store did not come back, or came back on another address: *none* is the one answer
-      // a restore must never hear from a listing it could not make (the S0 spec, seam 4).
       const unreachable = openObjects({
         endpoint: "http://127.0.0.1:1",
         region: "garage",
@@ -424,12 +328,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
     );
 
     it("object-store-orphans refuses — exit 1 — now its tables are there and the implementation is not", async () => {
-      // T-053 landed the graph tables, T-055 `source_document` and T-120 the erasure families,
-      // so *not built* has stopped being true against a migrated schema; T-058 filled in the
-      // three graph commands below and T-125 the two erasure ones, and the orphan sweep waits
-      // on the sources slice. That is exactly the state the third answer is for: the tables
-      // exist and this image has no implementation, which is a refusal a restore must stop on
-      // rather than a silence.
       const run = await ops(app(), ["object-store-orphans", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(1);
@@ -449,8 +347,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
 
       expect(run.exitCode).toBe(0);
-      // The last line and nothing after it: the drill reads it with `tail -1` and hands it
-      // straight to `dump-grep --tokens`, which splits on the comma and trims.
+
       const email = `subject-${workspaceId.toLowerCase()}@erasure-rehearsal.example.test`;
       expect(run.lines.at(-1)).toBe(`${email},human:${email},Rehearsal subject ${workspaceId}`);
       const seeded = await app().database.superuser.query(
@@ -465,8 +362,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       await initRepository(openTestGit(app()), workspaceId);
       const file = await reportPath();
       const pinned = { clock: { now: () => REHEARSED_AT } };
-      // Phase one, then phase two, with nothing carried between them but the workspace id —
-      // which is what lets the drill take a `pg_dump` in the middle.
+
       const seed = await opsWith(
         app(),
         ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--seed"],
@@ -485,10 +381,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "SELECT id FROM subject_request WHERE workspace_id = $1",
         [workspaceId],
       );
-      // The report is the routine's, not a document this command composed: it names *this*
-      // run's request, and it carries the four beyond-use dates the lock instant fixes. The
-      // core suite holds the wording word for word; what is held here is that the file the
-      // writer was handed is that report.
+
       const written = await readFile(file, "utf8");
       expect(written).toContain(`Erasure report for subject request ${request.rows[0]?.id ?? ""}.`);
       expect(written).toContain(
@@ -568,7 +461,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(0);
       const queued = await jobsOf(app(), workspaceId);
-      // The reason defaults to the drill's, because the restore drill is the caller.
+
       expect(queued).toEqual([
         { id: expect.any(String), kind: "full-rebuild", reason: "drill", status: "queued" },
       ]);
@@ -625,9 +518,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("waits the rebuild's own budget by default — ADR 0032's two minutes — and says so in its usage", async () => {
-      // The budget is the promise, not a multiple of a measurement: a rebuild that has not
-      // finished in two minutes is the thing an operator has to look at, and a longer wait
-      // is asked for explicitly with --wait-seconds rather than granted by the default.
       const run = await ops(app(), ["help"]);
 
       expect(run.exitCode).toBe(0);
@@ -666,9 +556,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("refuses when the job is still queued at the end of the wait it was given", async () => {
       const { workspaceId } = await app().provision();
 
-      // A one-second wait, because nothing claims the job in this process: the drill's own
-      // wait is the two-minute budget and this flag is what an estate with a slower worker
-      // says explicitly.
       const run = await ops(app(), [
         "graph-rebuild",
         "--workspace",
@@ -691,8 +578,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await ops(app(), ["graph-counts", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(0);
-      // One line, because the drill redirects it to a file and diffs it against the counts
-      // production's last good sync run stamped (`restore-drill.sh` step 6).
+
       expect(run.lines).toHaveLength(1);
       expect(answered(run)).toEqual({
         live_gen: 1,
@@ -726,7 +612,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual(["graph-sweep: done — swept generation 2 (2 nodes, 1 edge)"]);
-      // The live generation is untouched, which is what the counts read back says.
+
       const counted = await ops(app(), ["graph-counts", "--workspace", workspaceId]);
       expect(answered(counted)).toEqual({
         live_gen: 1,
@@ -823,8 +709,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         async (resolved) => resolved,
       );
       if (!principal.ok) throw new Error(`the principal did not resolve: ${principal.error}`);
-      // The crash window, as `packages/core/test/reconciler.test.ts` opens it: while the
-      // trigger stands, the act's commit lands and its rows do not — the restore path's shape.
+
       const superuser = app().database.superuser;
       await superuser.query(
         `CREATE FUNCTION crash_in_the_window() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -878,14 +763,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.filter((line) => line.startsWith("FAIL"))).toEqual([]);
       expect(run.exitCode).toBe(0);
       expect(run.lines.filter((line) => line.startsWith("ok  "))).toHaveLength(4);
-      // The three entries are named and honestly deferred, never reported as passed.
+
       expect(run.lines.filter((line) => line.startsWith("note "))).toHaveLength(3);
     });
 
     it("passes on the loopback the way the drill reaches it, by sending the app hostname as Host through node:http", async () => {
-      // The drill and the production restore call `smoke --url http://127.0.0.1:3000` from
-      // inside the stack. The fence carries /health alone on the loopback, and Node's fetch
-      // drops a `host` header, so this is the one path a harness `server.request` cannot prove.
       let listener: ReturnType<typeof serve> | undefined;
       const port = await new Promise<number>((resolve) => {
         listener = serve({ fetch: app().server.fetch, port: 0, hostname: "127.0.0.1" }, (info) =>
@@ -899,8 +781,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
         expect(await runOps(["smoke", "--url", url], app().database.pool, withHost)).toBe(0);
         expect(io.lines.filter((line) => line.startsWith("FAIL"))).toEqual([]);
 
-        // And without the hostname the fence refuses everything but /health — the failure
-        // the header exists to prevent, shown rather than assumed.
         const bare: OpsIo = { ...ioFor(app()), fetch: fetchHonouringHost, appHostname: undefined };
         expect(await runOps(["smoke", "--url", url], app().database.pool, bare)).toBe(1);
       } finally {
@@ -915,22 +795,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  /**
-   * **Which table, and how many lines in it** — the drill's step 10 reads these lines and decides
-   * whether an erasure erased (`deploy/restore-drill.sh`; the S0 spec, *The two ops commands*).
-   *
-   * Per `COPY` section rather than per dump, because after an erasure the honest answer is not
-   * "absent": `subject_request` and `suppression` keep the subject's identifier set **by design**
-   * — a restore from a dump older than the request has to re-create the suppressions from it —
-   * so a whole-database dump taken after the routine still holds the address and the display
-   * name, in exactly those two tables and nowhere else. A reader told only that *something* holds
-   * the value cannot tell that apart from an erasure that missed a store.
-   *
-   * What does not change: the line itself is never quoted, whatever it says. A dump is personal
-   * data and this output is what a regulator reads.
-   */
   describe("dump-grep — which table holds a token and in how many lines, never the line", () => {
-    /** One dump of the shape `pg_dump --format=plain` writes, schema-qualified as it writes them. */
     const dump = [
       "SET search_path = public;",
       "COPY public.person (id, email) FROM stdin;",
@@ -961,7 +826,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "jane…st: present in 2 line(s) of table public.suppression",
         "nobo…st: absent",
       ]);
-      // The other row of `person` was read and never repeated: not the line, not ever.
+
       expect(run.lines.join("\n")).not.toContain("other@example.test");
     });
 
@@ -982,7 +847,6 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("does not count the COPY header, whose column names are the schema and not a row", async () => {
-      // `id` is a column name of all three sections above and a value in none of them.
       const run = await ops(app(), ["dump-grep", "--tokens", "id"], dump);
 
       expect(run.exitCode).toBe(0);

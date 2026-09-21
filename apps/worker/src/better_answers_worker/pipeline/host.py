@@ -1,37 +1,3 @@
-"""The host: one event loop, one pool per workspace, one Environment per binding.
-
-Three facts about the engine decide the whole shape of this module, and each of them was
-measured on the pinned version rather than read off a document.
-
-**The blocking form of an update deadlocks when it is called from inside the loop the
-Environment was given.** So the loop this host owns runs on a thread of its own and
-nothing is ever awaited on it from the outside: work is submitted to it, and the
-engine's blocking calls are made from the caller's own thread, which is never that one.
-
-**A named Environment takes its context through a standalone provider.** The decorator
-the library documents registers against the *default* environment, so a key provided
-through it is simply absent from a named one and the flow fails looking the pool up at
-the moment it would have written a row. The provider is built here and handed in.
-
-**A pool must be *built* on the loop, not merely awaited there.** `asyncpg.create_pool`
-is not a coroutine function: it constructs a pool whose constructor reads the current
-event loop, so handing the call's result to the loop raises before the loop ever sees
-it. The call therefore happens inside a coroutine of this module's own, which is what
-gets submitted.
-
-**Why a pool exists at all**: `index`.`chunk` forces row-level security and checks the
-workspace on every write, the engine takes its own connections out of the pool and runs
-bare statements on them under a task group with no transaction around them, and this
-tier's other door sets the workspace *transaction-locally*. A transaction-local setting
-would be gone before the engine's statement ran, so the pool sets it for the session, in
-the `setup` hook and never in `init`: asyncpg resets a connection on its way back to the
-pool and that reset is `RESET ALL`, so a scope applied once when the connection opened
-is gone from the second checkout and the row that lands on it is refused by the policy.
-`setup` runs after the reset, which makes it every acquisition; `open_pool` below
-carries the whole of it. Two connections at most: the default is ten, and ten per
-workspace exhausts Postgres long before the estate has ten busy workspaces.
-"""
-
 import asyncio
 import shutil
 import threading
@@ -49,68 +15,28 @@ from ..config import Bootstrap
 from ..log import logger
 from .tables import POOL, Table, declare_nothing, declare_rows
 
-#: How many bindings' Environments one `Host` keeps open. **Today the cache never holds
-#: more than the run's one binding**, so this bound is never reached: `index_binding`
-#: opens a `Host` around the job it is handed and closes it when the job ends, and one
-#: index job is one binding. The bound is the eviction rule the structure carries for
-#: the day a `Host` outlives its run, which the S1 spec holds as a written trigger.
-#: Small for that day, because the loop runs one job at a time: a named Environment has
-#: no close of its own and an open one is an open LMDB handle, so a host that kept every
-#: binding it ever saw would grow handles for the life of the process.
 ENVIRONMENTS_HELD = 4
 
-#: At most two connections per workspace (see this module's docblock), and none held
-#: open while nothing is running.
+
 POOL_MIN_SIZE = 0
 POOL_MAX_SIZE = 2
 
-#: The two apps a run has inside its binding's Environment, and they are **two on
-#: purpose**. An app's name is its state record within the Environment, and a record
-#: holds what its last run declared — both the entries a memoised call left and the rows
-#: a target was told to hold. So a second main function run under one name reverts the
-#: first's: probed on 11/09/2026 against the pinned engine, where reading one document,
-#: running any other main under the same name and reading the document again ran the
-#: detector **twice**, and the same sequence under two names ran it once.
-#:
-#: `landed` is the reading: one component per document, the memoised conversion and seam
-#: beneath it, and no target at all. `chunks` is the writing: the rows of the chunk
-#: index, whose state record is what tells the engine which of a binding's rows have
-#: gone.
+
 LANDED_APP = "landed"
 CHUNKS_APP = "chunks"
 
 
 @dataclass(frozen=True, slots=True)
 class IndexRun:
-    """One index run: the binding it is for, in the workspace that holds it."""
-
     workspace_id: str
     binding_id: str
-    #: Why this run is happening, as the job row carries it — `bound`, `restored`,
-    #: `rule-change`, `wiped` or `narrowed`. The wipe's own order hangs off this word.
+
     reason: str
 
 
 async def open_pool(
     database_url: str, workspace_id: str, *, max_size: int = POOL_MAX_SIZE
 ) -> asyncpg.Pool:
-    """A pool that hands out no connection which is not scoped to this workspace.
-
-    Two decisions, and the second is the one that is easy to get wrong.
-
-    `set_config(..., false)` and not `true`: the third argument is whether the setting
-    is local to the transaction, and the engine's writes land on connections outside any
-    transaction this tier opened. The scope has to outlive a statement here, which is
-    the opposite of what the worker's psycopg door wants and the reason the two differ.
-
-    **And it is re-applied on every acquisition, not once when the connection opens.**
-    asyncpg resets a connection when it goes back to the pool, and its reset is
-    `RESET ALL` — which takes a session setting with it. A scope applied in the pool's
-    `init` therefore holds for exactly as long as the first checkout and is gone from
-    the second, so the first row of a run lands and a later one is refused by the
-    policy. The hook that runs after the reset is `setup`, so that is where the
-    scope goes.
-    """
 
     async def scope(connection: asyncpg.Connection) -> None:
         await connection.execute(
@@ -127,13 +53,6 @@ async def open_pool(
 
 
 class _Loop:
-    """The one event loop the host owns, on a thread of its own.
-
-    Every Environment is constructed against this loop, and every coroutine this module
-    runs is submitted to it from outside. Nothing in this tier awaits on it, because the
-    engine's blocking calls made from inside it never return.
-    """
-
     def __init__(self) -> None:
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(
@@ -150,7 +69,6 @@ class _Loop:
         return self._loop
 
     def run[T](self, work: Coroutine[Any, Any, T]) -> T:
-        """Run one coroutine on the host's loop and wait for it here."""
         return asyncio.run_coroutine_threadsafe(work, self._loop).result()
 
     def close(self) -> None:
@@ -160,20 +78,6 @@ class _Loop:
 
 
 class Host:
-    """What one index run holds: the loop, its workspace's pool and its binding's store.
-
-    A `Host` lives for exactly one run — `index_binding` opens it around the job it is
-    handed and `close` drops every Environment and every pool when the job ends — so the
-    pool is that run's and the binding's `Environment` is that run's, and nothing here
-    survives to the next claim. The dict of pools and the LRU of Environments are the
-    shapes a `Host` that outlived its run would need; the S1 spec names the trigger for
-    building one and what it must then carry.
-
-    Everything crossing this class's surface is a plain type. The Environments, the apps
-    and the pool's identity to the engine stay inside it, which is what keeps the exit
-    cost of the engine one directory (ADR 0036).
-    """
-
     def __init__(
         self, bootstrap: Bootstrap, *, environments_held: int = ENVIRONMENTS_HELD
     ) -> None:
@@ -196,23 +100,10 @@ class Host:
     ) -> None:
         self.close()
 
-    # -- the stores on disk ----------------------------------------------------------
-
     def binding_directory(self, run: IndexRun) -> Path:
-        """Where this binding's store lives — one directory per binding (ADR 0005).
-
-        Under the workspace, so that what an operator sees on the volume is the shape
-        the estate is in rather than a flat list of identifiers.
-        """
         return Path(self._engine.lmdb_dir) / run.workspace_id / run.binding_id
 
     def lmdb_bytes(self, run: IndexRun) -> int:
-        """How much disk the binding's store is using, or nothing when it has none.
-
-        Read off the directory rather than asked of the engine: the number the compose
-        file's per-binding cap is checked against is the one the filesystem reports, and
-        a run that never opened a store answers zero rather than refusing.
-        """
         directory = self.binding_directory(run)
         if not directory.is_dir():
             return 0
@@ -221,22 +112,10 @@ class Host:
         )
 
     def remove_binding_directory(self, run: IndexRun) -> None:
-        """Forget this binding's store entirely, evicting it from the cache first.
-
-        The order is not a preference: removing the directory under an open handle would
-        leave the engine writing into a store nothing can read.
-        """
         self.evict(run)
         shutil.rmtree(self.binding_directory(run), ignore_errors=True)
 
-    # -- the pools -------------------------------------------------------------------
-
     def pool(self, workspace_id: str) -> asyncpg.Pool:
-        """This workspace's pool, built on the host's loop the first time it is asked
-        for. One per workspace and not one per binding: the scope a connection holds is
-        the workspace's, so every Environment of one workspace shares these two
-        connections rather than opening two of its own.
-        """
         held = self._pools.get(workspace_id)
         if held is not None:
             return held
@@ -244,22 +123,13 @@ class Host:
         self._pools[workspace_id] = opened
         return opened
 
-    # -- the Environments ------------------------------------------------------------
-
     def open_binding(self, run: IndexRun) -> None:
-        """Make sure this binding's Environment is open and the most recently used."""
         self._environment(run)
 
     def held_bindings(self) -> tuple[str, ...]:
-        """Which bindings the cache is holding, oldest touch first."""
         return tuple(self._environments)
 
     def evict(self, run: IndexRun) -> None:
-        """Drop this binding's Environment, if the cache is holding one.
-
-        Dropping the reference is the whole of it: a named Environment has no close, and
-        what goes when the last reference does is the LMDB handle beneath it.
-        """
         self._environments.pop(run.binding_id, None)
         self._providers.pop(run.binding_id, None)
 
@@ -295,56 +165,24 @@ class Host:
         return opened
 
     def app_config(self, run: IndexRun, name: str) -> coco.AppConfig:
-        """How an app of this package's runs in this binding's store.
-
-        Public to the package and to nothing outside it: a module that has its own main
-        function builds its own app around this, rather than this class growing a method
-        per kind of work and learning what a document or a chunk is. The engine's own
-        type is named here and that is the whole point of the line — a caller outside
-        this directory never sees it (ADR 0036).
-
-        The name is the caller's because it is the caller's state record: two mains
-        under one name revert each other's, so a module with its own main asks for its
-        own name (see `LANDED_APP` and `CHUNKS_APP` above).
-        """
         return coco.AppConfig(
             name=name,
             environment=self._environment(run),
             max_inflight_components=self._engine.max_inflight_components,
         )
 
-    # -- the runs --------------------------------------------------------------------
-
     def land_rows(
         self, run: IndexRun, table: Table, rows: Sequence[Mapping[str, Any]]
     ) -> int:
-        """Declare these rows against the table and let the engine converge it.
-
-        Called from the caller's own thread, which is never the host's loop thread: the
-        blocking form of an update never returns when it is called from inside the loop
-        its Environment was given.
-        """
         declared = tuple(rows)
         app = coco.App(self.app_config(run, CHUNKS_APP), declare_rows, table, declared)
         landed = app.update_blocking()
         return int(landed) if isinstance(landed, int) else len(declared)
 
     def drop_binding(self, run: IndexRun) -> None:
-        """Revert everything this binding's app declared, and clear its store.
-
-        For a user-managed target that reverts **nothing in Postgres** — not the table,
-        not its indexes and not the rows this binding's own runs landed. The binding's
-        chunk rows are deleted by the app, in its own transaction, before the job that
-        removes this store is ever enqueued.
-
-        The app dropped is the writing one, because that is the only one with a target
-        state to revert; the reading app's record holds memo entries alone, and what
-        clears those is the wipe removing the directory they live in.
-        """
         coco.App(self.app_config(run, CHUNKS_APP), declare_nothing).drop_blocking()
 
     def close(self) -> None:
-        """Let every store go and close every pool, on the loop that opened them."""
         self._environments.clear()
         self._providers.clear()
         pools = list(self._pools.values())

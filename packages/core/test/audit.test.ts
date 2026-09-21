@@ -20,29 +20,20 @@ import { bootstrap, principalOf, provisionedWorkspace } from "./platform.ts";
 import { coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
-/**
- * The ledger through the audit slice's entry point (`[TEST1]`), against real Postgres:
- * the vocabulary a slice declares against, the walk over every slice's declared acts, and
- * the two doors — each proved to land a row with the supplied id verbatim, booked to the
- * actor the door derives or names, in the workspace the transaction is scoped to.
- */
-
 const db = postgresForSuite();
 
 const PACKAGE_JSON = path.resolve(import.meta.dirname, "../package.json");
 
-/** Every module the exports map names, loaded — so every slice's declarations have run. */
 const loadEveryEntryPoint = async (): Promise<void> => {
   const manifest: { exports: Readonly<Record<string, string>> } = JSON.parse(
     readFileSync(PACKAGE_JSON, "utf8"),
   );
   for (const relative of Object.values(manifest.exports)) {
     const file = pathToFileURL(path.resolve(path.dirname(PACKAGE_JSON), relative)).href;
-    await import(/* @vite-ignore */ file);
+    await import(file);
   }
 };
 
-/** Every act name written as `act("…")` in the files given. */
 const actLiteralsIn = (files: readonly string[]): Set<string> =>
   new Set(
     files.flatMap((file) =>
@@ -52,14 +43,8 @@ const actLiteralsIn = (files: readonly string[]): Set<string> =>
     ),
   );
 
-/** A provisioned workspace and its Admin, as a user principal's claims. */
 const provisioned = () => provisionedWorkspace(db(), "Ledger");
 
-/**
- * Write one event as the platform in a provisioned workspace — the shape every case that
- * hands the door a whole event takes, so a suite of refusals says what it is refusing and
- * not how a write is opened.
- */
 const writingIn =
   (door: PostgresDoor, workspaceId: string) => (event: Parameters<typeof record>[2]) =>
     withScope(bootstrap, door, workspaceId, (tx) => record(bootstrap, tx, event));
@@ -88,12 +73,11 @@ describe("the declared-acts walk", () => {
     expect(walked.length).toBeGreaterThan(0);
 
     for (const declaration of walked) {
-      // One way: the family a slice declared under is one of the four.
       expect({ family: declaration.family, known: FAMILIES.includes(declaration.family) }).toEqual({
         family: declaration.family,
         known: true,
       });
-      // The other: every act's first word is that family, and nothing else's.
+
       for (const name of declaration.acts) {
         expect({ name, prefix: name.split(".")[0] }).toEqual({ name, prefix: declaration.family });
       }
@@ -103,9 +87,6 @@ describe("the declared-acts walk", () => {
   it.skipIf(sourceTreeIsInstrumented())(
     "reaches every act declared in the tree, and every act it reached is declared in the tree",
     async () => {
-      // `[TEST7]`: an act declared in a file its slice's entry point never imports would be
-      // one the walk cannot see; a registration no source names would be one nobody can read.
-      // Held by name, both ways, with this suite's own probe declarations counted in.
       await loadEveryEntryPoint();
       const registered = new Set<string>(declarations().flatMap((declaration) => declaration.acts));
       const inTree = actLiteralsIn(coreSourceFiles());
@@ -120,8 +101,6 @@ describe("the declared-acts walk", () => {
   );
 
   it("answers the act it was handed — its name and the shape of the detail every row carries", () => {
-    // The acceptance path of the vocabulary's own constructor: the refusals below say what
-    // may not be declared, and this says what a declaration is when nothing refuses it.
     expect(act("platform.probe.shaped", { adminUserId: "id", confirmed: "flag" })).toEqual({
       name: "platform.probe.shaped",
       detail: { adminUserId: "id", confirmed: "flag" },
@@ -145,7 +124,7 @@ describe("the declared-acts walk", () => {
   it("refuses an act declared under a family that is not its first word", () => {
     expect(() =>
       // @ts-expect-error — a people act cannot be declared as a platform act; held at
-      // compile time first, and this is the runtime half for a caller without the compiler.
+
       declareActs("platform", { added: act("people.member.added", {}) }),
     ).toThrow(/not a platform act/);
   });
@@ -159,9 +138,6 @@ describe("the declared-acts walk", () => {
   });
 
   it("refuses an act whose subject names a record that is never a ledger row", () => {
-    // Runs, the answer audit, signals, alerts, spend and its rows, backup runs, health
-    // checks and the inbox are their own records; a declaration naming one is refused
-    // before any row could exist.
     const neverASubject = [
       "run",
       "answer_audit",
@@ -181,8 +157,6 @@ describe("the declared-acts walk", () => {
   });
 
   it("registers nothing when one act of a declaration is refused", () => {
-    // A slice's declaration is one act of its own: the first name must not become
-    // writable while the second is refused and the whole is invisible to the walk.
     expect(() =>
       declareActs("platform", {
         fine: act("platform.probe.atomic", {}),
@@ -204,17 +178,9 @@ describe("the declared-acts walk", () => {
   it.skipIf(sourceTreeIsInstrumented())(
     "finds no door call wrapped in attempt anywhere in the tree",
     () => {
-      // `[AUDIT1]`: the doors are called bare, so a door's rejection aborts the caller's
-      // transaction. `attempt(() => record(...))` would hand the abort back as a value
-      // the act might not read, and the act would commit without its event. The regex
-      // refuses the direct wrap in its spellings — braced or not, `return`/`await`/`void`
-      // before the call, statements ahead of it — and stops at a `with…` opener, because
-      // `attempt(() => withScope(… => record(…)))` is the sanctioned shape: there the
-      // door is bare inside the opener, and the abort still fails the whole attempt.
-      // The deep hold is `[AUDIT1]`'s per-slice fail-together test, not this pattern.
       const wrapped =
         /attempt\(\s*(?:async\s+)?\(\s*\)\s*=>\s*(?:\{(?:(?!with[A-Z])[^])*?)?(?:return\s+)?(?:await\s+|void\s+)?record(?:For)?\(/;
-      // The pattern is proved to bite before its silence is read as innocence.
+
       expect(wrapped.test("attempt(() => record(principal, tx, event))")).toBe(true);
       expect(wrapped.test("attempt(async () => recordFor(platform, tx, event))")).toBe(true);
       expect(
@@ -226,7 +192,7 @@ describe("the declared-acts walk", () => {
           "attempt(async () => {\n  const before = prepare();\n  return record(before, tx, event);\n})",
         ),
       ).toBe(true);
-      // And proved to pass the sanctioned shape, so the guard cannot outlaw the convention.
+
       expect(
         wrapped.test(
           "attempt(() => withScope(platform, door, id, (tx) => record(platform, tx, event)))",
@@ -246,11 +212,10 @@ describe("the declared-acts walk", () => {
   );
 });
 
-/** An act declared once for this suite, so the doors have something declared to write. */
 const PROBE = declareActs("platform", {
   written: act("platform.probe.written", { adminUserId: "id", role: "role", confirmed: "flag" }),
   noted: act("platform.probe.noted", { confirmed: "flag" }),
-  /** An act with a field that may be absent — the `?` kind, which the subject request needs. */
+
   optional: act("platform.probe.optional", { adminUserId: "id?", confirmed: "flag" }),
 });
 
@@ -315,9 +280,6 @@ describe("the first door — record, the actor derived from the Principal", () =
     const { door } = await provisioned();
     const id = ulid();
 
-    // An unscoped transaction, as an identity-set write would be: the scope resolves to
-    // NULL, which the policy refuses before the column can, so the row is impossible
-    // rather than merely unwritten.
     await expect(
       withScope(bootstrap, door, "", (tx) =>
         record(bootstrap, tx, {
@@ -334,8 +296,7 @@ describe("the first door — record, the actor derived from the Principal", () =
   it("writes the person's own workspace on the row, so a transaction scoped elsewhere is refused", async () => {
     const here = await provisioned();
     const there = await provisionedWorkspace(db(), "Elsewhere");
-    // The other workspace's Admin, holding a Principal for it: the session a cross-tenant
-    // write would arrive under.
+
     const theirs = principalOf(there.workspaceId, there.adminUserId, "Admin");
     const refused = ulid();
     const landed = ulid();
@@ -349,12 +310,9 @@ describe("the first door — record, the actor derived from the Principal", () =
         }),
       );
 
-    // The explicit workspace id is what the policy refuses the disagreement over; passing
-    // none would let the row fall into whichever workspace the transaction is scoped to.
     await expect(noteAs(here.workspaceId, refused)).rejects.toThrow(/row-level security/);
     expect(await rowById(refused)).toBeUndefined();
 
-    // And in the scope it agrees with, the row lands in the Principal's own workspace.
     await noteAs(there.workspaceId, landed);
     expect(await rowById(landed)).toMatchObject({
       workspace_id: there.workspaceId,
@@ -367,9 +325,6 @@ describe("the first door — record, the actor derived from the Principal", () =
     const named = ulid();
     const left = ulid();
 
-    // Both ways (`[TEST7]`): a `?` kind that refused the absent field would be the required
-    // kind under another name, and one that never checked the given field would be no kind
-    // at all. The row carries the field it was given and nothing where it was not.
     await withScope(bootstrap, door, workspaceId, (tx) =>
       record(bootstrap, tx, {
         id: named,
@@ -400,8 +355,7 @@ describe("the first door — record, the actor derived from the Principal", () =
         id: ulid(),
         act: PROBE.optional,
         subjectId: adminUserId,
-        // The optional field is given and the required one is not: absence is the `?` kind's
-        // alone, and `confirmed` is refused exactly as it was before the kind existed.
+
         detail: { adminUserId },
       }),
     ).rejects.toThrow(/detail is missing the field confirmed/);
@@ -437,9 +391,6 @@ describe("the first door — record, the actor derived from the Principal", () =
     const { door, workspaceId, adminUserId } = await provisioned();
     const write = writingIn(door, workspaceId);
 
-    // The end anchor is what tells this refusal from the optional kind's, which is this one
-    // plus ", or absent": unanchored, the pattern matches both, and a required field that
-    // wrongly gained the absence clause would still read green here.
     await expect(
       write({
         id: ulid(),
@@ -453,8 +404,7 @@ describe("the first door — record, the actor derived from the Principal", () =
         id: ulid(),
         act: PROBE.written,
         subjectId: adminUserId,
-        // The act names three fields and this detail brings two; a field that is missing
-        // is its own word, not the kind check's.
+
         detail: { adminUserId, role: "Admin" },
       }),
     ).rejects.toThrow(/detail is missing the field confirmed/);
@@ -466,8 +416,7 @@ describe("the first door — record, the actor derived from the Principal", () =
         detail: {},
       }),
     ).rejects.toThrow(/never declared/);
-    // The boundary's own refusal keeps the cause it refused over, so a caller reading the
-    // Error is told which field and why rather than only that something was wrong.
+
     await expect(
       write({
         id: "audit-1",
@@ -486,8 +435,7 @@ describe("the second door — recordFor, the platform naming the actor", () => {
   it("lands a row booked to the actor named, not to the platform", async () => {
     const { door, workspaceId } = await provisioned();
     const id = ulid();
-    // A person who holds no membership here and so no Principal — T-061's requester. The
-    // kernel derivation for that case is T-061's; the door takes any actor id.
+
     const requester: ActorId = `human:${ulid()}`;
 
     const written = await withScope(bootstrap, door, workspaceId, (tx) =>
@@ -505,9 +453,6 @@ describe("the second door — recordFor, the platform naming the actor", () => {
   });
 
   it("is not reachable from a user principal: the type refuses it, and the type is the one guard", () => {
-    // No runtime check stands behind the parameter — every caller of this package is
-    // compiled against it — so a widening of the type is the whole of what would let a
-    // person's session book a row to somebody else, and the type is what is pinned.
     expectTypeOf(recordFor).parameter(0).toEqualTypeOf<PlatformPrincipal>();
     expectTypeOf<UserPrincipal>().not.toExtend<PlatformPrincipal>();
   });

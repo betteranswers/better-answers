@@ -6,13 +6,6 @@ import { listRoutes, LLM_PURPOSES } from "../src/llm/index.ts";
 import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
-/**
- * The routes capability through the `llm` slice's export (`[TEST1]`): the workspace's
- * routes as the Principal, five rows whatever is configured, and one workspace's
- * choices invisible to another's member. Seeded as the superuser through the factory
- * and read back through the runtime pool, where RLS applies.
- */
-
 const db = postgresForSuite();
 
 type Seeded = { readonly workspaceId: string; readonly userId: string };
@@ -21,11 +14,10 @@ type SeededRoute = {
   readonly purpose: "answering" | "embedding";
   readonly provider: string;
   readonly model: string;
-  /** Named only by a test about the retention tail; a route nobody read the terms for has none. */
+
   readonly retentionTail?: string;
 };
 
-/** A workspace whose Viewer can read it, with the routes the scenario names. */
 const seedWorkspace = async (routes: readonly SeededRoute[]): Promise<Seeded> => {
   const client = await db().pool.connect();
   try {
@@ -92,9 +84,6 @@ describe("a workspace's model routes", () => {
   });
 
   it("reads back the retention tail a route carries, in the provider's own words", async () => {
-    // The sentence the DPIA input prints for this route (the S0 spec, *The DPIA input*; ADR
-    // 0020 amending ADR 0013's route slot). It is the provider's wording and not a duration,
-    // so the test writes one down rather than deriving it.
     const tail = "Prompts and outputs are deleted within 30 days; no training on customer data.";
     const seeded = await seedWorkspace([
       {
@@ -111,8 +100,6 @@ describe("a workspace's model routes", () => {
   });
 
   it("says a route nobody read the provider's terms for has no tail, rather than inventing one", async () => {
-    // The other way (`[TEST7]`): a configured route with no tail reads `null`, which is what
-    // lets a DPIA say *not recorded* instead of a sentence nobody wrote.
     const seeded = await seedWorkspace([
       { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
     ]);
@@ -150,9 +137,6 @@ describe("a workspace's model routes", () => {
     ]);
     await seedWorkspace([{ purpose: "answering", provider: "mistral", model: "mistral-large" }]);
 
-    // The same transaction the capability runs in, asked for every route there is:
-    // the policy — not the `WHERE workspace_id = $1` the capability also writes — is
-    // what leaves the other workspace's rows out of the answer.
     const visible = await withPrincipal(
       openPostgres(db().runtimePool),
       claimsFor(mine),
@@ -169,12 +153,8 @@ describe("a workspace's model routes", () => {
     const seeded = await seedWorkspace([]);
     let read: Awaited<ReturnType<typeof listRoutes>> | undefined;
 
-    // `[TEST8]`: the abort is provoked inside the work, so the assertion is on the
-    // transaction's outcome first — the opener rejects — and on the value second.
     await expect(
       withPrincipal(openPostgres(db().runtimePool), claimsFor(seeded), async (principal, tx) => {
-        // A statement Postgres refuses aborts the transaction, so the capability's own
-        // read cannot run. `attempt` is the one place a rejection is caught (§ TYPES).
         await attempt(() => tx.query("SELECT no_such_function()"));
         read = await listRoutes(principal, tx);
       }),

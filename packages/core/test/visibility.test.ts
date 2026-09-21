@@ -35,31 +35,15 @@ import {
   type SourcedConcept,
 } from "./sourced-concept.ts";
 
-/**
- * Who may see a concept, derived inside the act that changes it (T-055; ADR 0023, ADR
- * 0039), through the slices' entry points (`[TEST1]`) against real Postgres and a real
- * bare repository: the derivation at write time, the narrowing act's two-level cascade in
- * one transaction, the Admin's override and the state it creates, the evidence pane's
- * routing, and `find`'s first real read — each asserted on the rows the act left and on
- * what a reader then sees, never on internals.
- */
-
 const { db, arrange, reading } = visibilitySuite();
 
 const RESTRICTED = { sensitivity: "Restricted" } as const;
 
-/** A literal the test writes down (`[TEST9]`), never the wall clock (ADR 0040): nothing
- * `open` or `find` reads below turns on which instant it is. */
 const now = new Date("2026-09-08T12:00:00.000Z");
 
-/** The concept's row alone, as the superuser reads it. */
 const heldRow = (workspaceId: string, iri: string) =>
   visibilityHeld(db().pool, "concept_index", workspaceId, iri);
 
-/**
- * The three visibility columns of one document's chunk copies, oldest span first, read as the
- * superuser so no policy hides a row the narrowing should have reached.
- */
 const chunkCopiesOf = async (workspaceId: string, sourceDocumentId: string) => {
   const read = await db().pool.query(
     `SELECT sensitivity, audience, audience_groups FROM "index".chunk
@@ -69,18 +53,10 @@ const chunkCopiesOf = async (workspaceId: string, sourceDocumentId: string) => {
   return read.rows;
 };
 
-/** What a seeded chunk holds — the passage whose copy of the three columns a narrowing rewrites. */
 const HOLIDAY = "Holiday is twenty-eight days including bank holidays.";
 
-/** Postgres's own word for *somebody else holds this row*, which is what the probe below reads. */
 const LOCK_NOT_AVAILABLE = "55P03";
 
-/**
- * Whether an act in flight already holds this binding's chunk rows: an update on them from
- * another connection, given a quarter of a second to take the row and told to give up rather
- * than wait. The update writes what is already there and is rolled back either way, so the
- * probe changes nothing — what it reports is who holds the row, not what it says.
- */
 const chunkRowsAreHeld = async (workspaceId: string, bindingId: string): Promise<boolean> => {
   const probe = await db().pool.connect();
   try {
@@ -101,18 +77,12 @@ const chunkRowsAreHeld = async (workspaceId: string, bindingId: string): Promise
   }
 };
 
-/** The Admin's override of one concept to a class for everyone, through the act. */
 const overriddenTo = (scenario: Scenario, iri: string, sensitivity: string) =>
   reading(scenario.admin, (admin, tx) =>
     overrideConceptClass(admin, tx, { iri, sensitivity, audience: "everyone" }),
   );
 const EVERYONE = { audience: "everyone", audience_groups: null } as const;
 
-/**
- * What a refused write would have landed, counted as the superuser so no policy hides a
- * survivor: the concept at the path it asked for, and any evidence naming the document it
- * cited.
- */
 const landedFor = async (workspaceId: string, path: string, documentId: string) => {
   const concepts = await db().pool.query(
     "SELECT 1 FROM concept_index WHERE workspace_id = $1 AND path = $2",
@@ -125,21 +95,13 @@ const landedFor = async (workspaceId: string, path: string, documentId: string) 
   return { concepts: concepts.rowCount ?? 0, evidence: cited.rowCount ?? 0 };
 };
 
-/** The concept's row and its node, which the derivation must keep in step. */
 const rowAndNode = async (workspaceId: string, iri: string) => ({
   row: await visibilityHeld(db().pool, "concept_index", workspaceId, iri),
   node: await visibilityHeld(db().pool, "graph_node", workspaceId, iri),
 });
 
-/** The row and the node both at one pair — the derivation's answer, on the map too. */
 const bothAt = (pair: object) => ({ row: pair, node: pair });
 
-/**
- * Whether some other connection to this suite's database is waiting on a row lock — how a
- * test about two connections sees that the second has reached the row the first holds,
- * rather than guessing from a pause. Polled through `until`, whose cap is the one runaway
- * guard every two-connection test here shares.
- */
 const someoneWaitsOnALock = async (): Promise<boolean> => {
   const found = await db().pool.query(
     "SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'",
@@ -147,7 +109,6 @@ const someoneWaitsOnALock = async (): Promise<boolean> => {
   return (found.rowCount ?? 0) > 0;
 };
 
-/** A composition seeded as including these concepts, Internal and open to everyone. */
 const compositionIncluding = (workspaceId: string, iris: readonly string[]): Promise<string> =>
   seededBy(db(), async (seed) => {
     const composition = await seed.composition({ workspaceId });
@@ -219,7 +180,7 @@ describe("what a governed write derives from the bindings of what it cites", () 
     expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
       bothAt({ sensitivity: "Restricted", ...EVERYONE }),
     );
-    // Nobody's: the HR Viewer passes neither the class nor an audience that is not there.
+
     const seen = await reading(scenario.viewer, (viewer, tx) =>
       open(viewer, tx, { iri: written.iri }, now),
     );
@@ -289,7 +250,7 @@ describe("what a governed write derives from the bindings of what it cites", () 
 
   it("keeps a re-write's audience when it drops the citations that named it, rather than widening", async () => {
     const scenario = await arrange();
-    // The Editor is in the group, so the concept is theirs to re-write.
+
     const { groupId: hr, written } = await conceptForGroup(db(), scenario, "HR", [scenario.editor]);
 
     await conceptCiting(scenario, scenario.editor, [], {
@@ -306,10 +267,6 @@ describe("what a governed write derives from the bindings of what it cites", () 
   });
 });
 
-/**
- * A re-write of one concept by this person, citing these documents — the act as `writeConcept`
- * answers it, refusal and all, against the bundle's current head.
- */
 const rewriteCiting = async (
   scenario: Scenario,
   writer: UserPrincipal,
@@ -342,13 +299,11 @@ describe("what a re-write may not do to the class a concept holds", () => {
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
     const forHr = await bindingForGroups(db(), scenario.workspaceId, [hr]);
-    // The Admin may read a Restricted concept, so the refusal below is the widening's alone.
+
     const restrictedNote = await conceptCiting(scenario, scenario.admin, [restricted.documentId]);
     const hrNote = await conceptCiting(scenario, scenario.editor, [forHr.documentId]);
     const before = await bundleHistory(scenario.git, scenario.workspaceId);
 
-    // Swapping the Restricted document for an Internal one would land the concept Internal
-    // — an un-narrowing no Admin recorded; swapping HR's for everyone's widens the audience.
     const widenedClass = await rewriteCiting(scenario, scenario.admin, restrictedNote, [
       internal.documentId,
     ]);
@@ -385,7 +340,7 @@ describe("what a re-write may not do to the class a concept holds", () => {
     const byAudience = await rewriteCiting(scenario, scenario.editor, boardNote, [
       forBoard.documentId,
     ]);
-    // The Admin reaches the Restricted one and re-writes it; the audience narrows Admins too.
+
     const byAdmin = await rewriteCiting(scenario, scenario.admin, restrictedNote, [
       restricted.documentId,
     ]);
@@ -413,11 +368,7 @@ describe("what a re-write may not do to the class a concept holds", () => {
       { ...withheld, iri: conceptIriOf(ulid()) },
       [],
     );
-    // The one oracle that cannot close: a key is one concept's, so a creation onto a key a
-    // withheld concept holds cannot land as a creation onto a free key would. What the act
-    // guarantees is that the refusal is read before the commit — a commit refused by the
-    // index afterwards would be the reconciler's stop, and a way for an Editor to wedge the
-    // bundle behind it (ADR 0012, 2026-09-07).
+
     const ontoKey = await writeConcept(scenario.editor, doorsOf(scenario), {
       mergeKey: withheld.mergeKey,
       path: "knowledge/jane-doe-again.md",
@@ -453,9 +404,7 @@ describe("what a re-write may not do to the class a concept holds", () => {
     ]);
 
     expect(narrowed.ok).toBe(true);
-    // The second level of the cascade ran in the write's own transaction: the composition's
-    // columns are its include's, and the Viewer loses the page as they do after a narrowing
-    // of the binding — nothing, not an empty list.
+
     expect(await heldRow(scenario.workspaceId, written.iri)).toEqual({
       sensitivity: "Restricted",
       ...EVERYONE,
@@ -467,12 +416,6 @@ describe("what a re-write may not do to the class a concept holds", () => {
   });
 });
 
-/**
- * One workspace, an HR group the Editor is in, and one binding under it at the default pair —
- * the three lines two of the narrowing cases below open with before they say what they are
- * about. The arrangement is shared and nothing either case asserts is: what each is about
- * starts at its next line.
- */
 const workspaceWithHrBinding = async () => {
   const scenario = await arrange();
   const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
@@ -480,17 +423,6 @@ const workspaceWithHrBinding = async () => {
   return { scenario, hr, binding };
 };
 
-/**
- * The narrowing act and the three levels it rewrites inside one transaction, under the
- * workspace's one cascade lock: the binding's chunk copies first, then every concept citing
- * its documents, then every composition including one of those concepts.
- *
- * **What the cascade costs: 3.3 ms per citing concept inside the workspace's cascade lock,
- * probe 3 of 10/09/2026** — 995 ms for one binding 300 concepts cite, linear in the count.
- * The lock is a workspace's, so that is how long a second Admin's narrowing waits; the figure
- * is what S4's plan and the operations thresholds are priced from, and it is written down
- * here because the tests below are where anybody comes to read what this act does.
- */
 describe("narrowing a binding", () => {
   it("recomputes the concepts citing its documents and the compositions including them, in its own transaction, with its ledger row", async () => {
     const scenario = await arrange();
@@ -522,8 +454,7 @@ describe("narrowing a binding", () => {
         compositions: [composition],
       },
     });
-    // Both levels of the cascade, and the map's copies — the node and the edges that wear
-    // the from-concept's columns — moved with the row.
+
     for (const iri of [cited.iri, linked.iri]) {
       expect(await rowAndNode(scenario.workspaceId, iri)).toEqual(
         bothAt({ sensitivity: "Restricted", ...EVERYONE }),
@@ -542,7 +473,7 @@ describe("narrowing a binding", () => {
       sensitivity: "Internal",
       ...EVERYONE,
     });
-    // The ledger row: the binding as subject, the decision in the glossary's words.
+
     expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed")).toEqual(
       [
         {
@@ -557,8 +488,7 @@ describe("narrowing a binding", () => {
 
   it("rewrites the chunk copies of every document under it, keeping a document's own narrower class and never taking a wider one", async () => {
     const { scenario, hr, binding } = await workspaceWithHrBinding();
-    // The three shapes the visibility-columns agreement names: a document with no class of
-    // its own, one narrower than its binding, and one whose own word is wider.
+
     const narrowed = await documentUnder(
       db(),
       scenario.workspaceId,
@@ -581,8 +511,6 @@ describe("narrowing a binding", () => {
       });
     }
 
-    // The audience alone moves: the class the binding holds is the one it keeps, so a copy
-    // rewritten from the binding and nothing else would widen the narrowed document's chunk.
     const moved = await reading(scenario.admin, (admin, tx) =>
       narrowBinding(admin, tx, {
         bindingId: binding.bindingId,
@@ -597,8 +525,7 @@ describe("narrowing a binding", () => {
     expect(await chunkCopiesOf(scenario.workspaceId, binding.documentId)).toEqual([
       { sensitivity: "Internal", ...forHr },
     ]);
-    // The fold takes the narrower of the two, so a class on a document can only ever take
-    // visibility away: Restricted stays, and Public never becomes the chunk's word.
+
     expect(await chunkCopiesOf(scenario.workspaceId, narrowed.documentId)).toEqual([
       { sensitivity: "Restricted", ...forHr },
     ]);
@@ -623,9 +550,6 @@ describe("narrowing a binding", () => {
       });
     }
 
-    // The narrowing is held at its first concept — its binding taken and, if the order is the
-    // one this act promises, its chunk copies already rewritten — and the rows are asked who
-    // holds them from another connection while it waits there.
     await whileActsWaitAt(db().pool, "concept_index", "UPDATE", async (release) => {
       const narrowing = reading(scenario.admin, (admin, tx) =>
         narrowBinding(admin, tx, {
@@ -636,11 +560,8 @@ describe("narrowing a binding", () => {
       );
       await until(async () => (await countWaitingOnLocks(db().pool)) >= 1);
 
-      // Level zero has run: the binding's chunk rows are the act's until it commits. Were the
-      // copies written after the cascade instead, this probe would take the row and pass.
       expect(await chunkRowsAreHeld(scenario.workspaceId, binding.bindingId)).toBe(true);
-      // And the pair the other way: a chunk of a binding this act never names is free, so
-      // what the probe read is the act's own rows and not a lock over the whole table.
+
       expect(await chunkRowsAreHeld(scenario.workspaceId, elsewhere.bindingId)).toBe(false);
 
       await release();
@@ -697,8 +618,7 @@ describe("narrowing a binding", () => {
         }),
       );
       expect(refused).toEqual({ ok: false, error: "role-forbids" });
-      // The role is decided ahead of the shape, so a person who may not act learns nothing
-      // from the string they asked with — not even that it was never a binding id.
+
       const askedWithNonsense = await reading(person, (reader, tx) =>
         narrowBinding(reader, tx, {
           bindingId: "not-a-binding-id",
@@ -737,7 +657,7 @@ describe("narrowing a binding", () => {
       const refused = await reading(scenario.admin, (admin, tx) => narrowBinding(admin, tx, move));
       expect(refused).toEqual({ ok: false, error: "widening-refused" });
     }
-    // And the narrowing of the same list is allowed: fewer groups, never more.
+
     const kept = await reading(scenario.admin, (admin, tx) =>
       narrowBinding(admin, tx, {
         bindingId: forHr.bindingId,
@@ -764,8 +684,7 @@ describe("narrowing a binding", () => {
           audienceGroups: [theirGroup],
         },
         { bindingId: ulid(), sensitivity: "Restricted", audience: "everyone" },
-        // An id the binding table's own column would never hold is refused by its shape,
-        // before any statement carries it, and reads the same as a visibility that is no pair.
+
         { bindingId: "not-a-binding-id", sensitivity: "Restricted", audience: "everyone" },
         {
           bindingId: binding.bindingId,
@@ -793,12 +712,6 @@ describe("narrowing a binding", () => {
     ]);
   });
 
-  /**
-   * A binding narrowed to Restricted on a second connection and **held open** across a write:
-   * the write is started, seen from the database itself to be waiting on a row the narrowing
-   * holds — "still pending after a pause" would also be true of a write that was merely slow
-   * to reach it — then the narrowing commits and the write is expected to land.
-   */
   const writeBesideAnOpenNarrowing = async (
     scenario: Scenario,
     bindingId: string,
@@ -828,7 +741,6 @@ describe("narrowing a binding", () => {
       await narrowing.query("COMMIT");
       expect(await landing).toMatchObject({ ok: true });
     } finally {
-      // A no-op after the COMMIT; what frees the write if an assertion above failed first.
       await attempt(() => narrowing.query("ROLLBACK"));
       narrowing.release();
     }
@@ -839,9 +751,6 @@ describe("narrowing a binding", () => {
     const binding = await bindingHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
 
-    // READ COMMITTED would let a plain read of the binding see the row before the narrowing
-    // and derive Internal, then commit after it — a concept citing a Restricted binding at
-    // Internal until the next recompute. The write has to wait on the binding row instead.
     await writeBesideAnOpenNarrowing(scenario, binding.bindingId, () =>
       rewriteCiting(scenario, scenario.editor, written, [binding.documentId]),
     );
@@ -857,20 +766,10 @@ describe("narrowing a binding", () => {
     const other = await bindingHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [cited.documentId]);
 
-    // The narrowing is of the binding the concept cites *today*, and its cascade has moved
-    // the concept's row to Restricted, uncommitted. The re-write cites the other binding —
-    // Internal — so its pre-commit check reads the row as it stands committed (Internal) and
-    // derives Internal from the new citations: no widening, and a commit is made. The landing
-    // derives Internal from the new binding too, which nothing it read FOR SHARE would stop;
-    // only the row itself, read again in the landing's own transaction, says the concept has
-    // since narrowed.
     await writeBesideAnOpenNarrowing(scenario, cited.bindingId, () =>
       rewriteCiting(scenario, scenario.editor, written, [other.documentId]),
     );
 
-    // Restricted — what the row held when the rows landed — and not the Internal the new
-    // citations derive: a re-write never widens a concept, whichever instant the widening
-    // would have slipped through at.
     expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
       bothAt({ sensitivity: "Restricted", ...EVERYONE }),
     );
@@ -880,8 +779,7 @@ describe("narrowing a binding", () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
-    // An include naming an identity with no index row — a creation whose rows were lost in
-    // the crash window and not yet replayed, as the cascade may find one.
+
     const composition = await seededBy(db(), async (seed) => {
       const page = await seed.composition({ workspaceId: scenario.workspaceId });
       await seed.compositionInclude({
@@ -898,8 +796,6 @@ describe("narrowing a binding", () => {
       return page.id;
     });
 
-    // A narrowing that changes nothing recomputes all the same, and that is the road to the
-    // composition's recompute here.
     const narrowed = await reading(scenario.admin, (admin, tx) =>
       narrowBinding(admin, tx, {
         bindingId: binding.bindingId,
@@ -909,18 +805,12 @@ describe("narrowing a binding", () => {
     );
 
     expect(narrowed).toMatchObject({ ok: true, value: { compositions: [composition] } });
-    // Not the Internal its one readable include would derive: the missing include stands
-    // in at the most restrictive visibility there is until its row does.
+
     expect(
       await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
     ).toEqual({ sensitivity: "Restricted", ...EVERYONE });
   });
 
-  /**
-   * A re-write started and **parked** at its first write to `table` by `whileActsWaitAt`,
-   * a narrowing then started beside it and seen from the database to be waiting too, and
-   * the pair released: the shape of every race between the write road and the cascade.
-   */
   const narrowingBesideAParkedWrite = async (
     scenario: Scenario,
     table: string,
@@ -945,10 +835,6 @@ describe("narrowing a binding", () => {
     const kept = await bindingHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [dropped.documentId]);
 
-    // The re-write swaps its citation from one binding to the other and is held inside its
-    // landing — its row taken, its citations replaced, the commit row not yet written —
-    // while the binding it dropped is narrowed. The cascade sees the concept as still citing
-    // that binding (the swap is uncommitted), reaches the row and waits.
     await narrowingBesideAParkedWrite(
       scenario,
       "bundle_commit",
@@ -957,8 +843,6 @@ describe("narrowing a binding", () => {
       { bindingId: dropped.bindingId, sensitivity: "Restricted", audience: "everyone" },
     );
 
-    // Internal — what the binding it now cites allows — and not the Restricted a cascade
-    // deriving from the citation it had already dropped would have written over it.
     expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
       bothAt({ sensitivity: "Internal", ...EVERYONE }),
     );
@@ -978,9 +862,6 @@ describe("narrowing a binding", () => {
       cited.iri,
     ]);
 
-    // The re-write takes its concept to HR alone and is held at its composition update,
-    // having derived the page from the other include as it stood — everyone. The narrowing
-    // then takes the other include to Sales alone and reaches the same page.
     await narrowingBesideAParkedWrite(
       scenario,
       "composition",
@@ -994,8 +875,6 @@ describe("narrowing a binding", () => {
       },
     );
 
-    // HR and Sales share nobody: the page is for nobody, which is Restricted for everyone
-    // (ADR 0039) — never the groups of whichever act wrote last.
     expect(
       await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
     ).toEqual({ sensitivity: "Restricted", ...EVERYONE });
@@ -1010,13 +889,7 @@ describe("narrowing a binding", () => {
       second.documentId,
     ]);
 
-    // The first narrowing is held at its ledger row — its binding taken, its cascade not
-    // yet run — while the second narrowing starts. Without one lock at the head, each would
-    // hold its own binding and want the other through the concept citing both, and Postgres
-    // would end one Admin's act with an error.
     await whileActsWaitAt(db().pool, "audit_event", "INSERT", async (release) => {
-      // The second starts only once the first is parked, so the order is the one the
-      // deadlock needs and never the one a fast first narrowing would have finished in.
       const narrowings: Promise<Awaited<ReturnType<typeof narrowBinding>>>[] = [];
       for (const [at, binding] of [first, second].entries()) {
         narrowings.push(
@@ -1059,8 +932,6 @@ describe("narrowing a binding", () => {
       audience: "everyone",
     });
 
-    // `[AUDIT1]` and `[TEST8]`: a failure provoked after the act's rows and its ledger row
-    // have landed, and the assertion on what the transaction left, before any value.
     await expect(
       reading(scenario.admin, async (admin, tx) => {
         const narrowed = await narrowBinding(admin, tx, {
@@ -1089,8 +960,7 @@ describe("narrowing a binding", () => {
       sensitivity: "Internal",
       ...EVERYONE,
     });
-    // Level zero rolls back with the rest of it: the copies are the act's own statement, in
-    // the act's own transaction, and not a write that outlives the act that made it.
+
     expect(await chunkCopiesOf(scenario.workspaceId, binding.documentId)).toEqual([
       { sensitivity: "Internal", ...EVERYONE },
     ]);
@@ -1109,7 +979,7 @@ describe("an Admin's recorded override", () => {
       frontmatter: { title: "Ada Lovelace", type: "Person" },
     });
     const composition = await compositionIncluding(scenario.workspaceId, [person.iri]);
-    // As the cascade would have left it: a composition including a Restricted concept.
+
     await db().pool.query(
       "UPDATE composition SET sensitivity = 'Restricted' WHERE workspace_id = $1 AND id = $2",
       [scenario.workspaceId, composition],
@@ -1148,7 +1018,7 @@ describe("an Admin's recorded override", () => {
         detail: { iri: person.iri, sensitivity: "Internal", audience: "everyone" },
       },
     ]);
-    // The Viewer now sees the concept — and its class is derived from nothing they could read.
+
     const seen = await reading(scenario.viewer, (viewer, tx) =>
       open(viewer, tx, { iri: person.iri }, now),
     );
@@ -1220,8 +1090,7 @@ describe("an Admin's recorded override", () => {
           audience: "everyone",
         });
         expect(overridden.ok).toBe(true);
-        // A second identity row under the concept's own key: the primary key refuses it,
-        // which aborts the transaction the override landed in.
+
         await attempt(() =>
           tx.query(
             "INSERT INTO concept_identity (workspace_id, iri, merge_key) VALUES ($1, $2, 'x')",
@@ -1302,7 +1171,7 @@ describe("the evidence pane", () => {
       next: "Ask an Admin for access to the sources, or read the concept as it stands.",
     });
     expect(pane.ok && pane.value?.sharedBeyondEvidence?.at).toBeInstanceOf(Date);
-    // Nothing of the withheld evidence reaches the reader — not its locator, not its name.
+
     expect(JSON.stringify(pane)).not.toContain("Document 1");
   });
 
@@ -1369,10 +1238,6 @@ describe("the evidence pane", () => {
   });
 });
 
-/**
- * Two concepts about expenses — one an Internal-sourced Policy the Viewer may see, one
- * Restricted-sourced and withheld from them — which is what both reads are asked about.
- */
 const expensesNotes = async (scenario: Scenario) => {
   const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
   const visible = await conceptCiting(scenario, scenario.editor, [internal.documentId], {
@@ -1425,8 +1290,7 @@ describe("find", () => {
         ],
       },
     });
-    // Only the bundles arm has an IRI, and this proof is about which concepts each reader
-    // may see; the sources arm is `find`'s other half and is proved in `answering.test.ts`.
+
     expect(
       admin.ok &&
         admin.value.hits.flatMap((hit) => (hit.layer === "bundles" ? [hit.iri] : [])).toSorted(),
@@ -1444,8 +1308,6 @@ describe("find", () => {
       reading(scenario.viewer, (reader, tx) => ask(reader, tx, { question: "Is the sky blue?" })),
     ]);
 
-    // Verdict first (ADR 0016), the one sentence, and the concepts it would rest on named
-    // by IRI — the Viewer's answer naming only what the Viewer could open.
     expect(viewer).toEqual({
       ok: true,
       value: {

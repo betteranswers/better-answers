@@ -1,14 +1,3 @@
-"""The Python half of the tier-contract conformance suite (ADR 0031).
-
-The TypeScript half is ``packages/core/test/tier-contract.test.ts``, and the two
-assert the same expectations against the same ``contracts/`` directory.
-
-The version and the agreement ids are hardcoded on each side on purpose, never read
-from a shared constant: each suite states what its tier speaks, so a change to the
-contract that either tier has not been taught fails that tier's suite. That failure
-is the mechanism; deduplicating it away would delete the test.
-"""
-
 import json
 import re
 from pathlib import Path
@@ -42,17 +31,6 @@ def read_manifest() -> dict[str, Any]:
 
 
 def fixtures_on_disk(directory: Path) -> set[str]:
-    """Every fixture a directory holds, as the manifest writes a path.
-
-    Dotfiles are not fixtures. macOS writes a ``.DS_Store`` into any directory a
-    Finder window has opened, and ``contracts/`` is a directory a person browses;
-    ``rglob`` returns it exactly as the TypeScript half's ``readdirSync`` does. It
-    is git-ignored, so no manifest can list it, CI never has one, and the owner
-    reviewing the failure cannot see it — the suite would fail on the one machine
-    that has one and pass on every other. The TypeScript half applies the same rule
-    to the same directory (ADR 0031); a filter in one half alone leaves the other
-    tripping on the same file.
-    """
     found: set[str] = set()
     for file in directory.rglob("*"):
         if not file.is_file():
@@ -85,7 +63,6 @@ def test_lists_a_fixture_if_and_only_if_it_exists_under_an_agreement_it_names() 
         assert fixture["agreement"] in SPOKEN_AGREEMENTS
         assert (CONTRACTS_DIR / fixture["path"]).exists()
 
-    # The other direction: a file on disk the manifest does not list fails too.
     assert fixtures_on_disk(CONTRACTS_DIR) == {
         fixture["path"] for fixture in manifest["fixtures"]
     }
@@ -96,23 +73,13 @@ def test_counts_a_fixture_and_never_a_dotfile(tmp_path: Path) -> None:
     (tmp_path / "id-shape" / "cases.json").write_text("{}", encoding="utf-8")
     (tmp_path / "manifest.json").write_text("{}", encoding="utf-8")
     (tmp_path / "README.md").write_text("", encoding="utf-8")
-    # What macOS writes into any directory a Finder window has opened, at the root and
-    # under a fixture's own. `rglob` returns it exactly as `readdirSync` does, which is
-    # why both halves need the same filter: fixing one leaves the other tripping on it.
+
     (tmp_path / ".DS_Store").write_text("", encoding="utf-8")
     (tmp_path / "id-shape" / ".DS_Store").write_text("", encoding="utf-8")
     (tmp_path / ".cache").mkdir()
     (tmp_path / ".cache" / "cases.json").write_text("{}", encoding="utf-8")
 
     assert fixtures_on_disk(tmp_path) == {"id-shape/cases.json"}
-
-
-# --- id-shape: one id shape, whichever tier minted it (ADR 0035) ----------------------
-#
-# The fixture is the contract: the pattern an id matches, the ids that must match it and
-# the ids that must not. This tier reads an id the other tier minted on every row it
-# touches, so the pattern is what it holds them to; and every id this tier seeds is held
-# to the same one, so an id minted here parses at the other tier's boundary.
 
 
 def read_id_shape() -> dict[str, Any]:
@@ -131,16 +98,14 @@ def test_the_id_shape_accepts_and_refuses_exactly_what_the_fixture_says() -> Non
 
 
 def test_the_shape_this_tier_holds_a_workspace_id_to_is_the_fixtures_own() -> None:
-    # `bundle.py` refuses to turn a workspace id into a path unless it has this shape;
-    # the copy in `ids.py` is held to the fixture's pattern, so it can never drift.
+
     from better_answers_worker.ids import ID_SHAPE
 
     assert ID_SHAPE.pattern == read_id_shape()["pattern"]
 
 
 def test_an_id_minted_in_this_tier_matches_the_shape_the_other_tier_parses() -> None:
-    # The tier's own minter, not the factory's re-export: this is the function the
-    # nightly audit's self-scheduling names a job with, and it is the one held here.
+
     from better_answers_worker.ids import ulid
 
     pattern = re.compile(read_id_shape()["pattern"])
@@ -148,18 +113,10 @@ def test_an_id_minted_in_this_tier_matches_the_shape_the_other_tier_parses() -> 
     minted = [ulid() for _ in range(100)]
     for identifier in minted:
         assert pattern.fullmatch(identifier), identifier
-    # The time half is the half the shape promises: ids made in order read in order.
+
     assert [identifier[:10] for identifier in minted] == sorted(
         identifier[:10] for identifier in minted
     )
-
-
-# --- llm-routing: the first real fixture (ADR 0031) -----------------------------------
-#
-# The fixture is the contract: seed its workspaces and routes, run every call as
-# app_rt under the call's workspace GUC ('' = the missing scope), and expect exactly
-# expect_route_id (None = zero rows). The TypeScript half runs the same cases in
-# packages/core/test/llm-routing.contract.test.ts.
 
 
 def test_llm_routing_resolves_every_fixtured_call() -> None:
@@ -197,17 +154,6 @@ def test_llm_routing_resolves_every_fixtured_call() -> None:
             resolved = rows[0][0] if rows else None
             assert resolved == call["expect_route_id"], call
         connection.rollback()
-
-
-# --- concept-inbox: the queue both tiers write to (ADR 0031, ADR 0012) ----------------
-#
-# The fixture is the contract: this tier submits a run's candidates as one call to
-# submit_suggestion_set and reads nothing back — the queue and the payload are the
-# app's. The summary is asserted here too, because the agreement is what the *database*
-# promises and either tier must be able to read the same answer out of it.
-#
-# Refusals are held by SQLSTATE and not by message text: the message is the server's
-# prose, the code is the agreement.
 
 
 def read_concept_inbox() -> dict[str, Any]:
@@ -316,27 +262,6 @@ def test_the_inbox_refuses_every_road_the_fixture_says_is_closed() -> None:
         connection.rollback()
 
 
-# --- queue: the claim protocol both tiers call (ADR 0031, ADR 0005) -------------------
-#
-# The fixture is the contract: seed its workspaces and jobs as the superuser (the two
-# relative instants become absolute, which is how time is advanced without waiting), run
-# every `claims` entry as its own role in its own scope and expect exactly the ids it
-# names, then every `calls` entry and expect exactly the boolean it names, then read
-# every
-# job back and hold it to `expect_final`. The TypeScript half runs the same cases in
-# packages/core/test/queue.contract.test.ts.
-#
-# This tier is the one that claims in production, so what the fixture pins is what the
-# work
-# loop is allowed to assume: the oldest claimable job first, a lapsed lease claimable
-# again,
-# a heartbeat that is the claimant's alone, and poison at the ceiling. From
-# `contract_version` 7 it pins two more: a claim reaches only the kinds it passes, in
-# the poison arm as well as the candidate one, so a kind this loop's registry lacks is
-# left where it is; and a subject has one job claimed under a live lease and one queued
-# behind it, so a binding is never indexed by two runs at once.
-
-
 def read_queue() -> dict[str, Any]:
     raw = (CONTRACTS_DIR / "queue" / "cases.json").read_text(encoding="utf-8")
     return cast("dict[str, Any]", json.loads(raw))
@@ -365,11 +290,6 @@ def _seed_queue_fixture(cursor: Cursor[Any], fixture: dict[str, Any]) -> None:
 
 
 def _refused_enqueue(cursor: Cursor[Any], refused: dict[str, Any]) -> str:
-    """One enqueue the queue must refuse, answered with the SQLSTATE that refused it.
-
-    A failed statement aborts the transaction it happened in, so the probe runs against
-    a savepoint it can come back to.
-    """
     import psycopg
 
     cursor.execute("SAVEPOINT refused_enqueue")
@@ -393,9 +313,6 @@ def _refused_enqueue(cursor: Cursor[Any], refused: dict[str, Any]) -> str:
 
 
 def _lapse_leases(cursor: Cursor[Any], job_ids: list[str]) -> None:
-    """Push a lease thirty seconds into the past, as the superuser: how the fixture
-    lapses a lease part-way through a sequence of claims without waiting a minute.
-    """
     if not job_ids:
         return
     cursor.execute(
@@ -423,9 +340,6 @@ def test_the_queue_hands_out_every_job_the_fixture_says_and_answers_every_call()
     with migrated_postgres() as connection, connection.cursor() as cursor:
         _seed_queue_fixture(cursor, fixture)
 
-        # The run key first, while the jobs it collides with are still queued: a second
-        # queued job for a subject that already has one is the database's refusal, which
-        # is what lets an enqueue read the waiting job's id back and never duplicate it.
         enqueues = [
             {"why": refused["why"], "sqlstate": _refused_enqueue(cursor, refused)}
             for refused in fixture["refused_enqueues"]
@@ -435,9 +349,6 @@ def test_the_queue_hands_out_every_job_the_fixture_says_and_answers_every_call()
             for refused in fixture["refused_enqueues"]
         ]
 
-        # The claims in order and the whole list at once: the agreement is about which
-        # job
-        # goes next, so asserting one at a time would let a claim nobody made pass.
         claimed: list[dict[str, Any]] = []
         for claim in fixture["claims"]:
             _lapse_leases(cursor, claim.get("lapse_first", []))
@@ -474,8 +385,6 @@ def test_the_queue_hands_out_every_job_the_fixture_says_and_answers_every_call()
             {"why": call["why"], "answer": call["expect"]} for call in fixture["calls"]
         ]
 
-        # What every job was left as: a poisoning and a lapsed lease are facts about a
-        # row, and the row is where the fixture says to look.
         cursor.execute(
             "SELECT workspace_id, id, status, attempts, claimed_by FROM job"
             " ORDER BY workspace_id, id"
@@ -494,18 +403,6 @@ def test_the_queue_hands_out_every_job_the_fixture_says_and_answers_every_call()
             )
         ]
         connection.rollback()
-
-
-# --- concept-file: one canonical text and one hash, whichever tier read the file ------
-# (ADR 0031, ADR 0014, ADR 0019)
-#
-# The fixture is the contract: a frontmatter in, and the canonical text and the SHA-256
-# both tiers must produce — for the cases the two languages disagree on by default, an
-# object's integer-like keys and every number shape among them. This tier hashes on
-# every nightly audit and reports a concept mismatched when its number differs from the
-# app's, so what the fixture pins is what a *mismatch* is allowed to mean: the file
-# changed, never the two canonicalisers disagreeing. The TypeScript half runs the same
-# cases in packages/core/test/concept-file.contract.test.ts.
 
 
 def read_concept_file() -> dict[str, Any]:

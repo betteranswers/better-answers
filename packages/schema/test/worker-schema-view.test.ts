@@ -11,12 +11,6 @@ import { journalEntries, journalEntriesOf, lastMigration } from "../src/journal.
 import type { MigratedPostgres } from "./harness.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
-/**
- * The drift check, both directions (ADR 0032): regenerate the worker's schema view
- * from the journal and fail on a stale committed view, and on any table in the
- * migrated database the `src/` declarations do not know.
- */
-
 const viewPath = path.resolve(
   import.meta.dirname,
   "../../../apps/worker/src/better_answers_worker/schema_view.py",
@@ -57,11 +51,6 @@ describe("the worker's schema view", () => {
   });
 
   it("stamps the instant the migrator wrote, so the worker's stamp check has something to compare", async () => {
-    // The pair the worker's `[WRK1]` check joins on, held both ways: the committed view
-    // carries the journal's `when` for the migration it names, and that is the value the
-    // migrator actually stamped the database with. One direction finds a view regenerated
-    // from a journal nobody applied; only the other finds a `when` the migrator ignores,
-    // which would leave the worker comparing a number the database never writes.
     const migration = lastMigration();
     const stamped = await db.pool.query<{ created_at: string }>(
       "SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY created_at DESC LIMIT 1",
@@ -72,10 +61,6 @@ describe("the worker's schema view", () => {
   });
 
   it("refuses a journal whose migrations share an instant, because the stamp check could not tell them apart", () => {
-    // The stamp the worker compares is `when` alone: two migrations at one instant would let
-    // a database stopped after the earlier one read as stamped with the later, and the view
-    // would claim against a schema one migration short. The committed journal is held to it
-    // as a whole, and a journal with the defect is refused before any view is rendered.
     const entries = journalEntries();
     expect(entries.map((entry) => entry.when)).toEqual(
       entries.map((entry) => entry.when).toSorted((a, b) => a - b),
@@ -83,8 +68,7 @@ describe("the worker's schema view", () => {
     expect(new Set(entries.map((entry) => entry.when)).size).toBe(entries.length);
 
     const last = entries.at(-1);
-    // `idx` is part of the shape the journal's reader parses, so a hand-built entry carries
-    // one: the defect under test is the shared instant and nothing else.
+
     const later = { idx: 9999, tag: "9999_a-second-at-the-same-instant", when: last?.when ?? 0 };
     expect(journalEntriesOf({ entries: [...entries, later] })).toEqual({
       ok: false,

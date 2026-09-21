@@ -1,74 +1,12 @@
-/**
- * Who owns each table, and who else reads or writes one.
- *
- * ADR 0029 names the failure that no import-direction linter can ever see: one slice
- * writing SQL against another slice's tables works perfectly, because it is the same
- * database. The mitigation it names first is **a checked-in table-ownership map,
- * reviewed like the export list** — this file. It is shaped like `RLS_EXEMPTIONS`
- * beside it (T-015) for the same reason: one record a reviewer reads, every entry
- * carrying a reason, and a test asserting each pair in both directions, so no name can
- * be added in one place and forgotten in another
- * (`packages/schema/test/table-ownership.test.ts`).
- *
- * **An owner is a module, written as the name a reader can open it by.** Most owners are
- * slices — the capability whose invariants a table holds, which is the write path and
- * never a screen (ADR 0029) — and a slice is written as its directory name under
- * `packages/core/src/`: `workspaces`, `sources`. `llm` is written the same way without
- * being a slice (ADR 0029 rule 3: `llm` and `audit` import `kernel`, `access` and
- * `store`, never a slice and never each other), because the name still opens a
- * directory. Three owners are not a directory name under `packages/core/src/` — the
- * identity provider lives outside it, and the two doors sit a level deeper — so each is
- * written as the repository path of the module it is, a form no directory name there can
- * take, and the two kinds can never be confused:
- *
- * - `apps/api/src/auth` — the **identity provider**. The sixteen tables of
- *   `IDENTITY_SET` are Better Auth's own: the library declares their shapes, writes
- *   them on every sign-in, consent, issue and refresh, and is configured in that one
- *   directory and nowhere else (ADR 0009, lint-enforced). No slice could own them
- *   without owning the library, and inventing an `identity` slice to hold a table
- *   nobody in `core` writes would put a name in the tree that answers no call.
- * - `packages/core/src/store/postgres` — the **Postgres door**. The two counters are
- *   the limiter's own rows, read and written by the door's fixed-window helpers; the
- *   door is explicitly not a slice (ADR 0029), and the alternative — hanging them off
- *   `access`, which imports only `kernel` and touches no store — would be a fiction.
- * - `packages/core/src/store/graph` — the **graph door**: the delta builder and the
- *   traversal templates, the one graph query module in this tier (ADR 0032). It writes
- *   the graph tables inside the governed write's transaction and is not a slice, so its
- *   access to the concepts slice's tables is recorded below rather than owned.
- *
- * **The lint rule this map is the written trigger for** (ADR 0029; out of scope in the
- * T-063 spec, deliberately): *a store file imports no slice's table*. Build it when a
- * store file first reaches for one — the map is where the breach shows up as a diff, and
- * the rule is what stops it being a diff nobody read. The counters above are the door's
- * own rows and are not a slice's table, so they are not the breach.
- */
-
 export const IDENTITY_PROVIDER = "apps/api/src/auth";
 export const POSTGRES_DOOR = "packages/core/src/store/postgres";
 export const GRAPH_DOOR = "packages/core/src/store/graph";
-/**
- * The **knowledge worker** (ADR 0005): the other tier, which shares these stores and no
- * code. It owns no table — the app is the only migration owner (ADR 0007) — and it is
- * named here because a tier that writes a table it does not own is exactly the fact this
- * map exists to record, and no import-direction rule can see across a process boundary.
- */
+
 export const WORKER = "apps/worker";
 
-/**
- * The owners that are not a directory name under `packages/core/src/` and so are written
- * as paths. The owner test admits exactly these and holds each to a directory that
- * exists; every other owner it holds to a directory under `packages/core/src/`.
- */
 export const OWNERS_OUTSIDE_CORE = [IDENTITY_PROVIDER, POSTGRES_DOOR, GRAPH_DOOR, WORKER] as const;
 
-/**
- * The owner of every table `src/` declares — written out rather than derived, so a
- * reviewer reads the whole map in one place, exactly as `RLS_EXEMPTIONS` is. The identity
- * set's sixteen rows are the one place that copies another list, and the ownership test
- * holds them equal to `IDENTITY_SET` in both directions so the copy cannot drift.
- */
 export const TABLE_OWNERS = {
-  // Better Auth's identity set (ADR 0009). Declared here, written by the library.
   "public.user": IDENTITY_PROVIDER,
   "public.session": IDENTITY_PROVIDER,
   "public.account": IDENTITY_PROVIDER,
@@ -86,13 +24,9 @@ export const TABLE_OWNERS = {
   "public.oauth_client_assertion": IDENTITY_PROVIDER,
   "public.rate_limit": IDENTITY_PROVIDER,
 
-  // The limiter's own rows, read and written by the door's fixed-window helpers.
   "public.ingress_counter": POSTGRES_DOOR,
   "public.mcp_call_counter": POSTGRES_DOOR,
 
-  // The modules under `packages/core/src/`: three slices, and the two ADR 0029 rule 3
-  // names that own a table without being one — `llm` its route table, `audit` the one
-  // ledger every slice writes through its doors and none by its own SQL (ADR 0038).
   "public.workspace_config": "workspaces",
   "public.group": "members",
   "public.group_member": "members",
@@ -101,103 +35,52 @@ export const TABLE_OWNERS = {
   "public.access_request": "members",
   "index.chunk": "sources",
 
-  // The concept write path's five (ADRs 0011, 0012, 0019). The governed write writes four of
-  // them in the act's own transaction — the identity, the index row, the commit and the
-  // evidence — and touches the fifth not at all: `concept_verification` is written by the
-  // verify act, which is a later ticket's, and read by this slice's `conceptByIri` for the
-  // trust `open` projects. Nothing outside this slice writes any of the five.
   "public.concept_identity": "concepts",
   "public.concept_index": "concepts",
   "public.bundle_commit": "concepts",
   "public.evidence": "concepts",
   "public.concept_verification": "concepts",
 
-  // The worker's queue (ADR 0005: the control plane is rows, never HTTP). The runs slice
-  // is the app's side of it — enqueue and the views over what a job found — and the claim
-  // protocol itself is SQL functions both tiers call, so the worker writes this table
-  // without owning it; the entry below records that.
   "public.job": "runs",
 
-  // The graph (ADR 0023, ADR 0032): the concepts slice's, because the governed write's
-  // transaction is where the bundle-and-record delta lands — the act that owns the
-  // transaction owns the invariants over these rows. The graph door writes them for it,
-  // recorded below.
   "public.graph_generation": "concepts",
   "public.graph_node": "concepts",
   "public.graph_edge": "concepts",
 
-  // The inbox's two (ADRs 0005, 0012). The suggestion is the concepts slice's queue and
-  // the write request is its payload — read by the acceptance path and by nothing else,
-  // which is why neither runtime role holds `SELECT` on the payload at all and the one
-  // definer function that serves it is granted to the app's role alone.
   "public.suggestion": "concepts",
   "public.concept_write_request": "concepts",
 
-  // The visibility derivation's ground (ADR 0013, ADR 0023, ADR 0039) and the catalogue over
-  // it: a binding carries the three permission fields a concept's class is derived from, its
-  // connector, destination, retention class and state; a document row ties a piece of evidence
-  // to the binding that yielded it, holds the keys of its two landed copies, and may carry a
-  // class of its own that only ever narrows its binding's. Both are the sources slice's — the
-  // bind, the review, the publish and the narrowing are its acts.
   "public.source_binding": "sources",
   "public.source_document": "sources",
-  // What the redaction seam withheld in one document (ADR 0020): the sources slice's,
-  // because the acts over these rows — the review of a finding and the restore of an
-  // always-set span — are the slice's own, and the counts a publish dialog reads come off
-  // them. The worker inserts them and owns nothing here; the entry below records that.
+
   "public.finding": "sources",
-  // A person's access or erasure request, with the identifier set it is about and the clock
-  // it runs on (ADR 0020): the erasure slice's, which sits at the top of the slice graph
-  // (ADR 0029 rule 4) and is the only writer — the request is recorded by an act, the map is
-  // computed from the set, and the routine writes the answer back on the same row.
+
   "public.subject_request": "erasure",
-  // What the routine did in every store for one of those requests (ADR 0020, amended
-  // 2026-09-05): the same slice's, written by the routine under the platform principal and
-  // read by the replay a restore runs before the app serves anything.
+
   "public.erasure_request": "erasure",
-  // What one document must keep out the next time it is reprocessed (ADR 0020): the same
-  // slice's, written by the routine's step 6 and never by the tier that reads it. S1's run
-  // gathers the sets standing over each document it converts and hands them to the seam, so
-  // the worker's read is recorded below; the write stays the routine's alone.
+
   "public.suppression": "erasure",
-  // Which evidence a concept cites, and a recorded Admin override of its derived class:
-  // both written in the concepts slice's own transactions, the first by the governed write
-  // and the second by the override act.
+
   "public.concept_evidence": "concepts",
   "public.concept_class_override": "concepts",
-  // A composition and the concepts it includes (ADRs 0004, 0015): the guides slice's, whose
-  // recompute derives one's class from its includes and whose footnote read withholds an
-  // include through the concept's own predicate. The composition as a product is B8's.
+
   "public.composition": "guides",
   "public.composition_include": "guides",
 } satisfies Record<string, string>;
 
-/** A table the schema package declares: every key of the map, and nothing else. */
 export type OwnedTable = keyof typeof TABLE_OWNERS;
 
-/** Every owner the map names, as a union — so a typo in an owner is a type error. */
 export type TableOwner = (typeof TABLE_OWNERS)[OwnedTable];
 
-/** A read or a write of a table by anyone but its owner. */
 export type CrossOwnerAccess = {
-  /** The schema-qualified table, as `TABLE_OWNERS` and `RLS_EXEMPTIONS` name it. */
   readonly table: OwnedTable;
-  /**
-   * The module doing the reading or writing. Not narrowed to `TableOwner`: a module may
-   * read a table without owning one of its own, which is precisely the fact this list
-   * exists to record. The ownership test holds the name to a directory either way.
-   */
+
   readonly by: string;
   readonly access: "read" | "write" | "read and write";
-  /** Why it is allowed to, in the words a reviewer would want at the diff. */
+
   readonly reason: string;
 };
 
-/**
- * Every read and write of a table by a module that does not own it — the entries the
- * map exists for. Each is a fact about code in the tree today; a fact about code a
- * later ticket writes is a sentence in the docblock above, not an entry here.
- */
 export const CROSS_OWNER_TABLE_ACCESS = [
   {
     table: "public.workspace",

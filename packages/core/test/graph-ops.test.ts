@@ -6,17 +6,6 @@ import { GRAPH_MAINTENANCE, graphCounts, sweepGraph } from "@better-answers/core
 import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
 import { postgresForSuite, seedingWith } from "./suite-postgres.ts";
 
-/**
- * The two graph maintenance acts the restore drill calls — the per-label count of the map
- * a read can reach, and the sweep of everything a finished rebuild left behind — through
- * the concepts slice's interface (`[TEST1]`), on real Postgres.
- *
- * Both run under the graph maintenance principal and never a person's: the drill has no
- * session behind it. The count writes no ledger row, because a read is not an act; the
- * sweep writes one row per generation it removed, in the transaction that removed it
- * (`[AUDIT1]`).
- */
-
 const db = postgresForSuite();
 
 const seeded = <T>(work: (seed: TestData) => Promise<T>): Promise<T> =>
@@ -24,14 +13,12 @@ const seeded = <T>(work: (seed: TestData) => Promise<T>): Promise<T> =>
 
 const arrange = (): Promise<ProvisionedWorkspace> => provisionedWorkspace(db(), "Mapped");
 
-/** The two acts as a test calls them: under the maintenance principal, through this door. */
 const counting = (workspace: ProvisionedWorkspace, workspaceId = workspace.workspaceId) =>
   graphCounts(GRAPH_MAINTENANCE, workspace.door, { workspaceId });
 
 const sweeping = (workspace: ProvisionedWorkspace, workspaceId = workspace.workspaceId) =>
   sweepGraph(GRAPH_MAINTENANCE, workspace.door, { workspaceId });
 
-/** The rows one generation of a workspace's map still holds, read past the policy. */
 const rowsOf = async (workspaceId: string, gen: number | null): Promise<[number, number]> => {
   const clause = gen === null ? "gen IS NULL" : "gen = $2";
   const parameters = gen === null ? [workspaceId] : [workspaceId, gen];
@@ -46,7 +33,6 @@ const rowsOf = async (workspaceId: string, gen: number | null): Promise<[number,
   return [nodes.rowCount ?? 0, edges.rowCount ?? 0];
 };
 
-/** Every `platform.graph.swept` row of a workspace, read as the superuser. */
 const sweptEvents = async (
   workspaceId: string,
 ): Promise<readonly { subject_id: string; detail: unknown; batch_id: string | null }[]> => {
@@ -62,10 +48,6 @@ const sweptEvents = async (
   return found.rows;
 };
 
-/**
- * A map of two generations and a source entity: the live one, a rebuild's leftovers beside
- * it, and the partition that carries no generation at all. What every test here starts from.
- */
 const mapWithLeftovers = async (workspace: ProvisionedWorkspace): Promise<void> => {
   const workspaceId = workspace.workspaceId;
   await seeded(async (seed) => {
@@ -97,9 +79,6 @@ describe("counting a workspace's map", () => {
 
     const counted = await counting(workspace);
 
-    // Generation 2 holds a node and an edge of its own and appears nowhere: the counts are
-    // exactly the set a walk binds — the live generation, and the partition with no
-    // generation, which is reconciled per document and walks beside it (ADR 0023).
     expect(counted).toEqual({
       ok: true,
       value: {
@@ -162,11 +141,7 @@ describe("sweeping a workspace's map", () => {
   it("writes one ledger row per generation removed, sharing a batch id, with the counts it removed", async () => {
     const workspace = await arrange();
     await mapWithLeftovers(workspace);
-    // A second rebuild's generation beside the first's, flipped live as a rebuild flips it
-    // — the database admits a row only in the live generation or the next (migration
-    // 0022) — so the leftovers are the two generations before it. The flips are raw
-    // statements: `seed.graphGeneration` inserts a workspace's row, which the map above
-    // already has, and the flip is the worker's act, which no door of this tier performs.
+
     await seeded(async (seed) => {
       await db().pool.query("UPDATE graph_generation SET live_gen = 2 WHERE workspace_id = $1", [
         workspace.workspaceId,
@@ -193,7 +168,7 @@ describe("sweeping a workspace's map", () => {
       { generation: 1, nodes: 2, edges: 1 },
       { generation: 2, nodes: 2, edges: 1 },
     ]);
-    // A bulk act is N rows sharing one batch id, never one row hiding N (`[AUDIT1]`).
+
     const batches = new Set(events.map((event) => event.batch_id));
     expect(batches.size).toBe(1);
     expect([...batches][0]).not.toBeNull();
@@ -212,9 +187,7 @@ describe("sweeping a workspace's map", () => {
 
   it("has nothing to sweep in a workspace with no generation row, and touches no row it cannot say is not live", async () => {
     const workspace = await arrange();
-    // Rows with a generation and no `graph_generation` row to say which one is live: a
-    // restore that carried the map without its one-row pointer. Which generation is live
-    // is unknown, so a sweep that guessed would delete the map.
+
     await seeded(async (seed) => {
       await seed.graphGeneration({ workspaceId: workspace.workspaceId, liveGen: 7 });
       await seed.graphNode({ workspaceId: workspace.workspaceId, gen: 7 });
@@ -251,10 +224,6 @@ describe("sweeping a workspace's map", () => {
 });
 
 describe("a sweep whose ledger row cannot be written", () => {
-  // `[AUDIT1]` and `[TEST8]`: the rows a sweep removes and the rows it books land or fail
-  // together. The provocation is the ledger itself refusing the app's role, which is what
-  // an act whose event cannot be written looks like from inside the transaction; the
-  // assertion is on the transaction's outcome first, then on the rows.
   it("removes no generation at all", async () => {
     const workspace = await arrange();
     await mapWithLeftovers(workspace);

@@ -5,31 +5,12 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./browser.ts";
 import { anAddress, provision, revokeCredentials, signIn } from "./harness.ts";
 
-/**
- * T-045's acceptance seam: the MCP consent flow on one origin, in a real browser (ADR
- * 0034). A person signs in on the product, a host sends them to authorize, consent is
- * shown as a page of its own, and the code lands at the client's redirect and nowhere
- * else. Before T-045 this could not be proven here at all: the loopback estate had two
- * hosts and a host-only cookie, so the session made on one never reached the other.
- *
- * The client is Claude's own metadata document, served in process by the api's harness
- * (`apps/api/tests/harness.ts`). Its redirect is `https://claude.ai/…`, which this
- * browser never reaches: the route is intercepted and answered with a blank page, so
- * the navigation completes and the URL the browser landed on — code, state, `iss` — is
- * read off the page rather than followed.
- */
-
 const CLIENT_ID = "https://claude.ai/oauth/mcp-oauth-client-metadata";
 const REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback";
 
-/**
- * A PKCE challenge with no verifier kept: no code is exchanged in this suite, so what is
- * needed is only a challenge Better Auth accepts, not a pair.
- */
 const aChallenge = (): string =>
   createHash("sha256").update(randomBytes(64).toString("base64url")).digest("base64url");
 
-/** Claude's authorize request, as prototype 61 captured it: CIMD, S256, `resource`, `prompt=consent`. */
 const authorizeUrl = (
   baseURL: string,
   options: { readonly prompt?: "consent" | undefined; readonly state?: string } = {},
@@ -48,7 +29,6 @@ const authorizeUrl = (
   return `/oauth2/authorize?${query.toString()}`;
 };
 
-/** Answer the client's redirect ourselves, so the browser lands on it and stays there. */
 const catchClaudesRedirect = (page: Page) =>
   page.route(`${REDIRECT_URI}*`, (route) =>
     route.fulfill({
@@ -78,30 +58,23 @@ test("sign-in, authorize, consent and the code at Claude's redirect, all on one 
   await signIn(page, request, email);
   await expect(page).toHaveURL(/\/system$/);
 
-  // The host sends the person to authorize. A member of one workspace has it active
-  // already, so the next page is consent — on the origin the browser is on.
   await page.goto(authorizeUrl(origin, { prompt: "consent" }));
 
   await expect(consentHeading(page)).toBeVisible();
   expect(landedAt(page).origin).toBe(origin);
   expect(landedAt(page).pathname).toBe("/consent");
-  // A page of its own, not a screen in the shell: no Control Centre around it.
+
   await expect(page.getByRole("navigation", { name: "Control Centre" })).toHaveCount(0);
-  // Who is granting what, to whom, in the person's words.
+
   await expect(page.getByText(`Claude will act as you, at ${workspace.name}.`)).toBeVisible();
   await expect(page.getByText("Read what you can see of the company's knowledge")).toBeVisible();
   await expect(page.getByText("Stay connected until you disconnect it")).toBeVisible();
   await expect(page.getByText("hosted at claude.ai")).toBeVisible();
 
-  // Asked for here rather than left to the fixture: this test ends at the client's own
-  // redirect, which is another origin and no screen of ours, so the page a person actually
-  // reads has to be audited while the browser is still on it.
   await passesTheAccessibilityGate();
 
   await page.getByRole("button", { name: "Connect" }).click();
 
-  // The code went to Claude's redirect and nowhere else, with the host's state and the
-  // issuer (RFC 9207) — which is this origin.
   const callback = landedAt(page);
   expect(`${callback.origin}${callback.pathname}`).toBe(REDIRECT_URI);
   expect(callback.searchParams.get("code")).not.toBeNull();
@@ -116,9 +89,6 @@ test("a second authorization from the same client shows consent again when the h
   baseURL,
   passesTheAccessibilityGate,
 }) => {
-  // The one unverified behaviour in T-045's spec, settled here rather than assumed and
-  // written into ADR 0034 either way. Better Auth keeps one consent row per person per
-  // client; whether that row skips the screen depends on what the host sends.
   const origin = baseURL ?? "";
   const email = anAddress("returning");
   await provision(request, { name: "Returning Ltd", adminEmail: email });
@@ -132,8 +102,6 @@ test("a second authorization from the same client shows consent again when the h
   await page.getByRole("button", { name: "Connect" }).click();
   expect(landedAt(page).searchParams.get("state")).toBe("first");
 
-  // Claude's own request carries `prompt=consent`, and Better Auth honours it: consent
-  // is shown on every authorization from claude.ai, whatever rows exist.
   await page.goto(authorizeUrl(origin, { prompt: "consent", state: "second" }));
   await expect(consentHeading(page)).toBeVisible();
   expect(landedAt(page).pathname).toBe("/consent");
@@ -141,9 +109,6 @@ test("a second authorization from the same client shows consent again when the h
   expect(landedAt(page).searchParams.get("state")).toBe("second");
   expect(landedAt(page).searchParams.get("code")).not.toBeNull();
 
-  // Without `prompt`, the earlier answer stands: the existing consent row covers the
-  // scopes and the resource asked for, so the person is sent straight back to the client
-  // with a code and never sees the page.
   await page.goto(authorizeUrl(origin, { state: "third" }));
   const skipped = landedAt(page);
   expect(`${skipped.origin}${skipped.pathname}`).toBe(REDIRECT_URI);
@@ -181,9 +146,6 @@ test("consent is refused once the person's credentials are revoked, and no code 
   request,
   baseURL,
 }) => {
-  // Eight lines of the arrange the declining test also has, carried rather than folded: the
-  // whole subject of each test is what the person does at the consent page, and a reader has
-  // to see the page was reached the way a browser reaches it.
   /* jscpd:ignore-start */
   const origin = baseURL ?? "";
   const email = anAddress("revoked");
@@ -195,7 +157,6 @@ test("consent is refused once the person's credentials are revoked, and no code 
   await expect(consentHeading(page)).toBeVisible();
   /* jscpd:ignore-end */
 
-  // The act the People screen will one day perform, between the page and the click.
   await revokeCredentials(request, workspace.admin.id);
   await page.getByRole("button", { name: "Connect" }).click();
 

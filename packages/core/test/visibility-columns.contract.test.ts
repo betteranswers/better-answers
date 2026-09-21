@@ -6,33 +6,6 @@ import { boundarySchemas, SENSITIVITIES } from "@better-answers/schema";
 import { narrower, visibilityFrom, widens } from "../src/access/index.ts";
 import { contractFixture } from "./contract-fixture.ts";
 
-/**
- * The visibility-columns agreement's TypeScript half (ADR 0031, ADR 0023, ADR 0039): the
- * fixture in `contracts/visibility-columns/` is the contract — the fields a binding carries,
- * the class a document may carry of its own, and the columns every chunk row must carry so
- * the read predicate has something to test — and this suite holds this tier's boundary and
- * its one fold to it. The Python half is
- * `apps/worker/tests/test_visibility_columns_contract.py`, where the same file is read by the
- * tier that writes the rows.
- *
- * **Why the columns are the agreement and the predicate is not.** The predicate's logic is
- * this tier's alone (ADR 0031, *The read predicate leaves the contract*). What crosses the
- * seam is the columns: a row the worker lands without them, or with them copied from the
- * wrong place, makes this tier's predicate silently over- or under-filter, and nothing fails
- * until a reader sees a passage they should not have.
- *
- * **Two writers, one source.** The worker writes these columns on every chunk row a run
- * lands and re-copies them in the run's last statement; the app rewrites them on a publish, a
- * binding's narrowing and a document's narrowing. Both copy from one row — the binding,
- * narrowed by the document — so they can disagree only in a race the re-copy settles. The
- * cases below are that one source written down; the race itself is the cross-tier test's
- * (T-137).
- *
- * Neither half holds the other's literals (`[TEST9]`): this one folds the fixture's two
- * classes through the tier's own `narrower` and parses the expected row through its own
- * boundary, and the Python half reads the columns out of the generated schema view.
- */
-
 const visibility = z.object({
   published_at: z.string().nullable(),
   sensitivity: z.enum(SENSITIVITIES),
@@ -66,14 +39,9 @@ const fixtureSchema = z.object({
 
 const fixture = contractFixture("visibility-columns", fixtureSchema);
 
-/** The database's column name as this tier's boundary spells the same field. */
 const asField = (column: string): string =>
   column.replaceAll(/_([a-z])/g, (_whole, letter: string) => letter.toUpperCase());
 
-/**
- * Where a case's class sits in the agreement's own order. A document with no class of its
- * own is unranked, so it is neither narrower nor wider than its binding — it is the binding's.
- */
 const rankOf = (unit: {
   readonly sensitivity: z.infer<typeof visibility>["sensitivity"] | null;
 }) => (unit.sensitivity === null ? Number.NaN : fixture.sensitivity_rank[unit.sensitivity]);
@@ -103,12 +71,9 @@ describe("the columns the visibility-columns agreement names", () => {
       ([field]) => field === named,
     );
 
-    // Null is the ordinary case and a fact, not a gap: a document with no class of its own
-    // takes its binding's. A column the boundary made required would have no way to say so.
     expect(onADocument?.[0]).toBe(named);
     expect(onADocument?.[1].safeParse(null).success).toBe(true);
-    // And the binding's own class is not optional, which is what makes null on the document
-    // readable as a deferral rather than as an unanswered question on both rows at once.
+
     expect(boundarySchemas.sourceBinding.select.shape.sensitivity.safeParse(null).success).toBe(
       false,
     );
@@ -141,8 +106,6 @@ describe("the order the two classes fold in", () => {
         const expected =
           fixture.sensitivity_rank[one] <= fixture.sensitivity_rank[other] ? one : other;
 
-        // Both ways round the pair (`[TEST7]`): a fold that answered by argument order
-        // rather than by class would pass one direction and fail the other.
         expect({ one, other, narrower: narrower(one, other) }).toEqual({
           one,
           other,
@@ -204,9 +167,6 @@ describe("what a chunk row carries, for each case the agreement states", () => {
     }
   });
 
-  // The pair the document's class turns on (`[TEST7]`): a class narrower than the binding's
-  // reaches the row, and a class wider than it does not. One arm without the other would let
-  // an override pass for a narrowing, or a column nothing reads pass for a narrowing.
   it("states a case where the document is narrower, and the row takes the document's class", () => {
     const narrowed = fixture.cases.filter(
       ({ binding, document }) => rankOf(document) < rankOf(binding),

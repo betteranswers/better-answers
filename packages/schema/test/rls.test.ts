@@ -19,20 +19,6 @@ import { type MigratedPostgres, withRollback } from "./harness.ts";
 import { refusesEach } from "./probes.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
-/**
- * The isolation proofs ADR 0032 names: a missing scope (empty GUC) returns zero rows,
- * never another tenant's — once at the seam function, once through each tenant table —
- * and the one SECURITY DEFINER lifecycle function is the only runtime-DDL path.
- * Seeding runs through the factory as the container's superuser (which bypasses RLS by
- * design); every assertion runs as `app_rt`.
- *
- * A tenant table is every table `src/` declares minus `RLS_EXEMPTIONS`, the one list,
- * which carries a reason per entry: Better Auth's identity set (ADR 0009, 2026-09-01
- * amendment) and the pre-authentication counter, read by key before any workspace is
- * known. The exemption is checked in both directions (`[TEST7]`) so a table can neither
- * slip out of RLS unnamed nor stay named after it gains a policy.
- */
-
 let db: MigratedPostgres;
 
 beforeAll(async () => {
@@ -57,7 +43,6 @@ const seedTwoWorkspaces = async (client: pg.PoolClient) => {
   return seed;
 };
 
-/** Rows visible per table under the role and scope the client holds — the zero-rows probe. */
 const countedRows = async (
   client: pg.PoolClient,
   tables: readonly string[],
@@ -102,9 +87,6 @@ describe("the seam function", () => {
 
 describe("the exemption list", () => {
   it("names the same tables the two source arrays do, and carries a reason for each", () => {
-    // The one list a reviewer reads is `RLS_EXEMPTIONS`; the arrays stay beside the
-    // declarations they belong to. Held equal here, in both directions, so an entry
-    // cannot be added to one and forgotten in the other.
     expect(Object.keys(RLS_EXEMPTIONS).toSorted()).toEqual([...EXEMPT_TABLE_NAMES].toSorted());
     for (const [table, reason] of Object.entries(RLS_EXEMPTIONS)) {
       expect({ table, reasoned: reason.trim().length > 0 }).toEqual({ table, reasoned: true });
@@ -114,9 +96,6 @@ describe("the exemption list", () => {
 
 describe("every tenant table", () => {
   it("carries RLS and FORCE ROW LEVEL SECURITY in the catalogue", async () => {
-    // Every declared table outside the exemption list is a tenant table; a table
-    // created without the hand-written FORCE line (which withRLS() cannot emit
-    // through drizzle-kit) fails here rather than shipping RLS-without-FORCE silently.
     for (const qualified of tenantTableNames()) {
       expect({ table: qualified, ...(await rlsFlags(qualified)) }).toEqual({
         table: qualified,
@@ -127,8 +106,6 @@ describe("every tenant table", () => {
   });
 
   it("carries exactly one policy — the workspace-isolation one", async () => {
-    // withRLS()'s extraConfig could smuggle in a second, wider policy (policies are
-    // OR-combined); one policy per tenant table is the invariant, asserted here.
     for (const qualified of tenantTableNames()) {
       const [schema, table] = qualified.split(".");
       const policies = await db.pool.query(
@@ -143,7 +120,6 @@ describe("every tenant table", () => {
   });
 
   it("calls the one seam function in its policy, never a literal or a second function", async () => {
-    // ADR 0032: every tenant policy is written `(SELECT current_workspace_id())`.
     for (const qualified of tenantTableNames()) {
       const [schema, table] = qualified.split(".");
       const policy = await db.pool.query(
@@ -161,9 +137,6 @@ describe("every tenant table", () => {
 
 describe("the identity set", () => {
   it("names every declared table that carries no policy, and nothing else", async () => {
-    // Both directions: a declared table with no policy must be in the exemption list
-    // (or it is a tenant table that lost its guarantee); a name in the list must be a
-    // declared table with no policy (or the list is stale and hides a real check).
     const unpolicied: string[] = [];
     for (const qualified of declaredTableNames()) {
       const flags = await rlsFlags(qualified);
@@ -173,9 +146,6 @@ describe("the identity set", () => {
   });
 
   it("carries no workspace column on Better Auth's tables", async () => {
-    // The argument for the exemption is that these rows are isolated by key, not by
-    // scope; a workspace_id column appearing on one would mean the argument no longer
-    // holds and the table belongs under RLS.
     for (const qualified of IDENTITY_SET) {
       if (qualified === "public.workspace") continue;
       const [schema, table] = qualified.split(".");
@@ -211,9 +181,6 @@ describe("the identity set", () => {
   });
 
   it("refuses the worker role on every identity-set table and the counters (migration 0005, [SEC3])", async () => {
-    // The worker never touches identity rows — secrets, sessions, signing keys,
-    // memberships — nor the counters; migration 0000's default privileges would have
-    // granted it DML, which 0005 revokes. The refusal is asserted directly.
     const refused = [
       ...IDENTITY_SET.filter((name) => name !== "public.workspace"),
       "public.ingress_counter",
@@ -240,16 +207,12 @@ describe("the identity set", () => {
       await seed.workspaceConfig({ workspaceId: WS_A });
       await client.query("SET LOCAL ROLE worker_rt");
 
-      // `workspace` is the identity set (not RLS'd): the worker reads it globally, which
-      // is fine — it holds a tenant's name, not a secret. `workspace_config` is RLS'd, so
-      // a read needs a scope.
       const workspaces = await client.query("SELECT id FROM workspace ORDER BY id");
       expect(workspaces.rows).toEqual([{ id: WS_A }, { id: WS_B }]);
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       const config = await client.query("SELECT workspace_id FROM workspace_config");
       expect(config.rows).toEqual([{ workspace_id: WS_A }]);
 
-      // Writes to either: refused (0005 revokes DML from worker_rt).
       await client.query("SAVEPOINT w");
       await expect(
         client.query("UPDATE workspace SET name = 'x' WHERE id = $1", [WS_A]),
@@ -264,9 +227,6 @@ describe("the identity set", () => {
 
 describe("the role CHECK on the identity set", () => {
   it("holds member_role_check to the same three words the boundary narrows to, both ways", async () => {
-    // The CHECK's list is written from `ROLES` when the table is declared; this reads it
-    // back out of the catalogue and holds the two equal, so a fourth role can be added to
-    // neither alone — and the refusal below is a refusal of a word neither side admits.
     const constraint = await db.pool.query<{ definition: string }>(
       "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = 'member_role_check'",
     );
@@ -284,7 +244,6 @@ describe("the role CHECK on the identity set", () => {
       const seed = await seedTwoWorkspaces(client);
       const person = await seed.user();
 
-      // Better Auth's own owner/admin/member defaults, refused at the row.
       await client.query("SAVEPOINT m");
       await expect(
         client.query(
@@ -306,15 +265,6 @@ describe("the role CHECK on the identity set", () => {
   });
 });
 
-/**
- * The ledger's own proofs (ADR 0014 rule 4; ADR 0038): a tenant table like any other, so
- * its zero-rows proof is stated once here in its own words, and append-only by the
- * database — migration 0009 revokes UPDATE and DELETE from the app's role and everything
- * from the worker's, and each refusal is asserted beside the path it serves. The four
- * families and the act's shape are CHECKs the row itself refuses, as `member_role_check`
- * refuses a fourth role.
- */
-/** A ledger row in A, then the app's role scoped to A — the footing the app_rt ledger tests share. */
 const ledgerRowAsApp = async (client: pg.PoolClient) => {
   const seed = await seedTwoWorkspaces(client);
   const row = await seed.auditEvent({ workspaceId: WS_A });
@@ -344,8 +294,6 @@ describe("the ledger under app_rt", () => {
     await withRollback(db.pool, async (client) => {
       const row = await ledgerRowAsApp(client);
 
-      // The served path: an insert in scope lands, and the database derives the two
-      // columns from the act.
       const inserted = await client.query<{ family: string; subject_kind: string }>(
         `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
          VALUES ($1, $2, 'people.group.created', 'process:better-answers-test', $3, '{}')
@@ -354,7 +302,6 @@ describe("the ledger under app_rt", () => {
       );
       expect(inserted.rows).toEqual([{ family: "people", subject_kind: "group" }]);
 
-      // The refused paths, each fenced by a savepoint because a denial aborts the transaction.
       await client.query("SAVEPOINT u");
       await expect(
         client.query("UPDATE audit_event SET detail = '{}' WHERE id = $1", [row.id]),
@@ -373,8 +320,6 @@ describe("the ledger under app_rt", () => {
     await withRollback(db.pool, async (client) => {
       const row = await ledgerRowAsApp(client);
 
-      // INSERT … ON CONFLICT DO UPDATE is an UPDATE wearing an INSERT's privilege; Postgres
-      // asks for the UPDATE privilege on the conflict path, which 0009 revoked.
       await client.query("SAVEPOINT upsert");
       await expect(
         client.query(
@@ -386,7 +331,6 @@ describe("the ledger under app_rt", () => {
       ).rejects.toThrow(/permission denied/);
       await client.query("ROLLBACK TO SAVEPOINT upsert");
 
-      // A row for the other tenant, from this tenant's scope: the policy's WITH CHECK.
       await client.query("SAVEPOINT other_tenant");
       await expect(
         client.query(
@@ -397,8 +341,6 @@ describe("the ledger under app_rt", () => {
       ).rejects.toThrow(/row-level security/);
       await client.query("ROLLBACK TO SAVEPOINT other_tenant");
 
-      // The family and the subject kind are the database's reading of the act; a caller
-      // cannot write a family the act does not say.
       await expect(
         client.query(
           `INSERT INTO audit_event (id, workspace_id, act, family, actor, subject_id, detail)
@@ -432,8 +374,6 @@ describe("the ledger under app_rt", () => {
   });
 
   it("refuses an act outside the four families or the family.subject.verb shape at the row", async () => {
-    // Straight SQL rather than the factory, which would refuse these at the boundary before
-    // any INSERT existed: the claim here is the database's own.
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       for (const act of ["billing.invoice.sent", "people.member", "People.Member.Added"]) {
@@ -451,9 +391,6 @@ describe("the ledger under app_rt", () => {
   });
 
   it("holds the family CHECK to the same four words the boundary narrows to, both ways", async () => {
-    // The CHECK's list is written from `FAMILIES` when the table is declared; this reads it
-    // back out of the catalogue and holds the two equal, so a fifth family can be added to
-    // neither alone.
     const constraint = await db.pool.query<{ definition: string }>(
       "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = 'audit_event_family_check'",
     );
@@ -461,34 +398,20 @@ describe("the ledger under app_rt", () => {
       (match) => match[1],
     );
     expect(inCheck.toSorted()).toEqual([...FAMILIES].toSorted());
-    // The boundary's half: every word the CHECK admits parses, and a fifth does not.
+
     const family = boundarySchemas.auditEvent.select.shape.family;
     expect(inCheck.map((word) => family.safeParse(word).success)).toEqual(inCheck.map(() => true));
     expect(family.safeParse("billing").success).toBe(false);
   });
 });
 
-/**
- * The two group tables' own proofs (ADR 0038): tenant tables like any other, so the
- * zero-rows proof is stated here in their words; and two cascades that are the database's
- * promise rather than the slice's — a membership that ends takes its group rows with it,
- * and a deleted group takes its memberships. Both run as the app's role under FORCE, so
- * what is proved is what a deployed estate does.
- *
- * The composite key to `group` is the security claim: a foreign-key check bypasses RLS by
- * Postgres's own rule, so a key on the group id alone would confirm that *somebody* holds
- * a given id. Keyed by the workspace and the id together, it can only ever confirm a group
- * of the workspace the referring row already names.
- */
-/** A person in two of A's groups, a group of B's holding the same name, and the app's role scoped to A. */
 const groupsAsApp = async (client: pg.PoolClient) => {
   const seed = await seedTwoWorkspaces(client);
   const person = await seed.user();
   await seed.member({ workspaceId: WS_A, userId: person.id });
   const hr = await seed.group({ workspaceId: WS_A, name: "HR team" });
   const sales = await seed.group({ workspaceId: WS_A, name: "Sales executives" });
-  // The same name in the other tenant: the unique index is per workspace, and seeding
-  // this row at all is the proof — it would have thrown otherwise.
+
   const theirs = await seed.group({ workspaceId: WS_B, name: "HR team" });
   for (const group of [hr, sales]) {
     await seed.groupMember({ workspaceId: WS_A, groupId: group.id, userId: person.id });
@@ -538,8 +461,6 @@ describe("the group tables under app_rt", () => {
       ).rejects.toThrow(/row-level security/);
       await client.query("ROLLBACK TO SAVEPOINT other_group");
 
-      // A membership written wholly into the other tenant: the policy's WITH CHECK, on the
-      // second table as on the first.
       await client.query("SAVEPOINT other_membership");
       await expect(
         client.query(
@@ -549,9 +470,6 @@ describe("the group tables under app_rt", () => {
       ).rejects.toThrow(/row-level security/);
       await client.query("ROLLBACK TO SAVEPOINT other_membership");
 
-      // The row itself is this tenant's, so the policy admits it; what refuses it is the
-      // key, which names the workspace beside the group id — the foreign-key check runs
-      // outside RLS and still cannot find B's group under A's workspace.
       await expect(
         client.query(
           "INSERT INTO group_member (workspace_id, group_id, user_id) VALUES ($1, $2, $3)",
@@ -572,7 +490,7 @@ describe("the group tables under app_rt", () => {
       ]);
 
       expect(await groupIdsHeldBy(client, person.id)).toEqual([]);
-      // The groups outlive the person: a leaver empties, never deletes.
+
       const groups = await client.query('SELECT count(*)::int AS held FROM "group"');
       expect(groups.rows).toEqual([{ held: 2 }]);
     });
@@ -589,9 +507,6 @@ describe("the group tables under app_rt", () => {
   });
 
   it("refuses the worker role on both group tables, reading and writing alike (migration 0011)", async () => {
-    // The worker holds no people data: who is in which group is applied at read time by
-    // the app, never by the worker, so a compromised worker can neither read a workspace's
-    // membership nor write itself into one.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.group({ workspaceId: WS_A });
@@ -619,12 +534,6 @@ describe("the group tables under app_rt", () => {
   });
 });
 
-/**
- * The access-request queue's own proofs (ADR 0038): a tenant table like any other, so its
- * zero-rows proof is stated here in its own words; the worker's role is refused on it
- * outright (migration 0013, `[SEC3]`); and the partial unique index refuses a second open
- * request from the same person while leaving a decided one alone.
- */
 describe("access requests under app_rt", () => {
   it("returns zero rows on a missing scope and only the scoped tenant's rows otherwise", async () => {
     await withRollback(db.pool, async (client) => {
@@ -671,14 +580,10 @@ describe("access requests under app_rt", () => {
       const waiting = { workspaceId: WS_A, requesterId: person.id };
       await seed.accessRequest(waiting);
 
-      // The second open ask, refused by the partial unique index rather than by code.
       await client.query("SAVEPOINT second");
       await expect(seed.accessRequest(waiting)).rejects.toThrow(/access_request_waiting_uidx/);
       await client.query("ROLLBACK TO SAVEPOINT second");
 
-      // Both axes of the index's WHERE, each proved by a row it lets through: the same
-      // person waiting in the other workspace, and a decided row for this person here —
-      // which is what leaves a declined person free to ask again.
       await seed.accessRequest({ workspaceId: WS_B, requesterId: person.id });
       const decided = await seed.accessRequest({
         ...waiting,
@@ -691,14 +596,10 @@ describe("access requests under app_rt", () => {
   });
 
   it("refuses a fourth status and a decision that only half happened, at the row", async () => {
-    // Straight SQL rather than the factory, which would refuse the status at the boundary
-    // before any INSERT existed: the claim here is the database's own.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const person = await seed.user();
       const rows: readonly [string, string][] = [
-        // A fourth status, with a whole decision beside it so that only the status's own
-        // CHECK can be what refuses the row.
         [
           "INSERT INTO access_request (id, workspace_id, requester_id, reason, status, decided_at, decided_by) VALUES ($1, $2, $3, 'why', 'expired', now(), $3)",
           "access_request_status_check",
@@ -723,13 +624,6 @@ describe("access requests under app_rt", () => {
   });
 });
 
-/**
- * The concept write path's own proofs (ADR 0012, migration 0015, `[SEC3]`): five tenant
- * tables like any other, so the zero-rows proof is stated here in their words; the worker's
- * role is refused on all five outright; the composite keys refuse a row that names another
- * tenant's concept; and the CHECKs refuse a status, a class and an imported check that
- * carried a hash.
- */
 describe("the concept write path under app_rt", () => {
   const CONCEPT_TABLES = [
     "concept_identity",
@@ -742,8 +636,7 @@ describe("the concept write path under app_rt", () => {
   it("returns zero rows on a missing scope and only the scoped tenant's rows otherwise, on every one of the five", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
-      // One row of every table in each workspace: the claim is about all five, and asserting
-      // it on the index row alone would leave the other four proved by their neighbour.
+
       for (const workspaceId of [WS_A, WS_B]) {
         const identity = await seed.conceptIdentity({ workspaceId });
         const commit = await seed.bundleCommit({ workspaceId });
@@ -758,7 +651,7 @@ describe("the concept write path under app_rt", () => {
       );
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      // One each, never two: the other workspace's row is not in a scoped read at all.
+
       expect(await countedRows(client, CONCEPT_TABLES)).toEqual(
         CONCEPT_TABLES.map((table) => ({ table, rows: 1 })),
       );
@@ -766,13 +659,6 @@ describe("the concept write path under app_rt", () => {
   });
 
   it("refuses the worker role on four of the five, reading and writing alike (migrations 0015, 0022)", async () => {
-    // Migration 0015 revoked ALL on all five; migration 0022 gives the index row's *read*
-    // back, and nothing else, because both of the worker's job kinds read it — the audit
-    // compares its own parse against `content_hash`, the rebuild copies the derived
-    // visibility columns onto the generation it writes. The other four stay out of reach,
-    // and the index row stays unwritable, which is the half that matters: the records'
-    // derived visibility is the app's, and a worker that could write it would be a second
-    // opinion about who may read a concept.
     const OUT_OF_REACH = CONCEPT_TABLES.filter((table) => table !== "concept_index");
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
@@ -801,9 +687,6 @@ describe("the concept write path under app_rt", () => {
       for (const workspaceId of [WS_A, WS_B]) await seed.conceptIndex({ workspaceId });
       await client.query("SET LOCAL ROLE worker_rt");
 
-      // The grant is a table privilege; the policy is still what says which rows. Unscoped
-      // is zero rows, and a scope is this tenant's alone — the same guarantee the app's
-      // role reads under, because the read predicate is not what a grant does.
       expect(await countedRows(client, ["concept_index"])).toEqual([
         { table: "concept_index", rows: 0 },
       ]);
@@ -836,7 +719,6 @@ describe("the concept write path under app_rt", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      // The policy's WITH CHECK: a row whose workspace is not the scope never lands.
       await client.query("SAVEPOINT other_tenant");
       await expect(
         client.query(
@@ -846,9 +728,6 @@ describe("the concept write path under app_rt", () => {
       ).rejects.toThrow(/row-level security/);
       await client.query("ROLLBACK TO SAVEPOINT other_tenant");
 
-      // The composite key: the foreign-key check runs as the owner and bypasses the policy,
-      // so a key on the IRI alone would confirm that another tenant holds it. Keyed by the
-      // pair, it refuses inside this workspace exactly as it would for an IRI nobody minted.
       await expect(
         client.query(
           `INSERT INTO concept_verification (id, workspace_id, iri, actor, content_hash)
@@ -869,8 +748,6 @@ describe("the concept write path under app_rt", () => {
       const values = `($1, $2, $3, 'Policy', 'Expenses', '{}'::jsonb, 'body', '${"a".repeat(64)}', '${commit.sha}', 'everyone'`;
       const rows: readonly [string, readonly unknown[], string][] = [
         [
-          // No published instant, so the published CHECK is satisfied and only the status's
-          // own can be what refuses the row.
           `INSERT INTO concept_index ${columns} VALUES ${values}, 'retired', 'Internal', NULL)`,
           [WS_A, identity.iri, "knowledge/one.md"],
           "concept_index_status_check",
@@ -880,9 +757,7 @@ describe("the concept write path under app_rt", () => {
           [WS_A, identity.iri, "knowledge/two.md"],
           "concept_index_sensitivity_check",
         ],
-        // A concept a reader may reach that carries no published instant, and a draft that
-        // carries one: the predicate's first arm reads this column, so both directions are
-        // the database's to refuse.
+
         [
           `INSERT INTO concept_index ${columns} VALUES ${values}, 'stable', 'Internal', NULL)`,
           [WS_A, identity.iri, "knowledge/three.md"],
@@ -898,8 +773,7 @@ describe("the concept write path under app_rt", () => {
           [ulid(), WS_A, identity.iri, "a".repeat(64)],
           "concept_verification_imported_check",
         ],
-        // The other direction of the same sentence: a check the platform made, with nothing
-        // recorded as confirmed.
+
         [
           "INSERT INTO concept_verification (id, workspace_id, iri, actor, origin, content_hash) VALUES ($1, $2, $3, 'process:better-answers-test', 'platform', NULL)",
           [ulid(), WS_A, identity.iri],
@@ -910,8 +784,7 @@ describe("the concept write path under app_rt", () => {
           [WS_A, "d".repeat(40), commit.auditEventId],
           "bundle_commit_audit_event_uidx",
         ],
-        // A commit whose parent this workspace never recorded: the chain is the database's,
-        // so `bundle_commit` cannot hold a history with a link missing from it.
+
         [
           "INSERT INTO bundle_commit (workspace_id, sha, parent_sha, audit_event_id, actor) VALUES ($1, $2, $3, $4, 'process:better-answers-reconciler')",
           [WS_A, "d".repeat(40), "e".repeat(40), ulid()],
@@ -942,8 +815,6 @@ describe("the concept write path under app_rt", () => {
         [WS_A, identity.iri, "a".repeat(64), "f".repeat(40)],
       );
 
-      // Deferred: the row lands, and the constraint speaks when the act would end. `SET
-      // CONSTRAINTS ALL IMMEDIATE` is how a test reaches that moment without committing.
       await expect(client.query("SET CONSTRAINTS ALL IMMEDIATE")).rejects.toThrow(
         /concept_index_bundle_commit_fk/,
       );
@@ -952,15 +823,6 @@ describe("the concept write path under app_rt", () => {
   });
 });
 
-/**
- * The graph tables' own proofs (ADR 0032, migration 0016, `[SEC3]`): three tenant tables
- * like any other, so the zero-rows proof is stated here in their words; the worker's role
- * is refused on all three outright; the policy's WITH CHECK refuses a node written into
- * another tenant; and the CHECKs and unique indexes refuse a label outside the closed set,
- * a prefixed label inside a generation, a class outside the three, a doubled key in either
- * partition and a second live-generation row — while the side-by-side shape a full rebuild
- * needs (one uid in two generations) lands.
- */
 describe("the graph tables under app_rt", () => {
   const GRAPH_TABLES = ["graph_generation", "graph_node", "graph_edge"] as const;
 
@@ -968,8 +830,6 @@ describe("the graph tables under app_rt", () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) {
-        // One node, one edge and the generation row they stamp, in each workspace: the
-        // claim is about all three tables, not the neighbour that happened to be seeded.
         const from = await seed.graphNode({ workspaceId });
         await seed.graphEdge({ workspaceId, fromUid: from.uid });
       }
@@ -980,8 +840,7 @@ describe("the graph tables under app_rt", () => {
       );
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      // One generation row, the seeded node and the target the edge factory minted —
-      // never the other workspace's.
+
       expect(await countedRows(client, GRAPH_TABLES)).toEqual([
         { table: "graph_generation", rows: 1 },
         { table: "graph_node", rows: 2 },
@@ -991,12 +850,6 @@ describe("the graph tables under app_rt", () => {
   });
 
   it("lets the worker build a generation beside the live one and flip it, and refuses it every edit to a node or an edge (migration 0022)", async () => {
-    // Migration 0016 revoked ALL on all three and said the grants would land with the job
-    // that uses them; migration 0022 is that job, and this is the shape it grants. The
-    // worker may only ever *add* rows — to the generation it is building — and flip the
-    // one row that says which generation is live. It can neither edit nor remove a row of
-    // the live generation, which is what makes a rebuild invisible until the flip; and
-    // sweeping a retired generation is the app's (T-058), so DELETE is nobody's here.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const live = await seed.graphNode({ workspaceId: WS_A });
@@ -1046,11 +899,6 @@ describe("the graph tables under app_rt", () => {
   });
 
   it("refuses a flip to any generation but the next, and a row in any generation but the live one or the next (migration 0022)", async () => {
-    // The grants say what a role may touch; these two triggers say which generation. A
-    // rebuild writes `live + 1` and flips to it, an edit's delta writes into `live`, and
-    // nothing else is a map write (ADR 0023, ADR 0032) — so a flip back to a swept
-    // generation, or forward past one nobody built, and a row stamped into either, are
-    // refused by the database rather than left to the code that chose `live + 1`.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.graphNode({ workspaceId: WS_A });
@@ -1058,8 +906,6 @@ describe("the graph tables under app_rt", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      // The served path: the live generation, the one being built, the source-entity
-      // partition that carries none, and the flip to the next.
       const served: readonly [string, readonly unknown[]][] = [
         [
           "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'live', 'Concept')",
@@ -1078,7 +924,7 @@ describe("the graph tables under app_rt", () => {
           [WS_A],
         ],
         ["UPDATE graph_generation SET live_gen = 2 WHERE workspace_id = $1", [WS_A]],
-        // Re-asserting the live generation is not a flip; the delta's read does exactly this.
+
         [
           "INSERT INTO graph_generation (workspace_id, live_gen) VALUES ($1, 1) ON CONFLICT (workspace_id) DO UPDATE SET live_gen = graph_generation.live_gen",
           [WS_A],
@@ -1121,8 +967,6 @@ describe("the graph tables under app_rt", () => {
         ],
       ]);
 
-      // A workspace with no generation row has no live generation for a row to land in:
-      // the delta and the rebuild both create the row first, and nothing else writes a map.
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [
         "01J6CCCCCCCCCCCCCCCCCCCCCC",
       ]);
@@ -1144,9 +988,6 @@ describe("the graph tables under app_rt", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      // A source entity carries no generation, so the policy is the whole of what refuses
-      // it; a bundle-and-record row is refused a step earlier, by the generation guard,
-      // which under this scope can see no live generation of the other tenant's at all.
       await client.query("SAVEPOINT other_tenant");
       await expect(
         client.query(
@@ -1178,11 +1019,6 @@ describe("the graph tables under app_rt", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const rows: readonly [string, readonly unknown[], string][] = [
-        // Each label family bound to its partition (ADR 0032): a label outside the closed
-        // set; the prefixed form inside a generation, on either table; and a closed *node*
-        // label carrying no generation — a node's rule holds both ways, an edge's closed
-        // set is admitted at `gen` NULL because `IS_CONCEPT` and `SAME_AS` live there
-        // (ADR 0026's amendment).
         [
           "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'uid-1', 'Widget')",
           [WS_A],
@@ -1203,7 +1039,7 @@ describe("the graph tables under app_rt", () => {
           [WS_A],
           "graph_edge_label_check",
         ],
-        // A generation before the first, on the rows as on the counter's own row below.
+
         [
           "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 0, 'uid-7', 'Concept')",
           [WS_A],
@@ -1219,9 +1055,7 @@ describe("the graph tables under app_rt", () => {
           [WS_A],
           "graph_node_sensitivity_check",
         ],
-        // The two partitions' keys: a doubled `(workspace, gen, uid)` in the
-        // bundle-and-record partition, and a doubled `(workspace, uid)` among the
-        // source entities, which carry no generation to tell two rows apart by.
+
         [
           "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, $2, $3, 'Concept')",
           [WS_A, node.gen, node.uid],
@@ -1232,20 +1066,19 @@ describe("the graph tables under app_rt", () => {
           [WS_A, entity.uid],
           "graph_node_source_entity_uidx",
         ],
-        // The link columns are LINKS_TO's alone: a named edge cannot smuggle prose.
+
         [
           "INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid, sentence) VALUES ($1, 1, 'edge-1', 'SUPERSEDES', 'a', 'b', 'smuggled')",
           [WS_A],
           "graph_edge_links_to_check",
         ],
-        // One live generation per workspace, and never a generation before the first.
+
         [
           "INSERT INTO graph_generation (workspace_id, live_gen) VALUES ($1, 2)",
           [WS_A],
           "graph_generation_pkey",
         ],
-        // The scoped workspace, so the row's own CHECK is what refuses it — Postgres
-        // evaluates a CHECK before the key, so the doubled workspace never masks it.
+
         [
           "INSERT INTO graph_generation (workspace_id, live_gen) VALUES ($1, 0)",
           [WS_A],
@@ -1260,8 +1093,6 @@ describe("the graph tables under app_rt", () => {
         await client.query("ROLLBACK TO SAVEPOINT graph_row");
       }
 
-      // The shape a full rebuild writes beside the live map (ADR 0023): the same uid in
-      // the next generation lands, because the key carries the generation.
       await client.query(
         "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, $2, $3, 'Concept')",
         [WS_A, (node.gen ?? 0) + 1, node.uid],
@@ -1270,15 +1101,6 @@ describe("the graph tables under app_rt", () => {
   });
 });
 
-/**
- * The inbox's own proofs (ADR 0005, ADR 0012, migration 0018, `[SEC3]`): two tenant tables
- * like any other, so the zero-rows proof is stated here in their words; **the payload is out
- * of every runtime role's reach** and served by one definer function granted to the app
- * alone; the worker submits through a function and reads nothing back; and the decision
- * CHECK refuses every half-decided row the slice would otherwise have to remember not to
- * write.
- */
-/** A waiting suggestion and its payload in each workspace, with the app's role scoped to A. */
 const inboxAsApp = async (client: pg.PoolClient) => {
   const seed = await seedTwoWorkspaces(client);
   const here = await seed.suggestion({ workspaceId: WS_A });
@@ -1290,21 +1112,9 @@ const inboxAsApp = async (client: pg.PoolClient) => {
   return { seed, here, there };
 };
 
-/**
- * Say which suggestion this transaction is deciding, as the concepts slice's decision and
- * acceptance paths do (`markDeciding`). The row's trigger refuses a decision that arrives
- * without it, so a test asserting the *served* path has to speak the same sentence the
- * slice speaks; the test below asserts what happens when nobody does.
- */
 const deciding = (client: pg.PoolClient, suggestionId: string) =>
   client.query("SELECT set_config('app.deciding_suggestion', $1, true)", [suggestionId]);
 
-/**
- * One request of a submitted set, with whatever a test varies about it. The frontmatter is
- * the **producer's own JSON text**, because that is what `submit_suggestion_set` measures and
- * casts (migration 0018). Shared, because each test below varies one field of it and four
- * copies would be four places a change to the payload's shape has to land.
- */
 const submitRequest = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   suggestion_id: ulid(),
   merge_key: `policy:${ulid().toLowerCase()}`,
@@ -1317,7 +1127,6 @@ const submitRequest = (overrides: Record<string, unknown> = {}): Record<string, 
   ...overrides,
 });
 
-/** Submit a set as whoever the transaction currently is — the one call all four sites make. */
 const submitSet = (
   client: pg.PoolClient,
   set: { readonly kind: string; readonly proposer: string; readonly requests: readonly unknown[] },
@@ -1345,7 +1154,6 @@ describe("the inbox under app_rt", () => {
     await withRollback(db.pool, async (client) => {
       const { here } = await inboxAsApp(client);
 
-      // The app's role: no road to the table at all — not a read, not a write.
       for (const statement of [
         "SELECT 1 FROM concept_write_request LIMIT 1",
         "DELETE FROM concept_write_request",
@@ -1355,8 +1163,6 @@ describe("the inbox under app_rt", () => {
         await client.query("ROLLBACK TO SAVEPOINT payload");
       }
 
-      // And the one road that is open: the acceptance path's function, which serves the
-      // payload of a suggestion that is still waiting.
       const served = await client.query<{ merge_key: string }>(
         "SELECT merge_key FROM concept_write_request_for($1)",
         [here.id],
@@ -1369,8 +1175,7 @@ describe("the inbox under app_rt", () => {
         /permission denied/,
       );
       await client.query("ROLLBACK TO SAVEPOINT worker");
-      // The function is the app's alone: a producer that could call it could read another
-      // producer's candidates out of the inbox, which ADR 0012's amendment forbids.
+
       await expect(
         client.query("SELECT 1 FROM concept_write_request_for($1)", [here.id]),
       ).rejects.toThrow(/permission denied/);
@@ -1381,8 +1186,6 @@ describe("the inbox under app_rt", () => {
     await withRollback(db.pool, async (client) => {
       const { here, there } = await inboxAsApp(client);
 
-      // Another tenant's suggestion, asked for by id from this tenant's scope: the same
-      // answer as an id nobody minted, which is what stops the function being a probe.
       const foreign = await client.query("SELECT 1 FROM concept_write_request_for($1)", [there.id]);
       expect(foreign.rowCount).toBe(0);
 
@@ -1394,7 +1197,6 @@ describe("the inbox under app_rt", () => {
         [WS_A, here.id],
       );
 
-      // A decided suggestion has been committed or refused; its payload has no reader left.
       const decided = await client.query("SELECT 1 FROM concept_write_request_for($1)", [here.id]);
       expect(decided.rowCount).toBe(0);
     });
@@ -1411,10 +1213,6 @@ describe("the inbox under app_rt", () => {
   });
 
   it("decides a waiting suggestion once, and refuses every road back out of a decision (migration 0018)", async () => {
-    // The privilege the app keeps is a general UPDATE — it is how a decision is written —
-    // so what a decision *is* has to be the database's own sentence too: without this,
-    // app code could mark a suggestion accepted with no commit, no ledger row and no
-    // graph delta, which is the one thing the acceptance's transaction exists to prevent.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const decided = await seed.suggestion({ workspaceId: WS_A });
@@ -1433,13 +1231,8 @@ describe("the inbox under app_rt", () => {
         );
       };
 
-      // The served path first: a waiting suggestion is declined, once.
       expect((await decline(decided.id)).rowCount).toBe(1);
 
-      // A second decision over the first, and the first undone back to waiting; then, on a
-      // suggestion still waiting, an update that decides nothing and a decision that also
-      // restates what was proposed. Thunks, because each one has to run behind its own
-      // savepoint — a failed statement aborts everything after it (`[TEST8]`).
       const refusals: readonly [() => Promise<unknown>, RegExp][] = [
         [() => decline(decided.id), /decided as declined already/],
         [
@@ -1474,11 +1267,6 @@ describe("the inbox under app_rt", () => {
   });
 
   it("refuses a first decision from a transaction that never said it was making one (migration 0018)", async () => {
-    // The decision trigger's other half. Refusing a *second* decision leaves the first one
-    // open to any UPDATE the app can write — a suggestion marked accepted with no commit,
-    // no ledger row and no graph delta, which is exactly what the acceptance's transaction
-    // exists to make impossible. So the transaction has to name what it is deciding, and
-    // the concepts slice's two decision paths are the only things that say it.
     await withRollback(db.pool, async (client) => {
       const { here } = await inboxAsApp(client);
       const decline = (id: string) =>
@@ -1493,14 +1281,11 @@ describe("the inbox under app_rt", () => {
       await expect(decline(here.id)).rejects.toThrow(/this transaction is not making it/);
       await client.query("ROLLBACK TO SAVEPOINT bare");
 
-      // And a marker naming some *other* suggestion is no marker at all: the act names the
-      // row it is deciding, not merely that it is deciding something.
       await deciding(client, ulid());
       await client.query("SAVEPOINT elsewhere");
       await expect(decline(here.id)).rejects.toThrow(/this transaction is not making it/);
       await client.query("ROLLBACK TO SAVEPOINT elsewhere");
 
-      // The served path beside the refusals, in the words the slice speaks.
       await deciding(client, here.id);
       expect((await decline(here.id)).rowCount).toBe(1);
     });
@@ -1514,25 +1299,18 @@ describe("the inbox under app_rt", () => {
 
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      // Both `p_kind` and `p_proposer` are the caller's words, so a compromised producer
-      // could otherwise submit an *edit* under a `human:` proposer — a form the row's own
-      // CHECK accepts — and put a change in a person's name into the queue an Admin
-      // decides from. Which tier is calling is what the function reads instead.
+
       await client.query("SAVEPOINT kind");
       await expect(submit("edit", "human:01J6CCCCCCCCCCCCCCCCCCCCCC")).rejects.toThrow(
         /worker_rt may not raise a suggestion of kind edit/,
       );
       await client.query("ROLLBACK TO SAVEPOINT kind");
 
-      // And the served path beside it: the platform's own citation repair, which is a
-      // routine the worker runs.
       const repaired = await submit("repair", "process:better-answers-citation-repair");
       expect(repaired.rowCount).toBe(1);
 
       await client.query("SET LOCAL ROLE app_rt");
-      // And what the app may not raise: the platform's own repair, and a run's candidate —
-      // a candidate is what a run *found*, so an app that could raise one could put work
-      // no run did into the queue an Admin decides from.
+
       await client.query("SAVEPOINT app");
       await expect(submit("repair", "process:better-answers-citation-repair")).rejects.toThrow(
         /app_rt may not raise a suggestion of kind repair/,
@@ -1556,8 +1334,6 @@ describe("the inbox under app_rt", () => {
       );
       await client.query("ROLLBACK TO SAVEPOINT queue");
 
-      // The served path: a run's candidates, submitted as one call, landing in the
-      // workspace the transaction already names — the function takes no workspace at all.
       const submitted = await submitSet(client, {
         kind: "candidate",
         proposer: "better-answers-extract/1.0",
@@ -1573,8 +1349,6 @@ describe("the inbox under app_rt", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      // A producer chooses how much it sends, so somebody other than the caller chooses
-      // the ceiling; and a set of nothing is a call that meant to say something.
       for (const requests of [[], Array.from({ length: 501 }, () => submitRequest())]) {
         await client.query("SAVEPOINT sized");
         await expect(
@@ -1594,8 +1368,6 @@ describe("the inbox under app_rt", () => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
 
-      // The guard `[SEC3]` asks a definer function to make before it writes anything: the
-      // set lands in the scope the caller already holds, and an unscoped caller has none.
       await expect(
         client.query("SELECT * FROM submit_suggestion_set($1, 'edit', $2, '[]'::jsonb)", [
           ulid(),
@@ -1606,16 +1378,12 @@ describe("the inbox under app_rt", () => {
   });
 
   it("refuses every half-decided suggestion the write path forbids, each at its own constraint", async () => {
-    // Straight SQL rather than the factory, which would refuse these at the boundary before
-    // any INSERT existed: the claim here is the database's own.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const identity = await seed.conceptIdentity({ workspaceId: WS_A });
       const columns =
         "(workspace_id, id, set_id, kind, proposer, status, decider, decided_at, reason, target_iri)";
       const rows: readonly [string, string][] = [
-        // A fifth status, and a kind nobody declared. The status row is a whole decision
-        // otherwise, so that only the status's own CHECK can be what refuses it.
         [
           `VALUES ($1, $2, $3, 'edit', $4, 'withdrawn', $4, now(), NULL, NULL)`,
           "suggestion_status_check",
@@ -1624,7 +1392,7 @@ describe("the inbox under app_rt", () => {
           `VALUES ($1, $2, $3, 'merge', $4, 'waiting', NULL, NULL, NULL, NULL)`,
           "suggestion_kind_check",
         ],
-        // Decided by nobody, decided at no time, and each half of the pair alone.
+
         [
           `VALUES ($1, $2, $3, 'edit', $4, 'declined', NULL, now(), 'why', NULL)`,
           "suggestion_decision_check",
@@ -1633,7 +1401,7 @@ describe("the inbox under app_rt", () => {
           `VALUES ($1, $2, $3, 'edit', $4, 'declined', $4, NULL, 'why', NULL)`,
           "suggestion_decision_check",
         ],
-        // A decline with no reason, and an acceptance carrying one.
+
         [
           `VALUES ($1, $2, $3, 'edit', $4, 'declined', $4, now(), NULL, NULL)`,
           "suggestion_decision_check",
@@ -1642,8 +1410,7 @@ describe("the inbox under app_rt", () => {
           `VALUES ($1, $2, $3, 'edit', $4, 'accepted', $4, now(), 'why', '${identity.iri}')`,
           "suggestion_decision_check",
         ],
-        // A target on anything but an acceptance, and an acceptance with no target: the
-        // target is what the acceptance resolved, so the two are one fact.
+
         [
           `VALUES ($1, $2, $3, 'edit', $4, 'waiting', NULL, NULL, NULL, '${identity.iri}')`,
           "suggestion_decision_check",
@@ -1652,13 +1419,12 @@ describe("the inbox under app_rt", () => {
           `VALUES ($1, $2, $3, 'edit', $4, 'accepted', $4, now(), NULL, NULL)`,
           "suggestion_decision_check",
         ],
-        // A waiting suggestion that somebody has already decided.
+
         [
           `VALUES ($1, $2, $3, 'edit', $4, 'waiting', $4, now(), NULL, NULL)`,
           "suggestion_decision_check",
         ],
-        // A decider of no known form — the row is written by a definer function both tiers
-        // call, which is past every boundary the app parses through.
+
         [
           `VALUES ($1, $2, $3, 'edit', $4, 'declined', 'Ada Editor', now(), 'why', NULL)`,
           "suggestion_decider_check",
@@ -1677,12 +1443,6 @@ describe("the inbox under app_rt", () => {
         await client.query("ROLLBACK TO SAVEPOINT decision");
       }
 
-      // The proposer's own two rules, each read off the value the row carries: an actor of
-      // no known form at all, and — the security one — a **repair nobody but the platform
-      // may raise**. Accepting a repair re-points every standing check at the content it
-      // wrote, so a member who could raise one could make somebody's check vouch for
-      // content they never saw; not even an agent's output qualifies, because the repair is
-      // the platform's own routine (ADR 0019).
       const proposers: readonly [string, string, string][] = [
         ["edit", "ada@acme.invalid", "suggestion_proposer_check"],
         ["repair", "human:01J6CCCCCCCCCCCCCCCCCCCCCC", "suggestion_repair_proposer_check"],
@@ -1699,7 +1459,7 @@ describe("the inbox under app_rt", () => {
         ).rejects.toThrow(new RegExp(constraint));
         await client.query("ROLLBACK TO SAVEPOINT proposer");
       }
-      // And the served path the refusals sit beside: the platform's own repair lands.
+
       const platform = await client.query(
         `INSERT INTO suggestion (workspace_id, id, set_id, kind, proposer)
          VALUES ($1, $2, $3, 'repair', 'process:better-answers-citation-repair') RETURNING id`,
@@ -1710,16 +1470,10 @@ describe("the inbox under app_rt", () => {
   });
 
   it("refuses a body larger than a concept could be, at the row", async () => {
-    // Straight SQL rather than the factory, which would refuse it at the boundary before
-    // any INSERT existed: the claim here is the database's own, because the row is written
-    // by a definer function both tiers call and no boundary stands in front of that.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const here = await seed.suggestion({ workspaceId: WS_A });
 
-      // A concept is a fact stated once, not a document; a producer writes this column, so
-      // the size is somebody else's to bound. Its `frontmatter` neighbour is bounded in
-      // `submit_suggestion_set` instead, and the test below says why.
       await expect(
         client.query(
           `INSERT INTO concept_write_request
@@ -1743,12 +1497,6 @@ describe("the inbox under app_rt", () => {
           requests: [submitRequest({ frontmatter })],
         });
 
-      // **The rendering is not the caller's text, within any multiplier.** A `jsonb` column
-      // read back with `::text` is Postgres's own printing of it — `{"a":1e-100}` is twelve
-      // characters sent and a hundred and nine read back, and a number may carry a scale of
-      // sixteen thousand — so a bound over the rendering would refuse payloads the boundary
-      // had already passed. The frontmatter therefore arrives as the producer's own JSON text
-      // and is measured as sent, here, which is the only road to the row.
       const wide = JSON.stringify({ a: 1e-100, title: "Expenses" });
       expect(wide.length).toBeLessThan(CONCEPT_FRONTMATTER_MAX);
       expect((await submit(wide)).rowCount).toBe(1);
@@ -1759,18 +1507,12 @@ describe("the inbox under app_rt", () => {
       ).rejects.toThrow(/frontmatter is the producer's own JSON text/);
       await client.query("ROLLBACK TO SAVEPOINT frontmatter");
 
-      // And an object where the text belongs: refused rather than quietly rendered, which
-      // would be the measurement this function exists to avoid.
       await client.query("SAVEPOINT shape");
       await expect(submit({ title: "Expenses" })).rejects.toThrow(
         /frontmatter is the producer's own JSON text/,
       );
       await client.query("ROLLBACK TO SAVEPOINT shape");
 
-      // A payload is the file an acceptance would commit, so its frontmatter is a mapping.
-      // A list, a bare scalar and JSON's null are all valid JSON text that casts and stores
-      // perfectly well — and then fails at the acceptance, which reads the file's keys,
-      // where the refusal is somebody else's problem and the payload is already in the queue.
       for (const notAnObject of ["[1,2]", '"str"', "null", "7"]) {
         await client.query("SAVEPOINT shape");
         await expect(submit(notAnObject)).rejects.toThrow(/a JSON object of at most/);
@@ -1788,8 +1530,6 @@ describe("the inbox under app_rt", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       await deciding(client, here.id);
 
-      // The composite key again: the foreign-key check runs as the owner and bypasses the
-      // policy, so a key on the IRI alone would confirm that another tenant holds it.
       await expect(
         client.query(
           `UPDATE suggestion SET status = 'accepted', decider = 'process:better-answers-test',
@@ -1817,8 +1557,6 @@ describe("a tenant table under app_rt", () => {
 
   it("returns exactly the scoped tenant's rows", async () => {
     await withRollback(db.pool, async (client) => {
-      // Six lines of arrange the test above also has, carried rather than folded: which
-      // scope is set, and when, is the whole subject of each of these tests.
       /* jscpd:ignore-start */
       const seed = await seedTwoWorkspaces(client);
       await seed.workspaceConfig({ workspaceId: WS_A });
@@ -1881,8 +1619,6 @@ describe("a tenant table under app_rt", () => {
 describe("the workspace-lifecycle function", () => {
   it("creates the chunk partition and its full-text index for app_rt, in one transaction", async () => {
     await withRollback(db.pool, async (client) => {
-      // Six lines of arrange the test above also has, carried rather than folded: which
-      // scope is set, and when, is the whole subject of each of these tests.
       /* jscpd:ignore-start */
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
@@ -1896,10 +1632,6 @@ describe("the workspace-lifecycle function", () => {
       );
       expect(partition.rowCount).toBe(1);
 
-      // The index a new partition is born with, since migration 0037: a GIN index over the
-      // full-text column `find`'s document arm matches on, and no vector index — nothing
-      // embeds until S8, and an HNSW index over a column nobody writes cost every new
-      // workspace a build and a resident structure for nothing.
       const index = await client.query(
         "SELECT indexdef FROM pg_indexes WHERE schemaname = 'index' AND tablename = $1",
         [`chunk_${WS_A}`],
@@ -1911,8 +1643,6 @@ describe("the workspace-lifecycle function", () => {
       }).toEqual({ fullText: true, vector: false });
     });
 
-    // "In one transaction" made checkable: the enclosing transaction rolled back, so
-    // the partition and its index went with it.
     const afterRollback = await db.pool.query(
       "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'index' AND c.relname = $1",
       [`chunk_${WS_A}`],
@@ -1934,7 +1664,6 @@ describe("the workspace-lifecycle function", () => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
 
-      // No scope at all.
       await expect(client.query("SELECT create_workspace_partition($1)", [WS_A])).rejects.toThrow(
         /not scoped/,
       );
@@ -1944,7 +1673,6 @@ describe("the workspace-lifecycle function", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      // Scoped to A, asking for B's objects.
       await expect(client.query("SELECT create_workspace_partition($1)", [WS_B])).rejects.toThrow(
         /not scoped/,
       );
@@ -1983,13 +1711,7 @@ describe("the workspace-lifecycle function", () => {
   });
 
   it("denies a direct query against a partition, whatever the scope", async () => {
-    // The RLS-bypass Cubic caught: parent policies do not apply to a query aimed at
-    // a child table, and migration 0000's default privileges would have granted the
-    // runtime roles DML on it — the lifecycle function revokes them, so the only
-    // road to chunk rows is the policied parent.
     await withRollback(db.pool, async (client) => {
-      // Seven lines of arrange the chunk-scoping test above also has, carried rather than
-      // folded: which scope is set, and when, is the whole subject of each of these tests.
       /* jscpd:ignore-start */
       const seed = await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
@@ -1998,8 +1720,6 @@ describe("the workspace-lifecycle function", () => {
       await seed.chunk({ workspaceId: WS_A, content: "hello" });
       /* jscpd:ignore-end */
 
-      // The other tenant's scope, aiming straight at A's partition. Each denial
-      // aborts the transaction, so a savepoint fences it from the next assertion.
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
       await client.query("SAVEPOINT direct_query");
       await expect(client.query(`SELECT id FROM "index"."chunk_${WS_A}"`)).rejects.toThrow(
@@ -2007,7 +1727,6 @@ describe("the workspace-lifecycle function", () => {
       );
       await client.query("ROLLBACK TO SAVEPOINT direct_query");
 
-      // Even the owning tenant goes through the parent, never the child.
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       await expect(client.query(`SELECT id FROM "index"."chunk_${WS_A}"`)).rejects.toThrow(
         /permission denied/,
@@ -2016,22 +1735,7 @@ describe("the workspace-lifecycle function", () => {
   });
 });
 
-/**
- * The worker's hold on the chunk index, as ADR 0032's 2026-09-19 amendment records it:
- * SELECT beside INSERT, UPDATE and DELETE on the policied parent, and nothing at all on a
- * workspace's partition. The read is deliberate — all three statements a run makes against
- * the table read it, the upsert's `EXCLUDED` over every column the pipeline declares and
- * the delete's and the update's `WHERE` over the key columns, and PostgreSQL requires
- * SELECT on every column a predicate or an `EXCLUDED` reference reads — so it is pinned
- * here rather than revoked, and a migration that took it away would fail this suite first.
- */
 describe("the chunk index under worker_rt", () => {
-  /**
-   * Every privilege a table can carry on the pinned image (PostgreSQL 18), so *no other
-   * privilege* is read off the closed set rather than off the four a reader thought of.
-   * The set is the image's, not PostgreSQL's forever — `MAINTAIN` arrived in 17 — so a
-   * bump of `POSTGRES_IMAGE` re-reads `GRANT ALL` through `aclexplode` against this list.
-   */
   const TABLE_PRIVILEGES = [
     "SELECT",
     "INSERT",
@@ -2043,7 +1747,6 @@ describe("the chunk index under worker_rt", () => {
     "MAINTAIN",
   ] as const;
 
-  /** What the catalogue says a role holds on one table, every privilege answered. */
   const privilegesHeld = async (
     client: pg.PoolClient,
     role: string,
@@ -2058,20 +1761,15 @@ describe("the chunk index under worker_rt", () => {
 
   it("holds the four verbs on the parent and no other privilege, and nothing at all on a partition (migrations 0000 and 0037)", async () => {
     await withRollback(db.pool, async (client) => {
-      // Four lines of arrange the lifecycle tests also have, carried rather than folded for
-      // the reason they give: which role is set, and under which scope, is the subject.
       /* jscpd:ignore-start */
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       await client.query("SELECT create_workspace_partition($1)", [WS_A]);
       /* jscpd:ignore-end */
-      // Back to the seeding role: the catalogue answers the same whoever asks it, and the
-      // partition had to be made by the one role the lifecycle function admits.
+
       await client.query("RESET ROLE");
 
-      // The parent: the three writing verbs migration 0037 grants by name, and the read
-      // migration 0000's default privileges gave — recorded as intended, never revoked.
       expect(await privilegesHeld(client, "worker_rt", '"index".chunk')).toEqual({
         SELECT: true,
         INSERT: true,
@@ -2083,9 +1781,6 @@ describe("the chunk index under worker_rt", () => {
         MAINTAIN: false,
       });
 
-      // The partition: nothing, on any verb. Parent policies do not reach a query aimed at
-      // a child and default privileges do, so the lifecycle function's REVOKE ALL is what
-      // keeps the parent the only road — asserted at the child, never inferred.
       expect(await privilegesHeld(client, "worker_rt", `"index"."chunk_${WS_A}"`)).toEqual({
         SELECT: false,
         INSERT: false,
@@ -2105,8 +1800,6 @@ describe("the chunk index under worker_rt", () => {
       const mine = await seed.chunk({ workspaceId: WS_A, content: "ours" });
       await client.query("SET LOCAL ROLE worker_rt");
 
-      // The grant is a table privilege; the policy is still what says which rows — the
-      // same guarantee the app's role reads under, proved for the tier that writes them.
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       const scoped = await client.query('SELECT id FROM "index".chunk');
 
@@ -2125,16 +1818,7 @@ describe("the chunk index under worker_rt", () => {
   });
 });
 
-/**
- * The audience pair on every readable unit (ADR 0039; migrations 0019 and 0020, `[SEC3]`):
- * the word and the array are one fact the row holds — *everyone* over no array, *groups*
- * over a non-empty one with no NULL element — refused in every half-shape on every table
- * that carries the pair, the hand-written chunk and graph DDL included, with the two whole
- * shapes landing beside the refusals. An empty intersection is therefore never a row: the
- * derivation forces the unit Restricted instead.
- */
 describe("the audience pair on every readable unit", () => {
-  /** Every table carrying the pair, seeded with one row of A's, and the CHECK that holds it. */
   const AUDIENCE_TABLES: readonly [string, string, (seed: TestData) => Promise<unknown>][] = [
     [
       "concept_index",
@@ -2170,9 +1854,6 @@ describe("the audience pair on every readable unit", () => {
         await client.query("SET LOCAL ROLE app_rt");
         await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-        // *groups* over nothing, over an empty array and over a NULL element; *everyone*
-        // over an array; and a word outside the pair. Each aborts the transaction, so each
-        // runs behind its own savepoint (`[TEST8]`).
         const halfShapes = [
           "audience = 'groups', audience_groups = NULL",
           "audience = 'groups', audience_groups = '{}'",
@@ -2188,7 +1869,6 @@ describe("the audience pair on every readable unit", () => {
           await client.query("ROLLBACK TO SAVEPOINT half_shape");
         }
 
-        // The served paths: named groups, and back to everyone.
         const narrowed = await client.query(
           `UPDATE ${table} SET audience = 'groups', audience_groups = ARRAY['01J6JJJJJJJJJJJJJJJJJJJJJJ'] WHERE workspace_id = $1`,
           [WS_A],
@@ -2204,16 +1884,6 @@ describe("the audience pair on every readable unit", () => {
   );
 });
 
-/**
- * The **rules in force** on a binding (ADR 0020; migration 0031): the two tiers a binding
- * switches, on the row rather than by convention, with the safe set as the column's default.
- *
- * Held by the database and not by the boundary alone, because the boundary is the app's and
- * this value is the *worker's* argument: `worker_rt` holds default DML on every ordinary
- * `public` table (migration `0000_substrate.sql`), so a shape stated at the boundary alone is
- * a shape one tier could write around. The refusals are written as UPDATEs for the same reason
- * the identifier set's are — the CHECK is what the row is held to whoever wrote it.
- */
 describe("the rules in force on a source binding", () => {
   it("gives a binding nobody configured the safe set, and takes the one flip that changes it", async () => {
     await withRollback(db.pool, async (client) => {
@@ -2221,25 +1891,18 @@ describe("the rules in force on a source binding", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      // A binding written without the factory and without the boundary, naming the workspace
-      // and the id and nothing else: what lands in the column is then the database's own
-      // DEFAULT and not a value some layer above put there.
       const id = ulid();
       await client.query(
         "INSERT INTO source_binding (workspace_id, id, name, connector) VALUES ($1, $2, 'The handbook', 'upload')",
         [WS_A, id],
       );
 
-      // The safe set, written down here as a literal (`[TEST9]`): the default-on tier on, the
-      // default-off tier off, and no key for *always*, because no binding switches it off.
       const born = await client.query<{ rules_in_force: Record<string, boolean> }>(
         "SELECT rules_in_force FROM source_binding WHERE id = $1",
         [id],
       );
       expect(born.rows).toEqual([{ rules_in_force: { default_on: true, default_off: false } }]);
 
-      // The HR-shaped binding of the S0 spec: names withheld, which is one flip and not a new
-      // column, a new table or a list of categories anywhere near a migration.
       const flipped = await client.query(
         `UPDATE source_binding SET rules_in_force = '{"default_on": true, "default_off": true}'::jsonb
           WHERE id = $1`,
@@ -2257,16 +1920,12 @@ describe("the rules in force on a source binding", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const offShape = [
-        // A tier missing. `->` on an absent key is SQL NULL and a CHECK worth NULL passes, so
-        // this is the case a `=` comparison would have taken: a binding whose answer to *is a
-        // name withheld?* is nothing at all.
         `'{"default_on": true}'::jsonb`,
-        // A value that is neither a yes nor a no.
+
         `'{"default_on": true, "default_off": "no"}'::jsonb`,
-        // The JSON `null`, which `jsonb NOT NULL` takes — it refuses SQL NULL, not the JSON
-        // value — so this is the layer that refuses a binding withholding by no rule at all.
+
         `'null'::jsonb`,
-        // A list and a bare string: valid JSON, and not a set of tiers.
+
         `'[]'::jsonb`,
         `'"default_on"'::jsonb`,
       ];
@@ -2283,14 +1942,6 @@ describe("the rules in force on a source binding", () => {
   });
 });
 
-/**
- * The derivation's six tables (ADR 0039; migrations 0019 and 0020, `[SEC3]`): tenant tables
- * like any other, so the zero-rows proof is stated here in their words; the worker's role is
- * refused on all six outright; every composite key refuses a row naming another tenant's
- * binding, concept or evidence; the override's own CHECKs refuse an actor of no known form
- * and a class outside the three; and the citation's key keeps cited evidence while a
- * citation names it.
- */
 describe("the derivation's tables under app_rt", () => {
   const DERIVATION_TABLES = [
     "source_binding",
@@ -2301,7 +1952,6 @@ describe("the derivation's tables under app_rt", () => {
     "composition_include",
   ] as const;
 
-  /** One row of every table in one workspace: a binding, its document, a cited concept, its override, a composition including it. */
   const seedOneOfEach = async (seed: TestData, workspaceId: string) => {
     const binding = await seed.sourceBinding({ workspaceId });
     const document = await seed.sourceDocument({ workspaceId, bindingId: binding.id });
@@ -2334,12 +1984,6 @@ describe("the derivation's tables under app_rt", () => {
     });
   });
 
-  /**
-   * The four of the six the worker still reaches by no road at all. A class and an audience are
-   * applied at read time by the app and derived in the app's own transactions, and a citation,
-   * an override and a composition are records of somebody's decision — none of it a tier that
-   * runs a detector over a document has any business with.
-   */
   const REFUSED_TO_THE_WORKER = [
     "concept_evidence",
     "concept_class_override",
@@ -2361,20 +2005,13 @@ describe("the derivation's tables under app_rt", () => {
         ]);
       }
 
-      // The two S1 hands back, and only as far as a run needs them: the binding is read so a
-      // run can copy its class and audience onto the rows it writes, and the catalogue row is
-      // read and written back because the hash, the normalised copy's key, the redaction
-      // version, the outcome word, the quarantine error and the last-seen stamp are all a
-      // run's own findings.
       const binding = await client.query("SELECT id FROM source_binding");
       const document = await client.query("SELECT id FROM source_document");
       await client.query(
         "UPDATE source_document SET last_seen = now(), outcome = 'converted' WHERE id = $1",
         [seeded.document.id],
       );
-      // Both words a run may write, because the grant is the table's and the second one was
-      // added after it: a column the worker cannot write is a document quarantined with
-      // nothing on its row to say by what, and nothing else in this estate would notice.
+
       await client.query(
         `UPDATE source_document
             SET outcome = 'quarantined', quarantine_error = 'NeedsOcrError'
@@ -2395,7 +2032,6 @@ describe("the derivation's tables under app_rt", () => {
         quarantined: [{ outcome: "quarantined", quarantine_error: "NeedsOcrError" }],
       });
 
-      // And no further, each refusal beside the path it fences (`[SEC3]`).
       await refusesEach(client, [
         [
           "UPDATE source_binding SET name = 'renamed by a run'",
@@ -2434,9 +2070,6 @@ describe("the derivation's tables under app_rt", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      // Every key names the workspace beside the id: a foreign-key check runs outside RLS
-      // and still cannot find B's binding or concept under A's workspace — the same refusal
-      // an id nobody minted gets, so a prober learns nothing.
       const rows: readonly [string, readonly unknown[], string][] = [
         [
           `INSERT INTO source_document
@@ -2456,8 +2089,7 @@ describe("the derivation's tables under app_rt", () => {
           [WS_A, theirs.identity.iri, ulid()],
           "concept_class_override_identity_fk",
         ],
-        // A citation of evidence no row records: a concept cites what was recorded at its
-        // commit, never a locator nobody kept.
+
         [
           "INSERT INTO concept_evidence (workspace_id, iri, source_document_id, locator) VALUES ($1, $2, $3, 'p.99')",
           [WS_A, ours.identity.iri, ours.document.id],
@@ -2487,8 +2119,6 @@ describe("the derivation's tables under app_rt", () => {
           [WS_A, identity.iri, sensitivity, actor, ulid()],
         );
 
-      // The evidence pane names the overriding Admin off this column, so it holds the
-      // ledger's actor form and never a display name.
       await client.query("SAVEPOINT actor");
       await expect(override("Ada Admin", "Internal")).rejects.toThrow(
         /concept_class_override_actor_check/,
@@ -2499,7 +2129,7 @@ describe("the derivation's tables under app_rt", () => {
         /concept_class_override_sensitivity_check/,
       );
       await client.query("ROLLBACK TO SAVEPOINT class");
-      // And the served path beside them.
+
       const landed = await override("human:01J6CCCCCCCCCCCCCCCCCCCCCC", "Internal");
       expect(landed.rowCount).toBe(1);
     });
@@ -2512,8 +2142,6 @@ describe("the derivation's tables under app_rt", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      // Cited evidence outlives its source (ADR 0013): the key refuses the delete rather
-      // than cascading the citation away.
       await client.query("SAVEPOINT cited");
       await expect(
         client.query(
@@ -2523,8 +2151,6 @@ describe("the derivation's tables under app_rt", () => {
       ).rejects.toThrow(/concept_evidence_evidence_fk/);
       await client.query("ROLLBACK TO SAVEPOINT cited");
 
-      // A concept that has left the bundle cites nothing: the identity's cascade takes the
-      // citation, the override and the include that named it.
       await client.query("DELETE FROM concept_identity WHERE workspace_id = $1 AND iri = $2", [
         WS_A,
         ours.identity.iri,
@@ -2544,32 +2170,10 @@ describe("the derivation's tables under app_rt", () => {
   });
 });
 
-/**
- * The **finding** (`CONTEXT.md`; ADR 0020, the S0 spec's tier boundary): what the seam found
- * in one source document, written by the worker and reviewed by the app. A tenant table like
- * any other, so the zero-rows proof is stated here in its words — and the grant is the whole
- * of the boundary between the two tiers: the worker's role holds INSERT, SELECT on the five
- * columns that say which span a row is and the one that says it was restored (migration 0041),
- * and SELECT and UPDATE on the five that are a run's own **reading** of a span — its category,
- * tier and score and the version pair that read it (migration 0042; ADR 0020, amended
- * 2026-09-21). So a compromised worker can record what it withheld, refresh its own reading of
- * a span it finds again and learn that an Admin let one back, and can never read a reason, a
- * reviewer or a review, stamp one, move a span, or take away the record of one.
- *
- * The table never holds the value it found — offsets, a category and a score, and nothing a
- * personal detail could sit in. `boundary-schemas.test.ts` writes that column set down.
- */
-/** One name as a run records it: the statement up to its conflict clause. */
 const RECORD_A_NAME = `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
                                            char_start, char_end, score, rule_version, detector_pin)
                        VALUES ($1, $2, $3, 'person-name', $4, 'PERSON', $5, $6, 0.97, 'r2', 'd2')`;
 
-/**
- * The worker's conflict clause, as `apps/worker`'s `record_findings` writes it (migration 0042):
- * a span found again has its reading refreshed — never its id, its span or an Admin's marks —
- * a restored row keeps the tier it was restored at, and a reading that has not moved writes
- * nothing.
- */
 const REFRESH_THE_READING = `ON CONFLICT (workspace_id, document_id, rule_id, char_start, char_end)
   DO UPDATE SET category = EXCLUDED.category,
                 tier = CASE WHEN finding.restored_at IS NULL THEN EXCLUDED.tier ELSE finding.tier END,
@@ -2596,10 +2200,6 @@ describe("the finding under both runtime roles", () => {
   });
 
   it("lets the worker record a finding and refuses it every road to what an Admin wrote on one (migrations 0024, 0032, 0041, 0042)", async () => {
-    // Migration 0000 hands both runtime roles the DML on every new `public` table by default
-    // privilege, so the substrate revokes and grants INSERT back alone. The served path is
-    // written without RETURNING on purpose: INSERT is the whole of what the worker holds, and
-    // a statement that read its own row back would want the SELECT this grant withholds.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -2615,8 +2215,6 @@ describe("the finding under both runtime roles", () => {
       );
 
       await refusesEach(client, [
-        // Column by column, because the grant is: what a run may read is which span a row is
-        // and whether it was restored, and every other column is a refusal of its own.
         [
           "SELECT restore_reason FROM finding",
           "a reason is a sentence an Admin typed and may name a person, and the run needs only that the span was restored",
@@ -2634,8 +2232,7 @@ describe("the finding under both runtime roles", () => {
           "a finding's id is the ledger's subject and nothing a run names",
         ],
         ["SELECT * FROM finding", "every column is more than the eleven the two grants name"],
-        // The refresh reaches a run's own reading of a span and stops there. Each of these is
-        // an UPDATE of a column migration 0042 does not name, so it is refused on the column.
+
         [
           "UPDATE finding SET restored_at = NULL, restored_by = NULL, restore_reason = NULL",
           "a worker that could clear a restore could withhold again a span an Admin let back, at nobody's word",
@@ -2665,11 +2262,7 @@ describe("the finding under both runtime roles", () => {
           "DELETE FROM finding",
           "a finding is the record of what was withheld, and nothing the worker holds takes one away",
         ],
-        // The two the grant's column list is for (migration 0032). Neither of these is an
-        // UPDATE, and both reach the state the revoke of UPDATE was written to prevent: the
-        // row CHECKs admit a review and a restore **on the insert itself**, so a worker that
-        // may name those columns can land a reviewed or restored span without ever holding a
-        // privilege 0024 named. What is refused is the column, not the value.
+
         [
           `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
                                 char_start, char_end, score, rule_version, detector_pin,
@@ -2690,8 +2283,6 @@ describe("the finding under both runtime roles", () => {
         ],
       ]);
 
-      // The row the worker wrote, read back under the role that may read it — unreviewed,
-      // which is what a finding is born as.
       await client.query("RESET ROLE");
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
@@ -2703,9 +2294,6 @@ describe("the finding under both runtime roles", () => {
   });
 
   it("serves the worker which spans of a document were restored, and only its own tenant's", async () => {
-    // The whole of what the restore read is for (migration 0041): the run gathers a document's
-    // restored spans beside its suppressions and hands them to the memoised function, which
-    // leaves them in the text. The six columns are the statement below, word for word.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -2727,8 +2315,7 @@ describe("the finding under both runtime roles", () => {
         charStart: 40,
         charEnd: 48,
       });
-      // The other tenant's restored span, on a document the statement below also names: what
-      // keeps it out of the answer is the row-level policy and nothing in the WHERE clause.
+
       const theirs = await seed.sourceDocument({ workspaceId: WS_B });
       await seed.finding({
         workspaceId: WS_B,
@@ -2759,11 +2346,6 @@ describe("the finding under both runtime roles", () => {
   });
 
   it("holds one row per span, so a second run's insert lands nothing and leaves an Admin's mark where it stood", async () => {
-    // A finding is the same finding on every run that finds it: the document, the rule and the
-    // two offsets (migration 0040). The second insert below is the worker's own statement, run
-    // as the worker, and it is the **targeted** form — served because migration 0041 grants
-    // SELECT on exactly the columns the target names, and preferred because it steps over this
-    // key and no other: a primary-key collision is still an error rather than a silence.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -2807,8 +2389,7 @@ describe("the finding under both runtime roles", () => {
         "SELECT id, restore_reason, rule_version FROM finding WHERE document_id = $1",
         [document.id],
       );
-      // One row, the one the Admin marked — its id, its reason, and the reading of the run
-      // that first found it: the second run's score and version are not what the span is.
+
       expect(held.rows).toEqual([
         { id: marked.id, restore_reason: "the company's own sort code", rule_version: "1" },
       ]);
@@ -2816,16 +2397,6 @@ describe("the finding under both runtime roles", () => {
   });
 
   it("lets a run refresh its own reading of a span it finds again, and nothing an Admin wrote on it", async () => {
-    // The worker's own statement, run as the worker (migration 0042). A span found again is the
-    // same finding, and what a run knows about it — its category, its tier, its score and the
-    // version pair that read it — is refreshed, so the review reads the last run and not the
-    // first. The id, the span and both of an Admin's marks are not in the SET and cannot be:
-    // the grant names five columns and these are none of them.
-    //
-    // Two rows, because the tier has one exception. A **reviewed** name an erasure has since
-    // raised reads *always* afterwards. A **restored** one keeps the tier it was restored at
-    // whatever the run now reads: only the always set is restorable, the row's own CHECK says
-    // so, and a refresh that moved it would abort the run that made it.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -2875,7 +2446,7 @@ describe("the finding under both runtime roles", () => {
         ]);
       const raised = await refresh("always", 12, 20);
       const lowered = await refresh("default-off", 40, 48);
-      // The same reading again is a row nothing is written to: a second run changes no row.
+
       const unmoved = await refresh("always", 12, 20);
       await refusesEach(client, [
         [
@@ -2918,9 +2489,6 @@ describe("the finding under both runtime roles", () => {
   });
 
   it("refuses a finding naming another tenant's document, at its key", async () => {
-    // The key names the workspace beside the document id, as every cross-table key in this
-    // package does: a foreign-key check runs outside row-level security, so a key on the id
-    // alone would confirm that some other tenant holds a given document.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const theirs = await seed.sourceDocument({ workspaceId: WS_B });
@@ -2952,11 +2520,8 @@ describe("the finding under both runtime roles", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const rows: readonly [string, readonly unknown[], string][] = [
-        // A fourth tier and a fourth review state: both word sets are closed, and the
-        // seam's three tiers are the glossary's.
         ["UPDATE finding SET tier = 'sometimes' WHERE id = $1", [always.id], "finding_tier_check"],
-        // A fourth review state, with a whole review beside it so that only the state's own
-        // CHECK can be what refuses the row.
+
         [
           `UPDATE finding SET review_state = 'dismissed', reviewed_at = now(),
                               reviewed_by = 'process:better-answers-test'
@@ -2964,16 +2529,13 @@ describe("the finding under both runtime roles", () => {
           [always.id],
           "finding_review_state_check",
         ],
-        // Half a review: a state that moved with no Admin and no instant beside it would be
-        // a reviewed span the screen cannot say who reviewed.
+
         [
           "UPDATE finding SET review_state = 'narrowed' WHERE id = $1",
           [always.id],
           "finding_review_check",
         ],
-        // Half a restore, and a restore of a span no binding could switch off: the always
-        // set is the only tier a restore applies to, which is the act's refusal made the
-        // database's.
+
         [
           "UPDATE finding SET restored_at = now() WHERE id = $1",
           [always.id],
@@ -2998,20 +2560,6 @@ describe("the finding under both runtime roles", () => {
   });
 });
 
-/**
- * The **subject request** (`CONTEXT.md`; ADR 0020, the S0 spec's record families): a person's
- * access or erasure request as an Admin recorded it, with the subject and the clock. A tenant
- * table like any other, so the zero-rows proof is stated here in its words.
- *
- * **The worker holds nothing here**, and that is the whole of its relation to this table
- * (`[SEC3]`). Migration 0000's default privileges would have handed it the four, as they did
- * on `finding`, so the substrate revokes and grants none back: the identifier set is
- * restricted personal data — the names and addresses a subject gave, in a workspace's own
- * words — and a tier whose only job is to run a detector over a document has no road to it.
- * A worker that could read this table would hold the platform's list of who has asked to be
- * erased; one that could write it could start a clock nobody set or answer a request nobody
- * answered.
- */
 describe("the subject request under both runtime roles", () => {
   it("returns zero rows on a missing scope and only the scoped tenant's requests otherwise", async () => {
     await withRollback(db.pool, async (client) => {
@@ -3061,9 +2609,6 @@ describe("the subject request under both runtime roles", () => {
         ],
       ]);
 
-      // The row every one of those statements reached for, read back under the role that may
-      // read it: still there, still unanswered. The refusals above are privileges rather than
-      // policies, so this is what says the four were refused before the row and not after it.
       await client.query("RESET ROLE");
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
@@ -3082,14 +2627,12 @@ describe("the subject request under both runtime roles", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const rows: readonly [string, readonly unknown[], string][] = [
-        // A third kind: the pair is closed, as the glossary's *subject request* is.
         [
           "UPDATE subject_request SET kind = 'portability' WHERE id = $1",
           [request.id],
           "subject_request_kind_check",
         ],
-        // A request naming nobody. The subject is a person id or the identifier set, and a
-        // row with neither is a request no finder could run and no answer could reach.
+
         [
           `UPDATE subject_request
               SET person_id = NULL,
@@ -3098,24 +2641,19 @@ describe("the subject request under both runtime roles", () => {
           [request.id],
           "subject_request_subject_check",
         ],
-        // The set's three kinds, held by the database as well as the boundary: the finders
-        // read one arm each, and an arm that is not a list is a finder with nothing to walk.
-        // Two of the three missing is the case a `=` comparison would have taken, because
-        // `->` on an absent key is SQL NULL and a CHECK worth NULL passes.
+
         [
           `UPDATE subject_request SET identifiers = '{"emails": []}'::jsonb WHERE id = $1`,
           [request.id],
           "subject_request_identifiers_check",
         ],
-        // The one way off the shape the boundary does not refuse: `jsonb NOT NULL` takes the
-        // JSON `null`, so this is the layer that refuses a set naming nobody at all.
+
         [
           `UPDATE subject_request SET identifiers = 'null'::jsonb WHERE id = $1`,
           [request.id],
           "subject_request_identifiers_check",
         ],
-        // The clock, in the order the ICO's guidance sets it: the month runs from the start,
-        // which is receipt or the later instant identity was confirmed, never before receipt.
+
         [
           "UPDATE subject_request SET clock_started_at = received_at - interval '1 day' WHERE id = $1",
           [request.id],
@@ -3126,14 +2664,13 @@ describe("the subject request under both runtime roles", () => {
           [request.id],
           "subject_request_clock_check",
         ],
-        // An extension that does not extend. Article 12's two further months move the date
-        // out; a date inside the month would be the platform shortening its own deadline.
+
         [
           "UPDATE subject_request SET extended_to = due_at WHERE id = $1",
           [request.id],
           "subject_request_clock_check",
         ],
-        // Half an answer, either way: an instant with no words, and words with no instant.
+
         [
           "UPDATE subject_request SET answered_at = now() WHERE id = $1",
           [request.id],
@@ -3156,14 +2693,6 @@ describe("the subject request under both runtime roles", () => {
   });
 });
 
-/**
- * The **erasure request** (`CONTEXT.md`; ADR 0020, amended 2026-09-05): what the routine did
- * in every store for one subject request — the *erasure pseudonym* it minted, the instant it
- * took the lock, the per-store actions, the anchor with its four beyond-use dates, and the
- * report. The worker holds nothing here for the reason it holds nothing on the request: the
- * routine is the app tier's, under the platform principal, and this row is the record a
- * restore replays from.
- */
 describe("the erasure request under both runtime roles", () => {
   it("returns zero rows on a missing scope and only the scoped tenant's routines otherwise", async () => {
     await withRollback(db.pool, async (client) => {
@@ -3216,8 +2745,6 @@ describe("the erasure request under both runtime roles", () => {
         ],
       ]);
 
-      // The row all four reached for, read back under the role that may read it: still there,
-      // still unfinished, and still carrying the pseudonym the routine minted.
       await client.query("RESET ROLE");
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
@@ -3236,8 +2763,6 @@ describe("the erasure request under both runtime roles", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const rows: readonly [string, readonly unknown[], string][] = [
-        // Half a completion, either way: a stamp with no report is a routine that finished
-        // without saying what it did, and a report with no stamp is one that never finished.
         [
           "UPDATE erasure_request SET completed_at = now() WHERE id = $1",
           [request.id],
@@ -3248,9 +2773,7 @@ describe("the erasure request under both runtime roles", () => {
           [request.id],
           "erasure_request_completion_check",
         ],
-        // The four dates run out from the anchor in order — 48 hours, 30 days, 8 weeks, six
-        // months — because that is what the report promises about each backup tier. A weekly
-        // date inside the daily one would be a promise the lifecycle rule cannot keep.
+
         [
           "UPDATE erasure_request SET beyond_use_weekly_at = beyond_use_daily_at WHERE id = $1",
           [request.id],
@@ -3261,8 +2784,7 @@ describe("the erasure request under both runtime roles", () => {
           [request.id],
           "erasure_request_beyond_use_check",
         ],
-        // The actions are one flat object per store family; a `null` or a string would be a
-        // record of what was done that no report could be written from.
+
         [
           `UPDATE erasure_request SET actions = 'null'::jsonb WHERE id = $1`,
           [request.id],
@@ -3280,9 +2802,6 @@ describe("the erasure request under both runtime roles", () => {
   });
 
   it("refuses a second routine over one subject request, and one naming another tenant's", async () => {
-    // One erasure per subject request: the replay re-runs the routine and finds the same
-    // pseudonym on the same row, which is what makes it idempotent. A second row would be a
-    // second pseudonym for one person, and a history rewritten twice to two opaque ids.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const mine = await seed.erasureRequest({ workspaceId: WS_A });
@@ -3304,8 +2823,6 @@ describe("the erasure request under both runtime roles", () => {
       ).rejects.toThrow(/erasure_request_subject_request_uidx/);
       await client.query("ROLLBACK TO SAVEPOINT second_routine");
 
-      // And the key names the workspace beside the request id, as every cross-table key in
-      // this package does: a foreign-key check runs outside row-level security.
       await expect(client.query(insert, [WS_A, ulid(), theirs.id, ulid()])).rejects.toThrow(
         /erasure_request_subject_request_fk/,
       );
@@ -3313,15 +2830,6 @@ describe("the erasure request under both runtime roles", () => {
   });
 });
 
-/**
- * The **suppression** (`CONTEXT.md`; ADR 0020): what keeps a person's data out of every
- * derived store the next time one document is reprocessed — one row per document per erasure
- * request, carrying the identifiers to keep out. Restricted personal data itself, so the one
- * road the other tier holds is the read its run cannot do without (migration 0038): a
- * document's applicable sets are an argument to the memoised function S1 converts through,
- * gathered inside the run's own scoped transaction and held no longer than the run. The three
- * writing roads stay shut, and the policy still stands over the read that is open.
- */
 describe("the suppression under both runtime roles", () => {
   it("returns zero rows on a missing scope and only the scoped tenant's suppressions otherwise", async () => {
     await withRollback(db.pool, async (client) => {
@@ -3348,8 +2856,6 @@ describe("the suppression under both runtime roles", () => {
 
       await client.query("SET LOCAL ROLE worker_rt");
 
-      // The road that is open is still the policy's: a run that has not said which workspace
-      // it is for reads nothing at all, and one that has reads that tenant's set alone.
       expect(await countedRows(client, ["suppression"])).toEqual([
         { table: "suppression", rows: 0 },
       ]);
@@ -3379,8 +2885,6 @@ describe("the suppression under both runtime roles", () => {
         ],
       ]);
 
-      // The row all three reached for, read back under the role that owns the write: still
-      // there, still carrying the identifiers the routine wrote from the request's set.
       await client.query("RESET ROLE");
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
@@ -3406,15 +2910,12 @@ describe("the suppression under both runtime roles", () => {
       const empty = '{"emails": [], "names": [], "other": []}';
 
       const rows: readonly [string, readonly unknown[], string][] = [
-        // A suppression keeps something out or it is not one: an empty set is a row the
-        // reprocess would read and act on by doing nothing at all.
         [
           `UPDATE suppression SET identifiers = '${empty}'::jsonb WHERE document_id = $1`,
           [mine.documentId],
           "suppression_identifiers_check",
         ],
-        // Both keys name the workspace beside the id, as every cross-table key in this
-        // package does: a foreign-key check runs outside row-level security.
+
         [insert, [WS_A, mine.erasureRequestId, theirDocument.id, set], "suppression_document_fk"],
         [insert, [WS_A, theirRoutine.id, mine.documentId, set], "suppression_erasure_request_fk"],
       ];
@@ -3429,18 +2930,6 @@ describe("the suppression under both runtime roles", () => {
   });
 });
 
-/**
- * The queue (ADR 0005's control plane of rows; ADR 0031's queue agreement). The claim
- * protocol's own behaviour — the order, the lapsed lease, the poison — is the fixture's, in
- * `contracts/queue/cases.json`, and both tiers' conformance suites read it. What is proved
- * here is what a *role* and a *scope* reach: the table's zero-rows guarantee, and the fact
- * that the four functions are SECURITY INVOKER, so a caller in the wrong scope claims
- * nothing rather than claiming somebody else's work.
- *
- * Each claim below passes every declared kind, because what these tests are about is the
- * role and the scope: which kinds a claimant may pass is the queue agreement's, and a claim
- * narrowed here would prove the filter and stop proving the policy.
- */
 describe("the queue under both runtime roles", () => {
   it("returns zero rows on a missing scope and only the scoped tenant's jobs otherwise", async () => {
     await withRollback(db.pool, async (client) => {
@@ -3456,9 +2945,6 @@ describe("the queue under both runtime roles", () => {
   });
 
   it("claims nothing for a caller whose transaction names no workspace, and never another tenant's job", async () => {
-    // The functions take no workspace argument at all, so there is nothing to guard: the
-    // policy is what decides which rows they can see, and an unscoped transaction sees
-    // none. This is the whole reason none of the four is a definer function.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const theirs = await seed.job({ workspaceId: WS_B });
@@ -3480,8 +2966,6 @@ describe("the queue under both runtime roles", () => {
       ]);
       expect(elsewhere.rows).toEqual([]);
 
-      // And the other tenant's job is untouched — still queued, still unclaimed. Read from
-      // its own scope, because that is the only scope it exists in.
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
       const untouched = await client.query<{ status: string; claimed_by: string | null }>(
         "SELECT status, claimed_by FROM job WHERE id = $1",
@@ -3492,9 +2976,6 @@ describe("the queue under both runtime roles", () => {
   });
 
   it("refuses both runtime roles a DELETE on the queue, while the claim protocol still moves a row (migration 0022)", async () => {
-    // A job's row is the record of a run and nothing removes one: the queue retires a job
-    // by moving its status through the four functions, never by taking the row away, so the
-    // default DELETE migration 0000 would have handed both roles is revoked.
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const job = await seed.job({ workspaceId: WS_A });
@@ -3505,7 +2986,6 @@ describe("the queue under both runtime roles", () => {
         await client.query("RESET ROLE");
       }
 
-      // The served path: the row still moves, through the function, under the worker's role.
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       const claimed = await client.query<{ id: string }>(
@@ -3517,8 +2997,6 @@ describe("the queue under both runtime roles", () => {
   });
 
   it("refuses every caller but the two runtime roles the migration grants (migration 0022)", async () => {
-    // EXECUTE is revoked from PUBLIC on all four, so a role nobody granted — a person's
-    // ad-hoc session, a role a later migration adds — reaches none of them.
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("CREATE ROLE queue_probe NOLOGIN");
@@ -3541,12 +3019,6 @@ describe("the queue under both runtime roles", () => {
   });
 });
 
-/**
- * The migration stamp (`[WRK1]`): the worker refuses to claim a job when the schema view it
- * carries and the database it would claim from disagree about which migration ran last. The
- * grant that makes the check possible lands in the same migration as the check (migration
- * 0022, closing PR #5's finding), and it is one SELECT and nothing else.
- */
 describe("the migration stamp under worker_rt", () => {
   it("lets the worker read the stamp, and refuses it every other road to the migrator's own table", async () => {
     await withRollback(db.pool, async (client) => {

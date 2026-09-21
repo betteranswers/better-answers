@@ -10,32 +10,11 @@ import {
 import type { Report, ReportMutant } from "@better-answers/devtools/mutation-summary";
 import { afterAll, describe, expect, it } from "vitest";
 
-/**
- * The mutation run's job summary, read as the text a reader sees (T-090, T-107).
- *
- * What the summary is for is one question — which mutants newly survived since the last
- * run — and the cases below are the ways that question goes wrong quietly: a first run with
- * nothing to compare against listing every survivor as news, a file that gained lines above
- * a mutant reporting an unmoved survivor as new because its line number moved, and a row
- * the runner never tested counted as a survivor. Each expected line is written down
- * (`[TEST9]`): the summary is prose a person reads, so the assertion is the prose.
- *
- * The last case runs the script itself over two files in a temporary directory, so the
- * entry point the workflow calls — flags, file reading, the "no report" and "no baseline"
- * paths — is run rather than read (`[CHECK1]`).
- */
-
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const script = path.join(repositoryRoot, "scripts/mutation-summary.mjs");
 
 const scratch = mkdtempSync(path.join(tmpdir(), "mutation-summary-"));
 afterAll(() => {
-  // No retry here, unlike the mutant probe's teardown: this file's one spawn site is the
-  // `run` helper's spawnSync, synchronous and so already awaited by the time this runs, over
-  // scripts/mutation-summary.mjs, a fifteen-line script that reads files and writes stdout
-  // and spawns nothing itself. There is no git repository under this tree, no SIGINT case and
-  // no background writer, so nothing asynchronous can hold scratch when the removal runs —
-  // a retry here would be a fallback for a race that cannot occur.
   rmSync(scratch, { recursive: true, force: true });
 });
 
@@ -44,7 +23,6 @@ export const label = "answer";
 export const other = "other";
 `;
 
-/** The same file with a line added above every mutant, so every line number moves by one. */
 const SOURCE_SHIFTED = `// a comment nobody had before\n${SOURCE}`;
 
 type Span = { readonly line: number; readonly start: number; readonly end: number };
@@ -66,14 +44,12 @@ const mutant = (
   },
 });
 
-/** `n + 1` on line 1, `"answer"` on line 2 and `"other"` on line 3 of `SOURCE`. */
 const PLUS = { line: 1, start: 46, end: 51 };
 const LABEL = { line: 2, start: 22, end: 30 };
 const OTHER = { line: 3, start: 22, end: 29 };
 
 const shifted = (span: Span): Span => ({ ...span, line: span.line + 1 });
 
-/** One literal twice, so two mutants share a file, a mutator, a replacement and a text. */
 const SOURCE_TWICE = `export const first = "user";
 export const second = "user";
 `;
@@ -143,9 +119,6 @@ describe("the mutation summary (T-090)", () => {
   });
 
   it("pairs two identical spans by where they sit, whatever order the report lists them in", () => {
-    // Stryker does not keep a file's mutant order stable between runs: the same two
-    // `"user"` literals came out swapped in consecutive nightly reports, and a survivor
-    // paired with the other occurrence's kill read as a lost kill (T-107's residue).
     const baseline = report(SOURCE_TWICE, [
       mutant("StringLiteral", '""', FIRST_USER, "Killed", 1),
       mutant("StringLiteral", '""', SECOND_USER, "Survived", 1),

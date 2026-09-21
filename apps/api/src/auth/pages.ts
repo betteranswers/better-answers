@@ -1,13 +1,3 @@
-/**
- * The one page of the OAuth flow this tier still renders — consent — served from Hono,
- * plain and server-rendered (grilling Q5, 2026-09-01), and the refusal page beside it.
- * Sign-in and the workspace picker left with T-037: they are the SPA's screens now
- * (ADR 0009, 2026-09-02), and consent stays here because a decision to grant an outside
- * client access to a workspace must never sit behind the product's own shell. The
- * wording is ADR 0018's, in the person's words. Native controls, labels and a `main`
- * landmark: what WCAG 2.2 AA asks of every screen.
- */
-
 const escape = (value: string): string =>
   value
     .replaceAll("&", "&amp;")
@@ -31,9 +21,9 @@ export const consentPage = (
   query: string,
   params: {
     readonly clientName: string;
-    /** The `client_id` URL's hostname — the one name its author cannot choose. */
+
     readonly hostedAt: string;
-    /** The `redirect_uri` hostname the authorization code will be sent to. */
+
     readonly sendsCodeTo: string;
     readonly workspace: string;
     readonly scopes: readonly string[];

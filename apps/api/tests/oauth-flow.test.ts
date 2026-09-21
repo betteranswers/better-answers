@@ -22,17 +22,6 @@ import {
   type TestApp,
 } from "./harness.ts";
 
-/**
- * The OAuth half of research 80 §9's host-agnostic conformance test (assertions
- * 19–24), prototype 61's three silent configuration traps as regressions, the flow
- * driven as a host drives it — sign-in and the pick through the endpoints the SPA posts
- * to, consent through the page this tier still renders (grilling Q5; T-037), all on the
- * one origin (T-045, ADR 0034) — the cookie-session path through the one resolver,
- * refresh rotation and lifetime (Q10), revocation, the audit logs (Q12), the per-IP and
- * per-email limits (Q8), and the closed workspace-creation endpoint (Q11). Every request
- * crosses `server.request` (`[APP3]`).
- */
-
 let app: TestApp;
 
 beforeAll(async () => {
@@ -63,7 +52,7 @@ describe("discovery", () => {
       "offline_access",
     ]);
     expect(metadata["scopes_supported"]).not.toContain("openid");
-    // CIMD only (research 80 F2): no registration endpoint is advertised.
+
     expect(metadata["registration_endpoint"]).toBeUndefined();
   });
 
@@ -112,10 +101,9 @@ describe("the flow, as claude.ai drives it", () => {
 
     const connected = await connectAsHost(app, client, acme.admin);
 
-    // The success redirect carries iss (RFC 9207) and the host's state.
     expect(connected.callback.searchParams.get("iss")).toBe(PUBLIC_URL);
     expect(connected.callback.searchParams.get("state")).toBe("state-from-the-host");
-    // The token: one hour, audience-bound, the workspace claim, no role.
+
     expect(connected.expiresIn).toBe(3600);
     expect(connected.claims["iss"]).toBe(PUBLIC_URL);
     expect(connected.claims["aud"]).toBe(MCP_URL);
@@ -123,9 +111,9 @@ describe("the flow, as claude.ai drives it", () => {
     expect(connected.claims["user"]).toBe(acme.admin.id);
     expect(connected.claims["role"]).toBeUndefined();
     expect(connected.claims["scope"]).toBe("knowledge:read feedback:write offline_access");
-    // Trap 1: offline_access was honoured, so a refresh token came back.
+
     expect(connected.refreshToken).toBeDefined();
-    // §9 24: the whole flow, every endpoint, inside the host's ten-second budget.
+
     expect(Date.now() - started).toBeLessThan(10_000);
   });
 
@@ -148,15 +136,13 @@ describe("the flow, as claude.ai drives it", () => {
     const stranger = await app.provision({ name: "Stranger" });
     const client = app.client();
     const picker = await driveToPage(app, client, mine.admin);
-    // A person with a choice to make is sent to the product's picker, on the one
-    // origin, carrying the signed query.
+
     expect(`${picker.origin}${picker.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
 
     const chosen = await setActiveWorkspace(client, stranger.workspaceId);
 
     expect(chosen.ok).toBe(false);
-    // And the flow does not move on the back of it: nothing was made active, so the
-    // resume sends the person back to the picker rather than on to consent.
+
     const resumed = await continueAfterPostLogin(client, picker.search);
     expect(`${resumed.origin}${resumed.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
   });
@@ -168,8 +154,7 @@ describe("the flow, as claude.ai drives it", () => {
     const picker = await driveToPage(app, client, nobody);
 
     expect(`${picker.origin}${picker.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
-    // What the refused screen reads to decide it has nothing to offer, and where the
-    // resume sends a person who asks anyway: back to the picker, never to consent.
+
     const listed = await client.fetch("/organization/list");
     await expect(listed.json()).resolves.toEqual([]);
     const resumed = await continueAfterPostLogin(client, picker.search);
@@ -179,7 +164,7 @@ describe("the flow, as claude.ai drives it", () => {
   it("sets the active workspace on a session that predates the person's one membership, moving its updated_at (T-109, ADR 0040)", async () => {
     const person = await app.person();
     const client = app.client();
-    // A session with no membership at all, so the session-create hook has nothing to set.
+
     await driveToPage(app, client, person);
     const beforeUpdatedAt =
       (
@@ -189,8 +174,6 @@ describe("the flow, as claude.ai drives it", () => {
         )
       ).rows[0]?.updated_at.getTime() ?? 0;
 
-    // The membership arrives after the session did — `shouldRedirect`'s raw-SQL fallback
-    // is the only thing that can still set it.
     const solo = await app.provision({ name: "Solo" });
     await app.addMember(solo.workspaceId, person.id, "Viewer");
 
@@ -200,7 +183,6 @@ describe("the flow, as claude.ai drives it", () => {
       { redirect: "manual" },
     );
 
-    // `shouldRedirect` returned false: past the picker, straight to consent.
     expect(resumed.headers.get("location")).toContain("/consent");
     const after = await app.database.superuser.query<{
       active_workspace_id: string | null;
@@ -227,10 +209,6 @@ describe("the flow, as claude.ai drives it", () => {
   });
 
   it("refuses a client whose metadata document lives anywhere but claude.ai, without ever fetching it", async () => {
-    // The closed client list (ADR 0009, 2026-09-02; ADR 0034). The harness serves a
-    // look-alike document word for word, so the refusal below is the list's and not a
-    // missing document's — and the transport is never asked, so the list is read before
-    // the fetch and a refused client leaves no row.
     const { challenge } = pkce();
     const asked = app.metadataFetches.length;
 
@@ -269,13 +247,6 @@ describe("the flow, as claude.ai drives it", () => {
 });
 
 describe("the pages, as a person walks them", () => {
-  /**
-   * A person driven to the consent page, something that ends their standing, then the
-   * consent post. Two tests turn on that order — credentials revoked, and the membership
-   * removed between the redirect decision and the click — and what both are about is that
-   * the standing is checked at the post and not only at the redirect, so the thing that
-   * ends it is the argument and everything around it is one act.
-   */
   const consentPostedAfter = async (
     endTheirStanding: (workspace: Awaited<ReturnType<typeof app.provision>>) => Promise<void>,
   ): Promise<Response> => {
@@ -322,8 +293,6 @@ describe("the pages, as a person walks them", () => {
 
     const page = await (await client.fetch(`${consent.pathname}${consent.search}`)).text();
 
-    // The two hostnames a metadata document's author does not choose: where the client id
-    // lives and where the code goes (MCP 2026-07-28 authorization; CIMD draft §6).
     expect(page).toContain(`hosted at <strong>${new URL(CLAUDE_CLIENT_ID).hostname}</strong>`);
     expect(page).toContain(`sent to <strong>${new URL(CLAUDE_REDIRECT_URI).hostname}</strong>`);
   });
@@ -338,15 +307,6 @@ describe("the pages, as a person walks them", () => {
   });
 
   it("mints no code for a person whose membership ended between the redirect decision and their consent", async () => {
-    // The window T-077's adversarial pass asked about: the session still names the
-    // workspace as active and nothing re-runs `shouldRedirect`, so without a check the
-    // grant would carry a `workspace` claim its holder no longer holds. Two fences stand
-    // in it and this is the outer one — the consent post resolves the Principal through
-    // the same resolver every call uses, which has no member row to find and answers
-    // 401 (`auth/routes.ts`). The inner one is `consentReferenceId`, which now takes the
-    // active workspace only if the person still holds it; it is unreachable through this
-    // page and is there for Better Auth's own `/oauth2/consent`, which this fence does
-    // not sit in front of.
     const decided = await consentPostedAfter((acme) =>
       app.removeMember(acme.workspaceId, acme.admin.id),
     );
@@ -393,13 +353,6 @@ describe("the pages refuse a cross-site form", () => {
   });
 
   it("refuses consent posted as a fetch from this origin, even with the person's cookie, and mints no code", async () => {
-    // Since T-045 consent shares the product's origin, so a script in the shell can
-    // reach it with a `fetch` that carries this origin and the person's cookie — which
-    // the same-origin fence above admits. What refuses it is the shape: a fetch is
-    // `Sec-Fetch-Dest: empty`, and only a document navigation can follow the redirect
-    // the form answers with (ADR 0034; `auth/routes.ts`).
-    // Seven lines of the arrange above, carried rather than folded: a helper over it would
-    // hide which of the two fences each of these two tests is actually about.
     /* jscpd:ignore-start */
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
@@ -428,8 +381,7 @@ describe("the pages refuse a cross-site form", () => {
       "SELECT count(*)::int AS n FROM oauth_consent",
     );
     expect(after.rows[0]).toEqual(before.rows[0]);
-    // And the same form, as a document navigation from this origin, is the one that
-    // works: what the fence reads is the shape of the request and nothing else.
+
     const navigated = await client.form(`${consent.pathname}${consent.search}`, {
       accept: "true",
     });
@@ -455,9 +407,6 @@ describe("the pages refuse a cross-site form", () => {
   });
 
   it("refuses a code request from another origin, so no site can start a sign-in for someone", async () => {
-    // The screen moved to the SPA, so this fence moved with it: Better Auth's own origin
-    // check against the one trusted origin is what refuses it now (`auth.ts`). The check
-    // runs on a request that carries a cookie, which is the request that could do harm.
     const response = await app.client().fetch("/email-otp/send-verification-otp", {
       method: "POST",
       headers: {
@@ -475,10 +424,6 @@ describe("the pages refuse a cross-site form", () => {
 
 describe("one origin, one session (ADR 0034)", () => {
   it("sets a host-only, Secure-prefixed session cookie, and never one scoped to the apex", async () => {
-    // Before T-045 the cookie was scoped to the apex so a session made on `app.`
-    // answered the flow on `mcp.` — and so was sent to every subdomain of the estate,
-    // present and future. On one origin the library's own `__Secure-` host-only cookie
-    // is the session, and nothing the response sets names a domain at all.
     const acme = await app.provision({ name: "Host-only" });
     const client = app.client();
 
@@ -494,7 +439,7 @@ describe("one origin, one session (ADR 0034)", () => {
       expect(cookie).not.toMatch(/;\s*Domain=/i);
       expect(cookie).not.toContain(APEX_HOSTNAME);
     }
-    // The cookie made on the product is the one the authorization server reads.
+
     const me = await client.fetch(`${PUBLIC_URL}/me`);
     expect(me.status).toBe(200);
   });
@@ -508,16 +453,12 @@ describe("one origin, one session (ADR 0034)", () => {
 
     const sent = new URL(start.headers.get("location") ?? "", PUBLIC_URL);
     expect(`${sent.origin}${sent.pathname}`).toBe(`${PUBLIC_URL}/sign-in`);
-    // The signed query is carried whole: the resume is verified against it, and a page
-    // that dropped a parameter would break the signature (prototype 61, bug 2).
+
     expect(sent.searchParams.get("sig")).not.toBeNull();
     expect(sent.searchParams.get("client_id")).toBe(CLAUDE_CLIENT_ID);
   });
 
   it("answers the resume with an absolute address on the one origin", async () => {
-    // The picker reads the answer as a URL and sends the person there; absolute rather
-    // than relative because that is what Better Auth was configured with, and the day
-    // the two differ again this is the line that says so.
     const two = await app.provision({ name: "Second" });
     const one = await app.provision({ name: "First" });
     await app.addMember(two.workspaceId, one.admin.id, "Viewer");
@@ -531,9 +472,6 @@ describe("one origin, one session (ADR 0034)", () => {
   });
 
   it("refuses a cross-origin post that carries the person's cookie", async () => {
-    // The two posts the product makes with a session behind them: the pick, and the
-    // resume of a host's authorization. The origin check is the whole of what stands
-    // between a page an attacker controls and a grant made in the person's name.
     const acme = await app.provision({ name: "Cross" });
     const client = app.client();
     await signIn(app, client, acme.admin.email);
@@ -576,9 +514,7 @@ describe("the cookie session, through the same resolver", () => {
     const refused = await client.fetch("/me");
 
     expect(refused.status).toBe(401);
-    // Revocation ends the session itself (the platform's one act), so the person is
-    // simply no longer signed in; a session that somehow survived would be refused by
-    // the resolver as credentials-revoked. Either way: 401.
+
     expect((await json(refused))["error"]).toMatch(/^(not_signed_in|credentials-revoked)$/);
   });
 });
@@ -603,7 +539,6 @@ describe("refresh and revocation", () => {
     const lifetimeSeconds = (rows.rows[0]?.expires_at.getTime() ?? 0) / 1000 - Date.now() / 1000;
     expect(Math.abs(lifetimeSeconds - REFRESH_TOKEN_LIFETIME_SECONDS)).toBeLessThan(120);
 
-    // A rotated token presented again is a replay: refused, and the whole family with it.
     const replayed = await refresh(client, first);
     expect(replayed.status).toBe(400);
     expect((await json(replayed))["error"]).toBe("invalid_grant");
@@ -683,8 +618,6 @@ describe("the audit logs (Q12)", () => {
 });
 
 describe("the limits", () => {
-  // The counters are fixed windows aligned to the clock, so a loop may straddle a
-  // boundary; 2·max + 1 requests put max + 1 into one window whatever the clock does.
   const untilRefused = async (send: () => Promise<Response>, max: number): Promise<number[]> => {
     const statuses: number[] = [];
     for (let attempt = 0; attempt < 2 * max + 1; attempt += 1) statuses.push((await send()).status);
@@ -702,8 +635,7 @@ describe("the limits", () => {
     );
 
     expect(statuses).toContain(429);
-    // The same spoofed header from another tunnel address is not limited. The page itself
-    // refuses a caller with no session; what matters here is that it is not 429.
+
     const other = await app
       .client("203.0.113.11")
       .fetch("/consent", { headers: { "x-forwarded-for": "203.0.113.1" } });
@@ -714,8 +646,6 @@ describe("the limits", () => {
     const email = `throttled-${Date.now()}@example.invalid`;
     let address = 20;
 
-    // Better Auth's own limiter is per address per path, so a sender moving addresses
-    // would otherwise post codes at one inbox all day; this counter is the platform's.
     const statuses = await untilRefused(
       () =>
         app
@@ -791,8 +721,6 @@ describe("the three roles through Better Auth's own endpoints", () => {
   });
 
   it("refuses a Viewer who tries to change a role, and refuses every invitation until the People screen ships", async () => {
-    // Six lines of the arrange above, carried rather than folded: the two differ in who
-    // connects and whose membership is looked up, which is the whole subject of both.
     /* jscpd:ignore-start */
     const acme = await app.provision({ name: "Acme" });
     const viewer = await app.person();

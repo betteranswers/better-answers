@@ -29,54 +29,6 @@ import { cascadeOverEvidence } from "./cascade.ts";
 import { REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastRun, restoreFinding } from "./findings.ts";
 
-/**
- * The **review** of what the redaction seam found in one binding (ADR 0020; the S1 spec,
- * *The sources slice's acts*): the read an Admin opens it with, and the two bulk acts taken
- * over what that read lists.
- *
- * The read is `findingsOf` — a binding's findings grouped by **category × rule**, with how
- * many of each and the document each group sits in. It carries no value and no offset,
- * because a finding is a location and never a quotation, and a review screen that listed the
- * span would put the personal data back on a page the seam took it off.
- *
- * The two acts are the review's verbs, and both are bulk (`CONTEXT.md`; ADR 0014 rule 4 —
- * N rows sharing one batch id, never one row hiding N):
- *
- * - **keep in text**, an Admin saying of named finding groups that their spans are the
- *   company's own business facts — its sort code on its own supplier form — which restores
- *   each span through S0's act and queues the `index` run that will let them back into the text;
- * - **narrow these documents**, an Admin taking the documents of named finding groups down to
- *   a narrower class rather than span by span, which rewrites their chunk copies, runs the
- *   visibility cascade outward from the concepts citing them and queues the `index` run with
- *   reason *narrowed*.
- *
- * Both are Admin-only and refuse before a row is written; each writes its ledger rows inside
- * the caller's transaction, bare, so a rejected event aborts the act that wrote it.
- *
- * **Both are taken over finding groups, never spans** (`CONTEXT.md`; the owner's ruling of
- * 20/09/2026). The read lists groups and carries no finding id, so a group is all a reviewer
- * is shown and all a caller can hand back; each act finds the spans of its groups itself.
- *
- * **Both are the review, and each leaves its mark on the finding** (the S0 spec, the `finding`
- * family: the app updates the review columns through the slice's acts). A keep moves the spans
- * of its groups to *kept in text*, with the acting Admin, the instant and the batch's reason;
- * a narrowing moves the unreviewed findings of its groups to *narrowed*, with the Admin and the
- * instant — and neither ever marks a finding of a group it was not handed, because that column
- * is what a widening is held against while special-category findings are unreviewed (ADR 0013,
- * ADR 0020; the block is S4's), and a row must not say a review nobody took.
- */
-
-/**
- * A **finding group** as the review read lists it (`CONTEXT.md`): the document, the category,
- * the rule that raised it and the tier it was raised at, with how many spans it holds — never
- * the span and never its text. `FindingGroupKey` below is the part of it that names it.
- *
- * The class is the document's **effective** one: its own where it carries one, and its
- * binding's otherwise, which is how the derivation folds them. It is on the line because the
- * one thing an Admin needs to know before reaching for *narrow these documents* is whether
- * this document has already been taken down — a document the seam's special-category verdict
- * narrowed reads as Restricted here, and needs no act at all.
- */
 export type FindingGroup = {
   readonly documentId: string;
   readonly title: string;
@@ -84,61 +36,23 @@ export type FindingGroup = {
   readonly category: string;
   readonly ruleId: string;
   readonly tier: string;
-  /** Whether the category is special category data, as the `redaction` agreement declares it. */
+
   readonly specialCategory: boolean;
-  /** How many spans of this category and rule that document holds. */
+
   readonly found: number;
-  /**
-   * **How many of this group's kept spans are withheld all the same, because an erasure
-   * request names them** — as of the binding's last finished `index` run.
-   *
-   * An erasure outranks a restore (ADR 0020, amended 2026-09-20): a suppression raises the
-   * tier of the very finding an Admin may have kept, so a keep over such a span succeeds —
-   * its ledger row, its review, its run — and changes nothing a reader sees. Only the worker
-   * can know it happened, because a finding holds no value and the request's identifiers are
-   * matched against the text; the run says which spans on its outcome row and this read
-   * counts them per group, never naming one.
-   *
-   * **What the screen is owed.** Where this is above nought, say beside the group that a span
-   * kept in text stays withheld because a person asked to be erased from the document — a
-   * keep that silently did nothing is the defect this figure exists to close. It is a
-   * reading of the **last finished run**: while a run is queued or claimed (the keep itself
-   * queues one) it still says what the run before found, so it is shown with the run's state
-   * and not instead of it. A binding no run has finished over reads nought throughout.
-   */
+
   readonly overriddenByErasure: number;
 };
 
 export type FindingsOfRefusal = RoleRefusal | "malformed" | "no-such-binding" | Error;
 
-/**
- * Which categories the agreement calls special category, as one set rather than a scan per
- * row. Nothing imports the agreement (ADR 0031); `REDACTION_CATEGORIES` is the slice's own
- * reading of it, and this is that reading indexed.
- */
 const SPECIAL_CATEGORIES = new Set<string>(
   REDACTION_CATEGORIES.filter((entry) => entry.specialCategory).map((entry) => entry.category),
 );
 
-/** One of the three classes, or nothing — a column's word read as the vocabulary's. */
 const classOf = (word: string): Sensitivity | undefined =>
   SENSITIVITIES.find((known) => known === word);
 
-/**
- * **The class a document is actually read at**: the narrower of the binding's and the class
- * the document carries of its own (ADR 0013, amended 2026-09-11; ADR 0023). A document with
- * no class of its own is read at its binding's.
- *
- * It is the narrower and not the document's-or-else-the-binding's, because the two move
- * independently: narrowing a binding rewrites the binding's row and the chunk copies and
- * leaves `source_document.sensitivity` alone, so a document that carried Internal before its
- * binding went to Restricted still carries Internal while nobody below Admin can see it. Read
- * as the document's own, it would look a class wider than it is — on the review screen, and to
- * the widening check the narrowing act makes before it writes.
- *
- * `undefined` is a word outside the vocabulary, which both columns' CHECKs make impossible: a
- * broken database, not something a caller could put right by asking differently.
- */
 const effectiveClass = (own: string | null, binding: string): Sensitivity | undefined => {
   const inherited = classOf(binding);
   if (inherited === undefined || own === null) return inherited;
@@ -146,30 +60,8 @@ const effectiveClass = (own: string | null, binding: string): Sensitivity | unde
   return held === undefined ? undefined : narrower(held, inherited);
 };
 
-/** What a class outside the vocabulary answers, written once for the read and the act alike. */
 const BROKEN_CLASS = new Error("a source document's class is not one the visibility words hold");
 
-/**
- * The review read, in one statement: the counts grouped by document, category and rule, with
- * the document's title and **both** class words beside them.
- *
- * Both, and not one `COALESCE`: the derivation folds the *narrower* of the binding's class and
- * the document's (ADR 0013, amended 2026-09-11), and a document carrying Internal of its own
- * under a binding since taken to Restricted is Restricted to a reader. Coalescing would read
- * that document as Internal — wider than anybody can actually see it — so the two words come
- * back and the fold happens once, in the access module, where the ranking lives.
- *
- * The ordering is the screen's — category, then rule, then the document — so two calls over
- * unchanged rows answer the same list and a caller never sorts what the store can.
- *
- * Only findings **the binding's last run raised** are counted (`raisedByTheLastRun`): a span
- * the rules have since dropped is still a row, and the review shows the last run's reading.
- *
- * The four arrays are the spans the binding's last finished run said an erasure overrode,
- * each by the document, the rule and the two offsets that are what a finding is. A span is
- * counted only while an Admin's restore stands on its row: the figure is about kept spans,
- * and the run's word about any other is not this read's to repeat.
- */
 const FINDING_GROUPS = `SELECT d.id AS "documentId", d.title,
             d.sensitivity AS "documentSensitivity", b.sensitivity AS "bindingSensitivity",
             f.category, f.rule_id AS "ruleId", f.tier, count(*)::int AS found,
@@ -185,18 +77,8 @@ const FINDING_GROUPS = `SELECT d.id AS "documentId", d.title,
       GROUP BY d.id, d.title, d.sensitivity, b.sensitivity, f.category, f.rule_id, f.tier
       ORDER BY f.category, f.rule_id, d.title, d.id`;
 
-/**
- * The key an `index` run's outcome carries the kept spans an erasure overrode under — the
- * worker's word, spelled as `apps/worker`'s `IndexOutcome.as_row` spells it. Always a list on
- * a run that knows the figure; absent on one that predates it, which reads as none.
- */
 const OVERRIDDEN_KEY = "restores_overridden_by_erasure";
 
-/**
- * One span as a run's outcome names it: a finding's identity, each part held to the shape its
- * own column holds, read off the finding's boundary rather than written a second time (ADR
- * 0028). The keys are the worker's, which is why they are spelled as the row spells them.
- */
 const FINDING_COLUMNS = boundarySchemas.finding.select.shape;
 const OVERRIDDEN_SPAN = z.object({
   document_id: FINDING_COLUMNS.documentId,
@@ -205,21 +87,10 @@ const OVERRIDDEN_SPAN = z.object({
   char_end: FINDING_COLUMNS.charEnd,
 });
 
-/** What a run's list answers when it is there and is not a list of spans. */
 const UNREADABLE_RUN = new Error(
   "the binding's last index run names the kept spans an erasure overrode in a shape the review cannot read",
 );
 
-/**
- * The spans one outcome names, each a finding's identity — or a failure, never a guess.
- *
- * **Absent is nought and unreadable is an error.** A binding no run has finished over, and a
- * run that carries no such key, have nothing to say and the figure is nought. A key that is
- * there and is not a list of spans is the other thing entirely: nought would tell an Admin
- * that every keep is showing, which is exactly the false comfort this figure exists to end —
- * so *I cannot tell* fails the read, as `bundleHealth` reads an outcome it cannot parse as a
- * mismatch rather than as health.
- */
 const overriddenSpansOf = (
   outcome: JobOutcome | null,
 ): Result<ReadonlyArray<z.infer<typeof OVERRIDDEN_SPAN>>, Error> => {
@@ -234,15 +105,6 @@ type GroupRow = Omit<FindingGroup, "specialCategory" | "sensitivity"> & {
   readonly bindingSensitivity: string;
 };
 
-/**
- * Every finding in one binding as a reviewer reads them: by category × rule, with counts and
- * the document each group sits in. Admin only, and a read, so it writes no ledger row: the one
- * view the constitution counts as an act is an Admin opening a document's withheld original
- * bytes (ADR 0020), and this is a count of what the seam found, not a sight of it.
- *
- * A binding nobody has run yet answers an empty list rather than a refusal: nothing found is
- * a whole answer, and the screen says so.
- */
 export const findingsOf = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -252,7 +114,6 @@ export const findingsOf = async (
   if (!acting.ok) return err(acting.error);
   const { workspaceId, bindingId } = acting.value;
 
-  // A read, so no lock: there is nothing here for a second act to queue behind.
   const standing = await bindingNamed(acting.value, tx, { columns: "1", lock: "none" });
   if (!standing.ok) return err(standing.error);
 
@@ -283,17 +144,6 @@ export const findingsOf = async (
   return ok(groups);
 };
 
-/**
- * What names a **finding group** (`CONTEXT.md`): the four columns the review read groups by,
- * so the row the read answered is the group a caller hands back to either act. The tier is
- * one of the four because one rule raises one category at two tiers in one document — the
- * officer-block rule lifts a name to the always tier under the rule that finds every name —
- * and those are two groups on the screen, only one of which a keep may take.
- *
- * A group is what the acts are handed because it is all a reviewer is shown: the read carries
- * no value, no offset and no finding id, so an act over spans would be an act over something
- * no surface can name. The act resolves the group's spans itself, under its own lock.
- */
 export type FindingGroupKey = Pick<FindingGroup, "documentId" | "category" | "ruleId" | "tier">;
 
 const sameFindingGroup = (left: FindingGroupKey, right: FindingGroupKey): boolean =>
@@ -302,7 +152,6 @@ const sameFindingGroup = (left: FindingGroupKey, right: FindingGroupKey): boolea
   left.ruleId === right.ruleId &&
   left.tier === right.tier;
 
-/** One group once, however many times a caller named it. */
 const distinctFindingGroups = (
   findingGroups: readonly FindingGroupKey[],
 ): readonly FindingGroupKey[] =>
@@ -311,7 +160,6 @@ const distinctFindingGroups = (
       findingGroups.findIndex((other) => sameFindingGroup(other, findingGroup)) === index,
   );
 
-/** The finding groups as the four parallel arrays `findingGroupClause` unnests back into rows. */
 const findingGroupParameters = (findingGroups: readonly FindingGroupKey[]) =>
   [
     findingGroups.map((findingGroup) => findingGroup.documentId),
@@ -320,12 +168,6 @@ const findingGroupParameters = (findingGroups: readonly FindingGroupKey[]) =>
     findingGroups.map((findingGroup) => findingGroup.tier),
   ] as const;
 
-/**
- * The clause that holds a finding to the finding groups named — the predicate both acts'
- * statements share, written once as the access module writes its read predicate: the alias the
- * statement gives `finding`, and the placeholder the four arrays start at. Nothing a caller
- * sent is ever written into the text; the values travel as `findingGroupParameters`.
- */
 const findingGroupClause = (alias: string, first: number): string =>
   `(${alias}.document_id, ${alias}.category, ${alias}.rule_id, ${alias}.tier) IN
         (SELECT * FROM unnest($${first}::text[], $${first + 1}::text[],
@@ -333,19 +175,12 @@ const findingGroupClause = (alias: string, first: number): string =>
 
 export type KeepInTextInput = {
   readonly bindingId: string;
-  /** The finding groups this act is taken over, as the review read listed them. */
+
   readonly findingGroups: readonly FindingGroupKey[];
-  /** Why these spans are business facts — one sentence an Admin typed for the batch. */
+
   readonly reason: string;
 };
 
-/**
- * Why a *keep in text* was refused. `no-such-finding` covers a group this binding does not
- * hold as well as one nothing holds: the act is a binding's review, and a group of another
- * binding is not in it, whatever the caller meant. `not-the-always-set` is S0's own refusal,
- * handed back unchanged — the two default tiers are switched at the binding rather than span
- * by span, so a restore of one would reach past the binding's rules in force.
- */
 export type KeepInTextRefusal =
   | RoleRefusal
   | "malformed"
@@ -356,22 +191,14 @@ export type KeepInTextRefusal =
 
 export type KeptInText = {
   readonly bindingId: string;
-  /** The spans restored — every span of every group named, oldest id first. */
+
   readonly findingIds: readonly string[];
-  /** The id the N ledger rows share; `undefined` when the act kept one span (ADR 0014 rule 4). */
+
   readonly batchId: string | undefined;
-  /** The `index` run that will let the spans back into the text. */
+
   readonly jobId: string;
 };
 
-/**
- * The spans of this binding that fall in the groups named, with the group each falls in — the
- * act's membership question in one statement, because it is about the batch rather than about
- * a span: a keep is one transaction, and a batch naming a group this binding holds no span of
- * lands none of it. Of the spans **the last run raised**, as the review read counts them: an
- * act over a group acts on what the group showed, and never on a span the rules have dropped.
- * Oldest id first, which is the order the spans are restored and their ledger rows land in.
- */
 const FINDINGS_OF_GROUPS = `SELECT f.id, f.document_id AS "documentId", f.category,
             f.rule_id AS "ruleId", f.tier
        FROM finding f
@@ -381,50 +208,13 @@ const FINDINGS_OF_GROUPS = `SELECT f.id, f.document_id AS "documentId", f.catego
       ORDER BY f.id
         FOR UPDATE OF f`;
 
-/** The state a keep leaves a finding at, in the finding table's own closed words. */
 const KEPT_IN_TEXT = "kept-in-text" satisfies (typeof FINDING_REVIEW_STATES)[number];
 
-/**
- * The review's mark on the spans a keep restored. The Admin, the instant and the reason are
- * copied off the restore columns S0's act wrote a statement ago rather than derived a second
- * time, so the review and the restore it rests on can never name two actors, two instants or
- * two spellings of one reason.
- */
 const KEPT_IN_TEXT_REVIEW = `UPDATE finding
         SET review_state = $3, reviewed_by = restored_by,
             reviewed_at = restored_at, review_reason = restore_reason
       WHERE workspace_id = $1 AND id = ANY($2::text[])`;
 
-/**
- * **Keep in text**: an Admin restores the spans of named finding groups of one binding as
- * business facts, and the `index` run that will put them back into the document's text is
- * queued with them.
- *
- * **The act is handed groups and finds their spans itself** (the owner's ruling of 20/09/2026):
- * a group is all a reviewer is shown, so it is all a caller can name, and a group is kept
- * whole. Each span then goes through S0's own restore act rather than a second statement over
- * the same columns, so the row the restore writes, the actor derivation and the reason's bound
- * are one implementation; the batch id this act mints is handed to each, so the N ledger rows
- * read as the one act they were. The review's mark follows the restores in one statement over
- * the spans restored, and the job is queued last, inside the same transaction: a run queued
- * for restores that did not land would index the document unchanged.
- *
- * **Every refusal is decided before the first span moves, and a refused group lands nothing of
- * the batch.** The batch is one transaction and a caller reads one word off it, so a keep that
- * restored one group and then answered `not-the-always-set` for the next would leave the caller
- * to work out how much of its own transaction to take back. **The tier is answered off the
- * groups as named**, before a row is read: the tier is part of what names a group, so a group
- * named at a switchable tier is refused whatever it holds, and a span that comes back under a
- * group named *always* is an always-set span. S0's act asks it again of each row it restores.
- * Which of the groups this binding holds a span of is the membership read's, and the restores
- * run only after both.
- *
- * **A group that holds no span reads as `no-such-finding`**, whether it names another
- * binding's document, a rule that raised nothing, or a shape no finding could have: the
- * membership statement asks which spans of this binding fall in the groups named, and that
- * group's are simply not among them. A keep over nothing would still queue a run, and a screen
- * naming a group the binding no longer holds is a screen to read again.
- */
 export const keepInText = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -435,12 +225,9 @@ export const keepInText = async (
   const { admin, workspaceId, bindingId } = acting.value;
 
   const findingGroups = distinctFindingGroups(input.findingGroups);
-  // An act over no group at all is a caller that meant something else. It is refused rather
-  // than answered empty, because an empty keep would still queue a run over the binding.
+
   if (findingGroups.length === 0) return err("malformed");
-  // The batch's own refusal, ahead of the first restore and of the first read. S0's act asks
-  // the same question of the one span it is given; asking it of every group here is what makes
-  // the batch all-or-nothing rather than a restore or two followed by a word to undo.
+
   if (findingGroups.some((findingGroup) => findingGroup.tier !== REDACTION_ALWAYS_TIER)) {
     return err("not-the-always-set");
   }
@@ -490,10 +277,6 @@ export const keepInText = async (
   return ok({ bindingId, findingIds: named, batchId, jobId: queued.value.jobId });
 };
 
-/**
- * The narrowing act over a document. Its subject is the document and its detail the binding
- * it belongs to and the class it now carries, in the glossary's words.
- */
 const REVIEW_ACTS = declareActs("sources", {
   narrowed: act("sources.document.narrowed", {
     documentId: "id",
@@ -504,28 +287,12 @@ const REVIEW_ACTS = declareActs("sources", {
 
 export type NarrowDocumentsInput = {
   readonly bindingId: string;
-  /**
-   * The finding groups the Admin commanded the narrowing over, as the review read listed them.
-   * **The documents narrowed are the documents these groups sit in**, and the findings reviewed
-   * are these groups' and no other's — the act is told what the Admin was looking at, so it
-   * never marks a finding the Admin was not shown.
-   */
+
   readonly findingGroups: readonly FindingGroupKey[];
-  /**
-   * The class the named documents take. **Restricted unless said** — the narrowest of the
-   * three, which is what *narrow these documents* means on a review screen. The field exists
-   * because the act's promise is that it never widens, and a promise nothing can break is a
-   * promise nothing proves: a caller that names a class is held to it against the document's.
-   */
+
   readonly sensitivity?: string | undefined;
 };
 
-/**
- * Why a narrowing of documents was refused. `widening-refused` is the one this act exists to
- * say: a document's own class can only ever take visibility away from its binding's (ADR
- * 0013), so a class looser than the one the document effectively carries is a widening, and
- * widening is a gated act of its own.
- */
 export type NarrowDocumentsRefusal =
   | RoleRefusal
   | "malformed"
@@ -536,24 +303,19 @@ export type NarrowDocumentsRefusal =
 
 export type DocumentsNarrowed = {
   readonly bindingId: string;
-  /** The documents narrowed, oldest id first — the order the ledger rows were written in. */
+
   readonly documentIds: readonly string[];
   readonly sensitivity: Sensitivity;
-  /** The id the N ledger rows share; `undefined` when the act narrowed one document. */
+
   readonly batchId: string | undefined;
-  /**
-   * The `index` run standing for the binding when the act ended: this act's own, with the
-   * reason *narrowed*, or the run already queued for it, which answers its own id and keeps
-   * the reason it was queued with (the queue's rule: one queued run per binding).
-   */
+
   readonly jobId: string;
-  /** The concepts the first level of the cascade rewrote, by IRI. */
+
   readonly concepts: readonly string[];
-  /** The compositions the second level rewrote. */
+
   readonly compositions: readonly string[];
 };
 
-/** The named documents of this binding, with the class each carries of its own. */
 const DOCUMENTS_UNDER = `SELECT id, sensitivity FROM source_document
       WHERE workspace_id = $1 AND binding_id = $2 AND id = ANY($3::text[])
       ORDER BY id
@@ -561,19 +323,8 @@ const DOCUMENTS_UNDER = `SELECT id, sensitivity FROM source_document
 
 type DocumentRow = { readonly id: string; readonly sensitivity: string | null };
 
-/** The state a document's narrowing leaves a finding at, in the table's own closed words. */
 const NARROWED = "narrowed" satisfies (typeof FINDING_REVIEW_STATES)[number];
 
-/**
- * The review's mark a narrowing leaves: on the **unreviewed findings of the groups it was
- * handed that the last run raised** — the rows the review showed, and no span the rules have
- * since dropped — the acting Admin and the database's own instant (ADR 0040), and no reason, because
- * the act takes none. Never on a finding of another group of the same document — a widening is
- * held against this column while special-category findings are unreviewed (ADR 0013, ADR 0020),
- * and a narrowing taken from a home-address group that marked the health finding beside it
- * would have the row assert a review nobody took. A span already kept in text keeps that
- * review: the narrowing answers what nobody had, and a keep is not un-said by it.
- */
 const NARROWED_REVIEW = `UPDATE finding f
         SET review_state = $2, reviewed_by = $3, reviewed_at = now()
        FROM source_document d
@@ -581,42 +332,6 @@ const NARROWED_REVIEW = `UPDATE finding f
         AND d.workspace_id = f.workspace_id AND d.id = f.document_id
         AND ${raisedByTheLastRun("f", "d")}`;
 
-/**
- * **Narrow these documents**: an Admin takes the documents of named finding groups of one
- * binding down to a class of their own, and everything derived from them follows, in one
- * transaction.
- *
- * **The act is handed the groups it was commanded over** (the owner's ruling of 20/09/2026).
- * The documents it narrows are the ones those groups sit in, and the findings it reviews are
- * those groups' alone. A group that holds no finding at this instant still narrows its
- * document and reviews nothing — the safe direction both ways: the document is held back as
- * the Admin asked, and whatever a later run raises in it is born unreviewed.
- *
- * Every refusal is decided before a row is written: the role, the shapes, the binding, the
- * documents this binding actually holds, and — against each document as it stands — whether
- * the move would widen it. Then the document rows, then **their chunk copies** (the derived
- * rows the read predicate is applied to, so a narrowing that left them is one a reader reads
- * straight past), then the review's mark, then the ledger rows written **bare**, and then the
- * rest of the cascade:
- * every concept citing one of these documents re-derived, and every composition including one
- * of those concepts after it. The order is outward from the documents, and it is one
- * transaction, so no reader sees a level that has moved beside one that has not.
- *
- * **The `index` run is queued last, with the reason *narrowed*** — the fifth of the five
- * things that put a binding back through the index (the S1 spec, *The queue*). The chunk
- * copies are already right when the act commits, so the run is not what narrows a reader's
- * view; it is the worker's own pass over a binding whose documents moved, ending in the
- * re-copy that settles a race with a run already in flight.
- *
- * **The workspace's cascade lock is taken at the head**, as a binding's narrowing takes it:
- * two cascades in one workspace that met through a shared concept would each hold its own
- * rows and want the other's, and Postgres would end the deadlock by killing an Admin's act.
- *
- * The chunk copies take the new class outright rather than the fold of it and the binding's.
- * They are the same value, and the widening check above is what makes them so: the new class
- * is no wider than the document's effective one, and the effective class is the fold of the
- * document's and its binding's, so it is no wider than the binding's either.
- */
 export const narrowDocuments = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -632,9 +347,6 @@ export const narrowDocuments = async (
   const named = [...new Set(findingGroups.map((findingGroup) => findingGroup.documentId))];
   if (named.length === 0) return err("malformed");
 
-  // The lock first, and only then the rows: a cascade that took its rows before the lock
-  // would be the deadlock the lock exists to close. The act names no audience group, so the
-  // question the head also answers — whether this workspace holds them — is asked of none.
   const opened = await openingACascadeOverHeldGroups(admin, tx, []);
   if (!opened.ok) return err(opened.error);
 
@@ -651,9 +363,6 @@ export const narrowDocuments = async (
   const rows = documents.value.rows;
   if (rows.length !== named.length) return err("no-such-document");
 
-  // A class no narrower than the one this document is effectively read at would let a reader
-  // in that it currently keeps out. Every document is answered before any row moves, so a
-  // batch with one widening in it lands nothing at all.
   for (const row of rows) {
     const effective = effectiveClass(row.sensitivity, binding.value.sensitivity);
     if (effective === undefined) return err(BROKEN_CLASS);
@@ -676,7 +385,7 @@ export const narrowDocuments = async (
     ),
   );
   if (!copies.ok) return err(copies.error);
-  // After the document check above, so every group named sits in a document of this binding.
+
   const reviewed = await attempt(() =>
     tx.query(NARROWED_REVIEW, [
       workspaceId,
@@ -691,7 +400,6 @@ export const narrowDocuments = async (
   const documentIds = rows.map((row) => row.id);
   const batchId = documentIds.length > 1 ? ulid() : undefined;
   for (const documentId of documentIds) {
-    // Bare, after the rows: the door's rejection aborts the transaction they landed in.
     await record(admin, tx, {
       id: ulid(),
       act: REVIEW_ACTS.narrowed,
@@ -704,9 +412,6 @@ export const narrowDocuments = async (
   const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { bindingId, documentIds }));
   if (!cascaded.ok) return err(cascaded.error);
 
-  // Last, as a keep queues its own: a run queued for a narrowing that did not land would put
-  // the binding back through the index for nothing. One run whatever the count, because the
-  // run's subject is the binding; a run already queued for it answers its own id.
   const queued = await enqueueJobIn(admin, tx, {
     workspaceId,
     kind: INDEX_KIND,

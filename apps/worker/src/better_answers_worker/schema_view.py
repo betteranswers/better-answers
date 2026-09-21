@@ -1,12 +1,3 @@
-"""The worker's view of the schema — generated, never edited (ADR 0032).
-
-Regenerate with `pnpm --filter @better-answers/schema run generate:worker-view`;
-the drift test fails CI when this file and the journal disagree in either
-direction. The worker never migrates; this module is its read-only
-knowledge of what the app's journal built, stamped with the migration id it was
-generated from and with that migration's journal instant, which is what the
-migrator writes into `drizzle.__drizzle_migrations.created_at`."""
-
 MIGRATION_ID = "0042_the-reading-refresh"
 
 MIGRATION_WHEN = 1789951291377

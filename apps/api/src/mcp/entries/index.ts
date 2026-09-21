@@ -16,23 +16,6 @@ import type { Result } from "@better-answers/core/kernel";
 
 import { defineEntry, type Entry } from "./define.ts";
 
-/**
- * The four entries (ADR 0018, 2026-08-31 amendment: `find`, `ask`, `open`,
- * `give_feedback`), in the one order `tools/list` returns them — registration order
- * is the SDK's listing order, and the spec asks for a deterministic list so a host's
- * prompt cache hits (research 80 row 9). Never sorted by anything mutable.
- *
- * Every schema is JSON Schema 2020-12 through zod v4's `toJSONSchema`; no key carries
- * `x-mcp-header` (research 80 row 13: a question is the person's own words).
- */
-
-/**
- * A slice act answers a `Result` and never throws across its seam (the kernel's result
- * convention). The surface is a transport, and a transport is where a failure becomes a
- * throw again — the MCP runtime turns it into an error result for the host. Today's four
- * acts declare `never` for their error, so the throwing arm is unreachable through them;
- * the parameter is written wider so it stays right when their bodies arrive.
- */
 const valueOrThrow = <Value>(result: Result<Value, Error>): Value => {
   if (!result.ok) throw result.error;
   return result.value;
@@ -53,14 +36,6 @@ const passage = z.object({
   sensitivity: z.string(),
 });
 
-/**
- * A hit is a union by knowledge layer (CONTEXT.md, *hit*; T-134), discriminated on `layer`
- * so a host reads which arm a line came from rather than guessing it from which keys are
- * present. The bundles arm is a concept with its trust word and IRI; the sources arm is a
- * document nothing on the map covers, with the class it is offered under and the wire
- * locator `open` takes. The marker *Not company knowledge* is the human rendering's and is
- * no field here: every hit of the sources layer wears it by being one.
- */
 const hit = z.discriminatedUnion("layer", [
   z.object({
     layer: z.literal("bundles"),
@@ -166,9 +141,7 @@ const openEntry = defineEntry({
         concept: z
           .object({
             iri: z.string(),
-            // The boundary's own schema, not a copy of it: what the row may hold is what
-            // this surface serves, and a second union here would be a wire that refused a
-            // concept the database accepted (ADR 0028).
+
             frontmatter: conceptFrontmatter,
             body: z.string(),
             relations: z.array(z.object({ kind: z.string(), target: z.string() })),
@@ -178,8 +151,7 @@ const openEntry = defineEntry({
           .optional(),
         passage: passage.optional(),
       })
-      // Exactly one of the two: the type allows both keys so the wire and the slice
-      // agree; the refinement is what holds the invariant on the wire.
+
       .refine((value) => (value.concept === undefined) !== (value.passage === undefined), {
         message: "a found result carries a concept or a passage, never both or neither",
       }),
@@ -236,8 +208,7 @@ const giveFeedbackEntry = defineEntry({
         .describe("Required with a flag."),
       detail: z.string().max(2000).optional().describe("What was wrong, in the person's words."),
     })
-    // The schema says what `run` requires, so a flag without a reason is a validation
-    // error at the door, never a failure inside the entry.
+
     .refine((value) => value.verdict !== "flag" || value.reason !== undefined, {
       message: "a flag needs a reason: wrong, out-of-date, incomplete or should-not-have-shown",
       path: ["reason"],
@@ -263,7 +234,6 @@ const giveFeedbackEntry = defineEntry({
   render: renderFeedback,
 });
 
-/** The surface, in listing order. */
 export const ENTRIES: readonly Entry<z.ZodObject, z.ZodType>[] = [
   findEntry,
   askEntry,

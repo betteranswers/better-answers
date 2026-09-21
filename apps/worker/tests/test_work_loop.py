@@ -1,17 +1,3 @@
-"""The work loop, its two job kinds and its healthcheck (`[TEST1]`, `[TEST2]`,
-`[TEST4]`).
-
-Driven through the entry points a deploy unit drives — `loop.main` with `--once`, and
-`health.is_healthy` — against a real Postgres on the pinned image and a real bare
-repository, because the whole of what this tier does is read one and write the other.
-
-What is **not** proved here is that this tier's derivation matches the app's. That is
-the cross-tier rebuild-equivalence test in `packages/core`, which drives the app's own
-acts and then runs this loop as a real process against the same two stores. Here the
-app's side is seeded, so what these cases hold is the loop's own behaviour: claim, run,
-finish, and the refusals around them.
-"""
-
 import json
 import threading
 import time
@@ -52,9 +38,6 @@ def a_migrated_database() -> Iterator[psycopg.Connection]:
         yield connection
 
 
-#: Where a test's database is, for the one case that opens a second connection to it.
-#: `Connection` gives its conninfo back without the password, so the address is kept
-#: here rather than asked of the connection.
 _WHERE: dict[psycopg.Connection, str] = {}
 
 
@@ -69,10 +52,6 @@ def seed_concept(
     kind: str = "Policy",
     status: str = "stable",
 ) -> str:
-    """A concept as the app would have written it: the identity, the commit and the
-    index row, with the content hash this tier's own reader computes over the very
-    file the bundle holds — which is what makes a *seeded* mismatch a deliberate one.
-    """
     seed_concept_identity(
         cursor, workspace_id=workspace_id, iri=iri, merge_key=f"{kind}:{path}".lower()
     )
@@ -111,7 +90,6 @@ def seed_expenses(
     workspace: str,
     body: str = "Expenses are claimed within sixty days.",
 ) -> str:
-    """The one concept most cases here start from, as the app would have written it."""
     return seed_concept(
         cursor,
         workspace_id=workspace,
@@ -127,9 +105,6 @@ def bootstrap_for(database: psycopg.Connection, git_store: Path) -> Bootstrap:
         database_url=_WHERE[database],
         git_store_dir=str(git_store),
         worker_id=WORKER,
-        # Neither kind the loop runs today reaches either of these; they are here
-        # because a bootstrap is one class and a partial one would be a shape no
-        # deploy unit hands this process.
         object_store=ObjectStore(
             endpoint="http://objectstore:3900",
             access_key="key-under-test",
@@ -142,23 +117,12 @@ def bootstrap_for(database: psycopg.Connection, git_store: Path) -> Bootstrap:
 
 
 def test_the_worker_runs_exactly_the_kinds_its_registry_holds_a_handler_for() -> None:
-    """The dispatch is a table, so what this worker can run is one list in one place —
-    and the three words are written down here rather than read back off that table
-    (`[TEST9]`), so a handler landing or leaving is a change this case sees. The array
-    `claim_job` filters both arms by is this table's keys, so the day a kind joins it is
-    the day a job of that kind stops waiting for a process that can run it.
-    """
     assert tuple(KINDS) == ("nightly-audit", "full-rebuild", "index")
 
 
 def test_the_loop_runs_both_its_kinds_through_the_registry_one_job_at_a_time(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-    """Every kind the worker runs goes through the one lookup, and the host around it is
-    unchanged: it claims, stamps the claimant and the heartbeat the claim wrote, and
-    finishes with whatever outcome the handler answered. Two jobs in one workspace take
-    two passes, because the loop's shape is one job at a time.
-    """
     workspace = seed_workspace(database.cursor())["id"]
     with database.cursor() as cursor:
         content = seed_expenses(cursor, workspace)
@@ -188,24 +152,13 @@ def test_the_loop_runs_both_its_kinds_through_the_registry_one_job_at_a_time(
         ("nightly-audit", "done", WORKER, True),
         ("full-rebuild", "done", WORKER, True),
     ]
-    # Each row carries the outcome shape of its own kind and not the other's, which is
-    # what says the lookup ran the handler the row named.
+
     assert rows[0][4]["checked"] == 1
     assert "generation" not in rows[0][4]
     assert (rows[1][4]["generation"], rows[1][4]["nodes"]) == (2, 1)
 
 
 def an_index_job_older_than_an_audit(database: psycopg.Connection) -> tuple[str, str]:
-    """A workspace with two queued jobs: an index job for a binding, enqueued two
-    seconds before the nightly audit beside it. Answers the workspace and the binding.
-
-    **The age is the arrangement and not a detail.** A claim hands out the oldest row of
-    a kind its caller named, so an index job younger than the audit would be passed over
-    by a claim that filters nothing at all, and both cases below would pass against a
-    queue with no filter in either arm. Shared because both cases need exactly this
-    queue and neither is about how it was built; what each one claims from it, and says
-    it is claiming, stays its own.
-    """
     workspace = str(seed_workspace(database.cursor())["id"])
     binding_id = ulid()
     with database.cursor() as cursor:
@@ -225,17 +178,6 @@ def an_index_job_older_than_an_audit(database: psycopg.Connection) -> tuple[str,
 def test_a_claim_leaves_a_kind_its_caller_did_not_name_queued_and_unpoisoned(
     database: psycopg.Connection,
 ) -> None:
-    """The caller says which kinds it can run and the database filters **both arms** of
-    the claim by them, so a job of a kind this process has no handler for is neither
-    handed out nor counted against its attempts — it waits, untouched, for whoever does.
-
-    Every kind the queue declares now has a handler here, so the pair is driven at the
-    claim rather than through the loop (`[TEST7]`): the same index job, older than the
-    audit beside it, is passed over by a claim that names only the audit and taken by
-    one that names it. What the first half protects is the poison counter — a claim that
-    filtered only the arm that hands work out would take the older row, find no handler
-    and spend one of its attempts on every pass.
-    """
     workspace, binding_id = an_index_job_older_than_an_audit(database)
 
     with queue.connected(_WHERE[database]) as worker:
@@ -262,11 +204,6 @@ def test_a_claim_leaves_a_kind_its_caller_did_not_name_queued_and_unpoisoned(
 def test_a_claim_hands_the_handler_what_the_job_is_about(
     database: psycopg.Connection,
 ) -> None:
-    """A job row names its subject — the binding an index run is for — and the claim
-    carries it, so the handler reads the binding off the job it holds rather than going
-    back to the queue for a row it already has. A kind whose descriptor names no subject
-    carries none, and the claim says so rather than inventing one.
-    """
     workspace, binding_id = an_index_job_older_than_an_audit(database)
 
     with queue.connected(_WHERE[database]) as worker:
@@ -295,8 +232,6 @@ def test_the_loop_claims_runs_and_finishes_a_nightly_audit_it_scheduled_itself(
     database.commit()
     write_bundle(tmp_path, workspace, {"knowledge/expenses.md": content})
 
-    # Nothing is queued, so the first pass schedules the audit and the second runs it —
-    # which is the whole of the scheduler this tier has.
     bootstrap = bootstrap_for(database, tmp_path)
     assert loop.tick(database, bootstrap) is False
     assert loop.tick(database, bootstrap) is True
@@ -318,20 +253,14 @@ def test_the_loop_claims_runs_and_finishes_a_nightly_audit_it_scheduled_itself(
 def test_a_job_commits_as_it_goes_and_another_connection_sees_it_finish_after_the_claim(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-    """The claim, the work and the finish are three transactions, each committed where
-    its block ends — on the connection the image opens, not this suite's — so an app
-    polling the row sees it move while the worker lives, and the row says when the job
-    was claimed and when it finished as two instants rather than one.
-    """
     workspace = seed_workspace(database.cursor())["id"]
     database.commit()
     bootstrap = bootstrap_for(database, tmp_path)
 
     with queue.connected(bootstrap.database_url) as worker:
-        assert loop.tick(worker, bootstrap) is False  # schedules the audit
-        assert loop.tick(worker, bootstrap) is True  # claims, runs and finishes it
-        # Read from this suite's own connection while the worker's is still open: what
-        # the worker wrote is committed, and its two stamps are two transactions' now().
+        assert loop.tick(worker, bootstrap) is False
+        assert loop.tick(worker, bootstrap) is True
+
         with database.cursor() as cursor:
             cursor.execute(
                 "SELECT status, finished_at > claimed_at FROM job"
@@ -344,12 +273,6 @@ def test_a_job_commits_as_it_goes_and_another_connection_sees_it_finish_after_th
 def test_a_claim_is_visible_and_the_lease_moves_while_a_job_runs_through_the_loop(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-    """Through the loop's own connection shape — not a claim this suite committed — a
-    second connection sees the row *claimed* while the job runs, sees its lease pushed
-    out by the heartbeat beside the work, and afterwards sees it finished later than it
-    was claimed. The job is a rebuild held at its first write by a lock this suite
-    holds, because no job in this suite runs a heartbeat interval on its own.
-    """
     workspace = seed_workspace(database.cursor())["id"]
     database.commit()
     with scoped(database, workspace) as cursor:
@@ -378,7 +301,6 @@ def test_a_claim_is_visible_and_the_lease_moves_while_a_job_runs_through_the_loo
 
     passes: list[bool] = []
     with psycopg.connect(dsn) as blocker, queue.connected(dsn) as worker:
-        # The rebuild's first write is its generation row; this lock holds it there.
         blocker.execute("LOCK TABLE graph_generation IN EXCLUSIVE MODE")
         pass_ = threading.Thread(
             target=lambda: passes.append(
@@ -397,8 +319,7 @@ def test_a_claim_is_visible_and_the_lease_moves_while_a_job_runs_through_the_loo
             pass_.join(timeout=30)
 
     assert passes == [True]
-    # Finished, and finished *after* it was claimed: two statements' clocks, not one
-    # transaction's `now()`.
+
     finished = row()
     assert finished is not None
     assert (finished[0], finished[2]) == ("done", True)
@@ -409,15 +330,13 @@ def test_a_failed_audit_counts_as_run_so_the_loop_queues_no_other_every_idle_tic
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
     database.commit()
-    # A bundle directory that is not a repository: the audit raises on it, and the job
-    # ends *failed* — the terminal verdict an operator should be reading.
+
     (tmp_path / f"{workspace}.git").mkdir()
     bootstrap = bootstrap_for(database, tmp_path)
 
-    assert loop.tick(database, bootstrap) is False  # schedules the audit
-    assert loop.tick(database, bootstrap) is True  # claims it, and it fails
-    # And the next idle tick schedules nothing: a failure is the last audit this loop
-    # ran, not an audit that never happened, so the next one comes round a day later.
+    assert loop.tick(database, bootstrap) is False
+    assert loop.tick(database, bootstrap) is True
+
     assert loop.tick(database, bootstrap) is False
 
     with database.cursor() as cursor:
@@ -431,8 +350,7 @@ def test_a_failed_audit_counts_as_run_so_the_loop_queues_no_other_every_idle_tic
 def test_refuses_a_workspace_id_that_is_not_one_before_it_touches_the_store(
     tmp_path: Path,
 ) -> None:
-    # Every id the loop hands this module came off a row the app wrote; what these hold
-    # is that the path is arithmetic over an id and never over a caller's string.
+
     workspace = ulid()
     (tmp_path / "store").mkdir()
 
@@ -443,8 +361,6 @@ def test_refuses_a_workspace_id_that_is_not_one_before_it_touches_the_store(
         with pytest.raises(NotAWorkspaceIdError):
             concepts_at_head(str(tmp_path / "store"), escape)
 
-    # And a repository directory that is a link out of the store is refused too — the
-    # shape check cannot see it, the containment check can.
     elsewhere = tmp_path / "elsewhere.git"
     elsewhere.mkdir()
     (tmp_path / "store" / f"{workspace}.git").symlink_to(elsewhere)
@@ -455,17 +371,10 @@ def test_refuses_a_workspace_id_that_is_not_one_before_it_touches_the_store(
 def test_a_rebuild_holds_the_generation_row_before_it_reads_so_a_write_beside_it_lands(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-    """The app's delta takes the generation row as it lands an edit; a rebuild that read
-    the records before taking that row would build the next generation without the edit
-    a concurrent write had not yet committed, and lose it at the flip. So the row comes
-    first: here a write is held open beyond its index row and its generation lock, the
-    rebuild is started beside it and seen from the database to be waiting, and the
-    write then commits — and the generation the rebuild flips live carries its concept.
-    """
     workspace = seed_workspace(database.cursor())["id"]
     with database.cursor() as cursor:
         expenses = seed_expenses(cursor, workspace)
-        # Raw, against `[TEST4]`: this suite's factories have none for graph_generation.
+
         cursor.execute(
             "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, 1)",
             (workspace,),
@@ -476,9 +385,6 @@ def test_a_rebuild_holds_the_generation_row_before_it_reads_so_a_write_beside_it
     outcomes: list[Any] = []
     with psycopg.connect(dsn) as writer, queue.connected(dsn) as worker:
         with writer.cursor() as cursor:
-            # The write, as the app lands it: the commit is already in the bundle
-            # (below), its index row is written, and it holds the generation row the
-            # delta takes — uncommitted, for as long as the rebuild is made to wait.
             receipts = seed_concept(
                 cursor,
                 workspace_id=workspace,
@@ -526,9 +432,7 @@ def test_a_rebuild_holds_the_generation_row_before_it_reads_so_a_write_beside_it
 
     assert len(outcomes) == 1
     outcome = outcomes[0]
-    # Both concepts, the one the write landed while the rebuild waited included, and
-    # no file the index did not know: the rebuild read the records after the write
-    # committed.
+
     assert (outcome.generation, outcome.nodes, outcome.missing_row) == (2, 2, [])
     with database.cursor() as cursor:
         cursor.execute(
@@ -542,13 +446,11 @@ def test_a_rebuild_holds_the_generation_row_before_it_reads_so_a_write_beside_it
 def test_the_audit_reports_a_mismatch_as_a_state_and_never_as_a_refusal(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-    # "Nightly is fine; deleted is not" (ADR 0023): the two parsers police each other,
-    # and a disagreement is a fact the outcome carries — never a job that failed.
+
     workspace = seed_workspace(database.cursor())["id"]
     with database.cursor() as cursor:
         content = seed_expenses(cursor, workspace)
-        # The bundle moves under the row, which is what a drifted parse looks like from
-        # here: the file says one thing and the row's hash says another.
+
         cursor.execute(
             "UPDATE concept_index SET content_hash = %s WHERE workspace_id = %s",
             ("f" * 64, workspace),
@@ -585,9 +487,7 @@ def test_the_audit_counts_a_file_it_cannot_parse_and_a_row_whose_file_is_gone(
         outcome = run_audit(cursor, str(tmp_path), workspace)
 
     assert outcome.checked == 0
-    # A file nobody can read is not a file whose hash is wrong, and a file the index
-    # does not know is the crash window seen from this side: three different words,
-    # three different lists.
+
     assert outcome.unparsed == []
     assert outcome.missing_row == ["knowledge/strange.md"]
     assert outcome.missing_file == ["knowledge/gone.md"]
@@ -612,7 +512,7 @@ def test_a_rebuild_writes_the_next_generation_beside_the_live_one_and_flips_it(
             body="Receipts are kept for six years.",
             kind="Evidence",
         )
-        # Raw, against `[TEST4]`: this suite's factories have none for graph_generation.
+
         cursor.execute(
             "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, 1)",
             (workspace,),
@@ -656,9 +556,7 @@ def test_a_rebuild_writes_the_next_generation_beside_the_live_one_and_flips_it(
 def test_the_loop_claims_nothing_when_its_schema_stamp_does_not_match(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-    # `[WRK1]`: the worker never migrates, so a view generated from another migration is
-    # a deploy order that slipped — and reading a shape that has moved is worse than
-    # waiting.
+
     workspace = seed_workspace(database.cursor())["id"]
     database.commit()
     with database.cursor() as cursor:
@@ -671,7 +569,6 @@ def test_the_loop_claims_nothing_when_its_schema_stamp_does_not_match(
 
     assert loop.schema_stamp_matches(database) is False
 
-    # And nothing was claimed or scheduled: the refusal is total, not partial.
     with database.cursor() as cursor:
         cursor.execute("SELECT count(*) FROM job WHERE workspace_id = %s", (workspace,))
         assert cursor.fetchone() == (0,)
@@ -683,8 +580,6 @@ def test_a_worker_holding_a_fresh_lease_is_healthy_and_a_queue_left_waiting_is_n
     workspace = seed_workspace(database.cursor())["id"]
     database.commit()
 
-    # Idle with nothing waiting: healthy. This is what the worker is for most of a day,
-    # and a check that demanded a live claim would page on it.
     assert health.is_healthy(database, WORKER) is True
 
     with scoped(database, workspace) as cursor:
@@ -693,8 +588,7 @@ def test_a_worker_holding_a_fresh_lease_is_healthy_and_a_queue_left_waiting_is_n
             " VALUES (%s, %s, 'nightly-audit', now() - interval '5 minutes')",
             (workspace, ulid()),
         )
-    # A job older than a lease that nothing has claimed: this worker has stopped
-    # claiming, which is the failure the check exists to catch.
+
     assert health.is_healthy(database, WORKER) is False
 
     with scoped(database, workspace) as cursor:
@@ -703,33 +597,23 @@ def test_a_worker_holding_a_fresh_lease_is_healthy_and_a_queue_left_waiting_is_n
             (WORKER, list(KINDS)),
         )
         assert cursor.fetchone() is not None
-    # Claimed, with a heartbeat the claim itself wrote: healthy again.
+
     assert health.is_healthy(database, WORKER) is True
 
     with scoped(database, workspace) as cursor:
         cursor.execute("UPDATE job SET heartbeat_at = now() - interval '5 minutes'")
-    # A claimant that has stopped saying anything is not holding a fresh lease — but for
-    # as long as the lease itself stands, the job is nobody else's to take and nothing
-    # is waiting, so the check is still satisfied. That grace is exactly one lease long
-    # and is the reason the compose probe carries eight retries.
+
     assert health.is_healthy(database, WORKER) is True
 
     with scoped(database, workspace) as cursor:
         cursor.execute("UPDATE job SET lease_expires_at = now() - interval '1 minute'")
-    # And once the lease lapses, the job is claimable, older than a lease and unclaimed:
-    # this worker has stopped working, which is what the check is for.
+
     assert health.is_healthy(database, WORKER) is False
 
 
 def test_a_long_run_keeps_its_lease_from_a_connection_of_its_own(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-    """A heartbeat on the job's own connection would be invisible until the job
-    committed, and a lease that lapsed halfway through a long rebuild would be handed
-    to a second worker while the first was still building it. So the heartbeat has a
-    connection of its own — and what proves it is a *third* connection reading the
-    row while the job's transaction is still open.
-    """
     workspace = seed_workspace(database.cursor())["id"]
     database.commit()
 
@@ -749,7 +633,6 @@ def test_a_long_run_keeps_its_lease_from_a_connection_of_its_own(
             before = cursor.fetchone()
         assert before is not None
 
-        # The job's own transaction, held open for as long as the run would hold it.
         with (
             queue.keeping_alive(dsn, claimed, WORKER, every_seconds=0.05),
             scoped(database, workspace) as job_cursor,

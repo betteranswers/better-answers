@@ -4,15 +4,6 @@ import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { AGENT_HOSTNAME, APEX_HOSTNAME, APP_HOSTNAME } from "./harness.ts";
 import { servedApp } from "./suite-app.ts";
 
-/**
- * The api serves the SPA's static build on `app.` (ADR 0006, amended 2026-09-02; ADR 0022
- * gives `app.` the product). Every test drives the real server through the HTTP harness on
- * a real hostname and asserts what a caller sees.
- *
- * A browser is the caller this is for, so the requests here carry what a browser carries:
- * a navigation asks for `text/html`, a script tag does not.
- */
-
 const asABrowserNavigates = { headers: { accept: "text/html,application/xhtml+xml" } };
 
 describe("the api serves the shell on app. (ADR 0006)", () => {
@@ -36,11 +27,6 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
   });
 
   it("refuses to be framed by another site — sign-in and the picker as much as any screen", async () => {
-    // Sign-in and the workspace picker were server-rendered pages until T-037 and carried
-    // these two headers there (T-004). They are the shell's addresses now, so the shell
-    // carries them: a framed sign-in is a person typing a code into someone else's page,
-    // and a framed picker is a pick made for them. Consent keeps its own pair in
-    // `auth/routes.ts`, the page it is still rendered as.
     for (const screen of ["/sign-in", "/choose-workspace", "/system", "/"]) {
       const response = await app()
         .client(undefined, APP_HOSTNAME)
@@ -70,8 +56,6 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
   });
 
   it("leaves the health check answering the health check, not the shell", async () => {
-    // The uptime check T-005 sets up reaches `app.`'s health; a shell with status 200 would
-    // read as healthy for ever.
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/health", asABrowserNavigates);
@@ -81,17 +65,12 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
   });
 
   it("does not shadow an endpoint a client reaches with fetch", async () => {
-    // Better Auth's own endpoints answer the same wildcard. A `fetch` sends no `text/html`,
-    // which is what keeps the shell off them.
     const response = await app().client(undefined, APP_HOSTNAME).fetch("/get-session");
 
     expect(response.headers.get("content-type")).not.toContain("text/html");
   });
 
   it("leaves the product's own transport answering on app., not the shell", async () => {
-    // The tRPC mount and the shell share `app.` and the same wildcard behind them
-    // (ADR 0008, ADR 0022). A navigation-shaped request to a procedure's path has to
-    // reach tRPC: the shell answering it would be a screen where a refusal should be.
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch(`${TRPC_ENDPOINT}/routes.list`, asABrowserNavigates);
@@ -101,9 +80,6 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
   });
 
   it("answers a screen's address on a hostname the fence spells with a trailing dot", async () => {
-    // The fence admits `app.example.test.` — a trailing dot is the DNS root and names the
-    // same host — so the shell has to normalise the same way or that address reaches the
-    // authorization server's 404 instead of the product.
     const response = await app().server.request(
       new Request(`https://${APP_HOSTNAME}./system`, asABrowserNavigates),
     );
@@ -124,9 +100,6 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
   });
 
   it("leaves the protected-resource document answering as itself on app., not as the shell", async () => {
-    // The issuer's documents share `app.` with the product since T-045 (ADR 0034). A
-    // navigation to one has to reach the document: the shell answering it would be a
-    // host reading HTML where it looked for the resource.
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/.well-known/oauth-protected-resource", asABrowserNavigates);

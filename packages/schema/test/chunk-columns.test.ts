@@ -8,28 +8,11 @@ import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
 import { ADMITTED, postgresForSuite, refusalOf, refusesEach } from "./probes.ts";
 
-/**
- * The **chunk index** as the database holds it after S1's substrate migration (the S1 spec,
- * *The schema* and *The chunk's identity and the locator*): a row that carries the document it
- * came from and the span it covers, that may carry no vector at all, and whose full-text
- * column is the database's own work and neither tier's.
- *
- * Every probe is plain SQL aimed at the table, for the reason `source-catalogue.test.ts` gives:
- * the row is the subject under test, both tiers write these columns, and a word set or a pair
- * rule stated at the app's boundary alone is one the other tier writes around. The refusals
- * stand beside the statements they admit (`[SEC3]`, `[TEST7]`).
- *
- * `index.chunk` is LIST-partitioned, so every claim about a column, a CHECK or an index is a
- * claim about a *partition* as much as about the parent — which is why the first two tests ask
- * a partition made after the migration and a partition that was already there.
- */
-
 const db = postgresForSuite();
 
 const WS_A = "01J6EAAAAAAAAAAAAAAAAAAAAA";
 const WS_B = "01J6EBBBBBBBBBBBBBBBBBBBBB";
 
-/** The chunk table's columns as `pg_attribute` reports them, parent or partition alike. */
 type Attribute = { readonly column: string; readonly notNull: boolean; readonly generated: string };
 
 const attributesOf = async (client: pg.PoolClient, relation: string): Promise<Attribute[]> => {
@@ -49,13 +32,6 @@ const attributesOf = async (client: pg.PoolClient, relation: string): Promise<At
   }));
 };
 
-/**
- * Which of the two indexes one partition carries: the full-text one every partition is meant
- * to have from migration 0037 onward, and the vector one none of them is meant to have until
- * S8. Asked of a partition twice below — of one made after the migration and of one made
- * before it — and answered the same way both times, because the ruling is that no two
- * partitions differ.
- */
 const indexShapeOf = async (
   client: pg.PoolClient,
   relation: string,
@@ -71,7 +47,6 @@ const indexShapeOf = async (
   };
 };
 
-/** The workspace, its binding and one catalogued document — what a chunk row locates into. */
 const seedOneDocument = async (client: pg.PoolClient, workspaceId: string) => {
   const seed = testData(client);
   await seed.workspace({ id: workspaceId, name: "A" });
@@ -84,15 +59,8 @@ const INSERT_CHUNK = `INSERT INTO "index".chunk
     (workspace_id, id, content, embedding, embedding_route_id, sensitivity, audience, binding_id)
   VALUES ($1, $2, 'a paragraph of the handbook', $3, $4, 'Internal', 'everyone', $5)`;
 
-/** A vector of the route's width, in the bracketed text form pgvector accepts. */
 const VECTOR = JSON.stringify(Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0));
 
-/**
- * The first chunk of one document: ordinal zero, the first forty code points of its normalised
- * redacted text, and the locator that says so. One address written once, because two tests below
- * are about what happens to *the same* address — a second row at it, and the document under it
- * going away.
- */
 const firstSpanOf = (documentId: string) => ({
   workspaceId: WS_A,
   sourceDocumentId: documentId,
@@ -108,9 +76,6 @@ describe("the chunk's columns, on the parent and on a partition", () => {
       const { seed } = await seedOneDocument(client, WS_A);
       await seed.chunk({ workspaceId: WS_A });
 
-      // The whole shape in one assertion (`[TEST9]`): the nine columns the chunk table was
-      // created with, the audience array migration 0020 added, and S1's six — the document
-      // and its span, and the full-text column the database computes (`s` is *stored*).
       expect(await attributesOf(client, "chunk")).toEqual([
         { column: "id", notNull: true, generated: "" },
         { column: "workspace_id", notNull: true, generated: "" },
@@ -130,8 +95,6 @@ describe("the chunk's columns, on the parent and on a partition", () => {
         { column: "search", notNull: true, generated: "s" },
       ]);
 
-      // A partition is a table of its own, so it is asked in its own right rather than
-      // inferred from the parent — the same reason the direct-query denial is asserted.
       expect(await attributesOf(client, `chunk_${WS_A}`)).toEqual(
         await attributesOf(client, "chunk"),
       );
@@ -139,12 +102,6 @@ describe("the chunk's columns, on the parent and on a partition", () => {
   });
 
   it("propagates an ALTER on the parent to a partition that already exists, and to one made after", async () => {
-    // Probe 1 of 10/09/2026, written down as a test. The migration added its columns, its
-    // CHECK and its generated column to the partitioned parent alone and wrote no
-    // per-partition pass, which is only safe because all four shapes reach a partition that
-    // is already under the parent. A migrated test database holds no partition at the moment
-    // the migration runs, so the claim is made here against the real table with probe
-    // objects the rollback takes away.
     await withRollback(db().pool, async (client) => {
       const { seed } = await seedOneDocument(client, WS_A);
       await seed.chunk({ workspaceId: WS_A });
@@ -193,10 +150,6 @@ describe("the chunk's columns, on the parent and on a partition", () => {
 
 describe("the embedding and the route it came from", () => {
   it("refuses a vector without its route and a route without its vector, and admits both whole shapes", async () => {
-    // Nothing embeds until S8 (ADR 0020, amended 2026-09-09), so a chunk lands with no vector
-    // — and the two columns are one fact. A row carrying a vector whose route nobody recorded
-    // could never be re-embedded against the model that made it, and a row naming a route with
-    // no vector is a claim about work that was never done.
     await withRollback(db().pool, async (client) => {
       const { seed } = await seedOneDocument(client, WS_A);
       await seed.chunk({ workspaceId: WS_A });
@@ -238,9 +191,6 @@ describe("the full-text column", () => {
       );
       expect(computed.rows[0]?.matched).toBe(true);
 
-      // Neither tier writes this column (the S1 spec): the app's role and the worker's role
-      // are each refused a value for it, so a row's full text can never disagree with the
-      // content it is over — which is what `find`'s document arm ranks on in T-133.
       for (const role of ["app_rt", "worker_rt"]) {
         await client.query("RESET ROLE");
         await client.query(`SET LOCAL ROLE ${role}`);
@@ -280,12 +230,6 @@ describe("a partition's indexes", () => {
   });
 
   it("gives a partition that predates the migration the same pair, through the migration's own loop", async () => {
-    // The orchestrator's ruling of 11/09/2026: no two partitions differ. A workspace made
-    // before this migration has an HNSW index over a column nothing writes until S8 and no
-    // full-text index at all, so the migration walks `pg_inherits` and puts both right. The
-    // loop is read out of the shipped migration and run here against a partition built the
-    // way migration 0002's function built one, which is the only way to have a partition that
-    // predates a migration the harness applies to an empty database.
     await withRollback(db().pool, async (client) => {
       await client.query(
         `CREATE TABLE "index"."chunk_${WS_A}" PARTITION OF "index".chunk FOR VALUES IN ('${WS_A}')`,
@@ -337,11 +281,7 @@ describe("the chunk and the document it locates into", () => {
           WHERE n.nspname = 'index' AND c.relname = $1`,
         ["chunk_workspace_id_source_document_id_locator_uidx"],
       );
-      // The index is declared once on the parent; Postgres names each partition's copy of it
-      // from that partition's own name and shortens the parts to fit the identifier limit, so
-      // the refusal a row actually meets names the copy — which is the index the rule is
-      // enforced by. The shortened name is written out whole rather than composed from the
-      // workspace id, because composing it would state the truncation rule twice.
+
       expect({ refusedBy: second, declaredOnTheParent: onTheParent.rowCount }).toEqual({
         refusedBy: "chunk_01J6EAAAAAAAAAAAAAAAAAA_workspace_id_source_document__idx",
         declaredOnTheParent: 1,
@@ -352,10 +292,6 @@ describe("the chunk and the document it locates into", () => {
 
 describe("the worker on the chunk index", () => {
   it("writes a chunk row through the parent and is refused the partition itself", async () => {
-    // Migration 0000's default privileges in `index` already carry the worker's DML, and this
-    // migration writes the three out on the table by name so the ownership map and the journal
-    // say one thing (the orchestrator's answer of 11/09/2026). The partition is a table of its
-    // own, which the lifecycle function's REVOKE closes and this asserts directly (`[SEC3]`).
     await withRollback(db().pool, async (client) => {
       const { seed, document } = await seedOneDocument(client, WS_A);
       await seed.chunk({ workspaceId: WS_A });
@@ -400,11 +336,6 @@ describe("the worker on the chunk index", () => {
   });
 });
 
-/**
- * One statement of this ticket's substrate migration, found by a word it contains — so a test
- * of what the migration does to partitions that already exist runs the migration's own SQL
- * rather than a second copy of it that could drift.
- */
 const migrationStatementMatching = (word: string): string => {
   const file = journalMigrationFiles().find((name) => name.endsWith("the-chunk-substrate.sql"));
   if (file === undefined) throw new Error("the chunk substrate is not in the journal");

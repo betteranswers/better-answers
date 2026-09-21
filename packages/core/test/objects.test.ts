@@ -13,31 +13,15 @@ import {
 import { principalOf } from "./platform.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 
-/**
- * The object door against a real Garage — the store the estate runs, not a stand-in, for
- * the same reason every data suite runs a real Postgres: what a caller can observe here is
- * an S3 answer, and an in-memory bucket would agree with a door that addressed the wrong
- * bytes.
- *
- * What the suite is about is the door's **prefix discipline**: a caller names a workspace
- * or the platform and a key within it, never a bucket key, so the cases below are written
- * from the outside — put, get, list — and each one that matters is checked in both
- * directions (one workspace's key is unreachable from another's, and the other's from the
- * first).
- */
-
 const store = objectStoreForSuite();
 
-/** The erasure routine's own identity — the platform principal step 10 writes under. */
 const erasure: PlatformPrincipal = {
   kind: "platform",
   actorId: "process:better-answers-erasure",
 };
 
-/** One workspace's Admin, on a workspace id nothing else in this file uses. */
 const someone = () => principalOf(ulid(), ulid(), "Admin");
 
-/** The body a put takes: a stream, because a document's bytes arrive as one. */
 const streamOf = (text: string): ReadableStream<Uint8Array> =>
   new ReadableStream<Uint8Array>({
     start: (controller) => {

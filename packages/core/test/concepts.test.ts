@@ -38,32 +38,13 @@ import {
 } from "./suite-postgres.ts";
 import { arrangeWorkspace, doorsOf, principalFor, type Scenario } from "./workspace-with-bundle.ts";
 
-/**
- * The governed write through the concepts slice's entry point (`[TEST1]`), against real
- * Postgres and a real bare repository: **one act, one commit, one transaction** (ADR 0012).
- *
- * The claims this suite exists for are the ones no unit test can make. That the commit is
- * the person's and the platform's at once, that a stale precondition is refused loudly, that
- * the lock makes two acts on one bundle one after the other, and — the load-bearing one —
- * that a failure after the commit leaves **no partial rows and a head ahead of the last
- * `bundle_commit`**, which is exactly the state T-056's reconciler is defined to find. Each
- * of those is a claim about two stores at once, so the seam is the slice over both of them.
- */
-
 const db = postgresForSuite();
 const bundles = bundlesForSuite();
 
-/** This suite's footing: a provisioned workspace, its bundle, and its three people. */
 const arrange = (): Promise<Scenario> => arrangeWorkspace(db(), bundles());
 
 let minted = 0;
-/**
- * A concept's IRI: the one opaque form ADR 0002's amendments fix — the bare apex, `/c/`, a
- * minted id — through the minter the boundary exports, so a test can never assert against a
- * shape the boundary would refuse. **No write here supplies one**: the key is never
- * caller-settable (ADR 0002), so a creation gets its IRI back from the act and a re-write
- * names that. This mints one only where a test needs an IRI nobody minted.
- */
+
 const iriFor = (): string => conceptIriOf(ulid());
 
 const writeFor = (overrides: Partial<WriteConceptInput> = {}): WriteConceptInput => {
@@ -76,8 +57,7 @@ const unnamedWrite = (overrides: Partial<WriteConceptInput>): WriteConceptInput 
   path: `knowledge/expenses-${minted}.md`,
   kind: "Policy",
   title: "Expenses",
-  // OKF's own provenance shape: `resource` required, the platform's `locator` beside it, and
-  // a `title` a reader recognises (`docs/okf-v02.md`).
+
   frontmatter: {
     title: "Expenses",
     type: "Policy",
@@ -91,7 +71,6 @@ const unnamedWrite = (overrides: Partial<WriteConceptInput>): WriteConceptInput 
   ...overrides,
 });
 
-/** A re-write of a concept an earlier act made: its IRI, its path and the head it left. */
 const rewriteOf = (
   input: WriteConceptInput,
   written: { readonly iri: string; readonly sha: string },
@@ -106,18 +85,12 @@ const rewriteOf = (
 const write = (scenario: Scenario, principal: UserPrincipal, input: WriteConceptInput) =>
   writeConcept(principal, doorsOf(scenario), input);
 
-/**
- * The Editor's write, and what it landed. A test that is about the commit, the rows or the
- * read has no business restating "and it was not refused" in four lines; a test that is
- * about a refusal calls `write` above and reads the refusal itself.
- */
 const landed = async (scenario: Scenario, input: WriteConceptInput) => {
   const result = await write(scenario, scenario.editor, input);
   if (!result.ok) throw new Error(`the write was refused: ${String(result.error)}`);
   return result.value;
 };
 
-/** Every row the act writes, counted as the superuser so the policy cannot hide a survivor. */
 const rowsFor = async (workspaceId: string) => {
   const counted = await db().pool.query<Record<string, string>>(
     `SELECT (SELECT count(*) FROM concept_identity WHERE workspace_id = $1) AS identities,
@@ -132,7 +105,6 @@ const rowsFor = async (workspaceId: string) => {
   return counted.rows[0];
 };
 
-/** The shas `bundle_commit` knows about, oldest first — the prefix of git history it must be. */
 const recordedCommits = async (workspaceId: string): Promise<readonly string[]> => {
   const rows = await db().pool.query<{ sha: string }>(
     "SELECT sha FROM bundle_commit WHERE workspace_id = $1 ORDER BY committed_at, sha",
@@ -141,7 +113,6 @@ const recordedCommits = async (workspaceId: string): Promise<readonly string[]> 
   return rows.rows.map((row) => row.sha);
 };
 
-/** Run a read as this person, inside one transaction, the way a transport would. */
 const reading = <T>(
   principal: UserPrincipal,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
@@ -170,14 +141,12 @@ describe("a governed write", () => {
     const written = await landed(scenario, writeFor());
 
     const facts = await commitFacts(scenario.git, scenario.workspaceId, written.sha);
-    // The `Actor:` trailer is the kernel's ActorId — the person id, never their address,
-    // which is what the git author line above carries instead (ADR 0035, `[AUDIT3]`).
+
     expect(facts.trailers).toEqual({
       Actor: `human:${scenario.editor.userId}`,
       Audit: written.auditEventId,
     });
-    // Minted before the commit: the ledger row, the commit's trailer and the
-    // `bundle_commit` row all hold the same id, which is what makes a replay idempotent.
+
     const joined = await db().pool.query<{ act: string; sha: string }>(
       `SELECT e.act, c.sha
          FROM audit_event e JOIN bundle_commit c
@@ -195,8 +164,7 @@ describe("a governed write", () => {
     const written = await landed(scenario, input);
 
     const file = await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path);
-    // Every key quoted, because a concept's frontmatter is open and a key is whatever the
-    // file carried; `sources[]` written as OKF's list of objects.
+
     expect(file).toBe(
       [
         "---",
@@ -213,10 +181,7 @@ describe("a governed write", () => {
         "",
       ].join("\n"),
     );
-    // The hash on the row is the content's, not the file's: the trust keys and the IRI are
-    // left out of it (ADR 0014), so recording a check never moves it. Written down rather
-    // than computed here — an expectation this act's own hash produced would agree with
-    // any canonicalisation at all, the Python tier's included.
+
     expect(written.contentHash).toBe(
       "16f6c6993084b35862434bc90dece1fb2c2669cbddc21c910bdcd95bef0dcecc",
     );
@@ -224,8 +189,7 @@ describe("a governed write", () => {
 
   it("hashes the frontmatter the file carries — the type and the title the act wrote in — so the row's hash is what a parse of the file reproduces", async () => {
     const scenario = await arrange();
-    // A caller that names the kind and the title to the act and puts neither in the file:
-    // the act writes both in, and both are hashed keys.
+
     const input = writeFor({ frontmatter: { tags: ["finance"] } });
 
     const written = await landed(scenario, input);
@@ -237,9 +201,7 @@ describe("a governed write", () => {
       title: "Expenses",
       tags: ["finance"],
     });
-    // The nightly audit's whole check, made here once: the file's own parse hashes to the
-    // number the row carries, which it could not if the row were hashed before the act
-    // finished writing the file's keys.
+
     expect(read.ok && contentHashOf(read.value.frontmatter, read.value.body, input.path)).toBe(
       written.contentHash,
     );
@@ -252,7 +214,7 @@ describe("a governed write", () => {
 
   it("takes the status the file names when the act names none, so a file that says stable is not indexed as a draft", async () => {
     const scenario = await arrange();
-    // `writeFor` names no status of its own; the file is the only thing that says one.
+
     const input = writeFor({
       frontmatter: { title: "Expenses", type: "Policy", status: "stable" },
     });
@@ -264,15 +226,14 @@ describe("a governed write", () => {
       [scenario.workspaceId, written.iri],
     );
     expect(row.rows).toEqual([{ status: "stable", published: true }]);
-    // And the file says the same, so a replay lands the row the act did.
+
     const file = await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path);
     expect(file).toContain('"status": "stable"');
   });
 
   it("records the concept, its identity, the commit and its evidence in one transaction", async () => {
     const scenario = await arrange();
-    // Two spans of one catalogued document: evidence is keyed to `source_document` (T-128,
-    // owner D5), so a citation names a document the platform recorded and not a bare id.
+
     const handbook = await bindingHolding(db(), scenario.workspaceId);
     const input = writeFor({
       evidence: [
@@ -292,10 +253,9 @@ describe("a governed write", () => {
       concepts: "1",
       commits: "1",
       evidence: "2",
-      // The workspace's provisioning wrote the first, this act the second.
+
       events: "2",
-      // The bundle-and-record delta, in the same transaction: the concept's node, and no
-      // edge because nothing here links to a concept (ADR 0023).
+
       nodes: "1",
       edges: "0",
     });
@@ -320,8 +280,7 @@ describe("a governed write", () => {
 
   it("keeps the version its evidence was recorded against", async () => {
     const scenario = await arrange();
-    // The version is what a later re-read compares against, so a piece of evidence that
-    // lost it would be one nobody could tell had moved.
+
     const handbook = await bindingHolding(db(), scenario.workspaceId);
     await landed(
       scenario,
@@ -346,10 +305,7 @@ describe("a governed write", () => {
 
   it("folds the row's kind for case and plural, and leaves the file's own spelling alone", async () => {
     const scenario = await arrange();
-    // Three spellings of one kind. An unknown kind is the ordinary case, folded at write for
-    // case and plural only (ADR 0012's 2026-08-30 amendment), so the type vocabulary counts
-    // them once — while the file keeps what the person wrote, because `type` is not a key the
-    // platform owns (ADR 0019).
+
     let head: string | null = null;
     let firstFile: { readonly sha: string; readonly path: string } | undefined;
     for (const kind of ["policy", "Policies", "POLICY"]) {
@@ -365,7 +321,7 @@ describe("a governed write", () => {
       [scenario.workspaceId],
     );
     expect(kinds.rows).toEqual([{ kind: "Policy" }]);
-    // The file said what its author said.
+
     if (firstFile === undefined) return;
     const file = await fileAtCommit(
       scenario.git,
@@ -377,9 +333,6 @@ describe("a governed write", () => {
   });
 
   it("hashes two spellings of one source alike, and a swapped source differently", async () => {
-    // ADR 0019's normalisation: `sources[]` reduced to ordered `(resource, locator)` pairs
-    // with paths resolved to `/abs.md`. A link rewrite that only changes the spelling leaves
-    // a check standing; a swapped source un-checks the concept.
     const body = "Expenses are claimed within thirty days.";
     const path = "knowledge/policies/expenses.md";
     const cite = (resource: string) => ({ sources: [{ resource, locator: "p.4" }] });
@@ -387,24 +340,20 @@ describe("a governed write", () => {
     const absolute = contentHashOf(cite("/knowledge/handbook.md"), body, path);
     const relative = contentHashOf(cite("./../handbook.md"), body, path);
     const bare = contentHashOf(cite("../handbook.md"), body, path);
-    // An absolute spelling with dot segments is the same place: the normaliser runs on
-    // absolute paths too, or two spellings of one citation would hash apart.
+
     const dotted = contentHashOf(cite("/knowledge/policies/../handbook.md"), body, path);
     const swapped = contentHashOf(cite("/knowledge/other.md"), body, path);
 
     expect([relative, bare, dotted]).toEqual([absolute, absolute, absolute]);
     expect(swapped).not.toBe(absolute);
-    // A protocol-relative resource is external, like any URL: never folded into the
-    // bundle's paths, so it cannot collide with a local concept's citation.
+
     expect(contentHashOf(cite("//knowledge/handbook.md"), body, path)).not.toBe(absolute);
-    // Padding is not part of what a file cites, in **either** form: an asymmetry there would
-    // give two spellings of one citation two hashes, and a concept would un-check itself over
-    // whitespace.
+
     expect(contentHashOf(cite("  /knowledge/handbook.md  "), body, path)).toBe(absolute);
     expect(contentHashOf({ sources: ["  /knowledge/handbook.md  #p.4"] }, body, path)).toBe(
       absolute,
     );
-    // A title the platform repaired is not the fact, and does not move the hash.
+
     expect(
       contentHashOf(
         { sources: [{ resource: "/knowledge/handbook.md", locator: "p.4", title: "Fixed" }] },
@@ -424,8 +373,6 @@ describe("a governed write", () => {
       head = written.sha;
     }
 
-    // The invariant the lock buys and the reconciler leans on: what Postgres knows and what
-    // git holds are the same list, in the same order (ADR 0012's 2026-09-06 amendment).
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(shas);
     expect(await recordedCommits(scenario.workspaceId)).toEqual(shas);
     const parents = await db().pool.query<{ sha: string; parent_sha: string | null }>(
@@ -436,16 +383,6 @@ describe("a governed write", () => {
   });
 });
 
-/**
- * The content hash and the rendered file, asserted against **values written down**.
- *
- * Both are cross-tier contracts — the hash is the canonical form ADR 0014 fixes and the file
- * is "readable by any OKF tool" (ADR 0012) — so an expectation computed by calling the same
- * function would agree with a canonicalisation the Python tier could not read. The hash's
- * literals are the concept-file agreement's (`contracts/concept-file/cases.json`, held in
- * `concept-file.contract.test.ts` and the worker's twin); what stays here is what the hash
- * leaves out and what it reduces, and the rendered file's literals.
- */
 describe("what a concept hashes and what it renders", () => {
   const HASHED_PATH = "knowledge/policies/expenses.md";
 
@@ -458,9 +395,7 @@ describe("what a concept hashes and what it renders", () => {
       usage_count: 4,
       approved: true,
       owner: null,
-      // Two spellings of a path, one locator carried as a number and one absent: the
-      // reduction resolves both against the concept's own path and keeps the locator as
-      // the string the file meant, whichever scalar carried it (ADR 0019).
+
       sources: [
         { resource: "./handbook.md", title: "Handbook", locator: 4 },
         { resource: "/knowledge/policies/../rules.md", locator: null },
@@ -471,13 +406,9 @@ describe("what a concept hashes and what it renders", () => {
       status: "stable",
       iri: "https://better-answers.com/c/01JZZZZZZZZZZZZZZZZZZZZZZZ",
     };
-    // A body carrying every normalisation ADR 0014 names: CRLF line endings, trailing
-    // spaces and tabs, and a run of blank lines at the end.
+
     const body = "First line   \r\nsecond line\t\r\n\r\n\r\n";
 
-    // The same hash with every trust key and the identity moved: hashing them would make a
-    // check of its own recording move the hash and read *Changed since checked* at once.
-    // The number itself is the concept-file agreement's first case.
     expect(
       contentHashOf(
         {
@@ -496,8 +427,7 @@ describe("what a concept hashes and what it renders", () => {
 
   it("hashes a list of objects under any other key the same whichever order their keys were written in", () => {
     const body = "Expenses are claimed within thirty days.";
-    // A vendor's list, preserved verbatim in the file (ADR 0019) and canonicalised for the
-    // hash (RFC 8785): the order a producer wrote an object's keys in is not content.
+
     const written = contentHashOf(
       {
         reviewers: [
@@ -536,9 +466,6 @@ describe("what a concept hashes and what it renders", () => {
   it("hashes a `sources` that is no list, and an entry citing nothing, as citing nothing", () => {
     const body = "Expenses are claimed within thirty days.";
 
-    // Neither is a shape the boundary would store, and both are shapes a bundle a company
-    // brought with it can hold: what matters is that each reduces to a citation this
-    // concept does not make, rather than throwing where a hash was expected.
     expect(contentHashOf({ title: "Expenses", sources: "handbook.pdf" }, body, HASHED_PATH)).toBe(
       "71916fee7a5014777a4db734dffbe46b9c7f710bf699bb6092a15202953b78e5",
     );
@@ -596,11 +523,6 @@ describe("what a concept hashes and what it renders", () => {
     );
   });
 
-  /**
-   * Case and plural, and nothing else (ADR 0012's 2026-08-30 amendment). The plural rule is
-   * the conservative English one, and each row here is one arm of it — including the words
-   * it deliberately leaves alone, which is where an unanchored pattern would show.
-   */
   it.each([
     ["policy", "Policy"],
     ["Policies", "Policy"],
@@ -608,7 +530,7 @@ describe("what a concept hashes and what it renders", () => {
     ["Boxes", "Box"],
     ["Standards", "Standard"],
     ["Assessments", "Assessment"],
-    // Ends in no plural at all, but carries `ses` in the middle of the word.
+
     ["Assessment", "Assessment"],
     ["Business", "Business"],
     ["Bonus", "Bonus"],
@@ -619,25 +541,9 @@ describe("what a concept hashes and what it renders", () => {
   });
 });
 
-/**
- * The bundle-and-record graph delta joins the act's transaction (ADR 0023, ADR 0032): an
- * edit's map change lands with its rows, in the live generation, and the map is never
- * behind for an edit — no watermark, no debounce, no *updating* phrase. The rows are
- * asserted as the superuser, and the walk through the graph door is the reader's proof.
- */
 describe("the map a governed write leaves behind", () => {
-  /**
-   * A concept as these tests hold it: what the act was given, and the IRI the act answered
-   * with. The IRI is never the input's — it is minted (ADR 0002) — so a test that asserts
-   * about a concept reads it off the write that made it.
-   */
   type Written = WriteConceptInput & { readonly iri: string };
 
-  /**
-   * A stable Product, then a stable concept whose body `write` renders over it — the
-   * two-concept arrange the link-derivation tests share, so which act made which commit
-   * is one fact here and a body per test.
-   */
   const linkedPair = async (
     scenario: Scenario,
     write: (product: Written, filename: string) => Partial<WriteConceptInput>,
@@ -683,8 +589,7 @@ describe("the map a governed write leaves behind", () => {
         audience: "everyone",
       },
     ]);
-    // The link as ADR 0026 holds it: the two kinds, the section the link sits under and
-    // the sentence around it, flattened to what a reader would say.
+
     const edges = await db().pool.query(
       "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM graph_edge WHERE workspace_id = $1",
       [scenario.workspaceId],
@@ -701,7 +606,7 @@ describe("the map a governed write leaves behind", () => {
         sentence: "See the product for tiers.",
       },
     ]);
-    // And the map answers at once: a Viewer's walk from the policy reaches the product.
+
     const steps = await reading(scenario.viewer, (principal, tx) =>
       walkFrom(principal, tx, policy.iri),
     );
@@ -713,8 +618,7 @@ describe("the map a governed write leaves behind", () => {
 
   it("maps a link to not-yet-written knowledge when that knowledge lands", async () => {
     const scenario = await arrange();
-    // A path link to a concept nobody has written: legal (docs/okf-v02.md), and no edge
-    // yet, because a path is not an identity until the index holds it.
+
     const author = writeFor({
       status: "stable",
       body: "See [travel](./travel.md) once it is written.",
@@ -730,8 +634,6 @@ describe("the map a governed write leaves behind", () => {
     });
     const written = await landed(scenario, travel);
 
-    // The landing is what resolves it: the author's edges are re-derived in the same act,
-    // with the target's kind read off the index the transaction just wrote.
     const edges = await db().pool.query(
       "SELECT from_uid, to_uid, to_kind FROM graph_edge WHERE workspace_id = $1",
       [scenario.workspaceId],
@@ -743,9 +645,7 @@ describe("the map a governed write leaves behind", () => {
 
   it("reads a link however the markdown writes it — inline, by reference, shortcut or autolink", async () => {
     const scenario = await arrange();
-    // Three references to one concept, three forms; the definition line's own bracket is
-    // no link. Ordinals count every matched reference in document order — the skipped
-    // definition included — so a form change never renumbers a neighbour.
+
     const { product, policy } = await linkedPair(scenario, (target, filename) => ({
       body: [
         "# Sources",
@@ -788,11 +688,7 @@ describe("the map a governed write leaves behind", () => {
 
   it("keeps images, quoted code and protocol-relative targets off the map a reader walks", async () => {
     const scenario = await arrange();
-    // An image is a transclusion, code is quotation and `//host/…` points outside the
-    // bundle — none asserts between concepts. The image still holds its ordinal —
-    // removing the `!` later renumbers no neighbour — while code is blanked before the
-    // scan and holds none. The fence closes on a longer run of its own character, as
-    // CommonMark allows.
+
     const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
       body: [
         "# Details",
@@ -825,11 +721,7 @@ describe("the map a governed write leaves behind", () => {
 
   it("keeps mapping an Editor's links past long unmatched backtick runs in the body", async () => {
     const scenario = await arrange();
-    // The pairing the span scanner implements, against tenant input a backtracking regex
-    // would choke on: an unpaired run is literal text, and a double-backtick span holding
-    // a single backtick closes at the next run of exactly its own length. The middle
-    // paragraph is the shape that once made the pairing rescan — many distinct unpaired
-    // lengths followed by many paired short runs.
+
     const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
       body: [
         "# Details",
@@ -867,14 +759,9 @@ describe("the map a governed write leaves behind", () => {
     });
     const second = await landed(scenario, policy);
 
-    // The derived rows vanish while the index stands — the shape of a workspace whose
-    // concepts predate the graph tables, or of a restore that carried the records and not
-    // the derived store.
     await db().pool.query("DELETE FROM graph_edge WHERE workspace_id = $1", [scenario.workspaceId]);
     await db().pool.query("DELETE FROM graph_node WHERE workspace_id = $1", [scenario.workspaceId]);
 
-    // A re-write of the *cited* concept: newness is the map's own fact, not the index's,
-    // so the policy that names it is re-derived — inbound path links included.
     await landed(scenario, { ...product, iri: first.iri, expects: { head: second.sha } });
 
     const edges = await db().pool.query(
@@ -886,9 +773,7 @@ describe("the map a governed write leaves behind", () => {
 
   it("derives a succession over a deprecated concept of its kind, and a derivation over anything else", async () => {
     const scenario = await arrange();
-    // Two cited concepts, one difference: only the first is deprecated. ADR 0019's rule —
-    // SUPERSEDES when a sources[].resource resolves to a status: deprecated concept of
-    // the same type, else DERIVED_FROM — is the whole distinction.
+
     const superseded = writeFor({ status: "deprecated" });
     const first = await landed(scenario, superseded);
     const stillCurrent = writeFor({ status: "stable", expects: { head: first.sha } });
@@ -909,8 +794,7 @@ describe("the map a governed write leaves behind", () => {
       "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM graph_edge WHERE workspace_id = $1 ORDER BY uid",
       [scenario.workspaceId],
     );
-    // One `lineage:` uid prefix for both labels, so a later relabel moves no key; the
-    // lineage columns stay empty — the link columns are LINKS_TO's alone.
+
     expect(edges.rows).toEqual([
       {
         uid: `lineage:${third.iri}:0`,
@@ -953,11 +837,9 @@ describe("the map a governed write leaves behind", () => {
       );
       return rows.rows.map((row) => row.label);
     };
-    // Cited while current: a derivation.
+
     expect(await lineageLabel()).toEqual(["DERIVED_FROM"]);
 
-    // The deprecation commit — a re-write of the cited concept alone — revisits its
-    // inbound lineage (ADR 0019), so the successor's edge flips with no edit to it.
     await landed(
       scenario,
       writeFor({
@@ -977,8 +859,6 @@ describe("what a governed write refuses", () => {
     const scenario = await arrange();
     await landed(scenario, writeFor());
 
-    // The second write was written against an empty bundle, which is no longer what the
-    // ref holds: the person is told, rather than silently overwriting the first.
     const stale = await write(scenario, scenario.editor, writeFor({ expects: { head: null } }));
 
     expect(stale).toEqual({ ok: false, error: "stale-precondition" });
@@ -998,19 +878,13 @@ describe("what a governed write refuses", () => {
 
   it("refuses a workspace with no bundle, rather than making one nobody asked for", async () => {
     const scenario = await arrange();
-    // A member of a real workspace whose bundle is not on disk: authority passes and the
-    // store is what is missing, which is the only way to reach this refusal — the act checks
-    // who is asking before it goes near a repository.
+
     await removeRepository(scenario.git, scenario.workspaceId);
 
     const refused = await write(scenario, scenario.editor, writeFor());
 
     expect(refused).toEqual({ ok: false, error: "no-such-repository" });
   });
-
-  // A second concept at a path the bundle already holds is refused too — `path-taken` —
-  // and it is asserted where its whole consequence is: the first test below, which reads
-  // the refusal *and* the state it leaves in both stores.
 
   it.each([
     ["outside the bundle's concept area", "elsewhere/expenses.md"],
@@ -1027,9 +901,7 @@ describe("what a governed write refuses", () => {
 
   it("refuses an entry with no keys in a list of objects, and makes no commit", async () => {
     const scenario = await arrange();
-    // The renderer writes an entry as its keys' lines under a list dash, so an empty one has
-    // no line to be written as: it would come back off the file as nothing, which the parser
-    // refuses, and a replay would stop at the commit. Refused here instead, before any.
+
     const refused = await write(
       scenario,
       scenario.editor,
@@ -1043,9 +915,6 @@ describe("what a governed write refuses", () => {
   it("refuses a trailer value carrying a newline, whatever its type promised", async () => {
     const scenario = await arrange();
 
-    // The door's own guard, reached directly: every caller's `Audit:` is a minted id today,
-    // so the type refuses this — and the door refuses it again for the caller that arrives
-    // without the compiler.
     const forged = await commit(scenario.editor, scenario.git, {
       path: "knowledge/expenses.md",
       content: "---\n---\n\nbody\n",
@@ -1060,12 +929,6 @@ describe("what a governed write refuses", () => {
     expect(await head(scenario.editor, scenario.git)).toBeNull();
   });
 
-  /**
-   * The boundary this act runs **before** any commit exists (ADR 0028): a merge key or a
-   * piece of evidence the row would refuse is refused while there is still nothing to
-   * reconcile. Each half of the guard is asserted on its own, because a guard that only
-   * fired when both were wrong would let either through alone.
-   */
   it.each([
     ["a merge key of no shape", { mergeKey: "   " }],
     [
@@ -1095,8 +958,6 @@ describe("what a governed write refuses", () => {
       writeFor(),
     );
 
-    // The store failing is not a refusal a caller can act on, and it arrives as itself. The
-    // read that met it is the act's first transaction, so there is no commit to reconcile.
     expect(refused.ok).toBe(false);
     if (refused.ok) return;
     expect(refused.error).toBeInstanceOf(Error);
@@ -1106,9 +967,6 @@ describe("what a governed write refuses", () => {
   it("refuses a message carrying a newline, so a forged trailer never reaches a commit", async () => {
     const scenario = await arrange();
 
-    // The attack the trailers invite: a subject that ends the message and opens its own
-    // `Audit:` line. A first-match parse would read the forged id, and the idempotency index
-    // would then treat an unrecorded commit as one that already landed.
     const forged = await write(
       scenario,
       scenario.editor,
@@ -1120,19 +978,12 @@ describe("what a governed write refuses", () => {
   });
 });
 
-/**
- * A concept's **class** and its **path** are minted by the act that creates it and moved by
- * nothing this act does (ADR 0012, ADR 0023). Three ways to try, and the same answer to each,
- * decided before any commit is made.
- */
 describe("what a re-write of an existing concept may not move", () => {
   it("refuses a named widening of an existing concept's class, and makes no commit", async () => {
     const scenario = await arrange();
     const input = writeFor({ sensitivity: "Restricted" });
     const first = await landed(scenario, input);
 
-    // The Admin, who may see a Restricted concept: an Editor is refused a step earlier, as
-    // for a concept nobody minted (`visibility.test.ts`), and never reaches this word.
     const widened = await write(
       scenario,
       scenario.admin,
@@ -1153,8 +1004,6 @@ describe("what a re-write of an existing concept may not move", () => {
     const input = writeFor({ sensitivity: "Internal" });
     const first = await landed(scenario, input);
 
-    // No `sensitivity` on the second write. The act's default is the most restrictive of the
-    // three, which on a *re-write* would silently narrow a concept its readers can see today.
     const { sensitivity: _named, ...unclassified } = rewriteOf(input, first);
     await landed(scenario, {
       ...unclassified,
@@ -1173,8 +1022,6 @@ describe("what a re-write of an existing concept may not move", () => {
     const input = writeFor({ status: "stable" });
     const first = await landed(scenario, input);
 
-    // No `status` on the second write. The act's default is *draft* — what a concept is born
-    // at — and applying it here would take a published concept away from every reader.
     const { status: _named, ...unstated } = rewriteOf(input, first);
     await landed(scenario, {
       ...unstated,
@@ -1192,9 +1039,7 @@ describe("what a re-write of an existing concept may not move", () => {
   it("lands a newly published concept's publishedAt as the platform's instant, never the transaction's", async () => {
     const scenario = await arrange();
     const input = writeFor({ status: "stable" });
-    // Deliberately not "now": if the row's `published_at` came from the transaction's own
-    // `now()` rather than this Clock, it would land within milliseconds of the real time
-    // this test runs at, and could never equal a literal decades away (ADR 0040).
+
     const pinned = new Date("2031-06-15T09:30:00.000Z");
     const written = await writeConcept(
       scenario.editor,
@@ -1222,28 +1067,11 @@ describe("what a re-write of an existing concept may not move", () => {
     );
 
     expect(moved).toEqual({ ok: false, error: "rename-refused" });
-    // No commit either: a rename that refused after committing would leave a file at a path
-    // no row names, and a replay that refuses for ever.
+
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
   });
 });
 
-/**
- * Revoke the Editor's credentials — an Admin's, in this workspace, or the operator's
- * everywhere. Both write an **instant**, never a deletion and never a state (ADR 0035), which
- * is what makes "is this person revoked" a question only the acting credential's own issuance
- * can answer.
- *
- * The instant is **bound**, the way `revokeCredentials` binds its `at`, and never Postgres's
- * `now()`. The resolver decides revocation by comparing this instant against the credential's
- * own issuance, and that issuance is stamped by this process — so `now()` would answer one
- * side of the comparison from the container's clock and the other from the host's. Only
- * milliseconds separate the two events, which is the size of the offset between two clocks,
- * so their order would be settled by drift rather than by the order the test wrote them in:
- * a refusal that never arrives, or one that arrives for a credential minted afterwards.
- * Bound from here, one clock answers both sides. Production never has the question — the act
- * takes its instant from the app's own clock as a parameter.
- */
 const REVOCATIONS = {
   here: {
     statement:
@@ -1262,7 +1090,6 @@ const REVOCATIONS = {
 
 type RevocationScope = keyof typeof REVOCATIONS;
 
-/** The revocation, run on a client of the caller's choosing — the pool, or one held open. */
 const revoke = (
   client: { query: (statement: string, parameters: readonly unknown[]) => Promise<unknown> },
   scenario: Scenario,
@@ -1273,7 +1100,6 @@ const revoke = (
 const revokeEditor = (scenario: Scenario, scope: RevocationScope): Promise<unknown> =>
   revoke(db().pool, scenario, scope);
 
-/** Which backend a held connection is, so a test can ask Postgres about that one alone. */
 const backendPidOf = async (client: pg.PoolClient): Promise<number> => {
   const found = await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
   const pid = found.rows[0]?.pid;
@@ -1281,7 +1107,6 @@ const backendPidOf = async (client: pg.PoolClient): Promise<number> => {
   return pid;
 };
 
-/** Whether that backend is waiting on a lock — Postgres's own account of it, not a guess. */
 const isBlockedOnALock = async (pid: number): Promise<boolean> => {
   const found = await db().pool.query("SELECT 1 FROM pg_locks WHERE pid = $1 AND NOT granted", [
     pid,
@@ -1289,25 +1114,15 @@ const isBlockedOnALock = async (pid: number): Promise<boolean> => {
   return (found.rowCount ?? 0) > 0;
 };
 
-/** What a refused act leaves behind: no rows of its own, and every commit it made still there. */
 const expectCommitsWithoutRows = async (scenario: Scenario, commits: number): Promise<void> => {
   expect(await rowsFor(scenario.workspaceId)).toMatchObject({ concepts: "0", commits: "0" });
   expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(commits);
 };
 
-/**
- * Authority is judged **at time-of-act**, in the transaction that writes the rows — and
- * again in the read the act makes before it commits, which is why a revocation that has
- * already landed costs no commit at all. The window the reconciler exists for is what is
- * left: between that read and the write transaction, which no test can enter without a hook
- * inside the act. What every case here shares is the answer — the rows refuse.
- */
 describe("authority that moved while the act was in flight", () => {
   it("refuses a writer whose role moved, before a commit is made", async () => {
     const scenario = await arrange();
-    // The Principal was resolved as an Editor; the membership says Viewer by the time the
-    // act reads it. The door re-reads the membership in the transaction it opens, so the
-    // authority the act writes under is the row's and never the caller's.
+
     await db().pool.query(
       "UPDATE member SET role = 'Viewer' WHERE workspace_id = $1 AND user_id = $2",
       [scenario.workspaceId, scenario.editor.userId],
@@ -1327,7 +1142,6 @@ describe("authority that moved while the act was in flight", () => {
 
       const refused = await write(scenario, scenario.editor, writeFor());
 
-      // One word for both scopes, as the boundary answers them (ADR 0035).
       expect(refused).toEqual({ ok: false, error: "credentials-revoked" });
       await expectCommitsWithoutRows(scenario, 0);
     },
@@ -1335,9 +1149,7 @@ describe("authority that moved while the act was in flight", () => {
 
   it("lets a credential minted after a revocation write, because the instant ends what was issued", async () => {
     const scenario = await arrange();
-    // A revocation, then a fresh sign-in. ADR 0035's rule is that both scopes end what was
-    // *issued* and a fresh sign-in mints anew, so the act's judgement is the boundary's —
-    // the credential's issuance against the instant — and never "an instant is set".
+
     await revokeEditor(scenario, "here");
     const afresh = await principalFor(db(), scenario.workspaceId, scenario.editor.userId);
 
@@ -1363,40 +1175,29 @@ describe("authority that moved while the act was in flight", () => {
     "makes a revocation %s wait for the act holding the membership, and refuses the act after it",
     async (scope) => {
       const scenario = await arrange();
-      // The lock the act's door takes (`FOR SHARE OF m, u`) is what makes ADR 0012's
-      // *impossible by construction* a construction: a revocation of either row cannot land
-      // between the door's read and the act's COMMIT. Driven through the door's own callback,
-      // which is the seam that lets a test hold the act's transaction open.
+
       const revoker = await db().pool.connect();
       let settled = false;
       let waiting: Promise<unknown> = Promise.resolve();
       try {
         const pid = await backendPidOf(revoker);
         await withMembership(scenario.editor, scenario.postgres, async () => {
-          // Fired while the act's transaction holds the rows, and **never awaited in here**:
-          // the act is what releases the lock, so waiting for the revocation inside the act
-          // would be the act waiting for itself.
           waiting = revoke(revoker, scenario, scope).then(() => {
             settled = true;
           });
 
-          // Waited for as a **state Postgres reports**, never a stretch of wall clock: the
-          // revoking backend is asked for repeatedly until it says it is blocked on a lock,
-          // so a starved runner takes longer to observe the same fact rather than failing.
           await until(() => isBlockedOnALock(pid));
-          // Blocked, and therefore not done — which is the whole claim.
+
           expect(settled).toBe(false);
         });
 
         await waiting;
-        // Released by the act's COMMIT, and only then.
+
         expect(settled).toBe(true);
       } finally {
         revoker.release();
       }
 
-      // And the revocation, now committed, refuses the next act's rows — with no commit,
-      // because the act reads its authority before it reaches git.
       const refused = await write(scenario, scenario.editor, writeFor());
       expect(refused).toEqual({ ok: false, error: "credentials-revoked" });
       await expectCommitsWithoutRows(scenario, 0);
@@ -1405,12 +1206,7 @@ describe("authority that moved while the act was in flight", () => {
 
   it("refuses the rows when the revocation lands in the window the act cannot see", async () => {
     const scenario = await arrange();
-    // The window ADR 0012's docblock names: between the read that authorised the commit and
-    // the transaction that writes the rows. It is entered by **queueing** the revocation
-    // rather than by timing it. The act's first transaction is parked on `concept_index`
-    // while it already holds the shared lock on its own membership, so a revocation asked
-    // for now waits behind it and Postgres grants it the instant that transaction commits —
-    // which is before the act's git commit, let alone the transaction after it.
+
     const revoker = await db().pool.connect();
     let acting: Promise<Result<unknown, unknown>> | undefined;
     let revoking: Promise<unknown> = Promise.resolve();
@@ -1431,8 +1227,7 @@ describe("authority that moved while the act was in flight", () => {
     const landed = await acting;
 
     expect(landed).toEqual({ ok: false, error: "credentials-revoked" });
-    // And the state that leaves, which is the reconciler's whole definition: the commit is
-    // real, and no row of this act's — not the ledger's, not the bundle's — records it.
+
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
     expect(history).toHaveLength(1);
     expect(await recordedCommits(scenario.workspaceId)).toEqual([]);
@@ -1444,12 +1239,6 @@ describe("authority that moved while the act was in flight", () => {
   });
 });
 
-/**
- * The read `open` is a projection of, taken at its own seam. Trust is derived from what this
- * read answers (ADR 0019), so the two facts the projection cannot re-derive belong here: that
- * an unchecked concept answers *no check* rather than an unattributable one, and that a store
- * that failed answers as itself rather than as a concept nobody minted.
- */
 describe("the read a concept's trust is derived from", () => {
   it("reads no check at all off a concept nobody has checked", async () => {
     const scenario = await arrange();
@@ -1459,9 +1248,6 @@ describe("the read a concept's trust is derived from", () => {
       conceptByIri(principal, tx, written.iri),
     );
 
-    // Fail-closed on the platform's own trust signal: a concept with no verification row
-    // answers *no check*, never a check whose reviewer and instant are both nothing —
-    // which the trust projection would have to guess at.
     expect(opened.ok).toBe(true);
     if (!opened.ok) return;
     expect(opened.value?.check).toBeUndefined();
@@ -1473,8 +1259,6 @@ describe("the read a concept's trust is derived from", () => {
     const written = await landed(scenario, writeFor({ status: "stable" }));
     let read: Result<unknown, unknown> | undefined;
 
-    // `[TEST8]`: the transaction is aborted before the read, so the read meets the store
-    // failing and the transaction's own outcome is asserted before the value.
     await expect(
       reading(scenario.viewer, async (principal, tx) => {
         await abortTheTransaction(tx);
@@ -1482,17 +1266,10 @@ describe("the read a concept's trust is derived from", () => {
       }),
     ).rejects.toThrow(/did not commit/);
 
-    // A concept withheld and a concept nobody minted both answer `undefined`, so a store
-    // that failed answering as either would be a read a caller could not tell from a miss.
     expect(read).toEqual({ ok: false, error: expect.any(Error) });
   });
 });
 
-/**
- * The window ADR 0012's amendment governs: between the commit and the act's transaction. A
- * failure there is not a bug to be prevented — it is the state the reconciler is defined
- * for, and this is the test that says what it looks like.
- */
 describe("a failure after the commit", () => {
   it("leaves no partial rows, and a head ahead of the last recorded commit", async () => {
     const scenario = await arrange();
@@ -1500,21 +1277,14 @@ describe("a failure after the commit", () => {
     const written = await landed(scenario, first);
     const before = await rowsFor(scenario.workspaceId);
 
-    // A second concept at a path the index already holds: the commit is made — the file is
-    // real and git accepted it — and then the unique index refuses the row.
     const clash = await write(
       scenario,
       scenario.editor,
       writeFor({ path: first.path, expects: { head: written.sha } }),
     );
 
-    // `[TEST8]`: the rows are asserted before the returned value, because a statement that
-    // failed inside a transaction is only proved by what the transaction left. Nothing
-    // landed — not the identity, not the index row, not the commit row, and not the ledger
-    // row, which was written first inside the transaction, so this proves it rolled back
-    // with the act rather than that it was never reached (`[AUDIT1]`).
     expect(await rowsFor(scenario.workspaceId)).toEqual(before);
-    // And the shape the reconciler finds: git is one commit ahead of what Postgres knows.
+
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
     const recorded = await recordedCommits(scenario.workspaceId);
     expect(history).toHaveLength(2);
@@ -1543,8 +1313,6 @@ describe("the per-repository lock", () => {
       held(there.editor, "elsewhere"),
     ]);
 
-    // The two acts on one bundle never overlap; the third is on another bundle and is not
-    // serialised against them, which is why the lock is per repository and not global.
     const sameBundle = order.filter((step) => !step.startsWith("elsewhere"));
     expect(sameBundle).toEqual(["first in", "first out", "second in", "second out"]);
     expect(order).toContain("elsewhere out");
@@ -1553,8 +1321,6 @@ describe("the per-repository lock", () => {
   it("holds the bundle through the whole act, so two writes racing one head leave one commit", async () => {
     const scenario = await arrange();
 
-    // Both were written against an empty bundle. Without the lock spanning the act, both
-    // could read the same head; with it, the second sees what the first left and is refused.
     const [first, second] = await Promise.all([
       write(scenario, scenario.editor, writeFor()),
       write(scenario, scenario.editor, writeFor()),
@@ -1571,8 +1337,7 @@ describe("the per-repository lock", () => {
   it("releases the bundle when an act fails inside it, so the next act is not blocked behind it", async () => {
     const scenario = await arrange();
     await landed(scenario, writeFor());
-    // A failure the act meets **inside** the lock — the precondition is read there — rather
-    // than one decided before it is taken, which would prove nothing about releasing it.
+
     const failed = await write(scenario, scenario.editor, writeFor({ expects: { head: null } }));
     expect(failed).toEqual({ ok: false, error: "stale-precondition" });
 
@@ -1584,13 +1349,6 @@ describe("the per-repository lock", () => {
 });
 
 describe("opening a concept by IRI", () => {
-  /**
-   * The instant this block's reads are taken at — a literal the test writes down
-   * (`[TEST9]`), never the wall clock (ADR 0040, "how a test pins it"). Which instant it is
-   * matters to one row below, the shelf-life table's "the Clock's day" row, chosen to fall
-   * inside the day that row names; every other read here answers the same whichever instant
-   * it is handed.
-   */
   const now = new Date("2026-09-08T12:00:00.000Z");
 
   it("hands the reader the concept the write committed, unchecked until somebody checks it", async () => {
@@ -1606,8 +1364,7 @@ describe("opening a concept by IRI", () => {
     if (!opened.ok || !opened.value.found) return;
     expect(opened.value.concept).toEqual({
       iri: written.iri,
-      // The file carries the status the act named beside its IRI, so the row and the
-      // reconciler's replay of the commit read the same thing off it (T-056).
+
       frontmatter: { ...input.frontmatter, status: "stable", iri: written.iri },
       body: input.body,
       relations: [],
@@ -1624,8 +1381,7 @@ describe("opening a concept by IRI", () => {
 
   it("withholds a draft concept from every reader, whatever their role", async () => {
     const scenario = await arrange();
-    // A draft is a concept nobody has made the company's word on yet: it has no published
-    // instant, and the predicate's published arm is what keeps it out of every read.
+
     const input = writeFor({ status: "draft" });
     const written = await landed(scenario, input);
 
@@ -1672,8 +1428,6 @@ describe("opening a concept by IRI", () => {
       checkedBy: `human:${scenario.admin.userId}`,
     });
 
-    // The same concept written again moves the content hash past the check's, and the trust
-    // status says so without anybody recording anything (ADR 0019).
     await landed(
       scenario,
       rewriteOf(input, written, { body: "Expenses are claimed within sixty days." }),
@@ -1688,8 +1442,7 @@ describe("opening a concept by IRI", () => {
 
   it("shows a deprecated concept to every reader, and says that is what it is", async () => {
     const scenario = await arrange();
-    // *Deprecated* is a trust word a reader is shown, never a way of hiding a concept from
-    // them (ADR 0019), which is why the status is published and reaches the read at all.
+
     const written = await landed(scenario, writeFor({ status: "deprecated" }));
 
     const opened = await reading(scenario.viewer, (principal, tx) =>
@@ -1706,8 +1459,6 @@ describe("opening a concept by IRI", () => {
     const written = await landed(scenario, writeFor({ status: "stable" }));
     const client = await db().pool.connect();
     try {
-      // An imported check is the one kind that carries no content hash, which the table
-      // holds both ways — so it can never read *Changed since checked* and says *imported*.
       await testData(client).conceptVerification({
         workspaceId: scenario.workspaceId,
         iri: written.iri,
@@ -1744,8 +1495,7 @@ describe("opening a concept by IRI", () => {
           type: "Policy",
           sources: [
             { resource: "/sources/handbook.pdf", title: "Handbook", locator: "p.4" },
-            // A blank title is no title: the resource is the only thing left that names
-            // what was cited, and a reader is shown that rather than an empty line.
+
             { resource: "/sources/travel.pdf", title: "", locator: "p.9" },
             { resource: "/sources/rates.csv" },
           ],
@@ -1774,39 +1524,28 @@ describe("opening a concept by IRI", () => {
     expect(uncited.ok && uncited.value.found && uncited.value.concept?.evidence).toEqual([]);
   });
 
-  /**
-   * `stale_after` is the whole of *Out of date* and absence means no shelf life (ADR 0019), so
-   * a reader is told exactly what any other consumer of the same file would derive — and told
-   * nothing at all from a value that is not one of the two forms the ADR names. The far-future
-   * dates keep these cases true for the next thousand years rather than the next few.
-   */
   const SHELF_LIVES: readonly (readonly [string, FrontmatterValue | undefined, TrustStatus])[] = [
     ["no shelf life at all", undefined, "current"],
     ["a date long past", "2020-01-01", "out-of-date"],
-    // The boundary of the date-only form: a shelf life lasts *through* the day it names, so a
-    // date that has not ended yet is not past — and one that ended is.
+
     ["the Clock's day, which the concept lasts through", "2026-09-08", "current"],
     ["a date far ahead", "3000-01-01", "current"],
     ["an offset datetime long past", "2020-01-01T00:00:00Z", "out-of-date"],
     ["an offset datetime far ahead", "3000-01-01T00:00:00+01:00", "current"],
-    // Both halves of the datetime form the grammar has to read for itself: an explicit
-    // offset, sign and all, and the fractional seconds a producer may write.
+
     ["an explicit offset long past", "2020-01-01T00:00:00+01:00", "out-of-date"],
     ["fractions of a second long past", "2020-01-01T00:00:00.123Z", "out-of-date"],
-    // Outside the grammar: an impossible calendar day, an offsetless datetime `Date` would
-    // read as local time, and a sentence. None of them is a shelf life.
+
     ["an impossible calendar day", "2026-02-30", "current"],
-    // The same day with an offset, which `Date` would roll forward into March rather than
-    // refuse — the calendar check is what stops a shelf life nobody wrote from expiring.
+
     ["an impossible calendar day with an offset", "2026-02-30T00:00:00Z", "current"],
     ["a month the calendar has not got", "2020-13-01", "current"],
     ["a datetime with no offset", "2020-01-01T00:00:00", "current"],
     ["a two-digit year `Date` would remap", "0020-01-01", "out-of-date"],
     ["something that is not a date", "when the contract ends", "current"],
-    // The grammar is anchored at both ends, so a date buried in a sentence is not one.
+
     ["a past date behind a prefix", "not-a-date2020-01-01", "current"],
-    // Not a string at all: a list a file wrote where a date belongs carries no shelf life,
-    // which is the same answer as absence.
+
     ["a list where a date belongs", ["2020-01-01"], "current"],
   ];
 
@@ -1829,14 +1568,6 @@ describe("opening a concept by IRI", () => {
     expect(read.ok && read.value.found && read.value.concept?.trust.status).toBe(expected);
   });
 
-  /**
-   * The two exact-boundary comparisons `pastShelfLife` makes, pinned on both sides of each
-   * (ADR 0040): the real clock can only ever land on one side of an instant by accident, so
-   * these move `now` to a literal a millisecond either side of the boundary instead of
-   * waiting for the clock to get there. `open`'s own `now` parameter is what makes the move
-   * possible — before ADR 0040 the comparison read `new Date()` from inside `trustOf`, and
-   * no test could hold it still.
-   */
   it("is out of date exactly at the end of a date-only shelf life's day, and current a moment before", async () => {
     const scenario = await arrange();
     const written = await landed(
@@ -1847,8 +1578,6 @@ describe("opening a concept by IRI", () => {
       }),
     );
 
-    // Midnight UTC the day after `stale_after`: the date-only form lasts *through* the day
-    // it names, so this instant and no earlier one is where it becomes out of date.
     const boundary = new Date("2026-03-02T00:00:00.000Z");
     const atTheBoundary = await reading(scenario.viewer, (principal, tx) =>
       open(principal, tx, { iri: written.iri }, boundary),
@@ -1877,8 +1606,6 @@ describe("opening a concept by IRI", () => {
       }),
     );
 
-    // The datetime form names the instant itself: not yet past at that instant, only
-    // strictly after it.
     const instant = new Date("2026-03-01T12:00:00.000Z");
     const atTheInstant = await reading(scenario.viewer, (principal, tx) =>
       open(principal, tx, { iri: written.iri }, instant),
@@ -1910,12 +1637,9 @@ describe("opening a concept by IRI", () => {
       open(principal, tx, { iri: unminted }, now),
     );
 
-    // Indistinguishable, which is the whole requirement: the same shape, and neither says
-    // anything a caller could probe with (user story 13). Both are asserted whole, because
-    // a read that *failed* also has no concept in it and must never read as this.
     expect(withheld).toEqual({ ok: true, value: { found: false, iri: written.iri } });
     expect(absent).toEqual({ ok: true, value: { found: false, iri: unminted } });
-    // The Admin, who may see it, is the proof the concept is really there.
+
     const seen = await reading(scenario.admin, (principal, tx) =>
       open(principal, tx, { iri: written.iri }, now),
     );

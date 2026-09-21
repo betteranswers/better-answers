@@ -3,19 +3,6 @@ import { screenById } from "@/shared/screens.ts";
 
 const system = screenById("system");
 
-/**
- * System — signals, health, routes and spend, and backups. The screen the frame was built
- * around, and the one place a card of the product's own is built.
- *
- * ADR 0025 gives this screen eight cards, Boxes first; routes is the only one built, and the
- * line below says so rather than letting one card read as the whole screen.
- *
- * The card itself is `features/routes/`: the app layer composes features and holds none of
- * their requests (T-036's rule), so this screen names the card and knows nothing about how it
- * is filled.
- *
- * WCAG 2.2 AA, tested with a keyboard and a screen reader.
- */
 export function SystemScreen() {
   return (
     <>

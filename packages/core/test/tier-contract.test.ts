@@ -15,17 +15,6 @@ import { boundarySchemas, ULID_PATTERN } from "@better-answers/schema";
 
 import { ulid } from "../src/kernel/index.ts";
 
-/**
- * The TypeScript half of the tier-contract conformance suite (ADR 0031). The Python
- * half is `apps/worker/tests/test_tier_contract.py`, and the two assert the same
- * expectations against the same `contracts/` directory.
- *
- * The version and the agreement ids are hardcoded on each side on purpose, never read
- * from a shared constant: each suite states what its tier speaks, so a change to the
- * contract that either tier has not been taught fails that tier's suite. That failure
- * is the mechanism; deduplicating it away would delete the test.
- */
-
 const SPOKEN_CONTRACT_VERSION = 9;
 const SPOKEN_AGREEMENTS = {
   "concept-file": "fixtured",
@@ -40,7 +29,7 @@ const SPOKEN_AGREEMENTS = {
   "upload-media-types": "fixtured",
   "visibility-columns": "fixtured",
 } as const;
-/** Files the manifest does not have to list. */
+
 const NOT_FIXTURES = new Set(["manifest.json", "README.md"]);
 
 const contractsDir = path.resolve(import.meta.dirname, "../../../contracts");
@@ -54,17 +43,6 @@ type Manifest = {
 const readManifest = (): Manifest =>
   JSON.parse(readFileSync(path.join(contractsDir, "manifest.json"), "utf8")) as Manifest;
 
-/**
- * Every fixture a directory holds, as the manifest writes a path: sorted, relative, and
- * neither the manifest nor the README.
- *
- * Dotfiles are not fixtures. macOS writes a `.DS_Store` into any directory a Finder
- * window has opened; `contracts/` is a directory a person browses. It is git-ignored, so
- * no manifest can list it, CI never has one, and the owner reviewing the failure cannot
- * see it either — the suite would fail on the one machine that has one and pass on every
- * other. The Python half applies the same rule to the same directory (ADR 0031), because
- * a filter in one half alone leaves the other tripping on the same file.
- */
 const fixturesOnDisk = (directory: string): readonly string[] =>
   readdirSync(directory, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
@@ -73,12 +51,6 @@ const fixturesOnDisk = (directory: string): readonly string[] =>
     .filter((relative) => !NOT_FIXTURES.has(relative))
     .toSorted();
 
-/**
- * A stand-in for `contracts/`, outside the repository. The walk's rule is proved against
- * files this test writes rather than by dropping a `.DS_Store` into the tracked directory:
- * that would put the proof inside the tree it is proving, and the Python half walks the
- * same directory in another process at the same time.
- */
 const throwaway = mkdtempSync(path.join(tmpdir(), "tier-contract-"));
 
 afterAll(() => rmSync(throwaway, { recursive: true, force: true }));
@@ -107,7 +79,6 @@ describe("the tier contract", () => {
       expect(existsSync(path.join(contractsDir, fixture.path))).toBe(true);
     }
 
-    // The other direction: a file on disk the manifest does not list fails too.
     expect(fixturesOnDisk(contractsDir)).toEqual(
       manifest.fixtures.map((fixture) => fixture.path).toSorted(),
     );
@@ -118,10 +89,7 @@ describe("the tier contract", () => {
     writeFileSync(path.join(throwaway, "id-shape", "cases.json"), "{}");
     writeFileSync(path.join(throwaway, "manifest.json"), "{}");
     writeFileSync(path.join(throwaway, "README.md"), "");
-    // What macOS writes into any directory a Finder window has opened, at the root and
-    // under a fixture's own. It is git-ignored, so no manifest can list it, CI never has
-    // one and a reviewer cannot see it: without this, the suite fails on one laptop and
-    // passes everywhere else.
+
     writeFileSync(path.join(throwaway, ".DS_Store"), "");
     writeFileSync(path.join(throwaway, "id-shape", ".DS_Store"), "");
     mkdirSync(path.join(throwaway, ".cache"));
@@ -131,12 +99,6 @@ describe("the tier contract", () => {
   });
 });
 
-/**
- * id-shape: the one shape an id has, whichever tier minted it (ADR 0035). The fixture is
- * the contract — the pattern, the ids that must parse and the ids that must not — and
- * this half holds it against the tier's own minter and its own boundary, never against a
- * copy of the pattern written out here, which would agree with itself.
- */
 type IdShape = {
   readonly pattern: string;
   readonly must_parse: readonly string[];
@@ -155,8 +117,6 @@ describe("id-shape, the agreement about what an id looks like", () => {
     const fixture = readIdShape();
     const atTheBoundary = boundarySchemas.workspace.select.shape.id;
 
-    // The id and the reason travel with the assertion, so a failure names the sample
-    // rather than reporting that true was not false.
     for (const id of fixture.must_parse) {
       expect({ id, parses: atTheBoundary.safeParse(id).success }).toEqual({ id, parses: true });
     }
