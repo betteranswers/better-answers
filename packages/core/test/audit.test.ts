@@ -390,7 +390,7 @@ describe("the first door — record, the actor derived from the Principal", () =
     const { door, workspaceId, adminUserId } = await provisioned();
     const write = writingIn(door, workspaceId);
 
-    // The end anchor tells this refusal from the optional kind's, which is this plus ", or
+    // The end anchor tells this message from the optional kind's, which is this plus ", or
     // absent"; unanchored, both read green.
     await expect(
       write({

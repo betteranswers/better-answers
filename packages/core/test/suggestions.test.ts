@@ -668,7 +668,7 @@ describe("declining a suggestion", () => {
 
     const nothing = await declineSuggestion(scenario.admin, doorsOf(scenario), {
       suggestionId,
-      // @ts-expect-error — JSON's null parses; a decline with no reason is refused all the same.
+      // @ts-expect-error — null parses at the boundary; a decline with no reason is refused anyway.
       reason: null,
     });
 
@@ -1296,7 +1296,7 @@ describe("what the inbox refuses before it does any work", () => {
       { postgres: scenario.postgres },
       {
         kind: "edit",
-        // @ts-expect-error — JSON's null is not the file an acceptance would commit.
+        // @ts-expect-error — null is not a frontmatter mapping; the runtime half of what the type says.
         requests: [requestFor({ frontmatter: null })],
       },
     );

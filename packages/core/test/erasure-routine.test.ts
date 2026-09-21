@@ -63,8 +63,8 @@ const BEYOND_USE = {
   monthly: "2026-12-01T12:00:00.000Z",
 } as const;
 
-// A 31st is where a day count and a calendar interval part: six months on is 28 February,
-// 183 days 2 March.
+// This day tells a day count from a calendar interval: six months on is 28 February, 183
+// days on 2 March.
 const ANCHORED_ON_A_31ST = new Date("2026-08-31T12:00:00.000Z");
 
 const BEYOND_USE_FROM_THE_31ST = {
@@ -781,8 +781,8 @@ describe("the git step", () => {
     expect(await bundleCommitRowsIn(scenario.workspaceId)).toEqual(rows);
   });
 
-  // A request naming the person by id alone once completed with the address still in every
-  // blob and every author line.
+  // Without the subject's own address, the routine completes, reports and books its ledger
+  // event with it still in every blob and every author line.
   it("rewrites the address the subject's own user row carries when the request names them by id alone", async () => {
     const { scenario, email, subjectRequestId } = await bundleNamingThePerson({ byIdAlone: true });
     const before = await everyObjectOf(scenario.git, scenario.workspaceId);

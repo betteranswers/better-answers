@@ -724,8 +724,8 @@ describe("the map a governed write leaves behind", () => {
   it("keeps mapping an Editor's links past long unmatched backtick runs in the body", async () => {
     const scenario = await arrange();
 
-    // The middle paragraph is the shape that once made the pairing rescan: many distinct
-    // unpaired lengths, then many paired short runs.
+    // The middle paragraph's size and shape are what a rescanning pairing chokes on: many
+    // distinct unpaired lengths, then many paired short runs.
     const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
       body: [
         "# Details",
@@ -1076,8 +1076,8 @@ describe("what a re-write of an existing concept may not move", () => {
   });
 });
 
-// The instant is bound here, never Postgres's now(): two clocks milliseconds apart would
-// settle the order by drift.
+// Bound here, never Postgres's now(): issuance is stamped by this process, and a second clock
+// would order events milliseconds apart by drift.
 const REVOCATIONS = {
   here: {
     statement:
@@ -1177,8 +1177,6 @@ describe("authority that moved while the act was in flight", () => {
     await expectCommitsWithoutRows(scenario, 0);
   });
 
-  // Driven through the door's own callback: the one seam that holds the act's transaction
-  // open while the revocation waits.
   it.each(["here", "everywhere"] as const)(
     "makes a revocation %s wait for the act holding the membership, and refuses the act after it",
     async (scope) => {
@@ -1189,6 +1187,8 @@ describe("authority that moved while the act was in flight", () => {
       let waiting: Promise<unknown> = Promise.resolve();
       try {
         const pid = await backendPidOf(revoker);
+        // The door's own callback: the seam that lets a test hold the act's transaction open
+        // while the revocation waits.
         await withMembership(scenario.editor, scenario.postgres, async () => {
           waiting = revoke(revoker, scenario, scope).then(() => {
             settled = true;

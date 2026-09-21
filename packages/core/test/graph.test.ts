@@ -337,7 +337,7 @@ describe("the delta a second commit runs", () => {
     const { scenario, product, policy } = await linkedPair();
 
     // The target lands first: a newly mapped concept re-derives every file naming it, which
-    // would carry the new kind whether the sync ran.
+    // would carry the new kind whether or not the sync ran.
     await land(scenario, deltaOf(product));
     await land(scenario, deltaOf(policy));
 

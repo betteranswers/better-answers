@@ -189,8 +189,8 @@ describe("an Admin binds an upload", () => {
     const scenario = await arrange();
     const { input } = handbookOffered();
 
-    // The job is the transaction's last statement, so refusing it fails the act after its
-    // three rows exist.
+    // The job is the transaction's last statement, so refusing it fails the act with three
+    // rows written: only that tells one transaction from four statements.
     const bound = await whileWritesAreRefused(db().pool, "job", () =>
       bindUpload(scenario.admin, doorsOf(scenario), input),
     );
