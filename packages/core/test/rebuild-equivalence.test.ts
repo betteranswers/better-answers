@@ -135,6 +135,8 @@ const buildTheMap = async (scenario: Scenario) => {
     body: "The evidence this rests on.",
   });
 
+  // Written after the linker below, so the live map gains that edge through the re-derive
+  // rather than at the linker's own write.
   const laterPath = `knowledge/lands-later-${ulid().toLowerCase()}.md`;
 
   const unlanded = conceptIriOf(ulid());

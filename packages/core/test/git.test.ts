@@ -250,6 +250,8 @@ describe("the per-repository lock", () => {
     await a;
     await secondStarted.waited;
 
+    // The first has cleaned up while the second still holds the lock: an entry cleared by
+    // anyone but its owner lets this past.
     const c = withRepositoryLock(bundle.principal, bundle.door, async () => {
       order.push("c");
     });

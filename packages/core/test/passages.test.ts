@@ -177,6 +177,8 @@ const BOARD_TITLE = "The board's note";
 const BOARD_TEXT = "The board's note on the bid.";
 const BOARD_CHAR_END = 28;
 
+// Two words with a space is prose, not a tsquery: to_tsquery raises a syntax error, so the
+// read uses websearch_to_tsquery.
 const QUERY = "holiday policy";
 
 const HANDBOOK = {
@@ -514,6 +516,8 @@ const bindingUnderReview = (
     }
   });
 
+// Every row here matches the words the search asks, so the empty answer below is the
+// published arm, not an unmatched query.
 const seedTheBindingUnderReview = (workspaceId: string): Promise<void> =>
   bindingUnderReview(workspaceId, REVIEW_BINDING, [
     {

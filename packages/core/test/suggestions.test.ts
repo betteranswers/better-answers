@@ -668,8 +668,7 @@ describe("declining a suggestion", () => {
 
     const nothing = await declineSuggestion(scenario.admin, doorsOf(scenario), {
       suggestionId,
-      // @ts-expect-error — the column is nullable and the boundary mirrors it, so JSON's
-
+      // @ts-expect-error — JSON's null parses; a decline with no reason is refused all the same.
       reason: null,
     });
 
@@ -1297,8 +1296,7 @@ describe("what the inbox refuses before it does any work", () => {
       { postgres: scenario.postgres },
       {
         kind: "edit",
-        // @ts-expect-error — a payload is the file an acceptance would commit, and JSON's
-
+        // @ts-expect-error — JSON's null is not the file an acceptance would commit.
         requests: [requestFor({ frontmatter: null })],
       },
     );

@@ -182,6 +182,8 @@ describe("a governed write", () => {
       ].join("\n"),
     );
 
+    // Written down, never computed here: an expectation this act's own hash produced would
+    // agree with any canonicalisation at all, the Python tier's included.
     expect(written.contentHash).toBe(
       "16f6c6993084b35862434bc90dece1fb2c2669cbddc21c910bdcd95bef0dcecc",
     );
@@ -722,6 +724,8 @@ describe("the map a governed write leaves behind", () => {
   it("keeps mapping an Editor's links past long unmatched backtick runs in the body", async () => {
     const scenario = await arrange();
 
+    // The middle paragraph is the shape that once made the pairing rescan: many distinct
+    // unpaired lengths, then many paired short runs.
     const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
       body: [
         "# Details",
@@ -1072,6 +1076,8 @@ describe("what a re-write of an existing concept may not move", () => {
   });
 });
 
+// The instant is bound here, never Postgres's now(): two clocks milliseconds apart would
+// settle the order by drift.
 const REVOCATIONS = {
   here: {
     statement:
@@ -1171,6 +1177,8 @@ describe("authority that moved while the act was in flight", () => {
     await expectCommitsWithoutRows(scenario, 0);
   });
 
+  // Driven through the door's own callback: the one seam that holds the act's transaction
+  // open while the revocation waits.
   it.each(["here", "everywhere"] as const)(
     "makes a revocation %s wait for the act holding the membership, and refuses the act after it",
     async (scope) => {
@@ -1338,6 +1346,8 @@ describe("the per-repository lock", () => {
     const scenario = await arrange();
     await landed(scenario, writeFor());
 
+    // A failure the act meets inside the lock; one decided before the lock is taken would
+    // prove nothing about releasing it.
     const failed = await write(scenario, scenario.editor, writeFor({ expects: { head: null } }));
     expect(failed).toEqual({ ok: false, error: "stale-precondition" });
 
