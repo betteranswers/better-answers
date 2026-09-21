@@ -1,0 +1,536 @@
+apps/api/tests/workflow-tools.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 19
+apps/api/tests/client-addresses.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 29
+apps/api/tests/adr-index.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 11,13,29,77
+apps/api/tests/mcp-surface.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 95,177,239,276,299
+apps/web/src/app/router.tsx
+  s_c56f1a31cc620f::t_06cf9a5991f181 81,84
+packages/core/src/erasure/report.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 22
+packages/core/src/sources/passages.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 57,69,164
+packages/core/src/store/git/index.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 47,49,63,67,69,75,97,186,208,250,296,356,367,393,397,411,476,557,560,568
+apps/worker/tests/test_redaction.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 21,24,27,31,34,46,51,54,57,60,63,66,128,136,162,168,175,186,199,215,227,240,247,253,270,284,302,318,335,348,359,367,383,400,414,432,445,457,482,491,498,510,525,540
+apps/api/tests/check-scripts.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 19,97,128,142
+  s_c56f1a31cc620f::t_b2ad906ebf58be 21-22
+packages/core/src/audit/vocabulary.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 42
+apps/api/tests/flow.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 28,127
+packages/core/src/sources/dpia.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 57,63,65,68,70,74,76,84,137
+packages/schema/src/journal.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 8
+packages/core/test/git.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 34,97,163,252
+packages/core/src/store/postgres/index.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 42,141,152,174,207,229,231,247,270,280,292,302
+packages/devtools/test/mutant-probe.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 230
+apps/api/tests/routes-list.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 18,151,167,189,197
+packages/core/src/kernel/principal.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 9,11,21,23,29
+apps/api/tests/oauth-flow.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 55,106,114,116,139,145,157,167,384,442,456,517,638
+apps/api/tests/image-probe.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 27,98
+apps/api/vitest.config.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 6,8,10,12
+packages/schema/src/schema.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 16,48,50,56
+packages/core/src/erasure/identity.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 6-7,10,30,32,34,46,52,77
+packages/devtools/test/knip.test.ts
+  s_c56f1a31cc620f::t_a6552aa51b8d1e 120-121
+  s_c56f1a31cc620f::t_06cf9a5991f181 100
+  s_c56f1a31cc620f::t_e3abec87e7af04 101-102
+packages/core/src/concepts/reconciler.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 63,65,67,69,71,189,203,242,244,301,304
+packages/schema/test/rls.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 401,414,493,639,654,760,776,787,843,927,1042,1058,1069,1075,1081,1178,1302,1313,1395,1404,1413,1422,1427,1462,1770,1924,1926,1928,2014,2092,2132,2235,2265,2318,2392,2449,2524,2532,2538,2635,2644,2650,2656,2667,2673,2776,2787,2918
+packages/core/test/graph-budget.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 16,46,124
+apps/worker/tests/test_visibility_columns_contract.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 11,64,80,157
+packages/schema/src/job-tables.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 30,32,34,36,102,104,107,111,114,116,124,130,136,141,149,154,168
+packages/devtools/src/mutant-probe.ts
+  s_c56f1a31cc620f::t_8cc5a224357562 134-135
+  s_c56f1a31cc620f::t_06cf9a5991f181 133,167
+apps/api/src/trpc/mount.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 22
+packages/devtools/src/mutation-summary.ts
+  s_c56f1a31cc620f::t_6e48c729bed54a 192
+  s_c56f1a31cc620f::t_06cf9a5991f181 21,191
+packages/core/src/kernel/constraint.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 9
+packages/devtools/lint-rules/rules/import-direction.ts
+  s_c56f1a31cc620f::t_628db6292f508a 81-82
+  s_c56f1a31cc620f::t_06cf9a5991f181 71,80,109,111,181,204
+apps/worker/tests/test_redaction_suffixes.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 13,23,32,53,66
+apps/api/tests/local.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 16,32
+packages/schema/test/warm-postgres.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 177
+packages/schema/test/factory.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 40,42,44,46,48,50,54,56,58,60,64,68,70,72,76,78,80,82,86,90,92,94,96,100,102,106,108,112,116,118,122,126,128,130,158,168,171,254,276,278,305,320,379,404,439,509,537,541,564,601,607,619,627,632,634,645,658,674,678,690,693,710,729
+  s_c56f1a31cc620f::t_3b9a0146e3d723 172-173
+packages/core/test/erasure-replay.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 100,201,216,218,223,241,272,290,304,321,338,358,381,383,386,398,408,412,414,430
+packages/core/test/erasure.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 24,96,145,216,277
+apps/api/tests/postgres.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 6,8
+apps/worker/src/better_answers_worker/pipeline/objects.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 15,17
+packages/schema/test/harness.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 21,23,37
+packages/core/stryker.config.mjs
+  s_c56f1a31cc620f::t_1fc10b655f4218 1,12-13,18,24,27,30-31,34
+packages/core/src/answering/index.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 20,22,24,60,221,235,257,264,268,309
+packages/schema/src/ulid.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 10,14,19
+apps/worker/tests/test_work_loop.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 155,261-263,322,333,337-339,353,377,435,449,453,490,515,559,591,600,605,610
+apps/worker/src/better_answers_worker/pipeline/host.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 24,33
+apps/api/tests/config.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 67,178,210,241,243
+packages/schema/test/migration-ownership.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 24,27,29,31,72,127
+packages/core/test/graph.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 83,139,176,194,338,378,605,617
+packages/core/test/rebuild-equivalence.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 133,137,139,164,173,221,231,246,286
+packages/devtools/src/jscpd.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 8,10,13,15,28,62
+apps/api/src/trpc/router.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 15
+apps/worker/src/better_answers_worker/loop.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 16,158
+apps/worker/tests/test_redaction_descriptors.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 51,118,130,140,151,164,181,198,231,239,264,271,278,293
+apps/web/e2e/accessibility-gate.spec.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 32
+apps/worker/src/better_answers_worker/redaction/__init__.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 26,49,53,55,87,105
+apps/api/tests/ops.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 35,37,58,184-185,198,234,244,257,267,350,365,384,464,581,615,712,766,829
+packages/schema/test/chunk-columns.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 284
+packages/core/test/principal.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 24,31,33,35,37,109,158,200,328,438,440
+packages/core/test/import-direction.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 85,115,132,137,143,152,197
+packages/schema/src/composition-tables.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 10,26,37,43
+apps/api/src/config.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 20,25,49,55,57,60,84,92
+packages/schema/test/worker-schema-view.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 71
+packages/core/src/erasure/suppressions.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 39
+apps/web/src/shared/ui/dropdown-menu.tsx
+  s_c56f1a31cc620f::t_06cf9a5991f181 73
+packages/devtools/src/comment-density.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 35,56
+apps/worker/src/better_answers_worker/config.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 20,23,28,51,53
+packages/schema/src/index-tables.ts
+  s_c56f1a31cc620f::t_e25f84919e94df 12-13
+  s_c56f1a31cc620f::t_06cf9a5991f181 11,25,28,33,35,38,42
+apps/worker/src/better_answers_worker/pipeline/run.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 35
+apps/api/src/mcp/surface.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 44,70
+packages/schema/src/counter-tables.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 18
+apps/api/src/ingress/hostnames.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 79,99,127,139
+packages/schema/vitest.config.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 8,10,12,14
+packages/core/src/sources/chunk-address.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 10,12,44
+packages/core/test/erasure-routine.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 109,111,113,209,226,228,481,540,574,577,633,642,663,677,700,740,762,778,795,810,830,832,844,857,880,886,897,947,980,1015,1024,1044,1088,1148,1164,1214,1228,1274,1307,1352,1370,1373,1377,1391,1402,1405,1408,1410,1421,1431,1453,1472
+apps/web/src/features/auth/auth-hooks.ts
+  s_c56f1a31cc620f::t_c2b0234f4689c5 84-85
+apps/worker/tests/test_upload_media_types_contract.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 26
+packages/core/test/sources.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 270,491,510,810,858
+apps/api/src/mcp/entries/index.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 144,154,211
+packages/devtools/test/vitest-runner-patch.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 14,82,126,131
+  s_c56f1a31cc620f::t_a98e5ffe7f29c7 83
+apps/api/tests/hostnames.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 59,100,154,180,196
+apps/api/src/mcp/entries/define.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 19,30
+apps/api/src/ingress/limits.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 17,20
+apps/worker/tests/test_image.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 36,39,42,52,59,65,71,74,77,82,85,91,94,123-124,126-127,131,338,383,386,428,431,516,542,571,585,679,715,755,763,779,783,790,794,808,817,829,869,917,979
+packages/core/src/audit/index.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 34,61,85,130
+apps/worker/src/better_answers_worker/pipeline/converter.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 15,18,21,24,27,95,102
+packages/core/test/suite-documents.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 8,15,18,58
+packages/core/test/redaction.contract.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 66,79,89
+packages/devtools/src/throwaway-tree.ts
+  s_c56f1a31cc620f::t_0ff6c70f54f7e2 104-105
+  s_c56f1a31cc620f::t_06cf9a5991f181 11,13,15,17,19,100,115,213
+  s_c56f1a31cc620f::t_95b7a80cc29f51 214-215
+apps/api/tests/invisibility.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 173,279
+packages/core/src/erasure/rederive.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 13,44,52
+packages/core/src/sources/binding.ts
+  s_c56f1a31cc620f::t_deddc763cb9ea3 68-69
+  s_c56f1a31cc620f::t_06cf9a5991f181 87,100,102,104,107,125,128,259,280,282,321,371,379,381,383,413
+  s_c56f1a31cc620f::t_78a08f32b2b49e 74
+packages/core/test/worker-process.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 13,30,44
+apps/api/src/ingress/spa.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 8,14,38
+packages/schema/test/ulid.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 56
+apps/worker/tests/test_cocoindex_ban.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 17,20,89
+packages/core/test/answering.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 372,643,650,674
+packages/core/test/findings.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 84,86,112
+packages/schema/test/probes.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 26
+packages/core/test/members.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 169,259,330,432,516,545,550,576,588
+apps/worker/tests/test_links.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 56,67,78,98
+packages/core/src/workspaces/index.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 31,68,76,87,94,130,139,173,179,203,220,242
+apps/api/tests/image-job.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 53,59,69,83
+apps/web/e2e/routes.spec.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 100,116,118,120,133
+apps/worker/tests/test_tier_contract.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 76,101,108,116
+packages/core/test/bundle-root.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 66,75,94
+apps/web/playwright.config.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 9,16,18
+apps/worker/src/better_answers_worker/redaction/descriptors.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 92
+packages/schema/test/job-kinds.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 33,224,330,345
+packages/core/vitest.config.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 6,8,10,12
+packages/core/src/concepts/inbox.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 55,60,62,123,128,135,140,169,203,225,270,286
+apps/api/src/auth/constants.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 22,24,26,28,30,32
+apps/api/src/reconciler.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 20,24,81
+packages/core/src/concepts/index.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 137,148,154,156,162,164,166,168,170,178,180,219,230,250,260,266,279,281,283,285,289,301,334,337,462,484,508,545
+packages/core/src/erasure/replay-erasures.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 36,44,46,48,89,152
+apps/api/tests/cimd-fetch.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 57
+apps/worker/src/better_answers_worker/redaction/pins.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 3,6,9,12,16,19,22,25,29
+apps/api/tests/provision-skills.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 54,140,180,193,208,242,369
+apps/worker/tests/test_concept_file.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 68,75,92,109,119,138
+packages/core/src/store/objects/index.ts
+  s_c56f1a31cc620f::t_c9474bce3c6de4 84-85
+  s_c56f1a31cc620f::t_06cf9a5991f181 20,22,48,83,104
+apps/api/src/server.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 25,27,32,38,40,90,124,134
+apps/api/tests/deploy-tree.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 14,136,178,205,210,225,260,263,269,325,329,344,365,371,379
+apps/api/tests/harness-control.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 24,62
+packages/schema/src/finding-tables.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 33,35,38,40,43,45,49,53,61,67,80,82,84,93,102
+packages/schema/src/identity-tables.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 29,31,42,49,73,90,116,119,125,162,253
+packages/core/src/runs/index.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 36,38,46,51-52,62,64,70,118,164
+packages/schema/src/access-request-tables.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 24,31,34,40,45
+packages/core/test/suite-objects.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 98
+packages/devtools/python/comment_gate.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 14,54,80,157
+apps/worker/tests/test_pipeline_index.py
+  s_c56f1a31cc620f::t_602aae52890d50 427,441
+  s_c56f1a31cc620f::t_9e12192ab77d96 880,889
+  s_c56f1a31cc620f::t_4b927891de51b0 927,935
+  s_c56f1a31cc620f::t_06cf9a5991f181 58,68,79,273,675,726
+  s_c56f1a31cc620f::t_773ff4303c7bb3 794,803
+apps/worker/src/better_answers_worker/redaction/engine.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 33,36,39,44,56,59,62,67,106,111,126,147,157,163,187,331
+packages/schema/src/erasure-tables.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 43,45,49,52,54,62,64,69,78,91,93,95,102,109,115,120,122,124,134,145,151,162,164
+packages/core/src/sources/admin-binding.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 36
+packages/schema/src/group-tables.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 33,43,55,61
+packages/core/src/erasure/rehearsal.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 45,49,51,54,62,64
+apps/api/src/ops/http-fetch.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 26
+apps/web/e2e/sign-in.spec.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 39,59,83,164,202,245
+apps/api/src/ops.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 34,38
+apps/worker/tests/test_chunker.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 14,35,41,50
+packages/core/src/sources/findings.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 30,32,46,86
+apps/api/tests/docs-lane.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 37,62,64,256,261,264,266,323,325
+packages/core/test/visibility.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 183,253,302,343,371,407,457,476,491,528,564,621,660,687,782,808,963,982,1021,1093,1174,1293
+apps/worker/src/better_answers_worker/pipeline/rows.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 31
+apps/worker/tests/test_log_bridge.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 16
+packages/schema/src/source-tables.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 61,64,66,68,73,75,77,85,92,101,104,106,108,110,112,115,117,119,122,124,126,128,130,136,142,144,150,159,167
+packages/schema/test/boundary-schemas.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 38,45,48,50,53,55,58,61,83,94,96,171,199,230,254,260,292,341,381,414,423,427,469,495,516,537,577,592,596,617,717,724,744,748,753,757,759,762,764,767,799,804,812,825,836,852,867,873,885,893,901,915,920,955,964,975,1031
+apps/worker/src/better_answers_worker/concept_file.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 15,20,33,106,150
+apps/worker/src/better_answers_worker/bundle.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 17,27
+apps/api/src/auth/routes.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 32,38,70,116,188,217,234,236
+apps/api/src/trpc/base.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 25
+packages/core/src/store/graph/index.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 29,67,78,84,132,158,212,254,265,356,402,416,425
+apps/worker/tests/planted_page.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 20,26,35,38,41,44,50,56
+apps/worker/src/better_answers_worker/audit.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 41
+packages/schema/src/concept-tables.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 68,125,147,150,157,159,165,175,177,185,197,199,207,224,244,246,249,257,267,294,310
+apps/api/tests/image-probe.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 25,44,49,147,175,177
+apps/api/src/auth/verify.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 72
+apps/worker/tests/test_redaction_windows.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 27,30,45,49,67,73,77,168,184,205,218,235,252,260,272,283,298
+apps/api/tests/better-auth-endpoints.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 82
+apps/worker/src/better_answers_worker/links.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 14,17,20,26,44,108,121
+packages/core/test/invisibility.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 86,175,185,231,288
+packages/core/src/erasure/requests.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 33,42,55,118,122,155
+packages/schema/test/source-catalogue.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 116,160,174,176,227,234,275,327,355,370,425,440
+packages/devtools/lint-rules/rules/mcp-entry-annotations.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 34
+packages/core/src/sources/index.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 103,119,121,152,179,191
+apps/web/e2e/consent.spec.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 66,68
+apps/worker/src/better_answers_worker/redaction/consumer_domains.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 3,19
+packages/core/src/concepts/visibility.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 95,97,99,123,221,235,237,293,310,316,318,320,322
+apps/api/tests/coding-rules-tags.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 10,14
+apps/api/tests/harness.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 68,81,83,85,87,89,91,96,98,104,106,108,110,112,114,133,139,141,185,187,189,191,198,205,332,337,350,363,390
+apps/web/test/failed-screen.test.tsx
+  s_c56f1a31cc620f::t_06cf9a5991f181 77,89,97
+packages/core/test/erasure-rehearsal.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 116,144,149,170
+packages/schema/src/suggestion-tables.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 50,54,56,58,60,73,77,83,92,112,115,117,123
+apps/worker/src/better_answers_worker/rebuild.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 80
+apps/web/src/shared/ui/kibo-ui/combobox.tsx
+  s_c56f1a31cc620f::t_06cf9a5991f181 182
+packages/core/test/review.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 316,391,421,492,510,513,523,545,624,716,733,748,770,797,814,860
+packages/devtools/src/oxlint-config.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 15,18
+  s_c56f1a31cc620f::t_e112176cc150e3 23-24
+packages/core/test/suggestions.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 270,362,393,442,469,480,557,560,582,593,623,631,672,750,760,769,777,789,814,989,1089,1108,1142,1164,1273,1301
+apps/web/src/features/auth/choose-workspace-screen.tsx
+  s_c56f1a31cc620f::t_06cf9a5991f181 31,45,67,78,84
+apps/worker/tests/factories.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 44
+apps/web/e2e/harness.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 14,79
+packages/core/test/graph-ops.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 144,171,190
+apps/worker/src/better_answers_worker/redaction/recognisers.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 29,38,41,44,65,71,96
+packages/core/test/kernel.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 44,158,183
+packages/core/src/erasure/map.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 37,39,41,43,185,194,202
+apps/api/tests/limits.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 23
+packages/devtools/lint-rules/rules/mcp-entry-no-workspace-argument.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 22,27
+packages/core/test/erasure-map.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 295,328
+apps/api/tests/image.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 105
+packages/schema/src/graph-tables.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 79,101,110
+apps/worker/tests/test_redaction_contract.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 10,36,58,81,102
+apps/api/tests/reconciler.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 56
+apps/web/e2e/failed-screen.spec.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 30
+apps/worker/tests/test_pipeline_engine_environment.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 13,52
+apps/worker/tests/test_redaction_weights.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 13,20,27
+apps/api/tests/backup-image.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 51,53,132,143
+apps/worker/src/better_answers_worker/pipeline/chunks.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 12,44
+packages/core/src/members/groups.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 41,92,110,144,214,255,307
+apps/worker/tests/test_pipeline_landed.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 37,40,43,57,68,75,78,103,114,147,150,424,547
+apps/api/tests/client-addresses.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 2
+packages/core/test/passages.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 90,92,248,323,400,411,470,592,595
+packages/devtools/vitest.config.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 6
+apps/web/src/app/frame.tsx
+  s_c56f1a31cc620f::t_06cf9a5991f181 16,18
+apps/api/src/main.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 15
+packages/core/src/concepts/file.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 157,184
+apps/api/src/auth/pages.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 24,26
+packages/core/src/sources/review.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 39,41,43,178,180,194,196,198,228,230,290,292,306,309,311,313,315,388
+apps/worker/src/better_answers_worker/queue.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 14,24
+apps/api/tests/lefthook-config.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 68,171,195,205,215
+apps/worker/src/better_answers_worker/pipeline/landed.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 26,29,56,67,69
+packages/core/test/workspace-with-bundle.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 17
+packages/core/src/members/requests.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 48,50,98,113,155,179,209
+packages/core/src/access/index.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 64
+apps/api/src/ops/index.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 35,38,40,42,44,46,184,238,328
+apps/worker/tests/conftest.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 17,26,38
+apps/api/src/auth/auth.ts
+  s_c56f1a31cc620f::t_48ee785008d940 69-70
+  s_c56f1a31cc620f::t_06cf9a5991f181 85,131,199,203,205,224,233,244,250,289,302,304,329,336,340,363,368,370,373,378,394,399,413,424
+packages/devtools/lint-rules/rules/comment-only-the-why.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 40,89
+packages/core/test/audit.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 33,80,127,183,195,218,299,358,407,419,438
+packages/core/src/concepts/landing.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 52,57,59,183,185,187,189,222,264,276,342,371
+apps/worker/src/better_answers_worker/pipeline/catalogue.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 29,32
+packages/core/test/runs.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 224,247,393,463,495
+apps/worker/tests/test_document_chunk_contract.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 21,49,83,172,208
+packages/schema/test/warm-postgres.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 21,144
+apps/worker/tests/test_planted_page.py
+  s_c56f1a31cc620f::t_06cf9a5991f181 26,33,42,48,53
+packages/core/test/bundle.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 29,44,56,79,81,84,87,101
+packages/schema/src/boundary-schemas.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 101,103,105,107,134,169,186,205,229,729,764
+  s_c56f1a31cc620f::t_23745b390d6637 480-481
+  s_c56f1a31cc620f::t_3097ccc55ddd41 555
+packages/core/test/bundle-root.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 31,34
+packages/core/test/visibility-columns.contract.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 76
+packages/schema/src/audit-tables.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 23,27,29,35,37,43,45
+packages/core/test/concepts.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 47,60,144,149,167,184,192,204,217,229,236,256,258,283,308,324,343,349,351,356,398,409,430,533,592,609,621,648,691,724,776,797,840,881,904,1042,1070,1125,1152,1178,1190,1195,1209,1230,1287,1340,1367,1384,1445,1498,1530,1535,1538,1540,1546,1548,1642
+packages/core/src/erasure/replay.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 23,25,27,29,65,84
+apps/web/e2e/sign-out.spec.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 15
+apps/worker/tests/test_pipeline_host.py
+  s_c56f1a31cc620f::t_82e4d36b3c6f57 52,64
+  s_c56f1a31cc620f::t_06cf9a5991f181 148,235
+apps/web/test/api-seam.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 27,29
+apps/api/stryker.config.mjs
+  s_c56f1a31cc620f::t_fefba996307030 1,7-8,12-13,18,24,27,30-31,34
+packages/core/test/workspaces.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 90,111,124,157,170,178,204,272,294,392,427,520,558,614,729
+packages/core/src/erasure/routine.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 55-56,61,65,67,80,86,93,120,122,138,143,154,165,340,359,415,449
+packages/core/test/sourced-concept.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 95,118
+packages/core/test/llm-routes.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 17
+packages/schema/src/table-ownership.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 4,55,57,59,61,63,66,77,80
+packages/core/src/llm/index.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 13,15,17
+packages/core/test/access-requests.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 133,157,160,192,228,239,285,551,616
+packages/core/test/suite-postgres.ts
+  s_c56f1a31cc620f::t_a8190a3211ff8b 97-98
+apps/web/test/frame.test.tsx
+  s_c56f1a31cc620f::t_06cf9a5991f181 60
+packages/core/test/reconciler.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 190,206,215,217,220,263,309,394,430,477,542,561,576,590,608,670,678,707,734,800,816,827,833,882,884
+packages/core/test/tier-contract.test.ts
+  s_c56f1a31cc620f::t_06cf9a5991f181 32,92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "5d2b1dbca61210d0c1f397bd57a31dd229b945c3",
+  "prompts": {},
+  "sessions": {
+    "s_c56f1a31cc620f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8ac1ca55-d3f6-48b9-8be8-5a25b6a547f2",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
