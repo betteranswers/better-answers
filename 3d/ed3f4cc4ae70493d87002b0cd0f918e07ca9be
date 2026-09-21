@@ -1,0 +1,19 @@
+.github/workflows/probe-docker-driver-reads-gha.yml
+  s_8fbf54266b50d0::t_78afebfce10276 1-106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3ded3f4cc4ae70493d87002b0cd0f918e07ca9be",
+  "prompts": {},
+  "sessions": {
+    "s_8fbf54266b50d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6627d8a1-82ed-4761-808f-0cc813ca3112",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
