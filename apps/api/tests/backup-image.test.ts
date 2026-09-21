@@ -65,6 +65,8 @@ const contentsSchema = z.object({
 
 type ImageContents = z.infer<typeof contentsSchema>;
 
+// String.raw keeps \t and \n as the characters printf interprets; a plain literal makes
+// them a real tab and newline.
 const probe = String.raw`
 printf 'pgDump\t%s\n' "$(pg_dump --version 2>&1)"
 for tool in ${REQUIRED_TOOLS.join(" ")}; do

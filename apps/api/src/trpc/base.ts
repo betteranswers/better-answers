@@ -37,6 +37,8 @@ export const workspaceProcedure = trpc.procedure.use(async ({ ctx, next }) => {
   if (claims === undefined) throw unauthorized("no-active-workspace");
 
   const resolved = await withPrincipal(ctx.door, claims, async (principal, tx) => {
+    // tRPC returns a failed procedure rather than throwing, so without the throw below
+    // the transaction it failed inside commits.
     const ran = await next({ ctx: { principal, tx } });
     if (!ran.ok) throw ran.error;
     return ran;

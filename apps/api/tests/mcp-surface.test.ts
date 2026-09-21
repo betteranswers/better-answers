@@ -275,6 +275,8 @@ describe("era-independent", () => {
     const { client, token } = await connect();
 
     let refused: Response | undefined;
+    // The window is wall-clock aligned, so a burst of max + 1 can straddle a boundary and
+    // never be refused; 2·max + 1 cannot.
     const enough = 2 * MCP_TOKEN_RULE.max + 1;
     for (let call = 0; call < enough && refused === undefined; call += 1) {
       const answer = await modern(client, token, "tools/list");

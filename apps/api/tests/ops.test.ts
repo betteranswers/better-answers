@@ -28,6 +28,8 @@ import { servedApp } from "./suite-app.ts";
 
 type Run = { readonly exitCode: number; readonly lines: readonly string[] };
 
+// A replay reads every workspace, so each case erases at an instant of its own and asks
+// for the window holding only that one.
 const FROM_THE_ROWS_AT = new Date("2026-06-01T12:00:00.000Z");
 const FROM_THE_ROWS_SINCE = "2026-05-31T00:00:00Z";
 const FROM_THE_COPY_AT = new Date("2026-07-01T12:00:00.000Z");
