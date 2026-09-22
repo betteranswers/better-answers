@@ -4,7 +4,8 @@ set -euo pipefail
 # .claude/hooks/provision-skills.sh <worktree-path>
 #
 # The skills stage of provisioning: gives a worktree the agent tooling a checkout cannot
-# carry. Run by .claude/hooks/provision-worktree.sh after the installs.
+# carry. Run by .claude/hooks/provision-worktree.sh after the installs; runnable by hand.
+#
 SKILLS_CLI="skills@1.5.24"
 
 USAGE="Usage: provision-skills.sh <worktree-path>"
