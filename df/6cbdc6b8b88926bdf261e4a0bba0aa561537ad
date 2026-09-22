@@ -1,0 +1,23 @@
+docs/specs/T-328.md
+  s_b979b383b8487b::t_092a4064c55eea 1-73,75-90,92-113
+  s_b979b383b8487b::t_7ff17ce40ad6ae 74,91
+docs/specs/v01-route.md
+  s_b979b383b8487b::t_21a096614b89c8 445
+  s_b979b383b8487b::t_1aaabb8cdc5db5 380
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "df6cbdc6b8b88926bdf261e4a0bba0aa561537ad",
+  "prompts": {},
+  "sessions": {
+    "s_b979b383b8487b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e61a5c8-13ae-4dc9-a43d-8d5569f4e2c6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
