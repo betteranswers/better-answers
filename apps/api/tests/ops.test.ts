@@ -26,6 +26,7 @@ import {
   type Tx,
 } from "@better-answers/core/store/postgres";
 import { objectStoreForSuite } from "@better-answers/core/testing/objects";
+import { ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import { fetchHonouringHost } from "../src/ops/http-fetch.ts";
@@ -120,6 +121,54 @@ const mapped = async (app: TestApp, workspaceId: string): Promise<void> => {
 };
 
 const answered = (run: Run): unknown => JSON.parse(run.lines[0] ?? "");
+
+const ULID_SHAPE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+
+const BOOTSTRAP_ACTOR = "process:better-answers-bootstrap";
+
+const idOnTheDoneLine = (run: Run): string => {
+  const id = /done — (\S+),/.exec(run.lines[0] ?? "")?.[1];
+  if (id === undefined) throw new Error(`no id on the done line: ${run.lines.join("\n")}`);
+  return id;
+};
+
+const aSlug = (): string => `acme-${ulid().toLowerCase()}`;
+
+const provisioning = (app: TestApp, flags: readonly string[]): Promise<Run> =>
+  opsWith(app, ["provision-workspace", ...flags], {});
+
+const adding = (app: TestApp, workspaceId: string, email: string, role: string): Promise<Run> =>
+  opsWith(app, ["add-member", "--workspace", workspaceId, "--email", email, "--role", role], {});
+
+const membershipsOf = async (app: TestApp, workspaceId: string, userId: string) => {
+  const found = await app.database.superuser.query<{ id: string; role: string }>(
+    "SELECT id, role FROM member WHERE workspace_id = $1 AND user_id = $2",
+    [workspaceId, userId],
+  );
+  return found.rows;
+};
+
+const membershipsHeldBy = async (app: TestApp, userId: string): Promise<number> => {
+  const found = await app.database.superuser.query("SELECT 1 FROM member WHERE user_id = $1", [
+    userId,
+  ]);
+  return found.rowCount ?? 0;
+};
+
+const workspacesWithSlug = async (app: TestApp, slug: string): Promise<number> => {
+  const found = await app.database.superuser.query("SELECT 1 FROM workspace WHERE slug = $1", [
+    slug,
+  ]);
+  return found.rowCount ?? 0;
+};
+
+const rowsOfAct = async (app: TestApp, workspaceId: string, act: string) => {
+  const found = await app.database.superuser.query<Record<string, unknown>>(
+    "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY at, id",
+    [workspaceId, act],
+  );
+  return found.rows;
+};
 
 type QueuedJob = { id: string; kind: string; reason: string | null; status: string };
 
@@ -930,6 +979,296 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
+  describe("provision-workspace — a client's workspace with its first Admin, from the command line", () => {
+    const standingOf = async (app: TestApp, id: string) => {
+      const found = await app.database.superuser.query<Record<string, unknown>>(
+        `SELECT w.name, w.slug,
+                EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+                         WHERE n.nspname = 'index' AND c.relname = 'chunk_' || w.id) AS partition,
+                (SELECT value FROM workspace_config
+                  WHERE workspace_id = w.id AND key = 'mcp.tools_list_ttl_ms') AS ttl
+           FROM workspace w WHERE w.id = $1`,
+        [id],
+      );
+      return found.rows;
+    };
+
+    it("is done with the id first on its line, and the workspace, its partition, the Admin's membership, its configuration row, its ledger row and its bundle repository all stand", async () => {
+      const admin = await app().person(undefined, "Priya Shah");
+      const slug = aSlug();
+
+      const run = await provisioning(app(), [
+        "--name",
+        "Acme",
+        "--slug",
+        slug,
+        "--admin",
+        admin.email,
+      ]);
+
+      expect(run.exitCode).toBe(0);
+      const id = idOnTheDoneLine(run);
+      expect(run.lines).toEqual([
+        `provision-workspace: done — ${id}, slug ${slug}, Admin ${admin.email}`,
+      ]);
+      expect(await standingOf(app(), id)).toEqual([
+        { name: "Acme", slug, partition: true, ttl: "300000" },
+      ]);
+      expect(await membershipsOf(app(), id, admin.id)).toEqual([
+        { id: expect.stringMatching(ULID_SHAPE), role: "Admin" },
+      ]);
+      expect(await rowsOfAct(app(), id, "platform.workspace.provisioned")).toEqual([
+        {
+          actor: BOOTSTRAP_ACTOR,
+          subject_id: id,
+          detail: { adminUserId: admin.id, role: "Admin" },
+        },
+      ]);
+      const reconciled = await ops(app(), ["reconcile-watermark", "--workspace", id]);
+      expect(reconciled.lines).toEqual([
+        "reconcile-watermark: done — head none, watermark none, replayed 0, already landed 0",
+      ]);
+    });
+
+    it("resolves the Admin's email without regard to case, as sign-in does", async () => {
+      const admin = await app().person("Priya.Shah@Acme.Invalid");
+
+      const run = await provisioning(app(), [
+        "--name",
+        "Acme",
+        "--slug",
+        aSlug(),
+        "--admin",
+        "priya.shah@acme.invalid",
+      ]);
+
+      expect(run.exitCode).toBe(0);
+      expect(await membershipsOf(app(), idOnTheDoneLine(run), admin.id)).toEqual([
+        { id: expect.stringMatching(ULID_SHAPE), role: "Admin" },
+      ]);
+    });
+
+    it("refuses no-such-user for a person who has not signed in, says what to do next, and writes nothing", async () => {
+      const slug = aSlug();
+
+      const run = await provisioning(app(), [
+        "--name",
+        "Acme",
+        "--slug",
+        slug,
+        "--admin",
+        "nobody@acme.invalid",
+      ]);
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        "provision-workspace: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, then run this again",
+      ]);
+      expect(await workspacesWithSlug(app(), slug)).toBe(0);
+    });
+
+    it("refuses slug-taken for a slug another workspace holds, and writes nothing", async () => {
+      const first = await app().person();
+      const second = await app().person();
+      const slug = aSlug();
+      const held = await provisioning(app(), [
+        "--name",
+        "One",
+        "--slug",
+        slug,
+        "--admin",
+        first.email,
+      ]);
+      expect(held.exitCode).toBe(0);
+
+      const run = await provisioning(app(), [
+        "--name",
+        "Two",
+        "--slug",
+        slug,
+        "--admin",
+        second.email,
+      ]);
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        `provision-workspace: REFUSED — slug-taken: another workspace already holds the slug ${slug}`,
+      ]);
+      expect(await workspacesWithSlug(app(), slug)).toBe(1);
+      expect(await membershipsHeldBy(app(), second.id)).toBe(0);
+    });
+
+    it("refuses malformed for a blank name or slug, and writes nothing", async () => {
+      const admin = await app().person();
+
+      const run = await provisioning(app(), [
+        "--name",
+        "   ",
+        "--slug",
+        aSlug(),
+        "--admin",
+        admin.email,
+      ]);
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        "provision-workspace: REFUSED — malformed: the name and the slug must each carry at least one character",
+      ]);
+      expect(await membershipsHeldBy(app(), admin.id)).toBe(0);
+    });
+
+    it("refuses without a repositories' root before it writes anything, since a workspace with no bundle repository can take no import", async () => {
+      const admin = await app().person();
+      const slug = aSlug();
+
+      const run = await opsWith(
+        app(),
+        ["provision-workspace", "--name", "Acme", "--slug", slug, "--admin", admin.email],
+        { gitStoreDir: undefined },
+      );
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines.join("\n")).toContain("GIT_STORE_DIR");
+      expect(await workspacesWithSlug(app(), slug)).toBe(0);
+    });
+
+    it.each([
+      ["no flags at all", []],
+      ["no --admin", ["--name", "Acme", "--slug", "acme"]],
+      ["no --slug", ["--name", "Acme", "--admin", "a@b.c"]],
+      ["no --name", ["--slug", "acme", "--admin", "a@b.c"]],
+    ])("answers usage to %s, before it reads anything", async (_shape, flags) => {
+      const run = await ops(app(), ["provision-workspace", ...flags]);
+
+      expect(run.exitCode).toBe(2);
+      expect(run.lines).toEqual([
+        "provision-workspace: --name <name>, --slug <slug> and --admin <email> are required",
+      ]);
+    });
+
+    it("names both commands in the usage", async () => {
+      const run = await ops(app(), ["help"]);
+
+      expect(run.lines.join("\n")).toContain(
+        "provision-workspace --name <name> --slug <slug> --admin <email>",
+      );
+      expect(run.lines.join("\n")).toContain(
+        "add-member --workspace <id> --email <email> --role <Admin|Editor|Viewer>",
+      );
+    });
+  });
+
+  describe("add-member — a signed-in person made a member of a workspace, from the command line", () => {
+    it.each(["Admin", "Editor", "Viewer"])(
+      "is done making a signed-in person a %s, the membership row and its ledger row standing together",
+      async (role) => {
+        const { workspaceId } = await app().provision();
+        const person = await app().person();
+
+        const run = await adding(app(), workspaceId, person.email, role);
+
+        expect(run.exitCode).toBe(0);
+        expect(run.lines).toEqual([
+          `add-member: done — ${person.email} added to workspace ${workspaceId} as ${role}`,
+        ]);
+        expect(await membershipsOf(app(), workspaceId, person.id)).toEqual([
+          { id: expect.stringMatching(ULID_SHAPE), role },
+        ]);
+        expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toEqual([
+          { actor: BOOTSTRAP_ACTOR, subject_id: person.id, detail: { userId: person.id, role } },
+        ]);
+      },
+    );
+
+    it("resolves the email without regard to case, as sign-in does", async () => {
+      const { workspaceId } = await app().provision();
+      const person = await app().person("Sam.Okoro@Acme.Invalid");
+
+      const run = await adding(app(), workspaceId, "sam.okoro@acme.invalid", "Viewer");
+
+      expect(run.exitCode).toBe(0);
+      expect(await membershipsOf(app(), workspaceId, person.id)).toEqual([
+        { id: expect.stringMatching(ULID_SHAPE), role: "Viewer" },
+      ]);
+    });
+
+    it("refuses no-such-user for a person who has not signed in, says what to do next, and writes nothing", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await adding(app(), workspaceId, "nobody@acme.invalid", "Editor");
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        "add-member: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, then run this again",
+      ]);
+      expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toEqual([]);
+    });
+
+    it("refuses no-such-workspace for an id no workspace has, and writes nothing", async () => {
+      const person = await app().person();
+      const nowhere = ulid();
+
+      const run = await adding(app(), nowhere, person.email, "Editor");
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        `add-member: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
+      ]);
+      expect(await membershipsHeldBy(app(), person.id)).toBe(0);
+      expect(await ledgerOf(app(), nowhere)).toEqual([]);
+    });
+
+    it("refuses already-a-member on a repeat — the person just added, or the Admin provisioning made — and never changes a role", async () => {
+      const { workspaceId, admin } = await app().provision();
+      const person = await app().person();
+      expect((await adding(app(), workspaceId, person.email, "Editor")).exitCode).toBe(0);
+
+      const again = await adding(app(), workspaceId, person.email, "Admin");
+      const theAdmin = await adding(app(), workspaceId, admin.email, "Viewer");
+
+      expect([again.exitCode, theAdmin.exitCode]).toEqual([1, 1]);
+      expect(again.lines).toEqual([
+        `add-member: REFUSED — already-a-member: ${person.email} is already a member of workspace ${workspaceId}; a role change is the Admin's act on the People screen`,
+      ]);
+      expect((await membershipsOf(app(), workspaceId, person.id)).map((row) => row.role)).toEqual([
+        "Editor",
+      ]);
+      expect((await membershipsOf(app(), workspaceId, admin.id)).map((row) => row.role)).toEqual([
+        "Admin",
+      ]);
+      expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toHaveLength(1);
+    });
+
+    it("answers usage to a fourth role word, and writes nothing", async () => {
+      const { workspaceId } = await app().provision();
+      const person = await app().person();
+
+      const run = await adding(app(), workspaceId, person.email, "Owner");
+
+      expect(run.exitCode).toBe(2);
+      expect(run.lines).toEqual(["add-member: --role must be one of Admin, Editor, Viewer"]);
+      expect(await membershipsOf(app(), workspaceId, person.id)).toEqual([]);
+    });
+
+    it("answers usage to a workspace that is not an id, and to a missing flag, before it reads anything", async () => {
+      const notAnId = await ops(app(), [
+        "add-member",
+        "--workspace",
+        "ws_synthetic",
+        "--email",
+        "a@b.c",
+        "--role",
+        "Editor",
+      ]);
+      const noEmail = await ops(app(), ["add-member", "--workspace", ulid(), "--role", "Editor"]);
+
+      expect([notAnId.exitCode, noEmail.exitCode]).toEqual([2, 2]);
+      expect(noEmail.lines).toEqual([
+        "add-member: --workspace <id>, --email <email> and --role <Admin|Editor|Viewer> are required",
+      ]);
+    });
+  });
+
   describe("import-bundle — the company's bundle landed through the governed write", () => {
     const BUNDLE_FIXTURE = fileURLToPath(new URL("fixtures/bundle", import.meta.url));
     const BUNDLE_ID = "01J6CCCCCCCCCCCCCCCCCCCCCC";
@@ -1371,6 +1710,41 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await ops(app(), ["import-bundle", "--workspace", workspaceId, ...flags]);
 
       expect(run.exitCode).toBe(2);
+    });
+
+    it("lands the bundle in a workspace the two commands stood up — provision-workspace for the running Admin, add-member for each verifier — and find reads back Checked by the verifier's name · imported", async () => {
+      const owner = await app().person(undefined, "Liam Owner");
+      const provisioned = await provisioning(app(), [
+        "--name",
+        "Acme",
+        "--slug",
+        aSlug(),
+        "--admin",
+        owner.email,
+      ]);
+      expect(provisioned.exitCode).toBe(0);
+      const workspaceId = idOnTheDoneLine(provisioned);
+      await verifierOf(app(), MONA, "Mona Reviewer");
+      await verifierOf(app(), THEO, "Theo Approver");
+      for (const verifier of [MONA, THEO]) {
+        const added = await adding(app(), workspaceId, verifier, "Editor");
+        expect(added.lines).toEqual([
+          `add-member: done — ${verifier} added to workspace ${workspaceId} as Editor`,
+        ]);
+      }
+
+      const run = await importing(app(), workspaceId, owner.email);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines.at(-1)).toBe(
+        "import-bundle: done — landed 6, skipped 0, 7 checks recorded (0 already present), 4 links rewritten, 0.0 seconds",
+      );
+      const found = await reading(app(), workspaceId, owner.id, (principal, tx) =>
+        find(principal, tx, { query: "retention", limit: 10 }, IMPORTED_AT),
+      );
+      const hit = found.hits[0];
+      if (hit?.layer !== "bundles") throw new Error("the hit is not a concept");
+      expect(trustWords(hit.trust)).toBe("Checked by Theo Approver · 1 June 2026 · imported");
     });
   });
 });

@@ -18,13 +18,40 @@ import {
   withPrincipal,
   withScope,
 } from "../store/postgres/index.ts";
+import type { WorkspaceRefusal } from "./vocabulary.ts";
+
+export { WORKSPACE_REFUSALS, type WorkspaceRefusal } from "./vocabulary.ts";
 
 export const TOOLS_LIST_TTL_MS_DEFAULT = 300_000;
 export const TOOLS_LIST_TTL_CONFIG_KEY = "mcp.tools_list_ttl_ms";
 
+const BOOTSTRAP_ACTOR = "process:better-answers-bootstrap";
+
+export type BootstrapPrincipal = PlatformPrincipal & {
+  readonly actorId: typeof BOOTSTRAP_ACTOR;
+};
+
+export const BOOTSTRAP: BootstrapPrincipal = { kind: "platform", actorId: BOOTSTRAP_ACTOR };
+
 const WORKSPACE_ACTS = declareActs("platform", {
   provisioned: act("platform.workspace.provisioned", { adminUserId: "id", role: "role" }),
 });
+
+const MEMBER_ACTS = declareActs("people", {
+  added: act("people.member.added", { userId: "id", role: "role" }),
+});
+
+const insertMembership = async (
+  tx: Tx,
+  workspaceId: WorkspaceId,
+  userId: UserId,
+  role: Role,
+): Promise<void> => {
+  await tx.query(
+    "INSERT INTO member (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, $4, now())",
+    [ulid(), workspaceId, userId, role],
+  );
+};
 
 export type ProvisionWorkspaceInput = {
   readonly id: string;
@@ -34,7 +61,9 @@ export type ProvisionWorkspaceInput = {
   readonly adminUserId: string;
 };
 
-export type ProvisionRefusal = "slug-taken" | "workspace-exists" | "no-such-user" | "malformed";
+export type ProvisionRefusal = WorkspaceRefusal<
+  "slug-taken" | "workspace-exists" | "no-such-user" | "malformed"
+>;
 
 const PROVISION_CONSTRAINTS = {
   workspace_slug_unique: "slug-taken",
@@ -76,10 +105,7 @@ export const provisionWorkspace = async (
       });
       await tx.query("SELECT create_workspace_partition($1)", [row.data.id]);
 
-      await tx.query(
-        "INSERT INTO member (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, $4, now())",
-        [ulid(), row.data.id, admin.data, CREATOR_ROLE],
-      );
+      await insertMembership(tx, row.data.id, admin.data, CREATOR_ROLE);
       await tx.query(
         "INSERT INTO workspace_config (workspace_id, key, value) VALUES ($1, $2, $3)",
         [row.data.id, TOOLS_LIST_TTL_CONFIG_KEY, String(TOOLS_LIST_TTL_MS_DEFAULT)],
@@ -89,6 +115,97 @@ export const provisionWorkspace = async (
 
   if (!act.ok) return err(refusalFor(act.error, PROVISION_CONSTRAINTS));
   return ok({ workspaceId: row.data.id, actorId: platform.actorId });
+};
+
+const personIdIn = async (tx: Tx, email: string): Promise<UserId | undefined> => {
+  const rows = await tx.query<{ id: string }>(
+    'SELECT id FROM "user" WHERE lower(email) = lower($1)',
+    [email],
+  );
+  const id = rows.rows[0]?.id;
+  return id === undefined ? undefined : boundarySchemas.user.select.shape.id.parse(id);
+};
+
+export const personIdByEmail = (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  email: string,
+): Promise<Result<UserId | undefined, Error>> =>
+  attempt(() => withIdentityRead(platform, door, (tx) => personIdIn(tx, email)));
+
+export type AddMemberInput = {
+  readonly workspaceId: string;
+  readonly email: string;
+  readonly role: Role;
+};
+
+export type AddMemberRefusal = WorkspaceRefusal<
+  "malformed" | "no-such-workspace" | "no-such-user" | "already-a-member"
+>;
+
+export type MemberAdded = {
+  readonly workspaceId: WorkspaceId;
+  readonly userId: UserId;
+  readonly role: Role;
+  readonly actorId: PlatformPrincipal["actorId"];
+};
+
+const holdsARow = async (tx: Tx, statement: string, ...parameters: string[]): Promise<boolean> => {
+  const found = await tx.query(statement, parameters);
+  return (found.rowCount ?? 0) > 0;
+};
+
+type MembershipRefusal = WorkspaceRefusal<
+  "no-such-workspace" | "no-such-user" | "already-a-member"
+>;
+
+export const addMember = async (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  input: AddMemberInput,
+): Promise<Result<MemberAdded, AddMemberRefusal | Error>> => {
+  const workspaceId = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
+  if (!workspaceId.success) return err("malformed");
+
+  const added = await attempt(() =>
+    withScope(
+      platform,
+      door,
+      workspaceId.data,
+      async (tx): Promise<Result<UserId, MembershipRefusal>> => {
+        if (!(await holdsARow(tx, "SELECT 1 FROM workspace WHERE id = $1", workspaceId.data))) {
+          return err("no-such-workspace");
+        }
+        const userId = await personIdIn(tx, input.email);
+        if (userId === undefined) return err("no-such-user");
+        const held = await holdsARow(
+          tx,
+          "SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2",
+          workspaceId.data,
+          userId,
+        );
+        if (held) return err("already-a-member");
+
+        await insertMembership(tx, workspaceId.data, userId, input.role);
+        await record(platform, tx, {
+          id: ulid(),
+          act: MEMBER_ACTS.added,
+          subjectId: userId,
+          detail: { userId, role: input.role },
+        });
+        return ok(userId);
+      },
+    ),
+  );
+
+  if (!added.ok) return err(added.error);
+  if (!added.value.ok) return err(added.value.error);
+  return ok({
+    workspaceId: workspaceId.data,
+    userId: added.value.value,
+    role: input.role,
+    actorId: platform.actorId,
+  });
 };
 
 export type RevokeCredentialsInput = {

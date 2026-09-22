@@ -14,6 +14,8 @@ import {
   withScope,
 } from "../src/store/postgres/index.ts";
 import {
+  addMember,
+  personIdByEmail,
   provisionWorkspace,
   readMembership,
   revokeCredentials,
@@ -23,7 +25,7 @@ import {
   workspaceIdBySlug,
   workspacesHeldBy,
 } from "../src/workspaces/index.ts";
-import { postgresForSuite, readingAs } from "./suite-postgres.ts";
+import { addressOf, postgresForSuite, readingAs, whileWritesAreRefused } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
@@ -678,6 +680,15 @@ describe("what the slice answers when the store cannot be reached", () => {
       ],
       ["workspacesHeldBy", await workspacesHeldBy(bootstrap, door, userId)],
       ["workspaceIdBySlug", await workspaceIdBySlug(bootstrap, door, "acme")],
+      ["personIdByEmail", await personIdByEmail(bootstrap, door, "acme@example.invalid")],
+      [
+        "addMember",
+        await addMember(bootstrap, door, {
+          workspaceId: ulid(),
+          email: "acme@example.invalid",
+          role: "Editor",
+        }),
+      ],
     ];
 
     for (const [name, answered] of answers) {
@@ -702,7 +713,170 @@ describe("what the slice answers when the store cannot be reached", () => {
       ok: false,
       error: "malformed",
     });
+    expect(
+      await addMember(bootstrap, door, {
+        workspaceId: "not-a-ulid",
+        email: "acme@example.invalid",
+        role: "Admin",
+      }),
+    ).toEqual({ ok: false, error: "malformed" });
 
     expect(await workspaceIdBySlug(bootstrap, door, "   ")).toEqual({ ok: true, value: undefined });
+  });
+});
+
+const ULID_SHAPE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+
+describe("adding a member — the platform's act for a person who has signed in", () => {
+  const membershipsOf = async (workspaceId: string, userId: string) => {
+    const found = await db().pool.query<{ id: string; role: string }>(
+      "SELECT id, role FROM member WHERE workspace_id = $1 AND user_id = $2",
+      [workspaceId, userId],
+    );
+    return found.rows;
+  };
+
+  const addedRowsOf = async (workspaceId: string) => {
+    const found = await db().pool.query(
+      "SELECT id, act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1 AND act = 'people.member.added' ORDER BY at, id",
+      [workspaceId],
+    );
+    return found.rows;
+  };
+
+  const memberCountOf = async (workspaceId: string): Promise<string> => {
+    const found = await db().pool.query<{ members: string }>(
+      "SELECT count(*) AS members FROM member WHERE workspace_id = $1",
+      [workspaceId],
+    );
+    return found.rows[0]?.members ?? "";
+  };
+
+  const signedIn = async (): Promise<{ email: string; userId: string }> => {
+    const email = addressOf("member");
+    return { email, userId: await seedPerson(db().pool, { email }) };
+  };
+
+  it.each(["Admin", "Editor", "Viewer"] as const)(
+    "makes a signed-in person a %s of the workspace by their email, however cased, with a membership id minted from nothing, and the resolver reads that role back",
+    async (role) => {
+      const { door, workspaceId } = await provisionedWorkspace(db(), "Joined");
+      const { email, userId } = await signedIn();
+
+      const added = await addMember(bootstrap, door, {
+        workspaceId,
+        email: email.toUpperCase(),
+        role,
+      });
+
+      expect(added).toEqual({
+        ok: true,
+        value: { workspaceId, userId, role, actorId: "process:better-answers-bootstrap" },
+      });
+      const rows = await membershipsOf(workspaceId, userId);
+      expect(rows).toEqual([{ id: expect.stringMatching(ULID_SHAPE), role }]);
+      expect(rows[0]?.id).not.toContain(workspaceId);
+      expect(rows[0]?.id).not.toContain(userId);
+      const resolved = await withPrincipal(
+        door,
+        { workspaceId, userId, issuedAt: new Date() },
+        async (principal) => principal.role,
+      );
+      expect(resolved).toEqual({ ok: true, value: role });
+    },
+  );
+
+  it("writes one people.member.added row in the workspace's own ledger — the platform's actor, the person as its subject, the person id and the role word in the detail and no third field", async () => {
+    const { door, workspaceId } = await provisionedWorkspace(db(), "Ledgered");
+    const { email, userId } = await signedIn();
+
+    await addMember(bootstrap, door, { workspaceId, email, role: "Editor" });
+
+    expect(await addedRowsOf(workspaceId)).toEqual([
+      {
+        id: expect.stringMatching(ULID_SHAPE),
+        act: "people.member.added",
+        family: "people",
+        actor: "process:better-answers-bootstrap",
+        subject_kind: "member",
+        subject_id: userId,
+        detail: { userId, role: "Editor" },
+        batch_id: null,
+      },
+    ]);
+  });
+
+  it("writes the membership and its ledger row together, or neither", async () => {
+    const { door, workspaceId } = await provisionedWorkspace(db(), "Atomic");
+    const { email, userId } = await signedIn();
+
+    const added = await whileWritesAreRefused(db().pool, "audit_event", () =>
+      addMember(bootstrap, door, { workspaceId, email, role: "Viewer" }),
+    );
+
+    expect(added).toMatchObject({ ok: false, error: expect.any(Error) });
+    expect(await membershipsOf(workspaceId, userId)).toEqual([]);
+  });
+
+  it("refuses a workspace that is not there, a person who has not signed in, and a person the workspace already holds — writing nothing", async () => {
+    const admin = { name: "Priya Shah", email: addressOf("priya") };
+    const { door, workspaceId, adminUserId } = await provisionedWorkspace(db(), "Refusing", admin);
+    const { email } = await signedIn();
+
+    const refusals = [
+      await addMember(bootstrap, door, { workspaceId: ulid(), email, role: "Editor" }),
+      await addMember(bootstrap, door, { workspaceId, email: addressOf("nobody"), role: "Editor" }),
+      await addMember(bootstrap, door, { workspaceId, email: admin.email, role: "Editor" }),
+    ];
+
+    expect(refusals).toEqual([
+      { ok: false, error: "no-such-workspace" },
+      { ok: false, error: "no-such-user" },
+      { ok: false, error: "already-a-member" },
+    ]);
+    expect(await memberCountOf(workspaceId)).toBe("1");
+    expect(await membershipsOf(workspaceId, adminUserId)).toEqual([
+      { id: expect.stringMatching(ULID_SHAPE), role: "Admin" },
+    ]);
+    expect(await addedRowsOf(workspaceId)).toEqual([]);
+  });
+
+  it("refuses a repeat rather than changing the role, which is the Admin's act", async () => {
+    const { door, workspaceId } = await provisionedWorkspace(db(), "Repeated");
+    const { email, userId } = await signedIn();
+    const first = await addMember(bootstrap, door, { workspaceId, email, role: "Editor" });
+    expect(first.ok).toBe(true);
+
+    const again = await addMember(bootstrap, door, { workspaceId, email, role: "Admin" });
+
+    expect(again).toEqual({ ok: false, error: "already-a-member" });
+    expect((await membershipsOf(workspaceId, userId)).map((row) => row.role)).toEqual(["Editor"]);
+    expect(await addedRowsOf(workspaceId)).toHaveLength(1);
+  });
+
+  it("is not reachable from a workspace Admin's own principal", () => {
+    const door = openPostgres(db().runtimePool);
+    const admin = principalOf(ulid(), ulid(), "Admin");
+
+    // @ts-expect-error a user principal is not a platform principal
+    void (() => addMember(admin, door, { workspaceId: ulid(), email: "a@b.c", role: "Editor" }));
+    expect(admin.role).toBe("Admin");
+  });
+});
+
+describe("the person behind an email", () => {
+  it("answers the person id for the email however it is cased, and nothing for an email nobody has signed in with", async () => {
+    const door = openPostgres(db().runtimePool);
+    const email = addressOf("casey");
+    const userId = await seedPerson(db().pool, { email });
+
+    expect(await personIdByEmail(bootstrap, door, email.toUpperCase())).toEqual({
+      ok: true,
+      value: userId,
+    });
+    expect(await personIdByEmail(bootstrap, door, addressOf("nobody"))).toEqual({
+      ok: true,
+      value: undefined,
+    });
   });
 });
