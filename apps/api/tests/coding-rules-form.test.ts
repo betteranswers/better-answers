@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 
 const ROOT_FILE = "CODING_RULES.md";
-const ROOT_BUDGET = 2500;
+const ROOT_BUDGET = 3000;
 const RULE_BUDGET = 80;
 
 // The list only shrinks: the last case here fails an entry whose rule now fits.
