@@ -7,8 +7,9 @@ const contractsDir = path.resolve(import.meta.dirname, "../../../contracts");
 export const contractFixture = <Schema extends z.ZodType>(
   agreement: string,
   schema: Schema,
+  file = "cases.json",
 ): z.output<Schema> =>
-  schema.parse(JSON.parse(readFileSync(path.join(contractsDir, agreement, "cases.json"), "utf8")));
+  schema.parse(JSON.parse(readFileSync(path.join(contractsDir, agreement, file), "utf8")));
 
 export const documentChunkRow = z.object({
   ordinal: z.int().nonnegative(),

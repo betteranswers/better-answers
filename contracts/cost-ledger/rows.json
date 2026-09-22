@@ -1,0 +1,129 @@
+{
+  "description": "cost-ledger (ADR 0031, ADR 0025): the golden rows behind the `llm_call` ledger, and the one part of that row both tiers already speak. **`llm_call` has no table.** No migration creates it, nothing writes it, and no boundary schema is generated from it — so this file records the row ADR 0025's amendment of 05/09/2026 fixes, written down once rather than twice, and describes nothing the database has. What waits for the migration that brings the table: the writer, ADR 0025's retention — six months of rows, then a monthly per-workspace aggregate — ADR 0028's boundary schema generated from the table, and the five assertions ADR 0028 makes over `boundarySchemas` to hold a refinement to its column. None of them can be asserted against a table that does not exist, and a fixture that asserted them would be asserting its own bytes, which is the failure ADR 0031's redaction amendment names. What is held is the purposes. `purpose` is the one field of this row whose vocabulary is already live in both tiers: the api's `LLM_PURPOSES` over the schema's `llm_purpose` enum (packages/core/src/llm/index.ts, packages/schema/src/schema.ts), and, in the worker, the purpose it seeds a route with and resolves one by, `llm_route_for(purpose)` casting to that same enum. Each suite reads the purposes these rows use and holds them to its own tier's, both ways, so a purpose added to a tier and not to these rows — or to these rows and not to a tier — is that tier's red suite. Neither suite reads the other tier's list and neither writes the purposes out itself. Everything else here is recorded rather than held. `fields` is the row ADR 0025 names, one entry per column, and every row carries exactly those keys and no others: that is how *never the prompt or the completion* is checked against the disk rather than left to a reader, because a row cannot carry what the field set does not name and the field set names nothing that could hold either. `outcomes` is the words `outcome` takes; they are this file's own, for the migration to settle, and each is behind at least one row so neither is a word with nothing under it. A row names the run or the answer it served under two nullable columns with exactly one of them set, because a run and an answer are separate records and one foreign key cannot point at both. `cost_usd` carries its unit in its name and its value as a decimal string: money is not a float, the column will be `numeric`, and dollars are what a provider prices a call in — converting that to what a workspace is billed is a signal's work and never the row's. `seconds` is wall-clock, ADR 0025's own word for it. The rows are six across two workspaces: one per purpose, and one whose outcome is a failure. Two carry `tokens_out` 0 — the embedding call, which has no output tokens at all, and the failed answering call, which produced none — so no reader can take a zero for a failure, the outcome word being the only thing that says so, and the failed row still carries a cost because the tokens it sent were spent. The figures are one plausible day's calls and no suite asserts a number among them; nothing seeds these rows, there being nothing yet to seed them into.",
+  "fields": [
+    {
+      "field": "workspace_id",
+      "is": "the workspace whose spend this call is, and the column every signal over this ledger groups by"
+    },
+    {
+      "field": "purpose",
+      "is": "what the call was for, from the vocabulary both tiers hold these rows to"
+    },
+    {
+      "field": "route_id",
+      "is": "the `llm_route` row the call was resolved through, so spend can be read back per route"
+    },
+    {
+      "field": "model",
+      "is": "the model actually called, beside the route because a route's model is edited and a row is not"
+    },
+    { "field": "tokens_in", "is": "tokens sent, which are spent whatever the call returns" },
+    {
+      "field": "tokens_out",
+      "is": "tokens returned, zero where a call returns none and zero where it fails"
+    },
+    {
+      "field": "seconds",
+      "is": "wall-clock time the call took, the figure the onboarding ETA is read off"
+    },
+    {
+      "field": "cost_usd",
+      "is": "what the call cost at the provider's price, a decimal string because money is not a float"
+    },
+    { "field": "outcome", "is": "one of the words `outcomes` names" },
+    { "field": "run_id", "is": "the run this call served, null where it served an answer" },
+    { "field": "answer_id", "is": "the answer this call served, null where it served a run" }
+  ],
+  "outcomes": [
+    {
+      "outcome": "succeeded",
+      "failure": false,
+      "is": "the call returned, and its tokens, seconds and cost are what it spent doing so"
+    },
+    {
+      "outcome": "failed",
+      "failure": true,
+      "is": "the call returned nothing the caller could use — refused, cut off or timed out — and what it spent before that is still spent"
+    }
+  ],
+  "rows": [
+    {
+      "workspace_id": "01J9AAAAAAAAAAAAAAAAAAAAAA",
+      "purpose": "extraction",
+      "route_id": "01J9R1AAAAAAAAAAAAAAAAAAAA",
+      "model": "claude-sonnet-5",
+      "tokens_in": 18422,
+      "tokens_out": 1204,
+      "seconds": 6.812,
+      "cost_usd": "0.073326",
+      "outcome": "succeeded",
+      "run_id": "01J9N1AAAAAAAAAAAAAAAAAAAA",
+      "answer_id": null
+    },
+    {
+      "workspace_id": "01J9AAAAAAAAAAAAAAAAAAAAAA",
+      "purpose": "enrichment",
+      "route_id": "01J9R2AAAAAAAAAAAAAAAAAAAA",
+      "model": "claude-sonnet-5",
+      "tokens_in": 3140,
+      "tokens_out": 486,
+      "seconds": 2.204,
+      "cost_usd": "0.016710",
+      "outcome": "succeeded",
+      "run_id": "01J9N2AAAAAAAAAAAAAAAAAAAA",
+      "answer_id": null
+    },
+    {
+      "workspace_id": "01J9AAAAAAAAAAAAAAAAAAAAAA",
+      "purpose": "embedding",
+      "route_id": "01J9R5AAAAAAAAAAAAAAAAAAAA",
+      "model": "mistral-embed",
+      "tokens_in": 51200,
+      "tokens_out": 0,
+      "seconds": 4.019,
+      "cost_usd": "0.005120",
+      "outcome": "succeeded",
+      "run_id": "01J9N3AAAAAAAAAAAAAAAAAAAA",
+      "answer_id": null
+    },
+    {
+      "workspace_id": "01J9AAAAAAAAAAAAAAAAAAAAAA",
+      "purpose": "answering",
+      "route_id": "01J9R3AAAAAAAAAAAAAAAAAAAA",
+      "model": "claude-sonnet-5",
+      "tokens_in": 9860,
+      "tokens_out": 742,
+      "seconds": 5.433,
+      "cost_usd": "0.040710",
+      "outcome": "succeeded",
+      "run_id": null,
+      "answer_id": "01J9S1AAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "workspace_id": "01J9AAAAAAAAAAAAAAAAAAAAAA",
+      "purpose": "judging",
+      "route_id": "01J9R4AAAAAAAAAAAAAAAAAAAA",
+      "model": "claude-sonnet-5",
+      "tokens_in": 1580,
+      "tokens_out": 96,
+      "seconds": 1.118,
+      "cost_usd": "0.006180",
+      "outcome": "succeeded",
+      "run_id": null,
+      "answer_id": "01J9S1AAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "workspace_id": "01J9BBBBBBBBBBBBBBBBBBBBBB",
+      "purpose": "answering",
+      "route_id": "01J9R6BBBBBBBBBBBBBBBBBBBB",
+      "model": "claude-sonnet-5",
+      "tokens_in": 7310,
+      "tokens_out": 0,
+      "seconds": 30.004,
+      "cost_usd": "0.021930",
+      "outcome": "failed",
+      "run_id": null,
+      "answer_id": "01J9S2BBBBBBBBBBBBBBBBBBBB"
+    }
+  ]
+}
