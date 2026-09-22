@@ -1,0 +1,19 @@
+CODING_RULES.md
+  s_a38d2840827d6c::t_ad65eaa7cd8d40 194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "6010c893a903a212dd9f034e206c6f5c1fe5941d",
+  "prompts": {},
+  "sessions": {
+    "s_a38d2840827d6c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bcafdd87-9a23-47ee-b85e-27d4f2a91450",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
