@@ -171,7 +171,9 @@ t0=$(date +%s); ops graph-rebuild --workspace "${DRILL_WORKSPACE}" --wait
 say "graph rebuilt in $(( $(date +%s) - t0 )) s (promise: ≤ 120 s)"
 # One transaction, so there is nothing to wait for: the sweep answers when it has swept.
 ops graph-sweep --workspace "${DRILL_WORKSPACE}"
-ops object-store-orphans --workspace "${DRILL_WORKSPACE}" --list >> "${REPORT}"
+# The originals a bind whose rows never landed left behind. A restored object store is ahead of
+# the dump beside it, so the grace inside the command is what keeps a minutes-old upload.
+ops object-store-orphans --workspace "${DRILL_WORKSPACE}" >> "${REPORT}"
 
 say "## 7 counts diff against production's stamped run (ADR 0023) — production read over SSH, no open port (ticket 79 A12)"
 # An empty staging file is `graph-counts` answering `not built` (exit 3, which `ops` turns

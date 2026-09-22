@@ -82,6 +82,7 @@ describe("what a kernel parse answers", () => {
 
   it("names the failing field with a word and never the value that failed", () => {
     const read = parse(bindUploadFields, {
+      bindingId: A_BINDING,
       name: SECRET,
       fileName: "handbook.md",
       mediaType: "text/markdown",
@@ -154,6 +155,7 @@ describe("what a kernel parse answers", () => {
 describe("the shapes the Sources acts are handed", () => {
   it("defaults a bind's class, audience and groups to the narrowest a workspace can start from", () => {
     const read = parse(bindUploadFields, {
+      bindingId: A_BINDING,
       name: "The staff handbook",
       fileName: "handbook.md",
       mediaType: "text/markdown",
@@ -163,6 +165,7 @@ describe("the shapes the Sources acts are handed", () => {
     expect(read).toEqual({
       ok: true,
       value: {
+        bindingId: A_BINDING,
         name: "The staff handbook",
         fileName: "handbook.md",
         mediaType: "text/markdown",

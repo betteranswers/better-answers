@@ -27,6 +27,11 @@ import {
   type Result,
 } from "@better-answers/core/kernel";
 import { enqueueJob, JOB_IS_OVER, jobById, type RebuildReason } from "@better-answers/core/runs";
+import {
+  ORPHANED_UPLOAD_GRACE_HOURS,
+  sweepOrphanedUploads,
+  UPLOAD_SWEEP,
+} from "@better-answers/core/sources";
 import { initRepository, type GitDoor } from "@better-answers/core/store/git";
 import type { ObjectDoor } from "@better-answers/core/store/objects";
 import { tablesPresent, type PostgresDoor } from "@better-answers/core/store/postgres";
@@ -125,6 +130,9 @@ const NEEDS = {
 
 type SliceCommand = keyof typeof NEEDS;
 
+// SAFETY: the keys of a `const` object literal are its declared names and nothing else.
+export const SLICE_COMMANDS = Object.keys(NEEDS) as readonly SliceCommand[];
+
 const REBUILD_DEFAULT_REASON = "drill";
 
 const WAIT_SECONDS = 120;
@@ -139,7 +147,8 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   graph-sweep --workspace <id>                              delete every generation of the map but the live one
   graph-counts --workspace <id>                             nodes per label and edges, as JSON, for the drill's diff
   reconcile-watermark --workspace <id>                      recovery order step 2: replay the commits the rows missed (ADR 0012)
-  object-store-orphans --workspace <id> [--list]            recovery order step 5
+  object-store-orphans --workspace <id> [--list]            recovery order step 5: remove the originals a failed bind left, past a ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace, that no document row names
+    --list         say how many there are, removing none
   smoke --url <origin> [--workspace <id>] [--find] [--guide] [--ask]
   erasure-rehearsal --workspace <id> --synthetic --seed      phase one: the synthetic subject, its tokens on the last line
   erasure-rehearsal --workspace <id> --synthetic --run --report <file>   phase two: erase them, write the report, print the tokens again
@@ -374,12 +383,8 @@ const sliceCommand = async (
   if (command === "graph-counts") return graphCountsCommand(doors, workspaceId, io);
   if (command === "graph-sweep") return graphSweepCommand(doors, workspaceId, io);
   if (command === "erasure-rehearsal") return erasureRehearsal(doors, workspaceId, flags, io);
-  if (command === "import-bundle") return importBundleCommand(doors, workspaceId, flags, io);
-
-  io.say(
-    `${command}: REFUSED — its tables exist but this image carries no implementation; the slice's task fills it in`,
-  );
-  return REFUSED;
+  if (command === "object-store-orphans") return objectStoreOrphans(doors, workspaceId, flags, io);
+  return importBundleCommand(doors, workspaceId, flags, io);
 };
 
 export const reasonOf = (reason: string | Error): string =>
@@ -512,6 +517,40 @@ const graphSweepCommand = async (doors: Doors, workspaceId: string, io: OpsIo): 
   const edges = swept.value.reduce((total, generation) => total + generation.edges, 0);
   io.say(
     `graph-sweep: done — swept ${plural(swept.value.length, "generation")} ${generations} (${counted(nodes, "node")}, ${counted(edges, "edge")})`,
+  );
+  return DONE;
+};
+
+const objectStoreOrphans = async (
+  doors: Doors,
+  workspaceId: string,
+  flags: Flags,
+  io: OpsIo,
+): Promise<number> => {
+  const listing = flags.get("list");
+  if (listing !== undefined && listing !== true) {
+    io.say("object-store-orphans: --list takes no value");
+    return USAGE;
+  }
+  const objects = doorTold(
+    doors.objects,
+    "no object store is configured (S3_ENDPOINT, S3_BUCKET, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY on the api service), so the bytes a failed bind left cannot be reached",
+  );
+  if (!objects.ok) {
+    io.say(`object-store-orphans: REFUSED — ${objects.error}`);
+    return REFUSED;
+  }
+  const swept = await sweepOrphanedUploads(
+    UPLOAD_SWEEP,
+    { postgres: doors.postgres, objects: objects.value },
+    { workspaceId, now: doors.clock.now(), dryRun: listing === true },
+  );
+  if (!swept.ok) return refused("object-store-orphans", workspaceId, swept.error, io);
+  const past = `past the ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace no document names`;
+  io.say(
+    listing === true
+      ? `object-store-orphans: done — ${counted(swept.value.found, "object")} ${past}, removed none`
+      : `object-store-orphans: done — removed ${counted(swept.value.removed, "object")} ${past}`,
   );
   return DONE;
 };

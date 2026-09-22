@@ -17,15 +17,31 @@ import {
   type ErasureRehearsed,
 } from "@better-answers/core/erasure";
 import { ok, type UserPrincipal } from "@better-answers/core/kernel";
+import { bindUpload, bindUploadFields } from "@better-answers/core/sources";
 import { fileAtHead, head, initRepository } from "@better-answers/core/store/git";
-import { withPrincipal, type Answered, type Tx } from "@better-answers/core/store/postgres";
+import { listObjects } from "@better-answers/core/store/objects";
+import {
+  openPostgres,
+  withPrincipal,
+  type Answered,
+  type Tx,
+} from "@better-answers/core/store/postgres";
+import { inputOf } from "@better-answers/core/testing/input";
 import { objectStoreForSuite } from "@better-answers/core/testing/objects";
+import { whileWritesAreRefused } from "@better-answers/core/testing/postgres";
 import { ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import type { Doors } from "../src/doors.ts";
 import { fetchHonouringHost } from "../src/ops/http-fetch.ts";
-import { EXIT_OF_CLASS, NOT_BUILT, parseSince, runOps, type OpsIo } from "../src/ops/index.ts";
+import {
+  EXIT_OF_CLASS,
+  NOT_BUILT,
+  parseSince,
+  runOps,
+  SLICE_COMMANDS,
+  type OpsIo,
+} from "../src/ops/index.ts";
 import { readTreeUnder } from "../src/ops/read-tree.ts";
 import { APP_HOSTNAME, doorsFor, openTestGit, PUBLIC_URL, type TestApp } from "./harness.ts";
 import { servedApp } from "./suite-app.ts";
@@ -474,12 +490,110 @@ describe("pnpm ops — the restore scripts' commands", () => {
         expect(run.lines.join("\n")).toContain("not built");
       },
     );
+    it("answers in nobody else's name, so no command can be doing another's work", async () => {
+      const { workspaceId } = await app().provision();
 
-    it("object-store-orphans refuses — exit 1 — now its tables are there and the implementation is not", async () => {
+      for (const command of SLICE_COMMANDS) {
+        const run = await ops(app(), [command, "--workspace", workspaceId]);
+        const said = run.lines.join("\n");
+        const others = SLICE_COMMANDS.filter(
+          (other) => other !== command && said.includes(`${other}:`),
+        );
+        expect({ command, others }).toEqual({ command, others: [] });
+      }
+    });
+  });
+
+  describe("object-store-orphans — the bytes a failed bind left", () => {
+    // The store stamps an object with its own clock, so the instant the grace is judged from
+    // is the suite's own, moved on.
+    const aDayOn = (): Date => new Date(Date.now() + 25 * 60 * 60 * 1000);
+
+    const handbook = () => ({
+      ...inputOf(bindUploadFields, {
+        bindingId: ulid(),
+        name: "The staff handbook",
+        fileName: "handbook.md",
+        mediaType: "text/markdown",
+        byteSize: 43,
+      }),
+      body: new Blob(["The handbook says what the company decided."]).stream(),
+    });
+
+    const bindingsOf = async (workspaceId: string, userId: string) => {
+      const admin = await principalOf(app(), workspaceId, userId);
+      const doors = { postgres: openPostgres(app().database.pool), objects: objects().door };
+
+      const bound = await bindUpload(admin, doors, handbook());
+      if (!bound.ok) throw new Error(`the bind was refused: ${String(bound.error)}`);
+
+      // The job is the transaction's last statement, so refusing it leaves the object the act
+      // put before it and no row that names the object.
+      const failed = await whileWritesAreRefused(app().database.superuser, "job", () =>
+        bindUpload(admin, doors, handbook()),
+      );
+      if (failed.ok) throw new Error("the bind landed where the queue was refused");
+      return { admin, named: bound.value.originalKey };
+    };
+
+    it("removes the original no document names once the grace has passed, and keeps the named one", async () => {
+      const { workspaceId, admin: person } = await app().provision();
+      const { admin, named } = await bindingsOf(workspaceId, person.id);
+
+      const looked = await opsWith(
+        app(),
+        ["object-store-orphans", "--workspace", workspaceId, "--list"],
+        { doors: { clock: { now: aDayOn } } },
+      );
+      expect(looked.exitCode).toBe(0);
+      expect(looked.lines).toEqual([
+        "object-store-orphans: done — 1 object past the 24-hour grace no document names, removed none",
+      ]);
+
+      const run = await opsWith(app(), ["object-store-orphans", "--workspace", workspaceId], {
+        doors: { clock: { now: aDayOn } },
+      });
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual([
+        "object-store-orphans: done — removed 1 object past the 24-hour grace no document names",
+      ]);
+      expect(await listObjects(admin, objects().door, "")).toEqual({ ok: true, value: [named] });
+    });
+
+    it("removes nothing while the grace still holds over both", async () => {
+      const { workspaceId, admin: person } = await app().provision();
+      await bindingsOf(workspaceId, person.id);
+
+      const run = await ops(app(), ["object-store-orphans", "--workspace", workspaceId]);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual([
+        "object-store-orphans: done — removed 0 objects past the 24-hour grace no document names",
+      ]);
+    });
+
+    it("crosses its refusal as the word and the class's code, removing nothing", async () => {
       const run = await ops(app(), ["object-store-orphans", "--workspace", "ws_synthetic"]);
 
+      expect(run.exitCode).toBe(EXIT_OF_CLASS.malformed);
+      expect(run.lines).toEqual([
+        "object-store-orphans: REFUSED — malformed: --workspace ws_synthetic is not a workspace id",
+      ]);
+    });
+
+    it("refuses when this image was given no object store to sweep", async () => {
+      const { workspaceId } = await app().provision();
+
+      const run = await opsWith(
+        app(),
+        ["object-store-orphans", "--workspace", workspaceId],
+        { doors: { objects: undefined } },
+        app().database.superuser,
+      );
+
       expect(run.exitCode).toBe(1);
-      expect(run.lines.join("\n")).toContain("REFUSED");
+      expect(run.lines.join("\n")).toContain("no object store is configured");
     });
   });
 
