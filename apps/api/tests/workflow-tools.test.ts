@@ -92,8 +92,8 @@ const installStep = (runner: Runner): Step => {
   if (found.length !== 1 || only === undefined) {
     throw new Error(
       `${runner.file}'s \`${job}\` has ${String(found.length)} steps running \`uses: ${ACTION_USES}\`, not one. ` +
-        `It runs the erasure suite through \`${runner.suiteCommand}\`, and \`ubuntu-latest\` ` +
-        `carries no git-filter-repo, so it installs the tool the way every other such ` +
+        `It runs the erasure suite through \`${runner.suiteCommand}\`, and the hosted Ubuntu ` +
+        `runner carries no git-filter-repo, so it installs the tool the way every other such ` +
         `job does — with that one line, ahead of the step that runs the suite.`,
     );
   }
