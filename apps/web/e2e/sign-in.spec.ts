@@ -115,6 +115,7 @@ test("the sign-in screen says when a code was sent, when it did not work, and wh
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("alert")).toContainText("That code did not work");
 
+  // `request` has a client address of its own, so the ceiling this trips is the per-email one.
   const flooded = anAddress("flood");
   for (let asked = 0; asked < 6; asked += 1) {
     await request.post("/email-otp/send-verification-otp", {
