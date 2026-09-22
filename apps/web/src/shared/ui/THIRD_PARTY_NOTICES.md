@@ -131,8 +131,9 @@ line and are tested with a keyboard and a screen reader.
    fixes. They are listed above precisely so a refresh can reapply them without rereading
    this PR.
 3. Recompute both digest columns and this file's install date.
-4. **The test a refresh must pass** is `apps/web`'s `check`: `oxlint` under the four relaxations
-   in `.oxlintrc.json` and no others, `tsc --noEmit` (which is what catches the extensionless
+4. **The test a refresh must pass** is the root `check`: its `lint` gate, which walks the whole
+   tree and reaches this directory under the four relaxations in `.oxlintrc.json` and no others,
+   then `apps/web`'s own `check` — `tsc --noEmit` (which is what catches the extensionless
    imports coming back), the component and lint-rule suites, the production build, and the
    Playwright browser suite against the api-served build. A screen that renders any of these
    components also carries its own WCAG 2.2 AA check with a keyboard and a screen reader;
