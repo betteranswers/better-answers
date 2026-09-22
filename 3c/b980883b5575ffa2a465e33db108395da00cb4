@@ -1,0 +1,46 @@
+apps/api/tests/comment-gate-hook.test.ts
+  s_a38d2840827d6c::t_2c8bc85170cdbd 16
+  s_a38d2840827d6c::t_52bcfbe9261d97 221-238
+  s_a38d2840827d6c::t_e24732f6a7e7f6 255-258,260-264,268-269,272-273
+  s_a38d2840827d6c::t_13b24df4671c53 139-150
+  s_a38d2840827d6c::t_f927aec8daf0ca 152-153,162-166
+  s_a38d2840827d6c::t_73a3ffbdb2aa7b 204,207
+  s_a38d2840827d6c::t_cc4804654a9eaa 85,91-93,95-112
+  s_a38d2840827d6c::t_426da0419a5f58 20,22-27
+  s_a38d2840827d6c::t_573fb97dc48a3b 1-15,17-19,28-53,122-138,151,154-161,167-198,219-220,239-241,243-254,259,265-267,270-271,274-275
+  s_a38d2840827d6c::t_5490a8691ee186 21
+  s_a38d2840827d6c::t_f19ef76e64bf34 114-121
+  s_a38d2840827d6c::t_6eadd3cf8dee48 55-82,86-90,94,113
+  s_a38d2840827d6c::t_a607a5d0658d97 200,203,210-218
+  s_a38d2840827d6c::t_f3e5bebace575f 83-84
+  s_a38d2840827d6c::t_1746953f247819 242
+  s_a38d2840827d6c::t_064f5a38e9e0fc 201-202,205-206,208-209
+.claude/settings.json
+  s_a38d2840827d6c::t_67ab909fb30cc3 8-19
+.claude/hooks/comment-gate-hook.sh
+  s_a38d2840827d6c::t_56bbcab4547e1f 4-8
+  s_a38d2840827d6c::t_75fc9837794c1f 48
+  s_a38d2840827d6c::t_b879fc08eb0b0d 47
+  s_a38d2840827d6c::t_d50f4aabf593e5 60,71,73-74,83-85
+  s_a38d2840827d6c::t_8a684bf99184b8 44-46,49-50
+  s_a38d2840827d6c::t_0a6ea0a8477d49 1
+  s_a38d2840827d6c::t_9d5002ede08b45 2-3,10-41,51-57,61,65-70,72,75-80,86-92
+  s_a38d2840827d6c::t_231d1e509ecb3b 64
+  s_a38d2840827d6c::t_64f31d898579eb 58-59,62-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3cb980883b5575ffa2a465e33db108395da00cb4",
+  "prompts": {},
+  "sessions": {
+    "s_a38d2840827d6c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bcafdd87-9a23-47ee-b85e-27d4f2a91450",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": null
+    }
+  }
+}
