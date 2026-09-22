@@ -100,6 +100,13 @@ const withoutFences = (text: string): readonly Line[] => {
 const fenceLinesIn = (text: string): number =>
   text.split("\n").filter((line) => FENCE.test(line)).length;
 
+// Read before the fences are stripped, so a rule a stray fence hid still counts here.
+const taggedHeadingsIn = (text: string): number =>
+  text.split("\n").filter((line) => {
+    const heading = HEADING.exec(line)?.groups?.["text"];
+    return heading !== undefined && TAGGED.test(heading);
+  }).length;
+
 const countWords = (text: string): number =>
   text.split(/\s+/).filter((token) => /[A-Za-z0-9]/.test(token)).length;
 
@@ -213,6 +220,21 @@ describe("the parser this form test reads a rules file with", () => {
     expect(fenceLinesIn("# A file\n\n```ts\nconst one = 1;\n")).toBe(1);
   });
 
+  it("counts a rule's heading whether or not a stray fence hid it", () => {
+    const swallowed = [
+      `### ${spelled("FIX", "3")} Keep it`,
+      "```",
+      `### ${spelled("FIX", "4")} Keep it too`,
+      "```",
+      `### ${spelled("FIX", "5")} Keep it also`,
+      "",
+    ].join("\n");
+
+    expect(taggedHeadingsIn(swallowed)).toBe(3);
+    expect(rulesIn("fixture.md", withoutFences(swallowed))).toHaveLength(2);
+    expect(taggedHeadingsIn(FIXTURE)).toBe(2);
+  });
+
   it("counts a rule's prose and leaves a fenced snippet out of the count", () => {
     const [first] = rulesIn("fixture.md", lines);
     expect(first).toBeDefined();
@@ -251,6 +273,25 @@ describe("the form every coding rule is written in", () => {
     expect(
       odd,
       "a rules file opens a snippet it never closes, so every heading after it reads as part of that snippet and the rules under them vanish from this test.",
+    ).toEqual([]);
+  });
+
+  it("reads as many rules as each file has tagged headings, so none is hidden in a snippet", () => {
+    const lost = rulesFiles()
+      .map((file) => ({ file, headings: taggedHeadingsIn(read(file)) }))
+      .map(({ file, headings }) => ({
+        file,
+        headings,
+        read: rulesIn(file, withoutFences(read(file))).length,
+      }))
+      .filter((counted) => counted.headings !== counted.read)
+      .map(
+        (counted) => `${counted.file}: ${counted.headings} headings, ${counted.read} rules read`,
+      );
+
+    expect(
+      lost,
+      "a rule's heading sits inside a snippet, so every case below reads past it. A pair of stray fences is the usual cause, and an even pair passes the count above.",
     ).toEqual([]);
   });
 
