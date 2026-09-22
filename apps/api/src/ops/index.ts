@@ -9,6 +9,7 @@ import {
   reconcile,
   sweepGraph,
   type BundleTree,
+  type ConceptRewritten,
   type ImportBundleRefusal,
   type UnsoundReason,
 } from "@better-answers/core/concepts";
@@ -120,7 +121,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   erasure-rehearsal --workspace <id> --synthetic --run --report <file>   phase two: erase them, write the report, print the tokens again
   dump-grep --tokens <a,b,…>                                stdin: a plain-SQL dump; per token, which COPY section holds it and in how many lines — never a line
   import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <class>] [--dry-run]
-                                                            the company's bundle landed through the governed write, its checks imported (ADR 0002, 0014)
+                                                            the company's bundle landed through the governed write, its checks imported, its links rewritten to iris (ADR 0002, 0014)
     --sensitivity  one of ${SENSITIVITIES.join(" · ")} (default ${IMPORT_SENSITIVITY_DEFAULT})
     --dry-run      validate the tree and say what a run would do, writing nothing
 exit codes: ${DONE} done · ${REFUSED} refused, stop · ${USAGE} usage · ${NOT_BUILT} the slice this needs has no tables yet`;
@@ -508,6 +509,9 @@ const UNSOUND_WORDS = {
   "merge-key-clash": (about) => `derives the same merge key as ${about}`,
 } satisfies Readonly<Record<UnsoundReason, (about: string) => string>>;
 
+const linksOf = (rewritten: readonly ConceptRewritten[]): number =>
+  rewritten.reduce((sum, concept) => sum + concept.links, 0);
+
 const importReason = (refusal: ImportBundleRefusal | Error, email: string): string => {
   if (refusal instanceof Error) return refusal.message;
   if (typeof refusal === "string") {
@@ -518,6 +522,8 @@ const importReason = (refusal: ImportBundleRefusal | Error, email: string): stri
         return "a manifest with another bundle id already stands in this workspace's bundle";
       case "no-such-repository":
         return "this workspace has no bundle repository; provision it first";
+      case "class-unreadable":
+        return `${email} is not an Admin of this workspace, and a bundle landed Restricted is one only an Admin can read back for its second pass; run the import as an Admin`;
       default:
         return refusal;
     }
@@ -525,8 +531,8 @@ const importReason = (refusal: ImportBundleRefusal | Error, email: string): stri
   if (refusal.kind === "unsound") {
     return `${refusal.file}: ${UNSOUND_WORDS[refusal.reason](refusal.about)}; nothing was written`;
   }
-  const { landed, skipped, checks } = refusal.progress;
-  return `stopped at ${refusal.file} (${reasonOf(refusal.reason)}); landed ${landed.length}, skipped ${skipped.length}, checks ${checks.recorded} recorded; what landed stays, and a rerun continues from there`;
+  const { landed, skipped, checks, rewritten } = refusal.progress;
+  return `stopped at ${refusal.file} (${reasonOf(refusal.reason)}); landed ${landed.length}, skipped ${skipped.length}, checks ${checks.recorded} recorded, ${counted(linksOf(rewritten), "link")} rewritten; what landed stays, and a rerun continues from there`;
 };
 
 const importBundleCommand = async (
@@ -591,12 +597,13 @@ const importBundleCommand = async (
     io.say(`import-bundle: REFUSED — ${importReason(run.error, email)}`);
     return REFUSED;
   }
-  const { bundleId, manifest, landed, skipped, checks, concepts } = run.value;
+  const { bundleId, manifest, landed, skipped, checks, rewritten, concepts } = run.value;
   const recorded = `${counted(checks.recorded, "check")} recorded (${checks.present} already present)`;
+  const links = counted(linksOf(rewritten), "link");
   if (run.value.dryRun) {
     const standing = manifest === "standing" ? "already stands" : "would be written first";
     io.say(
-      `import-bundle: dry run — the tree is sound: ${counted(concepts, "concept")}, of which ${landed.length} would land and ${skipped.length} already stand; ${recorded.replace(" recorded", " would be recorded")}; manifest ${bundleId} ${standing}; nothing was written`,
+      `import-bundle: dry run — the tree is sound: ${counted(concepts, "concept")}, of which ${landed.length} would land and ${skipped.length} already stand; ${recorded.replace(" recorded", " would be recorded")}; ${links} in ${counted(rewritten.length, "concept")} would be rewritten; manifest ${bundleId} ${standing}; nothing was written`,
     );
     return DONE;
   }
@@ -608,8 +615,11 @@ const importBundleCommand = async (
     ...skipped.map((path) => [path, `skipped ${path} — already landed`] as const),
   ].toSorted(([one], [other]) => (one < other ? -1 : one > other ? 1 : 0));
   for (const [, line] of outcomes) io.say(`import-bundle: ${line}`);
+  for (const concept of rewritten) {
+    io.say(`import-bundle: rewrote ${concept.path} — ${counted(concept.links, "link")}`);
+  }
   io.say(
-    `import-bundle: done — landed ${landed.length}, skipped ${skipped.length}, ${recorded}, ${seconds} seconds`,
+    `import-bundle: done — landed ${landed.length}, skipped ${skipped.length}, ${recorded}, ${links} rewritten, ${seconds} seconds`,
   );
   return DONE;
 };

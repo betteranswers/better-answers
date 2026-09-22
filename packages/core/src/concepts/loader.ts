@@ -168,12 +168,48 @@ const verifiedEventsOf = (
 
 const INLINE_LINK = /\]\(\s*<?([^)\s>]+)/g;
 
-const relativeConceptLinksOf = (body: string): readonly string[] =>
+type RelativeLink = {
+  readonly at: number;
+  readonly target: string;
+  readonly file: string;
+};
+
+const relativeLinksOf = (body: string): readonly RelativeLink[] =>
   [...body.matchAll(INLINE_LINK)].flatMap((match) => {
-    const bare = (match[1] ?? "").split("#")[0] ?? "";
-    if (bare === "" || bare.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(bare)) return [];
-    return bare.endsWith(".md") ? [bare] : [];
+    const target = match[1] ?? "";
+    const file = target.split("#")[0] ?? "";
+    if (file === "" || file.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(file)) return [];
+    return file.endsWith(".md")
+      ? [{ at: match.index + match[0].length - target.length, target, file }]
+      : [];
   });
+
+const relativeConceptLinksOf = (body: string): readonly string[] =>
+  relativeLinksOf(body).map((link) => link.file);
+
+export type RewrittenBody = {
+  readonly body: string;
+  readonly links: number;
+};
+
+export const rewriteLinks = (
+  body: string,
+  path: string,
+  iriOf: (target: string) => string | undefined,
+): RewrittenBody => {
+  const pieces: string[] = [];
+  let cursor = 0;
+  let links = 0;
+  for (const link of relativeLinksOf(body)) {
+    const iri = iriOf(resolvedResource(link.file, path).slice(1));
+    if (iri === undefined) continue;
+    pieces.push(body.slice(cursor, link.at), iri, link.target.slice(link.file.length));
+    cursor = link.at + link.target.length;
+    links += 1;
+  }
+  pieces.push(body.slice(cursor));
+  return { body: pieces.join(""), links };
+};
 
 const entryLabelOf = (frontmatter: Frontmatter): string => {
   const sources = frontmatter["sources"];
@@ -293,15 +329,48 @@ export const authorOf = async (
   return row;
 };
 
-export const standingConcepts = async (
+export type StandingConcept = {
+  readonly iri: string;
+  readonly mergeKey: string;
+  readonly status: string;
+  readonly body: string;
+  readonly contentHash: string;
+};
+
+type StandingRow = {
+  readonly path: string;
+  readonly iri: string;
+  readonly merge_key: string;
+  readonly status: string;
+  readonly body: string;
+  readonly content_hash: string;
+};
+
+export const standingAt = async (
   principal: Principal,
   tx: Tx,
-): Promise<ReadonlyMap<string, string>> => {
-  const found = await tx.query<{ path: string; iri: string }>(
-    `SELECT path, iri FROM concept_index WHERE workspace_id = ${scopeClause(1)}`,
-    [scopeParameter(principal)],
+  paths: readonly string[],
+): Promise<ReadonlyMap<string, StandingConcept>> => {
+  if (paths.length === 0) return new Map();
+  const found = await tx.query<StandingRow>(
+    `SELECT c.path, c.iri, i.merge_key, c.status, c.body, c.content_hash
+       FROM concept_index c
+       JOIN concept_identity i ON i.workspace_id = c.workspace_id AND i.iri = c.iri
+      WHERE c.workspace_id = ${scopeClause(1)} AND c.path = ANY($2::text[])`,
+    [scopeParameter(principal), [...paths]],
   );
-  return new Map(found.rows.map((row) => [row.path, row.iri]));
+  return new Map(
+    found.rows.map((row) => [
+      row.path,
+      {
+        iri: row.iri,
+        mergeKey: row.merge_key,
+        status: row.status,
+        body: row.body,
+        contentHash: row.content_hash,
+      },
+    ]),
+  );
 };
 
 export type ImportedCheck = {

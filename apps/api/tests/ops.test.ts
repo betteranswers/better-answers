@@ -1011,6 +1011,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     };
 
     type IndexRow = {
+      readonly iri: string;
       readonly path: string;
       readonly kind: string;
       readonly title: string;
@@ -1020,12 +1021,24 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     const indexRowsOf = async (app: TestApp, workspaceId: string) => {
       const found = await app.database.superuser.query<IndexRow>(
-        `SELECT path, kind, title, status, sensitivity
+        `SELECT iri, path, kind, title, status, sensitivity
            FROM concept_index WHERE workspace_id = $1 ORDER BY path`,
         [workspaceId],
       );
       return found.rows;
     };
+
+    const iriOf = async (app: TestApp, workspaceId: string, path: string): Promise<string> => {
+      const row = (await indexRowsOf(app, workspaceId)).find((each) => each.path === path);
+      if (row === undefined) throw new Error(`no concept stands at ${path}`);
+      return row.iri;
+    };
+
+    const REWRITTEN_LINES = [
+      "import-bundle: rewrote knowledge/company/answers/support-hours.md — 1 link",
+      "import-bundle: rewrote knowledge/product/answers/can-two-teams-share-one-account-advanced-plan.md — 2 links",
+      "import-bundle: rewrote knowledge/product/answers/can-two-teams-share-one-account-standard-plan.md — 1 link",
+    ];
 
     const checkRowsOf = async (app: TestApp, workspaceId: string) => {
       const found = await app.database.superuser.query<Record<string, unknown>>(
@@ -1059,7 +1072,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return files;
     };
 
-    it("lands the fixture bundle and says what it did, one line per concept in path order", async () => {
+    it("lands the fixture bundle and says what it did, one line per concept in path order, then one per file whose links it rewrote", async () => {
       const { workspaceId, admin } = await bundleWorkspace(app());
 
       const run = await importing(app(), workspaceId, admin.email);
@@ -1068,7 +1081,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         `import-bundle: manifest ${BUNDLE_ID} written as the bundle's first commit`,
         ...IMPORTED_PATHS.map((file) => `import-bundle: landed ${file}`),
-        "import-bundle: done — landed 6, skipped 0, 7 checks recorded (0 already present), 0.0 seconds",
+        ...REWRITTEN_LINES,
+        "import-bundle: done — landed 6, skipped 0, 7 checks recorded (0 already present), 4 links rewritten, 0.0 seconds",
       ]);
     });
 
@@ -1078,7 +1092,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       await importing(app(), workspaceId, admin.email);
 
       const commits = await commitsOf(app(), workspaceId);
-      expect(commits).toHaveLength(7);
+      expect(commits).toHaveLength(10);
       expect(commits[0]).toEqual({
         sha: expect.any(String),
         parent_sha: null,
@@ -1102,7 +1116,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
     });
 
-    it("leaves the manifest in the platform's own form and no email in any concept file, with the links still relative", async () => {
+    it("leaves the manifest in the platform's own form, every link an iri across domains and between split concepts, and no relative link or email in any concept file", async () => {
       const { workspaceId, admin, mona } = await bundleWorkspace(app());
 
       await importing(app(), workspaceId, admin.email);
@@ -1120,11 +1134,37 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
       for (const file of IMPORTED_PATHS) {
         expect(files.get(file)).not.toContain("@");
+        expect(files.get(file)).not.toMatch(/\]\([^)]*\.md/);
         expect(files.get(file)).toContain(`"by": "human:${mona}"`);
       }
       expect(files.get("knowledge/company/answers/support-hours.md")).toContain(
-        "[Advanced plan](../../product/tiers/advanced-plan.md)",
+        `[Advanced plan](${await iriOf(app(), workspaceId, "knowledge/product/tiers/advanced-plan.md")}) customers reach an engineer out of hours`,
       );
+      expect(
+        files.get("knowledge/product/answers/can-two-teams-share-one-account-advanced-plan.md"),
+      ).toContain(
+        `The [Standard plan's answer](${await iriOf(app(), workspaceId, "knowledge/product/answers/can-two-teams-share-one-account-standard-plan.md")}) describes the looser default`,
+      );
+    });
+
+    it("open follows a rewritten link to the concept it names", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(app());
+      await importing(app(), workspaceId, admin.email);
+      const opening = (iri: string) =>
+        reading(app(), workspaceId, admin.id, (principal, tx) =>
+          open(principal, tx, { iri }, IMPORTED_AT),
+        );
+
+      const from = await opening(
+        await iriOf(app(), workspaceId, "knowledge/company/answers/support-hours.md"),
+      );
+      if (!from.ok || !from.value.found) throw new Error("the linking concept did not open");
+      const target = /\]\((https:\/\/[^)]+)\)/.exec(from.value.concept?.body ?? "")?.[1] ?? "";
+      const to = await opening(target);
+
+      if (!to.ok) throw new Error(`open refused: ${to.error.message}`);
+      if (!to.value.found) throw new Error(`nothing stands at ${target}`);
+      expect(to.value.concept?.frontmatter["title"]).toBe("Advanced plan");
     });
 
     it("records each verified event as an imported check with a null hash and one audit event, so find and open say Checked by the member's name · imported", async () => {
@@ -1159,7 +1199,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
       expect(await actsOf(app(), workspaceId)).toEqual([
         { act: "knowledge.check.imported", events: 7 },
-        { act: "knowledge.concept.committed", events: 6 },
+        { act: "knowledge.concept.committed", events: 9 },
         { act: "knowledge.manifest.written", events: 1 },
       ]);
 
@@ -1200,7 +1240,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("skips every landed concept and every present check on a rerun, and says so", async () => {
+    it("skips every landed concept and every present check on a rerun, rewrites no link, and says so", async () => {
       const { workspaceId, admin } = await bundleWorkspace(app());
       await importing(app(), workspaceId, admin.email);
 
@@ -1210,9 +1250,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(again.lines).toEqual([
         `import-bundle: manifest ${BUNDLE_ID} already stands`,
         ...IMPORTED_PATHS.map((file) => `import-bundle: skipped ${file} — already landed`),
-        "import-bundle: done — landed 0, skipped 6, 0 checks recorded (7 already present), 0.0 seconds",
+        "import-bundle: done — landed 0, skipped 6, 0 checks recorded (7 already present), 0 links rewritten, 0.0 seconds",
       ]);
-      expect(await commitsOf(app(), workspaceId)).toHaveLength(7);
+      expect(await commitsOf(app(), workspaceId)).toHaveLength(10);
       expect(await checkRowsOf(app(), workspaceId)).toHaveLength(7);
     });
 
@@ -1236,7 +1276,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
-        `import-bundle: dry run — the tree is sound: 6 concepts, of which 6 would land and 0 already stand; 7 checks would be recorded (0 already present); manifest ${BUNDLE_ID} would be written first; nothing was written`,
+        `import-bundle: dry run — the tree is sound: 6 concepts, of which 6 would land and 0 already stand; 7 checks would be recorded (0 already present); 4 links in 3 concepts would be rewritten; manifest ${BUNDLE_ID} would be written first; nothing was written`,
       ]);
       expect(await commitsOf(app(), workspaceId)).toEqual([]);
       expect(await indexRowsOf(app(), workspaceId)).toEqual([]);
@@ -1263,6 +1303,18 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.exitCode).toBe(1);
       expect(run.lines).toEqual([
         `import-bundle: REFUSED — ${viewer.email} is a Viewer of this workspace; the import runs as an Admin or an Editor`,
+      ]);
+      expect(await commitsOf(app(), workspaceId)).toEqual([]);
+    });
+
+    it("refuses an Editor asked to land the bundle Restricted, which only an Admin could read back, and writes nothing", async () => {
+      const { workspaceId } = await bundleWorkspace(app());
+
+      const run = await importing(app(), workspaceId, MONA, ["--sensitivity", "Restricted"]);
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        `import-bundle: REFUSED — ${MONA} is not an Admin of this workspace, and a bundle landed Restricted is one only an Admin can read back for its second pass; run the import as an Admin`,
       ]);
       expect(await commitsOf(app(), workspaceId)).toEqual([]);
     });

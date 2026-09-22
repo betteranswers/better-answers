@@ -10,7 +10,7 @@ import {
 } from "@better-answers/schema";
 import { z } from "zod";
 
-import { readableClause, readableParameters, widens } from "../access/index.ts";
+import { readableClause, readableParameters, readsSensitivity, widens } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
 import {
   actorIdOf,
@@ -73,11 +73,13 @@ import {
   presentChecks,
   readBundle,
   recordImportedChecks,
-  standingConcepts,
+  rewriteLinks,
+  standingAt,
   type BundleTree,
   type ChecksRecorded,
   type ImportedCheck,
   type LoadedConcept,
+  type StandingConcept,
   type Unsound,
 } from "./loader.ts";
 import { parseBundleManifest, writeManifest, type WriteManifestRefusal } from "./manifest.ts";
@@ -590,10 +592,16 @@ export type ImportBundleInput = {
   readonly dryRun?: boolean | undefined;
 };
 
+export type ConceptRewritten = {
+  readonly path: string;
+  readonly links: number;
+};
+
 export type ImportProgress = {
   readonly landed: readonly string[];
   readonly skipped: readonly string[];
   readonly checks: ChecksRecorded;
+  readonly rewritten: readonly ConceptRewritten[];
 };
 
 export type BundleImported = ImportProgress & {
@@ -608,6 +616,7 @@ export type ImportBundleRefusal =
   | PrincipalRefusal
   | "no-such-repository"
   | "manifest-taken"
+  | "class-unreadable"
   | ({ readonly kind: "unsound" } & Unsound)
   | {
       readonly kind: "stopped";
@@ -674,18 +683,35 @@ const dryRunOf = (
   bundleId: string,
   manifest: "standing" | "would-write",
   concepts: readonly ResolvedConcept[],
-  standing: ReadonlyMap<string, string>,
+  standing: ReadonlyMap<string, StandingConcept>,
   present: ReadonlySet<string>,
 ): BundleImported => {
   const landed: string[] = [];
   const skipped: string[] = [];
   let checks: ChecksRecorded = { recorded: 0, present: 0 };
+  const paths = new Set(concepts.map((concept) => concept.path));
+  const rewritten: ConceptRewritten[] = [];
   for (const concept of concepts) {
-    const iri = standing.get(concept.path);
-    (iri === undefined ? landed : skipped).push(concept.path);
-    checks = plus(checks, countChecks(iri, concept.checks, present));
+    const held = standing.get(concept.path);
+    (held === undefined ? landed : skipped).push(concept.path);
+    checks = plus(checks, countChecks(held?.iri, concept.checks, present));
+
+    // No iri is minted on a dry run, so the target's own path stands in and only the count is read.
+    const { links } = rewriteLinks(held?.body ?? concept.body, concept.path, (target) =>
+      paths.has(target) ? target : undefined,
+    );
+    if (links > 0) rewritten.push({ path: concept.path, links });
   }
-  return { bundleId, manifest, landed, skipped, checks, concepts: concepts.length, dryRun: true };
+  return {
+    bundleId,
+    manifest,
+    landed,
+    skipped,
+    checks,
+    rewritten,
+    concepts: concepts.length,
+    dryRun: true,
+  };
 };
 
 export const importBundle = async (
@@ -695,13 +721,21 @@ export const importBundle = async (
 ): Promise<Result<BundleImported, ImportBundleRefusal | Error>> => {
   if (!mayWrite(principal)) return err("role-forbids");
   const sensitivity = input.sensitivity ?? IMPORT_SENSITIVITY_DEFAULT;
+
+  // The second pass reads back what the first landed; a class the runner cannot read would stop
+  // the run after everything was written.
+  if (!readsSensitivity(principal, sensitivity)) return err("class-unreadable");
   const loaded = readBundle(input.tree);
   if (!loaded.ok) return err({ kind: "unsound", ...loaded.error });
   const { manifest, concepts } = loaded.value;
 
   const prepared = await attempt(() =>
     withMembership(principal, doors.postgres, async (fresh, tx) => {
-      const standing = await standingConcepts(fresh, tx);
+      const standing = await standingAt(
+        fresh,
+        tx,
+        concepts.map((concept) => concept.path),
+      );
       return {
         standing,
         persons: await memberIdsByEmail(
@@ -712,7 +746,11 @@ export const importBundle = async (
         author: await authorOf(fresh, tx, fresh.userId),
         present:
           input.dryRun === true
-            ? await presentChecks(fresh, tx, [...standing.values()])
+            ? await presentChecks(
+                fresh,
+                tx,
+                [...standing.values()].map((held) => held.iri),
+              )
             : new Set<string>(),
       };
     }),
@@ -744,12 +782,19 @@ export const importBundle = async (
   const landed: string[] = [];
   const skipped: string[] = [];
   let checks: ChecksRecorded = { recorded: 0, present: 0 };
+  const rewritten: ConceptRewritten[] = [];
   const batchId = ulid();
   const stoppedAt = (file: string, reason: WriteConceptRefusal | Error) =>
-    err({ kind: "stopped" as const, file, reason, progress: { landed, skipped, checks } });
+    err({
+      kind: "stopped" as const,
+      file,
+      reason,
+      progress: { landed, skipped, checks, rewritten },
+    });
+  const known = new Map<string, StandingConcept>(standing);
   for (const concept of resolved) {
-    let iri = standing.get(concept.path);
-    if (iri === undefined) {
+    let held = known.get(concept.path);
+    if (held === undefined) {
       const wrote = await writeConcept(principal, doors, {
         mergeKey: concept.mergeKey,
         path: concept.path,
@@ -765,7 +810,14 @@ export const importBundle = async (
       });
       if (wrote.ok) {
         landed.push(concept.path);
-        iri = wrote.value.iri;
+        held = {
+          iri: wrote.value.iri,
+          mergeKey: concept.mergeKey,
+          status: CONCEPT_STABLE_STATUS,
+          body: concept.body,
+          contentHash: wrote.value.contentHash,
+        };
+        known.set(concept.path, held);
       } else if (wrote.error === "path-taken") {
         skipped.push(concept.path);
         continue;
@@ -775,7 +827,7 @@ export const importBundle = async (
     } else {
       skipped.push(concept.path);
     }
-    const target = iri;
+    const target = held.iri;
     const recorded = await attempt(() =>
       withMembership(principal, doors.postgres, (fresh, tx) =>
         recordImportedChecks(fresh, tx, { iri: target, checks: concept.checks, batchId }),
@@ -785,12 +837,36 @@ export const importBundle = async (
     if (!recorded.value.ok) return stoppedAt(concept.file, recorded.value.error);
     checks = plus(checks, recorded.value.value);
   }
+
+  const iriOf = (target: string): string | undefined => known.get(target)?.iri;
+  for (const concept of resolved) {
+    const held = known.get(concept.path);
+    if (held === undefined) continue;
+    const linked = rewriteLinks(held.body, concept.path, iriOf);
+    if (linked.links === 0) continue;
+    const wrote = await writeConcept(principal, doors, {
+      iri: held.iri,
+      mergeKey: held.mergeKey,
+      path: concept.path,
+      kind: concept.kind,
+      title: concept.title,
+      frontmatter: concept.frontmatter,
+      body: linked.body,
+      message: `Rewrite the links in ${concept.path} to the iris of the concepts they name`,
+      author,
+      expects: { base: held.contentHash },
+      status: held.status,
+    });
+    if (!wrote.ok) return stoppedAt(concept.file, wrote.error);
+    rewritten.push({ path: concept.path, links: linked.links });
+  }
   return ok({
     bundleId: manifest.id,
     manifest: written.value.written ? "written" : "standing",
     landed,
     skipped,
     checks,
+    rewritten,
     concepts: resolved.length,
     dryRun: false,
   });
