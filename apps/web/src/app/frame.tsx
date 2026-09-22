@@ -6,6 +6,7 @@ import { NEEDS_A_PICK, refusalOf, useMembership } from "@/features/auth/membersh
 import { screenAt, viewAt } from "@/shared/screens.ts";
 import { IconRail } from "./icon-rail.tsx";
 import { SecondaryNav } from "./secondary-nav.tsx";
+import { isFilled, Toolbar, ViewPanel, ViewTabsRoot } from "./toolbar.tsx";
 import { TopBar } from "./top-bar.tsx";
 
 export function Frame() {
@@ -31,6 +32,11 @@ export function Frame() {
   const person = membership.data;
   const openScreen = screenAt(pathname);
   const openView = viewAt(pathname);
+  // The open view's own declaration, carried by its route: the shell fills nothing itself.
+  const toolbar = useRouterState({ select: (state) => state.matches.at(-1)?.staticData.toolbar });
+  // One source for both halves of the region, so a panel never outlives its tab list.
+  const region =
+    openView !== undefined && isFilled(toolbar) ? { name: openView.name, toolbar } : undefined;
 
   return (
     /*
@@ -68,11 +74,17 @@ export function Frame() {
           onSignOut={signOut}
         />
 
-        <main id="screen" aria-label="Screen" tabIndex={-1} className="flex-1 px-4 py-6 md:px-8">
-          <div className="max-w-measure">
-            <Outlet />
-          </div>
-        </main>
+        <ViewTabsRoot tabs={region?.toolbar.tabs}>
+          {region === undefined ? null : <Toolbar name={region.name} toolbar={region.toolbar} />}
+
+          <main id="screen" aria-label="Screen" tabIndex={-1} className="flex-1 px-4 py-6 md:px-8">
+            <div className="max-w-measure">
+              <ViewPanel>
+                <Outlet />
+              </ViewPanel>
+            </div>
+          </main>
+        </ViewTabsRoot>
       </div>
     </div>
   );
