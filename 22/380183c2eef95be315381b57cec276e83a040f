@@ -1,0 +1,19 @@
+docs/specs/the-strip-reaches-the-config-tree-and-the-frozen-documents.md
+  s_6644f940c20d5d::t_db5a2d252590d0 1-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "22380183c2eef95be315381b57cec276e83a040f",
+  "prompts": {},
+  "sessions": {
+    "s_6644f940c20d5d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5ceed9f9-5bb3-4047-8811-1b46ceb57ccf",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
