@@ -120,6 +120,14 @@ const dirty = (tree: Throwaway): Throwaway => {
   return tree;
 };
 
+// The stubs and the log sit outside the repository, so a linked worktree borrows them
+// unchanged and only the working directory moves.
+const linked = (tree: Throwaway, branch: string): Throwaway => {
+  const root = path.join(scratch, `${branch}-worktree`);
+  gitIn(tree.root, "worktree", "add", "-q", "-b", branch, root);
+  return { ...tree, root };
+};
+
 type Run = { readonly status: number | null; readonly stdout: string; readonly stderr: string };
 
 const landIn = (tree: Throwaway, argv: readonly string[]): Run => {
@@ -225,15 +233,82 @@ describe("pnpm land over a throwaway repository", () => {
     },
   );
 
-  it("refuses a tree standing anywhere but main, naming where it stands, and pushes nothing", () => {
-    const tree = dirty(workspace("off-main"));
-    gitIn(tree.root, "switch", "-q", "-c", "a-branch-of-its-own");
+  it("takes a linked worktree's uncommitted change, which can never stand on main", () => {
+    const worktree = linked(dirty(workspace("a-worktree")), "a-branch-of-its-own");
+    writeUnder(worktree.root, "docs/note.md", "a line the worktree can see\n");
+
+    const run = landWith(worktree, GOOD);
+
+    expect(run.stderr).toBe("");
+    expect(run.status).toBe(0);
+    expect(run.stdout).toContain("docs/note.md");
+    expect(branchOf(worktree)).toBe(GOOD_BRANCH);
+    expect(subjectOf(worktree)).toBe(GOOD);
+  });
+
+  it("takes a detached head that is origin's main, naming no branch to stand on", () => {
+    const tree = dirty(workspace("detached"));
+    gitIn(tree.root, "checkout", "-q", "--detach");
+
+    const run = landWith(tree, GOOD);
+
+    expect(run.stderr).toBe("");
+    expect(run.status).toBe(0);
+    expect(branchOf(tree)).toBe(GOOD_BRANCH);
+    expect(subjectOf(tree)).toBe(GOOD);
+  });
+
+  it("commits a head behind origin's main onto the newer head it fetched", () => {
+    const tree = workspace("behind");
+    const newer = "A commit origin's main carries and this tree has not seen";
+    gitIn(tree.root, "commit", "-q", "--allow-empty", "-m", newer);
+    gitIn(tree.root, "push", "-q", "origin", "main");
+    gitIn(tree.root, "reset", "--hard", "-q", "HEAD~1");
+    dirty(tree);
+
+    const run = landWith(tree, GOOD);
+
+    expect(run.stderr).toBe("");
+    expect(run.status).toBe(0);
+    expect(subjectOf(tree)).toBe(GOOD);
+    expect(gitIn(tree.root, "log", "-1", "--format=%s", "HEAD~1").trim()).toBe(newer);
+  });
+
+  it.each([
+    { held: 1, directory: "ahead-by-one", counted: "1 commit that" },
+    { held: 2, directory: "ahead-by-two", counted: "2 commits that" },
+  ])(
+    "refuses a head carrying $held of its own that origin's main has not, counting them",
+    ({ held, directory, counted }) => {
+      const tree = workspace(directory);
+      for (let made = 0; made < held; made += 1) {
+        gitIn(tree.root, "commit", "-q", "--allow-empty", "-m", `A commit this tree kept ${held}`);
+      }
+      dirty(tree);
+
+      const run = landWith(tree, GOOD);
+
+      expect(run.status).not.toBe(0);
+      expect(run.stderr).toContain(counted);
+      expect(logOf(tree)).not.toContain("git commit");
+      expect(logOf(tree)).not.toContain("git push");
+    },
+  );
+
+  it("names the change it could not carry onto origin's head, and pushes nothing", () => {
+    const tree = workspace("overwritten");
+    writeUnder(tree.root, "README.md", "the line origin's main carries\n");
+    gitIn(tree.root, "add", "-A");
+    gitIn(tree.root, "commit", "-q", "-m", "A line origin's main carries and this tree has not");
+    gitIn(tree.root, "push", "-q", "origin", "main");
+    gitIn(tree.root, "reset", "--hard", "-q", "HEAD~1");
+    writeUnder(tree.root, "README.md", "the line this tree carries\n");
 
     const run = landWith(tree, GOOD);
 
     expect(run.status).not.toBe(0);
-    expect(run.stderr).toContain("a-branch-of-its-own");
-    expect(logOf(tree)).not.toContain("git commit");
+    expect(run.stderr).toContain("could not be carried onto origin/main's head");
+    expect(run.stderr).toContain("README.md");
     expect(logOf(tree)).not.toContain("git push");
   });
 
@@ -249,16 +324,36 @@ describe("pnpm land over a throwaway repository", () => {
     expect(logOf(tree)).not.toContain("git push");
   });
 
-  it("refuses a path a session keeps to itself, naming it, and commits nothing", () => {
-    const tree = dirty(workspace("session-scratch"));
-    writeUnder(tree.root, ".claude/notes.md", "a note this session kept\n");
+  it.each([
+    { shape: "a session's own note", directory: "session-claude", path: ".claude/notes.md" },
+    { shape: "a scratch working file", directory: "session-scratch", path: ".scratch/map.md" },
+  ])("refuses $shape, untracked and under a kept folder, and commits nothing", (kept) => {
+    const tree = dirty(workspace(kept.directory));
+    writeUnder(tree.root, kept.path, "a line this session kept\n");
 
     const run = landWith(tree, GOOD);
 
     expect(run.status).not.toBe(0);
-    expect(run.stderr).toContain(".claude/notes.md");
+    expect(run.stderr).toContain(kept.path);
     expect(logOf(tree)).not.toContain("git commit");
     expect(logOf(tree)).not.toContain("git push");
+  });
+
+  it("takes a tracked file under .claude, which is this repository's content and not a session's", () => {
+    const tree = workspace("tracked-claude");
+    const hook = ".claude/hooks/provision-worktree.sh";
+    writeUnder(tree.root, hook, "#!/bin/sh\nexit 0\n");
+    gitIn(tree.root, "add", "-A");
+    gitIn(tree.root, "commit", "-q", "-m", "A hook this repository tracks stands under .claude");
+    gitIn(tree.root, "push", "-q", "origin", "main");
+    writeUnder(tree.root, hook, "#!/bin/sh\nexit 1\n");
+
+    const run = landWith(tree, GOOD);
+
+    expect(run.stderr).toBe("");
+    expect(run.status).toBe(0);
+    expect(run.stdout).toContain(hook);
+    expect(gitIn(tree.root, "show", "--name-only", "--format=", "HEAD")).toContain(hook);
   });
 
   it("refuses a clean working tree, naming it, and pushes nothing", () => {
