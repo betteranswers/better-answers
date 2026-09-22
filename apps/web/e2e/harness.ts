@@ -57,6 +57,15 @@ export const seedRoutes = (
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 
+// Sign-out is one disclosure in from the top bar, so a spec that leaves opens the menu first.
+export const signOutFromTheShell = async (page: Page, who: string): Promise<void> => {
+  await page
+    .getByRole("banner")
+    .getByRole("button", { name: new RegExp(who) })
+    .click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+};
+
 export const skipLinkReachesTheScreen = async (page: Page): Promise<void> => {
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();

@@ -13,11 +13,16 @@ const tsc = (() => {
   return binary;
 })();
 
+// The icon set declares a file per glyph, which puts this listing past Node's default
+// megabyte; truncation fails as a spawn error, not a finding.
+const LISTING_BUFFER_BYTES = 64 * 1024 * 1024;
+
 describe("the AppRouter seam", () => {
   it("pulls nothing of the auth server into the web program", () => {
     const listing = execFileSync(process.execPath, [tsc, "--noEmit", "--listFiles"], {
       cwd: webRoot,
       encoding: "utf8",
+      maxBuffer: LISTING_BUFFER_BYTES,
     });
     const authFiles = listing
       .split("\n")

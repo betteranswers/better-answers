@@ -1,30 +1,16 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-
 import { Button } from "@/shared/ui/button.tsx";
 
 import { useSignOut } from "./auth-hooks.ts";
 
 export function SignOutButton(properties: { readonly variant?: "default" | "outline" }) {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const signOut = useSignOut();
+  const { signOut, signingOut } = useSignOut();
 
   return (
     <Button
       type="button"
       variant={properties.variant ?? "outline"}
-      disabled={signOut.isPending}
-      onClick={() => {
-        signOut.mutate(undefined, {
-          // On settle, not success: whatever the server said, this browser is done with the
-          // session the person asked to leave.
-          onSettled: () => {
-            queryClient.clear();
-            void navigate({ href: "/sign-in", replace: true });
-          },
-        });
-      }}
+      disabled={signingOut}
+      onClick={signOut}
     >
       Sign out
     </Button>

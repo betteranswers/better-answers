@@ -11,6 +11,9 @@ item carries no version of its own, so the pin is the CLI, the registry URL and 
 
 T-037 added two more items on the same day with the same CLI — `input` and `label`.
 
+T-225 added `tooltip` on **22 September 2026** with the same CLI, `shadcn@4.20.1`; its two digests
+were taken that day and its arrival edits are listed below with the others.
+
 This file records vendored source only. The npm packages those items stand on are ordinary
 dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
 lockfile, which is where a reader reads them and where Renovate moves them.
@@ -51,6 +54,7 @@ the pin.
 | `ai-elements/inline-citation.tsx` | https://registry.ai-sdk.dev/inline-citation.json | `7ee8f5238d63b78f` | `618d35f1d1147d77` |
 | `input.tsx` | https://ui.shadcn.com/r/styles/new-york/input.json | `4d1a3b126cc62485` | `b1b9f3d7ab813dfe` |
 | `label.tsx` | https://ui.shadcn.com/r/styles/new-york/label.json | `ea924e70d496cbd6` | `ec7442bb079f9558` |
+| `tooltip.tsx` | https://ui.shadcn.com/r/styles/new-york/tooltip.json | `aef6ec3c142b054e` | `275fe11838d9edd6` |
 
 `components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
 the CLI's own default form; the table records the style-qualified URL the CLI resolves it to,
@@ -89,6 +93,15 @@ and these two files were what it was quietly excusing):
 - `kibo-ui/combobox.tsx`: the two `useControllableState` calls pass `onChange` by conditional
   spread, because the hook declares `onChange?:` without `| undefined` while `prop?:` admits
   it.
+
+T-225's arrival edits, on the one item it added:
+
+- The same extensionless-import rewrite as above, and the `cn` import repointed at
+  `@/shared/lib/utils.ts`: the CLI resolved this repository's `utils` alias to a package name
+  that does not exist here, and wrote `from "cn"` along with a dependency on it. The dependency
+  was not kept.
+- The arrow's `rounded-[2px]` became `rounded-sm`, which the bridge resolves to `0` like every
+  other step: a literal radius in the tree is a second scale even where a base rule zeroes it.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA

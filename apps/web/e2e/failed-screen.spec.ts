@@ -5,7 +5,7 @@ const NOT_A_LIST = { why: "the api answered a shape the routes card cannot rende
 
 const ROUTES_LIST = "routes.list";
 
-test("a screen that throws leaves the frame, the navigation and an accessible way out", async ({
+test("a view that throws leaves the three regions standing and an accessible way out", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -48,10 +48,12 @@ test("a screen that throws leaves the frame, the navigation and an accessible wa
   await expect(everything).not.toContainText("TypeError");
   await expect(everything).not.toContainText("is not a function");
 
-  await expect(page.getByRole("banner")).toBeVisible();
-  await expect(page.getByRole("region", { name: "You" })).toBeVisible();
+  await expect(page.getByRole("banner").getByText(workspace.name)).toBeVisible();
   const navigation = page.getByRole("navigation", { name: "Control Centre" });
   await expect(navigation.getByRole("link")).toHaveCount(6);
+  await expect(
+    page.getByRole("navigation", { name: "System" }).getByRole("link", { name: "Backups" }),
+  ).toBeVisible();
 
   await skipLinkReachesTheScreen(page);
   await page.keyboard.press("Tab");

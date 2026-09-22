@@ -23,28 +23,92 @@ const openAt = async (path: string) => {
   );
 };
 
-describe("Control Centre's frame", () => {
-  it("names all six screens in the navigation, in the glossary's order", async () => {
+const rail = () => screen.getByRole("navigation", { name: "Control Centre" });
+
+const secondaryNav = (screenName: string) => screen.getByRole("navigation", { name: screenName });
+
+describe("Control Centre's three-region shell", () => {
+  it("names all six screens in the icon rail, in the glossary's order", async () => {
     await openAt("/system");
 
-    const navigation = screen.getByRole("navigation", { name: "Control Centre" });
-    const named = within(navigation)
+    const named = within(rail())
       .getAllByRole("link")
       .map((link) => link.textContent);
 
     expect(named).toEqual(SCREENS.map((each) => each.name));
   });
 
-  it("carries the three landmarks and a skip link as the first thing in the order", async () => {
+  it("carries the four regions as landmarks and a skip link as the first thing in the order", async () => {
     const { container } = await openAt("/system");
 
+    expect(rail()).toBeDefined();
+    expect(secondaryNav("System")).toBeDefined();
     expect(screen.getByRole("banner")).toBeDefined();
-    expect(screen.getByRole("navigation", { name: "Control Centre" })).toBeDefined();
     expect(screen.getByRole("main")).toBeDefined();
 
     const first = container.querySelector("a");
     expect(first?.textContent).toBe("Skip to the screen");
     expect(first?.getAttribute("href")).toBe(`#${screen.getByRole("main").id}`);
+  });
+
+  it("lists the open screen's views in the secondary nav, under that screen's name", async () => {
+    await openAt("/system/health");
+
+    const listed = within(secondaryNav("System"))
+      .getAllByRole("link")
+      .map((link) => link.textContent);
+
+    expect(listed).toEqual(["Signals", "Health", "Routes and spend", "Backups"]);
+    expect(within(secondaryNav("System")).getByRole("heading", { level: 2 }).textContent).toBe(
+      "System",
+    );
+  });
+
+  it("swaps the secondary nav to the new screen's views, never showing another screen's", async () => {
+    const { unmount } = await openAt("/people/owners");
+    expect(
+      within(secondaryNav("People"))
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Roles", "Owners", "Thresholds", "Erasure and suppression", "Tokens"]);
+    expect(screen.queryByRole("navigation", { name: "System" })).toBeNull();
+    unmount();
+
+    await openAt("/questions/promotions");
+    expect(
+      within(secondaryNav("Questions"))
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Answer audit", "Promotions", "Answer tests"]);
+    expect(screen.queryByRole("navigation", { name: "People" })).toBeNull();
+  });
+
+  it("marks the open screen in the rail and the open view in the secondary nav", async () => {
+    await openAt("/people/thresholds");
+
+    const marked = within(rail())
+      .getAllByRole("link")
+      .filter((link) => link.hasAttribute("aria-current"))
+      .map((link) => link.textContent);
+    expect(marked).toEqual(["People"]);
+
+    const current = within(secondaryNav("People")).getByRole("link", { current: "page" });
+    expect(current.textContent).toBe("Thresholds");
+  });
+
+  it("names the workspace, then where the person is, then who they are, once it knows", async () => {
+    await openAt("/system/routes-and-spend");
+
+    const bar = screen.getByRole("banner");
+    expect(within(bar).getByText("System", { exact: false })).toBeDefined();
+    expect(within(bar).getByText("Routes and spend", { exact: false })).toBeDefined();
+  });
+
+  it("says nothing about the person until it knows it, rather than guessing", async () => {
+    const { container } = await openAt("/system");
+
+    expect(screen.queryByRole("button", { name: /sign out/i })).toBeNull();
+    expect(container.textContent).not.toMatch(/sign out/i);
   });
 
   it("says the five screens nobody has built are unbuilt, and does not say it of System", async () => {
@@ -66,30 +130,19 @@ describe("Control Centre's frame", () => {
     expect(screen.getByText(/The rest of System/)).toBeDefined();
   });
 
-  it("names nobody until it knows, rather than guessing", async () => {
-    const { container } = await openAt("/system");
-
-    expect(screen.queryByRole("region", { name: "You" })).toBeNull();
-    expect(container.textContent).not.toMatch(/sign out/i);
-  });
-
-  it("marks the screen being read, so it is announced and not only shaded", async () => {
-    await openAt("/people");
-
-    const current = screen.getByRole("link", { current: "page" });
-    expect(current.textContent).toBe("People");
-  });
-
   it("carries an address that is no screen and no view to a screen that says so", async () => {
     await openAt("/not-a-screen");
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("No such screen");
   });
 
-  it("carries an address under a screen that names no such view to the screen that says so", async () => {
+  it("keeps the regions on an address under a screen that names no such view, and says so", async () => {
     await openAt("/system/not-a-view");
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("No such screen");
+    expect(rail()).toBeDefined();
+    expect(secondaryNav("System")).toBeDefined();
+    expect(screen.getByRole("banner")).toBeDefined();
   });
 });
 
@@ -102,6 +155,18 @@ const routedViewPaths = (): readonly string[] => {
   return Object.keys(router.routesByPath).filter((path) =>
     SCREENS.some((each) => path.startsWith(`${each.path}/`)),
   );
+};
+
+const navigatedViewPaths = async (): Promise<readonly string[]> => {
+  const reached: string[] = [];
+  for (const each of SCREENS) {
+    const { unmount } = await openAt(each.defaultView);
+    for (const link of within(secondaryNav(each.name)).getAllByRole("link")) {
+      reached.push(link.getAttribute("href") ?? "");
+    }
+    unmount();
+  }
+  return reached;
 };
 
 describe("Control Centre's one list of screens and their views", () => {
@@ -127,7 +192,7 @@ describe("Control Centre's one list of screens and their views", () => {
     ]);
   });
 
-  it("names, for each screen, the address its own address leads to", () => {
+  it("names for each screen the address its own address leads to", () => {
     expect(SCREENS.map((each) => [each.path, each.defaultView])).toEqual([
       ["/sources", "/sources/bindings"],
       ["/suggestions", "/suggestions/queue"],
@@ -158,6 +223,22 @@ describe("Control Centre's one list of screens and their views", () => {
     const declared = declaredViewPaths();
 
     expect(routedViewPaths().filter((path) => !declared.includes(path))).toEqual([]);
+  });
+
+  it("gives every view on the list an entry in its screen's secondary nav", async () => {
+    const reached = await navigatedViewPaths();
+
+    expect(declaredViewPaths().filter((path) => !reached.includes(path))).toEqual([]);
+  });
+
+  it("lists nothing in a secondary nav that the list does not declare a view", async () => {
+    const declared = declaredViewPaths();
+
+    expect((await navigatedViewPaths()).filter((path) => !declared.includes(path))).toEqual([]);
+  });
+
+  it("gives each screen a glyph of its own, so no two rail entries draw the same one", () => {
+    expect(new Set(SCREENS.map((each) => each.icon)).size).toBe(SCREENS.length);
   });
 
   it("names as each screen's default an address that screen declares a view", () => {
