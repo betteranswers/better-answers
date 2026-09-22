@@ -4,7 +4,7 @@ import {
   RouterProvider,
   createMemoryHistory,
 } from "@tanstack/react-router";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FailedScreen } from "@/app/failed-screen.tsx";
@@ -57,13 +57,15 @@ const openSystemWithABrokenRead = async () => {
 };
 
 describe("a screen that throws", () => {
-  it("leaves Control Centre's frame, its landmarks and its navigation standing", async () => {
+  it("leaves the rail, the secondary nav, the top bar and the content standing", async () => {
     await openSystemWithABrokenRead();
 
     expect(screen.getByRole("banner")).toBeDefined();
     expect(screen.getByRole("main")).toBeDefined();
-    const navigation = screen.getByRole("navigation", { name: "Control Centre" });
-    expect(navigation.textContent).toContain("Knowledge");
+    const rail = screen.getByRole("navigation", { name: "Control Centre" });
+    expect(within(rail).getByRole("link", { name: "Knowledge" })).toBeDefined();
+    const views = screen.getByRole("navigation", { name: "System" });
+    expect(within(views).getByRole("link", { name: "Routes and spend" })).toBeDefined();
 
     expect(screen.getByRole("main").contains(screen.getByRole("alert"))).toBe(true);
   });

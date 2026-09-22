@@ -1,15 +1,15 @@
 import { expect, test } from "./browser.ts";
 
-import { anAddress, provision, revokeCredentials, signIn } from "./harness.ts";
+import { anAddress, provision, revokeCredentials, signIn, signOutFromTheShell } from "./harness.ts";
 
 test("sign-out from the shell ends the session", async ({ page, request }) => {
   const email = anAddress("leaving");
-  await provision(request, { name: "Leaving", adminEmail: email });
+  const workspace = await provision(request, { name: "Leaving", adminEmail: email });
   await page.goto("/sign-in");
   await signIn(page, request, email);
   await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOutFromTheShell(page, workspace.admin.name);
 
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
 
@@ -47,7 +47,7 @@ test("credentials revoked through the harness are refused on the next request", 
   const workspace = await provision(request, { name: "Revoked", adminEmail: email });
   await page.goto("/sign-in");
   await signIn(page, request, email);
-  await expect(page.getByRole("region", { name: "You" }).getByText(workspace.name)).toBeVisible();
+  await expect(page.getByRole("banner").getByText(workspace.name)).toBeVisible();
 
   await revokeCredentials(request, workspace.admin.id);
 

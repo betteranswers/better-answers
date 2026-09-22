@@ -5,6 +5,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import type { BetterFetchError } from "better-auth/client";
 
 import { authClient } from "./auth-client.ts";
@@ -57,7 +58,25 @@ const signOutOptions = () =>
     mutationFn: () => unwrap(authClient.signOut()),
   });
 
-export const useSignOut = () => useMutation(signOutOptions());
+export const useSignOut = () => {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const signOut = useMutation(signOutOptions());
+
+  return {
+    signingOut: signOut.isPending,
+    signOut: () => {
+      signOut.mutate(undefined, {
+        // On settle, not success: whatever the server said, this browser is done with the
+        // session the person asked to leave.
+        onSettled: () => {
+          queryClient.clear();
+          void navigate({ href: "/sign-in", replace: true });
+        },
+      });
+    },
+  };
+};
 
 const setActiveOrganizationOptions = () =>
   mutationOptions<unknown, BetterFetchError, { organizationId: string }>({

@@ -31,10 +31,10 @@ test("a member of one workspace lands in the shell, which names the workspace, t
 
   await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
   await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
-  const you = page.getByRole("region", { name: "You" });
-  await expect(you.getByText(workspace.name)).toBeVisible();
-  await expect(you.getByText(workspace.admin.name, { exact: false })).toBeVisible();
-  await expect(you.getByText("Admin", { exact: false })).toBeVisible();
+  const bar = page.getByRole("banner");
+  await expect(bar.getByText(workspace.name)).toBeVisible();
+  await expect(bar.getByText(workspace.admin.name, { exact: false })).toBeVisible();
+  await expect(bar.getByText("Admin", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "Choose a workspace" })).toHaveCount(0);
 
   await expect(page.getByRole("button", { name: /create/i })).toHaveCount(0);
@@ -62,10 +62,10 @@ test("a member of two workspaces picks one, and everything after is scoped to th
   await page.getByRole("button", { name: second.name }).click();
 
   await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
-  const you = page.getByRole("region", { name: "You" });
-  await expect(you.getByText(second.name)).toBeVisible();
-  await expect(you.getByText("Viewer", { exact: false })).toBeVisible();
-  await expect(you.getByText(first.name)).toHaveCount(0);
+  const bar = page.getByRole("banner");
+  await expect(bar.getByText(second.name)).toBeVisible();
+  await expect(bar.getByText("Viewer", { exact: false })).toBeVisible();
+  await expect(bar.getByText(first.name)).toHaveCount(0);
 });
 
 test("a signed-in person with no membership is refused, can sign out, and is offered no workspace to create", async ({
@@ -138,9 +138,9 @@ test("a member of one workspace whose session predates the membership is still n
   await page.goto("/choose-workspace");
 
   await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
-  const you = page.getByRole("region", { name: "You" });
-  await expect(you.getByText(workspace.name)).toBeVisible();
-  await expect(you.getByText("Editor", { exact: false })).toBeVisible();
+  const bar = page.getByRole("banner");
+  await expect(bar.getByText(workspace.name)).toBeVisible();
+  await expect(bar.getByText("Editor", { exact: false })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1, name: "Choose a workspace" })).toHaveCount(0);
 });
 
