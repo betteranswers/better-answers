@@ -1,0 +1,30 @@
+packages/schema/test/probes.ts
+  s_7f9d314902ff79::t_530466d668ef6d 299
+  s_7f9d314902ff79::t_b322ae32520cf9 41-43
+  s_7f9d314902ff79::t_3f478355be8d0f 40
+packages/schema/test/rls.test.ts
+  s_7f9d314902ff79::t_634fc8e7ff8b0b 15-17,22
+  s_7f9d314902ff79::t_70966c35bf191a 1540
+  s_7f9d314902ff79::t_62aff83222c338 1546-1547,1549-1551
+  s_7f9d314902ff79::t_34ec40e2d3e82a 1501-1506,1509,1513-1515,1517-1539,1541-1544,1552-1553,1556-1568
+  s_7f9d314902ff79::t_a0a468f9407a07 1545,1548,1554-1555
+  s_7f9d314902ff79::t_23bd8e14f93500 1507-1508,1510-1512,1516
+packages/schema/test/migration-ownership.test.ts
+  s_7f9d314902ff79::t_0e1c7ccdaa909f 10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "63a2387cb5bb6c4023806cd73bf12526e831cd90",
+  "prompts": {},
+  "sessions": {
+    "s_7f9d314902ff79": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba770256-7145-4f54-b83c-479953d54d3d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
