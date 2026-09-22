@@ -16,6 +16,6 @@ Every directory under `lifts/` carries a `THIRD_PARTY_NOTICES.md` naming its ups
 
 ## [APP5] Follow this tier's tRPC skills
 
-`apps/api/.claude/skills/` holds the tRPC skills this tier is written against. Read the skill that covers a procedure, a link or an adapter before writing or changing one. Where a skill and this file disagree, this file wins and the disagreement is recorded here. An upload is a mutation taking `octetInputParser` or `FormData`, reached through `splitLink` — never a second HTTP route beside tRPC.
+`apps/api/.claude/skills/` holds the tRPC skills this tier is written against. Read the skill that covers a procedure, a link or an adapter before writing or changing one. Where a skill and this file disagree, this file wins and the disagreement is recorded here. Bytes in are a mutation taking `octetInputParser`, reached through `splitLink`, the descriptor beside the bytes; bytes out are a route beside tRPC an ADR opens.
 
 Reviewer: a skill is prose, and nothing can check that one was followed.
