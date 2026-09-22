@@ -39,19 +39,32 @@ const isRulesFile = (file: string): boolean => path.basename(file) === "CODING_R
 // same file still fails.
 const QUOTES = new Set(['"', "'", "`"]);
 
-const insideAString = (text: string, at: number): boolean => {
+// Only a closed pair is a string, so an apostrophe in prose opens nothing — though two
+// bracketing a tag still read as one.
+const quotedSpansOf = (text: string): readonly (readonly [number, number])[] => {
+  const spans: [number, number][] = [];
   let open: string | undefined;
-  for (let index = 0; index < at; index += 1) {
+  let from = 0;
+  for (let index = 0; index < text.length; index += 1) {
     const character = text[index];
-    if (character === "\\") {
+    if (open !== undefined && character === "\\") {
       index += 1;
       continue;
     }
     if (character === undefined || !QUOTES.has(character)) continue;
-    open = open === character ? undefined : (open ?? character);
+    if (open === undefined) {
+      open = character;
+      from = index;
+    } else if (character === open) {
+      spans.push([from, index]);
+      open = undefined;
+    }
   }
-  return open !== undefined;
+  return spans;
 };
+
+const insideAString = (text: string, at: number): boolean =>
+  quotedSpansOf(text).some(([from, to]) => from < at && at < to);
 
 // Each of these prints the rule it holds in the message a reader hits, so the reader reaches
 // the rule without asking.
@@ -262,6 +275,8 @@ describe("the tags a gate prints and the rules files that define them", () => {
     expect(isAllowedCitation(at(`raise AssertionError("mocked")  # ${spelled} holds this`))).toBe(
       false,
     );
+    expect(isAllowedCitation(at(`# the rule's message names ${spelled}`))).toBe(false);
+    expect(isAllowedCitation(at(`"a face packages/core's map misses (${spelled})"`))).toBe(true);
   });
 
   it("reads tags from every rules file", () => {
