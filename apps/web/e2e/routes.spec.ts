@@ -235,7 +235,7 @@ test.describe("the System screen's routes card", () => {
     for (const screen of SCREENS.filter((candidate) => candidate.id !== "system")) {
       await navigation.getByRole("link", { name: screen.name }).click();
       await expect(page.getByRole("heading", { level: 1, name: screen.name })).toBeVisible();
-      await expect(page.getByText("This screen is not built yet.")).toBeVisible();
+      await expect(page.getByText("This view is not built yet.")).toBeVisible();
     }
   });
 });

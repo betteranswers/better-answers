@@ -29,9 +29,19 @@ test("a browser reaches the frame the api serves on app.", async ({ page, reques
   await expect(navigation.getByRole("link", { name: "Sources" })).toBeFocused();
 
   await navigation.getByRole("link", { name: "Knowledge" }).click();
+  await expect(page).toHaveURL(/\/knowledge\/review-table$/);
   await expect(page.getByRole("heading", { level: 1, name: "Knowledge" })).toBeVisible();
-  await expect(page.getByText("This screen is not built yet.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Review table" })).toBeVisible();
+  await expect(page.getByText("This view is not built yet.")).toBeVisible();
   await expect(page.getByText("the workspace's map")).toBeVisible();
+
+  // `goto` is the bookmark: a fresh document at a path no file sits at, not a click.
+  await page.goto("/people/erasure-and-suppression");
+  await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Erasure and suppression" }),
+  ).toBeVisible();
+  await expect(page.getByText("This view is not built yet.")).toBeVisible();
 
   const painted = await page.locator("main").evaluate((main) => {
     const frame = main.parentElement;

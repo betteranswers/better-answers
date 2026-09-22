@@ -739,6 +739,23 @@ to it by IRI and never restates it (ADR 0014).
   screen (Liam, 26/08/2026). _Avoid_: section (a guide's node), "Mission Control".
 - **screen (of Control Centre)** — one of its six: Sources, Suggestions, Knowledge, Questions,
   People, System.
+- **view (of a screen)** — one of the parts a screen of Control Centre is divided into: the parts
+  the Control Centre entry above lists for that screen, in that order and in those words. Each has
+  an address of its own; a screen names one of them its **default view**, and the screen's own
+  address leads there. A view nobody has built yet is still a destination, and says in words that
+  it is not built. Not a *view (of an MCP App)*. _Avoid_: section (a guide's node), tab (a division
+  inside one view, and the view's own business rather than a word of this glossary's).
+- **icon rail** — the region down Control Centre's left edge listing its six screens, each an icon
+  carrying its screen's name and marking the screen being read. _Avoid_: section nav, sidebar.
+- **secondary nav** — the region beside the icon rail listing the open screen's views under that
+  screen's name, marking the view being read, and swapping when the screen changes. _Avoid_:
+  section nav, sub-nav, sidebar.
+- **toolbar** — the region above a view's content carrying that view's tabs at one end and its acts
+  at the other, filled by the view; a view with neither gets no toolbar. _Avoid_: action bar,
+  section header.
+- **top bar** — the region across the top of Control Centre naming the workspace first, then which
+  screen and view the person is in, then who they are, their role and the way to sign out. _Avoid_:
+  masthead, section header.
 - **promotion** — an Editor's proposal that an answer or a response become an `Answer`
   concept — the button is *Save as an Answer* — kept as a suggestion of kind *promotion* until
   decided at the promotion gate. _Avoid_: promote (as a reader's verb — a marketing word).
@@ -763,12 +780,12 @@ to it by IRI and never restates it (ADR 0014).
   host controls, able to call the same entries the assistant can. It shows a concept, an answer
   or a set of hits; it is never a second way in (ADR 0030). _Avoid_: widget, panel, interactive
   connector.
-- **view** — the rendering half of an MCP App: one `ui://` resource bound to one entry. Every
-  view has a **human rendering** behind it — the text form of the same result — and not every
-  human rendering has a view.
-- **`ui://`** — the wire URI scheme for a view. Beside `okf://` and meaning something different:
-  `okf://` identifies a **concept**, `ui://` identifies a **view**. On the wire only, never in a
-  file.
+- **view (of an MCP App)** — the rendering half of an MCP App: one `ui://` resource bound to one
+  entry. Every one has a **human rendering** behind it — the text form of the same result — and not
+  every human rendering has one. Not a *view (of a screen)*.
+- **`ui://`** — the wire URI scheme for a view of an MCP App. Beside `okf://` and meaning something
+  different: `okf://` identifies a **concept**, `ui://` identifies a **view (of an MCP App)**. On
+  the wire only, never in a file.
 - **token scope** — what a token may do on the MCP surface: `knowledge:read`, `feedback:write`;
   `act:*` later. Shown at consent in the person's words, never as an id. Not a binding's scope.
 - **personal token** — a person's own bearer credential for Claude Code and scripts (the

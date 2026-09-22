@@ -56,7 +56,7 @@ test("sign-in, authorize, consent and the code at Claude's redirect, all on one 
 
   await page.goto("/sign-in");
   await signIn(page, request, email);
-  await expect(page).toHaveURL(/\/system$/);
+  await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
 
   await page.goto(authorizeUrl(origin, { prompt: "consent" }));
 

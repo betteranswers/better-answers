@@ -62,7 +62,7 @@ test("a screen that throws leaves the frame, the navigation and an accessible wa
   /* jscpd:ignore-start */
   await navigation.getByRole("link", { name: "Knowledge" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Knowledge" })).toBeVisible();
-  await expect(page.getByText("This screen is not built yet.")).toBeVisible();
+  await expect(page.getByText("This view is not built yet.")).toBeVisible();
   /* jscpd:ignore-end */
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
