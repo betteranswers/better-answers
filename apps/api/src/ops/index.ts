@@ -141,13 +141,13 @@ const WAIT_POLL_MS = 2_000;
 
 const USAGE_TEXT = `usage: pnpm ops <command> [options]
   replay-erasures --since <dump stamp | ISO instant>      re-apply every erasure completed after a dump (mandatory in every restore)
-  graph-rebuild --workspace <id> [--reason <word>] [--wait | --wait-seconds <n>]   the map made again by the worker (ADR 0023, 0032)
+  graph-rebuild --workspace <id> [--reason <word>] [--wait | --wait-seconds <n>]   the map made again by the worker
     --reason  one of ${REBUILD_REASONS.join(" · ")} (default ${REBUILD_DEFAULT_REASON})
-    --wait    poll the job until it is over, ${WAIT_SECONDS} seconds — the per-workspace budget (ADR 0032)
+    --wait    poll the job until it is over, ${WAIT_SECONDS} seconds — the rebuild's own budget
     --wait-seconds <n>  the same, for a whole number of seconds an operator names instead
   graph-sweep --workspace <id>                              delete every generation of the map but the live one
   graph-counts --workspace <id>                             nodes per label and edges, as JSON, for the drill's diff
-  reconcile-watermark --workspace <id>                      recovery order step 2: replay the commits the rows missed (ADR 0012)
+  reconcile-watermark --workspace <id>                      recovery order step 2: replay the commits the rows missed
   object-store-orphans --workspace <id> [--list]            recovery order step 5: remove the originals a failed bind left, past a ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace, that no document row names
     --list         say how many there are, removing none
   smoke --url <origin> [--workspace <id>] [--find] [--guide] [--ask]
@@ -159,7 +159,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   add-member --workspace <id> --email <email> --role <${ROLES.join("|")}>
                                                             a signed-in person made a member of the workspace; a repeat is refused and never changes a role
   import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <class>] [--dry-run]
-                                                            the company's bundle landed through the governed write, its checks imported, its links rewritten to iris (ADR 0002, 0014)
+                                                            the company's bundle landed through the governed write, its checks imported, its links rewritten to iris
     --sensitivity  one of ${SENSITIVITIES.join(" · ")} (default ${IMPORT_SENSITIVITY_DEFAULT})
     --dry-run      validate the tree and say what a run would do, writing nothing
 exit codes: ${DONE} done · ${REFUSED} refused in no registered word, stop · ${USAGE} usage, or a malformed argument · ${NOT_BUILT} the slice this needs has no tables yet
@@ -573,7 +573,7 @@ const reconcileWatermark = async (
   const found = `head ${head ?? "none"}, watermark ${watermark ?? "none"}, replayed ${replayed.length}, already landed ${skipped.length}`;
   if (stopped !== undefined) {
     io.say(
-      `reconcile-watermark: REFUSED — stopped at ${stopped.sha} (${reasonOf(stopped.reason)}); ${found}; every commit before it landed and nothing after it was attempted, and this workspace stays behind that commit until a person acts (ADR 0012)`,
+      `reconcile-watermark: REFUSED — stopped at ${stopped.sha} (${reasonOf(stopped.reason)}); ${found}; every commit before it landed and nothing after it was attempted, and this workspace stays behind that commit until a person acts`,
     );
     return REFUSED;
   }

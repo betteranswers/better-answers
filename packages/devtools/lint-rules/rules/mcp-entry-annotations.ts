@@ -10,9 +10,9 @@ export const mcpEntryAnnotationsRule = defineRule({
     },
     messages: {
       missing:
-        "This MCP entry declares no `annotations`; every entry carries readOnlyHint and its siblings (ADR 0018).",
+        "This MCP entry declares no `annotations`; every entry carries readOnlyHint and its siblings.",
       noReadOnlyHint:
-        "This MCP entry's `annotations` carry no `readOnlyHint`; the host splits read from write tools on it alone (prototype 61).",
+        "This MCP entry's `annotations` carry no `readOnlyHint`; the host splits read from write tools on it alone.",
       opaque:
         "This MCP entry's config is not an object literal, so its `annotations` cannot be checked here; declare it inline.",
     },

@@ -163,7 +163,7 @@ const signedInUser = z.object({ user: z.object({ id: z.string() }) });
 const invitationsNotYet = (): APIError =>
   new APIError("NOT_IMPLEMENTED", {
     error: "invitations_not_yet",
-    error_description: "invitations arrive with the People screen (T-027)",
+    error_description: "invitations arrive with the People screen",
   });
 
 const clientIdOfQuery = (query: string | undefined): string | undefined =>

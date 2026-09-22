@@ -181,7 +181,7 @@ const ranNoTestLines = (leg: string, report: Report): readonly string[] => {
     .sort(byPlace);
   if (rows.length === 0) return [`### ${leg} mutants that ran no test: none`];
   return [
-    `### ${leg} mutants that ran no test: ${String(rows.length)} — the runner resolved no test file for them, which is a runner fault to fix (the vitest-runner patch under \`patches/\`, T-107), never a survivor to triage`,
+    `### ${leg} mutants that ran no test: ${String(rows.length)} — the runner resolved no test file for them, which is a runner fault to fix (the vitest-runner patch under \`patches/\`), never a survivor to triage`,
     ...rows.map((placed) => row(placed)),
   ];
 };

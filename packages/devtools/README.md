@@ -119,6 +119,14 @@ its exemption. What a language calls code is code: a string in any of them, and 
 body, an escaped string or a quoted identifier in SQL. Each part carries the rule in the message
 it prints, and each is proven through the runner above, both ways.
 
+The citation half also reads the strings in source, because a usage line, a refusal message or
+a log line sends its reader somewhere just as a comment does, and the comment walk never saw
+one. A string with no space in it is a value — an identifier, a path, a key, a version — and
+goes past; the word ceiling is a comment's alone, because a usage text is long by design. A
+test is exempt, and so is a gate that prints its own rule tag in a failure message: those files
+are named in `gates-printing-a-tag.json` beside this README, which the oxlint rule reads through
+`src/tag-printing-gates.ts` and the Python check reads directly, so a new gate is one edit.
+
 | Part | What runs it | Its suite |
 | --- | --- | --- |
 | `lint-rules/rules/comment-only-the-why.ts`, under `lint-rules/comment-gate.oxlintrc.json` | `pnpm comment-gate:ts` | `test/comment-only-the-why.test.ts` |
@@ -169,11 +177,12 @@ a linter that did not run leaves the text as it was, and both halves of that ass
 It spawns the binary the runner would, through the runner's own `executableOf`, so the two
 resolutions cannot drift.
 
-**The word limit and the citation patterns are written twice, once per language.** They are
-two implementations of one rule, and nothing either tier could import at run time binds them,
-so what holds them together is the pair of suites: both run the same table — the same
-over-the-ceiling fixture, the same five citations, the same directive cases — so a limit that
-moved in one language and not the other is a red suite rather than a quiet divergence.
+**The word limit is written twice, once per language** — the citation patterns are not, since
+both tiers compile `contracts/citation/cases.json`. The limit is two implementations of one
+rule, and nothing either tier could import at run time binds them, so what holds them together
+is the pair of suites: both run the same table — the same over-the-ceiling fixture, the same
+five citations, the same directive cases — so a limit that moved in one language and not the
+other is a red suite rather than a quiet divergence.
 
 The Python check runs under bare `python3` and imports only the standard library, so a fresh
 clone can run it before `uv sync`. ruff reads it under `python/ruff.toml` and mypy under
