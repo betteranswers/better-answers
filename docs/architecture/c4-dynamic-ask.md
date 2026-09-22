@@ -7,7 +7,7 @@ C4Dynamic
   title Dynamic diagram — ask, from the question to the answer audit
 
   System_Ext(claude, "Claude, or the SPA", "The question, as the signed-in person")
-  Container(surface, "MCP entry or tRPC subscription", "workspaceProcedure", "Resolves the Principal; streams the answer, verdict first")
+  Container(surface, "MCP entry or tRPC subscription", "queryProcedure", "Resolves the Principal; streams the answer, verdict first")
 
   Container_Boundary(core, "packages/core") {
     Component(plan, "planAnswer", "answering slice, in the resolving transaction", "The full-text hits, the walk from the set, the reuse decision; returns a plan holding no Tx")

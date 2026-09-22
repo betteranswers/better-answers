@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { systemClock } from "@better-answers/core/kernel";
 import { initRepository } from "@better-answers/core/store/git";
 
+import { openDoors } from "../src/doors.ts";
 import { RECONCILER_INTERVAL_MS, startReconciler } from "../src/reconciler.ts";
 import { capturingLogger, openTestGit, type LogLine } from "./harness.ts";
 import { appForSuite } from "./suite-app.ts";
@@ -19,12 +19,7 @@ describe("the periodic head check", () => {
   const app = appForSuite();
 
   const running = (logger: Parameters<typeof startReconciler>[0]["logger"]) => {
-    const started = startReconciler({
-      database: app().database.pool,
-      gitStoreDir: app().gitStoreDir,
-      logger,
-      clock: systemClock(),
-    });
+    const started = startReconciler({ doors: app().doors, logger });
     if (!started.ok) throw new Error(`the app's own root was refused: ${started.error}`);
     return started.value;
   };
@@ -74,17 +69,15 @@ describe("the periodic head check", () => {
     expect(skips(logs)).toHaveLength(1);
   });
 
-  it("cannot start when the repositories' root names a missing directory: the boot hears the door's refusal", () => {
+  it("does not start when the image was never told a repositories' root, and says nothing of its own", () => {
     const { logger, logs } = capturingLogger();
 
     const refused = startReconciler({
-      database: app().database.pool,
-      gitStoreDir: `${app().gitStoreDir}/does-not-exist`,
+      doors: openDoors({ database: app().database.pool }),
       logger,
-      clock: systemClock(),
     });
 
-    expect(refused).toEqual({ ok: false, error: "no-such-root" });
+    expect(refused).toEqual({ ok: false, error: "no-bundle-store" });
     expect(logs).toEqual([]);
   });
 });

@@ -1,4 +1,3 @@
-import type { Pool } from "pg";
 import type { Logger } from "pino";
 
 import {
@@ -6,24 +5,22 @@ import {
   reconcileEveryWorkspace,
   type WorkspaceReconciled,
 } from "@better-answers/core/concepts";
-import { attempt, err, ok, type Clock, type Result } from "@better-answers/core/kernel";
-import { openGit, type GitRootRefusal } from "@better-answers/core/store/git";
-import { openPostgres } from "@better-answers/core/store/postgres";
+import { attempt, err, ok, type Result } from "@better-answers/core/kernel";
 
+import type { Doors } from "./doors.ts";
 import { logger as tierLogger } from "./logger.ts";
 import { reasonOf } from "./ops/index.ts";
 
 export const RECONCILER_INTERVAL_MS = 30_000;
 
 export type ReconcilerDependencies = {
-  readonly database: Pool;
+  readonly doors: Doors;
 
-  readonly gitStoreDir: string;
   readonly intervalMs?: number | undefined;
   readonly logger?: Logger | undefined;
-
-  readonly clock: Clock;
 };
+
+export type ReconcilerRefusal = "no-bundle-store";
 
 export type Reconciler = {
   stop(): Promise<void>;
@@ -54,15 +51,11 @@ const summaryOf = (outcomes: readonly WorkspaceReconciled[]) => {
 
 export const startReconciler = (
   dependencies: ReconcilerDependencies,
-): Result<Reconciler, GitRootRefusal> => {
+): Result<Reconciler, ReconcilerRefusal> => {
   const logger = dependencies.logger ?? tierLogger;
-  const git = openGit(dependencies.gitStoreDir);
-  if (!git.ok) return err(git.error);
-  const doors = {
-    git: git.value,
-    postgres: openPostgres(dependencies.database),
-    clock: dependencies.clock,
-  };
+  const { git, postgres, clock } = dependencies.doors;
+  if (git?.ok !== true) return err("no-bundle-store");
+  const doors = { git: git.value, postgres, clock };
 
   const tick = async (): Promise<void> => {
     const pass = await attempt(() => reconcileEveryWorkspace(RECONCILER, doors));

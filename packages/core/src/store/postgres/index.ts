@@ -163,10 +163,11 @@ type MembershipRow = {
   readonly group_ids: readonly string[];
 };
 
-export const withPrincipal = async <T>(
+const resolveClaims = async <T>(
   door: PostgresDoor,
   claims: Claims,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+  query: string,
 ): Promise<Opened<T>> => {
   const workspaceId = boundarySchemas.workspace.select.shape.id.safeParse(claims.workspaceId);
   const userId = boundarySchemas.user.select.shape.id.safeParse(claims.userId);
@@ -188,8 +189,21 @@ export const withPrincipal = async <T>(
         : err("role-disagrees");
     },
     work,
+    query,
   );
 };
+
+export const withPrincipal = async <T>(
+  door: PostgresDoor,
+  claims: Claims,
+  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+): Promise<Opened<T>> => resolveClaims(door, claims, work, MEMBERSHIP_QUERY);
+
+export const withHeldPrincipal = async <T>(
+  door: PostgresDoor,
+  claims: Claims,
+  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+): Promise<Opened<T>> => resolveClaims(door, claims, work, MEMBERSHIP_QUERY_HELD);
 
 export const withMembership = async <T>(
   principal: UserPrincipal,
@@ -218,7 +232,7 @@ const resolveScoped = async <T>(
   credentialIssuedAtMs: number,
   refusalFor: (row: MembershipRow | undefined) => Result<ResolvedMember, PrincipalRefusal>,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-  query: string = MEMBERSHIP_QUERY,
+  query: string,
 ): Promise<Opened<T>> => {
   const client = await door.pool.connect();
   try {

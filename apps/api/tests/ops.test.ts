@@ -16,23 +16,18 @@ import {
   seedSyntheticSubject,
   type ErasureRehearsed,
 } from "@better-answers/core/erasure";
-import { systemClock, type UserPrincipal } from "@better-answers/core/kernel";
+import { ok, type UserPrincipal } from "@better-answers/core/kernel";
 import { fileAtHead, head, initRepository } from "@better-answers/core/store/git";
-import { openObjects } from "@better-answers/core/store/objects";
-import {
-  openPostgres,
-  withPrincipal,
-  type Answered,
-  type Tx,
-} from "@better-answers/core/store/postgres";
+import { withPrincipal, type Answered, type Tx } from "@better-answers/core/store/postgres";
 import { objectStoreForSuite } from "@better-answers/core/testing/objects";
 import { ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
+import type { Doors } from "../src/doors.ts";
 import { fetchHonouringHost } from "../src/ops/http-fetch.ts";
 import { NOT_BUILT, parseSince, runOps, type OpsIo } from "../src/ops/index.ts";
 import { readTreeUnder } from "../src/ops/read-tree.ts";
-import { APP_HOSTNAME, openTestGit, PUBLIC_URL, type TestApp } from "./harness.ts";
+import { APP_HOSTNAME, doorsFor, openTestGit, PUBLIC_URL, type TestApp } from "./harness.ts";
 import { servedApp } from "./suite-app.ts";
 
 type Run = { readonly exitCode: number; readonly lines: readonly string[] };
@@ -64,15 +59,23 @@ const ioFor = (app: TestApp, stdin = ""): OpsIo & { readonly lines: string[] } =
       lines.push(line);
     },
     appHostname: APP_HOSTNAME,
-    gitStoreDir: app.gitStoreDir,
-    objects: objects().door,
 
     writeReport: async (file, body) => {
       await writeFile(file, body, "utf8");
     },
-    clock: systemClock(),
   };
 };
+
+type Overrides = {
+  readonly doors?: Partial<Doors>;
+  readonly io?: Partial<OpsIo>;
+};
+
+const doorsFrom = (app: TestApp, pool: Pool, overrides: Partial<Doors> = {}): Doors => ({
+  ...doorsFor(pool, { gitStoreDir: app.gitStoreDir }),
+  objects: ok(objects().door),
+  ...overrides,
+});
 
 const ops = async (
   app: TestApp,
@@ -81,18 +84,18 @@ const ops = async (
   pool: Pool = app.database.superuser,
 ): Promise<Run> => {
   const io = ioFor(app, stdin);
-  const exitCode = await runOps(argv, pool, io);
+  const exitCode = await runOps(argv, doorsFrom(app, pool), io);
   return { exitCode, lines: io.lines };
 };
 
 const opsWith = async (
   app: TestApp,
   argv: readonly string[],
-  overrides: Partial<OpsIo>,
+  overrides: Overrides,
   pool: Pool = app.database.pool,
 ): Promise<Run> => {
-  const io = { ...ioFor(app), ...overrides };
-  const exitCode = await runOps(argv, pool, io);
+  const io = { ...ioFor(app), ...overrides.io };
+  const exitCode = await runOps(argv, doorsFrom(app, pool, overrides.doors), io);
   return { exitCode, lines: io.lines };
 };
 
@@ -182,7 +185,7 @@ const jobsOf = async (app: TestApp, workspaceId: string): Promise<readonly Queue
 
 const erasureDoors = (app: TestApp, at: Date) => ({
   git: openTestGit(app),
-  postgres: openPostgres(app.database.pool),
+  postgres: app.doors.postgres,
   objects: objects().door,
   clock: { now: () => at },
 });
@@ -230,7 +233,7 @@ const finishTheJob = async (app: TestApp, workspaceId: string, status: string): 
 
 const principalOf = async (app: TestApp, workspaceId: string, userId: string) => {
   const principal = await withPrincipal(
-    openPostgres(app.database.pool),
+    app.doors.postgres,
     { workspaceId, userId, issuedAt: new Date() },
     async (resolved) => resolved,
   );
@@ -240,8 +243,8 @@ const principalOf = async (app: TestApp, workspaceId: string, userId: string) =>
 
 const bundleDoors = (app: TestApp) => ({
   git: openTestGit(app),
-  postgres: openPostgres(app.database.pool),
-  clock: systemClock(),
+  postgres: app.doors.postgres,
+  clock: app.doors.clock,
 });
 
 type Provisioned = Awaited<ReturnType<TestApp["provision"]>>;
@@ -371,7 +374,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
 
       const run = await opsWith(app(), ["replay-erasures", "--since", FROM_THE_COPY_SINCE], {
-        clock: { now: () => REPLAYED_AT },
+        doors: { clock: { now: () => REPLAYED_AT } },
       });
 
       expect(run.exitCode).toBe(0);
@@ -393,7 +396,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("refuses without a repositories' root, because an erasure it cannot rewrite is not replayed", async () => {
       const run = await opsWith(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
-        gitStoreDir: undefined,
+        doors: { git: undefined },
       });
 
       expect(run.exitCode).toBe(1);
@@ -403,7 +406,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it("refuses when the image was never told about an object store", async () => {
       const run = await opsWith(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
-        objects: undefined,
+        doors: { objects: undefined },
       });
 
       expect(run.exitCode).toBe(1);
@@ -412,17 +415,18 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("refuses an object store that will not answer, rather than reading silence as nothing owed", async () => {
-      const unreachable = openObjects({
-        endpoint: "http://127.0.0.1:1",
-        region: "garage",
-        bucket: "better-answers",
-        accessKeyId: "key",
-        secretAccessKey: "secret",
+      const unreachable = doorsFor(app().database.pool, {
+        objectStore: {
+          endpoint: "http://127.0.0.1:1",
+          region: "garage",
+          bucket: "better-answers",
+          accessKeyId: "key",
+          secretAccessKey: "secret",
+        },
       });
-      if (!unreachable.ok) throw new Error(`the door refused its settings: ${unreachable.error}`);
 
       const run = await opsWith(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
-        objects: unreachable.value,
+        doors: { objects: unreachable.objects },
       });
 
       expect(run.exitCode).toBe(1);
@@ -464,7 +468,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await opsWith(
         app(),
         ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--seed"],
-        { clock: { now: () => REHEARSED_AT } },
+        { doors: { clock: { now: () => REHEARSED_AT } } },
       );
 
       expect(run.exitCode).toBe(0);
@@ -482,7 +486,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const { workspaceId } = await app().provision();
       await initRepository(openTestGit(app()), workspaceId);
       const file = await reportPath();
-      const pinned = { clock: { now: () => REHEARSED_AT } };
+      const pinned = { doors: { clock: { now: () => REHEARSED_AT } } };
 
       const seed = await opsWith(
         app(),
@@ -761,35 +765,34 @@ describe("pnpm ops — the restore scripts' commands", () => {
   describe("reconcile-watermark — the reconciler on demand, which is the restore path", () => {
     it("refuses without a repositories' root, because a bundle it cannot open is nothing to reconcile against", async () => {
       const { workspaceId } = await app().provision();
-      const io: OpsIo & { readonly lines: string[] } = { ...ioFor(app()), gitStoreDir: undefined };
 
-      const exitCode = await runOps(
+      const run = await opsWith(
+        app(),
         ["reconcile-watermark", "--workspace", workspaceId],
+        { doors: { git: undefined } },
         app().database.superuser,
-        io,
       );
 
-      expect(exitCode).toBe(1);
-      expect(io.lines.join("\n")).toContain("REFUSED");
-      expect(io.lines.join("\n")).toContain("GIT_STORE_DIR");
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        "reconcile-watermark: REFUSED — no repositories' root is configured (GIT_STORE_DIR), so the bundle cannot be opened; the estate sets it to /data/git on the api service",
+      ]);
     });
 
-    it("refuses a repositories' root that names a missing directory, the same as an absent one", async () => {
+    it("refuses a repositories' root that names a missing directory, naming the root it was given", async () => {
       const { workspaceId } = await app().provision();
-      const io: OpsIo & { readonly lines: string[] } = {
-        ...ioFor(app()),
-        gitStoreDir: `${app().gitStoreDir}/does-not-exist`,
-      };
+      const missing = `${app().gitStoreDir}/does-not-exist`;
 
-      const exitCode = await runOps(
+      const run = await opsWith(
+        app(),
         ["reconcile-watermark", "--workspace", workspaceId],
+        { doors: doorsFor(app().database.superuser, { gitStoreDir: missing }) },
         app().database.superuser,
-        io,
       );
 
-      expect(exitCode).toBe(1);
-      expect(io.lines).toEqual([
-        `reconcile-watermark: REFUSED — the repositories' root is no-such-root (GIT_STORE_DIR=${app().gitStoreDir}/does-not-exist)`,
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        `reconcile-watermark: REFUSED — the repositories' root is no-such-root (GIT_STORE_DIR=${missing})`,
       ]);
     });
 
@@ -903,11 +906,12 @@ describe("pnpm ops — the restore scripts' commands", () => {
       try {
         const io = ioFor(app());
         const withHost: OpsIo = { ...io, fetch: fetchHonouringHost };
-        expect(await runOps(["smoke", "--url", url], app().database.pool, withHost)).toBe(0);
+        const doors = doorsFrom(app(), app().database.pool);
+        expect(await runOps(["smoke", "--url", url], doors, withHost)).toBe(0);
         expect(io.lines.filter((line) => line.startsWith("FAIL"))).toEqual([]);
 
         const bare: OpsIo = { ...ioFor(app()), fetch: fetchHonouringHost, appHostname: undefined };
-        expect(await runOps(["smoke", "--url", url], app().database.pool, bare)).toBe(1);
+        expect(await runOps(["smoke", "--url", url], doors, bare)).toBe(1);
       } finally {
         await new Promise<void>((resolve) => listener?.close(() => resolve()));
       }
@@ -1124,7 +1128,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const run = await opsWith(
         app(),
         ["provision-workspace", "--name", "Acme", "--slug", slug, "--admin", admin.email],
-        { gitStoreDir: undefined },
+        { doors: { git: undefined } },
       );
 
       expect(run.exitCode).toBe(1);
@@ -1324,7 +1328,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           email,
           ...more,
         ],
-        { readTree: readTreeUnder, clock: { now: () => IMPORTED_AT } },
+        { io: { readTree: readTreeUnder }, doors: { clock: { now: () => IMPORTED_AT } } },
       );
 
     const reading = async <T>(
@@ -1334,7 +1338,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
     ): Promise<Answered<T>> => {
       const read = await withPrincipal(
-        openPostgres(app.database.pool),
+        app.doors.postgres,
         { workspaceId, userId, issuedAt: new Date() },
         work,
       );
@@ -1685,7 +1689,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           "--as",
           admin.email,
         ],
-        { readTree: readTreeUnder },
+        { io: { readTree: readTreeUnder } },
       );
 
       expect(run.exitCode).toBe(1);
