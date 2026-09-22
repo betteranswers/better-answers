@@ -1,0 +1,22 @@
+.claude/skills/browser-suite/SKILL.md
+  s_f9270b508fdc2b::t_a2a888b92cc078 115-116
+  s_f9270b508fdc2b::t_01eea4015082bd 135-136
+  s_f9270b508fdc2b::t_f4213d6e5a9d86 184
+  s_f9270b508fdc2b::t_8b1ccd01a76e0e 44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "20af0a8658f1c9794eea990dfb330447488fb425",
+  "prompts": {},
+  "sessions": {
+    "s_f9270b508fdc2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e8de2d35-dcd7-4cf9-ad59-8c30a01bad7d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": null
+    }
+  }
+}
