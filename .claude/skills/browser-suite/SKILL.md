@@ -66,9 +66,10 @@ to do with what it was testing, and Better Auth logs that it could not tell the 
   `SEND_EMAIL_CODE_PATH`, ahead of Better Auth's own rule for that path. It keys on a hash of the
   address in the body, so which client asked makes no difference.
 - **Per client address.** `limitByIp` in `apps/api/src/ingress/limits.ts` reads `CLIENT_IP_HEADER`
-  and holds `OAUTH_IP_RULE`, `PAGE_IP_RULE`, `TRPC_IP_RULE` and the two MCP rules, all in
-  `apps/api/src/auth/constants.ts`; Better Auth's own limiter, configured there as
-  `BETTER_AUTH_RATE_LIMIT`, keys on the same header.
+  and applies `OAUTH_IP_RULE`, `PAGE_IP_RULE`, `TRPC_IP_RULE` and
+  `MCP_UNAUTHENTICATED_IP_RULE`, all in `apps/api/src/auth/constants.ts`; Better Auth's own
+  limiter, configured there as `BETTER_AUTH_RATE_LIMIT`, keys on the same header. `MCP_TOKEN_RULE`
+  is the odd one out, counted against the bearer token rather than the caller's address.
 
 A spec that means to prove a ceiling names which of the two it is proving, and reaches it from the
 side that counts. Read the numbers off those two files rather than from here.
