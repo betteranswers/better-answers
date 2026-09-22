@@ -1090,7 +1090,7 @@ describe("an Admin reprocesses a binding", () => {
     await expect(
       asAdmin(scenario, (admin, tx) =>
         reprocessBinding(admin, tx, {
-          bindingId,
+          ...inputOf(reprocessBindingInput, { bindingId, reason: "rule-change" }),
           // @ts-expect-error a reason the queue does not carry, on purpose; the refusal under test is the run's own
           reason: "spring-clean",
         }),

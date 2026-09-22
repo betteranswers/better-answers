@@ -360,6 +360,7 @@ const workflowFile = z.object({
   ),
 });
 type Workflow = z.infer<typeof workflowFile>;
+type Job = Workflow["jobs"][string];
 
 const workflow = (name: string): Workflow =>
   workflowFile.parse(parse(read(path.join(".github", "workflows", name))));

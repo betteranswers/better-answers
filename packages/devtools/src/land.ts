@@ -1,5 +1,7 @@
 import { spawnSync } from "node:child_process";
 
+import { z } from "zod";
+
 import { flagValues } from "./flags.ts";
 
 const USAGE =
@@ -142,33 +144,36 @@ const addressIn = (output: string): PullRequest | undefined => {
 
 type QueueState = { readonly isInMergeQueue: boolean; readonly enabledAt: string | undefined };
 
+// The shape gh answers the queue query with; anything else is no queue state to report.
+const queueAnswer = z.object({
+  data: z
+    .object({
+      repository: z
+        .object({
+          pullRequest: z
+            .object({
+              isInMergeQueue: z.boolean(),
+              autoMergeRequest: z
+                .object({ enabledAt: z.string().optional() })
+                .nullable()
+                .optional(),
+            })
+            .nullable()
+            .optional(),
+        })
+        .nullable()
+        .optional(),
+    })
+    .optional(),
+});
+
 const queueStateIn = (output: string): QueueState | undefined => {
   try {
-    const parsed: unknown = JSON.parse(output);
-
-    // SAFETY: every field below is checked with `typeof`, so an answer of another shape is
-    // refused rather than reported as a queue state.
-    const answer = parsed as {
-      readonly data?: {
-        readonly repository?: {
-          readonly pullRequest?: {
-            readonly isInMergeQueue?: boolean;
-            readonly autoMergeRequest?: { readonly enabledAt?: string } | null;
-          } | null;
-        } | null;
-      };
-    };
-    const pull = answer.data?.repository?.pullRequest;
+    const pull = queueAnswer.parse(JSON.parse(output)).data?.repository?.pullRequest;
     if (pull === undefined || pull === null) return undefined;
-    const queued = pull.isInMergeQueue;
-    if (typeof queued !== "boolean") return undefined;
-    const enabledAt = pull.autoMergeRequest?.enabledAt;
-    return {
-      isInMergeQueue: queued,
-      enabledAt: typeof enabledAt === "string" ? enabledAt : undefined,
-    };
+    return { isInMergeQueue: pull.isInMergeQueue, enabledAt: pull.autoMergeRequest?.enabledAt };
   } catch {
-    // gh answered with something other than JSON, which is no queue state to report.
+    // gh answered with something other than JSON, or JSON of another shape.
     return undefined;
   }
 };

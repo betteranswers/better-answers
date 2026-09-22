@@ -1,4 +1,5 @@
 import { Readable } from "node:stream";
+import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 
 import {
   DeleteObjectCommand,
@@ -93,9 +94,13 @@ const putInside = async (
 ): Promise<Result<void, KeyRefusal>> => {
   if (!isPortablePath(key)) return err("malformed-key");
 
+  // SAFETY: the DOM library and Node both declare `ReadableStream` over one runtime object,
+  // so the assertion is about declarations.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- the web's `ReadableStream` and `node:stream/web`'s are two declarations of one runtime object, and a workspace compiled under the DOM lib holds the first where `Readable.fromWeb` wants the second
+  const stream = body as NodeReadableStream<Uint8Array>;
   await new Upload({
     client: door.client,
-    params: { Bucket: door.bucket, Key: `${prefix}${key}`, Body: Readable.fromWeb(body) },
+    params: { Bucket: door.bucket, Key: `${prefix}${key}`, Body: Readable.fromWeb(stream) },
   }).done();
   return ok(undefined);
 };

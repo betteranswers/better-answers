@@ -345,13 +345,11 @@ export const bindUpload = async (
 export const publishBindingInput = z.object({
   bindingId: BINDING_ID,
 
-  confirmations: z.object(
-    // SAFETY: the mapping's keys are the tuple's members, each with the one boolean schema.
-    Object.fromEntries(CONFIRMATIONS.map((named) => [named, z.boolean()])) as Record<
-      (typeof CONFIRMATIONS)[number],
-      z.ZodBoolean
-    >,
-  ),
+  confirmations: z.object({
+    lawfulBasisRecorded: z.boolean(),
+    privacyInformationUpdated: z.boolean(),
+    dpiaReferenced: z.boolean(),
+  } satisfies Record<(typeof CONFIRMATIONS)[number], z.ZodBoolean>),
 });
 
 // The instant is the Clock's, never a caller's, so it travels beside the parsed fields.
