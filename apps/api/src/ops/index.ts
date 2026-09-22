@@ -1,5 +1,3 @@
-import type { Pool } from "pg";
-
 import {
   GRAPH_MAINTENANCE,
   graphCounts,
@@ -22,13 +20,9 @@ import {
 } from "@better-answers/core/erasure";
 import { attempt, err, ok, type Clock, type Result } from "@better-answers/core/kernel";
 import { enqueueJob, JOB_IS_OVER, jobById, type RebuildReason } from "@better-answers/core/runs";
-import { initRepository, openGit, type GitDoor } from "@better-answers/core/store/git";
+import { initRepository, type GitDoor } from "@better-answers/core/store/git";
 import type { ObjectDoor } from "@better-answers/core/store/objects";
-import {
-  openPostgres,
-  tablesPresent,
-  type PostgresDoor,
-} from "@better-answers/core/store/postgres";
+import { tablesPresent, type PostgresDoor } from "@better-answers/core/store/postgres";
 import {
   addMember,
   BOOTSTRAP,
@@ -46,6 +40,8 @@ import {
   ulid,
 } from "@better-answers/schema";
 
+import { doorTold, type Doors } from "../doors.ts";
+
 const DONE = 0;
 const REFUSED = 1;
 const USAGE = 2;
@@ -59,15 +55,9 @@ export type OpsIo = {
 
   readonly appHostname?: string | undefined;
 
-  readonly gitStoreDir?: string | undefined;
-
-  readonly objects?: ObjectDoor | undefined;
-
   readonly writeReport?: ((path: string, body: string) => Promise<void>) | undefined;
 
   readonly readTree?: ((directory: string) => Promise<BundleTree>) | undefined;
-
-  readonly clock: Clock;
 };
 
 export const parseSince = (value: string): Date | undefined => {
@@ -151,49 +141,48 @@ type ErasureDoors = {
   readonly clock: Clock;
 };
 
-const openBundleStore = (io: OpsIo, purpose: string): Result<GitDoor, string> => {
-  if (io.gitStoreDir === undefined) {
-    return err(
-      `no repositories' root is configured (GIT_STORE_DIR), so ${purpose}; the estate sets it to /data/git on the api service`,
-    );
-  }
-  const git = openGit(io.gitStoreDir);
-  return git.ok
-    ? ok(git.value)
-    : err(`the repositories' root is ${git.error} (GIT_STORE_DIR=${io.gitStoreDir})`);
-};
+const bundleStore = (doors: Doors, purpose: string): Result<GitDoor, string> =>
+  doorTold(
+    doors.git,
+    `no repositories' root is configured (GIT_STORE_DIR), so ${purpose}; the estate sets it to /data/git on the api service`,
+  );
 
-const erasureDoors = (pool: Pool, io: OpsIo): Result<ErasureDoors, string> => {
-  const git = openBundleStore(io, "the bundles an erasure rewrites cannot be opened");
+const erasureDoors = (doors: Doors): Result<ErasureDoors, string> => {
+  const git = bundleStore(doors, "the bundles an erasure rewrites cannot be opened");
   if (!git.ok) return err(git.error);
-  if (io.objects === undefined) {
-    return err(
-      "no object store is configured (S3_ENDPOINT, S3_BUCKET, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY on the api service), so the replay copies an erasure leaves cannot be read",
-    );
-  }
-  return ok({ git: git.value, postgres: openPostgres(pool), objects: io.objects, clock: io.clock });
+  const objects = doorTold(
+    doors.objects,
+    "no object store is configured (S3_ENDPOINT, S3_BUCKET, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY on the api service), so the replay copies an erasure leaves cannot be read",
+  );
+  if (!objects.ok) return err(objects.error);
+  return ok({
+    git: git.value,
+    postgres: doors.postgres,
+    objects: objects.value,
+    clock: doors.clock,
+  });
 };
 
-const replayErasuresCommand = async (pool: Pool, flags: Flags, io: OpsIo): Promise<number> => {
+const replayErasuresCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
   const sinceArgument = flagValue(flags, "since");
   const since = sinceArgument === undefined ? undefined : parseSince(sinceArgument);
   if (since === undefined) {
     io.say("replay-erasures: --since <dump stamp or ISO instant> is required");
     return USAGE;
   }
-  const present = await tablesPresent(openPostgres(pool), ["erasure_request"]);
+  const present = await tablesPresent(doors.postgres, ["erasure_request"]);
   if (present.length === 0) {
     io.say(
       `replayed 0 erasures since ${since.toISOString()}: no erasure_request table exists in this schema, so no erasure has ever been recorded here`,
     );
     return DONE;
   }
-  const doors = erasureDoors(pool, io);
-  if (!doors.ok) {
-    io.say(`replay-erasures: REFUSED — ${doors.error}; do not start api`);
+  const opened = erasureDoors(doors);
+  if (!opened.ok) {
+    io.say(`replay-erasures: REFUSED — ${opened.error}; do not start api`);
     return REFUSED;
   }
-  const replayed = await replayErasures(ERASURE, doors.value, { since });
+  const replayed = await replayErasures(ERASURE, opened.value, { since });
   if (!replayed.ok) {
     io.say(`replay-erasures: REFUSED — ${replayed.error.message}; do not start api`);
     return REFUSED;
@@ -340,7 +329,7 @@ const dumpGrep = async (flags: Flags, io: OpsIo): Promise<number> => {
 
 const sliceCommand = async (
   command: SliceCommand,
-  pool: Pool,
+  doors: Doors,
   flags: Flags,
   io: OpsIo,
 ): Promise<number> => {
@@ -350,19 +339,19 @@ const sliceCommand = async (
     return USAGE;
   }
   const needed = NEEDS[command];
-  const present = await tablesPresent(openPostgres(pool), needed);
+  const present = await tablesPresent(doors.postgres, needed);
   if (present.length < needed.length) {
     io.say(
       `${command}: not built — ${needed.filter((name) => !present.includes(name)).join(", ")} absent from this schema; the slice that owns them has not landed`,
     );
     return NOT_BUILT;
   }
-  if (command === "reconcile-watermark") return reconcileWatermark(pool, workspaceId, io);
-  if (command === "graph-rebuild") return graphRebuildCommand(pool, workspaceId, flags, io);
-  if (command === "graph-counts") return graphCountsCommand(pool, workspaceId, io);
-  if (command === "graph-sweep") return graphSweepCommand(pool, workspaceId, io);
-  if (command === "erasure-rehearsal") return erasureRehearsal(pool, workspaceId, flags, io);
-  if (command === "import-bundle") return importBundleCommand(pool, workspaceId, flags, io);
+  if (command === "reconcile-watermark") return reconcileWatermark(doors, workspaceId, io);
+  if (command === "graph-rebuild") return graphRebuildCommand(doors, workspaceId, flags, io);
+  if (command === "graph-counts") return graphCountsCommand(doors, workspaceId, io);
+  if (command === "graph-sweep") return graphSweepCommand(doors, workspaceId, io);
+  if (command === "erasure-rehearsal") return erasureRehearsal(doors, workspaceId, flags, io);
+  if (command === "import-bundle") return importBundleCommand(doors, workspaceId, flags, io);
 
   io.say(
     `${command}: REFUSED — its tables exist but this image carries no implementation; the slice's task fills it in`,
@@ -387,8 +376,12 @@ const refused = (
   return REFUSED;
 };
 
-const graphCountsCommand = async (pool: Pool, workspaceId: string, io: OpsIo): Promise<number> => {
-  const counted = await graphCounts(GRAPH_MAINTENANCE, openPostgres(pool), { workspaceId });
+const graphCountsCommand = async (
+  doors: Doors,
+  workspaceId: string,
+  io: OpsIo,
+): Promise<number> => {
+  const counted = await graphCounts(GRAPH_MAINTENANCE, doors.postgres, { workspaceId });
   if (!counted.ok) return refused("graph-counts", workspaceId, counted.error, io);
   const { liveGen, nodes, edges } = counted.value;
   io.say(JSON.stringify({ live_gen: liveGen, nodes, edges }));
@@ -416,17 +409,22 @@ const after = (ms: number): Promise<void> =>
   });
 
 const waitForJob = async (
-  door: PostgresDoor,
+  doors: Doors,
   workspaceId: string,
   jobId: string,
   seconds: number,
   io: OpsIo,
 ): Promise<number> => {
-  const deadline = io.clock.now().getTime() + seconds * 1_000;
+  const door = doors.postgres;
+  const deadline = doors.clock.now().getTime() + seconds * 1_000;
   const pollMs = Math.min(WAIT_POLL_MS, seconds * 1_000);
   let job = await jobById(GRAPH_MAINTENANCE, door, { workspaceId, jobId });
-  while (job.ok && !JOB_IS_OVER.includes(job.value.status) && io.clock.now().getTime() < deadline) {
-    await after(Math.min(pollMs, Math.max(deadline - io.clock.now().getTime(), 0)));
+  while (
+    job.ok &&
+    !JOB_IS_OVER.includes(job.value.status) &&
+    doors.clock.now().getTime() < deadline
+  ) {
+    await after(Math.min(pollMs, Math.max(deadline - doors.clock.now().getTime(), 0)));
     job = await jobById(GRAPH_MAINTENANCE, door, { workspaceId, jobId });
   }
   if (!job.ok) return refused("graph-rebuild", workspaceId, job.error, io);
@@ -443,7 +441,7 @@ const waitForJob = async (
 };
 
 const graphRebuildCommand = async (
-  pool: Pool,
+  doors: Doors,
   workspaceId: string,
   flags: Flags,
   io: OpsIo,
@@ -458,7 +456,7 @@ const graphRebuildCommand = async (
     io.say("graph-rebuild: --wait takes no value; --wait-seconds takes a whole number of seconds");
     return USAGE;
   }
-  const door = openPostgres(pool);
+  const door = doors.postgres;
   const enqueued = await enqueueJob(GRAPH_MAINTENANCE, door, {
     workspaceId,
     kind: FULL_REBUILD_KIND,
@@ -470,14 +468,14 @@ const graphRebuildCommand = async (
     io.say(`graph-rebuild: done — enqueued ${jobId}`);
     return DONE;
   }
-  return waitForJob(door, workspaceId, jobId, wait, io);
+  return waitForJob(doors, workspaceId, jobId, wait, io);
 };
 
 const plural = (many: number, noun: string): string => `${noun}${many === 1 ? "" : "s"}`;
 const counted = (many: number, noun: string): string => `${many} ${plural(many, noun)}`;
 
-const graphSweepCommand = async (pool: Pool, workspaceId: string, io: OpsIo): Promise<number> => {
-  const swept = await sweepGraph(GRAPH_MAINTENANCE, openPostgres(pool), { workspaceId });
+const graphSweepCommand = async (doors: Doors, workspaceId: string, io: OpsIo): Promise<number> => {
+  const swept = await sweepGraph(GRAPH_MAINTENANCE, doors.postgres, { workspaceId });
   if (!swept.ok) return refused("graph-sweep", workspaceId, swept.error, io);
   if (swept.value.length === 0) {
     io.say("graph-sweep: done — nothing to sweep");
@@ -492,14 +490,18 @@ const graphSweepCommand = async (pool: Pool, workspaceId: string, io: OpsIo): Pr
   return DONE;
 };
 
-const reconcileWatermark = async (pool: Pool, workspaceId: string, io: OpsIo): Promise<number> => {
-  const git = openBundleStore(io, "the bundle cannot be opened");
+const reconcileWatermark = async (
+  doors: Doors,
+  workspaceId: string,
+  io: OpsIo,
+): Promise<number> => {
+  const git = bundleStore(doors, "the bundle cannot be opened");
   if (!git.ok) {
     io.say(`reconcile-watermark: REFUSED — ${git.error}`);
     return REFUSED;
   }
-  const doors = { git: git.value, postgres: openPostgres(pool), clock: io.clock };
-  const run = await reconcile(RECONCILER, doors, { workspaceId });
+  const bundle = { git: git.value, postgres: doors.postgres, clock: doors.clock };
+  const run = await reconcile(RECONCILER, bundle, { workspaceId });
   if (!run.ok) return refused("reconcile-watermark", workspaceId, run.error, io);
   const { head, watermark, replayed, skipped, stopped } = run.value;
   const found = `head ${head ?? "none"}, watermark ${watermark ?? "none"}, replayed ${replayed.length}, already landed ${skipped.length}`;
@@ -554,7 +556,7 @@ const importReason = (refusal: ImportBundleRefusal | Error, email: string): stri
 };
 
 const importBundleCommand = async (
-  pool: Pool,
+  doors: Doors,
   workspaceId: string,
   flags: Flags,
   io: OpsIo,
@@ -576,7 +578,7 @@ const importBundleCommand = async (
     io.say("import-bundle: --dry-run takes no value");
     return USAGE;
   }
-  const git = openBundleStore(io, "the bundle the import writes into cannot be opened");
+  const git = bundleStore(doors, "the bundle the import writes into cannot be opened");
   if (!git.ok) {
     io.say(`import-bundle: REFUSED — ${git.error}`);
     return REFUSED;
@@ -595,8 +597,12 @@ const importBundleCommand = async (
     );
     return REFUSED;
   }
-  const postgres = openPostgres(pool);
-  const principal = await principalOfMember(postgres, { workspaceId, email, at: io.clock.now() });
+  const postgres = doors.postgres;
+  const principal = await principalOfMember(postgres, {
+    workspaceId,
+    email,
+    at: doors.clock.now(),
+  });
   if (!principal.ok) {
     const reason =
       principal.error === "not-a-member"
@@ -604,13 +610,13 @@ const importBundleCommand = async (
         : principal.error;
     return refused("import-bundle", workspaceId, reason, io);
   }
-  const started = io.clock.now();
+  const started = doors.clock.now();
   const run = await importBundle(
     principal.value,
-    { git: git.value, postgres, clock: io.clock },
+    { git: git.value, postgres, clock: doors.clock },
     { tree: tree.value, sensitivity, dryRun: dryRun === true },
   );
-  const seconds = ((io.clock.now().getTime() - started.getTime()) / 1_000).toFixed(1);
+  const seconds = ((doors.clock.now().getTime() - started.getTime()) / 1_000).toFixed(1);
   if (!run.ok) {
     io.say(`import-bundle: REFUSED — ${importReason(run.error, email)}`);
     return REFUSED;
@@ -648,7 +654,7 @@ const rehearsalReason = (reason: RehearsalRefusal | Error): string | Error =>
     : reason;
 
 const erasureRehearsal = async (
-  pool: Pool,
+  doors: Doors,
   workspaceId: string,
   flags: Flags,
   io: OpsIo,
@@ -674,14 +680,14 @@ const erasureRehearsal = async (
     );
     return USAGE;
   }
-  const doors = erasureDoors(pool, io);
-  if (!doors.ok) {
-    io.say(`erasure-rehearsal: REFUSED — ${doors.error}`);
+  const opened = erasureDoors(doors);
+  if (!opened.ok) {
+    io.say(`erasure-rehearsal: REFUSED — ${opened.error}`);
     return REFUSED;
   }
 
   if (seeding) {
-    const seeded = await seedSyntheticSubject(ERASURE, doors.value, { workspaceId });
+    const seeded = await seedSyntheticSubject(ERASURE, opened.value, { workspaceId });
     if (!seeded.ok) {
       return refused("erasure-rehearsal", workspaceId, rehearsalReason(seeded.error), io);
     }
@@ -692,7 +698,7 @@ const erasureRehearsal = async (
     return DONE;
   }
 
-  const rehearsed = await rehearseErasure(ERASURE, doors.value, { workspaceId });
+  const rehearsed = await rehearseErasure(ERASURE, opened.value, { workspaceId });
   if (!rehearsed.ok) {
     return refused("erasure-rehearsal", workspaceId, rehearsalReason(rehearsed.error), io);
   }
@@ -743,7 +749,11 @@ const provisionReason = (refusal: ProvisionRefusal | Error, slug: string): strin
 
 // The repository lives outside the Postgres transaction, so the root is checked before the act
 // and the repository made after it.
-const provisionWorkspaceCommand = async (pool: Pool, flags: Flags, io: OpsIo): Promise<number> => {
+const provisionWorkspaceCommand = async (
+  doors: Doors,
+  flags: Flags,
+  io: OpsIo,
+): Promise<number> => {
   const name = flagValue(flags, "name");
   const slug = flagValue(flags, "slug");
   const email = flagValue(flags, "admin");
@@ -751,12 +761,12 @@ const provisionWorkspaceCommand = async (pool: Pool, flags: Flags, io: OpsIo): P
     io.say("provision-workspace: --name <name>, --slug <slug> and --admin <email> are required");
     return USAGE;
   }
-  const git = openBundleStore(io, "the workspace's bundle repository cannot be created");
+  const git = bundleStore(doors, "the workspace's bundle repository cannot be created");
   if (!git.ok) {
     io.say(`provision-workspace: REFUSED — ${git.error}`);
     return REFUSED;
   }
-  const postgres = openPostgres(pool);
+  const postgres = doors.postgres;
   const admin = await personIdByEmail(BOOTSTRAP, postgres, email);
   if (!admin.ok) {
     io.say(`provision-workspace: REFUSED — ${admin.error.message}`);
@@ -806,7 +816,7 @@ const memberReason = (
   }
 };
 
-const addMemberCommand = async (pool: Pool, flags: Flags, io: OpsIo): Promise<number> => {
+const addMemberCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
   const workspaceId = flagValue(flags, "workspace");
   const email = flagValue(flags, "email");
   const asked = flagValue(flags, "role");
@@ -821,7 +831,7 @@ const addMemberCommand = async (pool: Pool, flags: Flags, io: OpsIo): Promise<nu
     io.say(`add-member: --role must be one of ${ROLES.join(", ")}`);
     return USAGE;
   }
-  const added = await addMember(BOOTSTRAP, openPostgres(pool), { workspaceId, email, role });
+  const added = await addMember(BOOTSTRAP, doors.postgres, { workspaceId, email, role });
   if (!added.ok) {
     return refused("add-member", workspaceId, memberReason(added.error, workspaceId, email), io);
   }
@@ -831,19 +841,19 @@ const addMemberCommand = async (pool: Pool, flags: Flags, io: OpsIo): Promise<nu
 
 const isSliceCommand = (command: string): command is SliceCommand => command in NEEDS;
 
-export const runOps = async (argv: readonly string[], pool: Pool, io: OpsIo): Promise<number> => {
+export const runOps = async (argv: readonly string[], doors: Doors, io: OpsIo): Promise<number> => {
   const [command, ...rest] = argv[0] === "--" ? argv.slice(1) : argv;
   const flags = parseFlags(rest);
   if (command === undefined || command === "--help" || command === "help") {
     io.say(USAGE_TEXT);
     return command === undefined ? USAGE : DONE;
   }
-  if (command === "replay-erasures") return replayErasuresCommand(pool, flags, io);
+  if (command === "replay-erasures") return replayErasuresCommand(doors, flags, io);
   if (command === "smoke") return smoke(flags, io);
   if (command === "dump-grep") return dumpGrep(flags, io);
-  if (command === "provision-workspace") return provisionWorkspaceCommand(pool, flags, io);
-  if (command === "add-member") return addMemberCommand(pool, flags, io);
-  if (isSliceCommand(command)) return sliceCommand(command, pool, flags, io);
+  if (command === "provision-workspace") return provisionWorkspaceCommand(doors, flags, io);
+  if (command === "add-member") return addMemberCommand(doors, flags, io);
+  if (isSliceCommand(command)) return sliceCommand(command, doors, flags, io);
   io.say(`unknown command: ${command}\n${USAGE_TEXT}`);
   return USAGE;
 };

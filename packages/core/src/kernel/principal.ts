@@ -14,6 +14,8 @@ export type AccessRequestId = z.infer<typeof boundarySchemas.accessRequest.selec
 
 export type GroupId = z.infer<typeof boundarySchemas.group.select>["id"];
 
+// A Principal outlives the transaction that resolved it only where an act opens its own; never
+// the request, and that act's door re-judges it.
 export type UserPrincipal = {
   readonly kind: "user";
   readonly workspaceId: WorkspaceId;

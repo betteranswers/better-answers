@@ -1,9 +1,7 @@
 import { Hono } from "hono";
-import type { Pool } from "pg";
 import type { Logger } from "pino";
 
-import { attempt, type Clock } from "@better-answers/core/kernel";
-import { openPostgres } from "@better-answers/core/store/postgres";
+import { attempt } from "@better-answers/core/kernel";
 
 import { createClientMetadataFetcher } from "../lifts/better-auth-cimd-node/index.ts";
 import {
@@ -14,6 +12,7 @@ import {
   createTokenVerifier,
   type EmailSender,
 } from "./auth/index.ts";
+import type { Doors } from "./doors.ts";
 import { routeByHostname, type PublicHostnames } from "./ingress/hostnames.ts";
 import { serveSpa } from "./ingress/spa.ts";
 import { logger as tierLogger } from "./logger.ts";
@@ -21,7 +20,7 @@ import { createMcpSurface } from "./mcp/surface.ts";
 import { createTrpcRoutes } from "./trpc/mount.ts";
 
 export type ServerDependencies = {
-  readonly database: Pool;
+  readonly doors: Doors;
 
   readonly publicUrl: string;
 
@@ -37,20 +36,19 @@ export type ServerDependencies = {
   readonly serverVersion?: string;
 
   readonly webRoot?: string | undefined;
-
-  readonly clock: Clock;
 };
 
 export function createServer(dependencies: ServerDependencies): Hono {
   const server = new Hono();
   const logger = dependencies.logger ?? tierLogger;
-  const door = openPostgres(dependencies.database);
+  const { doors } = dependencies;
+  const door = doors.postgres;
   const mcpUrl = `${dependencies.publicUrl}/mcp`;
 
   server.use("*", routeByHostname(dependencies.hostnames, logger));
 
   const auth = createAuth({
-    database: dependencies.database,
+    database: door.pool,
     door,
     publicUrl: dependencies.publicUrl,
     mcpUrl,
@@ -81,7 +79,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
 
   server.get("/health", async (context) => {
     const reached = await attempt(async () => {
-      await dependencies.database.query("select 1");
+      await door.pool.query("select 1");
     });
 
     if (!reached.ok) {
@@ -104,7 +102,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
       publicUrl: dependencies.publicUrl,
       mcpUrl,
       logger,
-      clock: dependencies.clock,
+      clock: doors.clock,
     }),
   );
 
@@ -119,12 +117,12 @@ export function createServer(dependencies: ServerDependencies): Hono {
     mcpUrl,
     logger,
     serverVersion: dependencies.serverVersion ?? "0.1.0",
-    clock: dependencies.clock,
+    clock: doors.clock,
   });
 
   server.all("/mcp", (context) => mcp(context.req.raw));
 
-  server.route("/", createTrpcRoutes({ auth, door, clock: dependencies.clock }));
+  server.route("/", createTrpcRoutes({ auth, doors }));
 
   const spa = serveSpa({ root: dependencies.webRoot, hostname: dependencies.hostnames.app });
   server.use("*", spa.assets);

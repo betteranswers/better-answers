@@ -1,19 +1,28 @@
 import { serve } from "@hono/node-server";
 import { createTransport } from "nodemailer";
-import { Pool } from "pg";
 
-import { systemClock } from "@better-answers/core/kernel";
-
-import { requireBootstrap, requireIdentityBootstrap } from "./config.ts";
+import { readObjectStore, requireBootstrap, requireIdentityBootstrap } from "./config.ts";
+import { openDoors } from "./doors.ts";
 import { logger } from "./logger.ts";
 import { RECONCILER_INTERVAL_MS, startReconciler } from "./reconciler.ts";
 import { createServer } from "./server.ts";
 
 const bootstrap = requireBootstrap("the app");
 const identity = requireIdentityBootstrap("the app");
-const database = new Pool({ connectionString: bootstrap.databaseUrl });
+const objectStore = readObjectStore();
 
-const clock = systemClock();
+const doors = openDoors({
+  database: bootstrap.databaseUrl,
+  gitStoreDir: bootstrap.gitStoreDir,
+  objectStore: objectStore.ok ? objectStore.value : undefined,
+});
+if (doors.git?.ok === false) {
+  logger.error(
+    { reason: doors.git.error, git_store_dir: bootstrap.gitStoreDir },
+    "the app cannot start: the head check's repositories' root was refused",
+  );
+  process.exit(1);
+}
 
 type EmailMessage = { readonly to: string; readonly subject: string; readonly text: string };
 
@@ -42,13 +51,12 @@ const sendEmail =
 serve(
   {
     fetch: createServer({
-      database,
+      doors,
       publicUrl: identity.publicUrl,
       hostnames: identity.hostnames,
       authSecret: identity.authSecret,
       sendEmail,
       webRoot: bootstrap.webRoot,
-      clock,
     }).fetch,
     port: bootstrap.port,
   },
@@ -57,16 +65,12 @@ serve(
   },
 );
 
-if (bootstrap.gitStoreDir === undefined) {
-  logger.warn("no repositories' root is configured (GIT_STORE_DIR): the head check is not running");
+const reconciler = startReconciler({ doors });
+if (!reconciler.ok) {
+  logger.warn(
+    { reason: reconciler.error },
+    "no repositories' root is configured (GIT_STORE_DIR): the head check is not running",
+  );
 } else {
-  const reconciler = startReconciler({ database, gitStoreDir: bootstrap.gitStoreDir, clock });
-  if (!reconciler.ok) {
-    logger.error(
-      { reason: reconciler.error, git_store_dir: bootstrap.gitStoreDir },
-      "the app cannot start: the head check's repositories' root was refused",
-    );
-    process.exit(1);
-  }
   logger.info({ interval_ms: RECONCILER_INTERVAL_MS }, "head check running");
 }

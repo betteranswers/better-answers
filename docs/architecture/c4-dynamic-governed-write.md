@@ -7,7 +7,7 @@ C4Dynamic
   title Dynamic diagram — one governed write, then the reconciler's tick
 
   Person(person, "Editor or Admin", "The git author of the act")
-  Container(trpc, "tRPC procedure", "workspaceProcedure", "Resolves the Principal, opens the transaction, calls the slice")
+  Container(trpc, "tRPC procedure", "mutationProcedure", "Resolves the Principal under the held read, opens the transaction, calls the slice")
 
   Container_Boundary(core, "packages/core") {
     Component(concepts, "concepts slice", "the act", "Authoring, acceptance, verification, revert; owns the transaction and the lock")

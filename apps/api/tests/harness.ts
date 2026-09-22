@@ -7,9 +7,9 @@ import type { Hono } from "hono";
 import type { Pool } from "pg";
 import { pino } from "pino";
 
-import { systemClock, type Clock, type PlatformPrincipal } from "@better-answers/core/kernel";
-import { openGit, type GitDoor } from "@better-answers/core/store/git";
-import { openPostgres } from "@better-answers/core/store/postgres";
+import type { Clock, PlatformPrincipal } from "@better-answers/core/kernel";
+import type { GitDoor } from "@better-answers/core/store/git";
+import type { ObjectStoreSettings } from "@better-answers/core/store/objects";
 import { removeBundleRoot } from "@better-answers/core/testing/bundle-root";
 import {
   provisionWorkspace,
@@ -20,6 +20,7 @@ import { testData } from "@better-answers/schema/testing";
 
 import type { EmailMessage } from "../src/auth/index.ts";
 import { CLIENT_IP_HEADER } from "../src/auth/index.ts";
+import { openDoors, type Doors } from "../src/doors.ts";
 import { hostnameOfUrl, type PublicHostnames } from "../src/ingress/hostnames.ts";
 import { createServer } from "../src/server.ts";
 import { defaultClientAddresses } from "./client-addresses.ts";
@@ -78,6 +79,8 @@ export const capturingLogger = (level: "debug" | "info" = "info") => {
 export type TestApp = {
   readonly server: Hono;
   readonly database: TestDatabase;
+
+  readonly doors: Doors;
 
   readonly gitStoreDir: string;
 
@@ -162,22 +165,31 @@ const cimdFixture = async (input: string | URL | Request): Promise<Response> => 
   return new Response("no such document", { status: 404 });
 };
 
+type DoorOptions = {
+  readonly gitStoreDir?: string | undefined;
+  readonly objectStore?: ObjectStoreSettings | undefined;
+  readonly clock?: Clock | undefined;
+};
+
+export const doorsFor = (database: Pool | string, options: DoorOptions = {}): Doors =>
+  openDoors({ database, ...options });
+
 export const serverFor = (pool: Pool): Hono =>
   createServer({
-    database: pool,
+    doors: doorsFor(pool),
     publicUrl: PUBLIC_URL,
     hostnames: HOSTNAMES,
     authSecret: AUTH_SECRET,
     sendEmail: async () => {},
     fetchClientMetadataResource: cimdFixture,
     logger: pino({ level: "silent" }),
-    clock: systemClock(),
   });
 
 export const openTestGit = (app: TestApp): GitDoor => {
-  const opened = openGit(app.gitStoreDir);
-  if (!opened.ok) throw new Error(`the test app's git store was refused: ${opened.error}`);
-  return opened.value;
+  if (app.doors.git?.ok !== true) {
+    throw new Error(`the test app's repositories' root is ${app.doors.git?.error ?? "not set"}`);
+  }
+  return app.doors.git.value;
 };
 
 export type TestAppOptions = {
@@ -208,8 +220,9 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
   const metadataFetches: string[] = [];
   const { logger, logs } = capturingLogger();
 
+  const doors = doorsFor(database.pool, { gitStoreDir, clock: options.clock });
   const server = createServer({
-    database: database.pool,
+    doors,
     publicUrl,
     hostnames,
     authSecret: AUTH_SECRET,
@@ -223,9 +236,8 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     },
     logger,
     webRoot: options.webRoot,
-    clock: options.clock ?? systemClock(),
   });
-  const door = openPostgres(database.pool);
+  const door = doors.postgres;
 
   const person: TestApp["person"] = async (email, name) => {
     const named = name === undefined ? {} : { name };
@@ -374,6 +386,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
   return {
     server,
     database,
+    doors,
     gitStoreDir,
     emails,
     metadataFetches,

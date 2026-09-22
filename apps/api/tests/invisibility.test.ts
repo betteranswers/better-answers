@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { writeConcept } from "@better-answers/core/concepts";
-import { systemClock, type UserPrincipal } from "@better-answers/core/kernel";
+import type { UserPrincipal } from "@better-answers/core/kernel";
 import { initRepository } from "@better-answers/core/store/git";
-import { openPostgres, withPrincipal } from "@better-answers/core/store/postgres";
+import { withPrincipal } from "@better-answers/core/store/postgres";
 import {
   codePointsOf,
   documentLanded,
@@ -62,7 +62,7 @@ const rendered = (result: Rpc): string => String(rpcOf(rpcListOf(result["content
 
 const principalFor = async (workspaceId: string, userId: string): Promise<UserPrincipal> => {
   const resolved = await withPrincipal(
-    openPostgres(app.database.pool),
+    app.doors.postgres,
     { workspaceId, userId, issuedAt: new Date() },
     async (principal) => principal,
   );
@@ -85,7 +85,7 @@ const conceptWrittenIn = async (
   await initRepository(git, workspace.workspaceId);
   const written = await writeConcept(
     await principalFor(workspace.workspaceId, workspace.admin.id),
-    { git, postgres: openPostgres(app.database.pool), clock: systemClock() },
+    { git, postgres: app.doors.postgres, clock: app.doors.clock },
     {
       kind: "Note",
       author: { name: workspace.admin.name, email: workspace.admin.email },
