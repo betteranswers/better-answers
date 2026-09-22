@@ -1,0 +1,20 @@
+packages/core/test/refusal-words.test.ts
+  s_2dd75a86f22d42::t_07b7095cf2a803 67-68,73,79
+  s_2dd75a86f22d42::t_04c8ce006cf6d2 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9a558d63b32e8bd6e962fa88634a4154bb7ca726",
+  "prompts": {},
+  "sessions": {
+    "s_2dd75a86f22d42": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1deab29c-2105-473f-9514-e52636269c8a",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
