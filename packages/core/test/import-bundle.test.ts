@@ -243,6 +243,60 @@ const authorOf = async (principal: UserPrincipal): Promise<string> => {
   return `${row.name} <${row.email}>`;
 };
 
+const irisByPath = async (workspaceId: string): Promise<ReadonlyMap<string, string>> => {
+  const found = await db().pool.query<{ path: string; iri: string }>(
+    "SELECT path, iri FROM concept_index WHERE workspace_id = $1",
+    [workspaceId],
+  );
+  return new Map(found.rows.map((row) => [row.path, row.iri]));
+};
+
+const filesAtHead = async (scenario: Scenario): Promise<ReadonlyMap<string, string>> => {
+  const sha = (await bundleHistory(scenario.git, scenario.workspaceId)).at(-1) ?? "";
+  const files = new Map<string, string>();
+  for (const path of PATHS_IN_ORDER) {
+    files.set(path, await fileAtCommit(scenario.git, scenario.workspaceId, sha, path));
+  }
+  return files;
+};
+
+const LINKED = {
+  supportHours: "knowledge/company/answers/support-hours.md",
+  advancedAnswer: "knowledge/product/answers/can-two-teams-share-one-account-advanced-plan.md",
+  standardAnswer: "knowledge/product/answers/can-two-teams-share-one-account-standard-plan.md",
+  advancedTier: "knowledge/product/tiers/advanced-plan.md",
+  standardTier: "knowledge/product/tiers/standard-plan.md",
+} as const;
+
+const REWRITTEN_IN_ORDER = [
+  { path: LINKED.supportHours, links: 1 },
+  { path: LINKED.advancedAnswer, links: 2 },
+  { path: LINKED.standardAnswer, links: 1 },
+];
+
+// Stands in for another writer's commit between the passes: the row's hash moves when the
+// concept's first check lands, before pass two reads it.
+const movedBetweenThePasses = async <T>(path: string, work: () => Promise<T>): Promise<T> => {
+  const pool = db().pool;
+  await pool.query(
+    `CREATE FUNCTION move_between_the_passes() RETURNS trigger LANGUAGE plpgsql AS $$
+       BEGIN
+         UPDATE concept_index SET content_hash = repeat('f', 64)
+          WHERE workspace_id = NEW.workspace_id AND iri = NEW.iri AND path = '${path}';
+         RETURN NEW;
+       END $$`,
+  );
+  await pool.query(
+    "CREATE TRIGGER move_between_the_passes AFTER INSERT ON concept_verification FOR EACH ROW EXECUTE FUNCTION move_between_the_passes()",
+  );
+  try {
+    return await work();
+  } finally {
+    await pool.query("DROP TRIGGER move_between_the_passes ON concept_verification");
+    await pool.query("DROP FUNCTION move_between_the_passes()");
+  }
+};
+
 const standingConcept = (scenario: Scenario, mergeKey: string) =>
   writeConcept(scenario.editor, doorsOf(scenario), {
     mergeKey,
@@ -268,11 +322,12 @@ describe("importing the bundle", () => {
       landed: PATHS_IN_ORDER,
       skipped: [],
       checks: { recorded: 7, present: 0 },
+      rewritten: REWRITTEN_IN_ORDER,
       concepts: 6,
       dryRun: false,
     });
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
-    expect(history).toHaveLength(7);
+    expect(history).toHaveLength(10);
     const first = await commitFacts(scenario.git, scenario.workspaceId, history[0] ?? "");
     expect({ subject: first.subject, files: first.files, parents: first.parents }).toEqual({
       subject: "Write the bundle's manifest",
@@ -408,7 +463,7 @@ describe("importing the bundle", () => {
     ]);
     const ledger = await ledgerOf(scenario.workspaceId);
     expect(ledger.map((row) => row["subject_kind"]).join(" ")).toBe(
-      "manifest concept check check concept check concept check concept check concept check concept check",
+      "manifest concept check check concept check concept check concept check concept check concept check concept concept concept",
     );
     expect(
       new Set(ledger.map((row) => `${String(row["act"])} on a ${String(row["subject_kind"])}`)),
@@ -431,11 +486,12 @@ describe("importing the bundle", () => {
     );
   });
 
-  it("skips what already landed on a rerun, records no second check for the same actor and instant, and says so", async () => {
+  it("skips what already landed on a rerun, records no second check for the same actor and instant, rewrites no link, and says so", async () => {
     const { scenario, verifiers } = await arranged();
     await imported(scenario, soundBundle(verifiers));
 
     const again = await imported(scenario, soundBundle(verifiers));
+    const dry = await imported(scenario, soundBundle(verifiers), { dryRun: true });
 
     expect(again).toEqual({
       bundleId: BUNDLE_ID,
@@ -443,15 +499,17 @@ describe("importing the bundle", () => {
       landed: [],
       skipped: PATHS_IN_ORDER,
       checks: { recorded: 0, present: 7 },
+      rewritten: [],
       concepts: 6,
       dryRun: false,
     });
-    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(7);
+    expect(dry.rewritten).toEqual([]);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(10);
     expect(await rowsFor(scenario.workspaceId)).toEqual({
       concepts: "6",
-      commits: "7",
+      commits: "10",
       checks: "7",
-      events: "14",
+      events: "17",
     });
   });
 
@@ -479,6 +537,7 @@ describe("importing the bundle", () => {
           ],
           skipped: [],
           checks: { recorded: 3, present: 0 },
+          rewritten: [],
         },
       },
     });
@@ -518,6 +577,7 @@ describe("importing the bundle", () => {
         "knowledge/company/answers/support-hours.md",
       ],
       checks: { recorded: 4, present: 3 },
+      rewritten: REWRITTEN_IN_ORDER,
       concepts: 6,
       dryRun: false,
     });
@@ -535,20 +595,119 @@ describe("importing the bundle", () => {
       landed: PATHS_IN_ORDER,
       skipped: [],
       checks: { recorded: 7, present: 0 },
+      rewritten: REWRITTEN_IN_ORDER,
       concepts: 6,
       dryRun: true,
     });
     await nothingWritten(scenario);
   });
 
-  it("lands every concept at the class the caller names", async () => {
+  it("lands every concept at the class the caller names, an Admin landing them Restricted and reading them back for the second pass", async () => {
     const { scenario, verifiers } = await arranged();
 
-    await imported(scenario, soundBundle(verifiers), { sensitivity: "Restricted" });
+    const run = await importing(scenario, scenario.admin, {
+      tree: soundBundle(verifiers),
+      sensitivity: "Restricted",
+    });
 
+    if (!run.ok) throw new Error(`the import was refused: ${JSON.stringify(run.error)}`);
+    expect(run.value.rewritten).toEqual(REWRITTEN_IN_ORDER);
     expect(
       new Set((await indexRows(scenario.workspaceId)).map((row) => row["sensitivity"])),
     ).toEqual(new Set(["Restricted"]));
+  });
+});
+
+describe("the second pass: every relative link becomes the iri of the concept it names", () => {
+  it("rewrites each link's target to the iri, its text untouched, as a governed write on top of pass one, and says which files it rewrote", async () => {
+    const { scenario, verifiers } = await arranged();
+
+    const run = await imported(scenario, soundBundle(verifiers));
+
+    expect(run.rewritten).toEqual(REWRITTEN_IN_ORDER);
+    const iri = await irisByPath(scenario.workspaceId);
+    const files = await filesAtHead(scenario);
+    expect(files.get(LINKED.supportHours)).toContain(
+      `Support answers between 08:00 and 18:00 on working days. [Advanced plan](${iri.get(LINKED.advancedTier)}) customers reach an engineer out of hours.`,
+    );
+    expect(files.get(LINKED.advancedAnswer)).toContain(
+      `The [Standard plan's answer](${iri.get(LINKED.standardAnswer)}) is the looser default.\n\nThis answer is for the [Advanced plan](${iri.get(LINKED.advancedTier)}).`,
+    );
+    expect(files.get(LINKED.standardAnswer)).toContain(
+      `This answer is for the [Standard plan](${iri.get(LINKED.standardTier)}).`,
+    );
+    for (const file of files.values()) {
+      expect(file).not.toMatch(/\]\([^)]*\.md/);
+      expect(file).not.toContain("@");
+    }
+    const history = await bundleHistory(scenario.git, scenario.workspaceId);
+    expect(history).toHaveLength(10);
+    const rewrite = await commitFacts(scenario.git, scenario.workspaceId, history[7] ?? "");
+    expect({
+      subject: rewrite.subject,
+      author: rewrite.author,
+      actor: rewrite.trailers["Actor"],
+    }).toEqual({
+      subject:
+        "Rewrite the links in knowledge/company/answers/support-hours.md to the iris of the concepts they name",
+      author: await authorOf(scenario.editor),
+      actor: `human:${scenario.editor.userId}`,
+    });
+    expect((await ledgerOf(scenario.workspaceId)).slice(-3).map((row) => row["act"])).toEqual([
+      "knowledge.concept.committed",
+      "knowledge.concept.committed",
+      "knowledge.concept.committed",
+    ]);
+    const edges = await db().pool.query<{ from_uid: string; to_uid: string }>(
+      `SELECT from_uid, to_uid FROM graph_edge
+        WHERE workspace_id = $1 AND label = 'LINKS_TO' ORDER BY from_uid, uid`,
+      [scenario.workspaceId],
+    );
+    const linked: readonly (readonly [string, string])[] = [
+      [LINKED.supportHours, LINKED.advancedTier],
+      [LINKED.advancedAnswer, LINKED.standardAnswer],
+      [LINKED.advancedAnswer, LINKED.advancedTier],
+      [LINKED.standardAnswer, LINKED.standardTier],
+    ];
+    expect(edges.rows).toEqual(
+      linked
+        .map(([from, to]) => ({ from_uid: iri.get(from), to_uid: iri.get(to) }))
+        .toSorted((one, other) => (one.from_uid ?? "").localeCompare(other.from_uid ?? "")),
+    );
+  });
+
+  it("stops at the file whose concept moved between the passes, naming it, rewrites nothing after it, and rewrites it on a rerun", async () => {
+    const { scenario, verifiers } = await arranged();
+
+    const stopped = await movedBetweenThePasses(LINKED.supportHours, () =>
+      importing(scenario, scenario.editor, { tree: soundBundle(verifiers) }),
+    );
+
+    expect(stopped).toEqual({
+      ok: false,
+      error: {
+        kind: "stopped",
+        file: "company/answers/support-hours.md",
+        reason: "stale-precondition",
+        progress: {
+          landed: PATHS_IN_ORDER,
+          skipped: [],
+          checks: { recorded: 7, present: 0 },
+          rewritten: [],
+        },
+      },
+    });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(7);
+    const files = await filesAtHead(scenario);
+    for (const { path } of REWRITTEN_IN_ORDER) expect(files.get(path)).toMatch(/\]\([^)]*\.md\)/);
+
+    const completed = await imported(scenario, soundBundle(verifiers));
+
+    expect(completed.rewritten).toEqual(REWRITTEN_IN_ORDER);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(10);
+    for (const file of (await filesAtHead(scenario)).values()) {
+      expect(file).not.toMatch(/\]\([^)]*\.md/);
+    }
   });
 });
 
@@ -719,6 +878,18 @@ describe("what the import refuses before it writes anything", () => {
     const refused = await importing(scenario, scenario.viewer, { tree: soundBundle(verifiers) });
 
     expect(refused).toEqual({ ok: false, error: "role-forbids" });
+    await nothingWritten(scenario);
+  });
+
+  it("refuses an Editor asked to land the bundle Restricted, a class only an Admin could read back for the second pass", async () => {
+    const { scenario, verifiers } = await arranged();
+
+    const refused = await importing(scenario, scenario.editor, {
+      tree: soundBundle(verifiers),
+      sensitivity: "Restricted",
+    });
+
+    expect(refused).toEqual({ ok: false, error: "class-unreadable" });
     await nothingWritten(scenario);
   });
 

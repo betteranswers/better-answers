@@ -33,6 +33,9 @@ export const readableParameters = (
   principal: UserPrincipal,
 ): readonly [Role, readonly GroupId[]] => [principal.role, principal.groups];
 
+export const readsSensitivity = (principal: UserPrincipal, sensitivity: Sensitivity): boolean =>
+  sensitivity !== RESTRICTED || principal.role === "Admin";
+
 const RANK = { Public: 2, Internal: 1, Restricted: 0 } as const satisfies Record<
   Sensitivity,
   number

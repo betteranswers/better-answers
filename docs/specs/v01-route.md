@@ -445,5 +445,5 @@ Two third-party doubles on the route: a fetch-shaped fake at the model client's 
 | **P2** | people | The platform console; provisioning and first membership | P1 | T-028 | provisioning only | unspecced | — |
 | **O1** | ops | Signals, seven of System's cards, `backup_run`, `platform_event` | S0 | — | yes | unspecced | — |
 | **V1** | records | Verification requests, cadence, shelf life, conflicts resolved | S2, S3 | — | yes | unspecced | — |
-| **C1** | client | First-client onboarding; the real answer tests | S5, S6, P1, P2 (provisioning), O1, S0 | — | yes | unspecced | — |
+| **C1** | client | First-client onboarding; the real answer tests | S5, S6, P1, P2 (provisioning), O1, S0 | — | yes | unspecced — one piece pulled forward with the owner's agreement (22/09/2026): **T-307**, the bundle loader (`docs/specs/T-307.md`), landed as `pnpm ops import-bundle` in T-308 (the manifest), T-309 (pass one and the command) and T-310 (pass two, the links); C1 stays blocked on its edges for everything else | — |
 | Hygiene | — | Off the route | — | T-014, T-017, T-110, T-118, T-106/T-107 remainder | no | open | — |
