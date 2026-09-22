@@ -1002,7 +1002,8 @@ def test_the_image_leaves_this_tiers_tests_out_of_the_runtime(
 
 
 JOB_OPENS = re.compile(r"^ {2}(?P<job>[\w-]+):\s*$")
-RUNS_A_ROOT_SCRIPT = re.compile(r"^ {6}- run: pnpm (?P<script>[\w:.-]+)\s*$")
+# A step's own `if:` pushes its `run:` onto a line of its own, so the dash is optional.
+RUNS_A_ROOT_SCRIPT = re.compile(r"^ +(?:- )?run: pnpm (?P<script>[\w:.-]+)\s*$")
 THIS_TIERS_GATE = "check:worker"
 
 
@@ -1023,11 +1024,12 @@ def _legs_of_check() -> dict[str, list[str]]:
     return legs
 
 
-def _gate_of(lines: list[str]) -> str:
-    for line in lines:
-        if found := RUNS_A_ROOT_SCRIPT.match(line):
-            return found.group("script")
-    return ""
+def _gates_of(lines: list[str]) -> list[str]:
+    return [
+        found.group("script")
+        for line in lines
+        if (found := RUNS_A_ROOT_SCRIPT.match(line))
+    ]
 
 
 def _root_scripts() -> dict[str, str]:
@@ -1050,31 +1052,48 @@ def test_this_tier_reads_the_names_the_workflows_actually_hand_it() -> None:
         for job, lines in legs.items()
         if any(f"{PROBE_DEFERRAL_VARIABLE}:" in line for line in lines)
     }
-    # This tier's leg, found by the gate it runs rather than by the name it was given.
-    mine = {job for job, lines in legs.items() if _gate_of(lines) == THIS_TIERS_GATE}
+    # This tier's legs, found by the gate they run rather than by their names.
+    mine = {job for job, lines in legs.items() if THIS_TIERS_GATE in _gates_of(lines)}
     # A leg running named files rather than a workspace's whole check builds no image.
     misread = {
         job
         for job in deferred
-        if not scripts.get(_gate_of(legs[job]), "").rstrip().endswith("check")
+        if not any(
+            scripts.get(gate, "").rstrip().endswith("check")
+            for gate in _gates_of(legs[job])
+        )
     }
 
     assert len(handed) == 1, BUILD_WORKFLOW
-    assert len(mine) == 1, CHECK_WORKFLOW
+    assert mine, CHECK_WORKFLOW
+    # One leg per lane, so no run of any lane pays for this tier's gates twice.
+    assert len(mine) == len({job.split("-", 1)[0] for job in mine}), CHECK_WORKFLOW
     assert mine <= deferred, CHECK_WORKFLOW
     assert misread == set(), CHECK_WORKFLOW
 
 
 def test_the_runner_refuses_the_engines_gateway_call_the_way_the_image_does() -> None:
-    declared = [
-        line
-        for line in CHECK_WORKFLOW.read_text("utf-8").splitlines()
+    legs = _legs_of_check()
+    running = {
+        job for job, lines in legs.items() if THIS_TIERS_GATE in _gates_of(lines)
+    }
+    declaring = {
+        job
+        for job, lines in legs.items()
+        if any("COCOINDEX_DISABLE_USAGE_TRACKING:" in line for line in lines)
+    }
+    declared = {
+        line.split(":", 1)[1].strip().strip('"')
+        for lines in legs.values()
+        for line in lines
         if "COCOINDEX_DISABLE_USAGE_TRACKING:" in line
-    ]
+    }
 
-    assert len(declared) == 1, CHECK_WORKFLOW
-    assert declared[0].split(":", 1)[1].strip().strip('"') == worker_environment(
-        "COCOINDEX_DISABLE_USAGE_TRACKING"
+    assert running, CHECK_WORKFLOW
+    # Every leg that runs the pipeline suite on the runner refuses the call.
+    assert declaring == running, CHECK_WORKFLOW
+    assert declared == {worker_environment("COCOINDEX_DISABLE_USAGE_TRACKING")}, (
+        CHECK_WORKFLOW
     )
 
 

@@ -8,7 +8,9 @@ import { describe, expect, it } from "vitest";
 import {
   gatesNamed,
   gatesUnder,
+  rootName,
   rootScripts,
+  workspacePackages,
   workspacesGated,
   workspacesChecked,
 } from "./workspaces.ts";
@@ -20,15 +22,126 @@ const read = (relative: string): string =>
 
 const LANE_SCRIPT = "scripts/docs-lane.mjs";
 
-const laneOf = (changed: readonly string[], separator = "\n"): string => {
+type Decision = { readonly lane: string; readonly worker: string };
+
+const decide = (changed: readonly string[], separator = "\n"): Decision => {
   const run = spawnSync("node", [path.join(repositoryRoot, LANE_SCRIPT)], {
     input: changed.map((changedPath) => `${changedPath}${separator}`).join(""),
     encoding: "utf8",
   });
 
   expect(run.status, `${LANE_SCRIPT} ended non-zero: ${run.stderr}`).toBe(0);
-  return run.stdout.trim();
+  const answered = (key: string): string =>
+    new RegExp(`^${key}=(?<value>.*)$`, "m").exec(run.stdout)?.groups?.["value"] ?? "";
+
+  return { lane: answered("lane"), worker: answered("worker") };
 };
+
+const laneOf = (changed: readonly string[], separator = "\n"): string =>
+  decide(changed, separator).lane;
+
+type LaneCase = {
+  readonly changed: readonly string[];
+
+  readonly lane: string;
+
+  readonly worker: string;
+
+  readonly because: string;
+};
+
+// The paths are what a pull request's diff hands the script; the answer is what the legs read.
+const LANES: readonly LaneCase[] = [
+  {
+    changed: ["apps/web/src/app.tsx"],
+    lane: "affected",
+    worker: "no",
+    because: "a web-only change: the filter names apps/web, and nothing depends on the SPA",
+  },
+  {
+    changed: ["packages/core/src/kernel/actor.ts"],
+    lane: "affected",
+    worker: "no",
+    because:
+      "a core change: apps/api imports it and apps/web imports apps/api, so the filter's `...[` prefix brings both of them with it",
+  },
+  {
+    changed: ["apps/worker/src/better_answers_worker/work_loop.py"],
+    lane: "affected",
+    worker: "yes",
+    because:
+      "a worker-only change: no pnpm workspace owns apps/worker, so the filter selects nothing and the worker's own leg is what runs",
+  },
+  {
+    changed: ["package.json"],
+    lane: "full",
+    worker: "no",
+    because:
+      "a root file no workspace owns: pnpm reads it as the workspace root's own and would run the root `check`, which is the whole run by another name",
+  },
+  {
+    changed: ["pnpm-lock.yaml"],
+    lane: "full",
+    worker: "no",
+    because: "a lockfile change is every workspace's dependencies, whatever the diff touched",
+  },
+  {
+    changed: ["contracts/manifest.json"],
+    lane: "full",
+    worker: "yes",
+    because:
+      "both tiers read the contract and no pnpm workspace owns a line of contracts/, so the TypeScript half — packages/core/test/tier-contract.test.ts — would not run on the filter's answer",
+  },
+  {
+    changed: [".github/workflows/check.yml"],
+    lane: "full",
+    worker: "no",
+    because: "this workflow is held by suites in apps/api and apps/worker that no filter names",
+  },
+  {
+    changed: ["apps/docs-site/index.ts"],
+    lane: "full",
+    worker: "no",
+    because:
+      "a directory that only looks like a workspace: pnpm would map it to the workspace root, the exclusion would drop that, and the leg would pass having run nothing",
+  },
+  {
+    changed: ["packages/not-a-workspace/index.ts"],
+    lane: "full",
+    worker: "no",
+    because: "the same hole one level down, and the same answer",
+  },
+  {
+    changed: ["docs/vision.md", "CONTEXT.md"],
+    lane: "docs",
+    worker: "no",
+    because: "every changed path is prose, which is the docs lane's whole rule",
+  },
+  {
+    changed: ["docs/vision.md", "apps/web/src/app.tsx"],
+    lane: "full",
+    worker: "no",
+    because:
+      "prose with code: the suites that read this repository's documents live in apps/api and packages/core, and a filter that named apps/web would run every gate except the coupled one",
+  },
+];
+
+describe("which paths reach which lane (T-335)", () => {
+  it.each(LANES)("$lane: $because", ({ changed, lane, worker }: LaneCase) => {
+    expect(decide(changed)).toEqual({ lane, worker });
+  });
+
+  it("reads every workspace the repository installs as one the filter can answer for", () => {
+    const unresolved = [...workspacePackages(), "apps/worker"].filter(
+      (directory) => laneOf([`${directory}/a-changed-file.ts`]) !== "affected",
+    );
+
+    expect(
+      unresolved,
+      "a workspace's own path takes the full lane, so every change inside it pays for the whole tree",
+    ).toEqual([]);
+  });
+});
 
 describe("which lane a change runs in (the process review, 21/09/2026)", () => {
   it("takes the docs lane when every changed path is markdown, whatever happened to it", () => {
@@ -249,8 +362,17 @@ const NARROWED: Readonly<Record<string, readonly string[]>> = {
   "check:workspaces": ["check:libraries", "check:api", "check:web"],
 };
 
+// The affected lane narrows the same step by asking rather than by naming: one script, whose
+// workspaces are the filter's answer.
+const BY_THE_FILTER: Readonly<Record<string, string>> = { "check:affected": "check:workspaces" };
+
 const wholeGateOf = (gate: string): string =>
-  Object.entries(NARROWED).find(([, parts]) => parts.includes(gate))?.[0] ?? gate;
+  BY_THE_FILTER[gate] ??
+  Object.entries(NARROWED).find(([, parts]) => parts.includes(gate))?.[0] ??
+  gate;
+
+// The lanes that run the root check's gates. The docs lane runs the prose suites, held above.
+const CODE_LANES = ["full", "affected"] as const;
 
 describe("the lane inside check.yml (the process review, 21/09/2026)", () => {
   it("reports on the merge queue's own ref, under the job name the ruleset requires", () => {
@@ -276,7 +398,11 @@ describe("the lane inside check.yml (the process review, 21/09/2026)", () => {
     const steps = decider?.steps ?? [];
     const decided = steps.find((step) => step.id === LANE)?.run ?? "";
 
-    expect(decider?.outputs).toEqual({ lane: `\${{ steps.${LANE}.outputs.lane }}` });
+    expect(decider?.outputs).toEqual({
+      lane: `\${{ steps.${LANE}.outputs.lane }}`,
+      base: `\${{ steps.${LANE}.outputs.base }}`,
+      worker: `\${{ steps.${LANE}.outputs.worker }}`,
+    });
     expect(steps.map(toolOf).filter((tool) => tool.startsWith("actions/checkout@"))).toHaveLength(
       1,
     );
@@ -290,7 +416,14 @@ describe("the lane inside check.yml (the process review, 21/09/2026)", () => {
     expect(decided).toContain("push | workflow_call) base=");
     expect(decided).toContain("lane=full");
 
-    expect(decided).toContain("docs | full) ;;");
+    expect(decided).toContain("docs | affected | full) ;;");
+    expect(decided).toContain("yes | no) ;;");
+
+    expect(
+      decided,
+      "the affected lane is a pull request's alone: merge-time checks are the whole",
+    ).toContain('[ "${EVENT}" != "pull_request" ]');
+
     expect(decided).toContain(LANE_SCRIPT);
 
     expect(decided).toContain("git diff -z --name-only --no-renames");
@@ -299,7 +432,11 @@ describe("the lane inside check.yml (the process review, 21/09/2026)", () => {
   it("names every leg for the lane it runs on, which is the condition it runs on", () => {
     const legs = Object.entries(checkJobs()).filter(([job]) => job !== LANE && job !== FAN_IN);
 
-    expect(legs.map(([job]) => job)).toEqual([...legsOf("docs"), ...legsOf("full")]);
+    expect(legs.map(([job]) => job)).toEqual([
+      ...legsOf("docs"),
+      ...legsOf("full"),
+      ...legsOf("affected"),
+    ]);
     for (const [job, leg] of legs) {
       const lane = job.slice(0, job.indexOf("-"));
 
@@ -343,41 +480,49 @@ type Setup = {
 const SETUP: readonly Setup[] = [
   {
     tool: "pnpm install --frozen-lockfile",
-    onlyOn: ["docs-gates", "full-root", "full-api", "full-web"],
+    onlyOn: [
+      "docs-gates",
+      "full-root",
+      "full-api",
+      "full-web",
+      "affected-gates",
+      "affected-workspaces",
+    ],
     because:
-      "every leg that runs a pnpm workspace's own gates needs the tree installed; the worker's gates are uv's and it only spawns the runner",
+      "every leg that runs a pnpm workspace's own gates needs the tree installed; the worker's gates are uv's and its legs only spawn the runner",
   },
   {
     tool: "astral-sh/setup-uv@",
-    onlyOn: ["full-root", "full-api", "full-worker"],
+    onlyOn: ["full-root", "full-api", "full-worker", "affected-workspaces", "affected-worker"],
     because:
       "the worker's gates are uv's, packages/devtools runs ruff and mypy out of the same environment, and the api's hook suite asks the binary itself whether it is there",
   },
   {
     tool: "actions/cache@",
-    onlyOn: ["full-worker"],
+    onlyOn: ["full-worker", "affected-worker"],
     because: "the only cache with a key here is the redaction detector's weights",
   },
   {
     tool: "./.github/actions/git-filter-repo",
-    onlyOn: ["full-root", "full-api"],
+    onlyOn: ["full-root", "full-api", "affected-workspaces"],
     because:
-      "both legs reach the erasure routine's git step — packages/core through the erasure suite, apps/api through the rehearsal's phase two — and ubuntu-latest carries no such tool",
+      "each leg reaches the erasure routine's git step — packages/core through the erasure suite, apps/api through the rehearsal's phase two, the filter through whichever of them it selects — and ubuntu-latest carries no such tool",
   },
   {
     tool: "playwright install",
-    onlyOn: ["full-web"],
-    because: "the browser suite over the served build is the SPA's last gate and no other leg's",
+    onlyOn: ["full-web", "affected-workspaces"],
+    because:
+      "the browser suite over the served build is the SPA's last gate, and the filter cannot say whether the SPA is in its answer until it has been asked",
   },
   {
     tool: "docker/setup-buildx-action@",
-    onlyOn: ["full-api", "full-worker"],
+    onlyOn: ["full-api", "full-worker", "affected-workspaces", "affected-worker"],
     because:
       "the daemon's own driver cannot import a type=gha cache, so a leg that builds an image without this builder is green and cold",
   },
   {
     tool: "crazy-max/ghaction-github-runtime@",
-    onlyOn: ["full-api", "full-worker"],
+    onlyOn: ["full-api", "full-worker", "affected-workspaces", "affected-worker"],
     because:
       "a runner hands the ACTIONS_* variables to an action and to no run: step, so the builds those legs run from inside a suite cannot reach the cache without it",
   },
@@ -394,6 +539,23 @@ describe("what each leg of check.yml installs (T-333)", () => {
     }
   });
 
+  it("gives the worker's two legs the same steps, and the affected one its condition", () => {
+    const WORKERS = "worker == 'yes'";
+    const full = stepsOfJob("full-worker").map(toolOf);
+    const affected = stepsOfJob("affected-worker");
+
+    expect(
+      full.filter((tool) => !affected.map(toolOf).includes(tool)),
+      "a step the full lane's worker leg runs is missing from the affected lane's, so the two tiers' runs read different trees",
+    ).toEqual([]);
+    expect(
+      affected
+        .filter((step) => full.includes(toolOf(step)))
+        .filter((step) => !conditionOf(step).includes(WORKERS)),
+      "a step on the affected lane's worker leg runs whether or not the change reached the worker",
+    ).toEqual([]);
+  });
+
   it("names a leg that exists for every tool, so an empty read would show", () => {
     const legs = Object.keys(checkJobs());
 
@@ -402,35 +564,45 @@ describe("what each leg of check.yml installs (T-333)", () => {
   });
 });
 
-describe("the legs of check.yml against the one list of gates (T-333)", () => {
-  it("runs, across its legs, every gate the root check names and no gate it does not", () => {
-    const ran: string[] = [];
-    for (const gate of legsOf("full").flatMap(gatesOf)) {
-      const whole = wholeGateOf(gate);
-      if (!ran.includes(whole)) ran.push(whole);
-    }
+describe.each(CODE_LANES)(
+  "the %s lane's legs against the one list of gates (T-333, T-335)",
+  (lane: string) => {
+    it("runs, across its legs, every gate the root check names and no gate it does not", () => {
+      const ran: string[] = [];
+      for (const gate of legsOf(lane).flatMap(gatesOf)) {
+        const whole = wholeGateOf(gate);
+        if (!ran.includes(whole)) ran.push(whole);
+      }
 
-    expect(
-      ran,
-      "the legs and the root check have stopped naming the same gates. Add the gate to a leg, or narrow it in NARROWED.",
-    ).toEqual(gatesNamed(rootScripts()["check"] ?? ""));
-  });
+      expect(
+        ran,
+        "the legs and the root check have stopped naming the same gates. Add the gate to a leg, or narrow it in NARROWED.",
+      ).toEqual(gatesNamed(rootScripts()["check"] ?? ""));
+    });
 
-  it("runs each gate on one leg, so no run pays for a gate twice", () => {
-    const ran = legsOf("full").flatMap(gatesOf);
+    it("runs each gate on one leg, so no run pays for a gate twice", () => {
+      const ran = legsOf(lane).flatMap(gatesOf);
 
-    expect(ran.filter((gate, at) => ran.indexOf(gate) !== at)).toEqual([]);
-    expect(ran.filter((gate) => rootScripts()[gate] === undefined)).toEqual([]);
-  });
+      expect(ran.filter((gate, at) => ran.indexOf(gate) !== at)).toEqual([]);
+      expect(ran.filter((gate) => rootScripts()[gate] === undefined)).toEqual([]);
+    });
+  },
+);
+
+describe("how the legs narrow check:workspaces (T-333, T-335)", () => {
+  const ran = (): readonly string[] => CODE_LANES.flatMap((lane) => legsOf(lane).flatMap(gatesOf));
 
   it("narrows a whole step only into root scripts the legs run", () => {
-    const ran = legsOf("full").flatMap(gatesOf);
+    const narrowings = [
+      ...Object.entries(NARROWED),
+      ...Object.entries(BY_THE_FILTER).map(([part, whole]) => [whole, [part]] as const),
+    ];
 
-    for (const [whole, parts] of Object.entries(NARROWED)) {
+    for (const [whole, parts] of narrowings) {
       expect(rootScripts()[whole], `${whole} is not a root script`).toBeDefined();
       expect(parts.filter((part) => rootScripts()[part] === undefined)).toEqual([]);
       expect(
-        parts.filter((part) => !ran.includes(part)),
+        parts.filter((part) => !ran().includes(part)),
         `${whole} is narrowed past the legs`,
       ).toEqual([]);
     }
@@ -445,6 +617,56 @@ describe("the legs of check.yml against the one list of gates (T-333)", () => {
       [...selected].sort(),
       "a workspace with a check script is on no leg, or is on two. The legs run check:workspaces between them or they do not run it at all.",
     ).toEqual([...workspacesGated()].sort());
+  });
+
+  it("asks the filter for the workspaces a change touched, and their dependents", () => {
+    const filtered = rootScripts()["check:affected"] ?? "";
+
+    expect(
+      filtered,
+      "the affected lane's script no longer asks pnpm which workspaces changed since the base",
+    ).toContain('--filter "...[${BASE}]"');
+    expect(filtered).toContain("--no-bail");
+    expect(filtered).toContain("--if-present");
+    expect(
+      filtered,
+      "pnpm maps a root file to the workspace root's own project, whose check is the whole run",
+    ).toContain("--filter '!better-answers'");
+    expect(rootName(), "the workspace root was renamed and the exclusion above was not").toEqual(
+      "better-answers",
+    );
+  });
+
+  it("reads the same selection back as the run it guards, out of the same two filters", () => {
+    const selectors = (script: string): readonly string[] =>
+      [...(rootScripts()[script] ?? "").matchAll(/--filter\s+(?<selector>"[^"]*"|'[^']*')/g)].map(
+        (found) => found.groups?.["selector"] ?? "",
+      );
+
+    expect(
+      selectors("check:affected:scope"),
+      "the leg's guard reads a different selection from the one it guards, so an empty run could pass it",
+    ).toEqual(selectors("check:affected"));
+    expect(selectors("check:affected")).toHaveLength(2);
+  });
+
+  it("brings a workspace's dependents with it, which is what the `...` prefix buys", () => {
+    const listed = spawnSync(
+      "pnpm",
+      ["--filter", "...@better-answers/core", "list", "--depth", "-1", "--parseable"],
+      { cwd: repositoryRoot, encoding: "utf8" },
+    );
+    const selected = listed.stdout
+      .split("\n")
+      .filter((line) => line.startsWith(repositoryRoot) && line !== repositoryRoot)
+      .map((line) => path.relative(repositoryRoot, line))
+      .sort();
+
+    expect(listed.status, `pnpm ended non-zero: ${listed.stderr}`).toBe(0);
+    expect(
+      selected,
+      "a change to packages/core no longer pays for the workspaces that import it",
+    ).toEqual(["apps/api", "apps/web", "packages/core"]);
   });
 });
 

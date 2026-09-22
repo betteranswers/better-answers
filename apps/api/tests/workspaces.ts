@@ -51,13 +51,29 @@ const manifestOf = (directory: string): Manifest => {
 
 export const rootScripts = (): Readonly<Record<string, string>> => manifestOf(".").scripts ?? {};
 
+// pnpm's own name for the workspace root, which is a project like any other to `--filter`.
+export const rootName = (): string => manifestOf(".").name ?? "";
+
 export const workspacesGated = (): readonly string[] =>
   workspacePackages().filter((directory) => manifestOf(directory).scripts?.["check"] !== undefined);
 
 const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<gates>[\s\S]+)$/;
 
-export const gatesNamed = (command: string): readonly string[] =>
+const stepsNamed = (command: string): readonly string[] =>
   (RUNNER.exec(command.trim())?.groups?.["gates"] ?? "").split(/\s+/).filter((gate) => gate !== "");
+
+// A step that is itself a runner call stands for its own steps, so `check:gates` holds the
+// tree-walking gates once.
+const expand = (command: string, seen: readonly string[]): readonly string[] =>
+  stepsNamed(command).flatMap((gate) => {
+    // A script that reaches itself is a cycle, named here rather than left to the stack.
+    if (seen.includes(gate)) throw new Error(`${gate} is a step of itself: ${seen.join(" -> ")}`);
+
+    const under = expand(rootScripts()[gate] ?? "", [...seen, gate]);
+    return under.length === 0 ? [gate] : under;
+  });
+
+export const gatesNamed = (command: string): readonly string[] => expand(command, []);
 
 const SCRIPT_RUN = /^pnpm\s+(?<script>[\w:@./-]+)$/;
 
@@ -76,9 +92,14 @@ const ENTERED = /\bcd\s+(?<directory>[\w./-]+)/g;
 // A command that ends in a named file runs that file, not the workspace's whole suite.
 const RUNS_A_WHOLE_CHECK = /\bcheck$/;
 
+// `...[<ref>]` names no workspace, so the widest answer it could give is the one to hold a
+// leg's setup and its variables against.
+const CHANGED_SINCE = /--filter\s+"?\.\.\.\[[^\]]*\]"?/;
+
 // A pnpm workspace is named by its package, the worker's uv one by being stepped into.
 export const workspacesChecked = (command: string): readonly string[] => {
   if (!RUNS_A_WHOLE_CHECK.test(command.trim())) return [];
+  if (CHANGED_SINCE.test(command)) return workspacesGated();
 
   const directoryOf = new Map(
     workspacePackages().map((directory) => [manifestOf(directory).name ?? directory, directory]),

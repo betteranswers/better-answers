@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
-import { workspacePackages } from "./workspaces.ts";
+import { gatesNamed, workspacePackages } from "./workspaces.ts";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 
@@ -134,7 +134,8 @@ describe("one run of check names every failure (T-068)", () => {
 describe("the gates a branch never narrows (T-099)", () => {
   it("are the root check's own steps ahead of check:workspaces, each a tool over the whole tree", () => {
     const scripts = scriptsOf(".");
-    const steps = stepsOf(scripts["check"] ?? "");
+    // Expanded, because the root check names `check:gates` and the gates are that script's.
+    const steps = gatesNamed(scripts["check"] ?? "");
     const tiers = steps.indexOf("check:workspaces");
     const gates = steps.slice(0, tiers);
 
