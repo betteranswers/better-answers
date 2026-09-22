@@ -17,7 +17,7 @@ from better_answers_worker.pipeline import (
     index_binding,
     open_pool,
 )
-from factories import seed_workspace
+from factories import land_chunk, seed_workspace
 from pg_harness import migrated_postgres_at
 
 WORKER_LOGIN = "worker_login_under_test"
@@ -128,28 +128,15 @@ def test_the_pools_scope_lets_a_chunk_row_land_and_a_pool_without_it_is_refused(
     row = chunk_row(
         workspace_id=workspace_id, binding_id="binding-one", chunk_id="chunk-one"
     )
-    statement = (
-        'INSERT INTO "index".chunk'
-        " (id, workspace_id, content, sensitivity, audience, binding_id)"
-        " VALUES ($1, $2, $3, $4, $5, $6)"
-    )
-    values = (
-        row["id"],
-        row["workspace_id"],
-        row["content"],
-        row["sensitivity"],
-        row["audience"],
-        row["binding_id"],
-    )
 
     async def served() -> None:
         pool = await open_pool(dsn, workspace_id, max_size=1)
         try:
             async with pool.acquire() as held:
-                await held.execute(statement, *values)
+                await land_chunk(held, row)
 
             async with pool.acquire() as again:
-                await again.execute(statement, *_second(values))
+                await land_chunk(again, {**row, "id": "chunk-two"})
         finally:
             await pool.close()
 
@@ -158,7 +145,7 @@ def test_the_pools_scope_lets_a_chunk_row_land_and_a_pool_without_it_is_refused(
         assert pool is not None
         try:
             async with pool.acquire() as held:
-                await held.execute(statement, *values)
+                await land_chunk(held, row)
         finally:
             await pool.close()
 
@@ -167,10 +154,6 @@ def test_the_pools_scope_lets_a_chunk_row_land_and_a_pool_without_it_is_refused(
 
     with pytest.raises(asyncpg.InsufficientPrivilegeError):
         asyncio.run(refused())
-
-
-def _second(values: tuple[Any, ...]) -> tuple[Any, ...]:
-    return ("chunk-two", *values[1:])
 
 
 def test_dropping_one_bindings_state_leaves_the_table_its_indexes_and_every_row(

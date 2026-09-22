@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { conceptIriOf, ulid } from "@better-answers/schema";
+import { bindingIdTakenAgain, conceptIriTakenAgain } from "@better-answers/schema/testing/probes";
 
 import { head } from "@better-answers/core/store/git";
 
@@ -941,11 +942,11 @@ describe("narrowing a binding", () => {
         });
         expect(narrowed.ok).toBe(true);
         await attempt(() =>
-          tx.query(
-            `INSERT INTO source_binding (workspace_id, id, name, connector, sensitivity, audience)
-             VALUES ($1, $2, 'The handbook', 'upload', 'Internal', 'everyone')`,
-            [scenario.workspaceId, binding.bindingId],
-          ),
+          bindingIdTakenAgain(tx, scenario.workspaceId, {
+            bindingId: binding.bindingId,
+            name: "The handbook",
+            sensitivity: "Internal",
+          }),
         );
       }),
     ).rejects.toThrow(/did not commit/);
@@ -1091,12 +1092,7 @@ describe("an Admin's recorded override", () => {
         });
         expect(overridden.ok).toBe(true);
 
-        await attempt(() =>
-          tx.query(
-            "INSERT INTO concept_identity (workspace_id, iri, merge_key) VALUES ($1, $2, 'x')",
-            [scenario.workspaceId, written.iri],
-          ),
-        );
+        await attempt(() => conceptIriTakenAgain(tx, scenario.workspaceId, written.iri));
       }),
     ).rejects.toThrow(/did not commit/);
 

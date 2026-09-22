@@ -17,6 +17,7 @@ import {
 } from "../src/erasure/index.ts";
 import { actorIdOfPerson, type UserPrincipal } from "../src/kernel/index.ts";
 import { withScope } from "../src/store/postgres/index.ts";
+import { identityRowsFor, verificationCodeFor } from "./identity-rows.ts";
 import { bootstrap } from "./platform.ts";
 import { addressOf, readingAs, seedingWith } from "./suite-postgres.ts";
 import {
@@ -37,41 +38,6 @@ const identifiersOf = (email: string): SubjectIdentifiers => ({
 const CONCEPT_PATH = "knowledge/expenses.md";
 const conceptFileNaming = (email: string): string =>
   `---\ngenerated:\n  by: human:${email}\n---\n\nExpenses are claimed within thirty days.\n`;
-
-const identityRowsFor = async (userId: string, email: string) => {
-  const sessionId = ulid();
-  const accountId = ulid();
-  const superuser = await db().pool.connect();
-  try {
-    await superuser.query(
-      `INSERT INTO session (id, expires_at, token, created_at, updated_at, ip_address, user_agent, user_id)
-       VALUES ($1, now(), $2, now(), now(), '203.0.113.7', 'Mozilla/5.0', $3)`,
-      [sessionId, `token-${sessionId}`, userId],
-    );
-    await superuser.query(
-      `INSERT INTO account (id, issuer, account_id, provider_id, user_id, created_at, updated_at)
-       VALUES ($1, 'https://accounts.example.invalid', $2, 'google', $3, now(), now())`,
-      [accountId, `google-${accountId}`, userId],
-    );
-  } finally {
-    superuser.release();
-  }
-  return { sessionId, accountId, verificationId: await verificationFor(email) };
-};
-
-const verificationFor = async (identifier: string): Promise<string> => {
-  const verificationId = ulid();
-  const superuser = await db().pool.connect();
-  try {
-    await superuser.query(
-      "INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at) VALUES ($1, $2, 'code', now(), now(), now())",
-      [verificationId, identifier],
-    );
-  } finally {
-    superuser.release();
-  }
-  return verificationId;
-};
 
 const requestFor = async (
   scenario: Scenario,
@@ -135,7 +101,7 @@ const workspaceHoldingAMember = async () => {
       inviterId: scenario.admin.userId,
     }),
   }));
-  const identity = await identityRowsFor(person.id, email);
+  const identity = await identityRowsFor(db().pool, { userId: person.id, email });
   const request = await requestFor(scenario, {
     personId: person.id,
     identifiers: identifiersOf(email),
@@ -327,8 +293,8 @@ describe("the erasure map for an address in the set the subject does not own", (
     const person = await memberOf(db().pool, here.workspaceId, email);
 
     const notTheirs = addressOf("a-stranger");
-    const theirs = await verificationFor(email);
-    await verificationFor(notTheirs);
+    const theirs = await verificationCodeFor(db().pool, email);
+    await verificationCodeFor(db().pool, notTheirs);
     const request = await requestFor(here, {
       personId: person.id,
       identifiers: { ...identifiersOf(email), emails: [email, notTheirs] },

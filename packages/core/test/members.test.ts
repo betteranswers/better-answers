@@ -1,5 +1,6 @@
 import { boundarySchemas, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
+import { groupNameTakenAgain } from "@better-answers/schema/testing/probes";
 import { describe, expect, it } from "vitest";
 
 import { attempt } from "../src/kernel/index.ts";
@@ -574,12 +575,7 @@ describe("an act whose transaction fails after it", () => {
         expect(made.ok).toBe(true);
         if (made.ok) groupId = made.value.groupId;
 
-        await attempt(() =>
-          tx.query(
-            `INSERT INTO "group" (id, workspace_id, name, origin) VALUES ($1, $2, 'HR team', 'admin-curated')`,
-            [ulid(), workspace.workspaceId],
-          ),
-        );
+        await attempt(() => groupNameTakenAgain(tx, workspace.workspaceId, "HR team"));
       }),
     ).rejects.toThrow(/did not commit/);
 

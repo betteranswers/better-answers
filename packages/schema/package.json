@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./testing": "./test/testing.ts",
+    "./testing/probes": "./test/probes.ts",
     "./testing/warm-postgres": "./test/warm-postgres.ts"
   },
   "scripts": {

@@ -30,6 +30,7 @@ import {
 } from "../src/erasure/index.ts";
 import { actorIdOfPerson, type Result } from "../src/kernel/index.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
+import { identityRowsFor, verificationCodeFor } from "./identity-rows.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import {
@@ -361,38 +362,6 @@ const rowTextIn = async (table: string, workspaceId: string) => {
     [workspaceId],
   );
   return read.rows;
-};
-
-const identityRowsFor = async (userId: string, email: string): Promise<void> => {
-  const superuser = await db().pool.connect();
-  try {
-    const id = ulid();
-    await superuser.query(
-      `INSERT INTO session (id, expires_at, token, created_at, updated_at, ip_address, user_agent, user_id)
-       VALUES ($1, now(), $2, now(), now(), '203.0.113.7', 'Mozilla/5.0', $3)`,
-      [`s-${id}`, `token-${id}`, userId],
-    );
-    await superuser.query(
-      `INSERT INTO account (id, issuer, account_id, provider_id, user_id, created_at, updated_at)
-       VALUES ($1, 'https://accounts.example.invalid', $2, 'google', $3, now(), now())`,
-      [`a-${id}`, `google-${id}`, userId],
-    );
-    await superuser.query(
-      `INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at)
-       VALUES ($1, $2, 'code', now(), now(), now())`,
-      [`v-${id}`, email],
-    );
-  } finally {
-    superuser.release();
-  }
-};
-
-const verificationCodeFor = async (identifier: string): Promise<void> => {
-  await db().pool.query(
-    `INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at)
-     VALUES ($1, $2, 'code', now(), now(), now())`,
-    [`v-${ulid()}`, identifier],
-  );
 };
 
 const verificationsFor = async (identifier: string): Promise<number> => {
@@ -954,7 +923,7 @@ describe("the identity set on the person's last membership", () => {
 
   it("deletes the person's sessions, verification rows, invitations and linked accounts", async () => {
     const { scenario, person, email, subjectRequestId } = await workspaceWithAnErasureRequest();
-    await identityRowsFor(person.id, email);
+    await identityRowsFor(db().pool, { userId: person.id, email });
     await seedingWith(db().pool, (seed) =>
       seed.invitation({ workspaceId: scenario.workspaceId, email }),
     );
@@ -981,8 +950,8 @@ describe("the identity set on the person's last membership", () => {
     const person = await memberOf(db().pool, scenario.workspaceId, email);
 
     const notTheirs = addressOf("a-client-contact");
-    await verificationCodeFor(email);
-    await verificationCodeFor(notTheirs);
+    await verificationCodeFor(db().pool, email);
+    await verificationCodeFor(db().pool, notTheirs);
     const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email, [
       notTheirs,
     ]);
@@ -1003,7 +972,7 @@ describe("the identity set on the person's last membership", () => {
     await seedingWith(db().pool, (seed) =>
       seed.member({ workspaceId: elsewhere.workspaceId, userId: person.id, role: "Editor" }),
     );
-    await identityRowsFor(person.id, email);
+    await identityRowsFor(db().pool, { userId: person.id, email });
     const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email);
 
     await completing(scenario, subjectRequestId);

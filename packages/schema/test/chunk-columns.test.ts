@@ -4,9 +4,17 @@ import { describe, expect, it } from "vitest";
 
 import { EMBEDDING_DIMENSIONS, ulid } from "../src/index.ts";
 import { journalMigrationFiles } from "../src/journal.ts";
+import { chunkWrittenThroughTheParent } from "./catalogue-statements.ts";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
-import { ADMITTED, postgresForSuite, refusalOf, refusesEach } from "./probes.ts";
+import {
+  ADMITTED,
+  attemptChunkEmbeddedBy,
+  chunkWritingItsOwnFullText,
+  postgresForSuite,
+  refusalOf,
+  refusesEach,
+} from "./probes.ts";
 
 const db = postgresForSuite();
 
@@ -54,10 +62,6 @@ const seedOneDocument = async (client: pg.PoolClient, workspaceId: string) => {
   const document = await seed.sourceDocument({ workspaceId, bindingId: binding.id });
   return { seed, binding, document };
 };
-
-const INSERT_CHUNK = `INSERT INTO "index".chunk
-    (workspace_id, id, content, embedding, embedding_route_id, sensitivity, audience, binding_id)
-  VALUES ($1, $2, 'a paragraph of the handbook', $3, $4, 'Internal', 'everyone', $5)`;
 
 const VECTOR = JSON.stringify(Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0));
 
@@ -155,21 +159,14 @@ describe("the embedding and the route it came from", () => {
       await seed.chunk({ workspaceId: WS_A });
       const binding = `binding-${ulid()}`;
 
-      const chunkOf = (embedding: string | null, route: string | null) => [
-        WS_A,
-        `chunk-${ulid()}`,
-        embedding,
-        route,
-        binding,
-      ];
-      const probe = (values: readonly unknown[]) =>
-        refusalOf(client, () => client.query(INSERT_CHUNK, [...values]));
+      const probe = (embedding: string | null, route: string | null) =>
+        attemptChunkEmbeddedBy(client, WS_A, binding, embedding, route);
 
       expect({
-        vectorWithoutItsRoute: await probe(chunkOf(VECTOR, null)),
-        routeWithoutItsVector: await probe(chunkOf(null, "route-embed")),
-        neither: await probe(chunkOf(null, null)),
-        both: await probe(chunkOf(VECTOR, "route-embed")),
+        vectorWithoutItsRoute: await probe(VECTOR, null),
+        routeWithoutItsVector: await probe(null, "route-embed"),
+        neither: await probe(null, null),
+        both: await probe(VECTOR, "route-embed"),
       }).toEqual({
         vectorWithoutItsRoute: "chunk_embedding_pair_check",
         routeWithoutItsVector: "chunk_embedding_pair_check",
@@ -196,14 +193,7 @@ describe("the full-text column", () => {
         await client.query(`SET LOCAL ROLE ${role}`);
         await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
         await refusesEach(client, [
-          [
-            `INSERT INTO "index".chunk
-               (workspace_id, id, content, sensitivity, audience, binding_id, search)
-             VALUES ($1, $2, 'a paragraph', 'Internal', 'everyone', 'binding-1', to_tsvector('english', 'something else'))`,
-            `${role} writing a full-text vector of its own on a new row`,
-            [WS_A, `chunk-${ulid()}`],
-            /non-DEFAULT value/,
-          ],
+          chunkWritingItsOwnFullText(role, WS_A, `chunk-${ulid()}`),
           [
             `UPDATE "index".chunk SET search = to_tsvector('english', 'something else')`,
             `${role} rewriting the full text over content it did not change`,
@@ -299,15 +289,7 @@ describe("the worker on the chunk index", () => {
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      const id = `chunk-${ulid()}`;
-      await client.query(
-        `INSERT INTO "index".chunk
-           (workspace_id, id, content, sensitivity, audience, binding_id,
-            source_document_id, locator, ordinal, char_start, char_end)
-         VALUES ($1, $2, 'a paragraph of the handbook', 'Internal', 'everyone', 'binding-1',
-                 $3, 'chars:0-40', 0, 0, 40)`,
-        [WS_A, id, document.id],
-      );
+      const id = await chunkWrittenThroughTheParent(client, WS_A, document.id);
       await client.query(
         `UPDATE "index".chunk SET published_at = now() WHERE workspace_id = $1 AND id = $2`,
         [WS_A, id],

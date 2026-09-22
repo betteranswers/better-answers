@@ -21,6 +21,7 @@ from better_answers_worker.pipeline.catalogue import record_findings
 from better_answers_worker.redaction.engine import Finding
 from better_answers_worker.redaction.pins import DETECTOR_PIN, RULE_VERSION
 from factories import (
+    seed_chunk,
     seed_finding,
     seed_job,
     seed_narrowed,
@@ -1088,11 +1089,11 @@ def test_the_recopy_reaches_the_rows_of_this_run_and_leaves_another_bindings_alo
         cursor.execute(
             "SELECT set_config('app.workspace_id', %s, true)", (workspace_id,)
         )
-        cursor.execute(
-            'INSERT INTO "index".chunk (id, workspace_id, content, sensitivity,'
-            " audience, binding_id) VALUES ('another-binding-row', %s, 'body',"
-            " 'Public', 'everyone', %s)",
-            (workspace_id, another),
+        seed_chunk(
+            cursor,
+            workspace_id=workspace_id,
+            binding_id=another,
+            chunk_id="another-binding-row",
         )
     connection.commit()
 
