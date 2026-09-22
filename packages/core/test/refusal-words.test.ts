@@ -27,6 +27,9 @@ const REGISTER = {
   "role-disagrees": "unauthenticated by kernel",
   "role-unknown": "unauthenticated by kernel",
   "malformed-claims": "unauthenticated by kernel",
+  "envelope-version-unknown": "inapplicable by kernel",
+  "envelope-malformed": "malformed by kernel",
+  "envelope-not-authentic": "malformed by kernel",
 
   "no-such-binding": "absent by sources",
   "no-such-document": "absent by sources",

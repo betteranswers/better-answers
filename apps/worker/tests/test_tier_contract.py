@@ -9,7 +9,7 @@ import psycopg
 import pytest
 from psycopg import Cursor
 
-SPOKEN_CONTRACT_VERSION = 10
+SPOKEN_CONTRACT_VERSION = 11
 SPOKEN_AGREEMENTS = {
     "citation": "fixtured",
     "concept-file": "fixtured",
