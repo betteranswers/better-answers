@@ -35,6 +35,37 @@ const read = (file: string): string => readFileSync(path.join(repositoryRoot, fi
 
 const isRulesFile = (file: string): boolean => path.basename(file) === "CODING_RULES.md";
 
+// Exempt only inside the string the gate prints, so a tag in a comment or a name in the
+// same file still fails.
+const QUOTES = new Set(['"', "'", "`"]);
+
+// Only a closed pair is a string, so an apostrophe in prose opens nothing — though two
+// bracketing a tag still read as one.
+const quotedSpansOf = (text: string): readonly (readonly [number, number])[] => {
+  const spans: [number, number][] = [];
+  let open: string | undefined;
+  let from = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (open !== undefined && character === "\\") {
+      index += 1;
+      continue;
+    }
+    if (character === undefined || !QUOTES.has(character)) continue;
+    if (open === undefined) {
+      open = character;
+      from = index;
+    } else if (character === open) {
+      spans.push([from, index]);
+      open = undefined;
+    }
+  }
+  return spans;
+};
+
+const insideAString = (text: string, at: number): boolean =>
+  quotedSpansOf(text).some(([from, to]) => from < at && at < to);
+
 // Each of these prints the rule it holds in the message a reader hits, so the reader reaches
 // the rule without asking.
 const GATES_PRINTING_A_TAG: readonly string[] = [
@@ -113,7 +144,13 @@ const FROZEN: readonly string[] = [
   "docs/specs/v01-route.md",
 ];
 
-type Citation = { readonly file: string; readonly line: number; readonly tag: string };
+type Citation = {
+  readonly file: string;
+  readonly line: number;
+  readonly tag: string;
+  readonly text: string;
+  readonly at: number;
+};
 
 const citationsIn = (file: string): readonly Citation[] =>
   read(file)
@@ -121,7 +158,7 @@ const citationsIn = (file: string): readonly Citation[] =>
     .flatMap((text, index) =>
       [...text.matchAll(RULE_TAG)].flatMap((match) => {
         const tag = match.groups?.["tag"];
-        return tag === undefined ? [] : [{ file, line: index + 1, tag }];
+        return tag === undefined ? [] : [{ file, line: index + 1, tag, text, at: match.index }];
       }),
     );
 
@@ -139,8 +176,10 @@ const definedTags = (): ReadonlyMap<string, string> =>
 
 const cite = ({ file, line, tag }: Citation): string => `${file}:${line} cites [${tag}]`;
 
-const isAllowedLocation = (file: string): boolean =>
-  isRulesFile(file) || GATES_PRINTING_A_TAG.includes(file) || FROZEN.includes(file);
+const isAllowedCitation = ({ file, text, at }: Citation): boolean =>
+  isRulesFile(file) ||
+  FROZEN.includes(file) ||
+  (GATES_PRINTING_A_TAG.includes(file) && insideAString(text, at));
 
 // The walk reads `git ls-files --others`, so a written file is seen as a committed one; the
 // `finally` keeps the next suite from reading it.
@@ -160,11 +199,14 @@ const whileAFileHolds = <T>(contents: string, taken: () => T): T =>
 const whileARulesFileHolds = <T>(contents: string, taken: () => T): T =>
   whileAFileNamed("apps/api/tests/CODING_RULES.md", contents, taken);
 
+const whileADocumentHolds = <T>(contents: string, taken: () => T): T =>
+  whileAFileNamed("apps/api/tests/tag-definition-proof.md", contents, taken);
+
 describe("where a rule tag may be written", () => {
   it("finds one only in a rules file, a gate's failure message, or a frozen document", () => {
     const stray = treeFiles()
-      .filter((file) => !isAllowedLocation(file))
-      .flatMap(citationsIn);
+      .flatMap(citationsIn)
+      .filter((citation) => !isAllowedCitation(citation));
 
     expect(
       stray.map(cite),
@@ -177,8 +219,8 @@ describe("where a rule tag may be written", () => {
     expect(aDefinedTag).toBeDefined();
     const strayFiles = (): readonly string[] =>
       treeFiles()
-        .filter((file) => !isAllowedLocation(file))
         .flatMap(citationsIn)
+        .filter((citation) => !isAllowedCitation(citation))
         .map(({ file }) => file);
 
     const before = new Set(strayFiles());
@@ -215,6 +257,28 @@ describe("the tags a gate prints and the rules files that define them", () => {
     ).toEqual([]);
   });
 
+  it("exempts a gate only where the tag sits inside the string it prints", () => {
+    const [aGate] = GATES_PRINTING_A_TAG;
+    expect(aGate).toBeDefined();
+    const spelled = `[${"TEST"}${"3"}]`;
+    const at = (text: string): Citation => ({
+      file: aGate ?? "",
+      line: 1,
+      tag: "TEST3",
+      text,
+      at: text.indexOf(spelled),
+    });
+
+    expect(isAllowedCitation(at(`raise AssertionError("${spelled}: our own code")`))).toBe(true);
+    expect(isAllowedCitation(at(`const message = \`over the ceiling (${spelled}).\`;`))).toBe(true);
+    expect(isAllowedCitation(at(`# the ${spelled} this file holds`))).toBe(false);
+    expect(isAllowedCitation(at(`raise AssertionError("mocked")  # ${spelled} holds this`))).toBe(
+      false,
+    );
+    expect(isAllowedCitation(at(`# the rule's message names ${spelled}`))).toBe(false);
+    expect(isAllowedCitation(at(`"a face packages/core's map misses (${spelled})"`))).toBe(true);
+  });
+
   it("reads tags from every rules file", () => {
     const files = new Set(definedTags().values());
 
@@ -222,6 +286,17 @@ describe("the tags a gate prints and the rules files that define them", () => {
     expect(files).toContain("apps/api/CODING_RULES.md");
     expect(files).toContain("apps/web/CODING_RULES.md");
     expect(files).toContain("apps/worker/CODING_RULES.md");
+    expect(files).toContain("deploy/CODING_RULES.md");
+  });
+
+  it("reads a well-formed heading outside a rules file as no definition at all", () => {
+    const before = new Set(definedTags().keys());
+    const after = whileADocumentHolds(
+      `## [${"PROBE"}${"1"}] A heading in the right shape, in the wrong file\n\n`,
+      () => new Set(definedTags().keys()),
+    );
+
+    expect([...after].filter((tag) => !before.has(tag))).toEqual([]);
   });
 
   it("reads a well-formed heading as a definition and a malformed one as none", () => {

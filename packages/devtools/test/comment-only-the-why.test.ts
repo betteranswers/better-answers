@@ -54,6 +54,10 @@ describe("the comment rule fires on the two shapes a tool can read", () => {
     ["a ticket id", "// Kept because the claim protocol changed under T-243.\n"],
     ["an ADR number", "// Kept because the graph is Postgres under ADR 0021.\n"],
     ["a rule tag", `// Kept because a raw insert lives in a factory (${tag("TEST", "4")}).\n`],
+    [
+      "a rule tag whose family carries a digit",
+      `// Kept because the outcome is announced (${tag("A11Y", "1")}).\n`,
+    ],
     ["an ISO date", "// Kept because the reading of the registry moved on 2026-09-21.\n"],
     ["a slashed date", "// Kept because the reading of the registry moved on 21/09/2026.\n"],
   ])("refuses a comment citing %s", (_what, comment) => {
