@@ -1,63 +1,22 @@
-# Better Answers — the STORES stack (ticket 41 Q3, ADR 0007 / 0022 / 0024).
-#
-# Two Coolify compose resources on VPC 1, because a Coolify redeploy stops and restarts the WHOLE
-# resource (`stop_running_container(force: true)` then `docker compose up -d` — research 68 §2a):
-#   stores.compose.yaml   — this file: redeployed a few times a year (a store's upgrade drill)
-#   platform.compose.yaml — migrate → api → worker: redeployed on every release
-# Both join the Coolify-created network on the server; Postgres is a Coolify DATABASE RESOURCE
-# on that network (its own lifecycle, UI and a second backup writer), reached by DSN — the
-# official pgvector image on Postgres 18, pinned by digest in
-# packages/schema/src/postgres-image.ts (ADR 0032; no custom image). The graph is plain tables
-# inside it: there is no graph service here (ADR 0032). The git store is bare repositories under
-# /data/git that the app writes through the git binary; no forge service (ADR 0024) — `init`
-# owns the directory, `backup` bundles it nightly and pushes the mirror.
-#
-# Versions read on 28/08/2026 from Docker Hub / GitHub releases —
-# .scratch/v01-spec/research/41-deploy-facts.md §1; the digests beside each tag were
-# read from Docker Hub's tag API on 03/09/2026 (T-005). Renovate keeps them pinned.
-#
-# State: bind mounts under /data/<service>, owned by each service's uid by `init` (idempotent;
-# runs on every redeploy). Never `user: "0:0"`. What is copied off-host and what is rebuilt:
-# BACKUPS.md.
-#
-# MEMORY: every service on VPC 1 carries an explicit limit (ticket 79 scale F2, T-003 → T-005),
-# because a 4 GB box shared by Postgres, the platform stack and this one has no room for a
-# service that grows unannounced. The sum of every limit — this file, platform.compose.yaml
-# and the Postgres resource's own (1 GB, set in Coolify) — leaves the page-cache floor
-# BACKUPS.md § Signals states; a box under that floor for five minutes is growth step A.
 
 name: better-answers-stores
 
 x-restart: &restart
   restart: unless-stopped
 
-# stdout is the log store; 30 days is the retention the DPIA states (rotation by size here,
-# the 42 signal watches it). Never a query string or an upload filename at info level.
 x-logging: &logging
   logging:
     driver: json-file
     options: { max-size: "20m", max-file: "10" }
 
-# `deploy.resources.limits.memory` is what `docker compose up` honours outside swarm, and it is
-# the form platform.compose.yaml already uses for the worker; one form in both files.
 x-mem-128: &mem128
   deploy: { resources: { limits: { memory: 128m } } }
 x-mem-384: &mem384
   deploy: { resources: { limits: { memory: 384m } } }
 
 services:
-  # `embeddings:1000` is absent from the list because the service below is commented out; it
-  # returns with the service. `worker/hf-cache:1000` left it with `T-122`: the model weights
-  # are baked into the worker image at build, nothing on the host holds them and nothing is
-  # mounted over the path they sit at, so there is no host directory left to create or chown.
   init:
-    # alpine 3.23.5, read from Docker Hub's tag API on 03/09/2026 — `latest` on that
-    # day resolved to 3.22.5, so the current release line is named rather than the alias.
     image: alpine:3.23.5@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40
-    # Explicit and quoted: Coolify fills a MISSING `restart` with unless-stopped
-    # (parsers.php `data_get_str($service, 'restart', RESTART_MODE)`), which restarts a
-    # one-shot forever and `service_completed_successfully` below never fires (first deploy,
-    # 04/09/2026). Unquoted `no` is YAML false and reads as missing.
     restart: "no"
     <<: *mem128
     command: >
@@ -68,10 +27,6 @@ services:
     volumes: ["/data:/data"]
     labels: { coolify.exclude_from_hc: "true" }
 
-  # Q12 — the S3-compatible object store: Garage (recommended; SeaweedFS is the alternative).
-  # NOT MinIO: minio/minio was archived 25/04/2026 and minio/mc on 14/07/2026 (research 68 §1).
-  # Internal only; the app and worker speak S3 to it on :3900 (deploy/garage.toml). Access keys
-  # are created once with `garage key create` and stored as OBJECTSTORE_ROOT_KEY/SECRET.
   objectstore:
     image: dxflrs/garage:v2.3.0@sha256:866bd13ed2038ba7e7190e840482bc27234c4afaf77be8cfa439ae088c1e4690
     <<: [*restart, *logging, *mem384]
@@ -81,9 +36,6 @@ services:
       GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?}
       GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:?}
     healthcheck:
-      # Exec form against the garage binary: the image carries no shell and no wget (first
-      # deploy, 04/09/2026), so an HTTP probe of :3903/health cannot run from inside it.
-      # `status` answers over the local RPC port and exits non-zero when the node is not up.
       test: ["CMD", "/garage", "status"]
       interval: 10s
       timeout: 3s
@@ -94,31 +46,7 @@ services:
     depends_on:
       init: { condition: service_completed_successfully }
 
-  # The CPU embedding host (bge-m3, 1024 dims) runs only for a workspace on the LOCAL embedding
-  # route. The first estate has none: client one embeds on the hosted route (ADR 0020 amendment),
-  # and a 4 GB box has no room for an idle model server (ADR 0024). Uncomment this service — and
-  # add `embeddings:1000` to init's list — when a workspace chooses the local route; the route is
-  # immutable per workspace (29).
-  #
-  # embeddings:
-  #   image: # the OpenAI-shaped embedding server, chosen and pinned the day a workspace takes the local route
-  #   <<: [*restart, *logging]
-  #   environment:
-  #     MODEL_ID: BAAI/bge-m3
-  #   healthcheck:
-  #     test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
-  #     interval: 15s
-  #     timeout: 3s
-  #     retries: 20
-  #     start_period: 120s
-  #   volumes: ["/data/embeddings:/data"]
-  #   depends_on:
-  #     init: { condition: service_completed_successfully }
 
-  # The only way in. Ingress (three hostnames, ADR 0034, + the catch-all http_status:404) is configured on
-  # the tunnel in Cloudflare (docs/operations/coolify.md § Ingress); every hostname → api:3000 on the
-  # platform stack, which the tunnel reaches over the shared network. Lives in the stores stack
-  # so a release never drops the tunnel.
   cloudflared:
     image: cloudflare/cloudflared:2026.8.2@sha256:0aa26e284f05e6c77ae375b8c9c11d9eb6a448fb7bcd8d40f31cb6176189eb38
     <<: [*restart, *logging, *mem128]
@@ -126,29 +54,19 @@ services:
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:?}
 
-  # Backup jobs (deploy/backup.sh, BACKUPS.md): hourly/daily/weekly/monthly Postgres dumps
-  # (age-encrypted), the nightly object-store mirror, one git bundle per bare repository and the
-  # push mirror of the git store to VPC 2 → the off-host buckets with rclone, the mirror over SSH.
-  # Cron inside; nothing listens. Every job: verify the upload, write a backup_run row, then ping
-  # with the outcome word and sizes only.
-  #
-  # The third image build.yml pushes by digest (deploy/backup.Dockerfile). `backup.sh` is inside
-  # it. The digest is this resource's env, set at the first deploy from build.yml's run summary
-  # and moved by hand when the backup image changes — never by release.yml, whose deploy unit
-  # is the platform stack alone (CONTEXT.md, *deploy unit*).
   backup:
     image: ghcr.io/betteranswers/backup@${BACKUP_IMAGE_DIGEST:?set from build.yml's run summary}
     <<: [*restart, *logging, *mem384]
     environment:
       DATABASE_URL: ${DATABASE_URL:?}
-      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:?}          # public half; the private key is escrow-only
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:?}
       RCLONE_CONFIG_DUMPS_TYPE: s3
       RCLONE_CONFIG_DUMPS_PROVIDER: ${BACKUP_S3_PROVIDER:?}
       RCLONE_CONFIG_DUMPS_ENDPOINT: ${BACKUP_S3_ENDPOINT:?}
-      RCLONE_CONFIG_DUMPS_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY:?}  # write-and-list; no delete, no bypass
+      RCLONE_CONFIG_DUMPS_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY:?}
       RCLONE_CONFIG_DUMPS_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_KEY:?}
-      BACKUP_DUMPS_BUCKET: ${BACKUP_DUMPS_BUCKET:?}             # governance lock, lifecycle tiers
-      BACKUP_MIRROR_BUCKET: ${BACKUP_MIRROR_BUCKET:?}           # versioned, NO lock, 30-day non-current expiry
+      BACKUP_DUMPS_BUCKET: ${BACKUP_DUMPS_BUCKET:?}
+      BACKUP_MIRROR_BUCKET: ${BACKUP_MIRROR_BUCKET:?}
       RCLONE_CONFIG_SRC_TYPE: s3
       RCLONE_CONFIG_SRC_PROVIDER: Other
       RCLONE_CONFIG_SRC_ENDPOINT: http://objectstore:3900
@@ -156,21 +74,17 @@ services:
       RCLONE_CONFIG_SRC_REGION: garage
       RCLONE_CONFIG_SRC_ACCESS_KEY_ID: ${OBJECTSTORE_ROOT_KEY:?}
       RCLONE_CONFIG_SRC_SECRET_ACCESS_KEY: ${OBJECTSTORE_ROOT_SECRET:?}
-      # `git push --mirror` nightly to VPC 2's public IP under the mirror deploy key (the two VPCs
-      # do not route privately; VPC 2's firewall allows SSH from VPC 1). Form: user@host:/data/mirror.
       GIT_MIRROR_SSH_TARGET: ${GIT_MIRROR_SSH_TARGET:?}
       HEALTHCHECKS_PING_URL_PG_HOURLY: ${HEALTHCHECKS_PING_URL_PG_HOURLY:?}
       HEALTHCHECKS_PING_URL_NIGHTLY: ${HEALTHCHECKS_PING_URL_NIGHTLY:?}
     healthcheck:
-      # `-x cron`, not `crond`: the image is Debian-based and its daemon is `cron -f`
-      # (first deploy, 04/09/2026 — `pgrep crond` matched nothing and the service sat unhealthy).
       test: ["CMD-SHELL", "pgrep -x cron >/dev/null && [ $(find /staging -type f -mmin +1440 | wc -l) -eq 0 ]"]
       interval: 60s
       timeout: 5s
       retries: 3
     volumes:
       - /data/git:/data/git:ro
-      - /data/backup/mirror-ssh:/root/.ssh:ro    # the mirror deploy key (private half) and known_hosts — root-only on the host, SECRETS.md
+      - /data/backup/mirror-ssh:/root/.ssh:ro
       - /data/backup/staging:/staging
     depends_on:
       objectstore: { condition: service_healthy }

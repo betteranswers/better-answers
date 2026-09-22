@@ -1,17 +1,4 @@
 #!/usr/bin/env bash
-# Better Answers — the synthetic fixture staging holds outside a drill (ADR 0022, ADR 0024).
-#
-# Called by `restore-drill.sh` after the wipe, and by hand after a rehearsal, so staging never
-# holds a client's data between drills and never stands empty either: the synthetic workspace is
-# what ticket 61's prototype and a rehearsal run against. Idempotent — the slug is unique, so a
-# second run changes nothing.
-#
-# What the fixture is today is what the schema holds today: one workspace. No person, no source,
-# no concept — those rows land with their slices (T-006 onwards) and this file grows one insert
-# per slice, each as free of personal data as this one. A fixture that invented a person would be
-# the one thing staging must never hold.
-#
-# Env: STAGING_DATABASE_URL — the owner DSN of the staging database (the same the drill migrates with).
 set -euo pipefail
 : "${STAGING_DATABASE_URL:?the owner DSN of the staging database}"
 

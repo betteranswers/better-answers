@@ -1,16 +1,3 @@
-# Better Answers — the PLATFORM stack (ticket 41 Q2/Q3, ADR 0007 / 0022 / 0024): migrate → api → worker.
-# Redeployed on every release; the stores stack (stores.compose.yaml) and the Postgres resource
-# are untouched by it. See stores.compose.yaml for why there are two.
-#
-# Every image is deployed BY DIGEST: `${API_IMAGE_DIGEST:?}` refuses to start without one, so
-# `:latest` cannot happen. The release workflow PATCHes the two digest env vars on this resource,
-# then calls Coolify's /deploy (research 68 §2b: the deploy call itself carries no variables).
-# VPC 1's Docker daemon pulls from ghcr.io with a read-only token (SECRETS.md) — packages are private.
-#
-# Order: `depends_on` conditions are a convenience; the safety is the runtime guard — migrate waits
-# for the DSN, the worker refuses to claim jobs when its schema stamp does not match
-# `__drizzle_migrations` (ADR 0007). Migrations are forward-only; a rollback is the previous digest,
-# and a migration that cannot run under the previous release says so in the release note.
 
 name: better-answers
 
@@ -22,54 +9,26 @@ x-logging: &logging
     driver: json-file
     options: { max-size: "20m", max-file: "10" }
 
-# Every service carries an explicit memory limit (ticket 79 scale F2; T-003 → T-005): the box
-# is 4 GB shared with the Postgres resource (1 GB, set in Coolify) and the stores stack, and the
-# sum of every limit is what BACKUPS.md § Signals measures the page-cache floor against.
-# `migrate` runs Drizzle over a journal and exits; `api` is one Node process serving the SPA,
-# the authorization server and the MCP surface. The worker's is below, with its swap allowance.
 x-mem-512: &mem512
   deploy: { resources: { limits: { memory: 512m } } }
 
 x-bootstrap: &bootstrap
-  # Bootstrap class only; every tenant credential is a row under the envelope, never a variable here.
   DATABASE_URL: ${DATABASE_URL:?}
-  # The five the object door is opened from (apps/api/src/config.ts § readObjectStore reads exactly
-  # these names, and defaults none of them). The endpoint and the region are facts of this estate
-  # rather than values an operator supplies: Garage is reached by service name on the internal
-  # network, path-style, and garage.toml fixes `s3_region = "garage"`. The region is therefore
-  # written in exactly two places — there, for the cluster, and here, for the client that signs
-  # against it — and the deploy tree's own test reads both lines and holds them equal, because a
-  # client signing for a region the cluster does not answer to is refused rather than misrouted.
-  # The bucket and the key pair come from wizard-41.sh's Garage stage, which creates all three.
-  S3_ENDPOINT: http://objectstore:3900   # Garage, path-style, region below (deploy/garage.toml)
-  S3_REGION: garage                      # deploy/garage.toml § [s3_api] s3_region
+  S3_ENDPOINT: http://objectstore:3900
+  S3_REGION: garage
   S3_BUCKET: ${S3_BUCKET:?the platform's bucket — wizard-41.sh § Garage creates it}
   S3_ACCESS_KEY: ${OBJECTSTORE_ROOT_KEY:?}
   S3_SECRET_KEY: ${OBJECTSTORE_ROOT_SECRET:?}
-  # Unset in the first estate: no embedding host runs there (client one is on the hosted route —
-  # ADR 0020 amendment); set it when the service in stores.compose.yaml is uncommented.
   EMBEDDINGS_URL: ${EMBEDDINGS_URL:-}
   OTEL_TRACES_EXPORTER: none
 
 services:
-  # One-shot: the tier's Drizzle migrations, including the DDL it owns in `index` and the graph.
-  # `exclude_from_hc` stops Coolify reporting the stack as Exited after every deploy (research 68 §2a).
-  # After a RESTORE this runs first and the replay of the erasures the dump undid runs later, on
-  # `api` — `pnpm ops replay-erasures` needs the git store and the object store, and this service
-  # carries neither by design (T-125, 11/09/2026). The restore scripts hold the order.
   migrate:
     image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?set by the release workflow}
     command: ["pnpm", "migrate"]
-    # Explicit and quoted: Coolify fills a MISSING `restart` with unless-stopped, which
-    # restarts a one-shot forever and api's `service_completed_successfully` never fires
-    # (stores.compose.yaml § init carries the reference). Unquoted `no` is YAML false.
     restart: "no"
     environment:
       <<: *bootstrap
-      # The owner DSN, migrate's alone (wizard stage 7): the runtime role `app_rt` that api
-      # connects as cannot run DDL — the first redeploy after the LOGIN act failed on
-      # `CREATE SCHEMA IF NOT EXISTS "drizzle"` (04/09/2026). Same per-service override
-      # idiom as the worker's WORKER_DATABASE_URL below.
       DATABASE_URL: ${MIGRATE_DATABASE_URL:?the owner DSN — migrate's alone}
     labels: { coolify.exclude_from_hc: "true" }
     <<: [*logging, *mem512]
@@ -81,75 +40,42 @@ services:
       <<: *bootstrap
       NODE_ENV: production
       PORT: "3000"
-      GIT_STORE_DIR: /data/git                # one bare repository per workspace, written through the git binary (ADR 0024)
+      GIT_STORE_DIR: /data/git
       KEK: ${KEK:?}
       AUTH_SECRET: ${AUTH_SECRET:?}
-      # The one https origin (ADR 0034): the product's, the authorization server's and the MCP
-      # surface's. Its host *is* the `app.` hostname — the app derives it from here rather than being
-      # told it twice (T-039, T-045) — and the MCP URL a person types is `${PUBLIC_URL}/mcp`, whose
-      # `resource` the protected-resource metadata equals exactly (T-004). Write the host the way a
-      # URL parser reads it: a spelling it rewrites is refused at bootstrap rather than deriving a
-      # hostname no request can match.
-      PUBLIC_URL: ${PUBLIC_URL:?}          # its host is `app.`: the SPA, /health, /me, the session endpoints, /mcp, discovery, /jwks, /oauth2/* and consent
+      PUBLIC_URL: ${PUBLIC_URL:?}
       SMTP_URL: ${SMTP_URL:?}
-      # Two of the estate's three hostnames (ADR 0022, ADR 0034) — per-resource env, not a default in
-      # a public file (docs/operations/SECRETS.md § What the estate holds). Bare hostnames: no scheme, port or
-      # path. The third, `app.`, is PUBLIC_URL's host and has no variable of its own: it is one
-      # origin, so setting it twice was one more thing to get wrong on deploy day (T-039). All three
-      # must differ, the derived one included, or the app refuses to start.
-      # The app routes on them itself: apps/api/src/ingress/hostnames.ts holds one list of
-      # surface → hostnames → why, and refuses a path outside its hostname's surface before any body
-      # is read (T-030). The tunnel's ingress rules stay the first fence (ADR 0022; docs/operations/coolify.md
-      # § Ingress records them); this is the second, because Better Auth's
-      # handler answers the wildcard on every hostname the process is given.
-      AGENT_HOSTNAME: ${AGENT_HOSTNAME:?}  # /agent/v1/* alone
-      APEX_HOSTNAME: ${APEX_HOSTNAME:?}    # nothing: 404, as the edge answers it
-      AGENT_MAX_FILE_BYTES: "104857600"   # 100 MB — Cloudflare's edge limit on Free/Pro (research 68 §4); the 53 contract's cap
+      AGENT_HOSTNAME: ${AGENT_HOSTNAME:?}
+      APEX_HOSTNAME: ${APEX_HOSTNAME:?}
+      AGENT_MAX_FILE_BYTES: "104857600"
       HEALTHCHECKS_PING_URL_SCHEDULER: ${HEALTHCHECKS_PING_URL_SCHEDULER:?}
     healthcheck:
-      # Why the loopback and not one of the three hostnames: `apps/api/Dockerfile` § HEALTHCHECK.
-      # The command is the same one the image carries; the settings are repeated here because
-      # a healthcheck declared in compose replaces the image's outright.
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 10s
       timeout: 3s
       retries: 12
       start_period: 20s
     volumes:
-      - /data/git:/data/git      # the bare repositories the tier writes — one per workspace, under a per-repository lock (ADR 0024)
+      - /data/git:/data/git
     depends_on:
       migrate: { condition: service_completed_successfully }
 
-  # Started by default, because it now has work to do: the loop claims jobs, runs the
-  # nightly parser audit and the full rebuild, and keeps its lease alive while it does.
-  #
-  # No `command:` here on purpose: the image's own is the deploy contract, and it is the
-  # loop. The safety against a deploy whose order slipped is inside the process rather than
-  # in this file — the worker compares its committed schema view against the migrator's
-  # stamp and claims nothing until they agree, logging once instead of exiting, so
-  # `restart: unless-stopped` cannot turn the seconds between `migrate` and `worker` into a
-  # restart storm.
   worker:
     image: ghcr.io/betteranswers/worker@${WORKER_IMAGE_DIGEST:?set by the release workflow}
     <<: [*restart, *logging]
     environment:
       <<: *bootstrap
-      DATABASE_URL: ${WORKER_DATABASE_URL:?}   # the workspace-scoped worker role, never the owner
-      GIT_STORE_DIR: /data/git                # the bare repositories, read at a head; mounted :ro below
-      HF_HOME: /data/worker/hf-cache          # where the image baked the weights; nothing is mounted over it (see volumes)
-      HF_HUB_OFFLINE: "1"                     # the weights ship in the image, warmed at build — a running worker fetches nothing
-      TLDEXTRACT_CACHE: /data/worker/tldextract-cache # the suffix list the build warmed, owned by this tier's uid; nothing is mounted over it (see volumes)
-      COCOINDEX_DISABLE_USAGE_TRACKING: "1"   # the engine calls cocoindex.gateway.scarf.sh per index run otherwise; nothing fails when it does, so it is refused here
-      MAX_CONCURRENT_RUNS: "1"                # one index at a time on a 4 GB box (ADR 0024); ticket 42 measures whether it can rise
-      LMDB_MAX_BYTES_PER_BINDING: "4294967296" # 4 GB cap; over it the binding's LMDB is wiped and reprocessed — it is disposable (ADR 0036)
-      LMDB_DIR: /data/worker/lmdb             # one store per binding beneath this; the volume below, never backed up
-      RUST_LOG: warn                          # the engine's Rust core prints its own non-JSON shape at info; this is the only thing that quiets it
+      DATABASE_URL: ${WORKER_DATABASE_URL:?}
+      GIT_STORE_DIR: /data/git
+      HF_HOME: /data/worker/hf-cache
+      HF_HUB_OFFLINE: "1"
+      TLDEXTRACT_CACHE: /data/worker/tldextract-cache
+      COCOINDEX_DISABLE_USAGE_TRACKING: "1"
+      MAX_CONCURRENT_RUNS: "1"
+      LMDB_MAX_BYTES_PER_BINDING: "4294967296"
+      LMDB_DIR: /data/worker/lmdb
+      RUST_LOG: warn
     healthcheck:
-      # Why a process-level probe and not an HTTP one, and why idle counts as healthy:
-      # `apps/worker/Dockerfile` § HEALTHCHECK. The command is the same one the image
-      # carries; the settings are repeated here because a healthcheck declared in compose
-      # replaces the image's outright. Eight retries at fifteen seconds is longer than one
-      # lease, so a claimant that goes quiet is given the lease's own grace first.
       test: ["CMD", "python", "-m", "better_answers_worker.health"]
       interval: 15s
       timeout: 3s
@@ -159,25 +85,10 @@ services:
       migrate: { condition: service_completed_successfully }
       api: { condition: service_healthy }
     volumes:
-      - /data/worker/lmdb:/data/worker/lmdb        # one LMDB per binding — personal data on disk; never backed up
-      - /data/worker/trees:/data/worker/trees      # git working trees per workspace — rebuilt
-      # Nothing here for HF_HOME, deliberately (`T-122`): the model weights are in the image,
-      # fetched at build, and a host directory mounted over that path would mask every byte of
-      # them. With HF_HUB_OFFLINE set above that is not a quiet re-download but a worker that
-      # cannot load a model at all. `apps/worker/tests/test_image.py` holds this file to it.
-      # Nothing for TLDEXTRACT_CACHE either (`T-152`), for the quieter version of the same
-      # reason: `tldextract` handed an empty directory tries two URLs, logs a warning for each,
-      # falls back to the copy in its own wheel and answers correctly — so a mount there costs a
-      # fetch per container and shows no other sign. The same file holds this one too.
-      - /data/git:/data/git:ro                     # read at the run's commit (`bundle_commit` on the run row); never written by the worker (ADR 0024)
+      - /data/worker/lmdb:/data/worker/lmdb
+      - /data/worker/trees:/data/worker/trees
+      - /data/git:/data/git:ro
     deploy:
       resources:
-        # 1.5 GB of a 4 GB box shared with Postgres, api, Garage and the tunnel (ADR 0024); an index
-        # that outgrows it spills to the host's swap file rather than failing — ticket 42 measures
-        # the swap-in rate and revises the cap.
         limits: { memory: 1536m }
-    # The spill is explicit, not implied: memory + swap = 3 GB, so an index may take up to
-    # 1.5 GB of the host's 4 GB swap file (RUNBOOK.md § Swap) before it fails (ticket 79 A9).
-    # Without this line the kernel's default is "as much swap as memory", which happens to be
-    # the same number today and would silently move with the cap above.
     memswap_limit: 3072m

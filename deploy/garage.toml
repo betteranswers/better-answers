@@ -1,14 +1,3 @@
-# Garage — the platform's S3-compatible object store (ticket 41 Q12, research 70 §1).
-# One node, one image (dxflrs/garage:v2.3.0, read 28/08/2026): `garage server --single-node`.
-# Garage has no versioning or object lock: every immutability guarantee is off-host (BACKUPS.md).
-#
-# The two secrets are NOT in this file and not in a `*_file` path either: the RPC secret and
-# the admin token arrive as `GARAGE_RPC_SECRET` and `GARAGE_ADMIN_TOKEN` in the service's
-# environment (stores.compose.yaml), from Coolify's per-resource env like every other
-# bootstrap secret. Garage's configuration reference (garagehq.deuxfleurs.fr, read
-# 03/09/2026) documents both variables as the environment form of `rpc_secret`
-# and `admin_token`; the earlier `*_file` keys pointed at `/run/secrets/*` that nothing
-# wrote (ticket 79 A10).
 
 metadata_dir = "/data/meta"
 data_dir = "/data/data"
@@ -23,4 +12,4 @@ api_bind_addr = "0.0.0.0:3900"
 root_domain = ".objectstore"
 
 [admin]
-api_bind_addr = "0.0.0.0:3903"        # /health for the compose healthcheck; internal network only
+api_bind_addr = "0.0.0.0:3903"
