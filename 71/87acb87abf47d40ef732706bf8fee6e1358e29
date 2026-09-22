@@ -1,0 +1,45 @@
+packages/devtools/src/oxlint-config.ts
+  s_2dd75a86f22d42::t_32c213a53266ca 34-46
+packages/core/src/kernel/admission.ts
+  s_2dd75a86f22d42::t_d5fa665c6ba6de 1-13,15-18,20-25,27,30-37,40-67,70-77,81-86,88-97,99-102
+  s_2dd75a86f22d42::t_32c213a53266ca 14,19,26,28-29,38-39,69,78-80,98
+packages/core/src/kernel/index.ts
+  s_2dd75a86f22d42::t_59323904e90346 8,23
+  s_2dd75a86f22d42::t_32c213a53266ca 9-10
+packages/core/src/sources/binding.ts
+  s_2dd75a86f22d42::t_59323904e90346 17,19,24,26,379-386,388,405-409,411-412
+  s_2dd75a86f22d42::t_32c213a53266ca 39,410
+packages/devtools/lint-rules/rules/act-admits-before-await.ts
+  s_2dd75a86f22d42::t_d5fa665c6ba6de 1-26,29-30,32,34-103
+  s_2dd75a86f22d42::t_b32fe456e97839 33,31
+  s_2dd75a86f22d42::t_32c213a53266ca 27-28
+packages/devtools/test/act-admits-before-await.test.ts
+  s_2dd75a86f22d42::t_d5fa665c6ba6de 2-8,11,15-47,49-63,65-66,68-72,74-75,77-86,67,76
+  s_2dd75a86f22d42::t_323415ca632daf 12-14
+  s_2dd75a86f22d42::t_90b78841a45911 48
+  s_2dd75a86f22d42::t_32c213a53266ca 64,73,1,10
+packages/devtools/test/comment-only-the-why.test.ts
+  s_2dd75a86f22d42::t_32c213a53266ca 7,17
+packages/core/test/admission.test.ts
+  s_2dd75a86f22d42::t_d5fa665c6ba6de 1-55,57-73,75-129,131-184
+  s_2dd75a86f22d42::t_32c213a53266ca 56,74
+packages/core/src/runs/index.ts
+  s_2dd75a86f22d42::t_59323904e90346 3,5,10,16,19,21,23,27-28,31,106-141,173,175-177
+  s_2dd75a86f22d42::t_32c213a53266ca 172,212-213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7187acb87abf47d40ef732706bf8fee6e1358e29",
+  "prompts": {},
+  "sessions": {
+    "s_2dd75a86f22d42": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1deab29c-2105-473f-9514-e52636269c8a",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
