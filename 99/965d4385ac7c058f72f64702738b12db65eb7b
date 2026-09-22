@@ -1,0 +1,147 @@
+packages/core/src/sources/binding.ts
+  s_2dd75a86f22d42::t_183f49a231cceb 26
+  s_2dd75a86f22d42::t_8847ed5f56a1e8 28-33
+  s_2dd75a86f22d42::t_411669a7b0cb3e 149-151
+  s_2dd75a86f22d42::t_f8e8f9d21852a7 207
+  s_2dd75a86f22d42::t_3a65c1c36fe8ac 253,410
+  s_2dd75a86f22d42::t_f6bf153603d3a5 409,411
+packages/core/src/store/postgres/index.ts
+  s_2dd75a86f22d42::t_2b93e42ee73981 32-33,38
+  s_2dd75a86f22d42::t_8f82469fc52172 34,39
+  s_2dd75a86f22d42::t_e4928509855e36 35-37,44,46-50,52-53,55-56,60
+  s_2dd75a86f22d42::t_a78c4102fef139 40-43
+  s_2dd75a86f22d42::t_697b45bad3e7c1 45,51,54,57-59
+  s_2dd75a86f22d42::t_20d2071bd6f4b0 170
+  s_2dd75a86f22d42::t_8d10617e5d217c 173
+  s_2dd75a86f22d42::t_7b02739e454cf6 198
+  s_2dd75a86f22d42::t_f62aa451a0a549 222
+  s_2dd75a86f22d42::t_3c1672252245e7 232
+  s_2dd75a86f22d42::t_02125ac83d6b98 244,247
+  s_2dd75a86f22d42::t_7a919f7ba26727 245-246
+packages/core/test/runs.test.ts
+  s_2dd75a86f22d42::t_107049afe4554e 340-341
+packages/core/test/sourced-concept.ts
+  s_2dd75a86f22d42::t_6199ad9ab05751 15,27
+  s_2dd75a86f22d42::t_37e8b52c59fec8 16
+  s_2dd75a86f22d42::t_06256040dae0d5 212-225
+packages/core/src/sources/review.ts
+  s_2dd75a86f22d42::t_183f49a231cceb 25-30
+  s_2dd75a86f22d42::t_e213b55ff2b69f 281,283
+  s_2dd75a86f22d42::t_3a65c1c36fe8ac 282,429
+  s_2dd75a86f22d42::t_47e4398a4f1a41 428,430
+apps/api/tests/ops.test.ts
+  s_2dd75a86f22d42::t_6be42f928fba14 22-27
+  s_2dd75a86f22d42::t_201c20ae320a03 996,1002
+  s_2dd75a86f22d42::t_a49268bbea56b7 1214
+  s_2dd75a86f22d42::t_a741252bae440e 1232-1233
+  s_2dd75a86f22d42::t_8c3b7784a29da7 1240
+packages/core/test/graph-budget.test.ts
+  s_2dd75a86f22d42::t_37e8b52c59fec8 8
+  s_2dd75a86f22d42::t_607a5fed7d4163 73-76
+packages/core/test/members.test.ts
+  s_2dd75a86f22d42::t_a283268225a338 9
+  s_2dd75a86f22d42::t_10dca80615ca6e 19-24
+  s_2dd75a86f22d42::t_e36c3a606f6030 48
+  s_2dd75a86f22d42::t_9dbeb5f52bb96b 55,58
+  s_2dd75a86f22d42::t_1f5e739ce912ca 488,492-493
+  s_2dd75a86f22d42::t_dc1f15112e251c 535-543
+packages/core/test/answering.test.ts
+  s_2dd75a86f22d42::t_6199ad9ab05751 25,53
+packages/core/test/erasure.test.ts
+  s_2dd75a86f22d42::t_116c62e1cb3840 15
+  s_2dd75a86f22d42::t_4f0757a44c78ce 47,53
+  s_2dd75a86f22d42::t_19fb160b681a5f 186
+  s_2dd75a86f22d42::t_310a9c0217f5d7 189-196
+packages/core/test/passages.test.ts
+  s_2dd75a86f22d42::t_1b1f63aa05ab5e 24
+  s_2dd75a86f22d42::t_1ea49bdaa99d7c 217-226
+  s_2dd75a86f22d42::t_702ded769780f9 278-286,288-292
+  s_2dd75a86f22d42::t_14618c55e9f811 393-402
+  s_2dd75a86f22d42::t_5ceec1eaa44874 571,575-580
+packages/core/test/dpia.test.ts
+  s_2dd75a86f22d42::t_4661a7c5608d6c 12-14,16
+packages/core/test/suite-postgres.ts
+  s_2dd75a86f22d42::t_fb83c1d22ea1e3 11
+  s_2dd75a86f22d42::t_a283268225a338 12
+  s_2dd75a86f22d42::t_c59c5a11df407a 50-51
+  s_2dd75a86f22d42::t_d905f39831e806 57-58
+packages/core/src/runs/index.ts
+  s_2dd75a86f22d42::t_aeabc5cf761e26 31-38
+  s_2dd75a86f22d42::t_cba4309a25a777 103,105-106,109
+  s_2dd75a86f22d42::t_de2e02ebfc4814 147-149
+  s_2dd75a86f22d42::t_79a37f3b0d554f 194-195
+packages/core/test/graph.test.ts
+  s_2dd75a86f22d42::t_37e8b52c59fec8 15
+  s_2dd75a86f22d42::t_2181e8cdb6bac0 40,45-47
+  s_2dd75a86f22d42::t_de278bf0840048 270-274
+packages/core/test/principal.test.ts
+  s_2dd75a86f22d42::t_5c8819b3d02f07 1
+  s_2dd75a86f22d42::t_677e853c949b26 6,8,15,18
+  s_2dd75a86f22d42::t_27cafe89d45fd3 7
+  s_2dd75a86f22d42::t_5dc1e9bfb2c52e 95-100,102,104-114,116-127,129,144,147-148,153-157,172-173
+  s_2dd75a86f22d42::t_fed7d40a7ad745 101,103,115
+  s_2dd75a86f22d42::t_d38c3c9e854ccc 128,130-143,145-146
+  s_2dd75a86f22d42::t_9ba02c84afa1d4 149-152,158-171
+packages/core/src/concepts/inbox.ts
+  s_2dd75a86f22d42::t_a6fb8ebf152209 294
+packages/core/test/invisibility.test.ts
+  s_2dd75a86f22d42::t_919d859937cb74 25
+  s_2dd75a86f22d42::t_bef0af7d3349d8 39,43-46,49-53
+  s_2dd75a86f22d42::t_0044e465970d2d 165-169,171-175,183-185
+packages/core/src/erasure/rehearsal.ts
+  s_2dd75a86f22d42::t_8e4a59d7b240f3 278-280,282
+packages/core/test/review.test.ts
+  s_2dd75a86f22d42::t_c47477b25671b5 23
+  s_2dd75a86f22d42::t_1615ab5d76b34e 199-206
+  s_2dd75a86f22d42::t_3fe561ce740aa3 541
+  s_2dd75a86f22d42::t_04998a9afd86a1 542-563
+  s_2dd75a86f22d42::t_4ba4d2f561d50d 835
+  s_2dd75a86f22d42::t_c7a409a7fa6c88 836-846,850-851
+  s_2dd75a86f22d42::t_dca4d417529f20 847-849
+  s_2dd75a86f22d42::t_2bd08dde508700 941-943
+packages/core/test/concepts.test.ts
+  s_2dd75a86f22d42::t_a283268225a338 22
+  s_2dd75a86f22d42::t_c9cf0866262141 33
+  s_2dd75a86f22d42::t_199e2e05db8087 126
+  s_2dd75a86f22d42::t_ea5db3c3929bbd 619-620
+packages/core/test/access-requests.test.ts
+  s_2dd75a86f22d42::t_a283268225a338 17,60
+  s_2dd75a86f22d42::t_c45250c117472f 56
+packages/core/test/llm-routes.test.ts
+  s_2dd75a86f22d42::t_cdf4f993c8bbd9 50-55
+packages/core/test/sources.test.ts
+  s_2dd75a86f22d42::t_ddf4be6049ff58 22
+  s_2dd75a86f22d42::t_9b87b3c702fa5c 419-423,426-430
+  s_2dd75a86f22d42::t_d93cadafac7c97 802-806
+  s_2dd75a86f22d42::t_d11f624d05b7be 833
+  s_2dd75a86f22d42::t_a9be6729dc39de 834-844,846-847
+  s_2dd75a86f22d42::t_52491b3980cf87 845
+  s_2dd75a86f22d42::t_90138115dc3c2d 866
+  s_2dd75a86f22d42::t_39710786437868 869,878-879,881-884,887
+  s_2dd75a86f22d42::t_597292e30e7f88 873-877,880
+  s_2dd75a86f22d42::t_e40c462bda6e91 920
+  s_2dd75a86f22d42::t_b011d2bee9ef77 921
+packages/core/src/kernel/result.ts
+  s_2dd75a86f22d42::t_4c2888a96c573e 19-20
+packages/core/test/findings.test.ts
+  s_2dd75a86f22d42::t_270fa76427c6f1 8-10,12
+packages/core/test/visibility.test.ts
+  s_2dd75a86f22d42::t_59ad57dd250acf 18
+  s_2dd75a86f22d42::t_227f6811933d37 895
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "99965d4385ac7c058f72f64702738b12db65eb7b",
+  "prompts": {},
+  "sessions": {
+    "s_2dd75a86f22d42": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1deab29c-2105-473f-9514-e52636269c8a",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
