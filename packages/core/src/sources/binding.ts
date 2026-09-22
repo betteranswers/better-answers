@@ -14,12 +14,16 @@ import { z } from "zod";
 import { visibilityAgreed } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
 import {
+  admit,
   attempt,
+  declareAct,
   err,
   ok,
   requireAdmin,
   ulid,
+  type InputOf,
   type PrincipalRefusal,
+  type RefusalOf,
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
@@ -32,7 +36,7 @@ import {
   type PostgresDoor,
   type Tx,
 } from "../store/postgres/index.ts";
-import { adminOnBinding, bindingNamed, BINDING_ID } from "./admin-binding.ts";
+import { adminOnBinding, bindingNamed, BINDING_ID, type ActingOnBinding } from "./admin-binding.ts";
 import { dpiaInputFor, REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastRun } from "./findings.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
@@ -456,9 +460,16 @@ export const reprocessBindingInput = z.object({
   reason: z.enum(INDEX_REASONS),
 });
 
-export type ReprocessBindingInput = z.output<typeof reprocessBindingInput>;
+export const reprocessBindingAct = declareAct({
+  admits: { role: "Admin", purposes: [] },
+  input: reprocessBindingInput,
+  refuses: ["role-forbids", "no-such-binding"],
+  effect: "write",
+});
 
-export type ReprocessBindingRefusal = SourceRefusal<"role-forbids" | "no-such-binding"> | Error;
+export type ReprocessBindingInput = InputOf<typeof reprocessBindingAct>;
+
+export type ReprocessBindingRefusal = SourceRefusal<RefusalOf<typeof reprocessBindingAct>> | Error;
 
 export type BindingReprocessed = {
   readonly bindingId: string;
@@ -475,11 +486,14 @@ export const reprocessBinding = async (
   tx: Tx,
   input: ReprocessBindingInput,
 ): Promise<Result<BindingReprocessed, ReprocessBindingRefusal>> => {
-  const acting = adminOnBinding(principal, input.bindingId);
-  if (!acting.ok) return err(acting.error);
-  const { admin, bindingId, workspaceId } = acting.value;
+  const admitted = admit(reprocessBindingAct, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  const admin = admitted.value;
+  const { workspaceId } = admin;
+  const { bindingId } = input;
+  const acting: ActingOnBinding = { admin, workspaceId, bindingId };
 
-  const standing = await bindingNamed(acting.value, tx, { columns: "1", lock: "for-update" });
+  const standing = await bindingNamed(acting, tx, { columns: "1", lock: "for-update" });
   if (!standing.ok) return err(standing.error);
 
   const queued = await enqueueJobIn(admin, tx, {

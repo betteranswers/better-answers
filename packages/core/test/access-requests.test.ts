@@ -611,7 +611,7 @@ describe("the actor-naming door", () => {
       const call = /\brecordFor\(/;
 
       expect(call.test("await recordFor(platform, tx, event);")).toBe(true);
-      expect(call.test("export const recordFor = <A extends Act>(")).toBe(false);
+      expect(call.test("export const recordFor = <A extends LedgerAct>(")).toBe(false);
       expect(call.test("import { record } from '../audit/index.ts';")).toBe(false);
 
       const callers = coreSourceFiles().filter((file) => call.test(readFileSync(file, "utf8")));

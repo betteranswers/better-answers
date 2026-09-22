@@ -31,6 +31,19 @@ export const readOxlintConfig = (): OxlintConfig =>
     ),
   ) as OxlintConfig;
 
+// The specifier is read off the real config, so a plugin that stopped loading fails the case
+// rather than leaving every rule under it silent.
+export const pluginConfigFor = (rules: Readonly<Record<string, string>>): string => {
+  const plugin = readOxlintConfig().jsPlugins.find((one) => one.name === "better-answers");
+  if (plugin === undefined) {
+    throw new Error(".oxlintrc.json no longer loads the better-answers plugin.");
+  }
+  return JSON.stringify({
+    jsPlugins: [{ name: plugin.name, specifier: path.join(repositoryRoot, plugin.specifier) }],
+    rules,
+  });
+};
+
 type GlobbedOverride = OxlintConfig["overrides"][number] & {
   readonly files: readonly string[];
 };

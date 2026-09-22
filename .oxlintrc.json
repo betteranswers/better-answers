@@ -48,6 +48,7 @@
     "anti-slop/require-safety-comment-for-type-assertion": "warn",
     "anti-slop/no-runtime-typeof": "off",
     "anti-slop/no-shape-in-symbol-names": "off",
+    "better-answers/act-admits-before-await": "error",
     "better-answers/mcp-entry-annotations": "error",
     "better-answers/mcp-entry-no-workspace-argument": "error",
     "better-answers/import-direction": "error"

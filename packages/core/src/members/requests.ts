@@ -6,7 +6,7 @@ import {
 import type { z } from "zod";
 
 import { act, declareActs, record, recordFor } from "../audit/index.ts";
-import type { Act, DetailOf } from "../audit/index.ts";
+import type { DetailOf, LedgerAct } from "../audit/index.ts";
 import {
   actorIdOfPerson,
   attempt,
@@ -144,7 +144,7 @@ const claimForDecision = async (
   });
 };
 
-const landDecision = async <A extends Act>(
+const landDecision = async <A extends LedgerAct>(
   admin: AdminUserPrincipal,
   tx: Tx,
   requestId: AccessRequestId,

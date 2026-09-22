@@ -70,7 +70,7 @@ export type DetailOf<Shape extends DetailShape> = {
   ]?: DetailValueOf<Shape[Field]>;
 };
 
-export type Act<Name extends ActName = ActName, Shape extends DetailShape = DetailShape> = {
+export type LedgerAct<Name extends ActName = ActName, Shape extends DetailShape = DetailShape> = {
   readonly name: Name;
   readonly detail: Shape;
 };
@@ -78,7 +78,7 @@ export type Act<Name extends ActName = ActName, Shape extends DetailShape = Deta
 export const act = <Name extends ActName, const Shape extends DetailShape>(
   name: Name,
   detail: Shape,
-): Act<Name, Shape> => ({ name, detail });
+): LedgerAct<Name, Shape> => ({ name, detail });
 
 const NEVER_A_SUBJECT: ReadonlySet<string> = new Set([
   "run",
@@ -112,7 +112,10 @@ const declarationRefusal = (family: Family, name: string): string | undefined =>
   return undefined;
 };
 
-export const declareActs = <F extends Family, const Acts extends Record<string, Act<ActName<F>>>>(
+export const declareActs = <
+  F extends Family,
+  const Acts extends Record<string, LedgerAct<ActName<F>>>,
+>(
   family: F,
   acts: Acts,
 ): Acts => {
