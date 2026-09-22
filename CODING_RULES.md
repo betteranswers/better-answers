@@ -191,6 +191,10 @@ Reviewer: attack a change to a migration, a grant, a policy or a definer functio
 
 No other module in the tier reads it, and never at a call site; a suite, a script and this repository's own tooling are outside the rule. A setting no step in the tier reads yet does not belong in the module. Passing the environment on to a child process is a different act, and it lives in one named function.
 
+### [SEC5] Run an act's admission before its first `await`
+
+An act judges whether a principal may ask for it before it opens a transaction or reads a row, so nothing is done for a caller it was never going to serve. The judgement is pure — the principal's kind, a person's role as a level, the purposes a platform principal acts for, the parsed input — and refuses in a word of the forbidden or unauthenticated class. A step takes the principal its act admitted and judges none.
+
 ## AUDIT
 
 ### [AUDIT1] Write an act and its audit event in one transaction

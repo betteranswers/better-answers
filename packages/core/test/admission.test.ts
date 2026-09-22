@@ -1,0 +1,205 @@
+import { boundarySchemas } from "@better-answers/schema";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import { z } from "zod";
+
+import {
+  admit,
+  declareAct,
+  EVERY_PURPOSE,
+  NO_PERSON,
+  reaches,
+  refusalRegister,
+  type AdmissionRefusal,
+  type AdmittedOf,
+  type InputOf,
+  type PlatformPrincipal,
+  type RefusalOf,
+  type Role,
+  type UserPrincipal,
+} from "../src/kernel/index.ts";
+import { enqueueJobAct, type EnqueueJobInput } from "../src/runs/index.ts";
+import {
+  reprocessBindingAct,
+  type ReprocessBindingInput,
+  type ReprocessBindingRefusal,
+} from "../src/sources/index.ts";
+
+const person = (role: Role): UserPrincipal => ({
+  kind: "user",
+  workspaceId: boundarySchemas.workspace.select.shape.id.parse("01JQ0000000000000000000WSP"),
+  userId: boundarySchemas.user.select.shape.id.parse("01JQ0000000000000000000PER"),
+  role,
+  groups: [],
+  credentialIssuedAtMs: Date.now(),
+});
+
+const processActor = (purpose: string): PlatformPrincipal => ({
+  kind: "platform",
+  actorId: `process:better-answers-${purpose}`,
+});
+
+const nothing = z.object({});
+
+const adminsOnly = declareAct({
+  admits: { role: "Admin", purposes: [] },
+  input: nothing,
+  refuses: ["role-forbids"],
+  effect: "write",
+});
+
+const everyone = declareAct({
+  admits: { role: "Viewer", purposes: EVERY_PURPOSE },
+  input: nothing,
+  refuses: ["role-forbids"],
+  effect: "read",
+});
+
+const erasureOnly = declareAct({
+  admits: { role: NO_PERSON, purposes: ["erasure"] },
+  input: nothing,
+  refuses: ["role-forbids"],
+  effect: "write",
+});
+
+const classOf = (word: string): string | undefined =>
+  refusalRegister().find((entry) => entry.word === word)?.class;
+
+describe("what an act admits, judged from the principal and the input alone", () => {
+  it("reads a person's role as a level, so the highest role reaches every act below it", () => {
+    expect([
+      reaches("Admin", "Viewer"),
+      reaches("Viewer", "Admin"),
+      reaches("Editor", "Editor"),
+    ]).toEqual([true, false, true]);
+  });
+
+  it("admits an Admin and refuses an Editor and a Viewer where the level is Admin", () => {
+    const answered = (["Admin", "Editor", "Viewer"] as const).map(
+      (role) => admit(adminsOnly, person(role), {}).ok,
+    );
+
+    expect(answered).toEqual([true, false, false]);
+  });
+
+  it("admits every role where the level is the lowest one", () => {
+    const answered = (["Admin", "Editor", "Viewer"] as const).map(
+      (role) => admit(everyone, person(role), {}).ok,
+    );
+
+    expect(answered).toEqual([true, true, true]);
+  });
+
+  it("keys a platform principal off the purpose in its process actor id", () => {
+    expect([
+      admit(erasureOnly, processActor("erasure"), {}).ok,
+      admit(erasureOnly, processActor("reconciler"), {}).ok,
+      admit(everyone, processActor("reconciler"), {}).ok,
+    ]).toEqual([true, false, true]);
+  });
+
+  it("refuses a platform principal for an act that names no purpose at all", () => {
+    expect(admit(adminsOnly, processActor("erasure"), {}).ok).toBe(false);
+  });
+
+  it("hands the narrowed principal back, so the body holds the proof and not the ask", () => {
+    const admitted = admit(adminsOnly, person("Admin"), {});
+
+    if (!admitted.ok) throw new Error(`an Admin was refused: ${admitted.error}`);
+    expect(admitted.value.role).toBe("Admin");
+    expectTypeOf(admitted.value).toExtend<UserPrincipal & { role: "Admin" }>();
+  });
+
+  it("refuses in a word of the forbidden class, which is what a caller can act on", () => {
+    const refused = admit(adminsOnly, person("Viewer"), {});
+
+    expect(refused).toEqual({ ok: false, error: "role-forbids" });
+    expect(classOf("role-forbids")).toBe("forbidden");
+    expectTypeOf<"role-forbids">().toExtend<AdmissionRefusal>();
+  });
+
+  it("holds an admission's word to the two classes, so no shape or absence crosses as one", () => {
+    expectTypeOf<"role-forbids">().toExtend<AdmissionRefusal>();
+    expectTypeOf<"credentials-revoked">().toExtend<AdmissionRefusal>();
+    expectTypeOf<"malformed">().not.toExtend<AdmissionRefusal>();
+    expectTypeOf<"not-found">().not.toExtend<AdmissionRefusal>();
+
+    expect(classOf("malformed")).toBe("malformed");
+  });
+});
+
+describe("what a declaration will not let an act say", () => {
+  it("refuses a word listed twice, so no act's union counts one word as two", () => {
+    expect(() =>
+      declareAct({
+        admits: { role: "Admin", purposes: [] },
+        input: nothing,
+        refuses: ["role-forbids", "role-forbids"],
+        effect: "write",
+      }),
+    ).toThrow("listed twice");
+  });
+
+  it("refuses a declaration that leaves out the word its own admission answers", () => {
+    expect(() =>
+      declareAct({
+        admits: { role: "Admin", purposes: [] },
+        input: nothing,
+        refuses: ["not-found"],
+        effect: "write",
+      }),
+    ).toThrow("role-forbids");
+  });
+});
+
+describe("the two acts that carry a declaration today", () => {
+  it("states what reprocessing a binding admits, takes, answers and does", () => {
+    expect({
+      admits: reprocessBindingAct.admits,
+      refuses: reprocessBindingAct.refuses,
+      effect: reprocessBindingAct.effect,
+    }).toEqual({
+      admits: { role: "Admin", purposes: [] },
+      refuses: ["role-forbids", "no-such-binding"],
+      effect: "write",
+    });
+  });
+
+  it("derives the act's input and refusal types from its declaration and nothing else", () => {
+    expectTypeOf<InputOf<typeof reprocessBindingAct>>().toEqualTypeOf<ReprocessBindingInput>();
+    expectTypeOf<RefusalOf<typeof reprocessBindingAct>>().toEqualTypeOf<
+      "role-forbids" | "no-such-binding"
+    >();
+    expectTypeOf<"no-such-binding">().toExtend<ReprocessBindingRefusal>();
+    expectTypeOf<AdmittedOf<typeof reprocessBindingAct>>().toExtend<UserPrincipal>();
+  });
+
+  it("reads the enqueue's level off the kind's descriptor rather than restating it", () => {
+    const audit: EnqueueJobInput = {
+      workspaceId: "01JQ0000000000000000000WSP",
+      kind: "nightly-audit",
+    };
+    const asked = enqueueJobAct.admits;
+
+    expect(typeof asked === "function" ? asked(audit) : asked).toEqual({
+      role: "Admin",
+      purposes: EVERY_PURPOSE,
+    });
+  });
+
+  it("admits the platform for the enqueue whatever purpose it acts for", () => {
+    const audit: EnqueueJobInput = {
+      workspaceId: "01JQ0000000000000000000WSP",
+      kind: "nightly-audit",
+    };
+
+    expect([
+      admit(enqueueJobAct, processActor("reconciler"), audit).ok,
+      admit(enqueueJobAct, person("Admin"), audit).ok,
+      admit(enqueueJobAct, person("Editor"), audit).ok,
+    ]).toEqual([true, true, false]);
+  });
+
+  it("says the enqueue writes and reprocessing writes, which no signature states", () => {
+    expect([enqueueJobAct.effect, reprocessBindingAct.effect]).toEqual(["write", "write"]);
+  });
+});

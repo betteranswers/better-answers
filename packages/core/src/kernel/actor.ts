@@ -4,7 +4,9 @@ import type { Principal, UserId } from "./principal.ts";
 
 export const PERSON_PREFIX = "human:";
 
-export type ProcessActorId = `process:better-answers-${string}`;
+export const PROCESS_PREFIX = "process:better-answers-";
+
+export type ProcessActorId = `${typeof PROCESS_PREFIX}${string}`;
 
 export type ActorId = `human:${string}` | ProcessActorId | `better-answers-${string}/${string}`;
 

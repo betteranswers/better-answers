@@ -70,6 +70,7 @@ const insideAString = (text: string, at: number): boolean =>
 // the rule without asking.
 const GATES_PRINTING_A_TAG: readonly string[] = [
   "apps/worker/tests/conftest.py",
+  "packages/devtools/lint-rules/rules/act-admits-before-await.ts",
   "packages/devtools/lint-rules/rules/comment-only-the-why.ts",
   "packages/devtools/lint-rules/rules/import-direction.ts",
   "packages/devtools/lint-rules/rules/mcp-entry-no-workspace-argument.ts",

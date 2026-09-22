@@ -1,4 +1,4 @@
-import { declareRefusals, type Vocabulary } from "./refusal.ts";
+import { declareRefusals, type RefusalClass, type Vocabulary } from "./refusal.ts";
 
 // A word naming a thing one slice owns stays there; a second slice borrows it rather than move it.
 export const KERNEL_REFUSALS = declareRefusals("kernel", {
@@ -19,6 +19,11 @@ type KernelRefusalWord = Extract<keyof typeof KERNEL_REFUSALS, string>;
 export type KernelRefusal<W extends KernelRefusalWord> = W;
 
 export type RefusalWordFor<V extends Vocabulary> = KernelRefusalWord | Extract<keyof V, string>;
+
+// Read off the register rather than restated, so a word whose class moved cannot pass unnoticed.
+export type KernelRefusalOfClass<C extends RefusalClass> = {
+  [W in KernelRefusalWord]: (typeof KERNEL_REFUSALS)[W] extends C ? W : never;
+}[KernelRefusalWord];
 
 export const NOT_FOUND = "not-found" satisfies KernelRefusalWord;
 

@@ -1,30 +1,35 @@
 import {
   boundarySchemas,
+  FULL_REBUILD_KIND,
   INDEX_KIND,
+  INDEX_REASONS,
   JOB_DONE_STATUS,
   JOB_KIND_DESCRIPTORS,
   JOB_QUEUED_STATUS,
   NIGHTLY_AUDIT_KIND,
+  REBUILD_REASONS,
   ROLES,
-  type FULL_REBUILD_KIND,
-  type INDEX_REASONS,
   type JOB_KINDS,
   type JOB_STATUSES,
   type JobKindDescriptor,
-  type REBUILD_REASONS,
 } from "@better-answers/schema";
-import type { z } from "zod";
+import { z } from "zod";
 
 import {
+  admit,
   attempt,
+  declareAct,
   err,
+  EVERY_PURPOSE,
   ok,
   requireAdmin,
   ulid,
+  type InputOf,
+  type KernelRefusal,
   type Principal,
   type PrincipalRefusal,
+  type RefusalOf,
   type Result,
-  type Role,
   type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
@@ -45,21 +50,7 @@ export type IndexReason = (typeof INDEX_REASONS)[number];
 
 const WIPE_REASON = "wiped" satisfies IndexReason;
 
-export type EnqueuedJob =
-  | { readonly kind: typeof NIGHTLY_AUDIT_KIND }
-  | { readonly kind: typeof FULL_REBUILD_KIND; readonly reason: RebuildReason }
-  | {
-      readonly kind: typeof INDEX_KIND;
-
-      readonly subjectId: string;
-      readonly reason: IndexReason;
-    };
-
 export type BundleHealth = "healthy" | "mismatched" | "never-audited";
-
-export type EnqueueJobInput = { readonly workspaceId: string } & EnqueuedJob;
-
-export type EnqueueJobRefusal = RoleRefusal | "malformed";
 
 export type JobState = {
   readonly jobId: string;
@@ -112,19 +103,42 @@ const inWorkspace = async <T>(
 const descriptorOf = (kind: string): JobKindDescriptor | undefined =>
   JOB_KIND_DESCRIPTORS.find((descriptor) => descriptor.kind === kind);
 
-const reaches = (held: Role, named: Role): boolean => ROLES.indexOf(held) <= ROLES.indexOf(named);
+const JOB_COLUMNS = boundarySchemas.job.insert.shape;
 
-const admittedToEnqueue = (
-  principal: Principal,
-  descriptor: JobKindDescriptor,
-  workspaceId: string,
-): Result<undefined, EnqueueJobRefusal> => {
-  if (principal.kind === "platform") return ok(undefined);
-  if (!reaches(principal.role, descriptor.enqueuedBy)) return err("role-forbids");
+// Steps reach the enqueue holding a workspace id off a row, so this one column crosses unbranded.
+const WORKSPACE_ID: z.ZodType<string, string> = JOB_COLUMNS.workspaceId;
 
-  if (workspaceId !== principal.workspaceId) return err("malformed");
-  return ok(undefined);
-};
+const SUBJECT_ID = JOB_COLUMNS.subjectId.unwrap();
+
+export const enqueueJobInput = z.discriminatedUnion("kind", [
+  z.object({ workspaceId: WORKSPACE_ID, kind: z.literal(NIGHTLY_AUDIT_KIND) }),
+  z.object({
+    workspaceId: WORKSPACE_ID,
+    kind: z.literal(FULL_REBUILD_KIND),
+    reason: z.enum(REBUILD_REASONS),
+  }),
+  z.object({
+    workspaceId: WORKSPACE_ID,
+    kind: z.literal(INDEX_KIND),
+    subjectId: SUBJECT_ID,
+    reason: z.enum(INDEX_REASONS),
+  }),
+]);
+
+export const enqueueJobAct = declareAct({
+  // The level is the kind's own, and a kind with no descriptor is left to the highest role.
+  admits: (input: z.output<typeof enqueueJobInput>) => ({
+    role: descriptorOf(input.kind)?.enqueuedBy ?? ROLES[0],
+    purposes: EVERY_PURPOSE,
+  }),
+  input: enqueueJobInput,
+  refuses: ["role-forbids", "malformed"],
+  effect: "write",
+});
+
+export type EnqueueJobInput = InputOf<typeof enqueueJobAct>;
+
+export type EnqueueJobRefusal = KernelRefusal<RefusalOf<typeof enqueueJobAct>>;
 
 const ENQUEUE = `WITH inserted AS (
     INSERT INTO job (workspace_id, id, kind, subject_id, reason)
@@ -155,8 +169,12 @@ export const enqueueJobIn = async (
   const descriptor = descriptorOf(input.kind);
   if (descriptor === undefined) return err("malformed");
 
-  const admitted = admittedToEnqueue(principal, descriptor, input.workspaceId);
+  // Reached on its own by five acts, so this step keeps the face's gate rather than assume one.
+  const admitted = admit(enqueueJobAct, principal, input);
   if (!admitted.ok) return err(admitted.error);
+  if (principal.kind !== "platform" && input.workspaceId !== principal.workspaceId) {
+    return err("malformed");
+  }
 
   const subjectId = "subjectId" in input ? input.subjectId : null;
   const reason = "reason" in input ? input.reason : null;
@@ -191,8 +209,13 @@ export const enqueueJob = async (
   principal: Principal,
   door: PostgresDoor,
   input: EnqueueJobInput,
-): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal | PrincipalRefusal | Error>> =>
-  inWorkspace(principal, door, input.workspaceId, (tx) => enqueueJobIn(principal, tx, input));
+): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal | PrincipalRefusal | Error>> => {
+  const admitted = admit(enqueueJobAct, principal, input);
+  if (!admitted.ok) return err(admitted.error);
+  return inWorkspace(principal, door, input.workspaceId, (tx) =>
+    enqueueJobIn(principal, tx, input),
+  );
+};
 
 export const jobById = async (
   principal: Principal,

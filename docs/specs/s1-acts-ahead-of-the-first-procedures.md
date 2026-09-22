@@ -96,8 +96,8 @@ A good test drives an act, a procedure or a command through the interface its ca
 
 ## Out of Scope
 
-- The act constructor and declared admission — built with T-178 or T-136 (ADR 0043). `requireAdmin` and the binding head stand until then.
-- Converting any slice but `sources`; the ledger acts as a declared field; the rename of the code's `Act` type; a per-procedure refusal type map; any adapter that builds procedures from declarations.
+- The act constructor — dropped by ADR 0043's 22/09/2026 amendment, the spike's probe 4 answering *lower bound*. Its fallback is T-237's: a declaration beside `reprocessBinding` and the enqueue, the act's types derived from it, admission as a pure function in the kernel, and a lint rule that a declared act admits before its first `await`. `requireAdmin` and the binding head stand for every other act.
+- Converting any act but `reprocessBinding` and the enqueue; the ledger acts as a declared field; a per-procedure refusal type map; any adapter that builds procedures from declarations.
 - T-135's procedures and T-136's screen themselves, and the word-to-sentence table the screen renders.
 - The architecture review's other three roots — one chunk-visibility derivation, the role-privilege sweep and `contract_version`, the worker's detection and decision split — and whether narrowing a binding queues an `index` run.
 

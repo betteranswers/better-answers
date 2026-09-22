@@ -23,6 +23,7 @@ export {
   publishBinding,
   publishBindingInput,
   reprocessBinding,
+  reprocessBindingAct,
   reprocessBindingInput,
   UPLOAD_BYTE_CAP,
   UPLOAD_MEDIA_TYPES,
