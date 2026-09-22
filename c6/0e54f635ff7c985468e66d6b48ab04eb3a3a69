@@ -1,0 +1,61 @@
+apps/web/e2e/sign-out.spec.ts
+  s_ad96c3d6a52986::t_fb1356a5ae9c95 30,38
+  s_ad96c3d6a52986::t_c2066b878fd7bf 10
+docs/specs/T-225.md
+  s_ad96c3d6a52986::t_5c0baf4b4f105f 3
+  s_ad96c3d6a52986::t_912250f3bf1fba 125
+apps/web/src/shared/screens.ts
+  s_ad96c3d6a52986::t_c8f20adb6ae6e2 8-17,24-25,33-42,49-54,61-68,75-81,87,94
+  s_ad96c3d6a52986::t_9f5422535c78b2 95
+  s_ad96c3d6a52986::t_efc0a6fca72ce8 96
+apps/web/src/app/unknown-screen.tsx
+  s_ad96c3d6a52986::t_cbb308ec1cd451 8
+apps/web/e2e/consent.spec.ts
+  s_ad96c3d6a52986::t_c2066b878fd7bf 59
+apps/web/src/app/router.tsx
+  s_ad96c3d6a52986::t_d7a4be42213d76 23
+  s_ad96c3d6a52986::t_9bd89872a7763d 19-20,24-25
+  s_ad96c3d6a52986::t_a807297c6c4b87 102
+  s_ad96c3d6a52986::t_07dd389036b295 65-66,74,80,82,86-93
+  s_ad96c3d6a52986::t_e1039c725e2429 68
+  s_ad96c3d6a52986::t_863da941e3f9a1 15,22,67,69-73,81
+apps/web/src/app/views/unbuilt-view.tsx
+  s_ad96c3d6a52986::t_3caf89b170dbc6 1-9
+apps/web/test/frame.test.tsx
+  s_ad96c3d6a52986::t_718578a7c3d83f 7,98,109,143-145,190
+  s_ad96c3d6a52986::t_b98cc96315df81 89,96,163-170,178-185,188,193
+  s_ad96c3d6a52986::t_4e05d1e6e9ae78 11,14-18,50,54,83,88,90-95,97,99-108,110-142,146-162,171-177,186-187,189,191-192,194-196
+CONTEXT.md
+  s_ad96c3d6a52986::t_fe6a2be78180ff 751-752
+  s_ad96c3d6a52986::t_10ecf33e8c9dee 783-788
+  s_ad96c3d6a52986::t_ecfcf5af45f764 742-750,753-758
+apps/web/e2e/failed-screen.spec.ts
+  s_ad96c3d6a52986::t_c2066b878fd7bf 65
+apps/web/src/app/views/routes-and-spend-view.tsx
+  s_ad96c3d6a52986::t_d733caa1019c40 2,15-16
+  s_ad96c3d6a52986::t_fbb741b11400ac 6
+apps/web/e2e/frame.spec.ts
+  s_ad96c3d6a52986::t_f6125ab6cc0c2c 38
+  s_ad96c3d6a52986::t_7d890a4930ae78 32,34,39-44
+  s_ad96c3d6a52986::t_c2066b878fd7bf 35
+apps/web/e2e/sign-in.spec.ts
+  s_ad96c3d6a52986::t_c2066b878fd7bf 32,64,140
+apps/web/e2e/routes.spec.ts
+  s_ad96c3d6a52986::t_c2066b878fd7bf 238
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c60e54f635ff7c985468e66d6b48ab04eb3a3a69",
+  "prompts": {},
+  "sessions": {
+    "s_ad96c3d6a52986": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0313d998-dcac-4a44-a510-4f064a54332f",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
