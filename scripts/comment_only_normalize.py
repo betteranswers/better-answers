@@ -44,6 +44,19 @@ def normalize(source: str) -> str:
     return f"{hashbang}\n{ast.dump(ast.parse(ast.unparse(tree)))}"
 
 
+def parsed(language: str, source: str) -> str:
+    """The data a real parser reads, which is blind to comments and to the table's misreads."""
+    if language == "toml":
+        import tomllib
+
+        loaded = tomllib.loads(source)
+    else:
+        import yaml
+
+        loaded = list(yaml.safe_load_all(source))
+    return json.dumps(loaded, default=str, ensure_ascii=False)
+
+
 def main() -> int:
     request = json.load(sys.stdin)
     digests: dict[str, str] = {}
@@ -55,7 +68,21 @@ def main() -> int:
             errors[key] = str(failure)
             continue
         digests[key] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    json.dump({"digests": digests, "errors": errors}, sys.stdout)
+
+    data: dict[str, str] = {}
+    unread: dict[str, str] = {}
+    for key, asked in request.get("data", {}).items():
+        try:
+            canonical = parsed(asked["language"], asked["source"])
+        except Exception as failure:  # noqa: BLE001 — any parse failure is one answer
+            unread[key] = f"{type(failure).__name__}: {failure}"
+            continue
+        data[key] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    json.dump(
+        {"digests": digests, "errors": errors, "data": data, "unread": unread},
+        sys.stdout,
+    )
     return 0
 
 
