@@ -8,7 +8,10 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import type { BetterFetchError } from "better-auth/client";
 
+import { useTRPC } from "@/shared/api/trpc.ts";
+
 import { authClient } from "./auth-client.ts";
+import { forgetMembership } from "./membership.ts";
 
 const AUTH_KEYS = {
   session: ["auth", "session"],
@@ -85,13 +88,16 @@ const setActiveOrganizationOptions = () =>
 
 export const useSetActiveOrganization = () => {
   const queryClient = useQueryClient();
+  const api = useTRPC();
   return useMutation({
     ...setActiveOrganizationOptions(),
-    onSuccess: () =>
-      Promise.all([
+    onSuccess: () => {
+      forgetMembership(queryClient, api);
+      return Promise.all([
         queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session }),
         queryClient.invalidateQueries({ queryKey: AUTH_KEYS.workspaces }),
-      ]),
+      ]);
+    },
   });
 };
 

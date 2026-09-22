@@ -1,26 +1,17 @@
-import { CatchBoundary, RouterProvider, createMemoryHistory } from "@tanstack/react-router";
+import { CatchBoundary } from "@tanstack/react-router";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Providers } from "@/app/providers.tsx";
-import { createAppRouter } from "@/app/router.tsx";
 import { Toolbar, ViewPanel, ViewTabsRoot } from "@/app/toolbar.tsx";
 import { viewStateOf, type ViewToolbar } from "@/shared/view-toolbar.tsx";
+
+import { openApp } from "./open-app.tsx";
 
 afterEach(cleanup);
 
 const ROUTES_AND_SPEND = "/system/routes-and-spend";
 
-const shellAt = async (path: string) => {
-  const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }));
-  await router.load();
-  render(
-    <Providers>
-      <RouterProvider router={router} />
-    </Providers>,
-  );
-  return router;
-};
+const shellAt = async (path: string) => (await openApp(path)).router;
 
 const tabs = () => screen.getByRole("tablist", { name: "Routes and spend" });
 

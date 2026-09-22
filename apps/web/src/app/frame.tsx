@@ -1,8 +1,8 @@
-import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect, useId } from "react";
+import { Outlet, useRouterState } from "@tanstack/react-router";
+import { useId } from "react";
 
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
-import { NEEDS_A_PICK, refusalOf, useMembership } from "@/features/auth/membership.ts";
+import { useMembership } from "@/features/auth/membership.ts";
 import { screenAt, viewAt } from "@/shared/screens.ts";
 import { isFilled } from "@/shared/view-toolbar.tsx";
 import { IconRail } from "./icon-rail.tsx";
@@ -14,27 +14,12 @@ import { TopBar } from "./top-bar.tsx";
 import { useWideLayout } from "./wide-layout.ts";
 
 export function Frame() {
-  const navigate = useNavigate();
-  const here = useRouterState({ select: (state) => state.location.href });
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const membership = useMembership();
-  const refusal = refusalOf(membership.error);
   const { signOut, signingOut } = useSignOut();
   const wide = useWideLayout();
   const { showing, show } = useSecondaryNavShowing();
   const navId = useId();
-
-  useEffect(() => {
-    if (refusal === undefined) return;
-
-    if (here.startsWith("/sign-in") || here.startsWith("/choose-workspace")) return;
-
-    const to =
-      refusal === NEEDS_A_PICK
-        ? "/choose-workspace"
-        : `/sign-in?redirect=${encodeURIComponent(here)}`;
-    void navigate({ href: to, replace: true });
-  }, [refusal, here, navigate]);
 
   const person = membership.data;
   const openScreen = screenAt(pathname);

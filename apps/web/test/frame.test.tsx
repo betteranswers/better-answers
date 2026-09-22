@@ -1,27 +1,16 @@
-import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { createMemoryHistory } from "@tanstack/react-router";
+import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Providers } from "@/app/providers.tsx";
+import { createAppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
 import { SCREENS, viewsOf } from "@/shared/screens.ts";
 
+import { appAt, openApp } from "./open-app.tsx";
+
 afterEach(cleanup);
 
-const routerAt = async (path: string) => {
-  const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }));
-  await router.load();
-  return router;
-};
-
-const openAt = async (path: string) => {
-  const router = await routerAt(path);
-  return render(
-    <Providers>
-      <RouterProvider router={router} />
-    </Providers>,
-  );
-};
+const openAt = async (path: string) => (await openApp(path)).rendered;
 
 const rail = () => screen.getByRole("navigation", { name: "Control Centre" });
 
@@ -151,7 +140,10 @@ const declaredViewPaths = (): readonly string[] =>
   SCREENS.flatMap((each) => viewsOf(each).map((view) => view.path));
 
 const routedViewPaths = (): readonly string[] => {
-  const router = createAppRouter(createMemoryHistory({ initialEntries: ["/system"] }));
+  const router = createAppRouter(
+    createAppClients(),
+    createMemoryHistory({ initialEntries: ["/system"] }),
+  );
   return Object.keys(router.routesByPath).filter((path) =>
     SCREENS.some((each) => path.startsWith(`${each.path}/`)),
   );
@@ -252,7 +244,7 @@ describe("Control Centre's one list of screens and their views", () => {
   it("lands a screen's own address on that screen's default view", async () => {
     const landed: string[] = [];
     for (const each of SCREENS) {
-      const router = await routerAt(each.path);
+      const { router } = await appAt(each.path);
       landed.push(router.state.location.pathname);
     }
 
