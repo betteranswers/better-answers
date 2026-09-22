@@ -1,0 +1,64 @@
+packages/devtools/src/citations.ts
+  s_41bfaa1109f771::t_0b4b7fad519a65 1-32
+packages/devtools/python/citations.py
+  s_41bfaa1109f771::t_34dda9cbd4f755 8
+  s_41bfaa1109f771::t_410b4d1dfa020c 1-7,9-29
+apps/worker/tests/test_tier_contract.py
+  s_41bfaa1109f771::t_711365c17f847b 471-479,483,485-487
+  s_41bfaa1109f771::t_73d04ced0704f0 480
+  s_41bfaa1109f771::t_0ae6158087a9f8 481-482,484
+  s_41bfaa1109f771::t_d72697488b6eaf 451-470,488-501
+  s_41bfaa1109f771::t_eb2f0a37a783e0 30-36
+  s_41bfaa1109f771::t_ba244c3c47f6f1 3-4,12,14
+docs/adr/README.md
+  s_41bfaa1109f771::t_58c5193e6ee71b 41
+apps/worker/pyproject.toml
+  s_41bfaa1109f771::t_f4f12a0407d53a 178-180
+apps/api/tests/coding-rules-tags.test.ts
+  s_41bfaa1109f771::t_6722e8947c5d2f 71,73
+  s_41bfaa1109f771::t_605654e5279161 325
+  s_41bfaa1109f771::t_c5af050620385f 69-70
+  s_41bfaa1109f771::t_6eed12bfa08bdf 184
+  s_41bfaa1109f771::t_b1af33eadd529f 263
+  s_41bfaa1109f771::t_9cb0ad994b2e3e 243
+packages/devtools/python/comment_gate.py
+  s_41bfaa1109f771::t_bcd91ede90de89 12-13
+  s_41bfaa1109f771::t_00fbe1538db370 114
+packages/core/test/tier-contract.test.ts
+  s_41bfaa1109f771::t_739d35107a7a45 15
+  s_41bfaa1109f771::t_b7d2dd1477a9ae 22,24
+  s_41bfaa1109f771::t_b5251e73269c47 160,162-166
+  s_41bfaa1109f771::t_bb05e47b3bfe4e 159,167
+  s_41bfaa1109f771::t_42489b72d2c0cf 141-158,161,168-186
+docs/adr/0031-the-tier-contract-is-six-agreements-in-three-forms-fixtured-in-one-language-neutral-directory-both-suites-read.md
+  s_41bfaa1109f771::t_bd602b1c781d45 23
+  s_41bfaa1109f771::t_6dae3c76be0dbe 69-74
+contracts/manifest.json
+  s_41bfaa1109f771::t_0600d3987fe052 2
+  s_41bfaa1109f771::t_91f77375cc8860 26-27
+  s_41bfaa1109f771::t_71264430a0f222 14-15
+packages/devtools/lint-rules/rules/comment-only-the-why.ts
+  s_41bfaa1109f771::t_a24a1977d80eb8 85-87
+  s_41bfaa1109f771::t_e9c2b54ab66ea8 3-4
+packages/devtools/package.json
+  s_41bfaa1109f771::t_c31fc54100a370 9
+contracts/citation/cases.json
+  s_41bfaa1109f771::t_32ce2d3b24d439 1,3-68
+  s_41bfaa1109f771::t_117ff87b2ff4e1 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7acef59ba0364e3c196b60a4c55b2bf57a20c6dd",
+  "prompts": {},
+  "sessions": {
+    "s_41bfaa1109f771": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0bc311b1-7404-4f66-a23e-5a963c829c9a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
