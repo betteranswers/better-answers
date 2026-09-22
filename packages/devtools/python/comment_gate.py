@@ -9,6 +9,8 @@ import token
 import tokenize
 from pathlib import Path
 
+from citations import citation_in
+
 WORD_LIMIT = 25
 
 
@@ -27,15 +29,6 @@ EXEMPT_OPENING = re.compile(
     r"|SPDX-License-Identifier"
     r"|Copyright"
     r")"
-)
-
-CITATIONS = (
-    ("a ticket id", re.compile(r"\bT-\d+\b")),
-    ("an ADR number", re.compile(r"\bADR[ -]?\d+\b", re.IGNORECASE)),
-    # A family may carry a digit, so the letters around it are what the shape reads.
-    ("a rule tag", re.compile(r"\[[A-Z][A-Z0-9]*[A-Z][0-9]+\]")),
-    ("a date", re.compile(r"\b\d{4}-\d{2}-\d{2}\b")),
-    ("a date", re.compile(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b")),
 )
 
 TOO_LONG = (
@@ -118,14 +111,7 @@ def _docstrings(source: str) -> list[tuple[int, str]]:
 def _findings(path: Path, source: str) -> list[str]:
     said: list[str] = []
     for line, prose in _comment_blocks(source) + _docstrings(source):
-        cited = next(
-            (
-                (what, found.group(0))
-                for what, pattern in CITATIONS
-                if (found := pattern.search(prose))
-            ),
-            None,
-        )
+        cited = citation_in(prose)
         if cited is not None:
             what, citation = cited
             said.append(CITES.format(path=path, line=line, what=what, cited=citation))

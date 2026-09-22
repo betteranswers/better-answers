@@ -1,5 +1,7 @@
 import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any, cast
 
@@ -7,8 +9,9 @@ import psycopg
 import pytest
 from psycopg import Cursor
 
-SPOKEN_CONTRACT_VERSION = 9
+SPOKEN_CONTRACT_VERSION = 10
 SPOKEN_AGREEMENTS = {
+    "citation": "fixtured",
     "concept-file": "fixtured",
     "concept-inbox": "sql-function",
     "cost-ledger": "generated",
@@ -24,6 +27,13 @@ SPOKEN_AGREEMENTS = {
 NOT_FIXTURES = {"manifest.json", "README.md"}
 
 CONTRACTS_DIR = Path(__file__).resolve().parents[3] / "contracts"
+COMMENT_GATE = (
+    Path(__file__).resolve().parents[3]
+    / "packages"
+    / "devtools"
+    / "python"
+    / "comment_gate.py"
+)
 
 
 def read_manifest() -> dict[str, Any]:
@@ -438,3 +448,40 @@ def test_every_number_the_fixture_names_is_written_as_the_text_both_tiers_write(
         assert canonical_frontmatter({"n": entry["value"]}, "knowledge/x.md") == (
             f'{{"n":{entry["text"]}}}'
         ), entry
+
+
+def read_citation() -> dict[str, Any]:
+    raw = (CONTRACTS_DIR / "citation" / "cases.json").read_text(encoding="utf-8")
+    return cast("dict[str, Any]", json.loads(raw))
+
+
+def _the_gate_over(directory: Path, prose: str) -> str:
+    probe = directory / "probe.py"
+    probe.write_text(f"# {prose}\nKEEP = 1\n", encoding="utf-8")
+    ran = subprocess.run(
+        [sys.executable, str(COMMENT_GATE), str(probe)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ran.returncode in {0, 1}, ran.stderr
+    return ran.stdout
+
+
+def test_the_comment_gate_refuses_every_sentence_the_fixture_says_cites(
+    tmp_path: Path,
+) -> None:
+    for pattern in read_citation()["patterns"]:
+        for case in pattern["cites"]:
+            prose = "".join(case["prose"])
+            cited = "".join(case["cited"])
+            said = _the_gate_over(tmp_path, prose)
+
+            assert f"cites {pattern['name']} (`{cited}`)" in said, prose
+
+
+def test_the_comment_gate_walks_past_every_sentence_the_fixture_says_cites_nothing(
+    tmp_path: Path,
+) -> None:
+    for prose in read_citation()["cites_nothing"]:
+        assert _the_gate_over(tmp_path, prose) == "", prose

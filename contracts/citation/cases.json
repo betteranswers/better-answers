@@ -1,0 +1,73 @@
+{
+  "description": "citation (ADR 0031): what a citation looks like, said once for both tiers. The comment gate runs twice — an oxlint rule over the TypeScript tier and a script over the Python one — and both refuse a comment that says which ticket, decision or rule asked for the code. Until this file they each carried the five patterns themselves, so a sixth was two edits that could disagree, and a fifth that drifted would have each gate refusing a different tree. `patterns` is the whole of the agreement, in the order the gates try them: `name` is the words the gate's message puts after *cites*, `pattern` is a regular expression written in the subset both languages read the same way — no flags, because a flag is not part of a pattern string either tier can compile — and `why` says what the pattern is holding. `cites` are the samples a gate must refuse, each with the very text it must quote back; `cites_nothing` are sentences that carry none of the five and must pass, which is how each suite sees that its gate holds no pattern of its own. A sample is written as the parts a suite joins, because a rule tag spelled whole here would be a rule tag written outside the three places the rules allow one; every other sample is a list of one. The TypeScript half compiles this file in `packages/devtools/src/citations.ts` and the Python half in `packages/devtools/python/citations.py`; the oxlint rule, the script and the write-time hook that runs them read those, and neither gate writes a pattern out any more, so a sixth is one edit here. Each tier's contract suite drives its own gate over every sample below: the core suite runs the rule through the throwaway-tree runner (packages/core/test/tier-contract.test.ts) and the worker suite runs the script itself (apps/worker/tests/test_tier_contract.py).",
+  "patterns": [
+    {
+      "name": "a ticket id",
+      "pattern": "\\bT-\\d+\\b",
+      "why": "The tracker's own id, which is where a ticket is read and never a comment.",
+      "cites": [
+        {
+          "prose": ["Kept because the claim protocol changed under T-243."],
+          "cited": ["T-243"]
+        }
+      ]
+    },
+    {
+      "name": "an ADR number",
+      "pattern": "\\b[Aa][Dd][Rr][ -]?\\d+\\b",
+      "why": "The letters are spelled in both cases because a case-insensitive flag is not part of a pattern string either tier can compile.",
+      "cites": [
+        {
+          "prose": ["Kept because the graph is Postgres under ADR 0021."],
+          "cited": ["ADR 0021"]
+        },
+        {
+          "prose": ["Kept because the graph is Postgres under adr-21."],
+          "cited": ["adr-21"]
+        }
+      ]
+    },
+    {
+      "name": "a rule tag",
+      "pattern": "\\[[A-Z][A-Z0-9]*[A-Z][0-9]+\\]",
+      "why": "A family may carry a digit, so the letters around it are what the shape is read by.",
+      "cites": [
+        {
+          "prose": ["Kept because a raw insert lives in a factory ([TEST", "4])."],
+          "cited": ["[TEST", "4]"]
+        },
+        {
+          "prose": ["Kept because the outcome is announced ([A11", "Y1])."],
+          "cited": ["[A11", "Y1]"]
+        }
+      ]
+    },
+    {
+      "name": "a date",
+      "pattern": "\\b\\d{4}-\\d{2}-\\d{2}\\b",
+      "why": "The way a date is written in a document, which is where a comment would be sending its reader.",
+      "cites": [
+        {
+          "prose": ["Kept because the reading of the registry moved on 2026-09-21."],
+          "cited": ["2026-09-21"]
+        }
+      ]
+    },
+    {
+      "name": "a date",
+      "pattern": "\\b\\d{1,2}/\\d{1,2}/\\d{2,4}\\b",
+      "why": "The way a date is written in this repository's prose, the day first.",
+      "cites": [
+        {
+          "prose": ["Kept because the reading of the registry moved on 21/09/2026."],
+          "cited": ["21/09/2026"]
+        }
+      ]
+    }
+  ],
+  "cites_nothing": [
+    "Deleting this changes what the engine memoises.",
+    "The order matters: the reaper runs before the claim.",
+    "A bare T is no ticket id, and the year on its own is no date."
+  ]
+}

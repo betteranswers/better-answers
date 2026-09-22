@@ -12,14 +12,19 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
+import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { boundarySchemas, ULID_PATTERN } from "@better-answers/schema";
 
 import { ulid } from "../src/kernel/index.ts";
 
+import type { Tree } from "@better-answers/devtools/throwaway-tree";
+
 // Version and agreements hardcoded on purpose, never read from a shared constant: that is
 // what fails a tier not yet taught a contract change.
-const SPOKEN_CONTRACT_VERSION = 9;
+const SPOKEN_CONTRACT_VERSION = 10;
 const SPOKEN_AGREEMENTS = {
+  citation: "fixtured",
   "concept-file": "fixtured",
   "concept-inbox": "sql-function",
   "cost-ledger": "generated",
@@ -134,5 +139,65 @@ describe("id-shape, the agreement about what an id looks like", () => {
     const pattern = new RegExp(readIdShape().pattern);
 
     for (let minted = 0; minted < 100; minted += 1) expect(pattern.test(ulid())).toBe(true);
+  });
+});
+
+const citation = z.object({
+  patterns: z.array(
+    z.object({
+      name: z.string(),
+      pattern: z.string(),
+      why: z.string(),
+      cites: z.array(z.object({ prose: z.array(z.string()), cited: z.array(z.string()) })),
+    }),
+  ),
+  cites_nothing: z.array(z.string()),
+});
+
+const readCitation = () =>
+  citation.parse(
+    JSON.parse(readFileSync(path.join(contractsDir, "citation", "cases.json"), "utf8")),
+  );
+
+const commenting = (prose: string): string => `// ${prose}\nexport const keep = 1;\n`;
+
+const citedSentences = readCitation().patterns.flatMap(({ name, cites }) =>
+  cites.map((one) => ({ name, prose: one.prose.join(""), cited: one.cited.join("") })),
+);
+
+const probeFor = (index: number): string => `probe-${index}.ts`;
+
+const treeOf = (sentences: readonly string[]): Tree =>
+  Object.fromEntries(sentences.map((prose, index) => [probeFor(index), commenting(prose)]));
+
+const citedTree = treeOf(citedSentences.map((one) => one.prose));
+
+const commentGate = oxlintOver(
+  pluginConfigFor({ "better-answers/comment-only-the-why": "error" }),
+  {
+    tree: citedTree,
+    flagged: citedSentences.map((_sentence, index) => probeFor(index)),
+  },
+);
+
+const lineFor = (file: string, said: string): string =>
+  said.split("\n").find((line) => line.startsWith(`${file}:`)) ?? "";
+
+describe("citation, the agreement about what a citation looks like", () => {
+  it("refuses every sentence the fixture says cites, quoting back the text the fixture names", () => {
+    const said = commentGate.output(citedTree);
+
+    expect(
+      citedSentences.map(({ name, prose, cited }, index) => ({
+        prose,
+        names: lineFor(probeFor(index), said).includes(`cites ${name} (\`${cited}\`)`),
+      })),
+    ).toEqual(citedSentences.map(({ prose }) => ({ prose, names: true })));
+  });
+
+  it("walks past every sentence the fixture says cites nothing, so the gate holds no pattern of its own", () => {
+    const clean = readCitation().cites_nothing;
+
+    expect({ clean, flagged: commentGate.flagged(treeOf(clean)) }).toEqual({ clean, flagged: [] });
   });
 });
