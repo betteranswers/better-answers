@@ -99,6 +99,16 @@ dependencies = [
     # `test_both_converters_hold_on_the_image_under_the_engines_own_runtime`.
     "firecrawl-anydoc==0.2.4",
     "pdf-inspector==1.22.0",
+    # The AEAD the credential envelope is sealed and opened under, AES-256-GCM (ADR 0005,
+    # amended 22/09/2026): this tier reaches it through `AESGCM` and the api tier through
+    # Node's own OpenSSL, so the frame one tier writes is one the other reads. The package was
+    # already in the lock beneath `presidio-anonymizer`; `envelope.py` imports it directly, so
+    # it is named here rather than left transitive. The pin is the version the lock already
+    # resolved, so naming it adds no wheel to the image and does not move a dependency of the
+    # detector's under it — 50.0.1 is newest on PyPI, read 22/09/2026, and taking it is its own
+    # deliberate act. Apache-2.0 under its dual licence, which is the arm this repository takes
+    # (ADR 0027).
+    "cryptography==48.0.1",
 ]
 
 [project.scripts]

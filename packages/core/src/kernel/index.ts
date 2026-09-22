@@ -2,6 +2,17 @@ export { ulid } from "@better-answers/schema";
 export { systemClock } from "./clock.ts";
 export type { Clock } from "./clock.ts";
 export { refusalFor } from "./constraint.ts";
+export {
+  ENVELOPE_AEAD,
+  ENVELOPE_KEY_BYTES,
+  ENVELOPE_NONCE_BYTES,
+  ENVELOPE_TAG_BYTES,
+  ENVELOPE_VERSION,
+  ENVELOPE_VERSION_BYTES,
+  openEnvelope,
+  sealEnvelope,
+} from "./envelope.ts";
+export type { OpenEnvelopeRefusal } from "./envelope.ts";
 export { declareRefusals, REFUSAL_CLASSES, refusalRegister } from "./refusal.ts";
 export type { RefusalClass, RegisteredRefusal } from "./refusal.ts";
 export { KERNEL_REFUSALS, MALFORMED, NOT_FOUND } from "./vocabulary.ts";

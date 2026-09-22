@@ -22,7 +22,7 @@ import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 // Version and agreements hardcoded on purpose, never read from a shared constant: that is
 // what fails a tier not yet taught a contract change.
-const SPOKEN_CONTRACT_VERSION = 10;
+const SPOKEN_CONTRACT_VERSION = 11;
 const SPOKEN_AGREEMENTS = {
   citation: "fixtured",
   "concept-file": "fixtured",

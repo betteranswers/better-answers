@@ -626,6 +626,9 @@ to it by IRI and never restates it (ADR 0014).
   is the alert. Carries an outcome word and sizes, never a path or an error.
 - **escrow** — the two-holder vault outside every box that keeps the handful of secrets whose loss
   loses everything else.
+- **envelope** — the sealed form a secret is kept in: one versioned frame, written by either tier
+  and read the same way by the other, which opens only under the key it was sealed with. A frame
+  whose version a reader does not know is refused, never guessed (ADR 0005).
 - **boundary schema** — the validation schema a caller is checked against for one table, in three
   shapes (select, insert, update), generated from the table rather than written beside it, so a
   column has one definition and a boundary cannot drift from it (ADR 0028). Narrowed by refinements

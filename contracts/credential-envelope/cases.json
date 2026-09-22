@@ -1,0 +1,76 @@
+{
+  "description": "credential-envelope (ADR 0031, ADR 0005): the format a sealed credential is written in, said once for both tiers. A credential is sealed by one tier and opened by the other, so the two have to agree about the bytes between them — which AEAD, which key length, which fields in which order, and where the version sits. `aead` is the cipher both tiers name (packages/core/src/kernel/envelope.ts, `ENVELOPE_AEAD`; apps/worker/src/better_answers_worker/envelope.py, `ENVELOPE_AEAD`) — AES-256-GCM as NIST SP 800-38D defines it, spelled the way OpenSSL names it because that is the string the api tier hands `createDecipheriv`. The worker's library takes a class and no string, so there the constant is a declaration beside its one `AESGCM`, and what holds that tier to the cipher is the vectors: nothing else opens them. `frame` is the widths, and the layout is *version · nonce · ciphertext · tag* concatenated in that order, with the version byte also the additional authenticated data (ADR 0005, amended 22/09/2026): the version is first so a tier reads a version it does not know before it decrypts anything, which is why the `refuses` vector whose version byte alone says 2 answers *unknown version* and not a failed tag. The version being the authenticated data buys nothing while there is one version — it is bought for the version after it, so that a body re-framed under another version does not open under a reader that knows both — and nothing here can hold a tier to it until that version exists; the ADR carries that half. What this file does hold is the order, through the vectors: a tier that read the nonce first opens none of them. Every byte string here is lower-case hex, including the plaintexts, because a credential is bytes and not text: the third `opens` vector is not valid UTF-8 on purpose, so a tier that decoded instead of handing bytes back fails rather than passes quietly. `opens` is a frame this file's `key` opens and the plaintext it must yield byte for byte. `refuses` is a frame this file's `key` does not open, each with the word its opener answers — `envelope-version-unknown` for a version this tier does not read, `envelope-malformed` for bytes too few to be a frame at all, `envelope-not-authentic` for a tag that does not verify, which is one word for a moved byte and a wrong key alike because an opener that told those apart would be an oracle. Sealing is not fixtured and cannot be: a seal draws a fresh nonce every time, so two seals of one plaintext differ and no frame here is reproducible by sealing. What each tier holds to this file instead is that it opens these frames, refuses those, and writes a frame of the widths `frame` names. The key is a test key and reads as one in a hex dump — it is the ASCII of a sentence saying so. It appears in no deploy file, is read from no environment, and seals nothing outside this file. What this agreement does not carry is where a real key comes from: the key hierarchy `docs/operations/SECRETS.md` names and the credentials provider ADR 0041 fixes are the first slice's that needs a credential, and neither is described here.",
+  "aead": "aes-256-gcm",
+  "version": 1,
+  "frame": {
+    "key_bytes": 32,
+    "version_bytes": 1,
+    "nonce_bytes": 12,
+    "tag_bytes": 16
+  },
+  "key": "6265747465722d616e7377657273207465737420656e76656c6f7065206b6579",
+  "opens": [
+    {
+      "name": "an ingestion token",
+      "why": "the ordinary case: a connector's token, the shape of the thing this envelope exists to carry",
+      "frame": "01656e76656c6f70652d763161d7d19355a86dbe3d4d8beed5e69d698bea3117e37a642f1a722fc0c109bab2c291d26b7ff0535503e3ff",
+      "plaintext": "62612d696e676573742d37663363316439653034613234623665"
+    },
+    {
+      "name": "an empty plaintext",
+      "why": "twenty-nine bytes and no ciphertext at all, so a tier that read an empty plaintext as an absent one, or skipped the tag because there was nothing to decrypt, answers nothing rather than nothing-in-particular",
+      "frame": "01656e76656c6f70652d7631625a1376c8f1a5bb7a35662ac4edd6136f",
+      "plaintext": ""
+    },
+    {
+      "name": "bytes that are no text",
+      "why": "a plaintext holding a null, a byte no UTF-8 sequence starts with and a lone continuation byte: a tier that decoded the plaintext to a string on its way out of the opener cannot return this one at all",
+      "frame": "01656e76656c6f70652d7631637041aabdd1801da68cc2a6e8b24fbaba063321f9de2e20f125d97618d078822ae2516e8a0b993eb7d3d10a",
+      "plaintext": "00fffe80207261772062797465732c206e6f74207465787420017f"
+    }
+  ],
+  "refuses": [
+    {
+      "name": "a version this tier does not know",
+      "why": "the first vector's frame with its version byte alone saying 2. A tier that guessed the layout from what it knows would reach the tag and answer `envelope-not-authentic`; the version is read first, so it answers what is actually wrong",
+      "frame": "02656e76656c6f70652d763161d7d19355a86dbe3d4d8beed5e69d698bea3117e37a642f1a722fc0c109bab2c291d26b7ff0535503e3ff",
+      "refusal": "envelope-version-unknown"
+    },
+    {
+      "name": "no bytes at all",
+      "why": "there is no version byte to read, so the version check cannot be what refuses it",
+      "frame": "",
+      "refusal": "envelope-malformed"
+    },
+    {
+      "name": "a frame one byte short of a nonce and a tag",
+      "why": "twenty-eight bytes where twenty-nine is the shortest frame a version 1 reader can have: the boundary, so an opener whose comparison is off by one fails here rather than handing the library a truncated nonce",
+      "frame": "01656e76656c6f70652d763161d7d19355a86dbe3d4d8beed5e69d69",
+      "refusal": "envelope-malformed"
+    },
+    {
+      "name": "a flipped ciphertext bit",
+      "why": "one bit of the first vector's ciphertext, which is what an attacker with the store and no key can move",
+      "frame": "01656e76656c6f70652d763161d6d19355a86dbe3d4d8beed5e69d698bea3117e37a642f1a722fc0c109bab2c291d26b7ff0535503e3ff",
+      "refusal": "envelope-not-authentic"
+    },
+    {
+      "name": "a flipped tag bit",
+      "why": "the same frame with its tag moved instead, so a tier that set the tag aside and never gave it to the cipher opens this one and fails here",
+      "frame": "01656e76656c6f70652d763161d7d19355a86dbe3d4d8beed5e69d698bea3117e37a642f1a722fc0c109bab2c291d26b7ff0535503e37f",
+      "refusal": "envelope-not-authentic"
+    },
+    {
+      "name": "a frame sealed with the version left out of the authenticated data",
+      "why": "every byte of a version 1 frame, sealed under this file's own key, differing only in that the sealer passed no additional authenticated data. This is what holds an opener to supplying the version while there is one version to supply: an opener that dropped it opens this frame, and nothing else in the file would notice",
+      "frame": "01656e76656c6f70652d763165fca7bd48120f8f903439442090cc1b6a25756e656521e10d61390808d63d67a83e1f74504edbeb4fd994",
+      "refusal": "envelope-not-authentic"
+    },
+    {
+      "name": "a frame sealed under a key this file does not carry",
+      "why": "a whole, unaltered, correctly versioned frame that this key cannot open — the same word as a moved byte, deliberately, because the opener is told nothing that would let a caller distinguish them",
+      "frame": "01656e76656c6f70652d76316465fcfb5bd9b932a09d7d0344a981e89366e6515c3605d8141cc739a661755e9180ba80fb14088e153eac",
+      "refusal": "envelope-not-authentic"
+    }
+  ]
+}

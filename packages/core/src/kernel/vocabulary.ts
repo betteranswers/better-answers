@@ -12,6 +12,12 @@ export const KERNEL_REFUSALS = declareRefusals("kernel", {
   "role-disagrees": "unauthenticated",
   "role-unknown": "unauthenticated",
   "malformed-claims": "unauthenticated",
+
+  // The envelope's three: both tiers answer a frame they cannot open in these words, the frame
+  // being what they agree through.
+  "envelope-version-unknown": "inapplicable",
+  "envelope-malformed": "malformed",
+  "envelope-not-authentic": "malformed",
 });
 
 type KernelRefusalWord = Extract<keyof typeof KERNEL_REFUSALS, string>;
