@@ -64,10 +64,10 @@ taken and not a ref to diff against. A refresh therefore compares source:
 
 ## The test a refresh must pass
 
-The repository's `check`. Every TypeScript workspace runs `oxlint --config
-../../.oxlintrc.json .`, which loads this plugin and runs all fifteen rules over that
-workspace's source; a rule that stopped loading, changed its name, or started firing on code
-this repository has always held fails that step rather than a report. The plugin's own
+The repository's `check`. Its `lint` gate runs `oxlint` once over the whole tree under
+`.oxlintrc.json`, which loads this plugin and runs all fifteen rules over every workspace's
+source; a rule that stopped loading, changed its name, or started firing on code this
+repository has always held fails that step rather than a report. The plugin's own
 loading is additionally exercised by `apps/api/tests/lint-rules.test.ts`, which resolves both
 `jsPlugins` specifiers out of the real `.oxlintrc.json` and runs oxlint over a throwaway tree
 through the devtools runner.

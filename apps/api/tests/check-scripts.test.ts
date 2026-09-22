@@ -85,7 +85,9 @@ describe("the workspaces' scripts (T-068)", () => {
   });
 });
 
-const GATE_STEPS = ["lint", "typecheck", "test", "e2e"] as const;
+// The tree's oxlint runs once from the root; a workspace copy would annotate every warning
+// twice, on paths CI cannot place on a diff.
+const GATE_STEPS = ["lint:python", "lint:python-format", "typecheck", "test", "e2e"] as const;
 
 const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<steps>.+)$/;
 

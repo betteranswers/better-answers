@@ -31,7 +31,7 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers �
 | `deploy/` | Compose files and deployment configuration |
 | `.cubic/wiki/` | Cubic's generated wiki |
 
-Commands, versions and scripts are read from each workspace's `package.json` or `pyproject.toml`. Every workspace exposes `check` (lint, types, tests) unless a test names it as having nothing to run; one `check` runs every step it has and names all that failed, and the root `check` runs them all.
+Commands, versions and scripts are read from each workspace's `package.json` or `pyproject.toml`. Every workspace exposes `check` (types, tests) unless a test names it as having nothing to run; one `check` runs every step it has and names all that failed, and the root `check` runs them all. The TypeScript lint is a root gate — `oxlint` walks the whole tree once under `check:gates` — so no workspace's `check` repeats it; each keeps its own `lint` script for running by hand, and `packages/devtools` keeps its Python lint and format checks in `check`, those being the tree walk's blind spot.
 
 ## Skills
 

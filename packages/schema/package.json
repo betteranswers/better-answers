@@ -15,7 +15,7 @@
     "generate:roles-surface": "node scripts/generate-roles-surface.ts",
     "lint": "oxlint --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
-    "check": "node ../../scripts/check.mjs lint typecheck test",
+    "check": "node ../../scripts/check.mjs typecheck test",
     "test": "vitest run"
   },
   "dependencies": {

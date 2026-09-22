@@ -45,31 +45,24 @@ export const ROOT_PATH = "";
 const pathOf = (segments: ReadonlyArray<PropertyKey>): string =>
   segments.map((segment) => String(segment)).join(".");
 
-const absent = (raw: unknown, segments: ReadonlyArray<PropertyKey>): boolean => {
-  let held: unknown = raw;
-  for (const segment of segments) {
-    if (typeof held !== "object" || held === null || typeof segment === "symbol") return true;
-    // The value was never checked against a shape, so its entries are walked, not asserted.
-    held = Object.entries(held).find(([name]) => name === String(segment))?.[1];
-  }
-  return held === undefined;
-};
-
-const wordOf = (issue: z.core.$ZodIssue, raw: unknown): IssueWord => {
-  if (issue.code === "invalid_type" && absent(raw, issue.path)) return "missing";
+const wordOf = (issue: z.core.$ZodIssue): IssueWord => {
+  if (issue.code === "invalid_type" && issue.input === undefined) return "missing";
   return WORD_OF_CODE.get(issue.code) ?? "refused";
 };
 
 export const parse = <Schema extends z.ZodType>(
   schema: Schema,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- this is the boundary the rule points at: a transport hands over whatever arrived and the schema is what narrows it, so a named type here would be a second parse nothing has done yet.
   raw: unknown,
 ): Result<z.output<Schema>, Malformed> => {
-  const read = schema.safeParse(raw);
+  // `reportInput` is how a missing key is told from a wrong-typed one; the values it
+  // copies onto issues never leave this function.
+  const read = schema.safeParse(raw, { reportInput: true });
   if (read.success) return ok(read.data);
 
   const fields: Record<string, IssueWord> = {};
   for (const issue of read.error.issues) {
-    fields[pathOf(issue.path)] ??= wordOf(issue, raw);
+    fields[pathOf(issue.path)] ??= wordOf(issue);
   }
   return err({ word: MALFORMED, fields });
 };

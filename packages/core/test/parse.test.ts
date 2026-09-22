@@ -127,6 +127,25 @@ describe("what a kernel parse answers", () => {
     });
   });
 
+  it("reads a nested key written as undefined the same as one that was never there", () => {
+    expect(
+      parse(publishBindingInput, {
+        bindingId: A_BINDING,
+        confirmations: { ...CONFIRMED, dpiaReferenced: undefined },
+      }),
+    ).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { "confirmations.dpiaReferenced": "missing" } },
+    });
+  });
+
+  it("calls the whole value missing when nothing was handed in at all", () => {
+    expect(parse(findingsOfInput, undefined)).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { [ROOT_PATH]: "missing" } },
+    });
+  });
+
   it("names the root when the whole value is the wrong kind", () => {
     expect(parse(findingsOfInput, "not an object")).toEqual({
       ok: false,
