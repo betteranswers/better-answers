@@ -1,0 +1,92 @@
+packages/core/src/kernel/vocabulary.ts
+  s_751caa505e1148::t_eed03fd68ec930 1-3,5-23
+  s_751caa505e1148::t_5085819f21d6c0 4
+packages/core/src/sources/admin-binding.ts
+  s_751caa505e1148::t_7de18f1ad5fa4b 13
+  s_751caa505e1148::t_ac8be55132d216 23-24,28
+  s_751caa505e1148::t_f7bc0ca8aa0a10 42-43,48
+packages/core/src/members/index.ts
+  s_751caa505e1148::t_fe4cfa50ecf472 3
+packages/core/src/sources/binding.ts
+  s_751caa505e1148::t_e71791d3c3118b 31
+  s_751caa505e1148::t_8c4d030db59e22 115-117
+  s_751caa505e1148::t_61d2d6e0ca102b 267-274
+  s_751caa505e1148::t_e93c3635e16537 377-379
+packages/core/src/kernel/refusal.ts
+  s_751caa505e1148::t_6605ebbb42a232 1-14,16-44
+  s_751caa505e1148::t_1634f5cd88f130 15
+packages/core/src/kernel/principal.ts
+  s_751caa505e1148::t_fa4d4f552fb5eb 5
+  s_751caa505e1148::t_2aec02bc4d1b82 43-45
+packages/core/src/sources/passages.ts
+  s_751caa505e1148::t_5be459ba1b4921 195-197
+packages/core/test/audit.test.ts
+  s_751caa505e1148::t_7a6c727675a45a 18
+packages/core/test/members.test.ts
+  s_751caa505e1148::t_2eb0e85d0752ae 278
+packages/core/test/refusal-words.test.ts
+  s_751caa505e1148::t_07a24d49666216 1-2,7-9,47-60,64-66,72,75-80,82-101,104,108-109
+  s_751caa505e1148::t_0efa2e59c5680b 3-6,10-46,61-63,67-71,73-74,81,103,105,107
+  s_751caa505e1148::t_b5bc40d7bde2bc 102,106
+packages/schema/src/table-ownership.ts
+  s_751caa505e1148::t_fff7a030226d30 194
+packages/core/src/sources/vocabulary.ts
+  s_751caa505e1148::t_9da23a7ab1df50 1-2,20-22
+  s_751caa505e1148::t_11d4f8b488479f 3-19
+  s_751caa505e1148::t_903e138d172bfb 23-24
+packages/core/src/members/vocabulary.ts
+  s_751caa505e1148::t_80a0e869505500 1,4,12
+  s_751caa505e1148::t_638ffdac74b180 2-3,5-11
+packages/core/src/sources/review.ts
+  s_751caa505e1148::t_16016dc0bce375 47-49
+  s_751caa505e1148::t_432afb3642a619 187-189
+  s_751caa505e1148::t_ba29bc932540a4 297-299
+packages/core/src/sources/index.ts
+  s_751caa505e1148::t_5be459ba1b4921 11
+  s_751caa505e1148::t_ea6cf916bcc6af 16
+  s_751caa505e1148::t_8bdc1c33bfac59 83
+  s_751caa505e1148::t_b97567f84ab530 102-104
+packages/core/src/sources/dpia.ts
+  s_751caa505e1148::t_e6c5ce31de3602 5,9
+  s_751caa505e1148::t_2644c1b6f56701 81-83
+packages/core/src/kernel/index.ts
+  s_751caa505e1148::t_799a01d6a07f34 5,7
+  s_751caa505e1148::t_5eaf43707324e3 6
+packages/core/src/kernel/role.ts
+  s_751caa505e1148::t_6e1bee84bba2bc 2
+  s_751caa505e1148::t_93ab177ba6d6a6 5
+packages/core/src/members/groups.ts
+  s_751caa505e1148::t_9816ddb7e3bf30 14
+  s_751caa505e1148::t_8c16706c8b851e 40,42,45,48,54-58
+  s_751caa505e1148::t_56832a0db892e9 220
+  s_751caa505e1148::t_0de0ece169a1fd 276
+  s_751caa505e1148::t_e3f10dc65aad66 291
+packages/core/src/sources/chunk-address.ts
+  s_751caa505e1148::t_5245b2cb83b81c 3
+  s_751caa505e1148::t_0b6b05a05e63b5 4
+  s_751caa505e1148::t_d5f5bb8535c429 14
+packages/core/src/sources/findings.ts
+  s_751caa505e1148::t_03b36eb86dddd8 15
+  s_751caa505e1148::t_fdbe1c67309a3f 37
+packages/core/src/answering/index.ts
+  s_751caa505e1148::t_31c6e75ddacfcc 3-11
+  s_751caa505e1148::t_e92c0ff2367744 301
+packages/core/test/entry-points.ts
+  s_751caa505e1148::t_5e969a26c5c957 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "24b3f3ef6250959ef6787969db6f0849768ed0e9",
+  "prompts": {},
+  "sessions": {
+    "s_751caa505e1148": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "86fcccd7-405c-460f-894a-ef3766723fdd",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
