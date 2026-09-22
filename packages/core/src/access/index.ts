@@ -4,6 +4,7 @@ import {
   boundarySchemas,
   type SENSITIVITIES,
 } from "@better-answers/schema";
+import type { z } from "zod";
 
 import type { GroupId, Role, UserPrincipal } from "../kernel/index.ts";
 
@@ -99,22 +100,46 @@ export type VisibilityRow = {
   readonly audience_groups: readonly string[] | null;
 };
 
-const VISIBILITY = boundarySchemas.conceptIndex.select.pick({
+const VISIBILITY_FIELDS = boundarySchemas.conceptIndex.select.pick({
   sensitivity: true,
   audience: true,
   audienceGroups: true,
 });
 
+const AUDIENCE_DISAGREES = "a readable unit's audience word and its group list disagree";
+
+export type VisibilityFields = z.output<typeof VISIBILITY_FIELDS>;
+
+const visibilityAgreeing = (fields: VisibilityFields): Visibility | undefined => {
+  const { sensitivity, audience, audienceGroups } = fields;
+  if (audience === AUDIENCE_GROUPS && audienceGroups !== null) {
+    return { sensitivity, audience: AUDIENCE_GROUPS, audienceGroups };
+  }
+  if (audience === AUDIENCE_EVERYONE && audienceGroups === null) {
+    return { sensitivity, ...EVERYONE };
+  }
+  return undefined;
+};
+
+export const visibilityAgreed = (
+  fields: VisibilityFields,
+  ctx: z.RefinementCtx,
+): Visibility | undefined => {
+  const held = visibilityAgreeing(fields);
+  if (held === undefined) {
+    ctx.addIssue({ code: "custom", path: ["audience"], message: AUDIENCE_DISAGREES });
+  }
+  return held;
+};
+
 export const visibilityOf = (row: VisibilityRow): Visibility => {
-  const parsed = VISIBILITY.parse({
+  const parsed = VISIBILITY_FIELDS.parse({
     sensitivity: row.sensitivity,
     audience: row.audience,
     audienceGroups: row.audience_groups,
   });
-  const visibility = visibilityFrom(parsed);
-  if (visibility === undefined) {
-    throw new Error("a readable unit's audience word and its group list disagree");
-  }
+  const visibility = visibilityAgreeing(parsed);
+  if (visibility === undefined) throw new Error(AUDIENCE_DISAGREES);
   return visibility;
 };
 
@@ -123,18 +148,10 @@ export const visibilityFrom = (fields: {
   readonly audience: string;
   readonly audienceGroups?: readonly string[] | null | undefined;
 }): Visibility | undefined => {
-  const parsed = VISIBILITY.safeParse({
+  const parsed = VISIBILITY_FIELDS.safeParse({
     sensitivity: fields.sensitivity,
     audience: fields.audience,
     audienceGroups: fields.audienceGroups ?? null,
   });
-  if (!parsed.success) return undefined;
-  const { sensitivity, audience, audienceGroups } = parsed.data;
-  if (audience === AUDIENCE_GROUPS && audienceGroups !== null) {
-    return { sensitivity, audience: AUDIENCE_GROUPS, audienceGroups };
-  }
-  if (audience === AUDIENCE_EVERYONE && audienceGroups === null) {
-    return { sensitivity, ...EVERYONE };
-  }
-  return undefined;
+  return parsed.success ? visibilityAgreeing(parsed.data) : undefined;
 };

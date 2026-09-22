@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 
 import { boundarySchemas, RULES_IN_FORCE_KEYS, type REDACTION_TIERS } from "@better-answers/schema";
+import { z } from "zod";
 
 import { err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import { listRoutes, type LlmPurpose } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { adminOnBinding, bindingNamed } from "./admin-binding.ts";
+import { adminOnBinding, bindingNamed, BINDING_ID } from "./admin-binding.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
 export const NOT_RECORDED = "not recorded";
@@ -78,9 +79,11 @@ export type DpiaInput = {
   readonly audience: string;
 };
 
-export type DpiaInputRefusal =
-  | SourceRefusal<"role-forbids" | "malformed" | "no-such-binding">
-  | Error;
+export const dpiaReadInput = z.object({ bindingId: BINDING_ID });
+
+export type DpiaReadInput = z.output<typeof dpiaReadInput>;
+
+export type DpiaInputRefusal = SourceRefusal<"role-forbids" | "no-such-binding"> | Error;
 
 export type DpiaInputRead = {
   readonly document: DpiaInput;
@@ -123,7 +126,7 @@ const canonical = (value: Canonical): string => {
 export const dpiaInputFor = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: { readonly bindingId: string },
+  input: DpiaReadInput,
 ): Promise<Result<DpiaInputRead, DpiaInputRefusal>> => {
   const acting = adminOnBinding(principal, input.bindingId);
   if (!acting.ok) return err(acting.error);

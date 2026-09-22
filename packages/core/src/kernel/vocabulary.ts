@@ -21,3 +21,5 @@ export type KernelRefusal<W extends KernelRefusalWord> = W;
 export type RefusalWordFor<V extends Vocabulary> = KernelRefusalWord | Extract<keyof V, string>;
 
 export const NOT_FOUND = "not-found" satisfies KernelRefusalWord;
+
+export const MALFORMED = "malformed" satisfies KernelRefusalWord;

@@ -14,7 +14,8 @@ import {
 } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { enqueueJob } from "../src/runs/index.ts";
-import { narrowBinding } from "../src/sources/index.ts";
+import { narrowBinding, narrowBindingInput } from "../src/sources/index.ts";
+import { inputOf } from "./suite-input.ts";
 import { readingAs } from "./suite-postgres.ts";
 import { runWorkerOnce } from "./worker-process.ts";
 import { bindingHolding, groupNamed } from "./sourced-concept.ts";
@@ -195,12 +196,16 @@ const buildTheMap = async (scenario: Scenario) => {
   });
 
   const narrowed = await readingAs(db().runtimePool, scenario.admin, (admin, tx) =>
-    narrowBinding(admin, tx, {
-      bindingId: binding.bindingId,
-      sensitivity: "Internal",
-      audience: "groups",
-      audienceGroups: [group],
-    }),
+    narrowBinding(
+      admin,
+      tx,
+      inputOf(narrowBindingInput, {
+        bindingId: binding.bindingId,
+        sensitivity: "Internal",
+        audience: "groups",
+        audienceGroups: [group],
+      }),
+    ),
   );
   if (!narrowed.ok) throw new Error(`the narrowing was refused: ${String(narrowed.error)}`);
 

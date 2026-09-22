@@ -4,20 +4,23 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { readableClause, readableParameters } from "../src/access/index.ts";
-import { attempt, type UserPrincipal } from "../src/kernel/index.ts";
+import { attempt, parse, type UserPrincipal } from "../src/kernel/index.ts";
 import {
   bindUpload,
+  bindUploadFields,
   dpiaInputFor,
+  dpiaReadInput,
   publishBinding,
+  publishBindingInput,
   reprocessBinding,
+  reprocessBindingInput,
   UPLOAD_BYTE_CAP,
-  type BindUploadInput,
-  type PublishBindingInput,
 } from "../src/sources/index.ts";
 import { getObject, listObjects } from "../src/store/objects/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
 import { contractFixture, mediaTypeOutside } from "./contract-fixture.ts";
 import { chunkUnder, ledgerRowsOf, groupNamed, seededBy } from "./sourced-concept.ts";
+import { inputOf } from "./suite-input.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import { answered, readingAs, whileWritesAreRefused } from "./suite-postgres.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
@@ -87,20 +90,21 @@ const countsIn = async (pool: pg.Pool, workspaceId: string) => {
 const HANDBOOK = "The handbook says what the company decided.";
 const HANDBOOK_BYTES = 43;
 
-type BindShape = Partial<Omit<BindUploadInput, "body">>;
+type BindShape = Partial<z.input<typeof bindUploadFields>>;
+
+const handbookAsked = (shape: BindShape = {}) => ({
+  name: "The staff handbook",
+  fileName: "handbook.md",
+  mediaType: "text/markdown",
+  byteSize: HANDBOOK_BYTES,
+  ...shape,
+});
 
 const handbookOffered = (shape: BindShape = {}) => {
   const upload = uploadOf(HANDBOOK);
   return {
     upload,
-    input: {
-      name: "The staff handbook",
-      fileName: "handbook.md",
-      mediaType: "text/markdown",
-      byteSize: HANDBOOK_BYTES,
-      body: upload.body,
-      ...shape,
-    },
+    input: { ...inputOf(bindUploadFields, handbookAsked(shape)), body: upload.body },
   };
 };
 
@@ -218,24 +222,30 @@ describe("an Admin binds an upload", () => {
   });
 
   it.each([
-    ["a binding nobody named", { name: "   " }],
-    ["a file the source system calls nothing", { fileName: "  " }],
-    ["a class the glossary does not have", { sensitivity: "Secret" }],
-    ["an audience the glossary does not have", { audience: "the board" }],
+    ["a binding nobody named", { name: "   " }, { name: "too-small" }],
+    ["a file the source system calls nothing", { fileName: "  " }, { fileName: "too-small" }],
+    [
+      "a class the glossary does not have",
+      { sensitivity: "Secret" },
+      { sensitivity: "not-in-set" },
+    ],
+    [
+      "an audience the glossary does not have",
+      { audience: "the board" },
+      { audience: "not-in-set" },
+    ],
     [
       "groups named under the audience that takes none",
       { audienceGroups: ["01J6NNNNNNNNNNNNNNNNNNNNN2"] },
+      { audience: "refused" },
     ],
-    ["a size that is not a whole number of bytes", { byteSize: 12.5 }],
-    ["a media type of nothing at all", { mediaType: "   " }],
-  ])("refuses %s with one word", async (_case, override) => {
-    const scenario = await arrange();
-    const { upload, input } = handbookOffered(override);
-
-    const bound = await bindUpload(scenario.admin, doorsOf(scenario), input);
-
-    expect(bound).toEqual({ ok: false, error: "malformed" });
-    expect(await leftBehindBy(scenario.admin, upload)).toEqual({ bodyRead: false, stored: [] });
+    ["a size that is not a whole number of bytes", { byteSize: 12.5 }, { byteSize: "wrong-type" }],
+    ["a media type of nothing at all", { mediaType: "   " }, { mediaType: "too-small" }],
+  ])("names the field of %s, so the bind is handed no such shape", (_case, override, fields) => {
+    expect(parse(bindUploadFields, handbookAsked(override))).toEqual({
+      ok: false,
+      error: { word: "malformed", fields },
+    });
   });
 
   it("refuses an audience naming a group this workspace does not hold", async () => {
@@ -448,8 +458,15 @@ const indexedHandbook = async (scenario: Scenario) => {
   return bound;
 };
 
-const publishing = (scenario: Scenario, input: PublishBindingInput) =>
-  asAdmin(scenario, (admin, tx) => publishBinding(admin, tx, input));
+type PublishAsked = z.input<typeof publishBindingInput> & { readonly publishedAt: Date };
+
+const publishedAsked = ({ publishedAt, ...asked }: PublishAsked) => ({
+  ...inputOf(publishBindingInput, asked),
+  publishedAt,
+});
+
+const publishing = (scenario: Scenario, asked: PublishAsked) =>
+  asAdmin(scenario, (admin, tx) => publishBinding(admin, tx, publishedAsked(asked)));
 
 const publishedHandbook = async (scenario: Scenario, bindingId: string) => {
   const published = await publishing(scenario, {
@@ -536,7 +553,9 @@ describe("an Admin publishes a binding", () => {
     });
 
     expect(row?.detail["dpiaHash"]).toMatch(SHA256_HEX);
-    const input = await asAdmin(scenario, (admin, tx) => dpiaInputFor(admin, tx, { bindingId }));
+    const input = await asAdmin(scenario, (admin, tx) =>
+      dpiaInputFor(admin, tx, inputOf(dpiaReadInput, { bindingId })),
+    );
     if (!input.ok) throw new Error(`the DPIA input was refused: ${String(input.error)}`);
     expect(row?.detail["dpiaHash"]).toEqual(input.value.hash);
   });
@@ -583,13 +602,11 @@ describe("an Admin publishes a binding", () => {
         },
       );
 
-      const published = await asAdmin(scenario, (admin, tx) =>
-        publishBinding(admin, tx, {
-          bindingId,
-          publishedAt: PUBLISHED_AT,
-          confirmations: CONFIRMED,
-        }),
-      );
+      const published = await publishing(scenario, {
+        bindingId,
+        publishedAt: PUBLISHED_AT,
+        confirmations: CONFIRMED,
+      });
 
       expect(published).toEqual({ ok: false, error: "not-indexed" });
       expect(await publishStateOf(db().pool, scenario.workspaceId, bindingId)).toEqual({
@@ -625,18 +642,18 @@ describe("an Admin publishes a binding", () => {
     const { bindingId, jobId } = await boundHandbook(scenario);
     await runEndedAt(scenario.workspaceId, bindingId, jobId, "done", RUN_FINISHED_AT);
 
-    const first = await asAdmin(scenario, (admin, tx) =>
-      publishBinding(admin, tx, { bindingId, publishedAt: PUBLISHED_AT, confirmations: CONFIRMED }),
-    );
+    const first = await publishing(scenario, {
+      bindingId,
+      publishedAt: PUBLISHED_AT,
+      confirmations: CONFIRMED,
+    });
     expect(first.ok).toEqual(true);
 
-    const again = await asAdmin(scenario, (admin, tx) =>
-      publishBinding(admin, tx, {
-        bindingId,
-        publishedAt: new Date("2026-09-12T10:00:00.000Z"),
-        confirmations: CONFIRMED,
-      }),
-    );
+    const again = await publishing(scenario, {
+      bindingId,
+      publishedAt: new Date("2026-09-12T10:00:00.000Z"),
+      confirmations: CONFIRMED,
+    });
 
     expect(again).toEqual({ ok: false, error: "already-published" });
     expect(await publishStateOf(db().pool, scenario.workspaceId, bindingId)).toEqual({
@@ -657,13 +674,11 @@ describe("an Admin publishes a binding", () => {
     const { bindingId, jobId } = await boundHandbook(scenario);
     await runEndedAt(scenario.workspaceId, bindingId, jobId, "done", RUN_FINISHED_AT);
 
-    const published = await asAdmin(scenario, (admin, tx) =>
-      publishBinding(admin, tx, {
-        bindingId,
-        publishedAt: PUBLISHED_AT,
-        confirmations: { ...CONFIRMED, ...override },
-      }),
-    );
+    const published = await publishing(scenario, {
+      bindingId,
+      publishedAt: PUBLISHED_AT,
+      confirmations: { ...CONFIRMED, ...override },
+    });
 
     expect(published).toEqual({ ok: false, error: "confirmation-missing" });
     expect(await publishStateOf(db().pool, scenario.workspaceId, bindingId)).toEqual({
@@ -681,11 +696,11 @@ describe("an Admin publishes a binding", () => {
     await runEndedAt(scenario.workspaceId, bindingId, jobId, "done", RUN_FINISHED_AT);
 
     const published = await readingAs(db().runtimePool, scenario.editor, (editor, tx) =>
-      publishBinding(editor, tx, {
-        bindingId,
-        publishedAt: PUBLISHED_AT,
-        confirmations: CONFIRMED,
-      }),
+      publishBinding(
+        editor,
+        tx,
+        publishedAsked({ bindingId, publishedAt: PUBLISHED_AT, confirmations: CONFIRMED }),
+      ),
     );
 
     expect(published).toEqual({ ok: false, error: "role-forbids" });
@@ -698,29 +713,20 @@ describe("an Admin publishes a binding", () => {
   it("refuses the publish of a binding this workspace does not hold", async () => {
     const scenario = await arrange();
 
-    const published = await asAdmin(scenario, (admin, tx) =>
-      publishBinding(admin, tx, {
-        bindingId: "01J6NNNNNNNNNNNNNNNNNNNNN3",
-        publishedAt: PUBLISHED_AT,
-        confirmations: CONFIRMED,
-      }),
-    );
+    const published = await publishing(scenario, {
+      bindingId: "01J6NNNNNNNNNNNNNNNNNNNNN3",
+      publishedAt: PUBLISHED_AT,
+      confirmations: CONFIRMED,
+    });
 
     expect(published).toEqual({ ok: false, error: "no-such-binding" });
   });
 
-  it("refuses the publish of a binding id that is not one the platform mints", async () => {
-    const scenario = await arrange();
-
-    const published = await asAdmin(scenario, (admin, tx) =>
-      publishBinding(admin, tx, {
-        bindingId: "  ",
-        publishedAt: PUBLISHED_AT,
-        confirmations: CONFIRMED,
-      }),
-    );
-
-    expect(published).toEqual({ ok: false, error: "malformed" });
+  it("names the binding id when it is not one the platform mints", () => {
+    expect(parse(publishBindingInput, { bindingId: "  ", confirmations: CONFIRMED })).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { bindingId: "bad-format" } },
+    });
   });
 });
 
@@ -810,7 +816,11 @@ describe("an Admin reprocesses a binding", () => {
     const { bindingId, documentId } = await indexedHandbook(scenario);
 
     const reprocessed = await asAdmin(scenario, (admin, tx) =>
-      reprocessBinding(admin, tx, { bindingId, reason: "rule-change" }),
+      reprocessBinding(
+        admin,
+        tx,
+        inputOf(reprocessBindingInput, { bindingId, reason: "rule-change" }),
+      ),
     );
     if (!reprocessed.ok) throw new Error(`the reprocess was refused: ${String(reprocessed.error)}`);
 
@@ -837,7 +847,11 @@ describe("an Admin reprocesses a binding", () => {
     await expect(
       whileWritesAreRefused(db().pool, "job", () =>
         asAdmin(scenario, (admin, tx) =>
-          reprocessBinding(admin, tx, { bindingId, reason: "rule-change" }),
+          reprocessBinding(
+            admin,
+            tx,
+            inputOf(reprocessBindingInput, { bindingId, reason: "rule-change" }),
+          ),
         ),
       ),
     ).rejects.toThrow(/refused a write to job/);
@@ -851,7 +865,11 @@ describe("an Admin reprocesses a binding", () => {
 
     await expect(
       asAdmin(scenario, async (admin, tx) => {
-        const reprocessed = await reprocessBinding(admin, tx, { bindingId, reason: "wiped" });
+        const reprocessed = await reprocessBinding(
+          admin,
+          tx,
+          inputOf(reprocessBindingInput, { bindingId, reason: "wiped" }),
+        );
         expect(reprocessed.ok).toBe(true);
         await attempt(() =>
           bindingIdTakenAgain(tx, scenario.workspaceId, {
@@ -870,10 +888,7 @@ describe("an Admin reprocesses a binding", () => {
     const scenario = await arrange();
     const { bindingId } = await indexedHandbook(scenario);
 
-    const asked: { readonly bindingId: string; readonly reason: string } = {
-      bindingId,
-      reason: "spring-clean",
-    };
+    const asked = { bindingId, reason: "spring-clean" };
 
     await expect(
       asAdmin(scenario, (admin, tx) =>
@@ -884,40 +899,51 @@ describe("an Admin reprocesses a binding", () => {
     expect(await bindingHolds(scenario.workspaceId, bindingId)).toEqual(AS_IT_WAS_INDEXED);
   });
 
-  it("refuses the reprocess of a Viewer and an Editor, of a binding this workspace does not hold and of an id the platform does not mint — each with the chunk rows still standing", async () => {
+  it("refuses the reprocess of a Viewer and an Editor and of a binding this workspace does not hold, names the field of an id the platform does not mint and of a reason no index run carries, and leaves the chunk rows standing", async () => {
     const scenario = await arrange();
     const { bindingId } = await indexedHandbook(scenario);
 
     const byOthers = await Promise.all(
       [scenario.viewer, scenario.editor].map((person) =>
         readingAs(db().runtimePool, person, (reader, tx) =>
-          reprocessBinding(reader, tx, { bindingId, reason: "rule-change" }),
+          reprocessBinding(
+            reader,
+            tx,
+            inputOf(reprocessBindingInput, { bindingId, reason: "rule-change" }),
+          ),
         ),
       ),
     );
 
-    const asked: readonly { readonly bindingId: string; readonly reason: string }[] = [
-      { bindingId: "01J6NNNNNNNNNNNNNNNNNNNNN3", reason: "rule-change" },
-      { bindingId: "  ", reason: "rule-change" },
-    ];
-    const refusals = await Promise.all(
-      asked.map((input) =>
-        asAdmin(scenario, (admin, tx) =>
-          reprocessBinding(admin, tx, input as Parameters<typeof reprocessBinding>[2]),
-        ),
+    const elsewhere = await asAdmin(scenario, (admin, tx) =>
+      reprocessBinding(
+        admin,
+        tx,
+        inputOf(reprocessBindingInput, {
+          bindingId: "01J6NNNNNNNNNNNNNNNNNNNNN3",
+          reason: "rule-change",
+        }),
       ),
     );
 
     expect({
       byOthers,
-      refusals: refusals.map((refused) => (refused.ok ? "ok" : refused.error)),
+      elsewhere,
+      shapes: [
+        parse(reprocessBindingInput, { bindingId: "  ", reason: "rule-change" }),
+        parse(reprocessBindingInput, { bindingId, reason: "spring-clean" }),
+      ],
       held: await bindingHolds(scenario.workspaceId, bindingId),
     }).toEqual({
       byOthers: [
         { ok: false, error: "role-forbids" },
         { ok: false, error: "role-forbids" },
       ],
-      refusals: ["no-such-binding", "malformed"],
+      elsewhere: { ok: false, error: "no-such-binding" },
+      shapes: [
+        { ok: false, error: { word: "malformed", fields: { bindingId: "bad-format" } } },
+        { ok: false, error: { word: "malformed", fields: { reason: "not-in-set" } } },
+      ],
       held: AS_IT_WAS_INDEXED,
     });
   });

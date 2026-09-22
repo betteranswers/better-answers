@@ -3,17 +3,19 @@ import { z } from "zod";
 
 import { ulid } from "@better-answers/schema";
 
-import type { UserPrincipal } from "../src/kernel/index.ts";
+import { parse, type UserPrincipal } from "../src/kernel/index.ts";
 import {
   findPassages,
   passageAt,
   previewChunks,
+  previewChunksInput,
   type LocatorRefusal,
   type Passage,
   type PassageHit,
   type PreviewedChunk,
 } from "../src/sources/index.ts";
 import { contractFixture, documentChunkRow } from "./contract-fixture.ts";
+import { inputOf } from "./suite-input.ts";
 import {
   bindingHolding,
   conceptCiting,
@@ -574,7 +576,7 @@ const previewing = async (
 ): Promise<readonly PreviewedChunk[] | string | Error> =>
   answered(
     await reading(person, async (reader, tx) => {
-      const read = await previewChunks(reader, tx, { bindingId });
+      const read = await previewChunks(reader, tx, inputOf(previewChunksInput, { bindingId }));
       return read.ok ? read.value : read.error;
     }),
   );
@@ -612,7 +614,10 @@ describe("the review list a binding is previewed with", () => {
     expect(viewer).toBe("role-forbids");
     expect(editor).toBe("role-forbids");
 
-    expect(await previewing(scenario.admin, "not-a-binding-id")).toBe("malformed");
+    expect(parse(previewChunksInput, { bindingId: "not-a-binding-id" })).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { bindingId: "bad-format" } },
+    });
   });
 
   it("is the only road to those rows: the same Admin finds none of them by search and opens none of them by locator", async () => {

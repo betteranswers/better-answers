@@ -13,9 +13,12 @@ import {
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import { footnotesOf } from "../src/guides/index.ts";
-import { attempt, type UserPrincipal } from "../src/kernel/index.ts";
-import { narrowBinding, type NarrowBindingInput } from "../src/sources/index.ts";
+import type { z } from "zod";
+
+import { attempt, parse, type UserPrincipal } from "../src/kernel/index.ts";
+import { narrowBinding, narrowBindingInput } from "../src/sources/index.ts";
 import type { Opened } from "../src/store/postgres/index.ts";
+import { inputOf } from "./suite-input.ts";
 import { bundleHistory } from "./bundle.ts";
 import { countWaitingOnLocks, until, whileActsWaitAt } from "./suite-postgres.ts";
 import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
@@ -38,6 +41,14 @@ import {
 } from "./sourced-concept.ts";
 
 const { db, arrange, reading } = visibilitySuite();
+
+type NarrowingAsked = z.input<typeof narrowBindingInput>;
+
+const narrowingAsked = (
+  principal: Parameters<typeof narrowBinding>[0],
+  tx: Parameters<typeof narrowBinding>[1],
+  asked: NarrowingAsked,
+) => narrowBinding(principal, tx, inputOf(narrowBindingInput, asked));
 
 const RESTRICTED = { sensitivity: "Restricted" } as const;
 
@@ -441,7 +452,7 @@ describe("narrowing a binding", () => {
     ]);
 
     const narrowed = await reading(scenario.admin, (admin, tx) =>
-      narrowBinding(admin, tx, {
+      narrowingAsked(admin, tx, {
         bindingId: binding.bindingId,
         sensitivity: "Restricted",
         audience: "everyone",
@@ -514,7 +525,7 @@ describe("narrowing a binding", () => {
     }
 
     const moved = await reading(scenario.admin, (admin, tx) =>
-      narrowBinding(admin, tx, {
+      narrowingAsked(admin, tx, {
         bindingId: binding.bindingId,
         sensitivity: "Internal",
         audience: "groups",
@@ -554,7 +565,7 @@ describe("narrowing a binding", () => {
 
     await whileActsWaitAt(db().pool, "concept_index", "UPDATE", async (release) => {
       const narrowing = reading(scenario.admin, (admin, tx) =>
-        narrowBinding(admin, tx, {
+        narrowingAsked(admin, tx, {
           bindingId: binding.bindingId,
           sensitivity: "Restricted",
           audience: "everyone",
@@ -581,7 +592,7 @@ describe("narrowing a binding", () => {
     const composition = await compositionIncluding(scenario.workspaceId, [written.iri]);
 
     const narrowed = await reading(scenario.admin, (admin, tx) =>
-      narrowBinding(admin, tx, {
+      narrowingAsked(admin, tx, {
         bindingId: binding.bindingId,
         sensitivity: "Internal",
         audience: "groups",
@@ -607,28 +618,28 @@ describe("narrowing a binding", () => {
     expect(editor?.ok && editor.value.found).toBe(true);
   });
 
-  it("refuses a Viewer and an Editor before anything moves, and before reading the id they asked with", async () => {
+  // A shape says nothing of a tenant's state, so refusing it ahead of the role leaks nothing.
+  it("tells a Viewer and an Editor asking with nonsense which field is wrong before it weighs their role — shape is refused before role (ADR 0043) — and moves nothing", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
 
+    expect(
+      parse(narrowBindingInput, {
+        bindingId: "not-a-binding-id",
+        sensitivity: "Restricted",
+        audience: "everyone",
+      }),
+    ).toEqual({ ok: false, error: { word: "malformed", fields: { bindingId: "bad-format" } } });
+
     for (const person of [scenario.viewer, scenario.editor]) {
       const refused = await reading(person, (reader, tx) =>
-        narrowBinding(reader, tx, {
+        narrowingAsked(reader, tx, {
           bindingId: binding.bindingId,
           sensitivity: "Restricted",
           audience: "everyone",
         }),
       );
       expect(refused).toEqual({ ok: false, error: "role-forbids" });
-
-      const askedWithNonsense = await reading(person, (reader, tx) =>
-        narrowBinding(reader, tx, {
-          bindingId: "not-a-binding-id",
-          sensitivity: "Restricted",
-          audience: "everyone",
-        }),
-      );
-      expect(askedWithNonsense).toEqual({ ok: false, error: "role-forbids" });
     }
     expect(
       await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
@@ -656,12 +667,12 @@ describe("narrowing a binding", () => {
       },
     ];
     for (const move of moves) {
-      const refused = await reading(scenario.admin, (admin, tx) => narrowBinding(admin, tx, move));
+      const refused = await reading(scenario.admin, (admin, tx) => narrowingAsked(admin, tx, move));
       expect(refused).toEqual({ ok: false, error: "widening-refused" });
     }
 
     const kept = await reading(scenario.admin, (admin, tx) =>
-      narrowBinding(admin, tx, {
+      narrowingAsked(admin, tx, {
         bindingId: forHr.bindingId,
         sensitivity: "Restricted",
         audience: "groups",
@@ -671,7 +682,7 @@ describe("narrowing a binding", () => {
     expect(kept.ok).toBe(true);
   });
 
-  it("refuses a group this workspace does not hold, a binding it does not hold, an id that is not the column's shape, and a pair that is not an audience", async () => {
+  it("refuses a group this workspace does not hold and a binding it does not hold", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
     const elsewhere = await arrange();
@@ -686,31 +697,12 @@ describe("narrowing a binding", () => {
           audienceGroups: [theirGroup],
         },
         { bindingId: ulid(), sensitivity: "Restricted", audience: "everyone" },
-
-        { bindingId: "not-a-binding-id", sensitivity: "Restricted", audience: "everyone" },
-        {
-          bindingId: binding.bindingId,
-          sensitivity: "Internal",
-          audience: "groups",
-          audienceGroups: [],
-        },
-        {
-          bindingId: binding.bindingId,
-          sensitivity: "Internal",
-          audience: "everyone",
-          audienceGroups: [ulid()],
-        },
-        { bindingId: binding.bindingId, sensitivity: "Secret", audience: "everyone" },
-      ].map((move) => reading(scenario.admin, (admin, tx) => narrowBinding(admin, tx, move))),
+      ].map((move) => reading(scenario.admin, (admin, tx) => narrowingAsked(admin, tx, move))),
     );
 
     expect(refusals.map((refused) => (refused.ok ? "ok" : refused.error))).toEqual([
       "no-such-group",
       "no-such-binding",
-      "malformed",
-      "malformed",
-      "malformed",
-      "malformed",
     ]);
   });
 
@@ -725,7 +717,7 @@ describe("narrowing a binding", () => {
       await narrowing.query("SELECT set_config('app.workspace_id', $1, true)", [
         scenario.workspaceId,
       ]);
-      const narrowed = await narrowBinding(scenario.admin, narrowing, {
+      const narrowed = await narrowingAsked(scenario.admin, narrowing, {
         bindingId,
         sensitivity: "Restricted",
         audience: "everyone",
@@ -799,7 +791,7 @@ describe("narrowing a binding", () => {
     });
 
     const narrowed = await reading(scenario.admin, (admin, tx) =>
-      narrowBinding(admin, tx, {
+      narrowingAsked(admin, tx, {
         bindingId: binding.bindingId,
         sensitivity: "Internal",
         audience: "everyone",
@@ -818,12 +810,12 @@ describe("narrowing a binding", () => {
     table: string,
     event: "INSERT" | "UPDATE",
     write: () => Promise<Awaited<ReturnType<typeof rewriteCiting>>>,
-    narrowing: NarrowBindingInput,
+    narrowing: NarrowingAsked,
   ): Promise<void> => {
     await whileActsWaitAt(db().pool, table, event, async (release) => {
       const rewriting = write();
       await until(async () => (await countWaitingOnLocks(db().pool)) >= 1);
-      const narrowed = reading(scenario.admin, (admin, tx) => narrowBinding(admin, tx, narrowing));
+      const narrowed = reading(scenario.admin, (admin, tx) => narrowingAsked(admin, tx, narrowing));
       await until(async () => (await countWaitingOnLocks(db().pool)) >= 2);
       await release();
       expect(await rewriting).toMatchObject({ ok: true });
@@ -896,7 +888,7 @@ describe("narrowing a binding", () => {
       for (const [at, binding] of [first, second].entries()) {
         narrowings.push(
           reading(scenario.admin, (admin, tx) =>
-            narrowBinding(admin, tx, {
+            narrowingAsked(admin, tx, {
               bindingId: binding.bindingId,
               sensitivity: "Restricted",
               audience: "everyone",
@@ -936,7 +928,7 @@ describe("narrowing a binding", () => {
 
     await expect(
       reading(scenario.admin, async (admin, tx) => {
-        const narrowed = await narrowBinding(admin, tx, {
+        const narrowed = await narrowingAsked(admin, tx, {
           bindingId: binding.bindingId,
           sensitivity: "Restricted",
           audience: "everyone",
@@ -1034,7 +1026,7 @@ describe("an Admin's recorded override", () => {
     await overriddenTo(scenario, written.iri, "Public");
 
     const narrowed = await reading(scenario.admin, (admin, tx) =>
-      narrowBinding(admin, tx, {
+      narrowingAsked(admin, tx, {
         bindingId: binding.bindingId,
         sensitivity: "Restricted",
         audience: "everyone",

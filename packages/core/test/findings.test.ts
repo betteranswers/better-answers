@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import { REDACTION_ALWAYS_TIER } from "@better-answers/schema";
 import type pg from "pg";
 
-import type { UserPrincipal } from "../src/kernel/index.ts";
-import { restoreFinding } from "../src/sources/index.ts";
+import { parse, type UserPrincipal } from "../src/kernel/index.ts";
+import { restoreFinding, restoreFindingInput } from "../src/sources/index.ts";
 import { visibilitySuite } from "./sourced-concept.ts";
+import { inputOf } from "./suite-input.ts";
 import { seedingWith, whileWritesAreRefused } from "./suite-postgres.ts";
 import type { Scenario } from "./workspace-with-bundle.ts";
 
@@ -14,7 +15,9 @@ const { db, arrange, reading: acting } = visibilitySuite();
 const BUSINESS_FACT = "The sort code is the company's own, printed on every invoice it sends.";
 
 const restoreAs = (who: UserPrincipal, findingId: string, reason: string) =>
-  acting(who, (principal, tx) => restoreFinding(principal, tx, { findingId, reason }));
+  acting(who, (principal, tx) =>
+    restoreFinding(principal, tx, inputOf(restoreFindingInput, { findingId, reason })),
+  );
 
 const findingIn = async (
   scenario: Scenario,
@@ -157,38 +160,37 @@ describe("what the restore act refuses", () => {
     },
   );
 
-  it("refuses a blank reason as malformed — a restore is the reason it was made for", async () => {
+  it("names the reason when it is blank — a restore is the reason it was made for", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
 
-    expect(await restoreAs(scenario.admin, findingId, "   ")).toEqual({
+    expect(parse(restoreFindingInput, { findingId, reason: "   " })).toEqual({
       ok: false,
-      error: "malformed",
+      error: { word: "malformed", fields: { reason: "too-small" } },
     });
     expect(await restoreColumnsOf(scenario.workspaceId, findingId)).toEqual(NOTHING_RESTORED);
     expect(await restoreEventsOf(db().pool, scenario.workspaceId)).toEqual([]);
   });
 
-  it("refuses an absent reason as malformed, which the column's own schema would have admitted", async () => {
+  it("names an absent reason, which the column's own schema would have admitted", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
 
-    for (const absent of [null, undefined]) {
-      expect(await restoreAs(scenario.admin, findingId, absent as unknown as string)).toEqual({
-        ok: false,
-        error: "malformed",
-      });
-    }
+    expect([
+      parse(restoreFindingInput, { findingId, reason: null }),
+      parse(restoreFindingInput, { findingId }),
+    ]).toEqual([
+      { ok: false, error: { word: "malformed", fields: { reason: "wrong-type" } } },
+      { ok: false, error: { word: "malformed", fields: { reason: "missing" } } },
+    ]);
     expect(await restoreColumnsOf(scenario.workspaceId, findingId)).toEqual(NOTHING_RESTORED);
     expect(await restoreEventsOf(db().pool, scenario.workspaceId)).toEqual([]);
   });
 
-  it("refuses an id that is not the minter's shape as malformed, before any read", async () => {
-    const scenario = await arrange();
-
-    expect(await restoreAs(scenario.admin, "not-an-id", BUSINESS_FACT)).toEqual({
+  it("names the id when it is not the minter's shape, and no read is reached", () => {
+    expect(parse(restoreFindingInput, { findingId: "not-an-id", reason: BUSINESS_FACT })).toEqual({
       ok: false,
-      error: "malformed",
+      error: { word: "malformed", fields: { findingId: "bad-format" } },
     });
   });
 

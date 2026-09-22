@@ -1,4 +1,5 @@
 import { boundarySchemas } from "@better-answers/schema";
+import { z } from "zod";
 
 import {
   narrower,
@@ -9,7 +10,7 @@ import {
 } from "../access/index.ts";
 import { attempt, err, NOT_FOUND, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { adminOnBinding } from "./admin-binding.ts";
+import { adminOnBinding, BINDING_ID } from "./admin-binding.ts";
 import { locatorOf, parseLocator, spanText, type LocatorRefusal } from "./chunk-address.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
@@ -188,12 +189,20 @@ type PreviewRow = {
   readonly content: string;
 };
 
-type PreviewChunksRefusal = SourceRefusal<"role-forbids" | "malformed"> | Error;
+export const previewChunksInput = z.object({
+  bindingId: BINDING_ID,
+
+  limit: z.int().positive().default(MAX_PASSAGE_HITS),
+});
+
+export type PreviewChunksInput = z.output<typeof previewChunksInput>;
+
+type PreviewChunksRefusal = SourceRefusal<"role-forbids"> | Error;
 
 export const previewChunks = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: { readonly bindingId: string; readonly limit?: number },
+  input: PreviewChunksInput,
 ): Promise<Result<readonly PreviewedChunk[], PreviewChunksRefusal>> => {
   const acting = adminOnBinding(principal, input.bindingId);
   if (!acting.ok) return err(acting.error);
@@ -204,7 +213,7 @@ export const previewChunks = async (
       admin.workspaceId,
       bindingId,
       ...readableParameters(admin),
-      hitsAsked(input.limit ?? MAX_PASSAGE_HITS),
+      hitsAsked(input.limit),
     ]);
     return read.rows.map((row) => ({
       id: row.id,

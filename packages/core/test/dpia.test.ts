@@ -2,14 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import { CONTENT_HASH } from "@better-answers/schema";
 
+import { parse } from "../src/kernel/index.ts";
 import {
   dpiaInputFor,
+  dpiaReadInput,
   NOT_RECORDED,
   PLATFORM_HELD_CATEGORIES,
   SPECIAL_CATEGORY_CONDITION,
   type DpiaInput,
 } from "../src/sources/index.ts";
 import { visibilitySuite } from "./sourced-concept.ts";
+import { inputOf } from "./suite-input.ts";
 import { seedingWith } from "./suite-postgres.ts";
 import type { Scenario } from "./workspace-with-bundle.ts";
 
@@ -59,17 +62,19 @@ const answeringRouteAndBinding = async (
   return bindingIn(scenario);
 };
 
-const documentFor = async (scenario: Scenario, bindingId: string): Promise<DpiaInput> => {
-  const read = await acting(scenario.admin, (admin, tx) => dpiaInputFor(admin, tx, { bindingId }));
+const readFor = async (scenario: Scenario, bindingId: string) => {
+  const read = await acting(scenario.admin, (admin, tx) =>
+    dpiaInputFor(admin, tx, inputOf(dpiaReadInput, { bindingId })),
+  );
   if (!read.ok) throw new Error(`the DPIA input was refused: ${String(read.error)}`);
-  return read.value.document;
+  return read.value;
 };
 
-const hashFor = async (scenario: Scenario, bindingId: string): Promise<string> => {
-  const read = await acting(scenario.admin, (admin, tx) => dpiaInputFor(admin, tx, { bindingId }));
-  if (!read.ok) throw new Error(`the DPIA input was refused: ${String(read.error)}`);
-  return read.value.hash;
-};
+const documentFor = async (scenario: Scenario, bindingId: string): Promise<DpiaInput> =>
+  (await readFor(scenario, bindingId)).document;
+
+const hashFor = async (scenario: Scenario, bindingId: string): Promise<string> =>
+  (await readFor(scenario, bindingId)).hash;
 
 const setRulesInForce = async (workspaceId: string, bindingId: string, rules: Rules) => {
   await db().pool.query(
@@ -296,7 +301,7 @@ describe("who may read a DPIA input", () => {
       const bindingId = await bindingIn(scenario);
 
       const read = await acting(principalOf(scenario), (principal, tx) =>
-        dpiaInputFor(principal, tx, { bindingId }),
+        dpiaInputFor(principal, tx, inputOf(dpiaReadInput, { bindingId })),
       );
 
       expect(read).toEqual({ ok: false, error: "role-forbids" });
@@ -308,18 +313,17 @@ describe("who may read a DPIA input", () => {
     const theirs = await arrange();
     const bindingId = await bindingIn(theirs);
 
-    const read = await acting(mine.admin, (admin, tx) => dpiaInputFor(admin, tx, { bindingId }));
+    const read = await acting(mine.admin, (admin, tx) =>
+      dpiaInputFor(admin, tx, inputOf(dpiaReadInput, { bindingId })),
+    );
 
     expect(read).toEqual({ ok: false, error: "no-such-binding" });
   });
 
-  it("says malformed for an id that is not the minter's shape, before any read", async () => {
-    const scenario = await arrange();
-
-    const read = await acting(scenario.admin, (admin, tx) =>
-      dpiaInputFor(admin, tx, { bindingId: "not-an-id" }),
-    );
-
-    expect(read).toEqual({ ok: false, error: "malformed" });
+  it("names the field when the id is not the minter's shape, and the read is never reached", () => {
+    expect(parse(dpiaReadInput, { bindingId: "not-an-id" })).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { bindingId: "bad-format" } },
+    });
   });
 });

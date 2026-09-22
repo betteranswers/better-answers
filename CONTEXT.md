@@ -698,6 +698,12 @@ to it by IRI and never restates it (ADR 0014).
   agent and an operator as itself; once shipped it is never removed and never changes class, so a
   client that has never met a word can still act on its class (ADR 0043). _Avoid_: error (a
   failure, not a refusal), rejection, denial, error code.
+- **issue word** — what a *malformed* refusal says about one field: one hyphenated word from the
+  kernel's closed list (`missing`, `wrong-type`, `too-small`, `not-in-set`, `bad-format`) naming
+  how the field was wrong, carried in a map of field path to word. The map never holds the value
+  that was wrong, so a refusal can be logged and shown whatever the field held. A field path
+  names a field, never a class: the class is the refusal's, and it is always *malformed*.
+  _Avoid_: validation error, issue code, field error, message.
 - **revoke credentials** — the one revocation act, in two scopes. *In a workspace*: a workspace
   Admin ends every session and token a person holds there, by an instant on the membership row
   the resolver refuses against; nothing outside that workspace changes, and the Admin never

@@ -1,0 +1,262 @@
+import { describe, expect, it } from "vitest";
+
+import { z } from "zod";
+
+import { ISSUE_WORDS, parse, ROOT_PATH, type IssueWord } from "../src/kernel/index.ts";
+import {
+  bindUploadFields,
+  findingsOfInput,
+  keepInTextInput,
+  narrowBindingInput,
+  narrowDocumentsInput,
+  previewChunksInput,
+  publishBindingInput,
+  reprocessBindingInput,
+} from "../src/sources/index.ts";
+
+const A_BINDING = "01J6NNNNNNNNNNNNNNNNNNNNN1";
+const A_GROUP = "01J6NNNNNNNNNNNNNNNNNNNNN2";
+const A_FINDING = "01J6NNNNNNNNNNNNNNNNNNNNN3";
+const A_DOCUMENT = "01J6NNNNNNNNNNNNNNNNNNNNN4";
+
+const SECRET = "37 Baker Street, sort code 01-02-03";
+
+const REASON = "The sort code is the company's own, printed on every invoice it sends.";
+
+const CONFIRMED = {
+  lawfulBasisRecorded: true,
+  privacyInformationUpdated: true,
+  dpiaReferenced: true,
+} as const;
+
+const ALWAYS_GROUP = {
+  documentId: A_DOCUMENT,
+  category: "bank-details",
+  ruleId: "sort-code-with-account-number",
+  tier: "always",
+} as const;
+
+const refusalOf = (read: ReturnType<typeof parse>) => (read.ok ? "ok" : read.error);
+
+// One case per word, so the walk below proves both directions of the register.
+const EVERY_ISSUE: ReadonlyArray<readonly [IssueWord, string, z.ZodType, unknown]> = [
+  ["missing", "field", z.object({ field: z.string() }), {}],
+  ["wrong-type", "field", z.object({ field: z.string() }), { field: 1 }],
+  ["too-small", "field", z.object({ field: z.string().min(2) }), { field: "a" }],
+  ["too-big", "field", z.object({ field: z.string().max(1) }), { field: "ab" }],
+  ["bad-format", "field", z.object({ field: z.string().regex(/^x$/) }), { field: "y" }],
+  ["not-a-multiple", "field", z.object({ field: z.number().multipleOf(3) }), { field: 4 }],
+  ["not-in-set", "field", z.object({ field: z.enum(["a", "b"]) }), { field: "c" }],
+  [
+    "no-shape-matches",
+    "field",
+    z.object({ field: z.union([z.string(), z.number()]) }),
+    { field: true },
+  ],
+  ["unrecognised-key", ROOT_PATH, z.strictObject({ field: z.string() }), { field: "a", other: 1 }],
+  [
+    "bad-key",
+    "field.other",
+    z.object({ field: z.record(z.string().regex(/^field$/), z.number()) }),
+    { field: { other: 1 } },
+  ],
+  ["refused", "field", z.object({ field: z.string().refine(() => false) }), { field: "a" }],
+];
+
+describe("what a kernel parse answers", () => {
+  it("hands back the branded value a schema admits, so an act's field is its own proof", () => {
+    const read = parse(narrowBindingInput, {
+      bindingId: A_BINDING,
+      sensitivity: "Restricted",
+      audience: "everyone",
+    });
+
+    expect(read).toEqual({
+      ok: true,
+      value: {
+        bindingId: A_BINDING,
+        visibility: { sensitivity: "Restricted", audience: "everyone", audienceGroups: null },
+      },
+    });
+  });
+
+  it("names the failing field with a word and never the value that failed", () => {
+    const read = parse(bindUploadFields, {
+      name: SECRET,
+      fileName: "handbook.md",
+      mediaType: "text/markdown",
+      byteSize: -1,
+    });
+
+    expect(read).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { byteSize: "too-small" } },
+    });
+    expect(JSON.stringify(read)).not.toContain("01-02-03");
+    expect(JSON.stringify(read)).not.toContain("-1");
+  });
+
+  it("carries no offending value for a whole object of wrong ones", () => {
+    const read = parse(keepInTextInput, {
+      bindingId: SECRET,
+      findingGroups: [{ ...ALWAYS_GROUP, tier: SECRET }],
+      reason: "",
+    });
+
+    expect(read).toEqual({
+      ok: false,
+      error: {
+        word: "malformed",
+        fields: {
+          bindingId: "bad-format",
+          "findingGroups.0.tier": "not-in-set",
+          reason: "too-small",
+        },
+      },
+    });
+    expect(JSON.stringify(read)).not.toContain("Baker Street");
+  });
+
+  it("names a nested field by the path that reaches it", () => {
+    const { dpiaReferenced: _dropped, ...part } = CONFIRMED;
+
+    expect(parse(publishBindingInput, { bindingId: A_BINDING, confirmations: part })).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { "confirmations.dpiaReferenced": "missing" } },
+    });
+  });
+
+  it("names the root when the whole value is the wrong kind", () => {
+    expect(parse(findingsOfInput, "not an object")).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { [ROOT_PATH]: "wrong-type" } },
+    });
+  });
+
+  it.each(EVERY_ISSUE)(
+    "answers %s for the issue a schema raises with it",
+    (word, path, schema, raw) => {
+      expect(refusalOf(parse(schema, raw))).toEqual({
+        word: "malformed",
+        fields: { [path]: word },
+      });
+    },
+  );
+
+  it("owns every word an issue can answer with, and reaches every word it owns", () => {
+    const reached = EVERY_ISSUE.map(([word]) => word);
+
+    expect([...ISSUE_WORDS].filter((word) => !reached.includes(word))).toEqual([]);
+    expect(reached.filter((word) => !ISSUE_WORDS.includes(word))).toEqual([]);
+  });
+});
+
+describe("the shapes the Sources acts are handed", () => {
+  it("defaults a bind's class, audience and groups to the narrowest a workspace can start from", () => {
+    const read = parse(bindUploadFields, {
+      name: "The staff handbook",
+      fileName: "handbook.md",
+      mediaType: "text/markdown",
+      byteSize: 43,
+    });
+
+    expect(read).toEqual({
+      ok: true,
+      value: {
+        name: "The staff handbook",
+        fileName: "handbook.md",
+        mediaType: "text/markdown",
+        byteSize: 43,
+        visibility: { sensitivity: "Restricted", audience: "everyone", audienceGroups: null },
+      },
+    });
+  });
+
+  it("refuses an audience word and a group list that disagree, on either side", () => {
+    const named = parse(narrowBindingInput, {
+      bindingId: A_BINDING,
+      sensitivity: "Internal",
+      audience: "everyone",
+      audienceGroups: [A_GROUP],
+    });
+    const bare = parse(narrowBindingInput, {
+      bindingId: A_BINDING,
+      sensitivity: "Internal",
+      audience: "groups",
+    });
+
+    expect([refusalOf(named), refusalOf(bare)]).toEqual([
+      { word: "malformed", fields: { audience: "refused" } },
+      { word: "malformed", fields: { audience: "refused" } },
+    ]);
+  });
+
+  it("refuses an empty group list, which a binding's audience column never holds", () => {
+    expect(
+      refusalOf(
+        parse(narrowBindingInput, {
+          bindingId: A_BINDING,
+          sensitivity: "Internal",
+          audience: "groups",
+          audienceGroups: [],
+        }),
+      ),
+    ).toEqual({ word: "malformed", fields: { audienceGroups: "too-small" } });
+  });
+
+  it("refuses a preview asking for a fraction of a row, and defaults one that asks for nothing", () => {
+    expect(refusalOf(parse(previewChunksInput, { bindingId: A_BINDING, limit: 2.5 }))).toEqual({
+      word: "malformed",
+      fields: { limit: "wrong-type" },
+    });
+    expect(parse(previewChunksInput, { bindingId: A_BINDING })).toEqual({
+      ok: true,
+      value: { bindingId: A_BINDING, limit: 20 },
+    });
+  });
+
+  it("defaults a narrowing of documents to the narrowest class, and keeps the groups it was handed", () => {
+    expect(
+      parse(narrowDocumentsInput, { bindingId: A_BINDING, findingGroups: [ALWAYS_GROUP] }),
+    ).toEqual({
+      ok: true,
+      value: {
+        bindingId: A_BINDING,
+        findingGroups: [ALWAYS_GROUP],
+        sensitivity: "Restricted",
+      },
+    });
+  });
+
+  it("refuses a reprocess reason no index run carries and a restore of a tier nobody named", () => {
+    expect(
+      refusalOf(parse(reprocessBindingInput, { bindingId: A_BINDING, reason: "spring-clean" })),
+    ).toEqual({ word: "malformed", fields: { reason: "not-in-set" } });
+    expect(
+      refusalOf(
+        parse(keepInTextInput, {
+          bindingId: A_BINDING,
+          findingGroups: [{ ...ALWAYS_GROUP, tier: "sometimes" }],
+          reason: REASON,
+        }),
+      ),
+    ).toEqual({ word: "malformed", fields: { "findingGroups.0.tier": "not-in-set" } });
+  });
+
+  it("brands the ids an act is handed, so no act parses one a second time", () => {
+    const kept = parse(keepInTextInput, {
+      bindingId: A_BINDING,
+      findingGroups: [ALWAYS_GROUP],
+      reason: REASON,
+    });
+
+    expect(kept).toEqual({
+      ok: true,
+      value: { bindingId: A_BINDING, findingGroups: [ALWAYS_GROUP], reason: REASON },
+    });
+    expect(refusalOf(parse(findingsOfInput, { bindingId: A_FINDING.toLowerCase() }))).toEqual({
+      word: "malformed",
+      fields: { bindingId: "bad-format" },
+    });
+  });
+});

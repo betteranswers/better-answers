@@ -1,4 +1,5 @@
 import { boundarySchemas, REDACTION_ALWAYS_TIER } from "@better-answers/schema";
+import { z } from "zod";
 
 import { act, declareActs, record } from "../audit/index.ts";
 import {
@@ -20,21 +21,23 @@ const FINDING_ACTS = declareActs("sources", {
 
 const FINDING_ID = boundarySchemas.finding.select.shape.id;
 
-const RESTORE_REASON = boundarySchemas.finding.insert.shape.restoreReason;
+export const RESTORE_REASON = boundarySchemas.finding.select.shape.restoreReason.unwrap();
 
 export const raisedByTheLastRun = (finding: string, document: string): string =>
   `${finding}.rule_version || ':' || ${finding}.detector_pin = ${document}.redaction_version`;
 
-export type RestoreFindingInput = {
-  readonly findingId: string;
+export const restoreFindingInput = z.object({
+  findingId: FINDING_ID,
 
-  readonly reason: string;
+  reason: RESTORE_REASON,
 
-  readonly batchId?: string | undefined;
-};
+  batchId: boundarySchemas.auditEvent.select.shape.batchId.unwrap().optional(),
+});
+
+export type RestoreFindingInput = z.output<typeof restoreFindingInput>;
 
 export type FindingRestoreRefusal =
-  | SourceRefusal<"role-forbids" | "malformed" | "no-such-finding" | "not-the-always-set">
+  | SourceRefusal<"role-forbids" | "no-such-finding" | "not-the-always-set">
   | Error;
 
 export type FindingRestored = {
@@ -51,17 +54,13 @@ export const restoreFinding = async (
 ): Promise<Result<FindingRestored, FindingRestoreRefusal>> => {
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);
-  const findingId = FINDING_ID.safeParse(input.findingId);
-  const reason = RESTORE_REASON.safeParse(input.reason);
-  if (!findingId.success || !reason.success || typeof reason.data !== "string") {
-    return err("malformed");
-  }
+  const { findingId, reason } = input;
   const { workspaceId } = admin.value;
 
   const known = await attempt(() =>
     tx.query<{ readonly tier: string }>(
       "SELECT tier FROM finding WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
-      [workspaceId, findingId.data],
+      [workspaceId, findingId],
     ),
   );
   if (!known.ok) return err(known.error);
@@ -75,7 +74,7 @@ export const restoreFinding = async (
       `UPDATE finding SET restored_at = now(), restored_by = $3, restore_reason = $4
         WHERE workspace_id = $1 AND id = $2
         RETURNING restored_at AS "restoredAt"`,
-      [workspaceId, findingId.data, actorIdOf(admin.value), reason.data],
+      [workspaceId, findingId, actorIdOf(admin.value), reason],
     ),
   );
   if (!written.ok) return err(written.error);
@@ -86,9 +85,9 @@ export const restoreFinding = async (
   await record(admin.value, tx, {
     id: auditEventId,
     act: FINDING_ACTS.restored,
-    subjectId: findingId.data,
-    detail: { findingId: findingId.data },
+    subjectId: findingId,
+    detail: { findingId },
     batchId: input.batchId,
   });
-  return ok({ findingId: findingId.data, auditEventId, restoredAt: stamped.restoredAt });
+  return ok({ findingId, auditEventId, restoredAt: stamped.restoredAt });
 };
