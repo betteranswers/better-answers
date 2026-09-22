@@ -313,6 +313,11 @@ const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Routes and spe
 
 const routesCardOf = (page: Page) => page.getByRole("region", { name: "Routes" });
 
+// The view's read of the routes is issued after the nav paints, so a screen here has not
+// finished starting until its card lists them.
+const theRoutesHaveLanded = (page: Page) =>
+  expect(routesCardOf(page).getByRole("list")).toHaveCount(1);
+
 test("the open view fills the toolbar with its tabs, marks the open one selected and moves on an arrow key", async ({
   page,
   request,
@@ -445,8 +450,10 @@ test("the choice to close the secondary nav survives a reload, kept on this brow
   const workspace = await signedIn(page, request, "Ribble Toolmaking");
   await page.goto("/system/routes-and-spend");
   await expect(navOf(page, "System")).toBeVisible();
+  await theRoutesHaveLanded(page);
 
-  // Listening only across the act, so the reload below cannot be mistaken for it.
+  // Listening only across the act, so neither the start above nor the reload below is mistaken
+  // for it.
   const asked: string[] = [];
   const noting = (each: { url: () => string }) => asked.push(each.url());
   page.on("request", noting);
