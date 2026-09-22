@@ -17,6 +17,49 @@ import {
 import { type TestData, testData } from "./factory.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
 import { refusesEach } from "./probes.ts";
+import {
+  A_BUNDLE_COMMIT,
+  A_BUNDLE_COMMIT_WITH_A_PARENT,
+  A_CITATION,
+  A_COMPOSITION_INCLUDE,
+  A_CONCEPT_CLASS_OVERRIDE,
+  A_CONCEPT_IDENTITY,
+  A_CONCEPT_INDEX_ROW,
+  A_CONCEPT_VERIFICATION,
+  A_CONCEPT_VERIFICATION_OF_ORIGIN,
+  A_CONCEPT_WRITE_REQUEST,
+  A_DECIDED_ACCESS_REQUEST,
+  A_DECIDED_SUGGESTION,
+  A_FINDING,
+  A_FINDING_BORN_RESTORED,
+  A_FINDING_BORN_REVIEWED,
+  A_GRAPH_GENERATION,
+  A_GRAPH_NODE,
+  A_GRAPH_NODE_CLASSED,
+  A_GRAPH_NODE_OF_KIND,
+  A_GROUP,
+  A_GROUP_MEMBERSHIP,
+  A_LEDGER_ROW,
+  A_LEDGER_ROW_WITH_ITS_FAMILY,
+  A_MEMBER,
+  A_MIGRATION_STAMP,
+  A_SOURCE_BINDING,
+  A_SOURCE_BINDING_CLASSED,
+  A_SOURCE_DOCUMENT,
+  A_SUBJECT_REQUEST,
+  A_SUGGESTION,
+  A_SUPPRESSION,
+  AN_ACCESS_REQUEST,
+  AN_EDGE,
+  AN_EDGE_CARRYING_A_SENTENCE,
+  AN_ERASURE_ROUTINE,
+  AN_INVITATION,
+  ONE_CALL_AGAINST_A_TOKEN,
+  REFRESH_THE_READING,
+  THE_DETAIL_EDITED,
+  THE_FAMILY_AND_SUBJECT_IT_LANDS_IN,
+  THE_GENERATION_ROW_HELD,
+} from "./rls-probes.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
 let db: MigratedPostgres;
@@ -245,21 +288,15 @@ describe("the role CHECK on the identity set", () => {
       const person = await seed.user();
 
       await client.query("SAVEPOINT m");
-      await expect(
-        client.query(
-          "INSERT INTO member (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, 'owner', now())",
-          [ulid(), WS_A, person.id],
-        ),
-      ).rejects.toThrow(/member_role_check/);
+      await expect(client.query(A_MEMBER, [ulid(), WS_A, person.id, "owner"])).rejects.toThrow(
+        /member_role_check/,
+      );
       await client.query("ROLLBACK TO SAVEPOINT m");
 
       await client.query("SAVEPOINT i");
-      await expect(
-        client.query(
-          "INSERT INTO invitation (id, workspace_id, email, role, expires_at, inviter_id) VALUES ($1, $2, 'x@example.invalid', 'admin', now(), $3)",
-          [ulid(), WS_A, person.id],
-        ),
-      ).rejects.toThrow(/invitation_role_check/);
+      await expect(client.query(AN_INVITATION, [ulid(), WS_A, "admin", person.id])).rejects.toThrow(
+        /invitation_role_check/,
+      );
       await client.query("ROLLBACK TO SAVEPOINT i");
     });
   });
@@ -295,10 +332,8 @@ describe("the ledger under app_rt", () => {
       const row = await ledgerRowAsApp(client);
 
       const inserted = await client.query<{ family: string; subject_kind: string }>(
-        `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
-         VALUES ($1, $2, 'people.group.created', 'process:better-answers-test', $3, '{}')
-         RETURNING family, subject_kind`,
-        [ulid(), WS_A, ulid()],
+        `${A_LEDGER_ROW} ${THE_FAMILY_AND_SUBJECT_IT_LANDS_IN}`,
+        [ulid(), WS_A, "people.group.created", "process:better-answers-test", ulid()],
       );
       expect(inserted.rows).toEqual([{ family: "people", subject_kind: "group" }]);
 
@@ -320,33 +355,36 @@ describe("the ledger under app_rt", () => {
     await withRollback(db.pool, async (client) => {
       const row = await ledgerRowAsApp(client);
 
+      const GROUP_CREATED = "people.group.created";
+      const TEST_ACTOR = "process:better-answers-test";
+
       await client.query("SAVEPOINT upsert");
       await expect(
-        client.query(
-          `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
-           VALUES ($1, $2, 'people.group.created', 'process:better-answers-test', $3, '{}')
-           ON CONFLICT (id) DO UPDATE SET detail = '{"edited": true}'`,
-          [row.id, WS_A, ulid()],
-        ),
+        client.query(`${A_LEDGER_ROW} ${THE_DETAIL_EDITED}`, [
+          row.id,
+          WS_A,
+          GROUP_CREATED,
+          TEST_ACTOR,
+          ulid(),
+        ]),
       ).rejects.toThrow(/permission denied/);
       await client.query("ROLLBACK TO SAVEPOINT upsert");
 
       await client.query("SAVEPOINT other_tenant");
       await expect(
-        client.query(
-          `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
-           VALUES ($1, $2, 'people.group.created', 'process:better-answers-test', $3, '{}')`,
-          [ulid(), WS_B, ulid()],
-        ),
+        client.query(A_LEDGER_ROW, [ulid(), WS_B, GROUP_CREATED, TEST_ACTOR, ulid()]),
       ).rejects.toThrow(/row-level security/);
       await client.query("ROLLBACK TO SAVEPOINT other_tenant");
 
       await expect(
-        client.query(
-          `INSERT INTO audit_event (id, workspace_id, act, family, actor, subject_id, detail)
-           VALUES ($1, $2, 'people.group.created', 'platform', 'process:better-answers-test', $3, '{}')`,
-          [ulid(), WS_A, ulid()],
-        ),
+        client.query(A_LEDGER_ROW_WITH_ITS_FAMILY, [
+          ulid(),
+          WS_A,
+          GROUP_CREATED,
+          "platform",
+          TEST_ACTOR,
+          ulid(),
+        ]),
       ).rejects.toThrow(/generated|non-DEFAULT/);
     });
   });
@@ -364,11 +402,13 @@ describe("the ledger under app_rt", () => {
       );
       await client.query("ROLLBACK TO SAVEPOINT r");
       await expect(
-        client.query(
-          `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
-           VALUES ($1, $2, 'sources.binding.published', 'process:better-answers-worker', $3, '{}')`,
-          [ulid(), WS_A, ulid()],
-        ),
+        client.query(A_LEDGER_ROW, [
+          ulid(),
+          WS_A,
+          "sources.binding.published",
+          "process:better-answers-worker",
+          ulid(),
+        ]),
       ).rejects.toThrow(/permission denied/);
     });
   });
@@ -379,11 +419,7 @@ describe("the ledger under app_rt", () => {
       for (const act of ["billing.invoice.sent", "people.member", "People.Member.Added"]) {
         await client.query("SAVEPOINT act");
         await expect(
-          client.query(
-            `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
-             VALUES ($1, $2, $3, 'process:better-answers-test', $4, '{}')`,
-            [ulid(), WS_A, act, ulid()],
-          ),
+          client.query(A_LEDGER_ROW, [ulid(), WS_A, act, "process:better-answers-test", ulid()]),
         ).rejects.toThrow(/audit_event_act_check|audit_event_family_check/);
         await client.query("ROLLBACK TO SAVEPOINT act");
       }
@@ -453,29 +489,20 @@ describe("the group tables under app_rt", () => {
       const { theirs, person } = await groupsAsApp(client);
 
       await client.query("SAVEPOINT other_group");
-      await expect(
-        client.query(
-          `INSERT INTO "group" (id, workspace_id, name, origin) VALUES ($1, $2, 'Theirs', 'admin-curated')`,
-          [ulid(), WS_B],
-        ),
-      ).rejects.toThrow(/row-level security/);
+      await expect(client.query(A_GROUP, [ulid(), WS_B, "Theirs"])).rejects.toThrow(
+        /row-level security/,
+      );
       await client.query("ROLLBACK TO SAVEPOINT other_group");
 
       await client.query("SAVEPOINT other_membership");
-      await expect(
-        client.query(
-          "INSERT INTO group_member (workspace_id, group_id, user_id) VALUES ($1, $2, $3)",
-          [WS_B, theirs.id, person.id],
-        ),
-      ).rejects.toThrow(/row-level security/);
+      await expect(client.query(A_GROUP_MEMBERSHIP, [WS_B, theirs.id, person.id])).rejects.toThrow(
+        /row-level security/,
+      );
       await client.query("ROLLBACK TO SAVEPOINT other_membership");
 
-      await expect(
-        client.query(
-          "INSERT INTO group_member (workspace_id, group_id, user_id) VALUES ($1, $2, $3)",
-          [WS_A, theirs.id, person.id],
-        ),
-      ).rejects.toThrow(/group_member_group_fk/);
+      await expect(client.query(A_GROUP_MEMBERSHIP, [WS_A, theirs.id, person.id])).rejects.toThrow(
+        /group_member_group_fk/,
+      );
     });
   });
 
@@ -516,14 +543,8 @@ describe("the group tables under app_rt", () => {
       const refused: readonly [string, readonly string[]][] = [
         [`SELECT 1 FROM "group" LIMIT 1`, []],
         ["SELECT 1 FROM group_member LIMIT 1", []],
-        [
-          `INSERT INTO "group" (id, workspace_id, name, origin) VALUES ($1, $2, 'Worker', 'admin-curated')`,
-          [ulid(), WS_A],
-        ],
-        [
-          "INSERT INTO group_member (workspace_id, group_id, user_id) VALUES ($1, $2, $3)",
-          [WS_A, ulid(), ulid()],
-        ],
+        [A_GROUP, [ulid(), WS_A, "Worker"]],
+        [A_GROUP_MEMBERSHIP, [WS_A, ulid(), ulid()]],
       ];
       for (const [statement, values] of refused) {
         await client.query("SAVEPOINT worker_probe");
@@ -564,12 +585,9 @@ describe("access requests under app_rt", () => {
         /permission denied/,
       );
       await client.query("ROLLBACK TO SAVEPOINT r");
-      await expect(
-        client.query(
-          "INSERT INTO access_request (id, workspace_id, requester_id, reason) VALUES ($1, $2, $3, 'let me in')",
-          [ulid(), WS_A, person.id],
-        ),
-      ).rejects.toThrow(/permission denied/);
+      await expect(client.query(AN_ACCESS_REQUEST, [ulid(), WS_A, person.id])).rejects.toThrow(
+        /permission denied/,
+      );
     });
   });
 
@@ -599,23 +617,29 @@ describe("access requests under app_rt", () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const person = await seed.user();
-      const rows: readonly [string, string][] = [
+      const decidedAt = new Date();
+
+      const rows: readonly [string, readonly unknown[], string][] = [
         [
-          "INSERT INTO access_request (id, workspace_id, requester_id, reason, status, decided_at, decided_by) VALUES ($1, $2, $3, 'why', 'expired', now(), $3)",
+          A_DECIDED_ACCESS_REQUEST,
+          [ulid(), WS_A, person.id, "expired", decidedAt, person.id, null],
           "access_request_status_check",
         ],
+
         [
-          "INSERT INTO access_request (id, workspace_id, requester_id, reason, status, decided_at) VALUES ($1, $2, $3, 'why', 'declined', now())",
+          A_DECIDED_ACCESS_REQUEST,
+          [ulid(), WS_A, person.id, "declined", decidedAt, null, null],
           "access_request_decision_check",
         ],
         [
-          "INSERT INTO access_request (id, workspace_id, requester_id, reason, status, decided_at, decided_by, invitation_id) VALUES ($1, $2, $3, 'why', 'declined', now(), $3, 'invitation-1')",
+          A_DECIDED_ACCESS_REQUEST,
+          [ulid(), WS_A, person.id, "declined", decidedAt, person.id, "invitation-1"],
           "access_request_decision_check",
         ],
       ];
-      for (const [statement, constraint] of rows) {
+      for (const [statement, parameters, constraint] of rows) {
         await client.query("SAVEPOINT decision");
-        await expect(client.query(statement, [ulid(), WS_A, person.id])).rejects.toThrow(
+        await expect(client.query(statement, [...parameters])).rejects.toThrow(
           new RegExp(constraint),
         );
         await client.query("ROLLBACK TO SAVEPOINT decision");
@@ -632,6 +656,11 @@ describe("the concept write path under app_rt", () => {
     "evidence",
     "concept_verification",
   ] as const;
+
+  const A_CONTENT_HASH = "a".repeat(64);
+  const A_SECOND_COMMIT_SHA = "d".repeat(40);
+  const A_PARENT_SHA = "e".repeat(40);
+  const A_COMMIT_NOBODY_RECORDED = "f".repeat(40);
 
   it("returns zero rows on a missing scope and only the scoped tenant's rows otherwise, on every one of the five", async () => {
     await withRollback(db.pool, async (client) => {
@@ -720,20 +749,13 @@ describe("the concept write path under app_rt", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       await client.query("SAVEPOINT other_tenant");
-      await expect(
-        client.query(
-          "INSERT INTO concept_identity (workspace_id, iri, merge_key) VALUES ($1, $2, 'policy:theirs')",
-          [WS_B, `${theirs.iri}-copy`],
-        ),
-      ).rejects.toThrow(/row-level security/);
+      await expect(client.query(A_CONCEPT_IDENTITY, [WS_B, `${theirs.iri}-copy`])).rejects.toThrow(
+        /row-level security/,
+      );
       await client.query("ROLLBACK TO SAVEPOINT other_tenant");
 
       await expect(
-        client.query(
-          `INSERT INTO concept_verification (id, workspace_id, iri, actor, content_hash)
-           VALUES ($1, $2, $3, 'process:better-answers-test', $4)`,
-          [ulid(), WS_A, theirs.iri, "a".repeat(64)],
-        ),
+        client.query(A_CONCEPT_VERIFICATION, [ulid(), WS_A, theirs.iri, A_CONTENT_HASH]),
       ).rejects.toThrow(/concept_verification_identity_fk/);
     });
   });
@@ -743,51 +765,60 @@ describe("the concept write path under app_rt", () => {
       const seed = await seedTwoWorkspaces(client);
       const identity = await seed.conceptIdentity({ workspaceId: WS_A });
       const commit = await seed.bundleCommit({ workspaceId: WS_A });
-      const columns =
-        "(workspace_id, iri, path, kind, title, frontmatter, body, content_hash, commit_sha, audience, status, sensitivity, published_at)";
-      const values = `($1, $2, $3, 'Policy', 'Expenses', '{}'::jsonb, 'body', '${"a".repeat(64)}', '${commit.sha}', 'everyone'`;
+      const indexed = (path: string, status: string, sensitivity: string, published: Date | null) =>
+        [
+          WS_A,
+          identity.iri,
+          path,
+          A_CONTENT_HASH,
+          commit.sha,
+          status,
+          sensitivity,
+          published,
+        ] as const;
+
       const rows: readonly [string, readonly unknown[], string][] = [
         [
-          `INSERT INTO concept_index ${columns} VALUES ${values}, 'retired', 'Internal', NULL)`,
-          [WS_A, identity.iri, "knowledge/one.md"],
+          A_CONCEPT_INDEX_ROW,
+          indexed("knowledge/one.md", "retired", "Internal", null),
           "concept_index_status_check",
         ],
         [
-          `INSERT INTO concept_index ${columns} VALUES ${values}, 'draft', 'Secret', NULL)`,
-          [WS_A, identity.iri, "knowledge/two.md"],
+          A_CONCEPT_INDEX_ROW,
+          indexed("knowledge/two.md", "draft", "Secret", null),
           "concept_index_sensitivity_check",
         ],
 
         [
-          `INSERT INTO concept_index ${columns} VALUES ${values}, 'stable', 'Internal', NULL)`,
-          [WS_A, identity.iri, "knowledge/three.md"],
+          A_CONCEPT_INDEX_ROW,
+          indexed("knowledge/three.md", "stable", "Internal", null),
           "concept_index_published_check",
         ],
         [
-          `INSERT INTO concept_index ${columns} VALUES ${values}, 'draft', 'Internal', now())`,
-          [WS_A, identity.iri, "knowledge/four.md"],
+          A_CONCEPT_INDEX_ROW,
+          indexed("knowledge/four.md", "draft", "Internal", new Date()),
           "concept_index_published_check",
         ],
+
         [
-          "INSERT INTO concept_verification (id, workspace_id, iri, actor, origin, content_hash) VALUES ($1, $2, $3, 'process:better-answers-test', 'imported', $4)",
-          [ulid(), WS_A, identity.iri, "a".repeat(64)],
+          A_CONCEPT_VERIFICATION_OF_ORIGIN,
+          [ulid(), WS_A, identity.iri, "imported", A_CONTENT_HASH],
+          "concept_verification_imported_check",
+        ],
+        [
+          A_CONCEPT_VERIFICATION_OF_ORIGIN,
+          [ulid(), WS_A, identity.iri, "platform", null],
           "concept_verification_imported_check",
         ],
 
         [
-          "INSERT INTO concept_verification (id, workspace_id, iri, actor, origin, content_hash) VALUES ($1, $2, $3, 'process:better-answers-test', 'platform', NULL)",
-          [ulid(), WS_A, identity.iri],
-          "concept_verification_imported_check",
-        ],
-        [
-          "INSERT INTO bundle_commit (workspace_id, sha, audit_event_id, actor) VALUES ($1, $2, $3, 'process:better-answers-reconciler')",
-          [WS_A, "d".repeat(40), commit.auditEventId],
+          A_BUNDLE_COMMIT,
+          [WS_A, A_SECOND_COMMIT_SHA, commit.auditEventId],
           "bundle_commit_audit_event_uidx",
         ],
-
         [
-          "INSERT INTO bundle_commit (workspace_id, sha, parent_sha, audit_event_id, actor) VALUES ($1, $2, $3, $4, 'process:better-answers-reconciler')",
-          [WS_A, "d".repeat(40), "e".repeat(40), ulid()],
+          A_BUNDLE_COMMIT_WITH_A_PARENT,
+          [WS_A, A_SECOND_COMMIT_SHA, A_PARENT_SHA, ulid()],
           "bundle_commit_parent_fk",
         ],
       ];
@@ -806,14 +837,16 @@ describe("the concept write path under app_rt", () => {
       const seed = await seedTwoWorkspaces(client);
       const identity = await seed.conceptIdentity({ workspaceId: WS_A });
       await client.query("SAVEPOINT dangling");
-      await client.query(
-        `INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter, body,
-                                    content_hash, commit_sha, audience, status, sensitivity,
-                                    published_at)
-         VALUES ($1, $2, 'knowledge/one.md', 'Policy', 'Expenses', '{}'::jsonb, 'body', $3, $4,
-                 'everyone', 'stable', 'Internal', now())`,
-        [WS_A, identity.iri, "a".repeat(64), "f".repeat(40)],
-      );
+      await client.query(A_CONCEPT_INDEX_ROW, [
+        WS_A,
+        identity.iri,
+        "knowledge/one.md",
+        A_CONTENT_HASH,
+        A_COMMIT_NOBODY_RECORDED,
+        "stable",
+        "Internal",
+        new Date(),
+      ]);
 
       await expect(client.query("SET CONSTRAINTS ALL IMMEDIATE")).rejects.toThrow(
         /concept_index_bundle_commit_fk/,
@@ -861,14 +894,15 @@ describe("the graph tables under app_rt", () => {
         [WS_A],
       );
       const next = (generation.rows[0]?.live_gen ?? 0) + 1;
-      await client.query(
-        "INSERT INTO graph_node (workspace_id, gen, uid, label, kind) VALUES ($1, $2, $3, 'Concept', 'Policy')",
-        [WS_A, next, live.uid],
-      );
-      await client.query(
-        "INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid) VALUES ($1, $2, $3, 'DERIVED_FROM', $4, $4)",
-        [WS_A, next, `lineage:${live.uid}:0`, live.uid],
-      );
+      await client.query(A_GRAPH_NODE_OF_KIND, [WS_A, next, live.uid, "Concept", "Policy"]);
+      await client.query(AN_EDGE, [
+        WS_A,
+        next,
+        `lineage:${live.uid}:0`,
+        "DERIVED_FROM",
+        live.uid,
+        live.uid,
+      ]);
       await client.query("UPDATE graph_generation SET live_gen = $2 WHERE workspace_id = $1", [
         WS_A,
         next,
@@ -906,29 +940,13 @@ describe("the graph tables under app_rt", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      const served: readonly [string, readonly unknown[]][] = [
-        [
-          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'live', 'Concept')",
-          [WS_A],
-        ],
-        [
-          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 2, 'next', 'Concept')",
-          [WS_A],
-        ],
-        [
-          "INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid) VALUES ($1, 2, 'e-next', 'LINKS_TO', 'next', 'live')",
-          [WS_A],
-        ],
-        [
-          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, NULL, 'entity', 'source-entity:Person')",
-          [WS_A],
-        ],
-        ["UPDATE graph_generation SET live_gen = 2 WHERE workspace_id = $1", [WS_A]],
-
-        [
-          "INSERT INTO graph_generation (workspace_id, live_gen) VALUES ($1, 1) ON CONFLICT (workspace_id) DO UPDATE SET live_gen = graph_generation.live_gen",
-          [WS_A],
-        ],
+      const served: readonly (readonly [string, readonly unknown[]])[] = [
+        [A_GRAPH_NODE, [WS_A, 1, "live", "Concept"]],
+        [A_GRAPH_NODE, [WS_A, 2, "next", "Concept"]],
+        [AN_EDGE, [WS_A, 2, "e-next", "LINKS_TO", "next", "live"]],
+        [A_GRAPH_NODE, [WS_A, null, "entity", "source-entity:Person"]],
+        ["UPDATE graph_generation SET live_gen = $2 WHERE workspace_id = $1", [WS_A, 2]],
+        [`${A_GRAPH_GENERATION} ${THE_GENERATION_ROW_HELD}`, [WS_A, 1]],
       ];
       for (const [statement, parameters] of served) {
         await client.query(statement, [...parameters]);
@@ -948,21 +966,21 @@ describe("the graph tables under app_rt", () => {
           /flips only to the next/,
         ],
         [
-          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'retired', 'Concept')",
+          A_GRAPH_NODE,
           "a node into the retired generation, now that 2 is live",
-          [WS_A],
+          [WS_A, 1, "retired", "Concept"],
           /lands in the live generation or the next/,
         ],
         [
-          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 4, 'far', 'Concept')",
+          A_GRAPH_NODE,
           "a node into a generation nobody is building",
-          [WS_A],
+          [WS_A, 4, "far", "Concept"],
           /lands in the live generation or the next/,
         ],
         [
-          "INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid) VALUES ($1, 4, 'e-far', 'LINKS_TO', 'next', 'live')",
+          AN_EDGE,
           "and an edge the same",
-          [WS_A],
+          [WS_A, 4, "e-far", "LINKS_TO", "next", "live"],
           /lands in the live generation or the next/,
         ],
       ]);
@@ -972,10 +990,7 @@ describe("the graph tables under app_rt", () => {
       ]);
       await client.query("SAVEPOINT guard_probe");
       await expect(
-        client.query(
-          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'first', 'Concept')",
-          ["01J6CCCCCCCCCCCCCCCCCCCCCC"],
-        ),
+        client.query(A_GRAPH_NODE, ["01J6CCCCCCCCCCCCCCCCCCCCCC", 1, "first", "Concept"]),
       ).rejects.toThrow(/lands in the live generation or the next/);
       await client.query("ROLLBACK TO SAVEPOINT guard_probe");
     });
@@ -990,18 +1005,12 @@ describe("the graph tables under app_rt", () => {
 
       await client.query("SAVEPOINT other_tenant");
       await expect(
-        client.query(
-          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, NULL, 'uid-b', 'source-entity:Person')",
-          [WS_B],
-        ),
+        client.query(A_GRAPH_NODE, [WS_B, null, "uid-b", "source-entity:Person"]),
       ).rejects.toThrow(/row-level security/);
       await client.query("ROLLBACK TO SAVEPOINT other_tenant");
-      await expect(
-        client.query(
-          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'uid-b', 'Concept')",
-          [WS_B],
-        ),
-      ).rejects.toThrow(/lands in the live generation or the next: live is <NULL>/);
+      await expect(client.query(A_GRAPH_NODE, [WS_B, 1, "uid-b", "Concept"])).rejects.toThrow(
+        /lands in the live generation or the next: live is <NULL>/,
+      );
     });
   });
 
@@ -1019,71 +1028,39 @@ describe("the graph tables under app_rt", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const rows: readonly [string, readonly unknown[], string][] = [
+        [A_GRAPH_NODE, [WS_A, 1, "uid-1", "Widget"], "graph_node_label_check"],
+        [A_GRAPH_NODE, [WS_A, 1, "uid-2", "source-entity:Person"], "graph_node_label_check"],
+        [A_GRAPH_NODE, [WS_A, null, "uid-6", "Concept"], "graph_node_label_check"],
         [
-          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'uid-1', 'Widget')",
-          [WS_A],
-          "graph_node_label_check",
-        ],
-        [
-          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 1, 'uid-2', 'source-entity:Person')",
-          [WS_A],
-          "graph_node_label_check",
-        ],
-        [
-          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, NULL, 'uid-6', 'Concept')",
-          [WS_A],
-          "graph_node_label_check",
-        ],
-        [
-          "INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid) VALUES ($1, 1, 'edge-2', 'source-entity:mentions', 'a', 'b')",
-          [WS_A],
+          AN_EDGE,
+          [WS_A, 1, "edge-2", "source-entity:mentions", "a", "b"],
           "graph_edge_label_check",
         ],
 
+        [A_GRAPH_NODE, [WS_A, 0, "uid-7", "Concept"], "graph_node_gen_check"],
+        [AN_EDGE, [WS_A, 0, "edge-3", "LINKS_TO", "a", "b"], "graph_edge_gen_check"],
+
         [
-          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, 0, 'uid-7', 'Concept')",
-          [WS_A],
-          "graph_node_gen_check",
-        ],
-        [
-          "INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid) VALUES ($1, 0, 'edge-3', 'LINKS_TO', 'a', 'b')",
-          [WS_A],
-          "graph_edge_gen_check",
-        ],
-        [
-          "INSERT INTO graph_node (workspace_id, gen, uid, label, sensitivity) VALUES ($1, 1, 'uid-3', 'Concept', 'Secret')",
-          [WS_A],
+          A_GRAPH_NODE_CLASSED,
+          [WS_A, 1, "uid-3", "Concept", "Secret"],
           "graph_node_sensitivity_check",
         ],
 
+        [A_GRAPH_NODE, [WS_A, node.gen, node.uid, "Concept"], "graph_node_bundle_uidx"],
         [
-          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, $2, $3, 'Concept')",
-          [WS_A, node.gen, node.uid],
-          "graph_node_bundle_uidx",
-        ],
-        [
-          "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, NULL, $2, 'source-entity:Person')",
-          [WS_A, entity.uid],
+          A_GRAPH_NODE,
+          [WS_A, null, entity.uid, "source-entity:Person"],
           "graph_node_source_entity_uidx",
         ],
 
         [
-          "INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid, sentence) VALUES ($1, 1, 'edge-1', 'SUPERSEDES', 'a', 'b', 'smuggled')",
-          [WS_A],
+          AN_EDGE_CARRYING_A_SENTENCE,
+          [WS_A, 1, "edge-1", "SUPERSEDES", "a", "b", "smuggled"],
           "graph_edge_links_to_check",
         ],
 
-        [
-          "INSERT INTO graph_generation (workspace_id, live_gen) VALUES ($1, 2)",
-          [WS_A],
-          "graph_generation_pkey",
-        ],
-
-        [
-          "INSERT INTO graph_generation (workspace_id, live_gen) VALUES ($1, 0)",
-          [WS_A],
-          "graph_generation_live_gen_check",
-        ],
+        [A_GRAPH_GENERATION, [WS_A, 2], "graph_generation_pkey"],
+        [A_GRAPH_GENERATION, [WS_A, 0], "graph_generation_live_gen_check"],
       ];
       for (const [statement, parameters, constraint] of rows) {
         await client.query("SAVEPOINT graph_row");
@@ -1093,10 +1070,7 @@ describe("the graph tables under app_rt", () => {
         await client.query("ROLLBACK TO SAVEPOINT graph_row");
       }
 
-      await client.query(
-        "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, $2, $3, 'Concept')",
-        [WS_A, (node.gen ?? 0) + 1, node.uid],
-      );
+      await client.query(A_GRAPH_NODE, [WS_A, (node.gen ?? 0) + 1, node.uid, "Concept"]);
     });
   });
 });
@@ -1381,90 +1355,105 @@ describe("the inbox under app_rt", () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const identity = await seed.conceptIdentity({ workspaceId: WS_A });
-      const columns =
-        "(workspace_id, id, set_id, kind, proposer, status, decider, decided_at, reason, target_iri)";
-      const rows: readonly [string, string][] = [
-        [
-          `VALUES ($1, $2, $3, 'edit', $4, 'withdrawn', $4, now(), NULL, NULL)`,
-          "suggestion_status_check",
-        ],
-        [
-          `VALUES ($1, $2, $3, 'merge', $4, 'waiting', NULL, NULL, NULL, NULL)`,
-          "suggestion_kind_check",
-        ],
+      const PROPOSER = "process:better-answers-test";
+      const decidedAt = new Date();
+      const decided = (
+        kind: string,
+        status: string,
+        decider: string | null,
+        moment: Date | null,
+        reason: string | null,
+        target: string | null,
+      ) => [WS_A, ulid(), ulid(), kind, PROPOSER, status, decider, moment, reason, target] as const;
 
+      await refusesEach(client, [
         [
-          `VALUES ($1, $2, $3, 'edit', $4, 'declined', NULL, now(), 'why', NULL)`,
-          "suggestion_decision_check",
+          A_DECIDED_SUGGESTION,
+          "a withdrawn suggestion",
+          decided("edit", "withdrawn", PROPOSER, decidedAt, null, null),
+          /suggestion_status_check/,
         ],
         [
-          `VALUES ($1, $2, $3, 'edit', $4, 'declined', $4, NULL, 'why', NULL)`,
-          "suggestion_decision_check",
+          A_DECIDED_SUGGESTION,
+          "a merge nobody raises",
+          decided("merge", "waiting", null, null, null, null),
+          /suggestion_kind_check/,
         ],
+        [
+          A_DECIDED_SUGGESTION,
+          "a decision with nobody behind it",
+          decided("edit", "declined", null, decidedAt, "why", null),
+          /suggestion_decision_check/,
+        ],
+        [
+          A_DECIDED_SUGGESTION,
+          "a decision with no moment",
+          decided("edit", "declined", PROPOSER, null, "why", null),
+          /suggestion_decision_check/,
+        ],
+        [
+          A_DECIDED_SUGGESTION,
+          "a decline with no reason",
+          decided("edit", "declined", PROPOSER, decidedAt, null, null),
+          /suggestion_decision_check/,
+        ],
+        [
+          A_DECIDED_SUGGESTION,
+          "an acceptance carrying a reason",
+          decided("edit", "accepted", PROPOSER, decidedAt, "why", identity.iri),
+          /suggestion_decision_check/,
+        ],
+        [
+          A_DECIDED_SUGGESTION,
+          "a waiting suggestion naming its target",
+          decided("edit", "waiting", null, null, null, identity.iri),
+          /suggestion_decision_check/,
+        ],
+        [
+          A_DECIDED_SUGGESTION,
+          "an acceptance naming no target",
+          decided("edit", "accepted", PROPOSER, decidedAt, null, null),
+          /suggestion_decision_check/,
+        ],
+        [
+          A_DECIDED_SUGGESTION,
+          "a waiting suggestion carrying a decider",
+          decided("edit", "waiting", PROPOSER, decidedAt, null, null),
+          /suggestion_decision_check/,
+        ],
+        [
+          A_DECIDED_SUGGESTION,
+          "a decider who is a name",
+          decided("edit", "declined", "Ada Editor", decidedAt, "why", null),
+          /suggestion_decider_check/,
+        ],
+        [
+          A_SUGGESTION,
+          "an edit from a bare email address",
+          [WS_A, ulid(), ulid(), "edit", "ada@acme.invalid"],
+          /suggestion_proposer_check/,
+        ],
+        [
+          A_SUGGESTION,
+          "a repair from a person",
+          [WS_A, ulid(), ulid(), "repair", "human:01J6CCCCCCCCCCCCCCCCCCCCCC"],
+          /suggestion_repair_proposer_check/,
+        ],
+        [
+          A_SUGGESTION,
+          "a repair from a versioned producer",
+          [WS_A, ulid(), ulid(), "repair", "better-answers-citation-repair/1.0"],
+          /suggestion_repair_proposer_check/,
+        ],
+      ]);
 
-        [
-          `VALUES ($1, $2, $3, 'edit', $4, 'declined', $4, now(), NULL, NULL)`,
-          "suggestion_decision_check",
-        ],
-        [
-          `VALUES ($1, $2, $3, 'edit', $4, 'accepted', $4, now(), 'why', '${identity.iri}')`,
-          "suggestion_decision_check",
-        ],
-
-        [
-          `VALUES ($1, $2, $3, 'edit', $4, 'waiting', NULL, NULL, NULL, '${identity.iri}')`,
-          "suggestion_decision_check",
-        ],
-        [
-          `VALUES ($1, $2, $3, 'edit', $4, 'accepted', $4, now(), NULL, NULL)`,
-          "suggestion_decision_check",
-        ],
-
-        [
-          `VALUES ($1, $2, $3, 'edit', $4, 'waiting', $4, now(), NULL, NULL)`,
-          "suggestion_decision_check",
-        ],
-
-        [
-          `VALUES ($1, $2, $3, 'edit', $4, 'declined', 'Ada Editor', now(), 'why', NULL)`,
-          "suggestion_decider_check",
-        ],
-      ];
-      for (const [values, constraint] of rows) {
-        await client.query("SAVEPOINT decision");
-        await expect(
-          client.query(`INSERT INTO suggestion ${columns} ${values}`, [
-            WS_A,
-            ulid(),
-            ulid(),
-            "process:better-answers-test",
-          ]),
-        ).rejects.toThrow(new RegExp(constraint));
-        await client.query("ROLLBACK TO SAVEPOINT decision");
-      }
-
-      const proposers: readonly [string, string, string][] = [
-        ["edit", "ada@acme.invalid", "suggestion_proposer_check"],
-        ["repair", "human:01J6CCCCCCCCCCCCCCCCCCCCCC", "suggestion_repair_proposer_check"],
-        ["repair", "better-answers-citation-repair/1.0", "suggestion_repair_proposer_check"],
-      ];
-      for (const [kind, proposer, constraint] of proposers) {
-        await client.query("SAVEPOINT proposer");
-        await expect(
-          client.query(
-            `INSERT INTO suggestion (workspace_id, id, set_id, kind, proposer)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [WS_A, ulid(), ulid(), kind, proposer],
-          ),
-        ).rejects.toThrow(new RegExp(constraint));
-        await client.query("ROLLBACK TO SAVEPOINT proposer");
-      }
-
-      const platform = await client.query(
-        `INSERT INTO suggestion (workspace_id, id, set_id, kind, proposer)
-         VALUES ($1, $2, $3, 'repair', 'process:better-answers-citation-repair') RETURNING id`,
-        [WS_A, ulid(), ulid()],
-      );
+      const platform = await client.query(A_SUGGESTION, [
+        WS_A,
+        ulid(),
+        ulid(),
+        "repair",
+        "process:better-answers-citation-repair",
+      ]);
       expect(platform.rowCount).toBe(1);
     });
   });
@@ -1475,12 +1464,7 @@ describe("the inbox under app_rt", () => {
       const here = await seed.suggestion({ workspaceId: WS_A });
 
       await expect(
-        client.query(
-          `INSERT INTO concept_write_request
-             (workspace_id, suggestion_id, merge_key, path, concept_kind, title, frontmatter, body)
-           VALUES ($1, $2, 'policy:big', 'knowledge/big.md', 'Policy', 'Big', '{}'::jsonb, $3)`,
-          [WS_A, here.id, "x".repeat(SUGGESTION_BODY_MAX + 1)],
-        ),
+        client.query(A_CONCEPT_WRITE_REQUEST, [WS_A, here.id, "x".repeat(SUGGESTION_BODY_MAX + 1)]),
       ).rejects.toThrow(/concept_write_request_body_length_check/);
     });
   });
@@ -1600,10 +1584,7 @@ describe("a tenant table under app_rt", () => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      await client.query(
-        "INSERT INTO mcp_call_counter (workspace_id, token_id, window_start, count) VALUES ($1, 'jti-1', now(), 1)",
-        [WS_A],
-      );
+      await client.query(ONE_CALL_AGAINST_A_TOKEN, [WS_A]);
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
       const otherTenant = await client.query("SELECT token_id FROM mcp_call_counter");
@@ -1892,10 +1873,7 @@ describe("the rules in force on a source binding", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       const id = ulid();
-      await client.query(
-        "INSERT INTO source_binding (workspace_id, id, name, connector) VALUES ($1, $2, 'The handbook', 'upload')",
-        [WS_A, id],
-      );
+      await client.query(A_SOURCE_BINDING, [WS_A, id, "The handbook"]);
 
       const born = await client.query<{ rules_in_force: Record<string, boolean> }>(
         "SELECT rules_in_force FROM source_binding WHERE id = $1",
@@ -2038,21 +2016,18 @@ describe("the derivation's tables under app_rt", () => {
           "a binding is what an Admin made, and the tier that indexes it has no say in what it is",
         ],
         [
-          `INSERT INTO source_binding (workspace_id, id, name, connector, sensitivity, audience)
-             VALUES ($1, $2, 'A binding nobody made', 'upload', 'Restricted', 'everyone')`,
+          A_SOURCE_BINDING_CLASSED,
           "a worker that could insert a binding could bind a source no Admin ever connected",
-          [WS_A, ulid()],
+          [WS_A, ulid(), "A binding nobody made"],
         ],
         [
           "DELETE FROM source_binding",
           "and one that could remove a binding could take a published source away without a record",
         ],
         [
-          `INSERT INTO source_document
-             (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size, original_key)
-           VALUES ($1, $2, $3, 'invented.md', 'Invented', 'text/markdown', 1, 'documents/x/original')`,
+          A_SOURCE_DOCUMENT,
           "a worker that could insert a document row could catalogue a document nobody uploaded",
-          [WS_A, ulid(), seeded.binding.id],
+          [WS_A, ulid(), seeded.binding.id, "invented.md", "Invented", 1],
         ],
         [
           "DELETE FROM source_document",
@@ -2072,29 +2047,22 @@ describe("the derivation's tables under app_rt", () => {
 
       const rows: readonly [string, readonly unknown[], string][] = [
         [
-          `INSERT INTO source_document
-             (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size, original_key)
-           VALUES ($1, $2, $3, 'handbook.md', 'The handbook', 'text/markdown', 1024, 'documents/x/original')`,
-          [WS_A, ulid(), theirs.binding.id],
+          A_SOURCE_DOCUMENT,
+          [WS_A, ulid(), theirs.binding.id, "handbook.md", "The handbook", 1024],
           "source_document_binding_fk",
         ],
         [
-          "INSERT INTO composition_include (workspace_id, composition_id, id, ordinal, iri) VALUES ($1, $2, 'i9', 9, $3)",
+          A_COMPOSITION_INCLUDE,
           [WS_A, ours.composed.id, theirs.identity.iri],
           "composition_include_identity_fk",
         ],
         [
-          `INSERT INTO concept_class_override (workspace_id, iri, sensitivity, audience, actor, audit_event_id)
-           VALUES ($1, $2, 'Internal', 'everyone', 'process:better-answers-test', $3)`,
-          [WS_A, theirs.identity.iri, ulid()],
+          A_CONCEPT_CLASS_OVERRIDE,
+          [WS_A, theirs.identity.iri, "Internal", "process:better-answers-test", ulid()],
           "concept_class_override_identity_fk",
         ],
 
-        [
-          "INSERT INTO concept_evidence (workspace_id, iri, source_document_id, locator) VALUES ($1, $2, $3, 'p.99')",
-          [WS_A, ours.identity.iri, ours.document.id],
-          "concept_evidence_evidence_fk",
-        ],
+        [A_CITATION, [WS_A, ours.identity.iri, ours.document.id], "concept_evidence_evidence_fk"],
       ];
       for (const [statement, parameters, constraint] of rows) {
         await client.query("SAVEPOINT derivation_row");
@@ -2113,11 +2081,7 @@ describe("the derivation's tables under app_rt", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       const override = (actor: string, sensitivity: string) =>
-        client.query(
-          `INSERT INTO concept_class_override (workspace_id, iri, sensitivity, audience, actor, audit_event_id)
-           VALUES ($1, $2, $3, 'everyone', $4, $5)`,
-          [WS_A, identity.iri, sensitivity, actor, ulid()],
-        );
+        client.query(A_CONCEPT_CLASS_OVERRIDE, [WS_A, identity.iri, sensitivity, actor, ulid()]);
 
       await client.query("SAVEPOINT actor");
       await expect(override("Ada Admin", "Internal")).rejects.toThrow(
@@ -2170,21 +2134,6 @@ describe("the derivation's tables under app_rt", () => {
   });
 });
 
-const RECORD_A_NAME = `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
-                                           char_start, char_end, score, rule_version, detector_pin)
-                       VALUES ($1, $2, $3, 'person-name', $4, 'PERSON', $5, $6, 0.97, 'r2', 'd2')`;
-
-const REFRESH_THE_READING = `ON CONFLICT (workspace_id, document_id, rule_id, char_start, char_end)
-  DO UPDATE SET category = EXCLUDED.category,
-                tier = CASE WHEN finding.restored_at IS NULL THEN EXCLUDED.tier ELSE finding.tier END,
-                score = EXCLUDED.score,
-                rule_version = EXCLUDED.rule_version,
-                detector_pin = EXCLUDED.detector_pin
-  WHERE (finding.category, finding.score, finding.rule_version, finding.detector_pin)
-        IS DISTINCT FROM
-        (EXCLUDED.category, EXCLUDED.score, EXCLUDED.rule_version, EXCLUDED.detector_pin)
-     OR (finding.restored_at IS NULL AND finding.tier IS DISTINCT FROM EXCLUDED.tier)`;
-
 describe("the finding under both runtime roles", () => {
   it("returns zero rows on a missing scope and only the scoped tenant's findings otherwise", async () => {
     await withRollback(db.pool, async (client) => {
@@ -2206,13 +2155,19 @@ describe("the finding under both runtime roles", () => {
 
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      await client.query(
-        `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
-                              char_start, char_end, score, rule_version, detector_pin)
-         VALUES ($1, $2, $3, 'bank-details', 'always', 'sort-code-with-account-number',
-                 12, 20, 0.85, 'r1', 'd1')`,
-        [WS_A, ulid(), document.id],
-      );
+      await client.query(A_FINDING, [
+        WS_A,
+        ulid(),
+        document.id,
+        "bank-details",
+        "always",
+        "sort-code-with-account-number",
+        12,
+        20,
+        0.85,
+        "r1",
+        "d1",
+      ]);
 
       await refusesEach(client, [
         [
@@ -2264,20 +2219,12 @@ describe("the finding under both runtime roles", () => {
         ],
 
         [
-          `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
-                                char_start, char_end, score, rule_version, detector_pin,
-                                review_state, reviewed_by, reviewed_at)
-           VALUES ($1, $2, $3, 'bank-details', 'always', 'sort-code-with-account-number',
-                   30, 38, 0.9, 'r1', 'd1', 'kept-in-text', 'process:better-answers-test', now())`,
+          A_FINDING_BORN_REVIEWED,
           "a finding is born unreviewed, and one inserted already reviewed is a special-category span a binding may widen over at nobody's word",
           [WS_A, ulid(), document.id],
         ],
         [
-          `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
-                                char_start, char_end, score, rule_version, detector_pin,
-                                restored_at, restored_by, restore_reason)
-           VALUES ($1, $2, $3, 'bank-details', 'always', 'sort-code-with-account-number',
-                   40, 48, 0.9, 'r1', 'd1', now(), 'process:better-answers-test', 'let it stand')`,
+          A_FINDING_BORN_RESTORED,
           "the restore is an Admin's act as well, and a span born restored is one the seam withheld and nobody put back",
           [WS_A, ulid(), document.id],
         ],
@@ -2358,27 +2305,34 @@ describe("the finding under both runtime roles", () => {
         restoredBy: `human:${WS_A}`,
         restoreReason: "the company's own sort code",
       });
-      const again = `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
-                                          char_start, char_end, score, rule_version, detector_pin)
-                     VALUES ($1, $2, $3, 'bank-details', 'always', 'sort-code-with-account-number',
-                             12, 20, 0.91, 'r2', 'd2')`;
+      const theSameSpanAgain = (): readonly unknown[] => [
+        WS_A,
+        ulid(),
+        document.id,
+        "bank-details",
+        "always",
+        "sort-code-with-account-number",
+        12,
+        20,
+        0.91,
+        "r2",
+        "d2",
+      ];
 
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       const targeted = await client.query(
-        `${again} ON CONFLICT (workspace_id, document_id, rule_id, char_start, char_end) DO NOTHING`,
-        [WS_A, ulid(), document.id],
+        `${A_FINDING} ON CONFLICT (workspace_id, document_id, rule_id, char_start, char_end) DO NOTHING`,
+        [...theSameSpanAgain()],
       );
-      const untargeted = await client.query(`${again} ON CONFLICT DO NOTHING`, [
-        WS_A,
-        ulid(),
-        document.id,
+      const untargeted = await client.query(`${A_FINDING} ON CONFLICT DO NOTHING`, [
+        ...theSameSpanAgain(),
       ]);
       await refusesEach(client, [
         [
-          again,
+          A_FINDING,
           "the same span under the same rule is the same finding, and a bare insert of it is a run that would double the binding's rows",
-          [WS_A, ulid(), document.id],
+          theSameSpanAgain(),
           /finding_span_key/,
         ],
       ]);
@@ -2435,14 +2389,22 @@ describe("the finding under both runtime roles", () => {
 
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const aNameRead = (tier: string, charStart: number, charEnd: number): readonly unknown[] => [
+        WS_A,
+        ulid(),
+        document.id,
+        "person-name",
+        tier,
+        "PERSON",
+        charStart,
+        charEnd,
+        0.97,
+        "r2",
+        "d2",
+      ];
       const refresh = (tier: string, charStart: number, charEnd: number) =>
-        client.query(`${RECORD_A_NAME} ${REFRESH_THE_READING}`, [
-          WS_A,
-          ulid(),
-          document.id,
-          tier,
-          charStart,
-          charEnd,
+        client.query(`${A_FINDING} ${REFRESH_THE_READING}`, [
+          ...aNameRead(tier, charStart, charEnd),
         ]);
       const raised = await refresh("always", 12, 20);
       const lowered = await refresh("default-off", 40, 48);
@@ -2450,11 +2412,11 @@ describe("the finding under both runtime roles", () => {
       const unmoved = await refresh("always", 12, 20);
       await refusesEach(client, [
         [
-          `${RECORD_A_NAME}
+          `${A_FINDING}
            ON CONFLICT (workspace_id, document_id, rule_id, char_start, char_end) DO UPDATE
              SET review_state = 'unreviewed', reviewed_by = NULL, reviewed_at = NULL`,
           "a refresh that named a review column would be the UPDATE migration 0024 revoked, arriving through an insert",
-          [WS_A, ulid(), document.id, "always", 12, 20],
+          aNameRead("always", 12, 20),
         ],
       ]);
 
@@ -2496,12 +2458,19 @@ describe("the finding under both runtime roles", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       await expect(
-        client.query(
-          `INSERT INTO finding (workspace_id, id, document_id, category, tier, rule_id,
-                                char_start, char_end, score, rule_version, detector_pin)
-           VALUES ($1, $2, $3, 'home-address', 'default-on', 'uk-address', 0, 9, 0.6, 'r1', 'd1')`,
-          [WS_A, ulid(), theirs.id],
-        ),
+        client.query(A_FINDING, [
+          WS_A,
+          ulid(),
+          theirs.id,
+          "home-address",
+          "default-on",
+          "uk-address",
+          0,
+          9,
+          0.6,
+          "r1",
+          "d1",
+        ]),
       ).rejects.toThrow(/finding_document_fk/);
     });
   });
@@ -2592,10 +2561,7 @@ describe("the subject request under both runtime roles", () => {
           "the identifier set is restricted personal data, and a worker that could read it would hold the platform's list of who has asked to be erased",
         ],
         [
-          `INSERT INTO subject_request (workspace_id, id, kind, identifiers, received_at,
-                                        clock_started_at, due_at)
-           VALUES ($1, $2, 'erasure', '{"emails": [], "names": [], "other": []}'::jsonb,
-                   now(), now(), now() + interval '1 month')`,
+          A_SUBJECT_REQUEST,
           "recording a request is an Admin's act, so a worker that could insert one could start a clock nobody set",
           [WS_A, ulid()],
         ],
@@ -2725,13 +2691,7 @@ describe("the erasure request under both runtime roles", () => {
           "the pseudonym is what a rewritten history was rewritten to, and a worker that could read it could join the history back to the request that caused it",
         ],
         [
-          `INSERT INTO erasure_request (workspace_id, id, subject_request_id, pseudonym,
-                                        locked_at, anchored_at, beyond_use_hourly_at,
-                                        beyond_use_daily_at, beyond_use_weekly_at,
-                                        beyond_use_monthly_at)
-           VALUES ($1, $2, $3, $4, now(), now(), now() + interval '2 days',
-                   now() + interval '30 days', now() + interval '8 weeks',
-                   now() + interval '6 months')`,
+          AN_ERASURE_ROUTINE,
           "the routine runs under the platform principal in the app tier, so a worker that could insert one could claim an erasure that never ran",
           [WS_A, ulid(), request.subjectRequestId, ulid()],
         ],
@@ -2809,13 +2769,7 @@ describe("the erasure request under both runtime roles", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      const insert = `INSERT INTO erasure_request (workspace_id, id, subject_request_id, pseudonym,
-                                                   locked_at, anchored_at, beyond_use_hourly_at,
-                                                   beyond_use_daily_at, beyond_use_weekly_at,
-                                                   beyond_use_monthly_at)
-                      VALUES ($1, $2, $3, $4, now(), now(), now() + interval '2 days',
-                              now() + interval '30 days', now() + interval '8 weeks',
-                              now() + interval '6 months')`;
+      const insert = AN_ERASURE_ROUTINE;
 
       await client.query("SAVEPOINT second_routine");
       await expect(
@@ -2870,10 +2824,14 @@ describe("the suppression under both runtime roles", () => {
 
       await refusesEach(client, [
         [
-          `INSERT INTO suppression (workspace_id, erasure_request_id, document_id, identifiers)
-           VALUES ($1, $2, $3, '{"emails": ["x@y.invalid"], "names": [], "other": []}'::jsonb)`,
+          A_SUPPRESSION,
           "the routine writes suppressions under the platform principal, so a worker that could insert one could suppress a document nobody asked about",
-          [WS_A, suppression.erasureRequestId, suppression.documentId],
+          [
+            WS_A,
+            suppression.erasureRequestId,
+            suppression.documentId,
+            '{"emails": ["x@y.invalid"], "names": [], "other": []}',
+          ],
         ],
         [
           `UPDATE suppression SET identifiers = '{"emails": [], "names": [], "other": []}'::jsonb`,
@@ -2904,8 +2862,7 @@ describe("the suppression under both runtime roles", () => {
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
-      const insert = `INSERT INTO suppression (workspace_id, erasure_request_id, document_id, identifiers)
-                      VALUES ($1, $2, $3, $4::jsonb)`;
+      const insert = A_SUPPRESSION;
       const set = '{"emails": ["priya@client.invalid"], "names": [], "other": []}';
       const empty = '{"emails": [], "names": [], "other": []}';
 
@@ -3031,7 +2988,7 @@ describe("the migration stamp under worker_rt", () => {
 
       await refusesEach(client, [
         [
-          "INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ('x', 1)",
+          A_MIGRATION_STAMP,
           "the app is the only migration owner, so a worker that could stamp one could tell itself the schema had moved",
         ],
         [

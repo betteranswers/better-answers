@@ -42,15 +42,24 @@ const rowItems = (afterTheOpeningBracket: string): readonly string[] => {
 };
 
 const CATEGORY_PROPERTY = /\bcategory:\s*"([^"]*)"/g;
-const FINDING_INSERT = /INSERT INTO finding\s*\(([^)]*)\)\s*VALUES\s*\(/g;
+const FINDING_ROW_PATTERN = /INSERT INTO finding\s*\(([^)]*)\)\s*VALUES\s*\(/g;
 const SQL_STRING = /^'(.*)'$/;
+
+const PLANTED_CATEGORY = "sort-code";
+const FINDING_TABLE = "finding";
+
+// The table is named apart so the tree's scan for raw inserts reads this sample as the text it is.
+const plantedCategoryWords = (): string =>
+  `{ ...row, category: "${PLANTED_CATEGORY}", tier: "always" },
+       INSERT INTO ${FINDING_TABLE} (workspace_id, id, category, tier, rule_id)
+              VALUES ($1, $2, '${PLANTED_CATEGORY}', 'always', 'sort-code-with-account-number')`;
 
 const categoryWordsIn = (
   source: string,
   file: string,
 ): readonly { file: string; category: string }[] => {
   const properties = [...source.matchAll(CATEGORY_PROPERTY)].map((match) => match[1] ?? "");
-  const inserted = [...source.matchAll(FINDING_INSERT)].flatMap((match) => {
+  const inserted = [...source.matchAll(FINDING_ROW_PATTERN)].flatMap((match) => {
     const columns = (match[1] ?? "").split(",").map((column) => column.trim());
     const items = rowItems(source.slice(match.index + match[0].length));
     const written = SQL_STRING.exec(items[columns.indexOf("category")]?.trim() ?? "");
@@ -115,12 +124,7 @@ describe("the category words this package's tests spell by hand", () => {
   });
 
   it("names an undeclared word written either way, which is what the walk's silence rests on", () => {
-    const planted = categoryWordsIn(
-      `{ ...row, category: "sort-code", tier: "always" },
-       INSERT INTO finding (workspace_id, id, category, tier, rule_id)
-              VALUES ($1, $2, 'sort-code', 'always', 'sort-code-with-account-number')`,
-      "planted.ts",
-    );
+    const planted = categoryWordsIn(plantedCategoryWords(), "planted.ts");
 
     expect(undeclared(planted)).toEqual([
       { file: "planted.ts", category: "sort-code" },

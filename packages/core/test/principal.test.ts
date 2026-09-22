@@ -1,5 +1,6 @@
 import { ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
+import { configProbeWritten } from "@better-answers/schema/testing/probes";
 import { describe, expect, it } from "vitest";
 
 import { attempt, type Claims } from "../src/kernel/index.ts";
@@ -283,10 +284,7 @@ describe("the Principal resolver", () => {
 
     await expect(
       withPrincipal(door, claimsFor(seeded), async (_principal, tx) => {
-        await tx.query(
-          "INSERT INTO workspace_config (workspace_id, key, value) VALUES ($1, $2, '1')",
-          [seeded.workspaceId, key],
-        );
+        await configProbeWritten(tx, seeded.workspaceId, key);
         throw new Error("the work failed after writing");
       }),
     ).rejects.toThrow("the work failed after writing");

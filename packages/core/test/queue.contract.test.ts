@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { JOB_KINDS } from "@better-answers/schema";
 import { testData, withRollback } from "@better-answers/schema/testing";
+import { enqueueAttempted } from "@better-answers/schema/testing/probes";
 
 import { contractFixture } from "./contract-fixture.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
@@ -99,26 +100,17 @@ const seedFixture = async (client: pg.PoolClient) => {
   }
 };
 
-const refusedEnqueue = async (
+const refusedEnqueue = (
   client: pg.PoolClient,
   refused: (typeof fixture.refused_enqueues)[number],
-): Promise<string> => {
-  await client.query("SAVEPOINT refused_enqueue");
-  try {
-    await client.query(
-      `INSERT INTO job (workspace_id, id, kind, reason, subject_id, status)
-         VALUES ($1, $2, $3, $4, $5, 'queued')`,
-      [refused.workspace_id, refused.id, refused.kind, refused.reason, refused.subject_id],
-    );
-  } catch (error) {
-    await client.query("ROLLBACK TO SAVEPOINT refused_enqueue");
-    const code =
-      typeof error === "object" && error !== null && "code" in error ? String(error.code) : "none";
-    return code;
-  }
-  await client.query("ROLLBACK TO SAVEPOINT refused_enqueue");
-  return "admitted";
-};
+): Promise<string> =>
+  enqueueAttempted(client, {
+    workspaceId: refused.workspace_id,
+    id: refused.id,
+    kind: refused.kind,
+    reason: refused.reason,
+    subjectId: refused.subject_id,
+  });
 
 const lapseLeases = async (client: pg.PoolClient, jobIds: readonly string[]) => {
   if (jobIds.length === 0) return;

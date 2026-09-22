@@ -1,4 +1,3 @@
-import json
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -15,16 +14,21 @@ from better_answers_worker.bundle import (
     concepts_at_head,
     repository_path,
 )
-from better_answers_worker.concept_file import content_hash_of, parse_concept_file
 from better_answers_worker.config import Bootstrap, Engine, ObjectStore
 from better_answers_worker.ids import ulid
 from better_answers_worker.kinds import KINDS
 from better_answers_worker.queue import scoped
 from better_answers_worker.rebuild import run_rebuild
 from better_answers_worker.schema_view import MIGRATION_WHEN
-from bundles import render_concept_file, write_bundle
-from factories import seed_concept_identity, seed_job, seed_workspace
-from pg_harness import migrated_postgres_at
+from bundles import write_bundle
+from factories import (
+    hold_graph_generation,
+    seed_concept,
+    seed_graph_generation,
+    seed_job,
+    seed_workspace,
+)
+from pg_harness import migrated_postgres_at, stamp_migration
 
 WORKER = "worker-under-test"
 IRI = "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM"
@@ -39,50 +43,6 @@ def a_migrated_database() -> Iterator[psycopg.Connection]:
 
 
 _WHERE: dict[psycopg.Connection, str] = {}
-
-
-def seed_concept(
-    cursor: psycopg.Cursor,
-    *,
-    workspace_id: str,
-    iri: str,
-    path: str,
-    frontmatter: dict[str, Any],
-    body: str,
-    kind: str = "Policy",
-    status: str = "stable",
-) -> str:
-    seed_concept_identity(
-        cursor, workspace_id=workspace_id, iri=iri, merge_key=f"{kind}:{path}".lower()
-    )
-    sha = f"{abs(hash(path)):040x}"[:40]
-    cursor.execute(
-        "INSERT INTO bundle_commit (workspace_id, sha, audit_event_id, actor)"
-        " VALUES (%s, %s, %s, 'process:better-answers-test')"
-        " ON CONFLICT DO NOTHING",
-        (workspace_id, sha, ulid()),
-    )
-    content = render_concept_file(frontmatter, body)
-    parsed_frontmatter, parsed_body = parse_concept_file(content)
-    cursor.execute(
-        "INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter,"
-        " body, content_hash, commit_sha, status, published_at, sensitivity, audience)"
-        " VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, now(), 'Internal',"
-        " 'everyone')",
-        (
-            workspace_id,
-            iri,
-            path,
-            kind,
-            str(frontmatter.get("title", "Untitled")),
-            json.dumps(parsed_frontmatter),
-            parsed_body,
-            content_hash_of(parsed_frontmatter, parsed_body, path),
-            sha,
-            status,
-        ),
-    )
-    return content
 
 
 def seed_expenses(
@@ -114,6 +74,16 @@ def bootstrap_for(database: psycopg.Connection, git_store: Path) -> Bootstrap:
         ),
         engine=Engine(lmdb_dir=str(git_store / "lmdb")),
     )
+
+
+def a_workspace_holding_one_job(
+    database: psycopg.Connection, *, kind: str, reason: str | None = None
+) -> str:
+    workspace = seed_workspace(database.cursor())["id"]
+    database.commit()
+    with scoped(database, workspace) as cursor:
+        seed_job(cursor, workspace_id=workspace, kind=kind, reason=reason)
+    return str(workspace)
 
 
 def test_the_worker_runs_exactly_the_kinds_its_registry_holds_a_handler_for() -> None:
@@ -273,14 +243,9 @@ def test_a_job_commits_as_it_goes_and_another_connection_sees_it_finish_after_th
 def test_a_claim_is_visible_and_the_lease_moves_while_a_job_runs_through_the_loop(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-    workspace = seed_workspace(database.cursor())["id"]
-    database.commit()
-    with scoped(database, workspace) as cursor:
-        cursor.execute(
-            "INSERT INTO job (workspace_id, id, kind, reason)"
-            " VALUES (%s, %s, 'full-rebuild', 'drill')",
-            (workspace, ulid()),
-        )
+    workspace = a_workspace_holding_one_job(
+        database, kind="full-rebuild", reason="drill"
+    )
     bootstrap = bootstrap_for(database, tmp_path)
     dsn = _WHERE[database]
 
@@ -375,10 +340,7 @@ def test_a_rebuild_holds_the_generation_row_before_it_reads_so_a_write_beside_it
     with database.cursor() as cursor:
         expenses = seed_expenses(cursor, workspace)
 
-        cursor.execute(
-            "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, 1)",
-            (workspace,),
-        )
+        seed_graph_generation(cursor, workspace_id=workspace)
     database.commit()
     dsn = _WHERE[database]
 
@@ -394,12 +356,7 @@ def test_a_rebuild_holds_the_generation_row_before_it_reads_so_a_write_beside_it
                 body="Receipts are kept for six years.",
                 kind="Evidence",
             )
-            cursor.execute(
-                "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, 1)"
-                " ON CONFLICT (workspace_id) DO UPDATE"
-                " SET live_gen = graph_generation.live_gen RETURNING live_gen",
-                (workspace,),
-            )
+            hold_graph_generation(cursor, workspace_id=workspace)
         write_bundle(
             tmp_path,
             workspace,
@@ -513,10 +470,7 @@ def test_a_rebuild_writes_the_next_generation_beside_the_live_one_and_flips_it(
             kind="Evidence",
         )
 
-        cursor.execute(
-            "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, 1)",
-            (workspace,),
-        )
+        seed_graph_generation(cursor, workspace_id=workspace)
     database.commit()
     write_bundle(
         tmp_path,
@@ -560,10 +514,10 @@ def test_the_loop_claims_nothing_when_its_schema_stamp_does_not_match(
     workspace = seed_workspace(database.cursor())["id"]
     database.commit()
     with database.cursor() as cursor:
-        cursor.execute(
-            'INSERT INTO "drizzle"."__drizzle_migrations" ("hash", "created_at")'
-            " VALUES ('a-migration-this-worker-has-never-seen', %s)",
-            (MIGRATION_WHEN + 1,),
+        stamp_migration(
+            cursor,
+            digest="a-migration-this-worker-has-never-seen",
+            when=MIGRATION_WHEN + 1,
         )
     database.commit()
 
@@ -583,10 +537,11 @@ def test_a_worker_holding_a_fresh_lease_is_healthy_and_a_queue_left_waiting_is_n
     assert health.is_healthy(database, WORKER) is True
 
     with scoped(database, workspace) as cursor:
-        cursor.execute(
-            "INSERT INTO job (workspace_id, id, kind, enqueued_at)"
-            " VALUES (%s, %s, 'nightly-audit', now() - interval '5 minutes')",
-            (workspace, ulid()),
+        seed_job(
+            cursor,
+            workspace_id=workspace,
+            kind="nightly-audit",
+            enqueued_ago_seconds=300,
         )
 
     assert health.is_healthy(database, WORKER) is False
@@ -614,14 +569,7 @@ def test_a_worker_holding_a_fresh_lease_is_healthy_and_a_queue_left_waiting_is_n
 def test_a_long_run_keeps_its_lease_from_a_connection_of_its_own(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-    workspace = seed_workspace(database.cursor())["id"]
-    database.commit()
-
-    with scoped(database, workspace) as cursor:
-        cursor.execute(
-            "INSERT INTO job (workspace_id, id, kind) VALUES (%s, %s, 'nightly-audit')",
-            (workspace, ulid()),
-        )
+    workspace = a_workspace_holding_one_job(database, kind="nightly-audit")
     with scoped(database, workspace) as cursor:
         claimed = queue.claim(cursor, workspace, WORKER, list(KINDS))
     assert claimed is not None

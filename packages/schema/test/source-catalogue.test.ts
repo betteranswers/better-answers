@@ -10,9 +10,29 @@ import {
   SENSITIVITIES,
   ulid,
 } from "../src/index.ts";
+import {
+  type CataloguedItem,
+  type CataloguePlace,
+  citeDocument,
+  seedBindingOfAConnectorAlone,
+  seedCataloguedDocument,
+} from "./catalogue-statements.ts";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
-import { ADMITTED, postgresForSuite, refusalOf } from "./probes.ts";
+import {
+  ADMITTED,
+  attemptBindingOf,
+  attemptCataloguedDocument,
+  attemptDocumentClassed,
+  attemptDocumentConcluded,
+  attemptDocumentSized,
+  attemptLedgerRowReusingAnId,
+  attemptQuarantinePair,
+  attemptRowKeyedToTheLedger,
+  type BindingWords,
+  postgresForSuite,
+  refusalOf,
+} from "./probes.ts";
 
 const db = postgresForSuite();
 
@@ -24,61 +44,24 @@ const HANDBOOK = "01J6CDDDDDDDDDDDDDDDDDDDDD";
 const CONTENT_SHA256 = "d".repeat(64);
 const WHEN = new Date("2026-09-01T00:00:00Z");
 
-const probe = (client: pg.PoolClient, sql: string, values: readonly unknown[]): Promise<string> =>
-  refusalOf(client, () => client.query(sql, [...values]));
+const admitting = (answer: string): string =>
+  answer === ADMITTED ? answer : `refused by ${answer}`;
 
-const admits = async (client: pg.PoolClient, sql: string, values: readonly unknown[]) => {
-  const answer = await probe(client, sql, values);
-  return answer === ADMITTED ? answer : `refused by ${answer}`;
-};
-
-const INSERT_BINDING = `INSERT INTO source_binding
-    (workspace_id, id, name, connector, destination, retention_class, state)
-  VALUES ($1, $2, $3, $4, $5, $6, $7)`;
-
-const bindingOf = (
+const wordsOf = (
   connector: string,
-  destination: readonly string[],
+  destination: readonly (string | null)[],
   retentionClass: string,
   state: string,
-): readonly unknown[] => [
-  WORKSPACE,
-  ulid(),
-  "The handbook",
-  connector,
-  [...destination],
-  retentionClass,
-  state,
-];
+): BindingWords => ({ connector, destination, retentionClass, state });
 
-const INSERT_DOCUMENT = `INSERT INTO source_document
-    (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size, original_key)
-  VALUES ($1, $2, $3, $4, 'The handbook', 'text/markdown', 1024, 'documents/x/original')`;
+const UNDER_THE_UPLOAD: CataloguePlace = { workspaceId: WORKSPACE, bindingId: UPLOAD_BINDING };
 
-const insertDocumentWith = (column: string, word: string) =>
-  `INSERT INTO source_document
-     (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size,
-      original_key, ${column})
-   VALUES ($1, $2, $3, $4, 'The handbook', 'text/markdown', 1024, 'documents/x/original', '${word}')`;
-
-const insertDocumentOutcome = (outcome: string | null, quarantineError: string | null) =>
-  `INSERT INTO source_document
-     (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size,
-      original_key, outcome, quarantine_error)
-   VALUES ($1, $2, $3, $4, 'The handbook', 'text/markdown', 1024, 'documents/x/original',
-           ${outcome === null ? "NULL" : `'${outcome}'`},
-           ${quarantineError === null ? "NULL" : `'${quarantineError}'`})`;
-
-const insertDocumentSized = (bytes: number) =>
-  `INSERT INTO source_document
-     (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size, original_key)
-   VALUES ($1, $2, $3, $4, 'The handbook', 'text/markdown', ${String(bytes)}, 'documents/x/original')`;
-
-const cite = (client: pg.PoolClient, documentId: string) =>
-  client.query(
-    "INSERT INTO evidence (workspace_id, source_document_id, locator, resource) VALUES ($1, $2, 'chars:0-42', 'The handbook')",
-    [WORKSPACE, documentId],
-  );
+const THE_HANDBOOK: CataloguedItem = {
+  workspaceId: WORKSPACE,
+  id: HANDBOOK,
+  bindingId: UPLOAD_BINDING,
+  sourceSystemId: "handbook.md",
+};
 
 const withBindings = async (
   fn: (client: pg.PoolClient) => Promise<void>,
@@ -104,10 +87,7 @@ const withWorkspace = async (fn: (client: pg.PoolClient) => Promise<void>): Prom
 describe("a binding nobody configured", () => {
   it("feeds the upload's two destinations, is kept by the platform, and has only landed", async () => {
     await withWorkspace(async (client) => {
-      await client.query(
-        "INSERT INTO source_binding (workspace_id, id, name, connector) VALUES ($1, $2, 'The handbook', 'upload')",
-        [WORKSPACE, UPLOAD_BINDING],
-      );
+      await seedBindingOfAConnectorAlone(client, WORKSPACE, UPLOAD_BINDING);
 
       const born = await client.query(
         "SELECT destination, retention_class, state FROM source_binding WHERE workspace_id = $1 AND id = $2",
@@ -127,34 +107,46 @@ describe("the four closed word sets a binding carries", () => {
       const landed: string[] = [];
       for (const connector of CONNECTORS) {
         landed.push(
-          await admits(
-            client,
-            INSERT_BINDING,
-            bindingOf(connector, ["chunk-index"], "keep", "landed"),
+          admitting(
+            await attemptBindingOf(
+              client,
+              WORKSPACE,
+              wordsOf(connector, ["chunk-index"], "keep", "landed"),
+            ),
           ),
         );
       }
       for (const destination of DESTINATIONS) {
         landed.push(
-          await admits(
-            client,
-            INSERT_BINDING,
-            bindingOf("upload", [destination], "keep", "landed"),
+          admitting(
+            await attemptBindingOf(
+              client,
+              WORKSPACE,
+              wordsOf("upload", [destination], "keep", "landed"),
+            ),
           ),
         );
       }
       for (const retentionClass of RETENTION_CLASSES) {
         landed.push(
-          await admits(
-            client,
-            INSERT_BINDING,
-            bindingOf("upload", ["chunk-index"], retentionClass, "landed"),
+          admitting(
+            await attemptBindingOf(
+              client,
+              WORKSPACE,
+              wordsOf("upload", ["chunk-index"], retentionClass, "landed"),
+            ),
           ),
         );
       }
       for (const state of BINDING_STATES) {
         landed.push(
-          await admits(client, INSERT_BINDING, bindingOf("upload", ["chunk-index"], "keep", state)),
+          admitting(
+            await attemptBindingOf(
+              client,
+              WORKSPACE,
+              wordsOf("upload", ["chunk-index"], "keep", state),
+            ),
+          ),
         );
       }
 
@@ -165,33 +157,33 @@ describe("the four closed word sets a binding carries", () => {
   it("refuses a word outside each set, an empty destination and a NULL among the destinations", async () => {
     await withWorkspace(async (client) => {
       const refusals = [
-        await probe(
+        await attemptBindingOf(
           client,
-          INSERT_BINDING,
-          bindingOf("sharepoint", ["chunk-index"], "keep", "landed"),
-        ),
-        await probe(client, INSERT_BINDING, bindingOf("upload", ["warehouse"], "keep", "landed")),
-
-        await probe(client, INSERT_BINDING, bindingOf("upload", [], "keep", "landed")),
-
-        await probe(client, INSERT_BINDING, [
           WORKSPACE,
-          ulid(),
-          "The handbook",
-          "upload",
-          ["bundle", null],
-          "keep",
-          "landed",
-        ]),
-        await probe(
-          client,
-          INSERT_BINDING,
-          bindingOf("upload", ["chunk-index"], "forever", "landed"),
+          wordsOf("sharepoint", ["chunk-index"], "keep", "landed"),
         ),
-        await probe(
+        await attemptBindingOf(
           client,
-          INSERT_BINDING,
-          bindingOf("upload", ["chunk-index"], "keep", "reviewing"),
+          WORKSPACE,
+          wordsOf("upload", ["warehouse"], "keep", "landed"),
+        ),
+
+        await attemptBindingOf(client, WORKSPACE, wordsOf("upload", [], "keep", "landed")),
+
+        await attemptBindingOf(
+          client,
+          WORKSPACE,
+          wordsOf("upload", ["bundle", null], "keep", "landed"),
+        ),
+        await attemptBindingOf(
+          client,
+          WORKSPACE,
+          wordsOf("upload", ["chunk-index"], "forever", "landed"),
+        ),
+        await attemptBindingOf(
+          client,
+          WORKSPACE,
+          wordsOf("upload", ["chunk-index"], "keep", "reviewing"),
         ),
       ];
       expect(refusals).toEqual([
@@ -209,7 +201,7 @@ describe("the four closed word sets a binding carries", () => {
 describe("the catalogue a run reconciles", () => {
   it("keeps every column it was given, and leaves a document no run has seen with nothing to say", async () => {
     await withBindings(async (client) => {
-      await client.query(INSERT_DOCUMENT, [WORKSPACE, HANDBOOK, UPLOAD_BINDING, "handbook.md"]);
+      await seedCataloguedDocument(client, THE_HANDBOOK);
       const landed = await client.query(
         `SELECT source_system_id, title, media_type, byte_size, original_key,
                 normalised_key, content_hash, redaction_version, last_modified, gone_at,
@@ -264,21 +256,17 @@ describe("the catalogue a run reconciles", () => {
   it("admits one item once per binding and refuses it twice, and admits it again under another binding", async () => {
     await withBindings(
       async (client) => {
-        await client.query(INSERT_DOCUMENT, [WORKSPACE, HANDBOOK, UPLOAD_BINDING, "handbook.md"]);
+        await seedCataloguedDocument(client, THE_HANDBOOK);
 
-        const twice = await probe(client, INSERT_DOCUMENT, [
-          WORKSPACE,
-          ulid(),
-          UPLOAD_BINDING,
-          "handbook.md",
-        ]);
+        const twice = await attemptCataloguedDocument(client, { ...THE_HANDBOOK, id: ulid() });
 
-        const elsewhere = await admits(client, INSERT_DOCUMENT, [
-          WORKSPACE,
-          ulid(),
-          SECOND_BINDING,
-          "handbook.md",
-        ]);
+        const elsewhere = admitting(
+          await attemptCataloguedDocument(client, {
+            ...THE_HANDBOOK,
+            id: ulid(),
+            bindingId: SECOND_BINDING,
+          }),
+        );
         expect({ twice, elsewhere }).toEqual({
           twice: "source_document_workspace_id_binding_id_source_system_id_uidx",
           elsewhere: ADMITTED,
@@ -292,47 +280,18 @@ describe("the catalogue a run reconciles", () => {
     await withBindings(async (client) => {
       const landed: string[] = [];
       for (const sensitivity of SENSITIVITIES) {
-        landed.push(
-          await admits(client, insertDocumentWith("sensitivity", sensitivity), [
-            WORKSPACE,
-            ulid(),
-            UPLOAD_BINDING,
-            ulid(),
-          ]),
-        );
+        landed.push(admitting(await attemptDocumentClassed(client, UNDER_THE_UPLOAD, sensitivity)));
       }
       for (const outcome of DOCUMENT_OUTCOMES) {
-        landed.push(
-          await admits(client, insertDocumentWith("outcome", outcome), [
-            WORKSPACE,
-            ulid(),
-            UPLOAD_BINDING,
-            ulid(),
-          ]),
-        );
+        landed.push(admitting(await attemptDocumentConcluded(client, UNDER_THE_UPLOAD, outcome)));
       }
       const refusals = [
-        await probe(client, insertDocumentWith("outcome", "skipped"), [
-          WORKSPACE,
-          ulid(),
-          UPLOAD_BINDING,
-          ulid(),
-        ]),
-        await probe(client, insertDocumentWith("sensitivity", "Secret"), [
-          WORKSPACE,
-          ulid(),
-          UPLOAD_BINDING,
-          ulid(),
-        ]),
+        await attemptDocumentConcluded(client, UNDER_THE_UPLOAD, "skipped"),
+        await attemptDocumentClassed(client, UNDER_THE_UPLOAD, "Secret"),
 
-        await probe(client, insertDocumentSized(-1), [WORKSPACE, ulid(), UPLOAD_BINDING, ulid()]),
+        await attemptDocumentSized(client, UNDER_THE_UPLOAD, -1),
       ];
-      const empty = await admits(client, insertDocumentSized(0), [
-        WORKSPACE,
-        ulid(),
-        UPLOAD_BINDING,
-        ulid(),
-      ]);
+      const empty = admitting(await attemptDocumentSized(client, UNDER_THE_UPLOAD, 0));
       expect({ landed, refusals, empty }).toEqual({
         landed: Array.from({ length: 5 }, () => ADMITTED),
         refusals: [
@@ -347,33 +306,18 @@ describe("the catalogue a run reconciles", () => {
 
   it("carries a quarantine error only on a document it also calls quarantined", async () => {
     await withBindings(async (client) => {
-      const quarantined = await admits(
-        client,
-        insertDocumentOutcome("quarantined", "NeedsOcrError"),
-        [WORKSPACE, ulid(), UPLOAD_BINDING, ulid()],
+      const quarantined = admitting(
+        await attemptQuarantinePair(client, UNDER_THE_UPLOAD, "quarantined", "NeedsOcrError"),
       );
 
       const refusals = [
-        await probe(client, insertDocumentOutcome("converted", "NeedsOcrError"), [
-          WORKSPACE,
-          ulid(),
-          UPLOAD_BINDING,
-          ulid(),
-        ]),
-        await probe(client, insertDocumentOutcome(null, "NeedsOcrError"), [
-          WORKSPACE,
-          ulid(),
-          UPLOAD_BINDING,
-          ulid(),
-        ]),
+        await attemptQuarantinePair(client, UNDER_THE_UPLOAD, "converted", "NeedsOcrError"),
+        await attemptQuarantinePair(client, UNDER_THE_UPLOAD, null, "NeedsOcrError"),
       ];
 
-      const wordAlone = await admits(client, insertDocumentOutcome("quarantined", null), [
-        WORKSPACE,
-        ulid(),
-        UPLOAD_BINDING,
-        ulid(),
-      ]);
+      const wordAlone = admitting(
+        await attemptQuarantinePair(client, UNDER_THE_UPLOAD, "quarantined", null),
+      );
       expect({ quarantined, refusals, wordAlone }).toEqual({
         quarantined: ADMITTED,
         refusals: [
@@ -389,13 +333,14 @@ describe("the catalogue a run reconciles", () => {
 describe("the key from evidence to the document it locates into", () => {
   it("refuses a cited document's deletion, and admits it once nothing cites it", async () => {
     await withBindings(async (client) => {
-      await client.query(INSERT_DOCUMENT, [WORKSPACE, HANDBOOK, UPLOAD_BINDING, "handbook.md"]);
-      await cite(client, HANDBOOK);
+      await seedCataloguedDocument(client, THE_HANDBOOK);
+      await citeDocument(client, WORKSPACE, HANDBOOK);
 
-      const whileCited = await probe(
-        client,
-        "DELETE FROM source_document WHERE workspace_id = $1 AND id = $2",
-        [WORKSPACE, HANDBOOK],
+      const whileCited = await refusalOf(client, () =>
+        client.query("DELETE FROM source_document WHERE workspace_id = $1 AND id = $2", [
+          WORKSPACE,
+          HANDBOOK,
+        ]),
       );
 
       await client.query(
@@ -420,14 +365,16 @@ describe("the key from evidence to the document it locates into", () => {
 
   it("refuses a binding's deletion while one of its documents is cited, because the cascade meets the key", async () => {
     await withBindings(async (client) => {
-      await client.query(INSERT_DOCUMENT, [WORKSPACE, HANDBOOK, UPLOAD_BINDING, "handbook.md"]);
-      await cite(client, HANDBOOK);
+      await seedCataloguedDocument(client, THE_HANDBOOK);
+      await citeDocument(client, WORKSPACE, HANDBOOK);
 
       expect(
-        await probe(client, "DELETE FROM source_binding WHERE workspace_id = $1 AND id = $2", [
-          WORKSPACE,
-          UPLOAD_BINDING,
-        ]),
+        await refusalOf(client, () =>
+          client.query("DELETE FROM source_binding WHERE workspace_id = $1 AND id = $2", [
+            WORKSPACE,
+            UPLOAD_BINDING,
+          ]),
+        ),
       ).toBe("evidence_source_document_fk");
     });
   });
@@ -436,9 +383,9 @@ describe("the key from evidence to the document it locates into", () => {
     await withWorkspace(async (client) => {
       const theirs = await testData(client).sourceDocument();
       const refusals = [
-        await refusalOf(client, () => cite(client, ulid())),
+        await refusalOf(client, () => citeDocument(client, WORKSPACE, ulid())),
 
-        await refusalOf(client, () => cite(client, theirs.id)),
+        await refusalOf(client, () => citeDocument(client, WORKSPACE, theirs.id)),
       ];
       expect(refusals).toEqual(["evidence_source_document_fk", "evidence_source_document_fk"]);
     });
@@ -463,11 +410,9 @@ describe("the ledger's unique pair", () => {
          )`,
       );
 
-      const insert =
-        "INSERT INTO keyed_to_the_ledger (workspace_id, audit_event_id) VALUES ($1, $2)";
       expect({
-        named: await admits(client, insert, [WORKSPACE, id]),
-        unnamed: await probe(client, insert, [WORKSPACE, ulid()]),
+        named: admitting(await attemptRowKeyedToTheLedger(client, WORKSPACE, id)),
+        unnamed: await attemptRowKeyedToTheLedger(client, WORKSPACE, ulid()),
       }).toEqual({
         named: ADMITTED,
         unnamed: "keyed_to_the_ledger_workspace_id_audit_event_id_fkey",
@@ -477,14 +422,7 @@ describe("the ledger's unique pair", () => {
 
   it("refuses a second ledger row on the same pair", async () => {
     await withLedgerRow(async (client, id) => {
-      expect(
-        await probe(
-          client,
-          `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
-           VALUES ($1, $2, 'sources.binding.created', 'process:better-answers-test', $3, '{}'::jsonb)`,
-          [id, WORKSPACE, ulid()],
-        ),
-      ).toBe("audit_event_pkey");
+      expect(await attemptLedgerRowReusingAnId(client, WORKSPACE, id)).toBe("audit_event_pkey");
     });
   });
 });

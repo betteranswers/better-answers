@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 from typing import Any, cast
 
+import psycopg
 import pytest
 from psycopg import Cursor
 
@@ -233,8 +234,6 @@ def test_the_inbox_takes_a_whole_set_in_one_call_and_re_renders_its_summary() ->
 
 
 def test_the_inbox_refuses_every_road_the_fixture_says_is_closed() -> None:
-    import psycopg
-
     from pg_harness import migrated_postgres
 
     fixture = read_concept_inbox()
@@ -290,20 +289,17 @@ def _seed_queue_fixture(cursor: Cursor[Any], fixture: dict[str, Any]) -> None:
 
 
 def _refused_enqueue(cursor: Cursor[Any], refused: dict[str, Any]) -> str:
-    import psycopg
+    from factories import enqueue_job
 
     cursor.execute("SAVEPOINT refused_enqueue")
     try:
-        cursor.execute(
-            "INSERT INTO job (workspace_id, id, kind, reason, subject_id, status)"
-            " VALUES (%s, %s, %s, %s, %s, 'queued')",
-            (
-                refused["workspace_id"],
-                refused["id"],
-                refused["kind"],
-                refused["reason"],
-                refused["subject_id"],
-            ),
+        enqueue_job(
+            cursor,
+            workspace_id=refused["workspace_id"],
+            job_id=refused["id"],
+            kind=refused["kind"],
+            reason=refused["reason"],
+            subject_id=refused["subject_id"],
         )
     except psycopg.Error as error:
         cursor.execute("ROLLBACK TO SAVEPOINT refused_enqueue")

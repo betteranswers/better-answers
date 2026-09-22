@@ -44,6 +44,7 @@ const GATES_PRINTING_A_TAG: readonly string[] = [
   "packages/devtools/lint-rules/rules/mcp-entry-no-workspace-argument.ts",
   "packages/devtools/python/comment_gate.py",
   "packages/devtools/src/comment-density.ts",
+  "packages/devtools/src/insert-scan.ts",
 ];
 
 // Only files that carry one, so the list holds no slot a later citation could land in.

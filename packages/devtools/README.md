@@ -4,7 +4,7 @@ The repository's own gate tooling. **It is imported and never deployed** — `pa
 is imported, `apps/` is what deploys (ADR 0029) — so nothing under `apps/` copies this
 directory into an image, and every dependency here is a development dependency.
 
-Six things live here.
+Seven things live here.
 
 ## `src/throwaway-tree.ts` — the runner
 
@@ -138,6 +138,27 @@ The Python check runs under bare `python3` and imports only the standard library
 clone can run it before `uv sync`. ruff reads it under `python/ruff.toml` and mypy under
 `--strict`, through this workspace's `lint:python` and `typecheck:python`, run from the
 worker's locked environment — the one Python toolchain the repository installs.
+
+## `src/insert-scan.ts` — the insert scan
+
+The setup rule's holder: a raw `INSERT` appears inside a factory module and nowhere else.
+`scripts/insert-scan.mjs` walks the directories it is named — `pnpm insert-scan`, a root
+`check` step — and reads the suites' territory: every `.ts`, `.tsx` and `.py` file that a
+test directory holds or that a test name marks. One reader covers both languages, so the
+statement's shape cannot move in one tier and not the other. Production code is not
+territory, which is where a statement belongs.
+
+**A factory module is a short named list, in the scan's own source, and nothing else.** A
+glob would let the next file written beside a suite become a factory by existing, which is
+the way round any gate of this kind; a module joins the list in the commit that creates it,
+and the failure message names where the list lives so a reader can get there. The suite holds
+the list to its job twice over: every entry names a file the tree still has, and every entry
+carries a statement, so a rename cannot open a hole and an entry cannot outlive its reason.
+
+A walk that read no suite file exits 2 rather than reporting a tree without inserts, which is
+the silence the runner above exists to refuse. `test/insert-scan.test.ts` runs the script
+through the runner over a throwaway tree, both ways and in both languages, and proves the
+module beside a suite is refused until it is named.
 
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted
 

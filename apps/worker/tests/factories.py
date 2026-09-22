@@ -3,9 +3,12 @@ import re
 import secrets
 from typing import Any
 
+import asyncpg
 from psycopg import Cursor
 
+from better_answers_worker.concept_file import content_hash_of, parse_concept_file
 from better_answers_worker.ids import ulid
+from bundles import render_concept_file
 from pg_harness import REPO_ROOT
 
 _DIMENSIONS_SOURCE = REPO_ROOT / "packages" / "schema" / "src" / "index-tables.ts"
@@ -324,6 +327,126 @@ def seed_concept_index(
         (workspace_id, iri, path, content_hash, sha),
     )
     return _returning_row(cursor)
+
+
+def seed_concept(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    iri: str,
+    path: str,
+    frontmatter: dict[str, Any],
+    body: str,
+    kind: str = "Policy",
+    status: str = "stable",
+) -> str:
+    seed_concept_identity(
+        cursor, workspace_id=workspace_id, iri=iri, merge_key=f"{kind}:{path}".lower()
+    )
+    sha = f"{abs(hash(path)):040x}"[:40]
+    cursor.execute(
+        "INSERT INTO bundle_commit (workspace_id, sha, audit_event_id, actor)"
+        " VALUES (%s, %s, %s, 'process:better-answers-test')"
+        " ON CONFLICT DO NOTHING",
+        (workspace_id, sha, ulid()),
+    )
+    content = render_concept_file(frontmatter, body)
+    parsed_frontmatter, parsed_body = parse_concept_file(content)
+    cursor.execute(
+        "INSERT INTO concept_index (workspace_id, iri, path, kind, title, frontmatter,"
+        " body, content_hash, commit_sha, status, published_at, sensitivity, audience)"
+        " VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, now(), 'Internal',"
+        " 'everyone')",
+        (
+            workspace_id,
+            iri,
+            path,
+            kind,
+            str(frontmatter.get("title", "Untitled")),
+            json.dumps(parsed_frontmatter),
+            parsed_body,
+            content_hash_of(parsed_frontmatter, parsed_body, path),
+            sha,
+            status,
+        ),
+    )
+    return content
+
+
+def seed_graph_generation(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    live_gen: int = 1,
+) -> dict[str, Any]:
+    cursor.execute(
+        "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, %s)"
+        " RETURNING *",
+        (workspace_id, live_gen),
+    )
+    return _returning_row(cursor)
+
+
+def hold_graph_generation(cursor: Cursor[Any], *, workspace_id: str) -> int:
+    # The no-op update takes the row lock a rebuild beside it must wait on.
+    cursor.execute(
+        "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, 1)"
+        " ON CONFLICT (workspace_id) DO UPDATE"
+        " SET live_gen = graph_generation.live_gen RETURNING live_gen",
+        (workspace_id,),
+    )
+    return int(_returning_row(cursor)["live_gen"])
+
+
+def seed_chunk(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    binding_id: str,
+    chunk_id: str,
+    content: str = "body",
+    sensitivity: str = "Public",
+    audience: str = "everyone",
+) -> dict[str, Any]:
+    cursor.execute(
+        'INSERT INTO "index".chunk (id, workspace_id, content, sensitivity, audience,'
+        " binding_id) VALUES (%s, %s, %s, %s, %s, %s)"
+        " RETURNING id, workspace_id, content, sensitivity, audience, binding_id",
+        (chunk_id, workspace_id, content, sensitivity, audience, binding_id),
+    )
+    return _returning_row(cursor)
+
+
+async def land_chunk(connection: asyncpg.Connection, row: dict[str, Any]) -> None:
+    # Placeholders are asyncpg's: the pools a row is landed through are asyncpg's.
+    await connection.execute(
+        'INSERT INTO "index".chunk'
+        " (id, workspace_id, content, sensitivity, audience, binding_id)"
+        " VALUES ($1, $2, $3, $4, $5, $6)",
+        row["id"],
+        row["workspace_id"],
+        row["content"],
+        row["sensitivity"],
+        row["audience"],
+        row["binding_id"],
+    )
+
+
+def enqueue_job(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    job_id: str,
+    kind: str,
+    reason: str | None,
+    subject_id: str | None,
+) -> None:
+    # Only the columns an enqueue names, so a refusal is the contract's.
+    cursor.execute(
+        "INSERT INTO job (workspace_id, id, kind, reason, subject_id, status)"
+        " VALUES (%s, %s, %s, %s, %s, 'queued')",
+        (workspace_id, job_id, kind, reason, subject_id),
+    )
 
 
 def seed_job(

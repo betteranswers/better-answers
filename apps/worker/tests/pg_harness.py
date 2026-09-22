@@ -4,6 +4,7 @@ import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import psycopg
 from testcontainers.community.postgres import PostgresContainer
@@ -43,6 +44,14 @@ CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (
 """
 
 
+def stamp_migration(cursor: psycopg.Cursor[Any], *, digest: str, when: object) -> None:
+    cursor.execute(
+        'INSERT INTO "drizzle"."__drizzle_migrations" ("hash", "created_at")'
+        " VALUES (%s, %s)",
+        (digest, when),
+    )
+
+
 def apply_journal(conninfo: str) -> None:
     with psycopg.connect(conninfo) as connection:
         for statement in _STAMP_TABLE.split(";"):
@@ -54,11 +63,12 @@ def apply_journal(conninfo: str) -> None:
             for statement in sql.split("--> statement-breakpoint"):
                 if statement.strip():
                     connection.execute(statement)
-            connection.execute(
-                'INSERT INTO "drizzle"."__drizzle_migrations" ("hash", "created_at")'
-                " VALUES (%s, %s)",
-                (hashlib.sha256(sql.encode("utf-8")).hexdigest(), entry["when"]),
-            )
+            with connection.cursor() as cursor:
+                stamp_migration(
+                    cursor,
+                    digest=hashlib.sha256(sql.encode("utf-8")).hexdigest(),
+                    when=entry["when"],
+                )
         connection.commit()
 
 

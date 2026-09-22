@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { boundarySchemas, ulid } from "@better-answers/schema";
 
 import { attempt, type Claims, type UserPrincipal } from "../src/kernel/index.ts";
+import { issuedCredentialsFor } from "./identity-rows.ts";
 import { bootstrap, principalOf, provisionedWorkspace, seedPerson } from "./platform.ts";
 import {
   openPostgres,
@@ -272,42 +273,15 @@ describe("revoking a person's credentials", () => {
     });
     const at = new Date("2026-09-02T12:00:00Z");
 
-    const superuser = await db().pool.connect();
-    try {
-      await superuser.query(
-        "INSERT INTO session (id, expires_at, token, created_at, updated_at, user_id) VALUES ('s-old', now(), 'tok-old', $2, now(), $1)",
-        [adminUserId, new Date("2026-09-02T11:00:00Z")],
-      );
-      await superuser.query(
-        "INSERT INTO session (id, expires_at, token, created_at, updated_at, user_id) VALUES ('s-new', now(), 'tok-new', $2, now(), $1)",
-        [adminUserId, new Date("2026-09-02T13:00:00Z")],
-      );
-      await superuser.query(
-        "INSERT INTO oauth_client (id, client_id, redirect_uris) VALUES ('c', 'https://c.example/x', ARRAY['https://c.example/cb'])",
-      );
-      await superuser.query(
-        "INSERT INTO oauth_refresh_token (id, token, client_id, user_id, expires_at, created_at, scopes) VALUES ('r-old', 'r-old-t', 'https://c.example/x', $1, now(), $2, ARRAY['knowledge:read'])",
-        [adminUserId, new Date("2026-09-02T11:00:00Z")],
-      );
-      await superuser.query(
-        "INSERT INTO oauth_refresh_token (id, token, client_id, user_id, expires_at, created_at, scopes) VALUES ('r-new', 'r-new-t', 'https://c.example/x', $1, now(), $2, ARRAY['knowledge:read'])",
-        [adminUserId, new Date("2026-09-02T13:00:00Z")],
-      );
-
-      for (const [tokenId, createdAt] of [
-        ["a-old", new Date("2026-09-02T11:00:00Z")],
-        ["a-new", new Date("2026-09-02T13:00:00Z")],
-      ] as const) {
-        await testData(superuser).oauthAccessToken({
-          id: tokenId,
-          clientId: "https://c.example/x",
-          userId: adminUserId,
-          createdAt,
-        });
-      }
-    } finally {
-      superuser.release();
-    }
+    await issuedCredentialsFor(db().pool, adminUserId, {
+      sessions: { earlier: "s-old", later: "s-new" },
+      refreshTokens: { earlier: "r-old", later: "r-new" },
+      accessTokens: { earlier: "a-old", later: "a-new" },
+      moments: {
+        earlier: new Date("2026-09-02T11:00:00Z"),
+        later: new Date("2026-09-02T13:00:00Z"),
+      },
+    });
 
     const beforeUpdatedAt =
       (

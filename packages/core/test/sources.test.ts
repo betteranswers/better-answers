@@ -1,3 +1,4 @@
+import { bindingIdTakenAgain } from "@better-answers/schema/testing/probes";
 import type pg from "pg";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -831,11 +832,11 @@ describe("an Admin reprocesses a binding", () => {
         const reprocessed = await reprocessBinding(admin, tx, { bindingId, reason: "wiped" });
         expect(reprocessed.ok).toBe(true);
         await attempt(() =>
-          tx.query(
-            `INSERT INTO source_binding (workspace_id, id, name, connector, sensitivity, audience)
-             VALUES ($1, $2, 'The staff handbook', 'upload', 'Restricted', 'everyone')`,
-            [scenario.workspaceId, bindingId],
-          ),
+          bindingIdTakenAgain(tx, scenario.workspaceId, {
+            bindingId,
+            name: "The staff handbook",
+            sensitivity: "Restricted",
+          }),
         );
       }),
     ).rejects.toThrow(/did not commit/);
