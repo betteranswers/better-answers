@@ -43,16 +43,16 @@ Every store this platform deploys is the real thing in a test, never a stand-in:
 
 `vi.mock`, `jest.mock` and a `monkeypatch` aimed at our own modules are banned whatever the target. A third-party attribute stays patchable.
 
-### [TEST4] Build test state through a factory
+### [TEST4] Build test state through a factory module
 
-A factory returns a domain object. A raw `INSERT` appears inside a factory module and nowhere else, so that a tier which cannot import the other's factories still has the compliant path.
+A raw `INSERT` appears inside a factory module and nowhere else, and `packages/devtools/src/insert-scan.ts` names the ones that count — a factory, a harness, a probes module, one set per tier. A file does not join that list by sitting beside a suite.
 
 ```python
 # BAD — in the test
-cursor.execute("INSERT INTO job (workspace_id, kind) VALUES (%s, %s)", (workspace, "parse"))
+cursor.execute("INSERT INTO workspace (id, name) VALUES (%s, %s)", (ulid(), "Acme"))
 
-# GOOD — in the factory the test calls
-def a_job(cursor, workspace, kind="parse") -> Job: ...
+# GOOD — in a module the scan names, which hands the row back
+workspace = seed_workspace(cursor, name="Acme")
 ```
 
 ### [TEST5] Title a test by the behaviour it proves
@@ -183,9 +183,9 @@ Every `packages/core` function that reads or writes tenant data takes a `Princip
 
 ### [SEC3] Ship a tenant table, a grant or a definer function with the test of what it refuses
 
-Create every tenant table `withRLS()` and ship its zero-rows test: under forced row-level security and the non-owner runtime role, a table with no policy returns no rows to anyone. The graph tables are tenant tables too; the identity set is the one named exemption. Every privilege a migration installs, a default privilege among them, lands with a test of the path it must **refuse** beside the path it serves: the wrong role, another tenant's scope, a partition reached directly. A partition child is a table of its own: assert its denial directly, never from the parent's. A definer function guards its arguments against the transaction's scope before any DDL, pins its `search_path`, schema-qualifies every object, and has `EXECUTE` revoked from `PUBLIC` and granted to its one caller. No LLM-authored SQL runs against a shared store.
+Create every tenant table `withRLS()` and ship its zero-rows test: under forced row-level security and the non-owner runtime role, a policy-less table returns no rows to anyone. The graph tables are tenant tables too, the identity set the one named exemption. Every privilege a migration installs, a default privilege among them, lands with a test of the path it must **refuse** beside the one it serves: the wrong role, another tenant's scope, a partition reached directly. A partition child is a table of its own: assert its denial directly, not from the parent's. A definer function guards its arguments against the transaction's scope before any DDL, pins its `search_path`, schema-qualifies every object, and has `EXECUTE` revoked from `PUBLIC` and granted to its one caller. No LLM-authored SQL runs against a shared store.
 
-Reviewer: attack a change to a migration, a grant, a policy or a definer function before it merges — a person's pass, no CI step; and nothing scans for LLM-authored SQL.
+Reviewer: attack a change to a migration, a grant, a policy or a definer function before it merges — a person's pass, no CI step; nothing scans for LLM-authored SQL.
 
 ### [SEC4] Read the environment in the tier's one config module
 
