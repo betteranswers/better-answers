@@ -15,7 +15,27 @@ import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools
 import { afterAll, describe, expect, it } from "vitest";
 
 const realGit = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
-const landScript = path.join(import.meta.dirname, "../../../scripts/land.mjs");
+const repositoryRoot = path.join(import.meta.dirname, "../../..");
+const landScript = path.join(repositoryRoot, "scripts/land.mjs");
+
+const lefthook = readFileSync(path.join(repositoryRoot, "lefthook.yml"), "utf8");
+
+const subjectCeilingHook = (): string => {
+  const block = /\n {4}subject-ceiling:\n {6}run: \|\n(?<body>(?: {8}.*\n|\n)+)/.exec(lefthook);
+  const body = block?.groups?.["body"];
+  if (body === undefined) {
+    throw new Error("lefthook.yml declares no `subject-ceiling` command under `commit-msg`");
+  }
+  return body.replaceAll(/^ {8}/gm, "");
+};
+
+const ceilingIn = (command: string): number => {
+  const found = /-gt (?<ceiling>\d+)/.exec(command)?.groups?.["ceiling"];
+  if (found === undefined) throw new Error(`the hook compares against no number:\n${command}`);
+  return Number(found);
+};
+
+const CEILING_IN_LEFTHOOK = ceilingIn(subjectCeilingHook());
 
 const scratch = mkdtempSync(path.join(tmpdir(), "land-"));
 afterAll(() => {
@@ -121,9 +141,10 @@ const branchOf = (tree: Throwaway): string =>
 
 const subjectOf = (tree: Throwaway): string => gitIn(tree.root, "log", "-1", "--format=%s").trim();
 
-const GOOD =
-  "The land command takes a small change through the queue rather than around it [T-332]";
-const GOOD_BRANCH = "t-332-land-command-takes-a-small";
+const GOOD = "The land command takes a change through the queue [T-332]";
+const GOOD_BRANCH = "t-332-land-command-takes-a-change";
+
+const OVER_THE_CEILING = `The land command says what changed ${"and says it again ".repeat(4)}[T-332]`;
 
 const REFUSED_MESSAGES = [
   {
@@ -149,6 +170,12 @@ const REFUSED_MESSAGES = [
     directory: "nameless",
     message: "— — — — — — — —",
     named: "no word a branch could be named from",
+  },
+  {
+    shape: "a subject over the ceiling",
+    directory: "over-the-ceiling",
+    message: OVER_THE_CEILING,
+    named: `this repository's ceiling is ${String(CEILING_IN_LEFTHOOK)}`,
   },
 ] as const;
 
@@ -305,6 +332,27 @@ describe("pnpm land over a throwaway repository", () => {
 
     expect(run.status).not.toBe(0);
     expect(run.stderr).toContain("could not be read back");
+  });
+
+  it("holds every commit to the same ceiling through lefthook, over a message file both ways", () => {
+    const messages = path.join(scratch, "commit-msg");
+    mkdirSync(messages, { recursive: true });
+    const hook = subjectCeilingHook();
+    const over = `${OVER_THE_CEILING}\n\nA paragraph saying what changed and why.\n`;
+    const under = `${GOOD}\n\nA paragraph saying what changed and why.\n`;
+
+    const ranOver = path.join(messages, "over");
+    const ranUnder = path.join(messages, "under");
+    writeFileSync(ranOver, over);
+    writeFileSync(ranUnder, under);
+    const refused = spawnSync("sh", ["-c", hook.replace("{1}", ranOver)], { encoding: "utf8" });
+    const taken = spawnSync("sh", ["-c", hook.replace("{1}", ranUnder)], { encoding: "utf8" });
+
+    expect(refused.status).toBe(1);
+    expect(refused.stdout).toContain(`ceiling is ${String(CEILING_IN_LEFTHOOK)}`);
+    expect(refused.stdout).toContain(String(OVER_THE_CEILING.length));
+    expect(taken.status).toBe(0);
+    expect(taken.stdout).toBe("");
   });
 
   it("says the pull request is queued when the read-back says so", () => {

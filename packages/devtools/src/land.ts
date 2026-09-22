@@ -7,6 +7,10 @@ const USAGE =
 
 const MINIMUM_WORDS = 8;
 const SLUG_WORDS = 5;
+
+// Held twice, here and by lefthook's commit-msg hook, which every commit passes through.
+// packages/devtools/test/land.test.ts holds the two to one number.
+const SUBJECT_CEILING = 72;
 const BASE = "main";
 
 const KEPT_BY_THE_SESSION = [".claude/", ".scratch/"];
@@ -45,6 +49,9 @@ const proseRefusal = (subject: string): string | undefined => {
   const words = wordsOf(subject);
   if (words.length < MINIMUM_WORDS) {
     return `the message is ${String(words.length)} words; a sentence saying what changed runs to at least eight`;
+  }
+  if (subject.length > SUBJECT_CEILING) {
+    return `the subject is ${String(subject.length)} characters and this repository's ceiling is ${String(SUBJECT_CEILING)}; say what is now true in one clause, and put the paragraph in the body after a blank line`;
   }
   if (TICKET_ANYWHERE.test(subject) && !TICKET_AT_THE_END.test(subject)) {
     return "the message names a ticket somewhere other than its end; a ticket id goes last, in brackets, so the merge commit and the branch can both be read off it";

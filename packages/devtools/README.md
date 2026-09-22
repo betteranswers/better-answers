@@ -80,11 +80,14 @@ working tree's changes and one sentence become a branch named from the message, 
 `origin/main`'s fetched head, a push, a pull request opened with `gh pr create --fill` and an
 armed auto-merge, with the queue state read back over GraphQL and printed. It exists because a
 one-line docs change cost five commands and so was pushed straight to `main`, and a commit that
-reaches `main` outside the queue rebuilds every entry already in it. **This module is where the
-repository's prose shape is written**, and the rule it serves is in `docs/agents/workflow.md`
-under *The queue*, which states no list of conditions of its own — a message or a tree the
-command will not take comes back naming the one it missed, so there is nowhere for a second
-copy to go stale. A read-back that shows the pull request neither queued nor armed fails the
+reaches `main` outside the queue rebuilds every entry already in it. The rule it serves is
+`docs/agents/workflow.md`'s *The prose shape*, which says the shape once and states no list of
+refusals of its own — a message or a tree the command will not take comes back naming the
+condition it missed. The subject ceiling is the one part written twice, here and in
+`lefthook.yml`'s `commit-msg` hook, because nothing either could import binds a shell
+one-liner to a TypeScript constant: the suite reads both and fails when they disagree, and
+runs the hook's own command over a message file either side of the ceiling. A read-back that
+shows the pull request neither queued nor armed fails the
 run and prints the command that arms it, because a run that says nothing about the arming is
 the silence this package exists to refuse. Its suite spawns the script over a throwaway git
 repository whose `origin` is a bare repository on disk, with `git push` and the whole of `gh`
