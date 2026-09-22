@@ -18,7 +18,7 @@ One adapter is a hypothetical seam; two is a real one. Take a dependency as a pa
 
 ### [DESIGN4] Refuse a value once, where it enters
 
-A value is refused by the type at the seam, by the boundary schema, or by the one check the door makes — and a value the boundary refused is never refused again inside that process. A second refusal cannot fire, so a fault in the first stays green under the suite. Correct the type so the boundary's refusal reaches the site, or delete the unreachable guard; never disable the lint there.
+A value is refused by the type at the seam, the boundary schema, or the one check the door makes — and a value the boundary refused is never refused again inside that process. A second refusal cannot fire, so a fault in the first stays green under the suite. Correct the type so the boundary's refusal reaches the site, or delete the unreachable guard; never disable the lint there.
 
 ```ts
 // BAD — `refuse` already rejected an unknown role, so this can never fire
@@ -33,11 +33,11 @@ const row: MembershipRow & { role: Role } = refuse(member);
 
 ### [TEST1] Test through the interface a caller crosses
 
-Reach `apps/api` through `server.request(...)`, `apps/worker` through the job or module entry point, and `packages/core` through an entry its `exports` map names. Drive `apps/web` as a browser drives the served build, or render a component through Testing Library where the component's own behaviour is under test; never assert a screen against its source. Hand a sibling workspace shared test infrastructure through an entry under the `./testing` name, never a bare path.
+Reach `apps/api` through `server.request(...)`, `apps/worker` through the job or module entry point, and `packages/core` through an entry its `exports` map names. Drive `apps/web` as a browser drives the served build, or render a component through Testing Library where its own behaviour is under test; never assert a screen against its source. Hand a sibling workspace shared test infrastructure through an entry under the `./testing` name, never a bare path.
 
 ### [TEST2] Run every store the platform runs, for real
 
-Every store this platform deploys is the real thing in a test, never a stand-in: Postgres, the object store, the git repository, the graph. An in-memory adapter is for a service someone else runs — an LLM provider, a SaaS API — and it lives behind that service's own adapter.
+Every store this platform deploys is the real thing in a test, never a stand-in: Postgres, the object store, the git repository, the graph. An in-memory adapter is for a service someone else runs — an LLM provider, a SaaS API — behind that service's own adapter.
 
 ### [TEST3] Never mock our own code
 
@@ -45,13 +45,13 @@ Every store this platform deploys is the real thing in a test, never a stand-in:
 
 ### [TEST4] Build test state through a factory module
 
-A raw `INSERT` appears inside a factory module and nowhere else, and `packages/devtools/src/insert-scan.ts` names the ones that count — a factory, a harness, a probes module, one set per tier. A file does not join that list by sitting beside a suite.
+A raw `INSERT` appears inside a factory module and nowhere else, and `packages/devtools/src/insert-scan.ts` names the ones that count — a factory, a harness, a probes module, one set per tier. A file does not join that list by sitting beside a suite. A factory hands back what it wrote, so a test never re-reads the row it made.
 
 ```python
-# BAD — in the test
+# BAD — in the test, and the row has to be read back to be asserted on
 cursor.execute("INSERT INTO workspace (id, name) VALUES (%s, %s)", (ulid(), "Acme"))
 
-# GOOD — in a module the scan names, which hands the row back
+# GOOD — the factory the scan names, handing back what it wrote
 workspace = seed_workspace(cursor, name="Acme")
 ```
 
@@ -67,11 +67,11 @@ A survivor the summary newly names is a task; a falling score is not a failed bu
 
 ### [TEST7] Check a pair in both directions
 
-Where a list names members, a generated artefact mirrors a source or a registry names them, assert both ways: every entry has its member, and every member has its entry. One direction finds the missing, the other the orphan.
+Where a list names members, a generated artefact mirrors a source or a registry names them, assert both ways: every entry has its member, and every member its entry. One direction finds the missing, the other the orphan.
 
 ### [TEST8] Assert a provoked transaction's outcome before any value
 
-Postgres aborts the transaction whatever the work does with a caught rejection, so a test that swallows a statement failure and asserts a returned value can pin a rolled-back transaction as a success. Assert the rejection, or the rows, first.
+Postgres aborts the transaction whatever the work does with a caught rejection, so a test that swallows a statement failure and asserts a returned value can pin a rolled-back transaction as success. Assert the rejection, or the rows, first.
 
 Reviewer: what a test asserts, and in what order, nothing but a person can see.
 
@@ -101,7 +101,7 @@ A test script never passes for having found no tests, and a focused browser spec
 
 ### [CHECK3] Name every failure in one run
 
-A workspace's `check` runs every step it has, even after one fails, and reports them together; `&&` between steps is banned. Each tier has one runner, and a manifest's steps are named in that manifest and nowhere else.
+A workspace's `check` runs every step it has even after one fails, and reports them together; `&&` between steps is banned. Each tier has one runner, and a manifest's steps are named in that manifest and nowhere else.
 
 ## COMMENT
 
@@ -183,9 +183,9 @@ Every `packages/core` function that reads or writes tenant data takes a `Princip
 
 ### [SEC3] Ship a tenant table, a grant or a definer function with the test of what it refuses
 
-Create every tenant table `withRLS()` and ship its zero-rows test: under forced row-level security and the non-owner runtime role, a policy-less table returns no rows to anyone. The graph tables are tenant tables too, the identity set the one named exemption. Every privilege a migration installs, a default privilege among them, lands with a test of the path it must **refuse** beside the one it serves: the wrong role, another tenant's scope, a partition reached directly. A partition child is a table of its own: assert its denial directly, not from the parent's. A definer function guards its arguments against the transaction's scope before any DDL, pins its `search_path`, schema-qualifies every object, and has `EXECUTE` revoked from `PUBLIC` and granted to its one caller. No LLM-authored SQL runs against a shared store.
+Create every tenant table `withRLS()` and ship its zero-rows test: under forced row-level security and the non-owner runtime role, a policy-less table returns no rows. The graph tables are tenant tables too, the identity set the one named exemption. Every privilege a migration installs, a default privilege among them, lands with a test of the path it must **refuse** beside the one it serves: the wrong role, another tenant's scope, a partition reached directly. A partition child is a table of its own: assert its denial directly, not the parent's. A definer function guards its arguments against the transaction's scope before any DDL, pins its `search_path`, schema-qualifies every object, and has `EXECUTE` revoked from `PUBLIC` and granted to its one caller. No LLM-authored SQL runs against a shared store.
 
-Reviewer: attack a change to a migration, a grant, a policy or a definer function before it merges — a person's pass, no CI step; nothing scans for LLM-authored SQL.
+Reviewer: attack a change to a migration, a grant, a policy or a definer function before it merges — a person's pass, no CI step; nothing scans LLM-authored SQL.
 
 ### [SEC4] Read the environment in the tier's one config module
 
@@ -215,11 +215,11 @@ The structured detail names a record by its id and a role by its word — Admin,
 
 ### [AUDIT6] Keep the ledger append-only in the database
 
-The migration that creates `audit_event` revokes `UPDATE` and `DELETE` from the app's role and grants the worker's role nothing on the table, each refusal tested beside the path it serves.
+The migration that creates `audit_event` revokes `UPDATE` and `DELETE` from the app's role and grants the worker's role nothing, each refusal tested beside the path it serves.
 
 ### [AUDIT7] Mint the row's id before the write
 
-The writer mints a ULID through the kernel minter, and the column has no database default, so a governed write mints its id before its git commit: a ledger row and a commit join on one id.
+The writer mints a ULID through the kernel minter and the column has no database default, so a governed write mints its id before its git commit: a ledger row and a commit join on one id.
 
 ### [AUDIT8] Keep a read, a run and a health check out of the ledger
 
@@ -241,4 +241,4 @@ Every dependency, image, extension and tool version is read from the vendor's ow
 
 ### [DEPS2] Export a pinned value as one constant
 
-Every pinned value is one exported constant in the package that owns the decision. Every TypeScript consumer imports it; a tier that cannot import reads the constant's source file and refuses more than one match. A copy is a second pin that ages alone.
+Every pinned value is one exported constant in the package that owns the decision. Every TypeScript consumer imports it; a tier that cannot import reads the constant's source and refuses more than one match. A copy is a second pin that ages alone.
