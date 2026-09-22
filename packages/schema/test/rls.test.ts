@@ -12,11 +12,14 @@ import {
   RLS_EXEMPTIONS,
   ROLES,
   SUGGESTION_BODY_MAX,
+  SUGGESTION_KINDS,
+  SUGGESTION_KINDS_FROM_A_RUN,
+  SUGGESTION_KINDS_FROM_THE_APP,
   ulid,
 } from "../src/index.ts";
 import { type TestData, testData } from "./factory.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
-import { refusesEach } from "./probes.ts";
+import { ADMITTED, refusesEach, sqlstateOf } from "./probes.ts";
 import {
   A_BUNDLE_COMMIT,
   A_BUNDLE_COMMIT_WITH_A_PARENT,
@@ -1265,37 +1268,6 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("lets each tier raise only the kinds that are its own, whatever a caller names (migration 0018)", async () => {
-    await withRollback(db.pool, async (client) => {
-      await seedTwoWorkspaces(client);
-      const submit = (kind: string, proposer: string) =>
-        submitSet(client, { kind, proposer, requests: [submitRequest()] });
-
-      await client.query("SET LOCAL ROLE worker_rt");
-      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-
-      await client.query("SAVEPOINT kind");
-      await expect(submit("edit", "human:01J6CCCCCCCCCCCCCCCCCCCCCC")).rejects.toThrow(
-        /worker_rt may not raise a suggestion of kind edit/,
-      );
-      await client.query("ROLLBACK TO SAVEPOINT kind");
-
-      const repaired = await submit("repair", "process:better-answers-citation-repair");
-      expect(repaired.rowCount).toBe(1);
-
-      await client.query("SET LOCAL ROLE app_rt");
-
-      await client.query("SAVEPOINT app");
-      await expect(submit("repair", "process:better-answers-citation-repair")).rejects.toThrow(
-        /app_rt may not raise a suggestion of kind repair/,
-      );
-      await client.query("ROLLBACK TO SAVEPOINT app");
-      await expect(submit("candidate", "better-answers-extraction/1.2")).rejects.toThrow(
-        /app_rt may not raise a suggestion of kind candidate/,
-      );
-    });
-  });
-
   it("refuses the worker role the queue, and lets it submit a set through the function alone (migration 0018)", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
@@ -1522,6 +1494,74 @@ describe("the inbox under app_rt", () => {
           [WS_A, here.id, theirs.iri],
         ),
       ).rejects.toThrow(/suggestion_target_fk/);
+    });
+  });
+});
+
+const INSUFFICIENT_PRIVILEGE = "42501";
+
+// The one proposer form every kind's CHECK accepts, repair's platform-only one included, so
+// the pair under test is all the probe varies.
+const A_PLATFORM_PROPOSER = "process:better-answers-test";
+
+// Under role NONE the function reads its caller off `session_user` instead: the migrator
+// who applied the journal, whom its CASE names no branch for.
+const THE_CALLERS = [
+  { caller: "app_rt", mayRaise: SUGGESTION_KINDS_FROM_THE_APP, role: "app_rt" },
+  { caller: "worker_rt", mayRaise: SUGGESTION_KINDS_FROM_A_RUN, role: "worker_rt" },
+  { caller: "the migrator", mayRaise: [], role: "NONE" },
+] as const satisfies readonly {
+  readonly caller: string;
+  readonly mayRaise: readonly string[];
+  readonly role: string;
+}[];
+
+const submittingOneRequest = async (client: pg.PoolClient, kind: string): Promise<string> => {
+  const suggestionId = ulid();
+  await client.query("SAVEPOINT kind_probe");
+  try {
+    const submitted = await submitSet(client, {
+      kind,
+      proposer: A_PLATFORM_PROPOSER,
+      requests: [submitRequest({ suggestion_id: suggestionId })],
+    });
+    const landed = submitted.rows.map((row) => row.submit_suggestion_set);
+    return landed.length === 1 && landed[0] === suggestionId
+      ? ADMITTED
+      : `landed ${landed.join(", ")}`;
+  } catch (error) {
+    return sqlstateOf(error);
+  } finally {
+    await client.query("ROLLBACK TO SAVEPOINT kind_probe");
+  }
+};
+
+describe("the kinds a caller may raise, asked of the function itself (migration 0018)", () => {
+  it("lands a set of any kind its caller's tier names, refuses that caller every other kind, and refuses a caller of no tier all of them", async () => {
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      // Owning the function, the migrator may execute it, so what refuses it below is the
+      // CASE's silence rather than a missing grant.
+      const owner = await client.query<{ holds: boolean }>(
+        "SELECT has_function_privilege(session_user, 'submit_suggestion_set(text, text, text, jsonb)', 'EXECUTE') AS holds",
+      );
+      expect(owner.rows[0]?.holds).toBe(true);
+
+      const answered: Record<string, string> = {};
+      const theConstantsSay: Record<string, string> = {};
+      for (const { caller, mayRaise, role } of THE_CALLERS) {
+        await client.query(`SET LOCAL ROLE ${role}`);
+        for (const kind of SUGGESTION_KINDS) {
+          answered[`${caller} raising ${kind}`] = await submittingOneRequest(client, kind);
+          theConstantsSay[`${caller} raising ${kind}`] = mayRaise.some((named) => named === kind)
+            ? ADMITTED
+            : INSUFFICIENT_PRIVILEGE;
+        }
+      }
+
+      expect(answered).toEqual(theConstantsSay);
     });
   });
 });
