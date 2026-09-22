@@ -1,0 +1,29 @@
+packages/core/src/sources/orphans.ts
+  s_2dd75a86f22d42::t_e53f3814c7faa2 3-4,11,25-28,33-34,53-91,109,115-121,124-127,129-131,133,136,138-140
+CONTEXT.md
+  s_2dd75a86f22d42::t_e53f3814c7faa2 268-269
+packages/core/test/sources.test.ts
+  s_2dd75a86f22d42::t_e53f3814c7faa2 22,393-394,397-400,425,427,430-434,467-495
+apps/api/tests/ops.test.ts
+  s_2dd75a86f22d42::t_e53f3814c7faa2 37-44,493-504,576,579-582
+apps/api/src/ops/index.ts
+  s_2dd75a86f22d42::t_e53f3814c7faa2 133-135
+packages/core/src/sources/binding.ts
+  s_2dd75a86f22d42::t_e53f3814c7faa2 162,164-165,216,219,224,230,260-267,291-297
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "96f2046b28d97b1470d978d966f7c2e3b5e4dbdb",
+  "prompts": {},
+  "sessions": {
+    "s_2dd75a86f22d42": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1deab29c-2105-473f-9514-e52636269c8a",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
