@@ -1,10 +1,13 @@
 import { defineRule } from "@oxlint/plugins";
 
 import { citationIn } from "../../src/citations.ts";
+import { stringsGoUnread } from "../../src/tag-printing-gates.ts";
 
-import type { Comment, Fix, Fixer, Range } from "@oxlint/plugins";
+import type { Comment, Fix, Fixer, Node, Range } from "@oxlint/plugins";
 
 const WORD_LIMIT = 25;
+
+const A_SPACE = /\s/;
 
 const EXEMPT_OPENING =
   /^(?:!|\/\s*<reference\b|eslint-|oxlint-|@ts-|@vitest-environment\b|@license\b|prettier-ignore\b|oxfmt-ignore\b|biome-ignore\b|jscpd:ignore|v8 ignore\b|c8 ignore\b|istanbul ignore\b|SPDX-License-Identifier\b|Copyright\b)/;
@@ -60,17 +63,36 @@ export const commentOnlyTheWhyRule = defineRule({
     fixable: "code",
     docs: {
       description:
-        "A comment block is 25 words at most and cites no ticket, date, rule tag or ADR number ([COMMENT1]). Directives and notices are exempt.",
+        "A comment block is 25 words at most and cites no ticket, date, rule tag or ADR number ([COMMENT1]), and neither does a string a person reads. Directives and notices are exempt.",
     },
     messages: {
       tooLong:
         "This comment runs to {{words}} words; a comment gives a reason the code cannot — a constraint, a trade-off, a gotcha — in {{limit}} at most ([COMMENT1]). Delete what the code already says.",
       cites:
         "This comment cites {{what}} (`{{cited}}`); a comment never says which ticket, decision or rule asked for the code ([COMMENT1]). git, a spec and an ADR are where that is read.",
+      stringCites:
+        "This string cites {{what}} (`{{cited}}`); a string that reaches a person names what they can act on, never a document they cannot open from where they read it ([COMMENT1]). Say the thing instead.",
     },
   },
   createOnce(context) {
+    const refuseCitation = (node: Node, text: string): void => {
+      // A string with no space in it is an identifier, a path, a key or a version — a value,
+      // not something a person reads.
+      if (!A_SPACE.test(text) || stringsGoUnread(context.filename)) return;
+      const cited = citationIn(text);
+      if (cited === undefined) return;
+      context.report({ node, messageId: "stringCites", data: { ...cited } });
+    };
+
     return {
+      Literal(node): void {
+        if (typeof node.value === "string") refuseCitation(node, node.value);
+      },
+      TemplateLiteral(node): void {
+        for (const quasi of node.quasis) {
+          refuseCitation(quasi, quasi.value.cooked ?? quasi.value.raw);
+        }
+      },
       "Program:exit"(): void {
         const text = context.sourceCode.text;
         for (const block of blocksIn(text, context.sourceCode.getAllComments())) {

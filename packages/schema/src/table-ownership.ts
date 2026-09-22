@@ -85,35 +85,35 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "workspaces",
     access: "read and write",
     reason:
-      "Provisioning inserts the row and its config in one transaction, and the membership read looks up the workspace's name; Better Auth owns the table as its organisation model, the workspaces slice owns the tenant's lifecycle over it (ADR 0009, ADR 0029).",
+      "Provisioning inserts the row and its config in one transaction, and the membership read looks up the workspace's name; Better Auth owns the table as its organisation model, the workspaces slice owns the tenant's lifecycle over it.",
   },
   {
     table: "public.member",
     by: "workspaces",
     access: "read and write",
     reason:
-      "Provisioning writes the first Admin membership in the same transaction as the workspace, and the slice reads the workspaces one person holds by their person id — the picker's cross-workspace read, which runs before any workspace is known (ADR 0035).",
+      "Provisioning writes the first Admin membership in the same transaction as the workspace, and the slice reads the workspaces one person holds by their person id — the picker's cross-workspace read, which runs before any workspace is known.",
   },
   {
     table: "public.user",
     by: "workspaces",
     access: "read and write",
     reason:
-      "Revoking a person's credentials writes the instant every later claim is refused against, and the membership read looks up the person's name and address for the shell (ADR 0018, ADR 0035).",
+      "Revoking a person's credentials writes the instant every later claim is refused against, and the membership read looks up the person's name and address for the shell.",
   },
   {
     table: "public.session",
     by: "workspaces",
     access: "write",
     reason:
-      "Revoking everywhere ends every browser session created before the instant, in the same transaction that wrote it (ADR 0018).",
+      "Revoking everywhere ends every browser session created before the instant, in the same transaction that wrote it.",
   },
   {
     table: "public.oauth_refresh_token",
     by: "workspaces",
     access: "write",
     reason:
-      "Revocation's two scopes end the refresh tokens minted before the instant — every one of the person's, or only those whose consented workspace is this one (ADR 0035).",
+      "Revocation's two scopes end the refresh tokens minted before the instant — every one of the person's, or only those whose consented workspace is this one.",
   },
   {
     table: "public.oauth_access_token",
@@ -126,21 +126,21 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "erasure",
     access: "read and write",
     reason:
-      "The routine's step 5 pseudonymises the row on the person's last membership — the address to a tombstone the erasure pseudonym names, the name cleared, the id kept because every ledger row names it (ADR 0020, ADR 0035) — and reads the address off it first, because the two rows deleted below are keyed by address and not by person. The erasure rehearsal's seed writes one row the other way, the synthetic subject a drill erases, under a reserved domain that resolves nowhere (ADR 0022, ADR 0024).",
+      "The routine's step 5 pseudonymises the row on the person's last membership — the address to a tombstone the erasure pseudonym names, the name cleared, the id kept because every ledger row names it — and reads the address off it first, because the two rows deleted below are keyed by address and not by person. The erasure rehearsal's seed writes one row the other way, the synthetic subject a drill erases, under a reserved domain that resolves nowhere.",
   },
   {
     table: "public.member",
     by: "erasure",
     access: "write",
     reason:
-      "Every erasure request ends this workspace's membership, which is the whole of what the arm for a person who holds another does; the judgement between the two arms is the platform's and is never shown to an Admin (ADR 0035's rejected oracle). The read that makes it is `workspacesHeldBy` through the workspaces slice, recorded above. The erasure rehearsal's seed writes the one membership it later ends, so the drill's subject is held where a real member is (ADR 0022).",
+      "Every erasure request ends this workspace's membership, which is the whole of what the arm for a person who holds another does; the judgement between the two arms is the platform's and is never shown to an Admin. The read that makes it is `workspacesHeldBy` through the workspaces slice, recorded above. The erasure rehearsal's seed writes the one membership it later ends, so the drill's subject is held where a real member is.",
   },
   {
     table: "public.session",
     by: "erasure",
     access: "write",
     reason:
-      "A sign-in carries the address it came from and the agent that made it, so the person's sessions go with the identity set on the last membership (ADR 0020).",
+      "A sign-in carries the address it came from and the agent that made it, so the person's sessions go with the identity set on the last membership.",
   },
   {
     table: "public.verification",
@@ -161,14 +161,14 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "erasure",
     access: "write",
     reason:
-      "A linked account is the external identity a sign-in came through — a name for this person at another provider — so it goes with the identity set on the last membership (ADR 0020).",
+      "A linked account is the external identity a sign-in came through — a name for this person at another provider — so it goes with the identity set on the last membership.",
   },
   {
     table: "public.member",
     by: POSTGRES_DOOR,
     access: "read",
     reason:
-      "The Principal resolver reads the member row for (workspace, person) and the membership's revocation instant, in the transaction that sets the scope — so the role is resolved in the same transaction as the read it authorises, which is what makes the door a door (ADR 0018, ADR 0035).",
+      "The Principal resolver reads the member row for (workspace, person) and the membership's revocation instant, in the transaction that sets the scope — so the role is resolved in the same transaction as the read it authorises, which is what makes the door a door.",
   },
   {
     table: "public.user",
@@ -182,14 +182,14 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: POSTGRES_DOOR,
     access: "read",
     reason:
-      "The same one resolve query aggregates the caller's group ids into the Principal, because groups are re-read per call rather than carried on a credential (ADR 0009): every visibility check then pays one membership lookup it already has (ADR 0038).",
+      "The same one resolve query aggregates the caller's group ids into the Principal, because groups are re-read per call rather than carried on a credential: every visibility check then pays one membership lookup it already has.",
   },
   {
     table: "public.member",
     by: "members",
     access: "read",
     reason:
-      "Adding a person to a group reads whether they are a member of the workspace first, so the act answers `no-such-member` rather than letting the composite foreign key abort the caller's transaction; T-061's request act reads the same row to answer already-a-member neutrally.",
+      "Adding a person to a group reads whether they are a member of the workspace first, so the act answers `no-such-member` rather than letting the composite foreign key abort the caller's transaction; the request act reads the same row to answer already-a-member neutrally.",
   },
   {
     table: "public.user",
@@ -203,76 +203,76 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "concepts",
     access: "read",
     reason:
-      "Accepting an *edit* suggestion commits with the proposer as git author (ADR 0012's 2026-08-27 amendment), and a git author line is a name and an address — which the ledger's `human:<person id>` deliberately is not, so the act reads them off the person the proposer names.",
+      "Accepting an *edit* suggestion commits with the proposer as git author, and a git author line is a name and an address — which the ledger's `human:<person id>` deliberately is not, so the act reads them off the person the proposer names.",
   },
   {
     table: "public.member",
     by: "concepts",
     access: "read",
     reason:
-      "The same read joins the membership: a proposer is a string a producer wrote and `user` is global by design (ADR 0009), so a lookup by id alone would let a compromised producer put any person on the platform into another tenant's commit. Only a member of this workspace can be named as an author.",
+      "The same read joins the membership: a proposer is a string a producer wrote and `user` is global by design, so a lookup by id alone would let a compromised producer put any person on the platform into another tenant's commit. Only a member of this workspace can be named as an author.",
   },
   {
     table: "public.invitation",
     by: "members",
     access: "write",
     reason:
-      "Approving an access request mints the invitation row directly, in the same transaction as the decision — a direct row write through the identity-write seam, never Better Auth's endpoint path, so T-004's two invitation fences stand until T-027 ships the accept page (ADR 0038).",
+      "Approving an access request mints the invitation row directly, in the same transaction as the decision — a direct row write through the identity-write seam, never Better Auth's endpoint path, so the two invitation fences stand until the accept page ships.",
   },
   {
     table: "public.graph_generation",
     by: GRAPH_DOOR,
     access: "read and write",
     reason:
-      "The delta builder creates the live-generation row on a workspace's first delta and binds it on every write; the traversal templates bind it on every walk, so a rebuild's flip is one row update every read sees at once (ADR 0023, ADR 0032).",
+      "The delta builder creates the live-generation row on a workspace's first delta and binds it on every write; the traversal templates bind it on every walk, so a rebuild's flip is one row update every read sees at once.",
   },
   {
     table: "public.graph_node",
     by: GRAPH_DOOR,
     access: "read and write",
     reason:
-      "The delta builder upserts the bundle-and-record nodes inside the governed write's transaction, and the traversal templates read them with the predicate on every element of every path (ADR 0023, ADR 0032).",
+      "The delta builder upserts the bundle-and-record nodes inside the governed write's transaction, and the traversal templates read them with the predicate on every element of every path.",
   },
   {
     table: "public.graph_edge",
     by: GRAPH_DOOR,
     access: "read and write",
     reason:
-      "The delta builder replaces a concept's outgoing edges inside the governed write's transaction, and the traversal templates read them with the predicate on every element of every path (ADR 0023, ADR 0032).",
+      "The delta builder replaces a concept's outgoing edges inside the governed write's transaction, and the traversal templates read them with the predicate on every element of every path.",
   },
   {
     table: "public.concept_index",
     by: GRAPH_DOOR,
     access: "read",
     reason:
-      "The delta builder resolves a link's target to a concept and reads its kind off the index inside the act's own transaction, and a newly landed concept's linkers are found there — the map is derived from the rows the same transaction just wrote (ADR 0023).",
+      "The delta builder resolves a link's target to a concept and reads its kind off the index inside the act's own transaction, and a newly landed concept's linkers are found there — the map is derived from the rows the same transaction just wrote.",
   },
   {
     table: "public.source_document",
     by: "concepts",
     access: "read",
     reason:
-      "The class derivation joins a concept's citations to the documents they locate, to reach the binding each was yielded by — the platform-held fact a producer's citation cannot supply (ADR 0023, ADR 0039).",
+      "The class derivation joins a concept's citations to the documents they locate, to reach the binding each was yielded by — the platform-held fact a producer's citation cannot supply.",
   },
   {
     table: "public.source_binding",
     by: "concepts",
     access: "read",
     reason:
-      "A concept's class is the most restrictive among the bindings of the evidence it cites and its audience their intersection (ADR 0023, ADR 0039); the evidence pane applies the reader's predicate to the same rows to say which cited evidence they may reach.",
+      "A concept's class is the most restrictive among the bindings of the evidence it cites and its audience their intersection; the evidence pane applies the reader's predicate to the same rows to say which cited evidence they may reach.",
   },
   {
     table: "public.job",
     by: "sources",
     access: "read",
     reason:
-      "The publish act reads the status of the binding's latest `index` run, by subject, inside its own transaction: the worker holds SELECT alone on `source_binding`, so the run's own row is the only place the tier doing the work can say where it got to, and only *done* lets a publish through (ADR 0013, amended 2026-09-11). One column of one row, by the statement in `packages/core/src/sources/binding.ts`. The review read's other question of the same table — what the latest finished run found — goes through the runs slice's own door (`latestIndexOutcomeIn`), because an outcome is read through the queue's boundary and a status word is not.",
+      "The publish act reads the status of the binding's latest `index` run, by subject, inside its own transaction: the worker holds SELECT alone on `source_binding`, so the run's own row is the only place the tier doing the work can say where it got to, and only *done* lets a publish through. One column of one row, by the statement in `packages/core/src/sources/binding.ts`. The review read's other question of the same table — what the latest finished run found — goes through the runs slice's own door (`latestIndexOutcomeIn`), because an outcome is read through the queue's boundary and a status word is not.",
   },
   {
     table: "public.concept_index",
     by: "guides",
     access: "read",
     reason:
-      "A composition's class is the most restrictive among its includes (ADR 0023), read off the concepts' rows; the footnote read applies the concept's own predicate to every include, so a composition's citation is never a side door to a concept its reader may not see.",
+      "A composition's class is the most restrictive among its includes, read off the concepts' rows; the footnote read applies the concept's own predicate to every include, so a composition's citation is never a side door to a concept its reader may not see.",
   },
 ] as const satisfies readonly CrossOwnerAccess[];

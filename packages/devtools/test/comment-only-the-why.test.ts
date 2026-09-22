@@ -103,6 +103,59 @@ describe("the comment rule stays silent where a comment earns its place", () => 
   });
 });
 
+describe("the string check refuses what a reader cannot open from where they read it", () => {
+  const saying = (text: string): Tree => ({ [FILE]: `export const usage = "${text}";\n` });
+
+  it.each([
+    ["a ticket id", "Ask the owner about T-243 first."],
+    ["an ADR number", "The graph is Postgres under ADR 0021."],
+    ["an ISO date", "The registry moved on 2026-09-21."],
+    ["a slashed date", "The registry moved on 21/09/2026."],
+  ])("refuses a string citing %s", (_what, text) => {
+    expect(lint.flagged(saying(text))).toEqual([FILE]);
+  });
+
+  it("refuses a rule tag in a string, which a comment scan never reached", () => {
+    expect(lint.flagged(saying(`A raw insert lives in a factory (${tag("TEST", "4")}).`))).toEqual([
+      FILE,
+    ]);
+  });
+
+  it("refuses a citation in a template literal's text", () => {
+    const template = {
+      [FILE]: "export const usage = (id: string): string => `${id} landed under T-243.`;\n",
+    };
+
+    expect(lint.flagged(template)).toEqual([FILE]);
+  });
+
+  it("stays silent over a string that names what the reader can do", () => {
+    expect(lint.flagged(saying("Name a workspace this person belongs to."))).toEqual([]);
+  });
+
+  it("walks past a value with no prose in it, which no reader reads as a sentence", () => {
+    const profile = { [FILE]: 'export const profile = "mcp-2026-07-28";\n' };
+
+    expect(lint.flagged(profile)).toEqual([]);
+  });
+
+  it("walks past the same string in a test", () => {
+    const inATest = {
+      "tests/probe.ts": 'export const usage = "The graph is Postgres under ADR 0021.";\n',
+    };
+
+    expect(lint.flagged(inATest)).toEqual([]);
+  });
+
+  it("walks past the same string in a gate that prints its own tag", () => {
+    const inAGate = {
+      "packages/devtools/src/insert-scan.ts": `export const said = "A raw insert lives in a factory (${tag("TEST", "4")}).";\n`,
+    };
+
+    expect(lint.flagged(inAGate)).toEqual([]);
+  });
+});
+
 describe("the rule's fix", () => {
   const fixed = (tree: Tree): string => {
     const directory = mkdtempSync(path.join(tmpdir(), "comment-fix-"));

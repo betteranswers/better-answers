@@ -107,9 +107,9 @@ A workspace's `check` runs every step it has even after one fails, and reports t
 
 ### [COMMENT1] Comment only the why
 
-A comment gives a reason the code cannot: a constraint, a trade-off, a gotcha. It never says what the code does, what it used to do, or which ticket, decision or rule asked for it. Absent is the default, and a file opens with code. A directive, a notice and a copy-detection fence sit outside this rule.
+A comment gives a reason the code cannot: a constraint, a trade-off, a gotcha. It never says what the code does or did, or which ticket, decision or rule asked for it. A string a person reads cites nothing either, tests apart. Absent is the default; a file opens with code. A directive, a notice and a copy-detection fence sit outside.
 
-Reviewer: nothing can read a comment's intent, so a restatement or a narration is a person's to remove.
+Reviewer: nothing reads a comment's intent, so a restatement or a narration is a person's to remove.
 
 ### [COMMENT2] Write a rule tag in a rules file, a review finding or a gate's failure message
 

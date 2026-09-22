@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ast
 import io
+import json
 import re
 import sys
 import token
@@ -10,6 +11,7 @@ import tokenize
 from bisect import bisect_right
 from collections.abc import Callable, Iterable
 from pathlib import Path
+from typing import Any
 
 from citations import citation_in
 
@@ -61,7 +63,27 @@ CITES = (
     "are where that is read."
 )
 
+STRING_CITES = (
+    "{path}:{line}: this string cites {what} (`{cited}`); a string that reaches a "
+    "person names what they can act on, never a document they cannot open from where "
+    "they read it ([COMMENT1]). Say the thing instead."
+)
+
 DOCSTRING_HOLDERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+
+A_TEST_PATH = re.compile(r"(?:^|/)(?:tests?|e2e)/|(?:^|/)(?:test_[^/]*|conftest)\.py$")
+
+A_SPACE = re.compile(r"\s")
+
+GATES = Path(__file__).resolve().parents[1] / "gates-printing-a-tag.json"
+
+
+def _gates_printing_a_tag() -> tuple[str, ...]:
+    fixture: Any = json.loads(GATES.read_text(encoding="utf8"))
+    return tuple(str(gate) for gate in fixture["gates"])
+
+
+PRINTS_A_TAG = _gates_printing_a_tag()
 
 
 NEVER_WALKED = frozenset(
@@ -224,6 +246,43 @@ def _docstrings(source: str) -> list[Block]:
     return found
 
 
+def _docstring_nodes(tree: ast.AST) -> set[int]:
+    held: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, DOCSTRING_HOLDERS) or not node.body:
+            continue
+        first = node.body[0]
+        if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant):
+            held.add(id(first.value))
+    return held
+
+
+def _strings(source: str) -> list[Block]:
+    tree = ast.parse(source)
+    a_docstring = _docstring_nodes(tree)
+    # A string with no space in it is an identifier, a path, a key or a version —
+    # a value, not something a person reads.
+    return [
+        (node.lineno, node.value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and A_SPACE.search(node.value) is not None
+        and id(node) not in a_docstring
+    ]
+
+
+def _strings_go_unread(path: Path) -> bool:
+    # Only Python source carries a string literal this check can read; the other
+    # languages in the table carry none.
+    if path.suffix != ".py":
+        return True
+    text = path.as_posix()
+    return bool(A_TEST_PATH.search(text)) or any(
+        text == gate or text.endswith(f"/{gate}") for gate in PRINTS_A_TAG
+    )
+
+
 def _python_blocks(source: str) -> list[Block]:
     return _blocks(source.splitlines(), _python_comments(source)) + _docstrings(source)
 
@@ -249,6 +308,14 @@ SYNTAX: dict[str, Reader] = {
 
 def _findings(path: Path, source: str) -> list[str]:
     said: list[str] = []
+    if not _strings_go_unread(path):
+        for line, text in _strings(source):
+            cited = citation_in(text)
+            if cited is not None:
+                what, citation = cited
+                said.append(
+                    STRING_CITES.format(path=path, line=line, what=what, cited=citation)
+                )
     for line, prose in SYNTAX[path.suffix](source):
         cited = citation_in(prose)
         if cited is not None:

@@ -275,6 +275,51 @@ describe("the check speaks only for a root the strip has wired", () => {
   });
 });
 
+describe("the Python check refuses what a reader cannot open from where they read it", () => {
+  const saying = (text: string): Tree => ({ [FILE]: `USAGE = "${text}"\n` });
+
+  it.each([
+    ["a ticket id", "Ask the owner about T-243 first."],
+    ["an ADR number", "The graph is Postgres under ADR 0021."],
+    ["an ISO date", "The registry moved on 2026-09-21."],
+    ["a slashed date", "The registry moved on 21/09/2026."],
+  ])("refuses a string citing %s", (_what, text) => {
+    expect(findings(saying(text))).toHaveLength(1);
+  });
+
+  it("refuses a rule tag in a string, which a comment scan never reached", () => {
+    expect(findings(saying(`A raw insert lives in a factory (${tag("TEST", "4")}).`))).toHaveLength(
+      1,
+    );
+  });
+
+  it("counts a docstring citing a ticket once, not twice", () => {
+    expect(findings({ [FILE]: `"""Kept under T-243."""\n\nKEEP = 1\n` })).toHaveLength(1);
+  });
+
+  it("stays silent over a string that names what the reader can do", () => {
+    expect(findings(saying("Name a workspace this person belongs to."))).toEqual([]);
+  });
+
+  it("walks past a value with no prose in it, which no reader reads as a sentence", () => {
+    expect(findings({ [FILE]: 'READ_ON = "2026-09-11"\n' })).toEqual([]);
+  });
+
+  it("walks past the same string in a test", () => {
+    const inATest = { "tests/test_probe.py": 'USAGE = "The graph is Postgres under ADR 0021."\n' };
+
+    expect(findings(inATest)).toEqual([]);
+  });
+
+  it("walks past the same string in the gate that prints its own tag", () => {
+    const inAGate = {
+      "packages/devtools/python/comment_gate.py": `SAID = "A raw insert lives in a factory (${tag("TEST", "4")})."\n`,
+    };
+
+    expect(findings(inAGate)).toEqual([]);
+  });
+});
+
 describe("the check refuses to answer for a file it could not read", () => {
   it("exits on a file it cannot parse rather than reporting a clean tree", () => {
     expect(() => run({ [FILE]: "def broken(\n" })).toThrow(/could not be read/);
