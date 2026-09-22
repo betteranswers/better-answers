@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { CONTENT_HASH } from "@better-answers/schema";
 
-import type { UserPrincipal } from "../src/kernel/index.ts";
 import {
   dpiaInputFor,
   NOT_RECORDED,
@@ -10,16 +9,11 @@ import {
   SPECIAL_CATEGORY_CONDITION,
   type DpiaInput,
 } from "../src/sources/index.ts";
-import type { Tx } from "../src/store/postgres/index.ts";
-import { readingAs, seedingWith } from "./suite-postgres.ts";
-import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
+import { visibilitySuite } from "./sourced-concept.ts";
+import { seedingWith } from "./suite-postgres.ts";
+import type { Scenario } from "./workspace-with-bundle.ts";
 
-const { db, arrange } = suiteWithBundles();
-
-const acting = <T>(
-  who: UserPrincipal,
-  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<T> => readingAs(db().runtimePool, who, work);
+const { db, arrange, reading: acting } = visibilitySuite();
 
 type Rules = Readonly<Record<string, boolean>>;
 

@@ -28,7 +28,14 @@ import {
   type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { withMembership, withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import {
+  opened,
+  withMembership,
+  withScope,
+  type Opened,
+  type PostgresDoor,
+  type Tx,
+} from "../store/postgres/index.ts";
 
 export type JobKind = (typeof JOB_KINDS)[number];
 export type JobStatus = (typeof JOB_STATUSES)[number];
@@ -93,14 +100,13 @@ const inWorkspace = async <T>(
   door: PostgresDoor,
   workspaceId: string,
   work: (tx: Tx) => Promise<T>,
-): Promise<Result<T, PrincipalRefusal | Error>> => {
+): Promise<Opened<T, Error>> => {
   if (principal.kind === "platform") {
-    return attempt(() => withScope(principal, door, workspaceId, (tx) => work(tx)));
+    const ran = await attempt(() => withScope(principal, door, workspaceId, (tx) => work(tx)));
+    return ran.ok ? opened(ran.value) : err(ran.error);
   }
   const held = await attempt(() => withMembership(principal, door, (_fresh, tx) => work(tx)));
-  if (!held.ok) return err(held.error);
-  if (!held.value.ok) return err(held.value.error);
-  return ok(held.value.value);
+  return held.ok ? held.value : err(held.error);
 };
 
 const descriptorOf = (kind: string): JobKindDescriptor | undefined =>
@@ -137,6 +143,9 @@ const ENQUEUE = `WITH inserted AS (
   SELECT id FROM job
    WHERE workspace_id = $1 AND kind = $3 AND subject_id = $4::text
      AND status = '${JOB_QUEUED_STATUS}' AND NOT EXISTS (SELECT 1 FROM inserted)`;
+
+export const indexRunRefused = (refusal: EnqueueJobRefusal): Error =>
+  new Error(`runs: the index run was refused (${refusal})`);
 
 export const enqueueJobIn = async (
   principal: Principal,
@@ -182,12 +191,8 @@ export const enqueueJob = async (
   principal: Principal,
   door: PostgresDoor,
   input: EnqueueJobInput,
-): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal | PrincipalRefusal | Error>> => {
-  const enqueued = await inWorkspace(principal, door, input.workspaceId, (tx) =>
-    enqueueJobIn(principal, tx, input),
-  );
-  return enqueued.ok ? enqueued.value : err(enqueued.error);
-};
+): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal | PrincipalRefusal | Error>> =>
+  inWorkspace(principal, door, input.workspaceId, (tx) => enqueueJobIn(principal, tx, input));
 
 export const jobById = async (
   principal: Principal,

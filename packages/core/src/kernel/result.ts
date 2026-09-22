@@ -16,6 +16,8 @@ export function normalizeError(cause: unknown): Error {
   return new Error(`non-Error thrown: ${Object.prototype.toString.call(cause)}`, { cause });
 }
 
+// After an act's first write, anything it calls rejects: a word it might not read commits the act
+// without its step.
 export async function attempt<T>(operation: () => Promise<T>): Promise<Result<T>> {
   try {
     return ok(await operation());

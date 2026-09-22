@@ -20,6 +20,7 @@ import {
   visibilitySuite,
   visibilityHeld,
 } from "./sourced-concept.ts";
+import { whileWritesAreRefused } from "./suite-postgres.ts";
 import type { Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange, reading: acting } = visibilitySuite();
@@ -194,6 +195,14 @@ const jobsOf = async (workspaceId: string) => {
   );
   return found.rows;
 };
+
+const narrowingLeftBehindIn = async (workspaceId: string, documentId: string) => ({
+  classes: await chunkClassesOf(workspaceId, documentId),
+  ledger: await batchedRowsOf(db().pool, workspaceId, "sources.document.narrowed"),
+  jobs: await jobsOf(workspaceId),
+});
+
+const NOTHING_NARROWED = { classes: ["Internal"], ledger: [], jobs: [] };
 
 const findingsAs = (who: UserPrincipal, bindingId: string) =>
   acting(who, (principal, tx) => findingsOf(principal, tx, { bindingId }));
@@ -529,6 +538,29 @@ describe("an Admin keeping named finding groups in the text", () => {
     ]);
   });
 
+  it("keeps not one span, and rejects rather than answering a word, when the queue will not hold its run", async () => {
+    const scenario = await arrange();
+    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const kept = await findingIn(scenario.workspaceId, first.documentId);
+
+    await expect(
+      whileWritesAreRefused(db().pool, "job", () =>
+        keepAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]),
+      ),
+    ).rejects.toThrow(/refused a write to job/);
+
+    expect(await restoreOf(scenario.workspaceId, kept)).toEqual({
+      restored: false,
+      restored_by: null,
+      restore_reason: null,
+    });
+    expect(await reviewOf(scenario.workspaceId, kept)).toEqual(UNREVIEWED);
+    expect(
+      await batchedRowsOf(db().pool, scenario.workspaceId, "sources.finding.restored"),
+    ).toEqual([]);
+    expect(await jobsOf(scenario.workspaceId)).toEqual([]);
+  });
+
   it("marks every span it kept as reviewed — kept in text, by this Admin, for the batch's reason — and no other", async () => {
     const scenario = await arrange();
 
@@ -800,6 +832,23 @@ describe("an Admin narrowing named documents", () => {
     ]);
   });
 
+  it("narrows not one document, and rejects rather than answering a word, when the queue will not hold its run", async () => {
+    const scenario = await arrange();
+    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const shown = await findingIn(scenario.workspaceId, first.documentId);
+
+    await expect(
+      whileWritesAreRefused(db().pool, "job", () =>
+        narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]),
+      ),
+    ).rejects.toThrow(/refused a write to job/);
+
+    expect(await reviewOf(scenario.workspaceId, shown)).toEqual(UNREVIEWED);
+    expect(await narrowingLeftBehindIn(scenario.workspaceId, first.documentId)).toEqual(
+      NOTHING_NARROWED,
+    );
+  });
+
   it("answers the run a keep already queued for the binding, and queues no second one", async () => {
     const scenario = await arrange();
     const { bindingId, first } = await bindingWithTwoDocuments(scenario);
@@ -889,11 +938,9 @@ describe("an Admin narrowing named documents", () => {
     });
 
     expect(outcome).toEqual({ ok: false, error: "widening-refused" });
-    expect(await chunkClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Internal"]);
-    expect(
-      await batchedRowsOf(db().pool, scenario.workspaceId, "sources.document.narrowed"),
-    ).toEqual([]);
-    expect(await jobsOf(scenario.workspaceId)).toEqual([]);
+    expect(await narrowingLeftBehindIn(scenario.workspaceId, first.documentId)).toEqual(
+      NOTHING_NARROWED,
+    );
   });
 
   it("refuses a class wider than the binding's, over a document whose own class is wider still", async () => {

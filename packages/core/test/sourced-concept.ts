@@ -12,8 +12,8 @@ import {
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { addToGroup, createGroup } from "../src/members/index.ts";
 import { chunkIdOf } from "../src/sources/index.ts";
-import type { Tx } from "../src/store/postgres/index.ts";
-import { readingAs } from "./suite-postgres.ts";
+import type { Opened, Tx } from "../src/store/postgres/index.ts";
+import { answered, readingAs } from "./suite-postgres.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 export const visibilitySuite = () => {
@@ -24,7 +24,7 @@ export const visibilitySuite = () => {
     reading: <T>(
       principal: UserPrincipal,
       work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-    ): Promise<T> => readingAs(db().runtimePool, principal, work),
+    ): Promise<Opened<T>> => readingAs(db().runtimePool, principal, work),
   };
 };
 
@@ -209,18 +209,20 @@ export const groupNamed = async (
   name: string,
   people: readonly UserPrincipal[],
 ): Promise<string> =>
-  readingAs(db.runtimePool, scenario.admin, async (admin, tx) => {
-    const made = await createGroup(admin, tx, { name });
-    if (!made.ok) throw new Error(`the group was not made: ${String(made.error)}`);
-    for (const person of people) {
-      const added = await addToGroup(admin, tx, {
-        groupId: made.value.groupId,
-        userId: person.userId,
-      });
-      if (!added.ok) throw new Error(`the person was not added: ${String(added.error)}`);
-    }
-    return made.value.groupId;
-  });
+  answered(
+    await readingAs(db.runtimePool, scenario.admin, async (admin, tx) => {
+      const made = await createGroup(admin, tx, { name });
+      if (!made.ok) throw new Error(`the group was not made: ${String(made.error)}`);
+      for (const person of people) {
+        const added = await addToGroup(admin, tx, {
+          groupId: made.value.groupId,
+          userId: person.userId,
+        });
+        if (!added.ok) throw new Error(`the person was not added: ${String(added.error)}`);
+      }
+      return made.value.groupId;
+    }),
+  );
 
 export const conceptForGroup = async (
   db: MigratedPostgres,

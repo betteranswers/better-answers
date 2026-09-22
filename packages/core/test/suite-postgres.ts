@@ -8,8 +8,8 @@ import {
 import type pg from "pg";
 import { afterAll, beforeAll } from "vitest";
 
-import type { UserPrincipal } from "../src/kernel/index.ts";
-import { openPostgres, withPrincipal, type Tx } from "../src/store/postgres/index.ts";
+import type { Result, UserPrincipal } from "../src/kernel/index.ts";
+import { openPostgres, withPrincipal, type Opened, type Tx } from "../src/store/postgres/index.ts";
 
 export const postgresForSuite = (): (() => MigratedPostgres) => {
   let db: MigratedPostgres | undefined;
@@ -47,13 +47,15 @@ export const readingAs = async <T>(
   pool: pg.Pool,
   reader: { readonly workspaceId: string; readonly userId: string },
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<T> => {
-  const read = await withPrincipal(
+): Promise<Opened<T>> =>
+  withPrincipal(
     openPostgres(pool),
     { workspaceId: reader.workspaceId, userId: reader.userId, issuedAt: new Date() },
     work,
   );
-  if (!read.ok) throw new Error(`the principal did not resolve: ${read.error}`);
+
+export const answered = <Value, Refusal>(read: Result<Value, Refusal>): Value => {
+  if (!read.ok) throw new Error(`the act answered ${String(read.error)}`);
   return read.value;
 };
 

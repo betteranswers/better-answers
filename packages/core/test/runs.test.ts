@@ -337,8 +337,8 @@ describe("an act that lands its rows and its job in one transaction", () => {
       enqueueJobIn(scenario.admin, tx, boundJob(scenario.workspaceId)),
     );
 
-    expect(editor).toEqual({ ok: true, value: { ok: false, error: "role-forbids" } });
-    expect(admin.ok && admin.value.ok).toBe(true);
+    expect(editor).toEqual({ ok: false, error: "role-forbids" });
+    expect(admin.ok).toBe(true);
     expect((await jobsIn(scenario.workspaceId)).length).toBe(1);
   });
 

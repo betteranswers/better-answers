@@ -19,7 +19,7 @@ import type { FrontmatterValue, TrustStatus } from "../src/answering/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/core/store/git";
 import { walkFrom } from "@better-answers/core/store/graph";
-import { openPostgres, type Tx, withMembership } from "../src/store/postgres/index.ts";
+import { openPostgres, type Opened, type Tx, withMembership } from "../src/store/postgres/index.ts";
 import {
   bundleHistory,
   bundlesForSuite,
@@ -30,6 +30,7 @@ import {
 import { bindingHolding } from "./sourced-concept.ts";
 import {
   abortTheTransaction,
+  answered,
   holdingTable,
   isBlockedOnTable,
   postgresForSuite,
@@ -122,7 +123,7 @@ const recordedCommits = async (workspaceId: string): Promise<readonly string[]> 
 const reading = <T>(
   principal: UserPrincipal,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<T> => readingAs(db().runtimePool, principal, work);
+): Promise<Opened<T>> => readingAs(db().runtimePool, principal, work);
 
 describe("a governed write", () => {
   it("lands one commit with the person as author and the platform bot as committer", async () => {
@@ -615,8 +616,8 @@ describe("the map a governed write leaves behind", () => {
       },
     ]);
 
-    const steps = await reading(scenario.viewer, (principal, tx) =>
-      walkFrom(principal, tx, policy.iri),
+    const steps = answered(
+      await reading(scenario.viewer, (principal, tx) => walkFrom(principal, tx, policy.iri)),
     );
     expect(steps.map((step) => ({ uid: step.uid, depth: step.depth }))).toEqual([
       { uid: policy.iri, depth: 0 },

@@ -5,7 +5,7 @@ import { GRAPH_WALK_ROW_LIMIT, walkFrom } from "@better-answers/core/store/graph
 import { writeConcept, type WriteConceptInput } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { enqueueJob } from "../src/runs/index.ts";
-import { readingAs } from "./suite-postgres.ts";
+import { answered, readingAs } from "./suite-postgres.ts";
 import { runWorkerOnce } from "./worker-process.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -70,8 +70,10 @@ const timedWalk = async (
   reader: UserPrincipal,
 ): Promise<{ readonly ms: number; readonly steps: number }> => {
   const started = performance.now();
-  const steps = await readingAs(db().runtimePool, reader, (principal, tx) =>
-    walkFrom(principal, tx, map.entry),
+  const steps = answered(
+    await readingAs(db().runtimePool, reader, (principal, tx) =>
+      walkFrom(principal, tx, map.entry),
+    ),
   );
   return { ms: performance.now() - started, steps: steps.length };
 };

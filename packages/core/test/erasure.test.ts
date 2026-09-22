@@ -12,7 +12,7 @@ import {
   type SubjectRequest,
   type SubjectRequestRecorded,
 } from "../src/erasure/index.ts";
-import type { Result, UserPrincipal } from "../src/kernel/index.ts";
+import type { PrincipalRefusal, Result, UserPrincipal } from "../src/kernel/index.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
 import { readingAs, seedingWith, whileWritesAreRefused } from "./suite-postgres.ts";
 import { suiteWithBundles } from "./workspace-with-bundle.ts";
@@ -44,13 +44,13 @@ const requestOf = (
 const recordingAs = (
   person: UserPrincipal,
   input: RecordSubjectRequestInput,
-): Promise<Result<SubjectRequestRecorded, RecordSubjectRequestRefusal>> =>
+): Promise<Result<SubjectRequestRecorded, RecordSubjectRequestRefusal | PrincipalRefusal>> =>
   readingAs(db().pool, person, (principal, tx) => recordSubjectRequest(principal, tx, input));
 
 const readingRequestAs = (
   person: UserPrincipal,
   id: string,
-): Promise<Result<SubjectRequest, ReadSubjectRequestRefusal>> =>
+): Promise<Result<SubjectRequest, ReadSubjectRequestRefusal | PrincipalRefusal>> =>
   readingAs(db().pool, person, (principal, tx) => subjectRequestFor(principal, tx, id));
 
 const requestRowsIn = async (workspaceId: string) => {
@@ -183,15 +183,17 @@ describe("recording a subject request", () => {
     expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("lets the table refuse a clock started before the request arrived, and lands nothing", async () => {
+  it("lands nothing for a clock started before the request arrived, and answers a failure to log rather than a word to act on", async () => {
     const scenario = await arrange();
 
-    await expect(
-      recordingAs(
-        scenario.admin,
-        requestOf({ receivedAt: CONFIRMED_AT, clockStartedAt: RECEIVED_AT }),
-      ),
-    ).rejects.toThrow(/did not commit/);
+    const recorded = await recordingAs(
+      scenario.admin,
+      requestOf({ receivedAt: CONFIRMED_AT, clockStartedAt: RECEIVED_AT }),
+    );
+
+    expect(recorded.ok).toBe(false);
+    if (recorded.ok) return;
+    expect(recorded.error).toBeInstanceOf(Error);
     expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
   });
 });

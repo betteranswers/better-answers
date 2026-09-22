@@ -15,6 +15,7 @@ import {
 import { footnotesOf } from "../src/guides/index.ts";
 import { attempt, type UserPrincipal } from "../src/kernel/index.ts";
 import { narrowBinding, type NarrowBindingInput } from "../src/sources/index.ts";
+import type { Opened } from "../src/store/postgres/index.ts";
 import { bundleHistory } from "./bundle.ts";
 import { countWaitingOnLocks, until, whileActsWaitAt } from "./suite-postgres.ts";
 import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
@@ -891,7 +892,7 @@ describe("narrowing a binding", () => {
     ]);
 
     await whileActsWaitAt(db().pool, "audit_event", "INSERT", async (release) => {
-      const narrowings: Promise<Awaited<ReturnType<typeof narrowBinding>>>[] = [];
+      const narrowings: Promise<Opened<Awaited<ReturnType<typeof narrowBinding>>>>[] = [];
       for (const [at, binding] of [first, second].entries()) {
         narrowings.push(
           reading(scenario.admin, (admin, tx) =>

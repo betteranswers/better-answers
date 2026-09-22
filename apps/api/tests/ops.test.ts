@@ -19,7 +19,12 @@ import {
 import { systemClock, type UserPrincipal } from "@better-answers/core/kernel";
 import { fileAtHead, head, initRepository } from "@better-answers/core/store/git";
 import { openObjects } from "@better-answers/core/store/objects";
-import { openPostgres, withPrincipal, type Tx } from "@better-answers/core/store/postgres";
+import {
+  openPostgres,
+  withPrincipal,
+  type Answered,
+  type Tx,
+} from "@better-answers/core/store/postgres";
 import { objectStoreForSuite } from "@better-answers/core/testing/objects";
 import { testData } from "@better-answers/schema/testing";
 
@@ -988,13 +993,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
       workspaceId: string,
       userId: string,
       work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-    ): Promise<T> => {
+    ): Promise<Answered<T>> => {
       const read = await withPrincipal(
         openPostgres(app.database.pool),
         { workspaceId, userId, issuedAt: new Date() },
         work,
       );
-      if (!read.ok) throw new Error(`the principal did not resolve: ${read.error}`);
+      if (!read.ok) throw new Error(`the read answered ${String(read.error)}`);
       return read.value;
     };
 
@@ -1158,13 +1163,12 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const from = await opening(
         await iriOf(app(), workspaceId, "knowledge/company/answers/support-hours.md"),
       );
-      if (!from.ok || !from.value.found) throw new Error("the linking concept did not open");
-      const target = /\]\((https:\/\/[^)]+)\)/.exec(from.value.concept?.body ?? "")?.[1] ?? "";
+      if (!from.found) throw new Error("the linking concept did not open");
+      const target = /\]\((https:\/\/[^)]+)\)/.exec(from.concept?.body ?? "")?.[1] ?? "";
       const to = await opening(target);
 
-      if (!to.ok) throw new Error(`open refused: ${to.error.message}`);
-      if (!to.value.found) throw new Error(`nothing stands at ${target}`);
-      expect(to.value.concept?.frontmatter["title"]).toBe("Advanced plan");
+      if (!to.found) throw new Error(`nothing stands at ${target}`);
+      expect(to.concept?.frontmatter["title"]).toBe("Advanced plan");
     });
 
     it("records each verified event as an imported check with a null hash and one audit event, so find and open say Checked by the member's name · imported", async () => {
@@ -1206,8 +1210,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const found = await reading(app(), workspaceId, admin.id, (principal, tx) =>
         find(principal, tx, { query: "retention", limit: 10 }, IMPORTED_AT),
       );
-      if (!found.ok) throw new Error(`find refused: ${found.error.message}`);
-      const [hit, ...rest] = found.value.hits;
+      const [hit, ...rest] = found.hits;
       expect(rest).toEqual([]);
       if (hit?.layer !== "bundles") throw new Error("the hit is not a concept");
       expect({
@@ -1225,16 +1228,15 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const opened = await reading(app(), workspaceId, admin.id, (principal, tx) =>
         open(principal, tx, { iri: hit.iri }, IMPORTED_AT),
       );
-      if (!opened.ok) throw new Error(`open refused: ${opened.error.message}`);
-      if (!opened.value.found) throw new Error("the concept was not found");
-      expect(opened.value.concept?.trust).toEqual({
+      if (!opened.found) throw new Error("the concept was not found");
+      expect(opened.concept?.trust).toEqual({
         tier: "human-reviewed",
         status: "current",
         checkedBy: "Theo Approver",
         checkedAt: "2026-06-01T09:30:00.000Z",
         rider: "imported",
       });
-      expect(opened.value.concept?.frontmatter["verified"]).toEqual([
+      expect(opened.concept?.frontmatter["verified"]).toEqual([
         { by: `human:${mona}`, at: "2026-04-16T00:00:00Z" },
         { by: `human:${theo}`, at: "2026-06-01T09:30:00Z" },
       ]);

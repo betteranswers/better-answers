@@ -21,6 +21,7 @@ import {
   seededBy,
   visibilitySuite,
 } from "./sourced-concept.ts";
+import { answered } from "./suite-postgres.ts";
 
 const fixtureSchema = z.object({
   locator: z.object({ not_found: z.string().min(1) }),
@@ -213,11 +214,16 @@ const hitOn = (
   sensitivity,
 });
 
-const opening = (person: UserPrincipal, wire: string): Promise<Passage | LocatorRefusal | Error> =>
-  reading(person, async (reader, tx) => {
-    const read = await passageAt(reader, tx, wire);
-    return read.ok ? read.value : read.error;
-  });
+const opening = async (
+  person: UserPrincipal,
+  wire: string,
+): Promise<Passage | LocatorRefusal | Error> =>
+  answered(
+    await reading(person, async (reader, tx) => {
+      const read = await passageAt(reader, tx, wire);
+      return read.ok ? read.value : read.error;
+    }),
+  );
 
 describe("the passage a wire locator opens", () => {
   it("answers every case the document-chunk agreement states, the astral character included", async () => {
@@ -269,19 +275,21 @@ describe("the passage a wire locator opens", () => {
     const scenario = await arrange();
     await seedTheAgreementsDocument(scenario.workspaceId);
 
-    const rows = await reading(scenario.admin, async (admin, tx) => {
-      const read = await tx.query<{
-        source_document_id: string;
-        char_start: number;
-        char_end: number;
-        locator: string;
-      }>(
-        `SELECT source_document_id, char_start, char_end, locator FROM "index".chunk
+    const rows = answered(
+      await reading(scenario.admin, async (admin, tx) => {
+        const read = await tx.query<{
+          source_document_id: string;
+          char_start: number;
+          char_end: number;
+          locator: string;
+        }>(
+          `SELECT source_document_id, char_start, char_end, locator FROM "index".chunk
           WHERE workspace_id = $1 AND source_document_id = $2 ORDER BY ordinal`,
-        [admin.workspaceId, document.source_document_id],
-      );
-      return read.rows;
-    });
+          [admin.workspaceId, document.source_document_id],
+        );
+        return read.rows;
+      }),
+    );
 
     expect(rows.length).toBe(document.chunks.length);
     expect(rows.map((row) => row.locator)).toEqual(
@@ -382,11 +390,16 @@ describe("what a passage read refuses", () => {
   });
 });
 
-const searching = (person: UserPrincipal, limit = 10): Promise<readonly PassageHit[] | Error> =>
-  reading(person, async (reader, tx) => {
-    const found = await findPassages(reader, tx, QUERY, limit);
-    return found.ok ? found.value : found.error;
-  });
+const searching = async (
+  person: UserPrincipal,
+  limit = 10,
+): Promise<readonly PassageHit[] | Error> =>
+  answered(
+    await reading(person, async (reader, tx) => {
+      const found = await findPassages(reader, tx, QUERY, limit);
+      return found.ok ? found.value : found.error;
+    }),
+  );
 
 describe("the passages a search finds", () => {
   it("withholds a document from the reader who may see a concept citing it and hands it to the reader who may not", async () => {
@@ -555,14 +568,16 @@ const seedTheBindingUnderReview = (workspaceId: string): Promise<void> =>
     },
   ]);
 
-const previewing = (
+const previewing = async (
   person: UserPrincipal,
   bindingId: string,
 ): Promise<readonly PreviewedChunk[] | string | Error> =>
-  reading(person, async (reader, tx) => {
-    const read = await previewChunks(reader, tx, { bindingId });
-    return read.ok ? read.value : read.error;
-  });
+  answered(
+    await reading(person, async (reader, tx) => {
+      const read = await previewChunks(reader, tx, { bindingId });
+      return read.ok ? read.value : read.error;
+    }),
+  );
 
 describe("the review list a binding is previewed with", () => {
   it("hands an Admin every chunk of a binding still under review, in document and ordinal order, and refuses a Viewer and an Editor", async () => {

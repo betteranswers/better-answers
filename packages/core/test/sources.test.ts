@@ -19,7 +19,7 @@ import type { Tx } from "../src/store/postgres/index.ts";
 import { contractFixture, mediaTypeOutside } from "./contract-fixture.ts";
 import { chunkUnder, ledgerRowsOf, groupNamed, seededBy } from "./sourced-concept.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
-import { readingAs, whileWritesAreRefused } from "./suite-postgres.ts";
+import { answered, readingAs, whileWritesAreRefused } from "./suite-postgres.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange } = suiteWithBundles();
@@ -416,16 +416,18 @@ const runsOver = async (pool: pg.Pool, workspaceId: string, bindingId: string) =
   return read.rows;
 };
 
-const passagesReadableBy = (person: UserPrincipal, sourceDocumentId: string) =>
-  readingAs(db().runtimePool, person, async (reader, tx) => {
-    const read = await tx.query<{ content: string }>(
-      `SELECT c.content FROM "index".chunk c
+const passagesReadableBy = async (person: UserPrincipal, sourceDocumentId: string) =>
+  answered(
+    await readingAs(db().runtimePool, person, async (reader, tx) => {
+      const read = await tx.query<{ content: string }>(
+        `SELECT c.content FROM "index".chunk c
         WHERE c.workspace_id = $1 AND c.source_document_id = $2 AND ${readableClause("c", 3)}
         ORDER BY c.ordinal`,
-      [reader.workspaceId, sourceDocumentId, ...readableParameters(reader)],
-    );
-    return read.rows.map((row) => row.content);
-  });
+        [reader.workspaceId, sourceDocumentId, ...readableParameters(reader)],
+      );
+      return read.rows.map((row) => row.content);
+    }),
+  );
 
 const chunksOfTheHandbook = async (
   workspaceId: string,
@@ -797,6 +799,11 @@ const bindingHolds = async (workspaceId: string, bindingId: string) => ({
   runs: await runsOver(db().pool, workspaceId, bindingId),
 });
 
+const AS_IT_WAS_INDEXED = {
+  chunks: [null, null],
+  runs: [{ kind: "index", reason: "bound", status: "done" }],
+};
+
 describe("an Admin reprocesses a binding", () => {
   it("the reprocess takes away every chunk row of the binding and queues one index run carrying the reason it was given", async () => {
     const scenario = await arrange();
@@ -823,6 +830,21 @@ describe("an Admin reprocesses a binding", () => {
     });
   });
 
+  it("the reprocess takes no chunk row away, and rejects rather than answering a word, when the queue will not hold its run", async () => {
+    const scenario = await arrange();
+    const { bindingId } = await indexedHandbook(scenario);
+
+    await expect(
+      whileWritesAreRefused(db().pool, "job", () =>
+        asAdmin(scenario, (admin, tx) =>
+          reprocessBinding(admin, tx, { bindingId, reason: "rule-change" }),
+        ),
+      ),
+    ).rejects.toThrow(/refused a write to job/);
+
+    expect(await bindingHolds(scenario.workspaceId, bindingId)).toEqual(AS_IT_WAS_INDEXED);
+  });
+
   it("the reprocess leaves the chunk rows and queues nothing when the act it rode in fails after it", async () => {
     const scenario = await arrange();
     const { bindingId } = await indexedHandbook(scenario);
@@ -841,13 +863,28 @@ describe("an Admin reprocesses a binding", () => {
       }),
     ).rejects.toThrow(/did not commit/);
 
-    expect(await bindingHolds(scenario.workspaceId, bindingId)).toEqual({
-      chunks: [null, null],
-      runs: [{ kind: "index", reason: "bound", status: "done" }],
-    });
+    expect(await bindingHolds(scenario.workspaceId, bindingId)).toEqual(AS_IT_WAS_INDEXED);
   });
 
-  it("refuses the reprocess of a Viewer and an Editor, of a binding this workspace does not hold, of an id the platform does not mint, and of a reason no index run carries — each with the chunk rows still standing", async () => {
+  it("rejects a reason no index run carries, which only a caller past the type can ask for, and takes no chunk row away", async () => {
+    const scenario = await arrange();
+    const { bindingId } = await indexedHandbook(scenario);
+
+    const asked: { readonly bindingId: string; readonly reason: string } = {
+      bindingId,
+      reason: "spring-clean",
+    };
+
+    await expect(
+      asAdmin(scenario, (admin, tx) =>
+        reprocessBinding(admin, tx, asked as Parameters<typeof reprocessBinding>[2]),
+      ),
+    ).rejects.toThrow(/the index run was refused \(malformed\)/);
+
+    expect(await bindingHolds(scenario.workspaceId, bindingId)).toEqual(AS_IT_WAS_INDEXED);
+  });
+
+  it("refuses the reprocess of a Viewer and an Editor, of a binding this workspace does not hold and of an id the platform does not mint — each with the chunk rows still standing", async () => {
     const scenario = await arrange();
     const { bindingId } = await indexedHandbook(scenario);
 
@@ -862,7 +899,6 @@ describe("an Admin reprocesses a binding", () => {
     const asked: readonly { readonly bindingId: string; readonly reason: string }[] = [
       { bindingId: "01J6NNNNNNNNNNNNNNNNNNNNN3", reason: "rule-change" },
       { bindingId: "  ", reason: "rule-change" },
-      { bindingId, reason: "spring-clean" },
     ];
     const refusals = await Promise.all(
       asked.map((input) =>
@@ -881,11 +917,8 @@ describe("an Admin reprocesses a binding", () => {
         { ok: false, error: "role-forbids" },
         { ok: false, error: "role-forbids" },
       ],
-      refusals: ["no-such-binding", "malformed", "malformed"],
-      held: {
-        chunks: [null, null],
-        runs: [{ kind: "index", reason: "bound", status: "done" }],
-      },
+      refusals: ["no-such-binding", "malformed"],
+      held: AS_IT_WAS_INDEXED,
     });
   });
 });

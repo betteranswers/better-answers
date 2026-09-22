@@ -21,7 +21,12 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { enqueueJobIn, latestIndexOutcomeIn, type JobOutcome } from "../runs/index.ts";
+import {
+  enqueueJobIn,
+  indexRunRefused,
+  latestIndexOutcomeIn,
+  type JobOutcome,
+} from "../runs/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { adminOnBinding, bindingNamed } from "./admin-binding.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
@@ -273,7 +278,9 @@ export const keepInText = async (
     subjectId: bindingId,
     reason: "restored",
   });
-  if (!queued.ok) return err(queued.error);
+  if (!queued.ok) {
+    throw indexRunRefused(queued.error);
+  }
   return ok({ bindingId, findingIds: named, batchId, jobId: queued.value.jobId });
 };
 
@@ -416,7 +423,9 @@ export const narrowDocuments = async (
     subjectId: bindingId,
     reason: "narrowed",
   });
-  if (!queued.ok) return err(queued.error);
+  if (!queued.ok) {
+    throw indexRunRefused(queued.error);
+  }
   return ok({
     bindingId,
     documentIds,

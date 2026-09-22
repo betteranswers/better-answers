@@ -275,12 +275,11 @@ export const rehearseErasure = async (
       }),
   );
   if (!recorded.ok) {
-    return err(new Error(`erasure: the rehearsal's principal was refused: ${recorded.error}`));
+    return err(
+      new Error(`erasure: the rehearsal's request was refused: ${String(recorded.error)}`),
+    );
   }
-  if (!recorded.value.ok) {
-    return err(new Error(`erasure: the rehearsal's request was refused: ${recorded.value.error}`));
-  }
-  const subjectRequestId = recorded.value.value.requestId;
+  const subjectRequestId = recorded.value.requestId;
 
   const run = await runErasure(platform, doors, { workspaceId, subjectRequestId });
   if (!run.ok) {
