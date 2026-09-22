@@ -46,7 +46,6 @@ const IGNORE = [
   "!.claude/skills/browser-suite/",
   "apps/*/.claude/skills/*",
   ".agents/",
-  "tasks/AGENTS.md",
   "",
 ].join("\n");
 
@@ -71,7 +70,6 @@ const primaryCheckout = (name: string, installed: boolean): string => {
     write(root, "apps/api/.claude/skills/trpc-router/SKILL.md", API_SKILL);
     linkSkill(root, "hono", "../../../../.agents/skills/hono", "apps/api/.claude/skills");
     write(root, "apps/worker/.claude/skills/cocoindex/SKILL.md", WORKER_SKILL);
-    write(root, "tasks/AGENTS.md", "# ordna\n");
   }
   return root;
 };
@@ -131,7 +129,6 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
     expect(readFileSync(path.join(worktree, ".claude/skills/gitnexus/SKILL.md"), "utf8")).toBe(
       "# gitnexus — a plugin install\n",
     );
-    expect(readFileSync(path.join(worktree, "tasks/AGENTS.md"), "utf8")).toBe("# ordna\n");
     expect(run.stderr).toContain("skills:");
   });
 
@@ -285,11 +282,6 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
         'printf \'%s\\n\' "$*" > "$PWD/npx-was-asked"',
         ...install,
       ]);
-      executable(path.join(bin, "ordna"), [
-        'printf \'%s\\n\' "$*" > "$PWD/ordna-was-asked"',
-        "mkdir -p tasks",
-        "printf '# ordna\\n' > tasks/AGENTS.md",
-      ]);
       return bin;
     };
 
@@ -309,10 +301,6 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
         "experimental_install",
       );
       expect(isSymlink(path.join(worktree, ".claude/skills/hono"))).toBe(true);
-      expect(readFileSync(path.join(worktree, "ordna-was-asked"), "utf8")).toContain(
-        "skill install --out tasks/AGENTS.md",
-      );
-      expect(readFileSync(path.join(worktree, "tasks/AGENTS.md"), "utf8")).toBe("# ordna\n");
     });
 
     it("does not read an installer's zero exit as skills when it installed none", () => {
@@ -326,7 +314,6 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
     it("still copies what the primary does have before reinstalling the rest", () => {
       const primary = primaryCheckout("partial-primary", false);
       write(primary, ".claude/skills/gitnexus/SKILL.md", "# gitnexus\n");
-      write(primary, "tasks/AGENTS.md", "# the primary's guide\n");
       const worktree = worktreeOf(primary, "partial-worktree");
       const bin = stubInstallers("partial", "installs");
 
@@ -336,10 +323,6 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
       expect(readFileSync(path.join(worktree, ".claude/skills/gitnexus/SKILL.md"), "utf8")).toBe(
         "# gitnexus\n",
       );
-      expect(readFileSync(path.join(worktree, "tasks/AGENTS.md"), "utf8")).toBe(
-        "# the primary's guide\n",
-      );
-      expect(existsSync(path.join(worktree, "ordna-was-asked"))).toBe(false);
       expect(isSymlink(path.join(worktree, ".claude/skills/hono"))).toBe(true);
     });
 
