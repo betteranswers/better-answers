@@ -398,7 +398,7 @@ describe("what each leg of check.yml installs (T-333)", () => {
     const legs = Object.keys(checkJobs());
 
     expect(SETUP.flatMap((setup) => setup.onlyOn).filter((job) => !legs.includes(job))).toEqual([]);
-    expect(SETUP.length).toBeGreaterThan(5);
+    expect(SETUP.length, "a row left this table without the leg that stopped needing it").toBe(7);
   });
 });
 

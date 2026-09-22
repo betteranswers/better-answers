@@ -1001,20 +1001,68 @@ def test_the_image_leaves_this_tiers_tests_out_of_the_runtime(
     assert contents.has_tests is False
 
 
+JOB_OPENS = re.compile(r"^ {2}(?P<job>[\w-]+):\s*$")
+RUNS_A_ROOT_SCRIPT = re.compile(r"^ {6}- run: pnpm (?P<script>[\w:.-]+)\s*$")
+THIS_TIERS_GATE = "check:worker"
+
+
+def _legs_of_check() -> dict[str, list[str]]:
+    legs: dict[str, list[str]] = {}
+    job = ""
+    under_jobs = False
+    for line in CHECK_WORKFLOW.read_text("utf-8").splitlines():
+        if line.rstrip() == "jobs:":
+            under_jobs = True
+        elif not under_jobs:
+            continue
+        elif opened := JOB_OPENS.match(line):
+            job = opened.group("job")
+            legs[job] = []
+        elif job:
+            legs[job].append(line)
+    return legs
+
+
+def _gate_of(lines: list[str]) -> str:
+    for line in lines:
+        if found := RUNS_A_ROOT_SCRIPT.match(line):
+            return found.group("script")
+    return ""
+
+
+def _root_scripts() -> dict[str, str]:
+    manifest: dict[str, dict[str, str]] = json.loads(
+        (REPO_ROOT / "package.json").read_text("utf-8")
+    )
+    return manifest.get("scripts", {})
+
+
 def test_this_tier_reads_the_names_the_workflows_actually_hand_it() -> None:
     handed = [
         line
         for line in BUILD_WORKFLOW.read_text("utf-8").splitlines()
         if re.search(rf"\b{IMAGE_ID_VARIABLE}:.*outputs\.imageid", line)
     ]
-    deferred = [
-        line
-        for line in CHECK_WORKFLOW.read_text("utf-8").splitlines()
-        if f"{PROBE_DEFERRAL_VARIABLE}:" in line
-    ]
+    legs = _legs_of_check()
+    scripts = _root_scripts()
+    deferred = {
+        job
+        for job, lines in legs.items()
+        if any(f"{PROBE_DEFERRAL_VARIABLE}:" in line for line in lines)
+    }
+    # This tier's leg, found by the gate it runs rather than by the name it was given.
+    mine = {job for job, lines in legs.items() if _gate_of(lines) == THIS_TIERS_GATE}
+    # A leg running named files rather than a workspace's whole check builds no image.
+    misread = {
+        job
+        for job in deferred
+        if not scripts.get(_gate_of(legs[job]), "").rstrip().endswith("check")
+    }
 
     assert len(handed) == 1, BUILD_WORKFLOW
-    assert len(deferred) == 1, CHECK_WORKFLOW
+    assert len(mine) == 1, CHECK_WORKFLOW
+    assert mine <= deferred, CHECK_WORKFLOW
+    assert misread == set(), CHECK_WORKFLOW
 
 
 def test_the_runner_refuses_the_engines_gateway_call_the_way_the_image_does() -> None:

@@ -240,7 +240,9 @@ describe("the job that probes every image it pushes", () => {
       workspacesUnder(steps).some((workspace) => reading.has(workspace)) ? [job] : [],
     );
 
-    expect(reading.size, "no workspace reads the deferral at all").toBeGreaterThan(1);
+    expect(reading.size, "the workspaces that read the deferral are apps/api and apps/worker").toBe(
+      2,
+    );
     expect(
       legsCarryingTheDeferral(),
       "a leg runs an image-contents suite it never tells to stand down, or is told and runs none",
@@ -250,7 +252,7 @@ describe("the job that probes every image it pushes", () => {
   it("gives every leg that builds an image a builder and the cache credentials first", () => {
     const building = checkLegs().filter(([job]) => legsCarryingTheDeferral().includes(job));
 
-    expect(building.length, "no leg of check.yml builds an image").toBeGreaterThan(1);
+    expect(building.length, "the legs of check.yml that build an image are two").toBe(2);
     for (const [job, steps] of building) {
       const at = (action: string): number => steps.findIndex((step) => runs(step, action));
 
