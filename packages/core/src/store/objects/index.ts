@@ -1,7 +1,12 @@
 import { Readable } from "node:stream";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 
-import { GetObjectCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 
 import {
@@ -62,11 +67,19 @@ export const closeObjects = (door: ObjectDoor): void => {
 
 const PLATFORM_PREFIX = "platform/";
 
-const prefixOf = (principal: UserPrincipal): string => `workspaces/${principal.workspaceId}/`;
+const prefixOfWorkspace = (workspaceId: string): string => `workspaces/${workspaceId}/`;
+
+const prefixOf = (principal: UserPrincipal): string => prefixOfWorkspace(principal.workspaceId);
 
 export type KeyRefusal = "malformed-key";
 
 export type ReadRefusal = KeyRefusal | "no-such-object";
+
+export type StoredObject = {
+  readonly key: string;
+
+  readonly storedAt: Date;
+};
 
 const isListingPrefix = (candidate: string): boolean =>
   candidate === "" || isPortablePath(candidate.endsWith("/") ? candidate.slice(0, -1) : candidate);
@@ -110,13 +123,18 @@ const getInside = async (
   }
 };
 
-const listInside = async (
+type Entry = {
+  readonly key: string;
+  readonly storedAt: Date | undefined;
+};
+
+const walkInside = async (
   door: ObjectDoor,
   prefix: string,
   under: string,
-): Promise<Result<readonly string[], KeyRefusal>> => {
+): Promise<Result<readonly Entry[], KeyRefusal>> => {
   if (!isListingPrefix(under)) return err("malformed-key");
-  const keys: string[] = [];
+  const entries: Entry[] = [];
   let continuationToken: string | undefined;
   do {
     const page = await door.client.send(
@@ -127,11 +145,47 @@ const listInside = async (
       }),
     );
     for (const entry of page.Contents ?? []) {
-      if (entry.Key !== undefined) keys.push(entry.Key.slice(prefix.length));
+      if (entry.Key !== undefined) {
+        entries.push({ key: entry.Key.slice(prefix.length), storedAt: entry.LastModified });
+      }
     }
     continuationToken = page.NextContinuationToken;
   } while (continuationToken !== undefined);
-  return ok(keys);
+  return ok(entries);
+};
+
+const listInside = async (
+  door: ObjectDoor,
+  prefix: string,
+  under: string,
+): Promise<Result<readonly string[], KeyRefusal>> => {
+  const walked = await walkInside(door, prefix, under);
+  return walked.ok ? ok(walked.value.map(({ key }) => key)) : err(walked.error);
+};
+
+const storedInside = async (
+  door: ObjectDoor,
+  prefix: string,
+  under: string,
+): Promise<Result<readonly StoredObject[], KeyRefusal>> => {
+  const walked = await walkInside(door, prefix, under);
+  if (!walked.ok) return err(walked.error);
+  const dated: StoredObject[] = [];
+  for (const entry of walked.value) {
+    // A stamp the store withheld leaves the age unknowable, which is all this listing is for.
+    if (entry.storedAt !== undefined) dated.push({ key: entry.key, storedAt: entry.storedAt });
+  }
+  return ok(dated);
+};
+
+const removeInside = async (
+  door: ObjectDoor,
+  prefix: string,
+  key: string,
+): Promise<Result<void, KeyRefusal>> => {
+  if (!isPortablePath(key)) return err("malformed-key");
+  await door.client.send(new DeleteObjectCommand({ Bucket: door.bucket, Key: `${prefix}${key}` }));
+  return ok(undefined);
 };
 
 export const putObject = (
@@ -173,3 +227,18 @@ export const listPlatformObjects = (
   door: ObjectDoor,
   under: string,
 ): Promise<Result<readonly string[], KeyRefusal>> => listInside(door, PLATFORM_PREFIX, under);
+
+export const listWorkspaceObjects = (
+  platform: PlatformPrincipal,
+  door: ObjectDoor,
+  workspaceId: string,
+  under: string,
+): Promise<Result<readonly StoredObject[], KeyRefusal>> =>
+  storedInside(door, prefixOfWorkspace(workspaceId), under);
+
+export const removeWorkspaceObject = (
+  platform: PlatformPrincipal,
+  door: ObjectDoor,
+  workspaceId: string,
+  key: string,
+): Promise<Result<void, KeyRefusal>> => removeInside(door, prefixOfWorkspace(workspaceId), key);

@@ -4,17 +4,20 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { readableClause, readableParameters } from "../src/access/index.ts";
-import { attempt, parse, type UserPrincipal } from "../src/kernel/index.ts";
+import { attempt, parse, ulid, type UserPrincipal } from "../src/kernel/index.ts";
 import {
   bindUpload,
   bindUploadFields,
   dpiaInputFor,
   dpiaReadInput,
+  ORPHANED_UPLOAD_GRACE_HOURS,
   publishBinding,
   publishBindingInput,
   reprocessBinding,
   reprocessBindingInput,
+  sweepOrphanedUploads,
   UPLOAD_BYTE_CAP,
+  UPLOAD_SWEEP,
 } from "../src/sources/index.ts";
 import { getObject, listObjects } from "../src/store/objects/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
@@ -48,6 +51,34 @@ const uploadOf = (text: string) => {
     { highWaterMark: 0 },
   );
   return { state, body };
+};
+
+const A_MEGABYTE = 1024 * 1024;
+
+const pastTheCap = () => {
+  const block = new Uint8Array(A_MEGABYTE);
+  let sent = 0;
+  return new ReadableStream<Uint8Array>(
+    {
+      pull: (controller) => {
+        const left = UPLOAD_BYTE_CAP + 1 - sent;
+        if (left <= 0) {
+          controller.close();
+          return;
+        }
+        const size = Math.min(block.byteLength, left);
+        controller.enqueue(size === block.byteLength ? block : block.subarray(0, size));
+        sent += size;
+      },
+    },
+    { highWaterMark: 0 },
+  );
+};
+
+const storedFor = async (by: UserPrincipal) => {
+  const stored = await listObjects(by, store().door, "");
+  if (!stored.ok) throw new Error(`the object door refused the listing: ${stored.error}`);
+  return stored.value;
 };
 
 const bindingRowOf = async (pool: pg.Pool, workspaceId: string, bindingId: string) => {
@@ -87,12 +118,31 @@ const countsIn = async (pool: pg.Pool, workspaceId: string) => {
   return read.rows[0];
 };
 
+const oneOfEachIn = async (pool: pg.Pool, workspaceId: string) => {
+  const read = await pool.query<{
+    bindings: number;
+    documents: number;
+    ledger: number;
+    jobs: number;
+  }>(
+    `SELECT (SELECT count(*)::int FROM source_binding WHERE workspace_id = $1) AS bindings,
+            (SELECT count(*)::int FROM source_document WHERE workspace_id = $1) AS documents,
+            (SELECT count(*)::int FROM audit_event
+               WHERE workspace_id = $1 AND act = 'sources.binding.bound') AS ledger,
+            (SELECT count(*)::int FROM job
+               WHERE workspace_id = $1 AND kind = 'index') AS jobs`,
+    [workspaceId],
+  );
+  return read.rows[0];
+};
+
 const HANDBOOK = "The handbook says what the company decided.";
 const HANDBOOK_BYTES = 43;
 
 type BindShape = Partial<z.input<typeof bindUploadFields>>;
 
 const handbookAsked = (shape: BindShape = {}) => ({
+  bindingId: ulid(),
   name: "The staff handbook",
   fileName: "handbook.md",
   mediaType: "text/markdown",
@@ -111,11 +161,7 @@ const handbookOffered = (shape: BindShape = {}) => {
 const leftBehindBy = async (
   by: UserPrincipal,
   upload: { readonly state: { readonly read: boolean } },
-) => {
-  const stored = await listObjects(by, store().door, "");
-  if (!stored.ok) throw new Error(`the object door refused the listing: ${stored.error}`);
-  return { bodyRead: upload.state.read, stored: stored.value };
-};
+) => ({ bodyRead: upload.state.read, stored: await storedFor(by) });
 
 describe("an Admin binds an upload", () => {
   it("the bind lands the binding, the document, the ledger row and the index job together, and the object holds the bytes under the workspace's prefix", async () => {
@@ -151,7 +197,7 @@ describe("an Admin binds an upload", () => {
       outcome: null,
       sensitivity: null,
     });
-    expect(originalKey).toEqual(`documents/${documentId.toLowerCase()}/original`);
+    expect(originalKey).toEqual(`uploads/${bindingId.toLowerCase()}/original`);
 
     expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.bound")).toEqual([
       {
@@ -222,6 +268,11 @@ describe("an Admin binds an upload", () => {
   });
 
   it.each([
+    [
+      "a binding id the caller did not mint as one",
+      { bindingId: "ws_handbook" },
+      { bindingId: "bad-format" },
+    ],
     ["a binding nobody named", { name: "   " }, { name: "too-small" }],
     ["a file the source system calls nothing", { fileName: "  " }, { fileName: "too-small" }],
     [
@@ -317,9 +368,125 @@ describe("an Admin binds an upload", () => {
     expect(bound.ok).toEqual(true);
   });
 
+  it("refuses a body that passes the cap whatever size was declared, and stores none of it", async () => {
+    const scenario = await arrange();
+    const asked = handbookAsked();
+    const input = { ...inputOf(bindUploadFields, asked), body: pastTheCap() };
+
+    const bound = await bindUpload(scenario.admin, doorsOf(scenario), input);
+
+    expect(bound).toEqual({ ok: false, error: "too-large" });
+    expect(await listObjects(scenario.admin, store().door, "")).toEqual({ ok: true, value: [] });
+    expect(await countsIn(db().pool, scenario.workspaceId)).toEqual({ bindings: 0, documents: 0 });
+  });
+
+  it("answers the first outcome to a repeat under the caller's binding id, leaving one of each", async () => {
+    const scenario = await arrange();
+    const bindingId = ulid();
+
+    const first = await bindUpload(
+      scenario.admin,
+      doorsOf(scenario),
+      handbookOffered({ bindingId }).input,
+    );
+    if (!first.ok) throw new Error(`the bind was refused: ${String(first.error)}`);
+    const again = await bindUpload(
+      scenario.admin,
+      doorsOf(scenario),
+      handbookOffered({ bindingId }).input,
+    );
+
+    expect(again).toEqual(first);
+    expect(await oneOfEachIn(db().pool, scenario.workspaceId)).toEqual({
+      bindings: 1,
+      documents: 1,
+      ledger: 1,
+      jobs: 1,
+    });
+    expect(await listObjects(scenario.admin, store().door, "")).toEqual({
+      ok: true,
+      value: [first.value.originalKey],
+    });
+  });
+
   it("caps one upload under the edge's own limit, with room for what the edge wraps it in", () => {
     expect(UPLOAD_BYTE_CAP).toEqual(67108864);
     expect(UPLOAD_BYTE_CAP).toBeLessThan(104857600);
+  });
+});
+
+const A_DAY_MS = 24 * 60 * 60 * 1000;
+
+const sweptAt = (scenario: Scenario, now: Date, dryRun = false) =>
+  sweepOrphanedUploads(
+    UPLOAD_SWEEP,
+    { postgres: scenario.postgres, objects: store().door },
+    { workspaceId: scenario.workspaceId, now, dryRun },
+  );
+
+const aFailedBind = async (scenario: Scenario) => {
+  const { input } = handbookOffered();
+  const bound = await whileWritesAreRefused(db().pool, "job", () =>
+    bindUpload(scenario.admin, doorsOf(scenario), input),
+  );
+  if (bound.ok) throw new Error("the bind landed where the queue was refused");
+  return `uploads/${input.bindingId.toLowerCase()}/original`;
+};
+
+describe("the sweep collects the originals a failed bind left", () => {
+  it("leaves every original standing while the grace holds", async () => {
+    const scenario = await arrange();
+    const named = await boundHandbook(scenario);
+    const orphaned = await aFailedBind(scenario);
+
+    const swept = await sweptAt(scenario, new Date());
+
+    expect(swept).toEqual({ ok: true, value: { found: 0, removed: 0 } });
+    expect(await listObjects(scenario.admin, store().door, "")).toEqual({
+      ok: true,
+      value: [named.originalKey, orphaned].sort(),
+    });
+  });
+
+  it("removes the original no document names once the grace has passed, and keeps the named one", async () => {
+    const scenario = await arrange();
+    const named = await boundHandbook(scenario);
+    await aFailedBind(scenario);
+
+    const past = new Date(Date.now() + (ORPHANED_UPLOAD_GRACE_HOURS + 1) * 60 * 60 * 1000);
+    const swept = await sweptAt(scenario, past);
+
+    expect(swept).toEqual({ ok: true, value: { found: 1, removed: 1 } });
+    expect(await listObjects(scenario.admin, store().door, "")).toEqual({
+      ok: true,
+      value: [named.originalKey],
+    });
+  });
+
+  it("counts the originals a run would remove and removes none when it is asked only to look", async () => {
+    const scenario = await arrange();
+    await boundHandbook(scenario);
+    const orphaned = await aFailedBind(scenario);
+
+    const past = new Date(Date.now() + A_DAY_MS * 2);
+    const looked = await sweptAt(scenario, past, true);
+
+    expect(looked).toEqual({ ok: true, value: { found: 1, removed: 0 } });
+    expect(await storedFor(scenario.admin)).toContain(orphaned);
+  });
+
+  it("refuses a workspace that is not an id, before it removes anything", async () => {
+    const scenario = await arrange();
+    const orphaned = await aFailedBind(scenario);
+
+    const swept = await sweepOrphanedUploads(
+      UPLOAD_SWEEP,
+      { postgres: scenario.postgres, objects: store().door },
+      { workspaceId: "ws_synthetic", now: new Date(Date.now() + A_DAY_MS * 2) },
+    );
+
+    expect(swept).toEqual({ ok: false, error: "malformed" });
+    expect(await storedFor(scenario.admin)).toContain(orphaned);
   });
 });
 

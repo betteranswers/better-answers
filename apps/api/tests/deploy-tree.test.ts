@@ -222,6 +222,10 @@ describe("the deploy tree (T-005)", () => {
     expect(drill).toContain('ops graph-sweep --workspace "${DRILL_WORKSPACE}"\n');
     expect(drill).not.toContain('graph-sweep --workspace "${DRILL_WORKSPACE}" --wait');
     expect(drill).toContain('ops reconcile-watermark --workspace "${DRILL_WORKSPACE}"');
+    expect(drill).toContain(
+      'ops object-store-orphans --workspace "${DRILL_WORKSPACE}" >> "${REPORT}"',
+    );
+    expect(drill).not.toContain('object-store-orphans --workspace "${DRILL_WORKSPACE}" --list');
 
     expect(drill).toContain("no stamped run on production to diff against");
     expect(drill).toContain("COUNTS DIFFER");

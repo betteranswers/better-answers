@@ -37,8 +37,10 @@ import { dpiaInputFor, REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastRun } from "./findings.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
-const originalKeyOf = (documentId: string): string =>
-  `documents/${documentId.toLowerCase()}/original`;
+export const UPLOAD_ORIGINALS_PREFIX = "uploads/";
+
+const originalKeyOf = (bindingId: string): string =>
+  `${UPLOAD_ORIGINALS_PREFIX}${bindingId.toLowerCase()}/original`;
 
 export const UPLOAD_MEDIA_TYPES = [
   "text/markdown",
@@ -119,13 +121,16 @@ const ASKED_VISIBILITY = BINDING_VISIBILITY.extend({
 });
 
 export const bindUploadFields = ASKED_VISIBILITY.extend({
+  bindingId: BINDING_ID,
   name: BINDING_COLUMNS.name,
   fileName: DOCUMENT_COLUMNS.sourceSystemId,
   mediaType: DOCUMENT_COLUMNS.mediaType,
   byteSize: DOCUMENT_COLUMNS.byteSize,
-}).transform(({ name, fileName, mediaType, byteSize, ...asked }, ctx) => {
+}).transform(({ bindingId, name, fileName, mediaType, byteSize, ...asked }, ctx) => {
   const visibility = visibilityAgreed(asked, ctx);
-  return visibility === undefined ? z.NEVER : { name, fileName, mediaType, byteSize, visibility };
+  return visibility === undefined
+    ? z.NEVER
+    : { bindingId, name, fileName, mediaType, byteSize, visibility };
 });
 
 export type BindUploadFields = z.output<typeof bindUploadFields>;
@@ -149,9 +154,21 @@ export type UploadBound = {
   readonly originalKey: string;
 };
 
+const BOUND_REASON = "bound";
+
 const INSERT_BINDING = `INSERT INTO source_binding
     (workspace_id, id, name, connector, sensitivity, audience, audience_groups)
-  VALUES ($1, $2, $3, $4, $5, $6, $7)`;
+  VALUES ($1, $2, $3, $4, $5, $6, $7)
+  ON CONFLICT DO NOTHING`;
+
+const FIRST_OUTCOME = `SELECT d.id AS document_id, e.id AS audit_event_id, j.id AS job_id
+     FROM source_document d
+     JOIN audit_event e
+       ON e.workspace_id = d.workspace_id AND e.subject_id = d.binding_id AND e.act = $3
+     JOIN job j
+       ON j.workspace_id = d.workspace_id AND j.subject_id = d.binding_id
+      AND j.kind = $4 AND j.reason = $5
+    WHERE d.workspace_id = $1 AND d.binding_id = $2`;
 
 const INSERT_DOCUMENT = `INSERT INTO source_document
     (workspace_id, id, binding_id, source_system_id, title, media_type, byte_size, original_key)
@@ -166,6 +183,55 @@ const inTransaction = async <T>(
   return ran.ok ? ran.value : err(ran.error);
 };
 
+type CappedBody = {
+  readonly body: ReadableStream<Uint8Array>;
+  readonly passedTheCap: () => boolean;
+};
+
+const cappedAt = (body: ReadableStream<Uint8Array>): CappedBody => {
+  const counted = { bytes: 0, passed: false };
+  return {
+    body: body.pipeThrough(
+      new TransformStream<Uint8Array, Uint8Array>({
+        transform: (chunk, controller) => {
+          counted.bytes += chunk.byteLength;
+          if (counted.bytes > UPLOAD_BYTE_CAP) {
+            counted.passed = true;
+            controller.error(new Error("sources: the upload passed the cap"));
+            return;
+          }
+          controller.enqueue(chunk);
+        },
+      }),
+    ),
+    passedTheCap: () => counted.passed,
+  };
+};
+
+const firstOutcomeOf = async (
+  tx: Tx,
+  workspaceId: string,
+  bindingId: string,
+  originalKey: string,
+): Promise<UploadBound> => {
+  const standing = await tx.query<{
+    document_id: string;
+    audit_event_id: string;
+    job_id: string;
+  }>(FIRST_OUTCOME, [workspaceId, bindingId, BINDING_ACTS.bound.name, INDEX_KIND, BOUND_REASON]);
+  const first = standing.rows[0];
+  if (first === undefined) {
+    throw new Error(`sources: ${bindingId} is taken by a binding no first bind accounts for`);
+  }
+  return {
+    bindingId,
+    documentId: first.document_id,
+    jobId: first.job_id,
+    auditEventId: first.audit_event_id,
+    originalKey,
+  };
+};
+
 export const bindUpload = async (
   principal: UserPrincipal,
   doors: { readonly postgres: PostgresDoor; readonly objects: ObjectDoor },
@@ -175,12 +241,8 @@ export const bindUpload = async (
   if (!admin.ok) return err(admin.error);
   const { workspaceId } = admin.value;
 
-  const bindingId = ulid();
-  const documentId = ulid();
-  const originalKey = originalKeyOf(documentId);
-  const auditEventId = ulid();
-
-  const { visibility } = input;
+  const { bindingId, visibility } = input;
+  const originalKey = originalKeyOf(bindingId);
 
   if (!UPLOAD_MEDIA_TYPES.some((allowed) => allowed === input.mediaType)) {
     return err("media-type-refused");
@@ -196,13 +258,21 @@ export const bindUpload = async (
     if (!held.value) return err("no-such-group");
   }
 
-  const put = await putObject(admin.value, doors.objects, originalKey, input.body);
+  const capped = cappedAt(input.body);
+  const put = await attempt(() => putObject(admin.value, doors.objects, originalKey, capped.body));
   if (!put.ok) {
-    throw new Error(`sources: the original's key was refused (${put.error})`);
+    if (capped.passedTheCap()) return err("too-large");
+    throw put.error;
+  }
+  if (!put.value.ok) {
+    throw new Error(`sources: the original's key was refused (${put.value.error})`);
   }
 
+  const documentId = ulid();
+  const auditEventId = ulid();
+
   return inTransaction(principal, doors.postgres, async (fresh, tx) => {
-    await tx.query(INSERT_BINDING, [
+    const landed = await tx.query(INSERT_BINDING, [
       workspaceId,
       bindingId,
       input.name,
@@ -211,6 +281,7 @@ export const bindUpload = async (
       visibility.audience,
       visibility.audienceGroups,
     ]);
+    if (landed.rowCount === 0) return firstOutcomeOf(tx, workspaceId, bindingId, originalKey);
     await tx.query(INSERT_DOCUMENT, [
       workspaceId,
       documentId,

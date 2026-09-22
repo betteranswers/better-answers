@@ -26,6 +26,7 @@ export {
   reprocessBindingInput,
   UPLOAD_BYTE_CAP,
   UPLOAD_MEDIA_TYPES,
+  UPLOAD_ORIGINALS_PREFIX,
   type BindingPublished,
   type BindingReprocessed,
   type BindUploadFields,
@@ -37,6 +38,15 @@ export {
   type ReprocessBindingRefusal,
   type UploadBound,
 } from "./binding.ts";
+export {
+  ORPHANED_UPLOAD_GRACE_HOURS,
+  sweepOrphanedUploads,
+  UPLOAD_SWEEP,
+  type SweepUploadsInput,
+  type SweepUploadsRefusal,
+  type SweptUploads,
+  type UploadSweepPrincipal,
+} from "./orphans.ts";
 export {
   restoreFinding,
   restoreFindingInput,
