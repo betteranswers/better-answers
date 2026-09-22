@@ -1,0 +1,20 @@
+apps/api/src/mcp/surface.ts
+  s_2dd75a86f22d42::t_0f509af57bbf5e 14
+  s_2dd75a86f22d42::t_00c3c8ca2d2538 103-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0ebf05b8858671b816a7a1fd7551d37e707f98dd",
+  "prompts": {},
+  "sessions": {
+    "s_2dd75a86f22d42": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1deab29c-2105-473f-9514-e52636269c8a",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
