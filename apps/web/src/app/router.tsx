@@ -1,5 +1,6 @@
+import type { QueryClient } from "@tanstack/react-query";
 import {
-  createRootRoute,
+  createRootRouteWithContext,
   createRoute,
   createRouter,
   Outlet,
@@ -10,11 +11,14 @@ import {
 import type { ReactElement } from "react";
 
 import { ChooseWorkspaceScreen } from "@/features/auth/choose-workspace-screen.tsx";
+import { membershipRefusal, NEEDS_A_PICK } from "@/features/auth/membership.ts";
 import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
 import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
+import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
 import { SCREENS, viewsOf, type Screen, type View } from "@/shared/screens.ts";
 import { FailedScreen } from "./failed-screen.tsx";
 import { Frame } from "./frame.tsx";
+import type { AppClients } from "./providers.tsx";
 import type { ViewToolbar } from "./toolbar.tsx";
 import { UnknownScreen } from "./unknown-screen.tsx";
 import { ROUTES_AND_SPEND_TOOLBAR, RoutesAndSpendView } from "./views/routes-and-spend-view.tsx";
@@ -27,7 +31,9 @@ const BUILT_VIEWS = new Map<View["path"], BuiltView>([
   ["/system/routes-and-spend", { draw: RoutesAndSpendView, toolbar: ROUTES_AND_SPEND_TOOLBAR }],
 ]);
 
-const rootRoute = createRootRoute({
+type ShellContext = { readonly queryClient: QueryClient; readonly api: ApiProxy };
+
+const rootRoute = createRootRouteWithContext<ShellContext>()({
   component: Outlet,
   notFoundComponent: UnknownScreen,
 });
@@ -55,6 +61,17 @@ const shellRoute = createRoute({
   id: "shell",
   component: Frame,
   notFoundComponent: UnknownScreen,
+  // The sign-in screen and the picker are this route's siblings, so this never runs on them.
+  beforeLoad: async ({ context, location }) => {
+    const refusal = await membershipRefusal(context.queryClient, context.api);
+    if (refusal === undefined) return;
+
+    throw redirect(
+      refusal === NEEDS_A_PICK
+        ? { href: "/choose-workspace", replace: true }
+        : { href: `/sign-in?redirect=${encodeURIComponent(location.href)}`, replace: true },
+    );
+  },
 });
 
 const indexRoute = createRoute({
@@ -97,7 +114,7 @@ const viewRoutes: AnyRoute[] = SCREENS.flatMap((screen) =>
   ),
 );
 
-export const createAppRouter = (history?: RouterHistory) => {
+export const createAppRouter = (clients: AppClients, history?: RouterHistory) => {
   const options = {
     routeTree: rootRoute.addChildren([
       signInRoute,
@@ -106,13 +123,15 @@ export const createAppRouter = (history?: RouterHistory) => {
       shellRoute.addChildren([indexRoute, ...screenRoutes, ...viewRoutes]),
     ]),
 
+    context: {
+      queryClient: clients.queryClient,
+      api: createApiProxy(clients.apiClient, clients.queryClient),
+    },
     defaultErrorComponent: FailedScreen,
   };
 
   return history === undefined ? createRouter(options) : createRouter({ ...options, history });
 };
-
-export const router = createAppRouter();
 
 declare module "@tanstack/react-router" {
   interface Register {

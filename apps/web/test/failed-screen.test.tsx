@@ -1,15 +1,12 @@
-import {
-  CatchBoundary,
-  RouterContextProvider,
-  RouterProvider,
-  createMemoryHistory,
-} from "@tanstack/react-router";
+import { CatchBoundary, RouterContextProvider, createMemoryHistory } from "@tanstack/react-router";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FailedScreen } from "@/app/failed-screen.tsx";
-import { Providers } from "@/app/providers.tsx";
+import { createAppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
+
+import { openApp } from "./open-app.tsx";
 
 afterEach(() => {
   cleanup();
@@ -45,13 +42,7 @@ const answerTrpc = (input: string | URL | Request): Promise<Response> => {
 
 const openSystemWithABrokenRead = async () => {
   vi.stubGlobal("fetch", answerTrpc);
-  const router = createAppRouter(createMemoryHistory({ initialEntries: ["/system"] }));
-  await router.load();
-  const rendered = render(
-    <Providers>
-      <RouterProvider router={router} />
-    </Providers>,
-  );
+  const { rendered } = await openApp("/system");
   await screen.findByRole("alert");
   return rendered;
 };
@@ -114,7 +105,10 @@ describe("a screen that throws", () => {
       return <p>The screen drew.</p>;
     };
 
-    const router = createAppRouter(createMemoryHistory({ initialEntries: ["/system"] }));
+    const router = createAppRouter(
+      createAppClients(),
+      createMemoryHistory({ initialEntries: ["/system"] }),
+    );
     render(
       <RouterContextProvider router={router}>
         <CatchBoundary getResetKey={() => "the reader's own retry"} errorComponent={FailedScreen}>
@@ -138,13 +132,8 @@ describe("a screen that throws", () => {
 
   it("leaves an address that is no screen to the screen that already says so", async () => {
     vi.stubGlobal("fetch", answerTrpc);
-    const router = createAppRouter(createMemoryHistory({ initialEntries: ["/not-a-screen"] }));
-    await router.load();
-    render(
-      <Providers>
-        <RouterProvider router={router} />
-      </Providers>,
-    );
+
+    await openApp("/not-a-screen");
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("No such screen");
   });

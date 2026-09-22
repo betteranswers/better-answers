@@ -6,7 +6,7 @@ import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
-import { Providers } from "@/app/providers.tsx";
+import { createAppClients, Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
 import { TRPC_ENDPOINT, useTRPC } from "@/shared/api/trpc.ts";
 
@@ -23,7 +23,7 @@ function RoutesProbe() {
 describe("the SPA's tRPC client", () => {
   it("hands a component the query options for a workspace's routes, named by the procedure", () => {
     render(
-      <Providers>
+      <Providers clients={createAppClients()}>
         <RoutesProbe />
       </Providers>,
     );
@@ -41,11 +41,12 @@ describe("the SPA's tRPC client", () => {
 
 describe("the query provider above the router", () => {
   it("wraps the router, so a screen the router renders reaches the same client", async () => {
-    const router = createAppRouter(createMemoryHistory({ initialEntries: ["/system"] }));
+    const clients = createAppClients();
+    const router = createAppRouter(clients, createMemoryHistory({ initialEntries: ["/system"] }));
     await router.load();
 
     render(
-      <Providers>
+      <Providers clients={clients}>
         <RouterProvider router={router} />
         <RoutesProbe />
       </Providers>,

@@ -1,24 +1,14 @@
-import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Providers } from "@/app/providers.tsx";
-import { createAppRouter } from "@/app/router.tsx";
+import { openApp } from "./open-app.tsx";
 
 afterEach(() => {
   cleanup();
   localStorage.clear();
 });
 
-const openAt = async (path: string) => {
-  const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }));
-  await router.load();
-  return render(
-    <Providers>
-      <RouterProvider router={router} />
-    </Providers>,
-  );
-};
+const openAt = async (path: string) => (await openApp(path)).rendered;
 
 const closer = () => screen.getByRole("button", { name: "Hide the secondary nav" });
 
