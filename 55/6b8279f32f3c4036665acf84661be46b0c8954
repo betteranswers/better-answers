@@ -1,0 +1,21 @@
+.claude/hooks/provision-skills.sh
+  s_f9270b508fdc2b::t_332a6701a2e0bb 7-8
+.claude/hooks/provision-worktree.sh
+  s_f9270b508fdc2b::t_332a6701a2e0bb 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "556b8279f32f3c4036665acf84661be46b0c8954",
+  "prompts": {},
+  "sessions": {
+    "s_f9270b508fdc2b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e8de2d35-dcd7-4cf9-ad59-8c30a01bad7d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
