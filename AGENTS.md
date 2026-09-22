@@ -45,7 +45,7 @@ Build tasks live in **ordna** (`storage: namespace` — git blobs at `refs/ordna
 
 ### Workflow
 
-A set of ordna tickets is built under one `/goal` in one session, the Coordinator: one agent per ticket runs `/implement` end to end and fixes what its own `/code-review` finds; PR into `main`, CI's root `check` the arbiter. The steps, the goal's shape and what `check` runs where are `docs/agents/workflow.md`.
+A set of ordna tickets is built under one `/goal` in one session, the Coordinator: one agent per ticket runs `/implement` end to end and fixes what its own `/code-review` finds; PR into `main`, CI's root `check` the arbiter. Every commit reaches `main` through the merge queue, and a change too small for a ticket takes `pnpm land --message "<a sentence saying what changed>"`, which branches, commits, pushes, opens the pull request and arms the merge in one command. The steps, the goal's shape, the queue and what `check` runs where are `docs/agents/workflow.md`.
 
 ### Triage labels
 

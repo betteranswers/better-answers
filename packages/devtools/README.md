@@ -4,7 +4,7 @@ The repository's own gate tooling. **It is imported and never deployed** — `pa
 is imported, `apps/` is what deploys (ADR 0029) — so nothing under `apps/` copies this
 directory into an image, and every dependency here is a development dependency.
 
-Seven things live here.
+Eight things live here.
 
 ## `src/throwaway-tree.ts` — the runner
 
@@ -74,6 +74,21 @@ as new — and the rows the runner never tested, named as a runner fault rather 
 as survivors. A first run says "no baseline"; the script exits zero whatever the
 reports hold, so the summary never gates. Its suite asserts the prose a reader sees, line by
 line, and runs the script over files.
+
+`src/land.ts` is the landing command behind `scripts/land.mjs` (`pnpm land --message "…"`): the
+working tree's changes and one sentence become a branch named from the message, a commit over
+`origin/main`'s fetched head, a push, a pull request opened with `gh pr create --fill` and an
+armed auto-merge, with the queue state read back over GraphQL and printed. It exists because a
+one-line docs change cost five commands and so was pushed straight to `main`, and a commit that
+reaches `main` outside the queue rebuilds every entry already in it. **This module is where the
+repository's prose shape is written**, and the rule it serves is in `docs/agents/workflow.md`
+under *The queue*, which states no list of conditions of its own — a message or a tree the
+command will not take comes back naming the one it missed, so there is nowhere for a second
+copy to go stale. A read-back that shows the pull request neither queued nor armed fails the
+run and prints the command that arms it, because a run that says nothing about the arming is
+the silence this package exists to refuse. Its suite spawns the script over a throwaway git
+repository whose `origin` is a bare repository on disk, with `git push` and the whole of `gh`
+stubbed on the path, so the fetch is real and no case can reach GitHub.
 
 ## `lint-rules/` — the `better-answers` oxlint plugin
 
