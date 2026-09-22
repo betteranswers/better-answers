@@ -1,7 +1,14 @@
 import type { Frontmatter, FrontmatterValue } from "../concepts/index.ts";
 import { citedSource, conceptByIri, findConcepts, type OpenedConcept } from "../concepts/index.ts";
-import { err, isPersonActor, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
-import { findPassages, passageAt, type LocatorRefusal } from "../sources/index.ts";
+import {
+  err,
+  isPersonActor,
+  NOT_FOUND,
+  ok,
+  type Result,
+  type UserPrincipal,
+} from "../kernel/index.ts";
+import { findPassages, passageAt } from "../sources/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
 export type TrustTier = "unverified" | "machine-confirmed" | "human-reviewed";
@@ -282,8 +289,6 @@ const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
   });
 };
 
-const PASSAGE_NOT_FOUND: LocatorRefusal = "not-found";
-
 export const open = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -293,7 +298,7 @@ export const open = async (
   if (input.iri === undefined) {
     const passage = await passageAt(principal, tx, input.locator);
     if (!passage.ok) {
-      return passage.error === PASSAGE_NOT_FOUND
+      return passage.error === NOT_FOUND
         ? ok({ found: false, locator: input.locator })
         : err(passage.error);
     }

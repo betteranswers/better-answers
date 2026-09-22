@@ -2,6 +2,7 @@ import type { boundarySchemas } from "@better-answers/schema";
 import type { z } from "zod";
 
 import type { ProcessActorId } from "./actor.ts";
+import type { KernelRefusal } from "./vocabulary.ts";
 
 export type WorkspaceId = z.infer<typeof boundarySchemas.workspace.select>["id"];
 export type UserId = z.infer<typeof boundarySchemas.user.select>["id"];
@@ -39,9 +40,6 @@ export type Claims = {
   readonly role?: Role;
 };
 
-export type PrincipalRefusal =
-  | "not-a-member"
-  | "credentials-revoked"
-  | "role-disagrees"
-  | "role-unknown"
-  | "malformed-claims";
+export type PrincipalRefusal = KernelRefusal<
+  "not-a-member" | "credentials-revoked" | "role-disagrees" | "role-unknown" | "malformed-claims"
+>;

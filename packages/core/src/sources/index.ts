@@ -8,19 +8,12 @@ import {
   type Visibility,
 } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
-import {
-  attempt,
-  err,
-  ok,
-  ulid,
-  type Result,
-  type RoleRefusal,
-  type UserPrincipal,
-} from "../kernel/index.ts";
+import { attempt, err, ok, ulid, type Result, type UserPrincipal } from "../kernel/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { adminOnBinding } from "./admin-binding.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
+import type { SourceRefusal } from "./vocabulary.ts";
 
 export {
   bindUpload,
@@ -87,6 +80,7 @@ export {
   type PassageHit,
   type PreviewedChunk,
 } from "./passages.ts";
+export { SOURCE_REFUSALS, type SourceRefusal } from "./vocabulary.ts";
 
 const SOURCE_ACTS = declareActs("sources", {
   narrowed: act("sources.binding.narrowed", {
@@ -105,11 +99,9 @@ export type NarrowBindingInput = {
 };
 
 export type NarrowBindingRefusal =
-  | RoleRefusal
-  | "malformed"
-  | "no-such-binding"
-  | "no-such-group"
-  | "widening-refused"
+  | SourceRefusal<
+      "role-forbids" | "malformed" | "no-such-binding" | "no-such-group" | "widening-refused"
+    >
   | Error;
 
 export type BindingNarrowed = {

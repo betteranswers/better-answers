@@ -275,7 +275,7 @@ describe("who is in a group", () => {
 
     const added = await putInGroup(workspace, groupId, stranger);
 
-    expect(added).toEqual({ ok: false, error: "not-a-member" });
+    expect(added).toEqual({ ok: false, error: "no-such-member" });
     const memberships = await db().pool.query("SELECT 1 FROM group_member WHERE group_id = $1", [
       groupId,
     ]);
