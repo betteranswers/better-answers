@@ -14,6 +14,27 @@
 # `git/ref/tags/<tag>`, annotated tags dereferenced, 03/09/2026). `renovate.json` keeps them
 # pinned — `pinDigests` on the `github-actions` manager, which is what the
 # `helpers:pinGitHubActionDigests` preset sets.
+#
+# ONE LIST OF GATES, FOUR LEGS AND ONE VERDICT (`T-333`). The root `pnpm check` is still the
+# one list — `package.json`'s `check` names every gate this repository has, and it is what a
+# person runs on a laptop. What this file owns is WHERE each of those gates runs. Until
+# 22/09/2026 the answer was "one job, in order", and run 35735268427 measured what that cost:
+# 795 seconds of which the worker was 462, while the root gates, the libraries, the api and
+# the web waited their turn for work that shares nothing with it. The legs below run those
+# four groups at once, so a full run is the longest leg rather than their sum, and each leg
+# installs only the toolchain its own gates ask for.
+#
+# THE LEG NAMES CARRY THEIR LANE, and the fan-in reads them. A job called `full-<something>`
+# runs on the full lane, `docs-<something>` on the docs lane, and `check` at the foot of this
+# file requires exactly that: every leg whose prefix is this run's lane concluded success, and
+# every other leg stood down. A leg added by copying one of these is therefore already under
+# the verdict, and a leg whose condition stopped matching its name is red rather than quietly
+# absent — which is the failure this shape exists to refuse, a `check` that is green because
+# nothing ran.
+#
+# `check` IS THE NAME, and it is the fan-in's. The branch ruleset requires the status context
+# `check` and `build.yml`'s `image` waits on `needs: check`; neither reads a leg. So the legs
+# may be renamed, split or added to freely, and that one job name may not move.
 name: check
 
 on:
@@ -34,9 +55,11 @@ on:
         description: >-
           Set by a caller whose own job builds the images, loads each one that has a
           contents test and runs that test against the build it is about to push (`T-043`).
-          The suite here then leaves those tests to that job, so a push to main builds a
+          The suites here then leave those tests to that job, so a push to main builds a
           probed image once rather than once on this runner and once on that one. A pull
           request builds no image, has no such job, passes nothing, and probes as usual.
+          It reaches every leg whose suites read it — the api's and the worker's — and no
+          other; `apps/api/tests/image-job.test.ts` holds that both ways.
         type: boolean
         default: false
 
@@ -77,6 +100,10 @@ on:
 # `main` is fast-forwarded to. So a run of this workflow CALLED by build.yml for that same
 # commit lands in the same group and waits rather than racing — the ordinary case is that
 # the gate below stands it down and it never starts at all.
+#
+# THE GROUP IS THE RUN'S, not a leg's. Every job below shares it, so a superseded pull
+# request loses its whole fan at once rather than leaving legs running for a commit nobody
+# is waiting on.
 concurrency:
   group: check-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -85,38 +112,24 @@ permissions:
   contents: read
 
 jobs:
-  check:
+  # WHICH LANE THIS RUN IS IN, decided once, before any leg installs anything. A change that
+  # is only markdown runs the prose-reading gates and nothing else: the process review of
+  # 21/09/2026 measured a five-file markdown pull request paying eleven minutes here and
+  # thirteen more on main for suites that could not have read a line of it. The rule and the
+  # reason each case falls the way it does are `scripts/docs-lane.mjs`; what this job owns is
+  # the base the diff is taken against, and publishing the answer to the legs.
+  #
+  # It installs nothing at all — not pnpm, not node's own setup action. The lane script is one
+  # file of plain JavaScript with no imports beyond `node:fs`, and every hosted runner already
+  # carries a node that can run it. That is what keeps this job's cost to a checkout, and the
+  # legs' own setup off the critical path of a decision they all wait on.
+  lane:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
+    outputs:
+      lane: ${{ steps.lane.outputs.lane }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # The redaction detector's model weights are fetched on first use and land under
-      # the runner's own temp directory, never inside the checkout: a cache restored into
-      # the checkout sits where every tree walker in this job reads it too — oxfmt, the
-      # tag scan, knip, jscpd — and one landed there read as unformatted JSON by the first
-      # and as a string too long to hold by the second, on a run where the cache happened
-      # to be warm before either walker ran. `runner.temp` is this job's own scratch space
-      # and nothing a tree walker visits. A job's own `env:` cannot read the `runner`
-      # context (GitHub's context-availability table), so the value is written to
-      # `$GITHUB_ENV` here instead, once, before anything downstream needs it — the cache
-      # step below still has one path to name and the worker's suite still finds the
-      # weights warm. The worker reads this from the process, never from a file: the
-      # location is the deploy unit's to decide, and the compose file sets the same
-      # variable for the running container.
-      - name: HF_HOME on the runner's own temp directory, not the checkout
-        run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-      # WHICH LANE THIS RUN IS IN, decided before anything expensive is installed. A change
-      # that is only markdown runs the prose-reading gates and nothing else: the process
-      # review of 21/09/2026 measured a five-file markdown pull request paying eleven
-      # minutes here and thirteen more on main for suites that could not have read a line of
-      # it. The rule and the reason each case falls the way it does are
-      # `scripts/docs-lane.mjs`; what this step owns is the base the diff is taken against.
-      #
       # THE BASE IS PER EVENT. A pull request carries its own base sha; a merge-group ref
       # carries the commit the queue built it on; a run CALLED by build.yml reads the
       # caller's `before`, the `github` context of a reusable workflow being the caller's.
@@ -175,9 +188,9 @@ jobs:
             # which of them it was.
             echo "::notice::no diff against a base (event ${EVENT}, base '${base}'), so this run takes the full lane"
           fi
-          # Every gate below is gated on this word, so a third value is a job that runs no
-          # gate at all and concludes success — the one way this whole design could be
-          # silently green. It is refused here rather than looked for later.
+          # Every leg below is gated on this word, so a third value is a run whose legs all
+          # stand down and whose fan-in has nothing to require — the one way this whole
+          # design could be silently green. It is refused here rather than looked for later.
           case "${lane}" in
             docs | full) ;;
             *)
@@ -187,20 +200,211 @@ jobs:
           esac
           echo "this run is in the ${lane} lane"
           echo "lane=${lane}" >> "$GITHUB_OUTPUT"
+
+  # THE DOCS LANE, AND THE WHOLE OF IT, in one job — which is the thing that must not move.
+  # `check:docs` runs the suites that read this repository's DOCUMENTS, through the same
+  # runner as the root `check`, so one command still names every step that failed.
+  # `format:check` leads it because it leads the root `check` — and on this lane it is a no-op
+  # by construction, `.oxfmtrc.json` ignoring `**/*.md`. It is in the list so that the two
+  # lanes start the same way, not because it reads a document.
+  #
+  # The lane keeps gates rather than skipping CI because a docs-only commit broke one on
+  # 21/09/2026: five specs moved into `docs/specs/` and `coding-rules-tags` went red on the
+  # three `CITED_NOWHERE_ELSE` entries they made stale. It installs no uv, no browser, no
+  # rewrite tool and no builder, because no gate that reads a document needs one, and
+  # `apps/api/tests/docs-lane.test.ts` holds that list against this job's steps.
+  #
+  # WHAT IT STILL PAYS, said plainly: `apps/api` and `packages/core` start a Postgres
+  # container from their vitest `globalSetup` whichever files are selected, so this lane
+  # pays two container starts that none of its suites touch. Making it not do so is a
+  # change to those configurations rather than to this workflow, and it is not this
+  # change's (the process review, 21/09/2026).
+  #
+  # It is not every suite coupled to a markdown file. Five are left to the full lane —
+  # four reading a committed redaction FIXTURE, and the worker's half of the contract
+  # count, whose other half is in this lane and catches the same commit without a uv
+  # environment. Which suites are in the lane, which are outside it and why each is where
+  # it is, are one table in `apps/api/tests/docs-lane.test.ts`, held against the root
+  # manifest both ways.
+  docs-gates:
+    needs: lane
+    if: ${{ needs.lane.outputs.lane == 'docs' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:docs
+
+  # THE FULL LANE'S FIRST LEG: every gate the root `check` names ahead of the workspaces —
+  # each one a tool walked over the whole tree — and then the libraries, which are the
+  # workspaces nothing deploys. They share a leg because they share a cost: one install, one
+  # tree, and between them 26 s of root gates and 142 s of suites on run 35735268427.
+  #
+  # It brings uv, and the reason is `packages/devtools`: its `lint` and `typecheck` are ruff
+  # and mypy over `packages/devtools/python`, run through the worker's environment because
+  # that is where those tools are pinned. It brings the rewrite tool for `packages/core`'s
+  # erasure suite. It brings no browser and no image builder, because nothing it runs opens
+  # one or builds one.
+  full-root:
+    needs: lane
+    if: ${{ needs.lane.outputs.lane == 'full' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        if: steps.lane.outputs.lane == 'full'
         with:
           enable-cache: true
       - run: pnpm install --frozen-lockfile
       # This checkout is the only fresh clone we ever get, so it is the only place the
       # promise "install and the hook is there" can actually be tested. The config test
       # reads the hook's configuration; nothing but a clone can prove the install wrote the
-      # hook script itself.
+      # hook script itself. It lives on this leg alone: `lefthook.yml` is not a markdown
+      # file, so no change that could move the hook ever takes the docs lane.
       - name: the pre-commit hook is installed by install alone
         run: |
           hook="$(git rev-parse --git-path hooks)/pre-commit"
           test -x "$hook" || { echo "no executable pre-commit hook at $hook"; exit 1; }
           grep -q lefthook "$hook" || { echo "$hook is not lefthook's"; exit 1; }
+      # `packages/devtools` runs ruff and mypy out of this environment, so this leg syncs it
+      # even though it runs none of the worker's own gates.
+      - run: uv sync --frozen
+        working-directory: apps/worker
+      # `check:libraries` runs `packages/core`'s erasure suite, which shells out to
+      # `git-filter-repo` and cannot be run without it. Why the install is an action of its
+      # own, and why its version is read rather than written, is said once where it lives.
+      - uses: ./.github/actions/git-filter-repo
+      # The root's own gates, then the workspaces nothing deploys. A leg names ONE root
+      # script and never a list of gates: a manifest's steps are named in that manifest and
+      # nowhere else, so `check:tree` is where this leg's gates are read and edited.
+      # `apps/api/tests/docs-lane.test.ts` expands the legs' scripts and holds what they come
+      # to against the root `check`, so a gate added there and on no leg is red.
+      - run: pnpm check:tree
+
+  # THE API'S OWN GATES. It builds two images inside its suite — `tests/image.test.ts` reads
+  # the api image and `tests/backup-image.test.ts` the backup one — so it takes the container
+  # builder and the cache credentials, for the reason `docs/operations/BUILD_CACHE.md` gives:
+  # the daemon's own driver cannot import a `type=gha` cache, logs `unknown cache importer`,
+  # builds every layer cold and exits 0. Without these two steps this leg would be green and
+  # cold for ever.
+  #
+  # It takes the rewrite tool too, which the single job used to install once for everything:
+  # `tests/ops.test.ts` runs the erasure REHEARSAL, and phase two of that drill reaches the
+  # same git step `packages/core`'s erasure suite does. `mutation.yml` already says this of
+  # its own two legs; here it is what makes the tool a second leg's and not only `full-root`'s.
+  full-api:
+    needs: lane
+    if: ${{ needs.lane.outputs.lane == 'full' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      # The BINARY, and not the worker's environment: `tests/lefthook-config.test.ts` asserts
+      # the hook's python commands go through uv, and asks the tool itself whether it is
+      # there. So no `uv sync` below and no `enable-cache:` here, where the other two legs
+      # have both — this leg resolves no Python package, so the cache it saved would be an
+      # empty entry against the 10 GB the repository gets, and the entry it evicted to write
+      # one could be the detector's weights (`docs/operations/BUILD_CACHE.md`).
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - run: pnpm install --frozen-lockfile
+      # The builder first. The driver a plain daemon answers with builds straight into its
+      # own image store and can export a cache nowhere, and it cannot read one either. This
+      # creates a container-driver builder and makes it the current one; the suite probes for
+      # exactly that before it asks for the cache, and builds the way it always did when it
+      # finds no such builder — a laptop, and this workflow before `T-150`. Read, and not
+      # write: what a pull request exports lands on its own ref, which `main` and every other
+      # pull request cannot read, so the probes pass `--cache-from` alone and the cache they
+      # read is the one `build.yml`'s legs wrote on `main` (`T-223`).
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      # And the credentials second. The `type=gha` backend reads its token and its endpoint
+      # out of the runner's `ACTIONS_*` variables, and a runner hands those to an action's
+      # own process and to no `run:` step at all: `docker/build-push-action` has them
+      # because it is an action, and the `docker buildx build` a suite runs from inside
+      # vitest does not. This step copies every `ACTIONS_*` variable into the job's
+      # environment, which is the helper Docker's own documentation names for this case, and
+      # copying all of them is what covers both spellings of the endpoint — the cache
+      # service moved from `ACTIONS_CACHE_URL` to `ACTIONS_RESULTS_URL` at v2, and the suites
+      # accept either. The token is the runner's own, minted for this job and dead when it
+      # ends; it is not `GITHUB_TOKEN` and the `permissions:` block above does not reach it.
+      - uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
+      - uses: ./.github/actions/git-filter-repo
+      # The image tests read the variable below and stand down when the caller's own job
+      # probes what it pushes; a pull request evaluates it to the empty string and probes.
+      - run: pnpm check:api
+        env:
+          IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller }}
+
+  # THE SPA'S OWN GATES, ending in a browser suite over the served build. The browser is not
+  # in the pnpm store, so it is installed here — Chromium alone, the suite running one
+  # project — and it is installed on this leg alone, which is what the install is worth: 42 s
+  # of the 90 the old single job paid before any gate started.
+  full-web:
+    needs: lane
+    if: ${{ needs.lane.outputs.lane == 'full' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @better-answers/web exec playwright install --with-deps chromium
+      - run: pnpm check:web
+
+  # THE WORKER, which is the longest leg and therefore the length of a full run: 462 s of the
+  # 795 on run 35735268427, of which pytest was 412 and mypy 49. Everything it needs and
+  # nothing else — the detector's weights, the container builder its image probe reads a
+  # layer cache through, and uv. No browser, no pnpm install: `check:worker` is
+  # `uv run --frozen check` in `apps/worker`, and the only thing node does on this leg is
+  # spawn it, so that this leg names its gate the way every other leg names its own.
+  full-worker:
+    needs: lane
+    if: ${{ needs.lane.outputs.lane == 'full' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The redaction detector's model weights are fetched on first use and land under
+      # the runner's own temp directory, never inside the checkout: a cache restored into
+      # the checkout sits where every tree walker reads it too — oxfmt, the tag scan, knip,
+      # jscpd — and one landed there read as unformatted JSON by the first and as a string
+      # too long to hold by the second, on a run where the cache happened to be warm before
+      # either walker ran. Those walkers are the `full-root` leg's now and this directory is
+      # on another runner altogether, which settles the question twice over; `runner.temp` is
+      # still the right home, being this job's own scratch space. A job's own `env:` cannot
+      # read the `runner` context (GitHub's context-availability table), so the value is
+      # written to `$GITHUB_ENV` here instead, once, before anything downstream needs it. The
+      # worker reads this from the process, never from a file: the location is the deploy
+      # unit's to decide, and the compose file sets the same variable for the running
+      # container.
+      - name: HF_HOME on the runner's own temp directory, not the checkout
+        run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
       # Hundreds of megabytes of detector weights, fetched once and restored on every run
       # after it. The key hashes the module the versions and the model id are declared in,
       # so a model or a package the weights answer to moving is a miss and a fresh
@@ -208,41 +412,16 @@ jobs:
       # to the new pin and nobody would see it happen.
       - name: the redaction detector's weights, keyed on the pins that name them
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: steps.lane.outputs.lane == 'full'
         with:
           path: ${{ runner.temp }}/huggingface
           key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
-      - if: steps.lane.outputs.lane == 'full'
-        run: uv sync --frozen
+      - run: uv sync --frozen
         working-directory: apps/worker
-      # The SPA's `check` ends in a browser suite over the served build; the
-      # browser is not in the pnpm store, so it is installed here. Chromium alone: the
-      # suite runs one project.
-      - if: steps.lane.outputs.lane == 'full'
-        run: pnpm --filter @better-answers/web exec playwright install --with-deps chromium
-      # `pnpm check` runs `packages/core`'s erasure suite, which shells out to
-      # `git-filter-repo` and cannot be run without it. Why the install is an action of its
-      # own, and why its version is read rather than written, is said once where it lives.
-      - uses: ./.github/actions/git-filter-repo
-        if: steps.lane.outputs.lane == 'full'
-      # `pnpm check` builds the worker image, and on a fresh runner every layer of that
-      # build is cold — the step that fetches the detector's weights above all, which is
-      # over a gigabyte and is paid again on every run. The two steps here are what let
-      # that build read a layer cache that outlives the runner; they sit last because the
-      # step below is the only one that uses them. Read, and not write: what a pull request
-      # exports lands on its own ref, which `main` and every other pull request cannot
-      # read, so the probes pass `--cache-from` alone and the cache they read is the one
-      # `build.yml`'s legs wrote on `main` (`T-223`).
-      #
-      # The builder first. The driver a plain daemon answers with builds straight into its
-      # own image store and can export a cache nowhere, so `--cache-to` on it fails the
-      # build outright rather than being ignored. It cannot read one either, and that
-      # failure is quiet: `--cache-from type=gha` on it logs `unknown cache importer: gha`,
-      # builds every layer cold and exits 0 (run 35602449161, 21/09/2026), so without this
-      # step the probes would be green and cold for ever. This creates a container-driver
-      # builder and makes it the current one. The worker's suite probes for exactly that
-      # before it asks for the cache and builds the way it always did when it finds no such
-      # builder — a laptop, and this workflow before this line.
+      # The builder and the credentials, for the reason the api leg gives: this leg's image
+      # probe builds `apps/worker/Dockerfile`, on a fresh runner every layer of it is cold —
+      # the step that fetches the detector's weights above all, which is over a gigabyte —
+      # and a `type=gha` cache can neither be read by the daemon's own driver nor reached
+      # from a `run:` step without the second of these.
       #
       # That cache needs no key of its own, which is why there is no second key here beside
       # the weights one above. BuildKit keys a layer by what goes into it, and the weights
@@ -251,62 +430,72 @@ jobs:
       # a key somebody has to remember to write. The two agree on purpose: the cache step
       # above hashes the same file for the same reason.
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
-        if: steps.lane.outputs.lane == 'full'
-      # And the credentials second. The `type=gha` backend reads its token and its endpoint
-      # out of the runner's `ACTIONS_*` variables, and a runner hands those to an action's
-      # own process and to no `run:` step at all: `docker/build-push-action` has them
-      # because it is an action, and the `docker buildx build` the worker's suite runs from
-      # inside pytest does not. This step copies every `ACTIONS_*` variable into the job's
-      # environment, which is the helper Docker's own documentation names for this case, and
-      # copying all of them is what covers both spellings of the endpoint — the cache
-      # service moved from `ACTIONS_CACHE_URL` to `ACTIONS_RESULTS_URL` at v2, and the suite
-      # accepts either. The token is the runner's own, minted for this job and dead when it
-      # ends; it is not `GITHUB_TOKEN` and the `permissions:` block above does not reach it.
       - uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
-        if: steps.lane.outputs.lane == 'full'
-      # One command, every workspace — the root `check` runs them all. The image tests read
-      # the first variable below and stand down when the caller's own job probes what it
-      # pushes; a pull request evaluates it to the empty string and probes.
-      #
-      # The second refuses the indexing engine's call home, for the reason the worker
-      # image's runtime `ENV` gives: cocoindex reaches `cocoindex.gateway.scarf.sh` on
-      # every update. The image's setting reaches a container and this job starts none —
-      # `pnpm check` runs the worker's pipeline suite on the runner itself — so without
-      # this line every pull request tells a third party what this repository is
-      # building, once per document. The value is held against the compose file's by
+      # The second variable refuses the indexing engine's call home, for the reason the
+      # worker image's runtime `ENV` gives: cocoindex reaches `cocoindex.gateway.scarf.sh` on
+      # every update. The image's setting reaches a container and this leg starts none —
+      # `check:worker` runs the pipeline suite on the runner itself — so without this line
+      # every pull request tells a third party what this repository is building, once per
+      # document. The value is held against the compose file's by
       # `apps/worker/tests/test_image.py`.
-      - if: steps.lane.outputs.lane == 'full'
-        run: pnpm check
+      - run: pnpm check:worker
         env:
           IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller }}
           COCOINDEX_DISABLE_USAGE_TRACKING: "1"
-      # The other lane, and the whole of it: `check:docs` runs the suites that read this
-      # repository's DOCUMENTS, through the same runner as the root `check`, so one command
-      # still names every step that failed. `format:check` leads it because it leads the root
-      # `check` — and on this lane it is a no-op by construction, `.oxfmtrc.json` ignoring
-      # `**/*.md`. It is in the list so that the two lanes start the same way, not because it
-      # reads a document.
-      #
-      # The lane keeps gates rather than skipping CI because a docs-only commit broke one on
-      # 21/09/2026: five specs moved into `docs/specs/` and `coding-rules-tags` went red on
-      # the three `CITED_NOWHERE_ELSE` entries they made stale. Nothing above this line is
-      # installed for it — no uv, no browser, no rewrite tool, no builder — because no gate
-      # that reads a document needs one.
-      #
-      # WHAT IT STILL PAYS, said plainly: `apps/api` and `packages/core` start a Postgres
-      # container from their vitest `globalSetup` whichever files are selected, so this lane
-      # pays two container starts that none of its suites touch. Making it not do so is a
-      # change to those configurations rather than to this workflow, and it is not this
-      # change's (the process review, 21/09/2026).
-      #
-      # It is not every suite coupled to a markdown file. Five are left to the full lane —
-      # four reading a committed redaction FIXTURE, and the worker's half of the contract
-      # count, whose other half is in this lane and catches the same commit without a uv
-      # environment. Which suites are in the lane, which are outside it and why each is where
-      # it is, are one table in `apps/api/tests/docs-lane.test.ts`, held against the root
-      # manifest both ways.
-      #
-      # This job concludes on either lane, which is the thing that must not move: `check` is
-      # the name the branch ruleset requires and the name build.yml's `image` waits on.
-      - if: steps.lane.outputs.lane == 'docs'
-        run: pnpm check:docs
+
+  # THE ONE VERDICT. This job is the branch ruleset's required status context and the job
+  # `build.yml`'s `image` waits on, and it is the only thing in this file either of them
+  # reads.
+  #
+  # `always()`, so that it runs whatever the legs did and reports on them — under
+  # `success()`, which is the default, a failed leg would leave this job SKIPPED, and a
+  # skipped required check is a check that never reports. That is the whole reason the rule
+  # below is written out rather than left to `needs`.
+  #
+  # THE RULE, and it is one sentence: `lane` succeeded, every leg whose name begins with this
+  # run's lane succeeded, and every other leg was skipped. Both halves matter. Requiring the
+  # successes catches a leg that failed, was cancelled, or was skipped because something it
+  # needed never ran; requiring the skips catches a leg that ran on the wrong lane, and a
+  # `lane` job that failed — its output is then the empty string, no leg matches the first
+  # case, and the legs GitHub skipped for it are held against a `lane` that is not `success`.
+  #
+  # It reads the leg names rather than a list of its own, so a leg added above is under this
+  # verdict the moment it is named in `needs:` — and a leg whose `if:` stopped agreeing with
+  # its prefix is red, which is the point. `apps/api/tests/docs-lane.test.ts` holds the two to
+  # each other.
+  check:
+    needs: [lane, docs-gates, full-root, full-api, full-web, full-worker]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: every leg this lane names is green, and every other leg stood down
+        env:
+          LANE: ${{ needs.lane.outputs.lane }}
+          LEGS: ${{ toJSON(needs) }}
+        run: |
+          named=0
+          required=0
+          wrong=""
+          for leg in $(printf '%s' "${LEGS}" | jq -r 'keys[]'); do
+            named=$((named + 1))
+            was="$(printf '%s' "${LEGS}" | jq -r --arg leg "${leg}" '.[$leg].result')"
+            case "${leg}" in
+              lane) wanted=success ;;
+              "${LANE}-"*) wanted=success; required=$((required + 1)) ;;
+              *) wanted=skipped ;;
+            esac
+            echo "${leg}: ${was} (this lane wants ${wanted})"
+            [ "${was}" = "${wanted}" ] || wrong="${wrong} ${leg}=${was}"
+          done
+          # A verdict that required nothing of anybody passes whatever happened, which is the
+          # one outcome this job exists to refuse. It is a floor, not a count to keep current.
+          if [ "${named}" -lt 2 ] || [ "${required}" -lt 1 ]; then
+            echo "::error::this verdict read ${named} jobs and required ${required} legs, so it proved nothing"
+            exit 1
+          fi
+          if [ -n "${wrong}" ]; then
+            echo "::error::check is not green:${wrong}"
+            exit 1
+          fi
+          echo "the ${LANE} lane is green: ${required} legs"

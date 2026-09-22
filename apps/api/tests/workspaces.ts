@@ -33,3 +33,61 @@ export const workspacePackages = (): readonly string[] => {
     .filter((project) => existsSync(path.join(repositoryRoot, project, "package.json")))
     .sort();
 };
+
+type Manifest = { readonly name?: string; readonly scripts?: Readonly<Record<string, string>> };
+
+const manifestOf = (directory: string): Manifest => {
+  const parsed: unknown = JSON.parse(
+    readFileSync(path.join(repositoryRoot, directory, "package.json"), "utf8"),
+  );
+
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error(`${directory}/package.json is not an object`);
+  }
+  // SAFETY: an object, checked above; both fields are optional, so a manifest missing either
+  // reads as a workspace without it.
+  return parsed as Manifest;
+};
+
+export const rootScripts = (): Readonly<Record<string, string>> => manifestOf(".").scripts ?? {};
+
+export const workspacesGated = (): readonly string[] =>
+  workspacePackages().filter((directory) => manifestOf(directory).scripts?.["check"] !== undefined);
+
+const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<gates>[\s\S]+)$/;
+
+export const gatesNamed = (command: string): readonly string[] =>
+  (RUNNER.exec(command.trim())?.groups?.["gates"] ?? "").split(/\s+/).filter((gate) => gate !== "");
+
+const SCRIPT_RUN = /^pnpm\s+(?<script>[\w:@./-]+)$/;
+
+// A workflow step names one root script; a script that is a runner call stands for its steps.
+export const gatesUnder = (command: string): readonly string[] => {
+  const script = SCRIPT_RUN.exec(command.trim())?.groups?.["script"];
+  if (script === undefined) return [];
+
+  const named = gatesNamed(rootScripts()[script] ?? "");
+  return named.length === 0 ? [script] : named;
+};
+
+const FILTERED = /--filter\s+(?<workspace>\S+)/g;
+const ENTERED = /\bcd\s+(?<directory>[\w./-]+)/g;
+
+// A command that ends in a named file runs that file, not the workspace's whole suite.
+const RUNS_A_WHOLE_CHECK = /\bcheck$/;
+
+// A pnpm workspace is named by its package, the worker's uv one by being stepped into.
+export const workspacesChecked = (command: string): readonly string[] => {
+  if (!RUNS_A_WHOLE_CHECK.test(command.trim())) return [];
+
+  const directoryOf = new Map(
+    workspacePackages().map((directory) => [manifestOf(directory).name ?? directory, directory]),
+  );
+
+  return [
+    ...[...command.matchAll(FILTERED)].flatMap(
+      (found) => directoryOf.get(found.groups?.["workspace"] ?? "") ?? [],
+    ),
+    ...[...command.matchAll(ENTERED)].flatMap((found) => found.groups?.["directory"] ?? []),
+  ];
+};

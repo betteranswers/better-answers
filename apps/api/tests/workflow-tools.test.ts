@@ -15,7 +15,11 @@ const ACTION_USES = "./.github/actions/git-filter-repo";
 type Runner = { readonly file: string; readonly suiteCommand: string };
 
 const RUNS_THE_SUITE: readonly Runner[] = [
-  { file: "check.yml", suiteCommand: "pnpm check" },
+  // The `full-root` leg, whose `check:libraries` step runs packages/core's erasure suite.
+  { file: "check.yml", suiteCommand: "pnpm check:tree" },
+
+  // The `full-api` leg: `tests/ops.test.ts` reaches the same git step through the rehearsal.
+  { file: "check.yml", suiteCommand: "pnpm check:api" },
 
   { file: "mutation.yml", suiteCommand: "stryker run" },
 ];
@@ -35,19 +39,27 @@ const linesOf = (file: string): readonly string[] =>
 const STEP_OPENS = /^ {6}- /;
 const COMMENT = /^ {6}#/;
 
-type Step = { readonly at: number; readonly body: string };
+// check.yml installs the tool on two legs, and one leg's install is nothing to the other's suite.
+const JOB_OPENS = /^ {2}(?<job>[\w-]+):\s*$/;
+
+type Step = { readonly at: number; readonly job: string; readonly body: string };
 
 const stepsIn = (lines: readonly string[]): readonly Step[] => {
   const steps: Step[] = [];
-  let open: { at: number; body: string[] } | undefined;
+  let job = "";
+  let open: { at: number; job: string; body: string[] } | undefined;
   const close = (): void => {
-    if (open !== undefined) steps.push({ at: open.at, body: open.body.join("\n") });
+    if (open !== undefined) steps.push({ at: open.at, job: open.job, body: open.body.join("\n") });
     open = undefined;
   };
   for (const [index, line] of lines.entries()) {
-    if (STEP_OPENS.test(line)) {
+    const opened = JOB_OPENS.exec(line)?.groups?.["job"];
+    if (opened !== undefined) {
       close();
-      open = { at: index + 1, body: [line] };
+      job = opened;
+    } else if (STEP_OPENS.test(line)) {
+      close();
+      open = { at: index + 1, job, body: [line] };
     } else if (COMMENT.test(line)) {
       close();
     } else open?.body.push(line);
@@ -57,22 +69,6 @@ const stepsIn = (lines: readonly string[]): readonly Step[] => {
 };
 
 const workflowPath = (file: string): string => path.join(workflowDirectory, file);
-
-const installStep = (runner: Runner): Step => {
-  const found = stepsIn(linesOf(workflowPath(runner.file))).filter((step) =>
-    step.body.includes(ACTION_USES),
-  );
-  const [only] = found;
-  if (found.length !== 1 || only === undefined) {
-    throw new Error(
-      `${runner.file} has ${String(found.length)} steps running \`uses: ${ACTION_USES}\`, not one. ` +
-        `It runs the erasure suite through \`${runner.suiteCommand}\`, and \`ubuntu-latest\` ` +
-        `carries no git-filter-repo, so it installs the tool the way every other such ` +
-        `workflow does — with that one line, ahead of the step that runs the suite.`,
-    );
-  }
-  return only;
-};
 
 const suiteStep = (runner: Runner): Step => {
   const found = stepsIn(linesOf(workflowPath(runner.file))).find((step) =>
@@ -84,6 +80,23 @@ const suiteStep = (runner: Runner): Step => {
   return found;
 };
 
+const installStep = (runner: Runner): Step => {
+  const job = suiteStep(runner).job;
+  const found = stepsIn(linesOf(workflowPath(runner.file))).filter(
+    (step) => step.job === job && step.body.includes(ACTION_USES),
+  );
+  const [only] = found;
+  if (found.length !== 1 || only === undefined) {
+    throw new Error(
+      `${runner.file}'s \`${job}\` has ${String(found.length)} steps running \`uses: ${ACTION_USES}\`, not one. ` +
+        `It runs the erasure suite through \`${runner.suiteCommand}\`, and \`ubuntu-latest\` ` +
+        `carries no git-filter-repo, so it installs the tool the way every other such ` +
+        `job does — with that one line, ahead of the step that runs the suite.`,
+    );
+  }
+  return only;
+};
+
 const VERSION_LITERAL = /\d+\.\d+/;
 
 const STEP_CONDITION = /^(?: {6}- | {8})if:\s*(?<condition>.+?)\s*$/m;
@@ -92,7 +105,7 @@ const conditionOf = (step: Step): string =>
   STEP_CONDITION.exec(step.body)?.groups?.["condition"] ?? "";
 
 describe.each(RUNS_THE_SUITE)(
-  "the tools $file installs for the suite it runs (T-124, T-224)",
+  "the tools $file installs for `$suiteCommand` (T-124, T-224)",
   (runner: Runner) => {
     it("installs the rewrite tool the erasure suite runs before it runs the suite", () => {
       expect(
