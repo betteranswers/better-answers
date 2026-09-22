@@ -9,7 +9,7 @@
     "check:gates": "node scripts/check.mjs format:check lint comment-gate:ts comment-gate:python comment-density insert-scan jscpd knip",
     "check:workspaces": "pnpm -r --no-bail --if-present run check",
     "check:affected": "pnpm --no-bail --if-present --filter \"...[${BASE}]\" --filter '!better-answers' run check",
-    "check:affected:scope": "pnpm --filter \"...[${BASE}]\" --filter '!better-answers' list --depth -1 --parseable",
+    "check:affected:scope": "pnpm --filter \"...[${BASE}]\" --filter '!better-answers' --filter '!@better-answers/design-system' list --depth -1 --parseable",
     "check:tree": "node scripts/check.mjs check:gates check:libraries",
     "check:libraries": "pnpm --no-bail --if-present --filter @better-answers/core --filter @better-answers/schema --filter @better-answers/devtools run check",
     "check:api": "pnpm --no-bail --if-present --filter @better-answers/api run check",

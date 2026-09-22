@@ -103,7 +103,14 @@ describe("the knip gate is a step of the root check (T-066)", () => {
     const scripts = (root as { readonly scripts?: Readonly<Record<string, string>> }).scripts ?? {};
 
     expect(scripts["knip"], "the root declares no knip script").toBeDefined();
-    expect(scripts["check"] ?? "").toContain(" knip");
+    // The gates a branch never narrows are one list under one name, so the reach is two hops.
+    expect(
+      scripts["check:gates"] ?? "",
+      "knip is not one of the gates that walk the whole tree",
+    ).toContain(" knip");
+    expect(scripts["check"] ?? "", "the root check no longer runs those gates").toContain(
+      "check:gates",
+    );
   });
 });
 

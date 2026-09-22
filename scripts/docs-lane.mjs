@@ -59,8 +59,9 @@ const isMarkdown = (changed) => changed.endsWith(".md");
  * `apps/worker` — named rather than matched by `apps/*`, because a directory that only LOOKS
  * like a workspace is the one way this lane could be silently green: pnpm would map its files
  * to the workspace root, the exclusion below would drop that, and the leg would pass having
- * run nothing. An unknown directory is `full`. The list is held against `workspacePackages()`
- * by `apps/api/tests/docs-lane.test.ts`, so a workspace added and not named here is red.
+ * run nothing. An unknown directory is `full`. `apps/api/tests/docs-lane.test.ts` holds this
+ * list against `workspacePackages()` both ways — a workspace missing from it is red, and so is
+ * a directory in it the repository has stopped installing.
  */
 const WORKSPACE_ROOTS = [
   "apps/api/",

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { parse } from "yaml";
@@ -13,6 +13,7 @@ import {
   workspacePackages,
   workspacesGated,
   workspacesChecked,
+  workspacesWithNoCheck,
 } from "./workspaces.ts";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
@@ -129,6 +130,25 @@ const LANES: readonly LaneCase[] = [
 describe("which paths reach which lane (T-335)", () => {
   it.each(LANES)("$lane: $because", ({ changed, lane, worker }: LaneCase) => {
     expect(decide(changed)).toEqual({ lane, worker });
+  });
+
+  it("treats no directory as a workspace the repository has stopped installing", () => {
+    const known = new Set([...workspacePackages(), "apps/worker"]);
+    const firstLevel = ["apps", "packages"].flatMap((parent) =>
+      readdirSync(path.join(repositoryRoot, parent), { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => `${parent}/${entry.name}`),
+    );
+    const orphans = firstLevel.filter(
+      (directory) =>
+        laneOf([`${directory}/a-changed-file.ts`]) === "affected" && !known.has(directory),
+    );
+
+    expect(firstLevel.length).toBeGreaterThan(known.size - 1);
+    expect(
+      orphans,
+      "the lane sends a directory to the affected lane that pnpm's filter cannot answer for, so its change would be read by the root gates alone",
+    ).toEqual([]);
   });
 
   it("reads every workspace the repository installs as one the filter can answer for", () => {
@@ -637,7 +657,7 @@ describe("how the legs narrow check:workspaces (T-333, T-335)", () => {
     );
   });
 
-  it("reads the same selection back as the run it guards, out of the same two filters", () => {
+  it("reads back the selection it guards, minus the workspaces that would run no gate", () => {
     const selectors = (script: string): readonly string[] =>
       [...(rootScripts()[script] ?? "").matchAll(/--filter\s+(?<selector>"[^"]*"|'[^']*')/g)].map(
         (found) => found.groups?.["selector"] ?? "",
@@ -645,9 +665,13 @@ describe("how the legs narrow check:workspaces (T-333, T-335)", () => {
 
     expect(
       selectors("check:affected:scope"),
-      "the leg's guard reads a different selection from the one it guards, so an empty run could pass it",
-    ).toEqual(selectors("check:affected"));
+      "the guard counts a workspace with no check script, so a selection of only those would pass it having run nothing — or it reads a different selection from the run it guards",
+    ).toEqual([
+      ...selectors("check:affected"),
+      ...workspacesWithNoCheck().map((name) => `'!${name}'`),
+    ]);
     expect(selectors("check:affected")).toHaveLength(2);
+    expect(workspacesWithNoCheck().length).toBeGreaterThan(0);
   });
 
   it("brings a workspace's dependents with it, which is what the `...` prefix buys", () => {

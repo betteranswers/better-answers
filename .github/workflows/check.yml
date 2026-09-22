@@ -509,9 +509,9 @@ jobs:
   # WHAT THE GRAPH DOES NOT CARRY, and it is one thing: the api's image holds the SPA's build,
   # and `apps/web` depends on `apps/api` rather than the other way about — so a change to the
   # SPA alone selects `apps/web` and `apps/api`'s image suite runs in the merge group instead
-  # of here. That is an ejection when it goes red, and it is the first candidate the week of
-  # ejections on `T-335` is counting. Left rather than hand-wired: a `--filter` arm written here
-  # for one coupling is a second dependency graph beside pnpm's.
+  # of here, which is an ejection when it goes red. Left rather than hand-wired: a `--filter`
+  # arm written here for one coupling is a second dependency graph beside pnpm's, and it would
+  # be read by nobody the day the real edge moves.
   #
   # THE WORKSPACE ROOT IS EXCLUDED BY NAME. pnpm maps a changed file to the nearest project
   # above it, and for a root file that project is this repository itself — whose `check` is the

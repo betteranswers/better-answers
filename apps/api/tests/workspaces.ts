@@ -57,6 +57,12 @@ export const rootName = (): string => manifestOf(".").name ?? "";
 export const workspacesGated = (): readonly string[] =>
   workspacePackages().filter((directory) => manifestOf(directory).scripts?.["check"] !== undefined);
 
+// By package name, which is how a filter names one: a selection of these alone runs no gate.
+export const workspacesWithNoCheck = (): readonly string[] =>
+  workspacePackages()
+    .filter((directory) => manifestOf(directory).scripts?.["check"] === undefined)
+    .map((directory) => manifestOf(directory).name ?? directory);
+
 const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<gates>[\s\S]+)$/;
 
 const stepsNamed = (command: string): readonly string[] =>
