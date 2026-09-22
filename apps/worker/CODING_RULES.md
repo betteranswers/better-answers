@@ -4,7 +4,7 @@ The whole of `CODING_RULES.md` binds this workspace. What follows is true of thi
 
 ## [WRK1] Never migrate, and never hold a git credential
 
-The app is the only migration owner and the only OKF writer. This tier reads the schema as structure, proposes a concept through a `concept_write_request` row, and claims no job while its schema stamp does not match the migration journal's.
+The app is the only migration owner and the only OKF writer, and it is the tier that holds the credential a write to the bundle needs. This tier reads the schema as structure, proposes a concept through a `concept_write_request` row, and claims no job while its schema stamp does not match the migration journal's.
 
 ## [PIPE1] Compose cocoindex; never rebuild what it provides and never rely on what it does not
 

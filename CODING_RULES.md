@@ -2,7 +2,7 @@
 
 These rules bind every workspace. A directory's own rules live beside it, in `apps/api/CODING_RULES.md`, `apps/web/CODING_RULES.md`, `apps/worker/CODING_RULES.md` and `deploy/CODING_RULES.md`.
 
-Every rule is an imperative under a tag a finding can cite. A `Reviewer:` line marks the part of a rule no mechanism can catch, and it is the only such marker. Where a gate holds a rule the rule says nothing about the gate, which prints the tag itself; where nothing holds it yet, a ticket names the gate that would. Why a rule was decided is in `docs/adr/`.
+Every rule is an imperative under a tag a finding can cite. A `Reviewer:` line marks the part of a rule no mechanism can catch, and it is the only such marker. A rule states what it asks for and not which gate catches a breach, the gate printing the tag itself; where nothing holds a rule yet, a ticket names the gate that would. Why a rule was decided is in `docs/adr/`.
 
 ## DESIGN
 
@@ -97,7 +97,7 @@ A lint rule, a tool in `check` and a hook command each land with a functional te
 
 ### [CHECK2] Fail a suite that can run nothing
 
-A test script never passes for having found no tests, and a focused browser spec fails under CI. pytest refuses a marker it does not know and an expected failure that passed. Every workspace carries a `check` script, or is named with the reason it has nothing to run.
+A test script never passes for having found no tests, and a focused browser spec fails under CI. pytest refuses a marker it does not know and an expected failure that passed. Every workspace carries a `check` script, or is named with its reason in `apps/api/tests/check-scripts.test.ts`.
 
 ### [CHECK3] Name every failure in one run
 
@@ -113,7 +113,7 @@ Reviewer: nothing can read a comment's intent, so a restatement or a narration i
 
 ### [COMMENT2] Write a rule tag in a rules file, a review finding or a gate's failure message
 
-Those three places and nowhere else, bar a frozen list of documents that cited a rule before this one, which only shrinks. A tag in source, a test, a document or a deploy file is a pointer a reader cannot follow and a citation nothing keeps true: write the rule in words where the reader meets it, or delete the sentence.
+Those three places and nowhere else, bar the frozen list in `apps/api/tests/coding-rules-tags.test.ts` — the documents that cited a rule before this one, and it only shrinks. A tag in source, a test, a document or a deploy file is a pointer a reader cannot follow and a citation nothing keeps true: write the rule in words where the reader meets it, or delete the sentence.
 
 ## GLOSSARY
 
@@ -175,7 +175,7 @@ Reviewer: no scan can tell what a logged value holds, on either tier.
 
 ### [SEC1] Keep a secret to its credential class
 
-A secret belongs to one of seven credential classes. The bootstrap class — what the deploy unit must give the process before it can reach anything — is what a config module reads; the other six are rows under the envelope, reached through a credentials provider the first slice needing one builds. Classes are never mixed in one scope, and a secret is never logged.
+A secret belongs to one of the seven credential classes `docs/operations/SECRETS.md` names. The bootstrap class — what the deploy unit must give the process before it can reach anything — is what a config module reads; the other six are rows under the envelope, reached through a credentials provider the first slice needing one builds. Classes are never mixed in one scope, and a secret is never logged.
 
 Reviewer: a diff that logs a bootstrap value is what this catches.
 
@@ -185,17 +185,15 @@ Every `packages/core` function that reads or writes tenant data takes a `Princip
 
 ### [SEC3] Ship a tenant table, a grant or a definer function with the test of what it refuses
 
-Create every tenant table `withRLS()` and ship its zero-rows test: under forced row-level security and the non-owner runtime role, a table with no policy returns no rows to anyone. The graph tables are tenant tables too; the identity set is the one named exemption. Every privilege a migration installs — a `GRANT`, a default privilege, a definer function — lands with a test of the path it must **refuse** beside the path it serves: the wrong role, another tenant's scope, a partition reached directly. A partition child is a table of its own: assert its denial directly, never from the parent's. A definer function guards its arguments against the transaction's scope before any DDL, pins its `search_path`, schema-qualifies every object, and has `EXECUTE` revoked from `PUBLIC` and granted to its one caller. No LLM-authored SQL runs against a shared store.
+Create every tenant table `withRLS()` and ship its zero-rows test: under forced row-level security and the non-owner runtime role, a table with no policy returns no rows to anyone. The graph tables are tenant tables too; the identity set is the one named exemption. Every privilege a migration installs, a default privilege among them, lands with a test of the path it must **refuse** beside the path it serves: the wrong role, another tenant's scope, a partition reached directly. A partition child is a table of its own: assert its denial directly, never from the parent's. A definer function guards its arguments against the transaction's scope before any DDL, pins its `search_path`, schema-qualifies every object, and grants `EXECUTE` to its one caller and no one else. No LLM-authored SQL runs against a shared store.
 
 Reviewer: attack a change to a migration, a grant, a policy or a definer function before it merges — a person's pass, no CI step; and nothing scans for LLM-authored SQL.
 
-### [SEC4] Read the environment only in the tier's config module
+### [SEC4] Read the environment in the tier's one config module
 
-A tier's shipped code reads the environment in one typed config module and nowhere else — never at a call site. A setting no step in that tier reads yet does not belong there. Passing the environment on to a child process is a different act, and it lives in one named function.
+No other module in the tier reads it, and never at a call site; a suite, a script and this repository's own tooling are outside the rule. A setting no step in the tier reads yet does not belong in the module. Passing the environment on to a child process is a different act, and it lives in one named function.
 
 ## AUDIT
-
-One append-only ledger, `audit_event`, and the audit slice that writes it.
 
 ### [AUDIT1] Write an act and its audit event in one transaction
 

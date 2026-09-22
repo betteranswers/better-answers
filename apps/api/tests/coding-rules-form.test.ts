@@ -25,7 +25,6 @@ const IMPERATIVES: ReadonlySet<string> = new Set([
   "Choose",
   "Comment",
   "Compose",
-  "Declare",
   "Derive",
   "Design",
   "Export",
@@ -47,7 +46,6 @@ const IMPERATIVES: ReadonlySet<string> = new Set([
   "Parse",
   "Pin",
   "Read",
-  "Rebuild",
   "Refuse",
   "Return",
   "Run",
@@ -98,6 +96,9 @@ const withoutFences = (text: string): readonly Line[] => {
     return inside ? [] : [{ number: index + 1, text: text_ }];
   });
 };
+
+const fenceLinesIn = (text: string): number =>
+  text.split("\n").filter((line) => FENCE.test(line)).length;
 
 const countWords = (text: string): number =>
   text.split(/\s+/).filter((token) => /[A-Za-z0-9]/.test(token)).length;
@@ -197,6 +198,21 @@ describe("the parser this form test reads a rules file with", () => {
     expect(headingsIn(lines).map((heading) => heading.text)).toContain("FAMILY");
   });
 
+  it("sorts a heading into the file's title, a family word, a rule's tag, or none of the three", () => {
+    const sorted = (text: string): string =>
+      TAGGED.test(text) ? "a rule" : FAMILY.test(text) ? "a family" : "neither";
+
+    expect(sorted("FAMILY")).toBe("a family");
+    expect(sorted(`${spelled("FIX", "1")} Write the expected value down`)).toBe("a rule");
+    expect(sorted("Notes")).toBe("neither");
+    expect(sorted("Further notes")).toBe("neither");
+  });
+
+  it("counts the fences a rules file opens and closes", () => {
+    expect(fenceLinesIn(FIXTURE)).toBe(2);
+    expect(fenceLinesIn("# A file\n\n```ts\nconst one = 1;\n")).toBe(1);
+  });
+
   it("counts a rule's prose and leaves a fenced snippet out of the count", () => {
     const [first] = rulesIn("fixture.md", lines);
     expect(first).toBeDefined();
@@ -224,6 +240,18 @@ describe("the form every coding rule is written in", () => {
       "apps/worker/CODING_RULES.md",
       "deploy/CODING_RULES.md",
     ]);
+  });
+
+  it("closes every fence it opens, so no rule is swallowed by one", () => {
+    const odd = rulesFiles()
+      .map((file) => ({ file, fences: fenceLinesIn(read(file)) }))
+      .filter(({ fences }) => fences % 2 !== 0)
+      .map(({ file, fences }) => `${file} has ${fences} fence lines`);
+
+    expect(
+      odd,
+      "a rules file opens a snippet it never closes, so every heading after it reads as part of that snippet and the rules under them vanish from this test.",
+    ).toEqual([]);
   });
 
   it("opens every rule with a tagged heading whose title is an imperative", () => {
