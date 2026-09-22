@@ -12,6 +12,7 @@
     "check:docs:api": "pnpm --filter @better-answers/api exec vitest run tests/adr-index.test.ts tests/coding-rules-form.test.ts tests/coding-rules-tags.test.ts tests/deploy-tree.test.ts tests/docs-lane.test.ts tests/provision-skills.test.ts",
     "check:docs:core": "pnpm --filter @better-answers/core exec vitest run test/tier-contract.test.ts",
     "check:docs:web": "pnpm --filter @better-answers/web exec vitest run test/browser-suite-skill.test.ts",
+    "land": "node scripts/land.mjs",
     "jscpd": "node scripts/jscpd.mjs",
     "comment-gate:ts": "oxlint --config packages/devtools/lint-rules/comment-gate.oxlintrc.json apps packages",
     "comment-gate:python": "python3 packages/devtools/python/comment_gate.py apps packages",

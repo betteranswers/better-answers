@@ -870,3 +870,9 @@ How the work from the foundation to a finished v0.1 is cut and ordered.
   to its end state: it dispatches each task to an agent with a context of its own — in a
   worktree, beside others in parallel — reads what comes back, and decides what runs next.
    _Avoid_: orchestrator, ralph.
+- **land** (the verb) — to take a change to `main` through the merge queue: a branch, a commit,
+  a push, a pull request and an armed auto-merge, the queue doing the merge. Step 5 of
+  `docs/agents/workflow.md` is a ticket's landing; `pnpm land` is one command's, for a change
+  too small for a ticket. The adjective is the other sense — a *landed* binding and a *landed
+  copy* are states of the knowledge layer, and nothing here lands those.
+  _Avoid_: ship, merge (the queue merges), push to main.

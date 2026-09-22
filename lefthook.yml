@@ -37,6 +37,23 @@
 # developer clone is the case that must work, and `.github/workflows/check.yml` asserts it
 # on the only genuinely fresh clone we get — so the fallback cannot hide a real failure.
 
+# The subject ceiling, over every commit rather than over `pnpm land`'s alone. The number is
+# written twice — here and in `packages/devtools/src/land.ts` — because nothing either could
+# import binds a shell one-liner to a TypeScript constant; what holds them to one number is
+# `packages/devtools/test/land.test.ts`, which reads this file and the command's own refusal
+# and fails when they disagree. It also runs this command over a message file both ways.
+commit-msg:
+  commands:
+    subject-ceiling:
+      run: |
+        subject=$(head -n 1 "{1}")
+        if [ "${#subject}" -gt 72 ]; then
+          echo "commit-msg: the subject is ${#subject} characters and this repository's ceiling is 72."
+          echo "Say what is now true in one clause ending with the ticket id in brackets, and put the"
+          echo "paragraph in the body, after a blank line. docs/agents/workflow.md, The prose shape."
+          exit 1
+        fi
+
 pre-commit:
   parallel: true
 
