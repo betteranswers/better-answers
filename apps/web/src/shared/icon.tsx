@@ -2,8 +2,10 @@ import {
   CaretDown,
   Database,
   Graph,
+  List,
   Pulse,
   Question,
+  SidebarSimple,
   Tray,
   Users,
   type Icon as PhosphorGlyph,
@@ -12,17 +14,28 @@ import {
 import { cn } from "@/shared/lib/utils.ts";
 
 // Phosphor stands in until the product has a set of its own; one family, one door to it.
-export type IconName = "caret-down" | "database" | "map" | "people" | "pulse" | "question" | "tray";
+export type IconName =
+  | "caret-down"
+  | "database"
+  | "map"
+  | "navigation"
+  | "people"
+  | "pulse"
+  | "question"
+  | "secondary-nav"
+  | "tray";
 
-// The keys are the glossary's words, not Phosphor's: a screen says map and people, never
-// graph or users.
+// The keys are the glossary's words, not Phosphor's: the shell says navigation and secondary
+// nav, never list or sidebar.
 const GLYPHS = {
   "caret-down": CaretDown,
   database: Database,
   map: Graph,
+  navigation: List,
   people: Users,
   pulse: Pulse,
   question: Question,
+  "secondary-nav": SidebarSimple,
   tray: Tray,
 } satisfies Readonly<Record<IconName, PhosphorGlyph>>;
 

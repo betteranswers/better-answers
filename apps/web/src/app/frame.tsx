@@ -1,13 +1,16 @@
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { NEEDS_A_PICK, refusalOf, useMembership } from "@/features/auth/membership.ts";
 import { screenAt, viewAt } from "@/shared/screens.ts";
 import { IconRail } from "./icon-rail.tsx";
+import { NavigationControl } from "./navigation-control.tsx";
 import { SecondaryNav } from "./secondary-nav.tsx";
+import { useSecondaryNavShowing } from "./secondary-nav-showing.ts";
 import { isFilled, Toolbar, ViewPanel, ViewTabsRoot } from "./toolbar.tsx";
 import { TopBar } from "./top-bar.tsx";
+import { useWideLayout } from "./wide-layout.ts";
 
 export function Frame() {
   const navigate = useNavigate();
@@ -16,6 +19,9 @@ export function Frame() {
   const membership = useMembership();
   const refusal = refusalOf(membership.error);
   const { signOut, signingOut } = useSignOut();
+  const wide = useWideLayout();
+  const { showing, show } = useSecondaryNavShowing();
+  const navId = useId();
 
   useEffect(() => {
     if (refusal === undefined) return;
@@ -41,7 +47,7 @@ export function Frame() {
   return (
     /*
      * A fixed rail and a 320px viewport cannot both be honoured; WCAG's reflow criterion
-     * says which gives, so the regions stack below this breakpoint.
+     * says which gives, so the navigation moves behind one button.
      */
     <div className="flex min-h-screen flex-col bg-background md:flex-row">
       <a
@@ -51,11 +57,16 @@ export function Frame() {
         Skip to the screen
       </a>
 
-      <IconRail openScreenId={openScreen?.id} />
+      {wide ? <IconRail openScreenId={openScreen?.id} tooltips /> : null}
 
-      {openScreen === undefined ? null : (
-        <SecondaryNav screen={openScreen} openViewPath={openView?.path} />
-      )}
+      {wide && openScreen !== undefined ? (
+        <SecondaryNav
+          id={navId}
+          showing={showing}
+          screen={openScreen}
+          openViewPath={openView?.path}
+        />
+      ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
@@ -70,6 +81,16 @@ export function Frame() {
           }
           screenName={openScreen?.name}
           viewName={openView?.name}
+          navigation={
+            <NavigationControl
+              wide={wide}
+              showing={showing}
+              controls={navId}
+              openScreen={openScreen}
+              openViewPath={openView?.path}
+              onShow={show}
+            />
+          }
           signingOut={signingOut}
           onSignOut={signOut}
         />

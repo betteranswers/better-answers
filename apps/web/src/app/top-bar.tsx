@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { Icon } from "@/shared/icon.tsx";
 import { Badge } from "@/shared/ui/badge.tsx";
 import { Button } from "@/shared/ui/button.tsx";
@@ -18,6 +20,7 @@ export function TopBar(properties: {
   readonly membership: Membership | undefined;
   readonly screenName: string | undefined;
   readonly viewName: string | undefined;
+  readonly navigation: ReactNode;
   readonly signingOut: boolean;
   readonly onSignOut: () => void;
 }) {
@@ -25,6 +28,10 @@ export function TopBar(properties: {
 
   return (
     <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-background px-4 py-2 md:sticky md:top-0 md:z-10 md:min-h-topbar md:flex-nowrap md:px-5">
+      {/* The corner the navigation is governed from, whichever layout is in force: one place
+          rather than one per breakpoint. */}
+      {properties.navigation}
+
       {membership === undefined ? null : (
         <p className="font-medium text-foreground">{membership.workspaceName}</p>
       )}
