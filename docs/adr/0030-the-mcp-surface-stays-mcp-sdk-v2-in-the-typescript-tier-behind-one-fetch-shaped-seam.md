@@ -21,7 +21,7 @@ framework owning Host/Origin validation. So the choice between the plain SDK and
 choice **behind one seam**, reversible in an afternoon — which is precisely the kind of choice
 that should be taken cheaply and not agonised over.
 
-Three findings decided it, each read from a primary source on 31 August 2026 (`[DEPS1]`; the
+Three findings decided it, each read from a primary source on 31 August 2026 (the
 research is `docs/research/mcp-approach-2026-08-31.md`).
 
 **Dual-era serving is not a differentiator.** It was framed as FastMCP's advantage. It is not:
@@ -52,7 +52,7 @@ move.** Better Auth has no ID-JAG page; SEP-990 is an open implementation issue 
 official TypeScript, Python and Kotlin SDKs alike. When a customer's IT department asks for
 enterprise-managed authorization, the work is to accept the RFC 7523 `jwt-bearer` grant at Better
 Auth's token endpoint and validate signature, issuer, audience, `typ`, `sub` and `jti` replay,
-behind ~~`[DESIGN5]`'s existing seam~~ the identity seam ADR 0009 keeps (its 2026-09-05 amendment). Buying that today by moving a transport into the Python
+behind ~~the identity-seam rule's existing seam~~ the identity seam ADR 0009 keeps (its 2026-09-05 amendment). Buying that today by moving a transport into the Python
 worker would trade one week of future work for a permanent second identity boundary.
 
 **This ADR is therefore not an ADR against ADR 0005's two tiers, and not against ADR 0029's one
@@ -80,7 +80,7 @@ under **their** consent, with credentials we never hold. The Claude platform is 
 **We therefore never build outbound connectors to third-party SaaS, no outbound OAuth client
 machinery, no field mapping or sync engine, no outbound scheduler or webhook fan-out, no
 per-destination rendering, and no connector directory of our own.** The **acting** credential
-class (~~`[SEC1]`~~ ADR 0041 — the 2026-09-21 amendment below) is for acts on our own estate and for the ingestion side; it is never a
+class (ADR 0041 — the 2026-09-21 amendment below) is for acts on our own estate and for the ingestion side; it is never a
 credential for writing into a customer's other systems. What we build instead is a read surface
 good enough that an assistant can carry our knowledge anywhere, plus one way to send a correction
 back — which is what ADR 0018 already describes.
@@ -139,12 +139,12 @@ back — which is what ADR 0018 already describes.
 - **Proposing a concept stays a web link in v0.1.** An App could offer a form; a governed write
   path (ADR 0012) wants its first version where an Admin sees the whole queue.
 - **SEP-990 becomes a named, sized future task rather than an unknown** — the RFC 7523
-  `jwt-bearer` grant on Better Auth's token endpoint, behind ~~`[DESIGN5]`'s~~ ADR 0009's seam (its 2026-09-05 amendment), roughly a week.
+  `jwt-bearer` grant on Better Auth's token endpoint, behind ADR 0009's seam (its 2026-09-05 amendment), roughly a week.
   It is also a fourth thing to watch alongside ADR 0009's three leave-triggers: if the self-hosted
   OAuth path never gains it while hosted alternatives do, that is evidence about the trigger-2
   question, not a separate decision.
 - **Three new domain words are settled and must reach `CONTEXT.md` before any of them appears in
-  code (`[GLOSSARY1]`): `MCP App`, `view`, `ui://`.** They are listed with proposed definitions
+  code: `MCP App`, `view`, `ui://`.** They are listed with proposed definitions
   under `## Words for CONTEXT.md` in `docs/research/mcp-approach-2026-08-31.md`. *Protocol era*,
   *legacy era*, *modern era* and *dual-era serving* are deliberately **not** proposed: they are
   architecture words, the same judgement ADR 0029 made about *slice*, *kernel* and *access*.
@@ -177,8 +177,8 @@ answers live in a briefing under `.scratch/`, not in the ADR tree, so an agent r
 each other and left this one to a build task; that deferral was reasonable and it is also how the
 gap survived.
 
-## Amendment — 2026-09-21, the credential class list is ADR 0041's, not `[SEC1]`'s (T-184)
+## Amendment — 2026-09-21, the credential class list is ADR 0041's, not the credential-class rule's (T-184)
 
-A citation repointed, no change of decision. This ADR names the **acting** class as `[SEC1]`'s. The coding-rules audit of 21 September 2026 found that class list to be a decision recorded as a rule with nothing checking it, and moved it to **ADR 0041**, which carries the seven classes unchanged. The citation above is struck in the index's convention and repointed there. What this ADR decides about the acting class — that it is for acts on our own estate and the ingestion side, and never for writing into a customer's other systems — is untouched and stays this ADR's.
+A citation repointed, no change of decision. This ADR names the **acting** class as the credential-class rule's. The coding-rules audit of 21 September 2026 found that class list to be a decision recorded as a rule with nothing checking it, and moved it to **ADR 0041**, which carries the seven classes unchanged. The citation above is struck in the index's convention and repointed there. What this ADR decides about the acting class — that it is for acts on our own estate and the ingestion side, and never for writing into a customer's other systems — is untouched and stays this ADR's.
 
 The same audit found that `docs/operations/SECRETS.md` glosses *acting* incompatibly, as "writing back into a connected system as the user, approval-gated". ADR 0041 records that conflict and settles neither side, so this ADR's sentence stands as written and is contested. Settling it is a decision of its own, and it will amend whichever of the two records loses.

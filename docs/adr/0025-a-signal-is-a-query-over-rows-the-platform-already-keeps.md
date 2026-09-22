@@ -16,11 +16,11 @@ amends: 0017, 0022, 0024
 
 **Who is told.** Three channels, each for the case only it can see: **healthchecks.io** for silence (the scheduler, every backup job, the drill — the app may be what is down); **Coolify → Resend** for the deploy, container and backup failures Coolify sees; **the app's own email through `SMTP_URL`** for the catalogue's thresholds — an immediate message for the short list (extraction ceiling at 80 %, an erasure request past 21 days, a credential or token about to expire, a restore performed, the worker stale beyond 15 minutes, a backup missed) and a daily digest for the rest, to the Admin role's addresses, each line with its action. An alert is a `platform_event(kind=alert)`; a matching *cleared* event closes it so no condition fires twice.
 
-**Born-evaluable.** Every model call writes an **`llm_call`** row — workspace, purpose (extract · answer · enrich · replay · embed), route, model, tokens in and out, seconds, priced cost, outcome, and the run or answer it served — never the prompt or the completion (`[LOG1]`). It feeds the ceiling, price drift, replay spend, per-client spend and the onboarding ETA, and is what ADR 0017's replay reads.
+**Born-evaluable.** Every model call writes an **`llm_call`** row — workspace, purpose (extract · answer · enrich · replay · embed), route, model, tokens in and out, seconds, priced cost, outcome, and the run or answer it served — never the prompt or the completion. It feeds the ceiling, price drift, replay spend, per-client spend and the onboarding ETA, and is what ADR 0017's replay reads.
 
 **Retention.** `platform_event` 90 days; heartbeats one a minute for seven days then one an hour for ninety; `llm_call` six months then a monthly per-workspace aggregate; the answer audit and `audit_event` as ADRs 0014 and 0017 set them. ADR 0017's thinning job does all of it and its own lag is a signal.
 
-**The exporter.** `[LOG1]`'s OpenTelemetry exporter is one config key, `OTEL_EXPORTER_OTLP_ENDPOINT`, empty in v0.1: pino and structlog write JSON to stdout and Coolify's log view is the reader. Tracing arrives as a config change the day something receives it.
+**The exporter.** The structured logger's OpenTelemetry exporter is one config key, `OTEL_EXPORTER_OTLP_ENDPOINT`, empty in v0.1: pino and structlog write JSON to stdout and Coolify's log view is the reader. Tracing arrives as a config change the day something receives it.
 
 ## Alternatives considered
 
@@ -35,11 +35,11 @@ amends: 0017, 0022, 0024
 ## Consequences
 
 - Records: `llm_call` (new family, ADR 0014 catalogue grows by one); `platform_event` gains kinds `alert` and `cleared`; the `worker_instance` heartbeat carries a `host` JSON; a `signal_threshold` config row per signal.
-- `CODING_RULES.md`: `[LOG1]` names the exporter key and the `llm_call` row; `[OPS1]` gains the alert-once rule.
+- `CODING_RULES.md`: the structured-logger rule names the exporter key and the `llm_call` row; the deploy rule that owns state on disk gains the alert-once rule.
 - `CONTEXT.md`: *signal*, *alert*, *System* (card order).
 - The first build task's first index on the box is the measurement for every threshold in the catalogue and for ADR 0024's step A.
 - Fog kept: SLOs, tracing, a status page, per-client reports, alert routing beyond email.
 
 ## Amendment — 2026-09-05, the ledger columns and the alert rule are this ADR's alone (T-078)
 
-The consequence above had `[LOG1]` name the `llm_call` row's columns and `[OPS1]` carry the alert-once rule; both were specification wearing a rule tag (the coding-rules audit of 5 September 2026). The rules keep their checkable sentences — no prompt or completion in any logger, exporter or row; no metrics store, no scrape — and the shape is here and only here. **`llm_call`** carries `workspace_id`, purpose, route, model, tokens in and out, seconds, priced cost, outcome and the run or answer served, one row per model call, never the prompt or the completion. The **answer audit** is its own table with a workspace id and a retention period (ADR 0017). A **signal** is a query over existing rows with a threshold held as a config row; an **alert** is recorded once as a `platform_event(kind=alert)` and closed by a *cleared* event. `llm_call`, `platform_event` and the threshold rows have no migration yet; this is the shape the task that migrates them builds to.
+The consequence above had the structured-logger rule name the `llm_call` row's columns and the deploy rule carry the alert-once rule; both were specification wearing a rule tag (the coding-rules audit of 5 September 2026). The rules keep their checkable sentences — no prompt or completion in any logger, exporter or row; no metrics store, no scrape — and the shape is here and only here. **`llm_call`** carries `workspace_id`, purpose, route, model, tokens in and out, seconds, priced cost, outcome and the run or answer served, one row per model call, never the prompt or the completion. The **answer audit** is its own table with a workspace id and a retention period (ADR 0017). A **signal** is a query over existing rows with a threshold held as a config row; an **alert** is recorded once as a `platform_event(kind=alert)` and closed by a *cleared* event. `llm_call`, `platform_event` and the threshold rows have no migration yet; this is the shape the task that migrates them builds to.

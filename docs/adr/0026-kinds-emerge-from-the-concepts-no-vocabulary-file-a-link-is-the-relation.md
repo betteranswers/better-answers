@@ -17,7 +17,7 @@ We decided this because OKF's first non-goal is a fixed taxonomy of concept type
 - **A per-tenant vocabulary file, authoritative in the bundle, closed-world checked** (ADR 0001; round 1 of ticket 50 as YAML with `types` · `relations` · `contexts`) — a list that restates what the concept files and `index.md` already say; an Admin tending a registry; a "provisional" state on every unknown kind; a plan diff; open-ontologies in the deploy unit. Cut by all three reviewers.
 - **An optional `types:`-only file for definitions and read-time aliases** — the one thing not derivable is a definition, but a definition is knowledge and a `Term` concept holds it without a second file format; read-time aliases for an *imported* bundle join the out-of-scope importing line.
 - **Typed relations derived from a relations list with sentence matching** — an edge label on the map and nothing on the answer path (ADR 0016's walk filters by the target's kind and the drafting model reads the sentence anyway); silently wrong on shared kind pairs; a registry someone maintains. A predicate label can be derived from edge sentences by an enrichment job later, still in the graph, with nothing re-keyed.
-- **Closed-world tags with an app-written tier tag** — a rule with no act, and derived content written into the file beyond `iri` and `locator` (`[OKF2]`).
+- **Closed-world tags with an app-written tier tag** — a rule with no act, and derived content written into the file beyond `iri` and `locator`.
 - **A concept alias as a `concept_identity` row only** — cheaper by one commit; the alias leaves with nothing on export.
 
 ## Consequences

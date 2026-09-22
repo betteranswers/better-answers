@@ -36,10 +36,10 @@ from inside the function it defaults on — the moment a caller forgets to pass 
 an ambient read wearing a signature, which is exactly what this record refuses. Every site named
 below now takes its time explicitly and without a default.
 
-**The six sites, and the two shapes.** `[DESIGN1]`'s question — design for the small interface —
-answers each site itself, using the rule an act that reads an instant once may take the `Date`
-a caller already read, while an act that hands the reading on to more than one call of its own
-takes the `Clock` and reads it itself:
+**The six sites, and the two shapes.** The deep-module rule's question — design for the small
+interface — answers each site itself, using the rule an act that reads an instant once may take
+the `Date` a caller already read, while an act that hands the reading on to more than one call
+of its own takes the `Clock` and reads it itself:
 
 - `answering/index.ts`'s `open` and `find` each take a trailing `now: Date`: one instant, read
   once by the caller, spent on one call to `trustOf` (or, for `find`, the same instant shared
@@ -82,11 +82,12 @@ one clock-shaped read, the ULID minter's (`packages/schema/src/ulid.ts`, re-expo
 the kernel as `ulid` — ADR 0035), and that read orders an id; it decides nothing the way
 `open`'s shelf-life comparison or an invitation's expiry does. Handing the worker a Clock would
 invite exactly the ambient time-based decision this record closes off in the app tier, in the
-one tier that has no test harness built to pin one (`[TEST1]`'s worker seam is the job or module
-entry point, not a dependency-injected clock). The worker stays outside this record entirely.
+one tier that has no test harness built to pin one (the worker is tested through the job or
+module entry point, not a dependency-injected clock). The worker stays outside this record
+entirely.
 
 **How a test pins it.** A site typed `now: Date` is pinned with a literal `Date` — no kernel
-export, no object, a value the test writes down (`[TEST9]`): `open(principal, tx, { iri }, new
+export, no object, a value the test writes down: `open(principal, tx, { iri }, new
 Date("2026-03-02T00:00:00.000Z"))`. A site typed `clock: Clock` is pinned with a literal object
 a test writes inline, `{ now: () => new Date("...") }`, never a second kernel export — a fixed
 clock is a fixture, not vocabulary every caller needs, so it does not belong beside
@@ -113,7 +114,7 @@ We decided this because a value every slice may already import is where the kern
 says shared vocabulary goes (ADR 0029 rule 1), and a clock is exactly that; because the
 smallest-interface question has a different answer at different sites and forcing one shape
 everywhere would make four of the six sites carry a `Clock` they call `.now()` on exactly once,
-which is the larger interface `[DESIGN1]` asks us not to prefer; because a row's timestamp is a
+which is the larger interface the deep-module rule asks us not to prefer; because a row's timestamp is a
 store fact and conflating it with the api's own clock is the bug ADR 0012's transaction-scoped
 writes were built to avoid, not a feature; and because the worker's one time-shaped read already
 has a name and a reason — the minter orders an id — that a second, decision-shaped reading would
@@ -129,13 +130,14 @@ blur.
   workspace's data lives in; a clock holds no tenant data and answers to no `Principal`, so
   filing it beside `postgres/`, `git/`, `graph/` and `objects/` would teach the next reader that
   a door is "a thing every act takes" rather than what the tree says it is.
-- **One process-wide mutable clock, monkey-patched in tests.** Rejected twice over: `[TEST3]`
+- **One process-wide mutable clock, monkey-patched in tests.** Rejected twice over: the constitution
   bans mocking our own code, and a shared mutable global is the same ambient state this record
   refuses in `new Date()`, moved rather than removed.
-- **`Clock` at every one of the six sites, none of them a bare `Date`.** Rejected by
-  `[DESIGN1]`: `open`, `find`, `approveRequest` and `CommitRequest.at` each read one instant and
-  spend it once or hand it to one sub-call; a `Clock` there is a bigger interface a caller has
-  to construct or fake for no reading it would not otherwise have handed over directly.
+- **`Clock` at every one of the six sites, none of them a bare `Date`.** Rejected by the
+  deep-module rule: `open`, `find`, `approveRequest` and `CommitRequest.at` each read one
+  instant and spend it once or hand it to one sub-call; a `Clock` there is a bigger interface a
+  caller has to construct or fake for no reading it would not otherwise have handed over
+  directly.
 - **Handing the worker a Clock, for symmetry with the app tier.** Rejected: the worker's one
   clock-shaped read already has a job — the minter orders an id, a job neither `open`'s trust
   reading nor an invitation's expiry is doing — and a Clock the worker could reach for would
@@ -206,7 +208,7 @@ api's clock to begin with, so there is nothing here for the api to hand a `now()
 constructor, as before, and the ULID minter (`packages/schema/src/ulid.ts`), whose one
 `Date.now()` — the worker's one clock-shaped read, named earlier in this record — orders an id
 and decides nothing, the same reason repeated for the same function now that the scan reaches
-the file it lives in. `[TEST7]` holds the pair both ways for both exemptions: the scan finds no
+the file it lives in. The pair is held both ways for both exemptions: the scan finds no
 ambient read outside them, and each named file is proved to still read the clock, so a future
 edit that quietly removed the minter's own reading would fail the gate rather than pass it by
 accident.
