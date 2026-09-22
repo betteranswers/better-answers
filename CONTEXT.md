@@ -265,7 +265,8 @@ Where a unit lives is decided by **minting**.
   every run reconciles. A locator is a span into its normalised redacted text and never one of
   those keys. _Avoid_: ingest trace (the draft's word).
 - **landed copy** — a source document's bytes as the platform holds them in the object store: the
-  original and the normalised redacted text, under one document key.
+  original and the normalised redacted text. The normalised copy is keyed by the document; an
+  upload's original by its *source binding*, the id its caller minted.
 - **converter** — what turns a landed copy's bytes into the document's normalised text, before the
   redaction seam sees a word of it. One per media type, chosen once (ADR 0013), because the text it
   writes is the address space every locator and every content hash is read against. _Avoid_: parser

@@ -159,9 +159,10 @@ const BOUND_REASON = "bound";
 const INSERT_BINDING = `INSERT INTO source_binding
     (workspace_id, id, name, connector, sensitivity, audience, audience_groups)
   VALUES ($1, $2, $3, $4, $5, $6, $7)
-  ON CONFLICT DO NOTHING`;
+  ON CONFLICT (workspace_id, id) DO NOTHING`;
 
-const FIRST_OUTCOME = `SELECT d.id AS document_id, e.id AS audit_event_id, j.id AS job_id
+const FIRST_OUTCOME = `SELECT d.id AS document_id, d.original_key AS original_key,
+          e.id AS audit_event_id, j.id AS job_id
      FROM source_document d
      JOIN audit_event e
        ON e.workspace_id = d.workspace_id AND e.subject_id = d.binding_id AND e.act = $3
@@ -212,23 +213,21 @@ const firstOutcomeOf = async (
   tx: Tx,
   workspaceId: string,
   bindingId: string,
-  originalKey: string,
-): Promise<UploadBound> => {
+): Promise<UploadBound | undefined> => {
   const standing = await tx.query<{
     document_id: string;
+    original_key: string;
     audit_event_id: string;
     job_id: string;
   }>(FIRST_OUTCOME, [workspaceId, bindingId, BINDING_ACTS.bound.name, INDEX_KIND, BOUND_REASON]);
   const first = standing.rows[0];
-  if (first === undefined) {
-    throw new Error(`sources: ${bindingId} is taken by a binding no first bind accounts for`);
-  }
+  if (first === undefined) return undefined;
   return {
     bindingId,
     documentId: first.document_id,
     jobId: first.job_id,
     auditEventId: first.audit_event_id,
-    originalKey,
+    originalKey: first.original_key,
   };
 };
 
@@ -258,6 +257,14 @@ export const bindUpload = async (
     if (!held.value) return err("no-such-group");
   }
 
+  // Before a byte is read: a repeat that streamed again would replace the bytes the standing
+  // document's row already describes.
+  const standing = await inTransaction(principal, doors.postgres, (fresh, tx) =>
+    firstOutcomeOf(tx, workspaceId, bindingId),
+  );
+  if (!standing.ok) return err(standing.error);
+  if (standing.value !== undefined) return ok(standing.value);
+
   const capped = cappedAt(input.body);
   const put = await attempt(() => putObject(admin.value, doors.objects, originalKey, capped.body));
   if (!put.ok) {
@@ -281,7 +288,13 @@ export const bindUpload = async (
       visibility.audience,
       visibility.audienceGroups,
     ]);
-    if (landed.rowCount === 0) return firstOutcomeOf(tx, workspaceId, bindingId, originalKey);
+    if (landed.rowCount === 0) {
+      const first = await firstOutcomeOf(tx, workspaceId, bindingId);
+      if (first === undefined) {
+        throw new Error(`sources: ${bindingId} is taken by a binding no first bind accounts for`);
+      }
+      return first;
+    }
     await tx.query(INSERT_DOCUMENT, [
       workspaceId,
       documentId,

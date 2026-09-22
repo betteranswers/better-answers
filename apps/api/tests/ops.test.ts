@@ -34,7 +34,14 @@ import { testData } from "@better-answers/schema/testing";
 
 import type { Doors } from "../src/doors.ts";
 import { fetchHonouringHost } from "../src/ops/http-fetch.ts";
-import { EXIT_OF_CLASS, NOT_BUILT, parseSince, runOps, type OpsIo } from "../src/ops/index.ts";
+import {
+  EXIT_OF_CLASS,
+  NOT_BUILT,
+  parseSince,
+  runOps,
+  SLICE_COMMANDS,
+  type OpsIo,
+} from "../src/ops/index.ts";
 import { readTreeUnder } from "../src/ops/read-tree.ts";
 import { APP_HOSTNAME, doorsFor, openTestGit, PUBLIC_URL, type TestApp } from "./harness.ts";
 import { servedApp } from "./suite-app.ts";
@@ -483,6 +490,18 @@ describe("pnpm ops — the restore scripts' commands", () => {
         expect(run.lines.join("\n")).toContain("not built");
       },
     );
+    it("answers in nobody else's name, so no command can be doing another's work", async () => {
+      const { workspaceId } = await app().provision();
+
+      for (const command of SLICE_COMMANDS) {
+        const run = await ops(app(), [command, "--workspace", workspaceId]);
+        const said = run.lines.join("\n");
+        const others = SLICE_COMMANDS.filter(
+          (other) => other !== command && said.includes(`${other}:`),
+        );
+        expect({ command, others }).toEqual({ command, others: [] });
+      }
+    });
   });
 
   describe("object-store-orphans — the bytes a failed bind left", () => {
@@ -554,11 +573,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("answers usage to a workspace that is not an id, before it removes anything", async () => {
+    it("crosses its refusal as the word and the class's code, removing nothing", async () => {
       const run = await ops(app(), ["object-store-orphans", "--workspace", "ws_synthetic"]);
 
-      expect(run.exitCode).toBe(2);
-      expect(run.lines.join("\n")).toContain("is not a workspace id");
+      expect(run.exitCode).toBe(EXIT_OF_CLASS.malformed);
+      expect(run.lines).toEqual([
+        "object-store-orphans: REFUSED — malformed: --workspace ws_synthetic is not a workspace id",
+      ]);
     });
 
     it("refuses when this image was given no object store to sweep", async () => {

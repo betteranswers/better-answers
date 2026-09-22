@@ -130,6 +130,9 @@ const NEEDS = {
 
 type SliceCommand = keyof typeof NEEDS;
 
+// SAFETY: the keys of a `const` object literal are its declared names and nothing else.
+export const SLICE_COMMANDS = Object.keys(NEEDS) as readonly SliceCommand[];
+
 const REBUILD_DEFAULT_REASON = "drill";
 
 const WAIT_SECONDS = 120;

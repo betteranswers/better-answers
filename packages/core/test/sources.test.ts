@@ -19,7 +19,7 @@ import {
   UPLOAD_BYTE_CAP,
   UPLOAD_SWEEP,
 } from "../src/sources/index.ts";
-import { getObject, listObjects } from "../src/store/objects/index.ts";
+import { getObject, listObjects, putObject } from "../src/store/objects/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
 import { contractFixture, mediaTypeOutside } from "./contract-fixture.ts";
 import { chunkUnder, ledgerRowsOf, groupNamed, seededBy } from "./sourced-concept.ts";
@@ -390,22 +390,19 @@ describe("an Admin binds an upload", () => {
       handbookOffered({ bindingId }).input,
     );
     if (!first.ok) throw new Error(`the bind was refused: ${String(first.error)}`);
-    const again = await bindUpload(
-      scenario.admin,
-      doorsOf(scenario),
-      handbookOffered({ bindingId }).input,
-    );
+    const repeat = handbookOffered({ bindingId });
+    const again = await bindUpload(scenario.admin, doorsOf(scenario), repeat.input);
 
     expect(again).toEqual(first);
+    expect(await leftBehindBy(scenario.admin, repeat.upload)).toEqual({
+      bodyRead: false,
+      stored: [first.value.originalKey],
+    });
     expect(await oneOfEachIn(db().pool, scenario.workspaceId)).toEqual({
       bindings: 1,
       documents: 1,
       ledger: 1,
       jobs: 1,
-    });
-    expect(await listObjects(scenario.admin, store().door, "")).toEqual({
-      ok: true,
-      value: [first.value.originalKey],
     });
   });
 
@@ -425,12 +422,16 @@ const sweptAt = (scenario: Scenario, now: Date, dryRun = false) =>
   );
 
 const aFailedBind = async (scenario: Scenario) => {
-  const { input } = handbookOffered();
+  const standing = await storedFor(scenario.admin);
   const bound = await whileWritesAreRefused(db().pool, "job", () =>
-    bindUpload(scenario.admin, doorsOf(scenario), input),
+    bindUpload(scenario.admin, doorsOf(scenario), handbookOffered().input),
   );
   if (bound.ok) throw new Error("the bind landed where the queue was refused");
-  return `uploads/${input.bindingId.toLowerCase()}/original`;
+  const left = (await storedFor(scenario.admin)).filter((key) => !standing.includes(key));
+  if (left.length !== 1 || left[0] === undefined) {
+    throw new Error(`the refused bind left ${String(left.length)} objects, not one`);
+  }
+  return left[0];
 };
 
 describe("the sweep collects the originals a failed bind left", () => {
@@ -461,6 +462,37 @@ describe("the sweep collects the originals a failed bind left", () => {
       ok: true,
       value: [named.originalKey],
     });
+  });
+
+  it("names the bind each removed original belonged to in the ledger, and never its key", async () => {
+    const scenario = await arrange();
+    const orphaned = await aFailedBind(scenario);
+
+    const past = new Date(Date.now() + A_DAY_MS * 2);
+    await sweptAt(scenario, past);
+
+    const bindingId = orphaned.slice("uploads/".length, -"/original".length).toUpperCase();
+    const rows = await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.upload.swept");
+    expect(rows).toEqual([
+      {
+        id: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+        actor: "process:better-answers-uploads",
+        subject_id: bindingId,
+        detail: { bindingId },
+      },
+    ]);
+    expect(JSON.stringify(rows)).not.toContain("uploads/");
+  });
+
+  it("leaves a key under the prefix that no bind could have written", async () => {
+    const scenario = await arrange();
+    const stray = "uploads/a-note-from-somewhere-else/original";
+    await putObject(scenario.admin, store().door, stray, uploadOf("not an original").body);
+
+    const swept = await sweptAt(scenario, new Date(Date.now() + A_DAY_MS * 2));
+
+    expect(swept).toEqual({ ok: true, value: { found: 0, removed: 0 } });
+    expect(await storedFor(scenario.admin)).toContain(stray);
   });
 
   it("counts the originals a run would remove and removes none when it is asked only to look", async () => {
