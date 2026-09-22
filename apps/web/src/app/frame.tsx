@@ -4,11 +4,12 @@ import { useEffect, useId } from "react";
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { NEEDS_A_PICK, refusalOf, useMembership } from "@/features/auth/membership.ts";
 import { screenAt, viewAt } from "@/shared/screens.ts";
+import { isFilled } from "@/shared/view-toolbar.tsx";
 import { IconRail } from "./icon-rail.tsx";
 import { NavigationControl } from "./navigation-control.tsx";
 import { SecondaryNav } from "./secondary-nav.tsx";
 import { useSecondaryNavShowing } from "./secondary-nav-showing.ts";
-import { isFilled, Toolbar, ViewPanel, ViewTabsRoot } from "./toolbar.tsx";
+import { Toolbar, ViewPanel, ViewTabsRoot } from "./toolbar.tsx";
 import { TopBar } from "./top-bar.tsx";
 import { useWideLayout } from "./wide-layout.ts";
 
