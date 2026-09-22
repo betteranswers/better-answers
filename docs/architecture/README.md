@@ -39,7 +39,7 @@ The route's status table says what a block is and what blocks it. This table say
 | P2 | api · Postgres | `workspaces` slice — provisioning at the `runOps` seam; the admin plugin reduced |
 | O1 | api · web · Postgres · backup | *the signal module* (a query per line, thresholds as rows); `backup_run`, `platform_event`; the System screen's cards |
 | V1 | api · web · Postgres · git store | `concepts` slice — verification requests, the cadence, the four conflict resolutions; the Knowledge screen's saved filters |
-| C1 | every container | No new component: a governed write per imported `Answer`, run by the operator |
+| C1 | every container | `importBundle` on the `concepts` slice behind `runOps` `import-bundle` (T-307, landed 22/09/2026) — a governed write per imported `Answer`, run by the operator; the rest of the block adds no component |
 
 ## Conventions
 
