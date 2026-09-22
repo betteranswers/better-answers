@@ -436,22 +436,37 @@ export const readCommit = async (
   };
 };
 
+const fileIn = async (
+  gitDir: string,
+  revision: string,
+  filePath: string,
+): Promise<string | null> => {
+  try {
+    return await git(gitDir, ["show", `${revision}:${filePath}`], { raw: true });
+  } catch (thrown) {
+    const listed = await git(gitDir, ["ls-tree", "--name-only", revision, "--", filePath]);
+    if (listed === "") return null;
+    throw normalizeError(thrown);
+  }
+};
+
 export const fileAt = async (
   platform: PlatformPrincipal,
   door: GitDoor,
   workspaceId: string,
   sha: string,
   filePath: string,
+): Promise<string | null> =>
+  isPortablePath(filePath) ? fileIn(repositoryPath(door, workspaceId), sha, filePath) : null;
+
+export const fileAtHead = async (
+  principal: UserPrincipal,
+  door: GitDoor,
+  filePath: string,
 ): Promise<string | null> => {
   if (!isPortablePath(filePath)) return null;
-  const gitDir = repositoryPath(door, workspaceId);
-  try {
-    return await git(gitDir, ["show", `${sha}:${filePath}`], { raw: true });
-  } catch (thrown) {
-    const listed = await git(gitDir, ["ls-tree", "--name-only", sha, "--", filePath]);
-    if (listed === "") return null;
-    throw normalizeError(thrown);
-  }
+  const gitDir = bundleOf(door, principal);
+  return (await headOf(gitDir)) === null ? null : fileIn(gitDir, BUNDLE_REF, filePath);
 };
 
 export type Pseudonymisation = {

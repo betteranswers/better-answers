@@ -49,7 +49,7 @@ Where a unit lives is decided by **minting**.
   as ordinary workspace-scoped rows (ADR 0032). Derived again from the bundles on every
   commit and from the records as they change; never a source of truth.
 - **bundle manifest** — the bundle's self-description carried inside it: identity, origin,
-  owner, content version.
+  what it was made from, owner, content version.
 - **api** — the TypeScript deployable: one directory (`apps/api`), one compose service and one
   process, carrying tRPC, the MCP surface, the authorization server and the SPA's build on one
   origin. The word for that tier in prose, in code and on a job's *claimant*, because "the app" is

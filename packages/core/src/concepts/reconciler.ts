@@ -1,4 +1,10 @@
-import { boundarySchemas, IRI, resolvedResource, ULID } from "@better-answers/schema";
+import {
+  boundarySchemas,
+  BUNDLE_MANIFEST_PATH,
+  IRI,
+  resolvedResource,
+  ULID,
+} from "@better-answers/schema";
 
 import { RESTRICTED_TO_ADMINS } from "../access/index.ts";
 import { act, declareActs, eventsOfAct, record } from "../audit/index.ts";
@@ -33,7 +39,8 @@ import { workspaceIds } from "../workspaces/index.ts";
 import { hashedFileOf, parseConceptFile, type Frontmatter, type HashedSource } from "./file.ts";
 import { payloadFor, targetOfMergeKey } from "./inbox.ts";
 import type { Acceptance } from "./index.ts";
-import { heldByIri, indexRowOf, landRows, WRITE_CONSTRAINTS } from "./landing.ts";
+import { heldByIri, indexRowOf, landBundleCommit, landRows, WRITE_CONSTRAINTS } from "./landing.ts";
+import { parseBundleManifest } from "./manifest.ts";
 
 const RECONCILER_ACTOR = "process:better-answers-reconciler";
 
@@ -45,10 +52,11 @@ export const RECONCILER: ReconcilerPrincipal = { kind: "platform", actorId: RECO
 
 const RECONCILER_ACTS = declareActs("platform", {
   replayed: act("platform.reconciler.replayed", {
-    iri: "iri",
     commitSha: "gitSha",
-    contentHash: "contentHash",
-    evidenceAgrees: "flag",
+    iri: "iri?",
+    contentHash: "contentHash?",
+    evidenceAgrees: "flag?",
+    bundleId: "id?",
   }),
 });
 
@@ -76,40 +84,93 @@ export type ReconcileRefusal = "malformed" | "no-such-repository" | "history-div
 
 type Replayed = "landed" | "skipped";
 
-type CommitFacts = {
+type TrailerFacts = {
   readonly sha: string;
   readonly parent: string | null;
   readonly actor: ActorId;
   readonly auditEventId: string;
   readonly suggestionId: string | undefined;
+};
+
+type CommitFacts = TrailerFacts & {
   readonly path: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
   readonly iri: string;
 };
 
-const factsOf = (read: CommitRead): CommitFacts | undefined => {
+const trailerFactsOf = (read: CommitRead): TrailerFacts | undefined => {
   const actor = read.trailers["Actor"];
   const audit = read.trailers["Audit"];
   if (actor === undefined || !isActorId(actor) || audit === undefined || !ULID.test(audit)) {
     return undefined;
   }
-  if (read.change === undefined) return undefined;
-  const parsed = parseConceptFile(read.change.content);
-  if (!parsed.ok) return undefined;
-  const iri = parsed.value.frontmatter["iri"];
-  if (typeof iri !== "string" || !IRI.test(iri)) return undefined;
   return {
     sha: read.sha,
     parent: read.parent,
     actor,
     auditEventId: audit,
     suggestionId: read.trailers["Suggestion"],
+  };
+};
+
+const factsOf = (read: CommitRead, trailers: TrailerFacts): CommitFacts | undefined => {
+  if (read.change === undefined) return undefined;
+  const parsed = parseConceptFile(read.change.content);
+  if (!parsed.ok) return undefined;
+  const iri = parsed.value.frontmatter["iri"];
+  if (typeof iri !== "string" || !IRI.test(iri)) return undefined;
+  return {
+    ...trailers,
     path: read.change.path,
     frontmatter: parsed.value.frontmatter,
     body: parsed.value.body,
     iri,
   };
+};
+
+const alreadyLanded = async (
+  platform: PlatformPrincipal,
+  tx: Tx,
+  trailers: TrailerFacts,
+): Promise<boolean> => {
+  const known = await tx.query(
+    `SELECT 1 FROM bundle_commit
+      WHERE workspace_id = ${scopeClause(1)} AND (sha = $2 OR audit_event_id = $3)`,
+    [scopeParameter(platform), trailers.sha, trailers.auditEventId],
+  );
+  return (known.rowCount ?? 0) > 0;
+};
+
+const replayManifestCommit = async (
+  platform: ReconcilerPrincipal,
+  door: PostgresDoor,
+  workspaceId: WorkspaceId,
+  content: string,
+  trailers: TrailerFacts,
+  batchId: string | undefined,
+): Promise<Result<Replayed, ReplayRefusal | Error>> => {
+  const manifest = parseBundleManifest(content);
+  if (!manifest.ok) return err("unreadable-commit");
+  const landed = await attempt(() =>
+    withScope(platform, door, workspaceId, async (tx): Promise<Replayed> => {
+      if (await alreadyLanded(platform, tx, trailers)) return "skipped";
+      await record(platform, tx, {
+        id: trailers.auditEventId,
+        act: RECONCILER_ACTS.replayed,
+        subjectId: trailers.sha,
+        batchId,
+        detail: { commitSha: trailers.sha, bundleId: manifest.value.id },
+      });
+      await landBundleCommit(platform, tx, {
+        commit: { sha: trailers.sha, parent: trailers.parent },
+        actor: trailers.actor,
+        auditEventId: trailers.auditEventId,
+      });
+      return "landed";
+    }),
+  );
+  return landed.ok ? ok(landed.value) : err(landed.error);
 };
 
 const stringIn = (frontmatter: Frontmatter, key: string): string | undefined => {
@@ -170,7 +231,19 @@ const replayCommit = async (
 ): Promise<Result<Replayed, ReplayRefusal | Error>> => {
   const read = await attempt(() => readCommit(platform, doors.git, workspaceId, sha));
   if (!read.ok) return err(read.error);
-  const facts = factsOf(read.value);
+  const trailers = trailerFactsOf(read.value);
+  if (trailers === undefined) return err("unreadable-commit");
+  if (read.value.change?.path === BUNDLE_MANIFEST_PATH) {
+    return replayManifestCommit(
+      platform,
+      doors.postgres,
+      workspaceId,
+      read.value.change.content,
+      trailers,
+      batchId,
+    );
+  }
+  const facts = factsOf(read.value, trailers);
   if (facts === undefined) return err("unreadable-commit");
 
   const landed = await attempt(() =>
@@ -179,11 +252,7 @@ const replayCommit = async (
       doors.postgres,
       workspaceId,
       async (tx): Promise<Result<Replayed, ReplayRefusal>> => {
-        const known = await tx.query(
-          "SELECT 1 FROM bundle_commit WHERE workspace_id = $1 AND (sha = $2 OR audit_event_id = $3)",
-          [workspaceId, facts.sha, facts.auditEventId],
-        );
-        if ((known.rowCount ?? 0) > 0) return ok("skipped");
+        if (await alreadyLanded(platform, tx, facts)) return ok("skipped");
 
         const held = await heldByIri(platform, tx, facts.iri);
 

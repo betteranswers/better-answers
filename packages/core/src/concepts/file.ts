@@ -135,6 +135,14 @@ const pairOf = (
   return match === null || typeof key !== "string" ? undefined : { key, rest: match[2] };
 };
 
+export const scalarPairOf = (
+  line: string,
+): { readonly key: string; readonly value: FrontmatterSource[string] } | undefined => {
+  const pair = pairOf(line);
+  const value = pair?.rest === undefined ? undefined : scalarOf(pair.rest);
+  return pair === undefined || value === undefined ? undefined : { key: pair.key, value };
+};
+
 const listItemsOf = (
   lines: readonly string[],
   from: number,

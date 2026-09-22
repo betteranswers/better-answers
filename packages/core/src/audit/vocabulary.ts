@@ -22,15 +22,21 @@ export type ActName<F extends Family = Family> = Extract<AuditEventRow["act"], `
 export type DetailValue = string | number | boolean;
 
 const isId = (value: DetailValue) => typeof value === "string" && ULID.test(value);
+const isFlag = (value: DetailValue) => typeof value === "boolean";
+const isIri = (value: DetailValue) => typeof value === "string" && IRI.test(value);
+const isContentHash = (value: DetailValue) => typeof value === "string" && CONTENT_HASH.test(value);
 
 export const DETAIL_KINDS = {
   id: isId,
   "id?": isId,
   role: (value: DetailValue) => typeof value === "string" && ROLES.some((role) => role === value),
-  flag: (value: DetailValue) => typeof value === "boolean",
-  iri: (value: DetailValue) => typeof value === "string" && IRI.test(value),
+  flag: isFlag,
+  "flag?": isFlag,
+  iri: isIri,
+  "iri?": isIri,
   gitSha: (value: DetailValue) => typeof value === "string" && GIT_SHA.test(value),
-  contentHash: (value: DetailValue) => typeof value === "string" && CONTENT_HASH.test(value),
+  contentHash: isContentHash,
+  "contentHash?": isContentHash,
   count: (value: DetailValue) => typeof value === "number" && Number.isInteger(value) && value >= 0,
   sensitivity: (value: DetailValue) =>
     typeof value === "string" && SENSITIVITIES.some((word) => word === value),
@@ -48,7 +54,7 @@ export const isOptionalKind = (kind: DetailKind): boolean => kind.endsWith("?");
 
 type DetailValueOf<K extends DetailKind> = K extends "role"
   ? Role
-  : K extends "flag"
+  : K extends "flag" | "flag?"
     ? boolean
     : K extends "count"
       ? number
