@@ -5,6 +5,18 @@
     "JCODEMUNCH_ENFORCE": "strict"
   },
   "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/comment-gate-hook.sh\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
     "WorktreeCreate": [
       {
         "hooks": [
