@@ -1,0 +1,29 @@
+docs/adr/README.md
+  s_a38d2840827d6c::t_f8b2fbc9258693 55
+CODING_RULES.md
+  s_a38d2840827d6c::t_f1c90957e78295 188
+apps/api/tests/coding-rules-form.test.ts
+  s_a38d2840827d6c::t_115a97de70762b 103-109
+  s_a38d2840827d6c::t_e3ffa1a64295d7 223-237
+  s_a38d2840827d6c::t_b9f57f7904335b 279-297
+docs/adr/0045-a-coding-rule-is-one-imperative-under-a-tag-in-the-file-for-the-directory-it-binds-and-names-a-reviewer-only-where-no-gate-can-hold-it.md
+  s_a38d2840827d6c::t_dca19f2bd31261 18
+  s_a38d2840827d6c::t_a9fab1b3aca886 14
+  s_a38d2840827d6c::t_79c515eca34e12 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "accbab1693d780ab93824158a49b446f6b74d0b0",
+  "prompts": {},
+  "sessions": {
+    "s_a38d2840827d6c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bcafdd87-9a23-47ee-b85e-27d4f2a91450",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
