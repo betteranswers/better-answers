@@ -1,8 +1,12 @@
 import {
   boundarySchemas,
+  BUNDLE_MANIFEST_PATH,
+  CONCEPT_STABLE_STATUS,
   conceptIriOf,
   SUGGESTION_EDIT_KIND,
   SUGGESTION_SET_MAX,
+  type BundleManifest,
+  type SENSITIVITIES,
 } from "@better-answers/schema";
 import { z } from "zod";
 
@@ -10,10 +14,12 @@ import { readableClause, readableParameters, widens } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
 import {
   actorIdOf,
+  actorIdOfPerson,
   attempt,
   err,
   isActorId,
   ok,
+  PERSON_PREFIX,
   personOfActor,
   refusalFor,
   requireAdmin,
@@ -23,10 +29,12 @@ import {
   type PrincipalRefusal,
   type Result,
   type RoleRefusal,
+  type UserId,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import {
   commit as commitToBundle,
+  fileAtHead,
   head,
   withRepositoryLock,
   type CommitAuthor,
@@ -34,7 +42,12 @@ import {
   type GitDoor,
 } from "../store/git/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
-import { hashedFileOf, renderConceptFile, type Frontmatter } from "./file.ts";
+import {
+  hashedFileOf,
+  renderConceptFile,
+  type Frontmatter,
+  type FrontmatterSource,
+} from "./file.ts";
 import {
   payloadFor,
   returnToProposer,
@@ -52,6 +65,22 @@ import {
   landRows,
   WRITE_CONSTRAINTS,
 } from "./landing.ts";
+import {
+  authorOf,
+  countChecks,
+  IMPORT_SENSITIVITY_DEFAULT,
+  memberIdsByEmail,
+  presentChecks,
+  readBundle,
+  recordImportedChecks,
+  standingConcepts,
+  type BundleTree,
+  type ChecksRecorded,
+  type ImportedCheck,
+  type LoadedConcept,
+  type Unsound,
+} from "./loader.ts";
+import { parseBundleManifest, writeManifest, type WriteManifestRefusal } from "./manifest.ts";
 import { conceptVisibilityFrom } from "./visibility.ts";
 
 export {
@@ -69,6 +98,14 @@ export {
   moveBundleCommits,
   type ChecksCarried,
 } from "./landing.ts";
+export {
+  ERASURE_REHEARSAL_PATH,
+  IMPORT_SENSITIVITY_DEFAULT,
+  type BundleTree,
+  type ChecksRecorded,
+  type Unsound,
+  type UnsoundReason,
+} from "./loader.ts";
 export {
   writeManifest,
   type ManifestWritten,
@@ -545,11 +582,227 @@ const acceptOne = async (
   return refused(written.error);
 };
 
+export type ImportBundleInput = {
+  readonly tree: BundleTree;
+
+  readonly sensitivity?: (typeof SENSITIVITIES)[number] | undefined;
+
+  readonly dryRun?: boolean | undefined;
+};
+
+export type ImportProgress = {
+  readonly landed: readonly string[];
+  readonly skipped: readonly string[];
+  readonly checks: ChecksRecorded;
+};
+
+export type BundleImported = ImportProgress & {
+  readonly bundleId: string;
+  readonly manifest: "written" | "standing" | "would-write";
+  readonly concepts: number;
+  readonly dryRun: boolean;
+};
+
+export type ImportBundleRefusal =
+  | RoleRefusal
+  | PrincipalRefusal
+  | "no-such-repository"
+  | "manifest-taken"
+  | ({ readonly kind: "unsound" } & Unsound)
+  | {
+      readonly kind: "stopped";
+      readonly file: string;
+      readonly reason: WriteConceptRefusal | Error;
+      readonly progress: ImportProgress;
+    };
+
+type ResolvedConcept = LoadedConcept & { readonly checks: readonly ImportedCheck[] };
+
+const withPersonsAsVerifiers = (
+  concept: LoadedConcept,
+  personOf: ReadonlyMap<string, UserId>,
+): Result<ResolvedConcept, Unsound> => {
+  const checks: ImportedCheck[] = [];
+  const verified: FrontmatterSource[] = [];
+  for (const event of concept.verified) {
+    const personId = personOf.get(event.email.toLowerCase());
+    if (personId === undefined) {
+      return err({ file: concept.file, reason: "verifier-not-a-member", about: event.email });
+    }
+    const actor = actorIdOfPerson(personId);
+    checks.push({ actor, at: event.at });
+    verified.push({ ...event.entry, by: actor });
+  }
+  const frontmatter =
+    concept.verified.length === 0 ? concept.frontmatter : { ...concept.frontmatter, verified };
+  return ok({ ...concept, checks, frontmatter });
+};
+
+const plus = (sum: ChecksRecorded, more: ChecksRecorded): ChecksRecorded => ({
+  recorded: sum.recorded + more.recorded,
+  present: sum.present + more.present,
+});
+
+const manifestStanding = async (
+  principal: UserPrincipal,
+  door: GitDoor,
+  manifest: BundleManifest,
+): Promise<Result<"standing" | "would-write", "manifest-taken" | Error>> => {
+  const standing = await attempt(() => fileAtHead(principal, door, BUNDLE_MANIFEST_PATH));
+  if (!standing.ok) return err(standing.error);
+  if (standing.value === null) return ok("would-write");
+  const held = parseBundleManifest(standing.value);
+  return held.ok && held.value.id === manifest.id ? ok("standing") : err("manifest-taken");
+};
+
+const manifestRefusalOf = (refusal: WriteManifestRefusal | Error): ImportBundleRefusal | Error => {
+  if (refusal instanceof Error) return refusal;
+  switch (refusal) {
+    case "path-taken":
+      return "manifest-taken";
+    case "malformed":
+    case "stale-precondition":
+    case "malformed-path":
+    case "malformed-message":
+      return new Error(`the manifest commit was refused: ${refusal}`);
+    default:
+      return refusal;
+  }
+};
+
+const dryRunOf = (
+  bundleId: string,
+  manifest: "standing" | "would-write",
+  concepts: readonly ResolvedConcept[],
+  standing: ReadonlyMap<string, string>,
+  present: ReadonlySet<string>,
+): BundleImported => {
+  const landed: string[] = [];
+  const skipped: string[] = [];
+  let checks: ChecksRecorded = { recorded: 0, present: 0 };
+  for (const concept of concepts) {
+    const iri = standing.get(concept.path);
+    (iri === undefined ? landed : skipped).push(concept.path);
+    checks = plus(checks, countChecks(iri, concept.checks, present));
+  }
+  return { bundleId, manifest, landed, skipped, checks, concepts: concepts.length, dryRun: true };
+};
+
+export const importBundle = async (
+  principal: UserPrincipal,
+  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
+  input: ImportBundleInput,
+): Promise<Result<BundleImported, ImportBundleRefusal | Error>> => {
+  if (!mayWrite(principal)) return err("role-forbids");
+  const sensitivity = input.sensitivity ?? IMPORT_SENSITIVITY_DEFAULT;
+  const loaded = readBundle(input.tree);
+  if (!loaded.ok) return err({ kind: "unsound", ...loaded.error });
+  const { manifest, concepts } = loaded.value;
+
+  const prepared = await attempt(() =>
+    withMembership(principal, doors.postgres, async (fresh, tx) => {
+      const standing = await standingConcepts(fresh, tx);
+      return {
+        standing,
+        persons: await memberIdsByEmail(
+          fresh,
+          tx,
+          concepts.flatMap((concept) => concept.verified.map((event) => event.email)),
+        ),
+        author: await authorOf(fresh, tx, fresh.userId),
+        present:
+          input.dryRun === true
+            ? await presentChecks(fresh, tx, [...standing.values()])
+            : new Set<string>(),
+      };
+    }),
+  );
+  if (!prepared.ok) return err(prepared.error);
+  if (!prepared.value.ok) return err(prepared.value.error);
+  const { standing, persons, author, present } = prepared.value.value;
+
+  const resolved: ResolvedConcept[] = [];
+  for (const concept of concepts) {
+    const one = withPersonsAsVerifiers(concept, persons);
+    if (!one.ok) return err({ kind: "unsound", ...one.error });
+    resolved.push(one.value);
+  }
+
+  if (input.dryRun === true) {
+    const state = await manifestStanding(principal, doors.git, manifest);
+    if (!state.ok) return err(state.error);
+    return ok(dryRunOf(manifest.id, state.value, resolved, standing, present));
+  }
+
+  const written = await writeManifest(principal, doors, {
+    manifest,
+    message: "Write the bundle's manifest",
+    author,
+  });
+  if (!written.ok) return err(manifestRefusalOf(written.error));
+
+  const landed: string[] = [];
+  const skipped: string[] = [];
+  let checks: ChecksRecorded = { recorded: 0, present: 0 };
+  const batchId = ulid();
+  const stoppedAt = (file: string, reason: WriteConceptRefusal | Error) =>
+    err({ kind: "stopped" as const, file, reason, progress: { landed, skipped, checks } });
+  for (const concept of resolved) {
+    let iri = standing.get(concept.path);
+    if (iri === undefined) {
+      const wrote = await writeConcept(principal, doors, {
+        mergeKey: concept.mergeKey,
+        path: concept.path,
+        kind: concept.kind,
+        title: concept.title,
+        frontmatter: concept.frontmatter,
+        body: concept.body,
+        message: `Import ${concept.path} from ${concept.entry}`,
+        author,
+        expects: { base: null },
+        sensitivity,
+        status: CONCEPT_STABLE_STATUS,
+      });
+      if (wrote.ok) {
+        landed.push(concept.path);
+        iri = wrote.value.iri;
+      } else if (wrote.error === "path-taken") {
+        skipped.push(concept.path);
+        continue;
+      } else {
+        return stoppedAt(concept.file, wrote.error);
+      }
+    } else {
+      skipped.push(concept.path);
+    }
+    const target = iri;
+    const recorded = await attempt(() =>
+      withMembership(principal, doors.postgres, (fresh, tx) =>
+        recordImportedChecks(fresh, tx, { iri: target, checks: concept.checks, batchId }),
+      ),
+    );
+    if (!recorded.ok) return stoppedAt(concept.file, recorded.error);
+    if (!recorded.value.ok) return stoppedAt(concept.file, recorded.value.error);
+    checks = plus(checks, recorded.value.value);
+  }
+  return ok({
+    bundleId: manifest.id,
+    manifest: written.value.written ? "written" : "standing",
+    landed,
+    skipped,
+    checks,
+    concepts: resolved.length,
+    dryRun: false,
+  });
+};
+
 export type ConceptCheck = {
   readonly actor: ActorId;
   readonly at: Date;
 
   readonly contentHash: string | null;
+
+  readonly memberName: string | null;
 };
 
 export type OpenedConcept = {
@@ -578,11 +831,13 @@ type ConceptRow = {
   readonly checked_by: string | null;
   readonly checked_at: Date | null;
   readonly checked_hash: string | null;
+  readonly checked_by_name: string | null;
 };
 
 const CONCEPT_SELECT = `SELECT c.iri, c.path, c.kind, c.title, c.frontmatter, c.body, c.status,
               c.content_hash, c.commit_sha,
-              v.actor AS checked_by, v.checked_at, v.content_hash AS checked_hash
+              v.actor AS checked_by, v.checked_at, v.content_hash AS checked_hash,
+              checker.name AS checked_by_name
          FROM concept_index c
          LEFT JOIN LATERAL (
                 SELECT actor, checked_at, content_hash
@@ -591,6 +846,12 @@ const CONCEPT_SELECT = `SELECT c.iri, c.path, c.kind, c.title, c.frontmatter, c.
                  ORDER BY checked_at DESC, id DESC
                  LIMIT 1
               ) v ON true
+         LEFT JOIN LATERAL (
+                SELECT u.name
+                  FROM member m
+                  JOIN "user" u ON u.id = m.user_id
+                 WHERE m.workspace_id = c.workspace_id AND v.actor = '${PERSON_PREFIX}' || m.user_id
+              ) checker ON true
         WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}`;
 
 const openedOf = (row: ConceptRow): OpenedConcept => ({
@@ -652,5 +913,10 @@ const checkOf = (row: ConceptRow): ConceptCheck | undefined => {
   if (row.checked_by === null || row.checked_at === null || !isActorId(row.checked_by)) {
     return undefined;
   }
-  return { actor: row.checked_by, at: row.checked_at, contentHash: row.checked_hash };
+  return {
+    actor: row.checked_by,
+    at: row.checked_at,
+    contentHash: row.checked_hash,
+    memberName: row.checked_by_name,
+  };
 };

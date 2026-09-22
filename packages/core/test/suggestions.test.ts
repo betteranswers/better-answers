@@ -808,7 +808,7 @@ describe("the platform's citation repair", () => {
     expect(await trustOf(scenario, written.iri)).toMatchObject({
       tier: "human-reviewed",
       status: "current",
-      checkedBy: `human:${scenario.editor.userId}`,
+      checkedBy: "Test person",
     });
 
     const verification = await db().pool.query<{ origin: string; content_hash: string }>(

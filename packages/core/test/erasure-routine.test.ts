@@ -835,9 +835,10 @@ describe("the checks the rewrite moved", () => {
     await theBundleRewritten();
   });
 
-  it("carries each one onto the new hash under origin erasure-rewrite, and the trust reading is unchanged", async () => {
+  it("carries each one onto the new hash under origin erasure-rewrite, and the trust reading stands with the erased person named by id alone", async () => {
     const {
       email,
+      person,
       iri,
       checksBefore,
       checksAfter,
@@ -871,18 +872,31 @@ describe("the checks the rewrite moved", () => {
       at: before?.checked_at.toISOString(),
     });
 
-    expect(trustAfter[0]).toEqual(trustBefore[0]);
-    expect(trustAfter[0]).toMatchObject({ status: "current", tier: "human-reviewed" });
+    expect(trustBefore[0]).toMatchObject({ checkedBy: "Priya Anand" });
+    expect(trustAfter[0]).toEqual({
+      tier: "human-reviewed",
+      status: "current",
+      checkedBy: actorIdOfPerson(person.id),
+      checkedAt: "2026-04-05T09:00:00.000Z",
+      rider: null,
+    });
   });
 
-  it("leaves a check alone when the rewrite touched only the keys ADR 0019 keeps out of the hash", async () => {
-    const { steadyIri, checksBefore, checksAfter, trustBefore, trustAfter } =
+  it("leaves a check alone when the rewrite touched only the keys ADR 0019 keeps out of the hash, the reading naming the erased person by id alone", async () => {
+    const { person, steadyIri, checksBefore, checksAfter, trustBefore, trustAfter } =
       await theBundleRewritten();
 
     expect(checksAfter.find((check) => check.iri === steadyIri)).toEqual(
       checksBefore.find((check) => check.iri === steadyIri),
     );
-    expect(trustAfter[1]).toEqual(trustBefore[1]);
+    expect(trustBefore[1]).toMatchObject({ checkedBy: "Priya Anand" });
+    expect(trustAfter[1]).toEqual({
+      tier: "human-reviewed",
+      status: "current",
+      checkedBy: actorIdOfPerson(person.id),
+      checkedAt: "2026-04-05T09:00:00.000Z",
+      rider: null,
+    });
   });
 
   it("records what it moved in the report's actions, rather than reshaping them", async () => {

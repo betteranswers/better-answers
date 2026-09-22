@@ -94,7 +94,7 @@ export type TestApp = {
     adminEmail?: string | undefined;
   }): Promise<Provisioned>;
 
-  person(email?: string): Promise<Person>;
+  person(email?: string, name?: string): Promise<Person>;
 
   addMember(
     workspaceId: string,
@@ -227,10 +227,13 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
   });
   const door = openPostgres(database.pool);
 
-  const person: TestApp["person"] = async (email) => {
+  const person: TestApp["person"] = async (email, name) => {
+    const named = name === undefined ? {} : { name };
     const client = await database.superuser.connect();
     try {
-      const created = await testData(client).user(email === undefined ? {} : { email });
+      const created = await testData(client).user(
+        email === undefined ? named : { ...named, email },
+      );
       return { id: created.id, email: created.email, name: created.name };
     } finally {
       client.release();

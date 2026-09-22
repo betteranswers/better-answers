@@ -223,7 +223,13 @@ const trustOf = (concept: OpenedConcept, now: Date): Trust => {
         : moved
           ? "changed-since-checked"
           : "current";
-  return { tier, status, checkedBy: check?.actor ?? null, checkedAt, rider };
+  return {
+    tier,
+    status,
+    checkedBy: check === undefined ? null : (check.memberName ?? check.actor),
+    checkedAt,
+    rider,
+  };
 };
 
 const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;

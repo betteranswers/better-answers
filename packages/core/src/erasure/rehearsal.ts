@@ -1,7 +1,7 @@
 import { boundarySchemas } from "@better-answers/schema";
 
 import { act, declareActs, record, type DetailOf } from "../audit/index.ts";
-import { writeConcept } from "../concepts/index.ts";
+import { ERASURE_REHEARSAL_PATH, writeConcept } from "../concepts/index.ts";
 import {
   attempt,
   err,
@@ -69,7 +69,6 @@ const SYNTHETIC_DOMAIN = "erasure-rehearsal.example.test";
 
 const SYNTHETIC_ROLE = "Admin";
 
-const CONCEPT_PATH = "knowledge/erasure-rehearsal.md";
 const CONCEPT_MERGE_KEY = "note:erasure-rehearsal";
 const CONCEPT_TITLE = "Erasure rehearsal";
 
@@ -162,7 +161,7 @@ const conceptSeeded = async (
     { git: doors.git, postgres: doors.postgres, clock: doors.clock },
     {
       mergeKey: CONCEPT_MERGE_KEY,
-      path: CONCEPT_PATH,
+      path: ERASURE_REHEARSAL_PATH,
       kind: "Note",
       title: CONCEPT_TITLE,
       frontmatter: {

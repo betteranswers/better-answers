@@ -3,9 +3,14 @@ import type { Pool } from "pg";
 import {
   GRAPH_MAINTENANCE,
   graphCounts,
+  IMPORT_SENSITIVITY_DEFAULT,
+  importBundle,
   RECONCILER,
   reconcile,
   sweepGraph,
+  type BundleTree,
+  type ImportBundleRefusal,
+  type UnsoundReason,
 } from "@better-answers/core/concepts";
 import {
   ERASURE,
@@ -14,7 +19,7 @@ import {
   seedSyntheticSubject,
   type RehearsalRefusal,
 } from "@better-answers/core/erasure";
-import { err, ok, type Clock, type Result } from "@better-answers/core/kernel";
+import { attempt, err, ok, type Clock, type Result } from "@better-answers/core/kernel";
 import { enqueueJob, JOB_IS_OVER, jobById, type RebuildReason } from "@better-answers/core/runs";
 import { openGit, type GitDoor } from "@better-answers/core/store/git";
 import type { ObjectDoor } from "@better-answers/core/store/objects";
@@ -23,7 +28,8 @@ import {
   tablesPresent,
   type PostgresDoor,
 } from "@better-answers/core/store/postgres";
-import { FULL_REBUILD_KIND, REBUILD_REASONS } from "@better-answers/schema";
+import { principalOfMember } from "@better-answers/core/workspaces";
+import { FULL_REBUILD_KIND, REBUILD_REASONS, SENSITIVITIES } from "@better-answers/schema";
 
 const DONE = 0;
 const REFUSED = 1;
@@ -43,6 +49,8 @@ export type OpsIo = {
   readonly objects?: ObjectDoor | undefined;
 
   readonly writeReport?: ((path: string, body: string) => Promise<void>) | undefined;
+
+  readonly readTree?: ((directory: string) => Promise<BundleTree>) | undefined;
 
   readonly clock: Clock;
 };
@@ -87,6 +95,7 @@ const NEEDS = {
   "reconcile-watermark": ["concept_index", "bundle_commit"],
   "object-store-orphans": ["source_document"],
   "erasure-rehearsal": ["erasure_request", "suppression"],
+  "import-bundle": ["concept_index", "bundle_commit", "concept_verification"],
 } as const;
 
 type SliceCommand = keyof typeof NEEDS;
@@ -110,6 +119,10 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   erasure-rehearsal --workspace <id> --synthetic --seed      phase one: the synthetic subject, its tokens on the last line
   erasure-rehearsal --workspace <id> --synthetic --run --report <file>   phase two: erase them, write the report, print the tokens again
   dump-grep --tokens <a,b,…>                                stdin: a plain-SQL dump; per token, which COPY section holds it and in how many lines — never a line
+  import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <class>] [--dry-run]
+                                                            the company's bundle landed through the governed write, its checks imported (ADR 0002, 0014)
+    --sensitivity  one of ${SENSITIVITIES.join(" · ")} (default ${IMPORT_SENSITIVITY_DEFAULT})
+    --dry-run      validate the tree and say what a run would do, writing nothing
 exit codes: ${DONE} done · ${REFUSED} refused, stop · ${USAGE} usage · ${NOT_BUILT} the slice this needs has no tables yet`;
 
 type ErasureDoors = {
@@ -119,16 +132,21 @@ type ErasureDoors = {
   readonly clock: Clock;
 };
 
-const erasureDoors = (pool: Pool, io: OpsIo): Result<ErasureDoors, string> => {
+const openBundleStore = (io: OpsIo, purpose: string): Result<GitDoor, string> => {
   if (io.gitStoreDir === undefined) {
     return err(
-      "no repositories' root is configured (GIT_STORE_DIR), so the bundles an erasure rewrites cannot be opened; the estate sets it to /data/git on the api service",
+      `no repositories' root is configured (GIT_STORE_DIR), so ${purpose}; the estate sets it to /data/git on the api service`,
     );
   }
   const git = openGit(io.gitStoreDir);
-  if (!git.ok) {
-    return err(`the repositories' root is ${git.error} (GIT_STORE_DIR=${io.gitStoreDir})`);
-  }
+  return git.ok
+    ? ok(git.value)
+    : err(`the repositories' root is ${git.error} (GIT_STORE_DIR=${io.gitStoreDir})`);
+};
+
+const erasureDoors = (pool: Pool, io: OpsIo): Result<ErasureDoors, string> => {
+  const git = openBundleStore(io, "the bundles an erasure rewrites cannot be opened");
+  if (!git.ok) return err(git.error);
   if (io.objects === undefined) {
     return err(
       "no object store is configured (S3_ENDPOINT, S3_BUCKET, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY on the api service), so the replay copies an erasure leaves cannot be read",
@@ -325,6 +343,7 @@ const sliceCommand = async (
   if (command === "graph-counts") return graphCountsCommand(pool, workspaceId, io);
   if (command === "graph-sweep") return graphSweepCommand(pool, workspaceId, io);
   if (command === "erasure-rehearsal") return erasureRehearsal(pool, workspaceId, flags, io);
+  if (command === "import-bundle") return importBundleCommand(pool, workspaceId, flags, io);
 
   io.say(
     `${command}: REFUSED — its tables exist but this image carries no implementation; the slice's task fills it in`,
@@ -455,17 +474,9 @@ const graphSweepCommand = async (pool: Pool, workspaceId: string, io: OpsIo): Pr
 };
 
 const reconcileWatermark = async (pool: Pool, workspaceId: string, io: OpsIo): Promise<number> => {
-  if (io.gitStoreDir === undefined) {
-    io.say(
-      "reconcile-watermark: REFUSED — no repositories' root is configured (GIT_STORE_DIR), so the bundle cannot be opened; the estate sets it to /data/git on the api service",
-    );
-    return REFUSED;
-  }
-  const git = openGit(io.gitStoreDir);
+  const git = openBundleStore(io, "the bundle cannot be opened");
   if (!git.ok) {
-    io.say(
-      `reconcile-watermark: REFUSED — the repositories' root is ${git.error} (GIT_STORE_DIR=${io.gitStoreDir})`,
-    );
+    io.say(`reconcile-watermark: REFUSED — ${git.error}`);
     return REFUSED;
   }
   const doors = { git: git.value, postgres: openPostgres(pool), clock: io.clock };
@@ -480,6 +491,126 @@ const reconcileWatermark = async (pool: Pool, workspaceId: string, io: OpsIo): P
     return REFUSED;
   }
   io.say(`reconcile-watermark: done — ${found}`);
+  return DONE;
+};
+
+const UNSOUND_WORDS = {
+  "manifest-missing": () => "the tree has no manifest.yaml at its root",
+  "manifest-malformed": (about) =>
+    `manifest.yaml does not carry the five keys the platform reads (${about})`,
+  "does-not-parse": (about) => `does not parse (${about})`,
+  "type-or-title-missing": (about) => `has no ${about}`,
+  "reserved-path": (about) => `sits at a path the platform keeps for itself (${about})`,
+  "path-refused": (about) => `sits at a path the platform cannot hold (${about})`,
+  "link-outside-tree": (about) => `links to ${about}, which is not a concept in the tree`,
+  "verifier-not-a-member": (about) =>
+    `is verified by ${about}, who is not a member of this workspace; invite them first`,
+  "merge-key-clash": (about) => `derives the same merge key as ${about}`,
+} satisfies Readonly<Record<UnsoundReason, (about: string) => string>>;
+
+const importReason = (refusal: ImportBundleRefusal | Error, email: string): string => {
+  if (refusal instanceof Error) return refusal.message;
+  if (typeof refusal === "string") {
+    switch (refusal) {
+      case "role-forbids":
+        return `${email} is a Viewer of this workspace; the import runs as an Admin or an Editor`;
+      case "manifest-taken":
+        return "a manifest with another bundle id already stands in this workspace's bundle";
+      case "no-such-repository":
+        return "this workspace has no bundle repository; provision it first";
+      default:
+        return refusal;
+    }
+  }
+  if (refusal.kind === "unsound") {
+    return `${refusal.file}: ${UNSOUND_WORDS[refusal.reason](refusal.about)}; nothing was written`;
+  }
+  const { landed, skipped, checks } = refusal.progress;
+  return `stopped at ${refusal.file} (${reasonOf(refusal.reason)}); landed ${landed.length}, skipped ${skipped.length}, checks ${checks.recorded} recorded; what landed stays, and a rerun continues from there`;
+};
+
+const importBundleCommand = async (
+  pool: Pool,
+  workspaceId: string,
+  flags: Flags,
+  io: OpsIo,
+): Promise<number> => {
+  const from = flagValue(flags, "from");
+  const email = flagValue(flags, "as");
+  const asked = flagValue(flags, "sensitivity") ?? IMPORT_SENSITIVITY_DEFAULT;
+  const sensitivity = SENSITIVITIES.find((word) => word === asked);
+  const dryRun = flags.get("dry-run");
+  if (from === undefined || email === undefined) {
+    io.say("import-bundle: --from <directory> and --as <member email> are required");
+    return USAGE;
+  }
+  if (sensitivity === undefined) {
+    io.say(`import-bundle: --sensitivity must be one of ${SENSITIVITIES.join(", ")}`);
+    return USAGE;
+  }
+  if (dryRun !== undefined && dryRun !== true) {
+    io.say("import-bundle: --dry-run takes no value");
+    return USAGE;
+  }
+  const git = openBundleStore(io, "the bundle the import writes into cannot be opened");
+  if (!git.ok) {
+    io.say(`import-bundle: REFUSED — ${git.error}`);
+    return REFUSED;
+  }
+  const readTree = io.readTree;
+  if (readTree === undefined) {
+    io.say(
+      "import-bundle: REFUSED — this process has no way to read a directory, which is a wiring fault and not an operator's",
+    );
+    return REFUSED;
+  }
+  const tree = await attempt(() => readTree(from));
+  if (!tree.ok) {
+    io.say(
+      `import-bundle: REFUSED — the directory ${from} could not be read: ${tree.error.message}`,
+    );
+    return REFUSED;
+  }
+  const postgres = openPostgres(pool);
+  const principal = await principalOfMember(postgres, { workspaceId, email, at: io.clock.now() });
+  if (!principal.ok) {
+    const reason =
+      principal.error === "not-a-member"
+        ? `${email} is not a member of workspace ${workspaceId}; invite them first`
+        : principal.error;
+    return refused("import-bundle", workspaceId, reason, io);
+  }
+  const started = io.clock.now();
+  const run = await importBundle(
+    principal.value,
+    { git: git.value, postgres, clock: io.clock },
+    { tree: tree.value, sensitivity, dryRun: dryRun === true },
+  );
+  const seconds = ((io.clock.now().getTime() - started.getTime()) / 1_000).toFixed(1);
+  if (!run.ok) {
+    io.say(`import-bundle: REFUSED — ${importReason(run.error, email)}`);
+    return REFUSED;
+  }
+  const { bundleId, manifest, landed, skipped, checks, concepts } = run.value;
+  const recorded = `${counted(checks.recorded, "check")} recorded (${checks.present} already present)`;
+  if (run.value.dryRun) {
+    const standing = manifest === "standing" ? "already stands" : "would be written first";
+    io.say(
+      `import-bundle: dry run — the tree is sound: ${counted(concepts, "concept")}, of which ${landed.length} would land and ${skipped.length} already stand; ${recorded.replace(" recorded", " would be recorded")}; manifest ${bundleId} ${standing}; nothing was written`,
+    );
+    return DONE;
+  }
+  io.say(
+    `import-bundle: manifest ${bundleId} ${manifest === "written" ? "written as the bundle's first commit" : "already stands"}`,
+  );
+  const outcomes = [
+    ...landed.map((path) => [path, `landed ${path}`] as const),
+    ...skipped.map((path) => [path, `skipped ${path} — already landed`] as const),
+  ].toSorted(([one], [other]) => (one < other ? -1 : one > other ? 1 : 0));
+  for (const [, line] of outcomes) io.say(`import-bundle: ${line}`);
+  io.say(
+    `import-bundle: done — landed ${landed.length}, skipped ${skipped.length}, ${recorded}, ${seconds} seconds`,
+  );
   return DONE;
 };
 

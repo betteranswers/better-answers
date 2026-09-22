@@ -8,6 +8,7 @@ import { closeObjects, openObjects } from "@better-answers/core/store/objects";
 import { readIdentityBootstrap, readObjectStore, requireBootstrap } from "./config.ts";
 import { fetchHonouringHost } from "./ops/http-fetch.ts";
 import { runOps } from "./ops/index.ts";
+import { readTreeUnder } from "./ops/read-tree.ts";
 
 const bootstrap = requireBootstrap("pnpm ops");
 const identity = readIdentityBootstrap();
@@ -35,6 +36,8 @@ const exitCode = await runOps(process.argv.slice(2), pool, {
   writeReport: async (path, body) => {
     await writeFile(path, body, "utf8");
   },
+
+  readTree: readTreeUnder,
 
   clock: systemClock(),
 }).finally(async () => {
