@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 
+import { LANGUAGE_BY_EXTENSION, withoutComments } from "./config-comments.mjs";
 import { workerPython } from "./worker-python.mjs";
 
 const require = createRequire(import.meta.url);
@@ -20,6 +21,25 @@ const WORKSPACES = [
   "packages/schema",
 ];
 
+// The config tree: every root the spec names, and the migrations, which sit inside a workspace
+// but are measured and stripped on their own.
+const CONFIG_ROOTS = [
+  ".claude/hooks",
+  ".github/actions",
+  ".github/workflows",
+  "deploy",
+  "packages/schema/migrations",
+  "scripts",
+];
+
+const CONFIG_FILES = [
+  "cubic.yaml",
+  "jscpd.config.mjs",
+  "knip.config.ts",
+  "lefthook.yml",
+  "pnpm-workspace.yaml",
+];
+
 // A lift is edited upstream, so its comments are not this repository's to delete.
 const SKIPPED = new Set([
   "node_modules",
@@ -33,6 +53,9 @@ const SKIPPED = new Set([
 ]);
 
 const TYPESCRIPT = new Set([".ts", ".cts", ".mts"]);
+const JAVASCRIPT = new Set([".js", ".cjs", ".mjs"]);
+
+const AST_GREP = new Set(["javascript", "typescript", "tsx"]);
 
 const DIRECTIVE = String.raw`(eslint|oxlint|biome)-(disable|enable)|@ts-|prettier-ignore|(v8|c8|istanbul) ignore`;
 
@@ -40,19 +63,25 @@ const DIRECTIVE = String.raw`(eslint|oxlint|biome)-(disable|enable)|@ts-|prettie
 // block carrying it on line two.
 const KEPT = String.raw`^(#!|///|//\s*(${DIRECTIVE}|@vitest-environment)|/\*!|/\*\s*(${DIRECTIVE}|jscpd:ignore)|#\s*(type:|noqa(:|$)|pragma:|ruff:|mypy:|fmt:\s*(on|off)))|(?i:spdx-license-identifier|copyright|@license|@preserve|lifted from|third-party notice)`;
 
+// The strip goes root by root, so `--only` names the one this run touches. Everything else,
+// the already-restored code tiers among them, stands.
 const parseArguments = (argv) => {
   let root = checkout;
+  /** @type {string[]} */
+  const only = [];
   for (let index = 0; index < argv.length; index += 1) {
-    if (argv[index] === "--root") {
+    const argument = argv[index];
+    if (argument === "--root" || argument === "--only") {
       const value = argv[index + 1];
-      if (value === undefined) fail("strip-comments: --root needs a directory");
-      root = path.resolve(value);
+      if (value === undefined) fail(`strip-comments: ${argument} needs a directory`);
+      if (argument === "--root") root = path.resolve(value);
+      else only.push(value.replace(/\/+$/, ""));
       index += 1;
       continue;
     }
-    fail(`strip-comments: unknown argument ${argv[index]}`);
+    fail(`strip-comments: unknown argument ${argument}`);
   }
-  return root;
+  return { root, only };
 };
 
 const fail = (message) => {
@@ -60,32 +89,57 @@ const fail = (message) => {
   process.exit(2);
 };
 
-const sourceFiles = (root) => {
-  const found = [];
+const codeLanguage = (extension) => {
+  if (extension === ".tsx") return "tsx";
+  if (TYPESCRIPT.has(extension)) return "typescript";
+  if (extension === ".py") return "python";
+  return undefined;
+};
 
-  const walk = (directory) => {
+// A config root takes the syntax table as well: the two code tiers, JavaScript, and the YAML,
+// shell, TOML and SQL the table names.
+const configLanguage = (extension) => {
+  if (JAVASCRIPT.has(extension)) return "javascript";
+  return codeLanguage(extension) ?? LANGUAGE_BY_EXTENSION.get(extension);
+};
+
+const sourceFiles = (root, only) => {
+  const found = new Map();
+  const asked = (named) => only.length === 0 || only.includes(named);
+
+  const take = (file, language) => {
+    if (language !== undefined && !found.has(file)) found.set(file, { file, language });
+  };
+
+  const walk = (directory, languageOf) => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const full = path.join(directory, entry.name);
       if (entry.isDirectory()) {
         if (SKIPPED.has(entry.name) || entry.name.startsWith(".")) continue;
-        walk(full);
+        walk(full, languageOf);
         continue;
       }
-      if (!entry.isFile()) continue;
-      const extension = path.extname(entry.name);
-      if (extension === ".tsx") found.push({ file: full, language: "tsx" });
-      else if (TYPESCRIPT.has(extension)) found.push({ file: full, language: "typescript" });
-      else if (extension === ".py") found.push({ file: full, language: "python" });
+      if (entry.isFile()) take(full, languageOf(path.extname(entry.name)));
     }
   };
 
   for (const workspace of WORKSPACES) {
     const directory = path.join(root, workspace);
-    if (fs.existsSync(directory)) walk(directory);
+    if (asked(workspace) && fs.existsSync(directory)) walk(directory, codeLanguage);
+  }
+  for (const config of CONFIG_ROOTS) {
+    const directory = path.join(root, config);
+    if (asked(config) && fs.existsSync(directory)) walk(directory, configLanguage);
+  }
+  for (const config of CONFIG_FILES) {
+    const file = path.join(root, config);
+    if (asked(config) && fs.existsSync(file)) take(file, configLanguage(path.extname(file)));
   }
 
-  return found;
+  return [...found.values()];
 };
+
+const NAMED = [...WORKSPACES, ...CONFIG_ROOTS, ...CONFIG_FILES];
 
 const binaryOf = (specifier, name) =>
   path.join(path.dirname(require.resolve(`${specifier}/package.json`)), name);
@@ -109,7 +163,7 @@ const writeRules = (directory) => {
   );
   fs.writeFileSync(
     plain,
-    ["typescript", "tsx"]
+    ["javascript", "typescript", "tsx"]
       .map(
         (language) =>
           `id: comment-${language}\nlanguage: ${language}\nrule:\n  kind: comment\n  not:\n    regex: ${JSON.stringify(KEPT)}\nfix: ""\n`,
@@ -141,6 +195,20 @@ const stripTypeScript = (root, files) => {
   });
 
   fs.rmSync(rules, { recursive: true, force: true });
+};
+
+// The syntax table's own pass: no parser to shell out to, so the result is written back here,
+// and only where it moved.
+const stripConfig = (files) => {
+  let moved = 0;
+  for (const found of files) {
+    const before = fs.readFileSync(found.file, "utf8");
+    const after = withoutComments(found.language, before);
+    if (after === before) continue;
+    fs.writeFileSync(found.file, after);
+    moved += 1;
+  }
+  return moved;
 };
 
 const stripPython = (files) => {
@@ -180,19 +248,32 @@ const collapseResidue = (root, typescript, python) => {
   }
 };
 
-const root = parseArguments(process.argv.slice(2));
-const files = sourceFiles(root);
-const typescript = files.filter((found) => found.language !== "python");
-const python = files.filter((found) => found.language === "python");
+const { root, only } = parseArguments(process.argv.slice(2));
+for (const named of only) {
+  if (!NAMED.includes(named)) {
+    fail(`strip-comments: ${named} is not a root this script knows. It knows ${NAMED.join(", ")}`);
+  }
+}
 
-if (files.length === 0) fail(`strip-comments: no TypeScript or Python found under ${root}`);
+const files = sourceFiles(root, only);
+const typescript = files.filter((found) => AST_GREP.has(found.language));
+const python = files.filter((found) => found.language === "python");
+const config = files.filter(
+  (found) => !AST_GREP.has(found.language) && found.language !== "python",
+);
+
+const covered = only.length === 0 ? "every root" : only.join(", ");
+if (files.length === 0) {
+  fail(`strip-comments: no file the syntax table reads is under ${root} in ${covered}`);
+}
 
 process.stdout.write(
-  `strip-comments: ${typescript.length} TypeScript and ${python.length} Python files under ${root}\n`,
+  `strip-comments: ${typescript.length} JavaScript or TypeScript, ${python.length} Python and ${config.length} config files in ${covered} under ${root}\n`,
 );
 
 stripTypeScript(root, typescript);
 stripPython(python);
+const moved = stripConfig(config);
 collapseResidue(root, typescript, python);
 
-process.stdout.write("strip-comments: done\n");
+process.stdout.write(`strip-comments: done — ${moved} of ${config.length} config files moved\n`);
