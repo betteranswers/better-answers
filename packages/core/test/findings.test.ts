@@ -5,18 +5,13 @@ import type pg from "pg";
 
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { restoreFinding } from "../src/sources/index.ts";
-import type { Tx } from "../src/store/postgres/index.ts";
-import { readingAs, seedingWith, whileWritesAreRefused } from "./suite-postgres.ts";
-import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
+import { visibilitySuite } from "./sourced-concept.ts";
+import { seedingWith, whileWritesAreRefused } from "./suite-postgres.ts";
+import type { Scenario } from "./workspace-with-bundle.ts";
 
-const { db, arrange } = suiteWithBundles();
+const { db, arrange, reading: acting } = visibilitySuite();
 
 const BUSINESS_FACT = "The sort code is the company's own, printed on every invoice it sends.";
-
-const acting = <T>(
-  who: UserPrincipal,
-  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<T> => readingAs(db().runtimePool, who, work);
 
 const restoreAs = (who: UserPrincipal, findingId: string, reason: string) =>
   acting(who, (principal, tx) => restoreFinding(principal, tx, { findingId, reason }));

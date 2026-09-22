@@ -47,14 +47,12 @@ const claimsFor = (seeded: Seeded): Claims => ({
 });
 
 const listAs = async (seeded: Seeded) => {
-  const resolved = await withPrincipal(
-    openPostgres(db().runtimePool),
-    claimsFor(seeded),
-    listRoutes,
-  );
-  if (!resolved.ok) throw new Error(`the Principal was refused: ${resolved.error}`);
-  const listed = resolved.value;
-  if (!listed.ok) throw listed.error;
+  const listed = await withPrincipal(openPostgres(db().runtimePool), claimsFor(seeded), listRoutes);
+  if (!listed.ok) {
+    throw new Error(`the routes were not listed: ${String(listed.error)}`, {
+      cause: listed.error,
+    });
+  }
   return listed.value;
 };
 

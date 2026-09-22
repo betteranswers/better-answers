@@ -22,6 +22,7 @@ import {
   visibilitySuite,
   type Sourced,
 } from "./sourced-concept.ts";
+import { answered } from "./suite-postgres.ts";
 import type { Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange, reading } = visibilitySuite();
@@ -35,19 +36,21 @@ const reaches = async (person: UserPrincipal, iri: string): Promise<boolean> => 
 const asAdmin = <T>(scenario: Scenario, work: (admin: UserPrincipal, tx: Tx) => Promise<T>) =>
   reading(scenario.admin, work);
 
-const chunksReadableBy = (
+const chunksReadableBy = async (
   person: UserPrincipal,
   sourceDocumentId: string,
 ): Promise<readonly string[]> =>
-  reading(person, async (reader, tx) => {
-    const read = await tx.query<{ id: string }>(
-      `SELECT c.id FROM "index".chunk c
+  answered(
+    await reading(person, async (reader, tx) => {
+      const read = await tx.query<{ id: string }>(
+        `SELECT c.id FROM "index".chunk c
         WHERE c.workspace_id = $1 AND c.source_document_id = $2 AND ${readableClause("c", 3)}
         ORDER BY c.id`,
-      [reader.workspaceId, sourceDocumentId, ...readableParameters(reader)],
-    );
-    return read.rows.map((row) => row.id);
-  });
+        [reader.workspaceId, sourceDocumentId, ...readableParameters(reader)],
+      );
+      return read.rows.map((row) => row.id);
+    }),
+  );
 
 const published = new Date("2026-09-11T09:00:00.000Z");
 
@@ -159,13 +162,17 @@ describe("a Restricted-sourced concept, to a Viewer", () => {
       body: `The board's note is [here](/${withheld.path}).`,
     });
 
-    const outward = await reading(scenario.viewer, (viewer, tx) => walkFrom(viewer, tx, entry.iri));
-    const fromWithheld = await reading(scenario.viewer, (viewer, tx) =>
-      walkFrom(viewer, tx, withheld.iri),
+    const outward = answered(
+      await reading(scenario.viewer, (viewer, tx) => walkFrom(viewer, tx, entry.iri)),
     );
-    const inward = await reading(scenario.viewer, (viewer, tx) => walkTo(viewer, tx, withheld.iri));
-    const absent = await reading(scenario.viewer, (viewer, tx) =>
-      walkFrom(viewer, tx, conceptIriOf(ulid())),
+    const fromWithheld = answered(
+      await reading(scenario.viewer, (viewer, tx) => walkFrom(viewer, tx, withheld.iri)),
+    );
+    const inward = answered(
+      await reading(scenario.viewer, (viewer, tx) => walkTo(viewer, tx, withheld.iri)),
+    );
+    const absent = answered(
+      await reading(scenario.viewer, (viewer, tx) => walkFrom(viewer, tx, conceptIriOf(ulid()))),
     );
 
     expect(outward.map((step) => [step.uid, step.depth])).toEqual([[entry.iri, 0]]);
@@ -173,7 +180,9 @@ describe("a Restricted-sourced concept, to a Viewer", () => {
     expect(inward).toEqual(absent);
     expect(absent).toEqual([]);
 
-    const admin = await reading(scenario.admin, (reader, tx) => walkFrom(reader, tx, entry.iri));
+    const admin = answered(
+      await reading(scenario.admin, (reader, tx) => walkFrom(reader, tx, entry.iri)),
+    );
     expect(admin.map((step) => step.uid).toSorted()).toEqual([entry.iri, withheld.iri].toSorted());
   });
 

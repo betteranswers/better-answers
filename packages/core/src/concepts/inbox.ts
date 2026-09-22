@@ -291,9 +291,7 @@ const decide = async (
       }),
     ),
   );
-  if (!decided.ok) return err(decided.error);
-  if (!decided.value.ok) return err(decided.value.error);
-  return decided.value.value;
+  return decided.ok ? decided.value : err(decided.error);
 };
 
 export const declineSuggestion = (

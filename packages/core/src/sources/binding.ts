@@ -22,9 +22,14 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { holdsEveryGroup } from "../members/index.ts";
-import { enqueueJobIn, type IndexReason } from "../runs/index.ts";
+import { enqueueJobIn, indexRunRefused, type IndexReason } from "../runs/index.ts";
 import { putObject, type ObjectDoor } from "../store/objects/index.ts";
-import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import {
+  withMembership,
+  type Opened,
+  type PostgresDoor,
+  type Tx,
+} from "../store/postgres/index.ts";
 import { adminOnBinding, bindingNamed } from "./admin-binding.ts";
 import { dpiaInputFor, REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastRun } from "./findings.ts";
@@ -139,11 +144,9 @@ const inTransaction = async <T>(
   principal: UserPrincipal,
   door: PostgresDoor,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Result<T, PrincipalRefusal | Error>> => {
-  const opened = await attempt(() => withMembership(principal, door, work));
-  if (!opened.ok) return err(opened.error);
-  if (!opened.value.ok) return err(opened.value.error);
-  return ok(opened.value.value);
+): Promise<Opened<T, Error>> => {
+  const ran = await attempt(() => withMembership(principal, door, work));
+  return ran.ok ? ran.value : err(ran.error);
 };
 
 export const bindUpload = async (
@@ -199,8 +202,7 @@ export const bindUpload = async (
       holdsEveryGroup(fresh, tx, named),
     );
     if (!held.ok) return err(held.error);
-    if (!held.value.ok) return err(held.value.error);
-    if (!held.value.value) return err("no-such-group");
+    if (!held.value) return err("no-such-group");
   }
 
   const put = await putObject(admin.value, doors.objects, originalKey, input.body);
@@ -246,7 +248,7 @@ export const bindUpload = async (
       reason: "bound",
     });
     if (!queued.ok) {
-      throw new Error(`sources: the index run was refused (${String(queued.error)})`);
+      throw indexRunRefused(queued.error);
     }
     return { bindingId, documentId, jobId: queued.value.jobId, auditEventId, originalKey };
   });
@@ -406,7 +408,9 @@ export const reprocessBinding = async (
     subjectId: bindingId,
     reason: input.reason,
   });
-  if (!queued.ok) return err(queued.error);
+  if (!queued.ok) {
+    throw indexRunRefused(queued.error);
+  }
   const wiped = await attempt(() =>
     tx.query(`DELETE FROM "index".chunk WHERE workspace_id = $1 AND binding_id = $2`, [
       workspaceId,

@@ -29,6 +29,35 @@ export type Tx = Pick<pg.PoolClient, "query">;
 
 export type TxRow = pg.QueryResultRow;
 
+type WhollyAResult<T> = [T] extends [Result<unknown, unknown>] ? true : false;
+
+type Unwrapped<T> = T extends { readonly ok: true; readonly value: infer Value } ? Value : never;
+
+type Refused<T> = T extends { readonly ok: false; readonly error: infer Refusal } ? Refusal : never;
+
+export type Answered<T> = WhollyAResult<T> extends true ? Unwrapped<T> : T;
+
+export type Opened<T, Failure = never> = Result<
+  Answered<T>,
+  Refused<T> | PrincipalRefusal | Failure
+>;
+
+const answersAResult = <T>(answer: T): answer is T & Result<unknown, unknown> =>
+  typeof answer === "object" &&
+  answer !== null &&
+  "ok" in answer &&
+  (answer.ok === true ? "value" in answer : answer.ok === false && "error" in answer);
+
+const answersARefusal = <T>(answer: T): boolean => answersAResult(answer) && !answer.ok;
+
+export const opened = <T>(answer: T): Opened<T> =>
+  // SAFETY: the predicate reads the key the type reads, so each branch returns its own half.
+  (answersAResult(answer) ? answer : ok(answer)) as Opened<T>;
+
+const refusedAtTheDoor = <T>(refusal: PrincipalRefusal): Opened<T> =>
+  // SAFETY: a refusal the door itself decided is the `ok: false` half of either branch.
+  err(refusal) as Opened<T>;
+
 const rollbackQuietly = async (client: pg.PoolClient): Promise<void> => {
   try {
     await client.query("ROLLBACK");
@@ -138,10 +167,10 @@ export const withPrincipal = async <T>(
   door: PostgresDoor,
   claims: Claims,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Result<T, PrincipalRefusal>> => {
+): Promise<Opened<T>> => {
   const workspaceId = boundarySchemas.workspace.select.shape.id.safeParse(claims.workspaceId);
   const userId = boundarySchemas.user.select.shape.id.safeParse(claims.userId);
-  if (!workspaceId.success || !userId.success) return err("malformed-claims");
+  if (!workspaceId.success || !userId.success) return refusedAtTheDoor<T>("malformed-claims");
 
   const credentialIssuedAtMs = claims.issuedAt.getTime();
 
@@ -166,7 +195,7 @@ export const withMembership = async <T>(
   principal: UserPrincipal,
   door: PostgresDoor,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Result<T, PrincipalRefusal>> =>
+): Promise<Opened<T>> =>
   resolveScoped(
     door,
     principal.workspaceId,
@@ -190,7 +219,7 @@ const resolveScoped = async <T>(
   refusalFor: (row: MembershipRow | undefined) => Result<ResolvedMember, PrincipalRefusal>,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
   query: string = MEMBERSHIP_QUERY,
-): Promise<Result<T, PrincipalRefusal>> => {
+): Promise<Opened<T>> => {
   const client = await door.pool.connect();
   try {
     await client.query("BEGIN");
@@ -200,7 +229,7 @@ const resolveScoped = async <T>(
     const resolved = refusalFor(membership.rows[0]);
     if (!resolved.ok) {
       await rollbackQuietly(client);
-      return err(resolved.error);
+      return refusedAtTheDoor<T>(resolved.error);
     }
 
     const principal: UserPrincipal = {
@@ -212,9 +241,10 @@ const resolveScoped = async <T>(
       groups: resolved.value.group_ids.map((id) => boundarySchemas.group.select.shape.id.parse(id)),
       credentialIssuedAtMs,
     };
-    const value = await work(principal, client);
-    await commit(client);
-    return ok(value);
+    const answer = await work(principal, client);
+    if (answersARefusal(answer)) await rollbackQuietly(client);
+    else await commit(client);
+    return opened(answer);
   } catch (cause) {
     await rollbackQuietly(client);
     throw cause;

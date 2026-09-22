@@ -12,7 +12,7 @@ import {
   type ConceptDelta,
   type WalkStep,
 } from "@better-answers/core/store/graph";
-import { postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
+import { answered, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
@@ -37,12 +37,14 @@ const arrange = (): Promise<MapScenario> =>
     };
   });
 
-const walked = (
+const walked = async (
   reader: MapScenario["admin"],
   uid: string,
   direction: typeof walkFrom = walkFrom,
 ): Promise<readonly WalkStep[]> =>
-  readingAs(db().runtimePool, reader, (principal, tx) => direction(principal, tx, uid));
+  answered(
+    await readingAs(db().runtimePool, reader, (principal, tx) => direction(principal, tx, uid)),
+  );
 
 const uidsByDepth = (steps: readonly WalkStep[]): readonly (readonly [string, number])[] =>
   steps.map((step) => [step.uid, step.depth]);
@@ -265,9 +267,11 @@ const deltaOf = (row: IndexRow, overrides: Partial<ConceptDelta> = {}): ConceptD
   };
 };
 
-const land = (scenario: MapScenario, delta: ConceptDelta): Promise<void> =>
-  readingAs(db().runtimePool, scenario.admin, (principal, tx) =>
-    writeConceptDelta(principal, tx, delta),
+const land = async (scenario: MapScenario, delta: ConceptDelta): Promise<void> =>
+  answered(
+    await readingAs(db().runtimePool, scenario.admin, (principal, tx) =>
+      writeConceptDelta(principal, tx, delta),
+    ),
   );
 
 const amend = async (

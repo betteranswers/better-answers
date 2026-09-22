@@ -1,17 +1,21 @@
-import { ulid } from "@better-answers/schema";
+import { NIGHTLY_AUDIT_KIND, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
 import { describe, expect, it } from "vitest";
 
-import { attempt, type Claims } from "../src/kernel/index.ts";
+import { act, declareActs, record } from "../src/audit/index.ts";
+import { attempt, err, ok, type Claims, type UserPrincipal } from "../src/kernel/index.ts";
+import { enqueueJobIn } from "../src/runs/index.ts";
 import {
   consumeCall,
   consumeIngress,
   openPostgres,
   readWorkspaceConfig,
   tablesPresent,
+  withMembership,
   withPrincipal,
   withScope,
+  type Tx,
 } from "../src/store/postgres/index.ts";
 import { bootstrap } from "./platform.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
@@ -86,6 +90,85 @@ const claimsFor = (seeded: Seeded, overrides: Partial<Claims> = {}): Claims => (
   userId: seeded.userId,
   issuedAt: new Date(),
   ...overrides,
+});
+
+const PROBE_ACTS = declareActs("platform", {
+  rolledBack: act("platform.probe.rolled_back", { confirmed: "flag" }),
+});
+
+const PROVOKED = "provoked" as const;
+
+const writingARowAnEventAndAJob =
+  (key: string) =>
+  async (principal: UserPrincipal, tx: Tx): Promise<void> => {
+    await configProbeWritten(tx, principal.workspaceId, key);
+    await record(principal, tx, {
+      id: ulid(),
+      act: PROBE_ACTS.rolledBack,
+      subjectId: principal.userId,
+      detail: { confirmed: true },
+    });
+    const queued = await enqueueJobIn(principal, tx, {
+      workspaceId: principal.workspaceId,
+      kind: NIGHTLY_AUDIT_KIND,
+    });
+    if (!queued.ok) throw new Error(`the probe's job answered ${String(queued.error)}`);
+  };
+
+const leftBehindIn = async (workspaceId: string, key: string) => {
+  const counted = await db().pool.query<{ rows: number; ledger: number; jobs: number }>(
+    `SELECT (SELECT count(*)::int FROM workspace_config WHERE workspace_id = $1 AND key = $2) AS rows,
+            (SELECT count(*)::int FROM audit_event WHERE workspace_id = $1 AND act = $3) AS ledger,
+            (SELECT count(*)::int FROM job WHERE workspace_id = $1) AS jobs`,
+    [workspaceId, key, PROBE_ACTS.rolledBack.name],
+  );
+  return counted.rows[0];
+};
+
+const DOORS = ["the transport's", "the slice's"] as const;
+
+const through = async <T>(
+  door: (typeof DOORS)[number],
+  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+) => {
+  const seeded = await seedMembership({ role: "Admin" });
+  const open = openPostgres(db().runtimePool);
+  const claims = claimsFor(seeded);
+  if (door === "the transport's") {
+    return { seeded, answered: await withPrincipal(open, claims, work) };
+  }
+  const admin = await withPrincipal(open, claims, async (principal) => principal);
+  if (!admin.ok) throw new Error(`the Admin's principal answered ${String(admin.error)}`);
+  return { seeded, answered: await withMembership(admin.value, open, work) };
+};
+
+describe("a principal-scoped door whose work answers a refusal after a write", () => {
+  it.each(DOORS)("rolls %s door back, leaving no row, no ledger entry and no job", async (door) => {
+    const key = `probe-${ulid()}`;
+
+    const { seeded, answered } = await through(door, async (principal, tx) => {
+      await writingARowAnEventAndAJob(key)(principal, tx);
+      return err(PROVOKED);
+    });
+
+    expect(answered).toEqual({ ok: false, error: PROVOKED });
+    expect(await leftBehindIn(seeded.workspaceId, key)).toEqual({ rows: 0, ledger: 0, jobs: 0 });
+  });
+
+  it.each(DOORS)(
+    "commits the same three writes through %s door when the work answers a value",
+    async (door) => {
+      const key = `probe-${ulid()}`;
+
+      const { seeded, answered } = await through(door, async (principal, tx) => {
+        await writingARowAnEventAndAJob(key)(principal, tx);
+        return ok("landed");
+      });
+
+      expect(answered).toEqual({ ok: true, value: "landed" });
+      expect(await leftBehindIn(seeded.workspaceId, key)).toEqual({ rows: 1, ledger: 1, jobs: 1 });
+    },
+  );
 });
 
 describe("the Principal resolver", () => {

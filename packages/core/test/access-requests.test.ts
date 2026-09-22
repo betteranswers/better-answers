@@ -14,7 +14,7 @@ import {
   REQUEST_ROLE_DEFAULT,
   requestAccess,
 } from "../src/members/index.ts";
-import { openPostgres, type Tx, withPrincipal } from "../src/store/postgres/index.ts";
+import { openPostgres, type Opened, type Tx, withPrincipal } from "../src/store/postgres/index.ts";
 import { provisionWorkspace } from "../src/workspaces/index.ts";
 import { bootstrap, seedPerson } from "./platform.ts";
 import { asSliceRelative, coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
@@ -53,15 +53,11 @@ const memberAt = async (workspaceId: string, role: Role): Promise<string> => {
   }
 };
 
-const as = async <T>(
+const as = <T>(
   workspaceId: string,
   userId: string,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<T> => {
-  const resolved = await withPrincipal(door(), { workspaceId, userId, issuedAt: new Date() }, work);
-  if (!resolved.ok) throw new Error(`the principal did not resolve: ${resolved.error}`);
-  return resolved.value;
-};
+): Promise<Opened<T>> => withPrincipal(door(), { workspaceId, userId, issuedAt: new Date() }, work);
 
 const requestRows = async (workspaceId: string) => {
   const rows = await db().pool.query<{

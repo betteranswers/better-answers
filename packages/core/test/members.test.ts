@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { attempt } from "../src/kernel/index.ts";
 import type { Result, Role, UserPrincipal } from "../src/kernel/index.ts";
 import { type ProvisionedWorkspace, provisionedWorkspace, seedPerson } from "./platform.ts";
-import { type Tx, withPrincipal } from "../src/store/postgres/index.ts";
+import { type Opened, type Tx, withPrincipal } from "../src/store/postgres/index.ts";
 import {
   addToGroup,
   createGroup,
@@ -16,7 +16,12 @@ import {
   removeFromGroup,
   renameGroup,
 } from "../src/members/index.ts";
-import { abortTheTransaction, postgresForSuite, whileWritesAreRefused } from "./suite-postgres.ts";
+import {
+  abortTheTransaction,
+  answered,
+  postgresForSuite,
+  whileWritesAreRefused,
+} from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
@@ -40,21 +45,17 @@ const asPerson = <T>(
   workspace: Workspace,
   userId: string,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Result<T, string>> =>
+): Promise<Opened<T>> =>
   withPrincipal(
     workspace.door,
     { workspaceId: workspace.workspaceId, userId, issuedAt: new Date() },
     work,
   );
 
-const asAdmin = async <T>(
+const asAdmin = <T>(
   workspace: Workspace,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<T> => {
-  const resolved = await asPerson(workspace, workspace.adminUserId, work);
-  if (!resolved.ok) throw new Error(`the Admin's principal did not resolve: ${resolved.error}`);
-  return resolved.value;
-};
+): Promise<Opened<T>> => asPerson(workspace, workspace.adminUserId, work);
 
 const peopleActs = async (
   workspaceId: string,
@@ -484,12 +485,12 @@ describe("a role that may not shape who sees what", () => {
       const refused = await asPerson(workspace, person, (principal, tx) =>
         holdsEveryGroup(principal, tx, [asked]),
       );
-      const answered = await asAdmin(workspace, (principal, tx) =>
+      const held = await asAdmin(workspace, (principal, tx) =>
         holdsEveryGroup(principal, tx, [asked]),
       );
 
-      expect(refused).toEqual({ ok: true, value: { ok: false, error: "role-forbids" } });
-      expect(answered).toEqual({ ok: true, value: true });
+      expect(refused).toEqual({ ok: false, error: "role-forbids" });
+      expect(held).toEqual({ ok: true, value: true });
     },
   );
 
@@ -531,13 +532,15 @@ describe("an Admin of another workspace", () => {
     const naming = everyVerb(groupId, ourPerson).filter(
       (verb) => verb.name !== "make" && verb.name !== "list",
     );
-    const outcomes = await asAdmin(theirs, async (principal, tx) => {
-      const attempted: { verb: string; outcome: unknown }[] = [];
-      for (const verb of naming) {
-        attempted.push({ verb: verb.name, outcome: await verb.run(principal, tx) });
-      }
-      return { attempted, listed: await listGroups(principal, tx) };
-    });
+    const outcomes = answered(
+      await asAdmin(theirs, async (principal, tx) => {
+        const attempted: { verb: string; outcome: unknown }[] = [];
+        for (const verb of naming) {
+          attempted.push({ verb: verb.name, outcome: await verb.run(principal, tx) });
+        }
+        return { attempted, listed: await listGroups(principal, tx) };
+      }),
+    );
 
     expect(outcomes.attempted).toEqual(
       naming.map((verb) => ({ verb: verb.name, outcome: { ok: false, error: "no-such-group" } })),
