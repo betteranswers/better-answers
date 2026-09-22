@@ -1,5 +1,5 @@
 {
-  "contract_version": 11,
+  "contract_version": 12,
   "agreements": {
     "queue": { "form": "sql-function" },
     "concept-inbox": { "form": "sql-function" },
@@ -25,6 +25,7 @@
     { "agreement": "visibility-columns", "path": "visibility-columns/cases.json" },
     { "agreement": "document-chunk", "path": "document-chunk/cases.json" },
     { "agreement": "upload-media-types", "path": "upload-media-types/cases.json" },
-    { "agreement": "citation", "path": "citation/cases.json" }
+    { "agreement": "citation", "path": "citation/cases.json" },
+    { "agreement": "cost-ledger", "path": "cost-ledger/rows.json" }
   ]
 }
