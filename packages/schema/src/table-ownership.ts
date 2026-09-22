@@ -2,9 +2,7 @@ export const IDENTITY_PROVIDER = "apps/api/src/auth";
 export const POSTGRES_DOOR = "packages/core/src/store/postgres";
 export const GRAPH_DOOR = "packages/core/src/store/graph";
 
-export const WORKER = "apps/worker";
-
-export const OWNERS_OUTSIDE_CORE = [IDENTITY_PROVIDER, POSTGRES_DOOR, GRAPH_DOOR, WORKER] as const;
+export const OWNERS_OUTSIDE_CORE = [IDENTITY_PROVIDER, POSTGRES_DOOR, GRAPH_DOOR] as const;
 
 export const TABLE_OWNERS = {
   "public.user": IDENTITY_PROVIDER,
@@ -265,73 +263,10 @@ export const CROSS_OWNER_TABLE_ACCESS = [
   },
   {
     table: "public.job",
-    by: WORKER,
-    access: "read and write",
-    reason:
-      "The worker claims a job, keeps its lease alive and writes what the job found — through the claim/lease/heartbeat SQL functions, which are SECURITY INVOKER, so the worker's own privileges and the transaction's workspace scope are what reach the row (ADR 0005, ADR 0031).",
-  },
-  {
-    table: "public.job",
     by: "sources",
     access: "read",
     reason:
       "The publish act reads the status of the binding's latest `index` run, by subject, inside its own transaction: the worker holds SELECT alone on `source_binding`, so the run's own row is the only place the tier doing the work can say where it got to, and only *done* lets a publish through (ADR 0013, amended 2026-09-11). One column of one row, by the statement in `packages/core/src/sources/binding.ts`. The review read's other question of the same table — what the latest finished run found — goes through the runs slice's own door (`latestIndexOutcomeIn`), because an outcome is read through the queue's boundary and a status word is not.",
-  },
-  {
-    table: "public.concept_index",
-    by: WORKER,
-    access: "read",
-    reason:
-      "The nightly audit compares its own parse of each file against the row's content hash, and the full rebuild copies the row's identity, kind, status and visibility columns onto the generation it writes rather than re-deriving them (ADR 0023, ADR 0031). The worker never writes this table.",
-  },
-  {
-    table: "public.finding",
-    by: WORKER,
-    access: "read and write",
-    reason:
-      "The detector runs in the worker and the review of what it found is an Admin's act, so the worker records a span it withheld — INSERT on the detector's own columns (migrations 0024, 0032) — and reads back one thing: which spans of a document an Admin restored, through SELECT on the five columns that say which span a row is and on `restored_at`, and on no other column (migration 0041; ADR 0020, amended 2026-09-20). The restored spans are an argument to the one memoised function a run converts through, as a document's suppressions are, so a restore re-reads that one document and the seam leaves the span in the text; the same five columns are the conflict target of the run's insert, which is what keeps a second run from doubling a binding's findings and an Admin's mark on the row it was made on. On that conflict the run refreshes its own reading of the span — category, tier, score and the version pair — through SELECT and UPDATE on exactly those five columns (migration 0042; ADR 0020, amended 2026-09-21), so the review reads the last run and a row whose version pair is not its document's is a span the last run did not raise. No DELETE, no UPDATE of a span or of anything an Admin wrote, and every withheld column a refusal test of its own: a worker that could read a reason would read a sentence an Admin typed about a person, one that could update a review column could mark a special-category span reviewed, and one that could clear a restore could withhold again what an Admin let back. No lint sees across a process boundary, which is why the grant and this entry are both written down.",
-  },
-  {
-    table: "public.suppression",
-    by: WORKER,
-    access: "read",
-    reason:
-      "A document's applicable suppressions are an argument to the one memoised function a run converts through, so one person's erasure re-reads the documents that mention them and leaves the rest of the binding answered out of the store; the run gathers the sets inside the transaction its own workspace scope is set in and holds SELECT alone (migration 0038). Carrying them on the job row instead would write an erased person's identifiers into a queue row that outlives the run. The three writing roads stay shut and each is a refusal test of its own (ADR 0020): a tier that could insert could suppress a document nobody asked about, one that could update could empty a set, and one that could delete could put a person's data back into every derived store at the next conversion.",
-  },
-  {
-    table: "index.chunk",
-    by: WORKER,
-    access: "read and write",
-    reason:
-      "A run writes the chunk rows it split out of one document's normalised redacted text, rewrites them when the same document is processed again, and deletes the rows of a document that has gone from the source — so the worker holds INSERT, UPDATE and DELETE on the table by name (migration 0037), and SELECT beside them: all three statements a run makes against this table read it — the engine's upsert reads EXCLUDED for every column the pipeline declares, and the engine's delete and the run's last statement each carry a WHERE over the key columns — and PostgreSQL requires SELECT on every column a predicate or an EXCLUDED reference reads, so the read is what the three writes are made of rather than a fourth road. It is deliberate and not a default nobody noticed — ADR 0032's 2026-09-19 amendment records it, the RLS suite pins the four verbs and no other privilege, and the next migration that touches this table's privileges writes the grant out by name. Every row is reached through the policied parent, never through a workspace's partition, which the lifecycle function revokes. The acts over the same rows are the sources slice's: a publish and a narrowing rewrite the visibility copies the run wrote, and the run's last statement re-copies them, so a narrowing that lands mid-run wins (ADR 0013, ADR 0031).",
-  },
-  {
-    table: "public.source_document",
-    by: WORKER,
-    access: "read and write",
-    reason:
-      "The catalogue is what a run reconciles: it reads the row to learn which item it is processing and writes back the content hash, the key of the normalised copy it wrote, the redaction version the seam returned, the outcome word and when it last saw the item. SELECT and UPDATE alone (migration 0037) — a document row is created by the act that bound its source and removed by the act that withdraws it, both the app's, so a worker that could insert one could catalogue a document nobody uploaded (ADR 0013, ADR 0020).",
-  },
-  {
-    table: "public.graph_generation",
-    by: WORKER,
-    access: "read and write",
-    reason:
-      "A full rebuild reads the live generation, writes the next one beside it and flips it with one row update at the end — the one write that makes a rebuilt map visible (ADR 0023).",
-  },
-  {
-    table: "public.graph_node",
-    by: WORKER,
-    access: "read and write",
-    reason:
-      "A full rebuild inserts the next generation's nodes. It may not update or delete one, so it can never edit the live generation; sweeping a retired generation is the app's (`graph-sweep`, T-058).",
-  },
-  {
-    table: "public.graph_edge",
-    by: WORKER,
-    access: "read and write",
-    reason:
-      "The same, for the edges the rebuild derives from each concept's file — insert only, in the generation it is building.",
   },
   {
     table: "public.concept_index",

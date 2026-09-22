@@ -35,6 +35,31 @@ const constraintOf = (error: unknown): string => {
   return typeof named === "string" ? named : `nothing named a constraint: ${String(error)}`;
 };
 
+// The closed set the pinned image has, so a privilege the journal never mentions is answered
+// false rather than left out of the question.
+export const TABLE_PRIVILEGES = [
+  "SELECT",
+  "INSERT",
+  "UPDATE",
+  "DELETE",
+  "TRUNCATE",
+  "REFERENCES",
+  "TRIGGER",
+  "MAINTAIN",
+] as const;
+
+export const privilegesHeld = async (
+  client: Writer,
+  role: string,
+  table: string,
+): Promise<Record<string, boolean>> => {
+  const held = await client.query<{ privilege: string; held: boolean }>(
+    "SELECT privilege, has_table_privilege($1, $2, privilege) AS held FROM unnest($3::text[]) AS privilege",
+    [role, table, [...TABLE_PRIVILEGES]],
+  );
+  return Object.fromEntries(held.rows.map((row) => [row.privilege, row.held]));
+};
+
 export const ADMITTED = "admitted";
 
 // A refusal's SQLSTATE outlives its message, which any author may reword.

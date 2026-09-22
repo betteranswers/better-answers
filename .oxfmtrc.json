@@ -10,6 +10,7 @@
     "packages/devtools/lifts/anti-slop/**",
     ".claude/worktrees/**",
     "packages/schema/migrations/**",
+    "packages/schema/roles-surface.json",
     ".cache/**"
   ]
 }

@@ -19,7 +19,7 @@ import {
 } from "../src/index.ts";
 import { type TestData, testData } from "./factory.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
-import { ADMITTED, refusesEach, sqlstateOf } from "./probes.ts";
+import { ADMITTED, privilegesHeld, refusesEach, sqlstateOf } from "./probes.ts";
 import {
   A_BUNDLE_COMMIT,
   A_BUNDLE_COMMIT_WITH_A_PARENT,
@@ -247,7 +247,7 @@ describe("the identity set", () => {
     });
   });
 
-  it("lets the worker read the workspace table and config, and never write them", async () => {
+  it("lets the worker read the workspace table, never write it, and never reach the config at all (migration 0043)", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.workspaceConfig({ workspaceId: WS_A });
@@ -256,17 +256,15 @@ describe("the identity set", () => {
       const workspaces = await client.query("SELECT id FROM workspace ORDER BY id");
       expect(workspaces.rows).toEqual([{ id: WS_A }, { id: WS_B }]);
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      const config = await client.query("SELECT workspace_id FROM workspace_config");
-      expect(config.rows).toEqual([{ workspace_id: WS_A }]);
 
       await client.query("SAVEPOINT w");
       await expect(
         client.query("UPDATE workspace SET name = 'x' WHERE id = $1", [WS_A]),
       ).rejects.toThrow(/permission denied/);
       await client.query("ROLLBACK TO SAVEPOINT w");
-      await expect(
-        client.query("UPDATE workspace_config SET value = 'x' WHERE workspace_id = $1", [WS_A]),
-      ).rejects.toThrow(/permission denied/);
+      await expect(client.query("SELECT workspace_id FROM workspace_config")).rejects.toThrow(
+        /permission denied/,
+      );
     });
   });
 });
@@ -1757,30 +1755,7 @@ describe("the workspace-lifecycle function", () => {
 });
 
 describe("the chunk index under worker_rt", () => {
-  const TABLE_PRIVILEGES = [
-    "SELECT",
-    "INSERT",
-    "UPDATE",
-    "DELETE",
-    "TRUNCATE",
-    "REFERENCES",
-    "TRIGGER",
-    "MAINTAIN",
-  ] as const;
-
-  const privilegesHeld = async (
-    client: pg.PoolClient,
-    role: string,
-    table: string,
-  ): Promise<Record<string, boolean>> => {
-    const held = await client.query<{ privilege: string; held: boolean }>(
-      "SELECT privilege, has_table_privilege($1, $2, privilege) AS held FROM unnest($3::text[]) AS privilege",
-      [role, table, [...TABLE_PRIVILEGES]],
-    );
-    return Object.fromEntries(held.rows.map((row) => [row.privilege, row.held]));
-  };
-
-  it("holds the four verbs on the parent and no other privilege, and nothing at all on a partition (migrations 0000 and 0037)", async () => {
+  it("holds the four verbs on the parent and no other privilege, and nothing at all on a partition (migrations 0037 and 0043)", async () => {
     await withRollback(db.pool, async (client) => {
       /* jscpd:ignore-start */
       await seedTwoWorkspaces(client);
