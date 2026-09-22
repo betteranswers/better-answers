@@ -63,7 +63,7 @@ case "$FILE" in
   # name means a comment.
   NAMES="better-answers(comment-only-the-why)"
   ;;
-*.py)
+*.py | *.yml | *.yaml | *.sh | *.bash | *.toml | *.sql)
   if ! command -v python3 >/dev/null 2>&1; then
     echo "comment-gate-hook: python3 is absent, so $RELATIVE went unchecked" >&2
     exit 0

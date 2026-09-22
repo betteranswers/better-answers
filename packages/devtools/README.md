@@ -110,11 +110,14 @@ both ways and over the committed tree.
 ## The comment gate — three parts, all in root `check`
 
 The comment rule's two conditions — a comment block is 25 words at most and cites no ticket id,
-date, rule tag or ADR number — held by a rule for TypeScript, a check for Python and a density
-ceiling over each unit. Directives and notices are exempt by their opening text everywhere, and
-a directive is dropped before blocks are grouped so it cannot lend a paragraph its exemption.
-Each part carries the rule in the message it prints, and each is proven through the runner
-above, both ways.
+date, rule tag or ADR number — held by a rule for TypeScript, a check for the rest and a density
+ceiling over each unit. The check reads a file by a syntax table keyed on its extension: `#` for
+Python, YAML, shell and TOML, `--` for SQL, and docstrings on top for Python alone. Directives
+and notices are exempt by their opening text everywhere, two of the migrations' own by their
+whole text, and a directive is dropped before blocks are grouped so it cannot lend a paragraph
+its exemption. What a language calls code is code: a string in any of them, and a dollar-quoted
+body, an escaped string or a quoted identifier in SQL. Each part carries the rule in the message
+it prints, and each is proven through the runner above, both ways.
 
 | Part | What runs it | Its suite |
 | --- | --- | --- |
@@ -137,6 +140,14 @@ TypeScript eight times its size decides. The report names a directory the way it
 workspace, and a named directory the counter read no file in is refused, never called clean.
 Root `check` names the two workspace roots and no directory yet; each config root is wired as
 its strip lands.
+
+`.claude/hooks/comment-gate-hook.sh` runs the same two parts at write time over the file an
+edit touched, and hands their message straight back; its suite holds its extension list against
+the check's syntax table both ways. The check names two paths it does not judge, each proved by
+a case in its suite: `apps/worker/pyproject.toml`, which no root of the config-tree strip
+covers, and `packages/schema/migrations`, whose strip has not landed — the change that strips
+the migrations and names them in root `check` deletes that second name. Skills are walked past
+wherever they sit, being prose no comment gate reads.
 
 The counter is **cloc**, pinned at `2.6.0-cloc`, which carries upstream cloc `2.06` — the
 number a behaviour is compared against. **Read the pin off the registry's `latest` tag and

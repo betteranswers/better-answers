@@ -82,6 +82,9 @@ const pathIn = (command: string, pattern: RegExp): string => {
 const configPath = (): string =>
   pathIn(rootScripts()["comment-gate:ts"] ?? "", /packages\/\S+\.oxlintrc\.json/);
 
+const checkerPath = (): string =>
+  pathIn(rootScripts()["comment-gate:python"] ?? "", /packages\/\S+\.py/);
+
 const gateConfig = z.object({ ignorePatterns: z.array(z.string()).optional() });
 
 // The config is JSONC, so the comment lines go before the parse; reading its patterns here
@@ -139,6 +142,19 @@ describe("the write-time hook hands back the comment rule the edit broke", () =>
     expect(run.stderr).toContain(tag("COMMENT", "1"));
   });
 
+  it.each([
+    ["YAML", "packages/probe/long.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
+    ["shell", "packages/probe/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
+    ["TOML", "packages/probe/long.toml", `# ${FORTY_WORDS}\nkeep = 1\n`],
+    ["SQL", "packages/probe/long.sql", `-- ${FORTY_WORDS}\nSELECT 1;\n`],
+  ])("refuses a 40-word %s comment, naming the count and its rule", (_language, file, source) => {
+    const run = edit(file, source);
+
+    expect(run.status).toBe(2);
+    expect(run.stderr).toContain("runs to 40 words");
+    expect(run.stderr).toContain(tag("COMMENT", "1"));
+  });
+
   it("reads a relative path against the session's directory, as the docs write one", () => {
     const file = "packages/probe/relative.ts";
     writeUnder(tree, file, `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
@@ -169,6 +185,18 @@ describe("the write-time hook is silent where the comment earns its place", () =
     ],
     ["a why inside the ceiling", "probe/why.py", `# ${A_WHY_OF_TWENTY}\nKEEP = 1\n`],
     ["a type-checker escape", "probe/directive.py", "# type: ignore[attr-defined]\nKEEP = 1\n"],
+    ["a why inside the ceiling", "probe/why.yml", `# ${A_WHY_OF_TWENTY}\nkeep: 1\n`],
+    [
+      "an editor schema line",
+      "probe/directive.yml",
+      "# yaml-language-server: $schema=x\nkeep: 1\n",
+    ],
+    ["a why inside the ceiling", "probe/why.sh", `# ${A_WHY_OF_TWENTY}\nKEEP=1\n`],
+    ["a shellcheck directive", "probe/directive.sh", "# shellcheck disable=SC2016\nKEEP=1\n"],
+    ["a why inside the ceiling", "probe/why.toml", `# ${A_WHY_OF_TWENTY}\nkeep = 1\n`],
+    ["a renovate directive", "probe/directive.toml", "# renovate: datasource=docker\nkeep = 1\n"],
+    ["a why inside the ceiling", "probe/why.sql", `-- ${A_WHY_OF_TWENTY}\nSELECT 1;\n`],
+    ["a migration separator", "probe/directive.sql", "SELECT 1;\n--> statement-breakpoint\n"],
   ])("lets %s through", (_what, file, source) => {
     const run = edit(`packages/${file}`, source);
 
@@ -240,13 +268,37 @@ describe("the write-time hook refuses nothing when it cannot run the gate", () =
   });
 });
 
+// Two readings of one list, each read here rather than restated, so neither drifts.
+const tableSuffixes = (): readonly string[] => {
+  const source = readFileSync(path.join(repositoryRoot, checkerPath()), "utf8");
+  const table = /SYNTAX[^{]*\{(?<body>[^}]*)\}/.exec(source)?.groups?.["body"];
+  if (table === undefined) {
+    throw new Error(`${checkerPath()} carries no syntax table this reading can find.`);
+  }
+  return [...table.matchAll(/"(?<suffix>\.\w+)"/g)].map((found) => found.groups?.["suffix"] ?? "");
+};
+
+const branchSuffixes = (): readonly string[] => {
+  const branch = [...hookText.matchAll(/^(?<case>\*\..*)\)$/gm)]
+    .map((found) => found.groups?.["case"] ?? "")
+    .find((one) => one.includes("*.py"));
+  if (branch === undefined) {
+    throw new Error(`${path.basename(script)} names no branch for the checker's file types.`);
+  }
+  return branch.split("|").map((one) => one.trim().replace(/^\*/, ""));
+};
+
 describe("the write-time hook runs the same gate the root check runs", () => {
   it("names the config `comment-gate:ts` names", () => {
     expect(hookText).toContain(configPath());
   });
 
+  it("dispatches to the checker on every file type its syntax table reads", () => {
+    expect([...branchSuffixes()].sort()).toEqual([...tableSuffixes()].sort());
+  });
+
   it("names the checker `comment-gate:python` names", () => {
-    const named = pathIn(rootScripts()["comment-gate:python"] ?? "", /packages\/\S+\.py/);
+    const named = checkerPath();
 
     expect(hookText).toContain(named);
   });
