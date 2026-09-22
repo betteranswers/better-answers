@@ -15,7 +15,7 @@ set -euo pipefail
 #   jcodemunch index — the worktree as a jCodeMunch root of its own
 #   skills           — .claude/hooks/provision-skills.sh: the installed, ignored agent
 #                      tooling (`.agents/`, `.claude/skills/*`, each workspace's
-#                      `.claude/skills/*`, `tasks/AGENTS.md`)
+#                      `.claude/skills/*`)
 #   scratch          — the primary checkout's `.scratch`, linked
 #
 # `git worktree add -b <branch> <path> origin/main` sets the new branch to track
