@@ -41,7 +41,7 @@ fixtures and adds a fourth:
 | `passesTheAccessibilityGate` | The audit below, declared `auto`, so it runs whether a spec names it or not |
 
 A spec asks for the ones it uses and gets the rest anyway: `apps/web/e2e/sign-out.spec.ts` takes
-`context` to clear cookies mid-test, and every spec takes `request` to build its state.
+`context` to clear cookies mid-test, and every spec that builds state takes `request`.
 
 ### Two addresses, not one
 
@@ -112,8 +112,8 @@ holding one.
   one, and everything after is scoped to the pick"`, not `"picker test"`.
 - **Minimal comments** — only comment to clarify non-obvious intent; never restate what the next line of code does.
 - **Give an assertion a message wherever the failure would not name itself.** The harness's own
-  `${path} answered ${status}` is the pattern; so is the second argument on the latency and axe
-  assertions.
+  `${path} answered ${status}` is the pattern, and so are the axe assertion and the gate's refusal
+  in `apps/web/e2e/browser.ts`.
 - **Read the app's own constants rather than copying them.** `apps/web/e2e/routes.spec.ts` imports
   `@/shared/screens.ts`, so the list of screens is written once.
 - **A latency budget is measured, annotated and asserted** — `test.info().annotations.push(…)`
@@ -132,8 +132,8 @@ three things, of which automated rules are only one:
 - **A keyboard traversal** reaching the screen and each of its acts without a pointer:
   `apps/web/e2e/sign-in.spec.ts` for the three screens outside the shell,
   `apps/web/e2e/frame.spec.ts` for the rail and the secondary nav, and
-  `apps/web/e2e/routes.spec.ts` and
-  `apps/web/e2e/failed-screen.spec.ts` for theirs. It is the floor, not the extra.
+  `apps/web/e2e/routes.spec.ts` and `apps/web/e2e/failed-screen.spec.ts` for theirs. It is the
+  floor, not the extra.
 - **An aria snapshot**, written inline with `toMatchAriaSnapshot`, where what a screen *sounds
   like* is the thing under test — a row that lost its heading or a list that stopped being a list
   fails it though the pixels are unchanged. `apps/web/e2e/routes.spec.ts` holds one and
@@ -181,7 +181,7 @@ committing.
 
 ## Carried from Onyx
 
-The donor is Onyx's Playwright skill. The practices of its that are ours:
+The donor is Onyx's Playwright skill. Its practices that are ours too:
 
 - **API-first set-up.** Build state through the harness; reserve the browser for the behaviour
   under test.
