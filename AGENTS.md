@@ -22,7 +22,7 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers �
 | `packages/core/` | The business logic `apps/api` calls — capability slices over four store doors. Transport-agnostic, and lint-enforced as such |
 | `packages/devtools/` | The repository's own gate tooling — the throwaway-tree runner every gate's test runs its tool through, the lint rules, the anti-slop lift, the mutation probe and summary; its README lists them. |
 | `packages/` | The rest of the shared TypeScript: `schema`, `design-system` |
-| `contracts/` | The tier contract's language-neutral fixtures — both tiers' suites read it, nothing imports it |
+| `contracts/` | The tier contract's language-neutral fixtures — both tiers' suites read it, as does the gate tooling; nothing imports it and nothing deploys it |
 | `docs/adr/` | Architecture decision records |
 | `docs/architecture/` | The C4 diagrams — context, containers, three component views, deployment, three flows — a reading of the tree, redrawn by `/c4-architecture` after any review that moves the shape; its README maps each route block to the containers and components it touches |
 | `docs/specs/` | `<ticket>.md` is a ticket's spec and `v01-route.md` the route |

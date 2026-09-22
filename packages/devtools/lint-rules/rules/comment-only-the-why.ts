@@ -1,20 +1,13 @@
 import { defineRule } from "@oxlint/plugins";
 
+import { citationIn } from "../../src/citations.ts";
+
 import type { Comment, Fix, Fixer, Range } from "@oxlint/plugins";
 
 const WORD_LIMIT = 25;
 
 const EXEMPT_OPENING =
   /^(?:!|\/\s*<reference\b|eslint-|oxlint-|@ts-|@vitest-environment\b|@license\b|prettier-ignore\b|oxfmt-ignore\b|biome-ignore\b|jscpd:ignore|v8 ignore\b|c8 ignore\b|istanbul ignore\b|SPDX-License-Identifier\b|Copyright\b)/;
-
-const CITATIONS: readonly { readonly what: string; readonly pattern: RegExp }[] = [
-  { what: "a ticket id", pattern: /\bT-\d+\b/ },
-  { what: "an ADR number", pattern: /\bADR[ -]?\d+\b/i },
-  // A family may carry a digit, so the letters around it are what the shape is read by.
-  { what: "a rule tag", pattern: /\[[A-Z][A-Z0-9]*[A-Z][0-9]+\]/ },
-  { what: "a date", pattern: /\b\d{4}-\d{2}-\d{2}\b/ },
-  { what: "a date", pattern: /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/ },
-];
 
 const proseOf = (comment: Comment): string =>
   comment.value
@@ -89,17 +82,9 @@ export const commentOnlyTheWhyRule = defineRule({
           const range: Range = [first.range[0], last.range[1]];
 
           const fix = (fixer: Fixer): Fix => fixer.removeRange(range);
-          const cited = CITATIONS.map((citation) => ({
-            what: citation.what,
-            found: citation.pattern.exec(prose)?.[0],
-          })).find((citation) => citation.found !== undefined);
-          if (cited?.found !== undefined) {
-            context.report({
-              loc,
-              messageId: "cites",
-              data: { what: cited.what, cited: cited.found },
-              fix,
-            });
+          const cited = citationIn(prose);
+          if (cited !== undefined) {
+            context.report({ loc, messageId: "cites", data: { ...cited }, fix });
             continue;
           }
           const words = wordsIn(prose);

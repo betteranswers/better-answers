@@ -1,6 +1,6 @@
 # The tier contract
 
-The language-neutral home of everything `apps/api` (TypeScript) and `apps/worker` (Python) must agree about across ADR 0005's stores-not-code seam. Decided in **ADR 0031**; this directory is that decision made checkable. It is deployed by nothing and imported by nothing — both tiers' test suites *read* it.
+The language-neutral home of everything `apps/api` (TypeScript) and `apps/worker` (Python) must agree about across ADR 0005's stores-not-code seam. Decided in **ADR 0031**; this directory is that decision made checkable. It is deployed by nothing and imported by nothing — both tiers' test suites *read* it, and so, since `citation`, does the repository's own gate tooling, which is deployed by nothing either.
 
 `manifest.json` names the agreements and the form each takes, one of three. **ADR 0031's table names them and what each settles; its amendments are the history** — which agreement arrived when, and at which `contract_version`. This page keeps no second copy of either.
 

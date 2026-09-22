@@ -1,5 +1,5 @@
 {
-  "contract_version": 9,
+  "contract_version": 10,
   "agreements": {
     "queue": { "form": "sql-function" },
     "concept-inbox": { "form": "sql-function" },
@@ -11,7 +11,8 @@
     "concept-file": { "form": "fixtured" },
     "redaction": { "form": "fixtured" },
     "document-chunk": { "form": "fixtured" },
-    "upload-media-types": { "form": "fixtured" }
+    "upload-media-types": { "form": "fixtured" },
+    "citation": { "form": "fixtured" }
   },
   "fixtures": [
     { "agreement": "llm-routing", "path": "llm-routing/cases.json" },
@@ -22,6 +23,7 @@
     { "agreement": "redaction", "path": "redaction/cases.json" },
     { "agreement": "visibility-columns", "path": "visibility-columns/cases.json" },
     { "agreement": "document-chunk", "path": "document-chunk/cases.json" },
-    { "agreement": "upload-media-types", "path": "upload-media-types/cases.json" }
+    { "agreement": "upload-media-types", "path": "upload-media-types/cases.json" },
+    { "agreement": "citation", "path": "citation/cases.json" }
   ]
 }
