@@ -1,0 +1,9 @@
+NOTICE
+  ai_agent 7-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7c8318b28c1f2438ae39dfa95f539e6befb87958",
+  "prompts": {}
+}
