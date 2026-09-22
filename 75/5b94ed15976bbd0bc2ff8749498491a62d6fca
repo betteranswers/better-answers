@@ -1,0 +1,71 @@
+packages/core/src/runs/index.ts
+  s_2dd75a86f22d42::t_3c580781e93c0a 3,5,10,16,19,21,23,27,31
+  s_2dd75a86f22d42::t_6567b2cfe1c291 28
+  s_2dd75a86f22d42::t_85bc43191c2f65 106-107,112-122,124-141
+  s_2dd75a86f22d42::t_4e1379e0871fbd 108-110
+  s_2dd75a86f22d42::t_b9bedbdddd5335 111
+  s_2dd75a86f22d42::t_6bef7a08648847 123
+  s_2dd75a86f22d42::t_8eb80e42e9a471 173,175-177
+  s_2dd75a86f22d42::t_1403ef0f164a69 172
+  s_2dd75a86f22d42::t_0518bf60cb4183 212-213
+packages/core/src/kernel/index.ts
+  s_2dd75a86f22d42::t_0d895a0878483d 8
+  s_2dd75a86f22d42::t_1bc42f0140a768 23
+  s_2dd75a86f22d42::t_efc69a15369b43 9-10
+packages/devtools/lint-rules/rules/act-admits-before-await.ts
+  s_2dd75a86f22d42::t_ecc2ee1a5255bd 1-8,10,12-26,29-30,32,34-41,43-46,48-51,53,65-74,76-77,89-103
+  s_2dd75a86f22d42::t_27b13fd230c33c 9,11
+  s_2dd75a86f22d42::t_352f8515936f8b 42,47,52,54-64
+  s_2dd75a86f22d42::t_b721a0c2fa6936 75,79
+  s_2dd75a86f22d42::t_a10aba6db5a033 78,80-85
+  s_2dd75a86f22d42::t_3c7c0ec47fc56f 86
+  s_2dd75a86f22d42::t_901619fdc66a95 87-88
+  s_2dd75a86f22d42::t_546f3722430fa7 27-28
+  s_2dd75a86f22d42::t_52a37b90616832 31,33
+packages/core/src/kernel/admission.ts
+  s_2dd75a86f22d42::t_c49ad22a2b128a 1-13,15-18,20-25,27,30-37,40-60,66-67,70-77,81-86,88-97,99-102
+  s_2dd75a86f22d42::t_57a9b93fdb7c5b 61-65
+  s_2dd75a86f22d42::t_58665aa9972b92 14,26,28,39,78-80,98
+  s_2dd75a86f22d42::t_c462a145f4786a 19
+  s_2dd75a86f22d42::t_8278cec5446759 29
+  s_2dd75a86f22d42::t_0104c1f6ee44be 38
+  s_2dd75a86f22d42::t_b24a1d9c49320c 69
+packages/core/test/admission.test.ts
+  s_2dd75a86f22d42::t_c142664417d78d 1-55,57-73,75-109,115,117-129,131-147,151-184
+  s_2dd75a86f22d42::t_ba4b2b81796794 110-114,116
+  s_2dd75a86f22d42::t_901619fdc66a95 148-150
+  s_2dd75a86f22d42::t_41c318a1030540 56
+  s_2dd75a86f22d42::t_70866f47f7547b 74
+packages/devtools/src/oxlint-config.ts
+  s_2dd75a86f22d42::t_27318df9192d94 34-46
+packages/devtools/test/act-admits-before-await.test.ts
+  s_2dd75a86f22d42::t_b40ca0ea9661e3 2-8,11-63,65-72,74-86
+  s_2dd75a86f22d42::t_61c38a736b0879 1,10
+  s_2dd75a86f22d42::t_4c3b6f49931aae 64
+  s_2dd75a86f22d42::t_b5c51793775287 73
+packages/core/src/sources/binding.ts
+  s_2dd75a86f22d42::t_65d3419abbf781 17,19,24,26
+  s_2dd75a86f22d42::t_b7b5326718bef2 379-386
+  s_2dd75a86f22d42::t_901619fdc66a95 388
+  s_2dd75a86f22d42::t_1a57ac239f287d 405-409,411-412
+  s_2dd75a86f22d42::t_546f3722430fa7 39
+  s_2dd75a86f22d42::t_47966b413c0286 410
+packages/devtools/test/comment-only-the-why.test.ts
+  s_2dd75a86f22d42::t_b16975f93e61ec 7,17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "755b94ed15976bbd0bc2ff8749498491a62d6fca",
+  "prompts": {},
+  "sessions": {
+    "s_2dd75a86f22d42": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1deab29c-2105-473f-9514-e52636269c8a",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
