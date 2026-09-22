@@ -1,0 +1,36 @@
+packages/devtools/README.md
+  s_df9ee117beb2ea::t_c5457b3c5161b2 83-90
+docs/agents/workflow.md
+  s_df9ee117beb2ea::t_6d5f6166cc6f37 32
+  s_df9ee117beb2ea::t_872f96caf9ea38 44,46-52
+  s_df9ee117beb2ea::t_fab34d7a41e8c9 25
+lefthook.yml
+  s_df9ee117beb2ea::t_ecab692a1a502a 40-56
+packages/devtools/src/land.ts
+  s_df9ee117beb2ea::t_5b1fde14e25352 11-13
+  s_df9ee117beb2ea::t_9220cca5666ac9 55
+  s_df9ee117beb2ea::t_f3de17946e9715 10
+  s_df9ee117beb2ea::t_4ff1deb98acc5c 53-54
+packages/devtools/test/land.test.ts
+  s_df9ee117beb2ea::t_d147e30a06cee8 18-38
+  s_df9ee117beb2ea::t_8e9d5bb39a0772 337-357
+  s_df9ee117beb2ea::t_40e814769e87a7 174,176-177,179
+  s_df9ee117beb2ea::t_0506c9c4d71adc 175,178
+  s_df9ee117beb2ea::t_a8f1eb36ebefef 144-147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "bb471753abb0a5a1002a5910a6770fbb13cb6712",
+  "prompts": {},
+  "sessions": {
+    "s_df9ee117beb2ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb2d3879-0bdc-4dd2-bf68-3d8827a104e8",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
