@@ -14,6 +14,9 @@ const ACT_BUDGET_MS = 100;
 
 const NARROW = { width: 320, height: 720 };
 
+// Past `--breakpoint-md`, which `--shell-wide` in `index.css` reads for the shell.
+const WIDE = { width: 1024, height: 720 };
+
 const SCREENS_AND_VIEWS = "Screens and views";
 
 const railOf = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
@@ -532,4 +535,26 @@ test("choosing a destination on a narrow screen closes the navigation over the c
 
   await expect(panelOf(page)).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
+});
+
+test("the navigation over the content closes when the wide layout arrives under the reader, and hands focus to the control that stays", async ({
+  page,
+  request,
+}) => {
+  await signedIn(page, request, "Calder Pressings");
+  await page.setViewportSize(NARROW);
+  await page.goto("/system/routes-and-spend");
+  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
+
+  await menuOf(page).click();
+  await expect(panelOf(page)).toBeVisible();
+
+  // The reader never asked for this crossing, so the sheet owes back the focus it borrowed —
+  // vanishing would leave it on the body.
+  await page.setViewportSize(WIDE);
+
+  await expect(panelOf(page)).toHaveCount(0);
+  await expect(railOf(page)).toBeVisible();
+  await expect(navOf(page, "System")).toBeVisible();
+  await expect(closerOf(page)).toBeFocused();
 });
