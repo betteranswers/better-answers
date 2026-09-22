@@ -25,8 +25,8 @@ C4Dynamic
   ContainerDb(postgres, "Postgres", "RLS", "source_binding, source_document, job, index.chunk")
   ContainerDb(lmdb, "Per-binding LMDB", "cocoindex", "Memo and target state")
 
-  Rel(admin, trpc, "1. Uploads the file with its binding fields", "FormData or octet stream")
-  Rel(trpc, sources, "2. Calls bind with the Principal and a Tx")
+  Rel(admin, trpc, "1. Uploads the file, its binding descriptor in headers", "application/octet-stream")
+  Rel(trpc, sources, "2. Calls bind with the Principal and its doors, no transaction open")
   Rel(sources, objects, "3. Streams the document to the object door under the workspace prefix", "S3")
   Rel(sources, postgres, "4. Writes source_binding and source_document, Restricted by default, audience everyone, unpublished")
   Rel(sources, runs, "5. In the bind transaction: the ledger row and the index job with subject_id the binding, reason bound")

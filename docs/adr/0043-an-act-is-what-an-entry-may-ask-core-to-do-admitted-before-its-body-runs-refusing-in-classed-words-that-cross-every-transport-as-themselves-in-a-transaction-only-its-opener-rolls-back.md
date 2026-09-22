@@ -145,3 +145,55 @@ There are three — `keepInText`, `narrowDocuments` and `reprocessBinding`; `bin
 throws already. `narrowBinding` calls no `enqueueJobIn`: its one answer after its writes is the
 cascade's `Error`, which the door's rollback covers. Read *four acts* and *the four tails* above
 as these three. T-232 and the S1 spec say the same; nothing else in the decision moves.
+
+## Amendment — 2026-09-22, the spike's findings: the constructor is dropped, and the upload streams over tRPC as an octet-stream mutation (T-230)
+
+The five probes ran on the branch `t-230-spike`, never merged; the code is the evidence and the
+ticket holds the readings. Two probes killed, and each kill is decided here.
+
+**Probe 1 — the door.** With `resolveScoped` rolling back when its work answers a `Result` that is
+not ok, the whole of core's suite changed in one case: the erasure request refused for a clock
+started before it arrived, which threw *did not commit* and now answers its refusal with no row
+landed. No act rightly answers a refusal and keeps its rows. The rollback stays in the door;
+T-232 stands as written.
+
+**Probe 2 — the upload.** The connection half passed: one connection per request — the Principal
+resolved and released before the input parser runs, then the act's own transaction — none held
+while the body is read, and ten concurrent uploads on a pool of ten peaked at ten with nothing
+asked while the pool was at its ceiling. The streaming half killed **for multipart only**: tRPC
+11.18's multipart handler is `await req.formData()`, so the procedure saw the input at 403 ms of a
+body whose last chunk arrived at 402 ms. Its octet-stream handler hands `req.body` through as a
+stream, and `octetInputParser` put the first byte inside `putObject` at 3 ms of a 400 ms body.
+The kill above was conditioned on tRPC not streaming; it streams. So **the upload is a tRPC
+mutation over `application/octet-stream`**, `octetInputParser` on the own-transaction road, and
+`FormData` is withdrawn as an admissible shape. The binding's descriptor travels beside the bytes
+— headers the link sets from `op.context`, gathered once in the procedure and handed to the kernel
+`parse` — which is this record's own sentence, *an upload's bytes travel beside the parsed fields*.
+The descriptor sits outside `AppRouter`'s inference, so the web keeps one typed wrapper and the api
+harness holds one case a renamed field fails; a custom link that carries the descriptor inside the
+typed input is the shape for a second octet-stream mutation, none being on the route
+(`[DESIGN3]`). ADR 0006 gains no exception; its 2026-09-22 amendment says what its rule is for. A
+plain Hono route was weighed and refused: Hono's own multipart buffers through the same
+`formData()`, and a raw body beside a plain route carries the same descriptor with nothing
+compiler-checked.
+
+**Probe 3 — the crossing.** The error formatter carries `{ word, class }` under `data.refusal`;
+the web infers the word union and the class from `AppRouter` alone and the api-seam fence stays
+green. T-235 stands as written.
+
+**Probe 4 — the constructor.** A constructed act with a named body infers its types — the spike's
+type-equality test holds the constructed `narrowBinding` to the hand-written signature and refusal
+union with a negative control — but the code index answers a **lower bound**: on one index, one
+commit and one router file, the hand-written `readMembership` answers impacted 5, direct 1, the
+router at depth 1; the constructed `narrowBinding`, called from the same router, answers impacted
+0, direct 0, risk *unknown*, kind `Const`, its named body no symbol at all. A gate that gates every
+edit here cannot be allowed to answer a lower bound for every act. **The constructor is dropped**,
+as this record said it could be. Read *The shape, and when it is built* as the fallback its
+*Considered options* names: a declaration beside the function, the act's types derived from it,
+and a lint rule that a face function admits before its first `await`, with its `[CHECK1]` test.
+The vocabulary, the crossing, the roads and the composition root stand. T-237 lands the fallback.
+
+**Probe 5 — the suite lines.** Zero. The constructed acts kept their call shape, and no line of the
+sources suites moved.
+
+Nothing else in the decision moves.

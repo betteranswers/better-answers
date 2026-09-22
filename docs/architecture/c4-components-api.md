@@ -19,7 +19,7 @@ C4Component
     Component(health, "/health", "Hono route", "Database reachable and the authorization server initialised, or 503; Docker holds the worker on it")
     Component(auth, "auth/", "Better Auth in-process", "The identity provider and authorization server: email code, the organisation plugin as the workspace, /oauth2/*, discovery, /jwks, the consent page, CIMD fetch; Microsoft at P1")
     Component(mcp, "mcp/surface.ts and entries/", "MCP SDK v2 behind one fetch-shaped seam", "The token verifier over the JWKS, then four entries: find, ask, open, give_feedback; structured content with a human rendering")
-    Component(trpc, "trpc/", "tRPC on Hono", "app-router, mount, base with workspaceProcedure; the SPA's transport, event streams for answers, splitLink for uploads at S1")
+    Component(trpc, "trpc/", "tRPC on Hono", "app-router, mount, base with workspaceProcedure; the SPA's transport, event streams for answers, splitLink for the octet-stream upload at S1")
     Component(spa, "ingress/spa.ts", "static files", "The SPA's hashed bundles and the shell on app., answered after every route this process owns and after Better Auth declines")
     Component(ops, "ops/", "runOps", "pnpm ops: replay-erasures, smoke, dump-grep, graph-rebuild, graph-counts, graph-sweep, reconcile-watermark; answers done, refused, usage or not built")
     Component(reconciler, "reconciler.ts", "setInterval, 30 s", "Every workspace's head against its watermark; replays missed commits through the live handler; reports a stop, never skips")
