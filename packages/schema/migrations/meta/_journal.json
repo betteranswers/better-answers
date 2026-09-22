@@ -302,6 +302,13 @@
       "when": 1789951291377,
       "tag": "0042_the-reading-refresh",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1790109250308,
+      "tag": "0043_the-worker-denied-by-default",
+      "breakpoints": true
     }
   ]
 }

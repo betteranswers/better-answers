@@ -12,6 +12,7 @@
   "scripts": {
     "generate": "node scripts/generate-migrations.ts",
     "generate:worker-view": "node scripts/generate-worker-schema.ts",
+    "generate:roles-surface": "node scripts/generate-roles-surface.ts",
     "lint": "oxlint --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
     "check": "node ../../scripts/check.mjs lint typecheck test",
