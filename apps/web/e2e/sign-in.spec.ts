@@ -29,7 +29,7 @@ test("a member of one workspace lands in the shell, which names the workspace, t
   await page.goto("/sign-in");
   await signIn(page, request, email);
 
-  await expect(page).toHaveURL(/\/system$/);
+  await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
   await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
   const you = page.getByRole("region", { name: "You" });
   await expect(you.getByText(workspace.name)).toBeVisible();
@@ -61,7 +61,7 @@ test("a member of two workspaces picks one, and everything after is scoped to th
   await expect(page.getByRole("link", { name: /create/i })).toHaveCount(0);
   await page.getByRole("button", { name: second.name }).click();
 
-  await expect(page).toHaveURL(/\/system$/);
+  await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
   const you = page.getByRole("region", { name: "You" });
   await expect(you.getByText(second.name)).toBeVisible();
   await expect(you.getByText("Viewer", { exact: false })).toBeVisible();
@@ -137,7 +137,7 @@ test("a member of one workspace whose session predates the membership is still n
   await addMember(request, { workspaceId: workspace.workspaceId, userId: who.id, role: "Editor" });
   await page.goto("/choose-workspace");
 
-  await expect(page).toHaveURL(/\/system$/);
+  await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
   const you = page.getByRole("region", { name: "You" });
   await expect(you.getByText(workspace.name)).toBeVisible();
   await expect(you.getByText("Editor", { exact: false })).toBeVisible();

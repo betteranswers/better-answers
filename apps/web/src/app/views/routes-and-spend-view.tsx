@@ -3,7 +3,7 @@ import { screenById } from "@/shared/screens.ts";
 
 const system = screenById("system");
 
-export function SystemScreen() {
+export function RoutesAndSpendView() {
   return (
     <>
       <h1>{system.name}</h1>

@@ -12,14 +12,17 @@ import type { ReactElement } from "react";
 import { ChooseWorkspaceScreen } from "@/features/auth/choose-workspace-screen.tsx";
 import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
 import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
-import { SCREENS, type Screen, type ScreenId } from "@/shared/screens.ts";
+import { SCREENS, viewsOf, type Screen, type View } from "@/shared/screens.ts";
 import { FailedScreen } from "./failed-screen.tsx";
 import { Frame } from "./frame.tsx";
-import { SystemScreen } from "./screens/system-screen.tsx";
-import { UnbuiltScreen } from "./screens/unbuilt-screen.tsx";
 import { UnknownScreen } from "./unknown-screen.tsx";
+import { RoutesAndSpendView } from "./views/routes-and-spend-view.tsx";
+import { UnbuiltView } from "./views/unbuilt-view.tsx";
 
-const BUILT_SCREENS = new Map<ScreenId, () => ReactElement>([["system", SystemScreen]]);
+// The list decides which views are built; this map only says by what.
+const BUILT_VIEWS = new Map<View["path"], () => ReactElement>([
+  ["/system/routes-and-spend", RoutesAndSpendView],
+]);
 
 const rootRoute = createRootRoute({
   component: Outlet,
@@ -59,15 +62,35 @@ const indexRoute = createRoute({
   },
 });
 
-const componentFor = (screen: Screen): (() => ReactElement) =>
-  BUILT_SCREENS.get(screen.id) ?? (() => <UnbuiltScreen screen={screen} />);
+const componentFor = (screen: Screen, view: View): (() => ReactElement) => {
+  const built = BUILT_VIEWS.get(view.path);
+  if (view.built && built === undefined) {
+    throw new Error(`the list calls ${view.path} built, and nothing draws it`);
+  }
+  if (!view.built && built !== undefined) {
+    throw new Error(`the list calls ${view.path} unbuilt, and something draws it`);
+  }
+  return built ?? (() => <UnbuiltView screen={screen} view={view} />);
+};
 
 const screenRoutes: AnyRoute[] = SCREENS.map((screen) =>
   createRoute({
     getParentRoute: () => shellRoute,
     path: screen.path,
-    component: componentFor(screen),
+    beforeLoad: () => {
+      throw redirect({ href: screen.defaultView, replace: true });
+    },
   }),
+);
+
+const viewRoutes: AnyRoute[] = SCREENS.flatMap((screen) =>
+  viewsOf(screen).map((view) =>
+    createRoute({
+      getParentRoute: () => shellRoute,
+      path: view.path,
+      component: componentFor(screen, view),
+    }),
+  ),
 );
 
 export const createAppRouter = (history?: RouterHistory) => {
@@ -76,7 +99,7 @@ export const createAppRouter = (history?: RouterHistory) => {
       signInRoute,
       chooseWorkspaceRoute,
       noWorkspaceRoute,
-      shellRoute.addChildren([indexRoute, ...screenRoutes]),
+      shellRoute.addChildren([indexRoute, ...screenRoutes, ...viewRoutes]),
     ]),
 
     defaultErrorComponent: FailedScreen,
