@@ -1,6 +1,4 @@
-import path from "node:path";
-
-import { readOxlintConfig, repositoryRoot } from "@better-answers/devtools/oxlint-config";
+import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
@@ -9,17 +7,7 @@ import type { Tree } from "@better-answers/devtools/throwaway-tree";
 const RULE = "better-answers/act-admits-before-await";
 const FILE = "act.ts";
 
-const specifier = (): string => {
-  const plugin = readOxlintConfig().jsPlugins.find((one) => one.name === "better-answers");
-  if (plugin === undefined)
-    throw new Error(".oxlintrc.json no longer loads the better-answers plugin.");
-  return path.join(repositoryRoot, plugin.specifier);
-};
-
-const CONFIG = JSON.stringify({
-  jsPlugins: [{ name: "better-answers", specifier: specifier() }],
-  rules: { [RULE]: "error" },
-});
+const CONFIG = pluginConfigFor({ [RULE]: "error" });
 
 // Spelled in two halves, so the tag scan does not read this assertion as a citation.
 const tag = (family: string, number: string): string => `[${family}${number}]`;
@@ -76,7 +64,7 @@ describe("the rule that a declared act admits before it awaits", () => {
   it("leaves a step alone: it takes the principal its act admitted and declares nothing", () => {
     const step = {
       "step.ts": `export const enqueueJobIn = async (principal, tx, input) => {
-  const landed = await tx.query("INSERT INTO job VALUES ($1)", [input.workspaceId]);
+  const landed = await tx.query("SELECT 1 FROM job WHERE workspace_id = $1", [input.workspaceId]);
   return landed;
 };
 `,
@@ -85,7 +73,7 @@ describe("the rule that a declared act admits before it awaits", () => {
     expect(lint.flagged(step)).toEqual([]);
   });
 
-  it("reads each function on its own, so an inner callback's await is not the act's", () => {
+  it("reads each function on its own: the inner callback that awaits before admitting fires", () => {
     const nested = `export const reprocess = async (principal, tx, input) => {
   const admitted = admit(reprocessAct, principal, input);
   if (!admitted.ok) return admitted;

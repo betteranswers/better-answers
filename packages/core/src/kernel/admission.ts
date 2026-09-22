@@ -10,25 +10,23 @@ export type Effect = "read" | "write";
 
 export const EVERY_PURPOSE = "every";
 
-export const NO_PERSON = "nobody";
-
 export type Admits = {
-  readonly role: Role | typeof NO_PERSON;
+  readonly role: Role;
 
   readonly purposes: readonly string[] | typeof EVERY_PURPOSE;
 };
 
+// The resolver's own words reach a caller from the door, never from here.
 export type AdmissionRefusal = KernelRefusalOfClass<"forbidden" | "unauthenticated">;
 
-// No row is read here, so nothing a credential could have done since sign-in can be known.
 const ADMISSION_REFUSED = "role-forbids" satisfies AdmissionRefusal;
 
 type AdmissionRefused = typeof ADMISSION_REFUSED;
 
-export const reaches = (held: Role, named: Role): boolean =>
-  ROLES.indexOf(held) <= ROLES.indexOf(named);
+const reaches = (held: Role, named: Role): boolean => ROLES.indexOf(held) <= ROLES.indexOf(named);
 
-export type Reaching<
+// `ROLES` runs from the highest down, so a named role is reached by itself and everything above.
+type Reaching<
   Named extends Role,
   Rest extends readonly Role[] = typeof ROLES,
 > = Rest extends readonly [infer Head extends Role, ...infer Tail extends readonly Role[]]
@@ -37,8 +35,8 @@ export type Reaching<
     : Head | Reaching<Named, Tail>
   : never;
 
-export type Admitted<A extends Admits> =
-  | (A["role"] extends Role ? UserPrincipal & { readonly role: Reaching<A["role"]> } : never)
+type Admitted<A extends Admits> =
+  | (UserPrincipal & { readonly role: Reaching<A["role"]> })
   | (A["purposes"] extends readonly [] ? never : PlatformPrincipal);
 
 export type ActDeclaration<
@@ -68,17 +66,7 @@ type AdmitsOf<D extends ActDeclaration> = [Extract<D["admits"], ReadsAdmits>] ex
 
 export type AdmittedOf<D extends ActDeclaration> = Admitted<AdmitsOf<D>>;
 
-// The words are fenced as registered by the slice's own refusal type; what a declaration
-// cannot state twice, or leave out, is held here.
-const declarationRefusal = (refuses: readonly string[]): string | undefined => {
-  for (const word of refuses) {
-    if (refuses.indexOf(word) !== refuses.lastIndexOf(word)) return `${word} is listed twice`;
-  }
-  return refuses.includes(ADMISSION_REFUSED)
-    ? undefined
-    : `an act that admits may refuse, so ${ADMISSION_REFUSED} belongs in its words`;
-};
-
+// A word stated twice counts once in the union it builds, so the count is checked here.
 export const declareAct = <
   Schema extends z.ZodType,
   const A extends Admits,
@@ -87,17 +75,15 @@ export const declareAct = <
 >(
   declaration: ActDeclaration<Schema, A, Word, E>,
 ): ActDeclaration<Schema, A, Word, E> => {
-  const refusal = declarationRefusal(declaration.refuses);
-  if (refusal !== undefined) throw new Error(`admission: ${refusal}`);
+  const { refuses } = declaration;
+  const twice = refuses.find((word) => refuses.indexOf(word) !== refuses.lastIndexOf(word));
+  if (twice !== undefined) throw new Error(`admission: ${twice} is listed twice`);
   return declaration;
 };
 
 const admitsPurpose = (admits: Admits, principal: PlatformPrincipal): boolean =>
   admits.purposes === EVERY_PURPOSE ||
   admits.purposes.includes(principal.actorId.slice(PROCESS_PREFIX.length));
-
-const admitsRole = (admits: Admits, principal: UserPrincipal): boolean =>
-  admits.role !== NO_PERSON && reaches(principal.role, admits.role);
 
 export const admit = <D extends ActDeclaration>(
   declaration: D,
@@ -109,7 +95,7 @@ export const admit = <D extends ActDeclaration>(
   const opens =
     principal.kind === "platform"
       ? admitsPurpose(wanted, principal)
-      : admitsRole(wanted, principal);
+      : reaches(principal.role, wanted.role);
 
   // SAFETY: the two branches above are the runtime reading of the conditional `Admitted` type.
   return opens ? ok(principal as AdmittedOf<D>) : err(ADMISSION_REFUSED);

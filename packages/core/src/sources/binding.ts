@@ -36,7 +36,7 @@ import {
   type PostgresDoor,
   type Tx,
 } from "../store/postgres/index.ts";
-import { adminOnBinding, bindingNamed, BINDING_ID } from "./admin-binding.ts";
+import { adminOnBinding, bindingNamed, BINDING_ID, type ActingOnBinding } from "./admin-binding.ts";
 import { dpiaInputFor, REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastRun } from "./findings.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
@@ -407,7 +407,7 @@ export const reprocessBinding = async (
   const admin = admitted.value;
   const { workspaceId } = admin;
   const { bindingId } = input;
-  const acting = { admin, workspaceId, bindingId };
+  const acting: ActingOnBinding = { admin, workspaceId, bindingId };
 
   const standing = await bindingNamed(acting, tx, { columns: "1", lock: "for-update" });
   if (!standing.ok) return err(standing.error);

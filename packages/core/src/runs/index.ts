@@ -169,7 +169,7 @@ export const enqueueJobIn = async (
   const descriptor = descriptorOf(input.kind);
   if (descriptor === undefined) return err("malformed");
 
-  // Reached on its own by five acts, so this step keeps the face's gate rather than assume one.
+  // Both ways into the enqueue pass here, so the gate stands where the door has not yet opened.
   const admitted = admit(enqueueJobAct, principal, input);
   if (!admitted.ok) return err(admitted.error);
   if (principal.kind !== "platform" && input.workspaceId !== principal.workspaceId) {
@@ -209,13 +209,8 @@ export const enqueueJob = async (
   principal: Principal,
   door: PostgresDoor,
   input: EnqueueJobInput,
-): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal | PrincipalRefusal | Error>> => {
-  const admitted = admit(enqueueJobAct, principal, input);
-  if (!admitted.ok) return err(admitted.error);
-  return inWorkspace(principal, door, input.workspaceId, (tx) =>
-    enqueueJobIn(principal, tx, input),
-  );
-};
+): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal | PrincipalRefusal | Error>> =>
+  inWorkspace(principal, door, input.workspaceId, (tx) => enqueueJobIn(principal, tx, input));
 
 export const jobById = async (
   principal: Principal,

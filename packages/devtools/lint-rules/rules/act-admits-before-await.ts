@@ -24,10 +24,11 @@ export const actAdmitsBeforeAwaitRule = defineRule({
   meta: {
     type: "problem",
     docs: {
-      description: "A declared act runs its admission before it awaits anything.",
+      description:
+        "A function that admits does so before it awaits, and a declared act is admitted by one.",
     },
     messages: {
-      late: "This act awaits before it admits: run `admit` first, so nothing is opened, read or written for a principal the act was never going to serve ([SEC5]).",
+      late: "This function awaits before it admits: run `admit` first, so nothing is opened, read or written for a principal the act was never going to serve ([SEC5]).",
       unadmitted:
         "`{{name}}` declares what an act admits and no function here passes it to `admit`, so the declaration states a gate nothing runs ([SEC5]).",
     },

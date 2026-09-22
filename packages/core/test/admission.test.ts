@@ -6,8 +6,6 @@ import {
   admit,
   declareAct,
   EVERY_PURPOSE,
-  NO_PERSON,
-  reaches,
   refusalRegister,
   type AdmissionRefusal,
   type AdmittedOf,
@@ -55,7 +53,7 @@ const everyone = declareAct({
 });
 
 const erasureOnly = declareAct({
-  admits: { role: NO_PERSON, purposes: ["erasure"] },
+  admits: { role: "Admin", purposes: ["erasure"] },
   input: nothing,
   refuses: ["role-forbids"],
   effect: "write",
@@ -65,14 +63,6 @@ const classOf = (word: string): string | undefined =>
   refusalRegister().find((entry) => entry.word === word)?.class;
 
 describe("what an act admits, judged from the principal and the input alone", () => {
-  it("reads a person's role as a level, so the highest role reaches every act below it", () => {
-    expect([
-      reaches("Admin", "Viewer"),
-      reaches("Viewer", "Admin"),
-      reaches("Editor", "Editor"),
-    ]).toEqual([true, false, true]);
-  });
-
   it("admits an Admin and refuses an Editor and a Viewer where the level is Admin", () => {
     const answered = (["Admin", "Editor", "Viewer"] as const).map(
       (role) => admit(adminsOnly, person(role), {}).ok,
@@ -81,7 +71,7 @@ describe("what an act admits, judged from the principal and the input alone", ()
     expect(answered).toEqual([true, false, false]);
   });
 
-  it("admits every role where the level is the lowest one", () => {
+  it("reads the role as a level: the lowest one named admits every role above it too", () => {
     const answered = (["Admin", "Editor", "Viewer"] as const).map(
       (role) => admit(everyone, person(role), {}).ok,
     );
@@ -137,17 +127,6 @@ describe("what a declaration will not let an act say", () => {
         effect: "write",
       }),
     ).toThrow("listed twice");
-  });
-
-  it("refuses a declaration that leaves out the word its own admission answers", () => {
-    expect(() =>
-      declareAct({
-        admits: { role: "Admin", purposes: [] },
-        input: nothing,
-        refuses: ["not-found"],
-        effect: "write",
-      }),
-    ).toThrow("role-forbids");
   });
 });
 

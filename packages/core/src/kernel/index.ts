@@ -6,18 +6,8 @@ export { declareRefusals, REFUSAL_CLASSES, refusalRegister } from "./refusal.ts"
 export type { RefusalClass, RegisteredRefusal } from "./refusal.ts";
 export { KERNEL_REFUSALS, MALFORMED, NOT_FOUND } from "./vocabulary.ts";
 export type { KernelRefusal, KernelRefusalOfClass, RefusalWordFor } from "./vocabulary.ts";
-export { admit, declareAct, EVERY_PURPOSE, NO_PERSON, reaches } from "./admission.ts";
-export type {
-  ActDeclaration,
-  AdmissionRefusal,
-  Admits,
-  Admitted,
-  AdmittedOf,
-  Effect,
-  InputOf,
-  Reaching,
-  RefusalOf,
-} from "./admission.ts";
+export { admit, declareAct, EVERY_PURPOSE } from "./admission.ts";
+export type { AdmissionRefusal, AdmittedOf, InputOf, RefusalOf } from "./admission.ts";
 export { ISSUE_WORDS, parse, ROOT_PATH } from "./parse.ts";
 export type { FieldIssues, IssueWord, Malformed } from "./parse.ts";
 export { isPortablePath } from "./portable-path.ts";

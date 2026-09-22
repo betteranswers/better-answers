@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { executableOf, oxlintOver, writeUnder } from "@better-answers/devtools/throwaway-tree";
-import { readOxlintConfig, repositoryRoot } from "@better-answers/devtools/oxlint-config";
+import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { describe, expect, it } from "vitest";
 
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
@@ -14,17 +14,7 @@ const FILE = "probe.ts";
 
 const OXLINT = { package: "oxlint", path: ["bin", "oxlint"] } as const;
 
-const specifier = (): string => {
-  const plugin = readOxlintConfig().jsPlugins.find((one) => one.name === "better-answers");
-  if (plugin === undefined)
-    throw new Error(".oxlintrc.json no longer loads the better-answers plugin.");
-  return path.join(repositoryRoot, plugin.specifier);
-};
-
-const CONFIG = JSON.stringify({
-  jsPlugins: [{ name: "better-answers", specifier: specifier() }],
-  rules: { [RULE]: "error" },
-});
+const CONFIG = pluginConfigFor({ [RULE]: "error" });
 
 const holding = (comment: string): Tree => ({ [FILE]: `${comment}export const keep = 1;\n` });
 
