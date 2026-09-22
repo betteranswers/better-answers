@@ -1,0 +1,27 @@
+packages/core/src/audit/index.ts
+  s_2dd75a86f22d42::t_568a8c9c028859 15,21,29,48,95,136,142
+packages/core/src/audit/vocabulary.ts
+  s_2dd75a86f22d42::t_568a8c9c028859 73,81,115-118
+packages/core/src/members/requests.ts
+  s_2dd75a86f22d42::t_568a8c9c028859 9,147
+packages/core/test/access-requests.test.ts
+  s_2dd75a86f22d42::t_568a8c9c028859 614
+packages/core/src/concepts/inbox.ts
+  s_2dd75a86f22d42::t_568a8c9c028859 13,246
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e4c92406d16268f3bc6feb22818ad2c24242b462",
+  "prompts": {},
+  "sessions": {
+    "s_2dd75a86f22d42": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1deab29c-2105-473f-9514-e52636269c8a",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
