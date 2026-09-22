@@ -39,6 +39,7 @@ Read before proposing any key, writing convention or feature that touches a conc
 - **Two knowledge layers on OKF.** The bundle (concepts, graph-*shaped* through its links) and the graph built on top (queryable, traversable, reasoned over). Everything the spec leaves open is met in the graph and in records — never with keys in the file. The spec's silence on supersession is a boundary, not a gap.
 - **Simplicity is the reason OKF is here.** If a planned feature or piece of infrastructure needs a concept file to carry more than the spec plus `iri` and `locator`, the approach is probably over-complicated; re-evaluate before proceeding.
 - **The file is written for a company with no platform** and to the spec.
+- **The bundle-alone test.** A key, a value or a writing convention goes into a concept file only if a company with no platform and no guides would still want it there. Evidence, trust, lifecycle, identity, the company's own language and its links pass; anything that exists so a guide, a section, an audience or a screen can find or phrase a concept fails, and is a platform record instead. Every new key on a concept file is argued against this test in the decision record that admits it, before the key; and every extraction or enrichment prompt is written for the file, never for the surface that will read it. Nothing can check it — the test is a judgement about a company that does not exist — which is why it is applied where a key is argued for rather than where one is written.
 
 ## Assumed but not in the spec
 

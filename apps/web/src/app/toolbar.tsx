@@ -1,24 +1,13 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs.tsx";
-
-export type ViewTab = { readonly id: string; readonly name: string };
-
-export type ViewToolbar = {
-  readonly tabs?: readonly ViewTab[] | undefined;
-  // A route's static data is built once, so an act carries its own behaviour rather than
-  // reaching for the view's own state.
-  readonly acts?: ReactNode | undefined;
-};
-
-// An empty bar above a view's content is the defect this guards.
-export const isFilled = (toolbar: ViewToolbar | undefined): toolbar is ViewToolbar =>
-  (toolbar?.tabs ?? []).length > 0 || toolbar?.acts !== undefined;
-
-const OpenTab = createContext<string | undefined>(undefined);
-
-// A view sits under the outlet, where the shell cannot hand it a prop.
-export const useOpenTab = (): string | undefined => useContext(OpenTab);
+import {
+  OpenTabProvider,
+  useOpenTab,
+  ViewStateSlot,
+  type ViewTab,
+  type ViewToolbar,
+} from "@/shared/view-toolbar.tsx";
 
 export function ViewTabsRoot(properties: {
   readonly tabs: readonly ViewTab[] | undefined;
@@ -31,7 +20,11 @@ export function ViewTabsRoot(properties: {
   // pick opens on its first tab.
   const openTab = tabs.find((tab) => tab.id === picked)?.id ?? tabs[0]?.id;
 
-  if (openTab === undefined) return <>{properties.children}</>;
+  // Inside the tabs root, so the slot spans the toolbar and the panel and both halves of a
+  // view see one value.
+  const spanned = <ViewStateSlot>{properties.children}</ViewStateSlot>;
+
+  if (openTab === undefined) return spanned;
 
   return (
     // Spanning the toolbar and the content leaves the whole pattern to the registry: its
@@ -42,7 +35,7 @@ export function ViewTabsRoot(properties: {
       // Out of the layout: the regions stay the content column's own children.
       className="contents"
     >
-      <OpenTab.Provider value={openTab}>{properties.children}</OpenTab.Provider>
+      <OpenTabProvider openTab={openTab}>{spanned}</OpenTabProvider>
     </Tabs>
   );
 }

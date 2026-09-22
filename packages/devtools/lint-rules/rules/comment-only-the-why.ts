@@ -10,7 +10,8 @@ const EXEMPT_OPENING =
 const CITATIONS: readonly { readonly what: string; readonly pattern: RegExp }[] = [
   { what: "a ticket id", pattern: /\bT-\d+\b/ },
   { what: "an ADR number", pattern: /\bADR[ -]?\d+\b/i },
-  { what: "a rule tag", pattern: /\[[A-Z]{2,}\d+\]/ },
+  // A family may carry a digit, so the letters around it are what the shape is read by.
+  { what: "a rule tag", pattern: /\[[A-Z][A-Z0-9]*[A-Z][0-9]+\]/ },
   { what: "a date", pattern: /\b\d{4}-\d{2}-\d{2}\b/ },
   { what: "a date", pattern: /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/ },
 ];

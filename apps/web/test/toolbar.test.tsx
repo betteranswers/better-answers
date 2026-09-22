@@ -1,7 +1,9 @@
+import { CatchBoundary } from "@tanstack/react-router";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Toolbar, ViewPanel, ViewTabsRoot, type ViewToolbar } from "@/app/toolbar.tsx";
+import { Toolbar, ViewPanel, ViewTabsRoot } from "@/app/toolbar.tsx";
+import { viewStateOf, type ViewToolbar } from "@/shared/view-toolbar.tsx";
 
 import { openApp } from "./open-app.tsx";
 
@@ -36,6 +38,81 @@ const ANOTHER_TABBED_VIEW: ViewToolbar = {
     { id: "ceiling-limits", name: "Limits" },
   ],
 };
+
+// One helper of the feature's own, called by its content and by its acts: the shared slot
+// never learns the type.
+const useTickedGroups = viewStateOf<number>("/bindings/review");
+
+const useAnotherViewsTickedGroups = viewStateOf<number>("/bindings/all");
+
+function NarrowAct() {
+  const [ticked] = useTickedGroups();
+
+  // Inert on an empty slot, which is the act's own property and what makes a thrown view safe.
+  return (
+    <button type="button" disabled={ticked === undefined}>
+      {ticked === undefined ? "Narrow these documents" : `Narrow ${ticked} documents`}
+    </button>
+  );
+}
+
+function AnotherViewsAct() {
+  const [ticked] = useAnotherViewsTickedGroups();
+
+  return (
+    <button type="button" disabled={ticked === undefined}>
+      Narrow another view's documents
+    </button>
+  );
+}
+
+function ReviewView(properties: { readonly throwsOnATick: boolean }) {
+  const [ticked, tick] = useTickedGroups();
+  if (properties.throwsOnATick && ticked !== undefined) throw new Error("the view's own bug");
+
+  return (
+    <button type="button" onClick={() => tick(2)}>
+      Tick two groups
+    </button>
+  );
+}
+
+const A_REVIEW_VIEW: ViewToolbar = {
+  tabs: [
+    { id: "review-open", name: "Open" },
+    { id: "review-done", name: "Done" },
+  ],
+  // Built once, the way a route's static data is, and live on every render all the same.
+  acts: (
+    <>
+      <NarrowAct />
+      <AnotherViewsAct />
+    </>
+  ),
+};
+
+const drawReview = (throwsOnATick: boolean) =>
+  render(
+    <ViewTabsRoot tabs={A_REVIEW_VIEW.tabs}>
+      <Toolbar name="Review" toolbar={A_REVIEW_VIEW} />
+      <ViewPanel>
+        <CatchBoundary
+          getResetKey={() => "the panel's own subtree"}
+          errorComponent={() => <p>The view failed to draw.</p>}
+        >
+          <ReviewView throwsOnATick={throwsOnATick} />
+        </CatchBoundary>
+      </ViewPanel>
+    </ViewTabsRoot>,
+  );
+
+const narrowAct = () => screen.getByRole("button", { name: /^Narrow (these|\d)/ });
+
+const anotherViewsAct = () =>
+  screen.getByRole("button", { name: "Narrow another view's documents" });
+
+const reviewTab = (name: string) =>
+  fireEvent.mouseDown(screen.getByRole("tab", { name, selected: false }));
 
 describe("the toolbar the open view fills", () => {
   it("carries the open view's tabs in the view's own order, marking the open one selected", async () => {
@@ -114,5 +191,36 @@ describe("the toolbar the open view fills", () => {
 
     expect(screen.getByRole("button", { name: "Add a binding" })).toBeDefined();
     expect(screen.queryByRole("tablist")).toBeNull();
+  });
+});
+
+describe("the slot a view writes and its acts read", () => {
+  it("gives an act declared on the route what its own view wrote, and another view nothing", () => {
+    drawReview(false);
+
+    expect(narrowAct().textContent).toBe("Narrow these documents");
+    expect(narrowAct().hasAttribute("disabled")).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tick two groups" }));
+
+    expect(narrowAct().textContent).toBe("Narrow 2 documents");
+    expect(narrowAct().hasAttribute("disabled")).toBe(false);
+    expect(anotherViewsAct().hasAttribute("disabled")).toBe(true);
+  });
+
+  it("leaves an act over a view that threw inert, because the way back in empties the slot", () => {
+    drawReview(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tick two groups" }));
+
+    expect(screen.getByText("The view failed to draw.")).toBeDefined();
+    expect(screen.getByRole("tab", { selected: true }).textContent).toBe("Open");
+
+    reviewTab("Done");
+    reviewTab("Open");
+
+    expect(screen.getByRole("button", { name: "Tick two groups" })).toBeDefined();
+    expect(narrowAct().textContent).toBe("Narrow these documents");
+    expect(narrowAct().hasAttribute("disabled")).toBe(true);
   });
 });

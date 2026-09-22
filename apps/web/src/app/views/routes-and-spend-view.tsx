@@ -1,6 +1,6 @@
-import { useOpenTab, type ViewToolbar } from "@/app/toolbar.tsx";
 import { RoutesCard } from "@/features/routes/routes-card.tsx";
 import { screenById } from "@/shared/screens.ts";
+import { useOpenTab, type ViewToolbar } from "@/shared/view-toolbar.tsx";
 
 const system = screenById("system");
 

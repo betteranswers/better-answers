@@ -759,6 +759,9 @@ to it by IRI and never restates it (ADR 0014).
 - **toolbar** — the region above a view's content carrying that view's tabs at one end and its acts
   at the other, filled by the view; a view with neither gets no toolbar. _Avoid_: action bar,
   section header.
+- **view-state slot** — the one place the open view writes what the acts on its toolbar must read,
+  such as what a reader has ticked. It answers empty to any view but the one that wrote it, and it
+  is emptied when the reader opens another tab. _Avoid_: selection store, shared context.
 - **top bar** — the region across the top of Control Centre carrying the navigation control in its
   leading corner, then naming the workspace, then which screen and view the person is in, then who
   they are, their role and the way to sign out. _Avoid_: masthead, section header.

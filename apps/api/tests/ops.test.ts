@@ -1,12 +1,14 @@
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { serve } from "@hono/node-server";
 
 import { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 
+import { find, open, trustWords } from "@better-answers/core/answering";
 import { writeConcept, writeManifest } from "@better-answers/core/concepts";
 import {
   ERASURE,
@@ -15,14 +17,15 @@ import {
   type ErasureRehearsed,
 } from "@better-answers/core/erasure";
 import { systemClock, type UserPrincipal } from "@better-answers/core/kernel";
-import { head, initRepository } from "@better-answers/core/store/git";
+import { fileAtHead, head, initRepository } from "@better-answers/core/store/git";
 import { openObjects } from "@better-answers/core/store/objects";
-import { openPostgres, withPrincipal } from "@better-answers/core/store/postgres";
+import { openPostgres, withPrincipal, type Tx } from "@better-answers/core/store/postgres";
 import { objectStoreForSuite } from "@better-answers/core/testing/objects";
 import { testData } from "@better-answers/schema/testing";
 
 import { fetchHonouringHost } from "../src/ops/http-fetch.ts";
 import { NOT_BUILT, parseSince, runOps, type OpsIo } from "../src/ops/index.ts";
+import { readTreeUnder } from "../src/ops/read-tree.ts";
 import { APP_HOSTNAME, openTestGit, PUBLIC_URL, type TestApp } from "./harness.ts";
 import { servedApp } from "./suite-app.ts";
 
@@ -375,7 +378,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   describe("the slice-owned commands", () => {
-    it.each(["erasure-rehearsal", "object-store-orphans"])(
+    it.each(["erasure-rehearsal", "object-store-orphans", "import-bundle"])(
       "%s says `not built` — exit 3 — against a schema its slice's tables are absent from",
       async (command) => {
         const run = await opsBeforeTheJournal(app(), [
@@ -919,6 +922,453 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual(["id: absent"]);
+    });
+  });
+
+  describe("import-bundle — the company's bundle landed through the governed write", () => {
+    const BUNDLE_FIXTURE = fileURLToPath(new URL("fixtures/bundle", import.meta.url));
+    const BUNDLE_ID = "01J6CCCCCCCCCCCCCCCCCCCCCC";
+    const IMPORTED_AT = new Date("2026-09-22T10:00:00.000Z");
+    const MONA = "mona.reviewer@acme.invalid";
+    const THEO = "theo.approver@acme.invalid";
+    const IMPORTED_PATHS = [
+      "knowledge/company/answers/data-retention-period.md",
+      "knowledge/company/answers/support-hours.md",
+      "knowledge/product/answers/can-two-teams-share-one-account-advanced-plan.md",
+      "knowledge/product/answers/can-two-teams-share-one-account-standard-plan.md",
+      "knowledge/product/tiers/advanced-plan.md",
+      "knowledge/product/tiers/standard-plan.md",
+    ] as const;
+
+    // The fixture names its verifiers by a fixed address, so one person row serves every
+    // workspace the block provisions.
+    const verifierIds = new Map<string, string>();
+
+    const verifierOf = async (app: TestApp, email: string, name: string): Promise<string> => {
+      const known = verifierIds.get(email);
+      if (known !== undefined) return known;
+      const { id } = await app.person(email, name);
+      verifierIds.set(email, id);
+      return id;
+    };
+
+    const bundleWorkspace = async (app: TestApp) => {
+      const { workspaceId, admin } = await app.provision();
+      await initRepository(openTestGit(app), workspaceId);
+      const mona = await verifierOf(app, MONA, "Mona Reviewer");
+      const theo = await verifierOf(app, THEO, "Theo Approver");
+      await app.addMember(workspaceId, mona, "Editor");
+      await app.addMember(workspaceId, theo, "Editor");
+      return { workspaceId, admin, mona, theo };
+    };
+
+    const importing = (
+      app: TestApp,
+      workspaceId: string,
+      email: string,
+      more: readonly string[] = [],
+    ): Promise<Run> =>
+      opsWith(
+        app,
+        [
+          "import-bundle",
+          "--workspace",
+          workspaceId,
+          "--from",
+          BUNDLE_FIXTURE,
+          "--as",
+          email,
+          ...more,
+        ],
+        { readTree: readTreeUnder, clock: { now: () => IMPORTED_AT } },
+      );
+
+    const reading = async <T>(
+      app: TestApp,
+      workspaceId: string,
+      userId: string,
+      work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+    ): Promise<T> => {
+      const read = await withPrincipal(
+        openPostgres(app.database.pool),
+        { workspaceId, userId, issuedAt: new Date() },
+        work,
+      );
+      if (!read.ok) throw new Error(`the principal did not resolve: ${read.error}`);
+      return read.value;
+    };
+
+    const commitsOf = async (app: TestApp, workspaceId: string) => {
+      const found = await app.database.superuser.query<Record<string, unknown>>(
+        `SELECT c.sha, c.parent_sha, e.act
+           FROM bundle_commit c
+           JOIN audit_event e ON e.workspace_id = c.workspace_id AND e.id = c.audit_event_id
+          WHERE c.workspace_id = $1
+          ORDER BY c.committed_at, c.sha`,
+        [workspaceId],
+      );
+      return found.rows;
+    };
+
+    type IndexRow = {
+      readonly iri: string;
+      readonly path: string;
+      readonly kind: string;
+      readonly title: string;
+      readonly status: string;
+      readonly sensitivity: string;
+    };
+
+    const indexRowsOf = async (app: TestApp, workspaceId: string) => {
+      const found = await app.database.superuser.query<IndexRow>(
+        `SELECT iri, path, kind, title, status, sensitivity
+           FROM concept_index WHERE workspace_id = $1 ORDER BY path`,
+        [workspaceId],
+      );
+      return found.rows;
+    };
+
+    const iriOf = async (app: TestApp, workspaceId: string, path: string): Promise<string> => {
+      const row = (await indexRowsOf(app, workspaceId)).find((each) => each.path === path);
+      if (row === undefined) throw new Error(`no concept stands at ${path}`);
+      return row.iri;
+    };
+
+    const REWRITTEN_LINES = [
+      "import-bundle: rewrote knowledge/company/answers/support-hours.md — 1 link",
+      "import-bundle: rewrote knowledge/product/answers/can-two-teams-share-one-account-advanced-plan.md — 2 links",
+      "import-bundle: rewrote knowledge/product/answers/can-two-teams-share-one-account-standard-plan.md — 1 link",
+    ];
+
+    const checkRowsOf = async (app: TestApp, workspaceId: string) => {
+      const found = await app.database.superuser.query<Record<string, unknown>>(
+        `SELECT c.path, v.actor, v.checked_at, v.content_hash, v.origin
+           FROM concept_verification v
+           JOIN concept_index c ON c.workspace_id = v.workspace_id AND c.iri = v.iri
+          WHERE v.workspace_id = $1
+          ORDER BY c.path, v.checked_at`,
+        [workspaceId],
+      );
+      return found.rows;
+    };
+
+    const actsOf = async (app: TestApp, workspaceId: string) => {
+      const found = await app.database.superuser.query<{ act: string; events: number }>(
+        `SELECT act, count(*)::int AS events FROM audit_event
+          WHERE workspace_id = $1 AND act LIKE 'knowledge.%'
+          GROUP BY act ORDER BY act`,
+        [workspaceId],
+      );
+      return found.rows;
+    };
+
+    const filesAtHead = async (app: TestApp, workspaceId: string, userId: string) => {
+      const principal = await principalOf(app, workspaceId, userId);
+      const git = openTestGit(app);
+      const files = new Map<string, string | null>();
+      for (const file of ["knowledge/manifest.yaml", ...IMPORTED_PATHS]) {
+        files.set(file, await fileAtHead(principal, git, file));
+      }
+      return files;
+    };
+
+    it("lands the fixture bundle and says what it did, one line per concept in path order, then one per file whose links it rewrote", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(app());
+
+      const run = await importing(app(), workspaceId, admin.email);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual([
+        `import-bundle: manifest ${BUNDLE_ID} written as the bundle's first commit`,
+        ...IMPORTED_PATHS.map((file) => `import-bundle: landed ${file}`),
+        ...REWRITTEN_LINES,
+        "import-bundle: done — landed 6, skipped 0, 7 checks recorded (0 already present), 4 links rewritten, 0.0 seconds",
+      ]);
+    });
+
+    it("writes the manifest as the first commit and every concept as its own commit after it, the rows landed with kind, title, status and the class given", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(app());
+
+      await importing(app(), workspaceId, admin.email);
+
+      const commits = await commitsOf(app(), workspaceId);
+      expect(commits).toHaveLength(10);
+      expect(commits[0]).toEqual({
+        sha: expect.any(String),
+        parent_sha: null,
+        act: "knowledge.manifest.written",
+      });
+      expect(commits.slice(1).map((row) => [row["act"], row["parent_sha"]])).toEqual(
+        commits.slice(0, -1).map((row) => ["knowledge.concept.committed", row["sha"]]),
+      );
+      const rows = await indexRowsOf(app(), workspaceId);
+      expect(rows.map((row) => row.path)).toEqual(IMPORTED_PATHS);
+      expect(rows.map((row) => `${row.kind}: ${row.title}`)).toEqual([
+        "Answer: Data retention period",
+        "Answer: Support hours",
+        "Answer: Can two teams share one account? (Advanced plan)",
+        "Answer: Can two teams share one account? (Standard plan)",
+        "Tier: Advanced plan",
+        "Tier: Standard plan",
+      ]);
+      expect(new Set(rows.map((row) => `${row.status} ${row.sensitivity}`))).toEqual(
+        new Set(["stable Internal"]),
+      );
+    });
+
+    it("leaves the manifest in the platform's own form, every link an iri across domains and between split concepts, and no relative link or email in any concept file", async () => {
+      const { workspaceId, admin, mona } = await bundleWorkspace(app());
+
+      await importing(app(), workspaceId, admin.email);
+
+      const files = await filesAtHead(app(), workspaceId, admin.id);
+      expect(files.get("knowledge/manifest.yaml")).toBe(
+        [
+          `"id": "${BUNDLE_ID}"`,
+          '"origin": "company"',
+          '"ref": "Two answer libraries, reviewed 22 September 2026"',
+          '"owner": "Acme Software Ltd"',
+          '"content_version": "2026-09-22"',
+          "",
+        ].join("\n"),
+      );
+      for (const file of IMPORTED_PATHS) {
+        expect(files.get(file)).not.toContain("@");
+        expect(files.get(file)).not.toMatch(/\]\([^)]*\.md/);
+        expect(files.get(file)).toContain(`"by": "human:${mona}"`);
+      }
+      expect(files.get("knowledge/company/answers/support-hours.md")).toContain(
+        `[Advanced plan](${await iriOf(app(), workspaceId, "knowledge/product/tiers/advanced-plan.md")}) customers reach an engineer out of hours`,
+      );
+      expect(
+        files.get("knowledge/product/answers/can-two-teams-share-one-account-advanced-plan.md"),
+      ).toContain(
+        `The [Standard plan's answer](${await iriOf(app(), workspaceId, "knowledge/product/answers/can-two-teams-share-one-account-standard-plan.md")}) describes the looser default`,
+      );
+    });
+
+    it("open follows a rewritten link to the concept it names", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(app());
+      await importing(app(), workspaceId, admin.email);
+      const opening = (iri: string) =>
+        reading(app(), workspaceId, admin.id, (principal, tx) =>
+          open(principal, tx, { iri }, IMPORTED_AT),
+        );
+
+      const from = await opening(
+        await iriOf(app(), workspaceId, "knowledge/company/answers/support-hours.md"),
+      );
+      if (!from.ok || !from.value.found) throw new Error("the linking concept did not open");
+      const target = /\]\((https:\/\/[^)]+)\)/.exec(from.value.concept?.body ?? "")?.[1] ?? "";
+      const to = await opening(target);
+
+      if (!to.ok) throw new Error(`open refused: ${to.error.message}`);
+      if (!to.value.found) throw new Error(`nothing stands at ${target}`);
+      expect(to.value.concept?.frontmatter["title"]).toBe("Advanced plan");
+    });
+
+    it("records each verified event as an imported check with a null hash and one audit event, so find and open say Checked by the member's name · imported", async () => {
+      const { workspaceId, admin, mona, theo } = await bundleWorkspace(app());
+
+      await importing(app(), workspaceId, admin.email);
+
+      const checks = await checkRowsOf(app(), workspaceId);
+      expect(checks).toHaveLength(7);
+      expect(checks.slice(0, 3)).toEqual([
+        {
+          path: "knowledge/company/answers/data-retention-period.md",
+          actor: `human:${mona}`,
+          checked_at: new Date("2026-04-16T00:00:00.000Z"),
+          content_hash: null,
+          origin: "imported",
+        },
+        {
+          path: "knowledge/company/answers/data-retention-period.md",
+          actor: `human:${theo}`,
+          checked_at: new Date("2026-06-01T09:30:00.000Z"),
+          content_hash: null,
+          origin: "imported",
+        },
+        {
+          path: "knowledge/company/answers/support-hours.md",
+          actor: `human:${mona}`,
+          checked_at: new Date("2026-04-16T00:00:00.000Z"),
+          content_hash: null,
+          origin: "imported",
+        },
+      ]);
+      expect(await actsOf(app(), workspaceId)).toEqual([
+        { act: "knowledge.check.imported", events: 7 },
+        { act: "knowledge.concept.committed", events: 9 },
+        { act: "knowledge.manifest.written", events: 1 },
+      ]);
+
+      const found = await reading(app(), workspaceId, admin.id, (principal, tx) =>
+        find(principal, tx, { query: "retention", limit: 10 }, IMPORTED_AT),
+      );
+      if (!found.ok) throw new Error(`find refused: ${found.error.message}`);
+      const [hit, ...rest] = found.value.hits;
+      expect(rest).toEqual([]);
+      if (hit?.layer !== "bundles") throw new Error("the hit is not a concept");
+      expect({
+        kind: hit.kind,
+        title: hit.title,
+        tags: hit.tags,
+        words: trustWords(hit.trust),
+      }).toEqual({
+        kind: "Answer",
+        title: "Data retention period",
+        tags: ["company", "data-protection", "g-cloud-15"],
+        words: "Checked by Theo Approver · 1 June 2026 · imported",
+      });
+
+      const opened = await reading(app(), workspaceId, admin.id, (principal, tx) =>
+        open(principal, tx, { iri: hit.iri }, IMPORTED_AT),
+      );
+      if (!opened.ok) throw new Error(`open refused: ${opened.error.message}`);
+      if (!opened.value.found) throw new Error("the concept was not found");
+      expect(opened.value.concept?.trust).toEqual({
+        tier: "human-reviewed",
+        status: "current",
+        checkedBy: "Theo Approver",
+        checkedAt: "2026-06-01T09:30:00.000Z",
+        rider: "imported",
+      });
+      expect(opened.value.concept?.frontmatter["verified"]).toEqual([
+        { by: `human:${mona}`, at: "2026-04-16T00:00:00Z" },
+        { by: `human:${theo}`, at: "2026-06-01T09:30:00Z" },
+      ]);
+    });
+
+    it("skips every landed concept and every present check on a rerun, rewrites no link, and says so", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(app());
+      await importing(app(), workspaceId, admin.email);
+
+      const again = await importing(app(), workspaceId, admin.email);
+
+      expect(again.exitCode).toBe(0);
+      expect(again.lines).toEqual([
+        `import-bundle: manifest ${BUNDLE_ID} already stands`,
+        ...IMPORTED_PATHS.map((file) => `import-bundle: skipped ${file} — already landed`),
+        "import-bundle: done — landed 0, skipped 6, 0 checks recorded (7 already present), 0 links rewritten, 0.0 seconds",
+      ]);
+      expect(await commitsOf(app(), workspaceId)).toHaveLength(10);
+      expect(await checkRowsOf(app(), workspaceId)).toHaveLength(7);
+    });
+
+    it("is reconciled once landed: the watermark is the head and a replay finds nothing to do", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(app());
+      await importing(app(), workspaceId, admin.email);
+      const sha = await head(await principalOf(app(), workspaceId, admin.id), openTestGit(app()));
+
+      const run = await ops(app(), ["reconcile-watermark", "--workspace", workspaceId]);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual([
+        `reconcile-watermark: done — head ${sha}, watermark ${sha}, replayed 0, already landed 0`,
+      ]);
+    });
+
+    it("reports what a run would do on a dry run and writes nothing", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(app());
+
+      const run = await importing(app(), workspaceId, admin.email, ["--dry-run"]);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual([
+        `import-bundle: dry run — the tree is sound: 6 concepts, of which 6 would land and 0 already stand; 7 checks would be recorded (0 already present); 4 links in 3 concepts would be rewritten; manifest ${BUNDLE_ID} would be written first; nothing was written`,
+      ]);
+      expect(await commitsOf(app(), workspaceId)).toEqual([]);
+      expect(await indexRowsOf(app(), workspaceId)).toEqual([]);
+    });
+
+    it("lands the bundle at the class the flag names", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(app());
+
+      const run = await importing(app(), workspaceId, admin.email, ["--sensitivity", "Restricted"]);
+
+      expect(run.exitCode).toBe(0);
+      expect(
+        new Set((await indexRowsOf(app(), workspaceId)).map((row) => row.sensitivity)),
+      ).toEqual(new Set(["Restricted"]));
+    });
+
+    it("refuses a Viewer as the member it runs as, and writes nothing", async () => {
+      const { workspaceId } = await bundleWorkspace(app());
+      const viewer = await app().person();
+      await app().addMember(workspaceId, viewer.id, "Viewer");
+
+      const run = await importing(app(), workspaceId, viewer.email);
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        `import-bundle: REFUSED — ${viewer.email} is a Viewer of this workspace; the import runs as an Admin or an Editor`,
+      ]);
+      expect(await commitsOf(app(), workspaceId)).toEqual([]);
+    });
+
+    it("refuses an Editor asked to land the bundle Restricted, which only an Admin could read back, and writes nothing", async () => {
+      const { workspaceId } = await bundleWorkspace(app());
+
+      const run = await importing(app(), workspaceId, MONA, ["--sensitivity", "Restricted"]);
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        `import-bundle: REFUSED — ${MONA} is not an Admin of this workspace, and a bundle landed Restricted is one only an Admin can read back for its second pass; run the import as an Admin`,
+      ]);
+      expect(await commitsOf(app(), workspaceId)).toEqual([]);
+    });
+
+    it("refuses a member email nobody in the workspace has, telling the operator to invite them", async () => {
+      const { workspaceId } = await bundleWorkspace(app());
+
+      const run = await importing(app(), workspaceId, "nobody@acme.invalid");
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        `import-bundle: REFUSED — nobody@acme.invalid is not a member of workspace ${workspaceId}; invite them first`,
+      ]);
+    });
+
+    it("refuses a directory it cannot read, naming it", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(app());
+
+      const run = await opsWith(
+        app(),
+        [
+          "import-bundle",
+          "--workspace",
+          workspaceId,
+          "--from",
+          "/nowhere/bundle",
+          "--as",
+          admin.email,
+        ],
+        { readTree: readTreeUnder },
+      );
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines.join("\n")).toContain(
+        "import-bundle: REFUSED — the directory /nowhere/bundle could not be read:",
+      );
+    });
+
+    it.each([
+      ["no --from and no --as", []],
+      [
+        "a sensitivity that is not a class",
+        ["--from", "/tmp/bundle", "--as", "a@b.c", "--sensitivity", "Secret"],
+      ],
+      [
+        "a --dry-run carrying a value",
+        ["--from", "/tmp/bundle", "--as", "a@b.c", "--dry-run", "yes"],
+      ],
+    ])("answers usage to %s, before it reads anything", async (_shape, flags) => {
+      const { workspaceId } = await bundleWorkspace(app());
+
+      const run = await ops(app(), ["import-bundle", "--workspace", workspaceId, ...flags]);
+
+      expect(run.exitCode).toBe(2);
     });
   });
 });

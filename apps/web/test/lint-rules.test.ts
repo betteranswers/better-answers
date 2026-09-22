@@ -59,6 +59,15 @@ describe("the direction is app \u2192 features \u2192 shared and never back", ()
     ]);
   });
 
+  it("lets a view read the toolbar's state from shared and refuses it the shell's own module", () => {
+    const refused = flagged({
+      "apps/web/src/features/sources/review-toolbar.ts": probe("@/shared/view-toolbar.tsx"),
+      "apps/web/src/features/sources/reaches-the-shell.ts": probe("@/app/toolbar.tsx"),
+    });
+
+    expect(refused).toEqual(["apps/web/src/features/sources/reaches-the-shell.ts"]);
+  });
+
   it("refuses shared importing a feature or the app layer, and allows the app layer importing both", () => {
     const refused = flagged({
       "apps/web/src/shared/reaches-a-feature.ts": probe("@/features/routes/api.ts"),
