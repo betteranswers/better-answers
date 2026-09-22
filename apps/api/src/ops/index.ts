@@ -22,15 +22,29 @@ import {
 } from "@better-answers/core/erasure";
 import { attempt, err, ok, type Clock, type Result } from "@better-answers/core/kernel";
 import { enqueueJob, JOB_IS_OVER, jobById, type RebuildReason } from "@better-answers/core/runs";
-import { openGit, type GitDoor } from "@better-answers/core/store/git";
+import { initRepository, openGit, type GitDoor } from "@better-answers/core/store/git";
 import type { ObjectDoor } from "@better-answers/core/store/objects";
 import {
   openPostgres,
   tablesPresent,
   type PostgresDoor,
 } from "@better-answers/core/store/postgres";
-import { principalOfMember } from "@better-answers/core/workspaces";
-import { FULL_REBUILD_KIND, REBUILD_REASONS, SENSITIVITIES } from "@better-answers/schema";
+import {
+  addMember,
+  BOOTSTRAP,
+  personIdByEmail,
+  principalOfMember,
+  provisionWorkspace,
+  type AddMemberRefusal,
+  type ProvisionRefusal,
+} from "@better-answers/core/workspaces";
+import {
+  FULL_REBUILD_KIND,
+  REBUILD_REASONS,
+  ROLES,
+  SENSITIVITIES,
+  ulid,
+} from "@better-answers/schema";
 
 const DONE = 0;
 const REFUSED = 1;
@@ -120,6 +134,10 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   erasure-rehearsal --workspace <id> --synthetic --seed      phase one: the synthetic subject, its tokens on the last line
   erasure-rehearsal --workspace <id> --synthetic --run --report <file>   phase two: erase them, write the report, print the tokens again
   dump-grep --tokens <a,b,…>                                stdin: a plain-SQL dump; per token, which COPY section holds it and in how many lines — never a line
+  provision-workspace --name <name> --slug <slug> --admin <email>
+                                                            a client's workspace with its first Admin, a person who has signed in; the id it minted is first on the done line
+  add-member --workspace <id> --email <email> --role <${ROLES.join("|")}>
+                                                            a signed-in person made a member of the workspace; a repeat is refused and never changes a role
   import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <class>] [--dry-run]
                                                             the company's bundle landed through the governed write, its checks imported, its links rewritten to iris (ADR 0002, 0014)
     --sensitivity  one of ${SENSITIVITIES.join(" · ")} (default ${IMPORT_SENSITIVITY_DEFAULT})
@@ -356,7 +374,7 @@ export const reasonOf = (reason: string | Error): string =>
   typeof reason === "string" ? reason : reason.message;
 
 const refused = (
-  command: SliceCommand,
+  command: string,
   workspaceId: string,
   reason: string | Error,
   io: OpsIo,
@@ -708,6 +726,109 @@ const writeTheReport = async (
   }
 };
 
+const notSignedIn = (email: string): string =>
+  `no-such-user: ${email} has not signed in; have them sign in with an email code first, then run this again`;
+
+const provisionReason = (refusal: ProvisionRefusal | Error, slug: string): string => {
+  if (refusal instanceof Error) return refusal.message;
+  switch (refusal) {
+    case "slug-taken":
+      return `slug-taken: another workspace already holds the slug ${slug}`;
+    case "malformed":
+      return "malformed: the name and the slug must each carry at least one character";
+    default:
+      return refusal;
+  }
+};
+
+// The repository lives outside the Postgres transaction, so the root is checked before the act
+// and the repository made after it.
+const provisionWorkspaceCommand = async (pool: Pool, flags: Flags, io: OpsIo): Promise<number> => {
+  const name = flagValue(flags, "name");
+  const slug = flagValue(flags, "slug");
+  const email = flagValue(flags, "admin");
+  if (name === undefined || slug === undefined || email === undefined) {
+    io.say("provision-workspace: --name <name>, --slug <slug> and --admin <email> are required");
+    return USAGE;
+  }
+  const git = openBundleStore(io, "the workspace's bundle repository cannot be created");
+  if (!git.ok) {
+    io.say(`provision-workspace: REFUSED — ${git.error}`);
+    return REFUSED;
+  }
+  const postgres = openPostgres(pool);
+  const admin = await personIdByEmail(BOOTSTRAP, postgres, email);
+  if (!admin.ok) {
+    io.say(`provision-workspace: REFUSED — ${admin.error.message}`);
+    return REFUSED;
+  }
+  if (admin.value === undefined) {
+    io.say(`provision-workspace: REFUSED — ${notSignedIn(email)}`);
+    return REFUSED;
+  }
+  const id = ulid();
+  const provisioned = await provisionWorkspace(BOOTSTRAP, postgres, {
+    id,
+    name,
+    slug,
+    adminUserId: admin.value,
+  });
+  if (!provisioned.ok) {
+    io.say(`provision-workspace: REFUSED — ${provisionReason(provisioned.error, slug)}`);
+    return REFUSED;
+  }
+  const repository = await attempt(() => initRepository(git.value, id));
+  if (!repository.ok) {
+    io.say(
+      `provision-workspace: REFUSED — workspace ${id} stands with ${email} as its Admin, but its bundle repository could not be created: ${repository.error.message}; a rerun is refused slug-taken, so create the repository by hand before any import`,
+    );
+    return REFUSED;
+  }
+  io.say(`provision-workspace: done — ${id}, slug ${slug}, Admin ${email}`);
+  return DONE;
+};
+
+const memberReason = (
+  refusal: AddMemberRefusal | Error,
+  workspaceId: string,
+  email: string,
+): string | Error => {
+  if (refusal instanceof Error) return refusal;
+  switch (refusal) {
+    case "no-such-user":
+      return notSignedIn(email);
+    case "no-such-workspace":
+      return `no-such-workspace: ${workspaceId} is not a workspace`;
+    case "already-a-member":
+      return `already-a-member: ${email} is already a member of workspace ${workspaceId}; a role change is the Admin's act on the People screen`;
+    default:
+      return refusal;
+  }
+};
+
+const addMemberCommand = async (pool: Pool, flags: Flags, io: OpsIo): Promise<number> => {
+  const workspaceId = flagValue(flags, "workspace");
+  const email = flagValue(flags, "email");
+  const asked = flagValue(flags, "role");
+  if (workspaceId === undefined || email === undefined || asked === undefined) {
+    io.say(
+      `add-member: --workspace <id>, --email <email> and --role <${ROLES.join("|")}> are required`,
+    );
+    return USAGE;
+  }
+  const role = ROLES.find((word) => word === asked);
+  if (role === undefined) {
+    io.say(`add-member: --role must be one of ${ROLES.join(", ")}`);
+    return USAGE;
+  }
+  const added = await addMember(BOOTSTRAP, openPostgres(pool), { workspaceId, email, role });
+  if (!added.ok) {
+    return refused("add-member", workspaceId, memberReason(added.error, workspaceId, email), io);
+  }
+  io.say(`add-member: done — ${email} added to workspace ${workspaceId} as ${role}`);
+  return DONE;
+};
+
 const isSliceCommand = (command: string): command is SliceCommand => command in NEEDS;
 
 export const runOps = async (argv: readonly string[], pool: Pool, io: OpsIo): Promise<number> => {
@@ -720,6 +841,8 @@ export const runOps = async (argv: readonly string[], pool: Pool, io: OpsIo): Pr
   if (command === "replay-erasures") return replayErasuresCommand(pool, flags, io);
   if (command === "smoke") return smoke(flags, io);
   if (command === "dump-grep") return dumpGrep(flags, io);
+  if (command === "provision-workspace") return provisionWorkspaceCommand(pool, flags, io);
+  if (command === "add-member") return addMemberCommand(pool, flags, io);
   if (isSliceCommand(command)) return sliceCommand(command, pool, flags, io);
   io.say(`unknown command: ${command}\n${USAGE_TEXT}`);
   return USAGE;

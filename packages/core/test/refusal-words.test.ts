@@ -4,6 +4,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { declareRefusals, REFUSAL_CLASSES, refusalRegister } from "../src/kernel/index.ts";
 import type { BindUploadRefusal, SourceRefusal } from "../src/sources/index.ts";
+import type { AddMemberRefusal, ProvisionRefusal } from "../src/workspaces/index.ts";
 import { loadEveryEntryPoint } from "./entry-points.ts";
 import { coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 
@@ -43,12 +44,18 @@ const REGISTER = {
   "not-in-group": "absent by members",
   "name-taken": "conflict by members",
   "already-in-group": "conflict by members",
+
+  "no-such-user": "absent by workspaces",
+  "no-such-workspace": "absent by workspaces",
+  "slug-taken": "conflict by workspaces",
+  "workspace-exists": "conflict by workspaces",
+  "already-a-member": "conflict by workspaces",
 };
 
 type EveryRegisteredWord = keyof typeof REGISTER;
 
 const ALIAS = /\btype \w+ =([^;]*);/g;
-const BUILT_FROM_A_VOCABULARY = /\b(?:Kernel|Member|Source)Refusal</;
+const BUILT_FROM_A_VOCABULARY = /\b(?:Kernel|Member|Source|Workspace)Refusal</;
 const QUOTED = /"([a-z][a-z0-9-]*)"/g;
 
 const wordsInConvertedUnions = (files: readonly string[]): ReadonlySet<string> => {
@@ -116,6 +123,8 @@ describe("the refusal-word walk", () => {
 
   it("answers an act's union in registered words alone, never a literal written beside them", () => {
     expectTypeOf<BindUploadRefusal>().toExtend<EveryRegisteredWord | Error>();
+    expectTypeOf<ProvisionRefusal>().toExtend<EveryRegisteredWord>();
+    expectTypeOf<AddMemberRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<SourceRefusal<"no-such-binding"> | "invented">().not.toExtend<
       EveryRegisteredWord | Error
     >();
