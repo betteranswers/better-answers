@@ -2,7 +2,7 @@
 
 These rules bind every workspace. A directory's own rules live beside it, in `apps/api/CODING_RULES.md`, `apps/web/CODING_RULES.md`, `apps/worker/CODING_RULES.md` and `deploy/CODING_RULES.md`.
 
-Every rule is an imperative under a tag a finding can cite. A `Reviewer:` line marks the part of a rule no mechanism can catch, and it is the only such marker. A rule states what it asks for and not which gate catches a breach, the gate printing the tag itself; where nothing holds a rule yet, a ticket names the gate that would. Why a rule was decided is in `docs/adr/`.
+Every rule is an imperative under a tag a finding can cite. A `Reviewer:` line marks the part of a rule no mechanism could ever catch, and it is the only such marker; where a mechanism is possible and absent, a ticket names it instead. A rule states what it asks for and not which gate catches a breach, the gate printing the tag itself. Why a rule was decided is in `docs/adr/`.
 
 ## DESIGN
 
@@ -159,9 +159,7 @@ A dynamic `import()` hides a dependency from every tool that reads the graph.
 
 ### [TYPES9] Type every public Python signature
 
-mypy runs strict over `src` and `tests`, and an untyped signature does not lint.
-
-Reviewer: `Any` is a question to answer on the diff that writes it.
+mypy runs strict over `src` and `tests`. An untyped signature does not lint, and neither does `Any` in one.
 
 ## LOG
 
