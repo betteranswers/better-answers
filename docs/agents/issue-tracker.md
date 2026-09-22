@@ -52,7 +52,7 @@ git update-ref refs/ordna/tasks/T-004 "$oid"
 ordna show T-004                                             # confirm the edit is what the CLI reads
 ```
 
-`ordna create` and `ordna move` write the local ref only; push it by hand the same way (`git push origin refs/ordna/tasks/T-030`) or the next fetch will not delete it but no other clone will see it. Two sessions editing the same task race on origin; re-read before writing.
+`ordna create` and `ordna move` write the local ref only. Push it by hand within the minute, and with `--force`, since a blob ref never fast-forwards and a plain push is refused: `git push --force origin refs/ordna/tasks/T-030`. Left unpushed, a created ref survives the next fetch but no other clone sees it, and a moved ref is reverted to origin's copy (22/09/2026: T-227's `done` was lost this way). Two sessions editing the same task race on origin; re-read before writing.
 
 `ordna move` fails silently about one time in ten. Read the status line back — `ordna show T-nnn | sed -n 2p` — after every move and before its push.
 
