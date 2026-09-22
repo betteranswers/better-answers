@@ -126,8 +126,16 @@ dev = [
     "testcontainers==4.15.0",
 ]
 
+# THE LINE THE BUILDERS ARE ACTUALLY ON. uv ships this backend inside itself and takes the
+# fast path only when its own version satisfies this range; outside it, it says so —
+# `build_system.requires = ["uv-build>=0.9.4,<0.10.0"] does not contain the current uv version
+# 0.12.17` was on every `uv sync` in CI, because the range was a year behind both builders.
+# The two that matter are named in one place each: `apps/worker/.tool-versions` is the uv CI
+# installs and `apps/worker/Dockerfile`'s `FROM ghcr.io/astral-sh/uv:` is the image's, and
+# both are 0.12.9. The floor is that version and the ceiling is the next minor, so a uv
+# Renovate moves within the 0.12 line stays inside it and a 0.13 is a bump somebody reads.
 [build-system]
-requires = ["uv_build>=0.9.4,<0.10.0"]
+requires = ["uv_build>=0.12.9,<0.13.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
@@ -218,6 +226,26 @@ testpaths = ["tests"]
 addopts = "-q --strict-markers"
 # An expected failure that passes is a bug that was fixed and an `xfail` that outlived it.
 xfail_strict = true
+# TWO WARNINGS THIS TIER CANNOT FIX, AND NO WIDER A HOLE THAN THEM. A run that ends "3
+# warnings" is a run nobody reads the warnings of, so the two that arrive from libraries
+# below the detector are named here — each by its category, the opening of its message and
+# the module that raises it — and everything else still reaches the report.
+#
+# The first is transformers' DeBERTa model, which GLiNER loads: it calls `torch.jit.script`,
+# which torch has deprecated in favour of `torch.compile`. The call is transformers' and the
+# warning is torch's own module, which is why the third field names torch and not the caller.
+# It goes when a `transformers` that has stopped calling it arrives under the `gliner` pin.
+#
+# The second is `gliner/model.py` passing `resume_download` to `snapshot_download`, which
+# huggingface_hub deprecated and ignores. It goes when a `gliner` that has dropped the
+# argument arrives — 0.2.29 is the pin that still passes it.
+#
+# Both are upstream's to remove. Re-read this list whenever either pin moves: a filter for a
+# warning nobody emits any more hides nothing and says something untrue.
+filterwarnings = [
+    "ignore:`torch\\.jit\\.script` is deprecated:FutureWarning:torch\\.jit\\._script",
+    "ignore:The `resume_download` argument is deprecated:UserWarning:huggingface_hub\\.utils\\._validators",
+]
 
 # Mutation testing, parked rather than scheduled: no job in .github/workflows/mutation.yml
 # runs this today, and `uv run --frozen mutmut run` is the way to run it by hand. The tier's

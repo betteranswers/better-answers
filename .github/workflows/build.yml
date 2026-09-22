@@ -68,7 +68,7 @@ jobs:
   # the images to a `check` that passed and to nothing else, so a gate that went red would
   # leave a commit on `main` with no image and `release.yml` refusing to promote it.
   already-checked:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     # This job's alone, and the only scope it has: it reads this repository's own workflow
     # runs. It checks nothing out, so it asks for no `contents` — the workflow default above
@@ -152,7 +152,7 @@ jobs:
       packages: write
       attestations: write
       id-token: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     strategy:
       fail-fast: false
@@ -238,6 +238,7 @@ jobs:
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         if: matrix.probe-toolchain == 'python'
         with:
+          version-file: apps/worker/.tool-versions
           enable-cache: true
       - if: matrix.probe-toolchain == 'python'
         run: uv sync --frozen

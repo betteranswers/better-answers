@@ -15,6 +15,21 @@
 # pinned — `pinDigests` on the `github-actions` manager, which is what the
 # `helpers:pinGitHubActionDigests` preset sets.
 #
+# EVERY `runs-on:` IN THIS DIRECTORY NAMES A RELEASE, `ubuntu-24.04`, and not the
+# `ubuntu-latest` label. The label is a moving reference into somebody else's estate the same
+# way a tag is: GitHub is migrating it to Ubuntu 26 from 19/10/2026
+# (actions/runner-images#14748, which every job in this directory has been printing as a
+# notice), so a tree that passed on Friday would fail on Monday for a reason no commit
+# carries. `ubuntu-26.04` is the move to make and it is made on a branch of its own — one
+# edit, every leg, a full run green before `main` sees it — rather than on a date in
+# somebody else's calendar.
+#
+# AND EVERY `setup-uv` IN THIS DIRECTORY READS ITS VERSION, for the same reason and out of
+# one file: `version-file: apps/worker/.tool-versions`. Unpinned, that action takes whatever
+# uv is newest, which was 0.12.17 against the worker image's 0.12.9 on 22/09/2026 — two
+# builders resolving one lockfile. Why that file and not `[tool.uv] required-version`, and
+# what keeps it in step with the image, are said once in the file itself.
+#
 # ONE LIST OF GATES, FOUR LEGS AND ONE VERDICT (`T-333`). The root `pnpm check` is still the
 # one list — `package.json`'s `check` names every gate this repository has, and it is what a
 # person runs on a laptop. What this file owns is WHERE each of those gates runs. Until
@@ -131,7 +146,7 @@ jobs:
   # carries a node that can run it. That is what keeps this job's cost to a checkout, and the
   # legs' own setup off the critical path of a decision they all wait on.
   lane:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       lane: ${{ steps.lane.outputs.lane }}
@@ -266,7 +281,7 @@ jobs:
   docs-gates:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'docs' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -291,7 +306,7 @@ jobs:
   full-root:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'full' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -302,6 +317,7 @@ jobs:
           cache: pnpm
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          version-file: apps/worker/.tool-versions
           enable-cache: true
       - run: pnpm install --frozen-lockfile
       # This checkout is the only fresh clone we ever get, so it is the only place the
@@ -343,7 +359,7 @@ jobs:
   full-api:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'full' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -359,6 +375,8 @@ jobs:
       # empty entry against the 10 GB the repository gets, and the entry it evicted to write
       # one could be the detector's weights (`docs/operations/BUILD_CACHE.md`).
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version-file: apps/worker/.tool-versions
       - run: pnpm install --frozen-lockfile
       # The builder first. The driver a plain daemon answers with builds straight into its
       # own image store and can export a cache nowhere, and it cannot read one either. This
@@ -394,7 +412,7 @@ jobs:
   full-web:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'full' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -410,13 +428,20 @@ jobs:
   # THE WORKER, which is the longest leg and therefore the length of a full run: 462 s of the
   # 795 on run 35735268427, of which pytest was 412 and mypy 49. Everything it needs and
   # nothing else — the detector's weights, the container builder its image probe reads a
-  # layer cache through, and uv. No browser, no pnpm install: `check:worker` is
+  # layer cache through, and uv. No browser, and no `pnpm install` step: `check:worker` is
   # `uv run --frozen check` in `apps/worker`, and the only thing node does on this leg is
   # spawn it, so that this leg names its gate the way every other leg names its own.
+  #
+  # THAT IS NOT THE SAME AS NOT INSTALLING, which is why `cache: pnpm` is below. pnpm 11
+  # verifies the tree before it runs a script, so `pnpm check:worker` installs all 665
+  # packages first whether this leg asked for them or not — 12 seconds of the longest leg of
+  # run 35774991309, 19:38:23 to 19:38:35, paid cold on every run because this leg had no
+  # store cache. The cache makes that install the cheapest thing on the leg; removing the
+  # install itself is a change to how the root manifest spawns this gate, and not this one.
   full-worker:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'full' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -439,8 +464,10 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
+          cache: pnpm
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          version-file: apps/worker/.tool-versions
           enable-cache: true
       # Hundreds of megabytes of detector weights, fetched once and restored on every run
       # after it. The key hashes the module the versions and the model id are declared in,
@@ -489,7 +516,7 @@ jobs:
   affected-gates:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'affected' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -529,7 +556,7 @@ jobs:
   affected-workspaces:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'affected' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -540,6 +567,7 @@ jobs:
           cache: pnpm
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
+          version-file: apps/worker/.tool-versions
           enable-cache: true
       # The checkout fetched one commit and the filter needs two trees, so the base arrives
       # here the way it arrived in the `lane` job — by sha, one commit, no tags, no history.
@@ -597,7 +625,7 @@ jobs:
   affected-worker:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'affected' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: whether this change reached the worker at all
@@ -619,9 +647,11 @@ jobs:
         if: ${{ needs.lane.outputs.worker == 'yes' }}
         with:
           node-version-file: .node-version
+          cache: pnpm
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         if: ${{ needs.lane.outputs.worker == 'yes' }}
         with:
+          version-file: apps/worker/.tool-versions
           enable-cache: true
       - name: the redaction detector's weights, keyed on the pins that name them
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -676,7 +706,7 @@ jobs:
         affected-worker,
       ]
     if: ${{ always() }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: every leg this lane names is green, and every other leg stood down

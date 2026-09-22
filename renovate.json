@@ -1,7 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", ":semanticCommitsDisabled", "schedule:weekends"],
-  "description": "No digest-pinning preset is extended: `:pinDigests` never existed (its absence rejected this whole file, GitHub issue #1), and `docker:pinDigests` plus `helpers:pinGitHubActionDigests` would only restate the `pinDigests: true` the images and actions `packageRules` below already carry for every enabled manager that has a digest",
+  "description": [
+    "No digest-pinning preset is extended: `:pinDigests` never existed (its absence rejected this whole file, GitHub issue #1), and `docker:pinDigests` plus `helpers:pinGitHubActionDigests` would only restate the `pinDigests: true` the images and actions `packageRules` below already carry for every enabled manager that has a digest",
+    "THE AGE RULE IS pnpm's, READ BACK. pnpm 11 refuses to install a release younger than one day (`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`), so a Renovate that proposes the newest version opens a pull request every leg of which dies on `pnpm install --frozen-lockfile` — jsdom@30.1.1, published 22/09/2026 and two hours inside the cutoff, killed pull request #25 whole (run 35775980034). `minimumReleaseAge` here is the same day, so Renovate proposes only what pnpm will accept; `internalChecksFilter: strict` is what makes it a filter rather than a delay, holding a pending version back from the branch instead of opening a pull request that waits for it. It is written once at the top rather than per manager: every manager this repository enables resolves through a lockfile somebody has to install"
+  ],
+  "minimumReleaseAge": "1 day",
+  "internalChecksFilter": "strict",
   "timezone": "Europe/London",
   "labels": ["deps"],
   "automerge": false,
@@ -15,6 +20,14 @@
       "description": "The versions an image fetches by name — `ARG <NAME>_VERSION=` under a `# renovate: datasource=… depName=…` line. The `dockerfile` manager reads `FROM` and nothing else, so rclone, age and git-filter-repo aged in silence (T-211). `enabledManagers` is an allow-list: without `custom.regex` in it this block is read and never run. `apps/api/tests/deploy-tree.test.ts` holds all three halves against the Dockerfiles `build.yml` builds",
       "managerFilePatterns": ["/(^|/|\\.)Dockerfile$/"],
       "matchStrings": ["# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)\\nARG [A-Z0-9_]+_VERSION=(?<currentValue>\\S+)\\n"]
+    },
+    {
+      "customType": "regex",
+      "description": "The uv every CI leg installs, written once in `apps/worker/.tool-versions` and read from there by `astral-sh/setup-uv`'s `version-file:`. No enabled manager reads that file — `asdf` would be a whole manager turned on for one line — so it is read here, and the `uv` rule below groups it with `ghcr.io/astral-sh/uv` so the runner's uv and the worker image's uv move in one pull request. The datasource is PyPI because uv publishes there under the same numbers its releases carry, which is the datasource the pin above already uses",
+      "managerFilePatterns": ["/(^|/)\\.tool-versions$/"],
+      "matchStrings": ["(^|\\n)uv (?<currentValue>\\S+)"],
+      "datasourceTemplate": "pypi",
+      "depNameTemplate": "uv"
     }
   ],
   "packageRules": [
@@ -23,6 +36,7 @@
     { "matchManagers": ["npm"], "matchDepTypes": ["devDependencies"], "groupName": "npm dev" },
     { "matchManagers": ["npm"], "matchPackageNames": ["cloc"], "followTag": "latest", "description": "cloc's npm redistribution renumbered itself to follow upstream, so its highest version (2.11.0, December 2022, upstream 1.96) is three years older than its `latest` tag (2.6.0-cloc, June 2025, upstream 2.06) and sorts above it. Renovate would offer that as an upgrade every week; following the tag is the publisher's own answer to which release is current, and the only ordering of this package's versions that means anything" },
     { "matchManagers": ["pep621"], "groupName": "python" },
+    { "matchPackageNames": ["uv", "ghcr.io/astral-sh/uv"], "groupName": "uv", "description": "One uv, in two places that cannot read each other: `apps/worker/.tool-versions` is what CI installs and `apps/worker/Dockerfile`'s `FROM` is what the worker image carries, and a `FROM` cannot read a file. Grouped so a release moves both in one pull request rather than leaving the runner building against a uv the image does not have — which is how `build_system.requires` came to name a line neither of them was on" },
     { "matchPackageNames": ["apache/age", "postgres"], "matchUpdateTypes": ["major"], "enabled": false, "description": "A Postgres or AGE major is an upgrade drill, not a bump (ADR 0023): the platform image is built from AGE's release for one Postgres major, and the graph rides the dump. Neo4j and Forgejo are gone (ADRs 0023, 0024)" }
   ],
   "lockFileMaintenance": { "enabled": true, "schedule": ["before 6am on monday"] }

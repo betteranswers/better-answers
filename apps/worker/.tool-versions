@@ -1,0 +1,14 @@
+# The uv this tier is built and gated with, written down once. `astral-sh/setup-uv` reads it
+# through `version-file:` in every leg of every workflow that touches the worker, and
+# `apps/worker/Dockerfile` carries the same number in its `FROM ghcr.io/astral-sh/uv:` — a
+# `FROM` cannot read a file, so `renovate.json`'s `uv` group is what moves the two together.
+#
+# WHY CI IS PINNED AT ALL. Unpinned, `setup-uv` takes the newest uv there is, and on
+# 22/09/2026 that was 0.12.17 against the image's 0.12.9: two different builders resolving one
+# lockfile, and `uv sync` warning that `build_system.requires` named neither of them.
+#
+# `.tool-versions` RATHER THAN `[tool.uv] required-version`. Both are read by `setup-uv`, and
+# `required-version` is enforced by uv itself — so it would stop every laptop whose uv is
+# older than this line, which is a toolchain upgrade and not a CI fix. asdf and mise read this
+# file too, which is the right answer for anyone who uses them; uv ignores it.
+uv 0.12.9

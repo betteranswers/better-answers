@@ -534,7 +534,7 @@ const SETUP: readonly Setup[] = [
     tool: "./.github/actions/git-filter-repo",
     onlyOn: ["full-root", "full-api", "affected-workspaces"],
     because:
-      "each leg reaches the erasure routine's git step — packages/core through the erasure suite, apps/api through the rehearsal's phase two, the filter through whichever of them it selects — and ubuntu-latest carries no such tool",
+      "each leg reaches the erasure routine's git step — packages/core through the erasure suite, apps/api through the rehearsal's phase two, the filter through whichever of them it selects — and the hosted Ubuntu runner carries no such tool",
   },
   {
     tool: "playwright install",
