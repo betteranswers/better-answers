@@ -150,8 +150,8 @@ platform runs one registration it owns.
   written in the same commit, which the ADR index test gates.
 - **A Microsoft sign-in task is created beside T-045**, depending on it.
 - **The re-prove is an acceptance artefact, not a test**: the claude.ai path over a quick tunnel
-  on the new issuer, with the issuer, the date and the outcome in the PR body beside the `[SEC3]`
-  adversarial pass.
+  on the new issuer, with the issuer, the date and the outcome in the PR body beside the
+  adversarial pass a migration, a grant, a policy or a definer function gets before it merges.
 
 ## Amendment — 2026-09-04, the Pro trigger's rationale corrected (T-005 stage 5)
 

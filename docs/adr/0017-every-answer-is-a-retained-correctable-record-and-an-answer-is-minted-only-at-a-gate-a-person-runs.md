@@ -26,7 +26,7 @@ We decided this because the platform's promise is that a wrong answer can be tra
 ## Consequences
 
 - `answer_audit` is a skeleton with `answer_audit_citation` rows and a month-partitioned `answer_audit_content` child; retention per workspace against shared partitions, the held-rows table, `flag_state` indexed with `at`, unguessable ids, the distinct-(person, day) aggregate, `suggestion.kind = promotion` with its payload and decision, `answer_test` with a synthetic principal and a *stale* state, the partial unique index on waiting rewrites — ticket 41's schema spike. The erasure union covers the content child, the test's question, the promotion payload and feedback notes (ticket 24).
-- Feedback is given only on an answer the person received (`[SEC2]`), through tRPC, OpenAPI and an MCP feedback tool (ticket 21); one *not found* for missing and forbidden alike.
+- Feedback is given only on an answer the person received, through tRPC, OpenAPI and an MCP feedback tool (ticket 21); one *not found* for missing and forbidden alike.
 - The judging route gains a second prompt (same · variant · different) under one purpose; `prompt_version` on `llm_call` so a prompt change triggers a replay; the judge runs at temperature 0 (ticket 29).
 - Signals: passed · failed · stale, replay spend beside extraction, the thinning job's lag, the Suggestions backlog counting promotions once, flags per hundred answers with last week's number, open corrections, "you copied this and it changed since" for the inbox and digest (ticket 42; who receives it, ticket 23).
 - Ticket 23 carries the *no evidence* rung, the rule that reuse is neither a generation nor a check, and who may propose from history; ticket 50 the `domain_path` an `Answer` lands in; ticket 24 what a *should not have shown* report does to a binding and the strip highlighter's rules.
@@ -40,7 +40,7 @@ We decided this because the platform's promise is that a wrong answer can be tra
 Three sweeps, none reopening this ADR.
 
 - **Roles are levels.** ADR 0019 made them **Admin · Editor · Viewer**, never job titles, and the rename never reached this file: where this ADR says *a Bid writer saves an answer* read **an Editor**; where the rejected option says *a Bid writer committing directly* read **an Editor**.
-- **One functional test per capability runs through every mounted transport.** This ADR requires a test "through tRPC, OpenAPI and MCP alike"; ADR 0008's amendment leaves the generated OpenAPI document **unmounted in v0.1**, so the rule is a transport that is actually served — tRPC, MCP and `/agent/v1` today, OpenAPI the day it mounts (`[SEC2]`).
+- **One functional test per capability runs through every mounted transport.** This ADR requires a test "through tRPC, OpenAPI and MCP alike"; ADR 0008's amendment leaves the generated OpenAPI document **unmounted in v0.1**, so the rule is a transport that is actually served — tRPC, MCP and `/agent/v1` today, OpenAPI the day it mounts.
 - **The repository export is a System act, and stays there.** Control Centre's **System** screen carries the whole-repository export (`git bundle`), as this ADR already lists it; **Knowledge's** toolbar exports are *knowledge* exports — concepts, compositions and the records over them. The distinction is the minting rule (ADR 0011): a knowledge export takes what the company knows, a repository export takes the store it is kept in.
 
 Everything else in this ADR and its amendments stands.

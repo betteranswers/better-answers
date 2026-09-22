@@ -41,7 +41,7 @@ row, already takes that proof first. **It is built with the first act that needs
 (T-136) — and until then `requireAdmin` and `adminOnBinding` stand. Two things an earlier draft
 declared are left out because nothing would operate from them: who opens the transaction, which
 the signature and the procedure's context type already say, and the ledger acts written, until
-an `[AUDIT1]` sweep exists to read them.
+a sweep for an act's audit event exists to read them.
 
 **Refusals.** A refusal word means one thing wherever it appears. Its owning slice declares it
 once and it is registered globally, as ledger acts are, with the shared words (`malformed`,
@@ -57,7 +57,7 @@ shipped word is never removed and never changes class.
 **Crossing a transport.** Each transport has one crossing function: a value crosses as itself;
 a word becomes the protocol's error for its class, carrying `{ word, class }` and, for
 `malformed`, the field map below; an `Error` becomes an internal failure and is logged there,
-once (`[LOG1]`), a refusal at info with its word. Over tRPC the refusal is a thrown error, and
+once, a refusal at info with its word. Over tRPC the refusal is a thrown error, and
 the word union reaches the web through `AppRouter`'s error-formatter type, so ADR 0006's
 one-type fence holds; a type-level sweep keeps any procedure's output from being a `Result`.
 `pnpm ops` maps the same classes to exit codes. **Procedures are written by hand** — input,
@@ -110,8 +110,9 @@ Instants cross every wire as ISO-8601 text and no transformer is mounted.
 - **No classes, a table per transport**; or **one flat list of words**, as the codebase these
   conventions were first modelled on keeps (137 entries, the status chosen at each call site).
 - **Capability-typed doors with no declared admission**, which moves `role-forbids` out of core
-  into every caller against `[SEC2]`; **a per-slice manifest a router is generated from**, which
-  puts a transport's facts in core; **schemas generated from types**, against ADR 0028.
+  into every caller against the Principal-first rule; **a per-slice manifest a router is
+  generated from**, which puts a transport's facts in core; **schemas generated from types**,
+  against ADR 0028.
 
 ## Consequences
 
@@ -124,10 +125,11 @@ Instants cross every wire as ISO-8601 text and no transformer is mounted.
 - **`bindUpload` is hardened before a transport reaches it**, as its own ticket: the binding's
   id is caller-minted so a repeat answers the first outcome; the object's key derives from it
   and a scheduled sweep removes objects no row names; the act counts the bytes it streams and
-  refuses past the cap, which is one exported constant (`[DEPS2]`).
-- **Deferred until a second consumer exists** (`[DESIGN3]`): the constructor and admission; the
-  ledger acts as a declared field; the other acts, each converted when an entry first reaches
-  it; the rename of the code's `Act` type to say *ledger act*, which lands with the constructor.
+  refuses past the cap, which is one exported constant.
+- **Deferred until a second consumer exists**, nothing having varied yet: the constructor and
+  admission; the ledger acts as a declared field; the other acts, each converted when an entry
+  first reaches it; the rename of the code's `Act` type to say *ledger act*, which lands with
+  the constructor.
 - **A spike goes first, and can amend this record.** In order: the result-aware door against
   the whole of core's suite — if more than two or three acts rightly answer a refusal and keep
   their rows, the throw moves to the crossing function alone; `bindUpload` through the
@@ -172,10 +174,10 @@ mutation over `application/octet-stream`**, `octetInputParser` on the own-transa
 The descriptor sits outside `AppRouter`'s inference, so the web keeps one typed wrapper and the api
 harness holds one case a renamed field fails; a custom link that carries the descriptor inside the
 typed input is the shape for a second octet-stream mutation, none being on the route
-(`[DESIGN3]`). ADR 0006 gains no exception; its 2026-09-22 amendment says what its rule is for. A
-plain Hono route was weighed and refused: Hono's own multipart buffers through the same
-`formData()`, and a raw body beside a plain route carries the same descriptor with nothing
-compiler-checked.
+and nothing having varied yet. ADR 0006 gains no exception; its 2026-09-22 amendment says what
+its rule is for. A plain Hono route was weighed and refused: Hono's own multipart buffers
+through the same `formData()`, and a raw body beside a plain route carries the same descriptor
+with nothing compiler-checked.
 
 **Probe 3 — the crossing.** The error formatter carries `{ word, class }` under `data.refusal`;
 the web infers the word union and the class from `AppRouter` alone and the api-seam fence stays
@@ -190,7 +192,7 @@ router at depth 1; the constructed `narrowBinding`, called from the same router,
 edit here cannot be allowed to answer a lower bound for every act. **The constructor is dropped**,
 as this record said it could be. Read *The shape, and when it is built* as the fallback its
 *Considered options* names: a declaration beside the function, the act's types derived from it,
-and a lint rule that a face function admits before its first `await`, with its `[CHECK1]` test.
+and a lint rule that a face function admits before its first `await`, with the test that runs it.
 The vocabulary, the crossing, the roads and the composition root stand. T-237 lands the fallback.
 
 **Probe 5 — the suite lines.** Zero. The constructed acts kept their call shape, and no line of the

@@ -53,9 +53,9 @@ one registry whose vocabulary actively disagrees with ours: it says *organizatio
 throughout, and `CONTEXT.md` says *workspace* and marks *organisation* as a word to avoid.
 It is taken with a `localization` override that replaces every one of those strings, and
 that override is not optional — a screen that says "organization" is a defect against
-`[GLOSSARY1]`, not a cosmetic issue.
+the glossary rule, not a cosmetic issue.
 
-Versions are read from the source on the day (`[DEPS1]`), never from memory. The source for
+Versions are read from the source on the day, never from memory. The source for
 each of these is the **npm registry**, read with `npm view <package> version` on **2
 September 2026**, and each pin lives in the manifest of the workspace that owns it. The pins
 taken that day are `tailwindcss` and `@tailwindcss/vite` 4.3.3,
@@ -99,9 +99,9 @@ installed by a later ticket and pinned when they are.
   failure mode is silent: every utility present and no token values behind them.
 - **The SPA's stylesheet imports the tokens before Tailwind**, because a nested `@import`
   may follow only another `@import` and would otherwise be dropped without a word.
-- **`apps/web` gains a browser suite** and `[TEST1]` gains its line: the served build driven
-  by a browser, or a rendered component through Testing Library where a component's
-  behaviour is the thing under test.
+- **`apps/web` gains a browser suite** and the test-interface rule gains its line: the served
+  build driven by a browser, or a rendered component through Testing Library where a
+  component's behaviour is the thing under test.
 - **A registry component is reviewed before it lands**, like any lifted part (ADR 0005): it
   arrives as source, so it is read, and its `THIRD_PARTY_NOTICES` obligation is the same as
   every other lift's.
@@ -113,7 +113,7 @@ installed by a later ticket and pinned when they are.
 
 The ADR left the registry components to "a later ticket… pinned when they are". This is that
 pin. Everything below was read from the registry on **3 September 2026**; nothing came from
-memory (`[DEPS1]`).
+memory.
 
 **Where they live.** `apps/web/src/shared/ui/` holds the shadcn primitives — `badge`,
 `button`, `carousel`, `collapsible`, `command`, `dialog`, `dropdown-menu`, `hover-card`,
@@ -140,8 +140,8 @@ review table it was wanted for uses the shadcn `table` primitive until Kibo catc
    over `apps/web/src/shared/ui/**` in `.oxlintrc.json` — `react/set-state-in-effect`,
    `react-doctor/effect-needs-cleanup`, `jsx-a11y/prefer-tag-over-role` and the type-assertion
    safety comment — each of which judges *how* a component is written, which is the half this
-   ADR gives the registries. Every import rule, `no-console`, `[A11Y1]` at the screen and the
-   anti-slop rules that catch a widened type stay on.
+   ADR gives the registries. Every import rule, `no-console`, the accessibility rule at the
+   screen and the anti-slop rules that catch a widened type stay on.
 2. **The registries write extensionless imports**, which do not resolve under this repository's
    `nodenext` setting. They are rewritten to explicit `.ts`/`.tsx` on arrival, along with the
    `"use client"` directives, which mean nothing in a Vite SPA.
@@ -216,7 +216,7 @@ the app's one query cache, so there was nothing left to provide and the router r
 its outlet directly. The `auth-provider` registry item — the provider wrapper and the
 plugin-type file, with their two `declare module` augmentations of a library outside the
 auth module — is removed with it, so no augmentation of a deleted library survives anywhere
-in the tree and ~~`[DESIGN5]`'s~~ the identity seam's browser half (ADR 0009, 2026-09-05 amendment) needs no exemption sentence.
+in the tree and the identity seam's browser half (ADR 0009, 2026-09-05 amendment) needs no exemption sentence.
 
 **Why.** Four costs for about 70 library-facing lines among the feature's 750 (the count
 and the decision are in `apps/docs-site/specs/T-046.md`). The package shipped 66 releases

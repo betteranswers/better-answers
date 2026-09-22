@@ -1,12 +1,12 @@
 ---
 status: rejected
 date: 2026-08-26
-rejected: 2026-08-26 — typed relations are derived in the graph, never written to the file (Liam, ticket 47; `[OKF2]`)
+rejected: 2026-08-26 — typed relations are derived in the graph, never written to the file (Liam, ticket 47)
 ---
 
 # Concepts carry typed relations as a `relations` extension key, with predicates from the company language
 
-An OKF link asserts an untyped relationship: "the specific kind is conveyed by the surrounding prose, not by the link itself" (SPEC §links). A company's knowledge is relational before any platform reads it: research 44 found that the first client's public website alone yields certifications that *apply to* products, clients who *use* products, products that *serve* sectors and tiers that *belong to* a product — 62 of 123 candidate concepts were entities related to other entities. A consumer rebuilding the map from the bundle alone cannot recover those kinds from untyped links plus prose. That is the only justification this ADR rests on; the fact that guide expectations could select by relation is a consequence, not a reason (`[OKF1]`). The proposal: a concept MAY carry a `relations` extension key — a list of `{predicate, target}` where `predicate` is a term from the tenant's company language (the same vocabulary file ADR 0001 makes authoritative in-bundle) and `target` is a bundle-absolute path or a concept IRI. The body link stays the human-readable form; `relations` is the machine-readable one; the governed write keeps them consistent. This is the smallest typed-link design: no RDF, no SHACL, no fenced Turtle blocks. Ticket 30 deferred typed links to a later slice; this ADR is **proposed** until that slice accepts or rejects it, and nothing in v0.1 depends on it.
+An OKF link asserts an untyped relationship: "the specific kind is conveyed by the surrounding prose, not by the link itself" (SPEC §links). A company's knowledge is relational before any platform reads it: research 44 found that the first client's public website alone yields certifications that *apply to* products, clients who *use* products, products that *serve* sectors and tiers that *belong to* a product — 62 of 123 candidate concepts were entities related to other entities. A consumer rebuilding the map from the bundle alone cannot recover those kinds from untyped links plus prose. That is the only justification this ADR rests on; the fact that guide expectations could select by relation is a consequence, not a reason. The proposal: a concept MAY carry a `relations` extension key — a list of `{predicate, target}` where `predicate` is a term from the tenant's company language (the same vocabulary file ADR 0001 makes authoritative in-bundle) and `target` is a bundle-absolute path or a concept IRI. The body link stays the human-readable form; `relations` is the machine-readable one; the governed write keeps them consistent. This is the smallest typed-link design: no RDF, no SHACL, no fenced Turtle blocks. Ticket 30 deferred typed links to a later slice; this ADR is **proposed** until that slice accepts or rejects it, and nothing in v0.1 depends on it.
 
 ## Considered options
 
@@ -25,7 +25,7 @@ An OKF link asserts an untyped relationship: "the specific kind is conveyed by t
 
 ## Rejected — 2026-08-26 (ticket 47)
 
-Liam, feedback on ticket 15: "we don't add `relations` to the concept files — OKF is two knowledge layers for us: the bundle and concepts, and any knowledge graph we build on top." Typed relations are **derived in the graph** from a concept's links, the target's `type` and the company language, and from Admin-confirmed entity resolution; the file carries only the link (`[OKF2]`). The accepted cost is the one this ADR named: a consumer rebuilding from the bundle alone sees untyped links plus prose, not the platform's typed map. Product tiers stay concepts (ADR 0004 amendment); a guide's tier axis reads the graph. Ticket 30's slice (now ticket 50) owns the derivation.
+Liam, feedback on ticket 15: "we don't add `relations` to the concept files — OKF is two knowledge layers for us: the bundle and concepts, and any knowledge graph we build on top." Typed relations are **derived in the graph** from a concept's links, the target's `type` and the company language, and from Admin-confirmed entity resolution; the file carries only the link. The accepted cost is the one this ADR named: a consumer rebuilding from the bundle alone sees untyped links plus prose, not the platform's typed map. Product tiers stay concepts (ADR 0004 amendment); a guide's tier axis reads the graph. Ticket 30's slice (now ticket 50) owns the derivation.
 
 ## Read strictly — 2026-08-29 (ticket 50, ADR 0026)
 
