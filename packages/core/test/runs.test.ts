@@ -152,15 +152,17 @@ describe("what the app puts on the worker's queue", () => {
   it("refuses a rebuild with no reason and an audit that carries one, before any statement", async () => {
     const scenario = await arrange();
 
+    // @ts-expect-error a rebuild without its reason is outside the input on purpose; the refusal under test is the queue's own
     const noReason = await enqueueJob(graphMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
       kind: "full-rebuild",
-    } as Parameters<typeof enqueueJob>[2]);
+    });
     const spuriousReason = await enqueueJob(graphMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
       kind: "nightly-audit",
+      // @ts-expect-error an audit carries no reason; the refusal under test is the queue's own
       reason: "drill",
-    } as Parameters<typeof enqueueJob>[2]);
+    });
 
     expect([noReason, spuriousReason]).toEqual([
       { ok: false, error: "malformed" },
@@ -316,10 +318,11 @@ describe("an act that lands its rows and its job in one transaction", () => {
       const scenario = await arrange();
 
       const refused = await actOf(scenario, (tx) =>
+        // @ts-expect-error each row is a shape the queue's input does not carry, on purpose; the refusal under test is the queue's own
         enqueueJobIn(graphMaintenance, tx, {
           workspaceId: scenario.workspaceId,
           ...asked,
-        } as Parameters<typeof enqueueJobIn>[2]),
+        }),
       );
 
       expect(refused).toEqual({ ok: false, error: "malformed" });

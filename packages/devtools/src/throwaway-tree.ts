@@ -4,6 +4,16 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import { z } from "zod";
+
+// What `execFileSync` throws once the tool ran; a spawn that never started carries a null
+// status and no streams, so nothing is required.
+const spawnFailure = z.object({
+  status: z.number().nullish(),
+  stdout: z.string().nullish(),
+  stderr: z.string().nullish(),
+});
+
 export type Tree = Readonly<Record<string, string>>;
 
 export type Tool = {
@@ -101,13 +111,8 @@ export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
         env: { ...process.env, ...tool.env },
       });
     } catch (cause) {
-      // SAFETY: every field is read defensively below, because a spawn that never started
-      // carries a null status and no stdout.
-      const failure = cause as {
-        status?: number | null;
-        stdout?: string;
-        stderr?: string;
-      };
+      const read = spawnFailure.safeParse(cause);
+      const failure = read.success ? read.data : {};
       const status = failure.status;
       if (status !== null && status !== undefined && tool.foundSomething.includes(status)) {
         return String(failure.stdout ?? "");
@@ -204,19 +209,33 @@ export type KnipRunner = {
   readonly findings: (tree: Tree) => readonly KnipFinding[];
 };
 
-type KnipReportEntry = { readonly file?: string } & {
-  readonly [Kind in (typeof KNIP_FINDING_KINDS)[number]]?: readonly { readonly name: string }[];
-};
+const namedIssues = z.array(z.object({ name: z.string() })).optional();
+
+// knip's JSON reporter, its kinds spelled out against the tuple. The smoke case proves the
+// shape, so an unreadable report is refused there.
+const knipReport = z.object({
+  issues: z
+    .array(
+      z.object({
+        file: z.string().optional(),
+        files: namedIssues,
+        exports: namedIssues,
+        types: namedIssues,
+        dependencies: namedIssues,
+        devDependencies: namedIssues,
+        unlisted: namedIssues,
+        binaries: namedIssues,
+      } satisfies Record<(typeof KNIP_FINDING_KINDS)[number], typeof namedIssues> & {
+        readonly file: z.ZodOptional<z.ZodString>;
+      }),
+    )
+    .optional(),
+});
 
 const sortKey = (finding: KnipFinding): string => `${finding.kind}:${finding.file}:${finding.name}`;
 
-const findingsIn = (output: string): readonly KnipFinding[] => {
-  const parsed: unknown = JSON.parse(output);
-
-  // SAFETY: the runner's smoke case proves knip's reporter contract; a report this cannot
-  // find is refused there, never read as a clean tree.
-  const report = parsed as { readonly issues?: readonly KnipReportEntry[] };
-  return (report.issues ?? [])
+const findingsIn = (output: string): readonly KnipFinding[] =>
+  (knipReport.parse(JSON.parse(output)).issues ?? [])
     .flatMap((entry) =>
       KNIP_FINDING_KINDS.flatMap((kind) =>
         (entry[kind] ?? []).map((issue) => ({
@@ -227,7 +246,6 @@ const findingsIn = (output: string): readonly KnipFinding[] => {
       ),
     )
     .sort((left, right) => sortKey(left).localeCompare(sortKey(right)));
-};
 
 export const knipOver = (
   scaffold: Tree,

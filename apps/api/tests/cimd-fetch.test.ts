@@ -1,22 +1,16 @@
 import { EventEmitter } from "node:events";
-import type { ClientRequest, IncomingMessage } from "node:http";
-import type { request as httpsRequest } from "node:https";
+import type { IncomingHttpHeaders } from "node:http";
+import type { RequestOptions } from "node:https";
 import { Readable } from "node:stream";
 import { describe, expect, it } from "vitest";
 
 import {
   CimdTransportError,
   createClientMetadataFetcher,
+  type HttpsRequest,
   type LookedUpAddress,
   type Lookup,
 } from "../lifts/better-auth-cimd-node/index.ts";
-
-type LookupOptions = { readonly all?: boolean };
-type LookupCallback = (
-  error: Error | null,
-  address: string | readonly { readonly address: string; readonly family: number }[],
-  family?: number,
-) => void;
 
 type Observed = {
   lookupAnswers: unknown[];
@@ -30,45 +24,46 @@ const resolvesTo =
   async () =>
     answers;
 
-const answering = (
-  observed: Observed,
-  response: {
-    status: number;
-    body?: string | Buffer;
-    headers?: Record<string, string>;
-    delayMs?: number;
-  },
-): typeof httpsRequest =>
-  ((
-    _url: string | URL,
-    options: {
-      headers?: Record<string, string>;
-      servername?: string;
-      lookup?: unknown;
-      signal?: AbortSignal;
+// The fetcher sends every header as one string; Node's wider shapes are not its.
+const stringHeadersOf = (headers: RequestOptions["headers"]): Readonly<Record<string, string>> =>
+  Object.fromEntries(
+    Object.entries(headers ?? {}).flatMap(([name, value]) =>
+      typeof value === "string" ? [[name, value]] : [],
+    ),
+  );
+
+const answering =
+  (
+    observed: Observed,
+    response: {
+      status: number;
+      body?: string | Buffer;
+      headers?: IncomingHttpHeaders;
+      delayMs?: number;
     },
-    callback?: (res: IncomingMessage) => void,
-  ) => {
-    observed.headers = options.headers ?? {};
+  ): HttpsRequest =>
+  (_url, options, callback) => {
+    observed.headers = stringHeadersOf(options.headers);
     observed.servername = options.servername;
-    const lookup = options.lookup as
-      | ((h: string, o: LookupOptions, cb: LookupCallback) => void)
-      | undefined;
+    const { lookup } = options;
 
     lookup?.("ignored", { all: true }, (_error, address) => observed.lookupAnswers.push(address));
     lookup?.("ignored", {}, (_error, address, family) =>
       observed.lookupAnswers.push([address, family]),
     );
 
-    const request = new EventEmitter() as ClientRequest;
-    request.end = () => request;
-    request.destroy = () => request;
+    const request = Object.assign(new EventEmitter(), {
+      end(): void {},
+      destroy(): void {},
+    });
     const deliver = () => {
-      const incoming = Readable.from([Buffer.from(response.body ?? "")]) as IncomingMessage;
-      incoming.statusCode = response.status;
-      incoming.statusMessage = "OK";
-      incoming.headers = response.headers ?? {};
-      callback?.(incoming);
+      callback(
+        Object.assign(Readable.from([Buffer.from(response.body ?? "")]), {
+          statusCode: response.status,
+          statusMessage: "OK",
+          headers: response.headers ?? {},
+        }),
+      );
     };
     if (response.delayMs === undefined) queueMicrotask(deliver);
     else {
@@ -81,7 +76,7 @@ const answering = (
       });
     }
     return request;
-  }) as unknown as typeof httpsRequest;
+  };
 
 const observe = (): Observed => ({ lookupAnswers: [], headers: {}, servername: undefined });
 
@@ -95,10 +90,10 @@ const neverResolving = (
   return {
     fetcher: createClientMetadataFetcher({
       lookup: () => new Promise(() => {}),
-      request: (() => {
+      request: () => {
         requested += 1;
         throw new Error("never");
-      }) as unknown as typeof httpsRequest,
+      },
       timeoutMs,
     }),
     requests: () => requested,

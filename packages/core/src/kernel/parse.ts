@@ -49,8 +49,8 @@ const absent = (raw: unknown, segments: ReadonlyArray<PropertyKey>): boolean => 
   let held: unknown = raw;
   for (const segment of segments) {
     if (typeof held !== "object" || held === null || typeof segment === "symbol") return true;
-    // SAFETY: an index read off a raw value is `unknown` whatever the key names.
-    held = (held as Readonly<Record<string, unknown>>)[String(segment)];
+    // The value was never checked against a shape, so its entries are walked, not asserted.
+    held = Object.entries(held).find(([name]) => name === String(segment))?.[1];
   }
   return held === undefined;
 };

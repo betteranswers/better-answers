@@ -3,8 +3,16 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { expect } from "vitest";
+import { z } from "zod";
 
 const run = promisify(execFile);
+
+// What `execFile` hangs on its rejection: the spawn's streams and the error's own line.
+const execFailure = z.object({
+  stderr: z.string().optional(),
+  stdout: z.string().optional(),
+  message: z.string().optional(),
+});
 
 const workerDirectory = path.resolve(import.meta.dirname, "../../../apps/worker");
 
@@ -36,10 +44,9 @@ export const runWorkerOnce = async (
       S3_REGION: "garage",
     },
   }).catch((cause: unknown) => {
-    const failure = cause as { stderr?: string; stdout?: string; message?: string };
-    throw new Error(
-      `the worker did not run: ${failure.message ?? ""}\n${failure.stderr ?? ""}\n${failure.stdout ?? ""}`,
-    );
+    const failure = execFailure.safeParse(cause);
+    const { message = "", stderr = "", stdout = "" } = failure.success ? failure.data : {};
+    throw new Error(`the worker did not run: ${message}\n${stderr}\n${stdout}`);
   });
 
   expect(outcome.stderr).not.toMatch(/Traceback/);

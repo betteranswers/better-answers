@@ -2,7 +2,15 @@ import type { APIRequestContext } from "@playwright/test";
 
 import { expect, test } from "./browser.ts";
 
-import { addMember, anAddress, person, provision, removeMember, signIn } from "./harness.ts";
+import {
+  addMember,
+  anAddress,
+  codeSentTo,
+  person,
+  provision,
+  removeMember,
+  signIn,
+} from "./harness.ts";
 
 const memberOfTwoWorkspaces = async (
   request: APIRequestContext,
@@ -231,8 +239,7 @@ test("the three screens outside the shell are keyboard-operable, landmarked and 
   await page.keyboard.press("Enter");
 
   await expect(page.getByLabel("Code")).toBeVisible();
-  const code = await request.get(`/__harness/codes?email=${encodeURIComponent(email)}`);
-  const { code: sixDigits } = (await code.json()) as { code: string };
+  const sixDigits = await codeSentTo(request, email);
   await page.getByLabel("Code").focus();
   await page.keyboard.type(sixDigits);
   await page.keyboard.press("Enter");

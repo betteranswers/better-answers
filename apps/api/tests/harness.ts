@@ -6,6 +6,7 @@ import { Writable } from "node:stream";
 import type { Hono } from "hono";
 import type { Pool } from "pg";
 import { pino } from "pino";
+import { z } from "zod";
 
 import type { Clock, PlatformPrincipal } from "@better-answers/core/kernel";
 import type { GitDoor } from "@better-answers/core/store/git";
@@ -58,7 +59,9 @@ const CLAUDE_METADATA_DOCUMENT = {
 export const LOOKALIKE_CLIENT_ID = "https://claude-ai.example/oauth/mcp-oauth-client-metadata";
 const LOOKALIKE_REDIRECT_URI = "https://claude-ai.example/api/mcp/auth_callback";
 
-export type LogLine = Readonly<Record<string, unknown>>;
+// pino writes one JSON object per line: its own level and time, then whatever the call logged.
+const logLine = z.looseObject({ level: z.number(), time: z.number() });
+export type LogLine = Readonly<z.infer<typeof logLine>>;
 
 export const capturingLogger = (level: "debug" | "info" = "info") => {
   const logs: LogLine[] = [];
@@ -66,9 +69,7 @@ export const capturingLogger = (level: "debug" | "info" = "info") => {
     write(chunk: Buffer, _encoding, callback) {
       for (const line of chunk.toString("utf8").split("\n")) {
         if (line.trim() === "") continue;
-
-        // SAFETY: pino writes one JSON object per line; a line is an object by construction.
-        logs.push(JSON.parse(line) as LogLine);
+        logs.push(logLine.parse(JSON.parse(line)));
       }
       callback();
     },

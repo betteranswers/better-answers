@@ -98,5 +98,6 @@ export const admit = <D extends ActDeclaration>(
       : reaches(principal.role, wanted.role);
 
   // SAFETY: the two branches above are the runtime reading of the conditional `Admitted` type.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- `AdmittedOf<D>` is conditional on a `D` still open here, which no runtime predicate resolves for the compiler
   return opens ? ok(principal as AdmittedOf<D>) : err(ADMISSION_REFUSED);
 };

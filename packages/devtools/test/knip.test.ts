@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { knipOver } from "@better-answers/devtools/throwaway-tree";
 import type { KnipFinding, Tree } from "@better-answers/devtools/throwaway-tree";
@@ -94,13 +95,14 @@ describe("knip over a throwaway tree (T-066)", () => {
 
 describe("the knip gate is a step of the root check (T-066)", () => {
   it("is named in the root check, so CI runs it with no workflow change", () => {
-    const root: unknown = JSON.parse(
-      readFileSync(path.resolve(import.meta.dirname, "../../../package.json"), "utf8"),
-    );
-
-    // SAFETY: each field is checked before use, so a manifest without them fails the
-    // assertions rather than this cast.
-    const scripts = (root as { readonly scripts?: Readonly<Record<string, string>> }).scripts ?? {};
+    const root = z
+      .object({ scripts: z.record(z.string(), z.string()).optional() })
+      .parse(
+        JSON.parse(
+          readFileSync(path.resolve(import.meta.dirname, "../../../package.json"), "utf8"),
+        ),
+      );
+    const scripts = root.scripts ?? {};
 
     expect(scripts["knip"], "the root declares no knip script").toBeDefined();
     // The gates a branch never narrows are one list under one name, so the reach is two hops.
@@ -124,12 +126,14 @@ describe("the repository's own top-level `ignore` follows the index's presence (
   });
 
   it("ignores what this checkout's own directory asks for", () => {
-    // SAFETY: knip's declared type admits a function config for CLI arguments; this
-    // repository's own config is always a plain object.
-    const { ignore } = knipConfig as { readonly ignore?: readonly string[] };
+    if (typeof knipConfig === "function") {
+      throw new Error("the repository's knip config is a plain object, never the function form");
+    }
     const root = path.resolve(import.meta.dirname, "../../..");
 
-    expect(ignore).toEqual(existsSync(path.join(root, ".gitnexus")) ? [".gitnexus/**"] : []);
+    expect(knipConfig.ignore).toEqual(
+      existsSync(path.join(root, ".gitnexus")) ? [".gitnexus/**"] : [],
+    );
   });
 });
 

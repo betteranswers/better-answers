@@ -1,6 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { z } from "zod";
+
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 
 const PACKAGES_BLOCK = /^packages:\n((?:[ \t]*-[ \t]+\S+[ \t]*\n)+)/m;
@@ -34,20 +36,17 @@ export const workspacePackages = (): readonly string[] => {
     .sort();
 };
 
-type Manifest = { readonly name?: string; readonly scripts?: Readonly<Record<string, string>> };
+// Both fields are optional, so a manifest missing either reads as a workspace without it.
+const manifest = z.object({
+  name: z.string().optional(),
+  scripts: z.record(z.string(), z.string()).optional(),
+});
+type Manifest = z.infer<typeof manifest>;
 
-const manifestOf = (directory: string): Manifest => {
-  const parsed: unknown = JSON.parse(
-    readFileSync(path.join(repositoryRoot, directory, "package.json"), "utf8"),
+const manifestOf = (directory: string): Manifest =>
+  manifest.parse(
+    JSON.parse(readFileSync(path.join(repositoryRoot, directory, "package.json"), "utf8")),
   );
-
-  if (typeof parsed !== "object" || parsed === null) {
-    throw new Error(`${directory}/package.json is not an object`);
-  }
-  // SAFETY: an object, checked above; both fields are optional, so a manifest missing either
-  // reads as a workspace without it.
-  return parsed as Manifest;
-};
 
 export const rootScripts = (): Readonly<Record<string, string>> => manifestOf(".").scripts ?? {};
 

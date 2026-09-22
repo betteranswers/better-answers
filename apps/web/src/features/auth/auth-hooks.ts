@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { BetterFetchError } from "better-auth/client";
+import { z } from "zod";
 
 import { useTRPC } from "@/shared/api/trpc.ts";
 
@@ -101,15 +102,14 @@ export const useSetActiveOrganization = () => {
   });
 };
 
-export type ResumeAnswer = { readonly redirect?: boolean; readonly url?: string };
+// The client plugin types this answer as `any`, so its shape is read where it lands.
+const resumeAnswer = z.object({ redirect: z.boolean().optional(), url: z.string().optional() });
+export type ResumeAnswer = z.infer<typeof resumeAnswer>;
 
 const oauthContinueOptions = () =>
   mutationOptions<ResumeAnswer, BetterFetchError, { postLogin: true }>({
-    mutationFn: async (input) => {
-      // SAFETY: the client plugin types this answer as `any`; the picker checks `url` for
-      // presence and shape before following it.
-      return (await unwrap(authClient.oauth2.continue(input))) as ResumeAnswer;
-    },
+    mutationFn: async (input) =>
+      resumeAnswer.parse(await unwrap(authClient.oauth2.continue(input))),
   });
 
 export const useOAuthContinue = () => useMutation(oauthContinueOptions());

@@ -346,14 +346,7 @@ describe("revoking a person's credentials", () => {
 
   it("is not reachable from a workspace Admin's own principal", () => {
     const door = openPostgres(db().runtimePool);
-    const admin: UserPrincipal = {
-      kind: "user",
-      workspaceId: ulid() as UserPrincipal["workspaceId"],
-      userId: "user-admin" as UserPrincipal["userId"],
-      role: "Admin",
-      groups: [],
-      credentialIssuedAtMs: Date.now(),
-    };
+    const admin: UserPrincipal = principalOf(ulid(), ulid(), "Admin");
 
     // @ts-expect-error a user principal is not a platform principal
     void (() => revokeCredentials(admin, door, { userId: admin.userId, at: new Date() }));

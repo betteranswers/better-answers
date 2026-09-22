@@ -4,6 +4,7 @@ import path from "node:path";
 import type { DrizzleSnapshotJSON } from "drizzle-kit/api";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
 import { afterAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { restoreFinalNewline } from "../scripts/journal-newline.ts";
 import {
@@ -105,7 +106,9 @@ const aCopyOfMeta = (): string => {
 const aCopyWithAPlantedLink = (snapshotName: string): string => {
   const meta = aCopyOfMeta();
   const snapshot = path.join(meta, snapshotName);
-  const planted = JSON.parse(readFileSync(snapshot, "utf8")) as Record<string, unknown>;
+  const planted = z
+    .looseObject({ prevId: z.string() })
+    .parse(JSON.parse(readFileSync(snapshot, "utf8")));
   writeFileSync(snapshot, JSON.stringify({ ...planted, prevId: NOT_THE_ONE_BEFORE }));
   return meta;
 };
@@ -195,9 +198,9 @@ const theNewestSnapshot = (): DrizzleSnapshotJSON => {
   const walked = journalSnapshots();
   const newest = walked.ok ? walked.value.at(-1) : undefined;
   if (newest === undefined) throw new Error("there is no newest snapshot to diff against");
-  return JSON.parse(
-    readFileSync(path.join(journalMetaFolder, newest), "utf8"),
-  ) as DrizzleSnapshotJSON;
+  const text = readFileSync(path.join(journalMetaFolder, newest), "utf8");
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- drizzle-kit exports no parser for its own snapshot, and the test hands the file to its differ whole
+  return JSON.parse(text) as DrizzleSnapshotJSON;
 };
 
 const theDeclarations = (prevId: string): DrizzleSnapshotJSON =>

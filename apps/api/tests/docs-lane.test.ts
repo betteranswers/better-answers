@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { parse } from "yaml";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   gatesNamed,
@@ -332,30 +333,37 @@ describe("what the docs lane runs (the process review, 21/09/2026)", () => {
   });
 });
 
-type Step = {
-  readonly id?: string;
-  readonly if?: string;
-  readonly uses?: string;
-  readonly run?: string;
-  readonly env?: Readonly<Record<string, string>>;
-};
+const step = z.object({
+  id: z.string().optional(),
+  if: z.string().optional(),
+  uses: z.string().optional(),
+  run: z.string().optional(),
+  env: z.record(z.string(), z.string()).optional(),
+});
+type Step = z.infer<typeof step>;
 
-type Job = {
-  readonly if?: string;
-  readonly needs?: string | readonly string[];
-  readonly permissions?: Readonly<Record<string, string>>;
-  readonly outputs?: Readonly<Record<string, string>>;
-  readonly steps?: readonly Step[];
-};
-
-type Workflow = {
-  readonly on: Readonly<Record<string, unknown>>;
-  readonly concurrency: { readonly group: string; readonly "cancel-in-progress": string };
-  readonly jobs: Readonly<Record<string, Job>>;
-};
+const workflowFile = z.object({
+  on: z.record(z.string(), z.unknown()),
+  concurrency: z.object({
+    group: z.string(),
+    "cancel-in-progress": z.union([z.string(), z.boolean()]),
+  }),
+  jobs: z.record(
+    z.string(),
+    z.object({
+      if: z.string().optional(),
+      needs: z.union([z.string(), z.array(z.string())]).optional(),
+      permissions: z.record(z.string(), z.string()).optional(),
+      outputs: z.record(z.string(), z.string()).optional(),
+      steps: z.array(step).optional(),
+    }),
+  ),
+});
+type Workflow = z.infer<typeof workflowFile>;
+type Job = Workflow["jobs"][string];
 
 const workflow = (name: string): Workflow =>
-  parse(read(path.join(".github", "workflows", name))) as Workflow;
+  workflowFile.parse(parse(read(path.join(".github", "workflows", name))));
 
 const conditionOf = (step: Step): string => step.if ?? "";
 

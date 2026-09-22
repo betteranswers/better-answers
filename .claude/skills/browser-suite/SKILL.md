@@ -1,7 +1,6 @@
 ---
 name: browser-suite
 description: How this repository drives a browser — the served-build seam, the client-address fixture, the api harness's acts, locators, waiting and the accessibility gate. Use when writing, changing, debugging or running a Playwright spec under apps/web/e2e.
-user-invocable: true
 ---
 
 # The browser suite
@@ -15,22 +14,17 @@ the suite already is; `apps/web/e2e/routes.spec.ts` is the fullest worked exampl
 The server under the browser is the api's own test harness — the server factory over a
 Testcontainers Postgres, the email transport capturing codes, the CIMD document served in
 process — started by Playwright as a **process**, not imported. `apps/web` imports nothing from
-`apps/api` at runtime (ADR 0006), so launching it is the only way the browser suite can reach the
+`apps/api` at runtime, so launching it is the only way the browser suite can reach the
 real server: `apps/api/tests/serve.ts` takes a port as its one argument and listens on it, with
 the harness's control paths (`apps/api/tests/harness-control.ts`) mounted in front of the app and
 served nowhere in `apps/api/src`.
 
-One origin carries the SPA, sign-in, consent and `/oauth2/*` (ADR 0034), which is why the consent
+One origin carries the SPA, sign-in, consent and `/oauth2/*`, which is why the consent
 flow is provable in a browser at all.
 
 `apps/web/playwright.config.ts` holds the port, the `webServer` command and `/health` as the
 readiness URL — the one path the loopback carries whatever else changes, and it answers only once
 the database is migrated and the authorization server has initialised.
-
-**A slow first start is normal.** A cold Testcontainers Postgres pulls its image before anything
-answers `/health`, so the first run on a machine sits silent for minutes; the timeout is 240
-seconds. A run that fails before any spec reports usually failed here — read the server's piped
-stdout, not the spec.
 
 ## Each test gets its own address
 
@@ -74,9 +68,9 @@ holding one.
 - **Wait with auto-retrying matchers.** `await expect(…).toBeVisible()`, `.toHaveURL()`,
   `.toHaveCount(0)`. Where a navigation must complete before the next act, assert the thing that
   proves the screen was left.
-- **Title says what the system does for whom** — "a member of two workspaces picks
-  one, and everything after is scoped to the pick", not "picker test".
-- **Comment the why** — the constraint, the trade-off, the gotcha; the assertion says the what.
+- **Title says what the system does for whom** — `"a member of two workspaces picks
+  one, and everything after is scoped to the pick"`, not `"picker test"`.
+- **Minimal comments** — only comment to clarify non-obvious intent; never restate what the next line of code does.
 
 ## The accessibility gate
 
@@ -123,23 +117,3 @@ specs import `test` from the fixture module, so oxlint's vitest rules never see 
 the only fence — a focused spec left behind would run alone and report the suite green.
 `apps/web/test/playwright-config.test.ts` holds it both ways. Take the `.only` out before
 committing.
-
-## Carried from Onyx
-
-The donor is Onyx's Playwright skill. Three of its practices are ours:
-
-- **API-first set-up.** Build state through the harness; reserve the browser for the behaviour
-  under test.
-- **Parallel isolation.** No shared mutable state between specs — each provisions its own
-  workspace and mints its own address, so two running together never collide.
-- **Extracted helpers, with a comment saying why.** A set-up repeated across a file becomes a
-  local helper carrying the reason it exists.
-
-## Not carried
-
-- **Storage-state global set-up.** A session is made by signing in on the product's own screen, so
-  what the browser sees is what a person would see.
-- **A worker-user pool.** The client-address fixture keeps parallel workers apart here, and people
-  are minted per spec.
-- **Visual regression.** Out of scope for v0.1; the aria snapshot is the structural record instead.
-- **Theme runs.** No light/dark matrix.

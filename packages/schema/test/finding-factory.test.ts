@@ -2,15 +2,17 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { testData } from "./factory.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
 const contractsDir = path.resolve(import.meta.dirname, "../../../contracts");
-const redactionCases = JSON.parse(
-  readFileSync(path.join(contractsDir, "redaction", "cases.json"), "utf8"),
-) as { readonly categories: ReadonlyArray<{ readonly category: string }> };
+const redactionContract = z.object({ categories: z.array(z.object({ category: z.string() })) });
+const redactionCases = redactionContract.parse(
+  JSON.parse(readFileSync(path.join(contractsDir, "redaction", "cases.json"), "utf8")),
+);
 const DECLARED_CATEGORIES = new Set(redactionCases.categories.map((entry) => entry.category));
 
 const CATEGORY_WORDS_IN_THE_TREE = 10;

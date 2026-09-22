@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { REFRESH_TOKEN_LIFETIME_SECONDS, SEND_EMAIL_CODE_PATH } from "../src/auth/index.ts";
 import {
@@ -32,28 +33,54 @@ afterAll(async () => {
   await app.stop();
 });
 
-const json = async (response: Response) =>
-  (await response.json()) as Readonly<Record<string, unknown>>;
+const json = async <T>(response: Response, shape: z.ZodType<T>): Promise<T> =>
+  shape.parse(await response.json());
+
+// RFC 8414, the fields the surface's discovery is held to.
+const authorizationServerMetadata = z.object({
+  issuer: z.string(),
+  client_id_metadata_document_supported: z.boolean().optional(),
+  token_endpoint_auth_methods_supported: z.array(z.string()),
+  authorization_response_iss_parameter_supported: z.boolean().optional(),
+  code_challenge_methods_supported: z.array(z.string()),
+  scopes_supported: z.array(z.string()),
+  registration_endpoint: z.string().optional(),
+});
+
+// RFC 9728.
+const protectedResourceMetadata = z.object({
+  resource: z.string(),
+  authorization_servers: z.array(z.string()),
+  scopes_supported: z.array(z.string()),
+});
+
+// `strictObject`, because the suite asserts the whole answer and nothing more.
+const whoAmI = z.strictObject({ workspaceId: z.string(), userId: z.string(), role: z.string() });
+
+const refusal = z.object({ error: z.string() });
+
+const rotatedTokens = z.object({ refresh_token: z.string() });
 
 describe("discovery", () => {
   it("advertises CIMD, a public token endpoint, iss on responses, S256, and no openid (§9 19)", async () => {
     const metadata = await json(
       await app.client().fetch("/.well-known/oauth-authorization-server"),
+      authorizationServerMetadata,
     );
 
-    expect(metadata["issuer"]).toBe(PUBLIC_URL);
-    expect(metadata["client_id_metadata_document_supported"]).toBe(true);
-    expect(metadata["token_endpoint_auth_methods_supported"]).toContain("none");
-    expect(metadata["authorization_response_iss_parameter_supported"]).toBe(true);
-    expect(metadata["code_challenge_methods_supported"]).toContain("S256");
-    expect(metadata["scopes_supported"]).toEqual([
+    expect(metadata.issuer).toBe(PUBLIC_URL);
+    expect(metadata.client_id_metadata_document_supported).toBe(true);
+    expect(metadata.token_endpoint_auth_methods_supported).toContain("none");
+    expect(metadata.authorization_response_iss_parameter_supported).toBe(true);
+    expect(metadata.code_challenge_methods_supported).toContain("S256");
+    expect(metadata.scopes_supported).toEqual([
       "knowledge:read",
       "feedback:write",
       "offline_access",
     ]);
-    expect(metadata["scopes_supported"]).not.toContain("openid");
+    expect(metadata.scopes_supported).not.toContain("openid");
 
-    expect(metadata["registration_endpoint"]).toBeUndefined();
+    expect(metadata.registration_endpoint).toBeUndefined();
   });
 
   it("serves the protected-resource document at both paths with resource exactly the MCP URL (§9 20)", async () => {
@@ -61,10 +88,10 @@ describe("discovery", () => {
       "/.well-known/oauth-protected-resource",
       "/.well-known/oauth-protected-resource/mcp",
     ]) {
-      const prm = await json(await app.client().fetch(path));
-      expect(prm["resource"]).toBe(MCP_URL);
-      expect((prm["authorization_servers"] as string[])[0]).toBe(PUBLIC_URL);
-      expect(prm["scopes_supported"]).toEqual(["knowledge:read", "feedback:write"]);
+      const prm = await json(await app.client().fetch(path), protectedResourceMetadata);
+      expect(prm.resource).toBe(MCP_URL);
+      expect(prm.authorization_servers[0]).toBe(PUBLIC_URL);
+      expect(prm.scopes_supported).toEqual(["knowledge:read", "feedback:write"]);
     }
   });
 
@@ -264,7 +291,7 @@ describe("the pages, as a person walks them", () => {
     const next = await driveToPage(app, client, acme.admin);
 
     expect(next.pathname).toBe("/consent");
-    const me = await json(await client.fetch("/me"));
+    const me = await json(await client.fetch("/me"), whoAmI);
     expect(me).toMatchObject({ workspaceId: acme.workspaceId, role: "Admin" });
   });
 
@@ -497,7 +524,7 @@ describe("the cookie session, through the same resolver", () => {
     const client = app.client();
     await connectAsHost(app, client, acme.admin);
 
-    const me = await json(await client.fetch("/me"));
+    const me = await json(await client.fetch("/me"), whoAmI);
 
     expect(me).toEqual({ workspaceId: acme.workspaceId, userId: acme.admin.id, role: "Admin" });
   });
@@ -515,7 +542,7 @@ describe("the cookie session, through the same resolver", () => {
 
     expect(refused.status).toBe(401);
 
-    expect((await json(refused))["error"]).toMatch(/^(not_signed_in|credentials-revoked)$/);
+    expect((await json(refused, refusal)).error).toMatch(/^(not_signed_in|credentials-revoked)$/);
   });
 });
 
@@ -528,9 +555,8 @@ describe("refresh and revocation", () => {
 
     const refreshed = await refresh(client, first);
     expect(refreshed.status).toBe(200);
-    const rotated = await json(refreshed);
-    expect(rotated["refresh_token"]).toBeDefined();
-    expect(rotated["refresh_token"]).not.toBe(first);
+    const rotated = await json(refreshed, rotatedTokens);
+    expect(rotated.refresh_token).not.toBe(first);
 
     const rows = await app.database.superuser.query<{ expires_at: Date; revoked: Date | null }>(
       "SELECT expires_at, revoked FROM oauth_refresh_token WHERE user_id = $1 AND revoked IS NULL ORDER BY created_at DESC LIMIT 1",
@@ -541,8 +567,8 @@ describe("refresh and revocation", () => {
 
     const replayed = await refresh(client, first);
     expect(replayed.status).toBe(400);
-    expect((await json(replayed))["error"]).toBe("invalid_grant");
-    const family = await refresh(client, String(rotated["refresh_token"]));
+    expect((await json(replayed, refusal)).error).toBe("invalid_grant");
+    const family = await refresh(client, rotated.refresh_token);
     expect(family.status).toBe(400);
   });
 
@@ -576,8 +602,8 @@ describe("the audit logs (Q12)", () => {
     const client = app.client();
     const before = app.logs.length;
     const connected = await connectAsHost(app, client, one.admin, { pick: two.workspaceId });
-    const rotated = await json(await refresh(client, connected.refreshToken ?? ""));
-    const current = String(rotated["refresh_token"]);
+    const rotated = await json(await refresh(client, connected.refreshToken ?? ""), rotatedTokens);
+    const current = rotated.refresh_token;
     await client.fetch("/oauth2/revoke", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -718,7 +744,7 @@ describe("the three roles through Better Auth's own endpoints", () => {
 
     const owner = await setRole(client, memberId, "owner");
     expect(owner.status).toBe(400);
-    expect((await json(owner))["error"]).toBe("invalid_role");
+    expect((await json(owner, refusal)).error).toBe("invalid_role");
     expect(await roleOf(acme.workspaceId, viewer.id)).toBe("Editor");
   });
 

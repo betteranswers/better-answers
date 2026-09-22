@@ -1087,11 +1087,13 @@ describe("an Admin reprocesses a binding", () => {
     const scenario = await arrange();
     const { bindingId } = await indexedHandbook(scenario);
 
-    const asked = { bindingId, reason: "spring-clean" };
-
     await expect(
       asAdmin(scenario, (admin, tx) =>
-        reprocessBinding(admin, tx, asked as Parameters<typeof reprocessBinding>[2]),
+        reprocessBinding(admin, tx, {
+          ...inputOf(reprocessBindingInput, { bindingId, reason: "rule-change" }),
+          // @ts-expect-error a reason the queue does not carry, on purpose; the refusal under test is the run's own
+          reason: "spring-clean",
+        }),
       ),
     ).rejects.toThrow(/the index run was refused \(malformed\)/);
 

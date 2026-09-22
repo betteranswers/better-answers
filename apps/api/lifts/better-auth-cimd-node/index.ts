@@ -1,5 +1,6 @@
 import { lookup as dnsLookup } from "node:dns/promises";
-import { request as httpsRequest } from "node:https";
+import type { IncomingHttpHeaders } from "node:http";
+import { request as httpsRequest, type RequestOptions } from "node:https";
 import { isIP } from "node:net";
 import type { Readable } from "node:stream";
 
@@ -12,7 +13,23 @@ const BODY_FORBIDDEN_RESPONSE_STATUSES = new Set([204, 205, 304]);
 
 export type LookedUpAddress = { readonly address: string; readonly family: 4 | 6 };
 export type Lookup = (hostname: string) => Promise<readonly LookedUpAddress[]>;
-export type HttpsRequest = typeof httpsRequest;
+// Only what the fetcher reads: Node's `request` fits, and so does a double built from an
+// `EventEmitter` and a `Readable`.
+export type InboundResponse = Readable & {
+  readonly statusCode?: number | undefined;
+  readonly statusMessage?: string | undefined;
+  readonly headers: IncomingHttpHeaders;
+};
+export type OutboundRequest = {
+  once(event: "error", listener: (error: NodeJS.ErrnoException) => void): void;
+  end(): void;
+  destroy(): void;
+};
+export type HttpsRequest = (
+  url: URL,
+  options: RequestOptions,
+  callback: (response: InboundResponse) => void,
+) => OutboundRequest;
 
 export type ClientMetadataFetcherOptions = {
   readonly lookup?: Lookup;

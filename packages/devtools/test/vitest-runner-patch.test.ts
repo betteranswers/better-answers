@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 const require = createRequire(import.meta.url);
 const packageRoot = (name: string): string => path.dirname(require.resolve(`${name}/package.json`));
@@ -48,14 +49,19 @@ const STRYKER_CONFIG = `export default {
 };
 `;
 
-type Row = {
-  readonly mutatorName: string;
-  readonly replacement: string;
-  readonly status: string;
-  readonly testsCompleted?: number;
-  readonly statusReason?: string;
-  readonly location: { readonly start: { readonly line: number } };
-};
+const mutantRow = z.object({
+  mutatorName: z.string(),
+  replacement: z.string().optional(),
+  status: z.string(),
+  testsCompleted: z.number().optional(),
+  statusReason: z.string().optional(),
+  location: z.object({ start: z.object({ line: z.number() }) }),
+});
+type Row = z.infer<typeof mutantRow>;
+
+const mutationReport = z.object({
+  files: z.record(z.string(), z.object({ mutants: z.array(mutantRow) })),
+});
 
 const workspace = (): string => {
   const root = mkdtempSync(path.join(tmpdir(), "vitest-runner-patch-"));
@@ -76,13 +82,10 @@ const workspace = (): string => {
 };
 
 const rowsOf = (root: string): readonly Row[] => {
-  const parsed: unknown = JSON.parse(
-    readFileSync(path.join(root, "reports/mutation.json"), "utf8"),
+  const parsed = mutationReport.parse(
+    JSON.parse(readFileSync(path.join(root, "reports/mutation.json"), "utf8")),
   );
-
-  // SAFETY: a report of another shape fails the assertions below rather than passing them.
-  const report = parsed as { readonly files: Record<string, { readonly mutants: readonly Row[] }> };
-  return Object.values(report.files).flatMap((file) => file.mutants);
+  return Object.values(parsed.files).flatMap((file) => file.mutants);
 };
 
 const rowAt = (
@@ -99,7 +102,7 @@ const rowAt = (
   );
   if (found === undefined) {
     throw new Error(
-      `no ${mutatorName} → ${replacement} mutant on line ${String(line)}; the report holds:\n${rows.map((row) => `${String(row.location.start.line)} ${row.mutatorName} ${row.replacement} ${row.status}`).join("\n")}`,
+      `no ${mutatorName} → ${replacement} mutant on line ${String(line)}; the report holds:\n${rows.map((found) => `${String(found.location.start.line)} ${found.mutatorName} ${found.replacement ?? ""} ${found.status}`).join("\n")}`,
     );
   }
   return found;

@@ -116,7 +116,8 @@ export const ComboboxTrigger = ({ children, ...props }: ComboboxTriggerProps) =>
   useEffect(() => {
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const newWidth = (entry.target as HTMLElement).offsetWidth;
+        if (!(entry.target instanceof HTMLElement)) continue;
+        const newWidth = entry.target.offsetWidth;
         if (newWidth) {
           setWidth?.(newWidth);
         }

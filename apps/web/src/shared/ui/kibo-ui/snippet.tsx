@@ -3,7 +3,7 @@ import {
   type ComponentProps,
   cloneElement,
   type HTMLAttributes,
-  type ReactElement,
+  isValidElement,
   useState,
 } from "react";
 import { Button } from "@/shared/ui/button.tsx";
@@ -62,8 +62,8 @@ export const SnippetCopyButton = ({
     }, onError);
   };
 
-  if (asChild) {
-    return cloneElement(children as ReactElement, {
+  if (asChild && isValidElement(children)) {
+    return cloneElement(children, {
       // @ts-expect-error - we know this is a button
       onClick: copyToClipboard,
     });

@@ -11,7 +11,7 @@ The Coordinator dispatches, reads and decides. It writes no code, since the cont
 ## The goal
 
 ```
-/goal T-130, T-132, T-134, T-135, T-136 and T-137 are done on the board — `ordna list -s todo` names none of them — each with a Progress entry naming the merge commit it landed on and the acceptance lines it met, built by the workflow in docs/agents/workflow.md.
+/goal T-130, T-132, T-134, T-135, T-136 and T-137 are done on the board — `ordna list -s todo` names none of them — built by the workflow in `docs/agents/workflow.md`.
 ```
 
 Three parts: the **end state** the board can show, the **check** that shows it, the **turn clause** that bounds it. The evaluator is a small model that reads the transcript and runs nothing, which is why step 6 prints the board and the entry into the conversation. A subagent still running defers the evaluation; a turn ends on what came back, never on a wait.
@@ -29,7 +29,7 @@ Three parts: the **end state** the board can show, the **check** that shows it, 
 
 One agent owns the ticket end to end - `/mattpocock-skills:implement` is the process: `/tdd` at the seams the ticket names, the tier's skills (`AGENTS.md`, *Skills*), typecheck and single suites as it goes, the table below's first row at the end, then `/code-review` against the ticket, each finding fixed before the commit. The standards that review reads are the rules files — `CODING_RULES.md` and the `CODING_RULES.md` of every directory the change touches, `apps/api/`, `apps/web/`, `apps/worker/` and `deploy/` — and a rule's `Reviewer:` line is the part of it no gate will catch for you. An ADR amendment lands in the commit that changes what the ADR decides; its `docs/adr/README.md` row moves in that same commit when the live conclusion moves, and is left alone when it does not (the rule at the index's head).
 
-Commits go on the ticket's branch, one message in the repository's prose shape (*The prose shape*, below), `detect_changes` clean before each.
+Commits go on the ticket's branch, one message in the repository's prose shape (*The prose shape*, below), `detect_changes` clean before each. **NB:** `detect_changes` in `compare` scope against `main` reads the main checkout's stale index and is not evidence; the worktree-scoped `all` reading is.
 
 ## The queue
 

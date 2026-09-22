@@ -4,46 +4,7 @@ set -euo pipefail
 # .claude/hooks/provision-skills.sh <worktree-path>
 #
 # The skills stage of provisioning: gives a worktree the agent tooling a checkout cannot
-# carry. Run by .claude/hooks/provision-worktree.sh after the installs; runnable by hand.
-#
-# `git worktree add` checks out tracked files only, and the tooling agents run on here is
-# installed and ignored (ADR 0027 — third-party content is never ours to publish):
-# `.agents/skills/` holds the installed skills, `.claude/skills/` a relative symlink per
-# skill into it plus the plugin skills that live there directly, each workspace's own
-# `.claude/skills/` (`apps/api/.claude/skills/` and its siblings — the tier's skills that
-# `AGENTS.md` names, kept beside the code they are for) the same two
-# shapes, and `tasks/AGENTS.md` is `ordna skill install`'s copy of the ordna guide.
-# Without this stage a worktree is offered only `.claude/skills/browser-suite/`, the one
-# skill this repository wrote.
-#
-# Copied, never symlinked, from the primary checkout — the working tree beside the
-# directory `git rev-parse --git-common-dir` names. Copying is safe here where it is not
-# for `node_modules` or `.venv`: a skill is static markdown that resolves no path, so a
-# worktree's copy reads the same whichever tree it sits in. A symlink into the primary
-# would break the moment the primary's install changed, and a `.claude/skills/*` link
-# is relative, so it must sit inside the tree it points within.
-#
-# The skill directories are found, not listed: every `.claude/skills` under the tree to a
-# workspace's depth, the worktrees and the installs pruned. A workspace that gains one is
-# provisioned without a change here.
-#
-# An entry the checkout already carries is left alone — the tracked skill is never
-# overwritten by the primary's copy — which is also what makes a second run a no-op. The
-# entries are the skills, not the directories that hold them: `.agents/skills/*` and each
-# skill directory's `*`, so a skill installed on the primary after a worktree was
-# provisioned is carried by the next run rather than skipped behind a directory already
-# there (11/09/2026: two skills installed that evening left every live worktree's link to
-# them dangling).
-#
-# When the worktree still has no skills after the copy (a primary that is a fresh clone,
-# or the primary is this checkout), they are reinstalled from `skills-lock.json`, the
-# tracked manifest of what this repository installs, through the skills CLI's own restore
-# command; the ordna guide comes from `ordna skill install`. A machine without either
-# tool, or a restore that leaves the tree empty, is said plainly and is a non-zero exit
-# like every other stage's failure.
-
-# The skills CLI, pinned: read from the npm registry (`npm view skills version`) on
-# 07/09/2026. `experimental_install` is its restore-from-lock command.
+# carry. Run by .claude/hooks/provision-worktree.sh after the installs.
 SKILLS_CLI="skills@1.5.24"
 
 USAGE="Usage: provision-skills.sh <worktree-path>"
@@ -73,11 +34,8 @@ skill_dirs() {
 STATUS=0
 
 # --- copy: every entry the primary has and the worktree does not ---
-# The installed skills and each skill directory are expanded per entry, so a tracked skill
-# is skipped on its own, the rest copied, and a later install reaches a worktree already
-# provisioned.
 if [ "$PRIMARY_PATH" != "$WORKTREE_PATH" ]; then
-  ENTRIES=("skills-lock.json" "tasks/AGENTS.md")
+  ENTRIES=("skills-lock.json")
   for entry in "$PRIMARY_PATH"/.agents/skills/*; do
     present "$entry" && ENTRIES+=(".agents/skills/$(basename "$entry")")
   done
@@ -118,17 +76,6 @@ if ! has_entries "$WORKTREE_PATH/.agents/skills"; then
   else
     say "FAILED — could not reinstall from skills-lock.json (npx $SKILLS_CLI experimental_install left .agents/skills empty); run it by hand in the worktree"
     exit 1
-  fi
-fi
-
-# --- the ordna guide: not in the lock, so it has its own installer ---
-if [ ! -f "$WORKTREE_PATH/tasks/AGENTS.md" ]; then
-  if command -v ordna >/dev/null 2>&1 \
-     && (cd "$WORKTREE_PATH" && ordna skill install --out tasks/AGENTS.md >&2); then
-    say "tasks/AGENTS.md written by ordna skill install"
-  else
-    say "FAILED — tasks/AGENTS.md is missing and \`ordna skill install --out tasks/AGENTS.md\` could not write it"
-    STATUS=1
   fi
 fi
 

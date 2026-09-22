@@ -1,33 +1,41 @@
 import { existsSync, readFileSync } from "node:fs";
 
+import { z } from "zod";
+
 import { flagValues } from "./flags.ts";
 
-export type MutantStatus =
-  | "Killed"
-  | "Survived"
-  | "NoCoverage"
-  | "Timeout"
-  | "Ignored"
-  | "CompileError"
-  | "RuntimeError"
-  | "Pending";
+const mutantStatus = z.enum([
+  "Killed",
+  "Survived",
+  "NoCoverage",
+  "Timeout",
+  "Ignored",
+  "CompileError",
+  "RuntimeError",
+  "Pending",
+]);
+export type MutantStatus = z.infer<typeof mutantStatus>;
 
-export type Position = { readonly line: number; readonly column: number };
+const position = z.object({ line: z.number(), column: z.number() });
+export type Position = z.infer<typeof position>;
 
-export type ReportMutant = {
-  readonly mutatorName: string;
-  readonly replacement?: string;
-  readonly status: MutantStatus;
+const reportMutant = z.object({
+  mutatorName: z.string(),
+  replacement: z.string().optional(),
+  status: mutantStatus,
 
-  readonly testsCompleted?: number;
-  readonly location: { readonly start: Position; readonly end: Position };
-};
+  testsCompleted: z.number().optional(),
+  location: z.object({ start: position, end: position }),
+});
+export type ReportMutant = z.infer<typeof reportMutant>;
 
-export type Report = {
-  readonly files: Readonly<
-    Record<string, { readonly source: string; readonly mutants: readonly ReportMutant[] }>
-  >;
-};
+// Stryker's mutation-testing report, read as far as the summary needs it.
+const report = z.object({
+  files: z
+    .record(z.string(), z.object({ source: z.string(), mutants: z.array(reportMutant).readonly() }))
+    .readonly(),
+});
+export type Report = z.infer<typeof report>;
 
 const USAGE = "usage: mutation-summary --leg <name> --report <path> [--baseline <path>]";
 
@@ -187,14 +195,12 @@ export const mutationSummary = (
   return `${[scoreLine(leg, report), ...newSurvivorLines(leg, report, baseline), ...ranNoTestLines(leg, report)].join("\n")}\n`;
 };
 
+// A file that is not a report, or not JSON, reads as no report.
 const readReport = (file: string): Report | undefined => {
   if (!existsSync(file)) return undefined;
   try {
-    const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
-    if (typeof parsed !== "object" || parsed === null || !("files" in parsed)) return undefined;
-
-    // SAFETY: a file without a `files` key is refused above rather than read as a report.
-    return parsed as Report;
+    const read = report.safeParse(JSON.parse(readFileSync(file, "utf8")));
+    return read.success ? read.data : undefined;
   } catch {
     return undefined;
   }

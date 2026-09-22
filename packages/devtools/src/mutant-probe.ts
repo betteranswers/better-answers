@@ -3,6 +3,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import { z } from "zod";
+
 import { flagValues } from "./flags.ts";
 
 type Verdict = "killed" | "survived" | "timed out";
@@ -121,21 +123,20 @@ type SuiteOutcome =
   | { readonly kind: "interrupted" }
   | { readonly kind: "did not run"; readonly detail: string };
 
-type VitestReport = {
-  readonly numTotalTests?: number;
-  readonly numFailedTests?: number;
-  readonly numTotalTestSuites?: number;
-  readonly numFailedTestSuites?: number;
-  readonly success?: boolean;
-};
+const vitestReport = z.object({
+  numTotalTests: z.number().optional(),
+  numFailedTests: z.number().optional(),
+  numTotalTestSuites: z.number().optional(),
+  numFailedTestSuites: z.number().optional(),
+  success: z.boolean().optional(),
+});
+type VitestReport = z.infer<typeof vitestReport>;
 
+// A reporter that changed shape reads as a suite that never ran.
 const readReport = (file: string): VitestReport | undefined => {
   if (!existsSync(file)) return undefined;
-  const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
-
-  // SAFETY: every field read off the report is checked, so a reporter that changed shape
-  // reads as a suite that never ran.
-  return typeof parsed === "object" && parsed !== null ? (parsed as VitestReport) : undefined;
+  const read = vitestReport.safeParse(JSON.parse(readFileSync(file, "utf8")));
+  return read.success ? read.data : undefined;
 };
 
 const killGroup = (pid: number, signal: NodeJS.Signals): void => {

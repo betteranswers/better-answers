@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, symlinkSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 
@@ -52,13 +53,14 @@ const A_WHY_OF_TWENTY =
 // Spelled in two halves, so the tag scan does not read a fixture as a citation.
 const tag = (family: string, number: string): string => `[${family}${number}]`;
 
-type Scripts = Readonly<Record<string, string>>;
+const scriptsByName = z.record(z.string(), z.string());
+type Scripts = Readonly<z.infer<typeof scriptsByName>>;
+const rootManifest = z.object({ scripts: scriptsByName.optional() });
 
 const rootScripts = (): Scripts => {
-  const parsed: unknown = JSON.parse(
-    readFileSync(path.join(repositoryRoot, "package.json"), "utf8"),
+  const { scripts } = rootManifest.parse(
+    JSON.parse(readFileSync(path.join(repositoryRoot, "package.json"), "utf8")),
   );
-  const { scripts } = parsed as { readonly scripts?: Scripts };
   if (scripts === undefined) {
     throw new Error("the root package.json carries no scripts, so nothing here is being proved.");
   }
@@ -80,6 +82,8 @@ const pathIn = (command: string, pattern: RegExp): string => {
 const configPath = (): string =>
   pathIn(rootScripts()["comment-gate:ts"] ?? "", /packages\/\S+\.oxlintrc\.json/);
 
+const gateConfig = z.object({ ignorePatterns: z.array(z.string()).optional() });
+
 // The config is JSONC, so the comment lines go before the parse; reading its patterns here
 // stops hook and config drifting apart.
 const ignorePatterns = (): readonly string[] => {
@@ -87,8 +91,7 @@ const ignorePatterns = (): readonly string[] => {
     .split("\n")
     .filter((line) => !line.trimStart().startsWith("//"))
     .join("\n");
-  const parsed: unknown = JSON.parse(source);
-  const { ignorePatterns: patterns } = parsed as { readonly ignorePatterns?: readonly string[] };
+  const { ignorePatterns: patterns } = gateConfig.parse(JSON.parse(source));
   if ((patterns ?? []).length === 0) {
     throw new Error(`${configPath()} names no ignore pattern, so this reading proves nothing.`);
   }
@@ -249,14 +252,17 @@ describe("the write-time hook runs the same gate the root check runs", () => {
   });
 });
 
-type HookCommand = { readonly command?: string; readonly timeout?: number };
-type HookMatcher = { readonly matcher?: string; readonly hooks?: readonly HookCommand[] };
+const hookCommand = z.object({ command: z.string().optional(), timeout: z.number().optional() });
+const hookMatcher = z.object({
+  matcher: z.string().optional(),
+  hooks: z.array(hookCommand).optional(),
+});
+const settings = z.object({ hooks: z.record(z.string(), z.array(hookMatcher)).optional() });
 
 const SETTINGS = path.join(repositoryRoot, ".claude/settings.json");
 
 const wiring = (): readonly { matcher: string | undefined; timeout: number | undefined }[] => {
-  const parsed: unknown = JSON.parse(readFileSync(SETTINGS, "utf8"));
-  const { hooks } = parsed as { readonly hooks?: Readonly<Record<string, readonly HookMatcher[]>> };
+  const { hooks } = settings.parse(JSON.parse(readFileSync(SETTINGS, "utf8")));
   return (hooks?.["PostToolUse"] ?? []).flatMap((entry) =>
     (entry.hooks ?? [])
       .filter((hook) => hook.command?.includes(path.basename(script)) === true)

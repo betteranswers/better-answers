@@ -130,8 +130,9 @@ const NEEDS = {
 
 type SliceCommand = keyof typeof NEEDS;
 
-// SAFETY: the keys of a `const` object literal are its declared names and nothing else.
-export const SLICE_COMMANDS = Object.keys(NEEDS) as readonly SliceCommand[];
+const isSliceCommand = (command: string): command is SliceCommand => command in NEEDS;
+
+export const SLICE_COMMANDS: readonly SliceCommand[] = Object.keys(NEEDS).filter(isSliceCommand);
 
 const REBUILD_DEFAULT_REASON = "drill";
 
@@ -903,8 +904,6 @@ const addMemberCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<
   io.say(`add-member: done — ${email} added to workspace ${workspaceId} as ${role}`);
   return DONE;
 };
-
-const isSliceCommand = (command: string): command is SliceCommand => command in NEEDS;
 
 export const runOps = async (argv: readonly string[], doors: Doors, io: OpsIo): Promise<number> => {
   const [command, ...rest] = argv[0] === "--" ? argv.slice(1) : argv;

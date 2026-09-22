@@ -630,7 +630,13 @@ const acceptedRows = {
   ],
 } as const;
 
-const registryNames = Object.keys(boundarySchemas) as (keyof typeof boundarySchemas)[];
+// `hasOwn` is what `keyof` means at runtime, so the filter narrows rather than asserts.
+const ownKeys = <T extends object>(record: T): readonly (keyof T)[] =>
+  Object.keys(record).filter((name): name is Extract<keyof T, string> =>
+    Object.hasOwn(record, name),
+  );
+
+const registryNames = ownKeys(boundarySchemas);
 const forms = ["select", "insert", "update"] as const;
 
 const unrefinedFor = (
@@ -643,9 +649,14 @@ const unrefinedFor = (
     update: createUpdateSchema(table),
   };
 };
-const unrefined = Object.fromEntries(
-  registryNames.map((name) => [name, unrefinedFor(name)]),
-) as Readonly<Record<keyof typeof boundarySchemas, Record<(typeof forms)[number], z.ZodObject>>>;
+const unrefined = new Map(registryNames.map((name) => [name, unrefinedFor(name)]));
+const unrefinedOf = (
+  name: keyof typeof boundarySchemas,
+): Record<(typeof forms)[number], z.ZodObject> => {
+  const found = unrefined.get(name);
+  if (found === undefined) throw new Error(`no generated schemas for ${name}`);
+  return found;
+};
 
 describe("1 — every table has a boundary", () => {
   it("registers exactly the PgTables the public entry point exports", () => {
@@ -664,7 +675,7 @@ describe("2 — the key sets agree", () => {
     for (const form of forms) {
       it(`${name}.${form} names exactly the generated keys`, () => {
         expect(Object.keys(boundarySchemas[name][form].shape).toSorted()).toEqual(
-          Object.keys(unrefined[name][form].shape).toSorted(),
+          Object.keys(unrefinedOf(name)[form].shape).toSorted(),
         );
       });
     }
@@ -676,7 +687,7 @@ describe("3 — optionality and nullability agree, per key, at runtime", () => {
     for (const form of forms) {
       it(`${name}.${form} accepts undefined and null exactly where the column does`, () => {
         const refinedShape = boundarySchemas[name][form].shape;
-        const unrefinedShape: Readonly<Record<string, z.ZodType>> = unrefined[name][form].shape;
+        const unrefinedShape: Readonly<Record<string, z.ZodType>> = unrefinedOf(name)[form].shape;
         const columns: Readonly<Record<string, { dataType: string }>> = getTableColumns(
           boundarySchemas[name].table,
         );
@@ -983,7 +994,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
     ],
   } as const;
 
-  for (const name of Object.keys(rejectedRows) as (keyof typeof rejectedRows)[]) {
+  for (const name of ownKeys(rejectedRows)) {
     it(`${name} refuses every row that violates a refinement`, () => {
       for (const row of rejectedRows[name]) {
         expect(boundarySchemas[name].insert.safeParse(row).success).toBe(false);
