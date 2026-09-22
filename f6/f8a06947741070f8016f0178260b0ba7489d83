@@ -1,0 +1,9 @@
+.claude/skills/browser-suite/SKILL.md
+  ai_agent 69-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f6f8a06947741070f8016f0178260b0ba7489d83",
+  "prompts": {}
+}
