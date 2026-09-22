@@ -1,0 +1,9 @@
+.claude/hooks/provision-skills.sh
+  ai_agent 7,38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "16f25721840ae6473f2e4826e87f65b47df86067",
+  "prompts": {}
+}
