@@ -176,9 +176,9 @@ const conceptSeeded = async (
       status: "stable",
     },
   );
-  if (written.ok || written.error === "path-taken" || written.error === "merge-key-taken") {
-    return ok(undefined);
-  }
+  // A re-run meets its own seed as merge-key-taken; path-taken is another concept at the drill's
+  // path, which no drill may run against.
+  if (written.ok || written.error === "merge-key-taken") return ok(undefined);
   return err(new Error(`erasure: the rehearsal's concept was refused: ${String(written.error)}`));
 };
 

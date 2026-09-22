@@ -112,6 +112,18 @@ export const heldByIri = async (
       };
 };
 
+export const holderOfPath = async (
+  principal: Principal,
+  tx: Tx,
+  path: string,
+): Promise<string | undefined> => {
+  const found = await tx.query<{ iri: string }>(
+    `SELECT iri FROM concept_index WHERE workspace_id = ${scopeClause(1)} AND path = $2`,
+    [scopeParameter(principal), path],
+  );
+  return found.rows[0]?.iri;
+};
+
 export const holdsEveryDocument = async (
   principal: Principal,
   tx: Tx,

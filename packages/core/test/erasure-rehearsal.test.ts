@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { writeConcept } from "../src/concepts/index.ts";
 import {
   ERASURE,
   rehearseErasure,
@@ -10,7 +11,7 @@ import {
 import { bundleHistory, everyObjectOf, fileAtCommit } from "./bundle.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite } from "./suite-objects.ts";
-import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
+import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange } = suiteWithBundles();
 
@@ -98,7 +99,7 @@ describe("the seed", () => {
     expect(file).toContain(named);
   });
 
-  it("is the same subject the second time, because a drill phase re-run is not a second person", async () => {
+  it("is the same subject the second time, because a drill phase re-run is not a second person, and makes no second commit", async () => {
     const scenario = await arrange();
 
     const first = await seeding(scenario);
@@ -107,6 +108,33 @@ describe("the seed", () => {
     expect(second.personId).toBe(first.personId);
     expect(second.tokens).toEqual(first.tokens);
     expect(await membershipRows(scenario.workspaceId, first.personId)).toHaveLength(1);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
+  });
+
+  it("refuses to seed a workspace where another concept holds the drill's path, with the bundle's head where it was, rather than reporting it seeded", async () => {
+    const scenario = await arrange();
+    const other = await writeConcept(scenario.editor, doorsOf(scenario), {
+      mergeKey: "Note:not the drill",
+      path: CONCEPT_PATH,
+      kind: "Note",
+      title: "Not the drill",
+      frontmatter: { title: "Not the drill", type: "Note" },
+      body: "A note somebody left at the drill's path.",
+      message: "Record a note at the drill's path",
+      author: { name: "Ada Editor", email: "ada@acme.invalid" },
+      expects: { head: null },
+    });
+    if (!other.ok) throw new Error(`the note was refused: ${String(other.error)}`);
+
+    const seeded = await seedSyntheticSubject(ERASURE, doorsFor(scenario), {
+      workspaceId: scenario.workspaceId,
+    });
+
+    expect(seeded).toEqual({
+      ok: false,
+      error: new Error("erasure: the rehearsal's concept was refused: path-taken"),
+    });
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([other.value.sha]);
   });
 });
 

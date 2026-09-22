@@ -60,6 +60,7 @@ import {
   foldKind,
   heldByIri,
   heldVisibilityOf,
+  holderOfPath,
   holdsEveryDocument,
   indexRowOf,
   landRows,
@@ -310,6 +311,7 @@ export const writeConcept = async (
           ),
 
           resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
+          holder: await holderOfPath(fresh, tx, input.path),
           waiting:
             input.acceptance === undefined ||
             (await suggestionIsWaiting(fresh, tx, input.acceptance.suggestionId)),
@@ -318,7 +320,7 @@ export const writeConcept = async (
     );
     if (!existing.ok) return err(existing.error);
     if (!existing.value.ok) return err(existing.value.error);
-    const { held, derived, resolved, waiting, catalogued } = existing.value.value;
+    const { held, derived, resolved, holder, waiting, catalogued } = existing.value.value;
 
     if (input.iri !== undefined && held === undefined) return err("no-such-concept");
 
@@ -336,6 +338,7 @@ export const writeConcept = async (
       return err("stale-precondition");
     }
     if (held !== undefined && held.path !== input.path) return err("rename-refused");
+    if (holder !== undefined && holder !== iri) return err("path-taken");
     if (
       held !== undefined &&
       input.sensitivity !== undefined &&
@@ -818,9 +821,6 @@ export const importBundle = async (
           contentHash: wrote.value.contentHash,
         };
         known.set(concept.path, held);
-      } else if (wrote.error === "path-taken") {
-        skipped.push(concept.path);
-        continue;
       } else {
         return stoppedAt(concept.file, wrote.error);
       }
