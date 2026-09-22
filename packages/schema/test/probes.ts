@@ -37,6 +37,10 @@ const constraintOf = (error: unknown): string => {
 
 export const ADMITTED = "admitted";
 
+// A refusal's SQLSTATE outlives its message, which any author may reword.
+export const sqlstateOf = (error: unknown): string =>
+  typeof error === "object" && error !== null && "code" in error ? String(error.code) : "none";
+
 export const refusalOf = async (
   client: pg.PoolClient,
   attempt: () => Promise<unknown>,
@@ -292,9 +296,7 @@ export const enqueueAttempted = async (
     );
   } catch (error) {
     await client.query("ROLLBACK TO SAVEPOINT refused_enqueue");
-    const code =
-      typeof error === "object" && error !== null && "code" in error ? String(error.code) : "none";
-    return code;
+    return sqlstateOf(error);
   }
   await client.query("ROLLBACK TO SAVEPOINT refused_enqueue");
   return ADMITTED;

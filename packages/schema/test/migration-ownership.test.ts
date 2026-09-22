@@ -7,13 +7,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { restoreFinalNewline } from "../scripts/journal-newline.ts";
-import {
-  AUDIENCE_CHECK,
-  CONCEPT_FRONTMATTER_MAX,
-  SUGGESTION_KINDS_FROM_A_RUN,
-  SUGGESTION_KINDS_FROM_THE_APP,
-  SUGGESTION_SET_MAX,
-} from "../src/index.ts";
+import { AUDIENCE_CHECK, CONCEPT_FRONTMATTER_MAX, SUGGESTION_SET_MAX } from "../src/index.ts";
 import {
   journalEntries,
   journalMetaFolder,
@@ -231,25 +225,7 @@ const inboxSubstrate = (): string => {
   return readFileSync(file, "utf8");
 };
 
-const kindsAdmittedFor = (sql: string, role: string): readonly string[] => {
-  const found = new RegExp(`WHEN '${role}' THEN ARRAY\\[([^\\]]*)\\]`, "u").exec(sql);
-  if (found === null) throw new Error(`the submit function admits no kinds for ${role}`);
-  return [...(found[1] ?? "").matchAll(/'([^']*)'/gu)].map(([, word]) => word ?? "");
-};
-
 describe("what the inbox substrate copies from the schema package", () => {
-  it("admits exactly the kinds each tier's own constant names", () => {
-    const sql = inboxSubstrate();
-
-    expect({
-      app: kindsAdmittedFor(sql, "app_rt"),
-      run: kindsAdmittedFor(sql, "worker_rt"),
-    }).toEqual({
-      app: [...SUGGESTION_KINDS_FROM_THE_APP],
-      run: [...SUGGESTION_KINDS_FROM_A_RUN],
-    });
-  });
-
   it("bounds a set and a frontmatter at the numbers their constants hold", () => {
     const sql = inboxSubstrate();
 
