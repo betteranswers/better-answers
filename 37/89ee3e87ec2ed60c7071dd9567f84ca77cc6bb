@@ -1,0 +1,72 @@
+apps/api/tests/workspaces.ts
+  s_df9ee117beb2ea::t_aa9218f2a6c11a 62,65-76
+  s_df9ee117beb2ea::t_4dbbfc3c012808 54-56
+  s_df9ee117beb2ea::t_383085b8cc91f9 95-96
+scripts/docs-lane.mjs
+  s_df9ee117beb2ea::t_5871af74b8c424 2-7,12-22,26-39,55-57,64,76,83-88,91-105,116-118
+  s_df9ee117beb2ea::t_8509f276461bf8 23-25
+  s_df9ee117beb2ea::t_5d1037a116a3e0 58-63,65-75
+  s_df9ee117beb2ea::t_709b19c02f0c08 90
+  s_df9ee117beb2ea::t_61dc19ca067796 77-82
+.github/workflows/check.yml
+  s_df9ee117beb2ea::t_40d67dcc1a08a4 28-40
+  s_df9ee117beb2ea::t_45309b0643b33b 191,195-199,204-205,207-215,217,221-228,230,234
+  s_df9ee117beb2ea::t_cdf7e4ccc42994 606
+  s_df9ee117beb2ea::t_c9c5e784b447c1 235-239
+  s_df9ee117beb2ea::t_04c694bd2078c3 509-515
+  s_df9ee117beb2ea::t_1fd8d7ff32e21e 565-581
+  s_df9ee117beb2ea::t_21afd766da7d74 138-141
+  s_df9ee117beb2ea::t_75a4ead7e83116 666-677
+  s_df9ee117beb2ea::t_2ea4edf7993dca 547-557
+docs/agents/workflow.md
+  s_df9ee117beb2ea::t_1bf7ddd7b90609 76-77
+  s_df9ee117beb2ea::t_7f58de4771c7b2 79
+  s_df9ee117beb2ea::t_fe532563f57be2 75
+apps/api/tests/docs-lane.test.ts
+  s_df9ee117beb2ea::t_ef746848b8a228 483-490,492,496,502,507,509,513-515,519,525
+  s_df9ee117beb2ea::t_49038c497396de 567-575,577-581,583-584,586-593,596-599,601,605,621-633
+  s_df9ee117beb2ea::t_7020c3c7ee9e1f 13
+  s_df9ee117beb2ea::t_a6b57cd5558545 401-405
+  s_df9ee117beb2ea::t_fe093df5762f8f 419-426
+  s_df9ee117beb2ea::t_12ed4100011a48 365-368,370-375
+  s_df9ee117beb2ea::t_fea153f11916f5 11
+  s_df9ee117beb2ea::t_7927f3b786c574 25-27,34-37,40-101,115-144
+  s_df9ee117beb2ea::t_d19fac0df6412c 435-439
+  s_df9ee117beb2ea::t_39408999d13d87 542-558
+  s_df9ee117beb2ea::t_61910c2100a1c2 634-669
+  s_df9ee117beb2ea::t_811c82c975e01d 102-114
+apps/worker/tests/test_image.py
+  s_df9ee117beb2ea::t_b2094ec567df2e 1076,1080-1088,1090,1092,1094
+  s_df9ee117beb2ea::t_b9f1fac5f32250 1005
+  s_df9ee117beb2ea::t_f33de78e83452c 1029-1031,1062-1063,1077-1079,1095-1096
+  s_df9ee117beb2ea::t_f3e8d2acbd6262 1055,1093
+  s_df9ee117beb2ea::t_ef4cf8285a6a96 1056,1061,1064,1068-1070
+  s_df9ee117beb2ea::t_dfebfaeb9788a9 1027-1028,1032
+  s_df9ee117beb2ea::t_919bf3411ad9b4 1006
+apps/api/tests/image-job.test.ts
+  s_df9ee117beb2ea::t_d27895ea325e9f 255-258
+apps/api/tests/check-scripts.test.ts
+  s_df9ee117beb2ea::t_d5a0b71974da54 8
+  s_df9ee117beb2ea::t_1e766b4dcf4a2f 137-138
+apps/api/tests/workflow-tools.test.ts
+  s_df9ee117beb2ea::t_eb17fe94b0a3a8 24-26
+package.json
+  s_df9ee117beb2ea::t_d71e0bf2836834 8-9,11,13
+  s_df9ee117beb2ea::t_8057f102f7a5eb 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3789ee3e87ec2ed60c7071dd9567f84ca77cc6bb",
+  "prompts": {},
+  "sessions": {
+    "s_df9ee117beb2ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb2d3879-0bdc-4dd2-bf68-3d8827a104e8",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
