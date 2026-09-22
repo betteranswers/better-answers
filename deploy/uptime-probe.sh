@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+# Probes from the other box, so its own silence trips the dead-man alarm too.
 set -euo pipefail
 
 : "${APEX:?APEX not set — source /etc/better-answers/uptime.env}"

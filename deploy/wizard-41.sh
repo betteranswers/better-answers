@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-
+# Above the STAGES marker is the shared wizard library: author the stages below it.
 set -euo pipefail
-
 
 if [[ -t 1 ]] && command -v tput >/dev/null 2>&1 && [[ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]]; then
   BOLD=$(tput bold); DIM=$(tput dim); RESET=$(tput sgr0)
@@ -13,7 +12,7 @@ fi
 TOTAL_STAGES=0
 
 _STAGE_INDEX=0
-ENV_FILE="${ENV_FILE:-deploy/wizard-41.env}"
+ENV_FILE="${ENV_FILE:-deploy/wizard-41.env}"   # facts only, never a secret; gitignored
 WRITTEN_ENV=()
 WRITTEN_SECRET=()
 SKIPPED=()
@@ -149,7 +148,7 @@ finish() {
   printf '\n'
 }
 
-
+# STAGES — the steps only the owner can take. No secret is written here, only facts.
 TOTAL_STAGES=11
 banner "Better Answers — ticket 41 / T-005: accounts, boxes, edge, control plane, the object store, the first drill (stages 1, 4, 7, 8, 9 and the drill precede the first client's data; the rest may follow go-live)"
 

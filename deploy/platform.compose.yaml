@@ -1,4 +1,3 @@
-
 name: better-answers
 
 x-restart: &restart
@@ -15,6 +14,7 @@ x-mem-512: &mem512
 x-bootstrap: &bootstrap
   DATABASE_URL: ${DATABASE_URL:?}
   S3_ENDPOINT: http://objectstore:3900
+  # garage.toml fixes the same word: a client signing for another region is refused.
   S3_REGION: garage
   S3_BUCKET: ${S3_BUCKET:?the platform's bucket — wizard-41.sh § Garage creates it}
   S3_ACCESS_KEY: ${OBJECTSTORE_ROOT_KEY:?}
@@ -26,9 +26,11 @@ services:
   migrate:
     image: ghcr.io/betteranswers/api@${API_IMAGE_DIGEST:?set by the release workflow}
     command: ["pnpm", "migrate"]
+    # Quoted: a missing `restart` becomes unless-stopped, and bare `no` is YAML false.
     restart: "no"
     environment:
       <<: *bootstrap
+      # The owner DSN, migrate's alone: the runtime role the api connects as cannot run DDL.
       DATABASE_URL: ${MIGRATE_DATABASE_URL:?the owner DSN — migrate's alone}
     labels: { coolify.exclude_from_hc: "true" }
     <<: [*logging, *mem512]
@@ -49,6 +51,7 @@ services:
       APEX_HOSTNAME: ${APEX_HOSTNAME:?}
       AGENT_MAX_FILE_BYTES: "104857600"
       HEALTHCHECKS_PING_URL_SCHEDULER: ${HEALTHCHECKS_PING_URL_SCHEDULER:?}
+    # A healthcheck declared here replaces the image's outright, so its own is repeated.
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 10s
@@ -60,6 +63,7 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
 
+  # `depends_on` is a convenience; the safety is the worker's own schema-stamp check.
   worker:
     image: ghcr.io/betteranswers/worker@${WORKER_IMAGE_DIGEST:?set by the release workflow}
     <<: [*restart, *logging]
@@ -70,6 +74,7 @@ services:
       HF_HOME: /data/worker/hf-cache
       HF_HUB_OFFLINE: "1"
       TLDEXTRACT_CACHE: /data/worker/tldextract-cache
+      # The engine calls a tracking host per index run otherwise, and nothing needs it.
       COCOINDEX_DISABLE_USAGE_TRACKING: "1"
       MAX_CONCURRENT_RUNS: "1"
       LMDB_MAX_BYTES_PER_BINDING: "4294967296"
@@ -87,8 +92,10 @@ services:
     volumes:
       - /data/worker/lmdb:/data/worker/lmdb
       - /data/worker/trees:/data/worker/trees
+      # Nothing for HF_HOME or the suffix cache: a mount would mask the baked-in weights.
       - /data/git:/data/git:ro
     deploy:
       resources:
         limits: { memory: 1536m }
+    # Explicit, not implied: an index may spill 1.5 GB to the host's swap file.
     memswap_limit: 3072m

@@ -263,7 +263,6 @@ describe("the deploy tree (T-005)", () => {
     expect(dumps.filter((line) => line.includes("--exclude"))).toEqual([]);
 
     expect(drill).toContain("grep -v -E ' of table ([a-z_]+\\.)?(subject_request|suppression)$'");
-    expect(drill).toContain("keep the identifier set BY DESIGN");
 
     expect(drill).toContain("the seed added no commit");
   });

@@ -1,4 +1,4 @@
-
+# The two secrets arrive as environment variables: nothing writes the `*_file` paths.
 metadata_dir = "/data/meta"
 data_dir = "/data/data"
 db_engine = "sqlite"

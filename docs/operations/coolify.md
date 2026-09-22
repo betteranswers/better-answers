@@ -24,7 +24,7 @@ The estate's addresses, SSH users and key names, and its host firewall rules are
 | Resource | Type | Server | Notes |
 | --- | --- | --- | --- |
 | the Postgres resource | orchestrator database on the **official pgvector image, by digest** — the one reference in `packages/schema/src/postgres-image.ts` (ADR 0032; no custom image, no graph engine: the graph is plain tables inside it) | VPC 1 | volume bind-mounted under `/data/postgres`; the orchestrator's own scheduled dump is the second backup writer (ADR 0022); `\du` at the first deploy records whether its owner is the superuser (§ Probes) |
-| the `stores` stack | Docker Compose from `deploy/stores.compose.yaml` | VPC 1 | object store, `cloudflared`, `backup` — the backup image by digest (`BACKUP_IMAGE_DIGEST` in this resource's env, from `build.yml`'s run summary; moved by hand, never by a release); the embedding host is commented out until a workspace takes the local route (ADR 0024) |
+| the `stores` stack | Docker Compose from `deploy/stores.compose.yaml` | VPC 1 | object store, `cloudflared`, `backup` — the backup image by digest (`BACKUP_IMAGE_DIGEST` in this resource's env, from `build.yml`'s run summary; moved by hand, never by a release); no embedding host runs until a workspace takes the local route (ADR 0024), and § The local embedding route below is how one is added |
 | the `platform` stack | Docker Compose from `deploy/platform.compose.yaml` | VPC 1 | `migrate` → `api` (`worker` is declared behind the `pipeline` profile until `T-006`); digests promoted by `release.yml` from what `build.yml` pushed; a private-registry pull credential on the server's Docker config; every service carries a memory limit (§ Memory) |
 | the staging Postgres resource | orchestrator database | VPC 2 | created once and kept empty; the drill refills it |
 | the two staging stacks | the same two compose files plus `deploy/staging.override.yaml`, staging env from a root-only file | VPC 2 | **on demand** — brought up for a drill or rehearsal and wiped after (`RUNBOOK.md` § Bring staging up); synthetic fixture only (`deploy/seed-synthetic.sh`); no hostname points at them |
@@ -53,6 +53,31 @@ A rule's effect on the real flow is rehearsed before it is written into the esta
 **The uptime check — one, external, on the hostname clients use.** **Two paths on the app hostname**, each expecting `200`: `/health` — the app is up and its database answers — and `/.well-known/oauth-protected-resource/mcp` — the authorization server's discovery is served, which is what a connector needs before anything else. On Pro, Cloudflare's own Health Checks (Traffic → Health Checks; a Pro feature) run them from outside both boxes every minute, three failures to go red, alerting the **second channel** through Cloudflare Notifications, and bypass the rate-limit rules above. Until the zone is on Pro, `deploy/uptime-probe.sh` runs them from VPC 2 by host cron every five minutes — through the public edge, so DNS, the tunnel and the origin are all on the probed path — and pings the healthchecks.io check `uptime` (5 min period · 5 min grace) with the outcome. The probe cannot be replaced by healthchecks.io alone: that service only listens for pings and never probes a URL. Its two requests per five minutes sit far under any threshold above. Either way the check is the one signal that covers VPC 1 from the outside. On Pro, VPC 2 is covered only by its daily and monthly pings; on Free, the probe's own silence — VPC 2 down included — trips the dead-man alarm within ten minutes, narrowing that blind spot (`RUNBOOK.md` page 1 records both postures).
 
 **The share agent's per-file cap** matches the edge's own body limit, 100 MB on Free and Pro.
+
+## The local embedding route
+
+The CPU embedding host (bge-m3, 1024 dims) runs only for a workspace on the **local** embedding route, and the first estate has none: client one embeds on the hosted route, and a 4 GB box has no room for an idle model server (ADR 0024). A workspace choosing the local route is growth step E — a third contract, sized for a model host — and the route is immutable per workspace, so the choice is made once.
+
+The day a workspace takes it, add this service to `deploy/stores.compose.yaml` and add `embeddings:1000` to `init`'s directory list. Nothing under `/data/embeddings` existed before, so `init` is what creates and owns it. The image is chosen and pinned by digest on that day, as every other image in the file is.
+
+```yaml
+  embeddings:
+    image: # the OpenAI-shaped embedding server, pinned by digest on the day
+    <<: [*restart, *logging]
+    environment:
+      MODEL_ID: BAAI/bge-m3
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 20
+      start_period: 120s
+    volumes: ["/data/embeddings:/data"]
+    depends_on:
+      init: { condition: service_completed_successfully }
+```
+
+`EMBEDDINGS_URL` is already declared in `deploy/platform.compose.yaml`'s bootstrap block and is unset while no host runs; it is set to `http://embeddings:8080` in the platform resource's env when the service is added.
 
 ## Probes at the first deploy
 

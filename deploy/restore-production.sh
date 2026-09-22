@@ -24,7 +24,9 @@ stores()   { compose --env-file "${STORES_ENV_FILE}" -f stores.compose.yaml -p b
 platform() { compose --env-file "${PLATFORM_ENV_FILE}" -f platform.compose.yaml -p better-answers "$@"; }
 tool() { stores run --rm --no-deps -v "${WORK}:/work" -v "${BACKUP_AGE_IDENTITY_FILE}:/run/age.key:ro" backup "$@"; }
 rclone() { tool rclone "$@"; }
-cleanup_work() { rm -rf "${WORK}"; }
+cleanup_work() { rm -rf "${WORK}"; }   # the decrypted dump is personal data
+
+# No exit trap: the drill's wipe-on-exit is the wrong trap for the box you are saving.
 
 say "# Production restore — dump=${dump} tier=${tier} objectstore=${objectstore} git=${git}"
 
@@ -46,6 +48,7 @@ rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/${dump}" "/work/pg.dump.a
 [ -z "${globals}" ] || rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/${globals}" "/work/globals.sql.age"
 [ ! -f "${WORK}/globals.sql.age" ] || tool sh -c 'age -d -i /run/age.key /work/globals.sql.age | psql "$DATABASE_URL" -q' || true
 tool age -d -i /run/age.key -o /work/pg.dump /work/pg.dump.age
+# --no-owner leaves the restoring role owning everything; the grants ride the dump.
 tool sh -c 'pg_restore --clean --if-exists --no-owner --dbname="$DATABASE_URL" /work/pg.dump'
 rm -f "${WORK}/pg.dump" "${WORK}/pg.dump.age" "${WORK}/globals.sql.age"
 say "restored — RPO $(( ( $(date +%s) - $(date -d "${stamp:0:8} ${stamp:9:2}:${stamp:11:2}" +%s) ) / 60 )) min"
@@ -73,6 +76,7 @@ fi
 cleanup_work
 
 say "## 6 REPLAY ERASURES completed after ${stamp} — mandatory; a failure here leaves api stopped"
+# On api, not migrate: only api carries the git directory and object store this reads.
 platform run --rm --no-deps api pnpm ops replay-erasures --since "${stamp}" | tee -a "${LOG}"
 
 say "## 7 start api and prove it answers"

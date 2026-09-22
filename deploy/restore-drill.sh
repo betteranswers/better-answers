@@ -25,6 +25,7 @@ started=$(date -u +%FT%TZ); T0=$(date +%s)
 say() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}"; }
 aside() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}" >&2; }
 DEPLOY_DIR="${REPO_DIR}/deploy"
+# The -f paths are absolute: compose resolves them against the caller's cwd.
 compose() { docker compose --project-directory "${DEPLOY_DIR}" --env-file "${STAGING_ENV_FILE}" "$@"; }
 stores()   { compose -f "${DEPLOY_DIR}/stores.compose.yaml" -f "${DEPLOY_DIR}/staging.override.yaml" -p better-answers-stores-staging "$@"; }
 platform() { compose -f "${DEPLOY_DIR}/platform.compose.yaml" -p better-answers-staging "$@"; }
@@ -38,6 +39,7 @@ prod_query() {
   aside "REFUSED: production could not be read for the counts diff — the SSH hop or psql failed"; return 1
 }
 wipe_staging() {
+  # Not "${WORK}": step 0 wipes too, and the report being written lives there.
   platform down --remove-orphans || true; stores down --remove-orphans || true
   sudo rm -rf /data/objectstore/* /data/git/* /data/worker/lmdb/* /data/worker/trees/* /data/backup/staging/*
   psql "${STAGING_DATABASE_URL}" -qc "drop schema if exists public cascade; create schema public; drop schema if exists index cascade; drop schema if exists drizzle cascade;" || true
@@ -61,9 +63,11 @@ globals=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/" | grep '^globals-'
 dump_at=$(echo "${latest}" | sed -E 's/^pg-([0-9T]+Z)\..*/\1/')
 rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/${globals}" "${WORK}/globals.sql.age"
 rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/${latest}" "${WORK}/pg.dump.age"
+# Production's globals carry an ALTER ROLE that would reset the staging superuser's password.
 staging_owner=$(printf '%s' "${STAGING_DATABASE_URL}" | sed -E 's|^[a-z]+://([^:/@]+).*|\1|')
 age -d -i "${BACKUP_AGE_IDENTITY_FILE}" "${WORK}/globals.sql.age" | grep -v -E "^(CREATE|ALTER) ROLE \"?${staging_owner}\"?[ ;]" | psql "${STAGING_DATABASE_URL}" -q || true
 age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${WORK}/pg.dump" "${WORK}/pg.dump.age"
+# --no-owner: the restoring role owns everything; the grants still ride the dump.
 pg_restore --no-owner --dbname="${STAGING_DATABASE_URL}" "${WORK}/pg.dump"
 say "restored ${latest} (taken ${dump_at}) — RPO $(( ( $(date +%s) - $(date -d "${dump_at:0:8} ${dump_at:9:2}:${dump_at:11:2}" +%s) ) / 60 )) min"
 
@@ -132,11 +136,15 @@ if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
   ws_git() { sudo -u '#1000' git -C "${ws_repo}" "$@"; }
   commits_before_seed=$({ ws_git rev-list --all 2>/dev/null || true; } | sort)
 
+  # 3 alone means no tables; a wider guard would write that over a refused seed.
+
+  # >>> seed status
   seed_rc=0
   subject=$(platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --seed | tail -n1) || seed_rc=$?
   if [ "${seed_rc}" -ne 0 ] && [ "${seed_rc}" -ne "${NOT_BUILT}" ]; then
     say "REHEARSAL FAILED: the synthetic seed exited ${seed_rc}, which is not the ${NOT_BUILT} that says the erasure slice has no tables"; exit 1
   fi
+  # <<< seed status
   if [ "${seed_rc}" -eq 0 ]; then
     commits_after_seed=$({ ws_git rev-list --all 2>/dev/null || true; } | sort)
     seeded_commits=$(comm -13 <(printf '%s\n' "${commits_before_seed}") <(printf '%s\n' "${commits_after_seed}"))
@@ -156,11 +164,13 @@ if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
 
     platform exec -T api pnpm --silent ops dump-grep --tokens "${subject}" < "${WORK}/post-erasure.sql" > "${WORK}/post-erasure.grep"
     cat "${WORK}/post-erasure.grep" >> "${REPORT}"
+    # Those two keep the identifier by design. Present anywhere else, a store was missed.
     if leaked=$(grep ': present in ' "${WORK}/post-erasure.grep" | grep -v -E ' of table ([a-z_]+\.)?(subject_request|suppression)$'); then
       say "REHEARSAL FAILED: the subject is still held — ${leaked}"; exit 1
     fi
     say "dump grep after: the subject is in no table but subject_request and suppression, which keep the identifier set by design"
 
+    # An empty set is a failure: the seed always commits, so nothing here means no read.
     if [ -z "${seeded_commits}" ]; then
       say "REHEARSAL FAILED: the seed added no commit to ${ws_repo} — step 7 would prove nothing"; exit 1
     fi

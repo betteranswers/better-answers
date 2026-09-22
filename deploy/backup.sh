@@ -35,6 +35,7 @@ job_pg() {
   if erasure_running; then echo "erasure routine running — hourly dump skipped"; return 0; fi
   read -r tier life <<<"$(tier_for_now)"
   local file="${STAGING}/pg-${NOW}.dump.age" remote="dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/pg-${NOW}.dump.age"
+  # pg_dumpall takes no positional DSN: bare, it echoes the password into the log.
   if { pg_dumpall --globals-only --dbname="${DATABASE_URL}" | age -r "${BACKUP_AGE_RECIPIENT}" > "${STAGING}/globals-${NOW}.sql.age"; } \
      && { pg_dump --format=custom --no-owner "${DATABASE_URL}" | age -r "${BACKUP_AGE_RECIPIENT}" > "${file}"; } \
      && rclone copyto --s3-no-check-bucket "${file}" "${remote}" \
@@ -78,6 +79,7 @@ job_git_mirror() {
     ws=$(basename "${repo}" .git)
     ssh -o BatchMode=yes "${GIT_MIRROR_SSH_TARGET%%:*}" init-repo "${ws}" >/dev/null || { rc=1; continue; }
     if ! pushed=$(git -C "${repo}" push --mirror --porcelain "${GIT_MIRROR_SSH_TARGET}/${ws}.git"); then rc=1; continue; fi
+    # The objects a rewrite replaced stay readable there through the reflog until pruned.
     if printf '%s\n' "${pushed}" | grep -qE '^[+-]'; then
       ssh -o BatchMode=yes "${GIT_MIRROR_SSH_TARGET%%:*}" prune-repo "${ws}" >/dev/null || rc=1
     fi
@@ -86,6 +88,7 @@ job_git_mirror() {
   return "${rc}"
 }
 
+# Anything left here for a day is a failed upload of personal data.
 find "${STAGING}" -type f -mmin +1440 -delete || true
 
 case "${1:-}" in
