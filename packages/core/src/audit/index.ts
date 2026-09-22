@@ -5,7 +5,6 @@ import { actorIdOf } from "../kernel/index.ts";
 import type { ActorId, AuditEventId, PlatformPrincipal, Principal } from "../kernel/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import {
-  type Act,
   DETAIL_KINDS,
   type DetailKind,
   type DetailOf,
@@ -13,12 +12,13 @@ import {
   type DetailValue,
   isDeclared,
   isOptionalKind,
+  type LedgerAct,
 } from "./vocabulary.ts";
 
 export { act, declareActs, declarations } from "./vocabulary.ts";
 export type {
-  Act,
   ActName,
+  LedgerAct,
   Declaration,
   DetailKind,
   DetailOf,
@@ -26,7 +26,7 @@ export type {
   Family,
 } from "./vocabulary.ts";
 
-export type AuditEvent<A extends Act> = {
+export type AuditEvent<A extends LedgerAct> = {
   readonly id: string;
   readonly act: A;
   readonly subjectId: string;
@@ -45,7 +45,7 @@ export type LedgerRow = z.infer<typeof boundarySchemas.auditEvent.select>;
 export const eventsOfAct = async (
   principal: Principal,
   tx: Tx,
-  act: Act,
+  act: LedgerAct,
   since?: Date,
 ): Promise<readonly LedgerRow[]> => {
   const found = await tx.query(
@@ -92,7 +92,7 @@ const detailRefusal = (
   return undefined;
 };
 
-const write = async <A extends Act>(
+const write = async <A extends LedgerAct>(
   tx: Tx,
   workspaceId: string | null,
   actor: ActorId,
@@ -133,13 +133,13 @@ const write = async <A extends Act>(
   return { id: boundarySchemas.auditEvent.select.shape.id.parse(id), actorId: actor };
 };
 
-export const record = <A extends Act>(
+export const record = <A extends LedgerAct>(
   principal: Principal,
   tx: Tx,
   event: AuditEvent<A>,
 ): Promise<Recorded> => write(tx, scopeParameter(principal), actorIdOf(principal), event);
 
-export const recordFor = <A extends Act>(
+export const recordFor = <A extends LedgerAct>(
   platform: PlatformPrincipal,
   tx: Tx,
   event: AuditEvent<A> & { readonly actor: ActorId },
