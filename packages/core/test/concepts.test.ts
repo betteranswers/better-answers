@@ -36,7 +36,13 @@ import {
   readingAs,
   until,
 } from "./suite-postgres.ts";
-import { arrangeWorkspace, doorsOf, principalFor, type Scenario } from "./workspace-with-bundle.ts";
+import {
+  arrangeWorkspace,
+  doorsOf,
+  memberOf,
+  principalFor,
+  type Scenario,
+} from "./workspace-with-bundle.ts";
 
 const db = postgresForSuite();
 const bundles = bundlesForSuite();
@@ -1433,7 +1439,7 @@ describe("opening a concept by IRI", () => {
     expect(opened.ok && opened.value.found && opened.value.concept?.trust).toMatchObject({
       tier: "human-reviewed",
       status: "current",
-      checkedBy: `human:${scenario.admin.userId}`,
+      checkedBy: "Test person",
     });
 
     await landed(
@@ -1446,6 +1452,38 @@ describe("opening a concept by IRI", () => {
     expect(moved.ok && moved.value.found && moved.value.concept?.trust.status).toBe(
       "changed-since-checked",
     );
+  });
+
+  it("names the member who checked it, and falls back to their id once they have left the workspace", async () => {
+    const scenario = await arrange();
+    const written = await landed(scenario, writeFor({ status: "stable" }));
+    const priya = await memberOf(db().pool, scenario.workspaceId, "priya.anand@acme.invalid");
+    const client = await db().pool.connect();
+    try {
+      await testData(client).conceptVerification({
+        workspaceId: scenario.workspaceId,
+        iri: written.iri,
+        actor: `human:${priya.id}`,
+        contentHash: written.contentHash,
+      });
+    } finally {
+      client.release();
+    }
+    const checkedBy = async () => {
+      const opened = await reading(scenario.viewer, (principal, tx) =>
+        open(principal, tx, { iri: written.iri }, now),
+      );
+      return opened.ok && opened.value.found ? opened.value.concept?.trust.checkedBy : undefined;
+    };
+
+    expect(await checkedBy()).toBe("Priya Anand");
+
+    await db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+      scenario.workspaceId,
+      priya.id,
+    ]);
+
+    expect(await checkedBy()).toBe(`human:${priya.id}`);
   });
 
   it("shows a deprecated concept to every reader, and says that is what it is", async () => {

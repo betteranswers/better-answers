@@ -944,10 +944,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
     // workspace the block provisions.
     const verifierIds = new Map<string, string>();
 
-    const verifierOf = async (app: TestApp, email: string): Promise<string> => {
+    const verifierOf = async (app: TestApp, email: string, name: string): Promise<string> => {
       const known = verifierIds.get(email);
       if (known !== undefined) return known;
-      const { id } = await app.person(email);
+      const { id } = await app.person(email, name);
       verifierIds.set(email, id);
       return id;
     };
@@ -955,8 +955,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
     const bundleWorkspace = async (app: TestApp) => {
       const { workspaceId, admin } = await app.provision();
       await initRepository(openTestGit(app), workspaceId);
-      const mona = await verifierOf(app, MONA);
-      const theo = await verifierOf(app, THEO);
+      const mona = await verifierOf(app, MONA, "Mona Reviewer");
+      const theo = await verifierOf(app, THEO, "Theo Approver");
       await app.addMember(workspaceId, mona, "Editor");
       await app.addMember(workspaceId, theo, "Editor");
       return { workspaceId, admin, mona, theo };
@@ -1127,7 +1127,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
     });
 
-    it("records each verified event as an imported check with a null hash and one audit event, so a reader sees Checked by · imported in find and open", async () => {
+    it("records each verified event as an imported check with a null hash and one audit event, so find and open say Checked by the member's name · imported", async () => {
       const { workspaceId, admin, mona, theo } = await bundleWorkspace(app());
 
       await importing(app(), workspaceId, admin.email);
@@ -1179,7 +1179,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         kind: "Answer",
         title: "Data retention period",
         tags: ["company", "data-protection", "g-cloud-15"],
-        words: `Checked by human:${theo} · 1 June 2026 · imported`,
+        words: "Checked by Theo Approver · 1 June 2026 · imported",
       });
 
       const opened = await reading(app(), workspaceId, admin.id, (principal, tx) =>
@@ -1190,7 +1190,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(opened.value.concept?.trust).toEqual({
         tier: "human-reviewed",
         status: "current",
-        checkedBy: `human:${theo}`,
+        checkedBy: "Theo Approver",
         checkedAt: "2026-06-01T09:30:00.000Z",
         rider: "imported",
       });
