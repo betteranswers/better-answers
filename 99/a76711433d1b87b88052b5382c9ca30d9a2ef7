@@ -1,0 +1,20 @@
+packages/core/test/erasure-routine.test.ts
+  s_b979b383b8487b::t_45b56a01551d74 838,841
+  s_b979b383b8487b::t_0ca407e96a8282 875-882,885-886,892-899
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "99a76711433d1b87b88052b5382c9ca30d9a2ef7",
+  "prompts": {},
+  "sessions": {
+    "s_b979b383b8487b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e61a5c8-13ae-4dc9-a43d-8d5569f4e2c6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
