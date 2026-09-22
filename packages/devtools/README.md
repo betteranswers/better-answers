@@ -111,7 +111,7 @@ both ways and over the committed tree.
 
 The comment rule's two conditions — a comment block is 25 words at most and cites no ticket id,
 date, rule tag or ADR number — held by a rule for TypeScript, a check for Python and a density
-ceiling per workspace. Directives and notices are exempt by their opening text everywhere, and
+ceiling over each unit. Directives and notices are exempt by their opening text everywhere, and
 a directive is dropped before blocks are grouped so it cannot lend a paragraph its exemption.
 Each part carries the rule in the message it prints, and each is proven through the runner
 above, both ways.
@@ -125,6 +125,18 @@ above, both ways.
 All three are root `check` steps, ahead of the tiers, and landed green with no baseline. The
 lint rule sits in a config of its own because oxlint switches a plugin rule on from a config's
 `rules` block and from nowhere on the command line — `--deny` does not reach one.
+
+The ceiling measures two kinds of unit. A positional argument is a root of workspaces: each
+directory under it carrying a `package.json` or a `pyproject.toml` is one workspace, measured
+on TypeScript and Python, split into a source arm and a test arm with a ceiling each.
+`--directory <path>`, repeatable, names one directory measured as a single number under the
+source ceiling, on those two languages and the config tree's beside them — shell, YAML, TOML,
+SQL and JavaScript. The longest path wins where a directory sits inside a workspace, so
+`--directory packages/schema/migrations` gives the SQL a number of its own rather than one the
+TypeScript eight times its size decides. The report names a directory the way it names a
+workspace, and a named directory the counter read no file in is refused, never called clean.
+Root `check` names the two workspace roots and no directory yet; each config root is wired as
+its strip lands.
 
 The counter is **cloc**, pinned at `2.6.0-cloc`, which carries upstream cloc `2.06` — the
 number a behaviour is compared against. **Read the pin off the registry's `latest` tag and
