@@ -1,0 +1,153 @@
+docs/operations/RUNBOOK.md
+  s_320323b36053d1::t_f54cc61a388038 1,115-122
+apps/web/src/app/toolbar.tsx
+  s_320323b36053d1::t_f54cc61a388038 1,4-10,23-27,38
+apps/worker/CODING_RULES.md
+  s_320323b36053d1::t_f54cc61a388038 3,5,7,9,11
+packages/core/src/concepts/landing.ts
+  s_320323b36053d1::t_f54cc61a388038 40-42
+apps/api/tests/fixtures/bundle/company/answers/support-hours.md
+  s_320323b36053d1::t_f54cc61a388038 1-18
+docs/specs/T-311.md
+  s_320323b36053d1::t_f54cc61a388038 137-144
+AGENTS.md
+  s_320323b36053d1::t_f54cc61a388038 10
+apps/web/src/app/views/routes-and-spend-view.tsx
+  s_320323b36053d1::t_f54cc61a388038 3
+packages/core/src/answering/index.ts
+  s_320323b36053d1::t_f54cc61a388038 226-232
+apps/api/src/ops/index.ts
+  s_320323b36053d1::t_f54cc61a388038 6-7,11-14,23,32-33,54-55,99,123-126,136,139,143-150,347,478,480,498-623
+apps/api/tests/coding-rules-tags.test.ts
+  s_320323b36053d1::t_f54cc61a388038 38-68,147-153,161,179-182,202-204,208-209,223,260-281,289-299
+apps/api/tests/fixtures/bundle/product/answers/can-two-teams-share-one-account-standard-plan.md
+  s_320323b36053d1::t_f54cc61a388038 1-20
+apps/web/src/shared/view-toolbar.tsx
+  s_320323b36053d1::t_f54cc61a388038 1-79
+CONTEXT.md
+  s_320323b36053d1::t_f54cc61a388038 762-764
+apps/api/tests/fixtures/bundle/log.md
+  s_320323b36053d1::t_f54cc61a388038 1-5
+packages/core/src/concepts/index.ts
+  s_320323b36053d1::t_f54cc61a388038 3-4,8-9,13,17,22,32,37,45-50,68-85,103-110,587-874,880-881,910,915-916,925-930,992-997
+apps/api/tests/fixtures/bundle/company/answers/index.md
+  s_320323b36053d1::t_f54cc61a388038 1-4
+packages/devtools/test/comment-only-the-why.test.ts
+  s_320323b36053d1::t_f54cc61a388038 57-60
+packages/devtools/python/comment_gate.py
+  s_320323b36053d1::t_f54cc61a388038 35-36
+deploy/CODING_RULES.md
+  s_320323b36053d1::t_f54cc61a388038 1-11
+packages/core/src/workspaces/index.ts
+  s_320323b36053d1::t_f54cc61a388038 7,18,286-309
+docs/specs/s1-one-uploaded-document-to-a-cited-passage.md
+  s_320323b36053d1::t_f54cc61a388038 159
+package.json
+  s_320323b36053d1::t_f54cc61a388038 12
+apps/api/tests/fixtures/bundle/company/index.md
+  s_320323b36053d1::t_f54cc61a388038 1-3
+apps/api/CODING_RULES.md
+  s_320323b36053d1::t_f54cc61a388038 3,5,7,9,11,13,15,17,19,21
+apps/api/tests/coding-rules-form.test.ts
+  s_320323b36053d1::t_f54cc61a388038 1-386
+apps/api/tests/fixtures/bundle/product/tiers/index.md
+  s_320323b36053d1::t_f54cc61a388038 1-4
+apps/api/tests/fixtures/bundle/product/answers/can-two-teams-share-one-account-advanced-plan.md
+  s_320323b36053d1::t_f54cc61a388038 1-20
+docs/architecture/c4-components-api.md
+  s_320323b36053d1::t_f54cc61a388038 22
+docs/architecture/c4-containers.md
+  s_320323b36053d1::t_f54cc61a388038 61
+apps/api/tests/fixtures/bundle/product/index.md
+  s_320323b36053d1::t_f54cc61a388038 1-4
+apps/api/tests/ops.test.ts
+  s_320323b36053d1::t_f54cc61a388038 4,11,20,22,28,381,927-1371
+apps/web/src/app/frame.tsx
+  s_320323b36053d1::t_f54cc61a388038 7,12
+docs/okf-v02.md
+  s_320323b36053d1::t_f54cc61a388038 42
+apps/api/tests/fixtures/bundle/index.md
+  s_320323b36053d1::t_f54cc61a388038 1-4
+apps/web/src/features/routes/routes-card.tsx
+  s_320323b36053d1::t_f54cc61a388038 46
+packages/core/package.json
+  s_320323b36053d1::t_f54cc61a388038 39
+packages/core/test/suggestions.test.ts
+  s_320323b36053d1::t_f54cc61a388038 811
+packages/core/src/access/index.ts
+  s_320323b36053d1::t_f54cc61a388038 36-38
+packages/core/test/import-bundle.test.ts
+  s_320323b36053d1::t_f54cc61a388038 1-927
+packages/devtools/test/comment-gate-python.test.ts
+  s_320323b36053d1::t_f54cc61a388038 58-61
+apps/web/CODING_RULES.md
+  s_320323b36053d1::t_f54cc61a388038 3-31
+apps/web/test/lint-rules.test.ts
+  s_320323b36053d1::t_f54cc61a388038 62-70
+docs/specs/T-225.md
+  s_320323b36053d1::t_f54cc61a388038 87,100
+apps/api/src/ops/read-tree.ts
+  s_320323b36053d1::t_f54cc61a388038 1-18
+packages/core/test/erasure-routine.test.ts
+  s_320323b36053d1::t_f54cc61a388038 838,841,875-882,885-886,892-899
+apps/api/tests/fixtures/bundle/company/answers/data-retention-period.md
+  s_320323b36053d1::t_f54cc61a388038 1-23
+apps/api/tests/fixtures/bundle/product/tiers/standard-plan.md
+  s_320323b36053d1::t_f54cc61a388038 1-18
+docs/adr/README.md
+  s_320323b36053d1::t_f54cc61a388038 16,39,53,55
+docs/specs/v01-route.md
+  s_320323b36053d1::t_f54cc61a388038 152,448
+packages/core/src/concepts/loader.ts
+  s_320323b36053d1::t_f54cc61a388038 1-453
+packages/devtools/lint-rules/rules/comment-only-the-why.ts
+  s_320323b36053d1::t_f54cc61a388038 13-14
+CODING_RULES.md
+  s_320323b36053d1::t_f54cc61a388038 3,5,9,11,13,15,17,19,21,23-26,28-30,34,36,38,40,42,44,46,48,50-52,54-56,58,60,62,64,66,68,70,72,74,76,78,80,82-84,86-88,90,92,94,96,98,100,102,104,110,112,114,116,120,122,124,126,128,130,132,134,136,138,140,142,144,146,148,150,152,154,156,158,160,162,164,166,168,170,172,174,176,178,180,182,184,186,188,190,192,194,196,198,200,202,204,206,208,210,212,214,216,218,220,222,224,226,228,230,232,234,238,240,242,244
+apps/api/tests/fixtures/bundle/manifest.yaml
+  s_320323b36053d1::t_f54cc61a388038 1-5
+docs/adr/0043-an-act-is-what-an-entry-may-ask-core-to-do-admitted-before-its-body-runs-refusing-in-classed-words-that-cross-every-transport-as-themselves-in-a-transaction-only-its-opener-rolls-back.md
+  s_320323b36053d1::t_f54cc61a388038 148-199
+docs/adr/0006-hono-server-and-vite-spa-not-nextjs.md
+  s_320323b36053d1::t_f54cc61a388038 25-28
+packages/core/test/concepts.test.ts
+  s_320323b36053d1::t_f54cc61a388038 39-45,1442,1455-1486
+apps/api/tests/harness.ts
+  s_320323b36053d1::t_f54cc61a388038 97,230-231,234-236
+packages/core/src/concepts/reconciler.ts
+  s_320323b36053d1::t_f54cc61a388038 42-49,195
+packages/core/src/erasure/rehearsal.ts
+  s_320323b36053d1::t_f54cc61a388038 4,164
+apps/api/tests/fixtures/bundle/product/tiers/advanced-plan.md
+  s_320323b36053d1::t_f54cc61a388038 1-18
+apps/api/tests/fixtures/bundle/product/answers/index.md
+  s_320323b36053d1::t_f54cc61a388038 1-4
+docs/agents/workflow.md
+  s_320323b36053d1::t_f54cc61a388038 30,38
+docs/adr/0045-a-coding-rule-is-one-imperative-under-a-tag-in-the-file-for-the-directory-it-binds-and-names-a-reviewer-only-where-no-gate-can-hold-it.md
+  s_320323b36053d1::t_f54cc61a388038 1-24
+apps/api/src/ops.ts
+  s_320323b36053d1::t_f54cc61a388038 11,40
+apps/api/tests/docs-lane.test.ts
+  s_320323b36053d1::t_f54cc61a388038 75-77
+docs/adr/0029-the-tier-is-apps-over-packages-business-logic-is-a-library-of-capability-slices-over-four-store-doors.md
+  s_320323b36053d1::t_f54cc61a388038 171-178
+docs/architecture/c4-dynamic-document-to-passage.md
+  s_320323b36053d1::t_f54cc61a388038 28-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "021fca22d22f6c7c99e0eaf48369f390d12bd69a",
+  "prompts": {},
+  "sessions": {
+    "s_320323b36053d1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6e020584-14a1-4e56-8ad9-2bb22a24c3fc",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
