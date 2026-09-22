@@ -1,0 +1,53 @@
+scripts/strip-comments.mjs
+  s_41bfaa1109f771::t_944672aec975f3 56-58
+  s_41bfaa1109f771::t_9f8cf00dc8ff78 191-192
+  s_41bfaa1109f771::t_fefbe2e02b477a 193-204
+  s_41bfaa1109f771::t_6fc100cc277d91 86-99,101,103-107,112,115,121-129,132
+  s_41bfaa1109f771::t_c5eb917949f308 7
+  s_41bfaa1109f771::t_c4a13e28a547a8 24-42
+  s_41bfaa1109f771::t_dceb7de598af5f 157
+  s_41bfaa1109f771::t_539329a732b413 244,246-248,250,253,258,261
+scripts/config-comments.mjs
+  s_41bfaa1109f771::t_9f725d8e135b63 1-2
+  s_41bfaa1109f771::t_8a4a13f4b35798 261-262
+  s_41bfaa1109f771::t_8d00b58888f886 253,256
+  s_41bfaa1109f771::t_c6eb7922e15bb7 23
+  s_41bfaa1109f771::t_e1e93347ffe30c 3-22,24-148,150-184,187-243,245-251,257-260,263-269,271,275-279,282-306,309-313,318-321
+  s_41bfaa1109f771::t_9f211bdd6615f3 149
+  s_41bfaa1109f771::t_6a2704223d99ee 307-308
+  s_41bfaa1109f771::t_8557356104d835 314-317
+  s_41bfaa1109f771::t_5f4313762589a6 244
+  s_41bfaa1109f771::t_053e8305876571 254-255
+  s_41bfaa1109f771::t_1c42337ff72dc4 270
+  s_41bfaa1109f771::t_6ecc59fa0aac09 252
+  s_41bfaa1109f771::t_f392f9245e3090 280-281
+  s_41bfaa1109f771::t_7815153a3c34a5 185-186
+  s_41bfaa1109f771::t_23b0df371a2954 272-274
+scripts/comment-only-proof.mjs
+  s_41bfaa1109f771::t_0aa142d6ae89db 123-128
+  s_41bfaa1109f771::t_f3787be8149599 40-44,49
+  s_41bfaa1109f771::t_b291a658a2bad7 147
+  s_41bfaa1109f771::t_60c74d071a21dd 555-561
+  s_41bfaa1109f771::t_f410c4882700b2 363-443,445-554,562-574
+  s_41bfaa1109f771::t_61fba0bd07c850 8,13
+  s_41bfaa1109f771::t_563ccff5faaf86 199-259,262-276
+  s_41bfaa1109f771::t_8b75ef96232f31 598
+  s_41bfaa1109f771::t_8557356104d835 444
+  s_41bfaa1109f771::t_fab2eee47829f9 103-111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3f4e177a36e243d963a0dd58db926be00d428422",
+  "prompts": {},
+  "sessions": {
+    "s_41bfaa1109f771": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0bc311b1-7404-4f66-a23e-5a963c829c9a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
