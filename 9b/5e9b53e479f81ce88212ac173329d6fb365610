@@ -1,0 +1,57 @@
+apps/api/src/trpc/router.ts
+  s_2dd75a86f22d42::t_4a67adf4dc09bc 9,14
+apps/api/tests/mcp-call.ts
+  s_2dd75a86f22d42::t_b9300d96fc04b1 1-18
+apps/api/src/trpc/base.ts
+  s_2dd75a86f22d42::t_fd01cd1aa0b1ce 8,28-30,46,50-52,58-59,72,75,77,80,82-97
+  s_2dd75a86f22d42::t_3dfb01fd839fcc 48-49
+apps/api/tests/mcp-surface.test.ts
+  s_2dd75a86f22d42::t_b9300d96fc04b1 11
+  s_2dd75a86f22d42::t_4455377f7ffccd 235-239,253-257
+apps/api/src/mcp/surface.ts
+  s_2dd75a86f22d42::t_4fbddc3c766e5a 107-111
+  s_2dd75a86f22d42::t_6b96e3747da667 35
+  s_2dd75a86f22d42::t_3b16ae1c267cd8 168-169
+  s_2dd75a86f22d42::t_89a1a37d9cc854 50-51,60-63
+  s_2dd75a86f22d42::t_7783c8a11bb698 14
+apps/api/src/mcp/entries/index.ts
+  s_2dd75a86f22d42::t_ff303a7af0010c 171-175
+  s_2dd75a86f22d42::t_164c7a7742aac4 15,17,20-22,78,115,221-222
+  s_2dd75a86f22d42::t_a0037986a3be0a 200-208
+  s_2dd75a86f22d42::t_8e8f6aef69b91b 199
+apps/api/src/mcp/entries/define.ts
+  s_2dd75a86f22d42::t_e920d6ca79db39 4,8
+  s_2dd75a86f22d42::t_7e33b76407228f 30
+apps/api/tests/routes-list.test.ts
+  s_2dd75a86f22d42::t_5c1defa5f236c7 51,111,118,129,141,159,194
+apps/web/test/refusal.test.ts
+  s_2dd75a86f22d42::t_5c1defa5f236c7 73,76
+apps/api/src/refusal.ts
+  s_2dd75a86f22d42::t_b7e692155578ca 21,23,35-38,43-53
+  s_2dd75a86f22d42::t_ff303a7af0010c 24-26
+apps/api/src/ops/index.ts
+  s_2dd75a86f22d42::t_5c1defa5f236c7 149
+apps/api/tests/ops.test.ts
+  s_2dd75a86f22d42::t_5c1defa5f236c7 258
+apps/api/tests/crossing.test.ts
+  s_2dd75a86f22d42::t_b9300d96fc04b1 11
+  s_2dd75a86f22d42::t_e88f3cd8b800be 2,23-24,33-34,80-106,204-222,227-238,240,243,256,258
+apps/api/src/mcp/crossing.ts
+  s_2dd75a86f22d42::t_0529201b40c7e7 6,8,16,19-20,32,34-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9b5e9b53e479f81ce88212ac173329d6fb365610",
+  "prompts": {},
+  "sessions": {
+    "s_2dd75a86f22d42": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1deab29c-2105-473f-9514-e52636269c8a",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
