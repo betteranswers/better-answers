@@ -1,0 +1,30 @@
+apps/api/tests/comment-gate-hook.test.ts
+  s_a38d2840827d6c::t_52bcfbe9261d97 138-156
+  s_a38d2840827d6c::t_13b24df4671c53 75-86
+  s_a38d2840827d6c::t_573fb97dc48a3b 1-15,18-49,58-74,87,90-97,103-137,157-159,163-174,178-198,203,209-211,214-215,218-219
+  s_a38d2840827d6c::t_ae2a93d81295f6 16-17
+  s_a38d2840827d6c::t_f19ef76e64bf34 50-57
+  s_a38d2840827d6c::t_e24732f6a7e7f6 199-202,204-208,212-213,216-217
+  s_a38d2840827d6c::t_f927aec8daf0ca 88-89,98-102,160-162,175-177
+.claude/hooks/comment-gate-hook.sh
+  s_a38d2840827d6c::t_0a6ea0a8477d49 1
+  s_a38d2840827d6c::t_9d5002ede08b45 2-88
+.claude/settings.json
+  s_a38d2840827d6c::t_67ab909fb30cc3 8-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "52840a19adaa8ae3b721eec299b73b35186fd27a",
+  "prompts": {},
+  "sessions": {
+    "s_a38d2840827d6c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bcafdd87-9a23-47ee-b85e-27d4f2a91450",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
