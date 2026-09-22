@@ -1,0 +1,173 @@
+packages/schema/test/finding-factory.test.ts
+  s_34dc90d7e2cd86::t_eed2f68efc2da3 5,12-15
+apps/api/tests/lefthook-config.test.ts
+  s_34dc90d7e2cd86::t_34d167e0cbc261 8,17-31,33
+  s_34dc90d7e2cd86::t_d2aa630cdad436 49-52,55
+  s_34dc90d7e2cd86::t_5cada9066da837 220-224
+  s_34dc90d7e2cd86::t_ab2601bc077350 232-235
+packages/core/test/erasure-routine.test.ts
+  s_34dc90d7e2cd86::t_4f07736d3dc7c2 3,1312-1329,1357,1382,1409,1459
+packages/core/test/workspaces.test.ts
+  s_34dc90d7e2cd86::t_4f07736d3dc7c2 349
+packages/schema/test/probes.ts
+  s_34dc90d7e2cd86::t_eed2f68efc2da3 71
+packages/devtools/src/mutation-summary.ts
+  s_34dc90d7e2cd86::t_f053a7611451f2 3-4,7-33,37-38,198,202-203
+  s_34dc90d7e2cd86::t_97abe2366744a6 34-36
+packages/devtools/test/knip.test.ts
+  s_34dc90d7e2cd86::t_eed2f68efc2da3 5,98-99,105,129-131,134-136
+  s_34dc90d7e2cd86::t_31c2b77bc9e784 100-104
+packages/core/test/reconciler.test.ts
+  s_34dc90d7e2cd86::t_4f07736d3dc7c2 2,174-176,546-549
+apps/api/tests/mcp-surface.test.ts
+  s_34dc90d7e2cd86::t_3b42ffcba16bc5 2
+  s_34dc90d7e2cd86::t_abdb571db80c42 24-75
+  s_34dc90d7e2cd86::t_fd4273a9deb97b 88-89,91
+  s_34dc90d7e2cd86::t_e07e1e352bf91d 109,118
+  s_34dc90d7e2cd86::t_a741e3eb73a3e4 121,125,127,130,132-133,137,139,142
+  s_34dc90d7e2cd86::t_3c869768967286 175
+  s_34dc90d7e2cd86::t_86d2a5508c4553 184
+  s_34dc90d7e2cd86::t_8fbc1b7677d0b4 195-196,200
+  s_34dc90d7e2cd86::t_dcfd3ba2493a37 208
+  s_34dc90d7e2cd86::t_8439d17665a571 224,228,231,235,237,239
+  s_34dc90d7e2cd86::t_2b83e1e4857d0c 248-252,256,258-259,267,269
+  s_34dc90d7e2cd86::t_2724787bddbba9 338-339
+  s_34dc90d7e2cd86::t_c47e92ccf2e58f 347,349-350,352-355,361,363-365,372,374
+  s_34dc90d7e2cd86::t_13548e52ebf16a 383
+  s_34dc90d7e2cd86::t_efa6aa84a870af 400
+  s_34dc90d7e2cd86::t_ab426cc097c895 441-443
+  s_34dc90d7e2cd86::t_16f71be3776de1 458-460,466,468
+  s_34dc90d7e2cd86::t_674f3b98d01679 481
+packages/core/test/worker-process.ts
+  s_34dc90d7e2cd86::t_4f07736d3dc7c2 6,10-16,47-49
+apps/api/tests/check-scripts.test.ts
+  s_34dc90d7e2cd86::t_419d75b6004614 7,16-18,21-25
+apps/api/src/auth/auth.ts
+  s_34dc90d7e2cd86::t_ea1109e991871a 71
+  s_34dc90d7e2cd86::t_897f7d851d935b 122-128,130,143,427-430
+packages/devtools/lint-rules/rules/import-direction.ts
+  s_34dc90d7e2cd86::t_f053a7611451f2 79,81-83,85
+packages/devtools/src/comment-density.ts
+  s_34dc90d7e2cd86::t_7579817d909d07 3-4
+  s_34dc90d7e2cd86::t_6d4b3ce5081139 56-57
+  s_34dc90d7e2cd86::t_f053a7611451f2 58-68,72-74
+packages/core/test/tier-contract.test.ts
+  s_34dc90d7e2cd86::t_4f07736d3dc7c2 13,40-44,46-47,105-109,111-114
+packages/devtools/test/vitest-runner-patch.test.ts
+  s_34dc90d7e2cd86::t_eed2f68efc2da3 8,53-59,86,88,105
+  s_34dc90d7e2cd86::t_31c2b77bc9e784 52,60-64,85
+packages/core/test/sources.test.ts
+  s_34dc90d7e2cd86::t_4f07736d3dc7c2 1092-1096
+packages/schema/test/migration-ownership.test.ts
+  s_34dc90d7e2cd86::t_eed2f68efc2da3 7,201-203
+  s_34dc90d7e2cd86::t_31c2b77bc9e784 109-111
+apps/web/e2e/harness.ts
+  s_34dc90d7e2cd86::t_891e9f4c1fc4b7 2,6,8-12,14-17,19-24,27,31,34,39
+  s_34dc90d7e2cd86::t_30394ba9656768 50
+  s_34dc90d7e2cd86::t_8996b55c490c54 61-68
+  s_34dc90d7e2cd86::t_478b0a6752090d 95
+packages/schema/test/table-ownership.test.ts
+  s_34dc90d7e2cd86::t_eed2f68efc2da3 74
+packages/devtools/src/mutant-probe.ts
+  s_34dc90d7e2cd86::t_b3b973d5dda78e 6-7
+  s_34dc90d7e2cd86::t_f053a7611451f2 126-133,135,138-139
+packages/core/test/suggestions.test.ts
+  s_34dc90d7e2cd86::t_4f07736d3dc7c2 704
+apps/api/tests/comment-gate-hook.test.ts
+  s_34dc90d7e2cd86::t_0222f4e5c72036 56-58,61-62
+  s_34dc90d7e2cd86::t_bfacd9b8a66c30 85-86,94
+  s_34dc90d7e2cd86::t_95d34dd6950e91 255-260,265
+packages/core/src/sources/binding.ts
+  s_34dc90d7e2cd86::t_97abe2366744a6 40
+  s_34dc90d7e2cd86::t_6d4b3ce5081139 75-76
+  s_34dc90d7e2cd86::t_f053a7611451f2 77-86,88-89,91-100
+packages/schema/test/boundary-schemas.test.ts
+  s_34dc90d7e2cd86::t_eed2f68efc2da3 633-639,652-659,678,690,997
+apps/web/e2e/sign-in.spec.ts
+  s_34dc90d7e2cd86::t_704f5407f31a98 5-13
+  s_34dc90d7e2cd86::t_26318a662ab9e3 242
+packages/core/src/store/postgres/index.ts
+  s_34dc90d7e2cd86::t_f053a7611451f2 55,60
+packages/core/test/concept-inbox.contract.test.ts
+  s_34dc90d7e2cd86::t_4f07736d3dc7c2 132-135
+apps/api/tests/oauth-flow.test.ts
+  s_34dc90d7e2cd86::t_63f6ef4aef4b57 2
+  s_34dc90d7e2cd86::t_64e1533a2988a5 36-62,68,71-75,81,83,91-94
+  s_34dc90d7e2cd86::t_26a5d8815d313f 76
+  s_34dc90d7e2cd86::t_354ce155c4af22 294
+  s_34dc90d7e2cd86::t_a7d27b7fe23bbe 527
+  s_34dc90d7e2cd86::t_a60671a1f1899c 545
+  s_34dc90d7e2cd86::t_a259e369f30763 558-559
+  s_34dc90d7e2cd86::t_b8496d0367edb5 570-571
+  s_34dc90d7e2cd86::t_823e2a1ad80705 605-606
+  s_34dc90d7e2cd86::t_7b30efbd0f2011 747
+packages/schema/src/index-tables.ts
+  s_34dc90d7e2cd86::t_f053a7611451f2 3,9-11,15
+apps/api/tests/docs-lane.test.ts
+  s_34dc90d7e2cd86::t_4a4ba5eb1f0ce2 336-340,342-343,345-356,358-362,365
+  s_34dc90d7e2cd86::t_4d2d1e1ec3bd1a 344
+packages/schema/src/boundary-schemas.ts
+  s_34dc90d7e2cd86::t_97abe2366744a6 33,84
+  s_34dc90d7e2cd86::t_6d4b3ce5081139 479-480
+  s_34dc90d7e2cd86::t_f053a7611451f2 481-484,552-557
+.oxlintrc.json
+  s_34dc90d7e2cd86::t_b221db09d1ca94 35
+apps/web/package.json
+  s_34dc90d7e2cd86::t_897f7d851d935b 34-35
+apps/api/tests/cimd-fetch.test.ts
+  s_34dc90d7e2cd86::t_ac03dd493ef8df 2,10,29-42,44-46,48,55-58,60-66,79
+  s_34dc90d7e2cd86::t_c9a6a39d35f513 3
+  s_34dc90d7e2cd86::t_804a3ac9c08688 27
+  s_34dc90d7e2cd86::t_26a5d8815d313f 28
+  s_34dc90d7e2cd86::t_ddd4837f5e7a63 93,96
+apps/api/tests/harness.ts
+  s_34dc90d7e2cd86::t_89ca2acdc8ac79 9
+  s_34dc90d7e2cd86::t_0eed06e5597ff1 62-64,72
+apps/api/lifts/better-auth-cimd-node/index.ts
+  s_34dc90d7e2cd86::t_897f7d851d935b 2-3,18-23,27-32
+  s_34dc90d7e2cd86::t_6d4b3ce5081139 16-17
+  s_34dc90d7e2cd86::t_97abe2366744a6 24-26
+apps/web/src/shared/ui/kibo-ui/combobox.tsx
+  s_34dc90d7e2cd86::t_f053a7611451f2 119-120
+packages/devtools/src/oxlint-config.ts
+  s_34dc90d7e2cd86::t_f053a7611451f2 4-5,8,10-19,21-22,24-27,30-37,39
+CODING_RULES.md
+  s_34dc90d7e2cd86::t_47591c9be7bd65 140
+  s_34dc90d7e2cd86::t_b958ed528af49c 142
+packages/schema/test/factory.ts
+  s_34dc90d7e2cd86::t_eed2f68efc2da3 4,174
+  s_34dc90d7e2cd86::t_1a392e1b6ed75e 148
+apps/web/src/shared/view-toolbar.tsx
+  s_34dc90d7e2cd86::t_6d4b3ce5081139 64-65
+  s_34dc90d7e2cd86::t_f053a7611451f2 66,73,75-82
+packages/devtools/src/throwaway-tree.ts
+  s_34dc90d7e2cd86::t_f053a7611451f2 7-8,11-16,114-115,212-213,216-233,237-238
+  s_34dc90d7e2cd86::t_6d4b3ce5081139 9-10,214-215
+apps/web/src/features/auth/auth-hooks.ts
+  s_34dc90d7e2cd86::t_f053a7611451f2 10,105-107
+  s_34dc90d7e2cd86::t_97abe2366744a6 111-112
+packages/core/src/store/objects/index.ts
+  s_34dc90d7e2cd86::t_225b195e06646e 98
+apps/web/src/shared/ui/kibo-ui/snippet.tsx
+  s_34dc90d7e2cd86::t_f053a7611451f2 6,65-66
+packages/devtools/package.json
+  s_34dc90d7e2cd86::t_897f7d851d935b 40-41
+packages/core/test/runs.test.ts
+  s_34dc90d7e2cd86::t_4f07736d3dc7c2 155,159,163,165,321,325
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3e0d346289d2088122f7c87fecf8fa80e19ab2a6",
+  "prompts": {},
+  "sessions": {
+    "s_34dc90d7e2cd86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5579c144-964d-4ce0-b0e6-76ec7141d581",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
