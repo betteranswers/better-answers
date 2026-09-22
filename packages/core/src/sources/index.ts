@@ -1,8 +1,9 @@
-import { SENSITIVITIES } from "@better-answers/schema";
+import { boundarySchemas, SENSITIVITIES } from "@better-answers/schema";
+import { z } from "zod";
 
 import {
   narrower,
-  visibilityFrom,
+  visibilityAgreed,
   visibilityOf,
   widens,
   type Visibility,
@@ -11,18 +12,23 @@ import { act, declareActs, record } from "../audit/index.ts";
 import { attempt, err, ok, ulid, type Result, type UserPrincipal } from "../kernel/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { adminOnBinding } from "./admin-binding.ts";
+import { adminOnBinding, BINDING_ID } from "./admin-binding.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
+export { adminOnBinding, BINDING_ID, type BindingId } from "./admin-binding.ts";
 export {
   bindUpload,
+  bindUploadFields,
   publishBinding,
+  publishBindingInput,
   reprocessBinding,
+  reprocessBindingInput,
   UPLOAD_BYTE_CAP,
   UPLOAD_MEDIA_TYPES,
   type BindingPublished,
   type BindingReprocessed,
+  type BindUploadFields,
   type BindUploadInput,
   type BindUploadRefusal,
   type PublishBindingInput,
@@ -33,17 +39,23 @@ export {
 } from "./binding.ts";
 export {
   restoreFinding,
+  restoreFindingInput,
   type FindingRestored,
   type FindingRestoreRefusal,
   type RestoreFindingInput,
 } from "./findings.ts";
 export {
+  findingGroupKey,
   findingsOf,
+  findingsOfInput,
   keepInText,
+  keepInTextInput,
   narrowDocuments,
+  narrowDocumentsInput,
   type DocumentsNarrowed,
   type FindingGroup,
   type FindingGroupKey,
+  type FindingsOfInput,
   type FindingsOfRefusal,
   type KeepInTextInput,
   type KeepInTextRefusal,
@@ -53,11 +65,13 @@ export {
 } from "./review.ts";
 export {
   dpiaInputFor,
+  dpiaReadInput,
   NOT_RECORDED,
   PLATFORM_HELD_CATEGORIES,
   REDACTION_CATEGORIES,
   SPECIAL_CATEGORY_CONDITION,
   type DpiaInput,
+  type DpiaReadInput,
   type DpiaInputRead,
   type DpiaInputRefusal,
   type DpiaRoute,
@@ -76,8 +90,10 @@ export {
   MAX_PASSAGE_HITS,
   passageAt,
   previewChunks,
+  previewChunksInput,
   type Passage,
   type PassageHit,
+  type PreviewChunksInput,
   type PreviewedChunk,
 } from "./passages.ts";
 export { SOURCE_REFUSALS, type SourceRefusal } from "./vocabulary.ts";
@@ -90,18 +106,24 @@ const SOURCE_ACTS = declareActs("sources", {
   }),
 });
 
-export type NarrowBindingInput = {
-  readonly bindingId: string;
-  readonly sensitivity: string;
-  readonly audience: string;
+const BINDING_VISIBILITY = boundarySchemas.sourceBinding.select.pick({
+  sensitivity: true,
+  audience: true,
+  audienceGroups: true,
+});
 
-  readonly audienceGroups?: readonly string[] | null | undefined;
-};
+export const narrowBindingInput = BINDING_VISIBILITY.extend({
+  bindingId: BINDING_ID,
+  audienceGroups: BINDING_VISIBILITY.shape.audienceGroups.default(null),
+}).transform(({ bindingId, ...asked }, ctx) => {
+  const visibility = visibilityAgreed(asked, ctx);
+  return visibility === undefined ? z.NEVER : { bindingId, visibility };
+});
+
+export type NarrowBindingInput = z.output<typeof narrowBindingInput>;
 
 export type NarrowBindingRefusal =
-  | SourceRefusal<
-      "role-forbids" | "malformed" | "no-such-binding" | "no-such-group" | "widening-refused"
-    >
+  | SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-group" | "widening-refused">
   | Error;
 
 export type BindingNarrowed = {
@@ -142,8 +164,7 @@ export const narrowBinding = async (
   if (!acting.ok) return err(acting.error);
   const { admin, workspaceId, bindingId } = acting.value;
 
-  const next = visibilityFrom(input);
-  if (next === undefined) return err("malformed");
+  const next = input.visibility;
 
   const groups = await openingACascadeOverHeldGroups(admin, tx, next.audienceGroups ?? []);
   if (!groups.ok) return err(groups.error);

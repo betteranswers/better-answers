@@ -5,11 +5,13 @@ import {
   CONNECTOR_UPLOAD,
   FINDING_UNREVIEWED_STATE,
   INDEX_KIND,
+  INDEX_REASONS,
   JOB_DONE_STATUS,
   SENSITIVITY_DEFAULT,
 } from "@better-answers/schema";
+import { z } from "zod";
 
-import { visibilityFrom } from "../access/index.ts";
+import { visibilityAgreed } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
 import {
   attempt,
@@ -22,7 +24,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { holdsEveryGroup } from "../members/index.ts";
-import { enqueueJobIn, indexRunRefused, type IndexReason } from "../runs/index.ts";
+import { enqueueJobIn, indexRunRefused } from "../runs/index.ts";
 import { putObject, type ObjectDoor } from "../store/objects/index.ts";
 import {
   withMembership,
@@ -30,7 +32,7 @@ import {
   type PostgresDoor,
   type Tx,
 } from "../store/postgres/index.ts";
-import { adminOnBinding, bindingNamed } from "./admin-binding.ts";
+import { adminOnBinding, bindingNamed, BINDING_ID } from "./admin-binding.ts";
 import { dpiaInputFor, REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastRun } from "./findings.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
@@ -100,26 +102,41 @@ const BINDING_ACTS = declareActs("sources", {
   }),
 });
 
-export type BindUploadInput = {
-  readonly name: string;
+const BINDING_COLUMNS = boundarySchemas.sourceBinding.insert.shape;
 
-  readonly fileName: string;
+const DOCUMENT_COLUMNS = boundarySchemas.sourceDocument.insert.shape;
 
-  readonly mediaType: string;
+const BINDING_VISIBILITY = boundarySchemas.sourceBinding.select.pick({
+  sensitivity: true,
+  audience: true,
+  audienceGroups: true,
+});
 
-  readonly byteSize: number;
+const ASKED_VISIBILITY = BINDING_VISIBILITY.extend({
+  sensitivity: BINDING_VISIBILITY.shape.sensitivity.default(SENSITIVITY_DEFAULT),
+  audience: BINDING_VISIBILITY.shape.audience.default(AUDIENCE_EVERYONE),
+  audienceGroups: BINDING_VISIBILITY.shape.audienceGroups.default(null),
+});
+
+export const bindUploadFields = ASKED_VISIBILITY.extend({
+  name: BINDING_COLUMNS.name,
+  fileName: DOCUMENT_COLUMNS.sourceSystemId,
+  mediaType: DOCUMENT_COLUMNS.mediaType,
+  byteSize: DOCUMENT_COLUMNS.byteSize,
+}).transform(({ name, fileName, mediaType, byteSize, ...asked }, ctx) => {
+  const visibility = visibilityAgreed(asked, ctx);
+  return visibility === undefined ? z.NEVER : { name, fileName, mediaType, byteSize, visibility };
+});
+
+export type BindUploadFields = z.output<typeof bindUploadFields>;
+
+export type BindUploadInput = BindUploadFields & {
   readonly body: ReadableStream<Uint8Array>;
-
-  readonly sensitivity?: string;
-  readonly audience?: string;
-  readonly audienceGroups?: readonly string[] | null | undefined;
 };
 
 export type BindUploadRefusal =
   | PrincipalRefusal
-  | SourceRefusal<
-      "role-forbids" | "malformed" | "no-such-group" | "media-type-refused" | "too-large"
-    >
+  | SourceRefusal<"role-forbids" | "no-such-group" | "media-type-refused" | "too-large">
   | Error;
 
 export type UploadBound = {
@@ -163,38 +180,12 @@ export const bindUpload = async (
   const originalKey = originalKeyOf(documentId);
   const auditEventId = ulid();
 
-  const visibility = visibilityFrom({
-    sensitivity: input.sensitivity ?? SENSITIVITY_DEFAULT,
-    audience: input.audience ?? AUDIENCE_EVERYONE,
-    audienceGroups: input.audienceGroups ?? null,
-  });
-  if (visibility === undefined) return err("malformed");
+  const { visibility } = input;
 
-  const binding = boundarySchemas.sourceBinding.insert.safeParse({
-    workspaceId,
-    id: bindingId,
-    name: input.name,
-    connector: CONNECTOR_UPLOAD,
-    sensitivity: visibility.sensitivity,
-    audience: visibility.audience,
-    audienceGroups: visibility.audienceGroups,
-  });
-  const document = boundarySchemas.sourceDocument.insert.safeParse({
-    workspaceId,
-    id: documentId,
-    bindingId,
-    sourceSystemId: input.fileName,
-    title: input.fileName,
-    mediaType: input.mediaType,
-    byteSize: input.byteSize,
-    originalKey,
-  });
-  if (!binding.success || !document.success) return err("malformed");
-
-  if (!UPLOAD_MEDIA_TYPES.some((allowed) => allowed === document.data.mediaType)) {
+  if (!UPLOAD_MEDIA_TYPES.some((allowed) => allowed === input.mediaType)) {
     return err("media-type-refused");
   }
-  if (document.data.byteSize > UPLOAD_BYTE_CAP) return err("too-large");
+  if (input.byteSize > UPLOAD_BYTE_CAP) return err("too-large");
 
   const named = visibility.audienceGroups ?? [];
   if (named.length > 0) {
@@ -212,23 +203,23 @@ export const bindUpload = async (
 
   return inTransaction(principal, doors.postgres, async (fresh, tx) => {
     await tx.query(INSERT_BINDING, [
-      binding.data.workspaceId,
-      binding.data.id,
-      binding.data.name,
-      binding.data.connector,
-      binding.data.sensitivity,
-      binding.data.audience,
-      binding.data.audienceGroups,
+      workspaceId,
+      bindingId,
+      input.name,
+      CONNECTOR_UPLOAD,
+      visibility.sensitivity,
+      visibility.audience,
+      visibility.audienceGroups,
     ]);
     await tx.query(INSERT_DOCUMENT, [
-      document.data.workspaceId,
-      document.data.id,
-      document.data.bindingId,
-      document.data.sourceSystemId,
-      document.data.title,
-      document.data.mediaType,
-      document.data.byteSize,
-      document.data.originalKey,
+      workspaceId,
+      documentId,
+      bindingId,
+      input.fileName,
+      input.fileName,
+      input.mediaType,
+      input.byteSize,
+      originalKey,
     ]);
     await record(fresh, tx, {
       id: auditEventId,
@@ -254,21 +245,26 @@ export const bindUpload = async (
   });
 };
 
-export type PublishBindingInput = {
-  readonly bindingId: string;
+export const publishBindingInput = z.object({
+  bindingId: BINDING_ID,
 
+  confirmations: z.object(
+    // SAFETY: the mapping's keys are the tuple's members, each with the one boolean schema.
+    Object.fromEntries(CONFIRMATIONS.map((named) => [named, z.boolean()])) as Record<
+      (typeof CONFIRMATIONS)[number],
+      z.ZodBoolean
+    >,
+  ),
+});
+
+// The instant is the Clock's, never a caller's, so it travels beside the parsed fields.
+export type PublishBindingInput = z.output<typeof publishBindingInput> & {
   readonly publishedAt: Date;
-  readonly confirmations: {
-    readonly lawfulBasisRecorded: boolean;
-    readonly privacyInformationUpdated: boolean;
-    readonly dpiaReferenced: boolean;
-  };
 };
 
 export type PublishBindingRefusal =
   | SourceRefusal<
       | "role-forbids"
-      | "malformed"
       | "no-such-binding"
       | "not-indexed"
       | "already-published"
@@ -370,15 +366,15 @@ export const publishBinding = async (
   });
 };
 
-export type ReprocessBindingInput = {
-  readonly bindingId: string;
+export const reprocessBindingInput = z.object({
+  bindingId: BINDING_ID,
 
-  readonly reason: IndexReason;
-};
+  reason: z.enum(INDEX_REASONS),
+});
 
-export type ReprocessBindingRefusal =
-  | SourceRefusal<"role-forbids" | "malformed" | "no-such-binding">
-  | Error;
+export type ReprocessBindingInput = z.output<typeof reprocessBindingInput>;
+
+export type ReprocessBindingRefusal = SourceRefusal<"role-forbids" | "no-such-binding"> | Error;
 
 export type BindingReprocessed = {
   readonly bindingId: string;

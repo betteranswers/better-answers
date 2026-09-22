@@ -1,16 +1,22 @@
 import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
-import type { UserPrincipal } from "../src/kernel/index.ts";
+import type { z } from "zod";
+
+import { parse, type UserPrincipal } from "../src/kernel/index.ts";
 import {
   findingsOf,
+  findingsOfInput,
   keepInText,
+  keepInTextInput,
   narrowDocuments,
+  narrowDocumentsInput,
   passageAt,
   reprocessBinding,
-  type FindingGroupKey,
-  type ReprocessBindingInput,
+  reprocessBindingInput,
+  type findingGroupKey,
 } from "../src/sources/index.ts";
+import { inputOf } from "./suite-input.ts";
 import {
   bindingHolding,
   chunkUnder,
@@ -27,19 +33,33 @@ const { db, arrange, reading: acting } = visibilitySuite();
 
 const BUSINESS_FACT = "The sort code is the company's own, printed on every invoice it sends.";
 
-const keepAs = (who: UserPrincipal, bindingId: string, findingGroups: readonly FindingGroupKey[]) =>
+type FindingGroupAsked = z.input<typeof findingGroupKey>;
+
+const keepAs = (
+  who: UserPrincipal,
+  bindingId: string,
+  findingGroups: readonly FindingGroupAsked[],
+) =>
   acting(who, (principal, tx) =>
-    keepInText(principal, tx, { bindingId, findingGroups, reason: BUSINESS_FACT }),
+    keepInText(
+      principal,
+      tx,
+      inputOf(keepInTextInput, { bindingId, findingGroups, reason: BUSINESS_FACT }),
+    ),
   );
 
 const narrowAs = (
   who: UserPrincipal,
   bindingId: string,
-  findingGroups: readonly FindingGroupKey[],
+  findingGroups: readonly FindingGroupAsked[],
   to: { readonly sensitivity?: string } = {},
 ) =>
   acting(who, (principal, tx) =>
-    narrowDocuments(principal, tx, { bindingId, findingGroups, sensitivity: to.sensitivity }),
+    narrowDocuments(
+      principal,
+      tx,
+      inputOf(narrowDocumentsInput, { bindingId, findingGroups, sensitivity: to.sensitivity }),
+    ),
   );
 
 const findingIn = async (
@@ -61,8 +81,8 @@ const findingIn = async (
 
 const findingGroupIn = (
   documentId: string,
-  overrides: Partial<Omit<FindingGroupKey, "documentId">> = {},
-): FindingGroupKey => ({
+  overrides: Partial<Omit<FindingGroupAsked, "documentId">> = {},
+): FindingGroupAsked => ({
   documentId,
   category: "bank-details",
   ruleId: "sort-code-with-account-number",
@@ -205,7 +225,9 @@ const narrowingLeftBehindIn = async (workspaceId: string, documentId: string) =>
 const NOTHING_NARROWED = { classes: ["Internal"], ledger: [], jobs: [] };
 
 const findingsAs = (who: UserPrincipal, bindingId: string) =>
-  acting(who, (principal, tx) => findingsOf(principal, tx, { bindingId }));
+  acting(who, (principal, tx) =>
+    findingsOf(principal, tx, inputOf(findingsOfInput, { bindingId })),
+  );
 
 const documentHeldAboveItsBinding = async (workspaceId: string) => {
   const binding = await bindingHolding(db(), workspaceId, { sensitivity: "Restricted" });
@@ -996,28 +1018,34 @@ describe("an Admin narrowing named documents", () => {
 const reprocessAsAdmin = (
   scenario: Scenario,
   bindingId: string,
-  reason: ReprocessBindingInput["reason"],
+  reason: z.input<typeof reprocessBindingInput>["reason"],
 ) =>
-  acting(scenario.admin, (principal, tx) => reprocessBinding(principal, tx, { bindingId, reason }));
+  acting(scenario.admin, (principal, tx) =>
+    reprocessBinding(principal, tx, inputOf(reprocessBindingInput, { bindingId, reason })),
+  );
 
 describe("a bulk act handed no finding group at all", () => {
-  it("refuses a keep as malformed, because an empty keep would still queue a run", async () => {
-    const scenario = await arrange();
-    const { bindingId } = await bindingWithTwoDocuments(scenario);
+  const A_BINDING = "01J6NNNNNNNNNNNNNNNNNNNNN1";
 
-    expect(await keepAs(scenario.admin, bindingId, [])).toEqual({ ok: false, error: "malformed" });
-    expect(await jobsOf(scenario.workspaceId)).toEqual([]);
+  const EMPTY_LIST = {
+    ok: false,
+    error: { word: "malformed", fields: { findingGroups: "too-small" } },
+  };
+
+  it("names the empty list a keep was arranged with, because an empty keep would still queue a run", () => {
+    expect(
+      parse(keepInTextInput, {
+        bindingId: A_BINDING,
+        findingGroups: [],
+        reason: BUSINESS_FACT,
+      }),
+    ).toEqual(EMPTY_LIST);
   });
 
-  it("refuses a narrowing as malformed, because it names no document to narrow", async () => {
-    const scenario = await arrange();
-    const { bindingId } = await bindingWithTwoDocuments(scenario);
-
-    expect(await narrowAs(scenario.admin, bindingId, [])).toEqual({
-      ok: false,
-      error: "malformed",
-    });
-    expect(await jobsOf(scenario.workspaceId)).toEqual([]);
+  it("names the empty list a narrowing was arranged with, because it names no document to narrow", () => {
+    expect(parse(narrowDocumentsInput, { bindingId: A_BINDING, findingGroups: [] })).toEqual(
+      EMPTY_LIST,
+    );
   });
 });
 

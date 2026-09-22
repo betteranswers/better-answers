@@ -22,7 +22,8 @@ import {
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import { actorIdOf, type Result, type UserPrincipal } from "../src/kernel/index.ts";
-import { narrowBinding } from "../src/sources/index.ts";
+import { narrowBinding, narrowBindingInput } from "../src/sources/index.ts";
+import { inputOf } from "./suite-input.ts";
 import { commit, withRepositoryLock } from "@better-answers/core/store/git";
 import {
   bundleHistory,
@@ -558,11 +559,15 @@ describe("a re-write whose rows were lost", () => {
     });
 
     const narrowed = await readingAs(db().runtimePool, scenario.admin, (admin, tx) =>
-      narrowBinding(admin, tx, {
-        bindingId: binding.bindingId,
-        sensitivity: "Restricted",
-        audience: "everyone",
-      }),
+      narrowBinding(
+        admin,
+        tx,
+        inputOf(narrowBindingInput, {
+          bindingId: binding.bindingId,
+          sensitivity: "Restricted",
+          audience: "everyone",
+        }),
+      ),
     );
     expect(narrowed.ok).toBe(true);
 

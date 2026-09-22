@@ -1,4 +1,5 @@
 import { boundarySchemas } from "@better-answers/schema";
+import type { z } from "zod";
 
 import {
   attempt,
@@ -7,30 +8,30 @@ import {
   requireAdmin,
   type AdminUserPrincipal,
   type Result,
+  type RoleRefusal,
   type UserPrincipal,
+  type WorkspaceId,
 } from "../kernel/index.ts";
 import type { Tx, TxRow } from "../store/postgres/index.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
-const BINDING_ID = boundarySchemas.sourceBinding.select.shape.id;
+export const BINDING_ID = boundarySchemas.sourceBinding.select.shape.id;
+
+export type BindingId = z.output<typeof BINDING_ID>;
 
 export type ActingOnBinding = {
   readonly admin: AdminUserPrincipal;
-  readonly workspaceId: string;
-  readonly bindingId: string;
+  readonly workspaceId: WorkspaceId;
+  readonly bindingId: BindingId;
 };
-
-type AdminOnBindingRefusal = SourceRefusal<"role-forbids" | "malformed">;
 
 export const adminOnBinding = (
   principal: UserPrincipal,
-  bindingId: string,
-): Result<ActingOnBinding, AdminOnBindingRefusal> => {
+  bindingId: BindingId,
+): Result<ActingOnBinding, RoleRefusal> => {
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);
-  const named = BINDING_ID.safeParse(bindingId);
-  if (!named.success) return err("malformed");
-  return ok({ admin: admin.value, workspaceId: admin.value.workspaceId, bindingId: named.data });
+  return ok({ admin: admin.value, workspaceId: admin.value.workspaceId, bindingId });
 };
 
 type BindingRead = {

@@ -28,11 +28,15 @@ import {
   type JobOutcome,
 } from "../runs/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { adminOnBinding, bindingNamed } from "./admin-binding.ts";
+import { adminOnBinding, bindingNamed, BINDING_ID } from "./admin-binding.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
 import { REDACTION_CATEGORIES } from "./dpia.ts";
-import { raisedByTheLastRun, restoreFinding } from "./findings.ts";
+import { raisedByTheLastRun, RESTORE_REASON, restoreFinding } from "./findings.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
+
+export const findingsOfInput = z.object({ bindingId: BINDING_ID });
+
+export type FindingsOfInput = z.output<typeof findingsOfInput>;
 
 export type FindingGroup = {
   readonly documentId: string;
@@ -49,9 +53,7 @@ export type FindingGroup = {
   readonly overriddenByErasure: number;
 };
 
-export type FindingsOfRefusal =
-  | SourceRefusal<"role-forbids" | "malformed" | "no-such-binding">
-  | Error;
+export type FindingsOfRefusal = SourceRefusal<"role-forbids" | "no-such-binding"> | Error;
 
 const SPECIAL_CATEGORIES = new Set<string>(
   REDACTION_CATEGORIES.filter((entry) => entry.specialCategory).map((entry) => entry.category),
@@ -115,7 +117,7 @@ type GroupRow = Omit<FindingGroup, "specialCategory" | "sensitivity"> & {
 export const findingsOf = async (
   principal: UserPrincipal,
   tx: Tx,
-  input: { readonly bindingId: string },
+  input: FindingsOfInput,
 ): Promise<Result<readonly FindingGroup[], FindingsOfRefusal>> => {
   const acting = adminOnBinding(principal, input.bindingId);
   if (!acting.ok) return err(acting.error);
@@ -151,7 +153,16 @@ export const findingsOf = async (
   return ok(groups);
 };
 
-export type FindingGroupKey = Pick<FindingGroup, "documentId" | "category" | "ruleId" | "tier">;
+export const findingGroupKey = boundarySchemas.finding.select.pick({
+  documentId: true,
+  category: true,
+  ruleId: true,
+  tier: true,
+});
+
+export type FindingGroupKey = z.output<typeof findingGroupKey>;
+
+const commandedGroups = z.array(findingGroupKey).min(1);
 
 const sameFindingGroup = (left: FindingGroupKey, right: FindingGroupKey): boolean =>
   left.documentId === right.documentId &&
@@ -180,18 +191,18 @@ const findingGroupClause = (alias: string, first: number): string =>
         (SELECT * FROM unnest($${first}::text[], $${first + 1}::text[],
                               $${first + 2}::text[], $${first + 3}::text[]))`;
 
-export type KeepInTextInput = {
-  readonly bindingId: string;
+export const keepInTextInput = z.object({
+  bindingId: BINDING_ID,
 
-  readonly findingGroups: readonly FindingGroupKey[];
+  findingGroups: commandedGroups,
 
-  readonly reason: string;
-};
+  reason: RESTORE_REASON,
+});
+
+export type KeepInTextInput = z.output<typeof keepInTextInput>;
 
 export type KeepInTextRefusal =
-  | SourceRefusal<
-      "role-forbids" | "malformed" | "no-such-binding" | "no-such-finding" | "not-the-always-set"
-    >
+  | SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-finding" | "not-the-always-set">
   | Error;
 
 export type KeptInText = {
@@ -230,8 +241,6 @@ export const keepInText = async (
   const { admin, workspaceId, bindingId } = acting.value;
 
   const findingGroups = distinctFindingGroups(input.findingGroups);
-
-  if (findingGroups.length === 0) return err("malformed");
 
   if (findingGroups.some((findingGroup) => findingGroup.tier !== REDACTION_ALWAYS_TIER)) {
     return err("not-the-always-set");
@@ -292,18 +301,20 @@ const REVIEW_ACTS = declareActs("sources", {
   }),
 });
 
-export type NarrowDocumentsInput = {
-  readonly bindingId: string;
+export const narrowDocumentsInput = z.object({
+  bindingId: BINDING_ID,
 
-  readonly findingGroups: readonly FindingGroupKey[];
+  findingGroups: commandedGroups,
 
-  readonly sensitivity?: string | undefined;
-};
+  sensitivity: boundarySchemas.sourceDocument.select.shape.sensitivity
+    .unwrap()
+    .default(SENSITIVITY_DEFAULT),
+});
+
+export type NarrowDocumentsInput = z.output<typeof narrowDocumentsInput>;
 
 export type NarrowDocumentsRefusal =
-  | SourceRefusal<
-      "role-forbids" | "malformed" | "no-such-binding" | "no-such-document" | "widening-refused"
-    >
+  | SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-document" | "widening-refused">
   | Error;
 
 export type DocumentsNarrowed = {
@@ -346,11 +357,9 @@ export const narrowDocuments = async (
   if (!acting.ok) return err(acting.error);
   const { admin, workspaceId, bindingId } = acting.value;
 
-  const next = classOf(input.sensitivity ?? SENSITIVITY_DEFAULT);
-  if (next === undefined) return err("malformed");
+  const next = input.sensitivity;
   const findingGroups = distinctFindingGroups(input.findingGroups);
   const named = [...new Set(findingGroups.map((findingGroup) => findingGroup.documentId))];
-  if (named.length === 0) return err("malformed");
 
   const opened = await openingACascadeOverHeldGroups(admin, tx, []);
   if (!opened.ok) return err(opened.error);
