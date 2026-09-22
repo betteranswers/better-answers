@@ -1,0 +1,32 @@
+scripts/comment-density.mjs
+  s_41bfaa1109f771::t_c08aa872d4363f 26-27
+  s_41bfaa1109f771::t_6e20c6a0fd91f9 15-16,18-25,28-36,51-57,60-64,67-70,72,77,80,86-93
+packages/devtools/src/comment-density.ts
+  s_41bfaa1109f771::t_ec7d705f445875 13-36
+  s_41bfaa1109f771::t_c85cf02e0a6fc4 110,117,119-123,130,134-140,143,146,148,155
+  s_41bfaa1109f771::t_6eec879d82e815 162
+  s_41bfaa1109f771::t_537b63627609e2 99
+packages/devtools/README.md
+  s_41bfaa1109f771::t_bc62e7f81e8538 129-139
+  s_41bfaa1109f771::t_200344ecce2f1b 114
+packages/devtools/test/comment-density.test.ts
+  s_41bfaa1109f771::t_d6a78d9bcc93fc 14,18-21,31-34,36,48-56,70-80,116,119,122,127,132,139-172,195-216
+  s_41bfaa1109f771::t_1d1d252e4b461f 35
+  s_41bfaa1109f771::t_5df119456a3791 46-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9d569d800d1dc4cb86f6b5b1c6ed10faddd6e000",
+  "prompts": {},
+  "sessions": {
+    "s_41bfaa1109f771": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0bc311b1-7404-4f66-a23e-5a963c829c9a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
