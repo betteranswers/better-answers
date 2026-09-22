@@ -25,7 +25,7 @@ import { testData } from "@better-answers/schema/testing";
 
 import type { Doors } from "../src/doors.ts";
 import { fetchHonouringHost } from "../src/ops/http-fetch.ts";
-import { NOT_BUILT, parseSince, runOps, type OpsIo } from "../src/ops/index.ts";
+import { EXIT_OF_CLASS, NOT_BUILT, parseSince, runOps, type OpsIo } from "../src/ops/index.ts";
 import { readTreeUnder } from "../src/ops/read-tree.ts";
 import { APP_HOSTNAME, doorsFor, openTestGit, PUBLIC_URL, type TestApp } from "./harness.ts";
 import { servedApp } from "./suite-app.ts";
@@ -307,6 +307,29 @@ describe("pnpm ops — the restore scripts' commands", () => {
     expect((await ops(app(), ["make-it-so"])).exitCode).toBe(2);
     expect((await ops(app(), ["graph-counts"])).exitCode).toBe(2);
     expect((await ops(app(), ["replay-erasures"])).exitCode).toBe(2);
+  });
+
+  it("prints the word a refusal carries and exits with the code its class holds", async () => {
+    const run = await ops(app(), ["graph-counts", "--workspace", "not-a-workspace-id"]);
+
+    expect(run.exitCode).toBe(2);
+    expect(run.lines.join("\n")).toContain("REFUSED — malformed");
+  });
+
+  it("gives each class a code of its own, so a wrapper can tell one refusal from another", () => {
+    const codes = Object.values(EXIT_OF_CLASS);
+
+    expect(EXIT_OF_CLASS).toEqual({
+      malformed: 2,
+      unauthenticated: 4,
+      forbidden: 5,
+      absent: 6,
+      inapplicable: 7,
+      conflict: 8,
+      precondition: 9,
+    });
+    expect(new Set(codes).size).toBe(codes.length);
+    expect(codes).not.toContain(0);
   });
 
   it("reads through the -- separator pnpm forwards, and does not read it as a command", async () => {

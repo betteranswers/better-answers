@@ -10,7 +10,7 @@ export const REFUSAL_CLASSES = [
 
 export type RefusalClass = (typeof REFUSAL_CLASSES)[number];
 
-export type RefusalOwner = "kernel" | "sources" | "members" | "workspaces";
+export type RefusalOwner = "kernel" | "sources" | "members" | "workspaces" | "transport";
 
 export type Vocabulary = Readonly<Record<string, RefusalClass>>;
 

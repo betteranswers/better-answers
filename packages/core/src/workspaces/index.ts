@@ -374,16 +374,18 @@ export type Membership = {
   readonly role: Role;
 };
 
+export type MembershipReadRefusal = WorkspaceRefusal<"workspace-gone" | "person-gone">;
+
 export const readMembership = async (
   principal: UserPrincipal,
   tx: Tx,
-): Promise<Result<Membership, "no-such-workspace" | "no-such-person" | Error>> => {
+): Promise<Result<Membership, MembershipReadRefusal | Error>> => {
   const workspace = await attempt(() =>
     tx.query<{ name: string }>("SELECT name FROM workspace WHERE id = $1", [principal.workspaceId]),
   );
   if (!workspace.ok) return err(workspace.error);
   const name = workspace.value.rows[0]?.name;
-  if (name === undefined) return err("no-such-workspace");
+  if (name === undefined) return err("workspace-gone");
 
   const person = await attempt(() =>
     tx.query<{ name: string; email: string }>('SELECT name, email FROM "user" WHERE id = $1', [
@@ -392,7 +394,7 @@ export const readMembership = async (
   );
   if (!person.ok) return err(person.error);
   const row = person.value.rows[0];
-  if (row === undefined) return err("no-such-person");
+  if (row === undefined) return err("person-gone");
 
   return ok({
     workspace: { id: principal.workspaceId, name },

@@ -4,8 +4,13 @@ import { z } from "zod";
 
 import { TRPC_IP_RULE } from "../src/auth/index.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
-import { signIn } from "./flow.ts";
-import { APP_HOSTNAME, startApp, type TestApp, type TestClient } from "./harness.ts";
+import { startApp, type TestApp, type TestClient } from "./harness.ts";
+import {
+  constraintDefinition,
+  memberOfTwoWorkspaces,
+  sessionPointedAt,
+  signedInClient,
+} from "./provoke.ts";
 
 const TRPC_ROUTES_LIST = `${TRPC_ENDPOINT}/routes.list`;
 
@@ -41,35 +46,19 @@ const seedRoutes = async (workspaceId: string): Promise<void> => {
   }
 };
 
-const signedInClient = async (email: string): Promise<TestClient> => {
-  const client = app.client(undefined, APP_HOSTNAME);
-  await signIn(app, client, email);
-  return client;
-};
-
 const listRoutes = (client: TestClient): Promise<Response> => client.fetch(TRPC_ROUTES_LIST);
 
-const refusalOf = async (response: Response): Promise<string> =>
+const messageOf = async (response: Response): Promise<string> =>
   refused.parse(await response.json()).error.message;
 
 const MEMBER_ROLE_CHECK = "member_role_check";
-
-const constraintDefinition = async (name: string): Promise<string> => {
-  const found = await app.database.superuser.query<{ definition: string }>(
-    "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = $1",
-    [name],
-  );
-  const definition = found.rows[0]?.definition;
-  if (definition === undefined) throw new Error(`no constraint named ${name}`);
-  return definition;
-};
 
 describe("the routes list over the wire", () => {
   it("answers a workspace member one route per purpose, with the embedding route fixed at its dimensions", async () => {
     const workspace = await app.provision();
     await seedRoutes(workspace.workspaceId);
 
-    const response = await listRoutes(await signedInClient(workspace.admin.email));
+    const response = await listRoutes(await signedInClient(app, workspace.admin.email));
 
     expect(response.status).toBe(200);
     expect(answered.parse(await response.json()).result.data).toEqual(LISTED_LLM_ROUTES);
@@ -83,7 +72,7 @@ describe("the routes list over the wire", () => {
       const person = await app.person();
       await app.addMember(workspace.workspaceId, person.id, role);
 
-      const response = await listRoutes(await signedInClient(person.email));
+      const response = await listRoutes(await signedInClient(app, person.email));
 
       expect(response.status).toBe(200);
       const listed = answered.parse(await response.json()).result.data;
@@ -107,7 +96,7 @@ describe("the routes list over the wire", () => {
       client.release();
     }
 
-    const response = await listRoutes(await signedInClient(mine.admin.email));
+    const response = await listRoutes(await signedInClient(app, mine.admin.email));
 
     const listed = answered.parse(await response.json()).result.data;
     expect(listed.map((route) => route.model)).not.toContain("mistral-large");
@@ -119,53 +108,47 @@ describe("what the routes list refuses", () => {
     const response = await listRoutes(app.client());
 
     expect(response.status).toBe(401);
-    expect(await refusalOf(response)).toBe("no-session");
+    expect(await messageOf(response)).toBe("no-session");
   });
 
   it("refuses a signed-in person who has not yet picked a workspace", async () => {
-    const first = await app.provision();
-    const second = await app.provision();
-    const person = await app.person();
-    await app.addMember(first.workspaceId, person.id, "Viewer");
-    await app.addMember(second.workspaceId, person.id, "Viewer");
-
-    const response = await listRoutes(await signedInClient(person.email));
+    const response = await listRoutes(await memberOfTwoWorkspaces(app));
 
     expect(response.status).toBe(401);
-    expect(await refusalOf(response)).toBe("no-active-workspace");
+    expect(await messageOf(response)).toBe("no-active-workspace");
   });
 
   it("refuses a person whose membership ended while their session was still live", async () => {
     const workspace = await app.provision();
-    const client = await signedInClient(workspace.admin.email);
+    const client = await signedInClient(app, workspace.admin.email);
     await app.removeMember(workspace.workspaceId, workspace.admin.id);
 
     const response = await listRoutes(client);
 
     expect(response.status).toBe(401);
-    expect(await refusalOf(response)).toBe("not-a-member");
+    expect(await messageOf(response)).toBe("not-a-member");
   });
 
   it("refuses a session issued before the person's credentials were revoked", async () => {
     const workspace = await app.provision();
 
     await app.revokeCredentials(workspace.admin.id, new Date(Date.now() + 60_000));
-    const client = await signedInClient(workspace.admin.email);
+    const client = await signedInClient(app, workspace.admin.email);
 
     const response = await listRoutes(client);
 
     expect(response.status).toBe(401);
-    expect(await refusalOf(response)).toBe("credentials-revoked");
+    expect(await messageOf(response)).toBe("credentials-revoked");
   });
 
   it("refuses a member row whose role is not one of the platform's three", async () => {
     const workspace = await app.provision();
-    const client = await signedInClient(workspace.admin.email);
+    const client = await signedInClient(app, workspace.admin.email);
     const { superuser } = app.database;
     const where = "workspace_id = $1 AND user_id = $2";
     const member = [workspace.workspaceId, workspace.admin.id];
 
-    const definition = await constraintDefinition(MEMBER_ROLE_CHECK);
+    const definition = await constraintDefinition(app, MEMBER_ROLE_CHECK);
     try {
       await superuser.query(`ALTER TABLE "member" DROP CONSTRAINT "${MEMBER_ROLE_CHECK}"`);
       await superuser.query(`UPDATE "member" SET role = 'Owner' WHERE ${where}`, member);
@@ -173,14 +156,14 @@ describe("what the routes list refuses", () => {
       const response = await listRoutes(client);
 
       expect(response.status).toBe(401);
-      expect(await refusalOf(response)).toBe("role-unknown");
+      expect(await messageOf(response)).toBe("role-unknown");
     } finally {
       await superuser.query(`UPDATE "member" SET role = 'Admin' WHERE ${where}`, member);
       await superuser.query(
         `ALTER TABLE "member" ADD CONSTRAINT "${MEMBER_ROLE_CHECK}" ${definition}`,
       );
     }
-    expect(await constraintDefinition(MEMBER_ROLE_CHECK)).toBe(definition);
+    expect(await constraintDefinition(app, MEMBER_ROLE_CHECK)).toBe(definition);
   });
 
   it("refuses a flood from one address before it can spend a session lookup each", async () => {
@@ -202,15 +185,12 @@ describe("what the routes list refuses", () => {
 
   it("refuses a session whose active workspace is not a workspace id", async () => {
     const workspace = await app.provision();
-    const client = await signedInClient(workspace.admin.email);
-    await app.database.superuser.query(
-      "UPDATE session SET active_workspace_id = 'not-a-workspace-id' WHERE user_id = $1",
-      [workspace.admin.id],
-    );
+    const client = await signedInClient(app, workspace.admin.email);
+    await sessionPointedAt(app, workspace.admin.id, "not-a-workspace-id");
 
     const response = await listRoutes(client);
 
     expect(response.status).toBe(401);
-    expect(await refusalOf(response)).toBe("malformed-claims");
+    expect(await messageOf(response)).toBe("malformed-claims");
   });
 });

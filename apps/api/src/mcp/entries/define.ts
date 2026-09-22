@@ -1,10 +1,11 @@
 import type { ToolAnnotations } from "@modelcontextprotocol/server";
 import type { z } from "zod";
 
-import type { UserPrincipal } from "@better-answers/core/kernel";
+import type { Result, UserPrincipal } from "@better-answers/core/kernel";
 import type { Tx } from "@better-answers/core/store/postgres";
 
 import type { McpScope } from "../../auth/constants.ts";
+import type { RefusalAnswer } from "../../refusal.ts";
 
 type Readonlyish<T> = T extends (infer Item)[]
   ? readonly Readonlyish<Item>[]
@@ -26,7 +27,7 @@ export type Entry<Input extends z.ZodObject, Output extends z.ZodType> = {
     tx: Tx,
     args: z.infer<Input>,
     now: Date,
-  ) => Promise<Readonlyish<z.infer<Output>>>;
+  ) => Promise<Result<Readonlyish<z.infer<Output>>, RefusalAnswer | Error>>;
 
   readonly render: (result: Readonlyish<z.infer<Output>>) => string;
 };

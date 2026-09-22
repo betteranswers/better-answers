@@ -8,6 +8,7 @@ import {
 import { MCP_TOKEN_RULE } from "../src/auth/constants.ts";
 import { connectAsHost } from "./flow.ts";
 import { startApp, type TestApp, type TestClient } from "./harness.ts";
+import { callMcp } from "./mcp-call.ts";
 
 let app: TestApp;
 
@@ -63,17 +64,7 @@ const legacy = async (
   token: string,
   method: string,
   params: Rpc = {},
-): Promise<Response> =>
-  client.fetch("/mcp", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json, text/event-stream",
-      authorization: `Bearer ${token}`,
-      "mcp-protocol-version": "2025-11-25",
-    },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-  });
+): Promise<Response> => callMcp(client, token, method, params);
 
 const rpc = async (response: Response): Promise<Rpc> => {
   const type = response.headers.get("content-type") ?? "";
@@ -241,7 +232,11 @@ describe("era-independent", () => {
     expect(challenge).toContain('error="invalid_token"');
     expect(challenge).not.toContain("credentials-revoked");
     expect(app.logs.slice(before)).toContainEqual(
-      expect.objectContaining({ event: "mcp.refused", reason: "credentials-revoked" }),
+      expect.objectContaining({
+        event: "mcp.refused",
+        refusal: "credentials-revoked",
+        class: "unauthenticated",
+      }),
     );
   });
 
@@ -255,7 +250,11 @@ describe("era-independent", () => {
     expect(refused.status).toBe(401);
     expect(refused.headers.get("www-authenticate") ?? "").not.toContain("not-a-member");
     expect(app.logs.slice(before)).toContainEqual(
-      expect.objectContaining({ event: "mcp.refused", reason: "not-a-member" }),
+      expect.objectContaining({
+        event: "mcp.refused",
+        refusal: "not-a-member",
+        class: "unauthenticated",
+      }),
     );
   });
 

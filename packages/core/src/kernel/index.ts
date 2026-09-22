@@ -4,7 +4,7 @@ export type { Clock } from "./clock.ts";
 export { refusalFor } from "./constraint.ts";
 export { declareRefusals, REFUSAL_CLASSES, refusalRegister } from "./refusal.ts";
 export type { RefusalClass, RegisteredRefusal } from "./refusal.ts";
-export { MALFORMED, NOT_FOUND } from "./vocabulary.ts";
+export { KERNEL_REFUSALS, MALFORMED, NOT_FOUND } from "./vocabulary.ts";
 export type { RefusalWordFor } from "./vocabulary.ts";
 export { ISSUE_WORDS, parse, ROOT_PATH } from "./parse.ts";
 export type { FieldIssues, IssueWord, Malformed } from "./parse.ts";
