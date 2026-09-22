@@ -1,0 +1,25 @@
+apps/web/e2e/frame.spec.ts
+  s_0eac4f271203d6::t_e0eea31ac1d66c 552-553
+  s_0eac4f271203d6::t_28132982f86d93 539-551,554-560
+  s_0eac4f271203d6::t_f3bde233cd82a2 17-19
+apps/web/src/app/navigation-control.tsx
+  s_0eac4f271203d6::t_b2e067540c88b4 25-26
+  s_0eac4f271203d6::t_ced9c94f971571 1,20-22,24,27-30,33,36-45,47-61,63,67-71
+  s_0eac4f271203d6::t_346b1d079d40fb 34-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "8ad6ed3572513c98c159e7373f9d94a96a0f7de3",
+  "prompts": {},
+  "sessions": {
+    "s_0eac4f271203d6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b7e5164-c222-4435-a137-44be543b225a",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
