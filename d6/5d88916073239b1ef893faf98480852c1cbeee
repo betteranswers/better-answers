@@ -1,0 +1,35 @@
+packages/core/src/audit/vocabulary.ts
+  s_2dd75a86f22d42::t_dce335e506c8c1 73
+  s_2dd75a86f22d42::t_e45cb43113d957 115-118
+packages/core/src/audit/index.ts
+  s_2dd75a86f22d42::t_c2cb04ded72cb0 48
+  s_2dd75a86f22d42::t_2136b7b4aa184f 142
+  s_2dd75a86f22d42::t_9defdad56a4525 95
+  s_2dd75a86f22d42::t_86c32271a1702a 136
+  s_2dd75a86f22d42::t_cbfa5b93255f75 29
+  s_2dd75a86f22d42::t_9c6e6c7538263e 15,21
+packages/core/src/concepts/inbox.ts
+  s_2dd75a86f22d42::t_32cac26e86d3fc 13
+  s_2dd75a86f22d42::t_7dc8e215c4121a 246
+packages/core/src/members/requests.ts
+  s_2dd75a86f22d42::t_6dfce1fe71121c 9
+  s_2dd75a86f22d42::t_7d40d7cb77a32e 147
+packages/core/test/access-requests.test.ts
+  s_2dd75a86f22d42::t_45899b5832ef29 614
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d65d88916073239b1ef893faf98480852c1cbeee",
+  "prompts": {},
+  "sessions": {
+    "s_2dd75a86f22d42": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1deab29c-2105-473f-9514-e52636269c8a",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
