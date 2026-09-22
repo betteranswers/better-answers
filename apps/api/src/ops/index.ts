@@ -18,7 +18,14 @@ import {
   seedSyntheticSubject,
   type RehearsalRefusal,
 } from "@better-answers/core/erasure";
-import { attempt, err, ok, type Clock, type Result } from "@better-answers/core/kernel";
+import {
+  attempt,
+  err,
+  ok,
+  type Clock,
+  type RefusalClass,
+  type Result,
+} from "@better-answers/core/kernel";
 import { enqueueJob, JOB_IS_OVER, jobById, type RebuildReason } from "@better-answers/core/runs";
 import { initRepository, type GitDoor } from "@better-answers/core/store/git";
 import type { ObjectDoor } from "@better-answers/core/store/objects";
@@ -42,10 +49,23 @@ import {
 
 import { doorTold, type Doors } from "../doors.ts";
 
+import { isRefusalWord, refusalOf } from "../refusal.ts";
+
 const DONE = 0;
 const REFUSED = 1;
 const USAGE = 2;
 export const NOT_BUILT = 3;
+
+// A wrapper reads the code alone, so a precondition it can wait on never shares one with a fault.
+export const EXIT_OF_CLASS = {
+  malformed: USAGE,
+  unauthenticated: 4,
+  forbidden: 5,
+  absent: 6,
+  inapplicable: 7,
+  conflict: 8,
+  precondition: 9,
+} as const satisfies Readonly<Record<RefusalClass, number>>;
 
 export type OpsIo = {
   readonly fetch: (url: string, init?: RequestInit) => Promise<Response>;
@@ -132,7 +152,10 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
                                                             the company's bundle landed through the governed write, its checks imported, its links rewritten to iris (ADR 0002, 0014)
     --sensitivity  one of ${SENSITIVITIES.join(" · ")} (default ${IMPORT_SENSITIVITY_DEFAULT})
     --dry-run      validate the tree and say what a run would do, writing nothing
-exit codes: ${DONE} done · ${REFUSED} refused, stop · ${USAGE} usage · ${NOT_BUILT} the slice this needs has no tables yet`;
+exit codes: ${DONE} done · ${REFUSED} refused in no registered word, stop · ${USAGE} usage, or a malformed argument · ${NOT_BUILT} the slice this needs has no tables yet
+  a refusal in a registered word exits with its class's code: ${Object.entries(EXIT_OF_CLASS)
+    .map(([refusalClass, code]) => `${code} ${refusalClass}`)
+    .join(" · ")}`;
 
 type ErasureDoors = {
   readonly git: GitDoor;
@@ -368,12 +391,15 @@ const refused = (
   reason: string | Error,
   io: OpsIo,
 ): number => {
-  if (reason === "malformed") {
-    io.say(`${command}: --workspace ${workspaceId} is not a workspace id`);
-    return USAGE;
+  if (!isRefusalWord(reason)) {
+    io.say(`${command}: REFUSED — ${reasonOf(reason)}`);
+    return REFUSED;
   }
-  io.say(`${command}: REFUSED — ${reasonOf(reason)}`);
-  return REFUSED;
+  const refusal = refusalOf(reason);
+  const about =
+    refusal.word === "malformed" ? `: --workspace ${workspaceId} is not a workspace id` : "";
+  io.say(`${command}: REFUSED — ${refusal.word}${about}`);
+  return EXIT_OF_CLASS[refusal.class];
 };
 
 const graphCountsCommand = async (

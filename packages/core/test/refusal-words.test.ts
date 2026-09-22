@@ -47,6 +47,8 @@ const REGISTER = {
 
   "no-such-user": "absent by workspaces",
   "no-such-workspace": "absent by workspaces",
+  "workspace-gone": "unauthenticated by workspaces",
+  "person-gone": "unauthenticated by workspaces",
   "slug-taken": "conflict by workspaces",
   "workspace-exists": "conflict by workspaces",
   "already-a-member": "conflict by workspaces",

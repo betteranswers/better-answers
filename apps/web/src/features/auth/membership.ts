@@ -1,7 +1,6 @@
 import { useQuery, type QueryClient } from "@tanstack/react-query";
-import { TRPCClientError } from "@trpc/client";
 
-import { useTRPC, type ApiProxy } from "@/shared/api/trpc.ts";
+import { refusalOf, useTRPC, type ApiProxy, type RefusalWord } from "@/shared/api/trpc.ts";
 
 // The route has read this before the shell mounts, so a read on mount would be the second.
 const membershipOptions = (api: ApiProxy) =>
@@ -12,24 +11,25 @@ export const useMembership = () => {
   return useQuery(membershipOptions(api));
 };
 
-const refusalOf = (error: Error): string | undefined =>
-  error instanceof TRPCClientError && error.data?.code === "UNAUTHORIZED"
-    ? error.message
-    : undefined;
+// Only a class the reader can answer by signing in again sends them to the sign-in screen.
+const wordSendingThemToSignIn = (error: Error): RefusalWord | undefined => {
+  const refusal = refusalOf(error);
+  return refusal?.class === "unauthenticated" ? refusal.word : undefined;
+};
 
-export const NEEDS_A_PICK = "no-active-workspace";
+export const NEEDS_A_PICK: RefusalWord = "no-active-workspace";
 
 // The cache the shell itself reads, so a redirect that has an answer already costs no request.
 export const membershipRefusal = async (
   queryClient: QueryClient,
   api: ApiProxy,
-): Promise<string | undefined> => {
+): Promise<RefusalWord | undefined> => {
   try {
     // A read that failed for anything else is the shell's own query to retry and report.
     await queryClient.ensureQueryData({ ...membershipOptions(api), retry: false });
     return undefined;
   } catch (error) {
-    return error instanceof Error ? refusalOf(error) : undefined;
+    return error instanceof Error ? wordSendingThemToSignIn(error) : undefined;
   }
 };
 

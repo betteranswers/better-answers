@@ -1,7 +1,7 @@
 import { declareRefusals, type Vocabulary } from "./refusal.ts";
 
 // A word naming a thing one slice owns stays there; a second slice borrows it rather than move it.
-const KERNEL_REFUSALS = declareRefusals("kernel", {
+export const KERNEL_REFUSALS = declareRefusals("kernel", {
   malformed: "malformed",
   "role-forbids": "forbidden",
   "not-found": "absent",

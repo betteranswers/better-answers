@@ -1,32 +1,18 @@
-import { TRPCError } from "@trpc/server";
-
 import { listRoutes } from "@better-answers/core/llm";
 import { readMembership } from "@better-answers/core/workspaces";
 
-import { queryProcedure, router } from "./base.ts";
-
-const storeFailed = (what: string, cause: Error): TRPCError =>
-  new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `${what} could not be read`, cause });
+import { crossing, queryProcedure, router } from "./base.ts";
 
 export const appRouter = router({
   session: router({
-    membership: queryProcedure.query(async ({ ctx }) => {
-      const read = await readMembership(ctx.principal, ctx.tx);
-
-      if (!read.ok) {
-        const { error } = read;
-        if (error instanceof Error) throw storeFailed("the membership", error);
-        throw new TRPCError({ code: "UNAUTHORIZED", message: error });
-      }
-      return read.value;
-    }),
+    membership: queryProcedure.query(({ ctx }) =>
+      crossing(ctx, readMembership.name, readMembership(ctx.principal, ctx.tx)),
+    ),
   }),
   routes: router({
-    list: queryProcedure.query(async ({ ctx }) => {
-      const listed = await listRoutes(ctx.principal, ctx.tx);
-      if (!listed.ok) throw storeFailed("the workspace's routes", listed.error);
-      return listed.value;
-    }),
+    list: queryProcedure.query(({ ctx }) =>
+      crossing(ctx, listRoutes.name, listRoutes(ctx.principal, ctx.tx)),
+    ),
   }),
 });
 

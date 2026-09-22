@@ -59,7 +59,12 @@ const answering =
               error: {
                 message: refusal,
                 code: REFUSED_CODE,
-                data: { code: "UNAUTHORIZED", httpStatus: 401, path: name },
+                data: {
+                  code: "UNAUTHORIZED",
+                  httpStatus: 401,
+                  path: name,
+                  refusal: { word: refusal, class: "unauthenticated" },
+                },
               },
             },
       ),

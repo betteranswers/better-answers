@@ -12,14 +12,9 @@ import {
   renderFind,
   renderOpen,
 } from "@better-answers/core/answering";
-import type { Result } from "@better-answers/core/kernel";
+import { parse } from "@better-answers/core/kernel";
 
 import { defineEntry, type Entry } from "./define.ts";
-
-const valueOrThrow = <Value>(result: Result<Value, Error>): Value => {
-  if (!result.ok) throw result.error;
-  return result.value;
-};
 
 const trust = z.object({
   tier: z.enum(["unverified", "machine-confirmed", "human-reviewed"]),
@@ -75,7 +70,7 @@ const findEntry = defineEntry({
     idempotentHint: true,
     openWorldHint: false,
   },
-  run: async (principal, tx, args, now) => valueOrThrow(await find(principal, tx, args, now)),
+  run: async (principal, tx, args, now) => find(principal, tx, args, now),
   render: renderFind,
 });
 
@@ -112,7 +107,7 @@ const askEntry = defineEntry({
     idempotentHint: false,
     openWorldHint: false,
   },
-  run: async (principal, tx, args) => valueOrThrow(await ask(principal, tx, args)),
+  run: async (principal, tx, args) => ask(principal, tx, args),
   render: renderAnswer,
 });
 
@@ -168,13 +163,11 @@ const openEntry = defineEntry({
     openWorldHint: false,
   },
   run: async (principal, tx, args, now) =>
-    valueOrThrow(
-      await open(
-        principal,
-        tx,
-        args.iri === undefined ? { locator: args.locator ?? "" } : { iri: args.iri },
-        now,
-      ),
+    open(
+      principal,
+      tx,
+      args.iri === undefined ? { locator: args.locator ?? "" } : { iri: args.iri },
+      now,
     ),
   render: renderOpen,
 });
@@ -198,21 +191,16 @@ const giveFeedbackEntry = defineEntry({
   description:
     "Record a reader's verdict on an answer or a concept: helpful, or a flag — wrong, out of date, incomplete, or should not have been shown — with what was wrong in their words. Called from a view's button or on the person's explicit ask; it is the surface's one write.",
   scopes: ["knowledge:read", "feedback:write"],
-  input: z
-    .object({
-      iri: z.string().min(1).describe("The concept or answer the feedback is about."),
-      verdict: z.enum(["helpful", "flag"]).describe("Helpful, or a flag with a reason."),
-      reason: z
-        .enum(["wrong", "out-of-date", "incomplete", "should-not-have-shown"])
-        .optional()
-        .describe("Required with a flag."),
-      detail: z.string().max(2000).optional().describe("What was wrong, in the person's words."),
-    })
-
-    .refine((value) => value.verdict !== "flag" || value.reason !== undefined, {
-      message: "a flag needs a reason: wrong, out-of-date, incomplete or should-not-have-shown",
-      path: ["reason"],
-    }),
+  // A flag with no reason is the act's own refusal, not a rule the flat wire shape could carry.
+  input: z.object({
+    iri: z.string().min(1).describe("The concept or answer the feedback is about."),
+    verdict: z.enum(["helpful", "flag"]).describe("Helpful, or a flag with a reason."),
+    reason: z
+      .enum(["wrong", "out-of-date", "incomplete", "should-not-have-shown"])
+      .optional()
+      .describe("Required with a flag."),
+    detail: z.string().max(2000).optional().describe("What was wrong, in the person's words."),
+  }),
   output: z.object({
     outcome: z.literal("received"),
     feedback: feedbackInput,
@@ -224,12 +212,9 @@ const giveFeedbackEntry = defineEntry({
     openWorldHint: false,
   },
   run: async (principal, tx, args) => {
-    const parsed = feedbackInput.safeParse(args);
-    if (!parsed.success)
-      throw new Error(
-        "a flag needs a reason: wrong, out-of-date, incomplete or should-not-have-shown",
-      );
-    return valueOrThrow(await giveFeedback(principal, tx, parsed.data));
+    const parsed = parse(feedbackInput, args);
+    if (!parsed.ok) return parsed;
+    return giveFeedback(principal, tx, parsed.value);
   },
   render: renderFeedback,
 });

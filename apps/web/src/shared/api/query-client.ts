@@ -1,16 +1,18 @@
 import { QueryClient } from "@tanstack/react-query";
-import { TRPCClientError } from "@trpc/client";
+
+import { refusalOf } from "./trpc.ts";
 
 const RETRY_ATTEMPTS = 2;
 
-const isRefusal = (error: Error) =>
-  error instanceof TRPCClientError && error.data?.code === "UNAUTHORIZED";
+// Every class names something its reader must do, and none of them is waiting, so a refusal of
+// any word is never asked again.
+const worthAnotherAsk = (error: Error) => refusalOf(error) === undefined;
 
 export const createQueryClient = () =>
   new QueryClient({
     defaultOptions: {
       queries: {
-        retry: (failureCount, error) => !isRefusal(error) && failureCount < RETRY_ATTEMPTS,
+        retry: (failureCount, error) => worthAnotherAsk(error) && failureCount < RETRY_ATTEMPTS,
       },
     },
   });

@@ -1,41 +1,84 @@
 import { initTRPC, TRPCError } from "@trpc/server";
+import type { Logger } from "pino";
 
-import { attempt, type Claims, type PrincipalRefusal } from "@better-answers/core/kernel";
+import { attempt, type Claims, type RefusalClass, type Result } from "@better-answers/core/kernel";
 import { withHeldPrincipal, withPrincipal } from "@better-answers/core/store/postgres";
 
 import { sessionClaims, type SessionReader } from "../auth/verify.ts";
 import type { Doors } from "../doors.ts";
+import { refusalLogged, refusalOf, RefusedError, type RefusalAnswer } from "../refusal.ts";
 
 type TrpcContext = {
   readonly doors: Doors;
   readonly readSession: SessionReader;
   readonly headers: Headers;
+  readonly log: Logger;
 };
 
-type TransportRefusal = PrincipalRefusal | "no-session" | "no-active-workspace";
+// The seven classes sort a word by what its caller can do, which is why each falls on one status.
+const CODE_OF_CLASS = {
+  unauthenticated: "UNAUTHORIZED",
+  forbidden: "FORBIDDEN",
+  absent: "NOT_FOUND",
+  malformed: "BAD_REQUEST",
+  inapplicable: "UNPROCESSABLE_CONTENT",
+  conflict: "CONFLICT",
+  precondition: "PRECONDITION_FAILED",
+} as const satisfies Readonly<Record<RefusalClass, TRPCError["code"]>>;
 
-const unauthorized = (refusal: TransportRefusal): TRPCError =>
-  new TRPCError({ code: "UNAUTHORIZED", message: refusal });
+const refused = (log: Logger, act: string, answered: RefusalAnswer): TRPCError => {
+  const refusal = refusalOf(answered);
+  log.info({ event: "trpc.refused", act, ...refusalLogged(refusal) }, "refused");
+  return new TRPCError({
+    code: CODE_OF_CLASS[refusal.class],
+    message: refusal.word,
+    cause: new RefusedError(refusal),
+  });
+};
 
-const trpc = initTRPC.context<TrpcContext>().create();
+const failed = (log: Logger, act: string, cause: Error): TRPCError => {
+  log.error({ event: "trpc.failed", act, err: cause }, "failed");
+  return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `${act} failed`, cause });
+};
+
+export const crossing = async <Value>(
+  ctx: { readonly log: Logger },
+  act: string,
+  running: Promise<Result<Value, RefusalAnswer | Error>>,
+): Promise<Value> => {
+  // A rejection is caught here, not by the protocol's own handler, so that every failure is
+  // logged once and in one place.
+  const ran = await attempt(() => running);
+  const answered = ran.ok ? ran.value : ran;
+
+  if (answered.ok) return answered.value;
+  if (answered.error instanceof Error) throw failed(ctx.log, act, answered.error);
+  throw refused(ctx.log, act, answered.error);
+};
+
+const trpc = initTRPC.context<TrpcContext>().create({
+  errorFormatter: ({ shape, error }) => ({
+    ...shape,
+    data: {
+      ...shape.data,
+      refusal: error.cause instanceof RefusedError ? error.cause.refusal : undefined,
+    },
+  }),
+});
 
 export const router = trpc.router;
+
+const RESOLVER = "withPrincipal";
 
 const claimsOf = async (ctx: TrpcContext): Promise<Claims> => {
   const read = await attempt(() => ctx.readSession(ctx.headers));
 
-  if (!read.ok) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: "the session could not be read",
-      cause: read.error,
-    });
-  }
+  if (!read.ok) throw failed(ctx.log, "readSession", read.error);
   const session = read.value;
-  if (session === null) throw unauthorized("no-session");
+  if (session === null) throw refused(ctx.log, "readSession", "no-session");
 
   const claims = await sessionClaims(async () => session, ctx.headers);
-  if (claims === undefined) throw unauthorized("no-active-workspace");
+  if (claims === undefined) throw refused(ctx.log, "sessionClaims", "no-active-workspace");
   return claims;
 };
 
@@ -43,15 +86,22 @@ const inTheResolversTransaction = (resolve: typeof withPrincipal) =>
   trpc.procedure.use(async ({ ctx, next }) => {
     const claims = await claimsOf(ctx);
 
-    const resolved = await resolve(ctx.doors.postgres, claims, async (principal, tx) => {
-      // tRPC returns a failed procedure rather than throwing, so without the throw below
-      // the transaction it failed inside commits.
-      const ran = await next({ ctx: { principal, tx, doors: undefined } });
-      if (!ran.ok) throw ran.error;
-      return ran;
-    });
-    if (!resolved.ok) throw unauthorized(resolved.error);
-    return resolved.value;
+    const resolved = await attempt(() =>
+      resolve(ctx.doors.postgres, claims, async (principal, tx) => {
+        // tRPC returns a failed procedure rather than throwing, so without the throw below
+        // the transaction it failed inside commits.
+        const ran = await next({ ctx: { principal, tx, doors: undefined } });
+        if (!ran.ok) throw ran.error;
+        return ran;
+      }),
+    );
+    if (!resolved.ok) {
+      // The procedure's own answer has crossed already; logging it here would say it twice.
+      if (resolved.error instanceof TRPCError) throw resolved.error;
+      throw failed(ctx.log, RESOLVER, resolved.error);
+    }
+    if (!resolved.value.ok) throw refused(ctx.log, RESOLVER, resolved.value.error);
+    return resolved.value.value;
   });
 
 export const queryProcedure = inTheResolversTransaction(withPrincipal);
@@ -63,8 +113,11 @@ export const mutationProcedure = inTheResolversTransaction(withHeldPrincipal);
 export const ownTransactionProcedure = trpc.procedure.use(async ({ ctx, next }) => {
   const claims = await claimsOf(ctx);
 
-  const resolved = await withPrincipal(ctx.doors.postgres, claims, async (principal) => principal);
-  if (!resolved.ok) throw unauthorized(resolved.error);
+  const resolved = await attempt(() =>
+    withPrincipal(ctx.doors.postgres, claims, async (principal) => principal),
+  );
+  if (!resolved.ok) throw failed(ctx.log, RESOLVER, resolved.error);
+  if (!resolved.value.ok) throw refused(ctx.log, RESOLVER, resolved.value.error);
 
-  return next({ ctx: { principal: resolved.value, doors: ctx.doors } });
+  return next({ ctx: { principal: resolved.value.value, doors: ctx.doors } });
 });

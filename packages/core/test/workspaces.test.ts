@@ -409,11 +409,11 @@ describe("reading the current membership", () => {
 
     expect(await readAs(principalOf(gone, adminUserId, "Admin"))).toEqual({
       ok: false,
-      error: "no-such-workspace",
+      error: "workspace-gone",
     });
     expect(await readAs(principalOf(workspaceId, gone, "Admin"))).toEqual({
       ok: false,
-      error: "no-such-person",
+      error: "person-gone",
     });
   });
 

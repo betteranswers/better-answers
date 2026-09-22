@@ -11,7 +11,7 @@ import {
 } from "@modelcontextprotocol/server";
 import type { Logger } from "pino";
 
-import type { Clock } from "@better-answers/core/kernel";
+import { err, type Clock } from "@better-answers/core/kernel";
 import {
   consumeCall,
   consumeIngress,
@@ -32,6 +32,8 @@ import {
 } from "../auth/constants.ts";
 import { bearerOf } from "../auth/verify.ts";
 import { clientIpOf, tooManyRequests } from "../ingress/limits.ts";
+import { refusalLogged, refusalOf, type RefusalAnswer } from "../refusal.ts";
+import { crossing } from "./crossing.ts";
 import { ENTRIES } from "./entries/index.ts";
 
 export type McpSurfaceDependencies = {
@@ -45,9 +47,13 @@ export type McpSurfaceDependencies = {
   readonly clock: Clock;
 };
 
+const THE_BEARER = "the bearer";
+
 const CEILING_MESSAGE =
   "This connection has made too many calls this minute; an Admin can raise the ceiling in System.";
 
+// The bearer gate's reason stays off the wire; the word and class an agent reads are the tool's,
+// past the gate.
 const refused = (): OAuthError =>
   new OAuthError(OAuthErrorCode.InvalidToken, "the bearer was refused");
 
@@ -87,25 +93,18 @@ export const createMcpSurface = (
           outputSchema: entry.output,
           annotations: entry.annotations,
         },
-        async (args) => {
-          if (bearer === undefined) {
-            return refusedResult("This call carried no verified credential.");
-          }
-          const outcome = await withPrincipal(deps.door, bearer.claims, (principal, tx) =>
-            entry.run(principal, tx, args, deps.clock.now()),
-          );
-          if (!outcome.ok) {
-            log.warn(
-              { event: "mcp.call_refused", entry: entry.name, reason: outcome.error },
-              "call refused",
-            );
-            return refusedResult("Your credentials were refused. Sign in again.");
-          }
-          return {
-            content: [{ type: "text", text: entry.render(outcome.value) }],
-            structuredContent: outcome.value,
-          };
-        },
+        async (args) =>
+          crossing(
+            log,
+            entry.name,
+            async () =>
+              bearer === undefined
+                ? err<RefusalAnswer>("no-session")
+                : withPrincipal(deps.door, bearer.claims, (principal, tx) =>
+                    entry.run(principal, tx, args, deps.clock.now()),
+                  ),
+            entry.render,
+          ),
       );
     }
     return server;
@@ -159,8 +158,8 @@ export const createMcpSurface = (
     }));
     if (!gate.ok) {
       log.info(
-        { event: "mcp.refused", reason: gate.error, client_id: authInfo.clientId },
-        "bearer refused",
+        { event: "mcp.refused", entry: THE_BEARER, ...refusalLogged(refusalOf(gate.error)) },
+        "refused",
       );
       return bearerAuthChallengeResponse(refused(), challengeOptions);
     }
@@ -183,8 +182,3 @@ export const createMcpSurface = (
     });
   };
 };
-
-const refusedResult = (text: string) => ({
-  content: [{ type: "text" as const, text }],
-  isError: true,
-});
