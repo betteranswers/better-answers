@@ -15,13 +15,16 @@ import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
 import { SCREENS, viewsOf, type Screen, type View } from "@/shared/screens.ts";
 import { FailedScreen } from "./failed-screen.tsx";
 import { Frame } from "./frame.tsx";
+import type { ViewToolbar } from "./toolbar.tsx";
 import { UnknownScreen } from "./unknown-screen.tsx";
-import { RoutesAndSpendView } from "./views/routes-and-spend-view.tsx";
+import { ROUTES_AND_SPEND_TOOLBAR, RoutesAndSpendView } from "./views/routes-and-spend-view.tsx";
 import { UnbuiltView } from "./views/unbuilt-view.tsx";
 
-// The list decides which views are built; this map only says by what.
-const BUILT_VIEWS = new Map<View["path"], () => ReactElement>([
-  ["/system/routes-and-spend", RoutesAndSpendView],
+type BuiltView = { readonly draw: () => ReactElement; readonly toolbar?: ViewToolbar };
+
+// The list decides which views are built; this map only says by what, and with what in hand.
+const BUILT_VIEWS = new Map<View["path"], BuiltView>([
+  ["/system/routes-and-spend", { draw: RoutesAndSpendView, toolbar: ROUTES_AND_SPEND_TOOLBAR }],
 ]);
 
 const rootRoute = createRootRoute({
@@ -70,7 +73,7 @@ const componentFor = (screen: Screen, view: View): (() => ReactElement) => {
   if (!view.built && built !== undefined) {
     throw new Error(`the list calls ${view.path} unbuilt, and something draws it`);
   }
-  return built ?? (() => <UnbuiltView screen={screen} view={view} />);
+  return built?.draw ?? (() => <UnbuiltView screen={screen} view={view} />);
 };
 
 const screenRoutes: AnyRoute[] = SCREENS.map((screen) =>
@@ -89,6 +92,7 @@ const viewRoutes: AnyRoute[] = SCREENS.flatMap((screen) =>
       getParentRoute: () => shellRoute,
       path: view.path,
       component: componentFor(screen, view),
+      staticData: { toolbar: BUILT_VIEWS.get(view.path)?.toolbar },
     }),
   ),
 );
@@ -113,5 +117,10 @@ export const router = createAppRouter();
 declare module "@tanstack/react-router" {
   interface Register {
     router: ReturnType<typeof createAppRouter>;
+  }
+
+  // The route is how a view's toolbar reaches the shell: props down, never an import up.
+  interface StaticDataRouteOption {
+    readonly toolbar?: ViewToolbar | undefined;
   }
 }

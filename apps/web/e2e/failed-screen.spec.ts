@@ -56,10 +56,19 @@ test("a view that throws leaves the three regions standing and an accessible way
   ).toBeVisible();
 
   await skipLinkReachesTheScreen(page);
+  // The open tab's panel is the first stop inside the content, so the way out is the next one.
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("tabpanel")).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Try this screen again" })).toBeFocused();
 
   await passesTheAccessibilityGate();
+
+  // The toolbar stands too, and its other tab is a way back in: the view is asked again.
+  await expect(page.getByRole("tab", { name: "Routes" })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("tab", { name: "Spend" }).click();
+  await expect(page.getByText("Spend is not built yet.")).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
 
   /* jscpd:ignore-start */
   await navigation.getByRole("link", { name: "Knowledge" }).click();

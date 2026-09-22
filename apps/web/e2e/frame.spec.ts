@@ -184,14 +184,17 @@ test("the keyboard order is the skip link, the rail, the secondary nav, the top 
     page.getByRole("banner").getByRole("button", { name: new RegExp(workspace.admin.name) }),
   ).toBeFocused();
 
-  // Nothing carries a positive tabindex, so the document's own order is the tab order and
-  // the screen comes last.
+  // Nothing carries a positive tabindex, so the document's own order is the tab order. Zero
+  // is not positive: the open tab's panel carries one.
   const contentIsLast = await page.evaluate(() => {
     const bar = document.querySelector("header");
     const content = document.querySelector("main");
     if (bar === null || content === null) return false;
     const following = bar.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING;
-    return following !== 0 && document.querySelector("[tabindex]:not([tabindex='-1'])") === null;
+    const jumped = [...document.querySelectorAll("[tabindex]")].some(
+      (element) => Number(element.getAttribute("tabindex")) > 0,
+    );
+    return following !== 0 && !jumped;
   });
   expect(contentIsLast).toBe(true);
 });
@@ -259,4 +262,85 @@ test("the shell is painted in the page's own token, so a screen sits on the prod
   });
   expect(painted.token).not.toBe("rgba(0, 0, 0, 0)");
   expect(painted.behind).toBe(painted.token);
+});
+
+const TOOLBAR_TABS = ["Routes", "Spend"];
+
+const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Routes and spend" });
+
+const routesCardOf = (page: Page) => page.getByRole("region", { name: "Routes" });
+
+test("the open view fills the toolbar with its tabs, marks the open one selected and moves on an arrow key", async ({
+  page,
+  request,
+}) => {
+  await signedIn(page, request, "Calder Ironworks");
+  await page.goto("/system/routes-and-spend");
+
+  const tabs = tabsOf(page);
+  await expect(tabs.getByRole("tab")).toHaveText(TOOLBAR_TABS);
+  await expect(tabs).toMatchAriaSnapshot(`
+    - tablist "Routes and spend":
+      - tab "Routes" [selected]
+      - tab "Spend"
+  `);
+
+  // The region is the shell's own, between the top bar and the content and inside neither.
+  const bar = await topOf(page.getByRole("banner"));
+  const toolbar = await topOf(tabs);
+  const content = await topOf(page.getByRole("main"));
+  expect(bar).toBeLessThan(toolbar);
+  expect(toolbar).toBeLessThan(content);
+
+  // The arrows and the selection are the registry's, so the shell rolls no keyboard of its own.
+  await tabs.getByRole("tab", { name: "Routes" }).click();
+  await page.keyboard.press("ArrowRight");
+  await expect(tabs.getByRole("tab", { name: "Spend" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByText("Spend is not built yet.")).toBeVisible();
+  await expect(routesCardOf(page)).toHaveCount(0);
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(routesCardOf(page)).toBeVisible();
+});
+
+test("a view that declares neither tabs nor acts gets no toolbar over its content", async ({
+  page,
+  request,
+}) => {
+  await signedIn(page, request, "Airedale Presswork");
+  await page.goto("/system/health");
+  await expect(page.getByRole("heading", { level: 2, name: "Health" })).toBeVisible();
+
+  await expect(page.getByRole("tablist")).toHaveCount(0);
+
+  // An empty bar is what this forbids, so the content must follow the top bar itself.
+  const met = await page.evaluate(
+    () => document.querySelector("header")?.nextElementSibling === document.querySelector("main"),
+  );
+  expect(met).toBe(true);
+});
+
+test("the keyboard order gains the toolbar between the top bar and the content", async ({
+  page,
+  request,
+}) => {
+  const workspace = await signedIn(page, request, "Wensleydale Precision");
+  await page.goto("/system/routes-and-spend");
+  await expect(routesCardOf(page).getByRole("listitem")).toHaveCount(5);
+
+  // The order down to the top bar is another test's; starting at its last stop proves this
+  // claim without proving that one twice.
+  await page
+    .getByRole("banner")
+    .getByRole("button", { name: new RegExp(workspace.admin.name) })
+    .focus();
+
+  await page.keyboard.press("Tab");
+  await expect(tabsOf(page).getByRole("tab", { name: "Routes" })).toBeFocused();
+
+  // The open tab's panel holds the view, so the content is reached through the toolbar.
+  const panel = page.getByRole("tabpanel");
+  await page.keyboard.press("Tab");
+  await expect(panel).toBeFocused();
+  await expect(panel.getByRole("region", { name: "Routes" })).toBeVisible();
 });
