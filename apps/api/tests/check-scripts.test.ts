@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { gatesNamed, workspacePackages } from "./workspaces.ts";
 
@@ -12,15 +13,16 @@ const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");
 
-type Manifest = { readonly scripts?: Readonly<Record<string, string>> };
+// A manifest without `scripts` reads as a workspace with none.
+const manifest = z.object({ scripts: z.record(z.string(), z.string()).optional() });
+type Manifest = z.infer<typeof manifest>;
 
 const manifestOf = (directory: string): Manifest => {
-  const parsed: unknown = JSON.parse(read(path.join(directory, "package.json")));
-
-  expect(typeof parsed, `${directory}/package.json is not an object`).toBe("object");
-  // SAFETY: the parse is asserted an object above, and a manifest without `scripts` reads as
-  // a workspace with none.
-  return parsed as Manifest;
+  const parsed = manifest.safeParse(JSON.parse(read(path.join(directory, "package.json"))));
+  if (!parsed.success) {
+    throw new Error(`${directory}/package.json is not a manifest: ${parsed.error.message}`);
+  }
+  return parsed.data;
 };
 
 const scriptsOf = (directory: string): Readonly<Record<string, string>> =>

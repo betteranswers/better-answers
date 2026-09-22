@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { parse } from "yaml";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import type { Tool } from "@better-answers/devtools/throwaway-tree";
@@ -13,15 +14,23 @@ const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");
 
-type Command = { readonly run?: string; readonly glob?: string; readonly root?: string };
-type Lefthook = {
-  readonly "pre-commit"?: {
-    readonly parallel?: boolean;
-    readonly commands?: Record<string, Command>;
-  };
-};
+const command = z.object({
+  run: z.string().optional(),
+  glob: z.string().optional(),
+  root: z.string().optional(),
+});
+type Command = z.infer<typeof command>;
+const lefthook = z.object({
+  "pre-commit": z
+    .object({
+      parallel: z.boolean().optional(),
+      commands: z.record(z.string(), command).optional(),
+    })
+    .optional(),
+});
+type Lefthook = z.infer<typeof lefthook>;
 
-const config = (): Lefthook => parse(read("lefthook.yml")) as Lefthook;
+const config = (): Lefthook => lefthook.parse(parse(read("lefthook.yml")));
 
 const preCommit = () => {
   const hook = config()["pre-commit"];
@@ -37,12 +46,13 @@ const runOf = (name: string): string => {
   return command.run;
 };
 
+const binaryManifest = z.object({
+  bin: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
+});
+
 const declaredBinary = (packageName: string, binaryName: string = packageName): string => {
   const manifestPath = createRequire(import.meta.url).resolve(`${packageName}/package.json`);
-  const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
-    bin?: string | Record<string, string>;
-  };
-  const bin = manifest.bin;
+  const { bin } = binaryManifest.parse(JSON.parse(readFileSync(manifestPath, "utf8")));
   const relative = typeof bin === "string" ? bin : bin?.[binaryName];
   if (relative === undefined) {
     throw new Error(`${packageName} declares no \`${binaryName}\` binary`);
@@ -207,10 +217,11 @@ describe("the pre-commit hook (T-070)", () => {
   });
 
   it("is installed by a root `prepare` script, so a fresh clone needs no remembered step", () => {
-    const manifest = JSON.parse(read("package.json")) as {
-      scripts: Record<string, string>;
-      devDependencies: Record<string, string>;
-    };
+    const rootManifest = z.object({
+      scripts: z.record(z.string(), z.string()),
+      devDependencies: z.record(z.string(), z.string()),
+    });
+    const manifest = rootManifest.parse(JSON.parse(read("package.json")));
     expect(manifest.scripts["prepare"]).toContain("lefthook install");
 
     expect(manifest.scripts["prepare"]).toContain("||");
@@ -218,9 +229,10 @@ describe("the pre-commit hook (T-070)", () => {
   });
 
   it("refuses lefthook's own postinstall in the allow-list, because `prepare` is the wiring", () => {
-    const workspace = parse(read("pnpm-workspace.yaml")) as {
-      allowBuilds?: Record<string, unknown>;
-    };
+    const workspaceManifest = z.object({
+      allowBuilds: z.record(z.string(), z.boolean()).optional(),
+    });
+    const workspace = workspaceManifest.parse(parse(read("pnpm-workspace.yaml")));
     expect(workspace.allowBuilds?.["lefthook"]).toBe(false);
   });
 });

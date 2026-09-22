@@ -1,5 +1,6 @@
 import { ulid } from "@better-answers/schema";
 import { beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { commit, type GitDoor } from "@better-answers/core/store/git";
 import {
@@ -1308,16 +1309,24 @@ const replayCopyOf = async (workspaceId: string, erasureRequestId: string): Prom
   return textOf(got.value);
 };
 
-type CopyAsRead = {
-  readonly workspaceId: string;
-  readonly subjectRequestId: string;
-  readonly erasureRequestId: string;
-  readonly personId?: string;
-  readonly pseudonym: string;
-  readonly completedAt: string;
-  readonly identifiers: unknown;
-  readonly map: readonly { readonly family: string; readonly locations: readonly string[] }[];
-};
+// Strict, so a key the copy gained is refused here and never read past as a finder's own.
+const copyAsRead = z.strictObject({
+  workspaceId: z.string(),
+  subjectRequestId: z.string(),
+  erasureRequestId: z.string(),
+  personId: z.string().optional(),
+  pseudonym: z.string(),
+  completedAt: z.string(),
+  identifiers: z.object({
+    emails: z.array(z.string()),
+    names: z.array(z.string()),
+    other: z.array(z.string()),
+  }),
+  map: z.array(z.object({ family: z.string(), locations: z.array(z.string()) })),
+});
+
+const readCopy = async (workspaceId: string, erasureRequestId: string) =>
+  copyAsRead.parse(JSON.parse(await replayCopyOf(workspaceId, erasureRequestId)));
 
 const replayCopiesIn = async (workspaceId: string): Promise<readonly string[]> => {
   const listed = await listPlatformObjects(ERASURE, objects().door, `erasures/${workspaceId}/`);
@@ -1345,9 +1354,7 @@ describe("the replay copy the restore reads", () => {
     const done = await completing(scenario, subjectRequestId);
 
     const [row] = await erasureRowsIn(scenario.workspaceId);
-    const copy = JSON.parse(
-      await replayCopyOf(scenario.workspaceId, done.erasureRequestId),
-    ) as CopyAsRead;
+    const copy = await readCopy(scenario.workspaceId, done.erasureRequestId);
     expect(copy.workspaceId).toEqual(scenario.workspaceId);
     expect(copy.subjectRequestId).toEqual(subjectRequestId);
     expect(copy.erasureRequestId).toEqual(done.erasureRequestId);
@@ -1372,7 +1379,7 @@ describe("the replay copy the restore reads", () => {
     const done = await completing(scenario, subjectRequestId);
 
     const text = await replayCopyOf(scenario.workspaceId, done.erasureRequestId);
-    const copy = JSON.parse(text) as CopyAsRead;
+    const copy = copyAsRead.parse(JSON.parse(text));
 
     expect(Object.keys(copy).sort()).toEqual([
       "completedAt",
@@ -1399,9 +1406,7 @@ describe("the replay copy the restore reads", () => {
   it("names no person for a subject with no user row, because an absent login is not a null one", async () => {
     const { scenario, done } = await completedForASubjectWithNoUserRow();
 
-    const copy = JSON.parse(
-      await replayCopyOf(scenario.workspaceId, done.erasureRequestId),
-    ) as CopyAsRead;
+    const copy = await readCopy(scenario.workspaceId, done.erasureRequestId);
     expect(Object.keys(copy)).not.toContain("personId");
 
     expect(copy.identifiers).toEqual({
@@ -1451,9 +1456,7 @@ describe("the replay copy the restore reads", () => {
     expect(await replayCopiesIn(scenario.workspaceId)).toEqual([
       `erasures/${scenario.workspaceId}/${first.erasureRequestId}.json`,
     ]);
-    const copy = JSON.parse(
-      await replayCopyOf(scenario.workspaceId, first.erasureRequestId),
-    ) as CopyAsRead;
+    const copy = await readCopy(scenario.workspaceId, first.erasureRequestId);
 
     expect(copy.completedAt).toEqual("2026-06-01T12:00:00.000Z");
   });

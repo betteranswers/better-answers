@@ -137,9 +137,9 @@ Input, environment and tool schemas are parsed where they enter.
 
 An `enum` does not compile here. A union of string literals says the same thing and erases.
 
-### [TYPES4] Never widen a type with `as`
+### [TYPES4] Never assert a type with `as`
 
-A chained assertion and a widen-then-assert are refused in source. An assertion that survives carries the comment saying why it is sound.
+A type assertion is refused in source and test alike; `as const` is not one. Parse the value with zod where it enters, narrow it in control flow, or state the type at the declaration. A test feeding a value its type forbids says so with `@ts-expect-error`. One survives only for a library's declaration gap or a generic the compiler leaves open, the comment saying why it is sound beside the disable.
 
 ### [TYPES5] Never mutate a parameter
 

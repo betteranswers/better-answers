@@ -76,14 +76,13 @@ type CorePackage = {
 const packages = new Map<string, CorePackage | null>();
 
 const readManifest = (root: string): CorePackage | null => {
-  const parsed: unknown = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
+  const manifest: unknown = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
 
-  // SAFETY: both asserted fields are checked below before use, and a manifest without a name
-  // is no core package.
-  const manifest = parsed as { readonly name?: unknown; readonly exports?: unknown };
-  if (manifest.name !== CORE) return null;
+  // A manifest without the core's name is no core package, whatever else it holds.
+  if (typeof manifest !== "object" || manifest === null) return null;
+  if (!("name" in manifest) || manifest.name !== CORE) return null;
   const entries = new Map<string, string>();
-  if (typeof manifest.exports === "object" && manifest.exports !== null) {
+  if ("exports" in manifest && typeof manifest.exports === "object" && manifest.exports !== null) {
     for (const [entry, target] of Object.entries(manifest.exports)) {
       if (typeof target === "string") entries.set(entry, path.resolve(root, target));
     }

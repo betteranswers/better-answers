@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   TOOLS_LIST_TTL_CONFIG_KEY,
@@ -20,7 +21,58 @@ afterAll(async () => {
   await app.stop();
 });
 
-type Rpc = Readonly<Record<string, unknown>>;
+type Params = Readonly<Record<string, unknown>>;
+
+// The wire's shapes, as the suite holds the surface to them.
+const rpcError = z.object({ code: z.number(), message: z.string(), data: z.unknown().optional() });
+const envelope = z.object({
+  jsonrpc: z.literal("2.0").optional(),
+  id: z.union([z.number(), z.string(), z.null()]).optional(),
+  result: z.unknown().optional(),
+  error: rpcError.optional(),
+});
+type Envelope = z.infer<typeof envelope>;
+
+const tool = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  annotations: z.looseObject({ readOnlyHint: z.boolean().optional() }).optional(),
+  // Loose, because one case reads the whole schema as text for a header it must not carry.
+  inputSchema: z.looseObject({ properties: z.record(z.string(), z.unknown()).optional() }),
+});
+type Tool = z.infer<typeof tool>;
+
+const toolsListed = z.object({
+  tools: z.array(tool),
+  resultType: z.string().optional(),
+  ttlMs: z.number().optional(),
+  cacheScope: z.string().optional(),
+});
+
+const toolCalled = z.object({
+  content: z.array(z.object({ type: z.string(), text: z.string().optional() })),
+  structuredContent: z.record(z.string(), z.unknown()).optional(),
+  isError: z.boolean().optional(),
+});
+
+const capabilities = z.object({
+  tools: z.object({ listChanged: z.boolean().optional() }).optional(),
+  resources: z.object({ subscribe: z.boolean().optional() }).optional(),
+});
+
+const discovered = z.object({
+  supportedVersions: z.array(z.string()),
+  capabilities,
+  resultType: z.string().optional(),
+  ttlMs: z.number().optional(),
+  cacheScope: z.string().optional(),
+});
+
+const initialised = z.object({ protocolVersion: z.string(), capabilities });
+
+const unsupportedVersion = z.object({ supported: z.array(z.string()) });
+
+const ceilingRefusal = z.object({ error: z.string(), error_description: z.string() });
 
 const MODERN = "2026-07-28";
 const ENVELOPE = {
@@ -33,10 +85,10 @@ const modern = async (
   client: TestClient,
   token: string,
   method: string,
-  params: Rpc = {},
-  overrides: { headers?: Record<string, string>; envelope?: Rpc | null; version?: string } = {},
+  params: Params = {},
+  overrides: { headers?: Record<string, string>; envelope?: Params | null; version?: string } = {},
 ): Promise<Response> => {
-  const envelope = overrides.envelope === undefined ? ENVELOPE : overrides.envelope;
+  const meta = overrides.envelope === undefined ? ENVELOPE : overrides.envelope;
   const headers: Record<string, string> = {
     "content-type": "application/json",
     accept: "application/json, text/event-stream",
@@ -54,7 +106,7 @@ const modern = async (
       jsonrpc: "2.0",
       id: Math.floor(Math.random() * 1e9),
       method,
-      params: envelope === null ? params : { ...params, _meta: envelope },
+      params: meta === null ? params : { ...params, _meta: meta },
     }),
   });
 };
@@ -63,37 +115,31 @@ const legacy = async (
   client: TestClient,
   token: string,
   method: string,
-  params: Rpc = {},
+  params: Params = {},
 ): Promise<Response> => callMcp(client, token, method, params);
 
-const rpc = async (response: Response): Promise<Rpc> => {
+const rpc = async (response: Response): Promise<Envelope> => {
   const type = response.headers.get("content-type") ?? "";
   if (type.includes("text/event-stream")) {
     const frames = (await response.text()).split("\n").filter((line) => line.startsWith("data:"));
-    return JSON.parse(frames.at(-1)?.slice("data:".length) ?? "{}") as Rpc;
+    return envelope.parse(JSON.parse(frames.at(-1)?.slice("data:".length) ?? "{}"));
   }
-  return (await response.json()) as Rpc;
+  return envelope.parse(await response.json());
 };
 
-const result = async (response: Response): Promise<Rpc> => {
+const result = async <T>(response: Response, shape: z.ZodType<T>): Promise<T> => {
   const body = await rpc(response);
-  expect(body["error"]).toBeUndefined();
-  return (body["result"] ?? {}) as Rpc;
-};
-
-type Tool = {
-  name: string;
-
-  description?: string;
-  annotations?: Rpc;
-  inputSchema: { properties?: Rpc } & Rpc;
+  expect(body.error).toBeUndefined();
+  return shape.parse(body.result);
 };
 
 const listTools = async (client: TestClient, token: string): Promise<Tool[]> =>
-  ((await result(await modern(client, token, "tools/list")))["tools"] ?? []) as Tool[];
+  (await result(await modern(client, token, "tools/list"), toolsListed)).tools;
 
-const callTool = (client: TestClient, token: string, name: string, args: Rpc) =>
+const callTool = (client: TestClient, token: string, name: string, args: Params) =>
   modern(client, token, "tools/call", { name, arguments: args });
+
+const firstText = (called: z.infer<typeof toolCalled>): string => called.content[0]?.text ?? "";
 
 const connect = async (scope = "knowledge:read feedback:write offline_access") => {
   const workspace = await app.provision();
@@ -126,7 +172,7 @@ describe("era-independent", () => {
         reason: "wrong",
       }),
     );
-    expect(refused["error"] ?? (refused["result"] as Rpc)["isError"]).toBeTruthy();
+    expect(refused.error ?? toolCalled.parse(refused.result).isError).toBeTruthy();
   });
 
   it("carries annotations on every entry: reads read-only, the one write not (ADR 0018)", async () => {
@@ -135,7 +181,7 @@ describe("era-independent", () => {
     const tools = await listTools(client, token);
 
     for (const tool of tools) expect(tool.annotations).toBeDefined();
-    expect(tools.map((tool) => [tool.name, tool.annotations?.["readOnlyHint"]])).toEqual([
+    expect(tools.map((entry) => [entry.name, entry.annotations?.readOnlyHint])).toEqual([
       ["find", true],
       ["ask", true],
       ["open", true],
@@ -146,12 +192,12 @@ describe("era-independent", () => {
   it("takes no workspace, bundle or tenant argument on any entry, and mirrors nothing into headers (§9 3, 14)", async () => {
     const { client, token } = await connect();
 
-    for (const tool of await listTools(client, token)) {
-      const keys = Object.keys(tool.inputSchema.properties ?? {});
+    for (const entry of await listTools(client, token)) {
+      const keys = Object.keys(entry.inputSchema.properties ?? {});
       for (const key of keys) {
         expect(key.toLowerCase()).not.toMatch(/workspace|bundle|tenant/);
       }
-      expect(JSON.stringify(tool.inputSchema)).not.toContain("x-mcp-header");
+      expect(JSON.stringify(entry.inputSchema)).not.toContain("x-mcp-header");
     }
   });
 
@@ -159,7 +205,7 @@ describe("era-independent", () => {
     const { client, token } = await connect();
 
     const described = new Map(
-      (await listTools(client, token)).map((tool) => [tool.name, tool.description ?? ""]),
+      (await listTools(client, token)).map((entry) => [entry.name, entry.description ?? ""]),
     );
 
     expect(described.get("find")).toContain("Not company knowledge");
@@ -175,20 +221,22 @@ describe("era-independent", () => {
 
     const absent = await result(
       await callTool(client, token, "open", { iri: "https://better-answers.com/c/01ABSENT" }),
+      toolCalled,
     );
     const foreign = await result(
       await callTool(client, token, "open", { iri: "https://better-answers.com/c/01FOREIGN" }),
+      toolCalled,
     );
 
-    expect(absent["structuredContent"]).toEqual({
+    expect(absent.structuredContent).toEqual({
       found: false,
       iri: "https://better-answers.com/c/01ABSENT",
     });
-    const text = String(((absent["content"] as Rpc[])[0] ?? {})["text"]);
+    const text = firstText(absent);
     expect(text).toBe("No concept at https://better-answers.com/c/01ABSENT.");
-    expect(text).not.toBe(JSON.stringify(absent["structuredContent"]));
+    expect(text).not.toBe(JSON.stringify(absent.structuredContent));
     expect(text.length).toBeLessThan(150_000);
-    expect(foreign["structuredContent"]).toEqual({
+    expect(foreign.structuredContent).toEqual({
       found: false,
       iri: "https://better-answers.com/c/01FOREIGN",
     });
@@ -197,16 +245,18 @@ describe("era-independent", () => {
   it("answers find, ask and give_feedback through the Principal", async () => {
     const { client, token } = await connect();
 
-    const found = await result(await callTool(client, token, "find", { query: "accreditation" }));
-    expect(found["structuredContent"]).toEqual({ query: "accreditation", hits: [] });
+    const found = await result(
+      await callTool(client, token, "find", { query: "accreditation" }),
+      toolCalled,
+    );
+    expect(found.structuredContent).toEqual({ query: "accreditation", hits: [] });
 
     const asked = await result(
       await callTool(client, token, "ask", { question: "What accreditations do we hold?" }),
+      toolCalled,
     );
-    expect((asked["structuredContent"] as Rpc)["verdict"]).toBe("refuse");
-    expect(String(((asked["content"] as Rpc[])[0] ?? {})["text"])).toMatch(
-      /^\*\*Not answered from the company/,
-    );
+    expect(asked.structuredContent?.["verdict"]).toBe("refuse");
+    expect(firstText(asked)).toMatch(/^\*\*Not answered from the company/);
 
     const fed = await result(
       await callTool(client, token, "give_feedback", {
@@ -214,8 +264,9 @@ describe("era-independent", () => {
         verdict: "flag",
         reason: "wrong",
       }),
+      toolCalled,
     );
-    expect((fed["structuredContent"] as Rpc)["outcome"]).toBe("received");
+    expect(fed.structuredContent?.["outcome"]).toBe("received");
   });
 
   it("refuses a token whose person was revoked after it was issued, on the next call — the reason to the log, not the wire (§9 6; ADR 0018)", async () => {
@@ -284,8 +335,8 @@ describe("era-independent", () => {
 
     expect(refused?.status).toBe(429);
     expect(refused?.headers.get("retry-after")).not.toBeNull();
-    const body = (await refused?.json()) as Rpc;
-    expect(String(body["error_description"])).toContain("an Admin can raise the ceiling in System");
+    const body = ceilingRefusal.parse(await refused?.json());
+    expect(body.error_description).toContain("an Admin can raise the ceiling in System");
   });
 });
 
@@ -293,34 +344,34 @@ describe("the 2026-07-28 leg", () => {
   it("answers server/discover with the version, the tools capability, resultType and cache hints (§9 8)", async () => {
     const { client, token } = await connect();
 
-    const discovered = await result(await modern(client, token, "server/discover"));
+    const answer = await result(await modern(client, token, "server/discover"), discovered);
 
-    expect(discovered["supportedVersions"]).toContain(MODERN);
-    expect((discovered["capabilities"] as Rpc)["tools"]).toBeDefined();
+    expect(answer.supportedVersions).toContain(MODERN);
+    expect(answer.capabilities.tools).toBeDefined();
 
-    expect((discovered["capabilities"] as Rpc)["resources"]).toBeUndefined();
-    expect(discovered["resultType"]).toBe("complete");
-    expect(discovered["ttlMs"]).toBeDefined();
-    expect(discovered["cacheScope"]).toBeDefined();
+    expect(answer.capabilities.resources).toBeUndefined();
+    expect(answer.resultType).toBe("complete");
+    expect(answer.ttlMs).toBeDefined();
+    expect(answer.cacheScope).toBeDefined();
   });
 
   it("returns tools/list complete, with the workspace's TTL and cacheScope private (§9 9; F5)", async () => {
     const { client, token } = await connect();
 
-    const listed = await result(await modern(client, token, "tools/list"));
+    const listed = await result(await modern(client, token, "tools/list"), toolsListed);
 
-    expect(listed["resultType"]).toBe("complete");
-    expect(listed["ttlMs"]).toBe(TOOLS_LIST_TTL_MS_DEFAULT);
-    expect(listed["cacheScope"]).toBe("private");
+    expect(listed.resultType).toBe("complete");
+    expect(listed.ttlMs).toBe(TOOLS_LIST_TTL_MS_DEFAULT);
+    expect(listed.cacheScope).toBe("private");
   });
 
   it("reads the TTL from the workspace's config row", async () => {
     const { workspace, client, token } = await connect();
     await app.setWorkspaceConfig(workspace.workspaceId, TOOLS_LIST_TTL_CONFIG_KEY, "42000");
 
-    const listed = await result(await modern(client, token, "tools/list"));
+    const listed = await result(await modern(client, token, "tools/list"), toolsListed);
 
-    expect(listed["ttlMs"]).toBe(42_000);
+    expect(listed.ttlMs).toBe(42_000);
   });
 
   it("rejects a header that disagrees with the envelope with 400 and -32020 (§9 10)", async () => {
@@ -329,7 +380,7 @@ describe("the 2026-07-28 leg", () => {
     const response = await modern(client, token, "tools/list", {}, { version: "2025-11-25" });
 
     expect(response.status).toBe(400);
-    expect(((await rpc(response))["error"] as Rpc)["code"]).toBe(-32020);
+    expect((await rpc(response)).error?.code).toBe(-32020);
   });
 
   it("rejects an envelope missing a required key with 400 and -32602 (§9 11)", async () => {
@@ -346,7 +397,7 @@ describe("the 2026-07-28 leg", () => {
     );
 
     expect(response.status).toBe(400);
-    expect(((await rpc(response))["error"] as Rpc)["code"]).toBe(-32602);
+    expect((await rpc(response)).error?.code).toBe(-32602);
   });
 
   it("rejects a call missing Mcp-Method, and one whose Mcp-Name disagrees with params.name (§9 12)", async () => {
@@ -387,9 +438,9 @@ describe("the 2026-07-28 leg", () => {
       },
     );
 
-    const error = (await rpc(response))["error"] as Rpc;
-    expect(error["code"]).toBe(-32022);
-    expect((error["data"] as Rpc)["supported"] as string[]).toContain(MODERN);
+    const { error } = await rpc(response);
+    expect(error?.code).toBe(-32022);
+    expect(unsupportedVersion.parse(error?.data).supported).toContain(MODERN);
   });
 });
 
@@ -404,17 +455,17 @@ describe("the 2025-11-25 leg", () => {
     });
 
     expect(response.status).toBe(200);
-    const initialised = await result(response);
-    expect(initialised["protocolVersion"]).toBe("2025-11-25");
-    expect((initialised["capabilities"] as Rpc)["tools"]).toBeDefined();
+    const answer = await result(response, initialised);
+    expect(answer.protocolVersion).toBe("2025-11-25");
+    expect(answer.capabilities.tools).toBeDefined();
   });
 
   it("lists the same four entries with no envelope and no method headers (§9 17)", async () => {
     const { client, token } = await connect();
 
-    const listed = await result(await legacy(client, token, "tools/list"));
+    const listed = await result(await legacy(client, token, "tools/list"), toolsListed);
 
-    expect((listed["tools"] as Tool[]).map((tool) => tool.name)).toEqual([
+    expect(listed.tools.map((entry) => entry.name)).toEqual([
       "find",
       "ask",
       "open",
@@ -427,6 +478,6 @@ describe("the 2025-11-25 leg", () => {
 
     const body = await rpc(await legacy(client, token, "server/discover"));
 
-    expect((body["error"] as Rpc)["code"]).toBe(-32601);
+    expect(body.error?.code).toBe(-32601);
   });
 });

@@ -1,35 +1,42 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { z } from "zod";
+
 export const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 
-type RuleSetting = string | readonly [string, ...unknown[]];
+const ruleSetting = z.union([z.string(), z.tuple([z.string()], z.unknown())]);
 
-export type OxlintConfig = {
-  readonly rules: Readonly<Record<string, RuleSetting>>;
-  readonly overrides: readonly {
-    readonly files?: readonly string[];
-    readonly rules?: Readonly<Record<string, RuleSetting>>;
-  }[];
-  readonly jsPlugins: readonly { readonly name: string; readonly specifier: string }[];
+// The keys the suites read; a key that stopped being there fails here, by name.
+const oxlintConfig = z.object({
+  rules: z.record(z.string(), ruleSetting),
+  overrides: z.array(
+    z.object({
+      files: z.array(z.string()).optional(),
+      rules: z.record(z.string(), ruleSetting).optional(),
+    }),
+  ),
+  jsPlugins: z.array(z.object({ name: z.string(), specifier: z.string() })),
 
-  readonly plugins: readonly string[];
-  readonly options?: Readonly<Record<string, unknown>>;
+  plugins: z.array(z.string()),
+  options: z.record(z.string(), z.unknown()).optional(),
 
-  readonly categories: Readonly<Record<string, string>>;
-};
+  categories: z.record(z.string(), z.string()),
+});
+
+export type OxlintConfig = z.infer<typeof oxlintConfig>;
 
 export const readOxlintConfig = (): OxlintConfig =>
-  // SAFETY: a key that stopped being there fails the suite that names it, and a file that is
-  // not JSON throws in the parse itself.
-  JSON.parse(
-    readFileSync(path.join(repositoryRoot, ".oxlintrc.json"), "utf8").replaceAll(
-      // Whole-line comments only: a wider match would swallow a `//` inside a string, such
-      // as a URL.
-      /^\s*\/\/.*$/gm,
-      "",
+  oxlintConfig.parse(
+    JSON.parse(
+      readFileSync(path.join(repositoryRoot, ".oxlintrc.json"), "utf8").replaceAll(
+        // Whole-line comments only: a wider match would swallow a `//` inside a string, such
+        // as a URL.
+        /^\s*\/\/.*$/gm,
+        "",
+      ),
     ),
-  ) as OxlintConfig;
+  );
 
 // The specifier is read off the real config, so a plugin that stopped loading fails the case
 // rather than leaving every rule under it silent.

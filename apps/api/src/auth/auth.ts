@@ -68,6 +68,7 @@ type WidenedAuthorize<P extends { readonly endpoints: object }> = Omit<P, "endpo
 const widenAuthorize = <P extends { readonly endpoints: object }>(plugin: P): WidenedAuthorize<P> =>
   // SAFETY: the endpoint is the library's own construction and satisfies this at runtime;
   // only its declaration differs.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- better-auth declares `oauth2Authorize`'s openapi metadata outside `Endpoint`, so the plugin is refused by `BetterAuthPlugin["endpoints"]` on its declaration alone; nothing at runtime can be read to narrow it
   plugin as WidenedAuthorize<P>;
 
 export type EmailMessage = {
@@ -118,20 +119,15 @@ type AuditEvent =
   | "auth.token_refresh"
   | "auth.revocation";
 
-const AUDITED_PATHS = {
-  "/sign-in/email-otp": "auth.sign_in",
-  "/organization/set-active": "auth.workspace_pick",
-  "/oauth2/consent": "auth.consent",
-  "/oauth2/token": "auth.token_issue",
-  "/oauth2/revoke": "auth.revocation",
-} satisfies Readonly<Record<string, AuditEvent>>;
+const AUDITED_PATHS: ReadonlyMap<string, AuditEvent> = new Map([
+  ["/sign-in/email-otp", "auth.sign_in"],
+  ["/organization/set-active", "auth.workspace_pick"],
+  ["/oauth2/consent", "auth.consent"],
+  ["/oauth2/token", "auth.token_issue"],
+  ["/oauth2/revoke", "auth.revocation"],
+]);
 
-const auditedEvent = (path: string): AuditEvent | undefined => {
-  if (!Object.hasOwn(AUDITED_PATHS, path)) return undefined;
-
-  // SAFETY: `hasOwn` just proved `path` is one of AUDITED_PATHS' own keys.
-  return AUDITED_PATHS[path as keyof typeof AUDITED_PATHS];
-};
+const auditedEvent = (path: string): AuditEvent | undefined => AUDITED_PATHS.get(path);
 
 const tokenResponse = z.object({ access_token: z.string() });
 const mintedClaims = z.object({
@@ -144,7 +140,7 @@ const mintedClaims = z.object({
 });
 
 const isPlatformRole = (role: string | undefined): boolean =>
-  role === undefined || (ROLES as readonly string[]).includes(role);
+  role === undefined || ROLES.some((known) => known === role);
 
 const refuseForeignRole = (role: string | undefined): void => {
   if (isPlatformRole(role)) return;
@@ -428,10 +424,10 @@ export const createAuth = (deps: AuthDependencies) => {
         metadataProfile: "mcp-2026-07-28",
         metadataRevalidationInterval: "60m",
 
-        isMetadataDocumentUrlAllowed: (clientIdUrl) =>
-          (CIMD_ALLOWED_CLIENT_HOSTS as readonly string[]).includes(
-            URL.parse(clientIdUrl)?.hostname ?? "",
-          ),
+        isMetadataDocumentUrlAllowed: (clientIdUrl) => {
+          const hostname = URL.parse(clientIdUrl)?.hostname;
+          return CIMD_ALLOWED_CLIENT_HOSTS.some((allowed) => allowed === hostname);
+        },
       }),
     ],
   });

@@ -61,16 +61,25 @@ export function ViewStateSlot(properties: { readonly children: ReactNode }) {
 // the type is stated in one place.
 export function viewStateOf<Value>(view: string) {
   const key = Symbol(view);
+  // The slot holds writes as `unknown`; this declaration's own are kept here under the object
+  // it handed over, typed by construction.
+  const held = new WeakMap<Written, Value>();
 
   const useViewState = (): readonly [Value | undefined, (value: Value) => void] => {
     const slot = useContext(ViewState);
     const written = slot?.written;
     const writeToSlot = slot?.write;
 
-    // SAFETY: nothing but this declaration holds the key, and it writes only a `Value`.
-    const value = written?.key === key ? (written.value as Value) : undefined;
+    const value = written === undefined ? undefined : held.get(written);
 
-    const write = useCallback((next: Value) => writeToSlot?.({ key, value: next }), [writeToSlot]);
+    const write = useCallback(
+      (next: Value) => {
+        const entry: Written = { key, value: next };
+        held.set(entry, next);
+        writeToSlot?.(entry);
+      },
+      [writeToSlot],
+    );
 
     return [value, write];
   };

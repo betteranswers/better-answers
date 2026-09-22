@@ -71,7 +71,7 @@ describe("every owner the map names", () => {
   it("reaches a module a reader can open — a directory under packages/core/src, or a path to one outside it", () => {
     const inCore = coreDirectories();
     for (const owner of ownersNamed()) {
-      const opens = (OWNERS_OUTSIDE_CORE as readonly string[]).includes(owner)
+      const opens = OWNERS_OUTSIDE_CORE.some((known) => known === owner)
         ? isDirectory(owner)
         : inCore.has(owner);
       expect({ owner, opens }).toEqual({ owner, opens: true });

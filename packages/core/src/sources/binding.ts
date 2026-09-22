@@ -37,7 +37,7 @@ import {
   type Tx,
 } from "../store/postgres/index.ts";
 import { adminOnBinding, bindingNamed, BINDING_ID, type ActingOnBinding } from "./admin-binding.ts";
-import { dpiaInputFor, REDACTION_CATEGORIES } from "./dpia.ts";
+import { dpiaInputFor, type REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastRun } from "./findings.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
@@ -72,23 +72,32 @@ type CountField<Word extends string> = `findings${Pascal<Word>}`;
 type FindingCounts = { readonly [Word in RedactionCategoryWord as CountField<Word>]: number };
 type FindingCountShape = { readonly [Word in RedactionCategoryWord as CountField<Word>]: "count" };
 
-const countFieldOf = (category: string): string =>
-  `findings${category
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join("")}`;
+// Spelled out: `Object.fromEntries` would lose what the two types hold, and a category the
+// list gains fails here at compile time.
+const FINDING_COUNT_SHAPE: FindingCountShape = {
+  findingsSpecialCategory: "count",
+  findingsBankDetails: "count",
+  findingsGovernmentIdentifier: "count",
+  findingsDateOfBirth: "count",
+  findingsHomeAddress: "count",
+  findingsPersonalContact: "count",
+  findingsPersonName: "count",
+  findingsJobTitle: "count",
+};
 
-// SAFETY: `Object.fromEntries` loses what the mapping guarantees — one entry per category,
-// each value the one kind.
-const FINDING_COUNT_SHAPE = Object.fromEntries(
-  REDACTION_CATEGORIES.map(({ category }) => [countFieldOf(category), "count"]),
-) as FindingCountShape;
+const countOf = (found: ReadonlyMap<string, number>, category: RedactionCategoryWord): number =>
+  found.get(category) ?? 0;
 
-// SAFETY: as above — one entry per category, and the value of each is a whole number.
-const countsOf = (found: ReadonlyMap<string, number>): FindingCounts =>
-  Object.fromEntries(
-    REDACTION_CATEGORIES.map(({ category }) => [countFieldOf(category), found.get(category) ?? 0]),
-  ) as FindingCounts;
+const countsOf = (found: ReadonlyMap<string, number>): FindingCounts => ({
+  findingsSpecialCategory: countOf(found, "special-category"),
+  findingsBankDetails: countOf(found, "bank-details"),
+  findingsGovernmentIdentifier: countOf(found, "government-identifier"),
+  findingsDateOfBirth: countOf(found, "date-of-birth"),
+  findingsHomeAddress: countOf(found, "home-address"),
+  findingsPersonalContact: countOf(found, "personal-contact"),
+  findingsPersonName: countOf(found, "person-name"),
+  findingsJobTitle: countOf(found, "job-title"),
+});
 
 const BINDING_ACTS = declareActs("sources", {
   bound: act("sources.binding.bound", {

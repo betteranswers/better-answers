@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { getTableColumns } from "drizzle-orm";
-import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
+import { getTableConfig } from "drizzle-orm/pg-core";
 import type pg from "pg";
 import type { z } from "zod";
 
@@ -145,7 +145,7 @@ const insertRow = async <TName extends keyof Registry>(
   const parsed: Readonly<Record<string, unknown>> = insert.parse(values);
   const columns: Readonly<Record<string, { name: string; getSQLType: () => string }>> =
     getTableColumns(table);
-  const config = getTableConfig(table as PgTable);
+  const config = getTableConfig(table);
   const qualified = `${config.schema === undefined ? "" : `"${config.schema}".`}"${config.name}"`;
 
   const keys = Object.keys(parsed);
@@ -171,6 +171,7 @@ const insertRow = async <TName extends keyof Registry>(
 
   // SAFETY: TypeScript loses the correlation on the generic indexed access; the registry
   // guarantees it.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- the registry correlates `select` with `TName` and TypeScript resolves neither side of a generic indexed access
   return select.parse(domain) as Row<TName>;
 };
 

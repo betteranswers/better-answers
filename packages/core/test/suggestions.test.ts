@@ -688,6 +688,7 @@ describe("declining a suggestion", () => {
     expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.declined")).toEqual([]);
   });
 
+  const anError: unknown = expect.any(Error);
   it.each([
     [
       "the store failing under it",
@@ -700,7 +701,7 @@ describe("declining a suggestion", () => {
           { suggestionId, reason: "not the company's word on this" },
         );
       },
-      expect.any(Error) as unknown,
+      anError,
     ],
     [
       "the decider's credentials ending first",

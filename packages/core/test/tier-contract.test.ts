@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { boundarySchemas, ULID_PATTERN } from "@better-answers/schema";
 
@@ -36,14 +37,14 @@ const NOT_FIXTURES = new Set(["manifest.json", "README.md"]);
 
 const contractsDir = path.resolve(import.meta.dirname, "../../../contracts");
 
-type Manifest = {
-  readonly contract_version: number;
-  readonly agreements: Readonly<Record<string, { readonly form: string }>>;
-  readonly fixtures: readonly { readonly agreement: string; readonly path: string }[];
-};
+const manifest = z.object({
+  contract_version: z.number(),
+  agreements: z.record(z.string(), z.object({ form: z.string() })),
+  fixtures: z.array(z.object({ agreement: z.string(), path: z.string() })),
+});
 
-const readManifest = (): Manifest =>
-  JSON.parse(readFileSync(path.join(contractsDir, "manifest.json"), "utf8")) as Manifest;
+const readManifest = () =>
+  manifest.parse(JSON.parse(readFileSync(path.join(contractsDir, "manifest.json"), "utf8")));
 
 const fixturesOnDisk = (directory: string): readonly string[] =>
   readdirSync(directory, { recursive: true, withFileTypes: true })
@@ -101,14 +102,16 @@ describe("the tier contract", () => {
   });
 });
 
-type IdShape = {
-  readonly pattern: string;
-  readonly must_parse: readonly string[];
-  readonly must_not_parse: readonly { readonly id: string; readonly why: string }[];
-};
+const idShape = z.object({
+  pattern: z.string(),
+  must_parse: z.array(z.string()),
+  must_not_parse: z.array(z.object({ id: z.string(), why: z.string() })),
+});
 
-const readIdShape = (): IdShape =>
-  JSON.parse(readFileSync(path.join(contractsDir, "id-shape", "cases.json"), "utf8")) as IdShape;
+const readIdShape = () =>
+  idShape.parse(
+    JSON.parse(readFileSync(path.join(contractsDir, "id-shape", "cases.json"), "utf8")),
+  );
 
 describe("id-shape, the agreement about what an id looks like", () => {
   it("pins the very pattern this tier narrows an identity id to at its boundary", () => {

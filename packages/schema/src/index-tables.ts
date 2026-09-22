@@ -1,17 +1,18 @@
 import { sql } from "drizzle-orm";
 import { customType, integer, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { z } from "zod";
 
 export const indexSchema = pgSchema("index");
 
 export const EMBEDDING_DIMENSIONS = 1024;
 
+// pgvector's text output is a JSON number array by the column's own contract, read as one.
+const embeddingValues = z.array(z.number());
+
 const embeddingVector = customType<{ data: number[]; driverData: string }>({
   dataType: () => `vector(${EMBEDDING_DIMENSIONS})`,
   toDriver: (value) => JSON.stringify(value),
-
-  // SAFETY: pgvector's text output is a JSON-compatible number array, so the parse yields
-  // numbers by the column's own contract.
-  fromDriver: (value) => JSON.parse(value) as number[],
+  fromDriver: (value) => embeddingValues.parse(JSON.parse(value)),
 });
 
 const searchVector = customType<{ data: string; driverData: string }>({

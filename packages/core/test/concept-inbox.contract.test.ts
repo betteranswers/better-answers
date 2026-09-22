@@ -129,7 +129,10 @@ describe("the concept-inbox agreement", () => {
 
         expect({
           why: refusal.why,
-          code: (refused as { code?: string } | undefined)?.code,
+          code:
+            refused instanceof Error && "code" in refused && typeof refused.code === "string"
+              ? refused.code
+              : undefined,
         }).toEqual({ why: refusal.why, code: refusal.sqlstate });
       });
     }

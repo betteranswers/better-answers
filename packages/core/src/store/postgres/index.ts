@@ -52,10 +52,12 @@ const answersARefusal = <T>(answer: T): boolean => answersAResult(answer) && !an
 
 export const opened = <T>(answer: T): Opened<T> =>
   // SAFETY: the predicate reads the key the type reads, so each branch returns its own half.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- `Opened<T>` is conditional on a `T` still open here, which no runtime predicate resolves for the compiler
   (answersAResult(answer) ? answer : ok(answer)) as Opened<T>;
 
 const refusedAtTheDoor = <T>(refusal: PrincipalRefusal): Opened<T> =>
   // SAFETY: a refusal the door itself decided is the `ok: false` half of either branch.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- as above: the conditional over an open `T` is what stands between `err(refusal)` and `Opened<T>`
   err(refusal) as Opened<T>;
 
 const rollbackQuietly = async (client: pg.PoolClient): Promise<void> => {

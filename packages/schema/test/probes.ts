@@ -68,7 +68,7 @@ export const refusesEach = async (
     const outcome = await client
       .query(statement, [...parameters])
       .then(() => "allowed")
-      .catch((cause: unknown) => (cause as { message: string }).message);
+      .catch((cause: unknown) => (cause instanceof Error ? cause.message : String(cause)));
     expect({ why, outcome }).toEqual({
       why,
       outcome: expect.stringMatching(message),

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { conceptIriOf, ulid } from "@better-answers/schema";
 
@@ -169,6 +170,9 @@ const rowsOf = async (workspaceId: string) => {
   );
   return read.rows;
 };
+
+// The flag the replay act declares as optional, read as such.
+const replayDetail = z.object({ evidenceAgrees: z.boolean().optional() });
 
 const replayedEvents = async (workspaceId: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
@@ -539,9 +543,10 @@ describe("a re-write whose rows were lost", () => {
     });
     const events = await replayedEvents(scenario.workspaceId);
     expect(events.map((event) => event["subject_id"])).toEqual(history.slice(1));
-    expect(
-      events.map((event) => (event["detail"] as Record<string, unknown>)["evidenceAgrees"]),
-    ).toEqual([true, false]);
+    expect(events.map((event) => replayDetail.parse(event["detail"]).evidenceAgrees)).toEqual([
+      true,
+      false,
+    ]);
   });
 
   it("is replayed even once its author may no longer read the concept, because the replay is the platform's and never a second judgement", async () => {

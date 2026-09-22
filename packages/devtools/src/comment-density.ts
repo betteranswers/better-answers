@@ -1,5 +1,7 @@
 import { execFileSync } from "node:child_process";
 
+import { z } from "zod";
+
 import { executableOf, runsOverThrowawayTree } from "./throwaway-tree.ts";
 
 import type { Tree } from "./throwaway-tree.ts";
@@ -51,28 +53,28 @@ export type Counted = {
   readonly comment: number;
 };
 
-type ClocEntry = {
-  readonly language?: unknown;
-  readonly code?: unknown;
-  readonly comment?: unknown;
-};
+// cloc's by-file JSON, with a `header` and a `SUM` beside the files; the smoke case proves
+// the contract.
+const clocReport = z.record(
+  z.string(),
+  z.looseObject({
+    language: z.string().optional(),
+    code: z.number().optional(),
+    comment: z.number().optional(),
+  }),
+);
 
-export const countedIn = (output: string): readonly Counted[] => {
-  const parsed: unknown = JSON.parse(output);
-
-  // SAFETY: cloc's by-file JSON contract, which the runner's smoke case proves still holds.
-  const report = parsed as Readonly<Record<string, ClocEntry>>;
-  return Object.entries(report)
+export const countedIn = (output: string): readonly Counted[] =>
+  Object.entries(clocReport.parse(JSON.parse(output)))
     .filter(([file]) => file !== "header" && file !== "SUM")
     .map(([file, entry]) => ({
       file,
-      language: typeof entry.language === "string" ? entry.language : "",
-      code: typeof entry.code === "number" ? entry.code : 0,
-      comment: typeof entry.comment === "number" ? entry.comment : 0,
+      language: entry.language ?? "",
+      code: entry.code ?? 0,
+      comment: entry.comment ?? 0,
     }))
     .filter((counted) => MEASURED_LANGUAGES.has(counted.language))
     .sort((left, right) => left.file.localeCompare(right.file));
-};
 
 export const armOf = (file: string): Arm => {
   const segments = file.replace(/^\.\//, "").split("/");

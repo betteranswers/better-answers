@@ -30,7 +30,7 @@ import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import {
   erasureRequest,
-  SUBJECT_IDENTIFIER_KINDS,
+  type SUBJECT_IDENTIFIER_KINDS,
   SUBJECT_IDENTIFIER_MAX,
   SUBJECT_IDENTIFIERS_MAX,
   SUBJECT_REQUEST_KINDS,
@@ -81,7 +81,7 @@ import {
   DOCUMENT_OUTCOMES,
   QUARANTINE_ERROR,
   RETENTION_CLASSES,
-  RULES_IN_FORCE_KEYS,
+  type RULES_IN_FORCE_KEYS,
   sourceBinding,
   sourceDocument,
 } from "./source-tables.ts";
@@ -476,14 +476,12 @@ export const conceptClassOverrideUpdate = createUpdateSchema(
 );
 
 const rulesInForce = z.union([
-  z.strictObject(
-    // SAFETY: `Object.fromEntries` loses what the mapping guarantees — that tuple's members
-    // as keys, the one boolean schema as each value.
-    Object.fromEntries(RULES_IN_FORCE_KEYS.map((key) => [key, z.boolean()])) as Record<
-      (typeof RULES_IN_FORCE_KEYS)[number],
-      z.ZodBoolean
-    >,
-  ),
+  // Spelled out against the tuple: `satisfies` refuses a key it lacks and a member the literal
+  // misses.
+  z.strictObject({
+    default_on: z.boolean(),
+    default_off: z.boolean(),
+  } satisfies Record<(typeof RULES_IN_FORCE_KEYS)[number], z.ZodBoolean>),
   z.null(),
 ]);
 
@@ -551,12 +549,12 @@ export const findingUpdate = createUpdateSchema(finding, findingRefinements);
 const subjectIdentifier = z.string().trim().min(1).max(SUBJECT_IDENTIFIER_MAX);
 const subjectIdentifierList = z.array(subjectIdentifier).max(SUBJECT_IDENTIFIERS_MAX);
 const subjectIdentifiers = z.union([
-  z.strictObject(
-    // SAFETY: as above — that tuple's members as keys, the one list schema as each value.
-    Object.fromEntries(
-      SUBJECT_IDENTIFIER_KINDS.map((kind) => [kind, subjectIdentifierList]),
-    ) as Record<(typeof SUBJECT_IDENTIFIER_KINDS)[number], typeof subjectIdentifierList>,
-  ),
+  // As above: the tuple's members, each spelled out and checked against it.
+  z.strictObject({
+    emails: subjectIdentifierList,
+    names: subjectIdentifierList,
+    other: subjectIdentifierList,
+  } satisfies Record<(typeof SUBJECT_IDENTIFIER_KINDS)[number], typeof subjectIdentifierList>),
   z.null(),
 ]);
 

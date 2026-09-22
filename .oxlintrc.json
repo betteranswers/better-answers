@@ -32,6 +32,7 @@
     "typescript/no-explicit-any": "error",
     "typescript/consistent-type-imports": "error",
     "typescript/no-non-null-assertion": "error",
+    "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }],
     "oxc/no-async-await": "off",
     "anti-slop/no-chained-type-assertions": "error",
     "anti-slop/no-module-mocking": "error",
