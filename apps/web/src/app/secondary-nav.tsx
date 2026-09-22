@@ -7,12 +7,19 @@ import { viewsOf, type Screen } from "@/shared/screens.ts";
 export function SecondaryNav(properties: {
   readonly screen: Screen;
   readonly openViewPath: string | undefined;
+  readonly showing: boolean;
+  readonly id?: string;
+  readonly onChoose?: () => void;
 }) {
   const named = useId();
 
   return (
     <nav
+      id={properties.id}
       aria-labelledby={named}
+      // Hidden rather than unmounted, so the button that governs it always names a region
+      // that is there to be named.
+      hidden={!properties.showing}
       className="shrink-0 border-b border-border bg-sidebar px-2 py-3 md:sticky md:top-0 md:h-screen md:w-sidebar md:self-start md:overflow-y-auto md:border-r md:border-b-0"
     >
       <h2
@@ -32,6 +39,7 @@ export function SecondaryNav(properties: {
                   written twice. */}
               <Link
                 to={view.path}
+                onClick={properties.onChoose}
                 className={cn(
                   // Weight, not only tint: the open view survives a greyscale screen.
                   "block px-2 py-1.5 transition-colors",

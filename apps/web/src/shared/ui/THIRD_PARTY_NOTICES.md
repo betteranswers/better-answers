@@ -14,6 +14,9 @@ T-037 added two more items on the same day with the same CLI — `input` and `la
 T-225 added `tooltip` on **22 September 2026** with the same CLI, `shadcn@4.20.1`; its two digests
 were taken that day and its arrival edits are listed below with the others.
 
+T-228 added `sheet` the same day with the same CLI; its two digests were taken that day and its
+arrival edits are listed below with the others.
+
 This file records vendored source only. The npm packages those items stand on are ordinary
 dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
 lockfile, which is where a reader reads them and where Renovate moves them.
@@ -55,6 +58,7 @@ the pin.
 | `input.tsx` | https://ui.shadcn.com/r/styles/new-york/input.json | `4d1a3b126cc62485` | `b1b9f3d7ab813dfe` |
 | `label.tsx` | https://ui.shadcn.com/r/styles/new-york/label.json | `ea924e70d496cbd6` | `ec7442bb079f9558` |
 | `tooltip.tsx` | https://ui.shadcn.com/r/styles/new-york/tooltip.json | `aef6ec3c142b054e` | `275fe11838d9edd6` |
+| `sheet.tsx` | https://ui.shadcn.com/r/styles/new-york/sheet.json | `f9d5c635be778573` | `bc0fc5ea77392c4a` |
 
 `components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
 the CLI's own default form; the table records the style-qualified URL the CLI resolves it to,
@@ -102,6 +106,17 @@ T-225's arrival edits, on the one item it added:
   was not kept.
 - The arrow's `rounded-[2px]` became `rounded-sm`, which the bridge resolves to `0` like every
   other step: a literal radius in the tree is a second scale even where a base rule zeroes it.
+
+T-228's arrival edits, on the one item it added:
+
+- The `cn` import repointed at `@/shared/lib/utils.ts` and the dependency on `cn` the CLI wrote
+  alongside it dropped, exactly as the tooltip's arrival needed.
+- The overlay's `bg-black/50` became `bg-[var(--surface-scrim)]` with
+  `[backdrop-filter:var(--blur-scrim)]`, matching the correction `dialog.tsx` already carries:
+  the scrim is one of the register's two deliberate uses of transparency, and it is a token.
+- The panel's `ease-in-out` became `ease-standard` and its `duration-500` / `duration-300` the
+  bridge's slow and base steps, because 500ms is twice the register's ceiling and the curve and
+  the durations are the design system's to name.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA

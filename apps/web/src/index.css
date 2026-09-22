@@ -43,3 +43,19 @@
     color: var(--text-primary);
   }
 }
+
+/*
+ * The shell reads which layout is in force from here rather than carrying the number itself,
+ * so the `md:` utilities and its own reading of them cannot drift apart.
+ */
+@layer base {
+  :root {
+    --shell-wide: 1;
+  }
+
+  @media (width < theme(--breakpoint-md)) {
+    :root {
+      --shell-wide: 0;
+    }
+  }
+}

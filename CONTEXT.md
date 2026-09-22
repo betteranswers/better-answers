@@ -748,14 +748,20 @@ to it by IRI and never restates it (ADR 0014).
 - **icon rail** — the region down Control Centre's left edge listing its six screens, each an icon
   carrying its screen's name and marking the screen being read. _Avoid_: section nav, sidebar.
 - **secondary nav** — the region beside the icon rail listing the open screen's views under that
-  screen's name, marking the view being read, and swapping when the screen changes. _Avoid_:
-  section nav, sub-nav, sidebar.
+  screen's name, marking the view being read, and swapping when the screen changes. The navigation
+  control closes it and opens it again, and that choice is remembered on the browser it was made
+  on. _Avoid_: section nav, sub-nav, sidebar.
+- **navigation control** — the button in the top bar's leading corner governing whether the
+  navigation is showing: where the screen is wide enough for the regions it closes the secondary
+  nav and opens it again, saying which state it is in; where it is not, it opens the icon rail and
+  the secondary nav over the content and gives focus back when it closes. _Avoid_: hamburger,
+  burger, drawer, menu toggle.
 - **toolbar** — the region above a view's content carrying that view's tabs at one end and its acts
   at the other, filled by the view; a view with neither gets no toolbar. _Avoid_: action bar,
   section header.
-- **top bar** — the region across the top of Control Centre naming the workspace first, then which
-  screen and view the person is in, then who they are, their role and the way to sign out. _Avoid_:
-  masthead, section header.
+- **top bar** — the region across the top of Control Centre carrying the navigation control in its
+  leading corner, then naming the workspace, then which screen and view the person is in, then who
+  they are, their role and the way to sign out. _Avoid_: masthead, section header.
 - **promotion** — an Editor's proposal that an answer or a response become an `Answer`
   concept — the button is *Save as an Answer* — kept as a suggestion of kind *promotion* until
   decided at the promotion gate. _Avoid_: promote (as a reader's verb — a marketing word).

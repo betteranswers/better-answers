@@ -8,7 +8,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shar
 // A beat before the first one, so a pointer crossing the rail on its way elsewhere opens none.
 const HOVER_DELAY_MS = 200;
 
-export function IconRail(properties: { readonly openScreenId: ScreenId | undefined }) {
+export function IconRail(properties: {
+  readonly openScreenId: ScreenId | undefined;
+  readonly tooltips: boolean;
+  readonly onChoose?: () => void;
+}) {
   return (
     <nav
       aria-label="Control Centre"
@@ -21,29 +25,36 @@ export function IconRail(properties: { readonly openScreenId: ScreenId | undefin
           {SCREENS.map((screen) => {
             const open = screen.id === properties.openScreenId;
 
+            const entry = (
+              <Link
+                to={screen.path}
+                onClick={properties.onChoose}
+                className={cn(
+                  // A fill and a bold glyph where the rest have neither, so greyscale
+                  // tells the open screen apart.
+                  "flex h-10 items-center gap-2 px-2 transition-colors md:w-10 md:justify-center md:px-0",
+                  open
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                )}
+              >
+                <Icon name={screen.icon} weight={open ? "bold" : "regular"} />
+                <span className="md:sr-only">{screen.name}</span>
+              </Link>
+            );
+
             return (
               <li key={screen.id}>
-                {/* The name is read where the rail has the width; the tooltip is what a
-                    narrow icon owes a pointer and a keyboard. */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Link
-                      to={screen.path}
-                      className={cn(
-                        // A fill and a bold glyph where the rest have neither, so greyscale
-                        // tells the open screen apart.
-                        "flex h-10 items-center gap-2 px-2 transition-colors md:w-10 md:justify-center md:px-0",
-                        open
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                      )}
-                    >
-                      <Icon name={screen.icon} weight={open ? "bold" : "regular"} />
-                      <span className="md:sr-only">{screen.name}</span>
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">{screen.name}</TooltipContent>
-                </Tooltip>
+                {/* What an icon alone owes a pointer and a keyboard; beside a name on the row
+                    it says the same twice and eats an Escape. */}
+                {properties.tooltips ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>{entry}</TooltipTrigger>
+                    <TooltipContent side="right">{screen.name}</TooltipContent>
+                  </Tooltip>
+                ) : (
+                  entry
+                )}
               </li>
             );
           })}
