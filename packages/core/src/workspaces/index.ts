@@ -4,6 +4,7 @@ import { act, declareActs, record } from "../audit/index.ts";
 import { attempt, err, ok, refusalFor, type Result, ulid } from "../kernel/index.ts";
 import type {
   PlatformPrincipal,
+  PrincipalRefusal,
   Role,
   UserId,
   UserPrincipal,
@@ -14,6 +15,7 @@ import {
   type Tx,
   withIdentityRead,
   withIdentityWrite,
+  withPrincipal,
   withScope,
 } from "../store/postgres/index.ts";
 
@@ -280,4 +282,29 @@ export const readMembership = async (
     person: { id: principal.userId, name: row.name, email: row.email },
     role: principal.role,
   });
+};
+
+export const principalOfMember = async (
+  door: PostgresDoor,
+  input: { readonly workspaceId: string; readonly email: string; readonly at: Date },
+): Promise<Result<UserPrincipal, "malformed" | PrincipalRefusal | Error>> => {
+  const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
+  if (!workspace.success) return err("malformed");
+  const person = await attempt(() =>
+    door.pool.query<{ id: string }>('SELECT id FROM "user" WHERE lower(email) = lower($1)', [
+      input.email,
+    ]),
+  );
+  if (!person.ok) return err(person.error);
+  const userId = person.value.rows[0]?.id;
+  if (userId === undefined) return err("not-a-member");
+  const resolved = await attempt(() =>
+    withPrincipal(
+      door,
+      { workspaceId: workspace.data, userId, issuedAt: input.at },
+      async (principal) => principal,
+    ),
+  );
+  if (!resolved.ok) return err(resolved.error);
+  return resolved.value;
 };

@@ -39,7 +39,14 @@ import { workspaceIds } from "../workspaces/index.ts";
 import { hashedFileOf, parseConceptFile, type Frontmatter, type HashedSource } from "./file.ts";
 import { payloadFor, targetOfMergeKey } from "./inbox.ts";
 import type { Acceptance } from "./index.ts";
-import { heldByIri, indexRowOf, landBundleCommit, landRows, WRITE_CONSTRAINTS } from "./landing.ts";
+import {
+  heldByIri,
+  indexRowOf,
+  landBundleCommit,
+  landRows,
+  mergeKeyOf,
+  WRITE_CONSTRAINTS,
+} from "./landing.ts";
 import { parseBundleManifest } from "./manifest.ts";
 
 const RECONCILER_ACTOR = "process:better-answers-reconciler";
@@ -185,7 +192,7 @@ const derivedMergeKey = async (
   kind: string,
   title: string,
 ): Promise<string> => {
-  const derived = `${kind}:${title.trim().replaceAll(/\s+/g, " ").toLowerCase()}`;
+  const derived = mergeKeyOf(kind, title);
   const holder = await targetOfMergeKey(platform, tx, derived);
   return holder === undefined || holder === iri ? derived : iri;
 };

@@ -37,6 +37,9 @@ export const foldKind = (kind: string): string =>
     return cased.slice(0, -1);
   });
 
+export const mergeKeyOf = (foldedKind: string, title: string): string =>
+  `${foldedKind}:${title.trim().replaceAll(/\s+/g, " ").toLowerCase()}`;
+
 const conceptRow = boundarySchemas.conceptIndex.insert.omit({ commitSha: true });
 
 export const WRITE_CONSTRAINTS = {
