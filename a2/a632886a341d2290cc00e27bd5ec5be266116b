@@ -1,0 +1,32 @@
+apps/api/tests/docs-lane.test.ts
+  s_df9ee117beb2ea::t_f9e703cc33089c 660,668-672,674
+  s_df9ee117beb2ea::t_a2c493e82c0547 16
+  s_df9ee117beb2ea::t_5fc865b92bea2b 2,135-151
+package.json
+  s_df9ee117beb2ea::t_0bacb67fec4e57 12
+.github/workflows/check.yml
+  s_df9ee117beb2ea::t_1df1b567636a6e 512-514
+apps/api/tests/workspaces.ts
+  s_df9ee117beb2ea::t_b7e9daaab23e73 60-65
+packages/devtools/test/knip.test.ts
+  s_df9ee117beb2ea::t_1a447e659e90ba 107-113
+  s_df9ee117beb2ea::t_367e9188713d03 106
+scripts/docs-lane.mjs
+  s_df9ee117beb2ea::t_f0ff517534ba29 62-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a2a632886a341d2290cc00e27bd5ec5be266116b",
+  "prompts": {},
+  "sessions": {
+    "s_df9ee117beb2ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb2d3879-0bdc-4dd2-bf68-3d8827a104e8",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
