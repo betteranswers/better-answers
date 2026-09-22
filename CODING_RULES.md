@@ -191,7 +191,7 @@ Reviewer: attack a change to a migration, a grant, a policy or a definer functio
 
 ### [SEC4] Read the environment only in the tier's config module
 
-One typed module per tier reads the environment, and nothing else does — never at a call site. A setting no step in that tier reads yet does not belong there. Passing the environment on to a child process is a different act, and it lives in one named function.
+A tier's shipped code reads the environment in one typed config module and nowhere else — never at a call site. A setting no step in that tier reads yet does not belong there. Passing the environment on to a child process is a different act, and it lives in one named function.
 
 ## AUDIT
 
