@@ -1,0 +1,68 @@
+packages/core/src/sources/binding.ts
+  s_2dd75a86f22d42::t_65d3419abbf781 17,19,24,26
+  s_2dd75a86f22d42::t_901619fdc66a95 388
+  s_2dd75a86f22d42::t_1a57ac239f287d 405-412
+  s_2dd75a86f22d42::t_b7b5326718bef2 379-386
+packages/core/src/sources/index.ts
+  s_2dd75a86f22d42::t_0e60d5ddde59a2 26
+packages/core/src/kernel/actor.ts
+  s_2dd75a86f22d42::t_c2fc39f19f2c35 7-9
+packages/core/src/runs/index.ts
+  s_2dd75a86f22d42::t_6567b2cfe1c291 28
+  s_2dd75a86f22d42::t_6bef7a08648847 123
+  s_2dd75a86f22d42::t_5375a975f8f1b7 212-214,218
+  s_2dd75a86f22d42::t_901619fdc66a95 215-217
+  s_2dd75a86f22d42::t_3c580781e93c0a 3,5,10,16,19,21,23,27,31
+  s_2dd75a86f22d42::t_85bc43191c2f65 106-107,112-122,124-141
+  s_2dd75a86f22d42::t_8eb80e42e9a471 172-173,175-177
+  s_2dd75a86f22d42::t_4e1379e0871fbd 108-110
+  s_2dd75a86f22d42::t_b9bedbdddd5335 111
+packages/devtools/lint-rules/index.ts
+  s_2dd75a86f22d42::t_7f75a256331377 12
+  s_2dd75a86f22d42::t_6525e996b3b27d 3
+packages/core/test/admission.test.ts
+  s_2dd75a86f22d42::t_ba4b2b81796794 120-124,126
+  s_2dd75a86f22d42::t_901619fdc66a95 169-171
+  s_2dd75a86f22d42::t_c142664417d78d 1-119,125,127-168,172-205
+packages/devtools/lint-rules/rules/act-admits-before-await.ts
+  s_2dd75a86f22d42::t_3c7c0ec47fc56f 85
+  s_2dd75a86f22d42::t_901619fdc66a95 86-87
+  s_2dd75a86f22d42::t_ecc2ee1a5255bd 1-8,10,12-40,42-45,47-50,52,64-73,75-76,88-102
+  s_2dd75a86f22d42::t_b721a0c2fa6936 74,78
+  s_2dd75a86f22d42::t_a10aba6db5a033 77,79-84
+  s_2dd75a86f22d42::t_352f8515936f8b 41,46,51,53-63
+  s_2dd75a86f22d42::t_27b13fd230c33c 9,11
+.oxlintrc.json
+  s_2dd75a86f22d42::t_e87d48776fe039 51
+packages/core/src/kernel/vocabulary.ts
+  s_2dd75a86f22d42::t_5e49a46442b190 23-27
+  s_2dd75a86f22d42::t_7343c9e9441cdd 1
+docs/specs/s1-acts-ahead-of-the-first-procedures.md
+  s_2dd75a86f22d42::t_6cf2195a000fd4 99-100
+packages/devtools/test/act-admits-before-await.test.ts
+  s_2dd75a86f22d42::t_b40ca0ea9661e3 1-98
+packages/core/src/kernel/admission.ts
+  s_2dd75a86f22d42::t_3612db94c57c8f 71-72
+  s_2dd75a86f22d42::t_57a9b93fdb7c5b 63-67
+  s_2dd75a86f22d42::t_c49ad22a2b128a 1-62,68-70,73-116
+packages/core/src/kernel/index.ts
+  s_2dd75a86f22d42::t_bb878d4f5a3624 9-20
+  s_2dd75a86f22d42::t_1bc42f0140a768 33
+  s_2dd75a86f22d42::t_0d895a0878483d 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7f1e80d14446291e4cf393dc2b363170c7daea52",
+  "prompts": {},
+  "sessions": {
+    "s_2dd75a86f22d42": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1deab29c-2105-473f-9514-e52636269c8a",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
