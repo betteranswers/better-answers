@@ -21,6 +21,9 @@ const RUNS_THE_SUITE: readonly Runner[] = [
   // The `full-api` leg: `tests/ops.test.ts` reaches the same git step through the rehearsal.
   { file: "check.yml", suiteCommand: "pnpm check:api" },
 
+  // The `affected-workspaces` leg, which runs whichever of those two the filter selects.
+  { file: "check.yml", suiteCommand: "pnpm check:affected" },
+
   { file: "mutation.yml", suiteCommand: "stryker run" },
 ];
 

@@ -252,7 +252,10 @@ describe("the job that probes every image it pushes", () => {
   it("gives every leg that builds an image a builder and the cache credentials first", () => {
     const building = checkLegs().filter(([job]) => legsCarryingTheDeferral().includes(job));
 
-    expect(building.length, "the legs of check.yml that build an image are two").toBe(2);
+    expect(
+      building.length,
+      "the legs of check.yml that build an image are the full lane's api and worker, and the affected lane's two",
+    ).toBe(4);
     for (const [job, steps] of building) {
       const at = (action: string): number => steps.findIndex((step) => runs(step, action));
 
