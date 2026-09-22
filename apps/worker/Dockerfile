@@ -24,7 +24,7 @@
 # `apps/worker/tests/test_image.py` holds that file to it.
 FROM ghcr.io/astral-sh/uv:0.12.9@sha256:8b940d3a9d65bed080436972241af2e21c84b5e8c9193f7014ed71479ee795ff AS uv
 
-FROM python:3.13.15-slim-bookworm@sha256:ed86c82274b3c69b52fb5820f358f0bd7df0b603332063cb5c6e32bd220c3e6e AS build
+FROM python:3.14.7-slim-bookworm@sha256:82bc3c539b8813ada9d68c63b40158fa002f7f33de9bf3312a3dfdc0620dff56 AS build
 COPY --from=uv /uv /uvx /usr/local/bin/
 # `--no-dev` is what keeps ruff, mypy, pytest, mutmut and testcontainers — the
 # `[dependency-groups] dev` list — out of the image. psycopg and dulwich are not on that
@@ -85,7 +85,7 @@ RUN --mount=type=cache,target=/tldextract-cache,uid=0 \
     /app/.venv/bin/python -m better_answers_worker.redaction.suffixes \
     /data/worker/tldextract-cache
 
-FROM python:3.13.15-slim-bookworm@sha256:ed86c82274b3c69b52fb5820f358f0bd7df0b603332063cb5c6e32bd220c3e6e AS runtime
+FROM python:3.14.7-slim-bookworm@sha256:82bc3c539b8813ada9d68c63b40158fa002f7f33de9bf3312a3dfdc0620dff56 AS runtime
 
 # uid 1000, the uid `init` in `deploy/stores.compose.yaml` chowns /data/worker/{lmdb,trees}
 # to; nothing runs as root to own a volume. The Python base ships no non-root
