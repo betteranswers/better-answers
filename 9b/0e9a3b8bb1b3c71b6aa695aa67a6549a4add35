@@ -1,0 +1,73 @@
+apps/web/test/open-app.tsx
+  s_320323b36053d1::t_3b0da2aa00d9b6 1-21
+apps/web/src/features/auth/auth-hooks.ts
+  s_320323b36053d1::t_e086d4c728cc6a 11-12,14,91,94-96,99-100
+apps/web/test/membership-redirect.test.tsx
+  s_320323b36053d1::t_ec228b8ab35da2 114,116,118
+  s_320323b36053d1::t_6d965ac7b5eda2 2-3,5,8-13,16-18,26-28,31-33,42-46,53,64,66-70,74-78,81-84,87,89,91-93,95-96,98,100-102,105,110-111,113,117,120,123-127,129,133-139
+  s_320323b36053d1::t_ceb3a67c2c31f8 14-15,19-25,29-30,34-41,47-52,54-63,65,72-73,85-86,88,90,94,97,103-104,106-109,112,121-122,128
+  s_320323b36053d1::t_4d6c3431b48922 115,119
+  s_320323b36053d1::t_2d8b4059d55c0f 1,4,6-7,71
+  s_320323b36053d1::t_cfd807ea9b1405 130,132
+  s_320323b36053d1::t_ac03b790da3e9d 99
+  s_320323b36053d1::t_101bf7f4abf848 80,131
+  s_320323b36053d1::t_fd3f0156e72e64 79
+apps/web/test/secondary-nav-showing.test.tsx
+  s_320323b36053d1::t_1051e92ac02fd4 1,4,11
+apps/web/src/app/router.tsx
+  s_320323b36053d1::t_a7fcd3df4618bd 3,14
+  s_320323b36053d1::t_1f0eebadf06cf0 34-36
+  s_320323b36053d1::t_811a93c872f2fa 64,66
+  s_320323b36053d1::t_209dc5c5bab693 117
+  s_320323b36053d1::t_43db31af2eae13 1,17,21
+  s_320323b36053d1::t_6dc9ede8b0508f 65,67-74
+  s_320323b36053d1::t_01ca1341edfe5c 126-129
+apps/web/src/app/frame.tsx
+  s_320323b36053d1::t_a68368ce2179ec 1-2,5
+apps/web/src/shared/api/trpc.ts
+  s_320323b36053d1::t_fc1eaa8bd10077 16
+  s_320323b36053d1::t_f8b09a435208b5 1,3,13-15,17-20
+apps/web/test/failed-screen.test.tsx
+  s_320323b36053d1::t_b8519fe4a17986 109
+  s_320323b36053d1::t_2d8b4059d55c0f 1,6,9-10,45,135-136
+  s_320323b36053d1::t_b926990e3367e6 108,110-111
+apps/web/test/toolbar.test.tsx
+  s_320323b36053d1::t_1051e92ac02fd4 6-7,12
+apps/web/test/frame.test.tsx
+  s_320323b36053d1::t_e466eee0a80bf5 143,145-146
+  s_320323b36053d1::t_3fcc21f24fb342 1-2,5,9,11,13,247
+  s_320323b36053d1::t_b8519fe4a17986 144
+apps/web/src/main.tsx
+  s_320323b36053d1::t_061ba9ee6cf26a 5,12,16-17
+  s_320323b36053d1::t_fd5eedb15b8698 6,13
+apps/web/src/app/providers.tsx
+  s_320323b36053d1::t_895db02b31dddd 12-13
+  s_320323b36053d1::t_c22bd4f898d9ed 1-2,8-11,18
+  s_320323b36053d1::t_9c9781cac63d20 5,7,14-17,19-23
+apps/web/src/features/auth/membership.ts
+  s_320323b36053d1::t_b0bab4ea99f4ac 15
+  s_320323b36053d1::t_7d325a04b77782 32
+  s_320323b36053d1::t_4213b79bb3e112 2,16-18,34-38
+  s_320323b36053d1::t_f8e52d4232fdd1 4,11,21-31,33,39
+  s_320323b36053d1::t_4daf28f041dbad 6-8
+  s_320323b36053d1::t_5a1d3096131431 1
+  s_320323b36053d1::t_c130f68409a6cd 12
+apps/web/test/api-client.test.tsx
+  s_320323b36053d1::t_b8519fe4a17986 9,26,44-45,49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9b0e9a3b8bb1b3c71b6aa695aa67a6549a4add35",
+  "prompts": {},
+  "sessions": {
+    "s_320323b36053d1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6e020584-14a1-4e56-8ad9-2bb22a24c3fc",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
