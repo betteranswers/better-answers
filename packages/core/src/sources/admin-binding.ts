@@ -7,10 +7,10 @@ import {
   requireAdmin,
   type AdminUserPrincipal,
   type Result,
-  type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx, TxRow } from "../store/postgres/index.ts";
+import type { SourceRefusal } from "./vocabulary.ts";
 
 const BINDING_ID = boundarySchemas.sourceBinding.select.shape.id;
 
@@ -20,10 +20,12 @@ export type ActingOnBinding = {
   readonly bindingId: string;
 };
 
+type AdminOnBindingRefusal = SourceRefusal<"role-forbids" | "malformed">;
+
 export const adminOnBinding = (
   principal: UserPrincipal,
   bindingId: string,
-): Result<ActingOnBinding, RoleRefusal | "malformed"> => {
+): Result<ActingOnBinding, AdminOnBindingRefusal> => {
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);
   const named = BINDING_ID.safeParse(bindingId);
@@ -37,11 +39,13 @@ type BindingRead = {
   readonly lock: "for-update" | "none";
 };
 
+type BindingNamedRefusal = SourceRefusal<"no-such-binding"> | Error;
+
 export const bindingNamed = async <Row extends TxRow>(
   acting: ActingOnBinding,
   tx: Tx,
   read: BindingRead,
-): Promise<Result<Row, "no-such-binding" | Error>> => {
+): Promise<Result<Row, BindingNamedRefusal>> => {
   const locked = read.lock === "for-update" ? " FOR UPDATE" : "";
   const found = await attempt(() =>
     tx.query<Row>(

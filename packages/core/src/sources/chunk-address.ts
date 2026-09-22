@@ -1,6 +1,7 @@
 import { ULID } from "@better-answers/schema";
 
-import { err, ok, type Result } from "../kernel/index.ts";
+import { err, NOT_FOUND, ok, type Result } from "../kernel/index.ts";
+import type { SourceRefusal } from "./vocabulary.ts";
 
 const ORDINAL_DIGITS = 6;
 const CHUNK_ID_SEPARATOR = "#";
@@ -8,11 +9,9 @@ const SPAN_PREFIX = "chars:";
 const SPAN_SEPARATOR = "-";
 const PATH_SEPARATOR = "/";
 
-const NOT_FOUND = "not-found";
-
 const OFFSET = /^(?:0|[1-9][0-9]*)$/;
 
-export type LocatorRefusal = typeof NOT_FOUND;
+export type LocatorRefusal = SourceRefusal<"not-found">;
 
 export type Locator = {
   readonly sourceDocumentId: string;

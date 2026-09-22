@@ -19,7 +19,6 @@ import {
   ulid,
   type PrincipalRefusal,
   type Result,
-  type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { holdsEveryGroup } from "../members/index.ts";
@@ -29,6 +28,7 @@ import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/in
 import { adminOnBinding, bindingNamed } from "./admin-binding.ts";
 import { dpiaInputFor, REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastRun } from "./findings.ts";
+import type { SourceRefusal } from "./vocabulary.ts";
 
 const originalKeyOf = (documentId: string): string =>
   `documents/${documentId.toLowerCase()}/original`;
@@ -111,12 +111,10 @@ export type BindUploadInput = {
 };
 
 export type BindUploadRefusal =
-  | RoleRefusal
   | PrincipalRefusal
-  | "malformed"
-  | "no-such-group"
-  | "media-type-refused"
-  | "too-large"
+  | SourceRefusal<
+      "role-forbids" | "malformed" | "no-such-group" | "media-type-refused" | "too-large"
+    >
   | Error;
 
 export type UploadBound = {
@@ -266,12 +264,14 @@ export type PublishBindingInput = {
 };
 
 export type PublishBindingRefusal =
-  | RoleRefusal
-  | "malformed"
-  | "no-such-binding"
-  | "not-indexed"
-  | "already-published"
-  | "confirmation-missing"
+  | SourceRefusal<
+      | "role-forbids"
+      | "malformed"
+      | "no-such-binding"
+      | "not-indexed"
+      | "already-published"
+      | "confirmation-missing"
+    >
   | Error;
 
 export type BindingPublished = {
@@ -374,7 +374,9 @@ export type ReprocessBindingInput = {
   readonly reason: IndexReason;
 };
 
-export type ReprocessBindingRefusal = RoleRefusal | "malformed" | "no-such-binding" | Error;
+export type ReprocessBindingRefusal =
+  | SourceRefusal<"role-forbids" | "malformed" | "no-such-binding">
+  | Error;
 
 export type BindingReprocessed = {
   readonly bindingId: string;

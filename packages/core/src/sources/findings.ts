@@ -9,10 +9,10 @@ import {
   requireAdmin,
   ulid,
   type Result,
-  type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import type { SourceRefusal } from "./vocabulary.ts";
 
 const FINDING_ACTS = declareActs("sources", {
   restored: act("sources.finding.restored", { findingId: "id" }),
@@ -34,10 +34,7 @@ export type RestoreFindingInput = {
 };
 
 export type FindingRestoreRefusal =
-  | RoleRefusal
-  | "malformed"
-  | "no-such-finding"
-  | "not-the-always-set"
+  | SourceRefusal<"role-forbids" | "malformed" | "no-such-finding" | "not-the-always-set">
   | Error;
 
 export type FindingRestored = {

@@ -1,7 +1,8 @@
 import type { UserPrincipal } from "./principal.ts";
+import type { KernelRefusal } from "./vocabulary.ts";
 import { err, ok, type Result } from "./result.ts";
 
-export type RoleRefusal = "role-forbids";
+export type RoleRefusal = KernelRefusal<"role-forbids">;
 
 export type AdminUserPrincipal = UserPrincipal & { readonly role: "Admin" };
 

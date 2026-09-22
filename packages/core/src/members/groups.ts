@@ -7,11 +7,11 @@ import type {
   AdminUserPrincipal,
   GroupId,
   Result,
-  RoleRefusal,
   UserId,
   UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import type { MemberRefusal } from "./vocabulary.ts";
 
 type GroupRow = z.infer<typeof boundarySchemas.group.select>;
 
@@ -37,22 +37,27 @@ const GROUP_NAME = boundarySchemas.group.insert.shape.name;
 const GROUP_ORIGIN = boundarySchemas.group.select.shape.origin;
 const PERSON_ID = boundarySchemas.user.select.shape.id;
 
-type GuardRefusal = RoleRefusal | "malformed";
+type AdminRefusal = MemberRefusal<"role-forbids">;
 
-type TargetRefusal = GuardRefusal | "no-such-group";
+type GuardRefusal = AdminRefusal | MemberRefusal<"malformed">;
+
+type TargetRefusal = GuardRefusal | MemberRefusal<"no-such-group">;
 
 export type CreateGroupInput = { readonly name: string };
-export type CreateGroupRefusal = GuardRefusal | "name-taken" | Error;
+export type CreateGroupRefusal = GuardRefusal | MemberRefusal<"name-taken"> | Error;
 
 export type RenameGroupInput = { readonly groupId: string; readonly name: string };
-export type RenameGroupRefusal = TargetRefusal | "name-taken" | Error;
+export type RenameGroupRefusal = TargetRefusal | MemberRefusal<"name-taken"> | Error;
 
 export type DeleteGroupInput = { readonly groupId: string };
 export type DeleteGroupRefusal = TargetRefusal | Error;
 
 export type GroupMemberInput = { readonly groupId: string; readonly userId: string };
-export type AddToGroupRefusal = TargetRefusal | "not-a-member" | "already-in-group" | Error;
-export type RemoveFromGroupRefusal = TargetRefusal | "not-in-group" | Error;
+export type AddToGroupRefusal =
+  | TargetRefusal
+  | MemberRefusal<"no-such-member" | "already-in-group">
+  | Error;
+export type RemoveFromGroupRefusal = TargetRefusal | MemberRefusal<"not-in-group"> | Error;
 
 type GroupTarget = { readonly admin: AdminUserPrincipal; readonly groupId: GroupId };
 
@@ -214,7 +219,7 @@ export const addToGroup = async (
 
   const row = known.value.rows[0];
   if (row?.holds_group !== true) return err("no-such-group");
-  if (!row.is_member) return err("not-a-member");
+  if (!row.is_member) return err("no-such-member");
 
   const added = await attempt(() =>
     tx.query(
@@ -270,7 +275,7 @@ export const holdsEveryGroup = async (
   principal: UserPrincipal,
   tx: Tx,
   groupIds: readonly GroupId[],
-): Promise<Result<boolean, RoleRefusal>> => {
+): Promise<Result<boolean, AdminRefusal>> => {
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);
   const distinct = [...new Set(groupIds)];
@@ -285,7 +290,7 @@ export const holdsEveryGroup = async (
 export const listGroups = async (
   principal: UserPrincipal,
   tx: Tx,
-): Promise<Result<readonly GroupSummary[], RoleRefusal | Error>> => {
+): Promise<Result<readonly GroupSummary[], AdminRefusal | Error>> => {
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);
 

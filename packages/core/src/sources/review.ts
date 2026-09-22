@@ -19,7 +19,6 @@ import {
   ok,
   ulid,
   type Result,
-  type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { enqueueJobIn, latestIndexOutcomeIn, type JobOutcome } from "../runs/index.ts";
@@ -28,6 +27,7 @@ import { adminOnBinding, bindingNamed } from "./admin-binding.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
 import { REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastRun, restoreFinding } from "./findings.ts";
+import type { SourceRefusal } from "./vocabulary.ts";
 
 export type FindingGroup = {
   readonly documentId: string;
@@ -44,7 +44,9 @@ export type FindingGroup = {
   readonly overriddenByErasure: number;
 };
 
-export type FindingsOfRefusal = RoleRefusal | "malformed" | "no-such-binding" | Error;
+export type FindingsOfRefusal =
+  | SourceRefusal<"role-forbids" | "malformed" | "no-such-binding">
+  | Error;
 
 const SPECIAL_CATEGORIES = new Set<string>(
   REDACTION_CATEGORIES.filter((entry) => entry.specialCategory).map((entry) => entry.category),
@@ -182,11 +184,9 @@ export type KeepInTextInput = {
 };
 
 export type KeepInTextRefusal =
-  | RoleRefusal
-  | "malformed"
-  | "no-such-binding"
-  | "no-such-finding"
-  | "not-the-always-set"
+  | SourceRefusal<
+      "role-forbids" | "malformed" | "no-such-binding" | "no-such-finding" | "not-the-always-set"
+    >
   | Error;
 
 export type KeptInText = {
@@ -294,11 +294,9 @@ export type NarrowDocumentsInput = {
 };
 
 export type NarrowDocumentsRefusal =
-  | RoleRefusal
-  | "malformed"
-  | "no-such-binding"
-  | "no-such-document"
-  | "widening-refused"
+  | SourceRefusal<
+      "role-forbids" | "malformed" | "no-such-binding" | "no-such-document" | "widening-refused"
+    >
   | Error;
 
 export type DocumentsNarrowed = {

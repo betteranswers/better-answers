@@ -2,10 +2,11 @@ import { createHash } from "node:crypto";
 
 import { boundarySchemas, RULES_IN_FORCE_KEYS, type REDACTION_TIERS } from "@better-answers/schema";
 
-import { err, ok, type Result, type RoleRefusal, type UserPrincipal } from "../kernel/index.ts";
+import { err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import { listRoutes, type LlmPurpose } from "../llm/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { adminOnBinding, bindingNamed } from "./admin-binding.ts";
+import type { SourceRefusal } from "./vocabulary.ts";
 
 export const NOT_RECORDED = "not recorded";
 
@@ -77,7 +78,9 @@ export type DpiaInput = {
   readonly audience: string;
 };
 
-export type DpiaInputRefusal = RoleRefusal | "malformed" | "no-such-binding" | Error;
+export type DpiaInputRefusal =
+  | SourceRefusal<"role-forbids" | "malformed" | "no-such-binding">
+  | Error;
 
 export type DpiaInputRead = {
   readonly document: DpiaInput;

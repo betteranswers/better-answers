@@ -191,7 +191,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "members",
     access: "read",
     reason:
-      "Adding a person to a group reads whether they are a member of the workspace first, so the act answers `not-a-member` rather than letting the composite foreign key abort the caller's transaction; T-061's request act reads the same row to answer already-a-member neutrally.",
+      "Adding a person to a group reads whether they are a member of the workspace first, so the act answers `no-such-member` rather than letting the composite foreign key abort the caller's transaction; T-061's request act reads the same row to answer already-a-member neutrally.",
   },
   {
     table: "public.user",

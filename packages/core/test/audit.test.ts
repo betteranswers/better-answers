@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { describe, expect, expectTypeOf, it } from "vitest";
 
@@ -16,23 +15,12 @@ import {
 } from "../src/audit/index.ts";
 import type { ActorId, PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
 import { withPrincipal, withScope, type PostgresDoor } from "../src/store/postgres/index.ts";
+import { loadEveryEntryPoint } from "./entry-points.ts";
 import { bootstrap, principalOf, provisionedWorkspace } from "./platform.ts";
 import { coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
-
-const PACKAGE_JSON = path.resolve(import.meta.dirname, "../package.json");
-
-const loadEveryEntryPoint = async (): Promise<void> => {
-  const manifest: { exports: Readonly<Record<string, string>> } = JSON.parse(
-    readFileSync(PACKAGE_JSON, "utf8"),
-  );
-  for (const relative of Object.values(manifest.exports)) {
-    const file = pathToFileURL(path.resolve(path.dirname(PACKAGE_JSON), relative)).href;
-    await import(/* @vite-ignore */ file);
-  }
-};
 
 const actLiteralsIn = (files: readonly string[]): Set<string> =>
   new Set(

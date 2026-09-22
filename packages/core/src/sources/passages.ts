@@ -7,17 +7,11 @@ import {
   sensitivityAndAudienceClause,
   type Sensitivity,
 } from "../access/index.ts";
-import {
-  attempt,
-  err,
-  ok,
-  type Result,
-  type RoleRefusal,
-  type UserPrincipal,
-} from "../kernel/index.ts";
+import { attempt, err, NOT_FOUND, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { adminOnBinding } from "./admin-binding.ts";
 import { locatorOf, parseLocator, spanText, type LocatorRefusal } from "./chunk-address.ts";
+import type { SourceRefusal } from "./vocabulary.ts";
 
 export type Passage = {
   readonly locator: string;
@@ -27,8 +21,6 @@ export type Passage = {
 };
 
 const CHUNK_SENSITIVITY = boundarySchemas.chunk.select.shape.sensitivity;
-
-const NOT_FOUND: LocatorRefusal = "not-found";
 
 const COVERING_ROWS = `SELECT c.content, c.char_start, c.char_end, c.sensitivity, d.title
      FROM "index".chunk c
@@ -196,11 +188,13 @@ type PreviewRow = {
   readonly content: string;
 };
 
+type PreviewChunksRefusal = SourceRefusal<"role-forbids" | "malformed"> | Error;
+
 export const previewChunks = async (
   principal: UserPrincipal,
   tx: Tx,
   input: { readonly bindingId: string; readonly limit?: number },
-): Promise<Result<readonly PreviewedChunk[], RoleRefusal | "malformed" | Error>> => {
+): Promise<Result<readonly PreviewedChunk[], PreviewChunksRefusal>> => {
   const acting = adminOnBinding(principal, input.bindingId);
   if (!acting.ok) return err(acting.error);
   const { admin, bindingId } = acting.value;
