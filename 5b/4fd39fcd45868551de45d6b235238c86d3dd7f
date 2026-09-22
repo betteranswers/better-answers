@@ -1,0 +1,21 @@
+docs/specs/T-311.md
+  s_0eac4f271203d6::t_06f5926ca9fbde 19-20
+  s_0eac4f271203d6::t_76c013f81addf6 241-245
+  s_0eac4f271203d6::t_946d70663b55c4 1-18,21-240,246-248
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "5b4fd39fcd45868551de45d6b235238c86d3dd7f",
+  "prompts": {},
+  "sessions": {
+    "s_0eac4f271203d6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b7e5164-c222-4435-a137-44be543b225a",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
