@@ -70,6 +70,12 @@ export {
   type ChecksCarried,
 } from "./landing.ts";
 export {
+  writeManifest,
+  type ManifestWritten,
+  type WriteManifestInput,
+  type WriteManifestRefusal,
+} from "./manifest.ts";
+export {
   RECONCILER,
   reconcile,
   reconcileEveryWorkspace,

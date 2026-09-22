@@ -7,14 +7,14 @@ import { serve } from "@hono/node-server";
 import { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 
-import { writeConcept } from "@better-answers/core/concepts";
+import { writeConcept, writeManifest } from "@better-answers/core/concepts";
 import {
   ERASURE,
   rehearseErasure,
   seedSyntheticSubject,
   type ErasureRehearsed,
 } from "@better-answers/core/erasure";
-import { systemClock } from "@better-answers/core/kernel";
+import { systemClock, type UserPrincipal } from "@better-answers/core/kernel";
 import { head, initRepository } from "@better-answers/core/store/git";
 import { openObjects } from "@better-answers/core/store/objects";
 import { openPostgres, withPrincipal } from "@better-answers/core/store/postgres";
@@ -169,6 +169,68 @@ const finishTheJob = async (app: TestApp, workspaceId: string, status: string): 
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
   throw new Error(`nothing was ever queued in ${workspaceId}`);
+};
+
+const principalOf = async (app: TestApp, workspaceId: string, userId: string) => {
+  const principal = await withPrincipal(
+    openPostgres(app.database.pool),
+    { workspaceId, userId, issuedAt: new Date() },
+    async (resolved) => resolved,
+  );
+  if (!principal.ok) throw new Error(`the principal did not resolve: ${principal.error}`);
+  return principal.value;
+};
+
+const bundleDoors = (app: TestApp) => ({
+  git: openTestGit(app),
+  postgres: openPostgres(app.database.pool),
+  clock: systemClock(),
+});
+
+type Provisioned = Awaited<ReturnType<TestApp["provision"]>>;
+
+const replayedAfterTheWindow = async (
+  app: TestApp,
+  write: (
+    principal: UserPrincipal,
+    doors: ReturnType<typeof bundleDoors>,
+    admin: Provisioned["admin"],
+  ) => Promise<{ readonly ok: boolean }>,
+) => {
+  const { workspaceId, admin } = await app.provision();
+  const git = openTestGit(app);
+  await initRepository(git, workspaceId);
+  const principal = await principalOf(app, workspaceId, admin.id);
+  await lostInTheWindow(app, () => write(principal, bundleDoors(app), admin));
+  const sha = await head(principal, git);
+
+  const run = await ops(app, ["reconcile-watermark", "--workspace", workspaceId]);
+
+  expect(run.exitCode).toBe(0);
+  expect(run.lines).toEqual([
+    `reconcile-watermark: done — head ${sha}, watermark none, replayed 1, already landed 0`,
+  ]);
+  return { workspaceId, admin, sha };
+};
+
+const lostInTheWindow = async (
+  app: TestApp,
+  act: () => Promise<{ readonly ok: boolean }>,
+): Promise<void> => {
+  const superuser = app.database.superuser;
+  await superuser.query(
+    `CREATE FUNCTION crash_in_the_window() RETURNS trigger LANGUAGE plpgsql AS $$
+       BEGIN RAISE EXCEPTION 'the process died between the commit and its rows'; END $$`,
+  );
+  await superuser.query(
+    "CREATE TRIGGER crash_in_the_window BEFORE INSERT ON bundle_commit FOR EACH ROW EXECUTE FUNCTION crash_in_the_window()",
+  );
+  try {
+    expect((await act()).ok).toBe(false);
+  } finally {
+    await superuser.query("DROP TRIGGER crash_in_the_window ON bundle_commit");
+    await superuser.query("DROP FUNCTION crash_in_the_window()");
+  }
 };
 
 describe("pnpm ops — the restore scripts' commands", () => {
@@ -702,59 +764,63 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("is done — exit 0 — after replaying the commit a bundle's rows missed, and the concept's row has landed", async () => {
-      const { workspaceId, admin } = await app().provision();
-      const git = openTestGit(app());
-      await initRepository(git, workspaceId);
-      const principal = await withPrincipal(
-        openPostgres(app().database.pool),
-        { workspaceId, userId: admin.id, issuedAt: new Date() },
-        async (resolved) => resolved,
+      const { workspaceId, sha } = await replayedAfterTheWindow(app(), (principal, doors, admin) =>
+        writeConcept(principal, doors, {
+          mergeKey: "note:restore-drill",
+          path: "knowledge/restore-drill.md",
+          kind: "Note",
+          title: "Restore drill",
+          frontmatter: { title: "Restore drill", type: "Note" },
+          body: "The rows are behind the bundle until the reconciler runs.",
+          message: "Record the restore drill note",
+          author: { name: admin.name, email: admin.email },
+          expects: { head: null },
+          status: "stable",
+        }),
       );
-      if (!principal.ok) throw new Error(`the principal did not resolve: ${principal.error}`);
 
-      const superuser = app().database.superuser;
-      await superuser.query(
-        `CREATE FUNCTION crash_in_the_window() RETURNS trigger LANGUAGE plpgsql AS $$
-           BEGIN RAISE EXCEPTION 'the process died between the commit and its rows'; END $$`,
-      );
-      await superuser.query(
-        "CREATE TRIGGER crash_in_the_window BEFORE INSERT ON bundle_commit FOR EACH ROW EXECUTE FUNCTION crash_in_the_window()",
-      );
-      try {
-        const lost = await writeConcept(
-          principal.value,
-          { git, postgres: openPostgres(app().database.pool), clock: systemClock() },
-          {
-            mergeKey: "note:restore-drill",
-            path: "knowledge/restore-drill.md",
-            kind: "Note",
-            title: "Restore drill",
-            frontmatter: { title: "Restore drill", type: "Note" },
-            body: "The rows are behind the bundle until the reconciler runs.",
-            message: "Record the restore drill note",
-            author: { name: admin.name, email: admin.email },
-            expects: { head: null },
-            status: "stable",
-          },
-        );
-        expect(lost.ok).toBe(false);
-      } finally {
-        await superuser.query("DROP TRIGGER crash_in_the_window ON bundle_commit");
-        await superuser.query("DROP FUNCTION crash_in_the_window()");
-      }
-      const sha = await head(principal.value, git);
-
-      const run = await ops(app(), ["reconcile-watermark", "--workspace", workspaceId]);
-
-      expect(run.exitCode).toBe(0);
-      expect(run.lines).toEqual([
-        `reconcile-watermark: done — head ${sha}, watermark none, replayed 1, already landed 0`,
-      ]);
-      const landed = await superuser.query<{ path: string; commit_sha: string }>(
+      const landed = await app().database.superuser.query<{ path: string; commit_sha: string }>(
         "SELECT path, commit_sha FROM concept_index WHERE workspace_id = $1",
         [workspaceId],
       );
       expect(landed.rows).toEqual([{ path: "knowledge/restore-drill.md", commit_sha: sha }]);
+    });
+
+    it("is done — exit 0 — after replaying a manifest commit a bundle's rows missed: its commit row lands, no concept does, and it stops nowhere", async () => {
+      const { workspaceId, admin, sha } = await replayedAfterTheWindow(
+        app(),
+        (principal, doors, author) =>
+          writeManifest(principal, doors, {
+            manifest: {
+              id: "01J6BBBBBBBBBBBBBBBBBBBBBB",
+              origin: "company",
+              ref: "Four bid libraries, reviewed 22 September 2026",
+              owner: "Acme",
+              content_version: "2026-09-22",
+            },
+            message: "Write the bundle's manifest",
+            author: { name: author.name, email: author.email },
+          }),
+      );
+
+      const rows = await app().database.superuser.query<Record<string, unknown>>(
+        `SELECT c.sha, c.parent_sha, c.actor, e.act, e.detail,
+                (SELECT count(*)::int FROM concept_index i WHERE i.workspace_id = c.workspace_id) AS concepts
+           FROM bundle_commit c
+           JOIN audit_event e ON e.workspace_id = c.workspace_id AND e.id = c.audit_event_id
+          WHERE c.workspace_id = $1`,
+        [workspaceId],
+      );
+      expect(rows.rows).toEqual([
+        {
+          sha,
+          parent_sha: null,
+          actor: `human:${admin.id}`,
+          act: "platform.reconciler.replayed",
+          detail: { commitSha: sha, bundleId: "01J6BBBBBBBBBBBBBBBBBBBBBB" },
+          concepts: 0,
+        },
+      ]);
     });
   });
 

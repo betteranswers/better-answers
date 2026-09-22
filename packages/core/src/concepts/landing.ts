@@ -190,6 +190,30 @@ type Landing = z.infer<typeof conceptRow> & {
   readonly acceptance: Acceptance | undefined;
 };
 
+type CommitLanding = {
+  readonly commit: Committed;
+  readonly actor: ActorId;
+  readonly auditEventId: string;
+};
+
+export const landBundleCommit = async (
+  principal: Principal,
+  tx: Tx,
+  landing: CommitLanding,
+): Promise<void> => {
+  await tx.query(
+    `INSERT INTO bundle_commit (workspace_id, sha, parent_sha, audit_event_id, actor)
+     VALUES (${scopeClause(1)}, $2, $3, $4, $5)`,
+    [
+      scopeParameter(principal),
+      landing.commit.sha,
+      landing.commit.parent,
+      landing.auditEventId,
+      landing.actor,
+    ],
+  );
+};
+
 export const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<void> => {
   await tx.query(
     `INSERT INTO concept_identity (workspace_id, iri, merge_key) VALUES ($1, $2, $3)
@@ -256,11 +280,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
       visibility.audienceGroups,
     ],
   );
-  await tx.query(
-    `INSERT INTO bundle_commit (workspace_id, sha, parent_sha, audit_event_id, actor)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [index.workspaceId, index.commit.sha, index.commit.parent, index.auditEventId, index.actor],
-  );
+  await landBundleCommit(principal, tx, index);
 
   await writeConceptDelta(principal, tx, {
     workspaceId: index.workspaceId,

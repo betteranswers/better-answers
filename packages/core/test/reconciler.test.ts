@@ -15,12 +15,13 @@ import {
   submitSuggestionSet,
   suggestionSetSummary,
   writeConcept,
+  writeManifest,
   type Frontmatter,
   type Reconciled,
   type SuggestionRequest,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
-import { actorIdOf, type UserPrincipal } from "../src/kernel/index.ts";
+import { actorIdOf, type Result, type UserPrincipal } from "../src/kernel/index.ts";
 import { narrowBinding } from "../src/sources/index.ts";
 import { commit, withRepositoryLock } from "@better-answers/core/store/git";
 import {
@@ -116,6 +117,30 @@ const recordedChain = async (
     [workspaceId],
   );
   return rows.rows.map((row) => [row.sha, row.parent_sha] as const);
+};
+
+const bothReplayedInOrder = async (
+  scenario: Scenario,
+  behind: Result<unknown, unknown>,
+): Promise<readonly string[]> => {
+  expect(behind.ok === false && behind.error instanceof Error).toBe(true);
+  const history = await bundleHistory(scenario.git, scenario.workspaceId);
+  expect(history).toHaveLength(2);
+  expect(await recordedChain(scenario.workspaceId)).toEqual([]);
+
+  const run = await reconciled(scenario);
+
+  expect(run).toMatchObject({
+    watermark: null,
+    replayed: history,
+    skipped: [],
+    stopped: undefined,
+  });
+  expect(await recordedChain(scenario.workspaceId)).toEqual([
+    [history[0], null],
+    [history[1], history[0]],
+  ]);
+  return history;
 };
 
 const rowsOf = async (workspaceId: string) => {
@@ -294,18 +319,8 @@ describe("a commit whose rows were lost", () => {
       doorsOf(scenario),
       guideline("Overtime", { expects: { head: orphan } }),
     );
-    expect(behind.ok === false && behind.error instanceof Error).toBe(true);
-    const history = await bundleHistory(scenario.git, scenario.workspaceId);
-    expect(history).toHaveLength(2);
-    expect(await recordedChain(scenario.workspaceId)).toEqual([]);
 
-    const run = await reconciled(scenario);
-
-    expect(run).toMatchObject({ watermark: null, replayed: history, skipped: [] });
-    expect(await recordedChain(scenario.workspaceId)).toEqual([
-      [history[0], null],
-      [history[1], history[0]],
-    ]);
+    const history = await bothReplayedInOrder(scenario, behind);
 
     const events = await replayedEvents(scenario.workspaceId);
     expect(events.map((event) => event["subject_id"])).toEqual(history);
@@ -372,6 +387,73 @@ describe("a commit whose rows were lost, carrying what the replay has to read of
       path: "knowledge/guidelines/café.md",
       commit_sha: sha,
     });
+  });
+});
+
+describe("a manifest commit whose rows were lost", () => {
+  const manifest = {
+    id: "01J6BBBBBBBBBBBBBBBBBBBBBB",
+    origin: "company",
+    ref: "Four bid libraries, reviewed 22 September 2026",
+    owner: "Acme",
+    content_version: "2026-09-22",
+  } as const;
+
+  it("is replayed as its commit row alone, the platform's act naming the bundle, and the concept written on it follows in order", async () => {
+    const scenario = await arrange();
+    const lost = await inTheWindow(() =>
+      writeManifest(scenario.editor, doorsOf(scenario), {
+        manifest,
+        message: "Write the bundle's manifest",
+        author: { name: "Grace Editor", email: "grace@acme.invalid" },
+      }),
+    );
+    expect(lost.ok).toBe(false);
+    const [first = ""] = await bundleHistory(scenario.git, scenario.workspaceId);
+    const input = guideline("Travel", { expects: { head: first } });
+    const behind = await writeConcept(scenario.editor, doorsOf(scenario), input);
+
+    const history = await bothReplayedInOrder(scenario, behind);
+
+    const facts = await commitFacts(scenario.git, scenario.workspaceId, first);
+    const events = await replayedEvents(scenario.workspaceId);
+    expect(events[0]).toEqual({
+      id: facts.trailers["Audit"],
+      actor: "process:better-answers-reconciler",
+      subject_id: first,
+      subject_kind: "reconciler",
+      batch_id: events[1]?.["batch_id"],
+      detail: { commitSha: first, bundleId: "01J6BBBBBBBBBBBBBBBBBBBBBB" },
+    });
+    const concepts = await db().pool.query<{ path: string; commit_sha: string }>(
+      "SELECT path, commit_sha FROM concept_index WHERE workspace_id = $1",
+      [scenario.workspaceId],
+    );
+    expect(concepts.rows).toEqual([{ path: input.path, commit_sha: history[1] }]);
+  });
+
+  it("stops at a manifest commit whose file does not parse — one the governed write never made — reported, with nothing landed", async () => {
+    const scenario = await arrange();
+    const forged = await commit(scenario.editor, scenario.git, {
+      path: "knowledge/manifest.yaml",
+      content: '"id": "acme-2026"\n"origin": "company"\n',
+      message: "Write a manifest by hand",
+      author: { name: "Grace Editor", email: "grace@acme.invalid" },
+      trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
+      expectedHead: null,
+      at: new Date(),
+    });
+    if (!forged.ok) throw new Error(`the forged commit was refused: ${String(forged.error)}`);
+
+    const run = await reconciled(scenario);
+
+    expect(run).toMatchObject({
+      replayed: [],
+      skipped: [],
+      stopped: { sha: forged.value.sha, reason: "unreadable-commit" },
+    });
+    expect(await recordedChain(scenario.workspaceId)).toEqual([]);
+    expect(await replayedEvents(scenario.workspaceId)).toEqual([]);
   });
 });
 
