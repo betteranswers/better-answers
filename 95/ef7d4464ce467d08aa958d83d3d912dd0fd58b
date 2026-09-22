@@ -1,0 +1,102 @@
+packages/devtools/test/comment-gate-python.test.ts
+  s_a38d2840827d6c::t_0b3caf3785f09a 58-61
+apps/worker/CODING_RULES.md
+  s_a38d2840827d6c::t_a9a04ab456ec89 3,5,9,11
+apps/api/tests/docs-lane.test.ts
+  s_a38d2840827d6c::t_f4fb05eda2a6cd 75-77
+docs/adr/README.md
+  s_a38d2840827d6c::t_3eeb80acfce508 39
+docs/agents/workflow.md
+  s_a38d2840827d6c::t_fa11c8ea963bc9 30
+CODING_RULES.md
+  s_a38d2840827d6c::t_3d24fe22d8502a 3,9,15,17,19,21,23-26,28-30,34,38,42,44,46,50-52,54-56,58,60,62,64,66,68,70,72,74,76,78,82-84,86-88,90,92,94,98,102,104,114,120,122,124,126,138,146,150,162,164,166,168,170,172,176,178,180,182,192,196,200,204,208,212,216,218,220,224,228,230,238,242,244
+  s_a38d2840827d6c::t_176e18be09acb9 11
+  s_a38d2840827d6c::t_092933b2b6b9ac 13
+  s_a38d2840827d6c::t_2caff5eea7f193 36
+  s_a38d2840827d6c::t_310b2e3bd71e30 40
+  s_a38d2840827d6c::t_7e1231083c27a2 96
+  s_a38d2840827d6c::t_225778d40e34d7 110
+  s_a38d2840827d6c::t_c960f252a7dea1 112
+  s_a38d2840827d6c::t_1d443f734205b2 131
+  s_a38d2840827d6c::t_f8ea5ee74f10bb 134
+  s_a38d2840827d6c::t_18b03dd55311a2 142
+  s_a38d2840827d6c::t_71b075737018a3 154
+  s_a38d2840827d6c::t_1d579a482aa13d 186
+  s_a38d2840827d6c::t_93d15057ae0ef7 198
+  s_a38d2840827d6c::t_9308b3ce5c7e0d 202
+  s_a38d2840827d6c::t_4e6934f0d5e145 206
+  s_a38d2840827d6c::t_f7d6fe76a57008 210
+  s_a38d2840827d6c::t_e5ad0c0a2e7d08 214
+  s_a38d2840827d6c::t_328e6820b6eed6 226
+  s_a38d2840827d6c::t_e334a8f42abdb7 232
+  s_a38d2840827d6c::t_3f98997181bd25 234
+  s_a38d2840827d6c::t_64eb6b907acc86 240
+packages/devtools/python/comment_gate.py
+  s_a38d2840827d6c::t_928590c98112bd 35
+  s_a38d2840827d6c::t_de97ece7d16434 36
+docs/adr/0029-the-tier-is-apps-over-packages-business-logic-is-a-library-of-capability-slices-over-four-store-doors.md
+  s_a38d2840827d6c::t_3224ebafe73653 171-178
+AGENTS.md
+  s_a38d2840827d6c::t_7c603d969c46d0 10
+docs/okf-v02.md
+  s_a38d2840827d6c::t_bcc8a87003f694 42
+docs/adr/0045-a-coding-rule-is-one-imperative-under-a-tag-in-the-file-for-the-directory-it-binds-and-names-a-reviewer-only-where-no-gate-can-hold-it.md
+  s_a38d2840827d6c::t_da7eeaa0258656 1-7,9-11,13,15-17,19,21-23
+  s_a38d2840827d6c::t_59b14710f04c19 20
+packages/devtools/lint-rules/rules/comment-only-the-why.ts
+  s_a38d2840827d6c::t_2d158071405c64 13-14
+packages/devtools/test/comment-only-the-why.test.ts
+  s_a38d2840827d6c::t_dd9954e81109ed 57-60
+apps/api/tests/coding-rules-tags.test.ts
+  s_a38d2840827d6c::t_67b8446a6bb311 41
+  s_a38d2840827d6c::t_5b2bd3ac1c173c 120-125
+  s_a38d2840827d6c::t_4ca7d2461aa411 152-153
+  s_a38d2840827d6c::t_96a7ae0f7911fa 174-176,180-181
+  s_a38d2840827d6c::t_1c0387ed605607 195
+  s_a38d2840827d6c::t_17ccc943f6975a 219-221
+  s_a38d2840827d6c::t_07fc999cbf9f49 223-224,239-244,246-249
+  s_a38d2840827d6c::t_3509117af58c30 225,228-229
+  s_a38d2840827d6c::t_892ad71bb95d52 245
+apps/api/CODING_RULES.md
+  s_a38d2840827d6c::t_c36810c9cc86a5 3,5,7,9,11,15,17,19,21
+  s_a38d2840827d6c::t_c55db9be7c3119 13
+apps/web/CODING_RULES.md
+  s_a38d2840827d6c::t_a960df3b36268f 3-6,8-22,24-26,28-30
+  s_a38d2840827d6c::t_4def462eef03e7 7
+  s_a38d2840827d6c::t_299c627ba1d977 23
+  s_a38d2840827d6c::t_ff76ec51361637 27
+  s_a38d2840827d6c::t_39c5e62eb72864 31
+apps/api/tests/coding-rules-form.test.ts
+  s_a38d2840827d6c::t_abba332b40b783 1-12,14-27,29-40,42-48,50-57,59,61-130,135,138-163,168-173,175-182,184-196,199-201,203-225,228-260,264-305,167
+  s_a38d2840827d6c::t_4336f6db44b2c0 131-134
+  s_a38d2840827d6c::t_162a9b6b47f76a 136-137
+  s_a38d2840827d6c::t_da248e0029318f 164,165-166,174,183
+  s_a38d2840827d6c::t_e3ffa1a64295d7 197-198
+  s_a38d2840827d6c::t_f460fb0e68ed03 202
+  s_a38d2840827d6c::t_b9f57f7904335b 226-227
+  s_a38d2840827d6c::t_cc2271d1f84d20 261-263
+  s_a38d2840827d6c::t_3c4bbd76ab27f0 13
+  s_a38d2840827d6c::t_c94027f6716bca 41
+  s_a38d2840827d6c::t_13f72c14b48e5e 58,60
+package.json
+  s_a38d2840827d6c::t_ec951f0672196b 12
+deploy/CODING_RULES.md
+  s_a38d2840827d6c::t_80f073e4675b22 1-4,6
+  s_a38d2840827d6c::t_df5c4129eae8f2 5,7-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "95ef7d4464ce467d08aa958d83d3d912dd0fd58b",
+  "prompts": {},
+  "sessions": {
+    "s_a38d2840827d6c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bcafdd87-9a23-47ee-b85e-27d4f2a91450",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
