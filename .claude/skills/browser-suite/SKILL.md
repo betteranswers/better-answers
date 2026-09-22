@@ -131,7 +131,8 @@ three things, of which automated rules are only one:
   reported. A new spec is held to it by existing, and there is nothing to remember.
 - **A keyboard traversal** reaching the screen and each of its acts without a pointer:
   `apps/web/e2e/sign-in.spec.ts` for the three screens outside the shell,
-  `apps/web/e2e/frame.spec.ts` for the rail and the drawer, and `apps/web/e2e/routes.spec.ts` and
+  `apps/web/e2e/frame.spec.ts` for the rail and the secondary nav, and
+  `apps/web/e2e/routes.spec.ts` and
   `apps/web/e2e/failed-screen.spec.ts` for theirs. It is the floor, not the extra.
 - **An aria snapshot**, written inline with `toMatchAriaSnapshot`, where what a screen *sounds
   like* is the thing under test — a row that lost its heading or a list that stopped being a list
