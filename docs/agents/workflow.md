@@ -35,13 +35,17 @@ Commits go on the ticket's branch, one message in the repository's prose shape (
 
 **Every commit reaches `main` through the merge queue.** A docs edit, a chore, a one-line fix and a dequeue followed by a merge are the same commit to GitHub: each moves `main` from outside the queue, which rebuilds every entry already in it and orphans the run each was halfway through. It also leaves no merge-group run for `build.yml`'s `already-checked` gate to find, so it pays a full `check` on `main` of its own — thirteen minutes, after the ones it just threw away.
 
-A change too small for a ticket takes the lane rather than the bypass, from a tree standing on `main`:
+A change too small for a ticket takes the lane rather than the bypass, from the main checkout or a worktree of it, with the change still uncommitted:
 
 ```
 pnpm land --message "The issue tracker's note says how a moved ref is pushed to origin"
 ```
 
 It names a branch from the message, commits the working tree over `origin/main`'s head, pushes, opens the pull request with `gh pr create --fill`, arms the merge, and prints the pull request number with the queue state read back. `--message` takes the whole message — the first line the subject, the rest the body — and `--fill` makes the title the subject and the pull request's body the body.
+
+Where it runs from is a question about commits, not about branch names: it fetches `origin/main` first and takes any head that is that commit or an older one of it, whatever the branch is called and whether or not one is checked out at all. A worktree, which git will never let stand on `main`, lands from there like the main checkout does; a head behind `origin/main` lands on the newer base, since the branch is cut from the fetched head and the working tree's changes come with it. What it refuses is a head carrying commits `origin/main` has not, naming how many: those are a branch's already and belong in a pull request of their own.
+
+Under `.claude/` and `.scratch/` the line runs between what git tracks and what it does not. A tracked file there is this repository's content — the hooks, the agents, the two skills `.gitignore` re-includes — and lands like any other path; an untracked one is the session's own state and is refused, naming it.
 
 ### The prose shape
 

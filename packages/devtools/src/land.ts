@@ -15,7 +15,10 @@ const SLUG_WORDS = 5;
 const SUBJECT_CEILING = 72;
 const BASE = "main";
 
+// The repository tracks content of its own under these — hooks, agents, two skills — so only
+// what git has never seen is a session's.
 const KEPT_BY_THE_SESSION = [".claude/", ".scratch/"];
+const UNTRACKED = "??";
 
 const CONVENTIONAL_LABEL = /^[a-z]+(\([^)]*\))?!?:/;
 const TICKET_ANYWHERE = /\bT-\d+\b/;
@@ -40,6 +43,8 @@ const say = (line: string): void => {
 const complain = (line: string): void => {
   process.stderr.write(`land: ${line}\n`);
 };
+
+const commitsWord = (count: string): string => (count === "1" ? "1 commit" : `${count} commits`);
 
 const wordsOf = (subject: string): readonly string[] =>
   subject.split(/\s+/).filter((word) => word.length > 0);
@@ -98,7 +103,9 @@ const runInOrder = (steps: readonly Step[]): boolean => {
   return true;
 };
 
-const pathsIn = (porcelain: string): readonly string[] =>
+type Change = { readonly untracked: boolean; readonly path: string };
+
+const changesIn = (porcelain: string): readonly Change[] =>
   porcelain
     .split("\n")
     .filter((line) => line.length > 3)
@@ -106,7 +113,10 @@ const pathsIn = (porcelain: string): readonly string[] =>
       const named = line.slice(3);
       const renamed = named.lastIndexOf(" -> ");
       const one = renamed === -1 ? named : named.slice(renamed + 4);
-      return one.startsWith('"') && one.endsWith('"') ? one.slice(1, -1) : one;
+      return {
+        untracked: line.slice(0, 2) === UNTRACKED,
+        path: one.startsWith('"') && one.endsWith('"') ? one.slice(1, -1) : one,
+      };
     });
 
 type OpenNumbers = { readonly open: readonly number[] } | { readonly unreadable: string };
@@ -196,12 +206,14 @@ export const land = (argv: readonly string[]): number => {
     return 2;
   }
 
-  const head = runOrComplain("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
-  if (head === undefined) return 1;
-  const standing = head.out.trim();
-  if (standing !== BASE) {
+  // Fetched here rather than beside the switch: what HEAD carries is measured against
+  // origin's head, which no branch name could stand in for.
+  if (runOrComplain("git", ["fetch", "origin", BASE]) === undefined) return 1;
+  if (run("git", ["merge-base", "--is-ancestor", "HEAD", "FETCH_HEAD"]).status !== 0) {
+    const counted = runOrComplain("git", ["rev-list", "--count", "FETCH_HEAD..HEAD"]);
+    if (counted === undefined) return 1;
     complain(
-      `the tree stands on ${standing}; land takes a change that sits on ${BASE}, so the branch it makes carries this change and nothing else`,
+      `HEAD carries ${commitsWord(counted.out.trim())} that origin/${BASE} has not; land takes an uncommitted change, so the branch it makes carries this change and nothing else`,
     );
     return 2;
   }
@@ -210,18 +222,22 @@ export const land = (argv: readonly string[]): number => {
   // can neither show nor keep out.
   const working = runOrComplain("git", ["status", "--porcelain", "--untracked-files=all"]);
   if (working === undefined) return 1;
-  const paths = pathsIn(working.out);
-  if (paths.length === 0) {
+  const changes = changesIn(working.out);
+  if (changes.length === 0) {
     complain("nothing to commit; the working tree is clean");
     return 2;
   }
-  const kept = paths.filter((one) => KEPT_BY_THE_SESSION.some((under) => one.startsWith(under)));
+  const kept = changes.filter(
+    (one) => one.untracked && KEPT_BY_THE_SESSION.some((under) => one.path.startsWith(under)),
+  );
   if (kept.length > 0) {
-    complain(`a session keeps these to itself and they never land: ${kept.join(", ")}`);
+    complain(
+      `a session keeps these to itself and they never land: ${kept.map((one) => one.path).join(", ")}`,
+    );
     return 2;
   }
-  say(`landing ${String(paths.length)} paths on a branch named ${branch}:`);
-  for (const one of paths) say(`  ${one}`);
+  say(`landing ${String(changes.length)} paths on a branch named ${branch}:`);
+  for (const one of changes) say(`  ${one.path}`);
 
   if (run("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`]).status === 0) {
     complain(`branch ${branch} already stands here; delete it, or say it in other words`);
@@ -251,9 +267,14 @@ export const land = (argv: readonly string[]): number => {
     return 2;
   }
 
+  const switched = run("git", ["switch", "-c", branch, "FETCH_HEAD"]);
+  if (switched.status !== 0) {
+    complain(
+      `the working tree's changes could not be carried onto origin/${BASE}'s head:\n${switched.out}${switched.err}commit them, move them aside, or bring this tree up to date with origin/${BASE} first`,
+    );
+    return 1;
+  }
   const went = runInOrder([
-    ["git", "fetch", "origin", BASE],
-    ["git", "switch", "-c", branch, "FETCH_HEAD"],
     ["git", "add", "-A"],
     ["git", "commit", "-m", message],
     ["git", "push", "-u", "origin", branch],
