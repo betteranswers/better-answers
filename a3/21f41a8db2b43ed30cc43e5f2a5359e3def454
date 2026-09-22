@@ -1,0 +1,40 @@
+apps/worker/tests/test_tier_contract.py
+  s_7f9d314902ff79::t_93a2fcc3c21628 12
+contracts/manifest.json
+  s_7f9d314902ff79::t_25a1a864bbbba8 28-29
+  s_7f9d314902ff79::t_7f2317acbd3898 2
+docs/adr/0031-the-tier-contract-is-six-agreements-in-three-forms-fixtured-in-one-language-neutral-directory-both-suites-read.md
+  s_7f9d314902ff79::t_661ce122c6af3c 77-85
+contracts/cost-ledger/rows.json
+  s_7f9d314902ff79::t_8602e8b3d1ebdd 1,3-19,29-32,36-45,47-103,105-128
+  s_7f9d314902ff79::t_4d2e068e10d487 2,20,33-35,46,104,129
+packages/core/test/contract-fixture.ts
+  s_7f9d314902ff79::t_d01fd30dd782eb 10,12
+apps/worker/tests/test_cost_ledger_contract.py
+  s_7f9d314902ff79::t_4ce69fa567ce42 1-108
+packages/core/test/tier-contract.test.ts
+  s_7f9d314902ff79::t_990628674c785e 25
+packages/core/test/cost-ledger.contract.test.ts
+  s_7f9d314902ff79::t_235f6792a4c022 28
+  s_7f9d314902ff79::t_9c8c007f71ef00 1-27,29-66,71-74,79,82-83
+  s_7f9d314902ff79::t_23caed0883d953 67
+  s_7f9d314902ff79::t_a6937d6dd4ce36 75-78,80-81
+docs/adr/README.md
+  s_7f9d314902ff79::t_ee7f1ee905464b 41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a321f41a8db2b43ed30cc43e5f2a5359e3def454",
+  "prompts": {},
+  "sessions": {
+    "s_7f9d314902ff79": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba770256-7145-4f54-b83c-479953d54d3d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": null
+    }
+  }
+}
