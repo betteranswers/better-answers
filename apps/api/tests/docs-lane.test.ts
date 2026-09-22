@@ -5,6 +5,14 @@ import path from "node:path";
 import { parse } from "yaml";
 import { describe, expect, it } from "vitest";
 
+import {
+  gatesNamed,
+  gatesUnder,
+  rootScripts,
+  workspacesGated,
+  workspacesChecked,
+} from "./workspaces.ts";
+
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 
 const read = (relative: string): string =>
@@ -143,30 +151,19 @@ const PROSE_SUITES: readonly ProseSuite[] = [
   },
 ];
 
-const manifest = (): Readonly<Record<string, string>> => {
-  const parsed: unknown = JSON.parse(read("package.json"));
-  expect(typeof parsed, "the root package.json is not an object").toBe("object");
-  return (parsed as { readonly scripts?: Readonly<Record<string, string>> }).scripts ?? {};
-};
-
-const stepsOf = (script: string): readonly string[] =>
-  (/^node\s+scripts\/check\.mjs\s+(?<steps>.+)$/.exec(script)?.groups?.["steps"] ?? "")
-    .split(/\s+/)
-    .filter((step) => step.length > 0);
-
 describe("what the docs lane runs (the process review, 21/09/2026)", () => {
   it("runs its steps through the same runner the root check does, so one run names them all", () => {
-    const steps = stepsOf(manifest()["check:docs"] ?? "");
+    const steps = gatesNamed(rootScripts()["check:docs"] ?? "");
 
     expect(steps.length, "the root check:docs does not call the runner").toBeGreaterThan(1);
     expect(steps).toContain("format:check");
-    expect(steps.filter((step) => manifest()[step] === undefined)).toEqual([]);
+    expect(steps.filter((step) => rootScripts()[step] === undefined)).toEqual([]);
   });
 
   it("runs every prose suite this table puts in it, and runs no suite it does not", () => {
-    const lane = manifest()["check:docs"] ?? "";
-    const commands = stepsOf(lane)
-      .map((step) => manifest()[step] ?? "")
+    const lane = rootScripts()["check:docs"] ?? "";
+    const commands = gatesNamed(lane)
+      .map((step) => rootScripts()[step] ?? "")
       .join("\n");
     const named = (suite: ProseSuite): boolean => commands.includes(path.basename(suite.file));
 
@@ -189,7 +186,7 @@ describe("what the docs lane runs (the process review, 21/09/2026)", () => {
       (suite) => !existsSync(path.join(repositoryRoot, suite.file)),
     ).map((suite) => suite.file);
     const unrunnable = PROSE_SUITES.flatMap((suite) =>
-      typeof suite.inTheLane === "string" && manifest()[suite.inTheLane] === undefined
+      typeof suite.inTheLane === "string" && rootScripts()[suite.inTheLane] === undefined
         ? [`${suite.file} is run by ${suite.inTheLane}`]
         : [],
     );
@@ -207,22 +204,21 @@ type Step = {
   readonly if?: string;
   readonly uses?: string;
   readonly run?: string;
+  readonly env?: Readonly<Record<string, string>>;
+};
+
+type Job = {
+  readonly if?: string;
+  readonly needs?: string | readonly string[];
+  readonly permissions?: Readonly<Record<string, string>>;
+  readonly outputs?: Readonly<Record<string, string>>;
+  readonly steps?: readonly Step[];
 };
 
 type Workflow = {
   readonly on: Readonly<Record<string, unknown>>;
   readonly concurrency: { readonly group: string; readonly "cancel-in-progress": string };
-  readonly jobs: Readonly<
-    Record<
-      string,
-      {
-        readonly if?: string;
-        readonly needs?: string | readonly string[];
-        readonly permissions?: Readonly<Record<string, string>>;
-        readonly steps?: readonly Step[];
-      }
-    >
-  >;
+  readonly jobs: Readonly<Record<string, Job>>;
 };
 
 const workflow = (name: string): Workflow =>
@@ -230,8 +226,31 @@ const workflow = (name: string): Workflow =>
 
 const conditionOf = (step: Step): string => step.if ?? "";
 
-const FULL_LANE = "steps.lane.outputs.lane == 'full'";
-const DOCS_LANE = "steps.lane.outputs.lane == 'docs'";
+const LANE = "lane";
+
+// The branch ruleset's required context, and the job build.yml's `image` waits on.
+const FAN_IN = "check";
+
+const checkJobs = (): Readonly<Record<string, Job>> => workflow("check.yml").jobs;
+
+// The fan-in reads the prefix to decide what it requires, so it is load-bearing, not tidiness.
+const legsOf = (lane: string): readonly string[] =>
+  Object.keys(checkJobs()).filter((job) => job.startsWith(`${lane}-`));
+
+const stepsOfJob = (job: string): readonly Step[] => checkJobs()[job]?.steps ?? [];
+
+const toolOf = (step: Step): string => step.uses ?? step.run ?? "";
+
+const gatesOf = (job: string): readonly string[] =>
+  stepsOfJob(job).flatMap((step) => gatesUnder(step.run ?? ""));
+
+// One step cannot run on four legs, so the legs run these narrowings and this folds them back.
+const NARROWED: Readonly<Record<string, readonly string[]>> = {
+  "check:workspaces": ["check:libraries", "check:api", "check:web"],
+};
+
+const wholeGateOf = (gate: string): string =>
+  Object.entries(NARROWED).find(([, parts]) => parts.includes(gate))?.[0] ?? gate;
 
 describe("the lane inside check.yml (the process review, 21/09/2026)", () => {
   it("reports on the merge queue's own ref, under the job name the ruleset requires", () => {
@@ -239,7 +258,7 @@ describe("the lane inside check.yml (the process review, 21/09/2026)", () => {
 
     expect(Object.keys(check.on)).toContain("merge_group");
     expect(Object.keys(check.on)).toContain("pull_request");
-    expect(Object.keys(check.jobs)).toEqual(["check"]);
+    expect(Object.keys(check.jobs)).toContain(FAN_IN);
   });
 
   it("asks one question about cancelling, so a new event is never cancelled by accident", () => {
@@ -252,12 +271,19 @@ describe("the lane inside check.yml (the process review, 21/09/2026)", () => {
     );
   });
 
-  it("decides the lane before it installs anything, and from the base its event carries", () => {
-    const steps = workflow("check.yml").jobs["check"]?.steps ?? [];
-    const laneAt = steps.findIndex((step) => step.id === "lane");
-    const decided = steps[laneAt]?.run ?? "";
+  it("decides the lane once, in a job that installs nothing, and hands it to the legs", () => {
+    const decider = checkJobs()[LANE];
+    const steps = decider?.steps ?? [];
+    const decided = steps.find((step) => step.id === LANE)?.run ?? "";
 
-    expect(laneAt).toBeGreaterThan(-1);
+    expect(decider?.outputs).toEqual({ lane: `\${{ steps.${LANE}.outputs.lane }}` });
+    expect(steps.map(toolOf).filter((tool) => tool.startsWith("actions/checkout@"))).toHaveLength(
+      1,
+    );
+    expect(
+      steps.map(toolOf).filter((tool) => tool.includes("setup") || tool.includes("install")),
+      "the lane job installs a toolchain every leg then installs again",
+    ).toEqual([]);
 
     expect(decided).toContain("pull_request) base=");
     expect(decided).toContain("merge_group) base=");
@@ -268,47 +294,196 @@ describe("the lane inside check.yml (the process review, 21/09/2026)", () => {
     expect(decided).toContain(LANE_SCRIPT);
 
     expect(decided).toContain("git diff -z --name-only --no-renames");
-
-    const gated = steps.flatMap((step, at) => (conditionOf(step) === "" ? [] : [at]));
-    expect(Math.min(...gated)).toBeGreaterThan(laneAt);
   });
 
-  it("gives the docs lane its gates and none of the setup no prose gate can use", () => {
-    const steps = workflow("check.yml").jobs["check"]?.steps ?? [];
-    const named = (fragment: string): Step | undefined =>
-      steps.find((step) => (step.uses ?? "").startsWith(fragment) || (step.run ?? "") === fragment);
+  it("names every leg for the lane it runs on, which is the condition it runs on", () => {
+    const legs = Object.entries(checkJobs()).filter(([job]) => job !== LANE && job !== FAN_IN);
 
+    expect(legs.map(([job]) => job)).toEqual([...legsOf("docs"), ...legsOf("full")]);
+    for (const [job, leg] of legs) {
+      const lane = job.slice(0, job.indexOf("-"));
+
+      expect(
+        leg.if,
+        `${job} runs on a condition its name does not say, so the fan-in requires the wrong thing of it`,
+      ).toEqual(`\${{ needs.${LANE}.outputs.lane == '${lane}' }}`);
+      expect(leg.needs).toEqual(LANE);
+    }
+  });
+
+  it("gives the docs lane one job, and none of the setup no prose gate can use", () => {
+    const tools = legsOf("docs").flatMap((job) => stepsOfJob(job).map(toolOf));
+
+    expect(legsOf("docs")).toHaveLength(1);
     for (const setup of [
       "astral-sh/setup-uv@",
       "actions/cache@",
       "./.github/actions/git-filter-repo",
       "docker/setup-buildx-action@",
       "crazy-max/ghaction-github-runtime@",
+      "playwright install",
     ]) {
-      expect(conditionOf(named(setup) ?? {}), `${setup} runs in the docs lane too`).toEqual(
-        FULL_LANE,
-      );
+      expect(
+        tools.filter((tool) => tool.includes(setup)),
+        `${setup} runs in the docs lane too`,
+      ).toEqual([]);
     }
-    expect(
-      conditionOf(
-        named("pnpm --filter @better-answers/web exec playwright install --with-deps chromium") ??
-          {},
-      ),
-    ).toEqual(FULL_LANE);
+    expect(tools).toContain("pnpm check:docs");
+  });
+});
 
-    expect(conditionOf(named("pnpm check") ?? {})).toEqual(FULL_LANE);
-    expect(conditionOf(named("pnpm check:docs") ?? {})).toEqual(DOCS_LANE);
+type Setup = {
+  readonly tool: string;
+
+  readonly onlyOn: readonly string[];
+
+  readonly because: string;
+};
+
+const SETUP: readonly Setup[] = [
+  {
+    tool: "pnpm install --frozen-lockfile",
+    onlyOn: ["docs-gates", "full-root", "full-api", "full-web"],
+    because:
+      "every leg that runs a pnpm workspace's own gates needs the tree installed; the worker's gates are uv's and it only spawns the runner",
+  },
+  {
+    tool: "astral-sh/setup-uv@",
+    onlyOn: ["full-root", "full-api", "full-worker"],
+    because:
+      "the worker's gates are uv's, packages/devtools runs ruff and mypy out of the same environment, and the api's hook suite asks the binary itself whether it is there",
+  },
+  {
+    tool: "actions/cache@",
+    onlyOn: ["full-worker"],
+    because: "the only cache with a key here is the redaction detector's weights",
+  },
+  {
+    tool: "./.github/actions/git-filter-repo",
+    onlyOn: ["full-root", "full-api"],
+    because:
+      "both legs reach the erasure routine's git step — packages/core through the erasure suite, apps/api through the rehearsal's phase two — and ubuntu-latest carries no such tool",
+  },
+  {
+    tool: "playwright install",
+    onlyOn: ["full-web"],
+    because: "the browser suite over the served build is the SPA's last gate and no other leg's",
+  },
+  {
+    tool: "docker/setup-buildx-action@",
+    onlyOn: ["full-api", "full-worker"],
+    because:
+      "the daemon's own driver cannot import a type=gha cache, so a leg that builds an image without this builder is green and cold",
+  },
+  {
+    tool: "crazy-max/ghaction-github-runtime@",
+    onlyOn: ["full-api", "full-worker"],
+    because:
+      "a runner hands the ACTIONS_* variables to an action and to no run: step, so the builds those legs run from inside a suite cannot reach the cache without it",
+  },
+];
+
+describe("what each leg of check.yml installs (T-333)", () => {
+  it("installs on a leg what that leg runs, and on no leg that does not run it", () => {
+    for (const { tool, onlyOn, because } of SETUP) {
+      const where = Object.keys(checkJobs()).filter((job) =>
+        stepsOfJob(job).some((step) => toolOf(step).includes(tool)),
+      );
+
+      expect(where, `${tool}: ${because}`).toEqual([...onlyOn]);
+    }
   });
 
-  it("installs the node side for both lanes, because the docs lane runs vitest too", () => {
-    const steps = workflow("check.yml").jobs["check"]?.steps ?? [];
-    const unconditional = steps
-      .filter((step) => conditionOf(step) === "")
-      .map((step) => step.uses ?? step.run ?? step.id ?? "");
+  it("names a leg that exists for every tool, so an empty read would show", () => {
+    const legs = Object.keys(checkJobs());
 
-    expect(unconditional.some((step) => step.startsWith("actions/checkout@"))).toBe(true);
-    expect(unconditional.some((step) => step.startsWith("actions/setup-node@"))).toBe(true);
-    expect(unconditional).toContain("pnpm install --frozen-lockfile");
+    expect(SETUP.flatMap((setup) => setup.onlyOn).filter((job) => !legs.includes(job))).toEqual([]);
+    expect(SETUP.length, "a row left this table without the leg that stopped needing it").toBe(7);
+  });
+});
+
+describe("the legs of check.yml against the one list of gates (T-333)", () => {
+  it("runs, across its legs, every gate the root check names and no gate it does not", () => {
+    const ran: string[] = [];
+    for (const gate of legsOf("full").flatMap(gatesOf)) {
+      const whole = wholeGateOf(gate);
+      if (!ran.includes(whole)) ran.push(whole);
+    }
+
+    expect(
+      ran,
+      "the legs and the root check have stopped naming the same gates. Add the gate to a leg, or narrow it in NARROWED.",
+    ).toEqual(gatesNamed(rootScripts()["check"] ?? ""));
+  });
+
+  it("runs each gate on one leg, so no run pays for a gate twice", () => {
+    const ran = legsOf("full").flatMap(gatesOf);
+
+    expect(ran.filter((gate, at) => ran.indexOf(gate) !== at)).toEqual([]);
+    expect(ran.filter((gate) => rootScripts()[gate] === undefined)).toEqual([]);
+  });
+
+  it("narrows a whole step only into root scripts the legs run", () => {
+    const ran = legsOf("full").flatMap(gatesOf);
+
+    for (const [whole, parts] of Object.entries(NARROWED)) {
+      expect(rootScripts()[whole], `${whole} is not a root script`).toBeDefined();
+      expect(parts.filter((part) => rootScripts()[part] === undefined)).toEqual([]);
+      expect(
+        parts.filter((part) => !ran.includes(part)),
+        `${whole} is narrowed past the legs`,
+      ).toEqual([]);
+    }
+  });
+
+  it("selects, between the narrowings of check:workspaces, every workspace it gates", () => {
+    const selected = Object.values(NARROWED)
+      .flat()
+      .flatMap((part) => workspacesChecked(rootScripts()[part] ?? ""));
+
+    expect(
+      [...selected].sort(),
+      "a workspace with a check script is on no leg, or is on two. The legs run check:workspaces between them or they do not run it at all.",
+    ).toEqual([...workspacesGated()].sort());
+  });
+});
+
+describe("the one verdict check.yml reports (T-333)", () => {
+  it("hangs the required context off every leg, and reports whatever they did", () => {
+    const jobs = Object.keys(checkJobs());
+    const fanIn = checkJobs()[FAN_IN];
+
+    expect(jobs.at(-1), "the fan-in is not the last job, so a leg was added after it").toEqual(
+      FAN_IN,
+    );
+    expect(fanIn?.needs).toEqual(jobs.filter((job) => job !== FAN_IN));
+    expect(
+      fanIn?.if,
+      "under anything narrower than always() a failed leg leaves the required context skipped, which never reports",
+    ).toEqual("${{ always() }}");
+  });
+
+  it("wants a success from this lane's legs and a skip from every other", () => {
+    const steps = stepsOfJob(FAN_IN);
+    const verdict = steps.map((step) => step.run ?? "").join("\n");
+    const read = steps.flatMap((step) => Object.values(step.env ?? {}));
+
+    expect(read).toContain(`\${{ needs.${LANE}.outputs.lane }}`);
+    expect(read).toContain("${{ toJSON(needs) }}");
+
+    expect(verdict).toContain(`${LANE}) wanted=success ;;`);
+    expect(verdict).toContain('"${LANE}-"*) wanted=success; required=$((required + 1)) ;;');
+    expect(verdict).toContain("*) wanted=skipped ;;");
+    expect(
+      verdict,
+      "the verdict can require nothing of anybody and still pass, which is a green check that read no leg",
+    ).toContain('[ "${required}" -lt 1 ]');
+    expect(verdict).toContain("exit 1");
+
+    expect(
+      verdict,
+      "the verdict splices a context into the shell rather than reading it from the environment",
+    ).not.toContain("${{");
   });
 });
 

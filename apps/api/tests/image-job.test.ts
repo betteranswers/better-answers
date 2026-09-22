@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -9,8 +11,10 @@ import {
   matrixLegs,
   PROBE_DEFERRAL_VARIABLE,
   readWorkflow,
+  repositoryRoot,
   workflowStepSchema,
 } from "./image-probe.ts";
+import { gatesUnder, rootScripts, workspacesChecked } from "./workspaces.ts";
 
 const checkWorkflowSchema = z.object({
   concurrency: z.object({ group: z.string() }),
@@ -19,10 +23,41 @@ const checkWorkflowSchema = z.object({
       inputs: z.record(z.string(), z.record(z.string(), z.unknown())),
     }),
   }),
-  jobs: z.object({ check: z.object({ steps: z.array(workflowStepSchema) }) }),
+  jobs: z.record(z.string(), z.object({ steps: z.array(workflowStepSchema).optional() })),
 });
 
 const checkWorkflow = () => readWorkflow("check.yml", checkWorkflowSchema);
+
+const checkLegs = (): readonly (readonly [string, readonly ImageStep[]])[] =>
+  Object.entries(checkWorkflow().jobs).map(([job, leg]) => [job, leg.steps ?? []] as const);
+
+const deferralAt = (steps: readonly ImageStep[]): number =>
+  steps.findIndex((step) => step.env?.[PROBE_DEFERRAL_VARIABLE] !== undefined);
+
+const legsCarryingTheDeferral = (): readonly string[] =>
+  checkLegs().flatMap(([job, steps]) => (deferralAt(steps) === -1 ? [] : [job]));
+
+// Tracked files only, which is what a leg would have checked out.
+const workspacesReadingTheDeferral = (): ReadonlySet<string> => {
+  const found = spawnSync(
+    "git",
+    ["grep", "-l", "-F", PROBE_DEFERRAL_VARIABLE, "--", "apps", "packages"],
+    { cwd: repositoryRoot, encoding: "utf8" },
+  );
+
+  expect(found.status, `git grep ended non-zero: ${found.stderr}`).toBe(0);
+  return new Set(
+    found.stdout
+      .split("\n")
+      .filter((file) => file !== "")
+      .map((file) => file.split("/").slice(0, 2).join("/")),
+  );
+};
+
+const workspacesUnder = (steps: readonly ImageStep[]): readonly string[] =>
+  steps.flatMap((step) =>
+    gatesUnder(step.run ?? "").flatMap((gate) => workspacesChecked(rootScripts()[gate] ?? "")),
+  );
 
 const input = (step: ImageStep, name: string): string => {
   const value = step.with?.[name];
@@ -182,30 +217,56 @@ describe("the job that probes every image it pushes", () => {
 
   it("stands the probes down only where the caller of `check.yml` probes the images itself", () => {
     const check = checkWorkflow();
-    const deferring = check.jobs.check.steps.find(
-      (step) => step.env?.[PROBE_DEFERRAL_VARIABLE] !== undefined,
+    const named = new Set(
+      checkLegs()
+        .flatMap(([, steps]) => steps)
+        .flatMap(
+          (step) =>
+            /^\$\{\{\s*inputs\.([\w-]+)\s*\}\}$/.exec(
+              step.env?.[PROBE_DEFERRAL_VARIABLE] ?? "",
+            )?.[1] ?? [],
+        ),
     );
-    const named = /^\$\{\{\s*inputs\.([\w-]+)\s*\}\}$/.exec(
-      deferring?.env?.[PROBE_DEFERRAL_VARIABLE] ?? "",
-    )?.[1];
+    const [only] = named;
 
-    expect(named).toBeDefined();
-    expect(check.on.workflow_call.inputs[named ?? ""]?.["default"]).toBe(false);
-    expect(buildWorkflow().jobs.check.with?.[named ?? ""]).toBe(true);
+    expect(named.size, "the legs read the deferral out of two different inputs").toBe(1);
+    expect(check.on.workflow_call.inputs[only ?? ""]?.["default"]).toBe(false);
+    expect(buildWorkflow().jobs.check.with?.[only ?? ""]).toBe(true);
   });
 
-  it("gives the job that runs `check` a builder and the cache credentials first", () => {
-    const steps = checkWorkflow().jobs.check.steps;
-    const at = (action: string): number => steps.findIndex((step) => runs(step, action));
-    const builderAt = at("docker/setup-buildx-action");
-    const credentialsAt = at("crazy-max/ghaction-github-runtime");
-    const checkedAt = steps.findIndex((step) => (step.run ?? "").includes("pnpm check"));
+  it("hands the deferral to every leg whose suites read it, and to no leg that runs none", () => {
+    const reading = workspacesReadingTheDeferral();
+    const wanted = checkLegs().flatMap(([job, steps]) =>
+      workspacesUnder(steps).some((workspace) => reading.has(workspace)) ? [job] : [],
+    );
 
-    expect(checkedAt).toBeGreaterThan(-1);
-    expect(builderAt).toBeGreaterThan(-1);
-    expect(credentialsAt).toBeGreaterThan(-1);
-    expect(checkedAt).toBeGreaterThan(builderAt);
-    expect(checkedAt).toBeGreaterThan(credentialsAt);
+    expect(reading.size, "the workspaces that read the deferral are apps/api and apps/worker").toBe(
+      2,
+    );
+    expect(
+      legsCarryingTheDeferral(),
+      "a leg runs an image-contents suite it never tells to stand down, or is told and runs none",
+    ).toEqual(wanted);
+  });
+
+  it("gives every leg that builds an image a builder and the cache credentials first", () => {
+    const building = checkLegs().filter(([job]) => legsCarryingTheDeferral().includes(job));
+
+    expect(building.length, "the legs of check.yml that build an image are two").toBe(2);
+    for (const [job, steps] of building) {
+      const at = (action: string): number => steps.findIndex((step) => runs(step, action));
+
+      expect(
+        at("docker/setup-buildx-action"),
+        `${job} builds cold: no container builder`,
+      ).toBeGreaterThan(-1);
+      expect(
+        at("crazy-max/ghaction-github-runtime"),
+        `${job} builds cold: a run: step cannot reach the cache without the runtime variables`,
+      ).toBeGreaterThan(-1);
+      expect(deferralAt(steps)).toBeGreaterThan(at("docker/setup-buildx-action"));
+      expect(deferralAt(steps)).toBeGreaterThan(at("crazy-max/ghaction-github-runtime"));
+    }
   });
 
   it("loads before it probes and pushes after, never the other way round", () => {
