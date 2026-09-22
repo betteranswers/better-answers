@@ -1,0 +1,117 @@
+packages/core/package.json
+  s_b295c29256691c::t_e7feab1d3afd7d 39
+apps/api/tests/ops.test.ts
+  s_b295c29256691c::t_27648bc1fa512e 381
+  s_b295c29256691c::t_6653bdf0e4d9a1 927-972,983-1012,1021,1023-1089,1099,1103-1172,1179-1247,1249-1251,1253-1285,1295-1305,1314-1321
+  s_b295c29256691c::t_6ab6e67b60901f 973-982,1173-1178,1248,1286-1294,1306-1313
+  s_b295c29256691c::t_4d0fa43d19608c 4,11,20,22,28
+  s_b295c29256691c::t_cfb95c04acc556 1252
+  s_b295c29256691c::t_3a6542c7bf5359 1090,1093-1098,1101-1102
+  s_b295c29256691c::t_ec2614e89b069f 1091-1092,1100
+  s_b295c29256691c::t_662e1f0f45b720 1013-1020,1022
+docs/operations/RUNBOOK.md
+  s_b295c29256691c::t_ba582ce017026e 1
+  s_b295c29256691c::t_9c890090f30bdb 115-122
+apps/api/tests/fixtures/bundle/product/answers/can-two-teams-share-one-account-advanced-plan.md
+  s_b295c29256691c::t_1097e31c1a3b96 1-20
+packages/core/test/import-bundle.test.ts
+  s_b295c29256691c::t_a4ebf68c6e4c87 410-412,416-421
+  s_b295c29256691c::t_72c0ec9c702792 1-78,81-168,175,186-187,189-191,198-282,289-409,422-463,466-491,493-543,545-548,552-566,570-657,663-678,680-694,696-702,704-756
+  s_b295c29256691c::t_1bd54ac0c3cc28 413-415
+  s_b295c29256691c::t_7730267c3782f0 492
+  s_b295c29256691c::t_6ab6e67b60901f 79-80,283-288,464-465,549-551,658-662
+  s_b295c29256691c::t_005245feb5d157 544
+  s_b295c29256691c::t_0659dea7ff5826 679,695,703
+  s_b295c29256691c::t_22367879349e13 169-174,176-185,188
+  s_b295c29256691c::t_c99841e9ee95dc 192-197
+  s_b295c29256691c::t_69570a1399fa5c 567-569
+apps/api/src/ops.ts
+  s_b295c29256691c::t_b787f1c4d29e30 11
+  s_b295c29256691c::t_1dd87fabbcd441 40-41
+apps/api/tests/fixtures/bundle/company/index.md
+  s_b295c29256691c::t_006573df1cf766 1-3
+packages/core/src/erasure/rehearsal.ts
+  s_b295c29256691c::t_e0941d4f429695 4
+  s_b295c29256691c::t_75cd1808f47b4d 164
+apps/api/tests/fixtures/bundle/product/tiers/standard-plan.md
+  s_b295c29256691c::t_acb68e3dd71c4c 1-18
+apps/api/tests/fixtures/bundle/product/tiers/advanced-plan.md
+  s_b295c29256691c::t_1201dd689ae554 1-18
+apps/api/tests/fixtures/bundle/product/answers/index.md
+  s_b295c29256691c::t_a8880e11cdcf39 1-4
+packages/core/src/concepts/reconciler.ts
+  s_b295c29256691c::t_f37d5b309164a0 42-49
+  s_b295c29256691c::t_18964f1be2c855 195
+apps/api/tests/fixtures/bundle/product/answers/can-two-teams-share-one-account-standard-plan.md
+  s_b295c29256691c::t_1d39c5e7409515 1-20
+apps/api/src/ops/index.ts
+  s_b295c29256691c::t_c29647dbefd553 122-125,135,138,142-149
+  s_b295c29256691c::t_d41d57328b5fee 346
+  s_b295c29256691c::t_c120ef07e825f6 477,479
+  s_b295c29256691c::t_5d2575eff69369 497
+  s_b295c29256691c::t_85babcfaa9dbc3 98
+  s_b295c29256691c::t_2cbc5d2e72d128 498-508,510-539,542-546,548-568,572-616
+  s_b295c29256691c::t_46c6e5c0204086 540-541,547
+  s_b295c29256691c::t_036705afae98e5 509
+  s_b295c29256691c::t_bec0fc74924cc7 6-7,11-13,22,31-32
+  s_b295c29256691c::t_220f537f7e5a05 53-54
+  s_b295c29256691c::t_6ab6e67b60901f 569-571
+apps/api/tests/fixtures/bundle/index.md
+  s_b295c29256691c::t_f5b205e04aa772 1-4
+apps/api/tests/fixtures/bundle/manifest.yaml
+  s_b295c29256691c::t_6696412cc774b3 1-5
+apps/api/tests/fixtures/bundle/log.md
+  s_b295c29256691c::t_5ab0753128ff5e 1-5
+packages/core/src/concepts/loader.ts
+  s_b295c29256691c::t_54c14d55ed6ab0 233-234
+  s_b295c29256691c::t_9be5f8cc677f31 205
+  s_b295c29256691c::t_8d7cbba83ffb80 68
+  s_b295c29256691c::t_21ef1dc64e3f40 8
+  s_b295c29256691c::t_2d76fc088690d2 114,121,124
+  s_b295c29256691c::t_6ab6e67b60901f 153-154,349-353
+  s_b295c29256691c::t_9a552ee07e7652 1-7,9-67,69-106,109-113,115-120,122-123,125-152,155-204,206-232,235-281,283-288,294-348,354-384
+  s_b295c29256691c::t_604cd8a3e24dbb 282,289-293
+  s_b295c29256691c::t_03237fda3d6bf4 107-108
+packages/core/src/workspaces/index.ts
+  s_b295c29256691c::t_83a92b74bb0567 286-310
+  s_b295c29256691c::t_5be3e619b6820f 7,18
+apps/api/tests/fixtures/bundle/company/answers/support-hours.md
+  s_b295c29256691c::t_5cf7d5658e1c21 1-18
+apps/api/tests/fixtures/bundle/product/index.md
+  s_b295c29256691c::t_7665a3e9e150f5 1-4
+packages/core/src/concepts/landing.ts
+  s_b295c29256691c::t_dd83e33a88dbdc 40-42
+apps/api/tests/fixtures/bundle/company/answers/data-retention-period.md
+  s_b295c29256691c::t_8ee97d69bd5023 1-23
+apps/api/tests/fixtures/bundle/product/tiers/index.md
+  s_b295c29256691c::t_a8948bf25ff810 1-4
+apps/api/src/ops/read-tree.ts
+  s_b295c29256691c::t_4935c842dcfab7 1-11,16-18
+  s_b295c29256691c::t_6ab6e67b60901f 12-15
+apps/api/tests/fixtures/bundle/company/answers/index.md
+  s_b295c29256691c::t_3debe72e9ba8bc 1-4
+packages/core/src/concepts/index.ts
+  s_b295c29256691c::t_adec7e8c920214 587
+  s_b295c29256691c::t_53029f7cc5012f 662
+  s_b295c29256691c::t_845a3939164094 9
+  s_b295c29256691c::t_95d2ce0eb3d575 712-715
+  s_b295c29256691c::t_8d3e6b1c9f8c46 101-107
+  s_b295c29256691c::t_2e0cc1d03525ad 3-4,8,17,31,36,44-49,67-82
+  s_b295c29256691c::t_83deda56566a47 584-586,588-661,663-711,716-797
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f269ffaad94f1e65acd79ed0d8f12ec9160d75a8",
+  "prompts": {},
+  "sessions": {
+    "s_b295c29256691c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8831497b-8f66-4ffd-b3a4-b608d198ea14",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
