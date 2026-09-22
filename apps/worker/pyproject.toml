@@ -108,7 +108,7 @@ dependencies = [
     # detector's under it — 50.0.1 is newest on PyPI, read 22/09/2026, and taking it is its own
     # deliberate act. Apache-2.0 under its dual licence, which is the arm this repository takes
     # (ADR 0027).
-    "cryptography==48.0.1",
+    "cryptography==50.0.0",
 ]
 
 [project.scripts]
