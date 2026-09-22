@@ -1,0 +1,20 @@
+docs/architecture/README.md
+  s_b979b383b8487b::t_d41c900ae80fa3 39
+  s_b979b383b8487b::t_d97312f458e239 42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "09568ed3dd90b248b05216aa32b04ccf6dfd4136",
+  "prompts": {},
+  "sessions": {
+    "s_b979b383b8487b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e61a5c8-13ae-4dc9-a43d-8d5569f4e2c6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
