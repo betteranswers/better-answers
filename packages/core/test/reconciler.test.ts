@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ulid } from "@better-answers/schema";
+import { conceptIriOf, ulid } from "@better-answers/schema";
 
 import {
   acceptSuggestions,
@@ -750,13 +750,20 @@ describe("a commit the rows cannot take", () => {
     const first = guideline("Fuel");
     const written = await landed(scenario, scenario.editor, first);
 
-    const clash = await writeConcept(
-      scenario.editor,
-      doorsOf(scenario),
-      guideline("Fuel again", { path: first.path, expects: { head: written.sha } }),
-    );
-    expect(clash).toEqual({ ok: false, error: "path-taken" });
-    const [, orphan = null] = await bundleHistory(scenario.git, scenario.workspaceId);
+    const clash = await commit(scenario.editor, scenario.git, {
+      path: first.path,
+      content: renderConceptFile(
+        { title: "Fuel again", type: "Guideline", iri: conceptIriOf(ulid()) },
+        first.body,
+      ),
+      message: "Record a second fuel guideline by hand",
+      author: first.author,
+      trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
+      expectedHead: written.sha,
+      at: new Date(),
+    });
+    expect(clash.ok).toBe(true);
+    const orphan = clash.ok ? clash.value.sha : null;
 
     const behind = await writeConcept(
       scenario.editor,

@@ -9,10 +9,12 @@ import {
   type BundleImported,
   type BundleTree,
   type ImportBundleInput,
+  type ImportProgress,
+  type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit } from "./bundle.ts";
-import { addressOf } from "./suite-postgres.ts";
+import { addressOf, holdingTable, isBlockedOnTable, until } from "./suite-postgres.ts";
 import { doorsOf, memberOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange } = suiteWithBundles();
@@ -297,7 +299,11 @@ const movedBetweenThePasses = async <T>(path: string, work: () => Promise<T>): P
   }
 };
 
-const standingConcept = (scenario: Scenario, mergeKey: string) =>
+const standingConcept = (
+  scenario: Scenario,
+  mergeKey: string,
+  overrides: Partial<WriteConceptInput> = {},
+) =>
   writeConcept(scenario.editor, doorsOf(scenario), {
     mergeKey,
     path: "knowledge/elsewhere.md",
@@ -308,7 +314,41 @@ const standingConcept = (scenario: Scenario, mergeKey: string) =>
     message: "Record a standing concept",
     author: { name: "Ada Editor", email: "ada@acme.invalid" },
     expects: { head: null },
+    ...overrides,
   });
+
+// Held at the manifest's row, the run has read the standing paths; the writer queues behind it
+// on the bundle's lock.
+const landedBetweenTheReadAndTheWrite = async (
+  scenario: Scenario,
+  path: string,
+  run: () => ReturnType<typeof importBundle>,
+) => {
+  let stopped: ReturnType<typeof importBundle> | undefined;
+  let landing: ReturnType<typeof writeConcept> | undefined;
+  await holdingTable(db().pool, "bundle_commit", async () => {
+    stopped = run();
+    await until(() => isBlockedOnTable(db().pool, "bundle_commit"));
+    landing = standingConcept(scenario, "Answer:landed elsewhere", {
+      path,
+      title: "Landed elsewhere",
+      frontmatter: { title: "Landed elsewhere", type: "Answer" },
+      body: "Landed by another writer.",
+      message: "Land a concept between the loader's read and its write",
+      expects: { base: null },
+    });
+  });
+  const other = await landing;
+  if (other === undefined || !other.ok) {
+    throw new Error(`the other writer was refused: ${String(other?.error)}`);
+  }
+  return { stopped: await stopped, other: other.value };
+};
+
+const stoppedAt = (file: string, reason: string, progress: ImportProgress) => ({
+  ok: false,
+  error: { kind: "stopped", file, reason, progress },
+});
 
 describe("importing the bundle", () => {
   it("lands the manifest first and every concept in path order through the governed write, each as its own commit", async () => {
@@ -524,13 +564,11 @@ describe("importing the bundle", () => {
 
     const stopped = await importing(scenario, scenario.editor, { tree: soundBundle(verifiers) });
 
-    expect(stopped).toEqual({
-      ok: false,
-      error: {
-        kind: "stopped",
-        file: "product/answers/can-two-teams-share-one-account-advanced-plan.md",
-        reason: "merge-key-taken",
-        progress: {
+    expect(stopped).toEqual(
+      stoppedAt(
+        "product/answers/can-two-teams-share-one-account-advanced-plan.md",
+        "merge-key-taken",
+        {
           landed: [
             "knowledge/company/answers/data-retention-period.md",
             "knowledge/company/answers/support-hours.md",
@@ -539,8 +577,8 @@ describe("importing the bundle", () => {
           checks: { recorded: 3, present: 0 },
           rewritten: [],
         },
-      },
-    });
+      ),
+    );
     expect(await rowsFor(scenario.workspaceId)).toEqual({
       concepts: "3",
       commits: "4",
@@ -582,6 +620,47 @@ describe("importing the bundle", () => {
       dryRun: false,
     });
     expect(await checkRows(scenario.workspaceId)).toHaveLength(7);
+  });
+
+  it("stops at the concept whose path another writer landed between the loader's read and its write, naming the file, with the head and the recorded commits where the refusal found them, and skips it on a rerun", async () => {
+    const { scenario, verifiers } = await arranged();
+
+    const { stopped, other } = await landedBetweenTheReadAndTheWrite(
+      scenario,
+      LINKED.supportHours,
+      () => importing(scenario, scenario.editor, { tree: soundBundle(verifiers) }),
+    );
+
+    expect(stopped).toEqual(
+      stoppedAt("company/answers/support-hours.md", "path-taken", {
+        landed: ["knowledge/company/answers/data-retention-period.md"],
+        skipped: [],
+        checks: { recorded: 2, present: 0 },
+        rewritten: [],
+      }),
+    );
+    const history = await bundleHistory(scenario.git, scenario.workspaceId);
+    expect(history).toHaveLength(3);
+    expect(history[1]).toBe(other.sha);
+    expect(await head(scenario.editor, scenario.git)).toBe(history[2]);
+    expect(await rowsFor(scenario.workspaceId)).toEqual({
+      concepts: "2",
+      commits: "3",
+      checks: "2",
+      events: "5",
+    });
+
+    const completed = await imported(scenario, soundBundle(verifiers));
+
+    expect(completed).toMatchObject({
+      landed: [
+        LINKED.advancedAnswer,
+        LINKED.standardAnswer,
+        LINKED.advancedTier,
+        LINKED.standardTier,
+      ],
+      skipped: ["knowledge/company/answers/data-retention-period.md", LINKED.supportHours],
+    });
   });
 
   it("reports what a run would do on a dry run and writes nothing", async () => {
@@ -683,20 +762,14 @@ describe("the second pass: every relative link becomes the iri of the concept it
       importing(scenario, scenario.editor, { tree: soundBundle(verifiers) }),
     );
 
-    expect(stopped).toEqual({
-      ok: false,
-      error: {
-        kind: "stopped",
-        file: "company/answers/support-hours.md",
-        reason: "stale-precondition",
-        progress: {
-          landed: PATHS_IN_ORDER,
-          skipped: [],
-          checks: { recorded: 7, present: 0 },
-          rewritten: [],
-        },
-      },
-    });
+    expect(stopped).toEqual(
+      stoppedAt("company/answers/support-hours.md", "stale-precondition", {
+        landed: PATHS_IN_ORDER,
+        skipped: [],
+        checks: { recorded: 7, present: 0 },
+        rewritten: [],
+      }),
+    );
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(7);
     const files = await filesAtHead(scenario);
     for (const { path } of REWRITTEN_IN_ORDER) expect(files.get(path)).toMatch(/\]\([^)]*\.md\)/);

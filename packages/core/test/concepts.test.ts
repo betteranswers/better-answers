@@ -877,6 +877,41 @@ describe("what a governed write refuses", () => {
     expect(await recordedCommits(scenario.workspaceId)).toHaveLength(1);
   });
 
+  it("refuses a path another concept holds before it commits, so the head and the recorded commits stay where they were and the next write lands", async () => {
+    const scenario = await arrange();
+    const first = writeFor();
+    const written = await landed(scenario, first);
+    const before = await rowsFor(scenario.workspaceId);
+
+    const refused = await write(
+      scenario,
+      scenario.editor,
+      writeFor({ path: first.path, expects: { head: written.sha } }),
+    );
+
+    expect(refused).toEqual({ ok: false, error: "path-taken" });
+    expect(await head(scenario.editor, scenario.git)).toBe(written.sha);
+    expect(await recordedCommits(scenario.workspaceId)).toEqual([written.sha]);
+    expect(await rowsFor(scenario.workspaceId)).toEqual(before);
+    const next = await landed(scenario, writeFor({ expects: { head: written.sha } }));
+    expect(await recordedCommits(scenario.workspaceId)).toEqual([written.sha, next.sha]);
+  });
+
+  it("holds a concept's own path for it, so a rewrite at that path is not the path being taken", async () => {
+    const scenario = await arrange();
+    const input = writeFor();
+    const first = await landed(scenario, input);
+
+    const rewritten = await write(
+      scenario,
+      scenario.editor,
+      rewriteOf(input, first, { body: "Expenses are claimed within sixty days." }),
+    );
+
+    expect(rewritten.ok).toBe(true);
+    expect(await recordedCommits(scenario.workspaceId)).toHaveLength(2);
+  });
+
   it("refuses a Viewer before anything is committed", async () => {
     const scenario = await arrange();
 
@@ -1288,22 +1323,32 @@ describe("a failure after the commit", () => {
     const scenario = await arrange();
     const first = writeFor();
     const written = await landed(scenario, first);
+    const forged = await commit(scenario.editor, scenario.git, {
+      path: first.path,
+      content: renderConceptFile({ title: "Expenses", type: "Policy", iri: iriFor() }, first.body),
+      message: "Record a second expenses policy by hand",
+      author: first.author,
+      trailers: { actor: `human:${scenario.editor.userId}`, audit: ulid() },
+      expectedHead: written.sha,
+      at: new Date(),
+    });
+    if (!forged.ok) throw new Error(`the forged commit was refused: ${String(forged.error)}`);
     const before = await rowsFor(scenario.workspaceId);
 
-    const clash = await write(
+    const behind = await write(
       scenario,
       scenario.editor,
-      writeFor({ path: first.path, expects: { head: written.sha } }),
+      writeFor({ expects: { head: forged.value.sha } }),
     );
 
     expect(await rowsFor(scenario.workspaceId)).toEqual(before);
 
     const history = await bundleHistory(scenario.git, scenario.workspaceId);
     const recorded = await recordedCommits(scenario.workspaceId);
-    expect(history).toHaveLength(2);
+    expect(history).toHaveLength(3);
     expect(recorded).toEqual([history[0]]);
-    expect(await head(scenario.editor, scenario.git)).toBe(history[1]);
-    expect(clash).toEqual({ ok: false, error: "path-taken" });
+    expect(await head(scenario.editor, scenario.git)).toBe(history[2]);
+    expect(behind).toEqual({ ok: false, error: expect.any(Error) });
   });
 });
 

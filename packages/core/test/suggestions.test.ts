@@ -743,8 +743,8 @@ describe("declining a suggestion", () => {
   });
 });
 
-describe("an acceptance whose transaction fails after it", () => {
-  it("leaves neither the concept, nor its ledger row, nor the suggestion decided", async () => {
+describe("an acceptance at a path another concept holds", () => {
+  it("is refused before a commit, and leaves neither the concept, nor its ledger row, nor the suggestion decided", async () => {
     const scenario = await arrange();
 
     const first = requestFor();
@@ -766,7 +766,7 @@ describe("an acceptance whose transaction fails after it", () => {
     });
     expect(outcomes.map(refusalOf)).toEqual([undefined, "path-taken"]);
 
-    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(2);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
   });
 });
 
