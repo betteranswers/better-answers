@@ -79,36 +79,6 @@ const GATES_PRINTING_A_TAG: readonly string[] = [
   "packages/devtools/src/insert-scan.ts",
 ];
 
-// Only files that carry one, so the list holds no slot a later citation could land in.
-const FROZEN: readonly string[] = [
-  "docs/specs/T-004.md",
-  "docs/specs/T-006.md",
-  "docs/specs/T-015.md",
-  "docs/specs/T-022.md",
-  "docs/specs/T-045.md",
-  "docs/specs/T-048.md",
-  "docs/specs/T-063.md",
-  "docs/specs/T-064.md",
-  "docs/specs/T-120.md",
-  "docs/specs/T-121.md",
-  "docs/specs/T-122.md",
-  "docs/specs/T-123.md",
-  "docs/specs/T-124.md",
-  "docs/specs/T-125.md",
-  "docs/specs/T-126.md",
-  "docs/specs/T-127.md",
-  "docs/specs/T-128.md",
-  "docs/specs/T-129.md",
-  "docs/specs/T-131.md",
-  "docs/specs/T-133.md",
-  "docs/specs/T-168.md",
-  "docs/specs/coding-rules-one-form-and-the-comment-strip.md",
-  "docs/specs/s0-redaction-seam-and-erasure.md",
-  "docs/specs/s1-acts-ahead-of-the-first-procedures.md",
-  "docs/specs/s1-one-uploaded-document-to-a-cited-passage.md",
-  "docs/specs/v01-route.md",
-];
-
 type Citation = {
   readonly file: string;
   readonly line: number;
@@ -142,9 +112,7 @@ const definedTags = (): ReadonlyMap<string, string> =>
 const cite = ({ file, line, tag }: Citation): string => `${file}:${line} cites [${tag}]`;
 
 const isAllowedCitation = ({ file, text, at }: Citation): boolean =>
-  isRulesFile(file) ||
-  FROZEN.includes(file) ||
-  (GATES_PRINTING_A_TAG.includes(file) && insideAString(text, at));
+  isRulesFile(file) || (GATES_PRINTING_A_TAG.includes(file) && insideAString(text, at));
 
 // The walk reads `git ls-files --others`, so a written file is seen as a committed one; the
 // `finally` keeps the next suite from reading it.
@@ -158,45 +126,67 @@ const whileAFileNamed = <T>(relative: string, contents: string, taken: () => T):
   }
 };
 
-const whileAFileHolds = <T>(contents: string, taken: () => T): T =>
-  whileAFileNamed("apps/api/tests/tag-location-proof.txt", contents, taken);
-
 const whileARulesFileHolds = <T>(contents: string, taken: () => T): T =>
   whileAFileNamed("apps/api/tests/CODING_RULES.md", contents, taken);
 
 const whileADocumentHolds = <T>(contents: string, taken: () => T): T =>
   whileAFileNamed("apps/api/tests/tag-definition-proof.md", contents, taken);
 
+const strayFiles = (): ReadonlySet<string> =>
+  new Set(
+    treeFiles()
+      .flatMap(citationsIn)
+      .filter((citation) => !isAllowedCitation(citation))
+      .map(({ file }) => file),
+  );
+
+const filesGoingStrayWhile = (relative: string, contents: string): readonly string[] => {
+  const before = strayFiles();
+  const after = whileAFileNamed(relative, contents, strayFiles);
+  return [...after].filter((file) => !before.has(file));
+};
+
+const aCitingLine = (tag: string): string =>
+  `A sentence that cites [${tag}] rather than the rule.\n`;
+
+// The rule names three places; a review finding is no file, so a walk of the tree sees two.
 describe("where a rule tag may be written", () => {
-  it("finds one only in a rules file, a gate's failure message, or a frozen document", () => {
+  it("finds one only in a rules file or a gate's failure message", () => {
     const stray = treeFiles()
       .flatMap(citationsIn)
       .filter((citation) => !isAllowedCitation(citation));
 
     expect(
       stray.map(cite),
-      "a rule tag is written outside the three places one belongs. Write the rule in words where the reader meets it, or delete the sentence; never swap the tag for a restatement of the rule's own wording.",
+      "a rule tag is written outside the two places in the tree one belongs. Write the rule in words where the reader meets it, or delete the sentence; never swap the tag for a restatement of the rule's own wording.",
     ).toEqual([]);
   });
 
-  it("refuses a tag written into a file the tree has just gained", () => {
+  it("passes a tag a rules file the tree has just gained writes", () => {
     const [aDefinedTag] = [...definedTags().keys()];
     expect(aDefinedTag).toBeDefined();
-    const strayFiles = (): readonly string[] =>
-      treeFiles()
-        .flatMap(citationsIn)
-        .filter((citation) => !isAllowedCitation(citation))
-        .map(({ file }) => file);
 
-    const before = new Set(strayFiles());
-    const after = whileAFileHolds(
-      `A note that cites [${aDefinedTag}] rather than the rule.\n`,
-      strayFiles,
-    );
+    expect(
+      filesGoingStrayWhile("apps/api/tests/CODING_RULES.md", aCitingLine(aDefinedTag ?? "")),
+    ).toEqual([]);
+  });
 
-    expect([...new Set(after)].filter((file) => !before.has(file))).toEqual([
-      "apps/api/tests/tag-location-proof.txt",
-    ]);
+  it("refuses a tag an architecture decision record the tree has just gained writes", () => {
+    const [aDefinedTag] = [...definedTags().keys()];
+    expect(aDefinedTag).toBeDefined();
+
+    expect(
+      filesGoingStrayWhile("docs/adr/tag-location-proof.md", aCitingLine(aDefinedTag ?? "")),
+    ).toEqual(["docs/adr/tag-location-proof.md"]);
+  });
+
+  it("refuses a tag a spec the tree has just gained writes", () => {
+    const [aDefinedTag] = [...definedTags().keys()];
+    expect(aDefinedTag).toBeDefined();
+
+    expect(
+      filesGoingStrayWhile("docs/specs/tag-location-proof.md", aCitingLine(aDefinedTag ?? "")),
+    ).toEqual(["docs/specs/tag-location-proof.md"]);
   });
 });
 
@@ -281,33 +271,31 @@ describe("the tags a gate prints and the rules files that define them", () => {
 
 const PROOF = "apps/api/tests/tag-location-proof.txt";
 
-const citingNothing = (list: readonly string[]): readonly string[] =>
+const printingNothing = (list: readonly string[]): readonly string[] =>
   list.filter((file) => citationsIn(file).length === 0);
 
-describe("the two lists this walk reads a file past", () => {
-  const listed = [...FROZEN, ...GATES_PRINTING_A_TAG];
-
-  it("names a file the tree still carries in every entry of both", () => {
+describe("the gates this walk reads a tag past", () => {
+  it("names a file the tree still carries in every entry", () => {
     const tracked = new Set(treeFiles());
 
     expect(
-      listed.filter((file) => !tracked.has(file)),
-      "a listed file is gone from the tree. Both lists only shrink, so an entry leaves with the file it named; a stale one is where the next citation could land unseen.",
+      GATES_PRINTING_A_TAG.filter((file) => !tracked.has(file)),
+      "a listed gate is gone from the tree. An entry leaves with the file it named; a stale one is an exemption with no gate behind it.",
     ).toEqual([]);
   });
 
-  it("names a file that still cites a tag in every entry of both", () => {
+  it("names a file that still prints a tag in every entry", () => {
     expect(
-      citingNothing(listed),
-      "a listed file cites no tag any more. Remove its entry in the commit that took the last one out: an entry whose file carries none is a slot the next citation lands in unseen.",
+      printingNothing(GATES_PRINTING_A_TAG),
+      "a listed gate prints no tag any more. Remove its entry in the commit that rewrote the message: an exemption no message needs is one a later citation hides behind.",
     ).toEqual([]);
   });
 
-  it("refuses an entry whose file has shed its last tag", () => {
-    const shed = whileAFileHolds("A document that names its rule in words.\n", () =>
-      citingNothing([...listed, PROOF]),
+  it("refuses an entry whose gate has stopped printing one", () => {
+    const quiet = whileAFileNamed(PROOF, "A message that names its rule in words.\n", () =>
+      printingNothing([...GATES_PRINTING_A_TAG, PROOF]),
     );
 
-    expect(shed).toEqual([PROOF]);
+    expect(quiet).toEqual([PROOF]);
   });
 });

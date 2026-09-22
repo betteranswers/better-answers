@@ -113,7 +113,7 @@ Reviewer: nothing reads a comment's intent, so a restatement or a narration is a
 
 ### [COMMENT2] Write a rule tag in a rules file, a review finding or a gate's failure message
 
-Those three places and nowhere else, bar the frozen list in `apps/api/tests/coding-rules-tags.test.ts` — the documents that cited a rule before this one, and it only shrinks. A tag in source, a test, a document or a deploy file is a pointer a reader cannot follow and a citation nothing keeps true: write the rule in words where the reader meets it, or delete the sentence.
+Those three places and nowhere else, with no document exempt. A tag in source, a test, a document or a deploy file is a pointer a reader cannot follow and a citation nothing keeps true: write the rule in words where the reader meets it, or delete the sentence. `apps/api/tests/coding-rules-tags.test.ts` holds the rule over the two of the three that are files.
 
 ## GLOSSARY
 
