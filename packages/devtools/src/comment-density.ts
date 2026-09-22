@@ -10,7 +10,29 @@ export const CEILING = { source: 0.1, test: 0.05 } as const;
 
 export type Arm = keyof typeof CEILING;
 
-const MEASURED_LANGUAGES = new Set(["TypeScript", "Python"]);
+const WORKSPACE_LANGUAGES = ["TypeScript", "Python"] as const;
+
+const CONFIG_LANGUAGES = [
+  "Bourne Again Shell",
+  "Bourne Shell",
+  "JavaScript",
+  "SQL",
+  "TOML",
+  "YAML",
+] as const;
+
+const MEASURED_LANGUAGES = {
+  workspace: new Set<string>(WORKSPACE_LANGUAGES),
+  directory: new Set<string>([...WORKSPACE_LANGUAGES, ...CONFIG_LANGUAGES]),
+} as const;
+
+type Kind = keyof typeof MEASURED_LANGUAGES;
+
+export type Unit = { readonly path: string; readonly kind: Kind };
+
+const EVERY_MEASURED_LANGUAGE = new Set<string>(
+  Object.values(MEASURED_LANGUAGES).flatMap((languages) => [...languages]),
+);
 
 const NEVER_WALKED = [
   ".venv",
@@ -73,7 +95,7 @@ export const countedIn = (output: string): readonly Counted[] =>
       code: entry.code ?? 0,
       comment: entry.comment ?? 0,
     }))
-    .filter((counted) => MEASURED_LANGUAGES.has(counted.language))
+    .filter((counted) => EVERY_MEASURED_LANGUAGE.has(counted.language))
     .sort((left, right) => left.file.localeCompare(right.file));
 
 export const armOf = (file: string): Arm => {
@@ -84,56 +106,59 @@ export const armOf = (file: string): Arm => {
 };
 
 export type Measured = {
-  readonly workspace: string;
+  readonly unit: string;
   readonly arm: Arm;
   readonly code: number;
   readonly comment: number;
   readonly ratio: number;
 };
 
-const workspaceOf = (file: string, workspaces: readonly string[]): string | undefined => {
+const unitOf = (file: string, units: readonly Unit[]): Unit | undefined => {
   const relative = file.replace(/^\.\//, "");
-  return [...workspaces]
-    .sort((left, right) => right.length - left.length)
-    .find((workspace) => relative === workspace || relative.startsWith(`${workspace}/`));
+
+  // Longest path first, so a directory named inside a workspace takes the files it holds.
+  return [...units]
+    .sort((left, right) => right.path.length - left.path.length)
+    .find((unit) => relative === unit.path || relative.startsWith(`${unit.path}/`));
 };
 
 type Total = { code: number; comment: number };
 
 export const measure = (
   counted: readonly Counted[],
-  workspaces: readonly string[],
+  units: readonly Unit[],
 ): readonly Measured[] => {
   const totals = new Map<string, Map<Arm, Total>>();
   for (const row of counted) {
-    const workspace = workspaceOf(row.file, workspaces);
-    if (workspace === undefined) continue;
-    const arms = totals.get(workspace) ?? new Map<Arm, Total>();
-    const arm = armOf(row.file);
+    const unit = unitOf(row.file, units);
+    if (unit === undefined) continue;
+    if (!MEASURED_LANGUAGES[unit.kind].has(row.language)) continue;
+    const arms = totals.get(unit.path) ?? new Map<Arm, Total>();
+
+    // A config root has no test arm to hold to the tighter ceiling, so one number is the truth.
+    const arm = unit.kind === "directory" ? "source" : armOf(row.file);
     const running = arms.get(arm) ?? { code: 0, comment: 0 };
     arms.set(arm, { code: running.code + row.code, comment: running.comment + row.comment });
-    totals.set(workspace, arms);
+    totals.set(unit.path, arms);
   }
   return [...totals.entries()]
-    .flatMap(([workspace, arms]) =>
+    .flatMap(([unit, arms]) =>
       [...arms.entries()].map(([arm, total]) => ({
-        workspace,
+        unit,
         arm,
         code: total.code,
         comment: total.comment,
         ratio: total.code === 0 ? 0 : total.comment / total.code,
       })),
     )
-    .sort((left, right) =>
-      `${left.workspace}${left.arm}`.localeCompare(`${right.workspace}${right.arm}`),
-    );
+    .sort((left, right) => `${left.unit}${left.arm}`.localeCompare(`${right.unit}${right.arm}`));
 };
 
 export const overTheCeiling = (measured: readonly Measured[]): readonly Measured[] =>
   measured.filter((one) => one.code > 0 && one.ratio > CEILING[one.arm]);
 
 export const reportOf = (one: Measured): string =>
-  `${one.workspace} ${one.arm}: ${one.ratio.toFixed(2)} comment lines per code line, over the ${CEILING[one.arm].toFixed(2)} ceiling ([COMMENT1]).`;
+  `${one.unit} ${one.arm}: ${one.ratio.toFixed(2)} comment lines per code line, over the ${CEILING[one.arm].toFixed(2)} ceiling ([COMMENT1]).`;
 
 export const countOver = (cwd: string, paths: readonly string[]): readonly Counted[] =>
   countedIn(
