@@ -1,0 +1,67 @@
+docs/adr/0009-better-auth-in-process-identity-provider.md
+  s_b979b383b8487b::t_75059fff88cbc7 93-96
+packages/core/src/kernel/refusal.ts
+  s_b979b383b8487b::t_a07162ab28129b 13
+packages/core/test/workspaces.test.ts
+  s_b979b383b8487b::t_2d5bda5e6f3f51 28
+  s_b979b383b8487b::t_e12623adfa0400 862
+  s_b979b383b8487b::t_997adc733a92b3 811,814,822-824,827-829
+  s_b979b383b8487b::t_0e3eb19f8ba1b8 846-847,850
+  s_b979b383b8487b::t_406b2149bf9618 17-18
+  s_b979b383b8487b::t_fc35d64bfdaabf 683-685,691
+  s_b979b383b8487b::t_8423fe3e41dd7b 686-690
+  s_b979b383b8487b::t_4bd80194aba226 717-721
+  s_b979b383b8487b::t_1c9be940736a37 755-759,761,764,766-770,791,793
+  s_b979b383b8487b::t_20a0c09cf9e0fd 716,722,727-754,760,762-763,765,771-790,792,794-810,812-813,815-821,825-826,830-845,848-849,851-861,863-880
+packages/core/src/workspaces/vocabulary.ts
+  s_b979b383b8487b::t_7736ec88b814f5 1-12
+packages/core/test/refusal-words.test.ts
+  s_b979b383b8487b::t_ffc86d7c500a44 47-52
+  s_b979b383b8487b::t_61727728f729c0 58
+  s_b979b383b8487b::t_204a38b5da6faf 126-127
+  s_b979b383b8487b::t_88b0795c8cc994 7
+packages/core/src/workspaces/index.ts
+  s_b979b383b8487b::t_aff3bddfdc18ef 21-23,28-35,40-43,45-48,51-53,64-66
+  s_b979b383b8487b::t_7957567185da1b 120-135,138,161,168,175,177,179-180,185,187,189,193-194,196,202,205
+  s_b979b383b8487b::t_2d5bda5e6f3f51 158-160
+  s_b979b383b8487b::t_f2421b2d91c43e 108,136-137,139-157,162-167,169-174,176,178,181-184,186,188,190-192,195,197-201,203-204,206-208
+  s_b979b383b8487b::t_6aee3fb48df88f 44,49-50,54
+apps/api/src/ops/index.ts
+  s_b979b383b8487b::t_0f5aadc9124284 844-845
+  s_b979b383b8487b::t_786a7ad3e488c4 732
+  s_b979b383b8487b::t_698635f5a5fae9 137-140
+  s_b979b383b8487b::t_fbd653b302d15e 744-745
+  s_b979b383b8487b::t_c43600d4f727d3 824
+  s_b979b383b8487b::t_d5fde17247978c 25,32-47
+  s_b979b383b8487b::t_e87855fc4c46e0 777
+  s_b979b383b8487b::t_7a333e2fe7ffa2 377
+  s_b979b383b8487b::t_1c66a5a963d836 729-731,733-743,746-776,778-823,825-831
+docs/operations/RUNBOOK.md
+  s_b979b383b8487b::t_f51a797bac4a17 123-137
+  s_b979b383b8487b::t_142214a9563e3d 1
+  s_b979b383b8487b::t_3ac3f4da756607 110
+apps/api/tests/ops.test.ts
+  s_b979b383b8487b::t_679edd9aea0de0 982-999,1008-1020,1026-1073,1082-1083,1092-1103,1112-1271
+  s_b979b383b8487b::t_2d5bda5e6f3f51 1000-1007,1021-1025,1074-1081,1084-1091,1104-1111
+  s_b979b383b8487b::t_f7857ed5eac7c9 125-172
+  s_b979b383b8487b::t_c7f29e694728fa 1714-1748
+  s_b979b383b8487b::t_4173e43d934620 29
+docs/adr/README.md
+  s_b979b383b8487b::t_2e0a5e2e8c4e2c 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "75e2b6662073e70cd88ba70af779bbf23cbe89ad",
+  "prompts": {},
+  "sessions": {
+    "s_b979b383b8487b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e61a5c8-13ae-4dc9-a43d-8d5569f4e2c6",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
