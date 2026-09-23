@@ -6,10 +6,12 @@ import { createTRPCContext, createTRPCOptionsProxy } from "@trpc/tanstack-react-
 import type { AppRouter } from "@better-answers/api/trpc";
 
 import { apiLink } from "./link.ts";
+import { sentWithProgress } from "./upload-progress.ts";
 
 export const TRPC_ENDPOINT = "/trpc";
 
-type ApiError = TRPCClientErrorLike<AppRouter>;
+// What a hook's `error` is typed as: the class's shape without the class.
+export type ApiError = TRPCClientErrorLike<AppRouter>;
 
 // The word union and its class are inferred from the router's error formatter, so the web holds
 // no second copy of the api's vocabulary.
@@ -19,16 +21,18 @@ export type RefusalWord = Refusal["word"];
 
 export type RefusalClass = Refusal["class"];
 
-export const refusalOf = (error: Error): Refusal | undefined => {
+export const refusalOf = (error: Error | ApiError): Refusal | undefined => {
   if (!(error instanceof TRPCClientError)) return undefined;
   const refusal: Refusal | undefined = error.data?.refusal;
   return refusal;
 };
 
-export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
+export const { TRPCProvider, useTRPC, useTRPCClient } = createTRPCContext<AppRouter>();
 
 export const createApiClient = () =>
-  createTRPCClient<AppRouter>({ links: [apiLink({ url: TRPC_ENDPOINT })] });
+  createTRPCClient<AppRouter>({
+    links: [apiLink({ url: TRPC_ENDPOINT, uploadFetch: sentWithProgress })],
+  });
 
 export type ApiClient = ReturnType<typeof createApiClient>;
 

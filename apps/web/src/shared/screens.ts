@@ -8,7 +8,7 @@ export const SCREENS = [
       "The workspace's source bindings, what each one is allowed to reach, and the gates that publish and accept what it brings in.",
     defaultView: "/sources/bindings",
     views: [
-      { name: "Bindings", path: "/sources/bindings", built: false },
+      { name: "Bindings", path: "/sources/bindings", built: true },
       { name: "Publish and accept gates", path: "/sources/publish-and-accept-gates", built: false },
       { name: "Priced plan", path: "/sources/priced-plan", built: false },
       { name: "Backlogs", path: "/sources/backlogs", built: false },

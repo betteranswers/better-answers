@@ -12,8 +12,9 @@ the suite already is; `apps/web/e2e/routes.spec.ts` is the fullest worked exampl
 ## The seam
 
 The server under the browser is the api's own test harness — `startApp` in
-`apps/api/tests/harness.ts` over a Testcontainers Postgres, the email transport capturing codes,
-Claude's client metadata document served in process — started by Playwright as a **process**, not
+`apps/api/tests/harness.ts` over a Testcontainers Postgres and a Garage object store, the email
+transport capturing codes, Claude's client metadata document served in process — started by
+Playwright as a **process**, not
 imported. `apps/web` imports nothing from `apps/api` at runtime, so launching it is the only way
 the browser suite can reach the real server: `apps/api/tests/serve.ts` takes a port as its one
 argument and listens on it, with the harness's control paths
@@ -77,8 +78,9 @@ side that counts. Read the numbers off those two files rather than from here.
 ## The harness's acts
 
 State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
-`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Six acts
-call `/__harness`, which `apps/api/tests/harness-control.ts` mounts:
+`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Eight acts
+call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources two from
+`apps/api/tests/harness-sources.ts`:
 
 | Act | What it does |
 | --- | --- |
@@ -88,6 +90,8 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts:
 | `removeMember` | Ends a membership, as the People screen will |
 | `revokeCredentials` | Revokes a person's credentials, so the next request is refused |
 | `seedRoutes` | The routes a workspace has chosen; a purpose left out of the list has no route, which the screen must show rather than omit |
+| `seedBindings` | Source bindings as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, chunks, an index run at any status, a concept and composition citing a document — answering each binding's and document's id |
+| `moveTheIndexRun` | The worker's two steps over the workspace's one index run, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |
 
 Four more helpers in the same module drive the browser rather than the harness:
 
@@ -117,7 +121,10 @@ holding one.
 - **Read the app's own constants rather than copying them.** `apps/web/e2e/routes.spec.ts` imports
   `@/shared/screens.ts`, so the list of screens is written once.
 - **A latency budget is measured, annotated and asserted** — `test.info().annotations.push(…)`
-  beside the comparison, so a run that passes still says how close it came.
+  beside the comparison, so a run that passes still says how close it came. A list's second is
+  timed from a fresh `goto`, so no cache answers it. An act's 100 ms is timed **in the page** — a
+  keydown listener and a `MutationObserver` — because a matcher's polling is coarser than the
+  budget; `apps/web/e2e/sources.spec.ts` holds both.
 
 ## The accessibility gate
 

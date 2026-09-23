@@ -5,6 +5,12 @@ import { llmPurpose } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import type { TestApp } from "./harness.ts";
+import {
+  bindingsSeeding,
+  indexRunMoving,
+  moveTheIndexRun,
+  seedBindings,
+} from "./harness-sources.ts";
 
 const HARNESS_PREFIX = "/__harness";
 
@@ -82,6 +88,16 @@ export const harnessControl = (app: TestApp): Hono => {
       client.release();
     }
     return context.json({ seeded: asked.routes.length });
+  });
+
+  control.post(`${HARNESS_PREFIX}/bindings`, async (context) => {
+    const asked = await readBody(context.req.raw, bindingsSeeding);
+    return context.json({ bindings: await seedBindings(app, asked) });
+  });
+
+  control.post(`${HARNESS_PREFIX}/index-runs`, async (context) => {
+    const asked = await readBody(context.req.raw, indexRunMoving);
+    return context.json(await moveTheIndexRun(app, asked));
   });
 
   control.get(`${HARNESS_PREFIX}/codes`, (context) => {
