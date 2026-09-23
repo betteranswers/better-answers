@@ -22,6 +22,7 @@ import {
   requireAdmin,
   ulid,
   type InputOf,
+  type Principal,
   type PrincipalRefusal,
   type RefusalOf,
   type Result,
@@ -38,7 +39,13 @@ import {
   type PostgresDoor,
   type Tx,
 } from "../store/postgres/index.ts";
-import { adminOnBinding, bindingNamed, BINDING_ID, type ActingOnBinding } from "./admin-binding.ts";
+import {
+  adminOnBinding,
+  bindingNamed,
+  BINDING_ID,
+  type ActingOnBinding,
+  type PlatformOnBinding,
+} from "./admin-binding.ts";
 import { dpiaInputFor, type REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastRun } from "./findings.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
@@ -450,13 +457,14 @@ export const publishBinding = async (
 };
 
 export const reprocessBindingInput = z.object({
+  workspaceId: boundarySchemas.workspace.select.shape.id,
   bindingId: BINDING_ID,
 
   reason: z.enum(REASONS_EMPTYING_THE_BINDING),
 });
 
 export const reprocessBindingAct = declareAct({
-  admits: { role: "Admin", purposes: [] },
+  admits: { role: "Admin", purposes: ["erasure"] },
   input: reprocessBindingInput,
   refuses: ["role-forbids", "no-such-binding"],
   effect: "write",
@@ -477,21 +485,26 @@ export type BindingReprocessed = {
 };
 
 export const reprocessBinding = async (
-  principal: UserPrincipal,
+  principal: Principal,
   tx: Tx,
   input: ReprocessBindingInput,
 ): Promise<Result<BindingReprocessed, ReprocessBindingRefusal>> => {
   const admitted = admit(reprocessBindingAct, principal, input);
   if (!admitted.ok) return err(admitted.error);
-  const admin = admitted.value;
-  const { workspaceId } = admin;
+  const admittedAs = admitted.value;
   const { bindingId } = input;
-  const acting: ActingOnBinding = { admin, workspaceId, bindingId };
+  const acting: ActingOnBinding | PlatformOnBinding =
+    admittedAs.kind === "user"
+      ? { admin: admittedAs, workspaceId: admittedAs.workspaceId, bindingId }
+      : { platform: admittedAs, workspaceId: input.workspaceId, bindingId };
+  const { workspaceId } = acting;
+  // A person acts where its membership was proved, so a workspace it names otherwise holds none of its bindings.
+  if (workspaceId !== input.workspaceId) return err("no-such-binding");
 
   const standing = await bindingNamed(acting, tx, { columns: "1", lock: "for-update" });
   if (!standing.ok) return err(standing.error);
 
-  const queued = await enqueueJobIn(admin, tx, {
+  const queued = await enqueueJobIn(admittedAs, tx, {
     workspaceId,
     kind: INDEX_KIND,
     subjectId: bindingId,

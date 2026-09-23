@@ -4,7 +4,14 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { readableClause, readableParameters } from "../src/access/index.ts";
-import { attempt, parse, ulid, type UserPrincipal } from "../src/kernel/index.ts";
+import { ERASURE } from "../src/erasure/index.ts";
+import {
+  attempt,
+  parse,
+  ulid,
+  type PlatformPrincipal,
+  type UserPrincipal,
+} from "../src/kernel/index.ts";
 import {
   bindUpload,
   bindUploadFields,
@@ -20,7 +27,7 @@ import {
   UPLOAD_SWEEP,
 } from "../src/sources/index.ts";
 import { getObject, listObjects, putObject } from "../src/store/objects/index.ts";
-import type { Tx } from "../src/store/postgres/index.ts";
+import { withScope, type Tx } from "../src/store/postgres/index.ts";
 import { contractFixture, mediaTypeOutside } from "./contract-fixture.ts";
 import {
   chunkUnder,
@@ -1010,7 +1017,11 @@ describe("an Admin reprocesses a binding", () => {
       reprocessBinding(
         admin,
         tx,
-        inputOf(reprocessBindingInput, { bindingId, reason: "rule-change" }),
+        inputOf(reprocessBindingInput, {
+          workspaceId: scenario.workspaceId,
+          bindingId,
+          reason: "rule-change",
+        }),
       ),
     );
     if (!reprocessed.ok) throw new Error(`the reprocess was refused: ${String(reprocessed.error)}`);
@@ -1041,7 +1052,11 @@ describe("an Admin reprocesses a binding", () => {
           reprocessBinding(
             admin,
             tx,
-            inputOf(reprocessBindingInput, { bindingId, reason: "rule-change" }),
+            inputOf(reprocessBindingInput, {
+              workspaceId: scenario.workspaceId,
+              bindingId,
+              reason: "rule-change",
+            }),
           ),
         ),
       ),
@@ -1059,7 +1074,11 @@ describe("an Admin reprocesses a binding", () => {
         const reprocessed = await reprocessBinding(
           admin,
           tx,
-          inputOf(reprocessBindingInput, { bindingId, reason: "wiped" }),
+          inputOf(reprocessBindingInput, {
+            workspaceId: scenario.workspaceId,
+            bindingId,
+            reason: "wiped",
+          }),
         );
         expect(reprocessed.ok).toBe(true);
         await attempt(() =>
@@ -1082,7 +1101,11 @@ describe("an Admin reprocesses a binding", () => {
     await expect(
       asAdmin(scenario, (admin, tx) =>
         reprocessBinding(admin, tx, {
-          ...inputOf(reprocessBindingInput, { bindingId, reason: "rule-change" }),
+          ...inputOf(reprocessBindingInput, {
+            workspaceId: scenario.workspaceId,
+            bindingId,
+            reason: "rule-change",
+          }),
           // @ts-expect-error a reason the queue does not carry, on purpose; the refusal under test is the run's own
           reason: "spring-clean",
         }),
@@ -1102,7 +1125,11 @@ describe("an Admin reprocesses a binding", () => {
           reprocessBinding(
             reader,
             tx,
-            inputOf(reprocessBindingInput, { bindingId, reason: "rule-change" }),
+            inputOf(reprocessBindingInput, {
+              workspaceId: scenario.workspaceId,
+              bindingId,
+              reason: "rule-change",
+            }),
           ),
         ),
       ),
@@ -1113,6 +1140,7 @@ describe("an Admin reprocesses a binding", () => {
         admin,
         tx,
         inputOf(reprocessBindingInput, {
+          workspaceId: scenario.workspaceId,
           bindingId: "01J6NNNNNNNNNNNNNNNNNNNNN3",
           reason: "rule-change",
         }),
@@ -1123,8 +1151,16 @@ describe("an Admin reprocesses a binding", () => {
       byOthers,
       elsewhere,
       shapes: [
-        parse(reprocessBindingInput, { bindingId: "  ", reason: "rule-change" }),
-        parse(reprocessBindingInput, { bindingId, reason: "spring-clean" }),
+        parse(reprocessBindingInput, {
+          workspaceId: scenario.workspaceId,
+          bindingId: "  ",
+          reason: "rule-change",
+        }),
+        parse(reprocessBindingInput, {
+          workspaceId: scenario.workspaceId,
+          bindingId,
+          reason: "spring-clean",
+        }),
       ],
       held: await bindingHolds(scenario.workspaceId, bindingId),
     }).toEqual({
@@ -1138,6 +1174,112 @@ describe("an Admin reprocesses a binding", () => {
         { ok: false, error: { word: "malformed", fields: { reason: "not-in-set" } } },
       ],
       held: AS_IT_WAS_INDEXED,
+    });
+  });
+
+  it("refuses an Admin naming a workspace other than its own, which reaches no binding there nor its own under that name", async () => {
+    const scenario = await arrange();
+    const other = await arrange();
+    const ours = await indexedHandbook(scenario);
+    const theirs = await indexedHandbook(other);
+
+    const [named, underTheirName] = await Promise.all(
+      [theirs.bindingId, ours.bindingId].map((bindingId) =>
+        asAdmin(scenario, (admin, tx) =>
+          reprocessBinding(
+            admin,
+            tx,
+            inputOf(reprocessBindingInput, {
+              workspaceId: other.workspaceId,
+              bindingId,
+              reason: "rule-change",
+            }),
+          ),
+        ),
+      ),
+    );
+
+    expect({
+      named,
+      underTheirName,
+      theirs: await bindingHolds(other.workspaceId, theirs.bindingId),
+      ours: await bindingHolds(scenario.workspaceId, ours.bindingId),
+    }).toEqual({
+      named: { ok: false, error: "no-such-binding" },
+      underTheirName: { ok: false, error: "no-such-binding" },
+      theirs: AS_IT_WAS_INDEXED,
+      ours: AS_IT_WAS_INDEXED,
+    });
+  });
+});
+
+const reprocessingAs = (
+  scenario: Scenario,
+  platform: PlatformPrincipal,
+  asked: z.input<typeof reprocessBindingInput>,
+) =>
+  withScope(platform, scenario.postgres, asked.workspaceId, (tx) =>
+    reprocessBinding(platform, tx, inputOf(reprocessBindingInput, asked)),
+  );
+
+describe("the erasure reprocesses a binding as the platform", () => {
+  it("takes away every chunk row of a binding in the workspace the erasure names and queues its index run with the wipe's reason", async () => {
+    const scenario = await arrange();
+    const { bindingId, documentId } = await indexedHandbook(scenario);
+
+    const wiped = await reprocessingAs(scenario, ERASURE, {
+      workspaceId: scenario.workspaceId,
+      bindingId,
+      reason: "wiped",
+    });
+    if (!wiped.ok) throw new Error(`the erasure's reprocess was refused: ${String(wiped.error)}`);
+
+    expect(wiped.value.chunks).toEqual(2);
+    expect(await passagesReadableBy(scenario.admin, documentId)).toEqual([]);
+    expect(await bindingHolds(scenario.workspaceId, bindingId)).toEqual({
+      chunks: [],
+      runs: [
+        { kind: "index", reason: "wiped", status: "queued" },
+        { kind: "index", reason: "bound", status: "done" },
+      ],
+    });
+  });
+
+  it("refuses the platform acting for any purpose but the erasure, in the forbidden word, and leaves the chunk rows standing", async () => {
+    const scenario = await arrange();
+    const { bindingId } = await indexedHandbook(scenario);
+
+    const refused = await reprocessingAs(scenario, UPLOAD_SWEEP, {
+      workspaceId: scenario.workspaceId,
+      bindingId,
+      reason: "wiped",
+    });
+
+    expect({ refused, held: await bindingHolds(scenario.workspaceId, bindingId) }).toEqual({
+      refused: { ok: false, error: "role-forbids" },
+      held: AS_IT_WAS_INDEXED,
+    });
+  });
+
+  it("refuses the erasure naming a workspace that does not hold the binding, deleting nothing and queueing nothing in either", async () => {
+    const scenario = await arrange();
+    const other = await arrange();
+    const { bindingId } = await indexedHandbook(scenario);
+
+    const refused = await reprocessingAs(scenario, ERASURE, {
+      workspaceId: other.workspaceId,
+      bindingId,
+      reason: "wiped",
+    });
+
+    expect({
+      refused,
+      held: await bindingHolds(scenario.workspaceId, bindingId),
+      queuedThere: await runsOver(db().pool, other.workspaceId, bindingId),
+    }).toEqual({
+      refused: { ok: false, error: "no-such-binding" },
+      held: AS_IT_WAS_INDEXED,
+      queuedThere: [],
     });
   });
 });
