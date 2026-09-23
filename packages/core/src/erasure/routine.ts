@@ -19,7 +19,7 @@ import {
 } from "../store/git/index.ts";
 import type { ObjectDoor } from "../store/objects/index.ts";
 import { withScope, withSessionLock, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
-import { eraseFromTheIdentitySet, type IdentitySwept } from "./identity.ts";
+import { eraseFromTheIdentitySet, type IdentityArm, type IdentitySwept } from "./identity.ts";
 import { erasureMapOf, type ErasureFamily, type ErasureMap } from "./map.ts";
 import { rederiveAfterErasure, type Rederived } from "./rederive.ts";
 import { writeReplayCopy } from "./replay.ts";
@@ -43,16 +43,23 @@ export const ERASURE: ErasurePrincipal = { kind: "platform", actorId: ERASURE_AC
 export type ErasureLogLine = {
   readonly actor: typeof ERASURE_ACTOR;
   readonly erasure_request_id: string;
+  readonly arm: IdentityArm;
+  readonly pseudonymised: number;
+  readonly sessions_deleted: number;
+  readonly verifications_deleted: number;
+  readonly accounts_deleted: number;
+  readonly invitations_deleted_here: number;
   readonly invitations_deleted: number;
 };
 
-// The row and the report are the erasing workspace's to read, so what the routine did beyond it
-// goes to the tier's log.
+// The row and the report are the erasing workspace's to read, so what varies with another
+// workspace's records goes to the tier's log.
 export type ErasureLog = {
   readonly info: (line: ErasureLogLine, message: string) => void;
 };
 
-const IDENTITY_STEP_LOGGED = "erasure: what the identity step deleted across every workspace";
+const IDENTITY_STEP_LOGGED =
+  "erasure: the identity step's arm, and what it pseudonymised and deleted";
 
 // deploy/backup.sh takes the same advisory lock by this number; change one and a dump runs
 // beside an erasure.
@@ -245,18 +252,11 @@ const withTheChecksMoved = (
   [CONCEPT_VERIFICATION]: { ...actions[CONCEPT_VERIFICATION], rehashed: carried.checks },
 });
 
+// The arm, pseudonymisation and deletes go to the operator's log line: on this workspace's row
+// they would say whether another workspace holds the person.
 const withTheIdentityStep = (actions: ErasureActions, swept: IdentitySwept): ErasureActions => ({
   ...actions,
-  "identity-user": {
-    ...actions["identity-user"],
-    arm: swept.arm,
-    pseudonymised: swept.pseudonymised,
-    membershipsEnded: swept.membershipsEnded,
-  },
-  "identity-session": { ...actions["identity-session"], deleted: swept.sessions },
-  "identity-verification": { ...actions["identity-verification"], deleted: swept.verifications },
-  "identity-invitation": { ...actions["identity-invitation"], deleted: swept.invitationsHere },
-  "identity-account": { ...actions["identity-account"], deleted: swept.accounts },
+  "identity-user": { ...actions["identity-user"], membershipsEnded: swept.membershipsEnded },
 });
 
 const identityStepLineOf = (
@@ -266,6 +266,12 @@ const identityStepLineOf = (
 ): ErasureLogLine => ({
   actor: platform.actorId,
   erasure_request_id: erasureRequestId,
+  arm: swept.arm,
+  pseudonymised: swept.pseudonymised,
+  sessions_deleted: swept.sessions,
+  verifications_deleted: swept.verifications,
+  accounts_deleted: swept.accounts,
+  invitations_deleted_here: swept.invitationsHere,
   invitations_deleted: swept.invitationsEverywhere,
 });
 
