@@ -59,12 +59,10 @@ jobs:
           OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
-          # The checkout above is `main`, so this is the default branch's head, and its tag is
-          # cut to the seven characters `build.yml`'s `type=sha,prefix=sha-` cuts it to.
+          # Seven characters, which is what `build.yml`'s `type=sha,prefix=sha-` cuts to.
           head="$(git rev-parse HEAD)"
           tag="sha-${head:0:7}"
-          # The refusal goes to stderr: inside `$(…)` stdout is the digest, and `set -e` ends
-          # the step on the `return 1` — a supplied digest never reaches this at all.
+          # The refusal goes to stderr: inside `$(…)` stdout is the digest.
           last_build() {
             docker buildx imagetools inspect "ghcr.io/${OWNER}/$1:${tag}" --format '{{.Manifest.Digest}}' && return
             echo "::error::main's head ${head} has no ghcr.io/${OWNER}/$1:${tag} — its build is still running, or red, or the head is a release's own row. No older image is promoted in its place: wait for that build, dispatch \`build\` on main, or pass the digests" >&2
@@ -101,8 +99,7 @@ jobs:
           }
           patch API_IMAGE_DIGEST "${API_DIGEST}"
           patch WORKER_IMAGE_DIGEST "${WORKER_DIGEST}"
-          # -X POST: Coolify v4.3.13 answers GET /deploy with 405 "changed to a POST request"
-          # (first CI release, 04/09/2026 — the 403s in front of it hid this until auth passed).
+          # `-X POST`: Coolify answers a GET on /deploy with 405, hidden behind a 403.
           curl -fsS -X POST "${COOLIFY_URL}/api/v1/deploy?uuid=${PROD_UUID}&force=false" \
             -H "Authorization: Bearer ${COOLIFY_TOKEN}" -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}"
       - name: record the promotion in deploy/RELEASES.md
@@ -135,9 +132,8 @@ jobs:
       - name: post-deploy smoke against production (the release's last step)
         run: |
           set -euo pipefail
-          # The two paths the uptime check watches (coolify.md § Ingress): the app is healthy and the
-          # protected-resource document names the MCP surface. Retried while the stack comes up.
-          # 40 × 6 s ≈ 4 min: /deploy is asynchronous and a release that pulls a fresh image
-          # takes ~3 min end to end — 2 min of retries lost the race (first CI release, 04/09/2026).
+          # /deploy is asynchronous and a fresh image takes about three minutes to pull.
           curl -fsS --retry 40 --retry-delay 6 --retry-all-errors -o /dev/null "${PUBLIC_URL}/health"
+          # The uptime check watches this path and the one above, so the smoke and the
+          # monitor read the same two.
           curl -fsS --retry 5 --retry-delay 6 --retry-all-errors "${PUBLIC_URL}/.well-known/oauth-protected-resource/mcp" | jq -e --arg mcp "${PUBLIC_URL}/mcp" '.resource == $mcp' >/dev/null

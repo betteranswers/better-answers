@@ -4,10 +4,11 @@ runs:
   using: composite
   steps:
     - shell: bash
+      # The version is read out of the api image's pin and is never written here.
       run: |
         pinned="$(sed -n 's/^ARG GIT_FILTER_REPO_VERSION=//p' "$GITHUB_WORKSPACE/apps/api/Dockerfile")"
-        # Exactly one, never the first of several: two `ARG` lines are two pins, and a read
-        # that quietly picks one of them is the second copy this whole arrangement avoids.
+        # Exactly one, never the first of several: a read that quietly picks one of two
+        # `ARG` lines is the second copy this avoids.
         matches="$(printf '%s\n' "$pinned" | grep -c . || true)"
         if [ "$matches" != 1 ]; then
           echo "apps/api/Dockerfile must pin GIT_FILTER_REPO_VERSION on exactly one ARG line; it has $matches" >&2
@@ -16,9 +17,6 @@ runs:
         uv tool install "git-filter-repo==$pinned"
         bin="$(uv tool dir --bin)"
         printf '%s\n' "$bin" >> "$GITHUB_PATH"
-        # Proved here rather than left to the suite, so an install that put the tool
-        # somewhere git cannot reach fails on this line and not three hundred tests later.
-        # `--version`, not `--help`: git answers a subcommand's `--help` by opening its man
-        # page, which the runner does not carry, and exits 16 with the tool installed (PR #57's
-        # first CI run, 11/09/2026); `--version` is answered by the tool itself.
+        # An install git cannot reach fails on this line, not three hundred tests later;
+        # `--help` would open a man page and exit 16.
         PATH="$bin:$PATH" git filter-repo --version > /dev/null

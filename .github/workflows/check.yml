@@ -2,7 +2,9 @@ name: check
 
 on:
   pull_request:
+  # Without this the queue waits on a run that never starts.
   merge_group:
+  # `build.yml` calls this on main, so a push runs `check` once rather than twice.
   workflow_call:
     inputs:
       images-probed-by-the-caller:
@@ -17,6 +19,8 @@ on:
         type: boolean
         default: false
 
+# A pull request cancels the run it supersedes; a run `build.yml` calls never does,
+# because every commit that lands is worth an image.
 concurrency:
   group: check-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -25,6 +29,8 @@ permissions:
   contents: read
 
 jobs:
+  # A release, not the `ubuntu-latest` label, which GitHub is moving to Ubuntu 26; every
+  # `runs-on:` in this directory names one.
   lane:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -34,6 +40,7 @@ jobs:
       worker: ${{ steps.lane.outputs.worker }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The base is fetched by sha: `git diff` between two trees needs no ancestry.
       - name: the lane this change runs in
         id: lane
         env:
@@ -53,31 +60,22 @@ jobs:
           if [ -n "${base}" ] && [ "${base}" != "0000000000000000000000000000000000000000" ] &&
             git fetch --no-tags --depth=1 origin "${base}" &&
             git diff -z --name-only --no-renames "${base}" HEAD > "${RUNNER_TEMP}/changed-paths"; then
-            # Two `key=value` lines, which is the form `$GITHUB_OUTPUT` takes: they are read
-            # back here so that an unknown word is refused below rather than published.
+            # Read back here so that an unknown word is refused below, not published.
             decided="$(node scripts/docs-lane.mjs < "${RUNNER_TEMP}/changed-paths")"
             lane="$(printf '%s\n' "${decided}" | sed -n 's/^lane=//p')"
             worker="$(printf '%s\n' "${decided}" | sed -n 's/^worker=//p')"
           else
-            # Three different failures arrive here — no base for this event, a base that
-            # could not be fetched, a diff that would not run — and all three mean the same
-            # thing downstream, so the notice names the event and the base rather than
-            # which of them it was. The base is cleared with them: a leg that filtered
-            # against a base this runner could not fetch would be reading nothing.
+            # A leg filtering against a base this runner could not fetch reads nothing, so
+            # the base is cleared with the lane.
             echo "::notice::no diff against a base (event ${EVENT}, base '${base}'), so this run takes the full lane"
             base=""
           fi
-          # PRE-MERGE CHECKS ARE A SUBSET AND MERGE-TIME CHECKS ARE THE WHOLE, which is the
-          # merge queue's own design: a pull request may run the affected lane, and the
-          # commit that is about to land runs everything. The lane script answers from the
-          # paths alone, so the event's half of the rule is here, beside the base.
+          # The lane script reads the paths alone, so only a pull request may narrow.
           if [ "${lane}" = "affected" ] && [ "${EVENT}" != "pull_request" ]; then
             echo "::notice::a ${EVENT} run takes the full lane, whatever it changed"
             lane=full
           fi
-          # Every leg below is gated on these words, so a fourth value is a run whose legs all
-          # stand down and whose fan-in has nothing to require — the one way this whole
-          # design could be silently green. It is refused here rather than looked for later.
+          # Every leg is gated on these words, so a fourth is a run that requires nothing.
           case "${lane}" in
             docs | affected | full) ;;
             *)
@@ -126,11 +124,14 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
+      # Unpinned, this action takes whatever uv is newest, which is not the uv the worker
+      # image was built with.
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version-file: apps/worker/.tool-versions
           enable-cache: true
       - run: pnpm install --frozen-lockfile
+      # The only fresh clone in CI, so the only place install's promise can be tested.
       - name: the pre-commit hook is installed by install alone
         run: |
           hook="$(git rev-parse --git-path hooks)/pre-commit"
@@ -153,10 +154,13 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
+      # The binary, not an environment: this leg resolves no Python package to cache.
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version-file: apps/worker/.tool-versions
       - run: pnpm install --frozen-lockfile
+      # The daemon's driver cannot read a `type=gha` cache, and a `run:` step gets the
+      # `ACTIONS_*` variables only from the second.
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
       - uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
       - uses: ./.github/actions/git-filter-repo
@@ -187,12 +191,16 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Weights inside the checkout are read by every tree walker too, and a job's own
+      # `env:` cannot reach the `runner` context.
       - name: HF_HOME on the runner's own temp directory, not the checkout
         run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
+          # pnpm verifies the tree before it runs a script, so `check:worker` installs
+          # whether this leg asked for it or not.
           cache: pnpm
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
@@ -210,6 +218,8 @@ jobs:
       - run: pnpm check:worker
         env:
           IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller }}
+          # Without it every pull request tells a third party what this repository is
+          # building, once per document.
           COCOINDEX_DISABLE_USAGE_TRACKING: "1"
 
   affected-gates:
@@ -248,6 +258,8 @@ jobs:
           BASE: ${{ needs.lane.outputs.base }}
         run: |
           git fetch --no-tags --depth=1 origin "${BASE}"
+          # git reports a move as the destination alone, so without this the workspace the
+          # file left goes unchecked.
           git config diff.renames false
       - run: pnpm install --frozen-lockfile
       - run: uv sync --frozen
@@ -272,6 +284,7 @@ jobs:
           BASE: ${{ needs.lane.outputs.base }}
           IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller }}
 
+  # A leg skipped by its own `if:` concludes nothing, and the verdict wants a conclusion.
   affected-worker:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'affected' }}
@@ -331,6 +344,7 @@ jobs:
         affected-workspaces,
         affected-worker,
       ]
+    # A skipped required check never reports, so this runs whatever the legs did.
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -354,8 +368,7 @@ jobs:
             echo "${leg}: ${was} (this lane wants ${wanted})"
             [ "${was}" = "${wanted}" ] || wrong="${wrong} ${leg}=${was}"
           done
-          # A verdict that required nothing of anybody passes whatever happened, which is the
-          # one outcome this job exists to refuse. It is a floor, not a count to keep current.
+          # A floor, not a count to keep current: a verdict requiring nothing of anybody passes.
           if [ "${named}" -lt 2 ] || [ "${required}" -lt 1 ]; then
             echo "::error::this verdict read ${named} jobs and required ${required} legs, so it proved nothing"
             exit 1

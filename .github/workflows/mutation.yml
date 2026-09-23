@@ -40,16 +40,20 @@ jobs:
       - run: uv sync --frozen
         working-directory: apps/worker
       - uses: ./.github/actions/git-filter-repo
+      # Split, because the combined action saves only on success and so discards a
+      # cancelled leg's checkpoint.
       - name: the previous run's mutant results
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
+          # An entry is written once, so the run id keeps the key new and the prefix restores.
           key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: stryker-incremental-${{ matrix.name }}-
       - name: the previous run's report, kept as the summary's baseline
         run: |
           f=${{ matrix.path }}/reports/mutation/stryker-incremental.json
           if [ -f "$f" ]; then cp "$f" "${{ matrix.path }}/reports/mutation/baseline.json"; fi
+      # `exec` leaves one process from the step down, so cancellation reaches Stryker.
       - name: mutation
         working-directory: ${{ matrix.path }}
         run: exec node_modules/.bin/stryker run ${{ inputs.force && '--force' || '' }}
