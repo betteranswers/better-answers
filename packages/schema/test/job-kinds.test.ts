@@ -387,36 +387,89 @@ describe("the claim's sibling check", () => {
   });
 });
 
+const THE_MIGRATION_OWNER = "the_migration_owner";
+
+// `migrate` connects as the owner, no superuser, so the policy `job` forces binds it; this
+// suite connects as a superuser, which no policy binds.
+const asTheMigrationOwner = async <T>(
+  client: pg.PoolClient,
+  work: () => Promise<T>,
+): Promise<T> => {
+  await client.query(`CREATE ROLE ${THE_MIGRATION_OWNER} NOLOGIN NOSUPERUSER NOBYPASSRLS`);
+  for (const object of [
+    "TABLE public.job",
+    "TABLE public.workspace",
+    "FUNCTION public.current_workspace_id()",
+  ]) {
+    await client.query(`ALTER ${object} OWNER TO ${THE_MIGRATION_OWNER}`);
+  }
+  await client.query(`SET LOCAL ROLE ${THE_MIGRATION_OWNER}`);
+  const done = await work();
+  await client.query("RESET ROLE");
+  return done;
+};
+
+const RETIRED = { kind: "index", reason: RETIRED_REASON } as const;
+
+const withTheRetiredWordAdmitted = async (
+  fn: (client: pg.PoolClient) => Promise<void>,
+): Promise<void> => {
+  await withWorkspace(async (client) => {
+    await client.query('ALTER TABLE "job" DROP CONSTRAINT "job_reason_check"');
+    await client.query(theCheckItReplaced());
+    await testData(client).workspace({ id: ANOTHER_WS, name: "The queue's other workspace" });
+    await fn(client);
+  });
+};
+
 describe("the migration that retired a run reason", () => {
-  it("takes every job row carrying the word, whatever its status, and leaves the rest standing", async () => {
-    await withWorkspace(async (client) => {
-      await client.query('ALTER TABLE "job" DROP CONSTRAINT "job_reason_check"');
-      await client.query(theCheckItReplaced());
-
-      // The delete runs under each workspace's own scope, and one that reached the first alone
-      // would leave this row for the CHECK.
-      await testData(client).workspace({ id: ANOTHER_WS, name: "The queue's other workspace" });
-
-      const retired = { kind: "index", reason: RETIRED_REASON } as const;
-      await seedQueuedJob(client, WS, { ...retired, subjectId: BINDING });
-      await seedClaimedJob(client, WS, { ...retired, subjectId: ANOTHER_BINDING }, 120);
-      await seedFinishedJob(client, WS, { ...retired, subjectId: A_THIRD_BINDING });
-      await seedQueuedJob(client, ANOTHER_WS, { ...retired, subjectId: BINDING });
+  it("takes every job row carrying the word, whatever its status or workspace, run as the owner the policy binds", async () => {
+    await withTheRetiredWordAdmitted(async (client) => {
+      await seedQueuedJob(client, WS, { ...RETIRED, subjectId: BINDING });
+      await seedClaimedJob(client, WS, { ...RETIRED, subjectId: ANOTHER_BINDING }, 120);
+      await seedFinishedJob(client, WS, { ...RETIRED, subjectId: A_THIRD_BINDING });
+      await seedQueuedJob(client, ANOTHER_WS, { ...RETIRED, subjectId: BINDING });
       const standing = await seedQueuedJob(client, WS, {
         kind: "index",
         reason: "rule-change",
         subjectId: A_THIRD_BINDING,
       });
 
-      for (const statement of migrationStatements(THE_RETIRING_MIGRATION)) {
-        await client.query(statement);
-      }
+      await asTheMigrationOwner(client, async () => {
+        for (const statement of migrationStatements(THE_RETIRING_MIGRATION)) {
+          await client.query(statement);
+        }
+      });
 
       expect(await jobsStandingIn(client, ANOTHER_WS)).toEqual([]);
       expect(await jobsStandingIn(client, WS)).toEqual([standing]);
       expect(
         await refusedBy(client, { kind: "index", reason: RETIRED_REASON, subjectId: BINDING }),
       ).toBe("job_reason_check");
+    });
+  });
+
+  it("reaches no row with a bare DELETE under that owner, so the loop over workspaces is what takes them", async () => {
+    await withTheRetiredWordAdmitted(async (client) => {
+      const inOne = await seedQueuedJob(client, WS, { ...RETIRED, subjectId: BINDING });
+      const inTheOther = await seedQueuedJob(client, ANOTHER_WS, {
+        ...RETIRED,
+        subjectId: BINDING,
+      });
+
+      const deleted = await asTheMigrationOwner(
+        client,
+        async () =>
+          (
+            await client.query("DELETE FROM public.job WHERE kind = 'index' AND reason = $1", [
+              RETIRED_REASON,
+            ])
+          ).rowCount,
+      );
+
+      expect(deleted).toBe(0);
+      expect(await jobsStandingIn(client, WS)).toEqual([inOne]);
+      expect(await jobsStandingIn(client, ANOTHER_WS)).toEqual([inTheOther]);
     });
   });
 });
