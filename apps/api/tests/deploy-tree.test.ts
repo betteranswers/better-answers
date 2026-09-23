@@ -59,7 +59,9 @@ describe("the deploy tree (T-005)", () => {
     expect(deployScripts()).toEqual(
       expect.arrayContaining([
         "backup.sh",
+        "browse-production.sh",
         "host-setup.sh",
+        "local-database.sh",
         "mirror-shell.sh",
         "restore-drill.sh",
         "restore-production.sh",

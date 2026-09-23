@@ -614,6 +614,12 @@ to it by IRI and never restates it (ADR 0014).
   proves it answers, records the recovery time, and wipes staging afterwards.
 - **staging** — a second copy of the platform on VPC 2 holding synthetic data only, brought up on
   demand for a drill or a rehearsal and wiped after; it never stands between them (ADR 0024).
+- **local database** — a developer's own Postgres on the pinned image, migrated and holding the
+  synthetic fixture, kept across restarts: what a GUI browses day to day. Nothing a client wrote is
+  in it.
+- **browsing role** — the read-only login every GUI profile signs in as, on the *local database*
+  and on production: every workspace's rows in every table and view, no credential column, no
+  write to a platform table. Made by an operator act, never by the journal.
 - **git store** — one of the platform's four shared stores (ADR 0005): the bare git repositories
   under `/data/git`, one per workspace, holding the bundle. The api is its only writer and the
   worker mounts it read-only at a commit; it is backed up as a verified `git bundle` per workspace
