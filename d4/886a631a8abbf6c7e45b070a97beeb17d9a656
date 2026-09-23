@@ -1,0 +1,69 @@
+apps/worker/src/better_answers_worker/pipeline/landed.py
+  s_69414e6e80cf2c::t_4dcadc04ed9b65 65
+  s_69414e6e80cf2c::t_4b2a65a0a96dfd 142
+  s_69414e6e80cf2c::t_6898b997f1a463 13
+apps/worker/tests/test_redaction.py
+  s_69414e6e80cf2c::t_109b4399d5f06d 660
+  s_69414e6e80cf2c::t_b2d4f365bc01aa 146,150
+  s_69414e6e80cf2c::t_ddcb3bf07d0dcd 494
+  s_69414e6e80cf2c::t_16dc9f004b22ce 588
+  s_69414e6e80cf2c::t_fd170c4ed60e7c 460-466,471-478
+  s_69414e6e80cf2c::t_77ee87b530d746 634-648
+  s_69414e6e80cf2c::t_174e20878d9a37 523
+  s_69414e6e80cf2c::t_a4fff88f327a8e 16-17
+  s_69414e6e80cf2c::t_6c370603d72ef1 598,601
+  s_69414e6e80cf2c::t_22c87a2600b31b 8-9,11-13
+  s_69414e6e80cf2c::t_2ca09481b8f5de 137-145,147-148,153-160
+  s_69414e6e80cf2c::t_e08ecc40743f65 7,10,14-15,18
+  s_69414e6e80cf2c::t_e85e127e56df1a 149,151-152
+  s_69414e6e80cf2c::t_2fc50d4fe3f41e 502-512
+  s_69414e6e80cf2c::t_67555685728f49 603-609,611-626,633,649-659,661-691
+  s_69414e6e80cf2c::t_326aba50ad5c95 610
+  s_69414e6e80cf2c::t_a75192031aaadf 627-632
+apps/worker/src/better_answers_worker/pipeline/catalogue.py
+  s_69414e6e80cf2c::t_90f5b9be14d59f 124-129,133
+apps/worker/tests/test_pipeline_index.py
+  s_69414e6e80cf2c::t_0c6a2f39f5f873 26
+  s_69414e6e80cf2c::t_312c0701226875 998-1012,1021-1022,1024-1035
+  s_69414e6e80cf2c::t_913519ffc6f806 953-962
+  s_69414e6e80cf2c::t_d331eb70585b2f 971-978,981
+  s_69414e6e80cf2c::t_fb4f0f46110833 1013-1020,1023
+  s_69414e6e80cf2c::t_92b4752021046f 547
+  s_69414e6e80cf2c::t_2fb0082382eef5 25,27-30
+  s_69414e6e80cf2c::t_c3a6a9e0adbfb3 96-118
+docs/adr/0020-personal-data-is-withheld-at-the-seam-before-any-store-and-erased-from-every-copy-by-routine.md
+  s_69414e6e80cf2c::t_e4cc873a5963ba 147-160
+  s_69414e6e80cf2c::t_6e765f15b5b975 114
+docs/adr/README.md
+  s_69414e6e80cf2c::t_ff1bf232dae9a5 30
+apps/worker/src/better_answers_worker/redaction/withholdings.py
+  s_69414e6e80cf2c::t_b2d4f365bc01aa 142
+  s_69414e6e80cf2c::t_9801d6c8ad0a62 115,119-120,122-123
+  s_69414e6e80cf2c::t_78a89e726e32f8 1-75,77-114,116-118,121,124-141,143-166
+  s_69414e6e80cf2c::t_3c9d13f410885b 76
+apps/worker/src/better_answers_worker/redaction/suppressions.py
+  s_69414e6e80cf2c::t_0bc1bb5a85fd48 3
+apps/worker/src/better_answers_worker/pipeline/run.py
+  s_69414e6e80cf2c::t_fa61ba1acc992f 7
+  s_69414e6e80cf2c::t_8ac9206120940e 115
+apps/worker/src/better_answers_worker/redaction/__init__.py
+  s_69414e6e80cf2c::t_b2d4f365bc01aa 99
+  s_69414e6e80cf2c::t_90c8db79b96b3c 6,10-16,30,51,57,59,75-78,80,86-88,91-96
+  s_69414e6e80cf2c::t_0b78ebf3049638 44-48,53-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d4886a631a8abbf6c7e45b070a97beeb17d9a656",
+  "prompts": {},
+  "sessions": {
+    "s_69414e6e80cf2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6af0bc5d-5e17-4638-afb3-472e1f42e570",
+        "model": "unknown"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
