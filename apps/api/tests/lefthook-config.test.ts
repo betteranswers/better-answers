@@ -69,27 +69,18 @@ const manifestScripts = (workspace: string): Readonly<Record<string, string>> =>
 
 const SCRIPT_CALL = /(?:pnpm run|check\.mjs)\s+([\w:.\- ]+)/g;
 
-// A hook command that delegates names its binary in the workspace script it runs, and that
-// script may delegate again through the `check` runner.
+// A delegating command names its binary in the script it runs, or in the steps that script
+// hands the `check` runner.
 const reachedFrom = (workspace: string, run: string): string => {
   const scripts = manifestScripts(workspace);
-  const seen = new Set<string>();
-  const queue = [run];
-  const texts: string[] = [];
-  while (queue.length > 0) {
-    const text = queue.shift() ?? "";
-    texts.push(text);
-    for (const [, named] of text.matchAll(SCRIPT_CALL)) {
-      for (const name of (named ?? "").trim().split(/\s+/)) {
-        const script = scripts[name];
-        if (script === undefined || seen.has(name)) continue;
-        seen.add(name);
-        queue.push(script);
-      }
-    }
-  }
-  if (seen.size === 0) throw new Error(`\`${run}\` reaches no script ${workspace} declares`);
-  return texts.join("\n");
+  const namedIn = (text: string): readonly string[] =>
+    [...text.matchAll(SCRIPT_CALL)].flatMap(([, list]) => (list ?? "").trim().split(/\s+/));
+  const bodies = (names: readonly string[]): readonly string[] =>
+    names.flatMap((name) => (scripts[name] === undefined ? [] : [scripts[name]]));
+
+  const first = bodies(namedIn(run));
+  if (first.length === 0) throw new Error(`\`${run}\` reaches no script ${workspace} declares`);
+  return [...first, ...bodies(first.flatMap(namedIn))].join("\n");
 };
 
 type Proof =

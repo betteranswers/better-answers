@@ -43,7 +43,9 @@ The `commit-msg` hook holds every commit's subject to 72 characters, not just `p
 
 ### The write-time comment gate
 
-`comment-gate-hook.sh` runs the same comment gate root `check` runs over the one file an agent has just written, and forwards the gate's own message rather than restating it. Exit 2 is the only code whose stderr reaches the model; every other outcome exits 0, so a machine without the tooling refuses no edit. It reads `apps/` and `packages/` only, those being the two roots root `check` hands the TypeScript and Python gates.
+`comment-gate-hook.sh` runs the same comment gate root `check` runs over the one file an agent has just written, and forwards the gate's own message rather than restating it. Exit 2 is the only code whose stderr reaches the model; every other outcome exits 0, so a machine without the tooling refuses no edit.
+
+It reads `apps/`, `packages/`, `scripts/`, `.claude/hooks/` and the five root tool-configuration files. Every one of those is gated by root `check`, and `apps/api/tests/comment-gate-hook.test.ts` holds the hook's list to the gate commands so a root cannot be added here that CI would accept. The gates reach further than the hook does — `.github/` and `deploy/` are read by root `check` and not by this hook — which is the safe direction: a file the hook walks past is judged at the pull request rather than refused at the keyboard.
 
 ### Creating and removing a worktree
 

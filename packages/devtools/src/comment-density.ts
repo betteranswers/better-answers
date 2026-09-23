@@ -28,15 +28,15 @@ const MEASURED_LANGUAGES = {
 
 type Kind = keyof typeof MEASURED_LANGUAGES;
 
-// A unit no directory gathers names what it holds, and its `path` is then the report's name
-// for the set, not a place on disk.
+// A unit no directory gathers names the paths it holds; one that is a directory or a
+// workspace stands at its own.
 export type Unit = {
-  readonly path: string;
+  readonly name: string;
   readonly kind: Kind;
   readonly holds?: readonly string[];
 };
 
-const heldBy = (unit: Unit): readonly string[] => unit.holds ?? [unit.path];
+export const heldBy = (unit: Unit): readonly string[] => unit.holds ?? [unit.name];
 
 const EVERY_MEASURED_LANGUAGE = new Set<string>(
   Object.values(MEASURED_LANGUAGES).flatMap((languages) => [...languages]),
@@ -142,13 +142,13 @@ export const measure = (
     const unit = unitOf(row.file, units);
     if (unit === undefined) continue;
     if (!MEASURED_LANGUAGES[unit.kind].has(row.language)) continue;
-    const arms = totals.get(unit.path) ?? new Map<Arm, Total>();
+    const arms = totals.get(unit.name) ?? new Map<Arm, Total>();
 
     // A config root has no test arm to hold to the tighter ceiling, so one number is the truth.
     const arm = unit.kind === "directory" ? "source" : armOf(row.file);
     const running = arms.get(arm) ?? { code: 0, comment: 0 };
     arms.set(arm, { code: running.code + row.code, comment: running.comment + row.comment });
-    totals.set(unit.path, arms);
+    totals.set(unit.name, arms);
   }
   return [...totals.entries()]
     .flatMap(([unit, arms]) =>

@@ -20,8 +20,8 @@ import type { Tree } from "@better-answers/devtools/throwaway-tree";
 const WORKSPACE = "packages/probe";
 const MIGRATIONS = `${WORKSPACE}/migrations`;
 
-const asWorkspace: Unit = { path: WORKSPACE, kind: "workspace" };
-const asDirectory: Unit = { path: MIGRATIONS, kind: "directory" };
+const asWorkspace: Unit = { name: WORKSPACE, kind: "workspace" };
+const asDirectory: Unit = { name: MIGRATIONS, kind: "directory" };
 
 const commentLine = "// one comment line that says nothing the code does not\n";
 const codeLine = (index: number): string =>
@@ -263,7 +263,7 @@ const configTree = (comments: number): Tree => ({
   [CONFIG_FILES[1]]: withRatio(comments, 20),
 });
 
-const asNamed: Unit = { path: NAMED, kind: "directory", holds: [...CONFIG_FILES] };
+const asNamed: Unit = { name: NAMED, kind: "directory", holds: [...CONFIG_FILES] };
 
 const clocConfig = clocOver([...CONFIG_FILES], { tree: configTree(1), counted: 2 });
 

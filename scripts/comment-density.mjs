@@ -5,6 +5,7 @@ import { parseArgs } from "node:util";
 
 import {
   countOver,
+  heldBy,
   measure,
   overTheCeiling,
   reportOf,
@@ -47,7 +48,7 @@ const named = (parsed.values.unit ?? []).map((given) => {
   if (at === -1 || label === "" || holds.length === 0) {
     refuse(`--unit takes <name>=<path>[,<path>], which ${given} is not`);
   }
-  return { path: label, kind: "directory", holds };
+  return { name: label, kind: "directory", holds };
 });
 
 if (roots.length === 0 && directories.length === 0 && named.length === 0) {
@@ -77,23 +78,19 @@ for (const directory of directories) {
 
 for (const unit of named) {
   for (const held of unit.holds) {
-    if (!existsSync(path.join(root, held))) refuse(`${unit.path} names no ${held}`);
+    if (!existsSync(path.join(root, held))) refuse(`${unit.name} names no ${held}`);
   }
 }
 
 const units = [
-  ...workspaces.map((workspace) => ({ path: workspace, kind: "workspace" })),
-  ...directories.map((directory) => ({ path: directory, kind: "directory" })),
+  ...workspaces.map((workspace) => ({ name: workspace, kind: "workspace" })),
+  ...directories.map((directory) => ({ name: directory, kind: "directory" })),
   ...named,
 ];
 
 let counted;
 try {
-  counted = countOver(root, [
-    ...workspaces,
-    ...directories,
-    ...named.flatMap((unit) => unit.holds),
-  ]);
+  counted = countOver(root, units.flatMap(heldBy));
 } catch (cause) {
   refuse(`the line counter did not run: ${String(cause)}`);
 }
@@ -105,7 +102,7 @@ if (counted.length === 0) {
 
 const measured = measure(counted, units);
 
-for (const one of [...directories, ...named.map((unit) => unit.path)]) {
+for (const one of [...directories, ...named.map((unit) => unit.name)]) {
   // A named unit read as nothing is the same false green as a whole run read as nothing.
   if (!measured.some((seen) => seen.unit === one)) {
     refuse(`the line counter measured no file it understands under ${one}`);

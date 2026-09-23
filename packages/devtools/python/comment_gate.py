@@ -47,11 +47,13 @@ MARKER = Path(__file__).resolve().parents[1] / "migration-marker.json"
 
 def _migration_marker() -> str:
     fixture: Any = json.loads(MARKER.read_text(encoding="utf8"))
-    return str(fixture["marker"])
+    marker = fixture.get("marker")
+    # A key that moved would exempt the string "None" and delete every marker in the tree.
+    if not isinstance(marker, str) or not marker.strip():
+        raise ValueError(f"{MARKER} carries no marker")
+    return marker
 
 
-# Read rather than written, so the gate and the strip cannot disagree on a marker that
-# names the decision allowing it.
 EXEMPT_WHOLE = frozenset({"--> statement-breakpoint", _migration_marker()})
 
 MARKERS = "#-"

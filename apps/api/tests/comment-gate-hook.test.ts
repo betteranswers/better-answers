@@ -125,6 +125,38 @@ if (smoke.status !== 2 || !smoke.stderr.includes("runs to 40 words")) {
   );
 }
 
+const CASE_BLOCK = /case "\$RELATIVE" in\n([\s\S]*?)\nesac/;
+
+// The roots a `case` arm names, with the trailing glob off, so `scripts/*` reads as `scripts`.
+const rootsIn = (hook: string): readonly string[] => {
+  const block = CASE_BLOCK.exec(hook)?.[1];
+  if (block === undefined) throw new Error("the hook holds no `$RELATIVE` case block to read");
+  return block
+    .split("\n")
+    .flatMap((line) => (line.split(")")[0] ?? "").split("|"))
+    .map((pattern) => pattern.trim().replace(/\/\*$/, ""))
+    .filter((pattern) => pattern !== "" && pattern !== "*");
+};
+
+const gatedRoots = (): ReadonlySet<string> =>
+  new Set(
+    ["comment-gate:ts", "comment-gate:python"].flatMap((name) =>
+      (rootScripts()[name] ?? "").split(/\s+/),
+    ),
+  );
+
+describe("the write-time hook reads no root root `check` leaves ungated", () => {
+  it("names every root of its own in a gate command too", () => {
+    expect(rootsIn(hookText).filter((root) => !gatedRoots().has(root))).toEqual([]);
+  });
+
+  it("reports one a gate command does not name, read off fixture text", () => {
+    const fixture = 'case "$RELATIVE" in\nnowhere/* | apps/*) ;;\n*) exit 0 ;;\nesac';
+
+    expect(rootsIn(fixture).filter((root) => !gatedRoots().has(root))).toEqual(["nowhere"]);
+  });
+});
+
 describe("the write-time hook hands back the comment rule the edit broke", () => {
   it("refuses a 40-word TypeScript comment, naming the count and its rule", () => {
     const run = edit("packages/probe/long.ts", `// ${FORTY_WORDS}\nexport const keep = 1;\n`);

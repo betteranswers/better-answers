@@ -410,14 +410,16 @@ const BREAKPOINT_BODY = "statement-breakpoint";
 const SEPARATOR = `--> ${BREAKPOINT_BODY}`;
 const BREAKPOINT = new RegExp(`^${BREAKPOINT_BODY}$`);
 
-// Read rather than written, so the gate and the strip cannot disagree on a marker that names
-// the decision allowing it.
-export const CUSTOM_MIGRATION = JSON.parse(
-  fs.readFileSync(
-    path.resolve(import.meta.dirname, "../packages/devtools/migration-marker.json"),
-    "utf8",
-  ),
-).marker;
+const MARKER = path.resolve(import.meta.dirname, "../packages/devtools/migration-marker.json");
+
+const markerIn = (file) => {
+  const { marker } = JSON.parse(fs.readFileSync(file, "utf8"));
+  // A key that moved would leave `undefined` here and strip every marker in the tree.
+  if (typeof marker !== "string" || marker.trim() === "") throw new Error(`${file} carries none`);
+  return marker;
+};
+
+export const CUSTOM_MIGRATION = markerIn(MARKER);
 
 // A bare number is a step or a count, so a version says so: a leading `v`, a dot, or a commit.
 const VERSION = /^(?:v\d+(?:\.\d+)*|\d+(?:\.\d+)+)$/;
