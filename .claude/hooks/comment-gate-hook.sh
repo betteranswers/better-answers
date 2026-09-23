@@ -31,7 +31,8 @@ RELATIVE="${FILE#"$ROOT"/}"
 # The roots this hook reads. Elsewhere it stays silent: a finding outside root `check`'s
 # gates would refuse an edit CI accepts.
 case "$RELATIVE" in
-apps/* | packages/*) ;;
+apps/* | packages/* | scripts/* | .claude/hooks/*) ;;
+cubic.yaml | jscpd.config.mjs | knip.config.ts | lefthook.yml | pnpm-workspace.yaml) ;;
 *) exit 0 ;;
 esac
 

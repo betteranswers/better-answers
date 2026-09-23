@@ -143,11 +143,14 @@ describe("the write-time hook hands back the comment rule the edit broke", () =>
   });
 
   it.each([
-    ["YAML", "packages/probe/long.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
-    ["shell", "packages/probe/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
-    ["TOML", "packages/probe/long.toml", `# ${FORTY_WORDS}\nkeep = 1\n`],
-    ["SQL", "packages/probe/long.sql", `-- ${FORTY_WORDS}\nSELECT 1;\n`],
-  ])("refuses a 40-word %s comment, naming the count and its rule", (_language, file, source) => {
+    ["a YAML file", "packages/probe/long.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
+    ["a shell file", "packages/probe/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
+    ["a TOML file", "packages/probe/long.toml", `# ${FORTY_WORDS}\nkeep = 1\n`],
+    ["a SQL file", "packages/probe/long.sql", `-- ${FORTY_WORDS}\nSELECT 1;\n`],
+    ["a root script", "scripts/long.mjs", `// ${FORTY_WORDS}\nexport const keep = 1;\n`],
+    ["a hook script", ".claude/hooks/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
+    ["a root configuration file", "lefthook.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
+  ])("refuses a 40-word comment in %s, naming the count and its rule", (_what, file, source) => {
     const run = edit(file, source);
 
     expect(run.status).toBe(2);

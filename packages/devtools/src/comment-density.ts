@@ -28,7 +28,15 @@ const MEASURED_LANGUAGES = {
 
 type Kind = keyof typeof MEASURED_LANGUAGES;
 
-export type Unit = { readonly path: string; readonly kind: Kind };
+// A unit no directory gathers names what it holds, and its `path` is then the report's name
+// for the set, not a place on disk.
+export type Unit = {
+  readonly path: string;
+  readonly kind: Kind;
+  readonly holds?: readonly string[];
+};
+
+const heldBy = (unit: Unit): readonly string[] => unit.holds ?? [unit.path];
 
 const EVERY_MEASURED_LANGUAGE = new Set<string>(
   Object.values(MEASURED_LANGUAGES).flatMap((languages) => [...languages]),
@@ -117,9 +125,10 @@ const unitOf = (file: string, units: readonly Unit[]): Unit | undefined => {
   const relative = file.replace(/^\.\//, "");
 
   // Longest path first, so a directory named inside a workspace takes the files it holds.
-  return [...units]
-    .sort((left, right) => right.path.length - left.path.length)
-    .find((unit) => relative === unit.path || relative.startsWith(`${unit.path}/`));
+  return units
+    .flatMap((unit) => heldBy(unit).map((held) => ({ unit, held })))
+    .sort((left, right) => right.held.length - left.held.length)
+    .find(({ held }) => relative === held || relative.startsWith(`${held}/`))?.unit;
 };
 
 type Total = { code: number; comment: number };
