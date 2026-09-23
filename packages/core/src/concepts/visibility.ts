@@ -100,25 +100,29 @@ export const conceptVisibilityFrom = async (
     readonly onTheRow?: boolean | undefined;
   },
 ): Promise<Visibility> => {
-  const bindings =
+  const rowsCited =
     concept.citing === undefined
-      ? await tx.query<SourcedVisibilityRow>(
-          `SELECT b.sensitivity, b.audience, b.audience_groups, d.sensitivity AS document_sensitivity
-             FROM concept_evidence ce
+      ? {
+          clause: `FROM concept_evidence ce
              JOIN source_document d ON d.workspace_id = ce.workspace_id AND d.id = ce.source_document_id
              JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
-            WHERE ce.workspace_id = ${scopeClause(1)} AND ce.iri = $2
-            FOR SHARE OF b`,
-          [scopeParameter(principal), concept.iri],
-        )
-      : await tx.query<SourcedVisibilityRow>(
-          `SELECT b.sensitivity, b.audience, b.audience_groups, d.sensitivity AS document_sensitivity
-             FROM source_document d
+            WHERE ce.workspace_id = ${scopeClause(1)} AND ce.iri = $2`,
+          parameters: [scopeParameter(principal), concept.iri],
+        }
+      : {
+          clause: `FROM source_document d
              JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
-            WHERE d.workspace_id = ${scopeClause(1)} AND d.id = ANY($2::text[])
-            FOR SHARE OF b`,
-          [scopeParameter(principal), [...new Set(concept.citing)]],
-        );
+            WHERE d.workspace_id = ${scopeClause(1)} AND d.id = ANY($2::text[])`,
+          parameters: [scopeParameter(principal), [...new Set(concept.citing)]],
+        };
+  // A statement that waited on a lock still reads unlocked rows at its first snapshot, so the
+  // document's class is read in the next.
+  await tx.query(`SELECT 1 ${rowsCited.clause} FOR SHARE OF b`, rowsCited.parameters);
+  const bindings = await tx.query<SourcedVisibilityRow>(
+    `SELECT b.sensitivity, b.audience, b.audience_groups, d.sensitivity AS document_sensitivity
+       ${rowsCited.clause}`,
+    rowsCited.parameters,
+  );
   const override = await overrideOf(principal, tx, concept.iri);
 
   // After the bindings, never before: taking this row first is the one order that deadlocks

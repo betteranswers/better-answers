@@ -16,8 +16,13 @@ import { footnotesOf } from "../src/guides/index.ts";
 import type { z } from "zod";
 
 import { attempt, parse, type UserPrincipal } from "../src/kernel/index.ts";
-import { narrowBinding, narrowBindingInput } from "../src/sources/index.ts";
-import type { Opened } from "../src/store/postgres/index.ts";
+import {
+  narrowBinding,
+  narrowBindingInput,
+  narrowDocuments,
+  narrowDocumentsInput,
+} from "../src/sources/index.ts";
+import type { Opened, Tx } from "../src/store/postgres/index.ts";
 import { inputOf } from "./suite-input.ts";
 import { bundleHistory } from "./bundle.ts";
 import { countWaitingOnLocks, until, whileActsWaitAt } from "./suite-postgres.ts";
@@ -38,6 +43,7 @@ import {
   seededBy,
   visibilityHeld,
   visibilitySuite,
+  type Sourced,
   type SourcedConcept,
 } from "./sourced-concept.ts";
 
@@ -136,11 +142,42 @@ const rowAndNode = async (workspaceId: string, iri: string) => ({
 
 const bothAt = (pair: object) => ({ row: pair, node: pair });
 
-const someoneWaitsOnALock = async (): Promise<boolean> => {
-  const found = await db().pool.query(
-    "SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'",
+const statementsWaitingOnALock = async (): Promise<readonly string[]> => {
+  const found = await db().pool.query<{ query: string }>(
+    "SELECT query FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'",
   );
-  return (found.rowCount ?? 0) > 0;
+  return found.rows.map((row) => row.query);
+};
+
+const someoneWaitsOnALock = async (): Promise<boolean> =>
+  (await statementsWaitingOnALock()).length > 0;
+
+const besideAnOpenNarrowing = async <T>(
+  scenario: Scenario,
+  narrowing: (tx: Tx) => Promise<{ readonly ok: boolean }>,
+  act: () => Promise<T>,
+): Promise<{ readonly outcome: T; readonly waitingAt: readonly string[] }> => {
+  const holder = await db().runtimePool.connect();
+  try {
+    await holder.query("BEGIN");
+    await holder.query("SELECT set_config('app.workspace_id', $1, true)", [scenario.workspaceId]);
+    expect(await narrowing(holder)).toMatchObject({ ok: true });
+
+    let settled = false;
+    const acting = act().then((outcome) => {
+      settled = true;
+      return outcome;
+    });
+    await until(someoneWaitsOnALock);
+    const waitingAt = await statementsWaitingOnALock();
+    expect(settled).toBe(false);
+
+    await holder.query("COMMIT");
+    return { outcome: await acting, waitingAt };
+  } finally {
+    await attempt(() => holder.query("ROLLBACK"));
+    holder.release();
+  }
 };
 
 const compositionIncluding = (workspaceId: string, iris: readonly string[]): Promise<string> =>
@@ -736,33 +773,17 @@ describe("narrowing a binding", () => {
     bindingId: string,
     write: () => Promise<Awaited<ReturnType<typeof rewriteCiting>>>,
   ) => {
-    const narrowing = await db().runtimePool.connect();
-    try {
-      await narrowing.query("BEGIN");
-      await narrowing.query("SELECT set_config('app.workspace_id', $1, true)", [
-        scenario.workspaceId,
-      ]);
-      const narrowed = await narrowingAsked(scenario.admin, narrowing, {
-        bindingId,
-        sensitivity: "Restricted",
-        audience: "everyone",
-      });
-      expect(narrowed.ok).toBe(true);
-
-      let settled = false;
-      const landing = write().then((outcome) => {
-        settled = true;
-        return outcome;
-      });
-      await until(someoneWaitsOnALock);
-      expect(settled).toBe(false);
-
-      await narrowing.query("COMMIT");
-      expect(await landing).toMatchObject({ ok: true });
-    } finally {
-      await attempt(() => narrowing.query("ROLLBACK"));
-      narrowing.release();
-    }
+    const { outcome } = await besideAnOpenNarrowing(
+      scenario,
+      (tx) =>
+        narrowingAsked(scenario.admin, tx, {
+          bindingId,
+          sensitivity: "Restricted",
+          audience: "everyone",
+        }),
+      write,
+    );
+    expect(outcome).toMatchObject({ ok: true });
   };
 
   it("holds a write landing beside it until it has committed, so the write derives from the narrowed binding and never lands wider", async () => {
@@ -983,6 +1004,103 @@ describe("narrowing a binding", () => {
     ]);
     expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed")).toEqual(
       [],
+    );
+  });
+});
+
+describe("narrowing documents", () => {
+  const besideAnOpenDocumentNarrowing = async <T>(
+    scenario: Scenario,
+    narrowed: Sourced,
+    waitingAt: string,
+    act: () => Promise<T>,
+  ): Promise<T> => {
+    const beside = await besideAnOpenNarrowing(
+      scenario,
+      (tx) =>
+        narrowDocuments(
+          scenario.admin,
+          tx,
+          inputOf(narrowDocumentsInput, {
+            bindingId: narrowed.bindingId,
+            findingGroups: [
+              {
+                documentId: narrowed.documentId,
+                category: "bank-details",
+                ruleId: "sort-code-with-account-number",
+                tier: "always",
+              },
+            ],
+            sensitivity: "Restricted",
+          }),
+        ),
+      act,
+    );
+    expect(beside.waitingAt).toEqual([expect.stringContaining(waitingAt)]);
+    return beside.outcome;
+  };
+
+  it("holds a concept landing beside it until it has committed, so a concept new to the document lands at the class the narrowing gave it, never the one it held before", async () => {
+    const scenario = await arrange();
+    const handbook = await bindingHolding(db(), scenario.workspaceId);
+    // A shared evidence row: a new one's foreign key would wait on the narrowed document before
+    // the landing reached the binding.
+    await conceptCiting(scenario, scenario.editor, [handbook.documentId]);
+
+    const landed = await besideAnOpenDocumentNarrowing(scenario, handbook, "FOR SHARE", () =>
+      conceptCiting(scenario, scenario.editor, [handbook.documentId]),
+    );
+
+    expect(await rowAndNode(scenario.workspaceId, landed.iri)).toEqual(
+      bothAt({ sensitivity: "Restricted", ...EVERYONE }),
+    );
+  });
+
+  it("holds a re-write's check beside it until it has committed, so the check weighs the document at its narrowed class and lets through a re-write that does not widen", async () => {
+    const scenario = await arrange();
+    const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const handbook = await bindingHolding(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.admin, [restricted.documentId]);
+
+    const rewritten = await besideAnOpenDocumentNarrowing(
+      scenario,
+      handbook,
+      "FOR SHARE OF b",
+      () => rewriteCiting(scenario, scenario.admin, written, [handbook.documentId]),
+    );
+
+    expect(rewritten).toEqual({ ok: true, value: expect.objectContaining({ iri: written.iri }) });
+    expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
+      bothAt({ sensitivity: "Restricted", ...EVERYONE }),
+    );
+  });
+
+  it("holds a narrowing of another binding at the cascade's head until it has committed, so the concept it recomputes rests on the document at its narrowed class", async () => {
+    const scenario = await arrange();
+    const handbook = await bindingHolding(db(), scenario.workspaceId);
+    const brochure = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Public" });
+    const written = await conceptCiting(scenario, scenario.editor, [
+      handbook.documentId,
+      brochure.documentId,
+    ]);
+
+    const narrowed = await besideAnOpenDocumentNarrowing(
+      scenario,
+      handbook,
+      "pg_advisory_xact_lock",
+      () =>
+        reading(scenario.admin, (admin, tx) =>
+          narrowingAsked(admin, tx, {
+            bindingId: brochure.bindingId,
+            sensitivity: "Internal",
+            audience: "everyone",
+          }),
+        ),
+    );
+
+    expect(narrowed).toMatchObject({ ok: true, value: { concepts: [written.iri] } });
+    expect(await rowAndNode(scenario.workspaceId, written.iri)).toEqual(
+      bothAt({ sensitivity: "Restricted", ...EVERYONE }),
     );
   });
 });
