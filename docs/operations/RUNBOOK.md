@@ -56,12 +56,21 @@ The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orche
 ## 6. A release went wrong
 
 - **Fires:** `release.yml`'s post-deploy smoke is red; the uptime check goes red within minutes of a promotion; the orchestrator's *failed deployment* or *unhealthy container* mail.
-- **Do:** open **`deploy/RELEASES.md`**. The row above the one just written is the release that worked: run `release` again with that row's two digests as the inputs and `rehearsed_by: hotfix: rollback of <the failed row>`. Migrations are forward-only (ADR 0022, and its 2026-09-21 amendment records why that is the ADR's decision and not a coding rule): a migration that cannot run under the previous release says so in its release note, and then the rollback is page 1's restore from the last hourly dump instead of the previous digest. Read the deploy log in the orchestrator before either — a stack that never came up (a missing env key: the app refuses to start unless `PUBLIC_URL`, `AGENT_HOSTNAME` and `APEX_HOSTNAME` are set and differ, ADR 0034) is fixed by the key, not by a rollback.
+- **Do:** **list the release tags newest first** and take the one *below* the promotion that just failed — that is the release that worked (promotions are `release/*` tags since 23/09/2026, T-342; `deploy/RELEASES.md` is frozen and holds the promotions before that date, its last row read the same way):
+
+  ```sh
+  git fetch --tags && git tag --list 'release/*' --sort=-creatordate | head -5
+  git show --no-patch release/<stamp>   # when, who, both digests, what it rode on
+  ```
+
+  The list is newest first, so the failed promotion is the top line and the release that worked is the one under it; `<stamp>` is that second line.
+
+  Run `release` again with that tag's two digests as the inputs and `rehearsed_by: hotfix: rollback of <the failed tag>`. Migrations are forward-only (ADR 0022, and its 2026-09-21 amendment records why that is the ADR's decision and not a coding rule): a migration that cannot run under the previous release says so in its release note, and then the rollback is page 1's restore from the last hourly dump instead of the previous digest. Read the deploy log in the orchestrator before either — a stack that never came up (a missing env key: the app refuses to start unless `PUBLIC_URL`, `AGENT_HOSTNAME` and `APEX_HOSTNAME` are set and differ, ADR 0034) is fixed by the key, not by a rollback.
 - **The switch (ticket 79 Q7):** the day the first client's data is on the box, set the repository variable `CLIENT_DATA_ON_BOX` to that date. From then on `release` refuses to run unless `rehearsed_by` names the drill report a restore was just proved on, or a hotfix reason — one deploy train a month, on the drill day, plus hotfixes. Before that day any green build may be promoted, and the smoke is the last step.
 - **The next release is two steps, once** (11/09/2026, T-125): `deploy/platform.compose.yaml`'s bootstrap anchor now **requires** `S3_BUCKET` — the replay of erasures reads the object store and refuses when it cannot, and a bucket name it had to guess would be that refusal in production. So before the next production deploy, **set `S3_BUCKET` on the platform resource** in the orchestrator, to the bucket `wizard-41.sh`'s Garage stage created, and **then deploy**. A stack deployed without it does not come up half-working: compose refuses to start it, which is the failure this page's second bullet describes.
-- **Attach:** the two `RELEASES.md` rows (failed, rolled back to); the workflow run; the orchestrator's deploy log; the body `/health` answered.
+- **Attach:** the two `release/*` tags (failed, rolled back to), each with the message `git show --no-patch` prints; the workflow run; the orchestrator's deploy log; the body `/health` answered.
 - **Escalate:** the technical contact if the rollback does not turn `/health` green within 30 minutes; the client's named contact if the product was unreachable for more than an hour.
-- **Rehearsed by:** the first release after the first drill is rolled back on purpose, once, and the row is kept.
+- **Rehearsed by:** the first release after the first drill is rolled back on purpose, once, and both tags are kept.
 
 ## 7. A backup check is red
 
