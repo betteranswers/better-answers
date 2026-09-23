@@ -48,7 +48,7 @@ def _unreadable_from(cause: Exception) -> UnreadableError:
     return UnreadableError(type(cause).__name__, str(cause))
 
 
-BYTES_PER_PAGE = 2488
+BYTES_PER_PAGE = 3107
 
 
 def pages_of(body: bytes, media_type: str) -> int:

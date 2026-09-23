@@ -732,20 +732,20 @@ def test_the_document_row_keeps_the_seams_version_and_not_the_converters(
 
 
 def test_the_timeout_is_the_seams_ms_per_page_times_the_pages_and_a_margin() -> None:
-    assert SEAM_MS_PER_PAGE == 2841
-    assert TIMEOUT_MARGIN_MS == 30_000
-    assert timeout_for(1).total_seconds() == pytest.approx(32.841)
-    assert timeout_for(12).total_seconds() == pytest.approx(64.092)
+    assert SEAM_MS_PER_PAGE == 6453
+    assert TIMEOUT_MARGIN_MS == 93_000
+    assert timeout_for(1).total_seconds() == pytest.approx(99.453)
+    assert timeout_for(12).total_seconds() == pytest.approx(170.436)
     assert timeout_for(12) - timeout_for(11) == timeout_for(1) - timeout_for(0)
 
 
 def test_a_pdfs_pages_are_read_and_the_other_types_measured_against_s0s_page() -> None:
     assert pages_of(fixture_bytes("rate-card.pdf"), PDF_MEDIA_TYPE) == 1
     assert pages_of(b"", "text/markdown") == 1
-    assert pages_of(b"a" * 2488, "text/markdown") == 1
-    assert pages_of(b"a" * 2489, "text/markdown") == 2
+    assert pages_of(b"a" * 3107, "text/markdown") == 1
+    assert pages_of(b"a" * 3108, "text/markdown") == 2
 
-    assert pages_of(fixture_bytes("expenses-policy.docx"), DOCX_MEDIA_TYPE) == 15
+    assert pages_of(fixture_bytes("expenses-policy.docx"), DOCX_MEDIA_TYPE) == 12
 
 
 def test_a_document_that_runs_past_its_ceiling_is_quarantined_and_the_run_finishes(

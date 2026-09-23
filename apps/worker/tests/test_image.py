@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import math
 import os
 import re
 import subprocess
@@ -28,6 +29,7 @@ BUILD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "build.yml"
 CHECK_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "check.yml"
 STORES_COMPOSE = REPO_ROOT / "deploy" / "stores.compose.yaml"
 PINS = WORKSPACE / "src" / "better_answers_worker" / "redaction" / "pins.py"
+PIPELINE = WORKSPACE / "src" / "better_answers_worker" / "pipeline"
 DOCKERFILE = WORKSPACE / "Dockerfile"
 
 
@@ -243,12 +245,28 @@ def base_image_python_version() -> tuple[int, int, int]:
     return major, minor, patch
 
 
-def _pin(name: str) -> str:
-    found = re.search(rf'^{name} = "([^"]+)"', PINS.read_text("utf-8"), re.M)
-    if found is None:
-        message = f"{PINS} declares no {name} this can read"
+def _declared(path: Path, name: str, value: str) -> str:
+    found = re.findall(rf"^{name} = {value}$", path.read_text("utf-8"), re.M)
+    if len(found) != 1:
+        message = f"{path} declares {len(found)} {name} this can read; expected one"
         raise RuntimeError(message)
-    return found.group(1)
+    return str(found[0])
+
+
+def _pin(name: str) -> str:
+    return _declared(PINS, name, r'"([^"]+)"')
+
+
+def _pipeline_constant(module: str, name: str) -> int:
+    return int(_declared(PIPELINE / module, name, r"([\d_]+)").replace("_", ""))
+
+
+def _worker_limit(key: str) -> str:
+    found = re.findall(rf"\b{key}: (\w+)", worker_service())
+    if len(found) != 1:
+        message = f"the worker service sets {len(found)} {key}; expected one"
+        raise RuntimeError(message)
+    return str(found[0])
 
 
 def pinned_model_ids() -> tuple[str, ...]:
@@ -427,6 +445,60 @@ sys.stdout.write(json.dumps({
     "pinned_ms": pinned,
 }))
 """
+
+
+@dataclass(frozen=True)
+class SeamReading:
+    taken_on: str
+    machine: str
+    platform: str
+    memory_and_memswap: tuple[str, str] | None
+    page_bytes: int
+    ms_per_page: tuple[int, int, int]
+    load_ms: tuple[int, int, int]
+
+
+AN_M4_PRO = "Apple M4 Pro (14 cores, 24 GB) under Docker Desktop"
+ROSETTA = f"{AN_M4_PRO} 29.8, the image emulated by Rosetta 2"
+
+
+SEAM_READINGS: Mapping[str, SeamReading] = {
+    "T-122": SeamReading(
+        "2026-09-11",
+        AN_M4_PRO,
+        "linux/arm64",
+        None,
+        2488,
+        (2841, 1910, 2646),
+        (6351, 6714, 7137),
+    ),
+    "T-177": SeamReading(
+        "2026-09-21",
+        AN_M4_PRO,
+        "linux/arm64",
+        None,
+        3107,
+        (4447, 4345, 5022),
+        (13078, 15961, 7514),
+    ),
+    "T-222": SeamReading(
+        "2026-09-23",
+        ROSETTA,
+        "linux/amd64",
+        ("1536m", "3072m"),
+        3107,
+        (5579, 6453, 5273),
+        (20358, 23058, 19798),
+    ),
+}
+
+
+THE_CEILINGS_READING = "T-222"
+
+
+# The margin carries the first document's model load plus conversion and the
+# engine's own work, which nothing times; four loads errs long on purpose.
+LOADS_IN_THE_MARGIN = 4
 
 
 CONVERSION_FIXTURES = WORKSPACE / "tests" / "fixtures" / "conversion"
@@ -975,6 +1047,22 @@ def test_what_the_seam_costs_per_page_is_measured_on_the_image_and_never_budgete
     assert measured.pinned_model == _pin("GLINER_MODEL_ID")
     assert measured.seam_ms > 0
     assert measured.pinned_ms > 0
+
+
+def test_a_documents_ceiling_is_cut_from_the_slowest_reading_under_the_cap() -> None:
+    reading = SEAM_READINGS[THE_CEILINGS_READING]
+    margin_s = math.ceil(LOADS_IN_THE_MARGIN * max(reading.load_ms) / 1000)
+
+    assert reading.platform == "linux/amd64"
+    assert reading.memory_and_memswap == (
+        _worker_limit("memory"),
+        _worker_limit("memswap_limit"),
+    )
+    assert _pipeline_constant("landed.py", "SEAM_MS_PER_PAGE") == max(
+        reading.ms_per_page
+    )
+    assert _pipeline_constant("converter.py", "BYTES_PER_PAGE") == reading.page_bytes
+    assert _pipeline_constant("landed.py", "TIMEOUT_MARGIN_MS") == margin_s * 1000
 
 
 def test_both_converters_hold_on_the_image_under_the_engines_own_runtime(

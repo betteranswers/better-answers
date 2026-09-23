@@ -56,3 +56,35 @@ The forge paragraph above gives the mirror on VPC 2 its whole surface — `git p
 **So the key gains a third verb, `prune-repo <ws>`**: argument-checked exactly as `init-repo` is (one path segment of DNS-safe characters, refused otherwise), taking a workspace id and no options, refusing a mirror that does not exist, and running `git reflog expire --expire=now --all` and `git gc --prune=now` on that one repository. `deploy/backup.sh`'s `job_git_mirror` calls it only after a push whose `--porcelain` report carries a forced update (`+`) or a deletion (`-`), which is precisely *refs were replaced*; an ordinary fast-forward night prints neither and prunes nothing. It is a verb on this key rather than a cron on VPC 2 because the push is the only thing that knows a rewrite happened, and ADR 0020's amendment of the same date already records that this prune is the backup service acting for the routine.
 
 **What still stands.** The surface is a closed list and everything outside it is refused and logged; `command="/usr/local/bin/mirror-shell /data/mirror",restrict` in the mirror user's `authorized_keys` is unchanged, so the key still has no shell and no forwarding; `git-shell` is still not the answer, for the reason the file gives. Three verbs, not a shell — and the mirror is still never pulled *from* by production.
+
+## Amendment — 2026-09-23 (T-222), the worker's memory read at the cgroup, under the cap and its swap
+
+The shape above caps `worker` at 1.5 GB and gives it a swap file so that "a first index that outgrows the cap runs slower rather than failing", and says ticket 42 measures the estimates. T-130 recorded the worker at **2,967–2,975 MB of peak RSS** with the seam and both converters in one process: nearly twice the cap. But that was the process's peak RSS, on `linux/arm64`, with no limit, and the deployed image is `linux/amd64`. This amendment records the same work read where the box reads it: the container's cgroup, the deployed architecture, and the deploy unit's own limits.
+
+**How it was read, 23/09/2026.** The worker image was built for `linux/amd64` from the tree. It ran the seam over the fixture page (3,107 bytes) and both converters over their fixtures in one process, with the network refused, under `--memory=1536m --memory-swap=3072m`. Those are `platform.compose.yaml`'s `limits.memory` and `memswap_limit`, so the container may spill 1.5 GB. Three containers ran, minutes apart. **The machine is not the box.** It was an Apple M4 Pro (14 cores, 24 GB) under Docker Desktop 29.8, and the amd64 image ran **emulated by Rosetta 2**. Time and probably memory therefore err long. The VM's own swap is 1 GB, and under it the capped run was OOM-killed twice, about 16 s into the model load, with all 1,024 MB of swap in use. So a temporary 2 GB swap file was added to the VM for the readings and removed after. The VM's `vm.swappiness` was 60, where `deploy/host-setup.sh` sets the box to 10.
+
+**What it read:**
+
+- **The run finished** in all three containers, with no OOM kill.
+- **`memory.peak` was 1,536 MB in all three**, at the cap. **`memory.swap.peak` was 1,474, 1,456 and 1,473 MB**, which is 95–96 % of the 1,536 MB the deploy unit lets it spill.
+- **Steady state**, read 30 s after the last page: **994–1,051 MB resident plus 1,053–1,088 MB in swap, 2.08–2.10 GB in all.**
+- **With no limit**, the same image read `memory.peak` 2,889 MB and a process peak RSS of 2,992 MB, beside T-130's 2,967–2,975 MB on arm64. Its steady state was 2,115 MB.
+- **The peak is the load.** Torch reads the pinned model's 1.16 GB `pytorch_model.bin` whole and builds the model beside it. The process drops to its steady figure once the load is done.
+- **`pswpin`**, read from the cgroup's `memory.stat`, which here matched `/proc/vmstat`:
+  - During the model load: **2.1–2.2 GB swapped in at 98–113 MB/s for 19.8–23.1 s**, and 3.3–3.5 GB swapped out.
+  - During detection, three pages: **3.8–4.6 MB/s**, 75–77 MB in all.
+  - Idle: none.
+- **The seam's milliseconds per page under the limit** were 5,579, 6,453 and 5,273, over loads of 19.8–23.1 s. With no limit the same image read 4,554. S1's per-document timeout is re-cut from these readings.
+
+**Only the pinned model loads.** An audit hook caught every `open` under `HF_HOME`. The only weights the process opened were `urchade/gliner_multi_pii-v1`'s `pytorch_model.bin`. Of `microsoft/mdeberta-v3-base` it opened the tokenizer and the config alone, and the image carries no weights for it. `/proc/self/maps` held no file from the cache, because torch reads the weights rather than mapping them. The measured-only `knowledgator/gliner-pii-base-v1.0` has not been in the image since T-148. No model is loaded for nothing, so there is no free 1.8 GB to take.
+
+**What this settles.** The cap works as this ADR designed it, but only because of its swap. Without swap the worker cannot hold the detector under 1.5 GB at all: its steady state alone is 2.1 GB, and with 1 GB of swap the load was killed. With the unit's 1.5 GB of spill the worker runs, and it uses 95 % of that allowance at every process start. A heavier load beside the model could exhaust that allowance, and so could a box whose swap file is smaller than the spill the unit allows. The kernel would then kill the worker mid-load, with a claimed job under a live lease.
+
+**The question it leaves open.** Is the always-on detector affordable on the two 4 GB boxes? Four answers are named, and none is chosen here:
+
+- swap as designed, which this reading says works, slower;
+- a load that does not hold the weights twice, unmeasured;
+- a smaller detector;
+- growth step E.
+
+The deciding readings are the box's own, at S4's first index. The first is `memory.peak` and `memory.swap.peak` at native `linux/amd64`, which this laptop cannot give. The second is step A's signal. Every process that loads the detector swaps in about 2.2 GB within 20–23 s, a burst the five-minute window has to absorb. Detection itself runs either side of the 4 MB/s threshold, and whether it stays above it for five minutes over a real index is the reading that decides step A.
