@@ -1,0 +1,57 @@
+docs/adr/0022-two-stacks-deployed-by-digest-every-irreplaceable-byte-encrypted-off-host-erasures-replayed-on-restore.md
+  s_69414e6e80cf2c::t_7c9b7b32afcbb8 81
+docs/adr/README.md
+  s_69414e6e80cf2c::t_bff2211fff6bba 32
+docs/operations/CI.md
+  s_69414e6e80cf2c::t_5f4553e45bc207 94
+  s_69414e6e80cf2c::t_380fac456ff56f 98
+deploy/wizard-41.sh
+  s_69414e6e80cf2c::t_7cdc589b1d62e7 178
+  s_69414e6e80cf2c::t_b1b04d7abd7bdb 322-323
+apps/api/tests/deploy-tree.test.ts
+  s_69414e6e80cf2c::t_f8b88ec04e7c08 367
+  s_69414e6e80cf2c::t_3f6df1ddf5c876 346,362-366,369-370,373-381,384,387-393,395,397-399,444-446,448,453,455-462
+  s_69414e6e80cf2c::t_55e6e004cde025 353-354,357-360
+  s_69414e6e80cf2c::t_1023ecf65b4776 17-20
+  s_69414e6e80cf2c::t_44702b2cf755dd 371-372,382-383,385-386,394,396,400-405
+  s_69414e6e80cf2c::t_ec127e961f2488 368
+  s_69414e6e80cf2c::t_14507479be38ba 408-421,425-443
+  s_69414e6e80cf2c::t_1246894558c89f 422-424
+  s_69414e6e80cf2c::t_18124f376de358 454
+  s_69414e6e80cf2c::t_21d939fb70bb3f 447,449-452
+.github/workflows/release.yml
+  s_69414e6e80cf2c::t_897b858774974c 117-126,128
+  s_69414e6e80cf2c::t_c537459cf47b36 105,110-111,115-116,127,129-131,134-135,139
+  s_69414e6e80cf2c::t_b982917ae4a211 68
+apps/api/tests/docs-lane.test.ts
+  s_69414e6e80cf2c::t_579f492cd08c5a 229
+  s_69414e6e80cf2c::t_2455b291882880 228
+docs/operations/RUNBOOK.md
+  s_69414e6e80cf2c::t_2b0c04c6042423 63,65-66
+  s_69414e6e80cf2c::t_2ff33f3a2fc687 73
+  s_69414e6e80cf2c::t_998fd684c40aac 59-62,64,67-68
+  s_69414e6e80cf2c::t_f79bb325499744 71
+deploy/RELEASES.md
+  s_69414e6e80cf2c::t_c2330ef8169149 3,7,11-14,20
+  s_69414e6e80cf2c::t_3acab17f549daf 15-19
+  s_69414e6e80cf2c::t_c3fb7e0a54e758 1,5-6,8,10,21-22
+  s_69414e6e80cf2c::t_ddd6ae840ccfe8 24
+docs/operations/BUILD_CACHE.md
+  s_69414e6e80cf2c::t_bd4a97be82bb1a 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "69c6f163089b20989f8b00507093e10ee366d96c",
+  "prompts": {},
+  "sessions": {
+    "s_69414e6e80cf2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6af0bc5d-5e17-4638-afb3-472e1f42e570",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": null
+    }
+  }
+}
