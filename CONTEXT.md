@@ -290,6 +290,12 @@ Where a unit lives is decided by **minting**.
   counted inside one — a finding's offsets are the document's. Where its edges fall is a rule, and
   the rule is ADR 0020's. _Avoid_: chunk — the index's unit above, which this seam runs ahead of
   and never produces; the model reads windows, the index holds chunks.
+- **detection key** — what the detector reads and nothing else, carried as one digest: the
+  recognisers and their pins, the thresholds, the context lemmas, the *consumer-domain list* and
+  the window rule. It moves only when a page's findings could move, and a move of it implies a
+  move of the rule version. _Avoid_: rule version — what a *finding* row and a document's
+  redaction version carry, which also moves for a category's tier, its placeholder word and what
+  it narrows to.
 - **locator** — the address of a passage inside a source document, written whole as
   `<source document id>/chars:<start>-<end>`: the document it is in, then the span, whose offsets
   are counted in Unicode code points into the document's normalised redacted text and versioned by
