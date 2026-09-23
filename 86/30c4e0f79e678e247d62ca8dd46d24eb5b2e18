@@ -1,0 +1,44 @@
+apps/api/stryker.config.mjs
+  s_0e5a222022ad59::t_3ad7aec391c23e 30-31,34
+docs/agents/workflow.md
+  s_0e5a222022ad59::t_958c29f3ff944d 87
+  s_0e5a222022ad59::t_5e5f3273426a23 88-89
+apps/api/vitest.config.ts
+  s_0e5a222022ad59::t_9994b94f284790 7-11
+packages/core/vitest.config.ts
+  s_0e5a222022ad59::t_01faf11d7af814 1-2,11-16
+  s_0e5a222022ad59::t_13885a3c0c9958 9-10
+packages/core/stryker.config.mjs
+  s_0e5a222022ad59::t_549b58d3a83a28 30-31,34
+packages/core/package.json
+  s_0e5a222022ad59::t_3ac81af9eb2295 25
+packages/core/test/warm-objects.ts
+  s_0e5a222022ad59::t_75cbc9f89c47ea 124-126,132
+  s_0e5a222022ad59::t_6776089483818e 1-5,7-44,46-47,54-68,75,77-123,133-141,154-158,162-164,166-168,178-183,193-211
+  s_0e5a222022ad59::t_68812ffefa6adc 53
+  s_0e5a222022ad59::t_316b86ee52c92c 127-131,147-151,159-161
+  s_0e5a222022ad59::t_6a4c6fd915bf15 143,152
+  s_0e5a222022ad59::t_4213fd291a1479 6,45,48-52,69-74,76,142,144-146,153,165,169-177,184-192
+packages/core/test/warm-objects.test.ts
+  s_0e5a222022ad59::t_693c544b711074 1-52,54-131
+  s_0e5a222022ad59::t_2c553784e308d2 53
+packages/core/test/suite-objects.ts
+  s_0e5a222022ad59::t_870b18453774a7 3-4,22
+  s_0e5a222022ad59::t_301f57f67b06b1 25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "8630c4e0f79e678e247d62ca8dd46d24eb5b2e18",
+  "prompts": {},
+  "sessions": {
+    "s_0e5a222022ad59": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "be066bbd-73de-415e-85ae-0e8bccdd6b9d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
