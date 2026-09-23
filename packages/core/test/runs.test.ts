@@ -1,7 +1,7 @@
 import { testData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
 
-import type { PlatformPrincipal } from "../src/kernel/index.ts";
+import type { PlatformPrincipal, WorkspaceId } from "../src/kernel/index.ts";
 import { bundleHealth, enqueueJob, enqueueJobIn, JOB_IS_OVER, jobById } from "../src/runs/index.ts";
 import { folded, withMembership, withScope, type Tx } from "../src/store/postgres/index.ts";
 import { abortTheTransaction } from "./suite-postgres.ts";
@@ -192,7 +192,7 @@ const BINDING = "01K4Q9F3V8YXP7R2M6ZKWC3TDS";
 
 const ANOTHER_BINDING = "01K4Q9F3V8YXP7R2M6ZKWC3TDT";
 
-const boundJob = (workspaceId: string) =>
+const boundJob = (workspaceId: WorkspaceId) =>
   ({ workspaceId, kind: "index", subjectId: BINDING, reason: "bound" }) as const;
 
 const actOf = <T>(scenario: Scenario, work: (tx: Tx) => Promise<T>): Promise<T> =>

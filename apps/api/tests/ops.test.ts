@@ -767,10 +767,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await jobsOf(app(), workspaceId)).toEqual([]);
     });
 
-    it("answers usage to a workspace that is not an id, before it queues anything", async () => {
+    it("refuses a workspace that is not an id as malformed, naming the flag it came in", async () => {
       const run = await ops(app(), ["graph-rebuild", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
+      expect(run.lines).toEqual([
+        "graph-rebuild: REFUSED — malformed: --workspace ws_synthetic is not a workspace id",
+      ]);
     });
 
     it.each([

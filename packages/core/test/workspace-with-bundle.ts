@@ -3,15 +3,19 @@ import type pg from "pg";
 
 import { initRepository, type GitDoor } from "@better-answers/core/store/git";
 
-import { systemClock, ulid, type Role, type UserPrincipal } from "../src/kernel/index.ts";
+import {
+  systemClock,
+  type Role,
+  type UserPrincipal,
+  type WorkspaceId,
+} from "../src/kernel/index.ts";
 import { openPostgres, withPrincipal, type PostgresDoor } from "../src/store/postgres/index.ts";
-import { provisionWorkspace } from "../src/workspaces/index.ts";
 import { bundlesForSuite } from "./bundle.ts";
-import { bootstrap, seedPerson } from "./platform.ts";
+import { provisionedWorkspace } from "./platform.ts";
 import { postgresForSuite, seedingWith } from "./suite-postgres.ts";
 
 export type Scenario = {
-  readonly workspaceId: string;
+  readonly workspaceId: WorkspaceId;
   readonly postgres: PostgresDoor;
   readonly git: GitDoor;
 
@@ -54,16 +58,7 @@ export const memberOf = (pool: pg.Pool, workspaceId: string, email: string) =>
   });
 
 export const arrangeWorkspace = async (db: MigratedPostgres, git: GitDoor): Promise<Scenario> => {
-  const adminUserId = await seedPerson(db.pool);
-  const postgres = openPostgres(db.runtimePool);
-  const workspaceId = ulid();
-  const provisioned = await provisionWorkspace(bootstrap, postgres, {
-    id: workspaceId,
-    name: "Acme",
-    slug: `acme-${workspaceId.toLowerCase()}`,
-    adminUserId,
-  });
-  if (!provisioned.ok) throw new Error(`the workspace was not provisioned: ${provisioned.error}`);
+  const { door: postgres, workspaceId, adminUserId } = await provisionedWorkspace(db, "Acme");
 
   const client = await db.pool.connect();
   const people: Partial<Record<Role, string>> = {};

@@ -1,7 +1,12 @@
 import type { TestData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
 
-import { GRAPH_MAINTENANCE, graphCounts, sweepGraph } from "@better-answers/core/concepts";
+import {
+  GRAPH_MAINTENANCE,
+  graphCounts,
+  rebuildGraph,
+  sweepGraph,
+} from "@better-answers/core/concepts";
 
 import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
 import { postgresForSuite, seedingWith } from "./suite-postgres.ts";
@@ -13,11 +18,24 @@ const seeded = <T>(work: (seed: TestData) => Promise<T>): Promise<T> =>
 
 const arrange = (): Promise<ProvisionedWorkspace> => provisionedWorkspace(db(), "Mapped");
 
-const counting = (workspace: ProvisionedWorkspace, workspaceId = workspace.workspaceId) =>
+const counting = (workspace: ProvisionedWorkspace, workspaceId: string = workspace.workspaceId) =>
   graphCounts(GRAPH_MAINTENANCE, workspace.door, { workspaceId });
 
-const sweeping = (workspace: ProvisionedWorkspace, workspaceId = workspace.workspaceId) =>
+const sweeping = (workspace: ProvisionedWorkspace, workspaceId: string = workspace.workspaceId) =>
   sweepGraph(GRAPH_MAINTENANCE, workspace.door, { workspaceId });
+
+const rebuilding = (workspace: ProvisionedWorkspace, workspaceId: string = workspace.workspaceId) =>
+  rebuildGraph(GRAPH_MAINTENANCE, workspace.door, { workspaceId, reason: "upgrade" });
+
+const jobsOf = async (workspaceId: string) => {
+  const found = await db().pool.query<{
+    id: string;
+    kind: string;
+    reason: string | null;
+    status: string;
+  }>("SELECT id, kind, reason, status FROM job WHERE workspace_id = $1", [workspaceId]);
+  return found.rows;
+};
 
 const rowsOf = async (workspaceId: string, gen: number | null): Promise<[number, number]> => {
   const clause = gen === null ? "gen IS NULL" : "gen = $2";
@@ -220,6 +238,28 @@ describe("sweeping a workspace's map", () => {
     const swept = await sweeping(workspace, "ws_synthetic");
 
     expect(swept).toEqual({ ok: false, error: "malformed" });
+  });
+});
+
+describe("rebuilding a workspace's map", () => {
+  it("queues a full rebuild for the reason it was given, and answers the id of the job it queued", async () => {
+    const workspace = await arrange();
+
+    const rebuilt = await rebuilding(workspace);
+
+    const jobs = await jobsOf(workspace.workspaceId);
+    expect(jobs).toEqual([
+      { id: expect.any(String), kind: "full-rebuild", reason: "upgrade", status: "queued" },
+    ]);
+    expect(rebuilt).toEqual({ ok: true, value: { jobId: jobs[0]?.id } });
+  });
+
+  it("says a workspace that is not an id is malformed", async () => {
+    const workspace = await arrange();
+
+    const rebuilt = await rebuilding(workspace, "ws_synthetic");
+
+    expect(rebuilt).toEqual({ ok: false, error: "malformed" });
   });
 });
 

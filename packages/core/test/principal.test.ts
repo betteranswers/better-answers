@@ -13,7 +13,7 @@ import {
   type Result,
   type UserPrincipal,
 } from "../src/kernel/index.ts";
-import { enqueueJobIn } from "../src/runs/index.ts";
+import { enqueueJobIn, enqueueJobInput } from "../src/runs/index.ts";
 import {
   consumeCall,
   consumeIngress,
@@ -29,6 +29,7 @@ import {
   type Tx,
 } from "../src/store/postgres/index.ts";
 import { bootstrap, principalOf } from "./platform.ts";
+import { inputOf } from "./suite-input.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
@@ -119,7 +120,11 @@ const answeringAfterThreeWrites =
       subjectId: workspaceId,
       detail: { confirmed: true },
     });
-    const queued = await enqueueJobIn(principal, tx, { workspaceId, kind: NIGHTLY_AUDIT_KIND });
+    const queued = await enqueueJobIn(
+      principal,
+      tx,
+      inputOf(enqueueJobInput, { workspaceId, kind: NIGHTLY_AUDIT_KIND }),
+    );
     if (!queued.ok) throw new Error(`the probe's job answered ${String(queued.error)}`);
     return answer;
   };
