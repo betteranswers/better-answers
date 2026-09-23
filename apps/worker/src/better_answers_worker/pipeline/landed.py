@@ -45,10 +45,10 @@ THE_MEMOS_IDENTITY: Mapping[str, str] = MappingProxyType(
 )
 
 
-SEAM_MS_PER_PAGE = 2841
+SEAM_MS_PER_PAGE = 6453
 
 
-TIMEOUT_MARGIN_MS = 30_000
+TIMEOUT_MARGIN_MS = 93_000
 
 
 @dataclass(frozen=True, slots=True)
