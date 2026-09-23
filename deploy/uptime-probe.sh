@@ -1,17 +1,5 @@
 #!/usr/bin/env bash
-#
-# The Free-plan uptime probe (coolify.md § Ingress). Run by host cron on VPC 2
-# every five minutes while the zone is not yet on Cloudflare Pro; Pro's Health
-# Checks replace it. Probes the two public paths through the edge — DNS, tunnel
-# and origin all on the probed path — then pings the healthchecks.io 'uptime'
-# check with the outcome, so a silent probe (VPC 2 down included) trips the
-# dead-man alarm on the second channel. The ping body is an outcome word and
-# counts, never a path or an error string.
-#
-# Env (root-only /etc/better-answers/uptime.env, sourced with set -a by cron):
-#   APEX                          the apex domain, e.g. example.com
-#   HEALTHCHECKS_PING_URL_UPTIME  the 'uptime' check's ping URL
-
+# Probes from the other box, so its own silence trips the dead-man alarm too.
 set -euo pipefail
 
 : "${APEX:?APEX not set — source /etc/better-answers/uptime.env}"

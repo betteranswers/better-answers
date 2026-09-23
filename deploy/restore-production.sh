@@ -1,45 +1,4 @@
 #!/usr/bin/env bash
-# Better Answers — restore PRODUCTION from the off-host copies (RUNBOOK.md page 1; BACKUPS.md § Recovery order).
-#
-# This is NOT the staging drill. `restore-drill.sh` restores into staging and then wipes staging on exit,
-# whatever happened — the right trap for a rehearsal and the wrong one for the box you are trying to
-# save (ticket 79 op F1). This script has no exit trap, wipes nothing, deletes nothing under /data, and
-# needs no read-only DSN to a second database: it runs ON the box being restored, against the DSN it is
-# given, and stops before the app is started if any step fails.
-#
-# What it shares with the drill is the recovery order and one rule that is not optional: every erasure
-# completed after the dump's timestamp is REPLAYED before `api` starts (ADR 0020, ADR 0022). A restore
-# that skipped that step would serve reads over data a subject was told is beyond use.
-#
-# WHERE the replay sits moved on 11/09/2026 (T-125, ADR 0022 amended): it runs AFTER the object store
-# and the git store are back, not beside `migrate`. The routine it re-runs rewrites the bare repository
-# and reads the replay copies an erasure left in the object store, so a replay ahead of those two stores
-# either finds nothing to replay or rewrites a repository the git step is about to overwrite. It still
-# runs before `api` is started, which is the rule that was never negotiable.
-#
-# Usage, as root on VPC 1 (or a rebuilt VPC 1 — RUNBOOK.md page 1 says when):
-#   restore-production.sh --dump latest|pg-<stamp>.dump.age [--tier daily|hourly|weekly|monthly]
-#                         [--objectstore] [--git] [--yes]
-#   --objectstore  mirror the object store back from the MIRROR bucket (only after a disk loss; a
-#                  restore of Postgres alone leaves the live object store as it is)
-#   --git          rebuild /data/git from the nightly bundles — refused unless /data/git is EMPTY,
-#                  because the live repositories are newer than any bundle, and the mirror on VPC 2
-#                  is the faster copy (BACKUPS.md)
-#   --yes          do not ask; for a runbook page followed to the letter
-#
-# Every tool but git runs INSIDE THE BACKUP IMAGE (`stores run --rm backup …`): pg_restore 18 on the
-# database's own base, rclone with the `dumps:` remote already configured from the stores env, age.
-# VPC 1 installs none of them, and a pg_restore from the distribution's postgresql-client would be a
-# major behind the server. The work directory and the identity are mounted in for the run.
-#
-# Env (the stores resource's env, or a root-only file — the same keys `backup.sh` reads):
-#   DATABASE_URL               the OWNER DSN of the production database (migrate's), as the stores network sees it
-#   REPO_DIR                   this repository's checkout on the box (compose files)
-#   PLATFORM_ENV_FILE          the platform stack's env (digests, PUBLIC_URL, …) as Coolify writes it
-#   STORES_ENV_FILE            the stores stack's env — it carries the `dumps:` remote's credential
-#   BACKUP_DUMPS_BUCKET · BACKUP_MIRROR_BUCKET
-#   BACKUP_AGE_IDENTITY_FILE   the private half, fetched from ESCROW for the duration of the restore
-#                              and deleted after (SECRETS.md) — it is never resident on VPC 1
 set -euo pipefail
 
 : "${DATABASE_URL:?the production owner DSN}" "${REPO_DIR:?}" "${PLATFORM_ENV_FILE:?}" "${STORES_ENV_FILE:?}"
@@ -63,10 +22,11 @@ say() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${LOG}"; }
 compose() { docker compose --project-directory "${REPO_DIR}/deploy" "$@"; }
 stores()   { compose --env-file "${STORES_ENV_FILE}" -f stores.compose.yaml -p better-answers-stores "$@"; }
 platform() { compose --env-file "${PLATFORM_ENV_FILE}" -f platform.compose.yaml -p better-answers "$@"; }
-# tool <cmd…> — run inside the backup image with the work directory at /work and the identity at /run/age.key
 tool() { stores run --rm --no-deps -v "${WORK}:/work" -v "${BACKUP_AGE_IDENTITY_FILE}:/run/age.key:ro" backup "$@"; }
 rclone() { tool rclone "$@"; }
-cleanup_work() { rm -rf "${WORK}"; }   # the decrypted dump is personal data: gone the moment the restore is done
+cleanup_work() { rm -rf "${WORK}"; }   # the decrypted dump is personal data
+
+# No exit trap: the drill's wipe-on-exit is the wrong trap for the box you are saving.
 
 say "# Production restore — dump=${dump} tier=${tier} objectstore=${objectstore} git=${git}"
 
@@ -86,12 +46,9 @@ platform stop api || true
 say "## 2 postgres"
 rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/${dump}" "/work/pg.dump.age"
 [ -z "${globals}" ] || rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/${globals}" "/work/globals.sql.age"
-[ ! -f "${WORK}/globals.sql.age" ] || tool sh -c 'age -d -i /run/age.key /work/globals.sql.age | psql "$DATABASE_URL" -q' || true   # roles exist already
+[ ! -f "${WORK}/globals.sql.age" ] || tool sh -c 'age -d -i /run/age.key /work/globals.sql.age | psql "$DATABASE_URL" -q' || true
 tool age -d -i /run/age.key -o /work/pg.dump /work/pg.dump.age
-# --clean --if-exists: the live objects are replaced by the dump's. --no-owner: the restoring role
-# (the owner DSN's) owns everything, as migrate's does. Privileges are NOT skipped: the grants and
-# default privileges for app_rt and worker_rt ride the dump, and `migrate` below is a no-op on a
-# journal the dump already carries — nothing else would re-grant them.
+# --no-owner leaves the restoring role owning everything; the grants ride the dump.
 tool sh -c 'pg_restore --clean --if-exists --no-owner --dbname="$DATABASE_URL" /work/pg.dump'
 rm -f "${WORK}/pg.dump" "${WORK}/pg.dump.age" "${WORK}/globals.sql.age"
 say "restored — RPO $(( ( $(date +%s) - $(date -d "${stamp:0:8} ${stamp:9:2}:${stamp:11:2}" +%s) ) / 60 )) min"
@@ -119,13 +76,7 @@ fi
 cleanup_work
 
 say "## 6 REPLAY ERASURES completed after ${stamp} — mandatory; a failure here leaves api stopped"
-# On `api`, not on `migrate`. The routine the replay re-runs rewrites the workspace's bare repository
-# and reads the replay copy each erasure left in the object store, so the one-shot must carry
-# GIT_STORE_DIR with /data/git mounted and the S3 endpoint, bucket, region and credentials. The `api`
-# service in platform.compose.yaml carries all of that; `migrate` carries the bootstrap env alone —
-# no git directory, no volume, and no reason to grow one for a command it does not run.
-# --no-deps because `migrate` ran at step 3 and `api` declares it a dependency: without this, compose
-# would run the migration a second time inside the replay's one-shot.
+# On api, not migrate: only api carries the git directory and object store this reads.
 platform run --rm --no-deps api pnpm ops replay-erasures --since "${stamp}" | tee -a "${LOG}"
 
 say "## 7 start api and prove it answers"

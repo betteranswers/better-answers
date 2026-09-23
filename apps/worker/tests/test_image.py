@@ -848,12 +848,19 @@ def test_the_deploy_unit_mounts_nothing_over_the_weights_the_image_carries() -> 
     assert worker_mounts_over(worker_environment("HF_HOME")) == []
 
 
-def test_the_lmdb_mount_with_its_trailing_comment_is_caught_and_a_longer_path_is_not(
+def test_the_lmdb_mount_is_caught_with_a_trailing_comment_and_a_longer_path_is_not(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert worker_mounts_over("/data/worker/lmdb") == [
-        "- /data/worker/lmdb:/data/worker/lmdb        "
-        "# one LMDB per binding — personal data on disk; never backed up"
+        "- /data/worker/lmdb:/data/worker/lmdb"
+    ]
+
+    monkeypatch.setattr(
+        f"{__name__}.worker_service",
+        lambda: "  - /data/worker/lmdb:/data/worker/lmdb   # a trailing comment",
+    )
+    assert worker_mounts_over("/data/worker/lmdb") == [
+        "- /data/worker/lmdb:/data/worker/lmdb   # a trailing comment"
     ]
 
     monkeypatch.setattr(

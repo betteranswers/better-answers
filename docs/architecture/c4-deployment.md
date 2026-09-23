@@ -14,7 +14,7 @@ C4Deployment
     Deployment_Node(pgnode, "Postgres resource", "Coolify database resource, 1 GB, shared_buffers 512 MB", "Its own lifecycle and a second backup writer") {
       ContainerDb(postgres, "Postgres", "pgvector on Postgres 18, pinned by digest", "The identity set, the tenant tables, the graph, the queue, the ledger")
     }
-    Deployment_Node(stores, "stores stack", "docker compose, redeployed for a store's upgrade only", "init, objectstore, cloudflared, backup; the embedding host commented out") {
+    Deployment_Node(stores, "stores stack", "docker compose, redeployed for a store's upgrade only", "init, objectstore, cloudflared, backup; no embedding host until a workspace takes the local route") {
       Container(init, "init", "alpine, one-shot", "Owns every /data directory by uid; never root")
       ContainerDb(garage, "objectstore", "Garage, single node, 384 MB", "S3 on :3900, internal only; /data/objectstore")
       Container(cloudflared, "cloudflared", "128 MB", "The only way in; lives here so a release never drops the tunnel")
