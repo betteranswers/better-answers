@@ -12,6 +12,8 @@ import pytest
 from better_answers_worker import loop, queue
 from better_answers_worker.kinds import index_run
 from better_answers_worker.pipeline import (
+    BINDING_STORE,
+    FINDINGS_STORE,
     IndexRun,
     ReadDocument,
     RedactedDocument,
@@ -112,6 +114,7 @@ def an_invoice_read_as(
             verdict=verdict,
             version=THE_VERSION,
             content_hash=sha256_of(AN_INVOICE),
+            detected_afresh=False,
         ),
         chunks=(),
     )
@@ -1139,9 +1142,9 @@ def test_a_kept_span_an_erasure_names_stays_withheld_and_the_run_says_which(
     ]
 
 
-def read_afresh_in(written: str) -> list[int]:
+def detected_afresh_in(written: str) -> list[list[str]]:
     return [
-        int(line["read_afresh"])
+        list(line["detected_afresh"])
         for line in (json.loads(one) for one in written.splitlines() if one.strip())
         if line.get("event") == "the binding's landed copies were read"
     ]
@@ -1155,23 +1158,28 @@ def test_a_reason_the_app_deletes_rows_for_empties_the_store_before_any_read(
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
     bootstrap = bootstrap_for(dsn, tmp_path)
-    binding_directory = tmp_path / workspace_id / BINDING
+    binding_directory = tmp_path / workspace_id / BINDING / BINDING_STORE
+    findings_directory = tmp_path / workspace_id / BINDING / FINDINGS_STORE
 
-    def files_now() -> dict[str, tuple[int, int]]:
+    def files_in(directory: Path) -> dict[str, tuple[int, int]]:
         return {
-            str(path.relative_to(binding_directory)): (
+            str(path.relative_to(directory)): (
                 path.stat().st_ino,
                 path.stat().st_ctime_ns,
             )
-            for path in sorted(binding_directory.rglob("*"))
+            for path in sorted(directory.rglob("*"))
             if path.is_file()
         }
+
+    def files_now() -> dict[str, tuple[int, int]]:
+        return files_in(binding_directory)
 
     def inodes_of(files: dict[str, tuple[int, int]]) -> dict[str, int]:
         return {name: inode for name, (inode, _) in files.items()}
 
     index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
     after_the_first = files_now()
+    findings_standing = files_in(findings_directory)
     planted = binding_directory / "planted-before-the-wipe"
     planted.write_bytes(b"what the removal must take with it")
     capsys.readouterr()
@@ -1182,7 +1190,7 @@ def test_a_reason_the_app_deletes_rows_for_empties_the_store_before_any_read(
         copies=a_bucket_holding_the_three(),
     )
     after_the_restore = files_now()
-    restored_read = read_afresh_in(capsys.readouterr().out)
+    restored_read = detected_afresh_in(capsys.readouterr().out)
     stood = planted.exists()
 
     index_binding(
@@ -1191,13 +1199,13 @@ def test_a_reason_the_app_deletes_rows_for_empties_the_store_before_any_read(
         copies=a_bucket_holding_the_three(),
     )
     after_the_rule_change = files_now()
-    rule_change_read = read_afresh_in(capsys.readouterr().out)
+    rule_change_read = detected_afresh_in(capsys.readouterr().out)
 
     wiped = index_binding(
         bootstrap, run_for(workspace_id, "wiped"), copies=a_bucket_holding_the_three()
     )
     after_the_wipe = files_now()
-    wiped_read = read_afresh_in(capsys.readouterr().out)
+    wiped_read = detected_afresh_in(capsys.readouterr().out)
 
     assert after_the_first != {}
     kept, first = inodes_of(after_the_restore), inodes_of(after_the_first)
@@ -1210,7 +1218,12 @@ def test_a_reason_the_app_deletes_rows_for_empties_the_store_before_any_read(
     assert set(after_the_wipe) & set(after_the_rule_change) != set()
     assert set(after_the_wipe.values()).isdisjoint(after_the_rule_change.values())
 
-    assert (restored_read, rule_change_read, wiped_read) == ([0], [1], [1])
+    assert (restored_read, rule_change_read, wiped_read) == ([[]], [[]], [[]])
+    # Same inodes, so the second store was never removed and remade under it.
+    assert inodes_of(findings_standing) != {}
+    assert inodes_of(files_in(findings_directory)).items() >= (
+        inodes_of(findings_standing).items()
+    )
     assert wiped.lmdb_bytes > 0
     assert chunk_rows_of(connection, workspace_id)[0]["content"] == AN_INVOICE_REDACTED
 

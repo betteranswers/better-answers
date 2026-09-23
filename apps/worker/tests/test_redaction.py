@@ -3,6 +3,7 @@ from collections.abc import Mapping, Sequence
 import pytest
 
 from better_answers_worker.redaction import Redaction, Restore, redact
+from better_answers_worker.redaction.engine import Span, spans_detected
 from better_answers_worker.redaction.pins import VERSION_STRING
 from better_answers_worker.redaction.withholdings import (
     AN_ERASURE,
@@ -85,28 +86,33 @@ def page() -> str:
 
 
 @pytest.fixture(scope="module")
-def on_a_plain_binding(page: str) -> Redaction:
-    return redact(page, THE_SAFE_SET, NO_SUPPRESSIONS, SEED)
+def spans(page: str) -> tuple[Span, ...]:
+    return spans_detected(page)
 
 
 @pytest.fixture(scope="module")
-def with_nothing_switchable_on(page: str) -> Redaction:
-    return redact(page, NOTHING_SWITCHABLE, NO_SUPPRESSIONS, SEED)
+def on_a_plain_binding(page: str, spans: tuple[Span, ...]) -> Redaction:
+    return redact(page, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED)
 
 
 @pytest.fixture(scope="module")
-def on_an_hr_shaped_binding(page: str) -> Redaction:
-    return redact(page, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED)
+def with_nothing_switchable_on(page: str, spans: tuple[Span, ...]) -> Redaction:
+    return redact(page, spans, NOTHING_SWITCHABLE, NO_SUPPRESSIONS, SEED)
 
 
 @pytest.fixture(scope="module")
-def under_another_seed(page: str) -> Redaction:
-    return redact(page, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, ANOTHER_SEED)
+def on_an_hr_shaped_binding(page: str, spans: tuple[Span, ...]) -> Redaction:
+    return redact(page, spans, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED)
 
 
 @pytest.fixture(scope="module")
-def with_one_name_suppressed(page: str) -> Redaction:
-    return redact(page, AN_HR_SHAPED_BINDING, ONE_NAME_SUPPRESSED, SEED)
+def under_another_seed(page: str, spans: tuple[Span, ...]) -> Redaction:
+    return redact(page, spans, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, ANOTHER_SEED)
+
+
+@pytest.fixture(scope="module")
+def with_one_name_suppressed(page: str, spans: tuple[Span, ...]) -> Redaction:
+    return redact(page, spans, AN_HR_SHAPED_BINDING, ONE_NAME_SUPPRESSED, SEED)
 
 
 def spans_under(found: Redaction, page: str, category: str) -> list[str]:
@@ -287,12 +293,13 @@ def test_the_telephone_number_is_personal_contact_whatever_the_domain_rule_does(
 
 def test_a_shouted_consumer_domain_is_still_the_same_domain() -> None:
 
-    found = redact(
+    shouted = (
         "Her own address is R.PETHERIDGE@GMAIL.COM and the office takes enquiries at"
-        " enquiries@meridianfenland.co.uk.",
-        THE_SAFE_SET,
-        NO_SUPPRESSIONS,
-        SEED,
+        " enquiries@meridianfenland.co.uk."
+    )
+
+    found = redact(
+        shouted, spans_detected(shouted), THE_SAFE_SET, NO_SUPPRESSIONS, SEED
     )
 
     assert "R.PETHERIDGE@GMAIL.COM" not in found.text
@@ -336,14 +343,13 @@ def test_an_ordinary_sentence_carrying_a_health_word_is_kept_on_every_binding(
 
 def test_a_cue_is_the_lemma_of_the_word_a_document_wrote_and_not_its_spelling() -> None:
 
-    found = redact(
+    cued = (
         "Sickness absence is logged by the site office.\n\n"
         "Her medications were changed in the spring.\n\n"
-        "The framework agreement was signed on 14 March 2024.",
-        THE_SAFE_SET,
-        NO_SUPPRESSIONS,
-        SEED,
+        "The framework agreement was signed on 14 March 2024."
     )
+
+    found = redact(cued, spans_detected(cued), THE_SAFE_SET, NO_SUPPRESSIONS, SEED)
 
     assert "Sickness absence is logged by the site office." not in found.text
     assert "Her medications were changed in the spring." not in found.text
@@ -352,12 +358,9 @@ def test_a_cue_is_the_lemma_of_the_word_a_document_wrote_and_not_its_spelling() 
 
 def test_a_page_with_no_special_category_cue_narrows_nothing() -> None:
 
-    found = redact(
-        "The framework agreement was signed on 14 March 2024.",
-        THE_SAFE_SET,
-        NO_SUPPRESSIONS,
-        SEED,
-    )
+    uncued = "The framework agreement was signed on 14 March 2024."
+
+    found = redact(uncued, spans_detected(uncued), THE_SAFE_SET, NO_SUPPRESSIONS, SEED)
 
     assert found.verdict is None
     assert [
@@ -513,10 +516,12 @@ def test_a_suppression_withholds_the_named_person_at_the_always_tier_and_rewrite
 
 
 def test_the_same_inputs_twice_give_identical_output(
-    on_an_hr_shaped_binding: Redaction, page: str
+    on_an_hr_shaped_binding: Redaction,
+    page: str,
+    spans: tuple[Span, ...],
 ) -> None:
 
-    again = redact(page, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED)
+    again = redact(page, spans, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED)
 
     assert again.text == on_an_hr_shaped_binding.text
     assert again.findings == on_an_hr_shaped_binding.findings
@@ -539,12 +544,14 @@ def restore_of(found: Redaction, page: str, span: str, tier: str = "always") -> 
 
 
 def test_a_restored_span_is_left_in_the_text_and_is_still_the_finding_it_was(
-    on_a_plain_binding: Redaction, page: str
+    on_a_plain_binding: Redaction,
+    page: str,
+    spans: tuple[Span, ...],
 ) -> None:
 
     kept = restore_of(on_a_plain_binding, page, THE_COMPANYS_OWN_ACCOUNT)
 
-    found = redact(page, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [kept])
+    found = redact(page, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [kept])
 
     assert THE_COMPANYS_OWN_ACCOUNT not in on_a_plain_binding.text
     assert THE_COMPANYS_OWN_ACCOUNT in found.text
@@ -555,26 +562,34 @@ def test_a_restored_span_is_left_in_the_text_and_is_still_the_finding_it_was(
 
 
 def test_a_restore_is_of_one_rules_span_and_another_rule_over_it_restores_nothing(
-    on_a_plain_binding: Redaction, page: str
+    on_a_plain_binding: Redaction,
+    page: str,
+    spans: tuple[Span, ...],
 ) -> None:
 
     kept = restore_of(on_a_plain_binding, page, THE_COMPANYS_OWN_ACCOUNT)
     under_another_rule = Restore(rule_id="UK_NHS", start=kept.start, end=kept.end)
 
-    found = redact(page, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [under_another_rule])
+    found = redact(
+        page, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [under_another_rule]
+    )
 
     assert found.text == on_a_plain_binding.text
 
 
 def test_an_unrestored_finding_over_the_same_characters_still_withholds_them(
-    on_a_plain_binding: Redaction, page: str
+    on_a_plain_binding: Redaction,
+    page: str,
+    spans: tuple[Span, ...],
 ) -> None:
 
     his_name = restore_of(on_a_plain_binding, page, A_FOURTH_OFFICER)
 
-    under_the_address = redact(page, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [his_name])
+    under_the_address = redact(
+        page, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [his_name]
+    )
     with_the_address_off = redact(
-        page, NOTHING_SWITCHABLE, NO_SUPPRESSIONS, SEED, [his_name]
+        page, spans, NOTHING_SWITCHABLE, NO_SUPPRESSIONS, SEED, [his_name]
     )
 
     assert A_FOURTH_OFFICER not in under_the_address.text
@@ -582,14 +597,18 @@ def test_an_unrestored_finding_over_the_same_characters_still_withholds_them(
 
 
 def test_an_erasure_outranks_a_restore(
-    on_an_hr_shaped_binding: Redaction, page: str
+    on_an_hr_shaped_binding: Redaction,
+    page: str,
+    spans: tuple[Span, ...],
 ) -> None:
 
     in_the_block = restore_of(on_an_hr_shaped_binding, page, "Rosalind Petheridge")
 
-    restored = redact(page, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED, [in_the_block])
+    restored = redact(
+        page, spans, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED, [in_the_block]
+    )
     erased = redact(
-        page, AN_HR_SHAPED_BINDING, ONE_NAME_SUPPRESSED, SEED, [in_the_block]
+        page, spans, AN_HR_SHAPED_BINDING, ONE_NAME_SUPPRESSED, SEED, [in_the_block]
     )
 
     assert "Rosalind Petheridge" in officers_block(restored.text)
@@ -603,15 +622,18 @@ def test_an_erasure_outranks_a_restore(
 
 
 def test_the_withholding_names_the_first_of_the_five_reasons_that_holds(
-    on_a_plain_binding: Redaction, on_an_hr_shaped_binding: Redaction, page: str
+    on_a_plain_binding: Redaction,
+    on_an_hr_shaped_binding: Redaction,
+    page: str,
+    spans: tuple[Span, ...],
 ) -> None:
 
     kept = restore_of(on_a_plain_binding, page, THE_COMPANYS_OWN_ACCOUNT)
     in_the_block = restore_of(on_an_hr_shaped_binding, page, "Rosalind Petheridge")
 
-    restored = redact(page, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [kept])
+    restored = redact(page, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [kept])
     erased = redact(
-        page, AN_HR_SHAPED_BINDING, ONE_NAME_SUPPRESSED, SEED, [in_the_block]
+        page, spans, AN_HR_SHAPED_BINDING, ONE_NAME_SUPPRESSED, SEED, [in_the_block]
     )
 
     assert reasons_over(on_a_plain_binding, page, THE_COMPANYS_OWN_ACCOUNT) == {
@@ -647,12 +669,14 @@ def test_the_seam_answers_one_withholding_for_each_finding_in_the_order_it_raise
 
 
 def test_a_restore_moves_neither_the_counts_nor_the_verdict_the_findings_give(
-    on_a_plain_binding: Redaction, page: str
+    on_a_plain_binding: Redaction,
+    page: str,
+    spans: tuple[Span, ...],
 ) -> None:
 
     kept = restore_of(on_a_plain_binding, page, A_HEALTH_SENTENCE)
 
-    found = redact(page, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [kept])
+    found = redact(page, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [kept])
 
     assert A_HEALTH_SENTENCE not in on_a_plain_binding.text
     assert A_HEALTH_SENTENCE in found.text

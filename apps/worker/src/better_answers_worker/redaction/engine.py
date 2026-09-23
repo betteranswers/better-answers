@@ -203,6 +203,14 @@ class ModelRecogniser(EntityRecognizer):
 
 
 @dataclass(frozen=True, slots=True)
+class Span:
+    rule_id: str
+    start: int
+    end: int
+    score: float
+
+
+@dataclass(frozen=True, slots=True)
 class Finding:
     category: str
     tier: str
@@ -289,27 +297,41 @@ def analyzer() -> AnalyzerEngine:
     return _ANALYZER
 
 
-def detect(text: str) -> tuple[Finding, ...]:
+def spans_detected(text: str) -> tuple[Span, ...]:
+    # No category and no tier: caching a pure function of the rule id would put the
+    # category table in the memo's key.
     raised = [
-        finding
-        for finding in (
-            _finding_of(result)
+        span
+        for span in (
+            _span_of(result)
             for result in analyzer().analyze(
                 text=text, language="en", entities=list(ANALYSED_ENTITIES)
             )
         )
-        if finding is not None
+        if span is not None
     ]
     return tuple(sorted(raised, key=lambda it: (it.start, it.end, it.rule_id)))
 
 
-def _finding_of(result: RecognizerResult) -> Finding | None:
+def findings_of(spans: Sequence[Span]) -> tuple[Finding, ...]:
+    return tuple(
+        Finding(
+            category=DESCRIPTOR_BY_ENTITY[span.rule_id].category,
+            tier=DESCRIPTOR_BY_ENTITY[span.rule_id].tier,
+            rule_id=span.rule_id,
+            start=span.start,
+            end=span.end,
+            score=span.score,
+        )
+        for span in spans
+    )
+
+
+def _span_of(result: RecognizerResult) -> Span | None:
     descriptor = DESCRIPTOR_BY_ENTITY.get(result.entity_type)
     if descriptor is None or result.score < descriptor.threshold:
         return None
-    return Finding(
-        category=descriptor.category,
-        tier=descriptor.tier,
+    return Span(
         rule_id=result.entity_type,
         start=result.start,
         end=result.end,

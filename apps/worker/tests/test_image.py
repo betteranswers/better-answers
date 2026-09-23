@@ -340,6 +340,7 @@ REDACTION_PROBE = """
 import json, logging, os, sys
 
 from better_answers_worker.redaction import redact
+from better_answers_worker.redaction.engine import spans_detected
 
 reached_out = []
 
@@ -363,8 +364,10 @@ warmed = sorted(
     for name in names
 )
 
+page = os.environ["PROBE_PAGE"]
 found = redact(
-    os.environ["PROBE_PAGE"],
+    page,
+    spans_detected(page),
     json.loads(os.environ["PROBE_RULES"]),
     (),
     os.environ["PROBE_SEED"],
@@ -388,7 +391,11 @@ MEASUREMENT_PROBE = """
 import json, os, statistics, sys, time
 
 from better_answers_worker.redaction import redact
-from better_answers_worker.redaction.engine import ANALYSED_ENTITIES, analyzer
+from better_answers_worker.redaction.engine import (
+    ANALYSED_ENTITIES,
+    analyzer,
+    spans_detected,
+)
 from better_answers_worker.redaction.pins import GLINER_MODEL_ID
 
 page = os.environ["PROBE_PAGE"]
@@ -409,7 +416,7 @@ started = time.perf_counter()
 analyzer()
 pinned_load = (time.perf_counter() - started) * 1000
 
-seam = median(lambda: redact(page, rules, (), seed))
+seam = median(lambda: redact(page, spans_detected(page), rules, (), seed))
 pinned = median(lambda: analyzer().analyze(text=page, language="en", entities=entities))
 
 sys.stdout.write(json.dumps({

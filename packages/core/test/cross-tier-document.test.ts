@@ -175,6 +175,17 @@ const bytesUnder = (directory: string): Buffer => {
 const storeOf = (workspaceId: string, bindingId: string): string =>
   path.join(lmdbRootUnder(bundles().root), workspaceId, bindingId);
 
+// A binding's directory holds two stores at sibling paths: its own, which a wipe
+// removes, and the findings memo's, which a wipe spares.
+const BINDING_STORE = "binding";
+const FINDINGS_STORE = "findings";
+
+const bindingStoreOf = (workspaceId: string, bindingId: string): string =>
+  path.join(storeOf(workspaceId, bindingId), BINDING_STORE);
+
+const findingsStoreOf = (workspaceId: string, bindingId: string): string =>
+  path.join(storeOf(workspaceId, bindingId), FINDINGS_STORE);
+
 const spanOf = (chunks: readonly ChunkRow[]) => {
   const first = chunks[0];
   if (first === undefined) throw new Error("the run landed no chunk row");
@@ -265,11 +276,15 @@ describe("one uploaded document, read back through both tiers", () => {
       expect(runs.map((run) => [run.status, run.attempts])).toEqual([["done", 2]]);
       expect(runs[0]?.outcome?.lmdb_bytes).toBeGreaterThan(0);
 
-      const held = bytesUnder(storeOf(scenario.workspaceId, bound.bindingId));
-      expect(held.includes(THE_PLACEHOLDER)).toBe(true);
-      expect(held.includes(THE_BANK_DETAILS)).toBe(false);
-      expect(held.includes(THE_SORT_CODE)).toBe(false);
-      expect(held.includes(THE_ACCOUNT_NUMBER)).toBe(false);
+      const binding = bytesUnder(bindingStoreOf(scenario.workspaceId, bound.bindingId));
+      const findings = bytesUnder(findingsStoreOf(scenario.workspaceId, bound.bindingId));
+      expect(findings.byteLength).toBeGreaterThan(0);
+      for (const held of [binding, findings]) {
+        expect(held.includes(THE_PLACEHOLDER)).toBe(false);
+        expect(held.includes(THE_BANK_DETAILS)).toBe(false);
+        expect(held.includes(THE_SORT_CODE)).toBe(false);
+        expect(held.includes(THE_ACCOUNT_NUMBER)).toBe(false);
+      }
     },
     A_CROSS_TIER_ALLOWANCE_MS,
   );
@@ -526,12 +541,13 @@ describe("one uploaded document, read back through both tiers", () => {
       );
       await runTheWorker("cross-tier-4");
 
-      const standing = bytesUnder(storeOf(scenario.workspaceId, kept.bindingId));
+      const standing = bytesUnder(findingsStoreOf(scenario.workspaceId, kept.bindingId));
 
       expect(before.map((chunk) => chunk.content)).toEqual([THE_PASSAGE]);
       expect(await chunksOf(scenario.workspaceId, dropped.bindingId)).toEqual([]);
       expect(await chunksOf(scenario.workspaceId, kept.bindingId)).toEqual(before);
-      expect(standing.includes(THE_PLACEHOLDER)).toBe(true);
+      expect(standing.byteLength).toBeGreaterThan(0);
+      expect(standing.includes(THE_PLACEHOLDER)).toBe(false);
     },
     A_CROSS_TIER_ALLOWANCE_MS,
   );

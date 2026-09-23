@@ -3,7 +3,13 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from .descriptors import A_PERSON_NAME, DESCRIPTORS
-from .engine import ALWAYS_TIER, DESCRIPTOR_BY_CATEGORY, Finding, detect
+from .engine import (
+    ALWAYS_TIER,
+    DESCRIPTOR_BY_CATEGORY,
+    Finding,
+    Span,
+    findings_of,
+)
 from .officers import raised_by_the_block_rule
 from .pins import VERSION_STRING
 from .pseudonyms import normalised, pseudonyms_for, written_as
@@ -35,6 +41,7 @@ class Redaction:
 
 def redact(
     text: str,
+    spans: Sequence[Span],
     rules_in_force: Mapping[str, bool],
     suppressions: Sequence[Mapping[str, Sequence[str]]],
     seed: str,
@@ -48,7 +55,8 @@ def redact(
         seed=seed,
     )
 
-    findings = raised_by_the_block_rule(detect(text), text)
+    # Both outside the detector's memo, so a fix to either re-detects nothing.
+    findings = raised_by_the_block_rule(findings_of(spans), text)
 
     letters = pseudonyms_for(_names_in(text, findings), policy.seed)
 

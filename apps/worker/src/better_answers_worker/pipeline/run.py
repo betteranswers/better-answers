@@ -68,7 +68,7 @@ def index_binding(
 ) -> IndexOutcome:
     with Host(bootstrap) as host:
         if run.reason in REASONS_EMPTYING_THE_BINDING:
-            host.remove_binding_directory(run)
+            host.remove_binding_store(run)
         store = copies or Bucket(bootstrap.object_store, run.workspace_id)
         with queue.connected(bootstrap.database_url) as connection:
             with queue.scoped(connection, run.workspace_id) as cursor:

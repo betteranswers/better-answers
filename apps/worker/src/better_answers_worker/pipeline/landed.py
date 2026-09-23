@@ -1,28 +1,49 @@
 import hashlib
-import threading
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
+from types import MappingProxyType
 
 import cocoindex as coco
 
 from ..log import logger
 from ..redaction import Restore, redact
+from ..redaction.detection_key import detection_key as the_detection_key
 from ..redaction.engine import Finding
-from ..redaction.pins import VERSION_STRING
 from ..redaction.withholdings import Withholding
 from .chunks import CHUNK_SIZE_BYTES, Chunk, split_into_chunks
 from .converter import (
-    CONVERTER_PIN,
     TEXT_ENCODING,
     UnreadableError,
     converted,
     pages_of,
 )
-from .host import LANDED_APP, Host, IndexRun
+from .detected import (
+    THE_MEMOS_MODULE,
+    THE_MEMOS_NAME,
+    THE_MEMOS_VERSION,
+    raised_by_the_detector,
+)
+from .host import FINDINGS_STORE, LANDED_APP, Host, IndexRun
 from .objects import LandedCopies
 
-MEMO_VERSION = f"{VERSION_STRING}+{CONVERTER_PIN}"
+# A function memo is fetched by a prefix scan of its calling component's path, so these
+# names are as much its identity as its own.
+A_DOCUMENTS_COMPONENT = "a-document"
+THE_SEAMS_COMPONENT = "the-seam"
+
+
+# Move any one and every page the estate holds is detected again; the suite pins six.
+THE_MEMOS_IDENTITY: Mapping[str, str] = MappingProxyType(
+    {
+        "app": LANDED_APP,
+        "directory": FINDINGS_STORE,
+        "module": THE_MEMOS_MODULE,
+        "mount_path": f"{A_DOCUMENTS_COMPONENT}/{THE_SEAMS_COMPONENT}",
+        "qualified_name": THE_MEMOS_NAME,
+        "version": str(THE_MEMOS_VERSION),
+    }
+)
 
 
 SEAM_MS_PER_PAGE = 2841
@@ -68,6 +89,7 @@ class RedactedDocument:
     version: str
 
     content_hash: str
+    detected_afresh: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,25 +109,15 @@ class QuarantinedDocument:
 @dataclass(frozen=True, slots=True)
 class LandedRun:
     documents: tuple[ReadDocument, ...]
-    read_afresh: int
     quarantined: tuple[QuarantinedDocument, ...] = ()
 
-
-class _Readings:
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._read = 0
-
-    def read_one(self) -> None:
-        with self._lock:
-            self._read += 1
-
-    def taken(self) -> int:
-        with self._lock:
-            return self._read
-
-
-_READINGS = _Readings()
+    @property
+    def detected_afresh(self) -> tuple[str, ...]:
+        return tuple(
+            document.source_document_id
+            for document in self.documents
+            if document.redacted.detected_afresh
+        )
 
 
 def timeout_for(
@@ -117,7 +129,7 @@ def timeout_for(
     return timedelta(milliseconds=ms_per_page * pages + margin_ms)
 
 
-@coco.fn(memo=True)
+@coco.fn
 def landed(
     body: bytes,
     media_type: str,
@@ -125,12 +137,15 @@ def landed(
     suppressions: tuple[Suppression, ...],
     restores: tuple[Restore, ...],
     seed: str,
-    version: str,
+    detection_key: str,
 ) -> RedactedDocument:
-    _READINGS.read_one()
+    # Unmemoised, so a fix to the conversion, the block rule or the withholding reaches
+    # every document on its next run with no version to remember.
     normalised = converted(body, media_type)
+    raised = raised_by_the_detector(normalised, detection_key)
     answer = redact(
         normalised,
+        raised.spans,
         dict(rules_in_force),
         [suppression.as_set() for suppression in suppressions],
         seed,
@@ -144,6 +159,7 @@ def landed(
         verdict=answer.verdict,
         version=answer.version,
         content_hash=hashlib.sha256(normalised.encode(TEXT_ENCODING)).hexdigest(),
+        detected_afresh=raised.afresh,
     )
 
 
@@ -151,7 +167,7 @@ def landed(
 class _Wave:
     rules_in_force: tuple[tuple[str, bool], ...]
     seed: str
-    version: str
+    detection_key: str
     chunk_size: int
     ms_per_page: int
     margin_ms: int
@@ -175,6 +191,7 @@ async def _one_document(
     try:
         with coco.timeout(ceiling):
             answer = await coco.use_mount(
+                coco.component_subpath(THE_SEAMS_COMPONENT),
                 landed,
                 body,
                 document.media_type,
@@ -182,7 +199,7 @@ async def _one_document(
                 document.suppressions,
                 document.restores,
                 wave.seed,
-                wave.version,
+                wave.detection_key,
             )
     except UnreadableError as refusal:
         refused[document.source_document_id] = refusal.name
@@ -209,6 +226,7 @@ async def _every_document(
     wave: _Wave,
 ) -> int:
     await coco.mount_each(
+        coco.component_subpath(A_DOCUMENTS_COMPONENT),
         _one_document,
         [
             (document.source_document_id, (document, body))
@@ -230,7 +248,7 @@ def redact_landed_copies(
     seed: str,
     *,
     chunk_size: int = CHUNK_SIZE_BYTES,
-    memo_version: str = MEMO_VERSION,
+    detection_key: str | None = None,
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> LandedRun:
@@ -239,7 +257,6 @@ def redact_landed_copies(
     )
     read: dict[str, ReadDocument] = {}
     refused: dict[str, str] = {}
-    before = _READINGS.taken()
     coco.App(
         host.app_config(run, LANDED_APP),
         _every_document,
@@ -249,7 +266,9 @@ def redact_landed_copies(
         _Wave(
             rules_in_force=tuple(sorted(rules_in_force.items())),
             seed=seed,
-            version=memo_version,
+            detection_key=(
+                the_detection_key() if detection_key is None else detection_key
+            ),
             chunk_size=chunk_size,
             ms_per_page=ms_per_page,
             margin_ms=margin_ms,
@@ -272,11 +291,7 @@ def redact_landed_copies(
         for document in documents
         if document.source_document_id in refused
     )
-    outcome = LandedRun(
-        documents=answered,
-        read_afresh=_READINGS.taken() - before,
-        quarantined=quarantined,
-    )
+    outcome = LandedRun(documents=answered, quarantined=quarantined)
     for refusal in quarantined:
         logger.warning(
             "the run could not read a document and quarantined it",
@@ -288,7 +303,7 @@ def redact_landed_copies(
         "the binding's landed copies were read",
         binding_id=run.binding_id,
         documents=len(answered),
-        read_afresh=outcome.read_afresh,
+        detected_afresh=list(outcome.detected_afresh),
         quarantined=len(quarantined),
     )
     return outcome

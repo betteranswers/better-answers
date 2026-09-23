@@ -5,7 +5,7 @@ from collections import OrderedDict
 from collections.abc import Coroutine, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from types import TracebackType
+from types import MappingProxyType, TracebackType
 from typing import Any
 
 import asyncpg
@@ -15,7 +15,8 @@ from ..config import Bootstrap
 from ..log import logger
 from .tables import POOL, Table, declare_nothing, declare_rows
 
-ENVIRONMENTS_HELD = 4
+# Two handles a binding, so the bound is twice what it held when a binding had one.
+ENVIRONMENTS_HELD = 8
 
 
 POOL_MIN_SIZE = 0
@@ -24,6 +25,24 @@ POOL_MAX_SIZE = 2
 
 LANDED_APP = "landed"
 CHUNKS_APP = "chunks"
+
+
+# The binding's own store: the chunk rows and the target-state tracking that says which
+# of them have gone. A wipe removes it.
+BINDING_STORE = "binding"
+
+
+# The second store: the landed app and the findings memo, no target declared and so no
+# target-state tracking and no text. A wipe spares it.
+FINDINGS_STORE = "findings"
+
+
+STORES_A_BINDING_HOLDS: tuple[str, ...] = (BINDING_STORE, FINDINGS_STORE)
+
+
+STORE_OF: Mapping[str, str] = MappingProxyType(
+    {CHUNKS_APP: BINDING_STORE, LANDED_APP: FINDINGS_STORE}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,8 +105,10 @@ class Host:
         self._held = environments_held
         self._loop = _Loop()
         self._pools: dict[str, asyncpg.Pool] = {}
-        self._environments: OrderedDict[str, coco.Environment] = OrderedDict()
-        self._providers: dict[str, coco.ContextProvider] = {}
+        self._environments: OrderedDict[tuple[str, str], coco.Environment] = (
+            OrderedDict()
+        )
+        self._providers: dict[tuple[str, str], coco.ContextProvider] = {}
 
     def __enter__(self) -> "Host":
         return self
@@ -103,7 +124,17 @@ class Host:
     def binding_directory(self, run: IndexRun) -> Path:
         return Path(self._engine.lmdb_dir) / run.workspace_id / run.binding_id
 
+    def store_directory(self, run: IndexRun, store: str) -> Path:
+        return self.binding_directory(run) / store
+
+    def store_map_bytes(self) -> int:
+        # Split across the binding's stores: a whole cap each would let a binding hold
+        # twice the operator's number.
+        return self._engine.lmdb_map_bytes // len(STORES_A_BINDING_HOLDS)
+
     def lmdb_bytes(self, run: IndexRun) -> int:
+        # The whole directory, both stores: the operator sizes a volume against what a
+        # binding holds and the split must not halve the number.
         directory = self.binding_directory(run)
         if not directory.is_dir():
             return 0
@@ -111,11 +142,11 @@ class Host:
             item.stat().st_size for item in directory.rglob("*") if item.is_file()
         )
 
-    def remove_binding_directory(self, run: IndexRun) -> None:
+    def remove_binding_store(self, run: IndexRun) -> None:
         # Evicted before the directory goes: removing it under an open handle would
         # leave the engine writing into a store nothing can read.
-        self.evict(run)
-        shutil.rmtree(self.binding_directory(run), ignore_errors=True)
+        self._evict(run, BINDING_STORE)
+        shutil.rmtree(self.store_directory(run, BINDING_STORE), ignore_errors=True)
 
     def pool(self, workspace_id: str) -> asyncpg.Pool:
         held = self._pools.get(workspace_id)
@@ -126,42 +157,48 @@ class Host:
         return opened
 
     def open_binding(self, run: IndexRun) -> None:
-        self._environment(run)
+        for store in STORES_A_BINDING_HOLDS:
+            self._environment(run, store)
 
     def held_bindings(self) -> tuple[str, ...]:
-        return tuple(self._environments)
+        return tuple(dict.fromkeys(binding_id for binding_id, _ in self._environments))
 
     def evict(self, run: IndexRun) -> None:
-        self._environments.pop(run.binding_id, None)
-        self._providers.pop(run.binding_id, None)
+        for store in STORES_A_BINDING_HOLDS:
+            self._evict(run, store)
 
-    def _environment(self, run: IndexRun) -> coco.Environment:
-        held = self._environments.get(run.binding_id)
+    def _evict(self, run: IndexRun, store: str) -> None:
+        self._environments.pop((run.binding_id, store), None)
+        self._providers.pop((run.binding_id, store), None)
+
+    def _environment(self, run: IndexRun, store: str) -> coco.Environment:
+        held = self._environments.get((run.binding_id, store))
         if held is not None:
-            self._environments.move_to_end(run.binding_id)
+            self._environments.move_to_end((run.binding_id, store))
             return held
 
-        directory = self.binding_directory(run)
+        directory = self.store_directory(run, store)
         directory.mkdir(parents=True, exist_ok=True)
         provider = coco.ContextProvider()
         provider.provide(POOL, self.pool(run.workspace_id))
         opened = coco.Environment(
             coco.Settings(
                 db_path=directory,
-                db_settings=coco.LmdbSettings(map_size=self._engine.lmdb_map_bytes),
+                db_settings=coco.LmdbSettings(map_size=self.store_map_bytes()),
             ),
-            name=f"binding:{run.binding_id}",
+            name=f"binding:{run.binding_id}:{store}",
             context_provider=provider,
             event_loop=self._loop.loop,
         )
-        self._environments[run.binding_id] = opened
-        self._providers[run.binding_id] = provider
+        self._environments[(run.binding_id, store)] = opened
+        self._providers[(run.binding_id, store)] = provider
         while len(self._environments) > self._held:
             dropped, _ = self._environments.popitem(last=False)
             self._providers.pop(dropped, None)
             logger.info(
                 "the binding's store was closed to stay within the cache",
-                binding_id=dropped,
+                binding_id=dropped[0],
+                store=dropped[1],
                 held=self._held,
             )
         return opened
@@ -169,7 +206,7 @@ class Host:
     def app_config(self, run: IndexRun, name: str) -> coco.AppConfig:
         return coco.AppConfig(
             name=name,
-            environment=self._environment(run),
+            environment=self._environment(run, STORE_OF[name]),
             max_inflight_components=self._engine.max_inflight_components,
         )
 

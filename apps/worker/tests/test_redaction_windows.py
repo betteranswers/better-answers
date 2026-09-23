@@ -4,7 +4,11 @@ from typing import NamedTuple
 
 from presidio_analyzer.chunkers import CharacterBasedTextChunker
 
-from better_answers_worker.redaction.engine import AnchoredWindows, detect
+from better_answers_worker.redaction.engine import (
+    AnchoredWindows,
+    findings_of,
+    spans_detected,
+)
 from planted_page import FIXTURE_PAGE
 
 HEADING_LESS_PAGE = FIXTURE_PAGE.parent / "depot-delivery-terms.txt"
@@ -130,7 +134,7 @@ def headings_in(text: str) -> list[int]:
 def spans_past_the_shared_heading(text: str, offset: int) -> list[tuple[str, int, int]]:
     return [
         (finding.category, finding.start + offset, finding.end + offset)
-        for finding in detect(text)
+        for finding in findings_of(spans_detected(text))
         if finding.start + offset >= THE_FIRST_HEADING_EVERY_LENGTH_KEEPS
     ]
 
@@ -143,7 +147,7 @@ def spans_past(text: str, tail_at: int) -> list[tuple[str, int, int, str]]:
             finding.end - tail_at,
             text[finding.start : finding.end],
         )
-        for finding in detect(text)
+        for finding in findings_of(spans_detected(text))
         if finding.start >= tail_at
     ]
 
@@ -151,7 +155,7 @@ def spans_past(text: str, tail_at: int) -> list[tuple[str, int, int, str]]:
 def partial_spans_on(text: str) -> list[str]:
     return [
         text[finding.start : finding.end]
-        for finding in detect(text)
+        for finding in findings_of(spans_detected(text))
         if inside_a_word(text, finding.start) or inside_a_word(text, finding.end)
     ]
 
@@ -159,7 +163,7 @@ def partial_spans_on(text: str) -> list[str]:
 def names_on(text: str) -> set[str]:
     return {
         text[finding.start : finding.end]
-        for finding in detect(text)
+        for finding in findings_of(spans_detected(text))
         if finding.category == THE_CATEGORY_A_FRAGMENT_WAS_RAISED_UNDER
     }
 
@@ -283,13 +287,13 @@ def test_a_page_with_no_heading_still_finds_what_it_plants() -> None:
 
     text = heading_less_page()
 
-    found = [text[f.start : f.end] for f in detect(text)]
+    found = [text[f.start : f.end] for f in findings_of(spans_detected(text))]
 
     assert THE_DEPOT_MANAGER in found
     assert THE_DEPOT_SORT_CODE in found
     assert partial_spans_on(text) == []
     assert (
-        tuple((f.category, f.start, f.end) for f in detect(text))
+        tuple((f.category, f.start, f.end) for f in findings_of(spans_detected(text)))
         == THE_DEPOT_FIXTURES_ANSWER
     )
 

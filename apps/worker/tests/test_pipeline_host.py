@@ -10,8 +10,11 @@ import pytest
 
 from better_answers_worker.config import Bootstrap, Engine, ObjectStore
 from better_answers_worker.pipeline import (
+    BINDING_STORE,
     CHUNK_TABLE,
     ENVIRONMENTS_HELD,
+    FINDINGS_STORE,
+    STORES_A_BINDING_HOLDS,
     Host,
     IndexRun,
     index_binding,
@@ -205,7 +208,7 @@ def test_the_environment_cache_holds_its_bound_and_drops_the_oldest_binding(
 
     with Host(
         bootstrap_for("postgresql://unreached/unreached", tmp_path),
-        environments_held=2,
+        environments_held=4,
     ) as host:
         for binding_id in touched:
             host.open_binding(
@@ -217,8 +220,9 @@ def test_the_environment_cache_holds_its_bound_and_drops_the_oldest_binding(
         assert host.held_bindings() == ("binding-one", "binding-three")
 
 
-def test_the_bound_the_host_holds_by_default_is_the_one_the_module_states() -> None:
-    assert ENVIRONMENTS_HELD == 4
+def test_the_bound_the_host_holds_by_default_is_two_handles_for_four_bindings() -> None:
+    assert ENVIRONMENTS_HELD == 8
+    assert ENVIRONMENTS_HELD // len((BINDING_STORE, FINDINGS_STORE)) == 4
 
 
 def test_the_seam_answers_an_outcome_of_plain_numbers_and_opens_the_bindings_store(
@@ -238,6 +242,38 @@ def test_the_seam_answers_an_outcome_of_plain_numbers_and_opens_the_bindings_sto
     }
     assert outcome.lmdb_bytes > 0
     assert (tmp_path / workspace_id / "binding-one").is_dir()
+
+
+def test_the_operators_per_binding_cap_is_what_both_its_stores_hold_together(
+    tmp_path: Path,
+) -> None:
+    bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
+
+    with Host(bootstrap) as host:
+        each = host.store_map_bytes()
+
+    assert each * len(STORES_A_BINDING_HOLDS) == bootstrap.engine.lmdb_map_bytes
+    assert len(STORES_A_BINDING_HOLDS) == 2
+
+
+def test_a_bindings_two_stores_sit_at_sibling_paths_under_its_own_directory(
+    tmp_path: Path,
+) -> None:
+    run = IndexRun(
+        workspace_id="01M2Q3R4S5T6V7W8X9YZAB0000",
+        binding_id="binding-one",
+        reason="bound",
+    )
+
+    with Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host:
+        host.open_binding(run)
+
+        binding = host.store_directory(run, BINDING_STORE)
+        findings = host.store_directory(run, FINDINGS_STORE)
+
+    assert binding.parent == findings.parent == host.binding_directory(run)
+    assert binding != findings
+    assert binding.is_dir() and findings.is_dir()
 
 
 def test_a_bindings_lmdb_size_is_readable_after_its_run(
