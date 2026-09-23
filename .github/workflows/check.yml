@@ -1,76 +1,8 @@
-# `check` on every PR, and on main as build.yml's first job — lint, types, tests per
-# workspace (AGENTS.md). One definition of `check`, called from both places.
-# Hosted Ubuntu runners ship Docker, so Testcontainers runs unchanged.
-# Action versions read from each repository's latest release on 28/08/2026 — research/41-deploy-facts.md §1.
-# The two the worker image's build needs — docker/setup-buildx-action and
-# crazy-max/ghaction-github-runtime — were read the same way, off their own release pages, on
-# 13/09/2026 (`T-150`).
-#
-# EVERY `uses:` IN THIS DIRECTORY NAMES A COMMIT SHA, with its tag beside it as a comment: the
-# tag is what a person reads and what Renovate rewrites, the SHA is what runs. A tag is a
-# moving reference into somebody else's repository, and these workflows hold a token that can
-# push our images. "Renovate pins them to digests" stood in this header from 28/08/2026 as a
-# plan, and every file went on using tags until `T-040` resolved them (GitHub API,
-# `git/ref/tags/<tag>`, annotated tags dereferenced, 03/09/2026). `renovate.json` keeps them
-# pinned — `pinDigests` on the `github-actions` manager, which is what the
-# `helpers:pinGitHubActionDigests` preset sets.
-#
-# EVERY `runs-on:` IN THIS DIRECTORY NAMES A RELEASE, `ubuntu-24.04`, and not the
-# `ubuntu-latest` label. The label is a moving reference into somebody else's estate the same
-# way a tag is: GitHub is migrating it to Ubuntu 26 from 19/10/2026
-# (actions/runner-images#14748, which every job in this directory has been printing as a
-# notice), so a tree that passed on Friday would fail on Monday for a reason no commit
-# carries. `ubuntu-26.04` is the move to make and it is made on a branch of its own — one
-# edit, every leg, a full run green before `main` sees it — rather than on a date in
-# somebody else's calendar.
-#
-# AND EVERY `setup-uv` IN THIS DIRECTORY READS ITS VERSION, for the same reason and out of
-# one file: `version-file: apps/worker/.tool-versions`. Unpinned, that action takes whatever
-# uv is newest, which was 0.12.17 against the worker image's 0.12.9 on 22/09/2026 — two
-# builders resolving one lockfile. Why that file and not `[tool.uv] required-version`, and
-# what keeps it in step with the image, are said once in the file itself.
-#
-# ONE LIST OF GATES, FOUR LEGS AND ONE VERDICT (`T-333`). The root `pnpm check` is still the
-# one list — `package.json`'s `check` names every gate this repository has, and it is what a
-# person runs on a laptop. What this file owns is WHERE each of those gates runs. Until
-# 22/09/2026 the answer was "one job, in order", and run 35735268427 measured what that cost:
-# 795 seconds of which the worker was 462, while the root gates, the libraries, the api and
-# the web waited their turn for work that shares nothing with it. The legs below run those
-# four groups at once, so a full run is the longest leg rather than their sum, and each leg
-# installs only the toolchain its own gates ask for.
-#
-# THE LEG NAMES CARRY THEIR LANE, and the fan-in reads them. A job called `full-<something>`
-# runs on the full lane, `docs-<something>` on the docs lane, `affected-<something>` on the
-# affected one, and `check` at the foot of this file requires exactly that: every leg whose
-# prefix is this run's lane concluded success, and every other leg stood down. A leg added by
-# copying one of these is therefore already under the verdict, and a leg whose condition
-# stopped matching its name is red rather than quietly absent — which is the failure this
-# shape exists to refuse, a `check` that is green because nothing ran.
-#
-# THREE LANES. A pull request runs the AFFECTED lane: the root gates, then `check` in
-# the workspaces the change touched and the workspaces that depend on them, by pnpm's filter
-# against the pull request's base. `merge_group` and a run called by `build.yml` run the whole
-# of it — pre-merge checks as a subset and merge-time checks as the whole is the queue's own
-# design, and the commit that is about to land is the one that pays for everything. What falls
-# in which lane is `scripts/docs-lane.mjs`.
-#
-# `check` IS THE NAME, and it is the fan-in's. The branch ruleset requires the status context
-# `check` and `build.yml`'s `image` waits on `needs: check`; neither reads a leg. So the legs
-# may be renamed, split or added to freely, and that one job name may not move.
 name: check
 
 on:
   pull_request:
-  # The merge queue tests each commit it means to land on a merge-group ref of its own, and
-  # the ruleset's required status context is the `check` job below — so without this trigger
-  # the queue would wait on a run that never starts. Three conflict-free pull requests took
-  # 92 minutes to land by hand on 21/09/2026 (the process review), which is what the queue
-  # is for; and because the queue fast-forwards `main` to the very commit it tested,
-  # build.yml can ask whether this run already happened rather than running it again.
   merge_group:
-  # On main this workflow is CALLED by build.yml as its first job, so a push runs `check`
-  # once — before the images are built, never beside them (`T-018`). A `push` trigger here as
-  # well would put both runs in the one group below and have them queue behind each other.
   workflow_call:
     inputs:
       images-probed-by-the-caller:
@@ -85,47 +17,6 @@ on:
         type: boolean
         default: false
 
-# A pull request cancels the run it supersedes; a run CALLED by build.yml never does.
-#
-# This block is evaluated in the caller's context, so `check-refs/heads/main` was one group
-# holding every push to main with `cancel-in-progress: true` — and build.yml asks for the
-# opposite, because an image is worth building for every commit that lands. Two fast pushes
-# and the second run cancelled the first run's `check` job, taking the images it gates with
-# it (`T-040`).
-#
-# Not cancelling was half of it. A group holds one running and one pending job whatever
-# `cancel-in-progress` says, and a third arrival cancels the pending one — so under one group
-# for `main`, three pushes inside one `check` would still lose the second commit's images.
-# build.yml's group is per commit (`T-211`) and a called run's is too: the group is the ref for
-# a pull request, which is what lets a newer push find the run it supersedes, and the commit
-# for everything else.
-#
-# Both conditions hold whichever value a called run reads: GitHub documents
-# `github.event_name` as "the name of the event that triggered the workflow run" without
-# saying, for a reusable workflow, whether that is the caller's event or `workflow_call` — and
-# neither of those is `pull_request`. Only a run triggered directly by a pull request takes the
-# ref and cancels, either way.
-#
-# The group must also stay different from build.yml's: a called workflow that waits on its
-# caller's group waits on itself. `apps/api/tests/image-job.test.ts` holds both groups.
-#
-# A MERGE-GROUP RUN reads both expressions as "not a pull request" — the commit for its
-# group, `false` for cancellation — and that is exactly what the queue needs. Its promise is
-# that the commit it tested is the commit that lands, so a merge-group run that another run
-# cancelled has tested nothing and would leave `build.yml`'s gate below looking for a
-# success that is not there. Both lines were written as one question — is this a pull
-# request — so the new event joined them without a character moving (the process review,
-# 21/09/2026); `apps/api/tests/docs-lane.test.ts` holds that shape, so an event added by
-# name rather than by that question fails there.
-#
-# `github.sha` on a merge-group run is the merge commit the queue built, which is the commit
-# `main` is fast-forwarded to. So a run of this workflow CALLED by build.yml for that same
-# commit lands in the same group and waits rather than racing — the ordinary case is that
-# the gate below stands it down and it never starts at all.
-#
-# THE GROUP IS THE RUN'S, not a leg's. Every job below shares it, so a superseded pull
-# request loses its whole fan at once rather than leaving legs running for a commit nobody
-# is waiting on.
 concurrency:
   group: check-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -134,60 +25,15 @@ permissions:
   contents: read
 
 jobs:
-  # WHICH LANE THIS RUN IS IN, decided once, before any leg installs anything. A change that
-  # is only markdown runs the prose-reading gates and nothing else: the process review of
-  # 21/09/2026 measured a five-file markdown pull request paying eleven minutes here and
-  # thirteen more on main for suites that could not have read a line of it. The rule and the
-  # reason each case falls the way it does are `scripts/docs-lane.mjs`; what this job owns is
-  # the base the diff is taken against, and publishing the answer to the legs.
-  #
-  # It installs nothing at all — not pnpm, not node's own setup action. The lane script is one
-  # file of plain JavaScript with no imports beyond `node:fs`, and every hosted runner already
-  # carries a node that can run it. That is what keeps this job's cost to a checkout, and the
-  # legs' own setup off the critical path of a decision they all wait on.
   lane:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       lane: ${{ steps.lane.outputs.lane }}
-      # The base the diff above was taken against, so the affected lane's filter asks the same
-      # question of the same two trees, and the flag the worker's leg reads.
       base: ${{ steps.lane.outputs.base }}
       worker: ${{ steps.lane.outputs.worker }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # THE BASE IS PER EVENT. A pull request carries its own base sha; a merge-group ref
-      # carries the commit the queue built it on; a run CALLED by build.yml reads the
-      # caller's `before`, the `github` context of a reusable workflow being the caller's.
-      # `workflow_call` is named beside `push` for the reason the concurrency block above
-      # gives: GitHub documents `github.event_name` without saying which of the two a called
-      # run reads, and `github.event.before` is the caller's push either way — so the base
-      # is found whichever string arrives, rather than the answer resting on a reading of
-      # the documentation that nothing here can test.
-      #
-      # Anything else — a dispatch, the all-zero `before` of a first push, a base this clone
-      # cannot fetch — leaves the lane at `full`, which is the lane this workflow ran before
-      # today: being wrong that way costs minutes, being wrong the other way ships a tree no
-      # gate read.
-      #
-      # The checkout above fetched one commit, so the base is not in this clone and is
-      # fetched by sha — one commit, no tags, no history, and `git diff` between two trees
-      # needs no ancestry between them. `fetch-depth: 0` is the other way and is not taken:
-      # it clones the whole history of the repository on every run of both lanes to answer a
-      # question about two trees.
-      #
-      # `-z` and a file, never a shell variable: a path with a newline in it survives the
-      # first and command substitution drops the NUL bytes of the second. `--no-renames` is
-      # the fail-safe reading of a rename — both paths appear, so a markdown file renamed to
-      # a `.ts` is the `full` lane by the name it arrived under.
-      #
-      # A pull request's base sha is the one its event payload carried, which is behind the
-      # tip of `main` as soon as anything else lands. The diff then picks up those commits
-      # too and a genuinely markdown-only pull request takes the full lane — the safe
-      # direction, and the reason this is a note rather than a fix, but it is what will make
-      # the lane fire less often on a busy `main` than the review measured. The sharper base
-      # is the merge ref's own first parent, which costs a deeper fetch; measure before
-      # taking it (the process review, 21/09/2026).
       - name: the lane this change runs in
         id: lane
         env:
@@ -253,31 +99,6 @@ jobs:
             echo "worker=${worker}"
           } >> "$GITHUB_OUTPUT"
 
-  # THE DOCS LANE, AND THE WHOLE OF IT, in one job — which is the thing that must not move.
-  # `check:docs` runs the suites that read this repository's DOCUMENTS, through the same
-  # runner as the root `check`, so one command still names every step that failed.
-  # `format:check` leads it because it leads the root `check` — and on this lane it is a no-op
-  # by construction, `.oxfmtrc.json` ignoring `**/*.md`. It is in the list so that the two
-  # lanes start the same way, not because it reads a document.
-  #
-  # The lane keeps gates rather than skipping CI because a docs-only commit broke one on
-  # 21/09/2026: five specs moved into `docs/specs/` and `coding-rules-tags` went red on the
-  # three `CITED_NOWHERE_ELSE` entries they made stale. It installs no uv, no browser, no
-  # rewrite tool and no builder, because no gate that reads a document needs one, and
-  # `apps/api/tests/docs-lane.test.ts` holds that list against this job's steps.
-  #
-  # WHAT IT STILL PAYS, said plainly: `apps/api` and `packages/core` start a Postgres
-  # container from their vitest `globalSetup` whichever files are selected, so this lane
-  # pays two container starts that none of its suites touch. Making it not do so is a
-  # change to those configurations rather than to this workflow, and it is not this
-  # change's (the process review, 21/09/2026).
-  #
-  # It is not every suite coupled to a markdown file. Five are left to the full lane —
-  # four reading a committed redaction FIXTURE, and the worker's half of the contract
-  # count, whose other half is in this lane and catches the same commit without a uv
-  # environment. Which suites are in the lane, which are outside it and why each is where
-  # it is, are one table in `apps/api/tests/docs-lane.test.ts`, held against the root
-  # manifest both ways.
   docs-gates:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'docs' }}
@@ -293,16 +114,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:docs
 
-  # THE FULL LANE'S FIRST LEG: every gate the root `check` names ahead of the workspaces —
-  # each one a tool walked over the whole tree — and then the libraries, which are the
-  # workspaces nothing deploys. They share a leg because they share a cost: one install, one
-  # tree, and between them 26 s of root gates and 142 s of suites on run 35735268427.
-  #
-  # It brings uv, and the reason is `packages/devtools`: its `lint` and `typecheck` are ruff
-  # and mypy over `packages/devtools/python`, run through the worker's environment because
-  # that is where those tools are pinned. It brings the rewrite tool for `packages/core`'s
-  # erasure suite. It brings no browser and no image builder, because nothing it runs opens
-  # one or builds one.
   full-root:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'full' }}
@@ -320,42 +131,16 @@ jobs:
           version-file: apps/worker/.tool-versions
           enable-cache: true
       - run: pnpm install --frozen-lockfile
-      # This checkout is the only fresh clone we ever get, so it is the only place the
-      # promise "install and the hook is there" can actually be tested. The config test
-      # reads the hook's configuration; nothing but a clone can prove the install wrote the
-      # hook script itself. It lives on this leg alone: `lefthook.yml` is not a markdown
-      # file, so no change that could move the hook ever takes the docs lane.
       - name: the pre-commit hook is installed by install alone
         run: |
           hook="$(git rev-parse --git-path hooks)/pre-commit"
           test -x "$hook" || { echo "no executable pre-commit hook at $hook"; exit 1; }
           grep -q lefthook "$hook" || { echo "$hook is not lefthook's"; exit 1; }
-      # `packages/devtools` runs ruff and mypy out of this environment, so this leg syncs it
-      # even though it runs none of the worker's own gates.
       - run: uv sync --frozen
         working-directory: apps/worker
-      # `check:libraries` runs `packages/core`'s erasure suite, which shells out to
-      # `git-filter-repo` and cannot be run without it. Why the install is an action of its
-      # own, and why its version is read rather than written, is said once where it lives.
       - uses: ./.github/actions/git-filter-repo
-      # The root's own gates, then the workspaces nothing deploys. A leg names ONE root
-      # script and never a list of gates: a manifest's steps are named in that manifest and
-      # nowhere else, so `check:tree` is where this leg's gates are read and edited.
-      # `apps/api/tests/docs-lane.test.ts` expands the legs' scripts and holds what they come
-      # to against the root `check`, so a gate added there and on no leg is red.
       - run: pnpm check:tree
 
-  # THE API'S OWN GATES. It builds two images inside its suite — `tests/image.test.ts` reads
-  # the api image and `tests/backup-image.test.ts` the backup one — so it takes the container
-  # builder and the cache credentials, for the reason `docs/operations/BUILD_CACHE.md` gives:
-  # the daemon's own driver cannot import a `type=gha` cache, logs `unknown cache importer`,
-  # builds every layer cold and exits 0. Without these two steps this leg would be green and
-  # cold for ever.
-  #
-  # It takes the rewrite tool too, which the single job used to install once for everything:
-  # `tests/ops.test.ts` runs the erasure REHEARSAL, and phase two of that drill reaches the
-  # same git step `packages/core`'s erasure suite does. `mutation.yml` already says this of
-  # its own two legs; here it is what makes the tool a second leg's and not only `full-root`'s.
   full-api:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'full' }}
@@ -368,47 +153,17 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-      # The BINARY, and not the worker's environment: `tests/lefthook-config.test.ts` asserts
-      # the hook's python commands go through uv, and asks the tool itself whether it is
-      # there. So no `uv sync` below and no `enable-cache:` here, where the other two legs
-      # have both — this leg resolves no Python package, so the cache it saved would be an
-      # empty entry against the 10 GB the repository gets, and the entry it evicted to write
-      # one could be the detector's weights (`docs/operations/BUILD_CACHE.md`).
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version-file: apps/worker/.tool-versions
       - run: pnpm install --frozen-lockfile
-      # The builder first. The driver a plain daemon answers with builds straight into its
-      # own image store and can export a cache nowhere, and it cannot read one either. This
-      # creates a container-driver builder and makes it the current one; the suite probes for
-      # exactly that before it asks for the cache, and builds the way it always did when it
-      # finds no such builder — a laptop, and this workflow before `T-150`. Read, and not
-      # write: what a pull request exports lands on its own ref, which `main` and every other
-      # pull request cannot read, so the probes pass `--cache-from` alone and the cache they
-      # read is the one `build.yml`'s legs wrote on `main` (`T-223`).
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
-      # And the credentials second. The `type=gha` backend reads its token and its endpoint
-      # out of the runner's `ACTIONS_*` variables, and a runner hands those to an action's
-      # own process and to no `run:` step at all: `docker/build-push-action` has them
-      # because it is an action, and the `docker buildx build` a suite runs from inside
-      # vitest does not. This step copies every `ACTIONS_*` variable into the job's
-      # environment, which is the helper Docker's own documentation names for this case, and
-      # copying all of them is what covers both spellings of the endpoint — the cache
-      # service moved from `ACTIONS_CACHE_URL` to `ACTIONS_RESULTS_URL` at v2, and the suites
-      # accept either. The token is the runner's own, minted for this job and dead when it
-      # ends; it is not `GITHUB_TOKEN` and the `permissions:` block above does not reach it.
       - uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
       - uses: ./.github/actions/git-filter-repo
-      # The image tests read the variable below and stand down when the caller's own job
-      # probes what it pushes; a pull request evaluates it to the empty string and probes.
       - run: pnpm check:api
         env:
           IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller }}
 
-  # THE SPA'S OWN GATES, ending in a browser suite over the served build. The browser is not
-  # in the pnpm store, so it is installed here — Chromium alone, the suite running one
-  # project — and it is installed on this leg alone, which is what the install is worth: 42 s
-  # of the 90 the old single job paid before any gate started.
   full-web:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'full' }}
@@ -425,19 +180,6 @@ jobs:
       - run: pnpm --filter @better-answers/web exec playwright install --with-deps chromium
       - run: pnpm check:web
 
-  # THE WORKER, which is the longest leg and therefore the length of a full run: 462 s of the
-  # 795 on run 35735268427, of which pytest was 412 and mypy 49. Everything it needs and
-  # nothing else — the detector's weights, the container builder its image probe reads a
-  # layer cache through, and uv. No browser, and no `pnpm install` step: `check:worker` is
-  # `uv run --frozen check` in `apps/worker`, and the only thing node does on this leg is
-  # spawn it, so that this leg names its gate the way every other leg names its own.
-  #
-  # THAT IS NOT THE SAME AS NOT INSTALLING, which is why `cache: pnpm` is below. pnpm 11
-  # verifies the tree before it runs a script, so `pnpm check:worker` installs all 665
-  # packages first whether this leg asked for them or not — 12 seconds of the longest leg of
-  # run 35774991309, 19:38:23 to 19:38:35, paid cold on every run because this leg had no
-  # store cache. The cache makes that install the cheapest thing on the leg; removing the
-  # install itself is a change to how the root manifest spawns this gate, and not this one.
   full-worker:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'full' }}
@@ -445,19 +187,6 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # The redaction detector's model weights are fetched on first use and land under
-      # the runner's own temp directory, never inside the checkout: a cache restored into
-      # the checkout sits where every tree walker reads it too — oxfmt, the tag scan, knip,
-      # jscpd — and one landed there read as unformatted JSON by the first and as a string
-      # too long to hold by the second, on a run where the cache happened to be warm before
-      # either walker ran. Those walkers are the `full-root` leg's now and this directory is
-      # on another runner altogether, which settles the question twice over; `runner.temp` is
-      # still the right home, being this job's own scratch space. A job's own `env:` cannot
-      # read the `runner` context (GitHub's context-availability table), so the value is
-      # written to `$GITHUB_ENV` here instead, once, before anything downstream needs it. The
-      # worker reads this from the process, never from a file: the location is the deploy
-      # unit's to decide, and the compose file sets the same variable for the running
-      # container.
       - name: HF_HOME on the runner's own temp directory, not the checkout
         run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
@@ -469,11 +198,6 @@ jobs:
         with:
           version-file: apps/worker/.tool-versions
           enable-cache: true
-      # Hundreds of megabytes of detector weights, fetched once and restored on every run
-      # after it. The key hashes the module the versions and the model id are declared in,
-      # so a model or a package the weights answer to moving is a miss and a fresh
-      # download — a key that named only the operating system would serve the old weights
-      # to the new pin and nobody would see it happen.
       - name: the redaction detector's weights, keyed on the pins that name them
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -481,38 +205,13 @@ jobs:
           key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
       - run: uv sync --frozen
         working-directory: apps/worker
-      # The builder and the credentials, for the reason the api leg gives: this leg's image
-      # probe builds `apps/worker/Dockerfile`, on a fresh runner every layer of it is cold —
-      # the step that fetches the detector's weights above all, which is over a gigabyte —
-      # and a `type=gha` cache can neither be read by the daemon's own driver nor reached
-      # from a `run:` step without the second of these.
-      #
-      # That cache needs no key of its own, which is why there is no second key here beside
-      # the weights one above. BuildKit keys a layer by what goes into it, and the weights
-      # step sits above the copy of the redaction package and below nothing else (`T-149`),
-      # so moving a pin in that package is a cold weights layer by arithmetic rather than by
-      # a key somebody has to remember to write. The two agree on purpose: the cache step
-      # above hashes the same file for the same reason.
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
       - uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
-      # The second variable refuses the indexing engine's call home, for the reason the
-      # worker image's runtime `ENV` gives: cocoindex reaches `cocoindex.gateway.scarf.sh` on
-      # every update. The image's setting reaches a container and this leg starts none —
-      # `check:worker` runs the pipeline suite on the runner itself — so without this line
-      # every pull request tells a third party what this repository is building, once per
-      # document. The value is held against the compose file's by
-      # `apps/worker/tests/test_image.py`.
       - run: pnpm check:worker
         env:
           IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller }}
           COCOINDEX_DISABLE_USAGE_TRACKING: "1"
 
-  # THE AFFECTED LANE'S ROOT GATES, which are every lane's. Each one is a tool walked over the
-  # whole tree — `format:check`, `lint`, both comment gates, the density and insert scans,
-  # `jscpd`, `knip` — so none of them can be narrowed to the workspaces a change touched, and
-  # this leg runs the same `check:gates` the full lane's `full-root` runs ahead of the
-  # libraries. It is the cheap half of the affected lane: 26 s of gates on run 35735268427,
-  # against the workspaces beside it.
   affected-gates:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'affected' }}
@@ -528,31 +227,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:gates
 
-  # THE WORKSPACES THE CHANGE TOUCHED AND THE WORKSPACES THAT DEPEND ON THEM, which is what
-  # `pnpm --filter "...[<base>]"` names: every package with a changed file, and every package
-  # that imports one. A change to `packages/core` therefore still pays for `apps/api` and
-  # `apps/web`, and a change to `apps/web` pays for `apps/web` alone.
-  #
-  # WHAT THE GRAPH DOES NOT CARRY, and it is one thing: the api's image holds the SPA's build,
-  # and `apps/web` depends on `apps/api` rather than the other way about — so a change to the
-  # SPA alone selects `apps/web` and `apps/api`'s image suite runs in the merge group instead
-  # of here, which is an ejection when it goes red. Left rather than hand-wired: a `--filter`
-  # arm written here for one coupling is a second dependency graph beside pnpm's, and it would
-  # be read by nobody the day the real edge moves.
-  #
-  # THE WORKSPACE ROOT IS EXCLUDED BY NAME. pnpm maps a changed file to the nearest project
-  # above it, and for a root file that project is this repository itself — whose `check` is the
-  # whole run. The lane script sends a root change to the full lane before this leg ever
-  # starts; this second filter is what makes that a belt as well as braces, and
-  # `apps/api/tests/docs-lane.test.ts` holds the name against the root manifest's.
-  #
-  # IT INSTALLS WHAT ANY SELECTION COULD ASK FOR, and not what this one did. The filter's
-  # answer is not known until the tree is installed and the base is fetched, so a toolchain
-  # gated on it would be a second reading of the same question — and a toolchain missing from
-  # a workspace that WAS selected is a red run, while one installed for a workspace that was
-  # not costs seconds. The browser is the SPA's, the rewrite tool `packages/core`'s erasure
-  # suite and `apps/api`'s rehearsal, the builder and the runtime variables the api's two image
-  # suites, and the worker's environment is `packages/devtools`' ruff and mypy.
   affected-workspaces:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'affected' }}
@@ -569,14 +243,6 @@ jobs:
         with:
           version-file: apps/worker/.tool-versions
           enable-cache: true
-      # The checkout fetched one commit and the filter needs two trees, so the base arrives
-      # here the way it arrived in the `lane` job — by sha, one commit, no tags, no history.
-      # pnpm asks `git diff --name-only <base> -- <root>`, which is two trees and no ancestry.
-      #
-      # AND A RENAME IS BOTH PATHS, as it is to the `lane` job's `--no-renames`. pnpm passes no
-      # such flag, so git's own detection would report a file moved from one workspace to
-      # another as the destination alone and the source workspace would go unchecked. The two
-      # diffs have to read one change the same way, and this is where that is said to pnpm.
       - name: the base the filter reads, and a rename read as both its paths
         env:
           BASE: ${{ needs.lane.outputs.base }}
@@ -590,12 +256,6 @@ jobs:
       - run: pnpm --filter @better-answers/web exec playwright install --with-deps chromium
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
       - uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
-      # A LEG THAT GATED NOTHING READ NOTHING. The lane script sends a path no workspace owns
-      # to the full lane, so an empty selection here with no worker gates beside it means the
-      # two have stopped agreeing and this run's whole verdict is the root gates. That is the
-      # one way the affected lane could be silently green, and it is refused rather than
-      # counted. An empty selection IS right for a change that is only the worker's: a uv
-      # workspace is not a pnpm one, and `affected-worker` is where it is gated.
       - name: the filter selected something, or the worker's gates did
         env:
           BASE: ${{ needs.lane.outputs.base }}
@@ -607,21 +267,11 @@ jobs:
             echo "::error::the affected lane selected no workspace and the worker's gates are not in this change, so only the root gates would have read it"
             exit 1
           fi
-      # One root script, as every leg names one: the filter and the exclusion are in the
-      # manifest, where a person can run them — `BASE=main pnpm check:affected`.
       - run: pnpm check:affected
         env:
           BASE: ${{ needs.lane.outputs.base }}
           IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller }}
 
-  # THE WORKER, WHEN THE CHANGE REACHED IT. `pnpm --filter` never names this tier — a uv
-  # workspace is not a pnpm one — so the `lane` job answers for it from the paths: a change
-  # under `apps/worker/` or `contracts/`, which are the two roots this tier's suites read.
-  #
-  # THE LEG RUNS EITHER WAY AND ITS STEPS DO NOT, which is what keeps the fan-in's rule whole:
-  # every leg named for this run's lane must conclude success, and a leg skipped by its own
-  # `if:` concludes nothing. So a change that never reached the worker pays a runner boot here
-  # and no download, no environment and no gates — and the leg still reports.
   affected-worker:
     needs: lane
     if: ${{ needs.lane.outputs.lane == 'affected' }}
@@ -634,10 +284,6 @@ jobs:
         run: echo "a path under apps/worker/ or contracts/ changed - ${WORKER}"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ needs.lane.outputs.worker == 'yes' }}
-      # Everything below is `full-worker`'s, step for step and reason for reason — the
-      # detector's weights under the runner's own temp directory, the environment, the builder
-      # its image probe reads a layer cache through and the runtime variables a `run:` step
-      # needs to reach that cache. Said once, there.
       - name: HF_HOME on the runner's own temp directory, not the checkout
         if: ${{ needs.lane.outputs.worker == 'yes' }}
         run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
@@ -672,26 +318,6 @@ jobs:
           IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller }}
           COCOINDEX_DISABLE_USAGE_TRACKING: "1"
 
-  # THE ONE VERDICT. This job is the branch ruleset's required status context and the job
-  # `build.yml`'s `image` waits on, and it is the only thing in this file either of them
-  # reads.
-  #
-  # `always()`, so that it runs whatever the legs did and reports on them — under
-  # `success()`, which is the default, a failed leg would leave this job SKIPPED, and a
-  # skipped required check is a check that never reports. That is the whole reason the rule
-  # below is written out rather than left to `needs`.
-  #
-  # THE RULE, and it is one sentence: `lane` succeeded, every leg whose name begins with this
-  # run's lane succeeded, and every other leg was skipped. Both halves matter. Requiring the
-  # successes catches a leg that failed, was cancelled, or was skipped because something it
-  # needed never ran; requiring the skips catches a leg that ran on the wrong lane, and a
-  # `lane` job that failed — its output is then the empty string, no leg matches the first
-  # case, and the legs GitHub skipped for it are held against a `lane` that is not `success`.
-  #
-  # It reads the leg names rather than a list of its own, so a leg added above is under this
-  # verdict the moment it is named in `needs:` — and a leg whose `if:` stopped agreeing with
-  # its prefix is red, which is the point. `apps/api/tests/docs-lane.test.ts` holds the two to
-  # each other.
   check:
     needs:
       [

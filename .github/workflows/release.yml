@@ -1,36 +1,3 @@
-# Promote a pair of image digests to PRODUCTION. A person runs this; nothing else deploys production
-# (ADR 0022). The `production` environment carries a required reviewer.
-#
-# THE DIGESTS. Blank inputs mean "the head of main": the digests `build.yml` pushed under that
-# commit's `sha-<short>` tag, read back from ghcr.io — staging is on demand and never stands
-# (ADR 0024), so there is no "digest staging runs" to default to (ticket 79 A1, Q7). There is no
-# `:main` tag to read (`T-211`): every commit builds in a group of its own, and a tag every run
-# wrote would name whichever finished last. WHEN THE HEAD HAS NO IMAGE — its build still
-# running, or red, or the head is the row a release just pushed, which no build runs for
-# because a GITHUB_TOKEN push starts no workflow — this REFUSES and names the commit. It never
-# reaches back for an older image: the ways on are to wait for that build, to dispatch `build`
-# on main, or to pass the digests, which is what page 6's rollback does with the row above.
-# Every digest is passed between steps
-# through `env:` and matched against `^sha256:[0-9a-f]{64}$` on its own before anything is
-# PATCHed — never interpolated into a shell line (ticket 79 SEC10).
-#
-# THE RHYTHM (ticket 79 Q7, a condition and not a date). While no client's data is on the box a
-# release is minutes to undo, so any green build may be promoted and the post-deploy smoke is the
-# release's last step. THE DAY THE FIRST CLIENT'S DATA IS ON THE BOX the owner sets the repository
-# variable `CLIENT_DATA_ON_BOX` (`gh variable set CLIENT_DATA_ON_BOX --body <date>`; RUNBOOK.md
-# page 6 says so), and from then on this workflow REFUSES to run unless `rehearsed_by` names the
-# drill report that just proved a restore (a drill-day release) or a hotfix reason. That is the
-# forcing function: the switch is a check in this file, not a sentence in a runbook.
-#
-# THE RECORD. Every promotion is appended to `deploy/RELEASES.md` — date, who, both digests, what
-# it rode on — and pushed to main BEFORE the smoke runs, so a release the smoke fails still has
-# its row and page 6's "the row above" exists (ticket 79 op F3; RUNBOOK.md page 6 reads it). The
-# `main` ruleset must let the GitHub Actions app bypass "require a pull request" for that one
-# push (wizard stage 2); whether the ruleset honours GITHUB_TOKEN as that app is proved at the
-# first release and recorded in the private coolify.md — if not, a GitHub App token replaces it.
-#
-# Action versions read from each repository's latest release and pinned by commit SHA
-# (`T-040`); one pin per action across the directory (tests/workflow-pins.test.ts).
 name: release
 
 on:
@@ -62,11 +29,9 @@ jobs:
     env:
       COOLIFY_URL: ${{ vars.COOLIFY_URL }}
       COOLIFY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
-      # Coolify sits behind Cloudflare Access; CI presents a service token pair (coolify.md § Stage 7 state).
       CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       PROD_UUID: ${{ vars.COOLIFY_PROD_APP_UUID }}
-      # The one origin (ADR 0034), for the post-deploy smoke: https://app.<apex>
       PUBLIC_URL: ${{ vars.PUBLIC_URL }}
       CLIENT_DATA_ON_BOX: ${{ vars.CLIENT_DATA_ON_BOX }}
       REHEARSED_BY: ${{ inputs.rehearsed_by }}

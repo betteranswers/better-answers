@@ -1,41 +1,9 @@
-# The rewrite tool the erasure suite runs, installed once for every workflow that runs it.
-#
-# `git-filter-repo` is what the erasure routine's git step shells out to (`T-124`, ADR 0020),
-# and `ubuntu-latest` does not carry it: without this a workspace's erasure suite fails on the
-# runner while every machine it was written on is green. There is no skip guard in that suite
-# on purpose — a red run on the one step that rewrites a workspace's history irreversibly is
-# the coverage those workflows exist to provide.
-#
-# ONE ACTION RATHER THAN A STEP PER WORKFLOW. The install was written into `check.yml` and
-# copied nowhere, so `mutation.yml` simply went without: Stryker's initial test run is a
-# workspace's suite run whole, so both its legs died on `git: 'filter-repo' is not a git
-# command`, mutated nothing and scored nothing for three nights before anyone looked
-# (`T-224`, runs 35429172629, 35497773123 and 35575658679). A step that has to be remembered
-# is a step that will be forgotten; a workflow now says `uses:` and gets the whole of it.
-#
-# THE VERSION IS READ OUT OF `apps/api/Dockerfile`, NOT WRITTEN HERE. Do not tidy it into a
-# literal. A rewrite proved against one version of the tool and run against another is a
-# rewrite nobody has tested, so the runner and the api image must carry the same one — and the
-# constitution's dependency rule is that a pinned value is written down once, read from there,
-# and the read refuses more than one match, because a second copy ages on its own. An action
-# cannot import a constant, so reading the pin out of the file that declares it is the
-# substitute, the way `apps/worker/tests/pg_harness.py` reads the Postgres image out of the
-# module that declares that. `apps/api/tests/workflow-tools.test.ts` holds this file to that,
-# and holds every workflow either to using this action before the step that runs the suite or
-# to being named as one that runs no such suite.
-#
-# A caller has already run `actions/checkout` and `astral-sh/setup-uv` — every one of them
-# sets uv up for the Python tier regardless — and the `$GITHUB_PATH` line below puts the tool
-# where git looks for the rest of the job.
 name: git-filter-repo
 description: Install git-filter-repo at the version the api image pins, and prove git can reach it.
 runs:
   using: composite
   steps:
     - shell: bash
-      # `$GITHUB_WORKSPACE` rather than a relative path: an action runs in whatever directory
-      # its caller was in, and the pin's location is a fact about the checkout, not about the
-      # caller.
       run: |
         pinned="$(sed -n 's/^ARG GIT_FILTER_REPO_VERSION=//p' "$GITHUB_WORKSPACE/apps/api/Dockerfile")"
         # Exactly one, never the first of several: two `ARG` lines are two pins, and a read

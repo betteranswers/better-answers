@@ -1,45 +1,10 @@
-# Mutation testing on a schedule: Stryker for apps/api and packages/core.
-# NIGHTLY, 02:17 UTC, on hosted runners. The cadence is a choice and not a budget — the
-# repository is public, so hosted standard runners carry no minute cap, and both legs finish
-# inside an hour — and the coding rules' mutation-schedule rule is where the choice is made and
-# where it changes. Nightly rather than weekly because the summary below names what newly
-# survived since the previous run (T-090), which is the one thing a reader needs from a run
-# that happens while they sleep; a nightly score with nothing to compare against was a number
-# nobody read, and weekly was the wait for that summary (T-106).
-# A falling score is an ordna task, not a failed build — the job posts the numbers, it does not gate.
-# Stryker does not exit non-zero on a survivor here (thresholds.break is null in both configs), so a red
-# job means the harness itself broke, which is worth seeing.
-#
-# TWO LEGS, AND WHAT WOULD BRING A THIRD BACK. A score is only worth reporting where the tests that
-# produce it exercise the code being mutated, which is what removed the other two:
-#   - apps/web. Its primary test interface is a browser — Playwright against a served build — and
-#     Stryker's Vitest runner cannot drive it. What is left for the runner is three jsdom files
-#     against a dozen components, so the score would be dominated by mutants no test covers and
-#     would move when jsdom coverage moved while staying blind to the suite that exercises the SPA.
-#     It comes back when a runner can drive the browser suite, or when component tests through
-#     Testing Library cover the screens on their own. `apps/web/stryker.config.mjs` went with it.
-#   - apps/worker. Its mutatable source is a few dozen lines of configuration and logging plus a
-#     schema view generated from the migration journal, so a mutmut score today measures the
-#     generator. It comes back with `T-006`, which is where the worker gets behaviour worth
-#     mutating; the tier keeps mutmut and its settings in `apps/worker/pyproject.toml` ready for it.
-#
-# Action versions read from each action's GitHub releases page on 31/08/2026, resolved to the
-# commit SHA each tag names on 03/09/2026 (`T-040`; the reason is in check.yml's header).
-# actions/cache read from https://github.com/actions/cache/releases/tag/v6.1.0 on 07/09/2026 and
-# resolved the same day; `restore` and `save` are directories inside that repository, so the two
-# carry the one commit its v6.1.0 tag names.
 name: mutation
 
 on:
   schedule:
-    - cron: "17 2 * * *"   # nightly, 02:17 UTC
+    - cron: "17 2 * * *"
   workflow_dispatch:
     inputs:
-      # Stryker's `--force`: every mutant is run again, the restored incremental file
-      # ignored for reuse. The incremental differ reuses a mutant's result when its source
-      # and its covering tests are unchanged, and a change to how the runner runs a mutant —
-      # `vitest.related`, `ignoreStatic` — is neither, so a run meant to measure that change
-      # has to be told to re-test what it would otherwise reuse (T-107's proof run).
       force:
         description: "Re-test every mutant (stryker --force); off reuses the previous run's results"
         type: boolean
@@ -51,15 +16,10 @@ permissions:
 jobs:
   stryker:
     runs-on: ubuntu-24.04
-    # A leg that restores nothing is the night this has to cover, and both finish inside an
-    # hour; the rest is room for the hardening tickets ahead lengthening both suites.
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        # `name` labels the job, the summary and the artifact; `path` is the workspace. They
-        # differ because an artifact name may not carry a slash (ADR 0029 moved the tiers
-        # under `apps/`).
         include:
           - name: api
             path: apps/api
@@ -72,10 +32,6 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-      # The worker's tier too: core's rebuild-equivalence suite runs the worker through uv
-      # against the app's own map, and a suite file the mutation run keeps is one it runs.
-      # On both legs, not core's alone: the install is seconds with the cache, and a suite
-      # file that spawns uv can appear in either. Pinned as in check.yml.
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version-file: apps/worker/.tool-versions
@@ -83,69 +39,26 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: uv sync --frozen
         working-directory: apps/worker
-      # Stryker runs the whole suite of the workspace it is mutating before it runs a single
-      # mutant — the initial test run — so both legs reach the erasure routine's git step:
-      # `core` through the erasure suite itself, `api` through the rehearsal's. Neither can
-      # run without `git-filter-repo`, and no `if:` here, because both legs need it. Why the
-      # install is an action of its own, and why its version is read rather than written, is
-      # said once where it lives.
       - uses: ./.github/actions/git-filter-repo
-      # The previous run's mutant results — or, after an overrun, the cancelled leg's own — so
-      # a file nobody touched is not re-tested.
-      # A cache entry is written once and never overwritten, so a fixed key would pin the first
-      # run's results forever: the run id makes the key new every time — so the entry is always
-      # saved — and the prefix restores the newest one this workspace has. The attempt number is
-      # on the key too, because a re-run keeps the run id and would reserve its own first
-      # attempt's entry, be refused, and discard what it proved.
-      # A night where nothing restores (a first run, or GitHub evicting an entry it has not seen
-      # read for seven days — which a nightly schedule reads every night, so eviction now takes
-      # a week of the workflow not running at all) is a full run: slower, never wrong, and
-      # `timeout-minutes` above is sized for exactly that night.
-      # Restore and save are separate steps because the combined action saves in a post step
-      # conditioned on success, which discards the checkpoint of the one run that needed to keep
-      # it — a leg cancelled at the job timeout. Split, the save below carries `always()` and an
-      # overrunning leg becomes the next night's starting point instead of the next night's full run.
       - name: the previous run's mutant results
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          # The path is the workspace's `incrementalFile`, which is where the reason for it
-          # sitting under `reports/` rather than under the run's temp directory is written.
           path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
           key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: stryker-incremental-${{ matrix.name }}-
-      # The restored file is the previous run's whole report — the same shape the JSON
-      # reporter writes, every mutant with its status — and Stryker overwrites it when this
-      # run ends. Copied aside first, it is the baseline the summary below names new survivors
-      # against. Nothing restored means no baseline, and the summary says so. After an overrun
-      # the baseline is the cancelled leg's partial report, and a mutant it never reached
-      # reads as "not in the baseline" in the next summary — true, and gone the night after.
       - name: the previous run's report, kept as the summary's baseline
         run: |
           f=${{ matrix.path }}/reports/mutation/stryker-incremental.json
           if [ -f "$f" ]; then cp "$f" "${{ matrix.path }}/reports/mutation/baseline.json"; fi
-      # Cancellation signals the step's entry process and nothing under it, and a shell waiting
-      # on a child forwards no signal: behind `pnpm run mutation`, with a pnpm and an sh in
-      # between, Stryker was never signalled and never wrote the partial incremental report it
-      # writes on SIGINT or SIGTERM (run 34128668967). `exec` into pnpm's bin shim, which execs
-      # into node, leaves one process from the step down — so the signal is Stryker's. The
-      # workspace's `mutation` script is skipped rather than called because calling it is what
-      # interposes the shell; `stryker.config.mjs` holds the run's settings either way.
       - name: mutation
         working-directory: ${{ matrix.path }}
         run: exec node_modules/.bin/stryker run ${{ inputs.force && '--force' || '' }}
-      # First of the `always()` steps because a cancelled job has about five minutes before the
-      # runner kills everything, and the checkpoint is the one artefact the next run needs.
       - name: this run's mutant results, whether or not it finished
         if: always()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
           key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
-      # The score, the mutants that survive here and did not in the baseline, and the rows the
-      # runner never tested — written by `scripts/mutation-summary.mjs`, whose reading of the
-      # two reports is proved in packages/devtools' suite. The script exits zero whatever the
-      # reports hold, so the job's conclusion never turns on a survivor count; a red step here
-      # is the script failing to run, which is the harness and worth seeing.
       - name: score and new survivors to the job summary
         if: always()
         run: |
