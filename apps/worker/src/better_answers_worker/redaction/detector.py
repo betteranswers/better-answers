@@ -2,6 +2,7 @@ from collections.abc import Callable, Mapping, Sequence
 from itertools import pairwise
 from types import MappingProxyType
 
+import torch.utils.serialization
 from presidio_analyzer import EntityRecognizer, RecognizerResult
 from presidio_analyzer.chunkers import CharacterBasedTextChunker, TextChunk
 from presidio_analyzer.nlp_engine import NlpArtifacts
@@ -138,13 +139,21 @@ class ModelRecogniser(EntityRecognizer):
     def __init__(
         self, labels: Mapping[str, str], model_name: str, threshold: float
     ) -> None:
-        self.gliner = GLiNERRecognizer(
-            model_name=model_name,
-            map_location="cpu",
-            threshold=threshold,
-            entity_mapping=dict(labels),
-            text_chunker=AnchoredWindows(),
-        )
+        # torch installs `patch` on its config modules at runtime, and this one never
+        # imports the stub that declares it.
+        with torch.utils.serialization.config.patch(  # type: ignore[attr-defined]
+            "load.mmap", True
+        ):
+            # Mapped, and assigned in place on the meta device, the weights are file
+            # pages the kernel drops, not anonymous memory held twice and swapped.
+            self.gliner = GLiNERRecognizer(
+                model_name=model_name,
+                map_location="cpu",
+                threshold=threshold,
+                entity_mapping=dict(labels),
+                text_chunker=AnchoredWindows(),
+                low_cpu_mem_usage=True,
+            )
         super().__init__(
             supported_entities=sorted(set(labels.values())),
             name=MODEL_RULE_NAME,
