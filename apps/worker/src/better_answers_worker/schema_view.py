@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0049_the-chunks-by-binding"
+MIGRATION_ID = "0050_the-sweep-pass"
 
-MIGRATION_WHEN = 1790184726022
+MIGRATION_WHEN = 1790192750641
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -495,6 +495,16 @@ TABLES: dict[str, dict[str, str]] = {
         "erasure_request_id": "text NOT NULL",
         "document_id": "text NOT NULL",
         "identifiers": "jsonb NOT NULL",
+    },
+    "public.sweep_pass": {
+        "id": "text NOT NULL",
+        "at": "timestamp with time zone NOT NULL",
+        "upload_sweep": "text NOT NULL",
+        "workspaces": "integer NOT NULL",
+        "refused": "integer NOT NULL",
+        "found": "integer NOT NULL",
+        "removed": "integer NOT NULL",
+        "generations": "integer NOT NULL",
     },
     "public.user": {
         "id": "text NOT NULL",

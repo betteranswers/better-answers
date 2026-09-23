@@ -1,11 +1,17 @@
 import { serve } from "@hono/node-server";
 import { createTransport } from "nodemailer";
 
-import { readObjectStore, requireBootstrap, requireIdentityBootstrap } from "./config.ts";
+import {
+  readObjectStore,
+  readSweeps,
+  requireBootstrap,
+  requireIdentityBootstrap,
+} from "./config.ts";
 import { openDoors } from "./doors.ts";
 import { logger } from "./logger.ts";
 import { RECONCILER_INTERVAL_MS, startReconciler } from "./reconciler.ts";
 import { createServer } from "./server.ts";
+import { startSweeps, SWEEP_FIRST_PASS_MS, SWEEP_INTERVAL_MS } from "./sweeps.ts";
 
 const bootstrap = requireBootstrap("the app");
 const identity = requireIdentityBootstrap("the app");
@@ -73,4 +79,26 @@ if (!reconciler.ok) {
   );
 } else {
   logger.info({ interval_ms: RECONCILER_INTERVAL_MS }, "head check running");
+}
+
+// A wrong setting stops the sweeps and not the app; their check's silence tells the operator.
+const sweepSettings = readSweeps();
+if (!sweepSettings.ok) {
+  logger.error({ reason: sweepSettings.error.message }, "the sweeps are not running");
+} else {
+  const { uploadSweep, pingUrl } = sweepSettings.value;
+  const sweeps = startSweeps({ doors, settings: sweepSettings.value });
+  if (!sweeps.ok) {
+    logger.error({ reason: sweeps.error }, "the sweeps are not running");
+  } else {
+    logger.info(
+      {
+        interval_ms: SWEEP_INTERVAL_MS,
+        first_pass_ms: SWEEP_FIRST_PASS_MS,
+        upload_sweep: uploadSweep,
+        check_configured: pingUrl !== undefined,
+      },
+      "sweeps running",
+    );
+  }
 }

@@ -55,6 +55,8 @@ import {
   A_SUBJECT_REQUEST,
   A_SUGGESTION,
   A_SUPPRESSION,
+  A_SWEEP_PASS,
+  A_SWEEP_PASS_COUNTING,
   AN_ACCESS_REQUEST,
   AN_EDGE,
   AN_EDGE_CARRYING_A_SENTENCE,
@@ -3053,6 +3055,82 @@ describe("the contract stamp", () => {
         [
           "DELETE FROM contract_stamp",
           "a stamp a reader can remove is a refusal that stops firing",
+        ],
+      ]);
+    });
+  });
+});
+
+describe("the sweep pass", () => {
+  it("lets the api record a pass and read it back, and never rewrite or remove one", async () => {
+    await withRollback(db.pool, async (client) => {
+      await client.query("SET LOCAL ROLE app_rt");
+      const id = ulid();
+
+      await client.query(A_SWEEP_PASS, [id]);
+      const read = await client.query("SELECT id, upload_sweep, found, removed FROM sweep_pass");
+      expect(read.rows).toEqual([{ id, upload_sweep: "list", found: 2, removed: 0 }]);
+
+      await refusesEach(client, [
+        [
+          "UPDATE sweep_pass SET removed = 0",
+          "a pass the api could rewrite could say a last run removed nothing when it removed much",
+        ],
+        [
+          "DELETE FROM sweep_pass",
+          "and one it could remove could make a missed day look like no day at all",
+        ],
+      ]);
+    });
+  });
+
+  it("refuses the worker every road to reading or recording a pass", async () => {
+    await withRollback(db.pool, async (client) => {
+      await client.query(A_SWEEP_PASS, [ulid()]);
+      expect(Object.values(await privilegesHeld(client, "worker_rt", "sweep_pass"))).not.toContain(
+        true,
+      );
+      await client.query("SET LOCAL ROLE worker_rt");
+
+      await refusesEach(client, [
+        ["SELECT id FROM sweep_pass", "the worker sweeps nothing, so it has no pass to read"],
+        [A_SWEEP_PASS, "and a worker that could record one could stand in for a pass", [ulid()]],
+        ["UPDATE sweep_pass SET removed = 0", "or rewrite what a pass removed"],
+        ["DELETE FROM sweep_pass", "or remove the last run an operator reads"],
+      ]);
+    });
+  });
+
+  it("refuses a row whose counts no pass could have made", async () => {
+    await withRollback(db.pool, async (client) => {
+      await client.query(A_SWEEP_PASS_COUNTING, [ulid(), "remove", 2, 1, 3, 3]);
+      const standing = await client.query("SELECT refused, found, removed FROM sweep_pass");
+      expect(standing.rows).toEqual([{ refused: 1, found: 3, removed: 3 }]);
+
+      await refusesEach(client, [
+        [
+          A_SWEEP_PASS_COUNTING,
+          "a list-only pass removes nothing",
+          [ulid(), "list", 1, 0, 2, 1],
+          /sweep_pass_counts_check/,
+        ],
+        [
+          A_SWEEP_PASS_COUNTING,
+          "a pass removes no more than it found",
+          [ulid(), "remove", 1, 0, 1, 2],
+          /sweep_pass_counts_check/,
+        ],
+        [
+          A_SWEEP_PASS_COUNTING,
+          "a pass passes over no more workspaces than it read",
+          [ulid(), "remove", 1, 2, 0, 0],
+          /sweep_pass_counts_check/,
+        ],
+        [
+          A_SWEEP_PASS_COUNTING,
+          "the upload sweep lists or removes, and nothing else",
+          [ulid(), "delete", 1, 0, 0, 0],
+          /sweep_pass_upload_sweep_check/,
         ],
       ]);
     });

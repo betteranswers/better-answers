@@ -4,6 +4,8 @@ import { z } from "zod";
 
 import { err, ok, type Result } from "@better-answers/core/kernel";
 import type { ObjectStoreSettings } from "@better-answers/core/store/objects";
+import type { UploadSweepMode } from "@better-answers/core/sweeps";
+import { UPLOAD_SWEEP_MODES } from "@better-answers/schema";
 
 import {
   bareHostname,
@@ -77,6 +79,11 @@ const objectStoreSchema = z.object({
   S3_SECRET_KEY: z.string().min(1),
 });
 
+const sweepsSchema = z.object({
+  UPLOAD_SWEEP: z.enum(UPLOAD_SWEEP_MODES).default("list"),
+  HEALTHCHECKS_PING_URL_SWEEPS: z.url({ protocol: /^https?$/ }).optional(),
+});
+
 export type Bootstrap = {
   readonly databaseUrl: string;
   readonly port: number;
@@ -93,8 +100,14 @@ export type IdentityBootstrap = {
   readonly smtpUrl: string | undefined;
 };
 
-const invalid = (parsed: z.ZodError): Error =>
-  new Error(`bootstrap configuration is invalid:\n${z.prettifyError(parsed)}`);
+export type SweepSettings = {
+  readonly uploadSweep: UploadSweepMode;
+
+  readonly pingUrl: string | undefined;
+};
+
+const invalid = (parsed: z.ZodError, what = "bootstrap configuration"): Error =>
+  new Error(`${what} is invalid:\n${z.prettifyError(parsed)}`);
 
 export function readBootstrap(
   environment: Readonly<Record<string, string | undefined>> = process.env,
@@ -137,6 +150,17 @@ export function readObjectStore(
     bucket: parsed.data.S3_BUCKET,
     accessKeyId: parsed.data.S3_ACCESS_KEY,
     secretAccessKey: parsed.data.S3_SECRET_KEY,
+  });
+}
+
+export function readSweeps(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): Result<SweepSettings> {
+  const parsed = sweepsSchema.safeParse(environment);
+  if (!parsed.success) return err(invalid(parsed.error, "the sweeps' settings"));
+  return ok({
+    uploadSweep: parsed.data.UPLOAD_SWEEP,
+    pingUrl: parsed.data.HEALTHCHECKS_PING_URL_SWEEPS,
   });
 }
 

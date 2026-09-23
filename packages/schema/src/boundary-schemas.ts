@@ -28,7 +28,7 @@ import {
 } from "./concept-tables.ts";
 import { CONTRACT_DIGEST_PATTERN } from "./contract-digest.ts";
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
-import { contractStamp } from "./platform-tables.ts";
+import { contractStamp, sweepPass, UPLOAD_SWEEP_MODES } from "./platform-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import {
   erasureRequest,
@@ -269,6 +269,22 @@ const contractStampRefinements = {
 export const contractStampSelect = createSelectSchema(contractStamp, contractStampRefinements);
 export const contractStampInsert = createInsertSchema(contractStamp, contractStampRefinements);
 export const contractStampUpdate = createUpdateSchema(contractStamp, contractStampRefinements);
+
+const aCount = (schema: z.ZodNumber) => schema.int().nonnegative();
+
+const sweepPassRefinements = {
+  id: (schema: z.ZodString) => schema.regex(ULID),
+  uploadSweep: (schema: z.ZodString) => schema.pipe(z.enum(UPLOAD_SWEEP_MODES)),
+  workspaces: aCount,
+  refused: aCount,
+  found: aCount,
+  removed: aCount,
+  generations: aCount,
+};
+
+export const sweepPassSelect = createSelectSchema(sweepPass, sweepPassRefinements);
+export const sweepPassInsert = createInsertSchema(sweepPass, sweepPassRefinements);
+export const sweepPassUpdate = createUpdateSchema(sweepPass, sweepPassRefinements);
 
 export { ACTOR_ID } from "./actor-id.ts";
 
@@ -839,6 +855,12 @@ export const boundarySchemas = {
     select: contractStampSelect,
     insert: contractStampInsert,
     update: contractStampUpdate,
+  },
+  sweepPass: {
+    table: sweepPass,
+    select: sweepPassSelect,
+    insert: sweepPassInsert,
+    update: sweepPassUpdate,
   },
   session: {
     table: session,
