@@ -1182,7 +1182,7 @@ def test_a_reason_the_app_deletes_rows_for_empties_the_store_before_any_read(
     findings_standing = files_in(findings_directory)
     planted = binding_directory / "planted-before-the-wipe"
     planted.write_bytes(b"what the removal must take with it")
-    capsys.readouterr()
+    first_read = detected_afresh_in(capsys.readouterr().out)
 
     index_binding(
         bootstrap,
@@ -1218,7 +1218,11 @@ def test_a_reason_the_app_deletes_rows_for_empties_the_store_before_any_read(
     assert set(after_the_wipe) & set(after_the_rule_change) != set()
     assert set(after_the_wipe.values()).isdisjoint(after_the_rule_change.values())
 
-    assert (restored_read, rule_change_read, wiped_read) == ([[]], [[]], [[]])
+    # The control: without it an empty read below could mean nothing is ever reported.
+    assert first_read == [[AN_INVOICE_ID]]
+    assert restored_read == [[]], "a restore keeps both stores, the memo among them"
+    assert rule_change_read == [[]], "a rule change removes the binding's store alone"
+    assert wiped_read == [[]], "a wipe removes the binding's store and spares the memo"
     # Same inodes, so the second store was never removed and remade under it.
     assert inodes_of(findings_standing) != {}
     assert inodes_of(files_in(findings_directory)).items() >= (
