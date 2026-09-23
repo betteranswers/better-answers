@@ -225,7 +225,8 @@ const PROSE_SUITES: readonly ProseSuite[] = [
   },
   {
     file: "apps/api/tests/deploy-tree.test.ts",
-    reads: "deploy/RELEASES.md and docs/operations/{RUNBOOK,SECRETS,coolify}.md",
+    reads:
+      "the deploy tree, .github/workflows/*.yml and deploy/RELEASES.md and docs/operations/{RUNBOOK,SECRETS,coolify}.md",
     inTheLane: "check:docs:api",
   },
   {

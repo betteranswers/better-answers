@@ -65,7 +65,7 @@ jobs:
           # The refusal goes to stderr: inside `$(…)` stdout is the digest.
           last_build() {
             docker buildx imagetools inspect "ghcr.io/${OWNER}/$1:${tag}" --format '{{.Manifest.Digest}}' && return
-            echo "::error::main's head ${head} has no ghcr.io/${OWNER}/$1:${tag} — its build is still running, or red, or the head is a release's own row. No older image is promoted in its place: wait for that build, dispatch \`build\` on main, or pass the digests" >&2
+            echo "::error::main's head ${head} has no ghcr.io/${OWNER}/$1:${tag} — its build is still running, or red. No older image is promoted in its place: wait for that build, dispatch \`build\` on main, or pass the digests" >&2
             return 1
           }
           api="${IN_API:-$(last_build api)}"
@@ -102,27 +102,41 @@ jobs:
           # `-X POST`: Coolify answers a GET on /deploy with 405, hidden behind a 403.
           curl -fsS -X POST "${COOLIFY_URL}/api/v1/deploy?uuid=${PROD_UUID}&force=false" \
             -H "Authorization: Bearer ${COOLIFY_TOKEN}" -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}"
-      - name: record the promotion in deploy/RELEASES.md
+      - name: record the promotion as an annotated release/<stamp> tag
         env:
           API_DIGEST: ${{ steps.d.outputs.api }}
           WORKER_DIGEST: ${{ steps.d.outputs.worker }}
           ACTOR: ${{ github.actor }}
+          IN_API: ${{ inputs.api_digest }}
+          IN_WORKER: ${{ inputs.worker_digest }}
         run: |
           set -euo pipefail
           rode="${REHEARSED_BY:-pre-client: any green build}"
-          # The backticks are the row's markdown and reach the file as themselves.
-          # shellcheck disable=SC2016
-          printf '| %s | %s | `%s` | `%s` | %s |\n' "$(date -u +%FT%TZ)" "${ACTOR}" "${API_DIGEST}" "${WORKER_DIGEST}" "${rode}" >> deploy/RELEASES.md
+          when="$(date -u +%FT%TZ)"
+          head="$(git rev-parse HEAD)"
+          # A ref name takes no colon; the head makes two runs of one second two tags.
+          stamp="${when//[-:]/}-${head:0:7}"
+          tag="release/${stamp}"
+          # Each digest says for itself whether it was passed or resolved from this head.
+          if [ -z "${IN_API}" ] && [ -z "${IN_WORKER}" ]; then
+            points="main's head, which both digests were resolved from"
+          elif [ -n "${IN_API}" ] && [ -n "${IN_WORKER}" ]; then
+            points="main's head at this dispatch — both digests were passed in, so this is not where either image was built"
+          elif [ -n "${IN_API}" ]; then
+            points="main's head, which the worker digest was resolved from — the api digest was passed in and its image was built elsewhere"
+          else
+            points="main's head, which the api digest was resolved from — the worker digest was passed in and its image was built elsewhere"
+          fi
+          message="$(printf 'release: api %s · worker %s\n\nWhen (UTC): %s\nBy: %s\napi: %s\nworker: %s\nRode on: %s\nCommit: %s (%s)\n' \
+            "${API_DIGEST:7:12}" "${WORKER_DIGEST:7:12}" "${when}" "${ACTOR}" "${API_DIGEST}" "${WORKER_DIGEST}" "${rode}" "${head}" "${points}")"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add deploy/RELEASES.md
-          git commit -m "release: api ${API_DIGEST:7:12} · worker ${WORKER_DIGEST:7:12}"
-          # main may have moved while the reviewer approved: rebase the one commit, then push.
-          git pull --rebase --quiet origin main
-          git push origin HEAD:main
+          git tag --annotate --message "${message}" "${tag}" "${head}"
+          git push origin "refs/tags/${tag}"
           {
             echo "### Promoted to production"
             echo ""
+            echo "- recorded as \`${tag}\` on \`${head}\` (${points})"
             echo "- api \`${API_DIGEST}\`"
             echo "- worker \`${WORKER_DIGEST}\`"
             echo "- rode on: ${rode}"

@@ -175,7 +175,7 @@ say "Push this repository:"
 note "  git remote add origin git@github.com:$GH_ORG/$GH_REPO.git && git push -u origin main"
 pause "Pushed?"
 open_url "https://github.com/$GH_ORG/$GH_REPO/settings/rules"
-step "Add a ruleset for 'main': require a pull request, require the 'check' status check. BYPASS LIST: the 'GitHub Actions' app — release.yml appends one row to deploy/RELEASES.md and pushes it to main on every promotion (RUNBOOK.md page 6 reads that file during an outage)."
+step "Add a ruleset for 'main': require a pull request, require the 'check' status check. NO BYPASS LIST — nothing in CI commits to main. release.yml records each promotion as an annotated release/<stamp> tag, which a branch ruleset does not govern (RUNBOOK.md page 6 reads those tags during an outage)."
 open_url "https://github.com/$GH_ORG/$GH_REPO/settings/environments"
 step "Create the environment 'production' (required reviewer: you). No 'staging' environment: staging is on demand and no workflow deploys it (ADR 0024)."
 open_url "https://github.com/organizations/$GH_ORG/settings/packages"
@@ -319,8 +319,8 @@ pause "Ping URLs in Coolify env and the drill env?"
 stage "First deploy and the probes"
 say "In GitHub → Actions run 'build' (main): three images are pushed and the run summary shows three digests. Put the backup one in the stores resource's env; then run 'release' with blank inputs to promote the api and worker digests to production (the worker is declared, not started — the pipeline profile)."
 step "Watch the production deploy log in Coolify. Record in the private coolify.md § Probes: the compose command Coolify ran; whether 'migrate' finished before 'api' started; whether redeploying 'better-answers' left 'better-answers-stores' running; the \\du answer."
-step "Open https://app.$APEX (the shell and sign-in), https://app.$APEX/.well-known/oauth-protected-resource/mcp (resource = https://app.$APEX/mcp), https://agent.$APEX/ (expect 404), https://$APEX/c/test (expect 404). Both uptime paths green (Cloudflare Health Checks on Pro; the healthchecks.io 'uptime' check on Free); one row in deploy/RELEASES.md."
-if confirm "All three hostnames answered as expected and RELEASES.md has its first row"; then
+step "Open https://app.$APEX (the shell and sign-in), https://app.$APEX/.well-known/oauth-protected-resource/mcp (resource = https://app.$APEX/mcp), https://agent.$APEX/ (expect 404), https://$APEX/c/test (expect 404). Both uptime paths green (Cloudflare Health Checks on Pro; the healthchecks.io 'uptime' check on Free); one release tag — git fetch --tags && git tag --list 'release/*'."
+if confirm "All three hostnames answered as expected and there is a release/* tag for that promotion"; then
   write_env FIRST_DEPLOY_DONE "$(date -u +%F)"
 else
   SKIPPED+=("first deploy / probes — re-run this stage")

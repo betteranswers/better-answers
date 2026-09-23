@@ -14,6 +14,10 @@ const read = (relative: string): string =>
 
 const operationsDocuments = "docs/operations";
 
+// One workflow step's block, so an assertion about it cannot pass on a neighbour's text.
+const stepNamed = (workflow: string, name: string): string =>
+  workflow.split(/^ {6}- name: /m).find((block) => block.startsWith(name)) ?? "";
+
 const deployScripts = (): readonly string[] =>
   readdirSync(path.join(repositoryRoot, "deploy"))
     .filter((file) => file.endsWith(".sh"))
@@ -339,23 +343,123 @@ describe("the deploy tree (T-005)", () => {
     expect(read("deploy/backup.sh")).toContain("init-repo");
   });
 
-  it("matches each promoted digest on its own through env, appends every promotion to RELEASES.md, and carries Q7's switch", () => {
+  it("matches each promoted digest on its own through env, and carries Q7's switch", () => {
     const release = read(".github/workflows/release.yml");
     expect(release).toContain("^sha256:[0-9a-f]{64}$");
     expect(release).toMatch(
       /env:\n\s+API_DIGEST: \$\{\{ steps\.d\.outputs\.api \}\}\n\s+WORKER_DIGEST: \$\{\{ steps\.d\.outputs\.worker \}\}/,
     );
 
-    const interpolated = release
+    // Every workflow expression is a binding, never a token spliced into a shell line.
+    const spliced = release
       .split("\n")
-      .filter((candidate) => /\$\{\{ steps\.d\.outputs/.test(candidate))
       .map((line) => line.trim())
-      .filter((line) => !/^(API|WORKER)_DIGEST: /.test(line));
-    expect(interpolated).toEqual([]);
-    expect(release).toContain("deploy/RELEASES.md");
+      .filter((line) => line.includes("${{"))
+      .filter((line) => !/^[A-Z_]+: \$\{\{ [^}]+ \}\}$/.test(line))
+      .filter((line) => !/^(ref|registry|username|password): /.test(line));
+    expect(spliced).toEqual([]);
     expect(release).toContain("CLIENT_DATA_ON_BOX");
-    expect(read("deploy/RELEASES.md")).toContain("| When (UTC) | By | api | worker | Rode on |");
-    expect(read(`${operationsDocuments}/RUNBOOK.md`)).toContain("RELEASES.md");
+  });
+
+  it("records a promotion as one annotated release tag, pushes no branch, and smokes after it", () => {
+    const release = read(".github/workflows/release.yml");
+
+    // The record is a tag and nothing else: `main` is merge-queue-only, so a push to it
+    // from the workflow is refused.
+    expect(release).toContain('tag="release/${stamp}"');
+    expect(release).toContain('git tag --annotate --message "${message}" "${tag}" "${head}"');
+    // The head makes two promotions in one second two tags rather than a rejected push.
+    expect(release).toContain('stamp="${when//[-:]/}-${head:0:7}"');
+
+    const pushes = release
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith("git push "));
+    expect(pushes).toEqual(['git push origin "refs/tags/${tag}"']);
+    expect(release).not.toContain("HEAD:main");
+    expect(release).not.toContain("git commit");
+
+    // Against the tag's own message, not the step: the step summary echoes four of these
+    // and would satisfy a message that carried none of them.
+    const record = stepNamed(release, "record the promotion");
+    const message = /message="\$\(printf[\s\S]*?\)"/.exec(record)?.[0] ?? "";
+    expect(message).not.toEqual("");
+    for (const field of [
+      "${when}",
+      "${ACTOR}",
+      "${API_DIGEST}",
+      "${WORKER_DIGEST}",
+      "${rode}",
+      "${head}",
+      "${points}",
+    ]) {
+      expect(message).toContain(field);
+    }
+
+    // The smoke follows the record, so a promotion whose smoke fails still has its tag.
+    const stepAt = (name: string): number => {
+      const index = release.indexOf(`- name: ${name}`);
+      expect(index).toBeGreaterThan(-1);
+      return index;
+    };
+    expect(stepAt("record the promotion")).toBeLessThan(stepAt("post-deploy smoke"));
+  });
+
+  it("says per digest whether the tag's commit resolved it or a rollback passed it in", () => {
+    const record = stepNamed(read(".github/workflows/release.yml"), "record the promotion");
+
+    // Four dispatch shapes, and the tag's message is true of each digest in all of them.
+    expect(record).toContain('if [ -z "${IN_API}" ] && [ -z "${IN_WORKER}" ]; then');
+    expect(record).toContain('elif [ -n "${IN_API}" ] && [ -n "${IN_WORKER}" ]; then');
+    expect(record).toContain('elif [ -n "${IN_API}" ]; then');
+
+    const points = [...record.matchAll(/^\s*points="([^"]+)"$/gm)].map((match) => match[1] ?? "");
+    expect(points).toHaveLength(4);
+    expect(new Set(points).size).toEqual(4);
+    for (const sentence of points) {
+      expect(sentence).toContain("main's head");
+    }
+    expect(
+      points.filter((sentence) => sentence.includes("both digests were resolved")),
+    ).toHaveLength(1);
+    expect(points.filter((sentence) => sentence.includes("were passed in"))).toHaveLength(1);
+  });
+
+  it("lets no workflow commit to a branch, which is what makes the record a tag", () => {
+    const workflows = readdirSync(path.join(repositoryRoot, ".github/workflows"))
+      .filter((file) => file.endsWith(".yml"))
+      .sort();
+    expect(workflows.length).toBeGreaterThan(1);
+
+    const writes = workflows.flatMap((file) =>
+      read(`.github/workflows/${file}`)
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => /^git (commit|push)\b/.test(line))
+        .map((line) => `${file}: ${line}`),
+    );
+    expect(writes).toEqual(['release.yml: git push origin "refs/tags/${tag}"']);
+  });
+
+  it("freezes RELEASES.md at the rows it holds and points every later promotion at its tag", () => {
+    const releases = read("deploy/RELEASES.md");
+    expect(releases).toContain("| When (UTC) | By | api | worker | Rode on |");
+    expect(releases).toContain("release/<UTC stamp>-<short commit>");
+    expect(releases).toContain("git tag --list 'release/*' --sort=-creatordate");
+    // An on-box promotion, which the unreachable-Coolify carve-out still allows, has a
+    // recorded home: the same tag, made by hand.
+    expect(releases).toContain("Access debt recorded 04/09/2026");
+    expect(releases).toContain('git push origin "refs/tags/${tag}"');
+
+    // Nothing appends to the table again, so its last row stays the last promotion in it.
+    const rows = releases.split("\n").filter((line) => /^\| 20\d\d-/.test(line));
+    expect(rows.at(-1)).toContain("2026-09-23T04:26:58Z");
+    expect(read(".github/workflows/release.yml")).not.toContain("deploy/RELEASES.md");
+
+    // The rollback reads the tags, and says with which command.
+    const runbook = read(`${operationsDocuments}/RUNBOOK.md`);
+    expect(runbook).toContain("git tag --list 'release/*' --sort=-creatordate");
+    expect(runbook).toContain("release/*` tags (failed, rolled back to)");
   });
 
   it("promotes the image of main's head commit, and refuses by name when that commit has none", () => {

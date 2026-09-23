@@ -2,7 +2,7 @@
 
 **Operational reference, not a page of the docs site.** This file lives in `docs/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
 
-Two caches, neither the estate's. Nothing deployed builds images — `RELEASES.md` promotes digests a runner built — so the build caches to bound are the two that build: a development machine's, bounded by a garbage-collection policy the builder reads at startup and by nothing a person runs, and the runner's, bounded by GitHub's quota and read in *The runner's cache* at the foot of this file. Every section between is the development machine's.
+Two caches, neither the estate's. Nothing deployed builds images — `release.yml` promotes digests a runner built, and records each promotion as a `release/*` tag — so the build caches to bound are the two that build: a development machine's, bounded by a garbage-collection policy the builder reads at startup and by nothing a person runs, and the runner's, bounded by GitHub's quota and read in *The runner's cache* at the foot of this file. Every section between is the development machine's.
 
 ## Where the policy lives
 

@@ -1,10 +1,27 @@
-# Releases — every promotion to production, appended by `release.yml`
+# Releases — closed 23/09/2026; a promotion is a `release/*` tag now
 
-One row per run of the `release` workflow: when, who, the two digests the platform stack now runs, and what the release rode on (`pre-client: any green build` before the first client's data is on the box; the drill report or the hotfix reason after — Q7's switch, enforced in the workflow). **The previous row is the rollback**: RUNBOOK.md page 6 runs `release` again with that row's digests. Nothing edits this file by hand except to correct a row the workflow wrote wrongly — or, while the workflow's Coolify call is unreachable (the Access debt recorded 04/09/2026), to append the row an on-box promotion made in its place; either edit says so in its commit.
+**This file is frozen** (`T-342`, 23/09/2026). `main`'s ruleset is merge-queue-only, so the push that appended a row is refused: the record was lost and the smoke behind it skipped. A promotion is recorded instead as an **annotated `release/<UTC stamp>-<short commit>` tag**, which no branch ruleset governs. The tag carries what a row carried — when, who, both digests, what the release rode on — and names the commit it points at. List them newest first and read one:
 
-**What blank inputs promote** (`T-211`, 20/09/2026): the image of `main`'s head commit, by its `sha-<short>` tag — every commit gets one, and there is no `:main` tag. A head with no image is refused by name and nothing older is promoted in its place. That is the state a release leaves behind, because the row it pushes is a commit no build runs for: a second release with nothing merged between passes the digests — the row above has them — or follows a dispatched `build` on `main`.
+```sh
+git fetch --tags && git tag --list 'release/*' --sort=-creatordate
+git show --no-patch release/<stamp>
+```
 
-Standing release note, true of every row: the app refuses to start unless `PUBLIC_URL`, `AGENT_HOSTNAME` and `APEX_HOSTNAME` are set on the `api` resource and all three hostnames differ, the derived `app.` one included (ADR 0034). The `worker` service is behind the `pipeline` compose profile until `T-006`; its digest is set so the file interpolates, and nothing runs it.
+**The previous tag is the rollback**: RUNBOOK.md page 6 runs `release` again with that tag's two digests. The rows below are the promotions up to and including 23/09/2026 and stay as the record of them; nothing appends to the table again, and nothing edits a row except to correct one the workflow wrote wrongly, which says so in its commit.
+
+**A promotion made on the box is tagged by hand.** While the workflow's Coolify call is unreachable (the Access debt recorded 04/09/2026) a promotion is made on the box, and it is recorded the same way the workflow would — the same tag name and the same message, with the last line saying it was made on the box and why:
+
+```sh
+when="$(date -u +%FT%TZ)"
+head="$(git rev-parse HEAD)"
+tag="release/${when//[-:]/}-${head:0:7}"
+git tag -a "${tag}" "${head}" -m "$(printf 'release: api <short> · worker <short>\n\nWhen (UTC): %s\nBy: <who>\napi: <digest>\nworker: <digest>\nRode on: <drill report or hotfix reason>\nCommit: %s (on-box promotion — the Coolify call was unreachable)\n' "${when}" "${head}")"
+git push origin "refs/tags/${tag}"
+```
+
+**What blank inputs promote** (`T-211`, 20/09/2026, and still true): the image of `main`'s head commit, by its `sha-<short>` tag — every commit gets one, and there is no `:main` tag. A head with no image is refused by name and nothing older is promoted in its place. A tag moves no branch, so a release now leaves `main`'s head where it found it, with the image it just promoted: a second release with nothing merged between promotes that same head again, where the row used to leave a commit no build ran for.
+
+Standing release note, true of every row and every tag since: the app refuses to start unless `PUBLIC_URL`, `AGENT_HOSTNAME` and `APEX_HOSTNAME` are set on the `api` resource and all three hostnames differ, the derived `app.` one included (ADR 0034). The `worker` service is behind the `pipeline` compose profile until `T-006`; its digest is set so the file interpolates, and nothing runs it.
 
 | When (UTC) | By | api | worker | Rode on |
 | --- | --- | --- | --- | --- |
