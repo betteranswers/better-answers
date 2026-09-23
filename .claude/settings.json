@@ -1,7 +1,7 @@
 {
   "subagentPromptCacheTtl": "1h",
   "env": {
-    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-opus-5",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "opus",
     "JCODEMUNCH_ENFORCE": "strict"
   },
   "hooks": {
