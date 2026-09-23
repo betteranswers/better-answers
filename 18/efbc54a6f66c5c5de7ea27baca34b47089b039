@@ -1,0 +1,77 @@
+apps/worker/tests/test_pipeline_landed.py
+  s_69414e6e80cf2c::t_0ab322db91c4db 47,83,276
+packages/core/test/suite-objects.ts
+  s_69414e6e80cf2c::t_2e22eb00091849 30-32
+  s_69414e6e80cf2c::t_f3d8f22a4c2a59 88-95
+apps/worker/tests/fixtures/conversion/README.md
+  s_69414e6e80cf2c::t_4e0a35b0f0c399 18-20
+  s_69414e6e80cf2c::t_6e8dae033306ec 14-17,21
+packages/core/src/sources/binding.ts
+  s_69414e6e80cf2c::t_31ff32073cb8cf 453
+  s_69414e6e80cf2c::t_6e2fabb22b0ad0 9
+packages/schema/src/job-tables.ts
+  s_69414e6e80cf2c::t_4ec0a435b37d00 26-32
+apps/worker/tests/test_pipeline_index.py
+  s_69414e6e80cf2c::t_757209ceef930f 1062-1091
+  s_69414e6e80cf2c::t_27c3e14fe7542a 994
+  s_69414e6e80cf2c::t_fd60f561641514 1020,1023-1031,1038-1039,1047,1049-1050,1052-1055,1057
+  s_69414e6e80cf2c::t_0ab322db91c4db 49,925
+apps/worker/src/better_answers_worker/pipeline/run.py
+  s_69414e6e80cf2c::t_9422b42c0c65bf 70
+  s_69414e6e80cf2c::t_44b3f0d673441a 21-22,25-26
+  s_69414e6e80cf2c::t_27c3e14fe7542a 23-24
+apps/worker/tests/fixtures/conversion/delivery-terms.txt
+  s_69414e6e80cf2c::t_d154774a7ceec7 12
+packages/core/test/cross-tier-document.test.ts
+  s_69414e6e80cf2c::t_6df3ea15e694d3 15-16
+  s_69414e6e80cf2c::t_293d194c1cdaac 308-320
+  s_69414e6e80cf2c::t_3a11ad52ed845d 79
+  s_69414e6e80cf2c::t_b935394744eb32 379,382-383
+  s_69414e6e80cf2c::t_bf903f35c5f8e1 13-14,68-71,165-169
+  s_69414e6e80cf2c::t_01bcfc2dc9b3cf 24
+  s_69414e6e80cf2c::t_16f27fe923b370 286
+  s_69414e6e80cf2c::t_73cc28402a7583 357
+  s_69414e6e80cf2c::t_4639b062d93f75 358-378,380-381,384,414-415,420-422,424-428,448-452
+  s_69414e6e80cf2c::t_ab802269a084c5 7
+  s_69414e6e80cf2c::t_f9582a8ed5e53b 339-346
+  s_69414e6e80cf2c::t_f9efd75f7ad7f2 417-419
+  s_69414e6e80cf2c::t_359432f7959a22 141-160
+  s_69414e6e80cf2c::t_100591d1e63b38 76-78,80-82
+  s_69414e6e80cf2c::t_aa734fe22ee486 347-348
+  s_69414e6e80cf2c::t_9204d3caced7d2 385-409,413,429,439-447
+  s_69414e6e80cf2c::t_a639bb38bae98d 107
+  s_69414e6e80cf2c::t_f3ace9e63cef8b 207-210,213
+  s_69414e6e80cf2c::t_7f21f2e5cf9757 41,45-48,293-294,296
+  s_69414e6e80cf2c::t_e2d0cf54100bea 500-506
+  s_69414e6e80cf2c::t_88f37e2086dabc 112
+  s_69414e6e80cf2c::t_20fe2aff1ab273 410-412,416,423,430-438
+  s_69414e6e80cf2c::t_37cb613ef3cc65 540-541,545
+  s_69414e6e80cf2c::t_0eec85d79be648 27,453
+  s_69414e6e80cf2c::t_46b39b2490c949 98-99
+  s_69414e6e80cf2c::t_56edacd78c208b 473,475-476
+  s_69414e6e80cf2c::t_11823312fc645e 1-6,8-12,17-23,25-26,28-40,42-44,49-53,55,58-67,83-97,100-103,105-106,110-111,113-140,161-164,170-206,211-212,214-242,244-250,252,256-257,259-262,264-269,271-274,276-279,281-285,287-292,295,297-307,321-338,349-356,454-472,474,477,479,481-487,491-494,496,499,511-518,521-539,542-544,546-549
+  s_69414e6e80cf2c::t_ad0399bfc1325f 72-75
+  s_69414e6e80cf2c::t_4c8263a269f743 507-509
+  s_69414e6e80cf2c::t_f5728ecf2fb47e 243,251,253-255,258,263,270,275,280
+  s_69414e6e80cf2c::t_69c6766d1e3a17 480,488-490,495,497-498,510
+  s_69414e6e80cf2c::t_d5fd0b164e6fec 54,56-57,104,108-109,478,519-520
+packages/core/test/worker-process.ts
+  s_69414e6e80cf2c::t_0c37361e592114 40-58,63
+  s_69414e6e80cf2c::t_299ec8d1e5f024 75-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "18efbc54a6f66c5c5de7ea27baca34b47089b039",
+  "prompts": {},
+  "sessions": {
+    "s_69414e6e80cf2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6af0bc5d-5e17-4638-afb3-472e1f42e570",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
