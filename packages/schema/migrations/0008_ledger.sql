@@ -11,8 +11,7 @@ CREATE TABLE "audit_event" (
 	"batch_id" text,
 	CONSTRAINT "audit_event_act_check" CHECK (act ~ '^(people|knowledge|sources|platform)\.[a-z][a-z_]*\.[a-z][a-z_]*$'),
 	CONSTRAINT "audit_event_family_check" CHECK (family IN ('people', 'knowledge', 'sources', 'platform'))
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "audit_event" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "audit_event" ADD CONSTRAINT "audit_event_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "audit_event_workspace_id_idx" ON "audit_event" USING btree ("workspace_id");--> statement-breakpoint

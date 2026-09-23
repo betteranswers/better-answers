@@ -10,8 +10,7 @@ CREATE TABLE "concept_write_request" (
 	"base_content_hash" text,
 	CONSTRAINT "concept_write_request_workspace_id_suggestion_id_pk" PRIMARY KEY("workspace_id","suggestion_id"),
 	CONSTRAINT "concept_write_request_body_length_check" CHECK (char_length(body) <= 100000)
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "concept_write_request" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "suggestion" (
 	"workspace_id" text NOT NULL,
@@ -36,8 +35,7 @@ CREATE TABLE "suggestion" (
          AND (decided_at IS NULL) = (decider IS NULL)
          AND (target_iri IS NOT NULL) = (status = 'accepted')
          AND (reason IS NOT NULL) = (status IN ('declined', 'returned')))
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "suggestion" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "concept_write_request" ADD CONSTRAINT "concept_write_request_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "concept_write_request" ADD CONSTRAINT "concept_write_request_suggestion_fk" FOREIGN KEY ("workspace_id","suggestion_id") REFERENCES "public"."suggestion"("workspace_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

@@ -25,8 +25,7 @@ CREATE TABLE "job" (
                   AND lease_expires_at IS NOT NULL AND heartbeat_at IS NOT NULL))),
 	CONSTRAINT "job_finished_check" CHECK ((finished_at IS NOT NULL) = (status IN ('done', 'failed', 'poisoned'))),
 	CONSTRAINT "job_outcome_check" CHECK ((outcome IS NOT NULL) = (status IN ('done', 'failed')))
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "job" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "job" ADD CONSTRAINT "job_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "job_workspace_id_status_enqueued_at_idx" ON "job" USING btree ("workspace_id","status","enqueued_at");--> statement-breakpoint

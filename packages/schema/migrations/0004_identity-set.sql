@@ -4,8 +4,7 @@ CREATE TABLE "workspace_config" (
 	"value" text NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "workspace_config_workspace_id_key_pk" PRIMARY KEY("workspace_id","key")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "workspace_config" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
@@ -22,8 +21,7 @@ CREATE TABLE "account" (
 	"password" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE TABLE "invitation" (
 	"id" text PRIMARY KEY NOT NULL,
 	"workspace_id" text NOT NULL,
@@ -33,8 +31,7 @@ CREATE TABLE "invitation" (
 	"expires_at" timestamp with time zone NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"inviter_id" text NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE TABLE "jwks" (
 	"id" text PRIMARY KEY NOT NULL,
 	"public_key" text NOT NULL,
@@ -43,16 +40,14 @@ CREATE TABLE "jwks" (
 	"expires_at" timestamp with time zone,
 	"alg" text,
 	"crv" text
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE TABLE "member" (
 	"id" text PRIMARY KEY NOT NULL,
 	"workspace_id" text NOT NULL,
 	"user_id" text NOT NULL,
 	"role" text NOT NULL,
 	"created_at" timestamp with time zone NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE TABLE "oauth_access_token" (
 	"id" text PRIMARY KEY NOT NULL,
 	"token" text NOT NULL,
@@ -70,8 +65,7 @@ CREATE TABLE "oauth_access_token" (
 	"confirmation" jsonb,
 	"scopes" text[] NOT NULL,
 	CONSTRAINT "oauth_access_token_token_unique" UNIQUE("token")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE TABLE "oauth_client" (
 	"id" text PRIMARY KEY NOT NULL,
 	"client_id" text NOT NULL,
@@ -110,21 +104,18 @@ CREATE TABLE "oauth_client" (
 	"reference_id" text,
 	"metadata" jsonb,
 	CONSTRAINT "oauth_client_client_id_unique" UNIQUE("client_id")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE TABLE "oauth_client_assertion" (
 	"id" text PRIMARY KEY NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE TABLE "oauth_client_resource" (
 	"id" text PRIMARY KEY NOT NULL,
 	"client_id" text NOT NULL,
 	"resource_id" text NOT NULL,
 	"metadata" jsonb,
 	"created_at" timestamp with time zone
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE TABLE "oauth_consent" (
 	"id" text PRIMARY KEY NOT NULL,
 	"client_id" text NOT NULL,
@@ -135,8 +126,7 @@ CREATE TABLE "oauth_consent" (
 	"scopes" text[] NOT NULL,
 	"created_at" timestamp with time zone NOT NULL,
 	"updated_at" timestamp with time zone NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE TABLE "oauth_refresh_token" (
 	"id" text PRIMARY KEY NOT NULL,
 	"token" text NOT NULL,
@@ -157,8 +147,7 @@ CREATE TABLE "oauth_refresh_token" (
 	"confirmation" jsonb,
 	"scopes" text[] NOT NULL,
 	CONSTRAINT "oauth_refresh_token_token_unique" UNIQUE("token")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE TABLE "oauth_resource" (
 	"id" text PRIMARY KEY NOT NULL,
 	"identifier" text NOT NULL,
@@ -176,16 +165,14 @@ CREATE TABLE "oauth_resource" (
 	"policy_version" integer DEFAULT 1,
 	"metadata" jsonb,
 	CONSTRAINT "oauth_resource_identifier_unique" UNIQUE("identifier")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE TABLE "rate_limit" (
 	"id" text PRIMARY KEY NOT NULL,
 	"key" text NOT NULL,
 	"count" integer NOT NULL,
 	"last_request" bigint NOT NULL,
 	CONSTRAINT "rate_limit_key_unique" UNIQUE("key")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE TABLE "session" (
 	"id" text PRIMARY KEY NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL,
@@ -197,8 +184,7 @@ CREATE TABLE "session" (
 	"user_id" text NOT NULL,
 	"active_workspace_id" text,
 	CONSTRAINT "session_token_unique" UNIQUE("token")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE TABLE "user" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
@@ -209,8 +195,7 @@ CREATE TABLE "user" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"credentials_revoked_at" timestamp with time zone,
 	CONSTRAINT "user_email_unique" UNIQUE("email")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 CREATE TABLE "verification" (
 	"id" text PRIMARY KEY NOT NULL,
 	"identifier" text NOT NULL,
@@ -218,8 +203,7 @@ CREATE TABLE "verification" (
 	"expires_at" timestamp with time zone NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "workspace" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "workspace" ADD COLUMN "slug" text NOT NULL;--> statement-breakpoint
 ALTER TABLE "workspace" ADD COLUMN "logo" text;--> statement-breakpoint

@@ -12,8 +12,7 @@ CREATE TABLE "access_request" (
 	CONSTRAINT "access_request_decision_check" CHECK ((status = 'waiting') = (decided_at IS NULL)
          AND (decided_at IS NULL) = (decided_by IS NULL)
          AND (invitation_id IS NULL OR status = 'approved'))
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "access_request" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "access_request" ADD CONSTRAINT "access_request_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "access_request" ADD CONSTRAINT "access_request_requester_id_user_id_fk" FOREIGN KEY ("requester_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
