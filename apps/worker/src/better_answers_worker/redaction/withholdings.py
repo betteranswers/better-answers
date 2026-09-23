@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from types import MappingProxyType
 
 from .engine import ALWAYS_TIER, TIER_PRECEDENCE, Finding
@@ -32,15 +32,6 @@ WITHHELD_FOR: Mapping[str, bool] = MappingProxyType(
 )
 
 
-UNDER_ITS_OWN_PLACEHOLDER = "its-own-placeholder"
-
-
-UNDER_ANOTHER_FINDINGS_PLACEHOLDER = "another-findings-placeholder"
-
-
-NOT_WRITTEN_AT_ALL = "not-at-all"
-
-
 SWITCHABLE_TIERS: Mapping[str, tuple[str, bool]] = MappingProxyType(
     {"default-on": ("default_on", True), "default-off": ("default_off", False)}
 )
@@ -60,7 +51,13 @@ class Withholding:
     withheld: bool
     tier: str
     reason: str
-    written: str
+
+
+@dataclass(frozen=True, slots=True)
+class WrittenSpan:
+    start: int
+    end: int
+    withholding: Withholding
 
 
 def withholdings_over(
@@ -68,12 +65,14 @@ def withholdings_over(
 ) -> tuple[Withholding, ...]:
     erased = suppressed_among(findings, text, policy.suppressions)
     restored = restored_among(findings, policy.restores)
-    answered = tuple(
+    return tuple(
         _answered(finding, finding in erased, finding in restored, policy)
         for finding in findings
     )
-    written = _without_overlaps(tuple(one for one in answered if one.withheld))
-    return tuple(replace(one, written=_how_written(one, written)) for one in answered)
+
+
+def written_spans_of(withholdings: Sequence[Withholding]) -> tuple[WrittenSpan, ...]:
+    return _without_overlaps(tuple(one for one in withholdings if one.withheld))
 
 
 def overridden_in(withholdings: Sequence[Withholding]) -> tuple[Finding, ...]:
@@ -92,7 +91,6 @@ def _answered(
         withheld=WITHHELD_FOR[reason],
         tier=tier,
         reason=reason,
-        written=NOT_WRITTEN_AT_ALL,
     )
 
 
@@ -112,31 +110,34 @@ def _in_force(tier: str, rules_in_force: Mapping[str, bool]) -> bool:
     return rules_in_force.get(key, unconfigured)
 
 
-def _how_written(withholding: Withholding, written: Sequence[Withholding]) -> str:
-    if not withholding.withheld:
-        return NOT_WRITTEN_AT_ALL
-    finding = withholding.finding
-    if any(one.finding == finding for one in written):
-        return UNDER_ITS_OWN_PLACEHOLDER
-    under_another = any(
-        one.finding.start <= finding.start and finding.end <= one.finding.end
-        for one in written
+def _without_overlaps(raised: Sequence[Withholding]) -> tuple[WrittenSpan, ...]:
+    """Containment first, then precedence: a finding inside a longer one takes no
+    span, and a loser gives up only the characters the winner takes."""
+    competing = sorted(
+        (one for one in raised if not _inside_another(one, raised)), key=_precedence
     )
-    return UNDER_ANOTHER_FINDINGS_PLACEHOLDER if under_another else NOT_WRITTEN_AT_ALL
+    remainders = (
+        _remainder(one, competing[:place]) for place, one in enumerate(competing)
+    )
+    return tuple(sorted((one for one in remainders if one is not None), key=_where))
 
 
-def _without_overlaps(raised: Sequence[Withholding]) -> tuple[Withholding, ...]:
-    competing = [one for one in raised if not _inside_another(one, raised)]
-    taken: list[Withholding] = []
-    for one in sorted(competing, key=_precedence):
-        if any(
-            one.finding.start < other.finding.end
-            and other.finding.start < one.finding.end
-            for other in taken
-        ):
+def _remainder(
+    withholding: Withholding, ahead: Sequence[Withholding]
+) -> WrittenSpan | None:
+    # Nothing ahead lies strictly inside this finding once containment has run, so each
+    # overlap takes a prefix or a suffix and one run is left.
+    finding = withholding.finding
+    start, end = finding.start, finding.end
+    for winner in ahead:
+        taken = winner.finding
+        if taken.end <= finding.start or finding.end <= taken.start:
             continue
-        taken.append(one)
-    return tuple(sorted(taken, key=_where))
+        if taken.start <= finding.start:
+            start = max(start, taken.end)
+        else:
+            end = min(end, taken.start)
+    return WrittenSpan(start, end, withholding) if start < end else None
 
 
 def _inside_another(withholding: Withholding, raised: Sequence[Withholding]) -> bool:
@@ -161,6 +162,5 @@ def _precedence(withholding: Withholding) -> tuple[int, int, float, int, str]:
     )
 
 
-def _where(withholding: Withholding) -> tuple[int, int, str]:
-    finding = withholding.finding
-    return (finding.start, finding.end, finding.rule_id)
+def _where(span: WrittenSpan) -> int:
+    return span.start
