@@ -14,7 +14,6 @@ from .landed import (
     Suppression,
     suppression_of,
 )
-from .rows import SENSITIVITY_ORDER, Visibility
 
 CONVERTED_OUTCOME = "converted"
 QUARANTINED_OUTCOME = "quarantined"
@@ -25,30 +24,21 @@ NORMALISED_KEY_SUFFIX = "normalised"
 
 @dataclass(frozen=True, slots=True)
 class BindingRun:
-    visibility: Visibility
-
     rules_in_force: Mapping[str, bool]
     documents: tuple[LandedDocument, ...]
-
-    own_class: Mapping[str, str | None]
-
-    def visibility_of(self, document_id: str) -> Visibility:
-        return self.visibility.narrowed_by(self.own_class.get(document_id))
 
 
 def read_binding(cursor: Cursor[Any], run: IndexRun) -> BindingRun | None:
     cursor.execute(
-        "SELECT published_at, sensitivity, audience, audience_groups, rules_in_force"
-        " FROM source_binding WHERE id = %s",
+        "SELECT rules_in_force FROM source_binding WHERE id = %s",
         (run.binding_id,),
     )
     binding = cursor.fetchone()
     if binding is None:
         return None
-    groups = binding[3]
 
     cursor.execute(
-        "SELECT id, media_type, original_key, normalised_key, sensitivity"
+        "SELECT id, media_type, original_key, normalised_key"
         " FROM source_document WHERE binding_id = %s AND gone_at IS NULL ORDER BY id",
         (run.binding_id,),
     )
@@ -58,15 +48,7 @@ def read_binding(cursor: Cursor[Any], run: IndexRun) -> BindingRun | None:
     restores = _restores_by_document(cursor, document_ids)
 
     return BindingRun(
-        visibility=Visibility(
-            published_at=binding[0],
-            sensitivity=str(binding[1]),
-            audience=str(binding[2]),
-            audience_groups=None
-            if groups is None
-            else tuple(str(one) for one in groups),
-        ),
-        rules_in_force={str(tier): bool(state) for tier, state in binding[4].items()},
+        rules_in_force={str(tier): bool(state) for tier, state in binding[0].items()},
         documents=tuple(
             LandedDocument(
                 source_document_id=str(row[0]),
@@ -80,9 +62,6 @@ def read_binding(cursor: Cursor[Any], run: IndexRun) -> BindingRun | None:
             )
             for row in catalogued
         ),
-        own_class={
-            str(row[0]): None if row[4] is None else str(row[4]) for row in catalogued
-        },
     )
 
 
@@ -206,13 +185,11 @@ def reconcile_catalogue(cursor: Cursor[Any], documents: Sequence[ReadDocument]) 
             " redaction_version = %(version)s, outcome = %(outcome)s,"
             " quarantine_error = NULL,"
             " last_seen = now(),"
+            # A document with no class of its own takes the verdict; from there the
+            # ranking is the database's, so a verdict can only ever narrow.
             " sensitivity = CASE"
-            "   WHEN %(verdict)s::text IS NULL THEN sensitivity"
             "   WHEN sensitivity IS NULL THEN %(verdict)s::text"
-            "   WHEN array_position(%(order)s::text[], %(verdict)s::text)"
-            "      < array_position(%(order)s::text[], sensitivity)"
-            "     THEN %(verdict)s::text"
-            "   ELSE sensitivity END"
+            "   ELSE public.narrower_class(sensitivity, %(verdict)s::text) END"
             " WHERE id = %(id)s",
             {
                 "content_hash": document.redacted.content_hash,
@@ -220,34 +197,6 @@ def reconcile_catalogue(cursor: Cursor[Any], documents: Sequence[ReadDocument]) 
                 "version": document.redacted.version,
                 "outcome": CONVERTED_OUTCOME,
                 "verdict": document.redacted.verdict,
-                "order": list(SENSITIVITY_ORDER),
                 "id": document.source_document_id,
             },
         )
-
-
-def recopy_visibility(
-    cursor: Cursor[Any], run: IndexRun, chunk_ids: Sequence[str]
-) -> int:
-    if not chunk_ids:
-        return 0
-    # One statement, not read-then-write: the binding and document must be seen at this
-    # instant; reading them into Python moves the race one statement on.
-    cursor.execute(
-        'UPDATE "index".chunk AS chunk SET published_at = binding.published_at,'
-        " audience = binding.audience, audience_groups = binding.audience_groups,"
-        " sensitivity = CASE"
-        "   WHEN document.sensitivity IS NULL THEN binding.sensitivity"
-        "   WHEN array_position(%(order)s::text[], document.sensitivity)"
-        "      < array_position(%(order)s::text[], binding.sensitivity)"
-        "     THEN document.sensitivity"
-        "   ELSE binding.sensitivity END"
-        " FROM source_binding AS binding, source_document AS document"
-        " WHERE chunk.id = ANY(%(ids)s)"
-        " AND binding.workspace_id = chunk.workspace_id"
-        " AND binding.id = chunk.binding_id"
-        " AND document.workspace_id = chunk.workspace_id"
-        " AND document.id = chunk.source_document_id",
-        {"order": list(SENSITIVITY_ORDER), "ids": list(chunk_ids)},
-    )
-    return cursor.rowcount

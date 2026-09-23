@@ -1,9 +1,7 @@
 import json
-from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
-from better_answers_worker.pipeline import SENSITIVITY_ORDER, Visibility
 from better_answers_worker.schema_view import TABLES
 
 CONTRACTS_DIR = Path(__file__).resolve().parents[3] / "contracts"
@@ -21,9 +19,7 @@ def read_visibility_columns() -> dict[str, Any]:
     return cast("dict[str, Any]", json.loads(raw))
 
 
-def test_every_column_the_agreement_names_on_a_chunk_row_is_one_this_tier_writes() -> (
-    None
-):
+def test_every_column_the_agreement_names_on_a_chunk_row_is_one_the_table_has() -> None:
     fixture = read_visibility_columns()
 
     for column in fixture["chunk_columns"]:
@@ -47,7 +43,7 @@ def test_a_document_may_leave_its_class_unset_which_is_what_the_bindings_means()
     assert TABLES[BINDING_TABLE][column] == "text NOT NULL"
 
 
-def test_the_class_a_run_writes_is_the_narrower_of_the_two_for_every_case() -> None:
+def test_the_class_the_agreement_states_is_the_narrower_of_the_two() -> None:
     fixture = read_visibility_columns()
     rank = fixture["sensitivity_rank"]
 
@@ -119,43 +115,3 @@ def test_the_two_writers_of_one_source_are_named_in_the_order_a_row_meets_them()
         "the worker",
         "the app",
     ]
-
-
-def visibility_from(binding: dict[str, Any]) -> Visibility:
-    groups = binding["audience_groups"]
-    return Visibility(
-        published_at=(
-            None
-            if binding["published_at"] is None
-            else datetime.fromisoformat(str(binding["published_at"]))
-        ),
-        sensitivity=str(binding["sensitivity"]),
-        audience=str(binding["audience"]),
-        audience_groups=None if groups is None else tuple(str(one) for one in groups),
-    )
-
-
-def test_the_order_the_fold_reads_is_the_rank_the_agreement_writes_down() -> None:
-    rank = read_visibility_columns()["sensitivity_rank"]
-
-    assert list(SENSITIVITY_ORDER) == sorted(rank, key=lambda word: rank[word])
-
-
-def test_the_fold_a_run_applies_answers_every_case_the_agreement_states() -> None:
-    for case in read_visibility_columns()["cases"]:
-        folded = visibility_from(case["binding"]).narrowed_by(
-            case["document"]["sensitivity"]
-        )
-        columns = dict(folded.as_columns())
-        stamped = columns["published_at"]
-
-        assert columns["sensitivity"] == case["chunk"]["sensitivity"], case["case"]
-        assert columns["audience"] == case["chunk"]["audience"], case["case"]
-        assert columns["audience_groups"] == case["chunk"]["audience_groups"], case[
-            "case"
-        ]
-
-        expected = case["chunk"]["published_at"]
-        assert stamped == (
-            None if expected is None else datetime.fromisoformat(str(expected))
-        ), case["case"]

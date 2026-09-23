@@ -2,22 +2,24 @@ import hashlib
 import json
 import re
 from collections.abc import Callable, Iterator, Mapping
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TypedDict
 
+import asyncpg
 import psycopg
 import pytest
 
 from better_answers_worker import loop, queue
-from better_answers_worker.ids import ulid
 from better_answers_worker.pipeline import (
     IndexRun,
     ReadDocument,
     RedactedDocument,
     index_binding,
 )
-from better_answers_worker.pipeline.catalogue import record_findings
+from better_answers_worker.pipeline.catalogue import (
+    reconcile_catalogue,
+    record_findings,
+)
 from better_answers_worker.redaction.engine import Finding
 from better_answers_worker.redaction.pins import DETECTOR_PIN, RULE_VERSION
 from factories import (
@@ -186,6 +188,35 @@ def seed_the_binding(
     return workspace_id
 
 
+def a_binding_whose_document_stands_at(
+    connection: psycopg.Connection, document_id: str, standing: str | None
+) -> str:
+    workspace_id = seed_the_binding(connection, documents=(document_id,))
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE source_document SET sensitivity = %s WHERE id = %s",
+            (standing, document_id),
+        )
+    connection.commit()
+    return workspace_id
+
+
+def seed_a_row_an_earlier_release_landed(
+    connection: psycopg.Connection, workspace_id: str
+) -> None:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT set_config('app.workspace_id', %s, true)", (workspace_id,)
+        )
+        seed_chunk(
+            cursor,
+            workspace_id=workspace_id,
+            binding_id=BINDING,
+            chunk_id=f"{AN_INVOICE_ID}#000000",
+        )
+    connection.commit()
+
+
 def a_run(reason: str = "bound") -> IndexRun:
     return IndexRun(workspace_id="", binding_id=BINDING, reason=reason)
 
@@ -205,10 +236,32 @@ def chunk_rows_of(
 ) -> list[dict[str, Any]]:
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT id, workspace_id, content, published_at, sensitivity, audience,"
-            " audience_groups, binding_id, source_document_id, locator, ordinal,"
-            ' char_start, char_end FROM "index".chunk'
+            "SELECT id, workspace_id, content, binding_id, source_document_id,"
+            ' locator, ordinal, char_start, char_end FROM "index".chunk'
             " WHERE workspace_id = %s ORDER BY id",
+            (workspace_id,),
+        )
+        return by_column(cursor)
+
+
+def row_versions_of(
+    connection: psycopg.Connection, workspace_id: str
+) -> list[tuple[Any, ...]]:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            'SELECT id, xmin FROM "index".chunk WHERE workspace_id = %s ORDER BY id',
+            (workspace_id,),
+        )
+        return list(cursor.fetchall())
+
+
+def visibility_columns_of(
+    connection: psycopg.Connection, workspace_id: str
+) -> list[dict[str, Any]]:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT published_at, sensitivity, audience, audience_groups"
+            ' FROM "index".chunk WHERE workspace_id = %s ORDER BY id',
             (workspace_id,),
         )
         return by_column(cursor)
@@ -300,10 +353,6 @@ def test_every_column_of_the_chunk_rows_one_run_lands(
             "id": f"{AN_INVOICE_ID}#000000",
             "workspace_id": workspace_id,
             "content": AN_INVOICE_REDACTED,
-            "published_at": datetime(2026, 9, 11, 9, 30, tzinfo=UTC),
-            "sensitivity": "Internal",
-            "audience": "everyone",
-            "audience_groups": None,
             "binding_id": BINDING,
             "source_document_id": AN_INVOICE_ID,
             "locator": f"{AN_INVOICE_ID}/chars:0-127",
@@ -314,16 +363,16 @@ def test_every_column_of_the_chunk_rows_one_run_lands(
     ]
 
 
-def test_the_rows_of_a_binding_published_to_named_groups_carry_the_group_ids(
+def test_a_landed_row_declares_no_visibility_though_its_binding_has_one(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
-    groups = ["01M2GR0PAAAAAAAAAAAAAAAAAA", "01M2GR0PBBBBBBBBBBBBBBBBBB"]
     workspace_id = seed_the_binding(
         connection,
         documents=(AN_INVOICE_ID,),
         audience="groups",
-        audience_groups=groups,
+        audience_groups=["01M2GR0PAAAAAAAAAAAAAAAAAA", "01M2GR0PBBBBBBBBBBBBBBBBBB"],
+        published_at="2026-09-11T09:30:00Z",
     )
 
     index_binding(
@@ -332,9 +381,13 @@ def test_the_rows_of_a_binding_published_to_named_groups_carry_the_group_ids(
         copies=a_bucket_holding_the_three(),
     )
 
-    landed = chunk_rows_of(connection, workspace_id)
-    assert [(row["audience"], row["audience_groups"]) for row in landed] == [
-        ("groups", groups)
+    assert visibility_columns_of(connection, workspace_id) == [
+        {
+            "published_at": None,
+            "sensitivity": None,
+            "audience": None,
+            "audience_groups": None,
+        }
     ]
 
 
@@ -446,12 +499,99 @@ def test_a_special_category_verdict_narrows_the_document_and_every_row_cut_from_
         for row in catalogue_rows_of(connection, workspace_id)
     ] == [(AN_INVOICE_ID, None), (A_SICK_NOTE_ID, "Restricted")]
     assert [
-        (row["source_document_id"], row["sensitivity"], row["content"])
+        (row["source_document_id"], row["content"])
         for row in chunk_rows_of(connection, workspace_id)
     ] == [
-        (AN_INVOICE_ID, "Internal", AN_INVOICE_REDACTED),
-        (A_SICK_NOTE_ID, "Restricted", A_SICK_NOTE_REDACTED),
+        (AN_INVOICE_ID, AN_INVOICE_REDACTED),
+        (A_SICK_NOTE_ID, A_SICK_NOTE_REDACTED),
     ]
+
+
+@pytest.mark.parametrize(
+    ("standing", "folded"),
+    [("Public", "Restricted"), ("Restricted", "Restricted"), (None, "Restricted")],
+)
+def test_the_verdict_narrows_a_documents_class_and_never_widens_it(
+    database: tuple[psycopg.Connection, str],
+    tmp_path: Path,
+    standing: str | None,
+    folded: str,
+) -> None:
+    connection, dsn = database
+    workspace_id = a_binding_whose_document_stands_at(
+        connection, A_SICK_NOTE_ID, standing
+    )
+
+    index_binding(
+        bootstrap_for(dsn, tmp_path),
+        run_for(workspace_id),
+        copies=a_bucket_holding_the_three(),
+    )
+
+    assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == folded
+
+
+@pytest.mark.parametrize(
+    ("standing", "verdict", "folded"),
+    [
+        ("Restricted", "Public", "Restricted"),
+        ("Internal", "Public", "Internal"),
+        ("Public", "Restricted", "Restricted"),
+        ("Internal", "Restricted", "Restricted"),
+        ("Restricted", None, "Restricted"),
+        (None, "Public", "Public"),
+    ],
+)
+def test_the_fold_takes_the_narrower_word_whichever_side_it_arrives_on(
+    database: tuple[psycopg.Connection, str],
+    tmp_path: Path,
+    standing: str | None,
+    verdict: str | None,
+    folded: str,
+) -> None:
+    connection, dsn = database
+    workspace_id = a_binding_whose_document_stands_at(
+        connection, AN_INVOICE_ID, standing
+    )
+    read = ReadDocument(
+        source_document_id=AN_INVOICE_ID,
+        normalised_key=normalised_key_of(AN_INVOICE_ID),
+        redacted=RedactedDocument(
+            text=AN_INVOICE_REDACTED,
+            findings=(),
+            counts=(),
+            verdict=verdict,
+            version=THE_VERSION,
+            content_hash=sha256_of(AN_INVOICE),
+            overridden=(),
+        ),
+        chunks=(),
+    )
+
+    with (
+        queue.connected(bootstrap_for(dsn, tmp_path).database_url) as worker,
+        queue.scoped(worker, workspace_id) as cursor,
+    ):
+        reconcile_catalogue(cursor, [read])
+
+    assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == folded
+
+
+def test_a_document_the_seam_says_nothing_about_keeps_the_class_it_stood_at(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    workspace_id = a_binding_whose_document_stands_at(
+        connection, AN_INVOICE_ID, "Restricted"
+    )
+
+    index_binding(
+        bootstrap_for(dsn, tmp_path),
+        run_for(workspace_id),
+        copies=a_bucket_holding_the_three(),
+    )
+
+    assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == "Restricted"
 
 
 def test_a_document_this_tier_cannot_read_is_quarantined_on_its_own_catalogue_row(
@@ -1045,57 +1185,78 @@ def test_the_wipe_reason_empties_the_bindings_store_before_the_run_reads_anythin
     assert chunk_rows_of(connection, workspace_id)[0]["content"] == AN_INVOICE_REDACTED
 
 
-def test_the_runs_last_statement_recopy_takes_a_narrowing_that_landed_mid_run(
+def test_a_run_dying_before_the_landing_leaves_the_verdict_and_no_chunk_at_all(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(A_SICK_NOTE_ID,))
+
+    def take_the_landing_away() -> None:
+        connection.execute('REVOKE INSERT ON "index".chunk FROM worker_rt')
+        connection.commit()
+
+    bucket = ABucket(
+        {original_key_of(A_SICK_NOTE_ID): A_SICK_NOTE.encode()},
+        on_write=take_the_landing_away,
+    )
+    bootstrap = bootstrap_for(dsn, tmp_path)
+
+    # The group is not held past the assertion: its traceback pins the engine's store
+    # open, and the retry below opens the same one.
+    refused = False
+    try:
+        index_binding(bootstrap, run_for(workspace_id), copies=bucket)
+    except BaseExceptionGroup as group:
+        refused = group.subgroup(asyncpg.InsufficientPrivilegeError) is not None
+
+    try:
+        assert refused
+        assert (
+            catalogue_rows_of(connection, workspace_id)[0]["sensitivity"]
+            == "Restricted"
+        )
+        assert chunk_rows_of(connection, workspace_id) == []
+    finally:
+        connection.execute('GRANT INSERT ON "index".chunk TO worker_rt')
+        connection.commit()
+
+    retried = index_binding(
+        bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three()
+    )
+
+    assert retried.chunks == 1
+    assert [
+        row["source_document_id"] for row in chunk_rows_of(connection, workspace_id)
+    ] == [A_SICK_NOTE_ID]
+
+
+def test_a_row_from_before_is_rewritten_once_and_an_unchanged_next_run_writes_nothing(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
+    seed_a_row_an_earlier_release_landed(connection, workspace_id)
+    stood_at = row_versions_of(connection, workspace_id)
+    bootstrap = bootstrap_for(dsn, tmp_path)
 
-    def narrow_the_document() -> None:
-        with (
-            psycopg.connect(dsn, autocommit=True) as narrower,
-            queue.scoped(narrower, workspace_id) as cursor,
-        ):
-            cursor.execute(
-                "UPDATE source_document SET sensitivity = 'Restricted' WHERE id = %s",
-                (AN_INVOICE_ID,),
-            )
+    index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    rewritten = row_versions_of(connection, workspace_id)
 
-    bucket = ABucket(
-        {original_key_of(AN_INVOICE_ID): AN_INVOICE.encode()},
-        on_write=narrow_the_document,
-    )
+    index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
 
-    index_binding(bootstrap_for(dsn, tmp_path), run_for(workspace_id), copies=bucket)
-
-    assert [row["sensitivity"] for row in chunk_rows_of(connection, workspace_id)] == [
-        "Restricted"
+    assert rewritten != stood_at
+    assert row_versions_of(connection, workspace_id) == rewritten
+    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+        AN_INVOICE_REDACTED
     ]
 
 
-def test_the_recopy_reaches_the_rows_of_this_run_and_leaves_another_bindings_alone(
+def test_the_row_a_run_rewrites_keeps_the_visibility_an_earlier_release_left(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
     workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
-    another = ulid()
-    with connection.cursor() as cursor:
-        seed_source_binding(
-            cursor,
-            workspace_id=workspace_id,
-            binding_id=another,
-            sensitivity="Public",
-        )
-        cursor.execute(
-            "SELECT set_config('app.workspace_id', %s, true)", (workspace_id,)
-        )
-        seed_chunk(
-            cursor,
-            workspace_id=workspace_id,
-            binding_id=another,
-            chunk_id="another-binding-row",
-        )
-    connection.commit()
+    seed_a_row_an_earlier_release_landed(connection, workspace_id)
 
     index_binding(
         bootstrap_for(dsn, tmp_path),
@@ -1103,10 +1264,14 @@ def test_the_recopy_reaches_the_rows_of_this_run_and_leaves_another_bindings_alo
         copies=a_bucket_holding_the_three(),
     )
 
-    assert [
-        (row["binding_id"], row["sensitivity"])
-        for row in chunk_rows_of(connection, workspace_id)
-    ] == [(BINDING, "Internal"), (another, "Public")]
+    assert visibility_columns_of(connection, workspace_id) == [
+        {
+            "published_at": None,
+            "sensitivity": "Public",
+            "audience": "everyone",
+            "audience_groups": None,
+        }
+    ]
 
 
 def test_the_worker_login_the_runs_connect_as_is_the_runtime_role_and_not_the_owner(

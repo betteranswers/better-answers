@@ -1,4 +1,4 @@
-import { boundarySchemas } from "@better-answers/schema";
+import { SENSITIVITIES } from "@better-answers/schema";
 import { z } from "zod";
 
 import {
@@ -21,7 +21,9 @@ export type Passage = {
   readonly sensitivity: Sensitivity;
 };
 
-const CHUNK_SENSITIVITY = boundarySchemas.chunk.select.shape.sensitivity;
+// The view's class: a row whose class is NULL fails the read predicate, so one that
+// reaches here is one of the three words.
+const CHUNK_SENSITIVITY = z.enum(SENSITIVITIES);
 
 const COVERING_ROWS = `SELECT c.content, c.char_start, c.char_end, c.sensitivity, d.title
      FROM "index".readable_chunk c

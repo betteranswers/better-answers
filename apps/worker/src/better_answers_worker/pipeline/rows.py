@@ -1,6 +1,4 @@
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
-from datetime import datetime
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from .host import IndexRun
@@ -14,10 +12,6 @@ CHUNK_TABLE = Table(
         Column(name="id", pg_type="text", nullable=False),
         Column(name="workspace_id", pg_type="text", nullable=False),
         Column(name="content", pg_type="text", nullable=False),
-        Column(name="published_at", pg_type="timestamp with time zone"),
-        Column(name="sensitivity", pg_type="text", nullable=False),
-        Column(name="audience", pg_type="text", nullable=False),
-        Column(name="audience_groups", pg_type="text[]"),
         Column(name="binding_id", pg_type="text", nullable=False),
         Column(name="source_document_id", pg_type="text"),
         Column(name="locator", pg_type="text"),
@@ -29,45 +23,7 @@ CHUNK_TABLE = Table(
 )
 
 
-SENSITIVITY_ORDER = ("Restricted", "Internal", "Public")
-
-
-@dataclass(frozen=True, slots=True)
-class Visibility:
-    published_at: datetime | None
-    sensitivity: str
-    audience: str
-    audience_groups: tuple[str, ...] | None
-
-    def narrowed_by(self, own_class: str | None) -> "Visibility":
-        if own_class is None or own_class not in SENSITIVITY_ORDER:
-            return self
-        if SENSITIVITY_ORDER.index(own_class) >= SENSITIVITY_ORDER.index(
-            self.sensitivity
-        ):
-            return self
-        return Visibility(
-            published_at=self.published_at,
-            sensitivity=own_class,
-            audience=self.audience,
-            audience_groups=self.audience_groups,
-        )
-
-    def as_columns(self) -> Mapping[str, Any]:
-        return {
-            "published_at": self.published_at,
-            "sensitivity": self.sensitivity,
-            "audience": self.audience,
-            "audience_groups": (
-                None if self.audience_groups is None else list(self.audience_groups)
-            ),
-        }
-
-
-def chunk_rows(
-    run: IndexRun, document: ReadDocument, visibility: Visibility
-) -> tuple[Mapping[str, Any], ...]:
-    columns = visibility.as_columns()
+def chunk_rows(run: IndexRun, document: ReadDocument) -> tuple[Mapping[str, Any], ...]:
     return tuple(
         {
             "id": chunk.id,
@@ -79,19 +35,12 @@ def chunk_rows(
             "ordinal": chunk.ordinal,
             "char_start": chunk.char_start,
             "char_end": chunk.char_end,
-            **columns,
         }
         for chunk in document.chunks
     )
 
 
 def rows_of(
-    run: IndexRun,
-    documents: Sequence[ReadDocument],
-    visibility_of: Callable[[str], Visibility],
+    run: IndexRun, documents: Sequence[ReadDocument]
 ) -> tuple[Mapping[str, Any], ...]:
-    return tuple(
-        row
-        for document in documents
-        for row in chunk_rows(run, document, visibility_of(document.source_document_id))
-    )
+    return tuple(row for document in documents for row in chunk_rows(run, document))
