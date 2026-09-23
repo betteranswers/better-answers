@@ -215,7 +215,7 @@ One document holds the route: this spec. Its head is the vision's v0.1 row expan
 
 **Edges.** Blocked by S1. Blocks S7.
 
-**Absorbs.** No open task.
+**Absorbs.** T-346 (one record per media type in the worker's converter, so admitting a type forces its page rule — built with the ticket that admits HTML, not before).
 
 **Seam sketch.** S1's cross-tier document test extended to a changing source — a fixture site served locally, a fake at the Graph API for SharePoint (a third party) — asserting the incremental run re-embeds one chunk on a one-line edit and lists a gone document's cited note only **(map 52)**; the worker pytest harness for the converter per provider; the core interface for the review and publish acts and the plan; the Sources screen through the browser suite.
 
