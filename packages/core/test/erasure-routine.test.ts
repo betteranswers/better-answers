@@ -1,4 +1,4 @@
-import { ulid } from "@better-answers/schema";
+import { boundarySchemas, ulid } from "@better-answers/schema";
 import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -1119,6 +1119,76 @@ const documentIn = (workspaceId: string, bindingId: string) =>
 const bindingIn = (workspaceId: string) =>
   seedingWith(db().pool, (seed) => seed.sourceBinding({ workspaceId }));
 
+const chunksUnder = (
+  workspaceId: string,
+  documents: readonly { readonly id: string; readonly bindingId: string }[],
+) =>
+  seedingWith(db().pool, async (seed) => {
+    for (const document of documents) {
+      await seed.chunk({
+        workspaceId,
+        bindingId: document.bindingId,
+        sourceDocumentId: document.id,
+        content: "Priya Anand approves expenses.",
+        locator: `${document.id}/chars:0-30`,
+        ordinal: 0,
+        charStart: 0,
+        charEnd: 30,
+      });
+    }
+  });
+
+const chunksIn = async (workspaceId: string) => {
+  const read = await db().pool.query<{ binding_id: string; chunks: number }>(
+    `SELECT binding_id, count(*)::int AS chunks FROM "index".chunk
+      WHERE workspace_id = $1 GROUP BY binding_id ORDER BY binding_id`,
+    [workspaceId],
+  );
+  return read.rows;
+};
+
+const queuedIn = async (workspaceId: string) => {
+  const read = await db().pool.query<{
+    kind: string;
+    subject_id: string | null;
+    reason: string | null;
+    status: string;
+  }>(
+    `SELECT kind, subject_id, reason, status FROM job
+      WHERE workspace_id = $1 ORDER BY kind, subject_id`,
+    [workspaceId],
+  );
+  return read.rows;
+};
+
+const aMapOverTwoOfThreeBindings = async () => {
+  const scenario = await arrange();
+  const shared = await bindingIn(scenario.workspaceId);
+  const apart = await bindingIn(scenario.workspaceId);
+  const untouched = await bindingIn(scenario.workspaceId);
+  const found = [
+    await documentIn(scenario.workspaceId, shared.id),
+    await documentIn(scenario.workspaceId, shared.id),
+    await documentIn(scenario.workspaceId, apart.id),
+  ];
+  await chunksUnder(scenario.workspaceId, [
+    ...found,
+    await documentIn(scenario.workspaceId, untouched.id),
+  ]);
+  return { scenario, shared, apart, untouched, found };
+};
+
+const rederivingOver = (
+  scenario: Scenario,
+  found: readonly { readonly id: string }[],
+  completedAt: Date | null,
+) =>
+  rederiveAfterErasure(ERASURE, scenario.postgres, {
+    workspaceId: boundarySchemas.workspace.select.shape.id.parse(scenario.workspaceId),
+    map: mapNaming(found.map((document) => document.id)),
+    completedAt,
+  });
+
 const anErasureOverOneDocument = async () => {
   const scenario = await arrange();
   const erasure = await anOpenErasure(scenario.workspaceId);
@@ -1244,26 +1314,73 @@ describe("the full-rebuild the erasure asks for", () => {
     ]);
   });
 
-  it("names the bindings holding the documents the map found, once each, which is the list S1's reprocess runs over", async () => {
-    const scenario = await arrange();
-    const shared = await bindingIn(scenario.workspaceId);
-    const apart = await bindingIn(scenario.workspaceId);
-    const untouched = await bindingIn(scenario.workspaceId);
-    const one = await documentIn(scenario.workspaceId, shared.id);
-    const another = await documentIn(scenario.workspaceId, shared.id);
-    const third = await documentIn(scenario.workspaceId, apart.id);
-    await documentIn(scenario.workspaceId, untouched.id);
+  it("names the bindings holding the documents the map found, once each, which is the list the wipe runs over", async () => {
+    const { scenario, shared, apart, found } = await aMapOverTwoOfThreeBindings();
 
-    const rederived = await rederiveAfterErasure(ERASURE, scenario.postgres, {
-      workspaceId: scenario.workspaceId,
-      map: mapNaming([one.id, another.id, third.id]),
-
-      completedAt: LOCKED_AT,
-    });
+    const rederived = await rederivingOver(scenario, found, LOCKED_AT);
 
     expect(rederived.bindingsToReprocess).toEqual([shared.id, apart.id].sort());
     expect(rederived.rebuildJobId).toBeNull();
-    expect(await jobsIn(scenario.workspaceId)).toEqual([]);
+  });
+});
+
+const THE_REBUILD = { kind: "full-rebuild", subject_id: null, reason: "erasure", status: "queued" };
+
+const wipesOf = (bindings: readonly { readonly id: string }[]) =>
+  bindings
+    .map((binding) => binding.id)
+    .sort()
+    .map((subject_id) => ({ kind: "index", subject_id, reason: "wiped", status: "queued" }));
+
+const whatTheWipeLeft = async (workspaceId: string) => ({
+  chunks: await chunksIn(workspaceId),
+  queued: await queuedIn(workspaceId),
+});
+
+const everyBindingWiped = (arranged: Awaited<ReturnType<typeof aMapOverTwoOfThreeBindings>>) => ({
+  chunks: [{ binding_id: arranged.untouched.id, chunks: 1 }],
+  queued: [THE_REBUILD, ...wipesOf([arranged.shared, arranged.apart])],
+});
+
+describe("the wipe of every binding the map found", () => {
+  it("takes away each binding's chunk rows and queues each its index run with the wipe's reason, beside the full-rebuild", async () => {
+    const arranged = await aMapOverTwoOfThreeBindings();
+
+    const rederived = await rederivingOver(arranged.scenario, arranged.found, null);
+
+    expect(rederived.rebuildJobId).not.toBeNull();
+    expect(await whatTheWipeLeft(arranged.scenario.workspaceId)).toEqual(
+      everyBindingWiped(arranged),
+    );
+  });
+
+  it("wipes again on a replay, where a restore brought the rows back, queueing no second run of either kind", async () => {
+    const arranged = await aMapOverTwoOfThreeBindings();
+
+    await rederivingOver(arranged.scenario, arranged.found, null);
+    await chunksUnder(arranged.scenario.workspaceId, arranged.found);
+    const replayed = await rederivingOver(arranged.scenario, arranged.found, LOCKED_AT);
+
+    expect(replayed.rebuildJobId).toBeNull();
+    expect(await whatTheWipeLeft(arranged.scenario.workspaceId)).toEqual(
+      everyBindingWiped(arranged),
+    );
+  });
+
+  it("takes over a run queued for another reason rather than queueing a second, so the worker empties the binding", async () => {
+    const { scenario, shared, apart, found } = await aMapOverTwoOfThreeBindings();
+    await seedingWith(db().pool, (seed) =>
+      seed.job({
+        workspaceId: scenario.workspaceId,
+        kind: "index",
+        subjectId: shared.id,
+        reason: "rule-change",
+      }),
+    );
+
+    await rederivingOver(scenario, found, LOCKED_AT);
+
+    expect(await queuedIn(scenario.workspaceId)).toEqual(wipesOf([shared, apart]));
   });
 });
 

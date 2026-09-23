@@ -7,6 +7,7 @@ import {
   ok,
   requireAdmin,
   type AdminUserPrincipal,
+  type PlatformPrincipal,
   type Result,
   type RoleRefusal,
   type UserPrincipal,
@@ -21,6 +22,13 @@ export type BindingId = z.output<typeof BINDING_ID>;
 
 export type ActingOnBinding = {
   readonly admin: AdminUserPrincipal;
+  readonly workspaceId: WorkspaceId;
+  readonly bindingId: BindingId;
+};
+
+// The platform carries no workspace, so its standing names the one its act was asked for.
+export type PlatformOnBinding = {
+  readonly platform: PlatformPrincipal;
   readonly workspaceId: WorkspaceId;
   readonly bindingId: BindingId;
 };
@@ -43,7 +51,7 @@ type BindingRead = {
 type BindingNamedRefusal = SourceRefusal<"no-such-binding"> | Error;
 
 export const bindingNamed = async <Row extends TxRow>(
-  acting: ActingOnBinding,
+  acting: ActingOnBinding | PlatformOnBinding,
   tx: Tx,
   read: BindingRead,
 ): Promise<Result<Row, BindingNamedRefusal>> => {

@@ -316,6 +316,7 @@ describe("one uploaded document, read back through both tiers", () => {
             admin,
             tx,
             inputOf(reprocessBindingInput, {
+              workspaceId: scenario.workspaceId,
               bindingId: bound.bindingId,
               reason: "rule-change",
             }),
@@ -385,7 +386,11 @@ describe("one uploaded document, read back through both tiers", () => {
           reprocessBinding(
             admin,
             tx,
-            inputOf(reprocessBindingInput, { bindingId: bound.bindingId, reason: "wiped" }),
+            inputOf(reprocessBindingInput, {
+              workspaceId: scenario.workspaceId,
+              bindingId: bound.bindingId,
+              reason: "wiped",
+            }),
           ),
         ),
       );
@@ -530,7 +535,11 @@ describe("one uploaded document, read back through both tiers", () => {
           reprocessBinding(
             admin,
             tx,
-            inputOf(reprocessBindingInput, { bindingId: dropped.bindingId, reason: "wiped" }),
+            inputOf(reprocessBindingInput, {
+              workspaceId: scenario.workspaceId,
+              bindingId: dropped.bindingId,
+              reason: "wiped",
+            }),
           ),
         ),
       );

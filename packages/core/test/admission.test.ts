@@ -18,6 +18,12 @@ import {
 import { enqueueJobAct, type EnqueueJobInput } from "../src/runs/index.ts";
 import {
   reprocessBindingAct,
+  reprocessBindingInput,
+  type adminOnBinding,
+  type dpiaInputFor,
+  type previewChunks,
+  type publishBinding,
+  type reprocessBinding,
   type ReprocessBindingInput,
   type ReprocessBindingRefusal,
 } from "../src/sources/index.ts";
@@ -137,9 +143,34 @@ describe("the two acts that carry a declaration today", () => {
       refuses: reprocessBindingAct.refuses,
       effect: reprocessBindingAct.effect,
     }).toEqual({
-      admits: { role: "Admin", purposes: [] },
+      admits: { role: "Admin", purposes: ["erasure"] },
       refuses: ["role-forbids", "no-such-binding"],
       effect: "write",
+    });
+  });
+
+  it("admits an Admin and the erasure's process to reprocess a binding, and refuses every other role and purpose in the forbidden word", () => {
+    const wipe = reprocessBindingInput.parse({
+      workspaceId: "01JQ0000000000000000000WSP",
+      bindingId: "01J6NNNNNNNNNNNNNNNNNNNNN1",
+      reason: "wiped",
+    });
+
+    expect({
+      admitted: [
+        processActor("erasure"),
+        processActor("reconciler"),
+        processActor("upload-sweep"),
+        person("Admin"),
+        person("Editor"),
+        person("Viewer"),
+      ].map((principal) => admit(reprocessBindingAct, principal, wipe).ok),
+      refused: admit(reprocessBindingAct, processActor("reconciler"), wipe),
+      itsClass: classOf("role-forbids"),
+    }).toEqual({
+      admitted: [true, false, false, true, false, false],
+      refused: { ok: false, error: "role-forbids" },
+      itsClass: "forbidden",
     });
   });
 
@@ -149,7 +180,18 @@ describe("the two acts that carry a declaration today", () => {
       "role-forbids" | "no-such-binding"
     >();
     expectTypeOf<"no-such-binding">().toExtend<ReprocessBindingRefusal>();
-    expectTypeOf<AdmittedOf<typeof reprocessBindingAct>>().toExtend<UserPrincipal>();
+    expectTypeOf<AdmittedOf<typeof reprocessBindingAct>>().toExtend<
+      UserPrincipal | PlatformPrincipal
+    >();
+    expectTypeOf<PlatformPrincipal>().toExtend<AdmittedOf<typeof reprocessBindingAct>>();
+  });
+
+  it("lets the platform reprocess a binding and keeps it from publishing one, reading its DPIA input, previewing its chunks or standing as its Admin", () => {
+    expectTypeOf<PlatformPrincipal>().toExtend<Parameters<typeof reprocessBinding>[0]>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof publishBinding>[0]>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof dpiaInputFor>[0]>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof previewChunks>[0]>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof adminOnBinding>[0]>();
   });
 
   it("reads the enqueue's level off the kind's descriptor rather than restating it", () => {

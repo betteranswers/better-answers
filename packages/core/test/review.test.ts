@@ -1014,7 +1014,11 @@ const reprocessAsAdmin = (
   reason: z.input<typeof reprocessBindingInput>["reason"],
 ) =>
   acting(scenario.admin, (principal, tx) =>
-    reprocessBinding(principal, tx, inputOf(reprocessBindingInput, { bindingId, reason })),
+    reprocessBinding(
+      principal,
+      tx,
+      inputOf(reprocessBindingInput, { workspaceId: scenario.workspaceId, bindingId, reason }),
+    ),
   );
 
 describe("a bulk act handed no finding group at all", () => {

@@ -51,7 +51,7 @@ export type RebuildReason = (typeof REBUILD_REASONS)[number];
 
 export type IndexReason = (typeof INDEX_REASONS)[number];
 
-const WIPE_REASON = "wiped" satisfies IndexReason;
+export const WIPE_REASON = "wiped" satisfies IndexReason;
 
 export type BundleHealth = "healthy" | "mismatched" | "never-audited";
 

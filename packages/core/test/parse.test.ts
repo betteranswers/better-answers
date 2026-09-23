@@ -14,6 +14,7 @@ import {
   reprocessBindingInput,
 } from "../src/sources/index.ts";
 
+const A_WORKSPACE = "01JQ0000000000000000000WSP";
 const A_BINDING = "01J6NNNNNNNNNNNNNNNNNNNNN1";
 const A_GROUP = "01J6NNNNNNNNNNNNNNNNNNNNN2";
 const A_FINDING = "01J6NNNNNNNNNNNNNNNNNNNNN3";
@@ -251,14 +252,16 @@ describe("the shapes the Sources acts are handed", () => {
   });
 
   it("refuses a reprocess reason no run carries or that empties no binding, and a restore of a tier nobody named", () => {
-    expect(
-      refusalOf(parse(reprocessBindingInput, { bindingId: A_BINDING, reason: "spring-clean" })),
-    ).toEqual({ word: "malformed", fields: { reason: "not-in-set" } });
-    for (const reason of ["bound", "restored", "narrowed"]) {
-      expect(refusalOf(parse(reprocessBindingInput, { bindingId: A_BINDING, reason }))).toEqual({
-        word: "malformed",
-        fields: { reason: "not-in-set" },
-      });
+    for (const reason of ["spring-clean", "bound", "restored", "narrowed"]) {
+      expect(
+        refusalOf(
+          parse(reprocessBindingInput, {
+            workspaceId: A_WORKSPACE,
+            bindingId: A_BINDING,
+            reason,
+          }),
+        ),
+      ).toEqual({ word: "malformed", fields: { reason: "not-in-set" } });
     }
     expect(
       refusalOf(
