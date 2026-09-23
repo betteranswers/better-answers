@@ -13,7 +13,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
-import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
+import { oxlintOver, writeUnder } from "@better-answers/devtools/throwaway-tree";
 import { boundarySchemas, ULID_PATTERN } from "@better-answers/schema";
 
 import { ulid } from "../src/kernel/index.ts";
@@ -48,8 +48,8 @@ const manifest = z.object({
   fixtures: z.array(z.object({ agreement: z.string(), path: z.string() })),
 });
 
-const readManifest = () =>
-  manifest.parse(JSON.parse(readFileSync(path.join(contractsDir, "manifest.json"), "utf8")));
+const readManifest = (directory = contractsDir) =>
+  manifest.parse(JSON.parse(readFileSync(path.join(directory, "manifest.json"), "utf8")));
 
 const fixturesOnDisk = (directory: string): readonly string[] =>
   readdirSync(directory, { recursive: true, withFileTypes: true })
@@ -59,9 +59,85 @@ const fixturesOnDisk = (directory: string): readonly string[] =>
     .filter((relative) => !NOT_FIXTURES.has(relative))
     .toSorted();
 
-const throwaway = mkdtempSync(path.join(tmpdir(), "tier-contract-"));
+const directoriesIn = (directory: string): readonly string[] =>
+  readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+    .map((entry) => entry.name);
 
-afterAll(() => rmSync(throwaway, { recursive: true, force: true }));
+const filesUnder = (root: string, agreement: string): readonly string[] => {
+  const directory = path.join(root, agreement);
+  return existsSync(directory) ? fixturesOnDisk(directory) : [];
+};
+
+const formFailures = (contract: z.infer<typeof manifest>, root: string): readonly string[] => {
+  const failures: string[] = [];
+
+  for (const [agreement, { form }] of Object.entries(contract.agreements)) {
+    const listed = contract.fixtures.filter((fixture) => fixture.agreement === agreement);
+
+    if (form === "fixtured") {
+      if (listed.length === 0)
+        failures.push(`${agreement} declares fixtured and the manifest lists no fixture under it`);
+      for (const fixture of listed)
+        if (!fixture.path.startsWith(`${agreement}/`))
+          failures.push(
+            `${agreement} declares fixtured and lists ${fixture.path}, which is not under ${agreement}/`,
+          );
+        else if (!existsSync(path.join(root, fixture.path)))
+          failures.push(
+            `${agreement} declares fixtured and lists ${fixture.path}, which is not on disk`,
+          );
+    } else if (form === "generated") {
+      if (filesUnder(root, agreement).length === 0)
+        failures.push(`${agreement} declares generated and has no golden rows on disk`);
+    } else if (form !== "sql-function") {
+      failures.push(`${agreement} declares ${form}, a form this check does not know`);
+    }
+  }
+
+  for (const directory of directoriesIn(root))
+    if (contract.agreements[directory] === undefined)
+      failures.push(`${directory} is a directory under contracts/ that no agreement claims`);
+
+  return failures.toSorted();
+};
+
+const throwaway = mkdtempSync(path.join(tmpdir(), "tier-contract-"));
+const brokenRoot = mkdtempSync(path.join(tmpdir(), "tier-contract-broken-"));
+
+afterAll(() => {
+  rmSync(throwaway, { recursive: true, force: true });
+  rmSync(brokenRoot, { recursive: true, force: true });
+});
+
+const brokenContracts = {
+  agreements: {
+    shape: { form: "fixtured" },
+    "empty-handed": { form: "fixtured" },
+    "missing-file": { form: "fixtured" },
+    astray: { form: "fixtured" },
+    ledger: { form: "generated" },
+    rows: { form: "generated" },
+    routing: { form: "sql-function" },
+    hearsay: { form: "spoken" },
+  },
+  fixtures: [
+    { agreement: "shape", path: "shape/cases.json" },
+    { agreement: "missing-file", path: "missing-file/cases.json" },
+    { agreement: "astray", path: "shape/cases.json" },
+    { agreement: "rows", path: "rows/rows.json" },
+  ],
+} as const;
+
+const LISTED_BUT_ABSENT = "missing-file/cases.json";
+const ON_DISK_BUT_UNLISTED = ["routing/cases.json", "orphan/cases.json"];
+
+const materialiseBrokenContracts = (root: string) => {
+  for (const { path: listed } of brokenContracts.fixtures)
+    if (listed !== LISTED_BUT_ABSENT) writeUnder(root, listed, "{}");
+  for (const unlisted of ON_DISK_BUT_UNLISTED) writeUnder(root, unlisted, "{}");
+  writeUnder(root, "manifest.json", JSON.stringify({ contract_version: 1, ...brokenContracts }));
+};
 
 describe("the tier contract", () => {
   it("speaks this tier's contract version", () => {
@@ -104,6 +180,23 @@ describe("the tier contract", () => {
     writeFileSync(path.join(throwaway, ".cache", "cases.json"), "{}");
 
     expect(fixturesOnDisk(throwaway)).toEqual(["id-shape/cases.json"]);
+  });
+
+  it("finds the disk answering every form the manifest declares, and claiming every directory", () => {
+    expect(formFailures(readManifest(), contractsDir)).toEqual([]);
+  });
+
+  it("names the agreement and the form it declared for each entry the disk does not answer", () => {
+    materialiseBrokenContracts(brokenRoot);
+
+    expect(formFailures(readManifest(brokenRoot), brokenRoot)).toEqual([
+      "astray declares fixtured and lists shape/cases.json, which is not under astray/",
+      "empty-handed declares fixtured and the manifest lists no fixture under it",
+      "hearsay declares spoken, a form this check does not know",
+      "ledger declares generated and has no golden rows on disk",
+      "missing-file declares fixtured and lists missing-file/cases.json, which is not on disk",
+      "orphan is a directory under contracts/ that no agreement claims",
+    ]);
   });
 });
 
