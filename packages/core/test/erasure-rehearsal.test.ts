@@ -38,6 +38,7 @@ const doorsFor = (scenario: Scenario, at: Date = REHEARSED_AT) => ({
   postgres: scenario.postgres,
   objects: objects().door,
   clock: { now: () => at },
+  log: { info: () => undefined },
 });
 
 const expectedTokensFor = (workspaceId: string): readonly string[] => {

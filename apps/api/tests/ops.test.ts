@@ -50,10 +50,22 @@ import {
   type OpsIo,
 } from "../src/ops/index.ts";
 import { readTreeUnder } from "../src/ops/read-tree.ts";
-import { APP_HOSTNAME, doorsFor, openTestGit, PUBLIC_URL, type TestApp } from "./harness.ts";
+import {
+  APP_HOSTNAME,
+  capturingLogger,
+  doorsFor,
+  openTestGit,
+  PUBLIC_URL,
+  type LogLine,
+  type TestApp,
+} from "./harness.ts";
 import { servedApp } from "./suite-app.ts";
 
-type Run = { readonly exitCode: number; readonly lines: readonly string[] };
+type Run = {
+  readonly exitCode: number;
+  readonly lines: readonly string[];
+  readonly logs: readonly LogLine[];
+};
 
 // A replay reads every workspace, so each case erases at an instant of its own and asks
 // for the window holding only that one.
@@ -72,15 +84,21 @@ const BEYOND_USE =
 
 const objects = objectStoreForSuite();
 
-const ioFor = (app: TestApp, stdin = ""): OpsIo & { readonly lines: string[] } => {
+const ioFor = (
+  app: TestApp,
+  stdin = "",
+): OpsIo & { readonly lines: string[]; readonly logs: readonly LogLine[] } => {
   const lines: string[] = [];
+  const { logger, logs } = capturingLogger();
   return {
     lines,
+    logs,
     fetch: async (url, init) => app.server.request(url, init),
     stdin: async () => stdin,
     say: (line) => {
       lines.push(line);
     },
+    logger,
     appHostname: APP_HOSTNAME,
 
     writeReport: async (file, body) => {
@@ -108,7 +126,7 @@ const ops = async (
 ): Promise<Run> => {
   const io = ioFor(app, stdin);
   const exitCode = await runOps(argv, doorsFrom(app, pool), io);
-  return { exitCode, lines: io.lines };
+  return { exitCode, lines: io.lines, logs: io.logs };
 };
 
 const opsWith = async (
@@ -119,7 +137,7 @@ const opsWith = async (
 ): Promise<Run> => {
   const io = { ...ioFor(app), ...overrides.io };
   const exitCode = await runOps(argv, doorsFrom(app, pool, overrides.doors), io);
-  return { exitCode, lines: io.lines };
+  return { exitCode, lines: io.lines, logs: io.logs };
 };
 
 const opsBeforeTheJournal = async (app: TestApp, argv: readonly string[]): Promise<Run> => {
@@ -211,6 +229,7 @@ const erasureDoors = (app: TestApp, at: Date) => ({
   postgres: app.doors.postgres,
   objects: objects().door,
   clock: { now: () => at },
+  log: capturingLogger().logger,
 });
 
 const erasedAt = async (
@@ -666,6 +685,47 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
+    it("leaves the operator the erasure's line in the tier's log, naming its request and no address", async () => {
+      const { workspaceId } = await app().provision();
+      await initRepository(openTestGit(app()), workspaceId);
+      const pinned = { doors: { clock: { now: () => REHEARSED_AT } } };
+      await opsWith(
+        app(),
+        ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--seed"],
+        pinned,
+      );
+
+      const run = await opsWith(
+        app(),
+        [
+          "erasure-rehearsal",
+          "--workspace",
+          workspaceId,
+          "--synthetic",
+          "--run",
+          "--report",
+          await reportPath(),
+        ],
+        pinned,
+      );
+
+      const erasure = await app().database.superuser.query<{ id: string }>(
+        "SELECT id FROM erasure_request WHERE workspace_id = $1",
+        [workspaceId],
+      );
+      expect(run.exitCode).toBe(0);
+      expect(run.logs).toEqual([
+        expect.objectContaining({
+          level: 30,
+          actor: "process:better-answers-erasure",
+          erasure_request_id: erasure.rows[0]?.id,
+          invitations_deleted: 0,
+          msg: "erasure: what the identity step deleted across every workspace",
+        }),
+      ]);
+      expect(JSON.stringify(run.logs)).not.toContain("@");
+    });
+
     it("refuses phase two in a workspace phase one never ran in, rather than erasing whoever is there", async () => {
       const { workspaceId } = await app().provision();
       await initRepository(openTestGit(app()), workspaceId);
@@ -938,7 +998,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         letGo();
         await pass;
 
-        expect(await run).toEqual({ exitCode: 0, lines: [done] });
+        expect(await run).toEqual({ exitCode: 0, lines: [done], logs: [] });
       },
     );
   });

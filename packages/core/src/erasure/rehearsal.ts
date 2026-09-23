@@ -22,7 +22,7 @@ import {
   type PostgresDoor,
 } from "../store/postgres/index.ts";
 import { recordSubjectRequest } from "./requests.ts";
-import { runErasure, type ErasurePrincipal } from "./routine.ts";
+import { runErasure, type ErasureLog, type ErasurePrincipal } from "./routine.ts";
 
 const REHEARSAL_ACTS = declareActs("platform", {
   rehearsed: act("platform.erasure.rehearsed", {
@@ -40,6 +40,7 @@ export type RehearsalDoors = {
   readonly postgres: PostgresDoor;
   readonly objects: ObjectDoor;
   readonly clock: Clock;
+  readonly log: ErasureLog;
 };
 
 export type RehearsalRefusal = "malformed" | "not-seeded";

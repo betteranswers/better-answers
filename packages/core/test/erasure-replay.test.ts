@@ -63,6 +63,7 @@ const doorsFor = (scenario: Scenario, at: Date) => ({
   postgres: scenario.postgres,
   objects: objects().door,
   clock: { now: () => at },
+  log: { info: () => undefined },
 });
 
 type Erased = {

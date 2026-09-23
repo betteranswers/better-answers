@@ -2,6 +2,7 @@ import { writeFile } from "node:fs/promises";
 
 import { readIdentityBootstrap, readObjectStore, requireBootstrap } from "./config.ts";
 import { closeDoors, openDoors } from "./doors.ts";
+import { logger } from "./logger.ts";
 import { fetchHonouringHost } from "./ops/http-fetch.ts";
 import { runOps } from "./ops/index.ts";
 import { readTreeUnder } from "./ops/read-tree.ts";
@@ -28,6 +29,7 @@ const exitCode = await runOps(process.argv.slice(2), doors, {
   say: (line) => {
     process.stdout.write(`${line}\n`);
   },
+  logger,
   appHostname: identity.ok ? identity.value.hostnames.app : undefined,
 
   writeReport: async (path, body) => {

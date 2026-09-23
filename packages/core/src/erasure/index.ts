@@ -22,7 +22,13 @@ export type { ReplayableErasure, ReplayDoors, ReplayedErasure } from "./replay-e
 export { erasureReportOf } from "./report.ts";
 export type { ErasureAction, ErasureActions, ErasureRecord, ErasureReportInput } from "./report.ts";
 export { ERASURE, runErasure } from "./routine.ts";
-export type { ErasurePrincipal, ErasureRefusal, ErasureRun } from "./routine.ts";
+export type {
+  ErasureLog,
+  ErasureLogLine,
+  ErasurePrincipal,
+  ErasureRefusal,
+  ErasureRun,
+} from "./routine.ts";
 export { deadlineOf, dueDateOf, recordSubjectRequest, subjectRequestFor } from "./requests.ts";
 export { suppressTheDocuments } from "./suppressions.ts";
 export type { Suppressed } from "./suppressions.ts";

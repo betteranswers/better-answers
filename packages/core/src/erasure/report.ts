@@ -45,6 +45,12 @@ const ANCHOR_NAMED =
   "last dump before it: no backup run is recorded, so the last dump precedes the anchor and " +
   "every date above is the latest a copy can expire.";
 
+// One sentence on every arm, with no count: printed on one arm alone, it would say which ran.
+const INVITATIONS_WHEREVER_SENT =
+  "Invitations sent to the address a person signs in with are deleted wherever they were sent, " +
+  "by the request that ends their last membership; the invitation line above counts this " +
+  "workspace's alone.";
+
 const OBJECT_STORE_UNTOUCHED =
   "The object store is untouched: a company document that mentions a person is suppressed " +
   "when it is next reprocessed, never deleted.";
@@ -82,6 +88,8 @@ export const erasureReportOf = (input: ErasureReportInput): string => {
     "",
     "Where this person was held, and what the routine did:",
     ...input.map.map((entry) => `- ${entry.family}: ${wordsFor(input.actions[entry.family])}`),
+    "",
+    INVITATIONS_WHEREVER_SENT,
     "",
     OBJECT_STORE_UNTOUCHED,
     "",

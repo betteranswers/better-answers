@@ -12,8 +12,12 @@ export type IdentitySwept = {
   readonly membershipsEnded: number;
   readonly sessions: number;
   readonly verifications: number;
-  readonly invitations: number;
   readonly accounts: number;
+  readonly invitationsHere: number;
+
+  // The delete reaches every workspace, so this count varies with records the erasing one may
+  // not read: it is the operator's, and never the report's.
+  readonly invitationsEverywhere: number;
 };
 
 const SWEPT_NOTHING = {
@@ -21,8 +25,9 @@ const SWEPT_NOTHING = {
   membershipsEnded: 0,
   sessions: 0,
   verifications: 0,
-  invitations: 0,
   accounts: 0,
+  invitationsHere: 0,
+  invitationsEverywhere: 0,
 } as const;
 
 export type ErasureSubject = {
@@ -46,9 +51,10 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
     [emails],
   );
 
-  const invitations = await tx.query("DELETE FROM invitation WHERE lower(email) = ANY($1)", [
-    emails,
-  ]);
+  const invitations = await tx.query<{ workspace_id: string }>(
+    "DELETE FROM invitation WHERE lower(email) = ANY($1) RETURNING workspace_id",
+    [emails],
+  );
   const sessions = await tx.query("DELETE FROM session WHERE user_id = $1", [subject.personId]);
   const accounts = await tx.query("DELETE FROM account WHERE user_id = $1", [subject.personId]);
 
@@ -60,9 +66,11 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
   );
   return {
     verifications: rowsOf(verifications),
-    invitations: rowsOf(invitations),
     sessions: rowsOf(sessions),
     accounts: rowsOf(accounts),
+    invitationsHere: invitations.rows.filter((row) => row.workspace_id === subject.workspaceId)
+      .length,
+    invitationsEverywhere: rowsOf(invitations),
     pseudonymised: rowsOf(pseudonymised),
   };
 };
