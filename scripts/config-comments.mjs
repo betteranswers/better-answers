@@ -406,7 +406,12 @@ const commentSpans = (language, source) => {
 
 // A word this list does not carry is prose, however tool-shaped it reads.
 const DIRECTIVE_WORD = /^(?:shellcheck|renovate|yaml-language-server|noqa)\b/i;
-const BREAKPOINT = /^statement-breakpoint$/;
+
+// One spelling of the migrations' separator, in the two forms its two readers want: the body
+// the directive test sees once the opener is off, and the whole token the migrator splits on.
+const BREAKPOINT_BODY = "statement-breakpoint";
+const SEPARATOR = `--> ${BREAKPOINT_BODY}`;
+const BREAKPOINT = new RegExp(`^${BREAKPOINT_BODY}$`);
 
 // The ownership suite reads this marker by its exact text and refuses a near miss, so it is
 // matched whole rather than by its body.
@@ -468,11 +473,16 @@ export const withoutComments = (language, source) => {
   return kept.join("\n");
 };
 
+// The migrator splits on this token wherever it sits, so the line it is written on is layout.
+const withSeparatorUnfolded = (source) => source.split(SEPARATOR).join(`\n${SEPARATOR}\n`);
+
 // What the proof compares: the same removal, then the trailing space and blank line a hand
 // restore leaves. Every other byte stands.
-export const normalized = (language, source) =>
-  withoutComments(language, source)
+export const normalized = (language, source) => {
+  const stripped = withoutComments(language, source);
+  return (language === SQL ? withSeparatorUnfolded(stripped) : stripped)
     .split("\n")
     .map((line) => line.trimEnd())
     .filter((line) => line !== "")
     .join("\n");
+};
