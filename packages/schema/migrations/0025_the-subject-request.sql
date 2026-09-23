@@ -21,8 +21,7 @@ CREATE TABLE "subject_request" (
          AND due_at > clock_started_at
          AND (extended_to IS NULL OR extended_to > due_at)),
 	CONSTRAINT "subject_request_answer_check" CHECK ((answered_at IS NULL) = (answer IS NULL))
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "subject_request" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "subject_request" ADD CONSTRAINT "subject_request_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "subject_request" ADD CONSTRAINT "subject_request_person_id_user_id_fk" FOREIGN KEY ("person_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

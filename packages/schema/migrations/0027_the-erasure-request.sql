@@ -19,8 +19,7 @@ CREATE TABLE "erasure_request" (
          AND beyond_use_weekly_at > beyond_use_daily_at
          AND beyond_use_monthly_at > beyond_use_weekly_at),
 	CONSTRAINT "erasure_request_completion_check" CHECK ((completed_at IS NULL) = (report IS NULL))
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "erasure_request" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "erasure_request" ADD CONSTRAINT "erasure_request_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "erasure_request" ADD CONSTRAINT "erasure_request_subject_request_fk" FOREIGN KEY ("workspace_id","subject_request_id") REFERENCES "public"."subject_request"("workspace_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

@@ -683,6 +683,30 @@ const selfTest = () => {
       same: false,
     },
     {
+      name: "SQL, the statement breakpoint folded onto the statement above it",
+      file: "0000_substrate.sql",
+      base: FIXTURE_SQL,
+      current: FIXTURE_SQL.replaceAll("\n--> statement-breakpoint", "--> statement-breakpoint"),
+      same: true,
+    },
+    {
+      name: "SQL, the statement breakpoint folded onto the statement below it",
+      file: "0000_substrate.sql",
+      base: FIXTURE_SQL,
+      current: FIXTURE_SQL.replace(
+        "--> statement-breakpoint\nCREATE FUNCTION",
+        "CREATE FUNCTION--> statement-breakpoint\n",
+      ),
+      same: false,
+    },
+    {
+      name: "SQL, a folded statement breakpoint lost",
+      file: "0000_substrate.sql",
+      base: FIXTURE_SQL.replaceAll("\n--> statement-breakpoint", "--> statement-breakpoint"),
+      current: FIXTURE_SQL.replaceAll("\n--> statement-breakpoint", ""),
+      same: false,
+    },
+    {
       name: "SQL, the custom-migration marker lost",
       file: "0000_substrate.sql",
       base: FIXTURE_SQL,

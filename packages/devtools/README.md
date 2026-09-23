@@ -146,16 +146,14 @@ SQL and JavaScript. The longest path wins where a directory sits inside a worksp
 `--directory packages/schema/migrations` gives the SQL a number of its own rather than one the
 TypeScript eight times its size decides. The report names a directory the way it names a
 workspace, and a named directory the counter read no file in is refused, never called clean.
-Root `check` names the two workspace roots and no directory yet; each config root is wired as
-its strip lands.
+Root `check` names the two workspace roots and `packages/schema/migrations`; each config root
+is wired as its strip lands.
 
 `.claude/hooks/comment-gate-hook.sh` runs the same two parts at write time over the file an
 edit touched, and hands their message straight back; its suite holds its extension list against
-the check's syntax table both ways. The check names two paths it does not judge, each proved by
-a case in its suite: `apps/worker/pyproject.toml`, which no root of the config-tree strip
-covers, and `packages/schema/migrations`, whose strip has not landed — the change that strips
-the migrations and names them in root `check` deletes that second name. Skills are walked past
-wherever they sit, being prose no comment gate reads.
+the check's syntax table both ways. The check names one path it does not judge, proved by a
+case in its suite: `apps/worker/pyproject.toml`, which no root of the config-tree strip covers.
+Skills are walked past wherever they sit, being prose no comment gate reads.
 
 The counter is **cloc**, pinned at `2.6.0-cloc`, which carries upstream cloc `2.06` — the
 number a behaviour is compared against. **Read the pin off the registry's `latest` tag and

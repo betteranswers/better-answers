@@ -11,8 +11,7 @@ CREATE TABLE "concept_class_override" (
 	CONSTRAINT "concept_class_override_sensitivity_check" CHECK (sensitivity IN ('Restricted', 'Internal', 'Public')),
 	CONSTRAINT "concept_class_override_audience_check" CHECK ((audience = 'everyone' AND audience_groups IS NULL) OR (audience = 'groups' AND audience_groups IS NOT NULL AND cardinality(audience_groups) > 0 AND array_position(audience_groups, NULL) IS NULL)),
 	CONSTRAINT "concept_class_override_actor_check" CHECK (actor ~ '^(human:[0-9A-HJKMNP-TV-Z]{26}|process:better-answers-[a-z0-9][a-z0-9-]*|better-answers-[a-z0-9][a-z0-9-]*/[0-9A-Za-z.-]+)$')
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "concept_class_override" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "concept_evidence" (
 	"workspace_id" text NOT NULL,
@@ -20,8 +19,7 @@ CREATE TABLE "concept_evidence" (
 	"source_document_id" text NOT NULL,
 	"locator" text NOT NULL,
 	CONSTRAINT "concept_evidence_workspace_id_iri_source_document_id_locator_pk" PRIMARY KEY("workspace_id","iri","source_document_id","locator")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "concept_evidence" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "source_binding" (
 	"workspace_id" text NOT NULL,
@@ -34,16 +32,14 @@ CREATE TABLE "source_binding" (
 	CONSTRAINT "source_binding_workspace_id_id_pk" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "source_binding_sensitivity_check" CHECK (sensitivity IN ('Restricted', 'Internal', 'Public')),
 	CONSTRAINT "source_binding_audience_check" CHECK ((audience = 'everyone' AND audience_groups IS NULL) OR (audience = 'groups' AND audience_groups IS NOT NULL AND cardinality(audience_groups) > 0 AND array_position(audience_groups, NULL) IS NULL))
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "source_binding" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "source_document" (
 	"workspace_id" text NOT NULL,
 	"id" text NOT NULL,
 	"binding_id" text NOT NULL,
 	CONSTRAINT "source_document_workspace_id_id_pk" PRIMARY KEY("workspace_id","id")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "source_document" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "composition" (
 	"workspace_id" text NOT NULL,
@@ -56,8 +52,7 @@ CREATE TABLE "composition" (
 	CONSTRAINT "composition_workspace_id_id_pk" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "composition_sensitivity_check" CHECK (sensitivity IN ('Restricted', 'Internal', 'Public')),
 	CONSTRAINT "composition_audience_check" CHECK ((audience = 'everyone' AND audience_groups IS NULL) OR (audience = 'groups' AND audience_groups IS NOT NULL AND cardinality(audience_groups) > 0 AND array_position(audience_groups, NULL) IS NULL))
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "composition" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "composition_include" (
 	"workspace_id" text NOT NULL,
@@ -67,8 +62,7 @@ CREATE TABLE "composition_include" (
 	"iri" text NOT NULL,
 	CONSTRAINT "composition_include_workspace_id_composition_id_id_pk" PRIMARY KEY("workspace_id","composition_id","id"),
 	CONSTRAINT "composition_include_ordinal_check" CHECK (ordinal >= 0)
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "composition_include" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "concept_index" ADD COLUMN "audience_groups" text[];--> statement-breakpoint
 ALTER TABLE "concept_class_override" ADD CONSTRAINT "concept_class_override_identity_fk" FOREIGN KEY ("workspace_id","iri") REFERENCES "public"."concept_identity"("workspace_id","iri") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

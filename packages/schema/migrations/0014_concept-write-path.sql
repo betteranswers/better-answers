@@ -6,8 +6,7 @@ CREATE TABLE "bundle_commit" (
 	"actor" text NOT NULL,
 	"committed_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "bundle_commit_workspace_id_sha_pk" PRIMARY KEY("workspace_id","sha")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "bundle_commit" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "concept_identity" (
 	"workspace_id" text NOT NULL,
@@ -15,8 +14,7 @@ CREATE TABLE "concept_identity" (
 	"merge_key" text NOT NULL,
 	"minted_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "concept_identity_workspace_id_iri_pk" PRIMARY KEY("workspace_id","iri")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "concept_identity" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "concept_index" (
 	"workspace_id" text NOT NULL,
@@ -37,8 +35,7 @@ CREATE TABLE "concept_index" (
 	CONSTRAINT "concept_index_status_check" CHECK (status IN ('draft', 'stable', 'deprecated', 'removed')),
 	CONSTRAINT "concept_index_sensitivity_check" CHECK (sensitivity IN ('Restricted', 'Internal', 'Public')),
 	CONSTRAINT "concept_index_published_check" CHECK ((status IN ('stable', 'deprecated')) = (published_at IS NOT NULL))
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "concept_index" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "concept_verification" (
 	"id" text NOT NULL,
@@ -51,8 +48,7 @@ CREATE TABLE "concept_verification" (
 	CONSTRAINT "concept_verification_workspace_id_id_pk" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "concept_verification_origin_check" CHECK (origin IN ('platform', 'imported', 'erasure-rewrite', 'repair')),
 	CONSTRAINT "concept_verification_imported_check" CHECK ((origin = 'imported') = (content_hash IS NULL))
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "concept_verification" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "evidence" (
 	"workspace_id" text NOT NULL,
@@ -62,8 +58,7 @@ CREATE TABLE "evidence" (
 	"content_version" text,
 	"recorded_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "evidence_workspace_id_source_document_id_locator_pk" PRIMARY KEY("workspace_id","source_document_id","locator")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "evidence" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "bundle_commit" ADD CONSTRAINT "bundle_commit_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bundle_commit" ADD CONSTRAINT "bundle_commit_parent_fk" FOREIGN KEY ("workspace_id","parent_sha") REFERENCES "public"."bundle_commit"("workspace_id","sha") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

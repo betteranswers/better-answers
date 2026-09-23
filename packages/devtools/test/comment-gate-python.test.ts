@@ -256,11 +256,6 @@ describe("the check reads what a language calls code as code", () => {
 describe("the check speaks only for a root the strip has wired", () => {
   it.each([
     [
-      "the migrations, which are wired by their own strip",
-      "packages/schema/migrations/0000_probe.sql",
-      `-- ${FORTY_WORDS}\nSELECT 1;\n`,
-    ],
-    [
       "a workspace's tool configuration, which no root covers",
       "apps/worker/pyproject.toml",
       `# ${FORTY_WORDS}\nkeep = 1\n`,
@@ -272,6 +267,12 @@ describe("the check speaks only for a root the strip has wired", () => {
     ],
   ])("walks past %s", (_what, file, source) => {
     expect(findings({ [file]: source })).toEqual([]);
+  });
+
+  it("judges the migrations, whose strip has landed", () => {
+    const migration = `-- ${FORTY_WORDS}\nSELECT 1;\n`;
+
+    expect(findings({ "packages/schema/migrations/0000_probe.sql": migration })).toHaveLength(1);
   });
 });
 

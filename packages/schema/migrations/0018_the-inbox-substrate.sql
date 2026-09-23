@@ -1,48 +1,10 @@
 -- Custom migration (hand-written SQL; ADR 0032).
--- The inbox's substrate: the FORCE line withRLS() cannot emit, the privileges that make
--- "nothing reads a payload but the acceptance path" the database's sentence rather than a
--- convention, and the three concept-inbox SQL functions both tiers call (ADR 0031).
 
--- FORCE applies RLS to the table's owner too (ADR 0032); the coverage test fails on any
--- tenant table whose FORCE line is missing.
-ALTER TABLE "suggestion" FORCE ROW LEVEL SECURITY;
---> statement-breakpoint
-ALTER TABLE "concept_write_request" FORCE ROW LEVEL SECURITY;
---> statement-breakpoint
--- **The payload is out of every runtime role's reach.** A `concept_write_request` is
--- platform state in no knowledge layer, and nothing reads one but the acceptance path
--- (ADR 0012's 2026-09-01 amendment) — which means, in particular, that no enrichment run
--- may read another run's candidates out of the inbox. Migration 0000's default privileges
--- would have granted both runtime roles DML on it; they are taken back here, and the two
--- functions below are the only way in. Proved by "refuses both runtime roles the payload
--- table itself, and serves it only through the definer function (migration 0018)" in
--- packages/schema/test/rls.test.ts.
-REVOKE ALL ON "concept_write_request" FROM app_rt, worker_rt;
---> statement-breakpoint
--- The worker submits through the function below and reads nothing back: the queue is the
--- app's, and a producer that could read it could read another producer's work.
-REVOKE ALL ON "suggestion" FROM worker_rt;
---> statement-breakpoint
--- A decided suggestion is a fact — "a declined suggestion is recorded with its reason"
--- (ADR 0012), and a record that can be deleted is a silence waiting to happen. The app
--- writes a decision as an UPDATE and never as a DELETE, so DELETE goes.
-REVOKE DELETE ON "suggestion" FROM app_rt;
---> statement-breakpoint
--- **A decision happens once, it is made by the act that makes it, and what a suggestion is
--- was settled when it was raised.** DELETE is gone above, but the app keeps a general
--- UPDATE — it is how a decision is written — and nothing in the row's own CHECKs says an
--- *accepted* row may not be turned back into a waiting one, or a waiting one marked
--- accepted by a statement that made no commit, wrote no ledger row and derived no graph
--- delta. That last is the one thing the acceptance's transaction exists to make impossible,
--- so the transaction has to be able to say it is the one making the decision: the slice's
--- decision path and its acceptance path both set `app.deciding_suggestion` — transaction-
--- local, so it cannot outlive the act or reach a pooled connection's next caller — and this
--- refuses a waiting row's decision that arrives without it.
---
--- It is a guard against the platform taking the short road, **not** against a compromised
--- role: anything that can write the row can also set the marker. What it buys is that the
--- governed path is the only path a reviewer has to read, and that a second road cannot be
--- added by accident.
+ALTER TABLE "suggestion" FORCE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "concept_write_request" FORCE ROW LEVEL SECURITY;--> statement-breakpoint
+REVOKE ALL ON "concept_write_request" FROM app_rt, worker_rt;--> statement-breakpoint
+REVOKE ALL ON "suggestion" FROM worker_rt;--> statement-breakpoint
+REVOKE DELETE ON "suggestion" FROM app_rt;--> statement-breakpoint
 CREATE FUNCTION suggestion_decides_once() RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
@@ -69,22 +31,9 @@ BEGIN
       OLD.id USING ERRCODE = 'integrity_constraint_violation';
   END IF;
   RETURN NEW;
-END $$;
---> statement-breakpoint
+END $$;--> statement-breakpoint
 CREATE TRIGGER suggestion_decides_once_trigger
-BEFORE UPDATE ON "suggestion" FOR EACH ROW EXECUTE FUNCTION suggestion_decides_once();
---> statement-breakpoint
--- concept-inbox (ADR 0031): **submitting a suggestion set is one function call**, and the
--- transition is the database's rather than two clients' agreeing interpretation of it.
---
--- It takes no workspace argument at all: the set lands in the workspace the caller's
--- transaction is already scoped to, so a producer cannot name another tenant's inbox even
--- by mistake: the guard a definer function's arguments have to carry against the
--- transaction's scope is made unnecessary by there being no such argument. search_path is
--- pinned and every object is schema-qualified, because the pinned path cannot see `public`.
---
--- Two statements rather than one, so the payload's foreign key is checked against a
--- suggestion row that already exists rather than against one written by the same command.
+BEFORE UPDATE ON "suggestion" FOR EACH ROW EXECUTE FUNCTION suggestion_decides_once();--> statement-breakpoint
 CREATE FUNCTION submit_suggestion_set(
   p_set_id text, p_kind text, p_proposer text, p_requests jsonb
 ) RETURNS SETOF text
@@ -172,24 +121,9 @@ BEGIN
       AS r(suggestion_id text, merge_key text, path text, concept_kind text, title text,
            frontmatter text, body text, base_content_hash text)
   RETURNING suggestion_id;
-END $$;
---> statement-breakpoint
-REVOKE EXECUTE ON FUNCTION submit_suggestion_set(text, text, text, jsonb) FROM PUBLIC;
---> statement-breakpoint
--- Both tiers submit: a person's *edit* through the app, a run's candidates through the
--- worker. That is what makes this an agreement rather than one tier's helper (ADR 0031).
-GRANT EXECUTE ON FUNCTION submit_suggestion_set(text, text, text, jsonb) TO app_rt, worker_rt;
---> statement-breakpoint
--- **The set's summary, re-rendered against `concept_identity` every time it is asked for.**
--- The resolution is a join and never a stored column, so an Admin decides against the map of
--- today rather than the map of the proposal's day; `base_moved` is the payload's own
--- precondition read the same way, so the summary says which items an acceptance would refuse
--- before anybody clicks. A read writes no row, which is why the resolution is
--- returned rather than stamped onto the suggestion.
---
--- Definer, because the payload table is out of the app's reach; the workspace guard is the
--- WHERE clause, which resolves to NULL and so to zero rows when the transaction names no
--- workspace.
+END $$;--> statement-breakpoint
+REVOKE EXECUTE ON FUNCTION submit_suggestion_set(text, text, text, jsonb) FROM PUBLIC;--> statement-breakpoint
+GRANT EXECUTE ON FUNCTION submit_suggestion_set(text, text, text, jsonb) TO app_rt, worker_rt;--> statement-breakpoint
 CREATE FUNCTION suggestion_set_summary(p_set_id text)
 RETURNS TABLE (
   suggestion_id text, kind text, status text, proposer text, decider text, reason text,
@@ -212,15 +146,9 @@ AS $$
    WHERE s.workspace_id = (SELECT public.current_workspace_id())
      AND s.set_id = p_set_id
    ORDER BY s.id
-$$;
---> statement-breakpoint
-REVOKE EXECUTE ON FUNCTION suggestion_set_summary(text) FROM PUBLIC;
---> statement-breakpoint
-GRANT EXECUTE ON FUNCTION suggestion_set_summary(text) TO app_rt;
---> statement-breakpoint
--- **The payload, for the acceptance path and nothing else.** Granted to the app's role
--- alone, and only for a suggestion that is still waiting: a decided one has been committed
--- or refused, and its payload has no reader left.
+$$;--> statement-breakpoint
+REVOKE EXECUTE ON FUNCTION suggestion_set_summary(text) FROM PUBLIC;--> statement-breakpoint
+GRANT EXECUTE ON FUNCTION suggestion_set_summary(text) TO app_rt;--> statement-breakpoint
 CREATE FUNCTION concept_write_request_for(p_suggestion_id text)
 RETURNS TABLE (
   merge_key text, path text, concept_kind text, title text, frontmatter jsonb, body text,
@@ -237,8 +165,6 @@ AS $$
    WHERE r.workspace_id = (SELECT public.current_workspace_id())
      AND r.suggestion_id = p_suggestion_id
      AND s.status = 'waiting'
-$$;
---> statement-breakpoint
-REVOKE EXECUTE ON FUNCTION concept_write_request_for(text) FROM PUBLIC;
---> statement-breakpoint
+$$;--> statement-breakpoint
+REVOKE EXECUTE ON FUNCTION concept_write_request_for(text) FROM PUBLIC;--> statement-breakpoint
 GRANT EXECUTE ON FUNCTION concept_write_request_for(text) TO app_rt;

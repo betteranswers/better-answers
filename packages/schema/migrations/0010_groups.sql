@@ -5,8 +5,7 @@ CREATE TABLE "group" (
 	"origin" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "group_workspace_id_id_unique" UNIQUE("workspace_id","id")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "group" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "group_member" (
 	"workspace_id" text NOT NULL,
@@ -14,8 +13,7 @@ CREATE TABLE "group_member" (
 	"user_id" text NOT NULL,
 	"added_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "group_member_workspace_id_group_id_user_id_pk" PRIMARY KEY("workspace_id","group_id","user_id")
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "group_member" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "group" ADD CONSTRAINT "group_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "group_member" ADD CONSTRAINT "group_member_group_fk" FOREIGN KEY ("workspace_id","group_id") REFERENCES "public"."group"("workspace_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

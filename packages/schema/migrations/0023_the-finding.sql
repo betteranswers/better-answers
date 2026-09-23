@@ -30,8 +30,7 @@ CREATE TABLE "finding" (
          AND (restored_at IS NULL OR tier = 'always')),
 	CONSTRAINT "finding_actor_check" CHECK ((reviewed_by IS NULL OR reviewed_by ~ '^(human:[0-9A-HJKMNP-TV-Z]{26}|process:better-answers-[a-z0-9][a-z0-9-]*|better-answers-[a-z0-9][a-z0-9-]*/[0-9A-Za-z.-]+)$')
          AND (restored_by IS NULL OR restored_by ~ '^(human:[0-9A-HJKMNP-TV-Z]{26}|process:better-answers-[a-z0-9][a-z0-9-]*|better-answers-[a-z0-9][a-z0-9-]*/[0-9A-Za-z.-]+)$'))
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "finding" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "finding" ADD CONSTRAINT "finding_document_fk" FOREIGN KEY ("workspace_id","document_id") REFERENCES "public"."source_document"("workspace_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "finding_workspace_id_document_id_idx" ON "finding" USING btree ("workspace_id","document_id");--> statement-breakpoint

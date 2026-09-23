@@ -6,6 +6,7 @@ import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
 import { afterAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { foldSeparators } from "../scripts/fold-separators.ts";
 import { restoreFinalNewline } from "../scripts/journal-newline.ts";
 import { AUDIENCE_CHECK, CONCEPT_FRONTMATTER_MAX, SUGGESTION_SET_MAX } from "../src/index.ts";
 import {
@@ -182,6 +183,54 @@ describe("the journal's final newline", () => {
     expect(readFileSync(path.join(folder, "_journal.json"), "utf8")).toBe(
       `${A_JOURNAL_AS_DRIZZLE_KIT_WRITES_IT}\n`,
     );
+  });
+});
+
+const SEPARATOR = "--> statement-breakpoint";
+
+const aFolderHoldingAMigrationThatReads = (text: string): string => {
+  const folder = mkdtempSync(path.join(trees, "generated-"));
+  writeFileSync(path.join(folder, "0000_probe.sql"), text);
+  return folder;
+};
+
+const migrationIn = (folder: string): string =>
+  readFileSync(path.join(folder, "0000_probe.sql"), "utf8");
+
+describe("the statement separator the generator writes", () => {
+  it("is on a statement's line in every tracked migration, so none reads as a comment line", () => {
+    const ownLine = journalMigrationFiles().filter((file) =>
+      readFileSync(file, "utf8").split("\n").includes(SEPARATOR),
+    );
+
+    expect(ownLine).toEqual([]);
+  });
+
+  it("is folded onto the statement above it where drizzle-kit wrote it on its own line", () => {
+    const folder = aFolderHoldingAMigrationThatReads(
+      `CREATE TABLE a (\n  id text\n);\n${SEPARATOR}\nCREATE TABLE b (id text);\n`,
+    );
+
+    expect(foldSeparators(folder)).toEqual(["0000_probe.sql"]);
+    expect(migrationIn(folder)).toBe(
+      `CREATE TABLE a (\n  id text\n);${SEPARATOR}\nCREATE TABLE b (id text);\n`,
+    );
+  });
+
+  it("is left where it is when drizzle-kit already wrote it on the statement's line", () => {
+    const written = `CREATE TABLE a (id text);${SEPARATOR}\nCREATE TABLE b (id text);\n`;
+    const folder = aFolderHoldingAMigrationThatReads(written);
+
+    expect(foldSeparators(folder)).toEqual([]);
+    expect(migrationIn(folder)).toBe(written);
+  });
+
+  it("leaves a separator with no statement above it alone rather than folding it onto nothing", () => {
+    const written = `${SEPARATOR}\nCREATE TABLE a (id text);\n`;
+    const folder = aFolderHoldingAMigrationThatReads(written);
+
+    expect(foldSeparators(folder)).toEqual([]);
+    expect(migrationIn(folder)).toBe(written);
   });
 });
 

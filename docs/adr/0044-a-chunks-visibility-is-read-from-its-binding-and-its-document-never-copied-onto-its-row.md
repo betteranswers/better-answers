@@ -35,3 +35,11 @@ amends: 0023, 0031
 - The narrowing flow in `docs/architecture/` is redrawn when the build lands.
 - ADR 0013's sentence stands: a document may carry a class of its own that only narrows its binding's, and the read takes the narrower.
 - Reopening condition: S8 measuring a filtered vector search that needs the filter columns on the indexed table.
+
+## Amendment — 2026-09-23, the two trade-offs migration 0044 took, recorded here rather than in its own comment (T-324)
+
+Migration 0044 wrote these into its own prose, and T-315's strip takes that prose out on the rule that a comment carries a why and never a decision. Neither moves the decision above; both are the reasons behind it, and a reader who has only the migration cannot recover either.
+
+**`security_barrier` is deliberately not set on `index.readable_chunk`.** `security_invoker` is what makes the base tables' policies and the caller's own privileges decide, so a view owned by the migrator cannot read every tenant's rows for anyone who may select it; the barrier is a different thing and nothing here needs it. Setting it would stop the planner reordering through the view and lose the GIN scan the spike measured. **The joins carry `workspace_id` beside the id** for the same performance reason turned safety reason: the chunk table is partitioned by that column, so the condition is what prunes the read to one tenant's partition, and a join on the id alone would plan across every partition and leave the isolation to the policy alone.
+
+**`narrower_class` pins its `search_path` and pays a call per row for it.** The pin plus schema-qualified `array_position` is what stops a `pg_temp` object a caller has made shadowing what the fold counts with. The cost is named: the planner will not inline a SQL function carrying a SET clause, so where the spike's CASE folded into the plan this one stays a call — one per row of the join's output, which the spike's plans show is the small set the index scan already produced, so the fold never drives a scan and the read stays inside ADR 0037's budget either way. Migration 0002's `llm_route_for` takes the other side of the same trade, schema-qualifying without the pin to keep a STABLE function inlinable.

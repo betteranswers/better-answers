@@ -6,15 +6,13 @@ CREATE TABLE "llm_route" (
 	"provider" text NOT NULL,
 	"model" text NOT NULL,
 	"dimensions" integer
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "llm_route" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "workspace" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
+);--> statement-breakpoint
 ALTER TABLE "workspace" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "llm_route" ADD CONSTRAINT "llm_route_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "llm_route_workspace_purpose_unique" ON "llm_route" USING btree ("workspace_id","purpose");--> statement-breakpoint
