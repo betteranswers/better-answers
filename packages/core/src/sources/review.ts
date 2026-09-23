@@ -325,8 +325,6 @@ export type DocumentsNarrowed = {
 
   readonly batchId: string | undefined;
 
-  readonly jobId: string;
-
   readonly concepts: readonly string[];
 
   readonly compositions: readonly string[];
@@ -391,14 +389,6 @@ export const narrowDocuments = async (
     ),
   );
   if (!narrowed.ok) return err(narrowed.error);
-  const copies = await attempt(() =>
-    tx.query(
-      `UPDATE "index".chunk SET sensitivity = $3
-        WHERE workspace_id = $1 AND source_document_id = ANY($2::text[])`,
-      [workspaceId, named, next],
-    ),
-  );
-  if (!copies.ok) return err(copies.error);
 
   const reviewed = await attempt(() =>
     tx.query(NARROWED_REVIEW, [
@@ -426,21 +416,5 @@ export const narrowDocuments = async (
   const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { bindingId, documentIds }));
   if (!cascaded.ok) return err(cascaded.error);
 
-  const queued = await enqueueJobIn(admin, tx, {
-    workspaceId,
-    kind: INDEX_KIND,
-    subjectId: bindingId,
-    reason: "narrowed",
-  });
-  if (!queued.ok) {
-    throw indexRunRefused(queued.error);
-  }
-  return ok({
-    bindingId,
-    documentIds,
-    sensitivity: next,
-    batchId,
-    jobId: queued.value.jobId,
-    ...cascaded.value,
-  });
+  return ok({ bindingId, documentIds, sensitivity: next, batchId, ...cascaded.value });
 };

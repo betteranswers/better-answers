@@ -459,7 +459,7 @@ describe("the race a narrowing in flight used to leave open", () => {
     });
   });
 
-  it("withholds rows landed during the uncommitted narrowing on the same terms as rows landed long before it, though their copies still differ", async () => {
+  it("withholds rows landed during the uncommitted narrowing on the same terms as rows landed long before it, the act having written neither", async () => {
     const scenario = await arrange();
     const theOld = await aBindingHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
@@ -480,13 +480,12 @@ describe("the race a narrowing in flight used to leave open", () => {
       landedDuring: await reaches(scenario.viewer, theNew),
     }).toEqual({ landedLongBefore: WITHHELD, landedDuring: WITHHELD });
 
-    // The act never saw the row landed beside it, so a read taken from the copies would hand
-    // the revoked class back for that one.
+    // A read taken from the copies would hand the revoked class back for both rows.
     expect({
       landedLongBefore: await copiesUnder(scenario.workspaceId, theOld.documentId),
       landedDuring: await copiesUnder(scenario.workspaceId, theNew.documentId),
     }).toEqual({
-      landedLongBefore: [{ sensitivity: "Restricted" }],
+      landedLongBefore: [{ sensitivity: "Internal" }],
       landedDuring: [{ sensitivity: "Internal" }],
     });
   });

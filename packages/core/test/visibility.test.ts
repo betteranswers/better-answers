@@ -499,7 +499,7 @@ describe("narrowing a binding", () => {
     );
   });
 
-  it("rewrites the chunk copies of every document under it, keeping a document's own narrower class and never taking a wider one", async () => {
+  it("touches the chunk row of no document under it, whatever class that document holds of its own", async () => {
     const { scenario, hr, binding } = await workspaceWithHrBinding();
 
     const narrowed = await documentUnder(
@@ -512,7 +512,7 @@ describe("narrowing a binding", () => {
     for (const [document, sensitivity] of [
       [binding, "Internal"],
       [narrowed, "Restricted"],
-      [wider, "Internal"],
+      [wider, "Public"],
     ] as const) {
       await chunkUnder(db(), scenario.workspaceId, document, {
         content: HOLIDAY,
@@ -534,20 +534,23 @@ describe("narrowing a binding", () => {
     );
 
     expect(moved.ok).toBe(true);
-    const forHr = { audience: "groups", audience_groups: [hr] };
+    expect(
+      await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
+    ).toEqual({ sensitivity: "Internal", audience: "groups", audience_groups: [hr] });
+
     expect(await chunkCopiesOf(scenario.workspaceId, binding.documentId)).toEqual([
-      { sensitivity: "Internal", ...forHr },
+      { sensitivity: "Internal", ...EVERYONE },
     ]);
 
     expect(await chunkCopiesOf(scenario.workspaceId, narrowed.documentId)).toEqual([
-      { sensitivity: "Restricted", ...forHr },
+      { sensitivity: "Restricted", ...EVERYONE },
     ]);
     expect(await chunkCopiesOf(scenario.workspaceId, wider.documentId)).toEqual([
-      { sensitivity: "Internal", ...forHr },
+      { sensitivity: "Public", ...EVERYONE },
     ]);
   });
 
-  it("writes the chunk copies before the cascade reaches the first concept, so the levels run outward from the binding", async () => {
+  it("holds no chunk row while it waits on the concept index, its own binding's or another's", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
     const elsewhere = await bindingHolding(db(), scenario.workspaceId);
@@ -573,7 +576,7 @@ describe("narrowing a binding", () => {
       );
       await until(async () => (await countWaitingOnLocks(db().pool)) >= 1);
 
-      expect(await chunkRowsAreHeld(scenario.workspaceId, binding.bindingId)).toBe(true);
+      expect(await chunkRowsAreHeld(scenario.workspaceId, binding.bindingId)).toBe(false);
 
       expect(await chunkRowsAreHeld(scenario.workspaceId, elsewhere.bindingId)).toBe(false);
 
@@ -582,7 +585,7 @@ describe("narrowing a binding", () => {
     });
 
     expect(await chunkCopiesOf(scenario.workspaceId, binding.documentId)).toEqual([
-      { sensitivity: "Restricted", ...EVERYONE },
+      { sensitivity: "Internal", ...EVERYONE },
     ]);
   });
 

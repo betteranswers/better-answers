@@ -204,11 +204,10 @@ Where a unit lives is decided by **minting**.
   span a request names is **overridden by the erasure** — it stays withheld, and the review says
   so beside its group. (Not a *class override*, which is an Admin's act on a concept's class.)
 - **narrow these documents** — an Admin's bulk act over named *finding groups* of one binding,
-  taken on the *source documents* they sit in: each document takes a class of its own, its chunk
-  copies are rewritten, the named groups' unreviewed findings are reviewed as *narrowed* — and
-  no finding the Admin was not shown — the *cascade* runs from the concepts citing the
-  documents, and the run that puts the binding back through the index is queued with them. One
-  ledger row per document; it never widens.
+  taken on the *source documents* they sit in: each document takes a class of its own; the named
+  groups' unreviewed findings are reviewed as *narrowed* — and no finding the Admin was not
+  shown — and the *cascade* runs from the concepts citing the documents. One ledger row per
+  document; it never widens.
 - **redaction seam** — the one place a document's text is read for what must be withheld and
   the placeholders are written in, ahead of chunking, extraction and every model call, so that
   no derived store and no model ever holds the value.
