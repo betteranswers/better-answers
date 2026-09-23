@@ -29,20 +29,33 @@ export type Tx = Pick<pg.PoolClient, "query">;
 
 export type TxRow = pg.QueryResultRow;
 
-type WhollyAResult<T> = [T] extends [Result<unknown, unknown>] ? true : false;
+type AnyResult = Result<unknown, unknown>;
+
+type WhollyAResult<T> = [T] extends [AnyResult] ? true : false;
+
+type PartlyAResult<T> = [Extract<T, AnyResult>] extends [never] ? false : true;
 
 type Unwrapped<T> = T extends { readonly ok: true; readonly value: infer Value } ? Value : never;
 
 type Refused<T> = T extends { readonly ok: false; readonly error: infer Refusal } ? Refusal : never;
 
-export type Answered<T> = WhollyAResult<T> extends true ? Unwrapped<T> : T;
+// A union only partly a Result has no answer to fold: its Result members would reach the caller as
+// values, a refusal among them.
+type OnlyPartlyAResult<T> = WhollyAResult<T> extends true ? false : PartlyAResult<T>;
 
-export type Opened<T, Failure = never> = Result<
+export type Answered<T> =
+  OnlyPartlyAResult<T> extends true ? never : WhollyAResult<T> extends true ? Unwrapped<T> : T;
+
+export type Foldable<T> = OnlyPartlyAResult<T> extends true ? never : T;
+
+type Opened<T> = Result<T, PrincipalRefusal>;
+
+export type Folded<T, Failure = never> = Result<
   Answered<T>,
   Refused<T> | PrincipalRefusal | Failure
 >;
 
-const answersAResult = <T>(answer: T): answer is T & Result<unknown, unknown> =>
+const answersAResult = <T>(answer: T): answer is T & AnyResult =>
   typeof answer === "object" &&
   answer !== null &&
   "ok" in answer &&
@@ -50,15 +63,13 @@ const answersAResult = <T>(answer: T): answer is T & Result<unknown, unknown> =>
 
 const answersARefusal = <T>(answer: T): boolean => answersAResult(answer) && !answer.ok;
 
-export const opened = <T>(answer: T): Opened<T> =>
+export const folded = <T>(opened: Opened<Foldable<T>>): Folded<T> => {
+  if (!opened.ok) return err(opened.error);
+  const answer = opened.value;
   // SAFETY: the predicate reads the key the type reads, so each branch returns its own half.
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- `Opened<T>` is conditional on a `T` still open here, which no runtime predicate resolves for the compiler
-  (answersAResult(answer) ? answer : ok(answer)) as Opened<T>;
-
-const refusedAtTheDoor = <T>(refusal: PrincipalRefusal): Opened<T> =>
-  // SAFETY: a refusal the door itself decided is the `ok: false` half of either branch.
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- as above: the conditional over an open `T` is what stands between `err(refusal)` and `Opened<T>`
-  err(refusal) as Opened<T>;
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- `Folded<T>` is conditional on a `T` still open here, which no runtime predicate resolves for the compiler
+  return (answersAResult(answer) ? answer : ok(answer)) as Folded<T>;
+};
 
 const rollbackQuietly = async (client: pg.PoolClient): Promise<void> => {
   try {
@@ -78,22 +89,30 @@ const commit = async (client: pg.PoolClient): Promise<void> => {
   }
 };
 
+// Every door opens its transaction here, so a refusal after a write leaves nothing behind whichever
+// door the work came through.
 const transaction = async <T>(
   door: PostgresDoor,
   work: (client: pg.PoolClient) => Promise<T>,
+  refuses: (answer: T) => boolean = answersARefusal,
 ): Promise<T> => {
   const client = await door.pool.connect();
   try {
     await client.query("BEGIN");
-    const result = await work(client);
-    await commit(client);
-    return result;
+    const answer = await work(client);
+    if (refuses(answer)) await rollbackQuietly(client);
+    else await commit(client);
+    return answer;
   } catch (cause) {
     await rollbackQuietly(client);
     throw cause;
   } finally {
     client.release();
   }
+};
+
+const scopeTo = async (tx: Tx, workspaceId: string): Promise<void> => {
+  await tx.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
 };
 
 export const withScope = async <T>(
@@ -103,7 +122,7 @@ export const withScope = async <T>(
   work: (tx: Tx, platform: PlatformPrincipal) => Promise<T>,
 ): Promise<T> =>
   transaction(door, async (client) => {
-    await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
+    await scopeTo(client, workspaceId);
     return work(client, platform);
   });
 
@@ -200,7 +219,7 @@ const resolveClaims = async <T>(
 ): Promise<Opened<T>> => {
   const workspaceId = boundarySchemas.workspace.select.shape.id.safeParse(claims.workspaceId);
   const userId = boundarySchemas.user.select.shape.id.safeParse(claims.userId);
-  if (!workspaceId.success || !userId.success) return refusedAtTheDoor<T>("malformed-claims");
+  if (!workspaceId.success || !userId.success) return err("malformed-claims");
 
   const credentialIssuedAtMs = claims.issuedAt.getTime();
 
@@ -262,39 +281,31 @@ const resolveScoped = async <T>(
   refusalFor: (row: MembershipRow | undefined) => Result<ResolvedMember, PrincipalRefusal>,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
   query: string,
-): Promise<Opened<T>> => {
-  const client = await door.pool.connect();
-  try {
-    await client.query("BEGIN");
-    await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
+): Promise<Opened<T>> =>
+  transaction(
+    door,
+    async (client): Promise<Opened<T>> => {
+      await scopeTo(client, workspaceId);
 
-    const membership = await client.query<MembershipRow>(query, [workspaceId, userId]);
-    const resolved = refusalFor(membership.rows[0]);
-    if (!resolved.ok) {
-      await rollbackQuietly(client);
-      return refusedAtTheDoor<T>(resolved.error);
-    }
+      const membership = await client.query<MembershipRow>(query, [workspaceId, userId]);
+      const resolved = refusalFor(membership.rows[0]);
+      if (!resolved.ok) return err(resolved.error);
 
-    const principal: UserPrincipal = {
-      kind: "user",
-      workspaceId,
-      userId,
-      role: resolved.value.role,
+      const principal: UserPrincipal = {
+        kind: "user",
+        workspaceId,
+        userId,
+        role: resolved.value.role,
 
-      groups: resolved.value.group_ids.map((id) => boundarySchemas.group.select.shape.id.parse(id)),
-      credentialIssuedAtMs,
-    };
-    const answer = await work(principal, client);
-    if (answersARefusal(answer)) await rollbackQuietly(client);
-    else await commit(client);
-    return opened(answer);
-  } catch (cause) {
-    await rollbackQuietly(client);
-    throw cause;
-  } finally {
-    client.release();
-  }
-};
+        groups: resolved.value.group_ids.map((id) =>
+          boundarySchemas.group.select.shape.id.parse(id),
+        ),
+        credentialIssuedAtMs,
+      };
+      return ok(await work(principal, client));
+    },
+    (opened) => !opened.ok || answersARefusal(opened.value),
+  );
 
 type ResolvedMember = MembershipRow & { readonly role: Role };
 

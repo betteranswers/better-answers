@@ -8,7 +8,9 @@ import {
   type ErasureRehearsed,
   type SyntheticSubject,
 } from "../src/erasure/index.ts";
+import { revokeCredentials } from "../src/workspaces/index.ts";
 import { bundleHistory, everyObjectOf, fileAtCommit } from "./bundle.ts";
+import { bootstrap } from "./platform.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite } from "./suite-objects.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
@@ -18,6 +20,8 @@ const { db, arrange } = suiteWithBundles();
 const objects = objectStoreForSuite();
 
 const REHEARSED_AT = new Date("2026-06-01T12:00:00.000Z");
+
+const REVOKED_AFTER_THE_SEED = new Date("2026-06-01T12:00:01.000Z");
 
 const BEYOND_USE =
   "2026-06-03T12:00:00.000Z · 2026-07-01T12:00:00.000Z · " +
@@ -149,6 +153,27 @@ describe("the rehearsal", () => {
     const rehearsed = await rehearsing(scenario);
 
     expect(rehearsed.tokens).toEqual(expectedTokensFor(scenario.workspaceId));
+  });
+
+  it("names a principal its door refused as the subject's, never as a refusal of the request", async () => {
+    const scenario = await arrange();
+    const subject = await seeding(scenario);
+    const revoked = await revokeCredentials(bootstrap, scenario.postgres, {
+      userId: subject.personId,
+      at: REVOKED_AFTER_THE_SEED,
+    });
+    if (!revoked.ok) throw new Error(`the revocation refused: ${String(revoked.error)}`);
+
+    const rehearsed = await rehearseErasure(ERASURE, doorsFor(scenario), {
+      workspaceId: scenario.workspaceId,
+    });
+
+    expect(rehearsed).toEqual({
+      ok: false,
+      error: new Error(
+        "erasure: the synthetic subject's principal was refused: credentials-revoked",
+      ),
+    });
   });
 
   it("refuses a workspace nothing was seeded into, rather than erasing whoever else is there", async () => {

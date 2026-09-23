@@ -6,7 +6,13 @@ import { describe, expect, it } from "vitest";
 import { attempt } from "../src/kernel/index.ts";
 import type { Result, Role, UserPrincipal } from "../src/kernel/index.ts";
 import { type ProvisionedWorkspace, provisionedWorkspace, seedPerson } from "./platform.ts";
-import { type Opened, type Tx, withPrincipal } from "../src/store/postgres/index.ts";
+import {
+  folded,
+  type Foldable,
+  type Folded,
+  type Tx,
+  withPrincipal,
+} from "../src/store/postgres/index.ts";
 import {
   addToGroup,
   createGroup,
@@ -41,21 +47,23 @@ const seedMemberAt = async (workspace: Workspace, role: Role): Promise<string> =
   }
 };
 
-const asPerson = <T>(
+const asPerson = async <T>(
   workspace: Workspace,
   userId: string,
-  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Opened<T>> =>
-  withPrincipal(
-    workspace.door,
-    { workspaceId: workspace.workspaceId, userId, issuedAt: new Date() },
-    work,
+  work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
+): Promise<Folded<T>> =>
+  folded<T>(
+    await withPrincipal(
+      workspace.door,
+      { workspaceId: workspace.workspaceId, userId, issuedAt: new Date() },
+      work,
+    ),
   );
 
 const asAdmin = <T>(
   workspace: Workspace,
-  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Opened<T>> => asPerson(workspace, workspace.adminUserId, work);
+  work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
+): Promise<Folded<T>> => asPerson(workspace, workspace.adminUserId, work);
 
 const peopleActs = async (
   workspaceId: string,

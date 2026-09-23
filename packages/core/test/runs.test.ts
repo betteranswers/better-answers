@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PlatformPrincipal } from "../src/kernel/index.ts";
 import { bundleHealth, enqueueJob, enqueueJobIn, JOB_IS_OVER, jobById } from "../src/runs/index.ts";
-import { withMembership, withScope, type Tx } from "../src/store/postgres/index.ts";
+import { folded, withMembership, withScope, type Tx } from "../src/store/postgres/index.ts";
 import { abortTheTransaction } from "./suite-postgres.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -333,11 +333,15 @@ describe("an act that lands its rows and its job in one transaction", () => {
   it("gates the enqueue on the role the kind's descriptor names", async () => {
     const scenario = await arrange();
 
-    const editor = await withMembership(scenario.editor, scenario.postgres, (_fresh, tx) =>
-      enqueueJobIn(scenario.editor, tx, boundJob(scenario.workspaceId)),
+    const editor = folded(
+      await withMembership(scenario.editor, scenario.postgres, (_fresh, tx) =>
+        enqueueJobIn(scenario.editor, tx, boundJob(scenario.workspaceId)),
+      ),
     );
-    const admin = await withMembership(scenario.admin, scenario.postgres, (_fresh, tx) =>
-      enqueueJobIn(scenario.admin, tx, boundJob(scenario.workspaceId)),
+    const admin = folded(
+      await withMembership(scenario.admin, scenario.postgres, (_fresh, tx) =>
+        enqueueJobIn(scenario.admin, tx, boundJob(scenario.workspaceId)),
+      ),
     );
 
     expect(editor).toEqual({ ok: false, error: "role-forbids" });

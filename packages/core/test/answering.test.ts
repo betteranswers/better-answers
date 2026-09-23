@@ -22,7 +22,7 @@ import {
   type Trust,
 } from "../src/answering/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
-import type { Opened, Tx } from "../src/store/postgres/index.ts";
+import type { Foldable, Folded, Tx } from "../src/store/postgres/index.ts";
 import {
   codePointsOf,
   documentLanded,
@@ -49,8 +49,8 @@ const arrange = async (): Promise<{ readonly workspaceId: string; readonly userI
 
 const acting = <T>(
   reader: { readonly workspaceId: string; readonly userId: string },
-  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Opened<T>> => readingAs(db().runtimePool, reader, work);
+  work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
+): Promise<Folded<T>> => readingAs(db().runtimePool, reader, work);
 
 const answer = (overrides: Partial<AnswerResult>): AnswerResult => ({
   verdict: "ok",

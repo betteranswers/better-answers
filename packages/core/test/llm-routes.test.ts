@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { attempt, type Claims } from "../src/kernel/index.ts";
 import { listRoutes, LLM_PURPOSES } from "../src/llm/index.ts";
-import { openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
+import { folded, openPostgres, withPrincipal } from "../src/store/postgres/index.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
@@ -47,7 +47,9 @@ const claimsFor = (seeded: Seeded): Claims => ({
 });
 
 const listAs = async (seeded: Seeded) => {
-  const listed = await withPrincipal(openPostgres(db().runtimePool), claimsFor(seeded), listRoutes);
+  const listed = folded(
+    await withPrincipal(openPostgres(db().runtimePool), claimsFor(seeded), listRoutes),
+  );
   if (!listed.ok) {
     throw new Error(`the routes were not listed: ${String(listed.error)}`, {
       cause: listed.error,

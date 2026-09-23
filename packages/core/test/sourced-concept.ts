@@ -11,7 +11,7 @@ import {
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { addToGroup, createGroup } from "../src/members/index.ts";
 import { chunkIdOf } from "../src/sources/index.ts";
-import type { Opened, Tx } from "../src/store/postgres/index.ts";
+import type { Foldable, Folded, Tx } from "../src/store/postgres/index.ts";
 import { answered, readingAs } from "./suite-postgres.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -22,8 +22,8 @@ export const visibilitySuite = () => {
     arrange,
     reading: <T>(
       principal: UserPrincipal,
-      work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-    ): Promise<Opened<T>> => readingAs(db().runtimePool, principal, work),
+      work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
+    ): Promise<Folded<T>> => readingAs(db().runtimePool, principal, work),
   };
 };
 

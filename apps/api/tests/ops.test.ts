@@ -21,9 +21,11 @@ import { bindUpload, bindUploadFields } from "@better-answers/core/sources";
 import { fileAtHead, head, initRepository } from "@better-answers/core/store/git";
 import { listObjects } from "@better-answers/core/store/objects";
 import {
+  folded,
   openPostgres,
   withPrincipal,
   type Answered,
+  type Foldable,
   type Tx,
 } from "@better-answers/core/store/postgres";
 import { inputOf } from "@better-answers/core/testing/input";
@@ -1514,12 +1516,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       app: TestApp,
       workspaceId: string,
       userId: string,
-      work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+      work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
     ): Promise<Answered<T>> => {
-      const read = await withPrincipal(
-        app.doors.postgres,
-        { workspaceId, userId, issuedAt: new Date() },
-        work,
+      const read = folded<T>(
+        await withPrincipal(
+          app.doors.postgres,
+          { workspaceId, userId, issuedAt: new Date() },
+          work,
+        ),
       );
       if (!read.ok) throw new Error(`the read answered ${String(read.error)}`);
       return read.value;

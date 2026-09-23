@@ -1,23 +1,34 @@
 import { NIGHTLY_AUDIT_KIND, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { act, declareActs, record } from "../src/audit/index.ts";
-import { attempt, err, ok, type Claims, type UserPrincipal } from "../src/kernel/index.ts";
+import {
+  attempt,
+  err,
+  ok,
+  type Claims,
+  type Principal,
+  type Result,
+  type UserPrincipal,
+} from "../src/kernel/index.ts";
 import { enqueueJobIn } from "../src/runs/index.ts";
 import {
   consumeCall,
   consumeIngress,
+  folded,
   openPostgres,
   readWorkspaceConfig,
   tablesPresent,
   withMembership,
   withPrincipal,
   withScope,
+  type Answered,
+  type PostgresDoor,
   type Tx,
 } from "../src/store/postgres/index.ts";
-import { bootstrap } from "./platform.ts";
+import { bootstrap, principalOf } from "./platform.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
@@ -98,21 +109,19 @@ const PROBE_ACTS = declareActs("platform", {
 
 const PROVOKED = "provoked" as const;
 
-const writingARowAnEventAndAJob =
-  (key: string) =>
-  async (principal: UserPrincipal, tx: Tx): Promise<void> => {
-    await configProbeWritten(tx, principal.workspaceId, key);
+const answeringAfterThreeWrites =
+  <Answer>(key: string, answer: Answer) =>
+  async (principal: Principal, workspaceId: string, tx: Tx): Promise<Answer> => {
+    await configProbeWritten(tx, workspaceId, key);
     await record(principal, tx, {
       id: ulid(),
       act: PROBE_ACTS.rolledBack,
-      subjectId: principal.userId,
+      subjectId: workspaceId,
       detail: { confirmed: true },
     });
-    const queued = await enqueueJobIn(principal, tx, {
-      workspaceId: principal.workspaceId,
-      kind: NIGHTLY_AUDIT_KIND,
-    });
+    const queued = await enqueueJobIn(principal, tx, { workspaceId, kind: NIGHTLY_AUDIT_KIND });
     if (!queued.ok) throw new Error(`the probe's job answered ${String(queued.error)}`);
+    return answer;
   };
 
 const leftBehindIn = async (workspaceId: string, key: string) => {
@@ -125,34 +134,44 @@ const leftBehindIn = async (workspaceId: string, key: string) => {
   return counted.rows[0];
 };
 
-const DOORS = ["the transport's", "the slice's"] as const;
+const DOORS = ["the transport's", "the slice's", "the platform's"] as const;
+
+const adminOf = async (door: PostgresDoor, claims: Claims): Promise<UserPrincipal> => {
+  const admin = await withPrincipal(door, claims, async (principal) => principal);
+  if (!admin.ok) throw new Error(`the Admin's principal answered ${admin.error}`);
+  return admin.value;
+};
 
 const through = async <T>(
   door: (typeof DOORS)[number],
-  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-) => {
+  work: (principal: Principal, workspaceId: string, tx: Tx) => Promise<T>,
+): Promise<{ readonly seeded: Seeded; readonly answered: T }> => {
   const seeded = await seedMembership({ role: "Admin" });
   const open = openPostgres(db().runtimePool);
-  const claims = claimsFor(seeded);
-  if (door === "the transport's") {
-    return { seeded, answered: await withPrincipal(open, claims, work) };
+  if (door === "the platform's") {
+    const answered = await withScope(bootstrap, open, seeded.workspaceId, (tx, platform) =>
+      work(platform, seeded.workspaceId, tx),
+    );
+    return { seeded, answered };
   }
-  const admin = await withPrincipal(open, claims, async (principal) => principal);
-  if (!admin.ok) throw new Error(`the Admin's principal answered ${String(admin.error)}`);
-  return { seeded, answered: await withMembership(admin.value, open, work) };
+  const claims = claimsFor(seeded);
+  const scoped = (principal: UserPrincipal, tx: Tx) => work(principal, principal.workspaceId, tx);
+  const opened =
+    door === "the transport's"
+      ? await withPrincipal(open, claims, scoped)
+      : await withMembership(await adminOf(open, claims), open, scoped);
+  if (!opened.ok) throw new Error(`the Admin's door answered ${opened.error}`);
+  return { seeded, answered: opened.value };
 };
 
-describe("a principal-scoped door whose work answers a refusal after a write", () => {
+describe("a door whose work answers a refusal after a write", () => {
   it.each(DOORS)("rolls %s door back, leaving no row, no ledger entry and no job", async (door) => {
     const key = `probe-${ulid()}`;
 
-    const { seeded, answered } = await through(door, async (principal, tx) => {
-      await writingARowAnEventAndAJob(key)(principal, tx);
-      return err(PROVOKED);
-    });
+    const { seeded, answered } = await through(door, answeringAfterThreeWrites(key, err(PROVOKED)));
 
-    expect(answered).toEqual({ ok: false, error: PROVOKED });
     expect(await leftBehindIn(seeded.workspaceId, key)).toEqual({ rows: 0, ledger: 0, jobs: 0 });
+    expect(answered).toEqual({ ok: false, error: PROVOKED });
   });
 
   it.each(DOORS)(
@@ -160,15 +179,95 @@ describe("a principal-scoped door whose work answers a refusal after a write", (
     async (door) => {
       const key = `probe-${ulid()}`;
 
-      const { seeded, answered } = await through(door, async (principal, tx) => {
-        await writingARowAnEventAndAJob(key)(principal, tx);
-        return ok("landed");
-      });
+      const { seeded, answered } = await through(
+        door,
+        answeringAfterThreeWrites(key, ok("landed")),
+      );
 
-      expect(answered).toEqual({ ok: true, value: "landed" });
       expect(await leftBehindIn(seeded.workspaceId, key)).toEqual({ rows: 1, ledger: 1, jobs: 1 });
+      expect(answered).toEqual({ ok: true, value: "landed" });
     },
   );
+});
+
+describe("a principal-scoped door's answer", () => {
+  const TOLD_APART = ["the transport's", "the slice's"] as const;
+
+  const refusedBothWays = (
+    door: (typeof TOLD_APART)[number],
+    seeded: Seeded,
+    open: PostgresDoor,
+  ) => {
+    const work = async () => err("not-a-member" as const);
+    const elsewhere = claimsFor(seeded, { workspaceId: seeded.otherWorkspaceId });
+    return door === "the transport's"
+      ? {
+          byTheDoor: withPrincipal(open, elsewhere, work),
+          byTheWork: withPrincipal(open, claimsFor(seeded), work),
+        }
+      : {
+          byTheDoor: withMembership(
+            principalOf(seeded.otherWorkspaceId, seeded.userId, "Viewer"),
+            open,
+            work,
+          ),
+          byTheWork: withMembership(
+            principalOf(seeded.workspaceId, seeded.userId, "Viewer"),
+            open,
+            work,
+          ),
+        };
+  };
+
+  it.each(TOLD_APART)(
+    "keeps %s door's own refusal apart from its work's, when the two share a word",
+    async (door) => {
+      const seeded = await seedMembership();
+
+      const { byTheDoor, byTheWork } = refusedBothWays(
+        door,
+        seeded,
+        openPostgres(db().runtimePool),
+      );
+
+      expect(await byTheDoor).toEqual({ ok: false, error: "not-a-member" });
+      expect(await byTheWork).toEqual({ ok: true, value: { ok: false, error: "not-a-member" } });
+    },
+  );
+
+  it("answers its own refusal and its work's as one to a caller whose own answer carries both", async () => {
+    const seeded = await seedMembership();
+    const door = openPostgres(db().runtimePool);
+
+    const elsewhere = claimsFor(seeded, { workspaceId: seeded.otherWorkspaceId });
+
+    const atTheDoor = folded(await withPrincipal(door, elsewhere, async () => ok("landed")));
+    const refused = folded(await withPrincipal(door, claimsFor(seeded), async () => err(PROVOKED)));
+    const valued = folded(await withPrincipal(door, claimsFor(seeded), async () => ok("landed")));
+    const plain = folded(await withPrincipal(door, claimsFor(seeded), async () => "reached"));
+
+    expect(atTheDoor).toEqual({ ok: false, error: "not-a-member" });
+    expect(refused).toEqual({ ok: false, error: PROVOKED });
+    expect(valued).toEqual({ ok: true, value: "landed" });
+    expect(plain).toEqual({ ok: true, value: "reached" });
+  });
+
+  it("hands back a work's answer that is only partly a Result untouched, and names no answer to fold from it", async () => {
+    type Partly = Result<number, typeof PROVOKED> | string;
+    const seeded = await seedMembership();
+    const door = openPostgres(db().runtimePool);
+
+    const partly = await withPrincipal(
+      door,
+      claimsFor(seeded),
+      async (): Promise<Partly> => "reached",
+    );
+
+    expect(partly).toEqual({ ok: true, value: "reached" });
+    expectTypeOf<Answered<Partly>>().toBeNever();
+    // @ts-expect-error — its Result members would reach the caller as values, a refusal among them.
+    void (() => folded(partly));
+  });
 });
 
 describe("the Principal resolver", () => {
