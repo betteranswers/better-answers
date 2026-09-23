@@ -24,7 +24,7 @@ export type Passage = {
 const CHUNK_SENSITIVITY = boundarySchemas.chunk.select.shape.sensitivity;
 
 const COVERING_ROWS = `SELECT c.content, c.char_start, c.char_end, c.sensitivity, d.title
-     FROM "index".chunk c
+     FROM "index".readable_chunk c
      JOIN source_document d ON d.workspace_id = c.workspace_id AND d.id = c.source_document_id
     WHERE c.workspace_id = $1
       AND c.source_document_id = $4
@@ -114,7 +114,7 @@ const wireLocatorOf = (row: {
 }): string => locatorOf(row.source_document_id, row.char_start, row.char_end);
 
 const MATCHING_ROWS = `SELECT c.source_document_id, c.char_start, c.char_end, c.sensitivity, d.title
-     FROM "index".chunk c
+     FROM "index".readable_chunk c
      JOIN source_document d ON d.workspace_id = c.workspace_id AND d.id = c.source_document_id
     CROSS JOIN websearch_to_tsquery('english', $2) AS q
     WHERE c.workspace_id = $1
@@ -172,7 +172,7 @@ export type PreviewedChunk = {
 };
 
 const BINDING_CHUNKS = `SELECT c.id, c.source_document_id, c.char_start, c.char_end, c.content
-     FROM "index".chunk c
+     FROM "index".readable_chunk c
     WHERE c.workspace_id = $1
       AND c.binding_id = $2
       AND c.char_start IS NOT NULL
