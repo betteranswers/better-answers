@@ -1,6 +1,3 @@
-// The syntax table the strip and the proof share, so the two agree to the character on what
-// a comment is.
-
 const YAML = "yaml";
 const SHELL = "shell";
 const TOML = "toml";
@@ -20,7 +17,6 @@ const endOfLine = (source, index) => {
   return newline === -1 ? source.length : newline;
 };
 
-// SQL doubles a quote to escape it, a basic string takes a backslash, a literal string neither.
 const endOfQuoted = (source, start, quote, { escapes = false, doubling = false } = {}) => {
   let index = start + 1;
   while (index < source.length) {
@@ -50,7 +46,6 @@ const sqlSpans = (source) => {
   while (index < source.length) {
     const here = source[index];
     if (here === "'") {
-      // `E'…'` takes backslash escapes where a plain literal does not.
       const prefixed =
         (source[index - 1] === "e" || source[index - 1] === "E") &&
         !WORD_CHARACTER.test(source[index - 2] ?? "");
@@ -77,7 +72,6 @@ const sqlSpans = (source) => {
       continue;
     }
     if (here === "/" && source[index + 1] === "*") {
-      // Postgres nests a block comment, so the depth is counted rather than the first close taken.
       let depth = 1;
       let scan = index + 2;
       while (scan < source.length && depth > 0) {
@@ -102,8 +96,6 @@ const sqlSpans = (source) => {
   return spans;
 };
 
-// A `\` inside `"""…"""` escapes the fence after it, and TOML lets two spare quotes stand
-// before the close, so the run is taken whole.
 const endOfFence = (source, start, quote) => {
   const fence = quote.repeat(3);
   let index = start + 3;
@@ -149,23 +141,18 @@ const tomlSpans = (source) => {
 const MARKS_A_VALUE = /^[&*!]/;
 const SEQUENCE = /^-( -)*$/;
 
-// A quote opens a scalar only where one may begin. Elsewhere it is plain, as the apostrophe
-// in a step's name is.
 const opensAScalar = (line, index, flow) => {
   const before = line.slice(0, index).trimEnd();
   if (before === "") return true;
   const last = before[before.length - 1];
   if (last === "[" || last === "{") return true;
   if (last === ",") return flow > 0;
-  // A `:` opens a value only with a space after it, `key:'x` being one plain scalar, except
-  // in flow, where the JSON spelling needs none.
+
   if (last === ":" || last === "?") return flow > 0 || before.length < index;
   if (last === "-") return before.length < index && SEQUENCE.test(before.trimStart());
   return MARKS_A_VALUE.test(before.slice(before.lastIndexOf(" ") + 1));
 };
 
-// The answer carries the quote and flow depth the line ended inside: both run over lines, and
-// a `#` inside either is the value.
 const yamlCommentStart = (line, open, depth) => {
   let quote = open;
   let flow = depth;
@@ -198,7 +185,6 @@ const yamlCommentStart = (line, open, depth) => {
 
 const BLOCK_SCALAR = /(?:^|\s)[|>][+-]?\d*[+-]?\s*$/;
 
-// A block scalar's body is a key's value, so a `#` there is the step's script, not a comment.
 const yamlSpans = (source) => {
   const spans = [];
   let offset = 0;
@@ -226,7 +212,6 @@ const yamlSpans = (source) => {
   return spans;
 };
 
-// `${ … }` is a parameter, so a `#` in it is a length or a pattern, never a comment.
 const endOfBraces = (source, start) => {
   let index = start + 2;
   let depth = 1;
@@ -271,8 +256,6 @@ const endOfHeredoc = (source, start, delimiter) => {
   return source.length;
 };
 
-// A frame per nesting: a double quote, where only `$(…)` speaks, and the command inside it,
-// where a comment runs to the line's end.
 const shellSpans = (source) => {
   const spans = [];
   const pending = [];
@@ -301,8 +284,7 @@ const shellSpans = (source) => {
       opens = false;
       continue;
     }
-    // `$'…'` takes backslash escapes; a plain `'…'` takes none, and inside a double quote the
-    // whole spelling is literal.
+
     if (here === "$" && source[index + 1] === "'" && !quoted) {
       index = endOfQuoted(source, index + 1, "'", { escapes: true });
       opens = false;
@@ -326,8 +308,7 @@ const shellSpans = (source) => {
       commands = true;
       continue;
     }
-    // A `case` pattern's `)` opened nothing, so a frame closes only where its `(` stood, and
-    // the two words count only at a command's start.
+
     if (opens) {
       const word = plainWordAt(source, index);
       if (word !== undefined) {
@@ -339,7 +320,7 @@ const shellSpans = (source) => {
         continue;
       }
     }
-    // A bare `( … )` is a subshell, and its close must not be read as the command's own.
+
     if (here === "(") {
       frames.push({ kind: "subshell", inCase });
       index += 1;
@@ -377,7 +358,7 @@ const shellSpans = (source) => {
         continue;
       }
     }
-    // Whitespace leaves the command position where it was; a separator restores it.
+
     if (OPENS_A_WORD.has(here)) {
       index += 1;
       opens = true;
@@ -404,26 +385,18 @@ const commentSpans = (language, source) => {
   return scan(source);
 };
 
-// A word this list does not carry is prose, however tool-shaped it reads.
 const DIRECTIVE_WORD = /^(?:shellcheck|renovate|yaml-language-server|noqa)\b/i;
 
-// One spelling of the migrations' separator, in the two forms its two readers want: the body
-// the directive test sees once the opener is off, and the whole token the migrator splits on.
 const BREAKPOINT_BODY = "statement-breakpoint";
 const SEPARATOR = `--> ${BREAKPOINT_BODY}`;
 const BREAKPOINT = new RegExp(`^${BREAKPOINT_BODY}$`);
 
-// The ownership suite reads this marker by its exact text and refuses a near miss, so it is
-// matched whole rather than by its body.
 const CUSTOM_MIGRATION = "-- Custom migration (hand-written SQL; ADR 0032).";
 
-// A bare number is a step or a count, so a version says so: a leading `v`, a dot, or a commit.
 const VERSION = /^(?:v\d+(?:\.\d+)*|\d+(?:\.\d+)+)$/;
 const COMMIT = /^[0-9a-f]{7,40}$/;
 const OPENER = /^(?:#+|--+>?|\/\*)/;
 
-// A pin tag beside a `uses:` line and a key's version are one shape: a name at most, a
-// version, and code beside it.
 const namesAVersion = (body) => {
   const words = body.split(/\s+/).filter((word) => word !== "");
   if (words.length === 0 || words.length > 2) return false;
@@ -445,7 +418,6 @@ const isDirective = (source, span) => {
 const CUT = "\u0000";
 const WHITESPACE = /\s/;
 
-// A comment with code on both sides leaves a space, or `a/* why */FROM` closes up into one word.
 export const withoutComments = (language, source) => {
   const removable = commentSpans(language, source).filter((span) => !isDirective(source, span));
   if (removable.length === 0) return source;
@@ -473,11 +445,8 @@ export const withoutComments = (language, source) => {
   return kept.join("\n");
 };
 
-// The migrator splits on this token wherever it sits, so the line it is written on is layout.
 const withSeparatorUnfolded = (source) => source.split(SEPARATOR).join(`\n${SEPARATOR}\n`);
 
-// What the proof compares: the same removal, then the trailing space and blank line a hand
-// restore leaves. Every other byte stands.
 export const normalized = (language, source) => {
   const stripped = withoutComments(language, source);
   return (language === SQL ? withSeparatorUnfolded(stripped) : stripped)

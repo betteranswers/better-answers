@@ -15,10 +15,10 @@ def _transformer(kept: re.Pattern[str]) -> cst.CSTTransformer:
                 return updated_node
             return cst.RemoveFromParent()
 
-        # A bare string statement is a docstring wherever it stands, and libcst puts the
-        # placeholder in itself when taking one empties a body.
         def leave_SimpleStatementLine(
-            self, original_node: cst.SimpleStatementLine, updated_node: cst.SimpleStatementLine
+            self,
+            original_node: cst.SimpleStatementLine,
+            updated_node: cst.SimpleStatementLine,
         ) -> cst.SimpleStatementLine | cst.RemovalSentinel:
             body = updated_node.body
             if (

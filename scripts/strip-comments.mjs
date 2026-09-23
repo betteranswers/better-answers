@@ -21,8 +21,6 @@ const WORKSPACES = [
   "packages/schema",
 ];
 
-// The config tree: every root the spec names, and the migrations, which sit inside a workspace
-// but are measured and stripped on their own.
 const CONFIG_ROOTS = [
   ".claude/hooks",
   ".github/actions",
@@ -40,7 +38,6 @@ const CONFIG_FILES = [
   "pnpm-workspace.yaml",
 ];
 
-// A lift is edited upstream, so its comments are not this repository's to delete.
 const SKIPPED = new Set([
   "node_modules",
   "lifts",
@@ -59,15 +56,11 @@ const AST_GREP = new Set(["javascript", "typescript", "tsx"]);
 
 const DIRECTIVE = String.raw`(eslint|oxlint|biome)-(disable|enable)|@ts-|prettier-ignore|(v8|c8|istanbul) ignore`;
 
-// Anchored arms only: a directive is one at a comment's start. The notice arm is not, a
-// block carrying it on line two.
 const KEPT = String.raw`^(#!|///|//\s*(${DIRECTIVE}|@vitest-environment)|/\*!|/\*\s*(${DIRECTIVE}|jscpd:ignore)|#\s*(type:|noqa(:|$)|pragma:|ruff:|mypy:|fmt:\s*(on|off)))|(?i:spdx-license-identifier|copyright|@license|@preserve|lifted from|third-party notice)`;
 
-// The strip goes root by root, so `--only` names the one this run touches. Everything else,
-// the already-restored code tiers among them, stands.
 const parseArguments = (argv) => {
   let root = checkout;
-  /** @type {string[]} */
+
   const only = [];
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -96,8 +89,6 @@ const codeLanguage = (extension) => {
   return undefined;
 };
 
-// A config root takes the syntax table as well: the two code tiers, JavaScript, and the YAML,
-// shell, TOML and SQL the table names.
 const configLanguage = (extension) => {
   if (JAVASCRIPT.has(extension)) return "javascript";
   return codeLanguage(extension) ?? LANGUAGE_BY_EXTENSION.get(extension);
@@ -150,8 +141,6 @@ const run = (label, command, argv, options) => {
   if (status !== 0) fail(`strip-comments: ${label} exited ${status}`);
 };
 
-// A handler body with a comment in it is also a `{…}` container; matching on the text alone
-// is what keeps it.
 const JSX_COMMENT_ONLY = String.raw`^\{\s*((/\*([^*]|\*[^/])*\*/|//[^\n]*)\s*)+\}$`;
 
 const writeRules = (directory) => {
@@ -180,8 +169,6 @@ const stripTypeScript = (root, files) => {
   const astGrep = binaryOf("@ast-grep/cli", "ast-grep");
   const paths = files.map((found) => found.file);
 
-  // The wrapper goes with the comment, so this runs first or the plain rule leaves an empty
-  // container.
   const jsxFiles = files.filter((found) => found.language === "tsx").map((found) => found.file);
   if (jsxFiles.length > 0) {
     run("ast-grep (jsx)", astGrep, ["scan", "--rule", jsx, "--update-all", ...jsxFiles], {
@@ -197,8 +184,6 @@ const stripTypeScript = (root, files) => {
   fs.rmSync(rules, { recursive: true, force: true });
 };
 
-// The syntax table's own pass: no parser to shell out to, so the result is written back here,
-// and only where it moved.
 const stripConfig = (files) => {
   let moved = 0;
   for (const found of files) {
@@ -228,8 +213,6 @@ const stripPython = (files) => {
   ]);
 };
 
-// Neither tool collapses the blank line and trailing space it leaves, and the restore pass
-// reads the diff.
 const collapseResidue = (root, typescript, python) => {
   if (typescript.length > 0) {
     run(
