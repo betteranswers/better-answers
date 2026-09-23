@@ -14,3 +14,4 @@ Standing release note, true of every row: the app refuses to start unless `PUBLI
 | 2026-09-04T15:58:44Z | liam-jons | `sha256:e0784f7e5763a5ae83b181affe363760f33c1e01caa0938c0facced47400f69f` | `sha256:e225e467c205f12b593e35ecae3fea8dffa5f24bee3ce5fb71e49f21c66ff127` | pre-client: any green build |
 | 2026-09-04T16:13:32Z | liam-jons | `sha256:e0784f7e5763a5ae83b181affe363760f33c1e01caa0938c0facced47400f69f` | `sha256:e225e467c205f12b593e35ecae3fea8dffa5f24bee3ce5fb71e49f21c66ff127` | pre-client: any green build |
 | 2026-09-04T17:20:29Z | liam-jons | `sha256:5a43990ff720ce22c2b59d90432fcae47d7bdcc408c7367e8710f1e9ddfc6d4a` | `sha256:daad1625474014f4eb01425975f31a643686fef0598e3caadd8e1ea5a1d5badb` | pre-client: any green build |
+| 2026-09-23T04:26:58Z | liam-jons | `sha256:3a01c9d0236f278311e93ab55533f7dbebbaa24c4474d148e0433b778949bec5` | `sha256:557ec42529db89cf26bc4cf30b09523e80b801d707d5c846ae09932576bfdeb3` | pre-client: any green build |
