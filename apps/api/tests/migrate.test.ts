@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 
 import { CONTRACT_DIGEST } from "@better-answers/schema";
+import { matchIsLeakproof, UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { startTestDatabase, type TestDatabase } from "./postgres.ts";
@@ -52,5 +53,17 @@ describe("migrate", () => {
     expect(migrating().status).toBe(0);
 
     expect(await stampedDigests()).toEqual([{ digest: CONTRACT_DIGEST }]);
+  });
+
+  it("marks the full-text match leakproof again after a restore that dropped the mark", async () => {
+    await database.superuser.query(UNMARK_THE_MATCH);
+    const restored = await matchIsLeakproof(database.superuser);
+
+    expect(migrating().status).toBe(0);
+
+    expect({ restored, migrated: await matchIsLeakproof(database.superuser) }).toEqual({
+      restored: false,
+      migrated: true,
+    });
   });
 });

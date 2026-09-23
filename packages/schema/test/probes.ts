@@ -60,6 +60,16 @@ export const privilegesHeld = async (
   return Object.fromEntries(held.rows.map((row) => [row.privilege, row.held]));
 };
 
+export const UNMARK_THE_MATCH =
+  "ALTER FUNCTION pg_catalog.ts_match_vq(tsvector, tsquery) NOT LEAKPROOF";
+
+export const matchIsLeakproof = async (client: Writer): Promise<boolean | undefined> => {
+  const read = await client.query<{ proleakproof: boolean }>(
+    "SELECT proleakproof FROM pg_catalog.pg_proc WHERE oid = 'pg_catalog.ts_match_vq(tsvector, tsquery)'::regprocedure",
+  );
+  return read.rows[0]?.proleakproof;
+};
+
 export const ADMITTED = "admitted";
 
 // A refusal's SQLSTATE outlives its message, which any author may reword.
