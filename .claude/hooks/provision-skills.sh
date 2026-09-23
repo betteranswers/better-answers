@@ -12,6 +12,7 @@ COMMON_DIR="$(git -C "$WORKTREE_PATH" rev-parse --path-format=absolute --git-com
 PRIMARY_PATH="$(cd "$(dirname "$COMMON_DIR")" && pwd -P)"
 
 say() { echo "  skills: $*" >&2; }
+# A path that is there — a dangling link included, which `-e` alone would miss.
 present() { [ -e "$1" ] || [ -L "$1" ]; }
 has_entries() { [ -d "$1" ] && [ -n "$(ls -A "$1" 2>/dev/null)" ]; }
 skill_dirs() {
@@ -76,6 +77,8 @@ while IFS= read -r dir; do
     LINKS=$((LINKS + 1))
     name="$dir/$(basename "$link")"
     target="$(readlink "$link")"
+    # Resolved from the link's own directory, the way a reader will; the target's parent is
+    # entered, so a link to a file resolves too.
     parent="$(cd "$(dirname "$link")" && cd -P "$(dirname "$target")" 2>/dev/null && pwd -P || true)"
     resolved="$parent/$(basename "$target")"
     if [ -z "$parent" ] || ! [ -e "$resolved" ]; then

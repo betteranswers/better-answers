@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-
+# This hook may tidy and never block, so every outcome below exits 0 and says why on stderr.
 INPUT="$(cat)"
 WT="$(printf '%s' "$INPUT" | jq -r '.worktree_path // empty' 2>/dev/null || true)"
 [ -n "$WT" ] || { echo "worktree-remove-hook: no worktree_path in input" >&2; exit 0; }
 [ -d "$WT" ] || { echo "worktree-remove-hook: $WT already gone" >&2; exit 0; }
+# Physically, and before the removal: a path cannot be resolved once its directory has gone.
 WT_REAL="$(cd "$WT" && pwd -P)"
 
 keep() {
@@ -43,6 +44,7 @@ else
 fi
 [ "$AHEAD" -eq 0 ] || keep "it has $AHEAD commit(s) $AGAINST does not have (branch $BRANCH)"
 
+# The main checkout owns the worktree list; resolve it from the shared `.git` directory.
 COMMON="$(git -C "$WT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
 ROOT="$(dirname "$COMMON")"
 

@@ -9,10 +9,12 @@ export const topLevelIgnore = (hasGitNexusIndex: boolean): readonly string[] =>
 const config: KnipConfig = {
   ignore: [...topLevelIgnore(existsSync(path.resolve(import.meta.dirname, ".gitnexus")))],
 
+  // `uv` is installed on the machine and never by npm, so no manifest names it.
   ignoreBinaries: ["uv"],
 
   workspaces: {
     ".": {
+      // A spawned binary is no edge for knip to follow.
       ignoreDependencies: ["@ast-grep/cli"],
     },
 
@@ -25,6 +27,8 @@ const config: KnipConfig = {
     },
 
     "apps/web": {
+      // Installed for a surface no ticket has opened yet, so a component nothing imports is not
+      // dead code.
       entry: ["src/shared/ui/**"],
     },
 

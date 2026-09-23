@@ -42,12 +42,17 @@ EXEMPT_OPENING = re.compile(
     r")"
 )
 
-EXEMPT_WHOLE = frozenset(
-    {
-        "--> statement-breakpoint",
-        "-- Custom migration (hand-written SQL; ADR 0032).",
-    }
-)
+MARKER = Path(__file__).resolve().parents[1] / "migration-marker.json"
+
+
+def _migration_marker() -> str:
+    fixture: Any = json.loads(MARKER.read_text(encoding="utf8"))
+    return str(fixture["marker"])
+
+
+# Read rather than written, so the gate and the strip cannot disagree on a marker that
+# names the decision allowing it.
+EXEMPT_WHOLE = frozenset({"--> statement-breakpoint", _migration_marker()})
 
 MARKERS = "#-"
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-
+# stdout must be exactly the created directory or session startup aborts, so every
+# diagnostic below goes to stderr.
 INPUT="$(cat)"
 NAME="$(printf '%s' "$INPUT" | jq -r '.name // empty' 2>/dev/null || true)"
 [ -n "$NAME" ] || NAME="wt-$(date +%s)-$$"

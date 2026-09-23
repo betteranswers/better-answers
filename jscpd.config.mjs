@@ -1,3 +1,6 @@
+/** @typedef {import("@better-answers/devtools/jscpd").JscpdConfig} JscpdConfig */
+
+/** @type {JscpdConfig} */
 export const jscpdConfig = {
   paths: ["apps", "packages"],
 

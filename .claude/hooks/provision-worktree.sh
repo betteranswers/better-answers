@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-
 USAGE="Usage: provision-worktree.sh <worktree-path>"
 WORKTREE_ARG="${1:?$USAGE}"
 [ -d "$WORKTREE_ARG" ] || { echo "Error: '$WORKTREE_ARG' does not exist." >&2; exit 1; }
@@ -9,6 +8,7 @@ WORKTREE_PATH="$(cd "$WORKTREE_ARG" && pwd -P)"
 git -C "$WORKTREE_PATH" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
   || { echo "Error: '$WORKTREE_PATH' is not a git worktree." >&2; exit 1; }
 
+# A hook inherits the session's PATH, which is not always a login shell's. A PATH that
 export PATH="$HOME/Library/pnpm:$HOME/.local/bin:/opt/homebrew/bin:$PATH"
 if ! command -v node >/dev/null 2>&1 && [ -d "$HOME/.nvm/versions/node" ]; then
   WANT="$(cat "$WORKTREE_PATH/.node-version" 2>/dev/null || echo 24)"
@@ -33,6 +33,8 @@ else
   echo "  upstream: none — $BRANCH tracks nothing" >&2
 fi
 
+# Installed, never shared with the primary checkout: both tools write links relative to the
+# real tree, so a shared tree would import the wrong workspace.
 if command -v pnpm >/dev/null 2>&1; then
   START=$SECONDS
   if pnpm --dir "$WORKTREE_PATH" install --frozen-lockfile --offline >&2 2>&1 \
@@ -63,6 +65,8 @@ if [ -f "$WORKER/pyproject.toml" ]; then
   fi
 fi
 
+# An index of its own from creation, or every edit here registers in the primary checkout's
+# index under a path another session reads.
 if command -v jcodemunch-mcp >/dev/null 2>&1; then
   START=$SECONDS
   if jcodemunch-mcp index "$WORKTREE_PATH" >&2 2>&1; then
@@ -82,6 +86,7 @@ PRIMARY_PATH="$(cd "$(dirname "$COMMON_DIR")" && pwd -P)"
 SCRATCH_LINK="$WORKTREE_PATH/.scratch"
 if [ "$PRIMARY_PATH" = "$WORKTREE_PATH" ]; then
   echo "  scratch: this is the primary checkout — nothing to link" >&2
+# `-L` as well, so a link whose target has gone is left alone rather than failed over by `ln`.
 elif [ -e "$SCRATCH_LINK" ] || [ -L "$SCRATCH_LINK" ]; then
   echo "  scratch: already here — left alone" >&2
 elif [ ! -d "$PRIMARY_PATH/.scratch" ]; then

@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-
-
+# Exit 2 is the only code whose stderr reaches the model; every other outcome exits 0, so
+# a tree without the gate refuses no edit.
 INPUT="$(cat)"
 FILE="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)"
 [ -n "$FILE" ] || exit 0
 
+# The docs' own example is a relative path, so resolve one against the session's directory.
 if [ "${FILE#/}" = "$FILE" ]; then
   CWD="$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)"
   FILE="${CWD:-$PWD}/$FILE"
@@ -14,6 +15,8 @@ fi
 
 DIRECTORY="$(dirname "$FILE")"
 [ -d "$DIRECTORY" ] || exit 0
+# Physically: git answers with a resolved path, and a `/tmp` that is really `/private/tmp`
+# would read as outside every root.
 DIRECTORY="$(cd "$DIRECTORY" && pwd -P)"
 FILE="$DIRECTORY/$(basename "$FILE")"
 [ -f "$FILE" ] || exit 0
@@ -25,6 +28,8 @@ ROOT="$(cd "$ROOT" && pwd -P)"
 RELATIVE="${FILE#"$ROOT"/}"
 [ "$RELATIVE" != "$FILE" ] || exit 0
 
+# The roots this hook reads. Elsewhere it stays silent: a finding outside root `check`'s
+# gates would refuse an edit CI accepts.
 case "$RELATIVE" in
 apps/* | packages/*) ;;
 *) exit 0 ;;
@@ -44,6 +49,8 @@ case "$FILE" in
   fi
   FOUND="$(cd "$ROOT" && "$TOOL" --config packages/devtools/lint-rules/comment-gate.oxlintrc.json "$RELATIVE" 2>&1)"
   STATUS=$?
+  # oxlint answers 1 for a parse error and an unloadable config too, so only the rule's own
+  # name means a comment.
   NAMES="better-answers(comment-only-the-why)"
   ;;
 *.py | *.yml | *.yaml | *.sh | *.bash | *.toml | *.sql)
@@ -60,6 +67,8 @@ esac
 
 [ "$STATUS" -eq 0 ] && exit 0
 
+# A 1 naming no rule is the gate failing, not the comment, and refusing that edit leaves the
+# agent no rule to read.
 if [ "$STATUS" -ne 1 ] || [ -z "$FOUND" ] ||
   { [ -n "$NAMES" ] && [ "${FOUND#*"$NAMES"}" = "$FOUND" ]; }; then
   echo "comment-gate-hook: the comment gate exited $STATUS over $RELATIVE without naming a comment" >&2

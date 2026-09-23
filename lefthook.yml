@@ -1,4 +1,5 @@
-
+# What each command is for, how to skip one and how the hook is installed:
+# docs/operations/local-gates.md
 commit-msg:
   commands:
     subject-ceiling:
@@ -15,6 +16,7 @@ pre-commit:
   parallel: true
 
   commands:
+    # `stage_fixed` commits what the formatter wrote, so a formatting-only CI failure cannot happen.
     oxfmt:
       run: pnpm exec oxfmt --no-error-on-unmatched-pattern {staged_files}
       stage_fixed: true
@@ -34,6 +36,7 @@ pre-commit:
       root: apps/worker/
       run: uv run --frozen ruff check {staged_files}
 
+    # A Homebrew binary a clone may not have: a warning and a pass, never a failure.
     actionlint:
       glob: ".github/workflows/*.{yml,yaml}"
       run: |
@@ -47,34 +50,24 @@ pre-commit:
     api-typecheck:
       glob: "*.{ts,tsx}"
       root: apps/api/
-      run: |
-        # tsc --noEmit, from this workspace's own typescript devDependency
-        pnpm run typecheck
+      run: pnpm run typecheck
 
     web-typecheck:
       glob: "*.{ts,tsx}"
       root: apps/web/
-      run: |
-        # tsc --noEmit, from this workspace's own typescript devDependency
-        pnpm run typecheck
+      run: pnpm run typecheck
 
     core-typecheck:
       glob: "*.{ts,tsx}"
       root: packages/core/
-      run: |
-        # tsc --noEmit, from this workspace's own typescript devDependency
-        pnpm run typecheck
+      run: pnpm run typecheck
 
     schema-typecheck:
       glob: "*.{ts,tsx}"
       root: packages/schema/
-      run: |
-        # tsc --noEmit, from this workspace's own typescript devDependency
-        pnpm run typecheck
+      run: pnpm run typecheck
 
     devtools-typecheck:
       glob: "*.{ts,tsx}"
       root: packages/devtools/
-      run: |
-        # tsc --noEmit, from this workspace's own typescript devDependency
-        pnpm run typecheck
+      run: pnpm run typecheck

@@ -10,6 +10,7 @@ import {
   reportOf,
 } from "../packages/devtools/src/comment-density.ts";
 
+// The tree it is run in, not the tree it lives in, so a suite can spawn it over a throwaway.
 const root = process.cwd();
 
 const refuse = (message) => {
@@ -35,6 +36,7 @@ if (roots.length === 0 && directories.length === 0) {
   refuse("name at least one root of workspaces, or one directory with --directory");
 }
 
+// A workspace is what carries a manifest, so a new one is measured without a line here.
 const workspaces = roots.flatMap((directory) =>
   readdirSync(path.join(root, directory), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -51,6 +53,7 @@ if (roots.length > 0 && workspaces.length === 0) {
 }
 
 for (const directory of directories) {
+  // A directory that is not there would measure as clean, the one answer it must not give.
   if (!existsSync(path.join(root, directory))) refuse(`no directory at ${directory}`);
 }
 
@@ -69,6 +72,7 @@ try {
   refuse(`the line counter did not run: ${String(cause)}`);
 }
 
+// A counter that read nothing is a gate that proved nothing, never a tree under the ceiling.
 if (counted.length === 0) {
   refuse("the line counter measured no file it understands");
 }
@@ -76,6 +80,7 @@ if (counted.length === 0) {
 const measured = measure(counted, units);
 
 for (const directory of directories) {
+  // A named directory read as nothing is the same false green as a whole run read as nothing.
   if (!measured.some((one) => one.unit === directory)) {
     refuse(`the line counter measured no file it understands under ${directory}`);
   }

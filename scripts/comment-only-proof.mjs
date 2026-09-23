@@ -5,7 +5,7 @@ import path from "node:path";
 
 import esbuild from "esbuild";
 
-import { LANGUAGE_BY_EXTENSION, normalized } from "./config-comments.mjs";
+import { CUSTOM_MIGRATION, LANGUAGE_BY_EXTENSION, normalized } from "./config-comments.mjs";
 import { workerPython } from "./worker-python.mjs";
 
 const checkout = path.resolve(import.meta.dirname, "..");
@@ -45,10 +45,13 @@ const loaderFor = (file) => {
 const typeScriptDigest = (file, source) =>
   digestOf(
     esbuild.transformSync(source, {
+      // `preserve` keeps JSX comments verbatim, which would read a deleted one as no change.
       loader: loaderFor(file),
       jsx: "transform",
       legalComments: "none",
 
+      // Only minified whitespace drops a comment sitting on a property; identifiers and
+      // syntax stay, or a renamed local reads as unchanged.
       minifyWhitespace: true,
       minifyIdentifiers: false,
       minifySyntax: false,
@@ -84,6 +87,8 @@ const pythonAnswers = (sources, data) => {
 
 const PARSED = new Set(["yaml", "toml"]);
 
+// Keyed by position rather than by path, so two pairs over one path cannot overwrite each
+// other on the way across the language boundary.
 const verdicts = (pairs) => {
   const pythonSources = {};
   const parsedSources = {};
@@ -117,6 +122,8 @@ const verdicts = (pairs) => {
         digestOf(normalized(language, pair.base)) === digestOf(normalized(language, pair.current));
       if (!PARSED.has(language)) return { file: pair.file, same: table };
 
+      // Two readers, and both must say so: the parse is blind to a lost directive, the table
+      // to its own misreads.
       const base = python.data[`${index}:base`];
       const current = python.data[`${index}:current`];
       if (base === undefined || current === undefined) {
@@ -154,6 +161,8 @@ const changedPairs = (root, base, named) => {
           return answer.stdout.split("\n").filter((line) => line !== "");
         })();
 
+  // An added or deleted file is a change the strip did not make, so it is reported, not
+  // refused.
   const pairs = [];
   const unpaired = [];
   for (const file of listed) {
@@ -200,10 +209,8 @@ export const Screen = () => (
 const FIXTURE_PY = `#!/usr/bin/env python3
 """The module docstring."""
 
-
 def waited() -> None:
     """Only a docstring."""
-
 
 def answered(value: int) -> int:
     # the caller already checked the bound
@@ -276,7 +283,7 @@ ignore = ["E501"]  # the formatter owns the line length
 banner = "a # inside a string is the value"
 `;
 
-const FIXTURE_SQL = `-- Custom migration (hand-written SQL; ADR 0032).
+const FIXTURE_SQL = `${CUSTOM_MIGRATION}
 -- the substrate's first table, and the counter in front of /oauth2/*
 CREATE TABLE workspace (
   id uuid PRIMARY KEY,
@@ -293,6 +300,8 @@ $$ LANGUAGE plpgsql;
 INSERT INTO note (body) VALUES ('a -- inside a literal is the value');
 `;
 
+// The corners a hand-written lexer gets wrong. In each the `#` or `--` is code, and reading it
+// as a comment blesses a broken file.
 const FIXTURE_YAML_CORNERS = `anchored: &tag "a # one"
 tagged: !!str "b # two"
 flow: [x, "c # three"]
@@ -335,6 +344,7 @@ const FIXTURE_TOML_RUN = `fenced = """a""""
 after = "b # thirteen"
 `;
 
+// Prose that reads like a directive is still prose, and a bare number is a step, not a pin.
 const FIXTURE_PROSE = `# actionlint is a Homebrew binary, so the runner installs it
 # step 3
 # retry 2
@@ -363,6 +373,8 @@ a)
 esac
 `;
 
+// `case` and `esac` are keywords only where a command may start. Read anywhere else they leave
+// the nesting wrong and the `#` after it swallowed.
 const FIXTURE_SHELL_WORDS = `x="$(cat case.txt)"; echo "p # twenty"
 y="$(echo the case is here)"; echo "q # twentyone"
 z="$(true && echo case)" ; echo "r # twentytwo"
