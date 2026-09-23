@@ -1,18 +1,12 @@
-import { boundarySchemas, SENSITIVITIES } from "@better-answers/schema";
+import { boundarySchemas } from "@better-answers/schema";
 import { z } from "zod";
 
-import {
-  narrower,
-  visibilityAgreed,
-  visibilityOf,
-  widens,
-  type Visibility,
-} from "../access/index.ts";
+import { visibilityAgreed, visibilityOf, widens, type Visibility } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
 import { attempt, err, ok, ulid, type Result, type UserPrincipal } from "../kernel/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { adminOnBinding, BINDING_ID } from "./admin-binding.ts";
+import { adminOnBinding, bindingNamed, BINDING_ID } from "./admin-binding.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
 
@@ -153,19 +147,6 @@ type BindingRow = {
   readonly audience_groups: readonly string[] | null;
 };
 
-const noWiderThan = (sensitivity: Visibility["sensitivity"]): readonly string[] =>
-  SENSITIVITIES.filter((word) => narrower(word, sensitivity) === word);
-
-const NARROW_CHUNK_COPIES = `UPDATE "index".chunk c
-        SET sensitivity = COALESCE(
-              (SELECT d.sensitivity FROM source_document d
-                WHERE d.workspace_id = c.workspace_id AND d.id = c.source_document_id
-                  AND d.sensitivity = ANY($6::text[])),
-              $3),
-            audience = $4,
-            audience_groups = $5
-      WHERE c.workspace_id = $1 AND c.binding_id = $2`;
-
 export const narrowBinding = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -179,17 +160,13 @@ export const narrowBinding = async (
 
   const groups = await openingACascadeOverHeldGroups(admin, tx, next.audienceGroups ?? []);
   if (!groups.ok) return err(groups.error);
-  const known = await attempt(() =>
-    tx.query<BindingRow>(
-      "SELECT sensitivity, audience, audience_groups FROM source_binding WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
-      [workspaceId, bindingId],
-    ),
-  );
-  if (!known.ok) return err(known.error);
-  const current = known.value.rows[0];
-  if (current === undefined) return err("no-such-binding");
+  const current = await bindingNamed<BindingRow>(acting.value, tx, {
+    columns: "sensitivity, audience, audience_groups",
+    lock: "for-update",
+  });
+  if (!current.ok) return err(current.error);
   if (!groups.value) return err("no-such-group");
-  if (widens(visibilityOf(current), next)) return err("widening-refused");
+  if (widens(visibilityOf(current.value), next)) return err("widening-refused");
 
   const auditEventId = ulid();
   const narrowed = await attempt(() =>
@@ -200,18 +177,6 @@ export const narrowBinding = async (
     ),
   );
   if (!narrowed.ok) return err(narrowed.error);
-
-  const copies = await attempt(() =>
-    tx.query(NARROW_CHUNK_COPIES, [
-      workspaceId,
-      bindingId,
-      next.sensitivity,
-      next.audience,
-      next.audienceGroups,
-      noWiderThan(next.sensitivity),
-    ]),
-  );
-  if (!copies.ok) return err(copies.error);
 
   await record(admin, tx, {
     id: auditEventId,

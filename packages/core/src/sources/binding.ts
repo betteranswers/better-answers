@@ -371,8 +371,6 @@ export type BindingPublished = {
   readonly bindingId: string;
   readonly auditEventId: string;
 
-  readonly chunks: number;
-
   readonly dpiaHash: string;
 };
 
@@ -432,13 +430,6 @@ export const publishBinding = async (
     ),
   );
   if (!published.ok) return err(published.error);
-  const stamped = await attempt(() =>
-    tx.query(
-      `UPDATE "index".chunk SET published_at = $3 WHERE workspace_id = $1 AND binding_id = $2`,
-      [workspaceId, bindingId, input.publishedAt],
-    ),
-  );
-  if (!stamped.ok) return err(stamped.error);
 
   await record(admin, tx, {
     id: auditEventId,
@@ -453,12 +444,7 @@ export const publishBinding = async (
       dpiaHash: dpia.value.hash,
     },
   });
-  return ok({
-    bindingId: bindingId,
-    auditEventId,
-    chunks: stamped.value.rowCount ?? 0,
-    dpiaHash: dpia.value.hash,
-  });
+  return ok({ bindingId: bindingId, auditEventId, dpiaHash: dpia.value.hash });
 };
 
 export const reprocessBindingInput = z.object({

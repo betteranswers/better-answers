@@ -629,7 +629,7 @@ const passagesReadableBy = async (person: UserPrincipal, sourceDocumentId: strin
   answered(
     await readingAs(db().runtimePool, person, async (reader, tx) => {
       const read = await tx.query<{ content: string }>(
-        `SELECT c.content FROM "index".chunk c
+        `SELECT c.content FROM "index".readable_chunk c
         WHERE c.workspace_id = $1 AND c.source_document_id = $2 AND ${readableClause("c", 3)}
         ORDER BY c.ordinal`,
         [reader.workspaceId, sourceDocumentId, ...readableParameters(reader)],
@@ -678,7 +678,7 @@ const publishedHandbook = async (scenario: Scenario, bindingId: string) => {
 };
 
 describe("an Admin publishes a binding", () => {
-  it("publishes the binding and every one of its chunk copies from the one instant, and its ledger row carries the confirmations, the totals by category and the DPIA hash", async () => {
+  it("publishes the binding, touches no chunk row of it, and its ledger row carries the confirmations, the totals by category and the DPIA hash", async () => {
     const scenario = await arrange();
     const { bindingId, documentId, jobId } = await boundHandbook(scenario);
     await runEndedAt(scenario.workspaceId, bindingId, jobId, "done", RUN_FINISHED_AT);
@@ -729,10 +729,7 @@ describe("an Admin publishes a binding", () => {
       state: "published",
     });
 
-    expect(await chunkStampsOf(db().pool, scenario.workspaceId, bindingId)).toEqual([
-      PUBLISHED_AT,
-      PUBLISHED_AT,
-    ]);
+    expect(await chunkStampsOf(db().pool, scenario.workspaceId, bindingId)).toEqual([null, null]);
 
     const rows = await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.published");
     expect(rows.length).toEqual(1);

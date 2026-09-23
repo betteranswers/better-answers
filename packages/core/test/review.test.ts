@@ -756,7 +756,7 @@ describe("an Admin keeping named finding groups in the text", () => {
 });
 
 describe("an Admin narrowing named documents", () => {
-  it("takes each one to Restricted, rewrites its chunk copies and writes one ledger row per document", async () => {
+  it("takes each one to Restricted, touches no chunk row and writes one ledger row per document", async () => {
     const scenario = await arrange();
     const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
 
@@ -766,7 +766,7 @@ describe("an Admin narrowing named documents", () => {
       ok: true,
       value: { bindingId, documentIds: [first.documentId], sensitivity: "Restricted" },
     });
-    expect(await chunkClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Restricted"]);
+    expect(await chunkClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Internal"]);
 
     expect(await chunkClassesOf(scenario.workspaceId, second.documentId)).toEqual(["Internal"]);
     expect(
@@ -838,7 +838,7 @@ describe("an Admin narrowing named documents", () => {
     });
   });
 
-  it("queues one index run with the reason narrowed, however many documents it took", async () => {
+  it("puts no job on the workspace's queue, however many documents it took", async () => {
     const scenario = await arrange();
     const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
 
@@ -847,23 +847,20 @@ describe("an Admin narrowing named documents", () => {
       findingGroupIn(second.documentId),
     ]);
 
-    expect(typeof (outcome.ok ? outcome.value.jobId : undefined)).toBe("string");
-
-    expect(await jobsOf(scenario.workspaceId)).toEqual([
-      { kind: "index", reason: "narrowed", subject_id: bindingId },
-    ]);
+    expect(outcome).toMatchObject({ ok: true });
+    expect(await jobsOf(scenario.workspaceId)).toEqual([]);
   });
 
-  it("narrows not one document, and rejects rather than answering a word, when the queue will not hold its run", async () => {
+  it("narrows not one document when the ledger refuses the event", async () => {
     const scenario = await arrange();
     const { bindingId, first } = await bindingWithTwoDocuments(scenario);
     const shown = await findingIn(scenario.workspaceId, first.documentId);
 
     await expect(
-      whileWritesAreRefused(db().pool, "job", () =>
+      whileWritesAreRefused(db().pool, "audit_event", () =>
         narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]),
       ),
-    ).rejects.toThrow(/refused a write to job/);
+    ).rejects.toThrow(/refused a write to audit_event/);
 
     expect(await reviewOf(scenario.workspaceId, shown)).toEqual(UNREVIEWED);
     expect(await narrowingLeftBehindIn(scenario.workspaceId, first.documentId)).toEqual(
@@ -871,18 +868,16 @@ describe("an Admin narrowing named documents", () => {
     );
   });
 
-  it("answers the run a keep already queued for the binding, and queues no second one", async () => {
+  it("leaves the run a keep already queued for the binding standing, and queues none of its own", async () => {
     const scenario = await arrange();
     const { bindingId, first } = await bindingWithTwoDocuments(scenario);
     await findingIn(scenario.workspaceId, first.documentId);
     const keep = await keepAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+    expect(typeof (keep.ok ? keep.value.jobId : undefined)).toBe("string");
 
     const outcome = await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
 
-    const queuedByTheKeep = keep.ok ? keep.value.jobId : undefined;
-    expect(typeof queuedByTheKeep).toBe("string");
-    expect(outcome).toMatchObject({ ok: true, value: { jobId: queuedByTheKeep } });
-
+    expect(outcome).toMatchObject({ ok: true });
     expect(await jobsOf(scenario.workspaceId)).toEqual([
       { kind: "index", reason: "restored", subject_id: bindingId },
     ]);
