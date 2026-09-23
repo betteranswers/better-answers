@@ -26,6 +26,8 @@ export const RLS_EXEMPTIONS = {
   "public.rate_limit": "Better Auth's own limiter, keyed by request, running before sign-in.",
   "public.ingress_counter":
     "The pre-authentication per-IP and per-email counter: no workspace exists yet to scope it by.",
+  "public.contract_stamp":
+    "One row saying which tier contract this deploy's api carries: a fact about the deploy, not about a tenant, and the worker reads it before any workspace is in hand.",
 } satisfies Record<string, string>;
 
 export const EXEMPT_TABLE_NAMES: readonly string[] = [

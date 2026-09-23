@@ -73,4 +73,4 @@ C4Container
 | concept-file | fixtured | the canonical text and content hash of a concept file |
 | cost-ledger | generated | the `llm_call` row's meaning |
 
-S1 adds the first document-shaped agreement and moves `contract_version` past 5.
+S1 adds the first document-shaped agreement, and every edit here moves the contract's digest — the SHA-256 of this directory each tier carries, `migrate` stamps and the worker reads back before it claims.

@@ -1,5 +1,4 @@
 {
-  "contract_version": 12,
   "agreements": {
     "queue": { "form": "sql-function" },
     "concept-inbox": { "form": "sql-function" },

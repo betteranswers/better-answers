@@ -1,11 +1,12 @@
 import threading
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 import psycopg
 import pytest
+from structlog.testing import capture_logs
 
 from better_answers_worker import health, loop, queue
 from better_answers_worker.audit import run_audit
@@ -15,6 +16,7 @@ from better_answers_worker.bundle import (
     repository_path,
 )
 from better_answers_worker.config import Bootstrap, Engine, ObjectStore
+from better_answers_worker.contract_stamp import CONTRACT_DIGEST
 from better_answers_worker.ids import ulid
 from better_answers_worker.kinds import KINDS
 from better_answers_worker.queue import scoped
@@ -28,7 +30,7 @@ from factories import (
     seed_job,
     seed_workspace,
 )
-from pg_harness import migrated_postgres_at, stamp_migration
+from pg_harness import migrated_postgres_at, stamp_contract, stamp_migration
 
 WORKER = "worker-under-test"
 IRI = "https://better-answers.com/c/01J6MMMMMMMMMMMMMMMMMMMMMM"
@@ -507,13 +509,46 @@ def test_a_rebuild_writes_the_next_generation_beside_the_live_one_and_flips_it(
         ]
 
 
-def test_the_loop_claims_nothing_when_its_schema_stamp_does_not_match(
+def a_workspace_with_a_queued_audit(
+    database: psycopg.Connection, tmp_path: Path
+) -> str:
+    workspace = seed_workspace(database.cursor())["id"]
+    with database.cursor() as cursor:
+        content = seed_expenses(cursor, workspace)
+    database.commit()
+    write_bundle(tmp_path, workspace, {"knowledge/expenses.md": content})
+    with scoped(database, workspace) as cursor:
+        seed_job(cursor, workspace_id=workspace, kind="nightly-audit")
+    return str(workspace)
+
+
+def audit_job(database: psycopg.Connection, workspace: str) -> tuple[Any, ...]:
+    with database.cursor() as cursor:
+        cursor.execute(
+            "SELECT status, claimed_by FROM job WHERE workspace_id = %s", (workspace,)
+        )
+        return cursor.fetchall()[0]
+
+
+def refusals_in(
+    written: Sequence[Mapping[str, Any]],
+) -> list[tuple[str, str, str]]:
+    return [
+        (line["event"], line["schema_stamp"], line["contract_stamp"])
+        for line in written
+        if line["log_level"] == "error"
+    ]
+
+
+REFUSES = "a deploy stamp does not match; claiming nothing"
+
+
+def test_the_loop_claims_nothing_and_exits_one_when_its_schema_stamp_does_not_match(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
-
-    workspace = seed_workspace(database.cursor())["id"]
-    database.commit()
+    workspace = a_workspace_with_a_queued_audit(database, tmp_path)
     with database.cursor() as cursor:
+        stamp_contract(cursor, digest=CONTRACT_DIGEST)
         stamp_migration(
             cursor,
             digest="a-migration-this-worker-has-never-seen",
@@ -521,11 +556,75 @@ def test_the_loop_claims_nothing_when_its_schema_stamp_does_not_match(
         )
     database.commit()
 
-    assert loop.schema_stamp_matches(database) is False
+    with capture_logs() as written:
+        assert loop.run(bootstrap_for(database, tmp_path), once=True) == 1
 
+    assert refusals_in(written) == [(REFUSES, "differs", "matches")]
+    assert audit_job(database, workspace) == ("queued", None)
+
+
+def test_the_loop_claims_nothing_and_exits_one_when_its_contract_digest_does_not_match(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = a_workspace_with_a_queued_audit(database, tmp_path)
     with database.cursor() as cursor:
-        cursor.execute("SELECT count(*) FROM job WHERE workspace_id = %s", (workspace,))
-        assert cursor.fetchone() == (0,)
+        stamp_contract(cursor, digest="a" * 64)
+    database.commit()
+
+    with capture_logs() as written:
+        assert loop.run(bootstrap_for(database, tmp_path), once=True) == 1
+
+    assert refusals_in(written) == [(REFUSES, "matches", "differs")]
+    assert audit_job(database, workspace) == ("queued", None)
+
+
+def test_a_worker_whose_two_stamps_both_match_claims_and_runs_what_is_queued(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = a_workspace_with_a_queued_audit(database, tmp_path)
+    with database.cursor() as cursor:
+        stamp_contract(cursor, digest=CONTRACT_DIGEST)
+    database.commit()
+
+    with capture_logs() as written:
+        assert loop.run(bootstrap_for(database, tmp_path), once=True) == 0
+
+    assert refusals_in(written) == []
+    assert audit_job(database, workspace) == ("done", WORKER)
+
+
+def test_the_refusal_is_said_once_and_lifts_by_itself_when_the_deploy_finishes(
+    database: psycopg.Connection, tmp_path: Path
+) -> None:
+    workspace = a_workspace_with_a_queued_audit(database, tmp_path)
+    with database.cursor() as cursor:
+        stamp_contract(cursor, digest="b" * 64)
+    database.commit()
+
+    with capture_logs() as written:
+        running = threading.Thread(
+            target=loop.run,
+            args=(bootstrap_for(database, tmp_path),),
+            kwargs={"once": False},
+            daemon=True,
+        )
+        running.start()
+        # A daemon thread because the loop never returns on its own, and the stamp is
+        # corrected from a connection of its own while it sleeps.
+        time.sleep(loop.IDLE_SLEEP_SECONDS / 2)
+        with (
+            psycopg.connect(_WHERE[database], autocommit=True) as deploying,
+            deploying.cursor() as cursor,
+        ):
+            stamp_contract(cursor, digest=CONTRACT_DIGEST)
+        deadline = time.monotonic() + loop.IDLE_SLEEP_SECONDS * 4
+        while time.monotonic() < deadline:
+            if audit_job(database, workspace)[0] == "done":
+                break
+            time.sleep(0.1)
+
+    assert audit_job(database, workspace) == ("done", WORKER)
+    assert refusals_in(written) == [(REFUSES, "matches", "differs")]
 
 
 def test_a_worker_holding_a_fresh_lease_is_healthy_and_a_queue_left_waiting_is_not(

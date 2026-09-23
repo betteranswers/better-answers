@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 
 import { attempt } from "@better-answers/core/kernel";
-import { migrationsFolder } from "@better-answers/schema";
+import { CONTRACT_DIGEST, migrationsFolder, STAMP_THE_CONTRACT } from "@better-answers/schema";
 
 import { requireBootstrap } from "./config.ts";
 import { logger } from "./logger.ts";
@@ -10,8 +10,10 @@ import { logger } from "./logger.ts";
 const bootstrap = requireBootstrap("migrations");
 const database = drizzle(bootstrap.databaseUrl);
 
+// After the journal, because the statement writes to a table a migration creates.
 const applied = await attempt(async () => {
   await migrate(database, { migrationsFolder });
+  await database.$client.query(STAMP_THE_CONTRACT, [CONTRACT_DIGEST]);
   await database.$client.end();
 });
 
@@ -20,4 +22,4 @@ if (!applied.ok) {
   process.exit(1);
 }
 
-logger.info("migrations applied");
+logger.info({ contractDigest: CONTRACT_DIGEST }, "migrations applied");

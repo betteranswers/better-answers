@@ -52,6 +52,15 @@ def stamp_migration(cursor: psycopg.Cursor[Any], *, digest: str, when: object) -
     )
 
 
+# What `migrate` writes after the journal, which on its own leaves the table empty.
+def stamp_contract(cursor: psycopg.Cursor[Any], *, digest: str) -> None:
+    cursor.execute(
+        "INSERT INTO contract_stamp (only_row, digest) VALUES (true, %s)"
+        " ON CONFLICT (only_row) DO UPDATE SET digest = excluded.digest",
+        (digest,),
+    )
+
+
 def apply_journal(conninfo: str) -> None:
     with psycopg.connect(conninfo) as connection:
         for statement in _STAMP_TABLE.split(";"):

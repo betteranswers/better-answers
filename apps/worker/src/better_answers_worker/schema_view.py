@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0044_the-readable-chunk"
+MIGRATION_ID = "0045_the-contract-stamp"
 
-MIGRATION_WHEN = 1790123720869
+MIGRATION_WHEN = 1790127151933
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -144,6 +144,11 @@ TABLES: dict[str, dict[str, str]] = {
         "frontmatter": "jsonb NOT NULL",
         "body": "text NOT NULL",
         "base_content_hash": "text",
+    },
+    "public.contract_stamp": {
+        "only_row": "boolean NOT NULL",
+        "digest": "text NOT NULL",
+        "stamped_at": "timestamp with time zone NOT NULL",
     },
     "public.erasure_request": {
         "workspace_id": "text NOT NULL",

@@ -2,7 +2,16 @@ export const IDENTITY_PROVIDER = "apps/api/src/auth";
 export const POSTGRES_DOOR = "packages/core/src/store/postgres";
 export const GRAPH_DOOR = "packages/core/src/store/graph";
 
-export const OWNERS_OUTSIDE_CORE = [IDENTITY_PROVIDER, POSTGRES_DOOR, GRAPH_DOOR] as const;
+// Not `MIGRATOR`: the roles' surface spells the owning database role that way, and this names
+// `migrate.ts`'s directory.
+export const JOURNAL_MIGRATOR = "apps/api/src";
+
+export const OWNERS_OUTSIDE_CORE = [
+  IDENTITY_PROVIDER,
+  POSTGRES_DOOR,
+  GRAPH_DOOR,
+  JOURNAL_MIGRATOR,
+] as const;
 
 export const TABLE_OWNERS = {
   "public.user": IDENTITY_PROVIDER,
@@ -24,6 +33,8 @@ export const TABLE_OWNERS = {
 
   "public.ingress_counter": POSTGRES_DOOR,
   "public.mcp_call_counter": POSTGRES_DOOR,
+
+  "public.contract_stamp": JOURNAL_MIGRATOR,
 
   "public.workspace_config": "workspaces",
   "public.group": "members",

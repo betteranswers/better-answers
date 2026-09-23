@@ -26,6 +26,7 @@ export * from "./finding-tables.ts";
 export * from "./erasure-tables.ts";
 export * from "./composition-tables.ts";
 export * from "./job-tables.ts";
+export * from "./platform-tables.ts";
 
 export const llmPurpose = pgEnum("llm_purpose", [
   "extraction",

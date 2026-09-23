@@ -149,3 +149,6 @@ export const A_SUPPRESSION = `INSERT INTO suppression (workspace_id, erasure_req
 
 export const A_MIGRATION_STAMP =
   "INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ('x', 1)";
+
+export const A_CONTRACT_STAMP =
+  "INSERT INTO contract_stamp (only_row, digest) VALUES (true, 'a-contract-nobody-deployed')";

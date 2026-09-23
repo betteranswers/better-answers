@@ -168,6 +168,7 @@ const acceptedRows = {
   rateLimit: [{ id: "limit-1", key: "ip:203.0.113.1", count: 1, lastRequest: 1 }],
   mcpCallCounter: [{ workspaceId: WS_ID, tokenId: "jti-1", windowStart: NOW, count: 1 }],
   ingressCounter: [{ scope: "ip", key: "203.0.113.1", windowStart: NOW, count: 1 }],
+  contractStamp: [{ onlyRow: true, digest: "a".repeat(64), stampedAt: NOW }],
 
   auditEvent: [
     {
@@ -750,6 +751,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "rateLimit",
         "mcpCallCounter",
         "ingressCounter",
+        "contractStamp",
         "auditEvent",
         "accessRequest",
 
@@ -832,6 +834,11 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
     ],
     workspaceConfig: [{ ...acceptedRows.workspaceConfig[0], key: "  " }],
     ingressCounter: [{ ...acceptedRows.ingressCounter[0], scope: "user-agent" }],
+    contractStamp: [
+      { ...acceptedRows.contractStamp[0], digest: "A".repeat(64) },
+      { ...acceptedRows.contractStamp[0], digest: "a".repeat(63) },
+      { ...acceptedRows.contractStamp[0], onlyRow: false },
+    ],
     mcpCallCounter: [{ ...acceptedRows.mcpCallCounter[0], count: -1 }],
 
     auditEvent: [

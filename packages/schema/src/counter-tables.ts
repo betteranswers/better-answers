@@ -23,4 +23,7 @@ export const mcpCallCounter = pgTable(
   (table) => [primaryKey({ columns: [table.workspaceId, table.tokenId, table.windowStart] })],
 );
 
-export const GLOBAL_TABLE_NAMES_BEYOND_IDENTITY = ["public.ingress_counter"] as const;
+export const GLOBAL_TABLE_NAMES_BEYOND_IDENTITY = [
+  "public.ingress_counter",
+  "public.contract_stamp",
+] as const;

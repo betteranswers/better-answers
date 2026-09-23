@@ -2,6 +2,8 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import { CONTRACT_DIGEST, STAMP_THE_CONTRACT } from "@better-answers/schema";
+import pg from "pg";
 import { expect } from "vitest";
 import { z } from "zod";
 
@@ -23,11 +25,25 @@ const workerDsn = (connectionUri: string): string => {
   return uri.toString();
 };
 
+// The deploy order in a fixture. As the owner, not through `workerDsn`: the worker is refused
+// this write.
+const stampTheContract = async (connectionUri: string): Promise<void> => {
+  const client = new pg.Client({ connectionString: connectionUri });
+  await client.connect();
+  try {
+    await client.query(STAMP_THE_CONTRACT, [CONTRACT_DIGEST]);
+  } finally {
+    await client.end();
+  }
+};
+
 export const runWorkerOnce = async (
   connectionUri: string,
   bundleRoot: string,
   workerId: string,
 ): Promise<void> => {
+  await stampTheContract(connectionUri);
+
   const outcome = await run("uv", ["run", "--frozen", "better-answers-worker", "--once"], {
     cwd: workerDirectory,
     env: {
