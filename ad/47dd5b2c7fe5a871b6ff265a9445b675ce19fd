@@ -1,0 +1,37 @@
+packages/schema/src/boundary-schemas.ts
+  s_69414e6e80cf2c::t_f4c35d54a91c0f 29,31
+  s_69414e6e80cf2c::t_d1f8cca20d4982 838-843
+  s_69414e6e80cf2c::t_fa061eee7cff25 265-273
+packages/core/test/worker-process.ts
+  s_69414e6e80cf2c::t_77dff70fedcac7 28-29
+  s_69414e6e80cf2c::t_cd21eb88e931a1 5-6
+  s_69414e6e80cf2c::t_a940852c19ff56 30-39,45-46
+packages/schema/src/contract-digest.ts
+  s_69414e6e80cf2c::t_e575550dc8dbc9 9-11
+packages/schema/test/boundary-schemas.test.ts
+  s_69414e6e80cf2c::t_02a1102b4c71a0 171
+  s_69414e6e80cf2c::t_32e1a9557ffd07 754
+  s_69414e6e80cf2c::t_ee1092055ca0c3 837-841
+apps/worker/CODING_RULES.md
+  s_69414e6e80cf2c::t_fdf80003d6779f 7
+packages/schema/src/table-ownership.ts
+  s_69414e6e80cf2c::t_50039606e01887 5-6
+  s_69414e6e80cf2c::t_4a6e4f41f24f72 7-13
+  s_69414e6e80cf2c::t_c015b682c9836b 37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ad47dd5b2c7fe5a871b6ff265a9445b675ce19fd",
+  "prompts": {},
+  "sessions": {
+    "s_69414e6e80cf2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6af0bc5d-5e17-4638-afb3-472e1f42e570",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
