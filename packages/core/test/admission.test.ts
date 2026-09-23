@@ -15,7 +15,7 @@ import {
   type Role,
   type UserPrincipal,
 } from "../src/kernel/index.ts";
-import { enqueueJobAct, type EnqueueJobInput } from "../src/runs/index.ts";
+import { enqueueJobAct, enqueueJobInput } from "../src/runs/index.ts";
 import {
   reprocessBindingAct,
   reprocessBindingInput,
@@ -195,10 +195,10 @@ describe("the two acts that carry a declaration today", () => {
   });
 
   it("reads the enqueue's level off the kind's descriptor rather than restating it", () => {
-    const audit: EnqueueJobInput = {
+    const audit = enqueueJobInput.parse({
       workspaceId: "01JQ0000000000000000000WSP",
       kind: "nightly-audit",
-    };
+    });
     const asked = enqueueJobAct.admits;
 
     expect(typeof asked === "function" ? asked(audit) : asked).toEqual({
@@ -208,10 +208,10 @@ describe("the two acts that carry a declaration today", () => {
   });
 
   it("admits the platform for the enqueue whatever purpose it acts for", () => {
-    const audit: EnqueueJobInput = {
+    const audit = enqueueJobInput.parse({
       workspaceId: "01JQ0000000000000000000WSP",
       kind: "nightly-audit",
-    };
+    });
 
     expect([
       admit(enqueueJobAct, processActor("reconciler"), audit).ok,

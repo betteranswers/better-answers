@@ -1,7 +1,16 @@
-import { boundarySchemas } from "@better-answers/schema";
+import { boundarySchemas, FULL_REBUILD_KIND } from "@better-answers/schema";
 
 import { act, declareActs, record } from "../audit/index.ts";
-import { attempt, err, ok, ulid, type PlatformPrincipal, type Result } from "../kernel/index.ts";
+import {
+  attempt,
+  err,
+  ok,
+  ulid,
+  type PlatformPrincipal,
+  type PrincipalRefusal,
+  type Result,
+} from "../kernel/index.ts";
+import { enqueueJob, type EnqueueJobRefusal, type RebuildReason } from "../runs/index.ts";
 import {
   countMap,
   sweepNonLiveGenerations,
@@ -72,4 +81,23 @@ export const sweepGraph = async (
     }),
   );
   return swept.ok ? ok(swept.value) : err(swept.error);
+};
+
+export const rebuildGraph = async (
+  platform: GraphMaintenancePrincipal,
+  door: PostgresDoor,
+  input: { readonly workspaceId: string; readonly reason: RebuildReason },
+): Promise<
+  Result<
+    { readonly jobId: string },
+    GraphMaintenanceRefusal | EnqueueJobRefusal | PrincipalRefusal | Error
+  >
+> => {
+  const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
+  if (!workspace.success) return err("malformed");
+  return enqueueJob(platform, door, {
+    workspaceId: workspace.data,
+    kind: FULL_REBUILD_KIND,
+    reason: input.reason,
+  });
 };

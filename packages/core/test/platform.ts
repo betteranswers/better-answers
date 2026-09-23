@@ -2,7 +2,7 @@ import { boundarySchemas, ulid } from "@better-answers/schema";
 import { type MigratedPostgres, testData } from "@better-answers/schema/testing";
 import type pg from "pg";
 
-import type { PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
+import type { PlatformPrincipal, UserPrincipal, WorkspaceId } from "../src/kernel/index.ts";
 import { openPostgres, type PostgresDoor } from "../src/store/postgres/index.ts";
 import { provisionWorkspace } from "../src/workspaces/index.ts";
 
@@ -26,7 +26,7 @@ export const principalOf = (
 
 export type ProvisionedWorkspace = {
   readonly door: PostgresDoor;
-  readonly workspaceId: string;
+  readonly workspaceId: WorkspaceId;
   readonly adminUserId: string;
 };
 
@@ -37,15 +37,15 @@ export const provisionedWorkspace = async (
 ): Promise<ProvisionedWorkspace> => {
   const adminUserId = await seedPerson(db.pool, admin);
   const door = openPostgres(db.runtimePool);
-  const workspaceId = ulid();
+  const mintedId = ulid();
   const made = await provisionWorkspace(bootstrap, door, {
-    id: workspaceId,
+    id: mintedId,
     name,
-    slug: `${name.toLowerCase()}-${workspaceId.toLowerCase()}`,
+    slug: `${name.toLowerCase()}-${mintedId.toLowerCase()}`,
     adminUserId,
   });
   if (!made.ok) throw new Error(`the workspace was not provisioned: ${made.error}`);
-  return { door, workspaceId, adminUserId };
+  return { door, workspaceId: made.value.workspaceId, adminUserId };
 };
 
 export type PersonOverrides = Parameters<ReturnType<typeof testData>["user"]>[0];

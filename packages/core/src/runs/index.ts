@@ -108,8 +108,7 @@ const descriptorOf = (kind: string): JobKindDescriptor | undefined =>
 
 const JOB_COLUMNS = boundarySchemas.job.insert.shape;
 
-// Steps reach the enqueue holding a workspace id off a row, so this one column crosses unbranded.
-const WORKSPACE_ID: z.ZodType<string, string> = JOB_COLUMNS.workspaceId;
+const WORKSPACE_ID = JOB_COLUMNS.workspaceId;
 
 const SUBJECT_ID = JOB_COLUMNS.subjectId.unwrap();
 
@@ -189,13 +188,13 @@ export const enqueueJobIn = async (
 
   const jobId = ulid();
   const parsed = boundarySchemas.job.insert
-    .pick({ workspaceId: true, id: true, kind: true, subjectId: true, reason: true })
-    .safeParse({ workspaceId: input.workspaceId, id: jobId, kind: input.kind, subjectId, reason });
+    .pick({ id: true, kind: true, subjectId: true, reason: true })
+    .safeParse({ id: jobId, kind: input.kind, subjectId, reason });
 
   if (!parsed.success) return err("malformed");
 
   const landed = await tx.query<{ id: string }>(ENQUEUE, [
-    parsed.data.workspaceId,
+    input.workspaceId,
     parsed.data.id,
     parsed.data.kind,
     parsed.data.subjectId ?? null,

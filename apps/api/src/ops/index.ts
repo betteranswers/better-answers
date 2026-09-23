@@ -4,6 +4,7 @@ import {
   IMPORT_SENSITIVITY_DEFAULT,
   importBundle,
   RECONCILER,
+  rebuildGraph,
   reconcile,
   sweepGraph,
   type BundleTree,
@@ -26,7 +27,7 @@ import {
   type RefusalClass,
   type Result,
 } from "@better-answers/core/kernel";
-import { enqueueJob, JOB_IS_OVER, jobById, type RebuildReason } from "@better-answers/core/runs";
+import { JOB_IS_OVER, jobById, type RebuildReason } from "@better-answers/core/runs";
 import {
   ORPHANED_UPLOAD_GRACE_HOURS,
   sweepOrphanedUploads,
@@ -45,13 +46,7 @@ import {
   type AddMemberRefusal,
   type ProvisionRefusal,
 } from "@better-answers/core/workspaces";
-import {
-  FULL_REBUILD_KIND,
-  REBUILD_REASONS,
-  ROLES,
-  SENSITIVITIES,
-  ulid,
-} from "@better-answers/schema";
+import { REBUILD_REASONS, ROLES, SENSITIVITIES, ulid } from "@better-answers/schema";
 
 import { doorTold, type Doors } from "../doors.ts";
 
@@ -489,12 +484,7 @@ const graphRebuildCommand = async (
     io.say("graph-rebuild: --wait takes no value; --wait-seconds takes a whole number of seconds");
     return USAGE;
   }
-  const door = doors.postgres;
-  const enqueued = await enqueueJob(GRAPH_MAINTENANCE, door, {
-    workspaceId,
-    kind: FULL_REBUILD_KIND,
-    reason,
-  });
+  const enqueued = await rebuildGraph(GRAPH_MAINTENANCE, doors.postgres, { workspaceId, reason });
   if (!enqueued.ok) return refused("graph-rebuild", workspaceId, enqueued.error, io);
   const { jobId } = enqueued.value;
   if (wait === undefined) {

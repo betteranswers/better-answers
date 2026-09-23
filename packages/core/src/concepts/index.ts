@@ -156,6 +156,7 @@ export {
 export {
   GRAPH_MAINTENANCE,
   graphCounts,
+  rebuildGraph,
   sweepGraph,
   type GraphMaintenancePrincipal,
   type GraphMaintenanceRefusal,
