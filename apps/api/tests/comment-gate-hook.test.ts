@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { commentGateRoots, rootScripts } from "@better-answers/devtools/root-commands";
 import { throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 
 import { hookScript, runHook, scratchRoot, type HookRun } from "./worktree-hooks.ts";
@@ -52,20 +53,6 @@ const A_WHY_OF_TWENTY =
 
 // Spelled in two halves, so the tag scan does not read a fixture as a citation.
 const tag = (family: string, number: string): string => `[${family}${number}]`;
-
-const scriptsByName = z.record(z.string(), z.string());
-type Scripts = Readonly<z.infer<typeof scriptsByName>>;
-const rootManifest = z.object({ scripts: scriptsByName.optional() });
-
-const rootScripts = (): Scripts => {
-  const { scripts } = rootManifest.parse(
-    JSON.parse(readFileSync(path.join(repositoryRoot, "package.json"), "utf8")),
-  );
-  if (scripts === undefined) {
-    throw new Error("the root package.json carries no scripts, so nothing here is being proved.");
-  }
-  return scripts;
-};
 
 const hookText = readFileSync(script, "utf8");
 
@@ -125,6 +112,39 @@ if (smoke.status !== 2 || !smoke.stderr.includes("runs to 40 words")) {
   );
 }
 
+const CASE_BLOCK = /case "\$RELATIVE" in\n([\s\S]*?)\nesac/;
+
+// The roots a `case` arm names, with the trailing glob off, so `scripts/*` reads as `scripts`.
+const rootsIn = (hook: string): readonly string[] => {
+  const block = CASE_BLOCK.exec(hook)?.[1];
+  if (block === undefined) throw new Error("the hook holds no `$RELATIVE` case block to read");
+  return block
+    .split("\n")
+    .flatMap((line) => (line.split(")")[0] ?? "").split("|"))
+    .map((pattern) => pattern.trim().replace(/\/\*$/, ""))
+    .filter((pattern) => pattern !== "" && pattern !== "*");
+};
+
+const missingFrom = (named: readonly string[], read: readonly string[]): readonly string[] =>
+  named.filter((root) => !read.includes(root)).sort();
+
+describe("the write-time hook and root `check` read one set of roots", () => {
+  it("names every root of its own in a gate command too", () => {
+    expect(missingFrom(rootsIn(hookText), commentGateRoots())).toEqual([]);
+  });
+
+  it("reads every root a gate command names, so no rule is learnt a pull request late", () => {
+    expect(missingFrom(commentGateRoots(), rootsIn(hookText))).toEqual([]);
+  });
+
+  it("reports a gap on either side, read off fixture text", () => {
+    const fixture = 'case "$RELATIVE" in\nnowhere/* | apps/*) ;;\n*) exit 0 ;;\nesac';
+
+    expect(missingFrom(rootsIn(fixture), commentGateRoots())).toEqual(["nowhere"]);
+    expect(missingFrom(commentGateRoots(), rootsIn(fixture))).toContain("packages");
+  });
+});
+
 describe("the write-time hook hands back the comment rule the edit broke", () => {
   it("refuses a 40-word TypeScript comment, naming the count and its rule", () => {
     const run = edit("packages/probe/long.ts", `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
@@ -143,11 +163,16 @@ describe("the write-time hook hands back the comment rule the edit broke", () =>
   });
 
   it.each([
-    ["YAML", "packages/probe/long.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
-    ["shell", "packages/probe/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
-    ["TOML", "packages/probe/long.toml", `# ${FORTY_WORDS}\nkeep = 1\n`],
-    ["SQL", "packages/probe/long.sql", `-- ${FORTY_WORDS}\nSELECT 1;\n`],
-  ])("refuses a 40-word %s comment, naming the count and its rule", (_language, file, source) => {
+    ["a YAML file", "packages/probe/long.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
+    ["a shell file", "packages/probe/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
+    ["a TOML file", "packages/probe/long.toml", `# ${FORTY_WORDS}\nkeep = 1\n`],
+    ["a SQL file", "packages/probe/long.sql", `-- ${FORTY_WORDS}\nSELECT 1;\n`],
+    ["a root script", "scripts/long.mjs", `// ${FORTY_WORDS}\nexport const keep = 1;\n`],
+    ["a hook script", ".claude/hooks/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
+    ["a root configuration file", "lefthook.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
+    ["a workflow", ".github/workflows/probe.yml", `# ${FORTY_WORDS}\nname: probe\n`],
+    ["a deployment script", "deploy/probe.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
+  ])("refuses a 40-word comment in %s, naming the count and its rule", (_what, file, source) => {
     const run = edit(file, source);
 
     expect(run.status).toBe(2);
@@ -199,6 +224,16 @@ describe("the write-time hook is silent where the comment earns its place", () =
     ["a migration separator", "probe/directive.sql", "SELECT 1;\n--> statement-breakpoint\n"],
   ])("lets %s through", (_what, file, source) => {
     const run = edit(`packages/${file}`, source);
+
+    expect(run.status).toBe(0);
+    expect(run.stderr).toBe("");
+  });
+
+  it.each([
+    ["a workflow", ".github/workflows/why.yml", `# ${A_WHY_OF_TWENTY}\nname: probe\n`],
+    ["a deployment script", "deploy/why.sh", `# ${A_WHY_OF_TWENTY}\nKEEP=1\n`],
+  ])("lets a why of twenty words through in %s", (_what, file, source) => {
+    const run = edit(file, source);
 
     expect(run.status).toBe(0);
     expect(run.stderr).toBe("");

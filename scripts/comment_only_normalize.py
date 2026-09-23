@@ -30,6 +30,7 @@ def _without_docstrings(tree: ast.Module) -> ast.Module:
         body = list(node.body)
         if body and _is_docstring(body[0]):
             body = body[1:]
+
         # The two spellings of a placeholder are one body, so both become the same node
         # before the dump.
         if not isinstance(node, ast.Module) and (not body or _is_placeholder(body)):

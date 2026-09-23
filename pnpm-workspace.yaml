@@ -1,18 +1,9 @@
-# `apps/worker/` is a uv workspace, not a pnpm one, and `docs-site/` joins this list the day
-# it is lifted in (AGENTS.md § Layout).
 packages:
   - apps/api
   - apps/web
   - packages/*
 
-# Postinstall scripts run for two packages, each because the script is what puts the
-# platform binary where the caller reaches it — esbuild for vite and drizzle-kit, ast-grep
-# for the strip script the root `strip-comments` runs. The other three are optional native
-# accelerations we do not take. lefthook is `false` for a different reason: its postinstall
-# would wire a hook into `.git`, and that is the root `prepare` script's job, where it is
-# visible — `lefthook.yml`'s header says so.
-# `false` rather than no entry at all: pnpm 11 makes an undecided build script a hard error
-# (`ERR_PNPM_IGNORED_BUILDS`, exit 1), so silence here would fail every fresh install.
+# `false` rather than no entry: pnpm 11 makes an undecided build script a hard error.
 allowBuilds:
   '@ast-grep/cli': true
   cpu-features: false
@@ -21,18 +12,10 @@ allowBuilds:
   protobufjs: false
   ssh2: false
 
-# pnpm 11 holds back releases younger than its minimum age; these were taken at their
-# current version deliberately, read from the registry on the day.
 minimumReleaseAgeExclude:
   - zod@4.5.4
   - '@aws-sdk/client-s3@3.1130.0'
   - '@aws-sdk/lib-storage@3.1130.0'
 
-# A patch is a liability at every upgrade, so each one carries its reason here and the
-# ticket that would retire it. @stryker-mutator/vitest-runner: a test file that failed to
-# load — a mutant threw while a module it imports was loading — is read by 10.0.0 as no
-# tests run, and the mutant that broke the import is reported as survived with
-# testsCompleted: 0; the patch counts the file's failure as one failed test named for it
-# (T-107; both stryker.config.mjs files say more). Retired when the fix is upstream.
 patchedDependencies:
   '@stryker-mutator/vitest-runner@10.0.0': patches/@stryker-mutator__vitest-runner@10.0.0.patch

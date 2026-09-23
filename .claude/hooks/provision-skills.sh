@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# .claude/hooks/provision-skills.sh <worktree-path>
-#
-# The skills stage of provisioning: gives a worktree the agent tooling a checkout cannot
-# carry. Run by .claude/hooks/provision-worktree.sh after the installs; runnable by hand.
-#
 SKILLS_CLI="skills@1.5.24"
 
 USAGE="Usage: provision-skills.sh <worktree-path>"
@@ -17,12 +12,9 @@ COMMON_DIR="$(git -C "$WORKTREE_PATH" rev-parse --path-format=absolute --git-com
 PRIMARY_PATH="$(cd "$(dirname "$COMMON_DIR")" && pwd -P)"
 
 say() { echo "  skills: $*" >&2; }
-# A path that is there — including a dangling link, which `-e` alone would miss.
+# A path that is there — a dangling link included, which `-e` alone would miss.
 present() { [ -e "$1" ] || [ -L "$1" ]; }
 has_entries() { [ -d "$1" ] && [ -n "$(ls -A "$1" 2>/dev/null)" ]; }
-# Every `.claude/skills` directory under a tree, relative to it: the root's at depth two
-# and a workspace's at depth four. The worktrees, the installs and the dependency trees
-# are pruned rather than merely excluded, so a large `node_modules` is not walked.
 skill_dirs() {
   (
     cd "$1" && find . -maxdepth 4 \
@@ -34,7 +26,6 @@ skill_dirs() {
 
 STATUS=0
 
-# --- copy: every entry the primary has and the worktree does not ---
 if [ "$PRIMARY_PATH" != "$WORKTREE_PATH" ]; then
   ENTRIES=("skills-lock.json")
   for entry in "$PRIMARY_PATH"/.agents/skills/*; do
@@ -52,7 +43,6 @@ if [ "$PRIMARY_PATH" != "$WORKTREE_PATH" ]; then
     present "$src" || continue
     present "$dst" && continue
     mkdir -p "$(dirname "$dst")"
-    # -R copies a directory whole; -P keeps a link a link rather than copying its target.
     cp -RP "$src" "$dst"
     COPIED=$((COPIED + 1))
   done
@@ -63,7 +53,6 @@ if [ "$PRIMARY_PATH" != "$WORKTREE_PATH" ]; then
   fi
 fi
 
-# --- reinstall: a worktree with no skills after the copy is restored from the manifest ---
 if ! has_entries "$WORKTREE_PATH/.agents/skills"; then
   if [ ! -f "$WORKTREE_PATH/skills-lock.json" ]; then
     say "FAILED — no installed skills to copy from $PRIMARY_PATH, and no skills-lock.json to reinstall from"
@@ -80,7 +69,6 @@ if ! has_entries "$WORKTREE_PATH/.agents/skills"; then
   fi
 fi
 
-# --- verify: every skill link, the root's and each workspace's, resolves inside the worktree ---
 LINKS=0
 BROKEN=0
 while IFS= read -r dir; do
@@ -89,8 +77,8 @@ while IFS= read -r dir; do
     LINKS=$((LINKS + 1))
     name="$dir/$(basename "$link")"
     target="$(readlink "$link")"
-    # Resolved physically from the link's own directory, the way a reader of the link will;
-    # the target's parent is entered rather than the target, so a link to a file resolves too.
+    # Resolved from the link's own directory, the way a reader will; the target's parent is
+    # entered, so a link to a file resolves too.
     parent="$(cd "$(dirname "$link")" && cd -P "$(dirname "$target")" 2>/dev/null && pwd -P || true)"
     resolved="$parent/$(basename "$target")"
     if [ -z "$parent" ] || ! [ -e "$resolved" ]; then

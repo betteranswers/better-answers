@@ -21,8 +21,6 @@ const WORKSPACES = [
   "packages/schema",
 ];
 
-// The config tree: every root the spec names, and the migrations, which sit inside a workspace
-// but are measured and stripped on their own.
 const CONFIG_ROOTS = [
   ".claude/hooks",
   ".github/actions",
@@ -63,10 +61,9 @@ const DIRECTIVE = String.raw`(eslint|oxlint|biome)-(disable|enable)|@ts-|prettie
 // block carrying it on line two.
 const KEPT = String.raw`^(#!|///|//\s*(${DIRECTIVE}|@vitest-environment)|/\*!|/\*\s*(${DIRECTIVE}|jscpd:ignore)|#\s*(type:|noqa(:|$)|pragma:|ruff:|mypy:|fmt:\s*(on|off)))|(?i:spdx-license-identifier|copyright|@license|@preserve|lifted from|third-party notice)`;
 
-// The strip goes root by root, so `--only` names the one this run touches. Everything else,
-// the already-restored code tiers among them, stands.
 const parseArguments = (argv) => {
   let root = checkout;
+
   /** @type {string[]} */
   const only = [];
   for (let index = 0; index < argv.length; index += 1) {
@@ -96,8 +93,6 @@ const codeLanguage = (extension) => {
   return undefined;
 };
 
-// A config root takes the syntax table as well: the two code tiers, JavaScript, and the YAML,
-// shell, TOML and SQL the table names.
 const configLanguage = (extension) => {
   if (JAVASCRIPT.has(extension)) return "javascript";
   return codeLanguage(extension) ?? LANGUAGE_BY_EXTENSION.get(extension);
@@ -197,8 +192,6 @@ const stripTypeScript = (root, files) => {
   fs.rmSync(rules, { recursive: true, force: true });
 };
 
-// The syntax table's own pass: no parser to shell out to, so the result is written back here,
-// and only where it moved.
 const stripConfig = (files) => {
   let moved = 0;
   for (const found of files) {
@@ -228,8 +221,6 @@ const stripPython = (files) => {
   ]);
 };
 
-// Neither tool collapses the blank line and trailing space it leaves, and the restore pass
-// reads the diff.
 const collapseResidue = (root, typescript, python) => {
   if (typescript.length > 0) {
     run(

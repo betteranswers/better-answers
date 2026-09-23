@@ -1,36 +1,12 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-# .claude/hooks/worktree-remove-hook.sh — Claude Code's `WorktreeRemove` hook.
-#
-# The cleanup half of .claude/hooks/worktree-create-hook.sh. Fires when a worktree subagent
-# finishes, a `--worktree` session exits and chooses removal, or a background session
-# is deleted. Claude Code passes the path the create hook returned as `.worktree_path`
-# and gives this hook no decision: it can tidy, never block, and a failure is logged
-# only in debug mode — so every outcome below exits 0 and says why on stderr.
-#
-# The rule is Claude Code's own for native worktrees: a clean worktree goes, and one
-# holding work stays on disk for a person to look at. "Work" is changed or untracked
-# files, or commits its upstream (or `main`, when it has none) does not have. A
-# hook-created worktree carries no Claude Code marker, so the periodic sweep never
-# removes it; a kept worktree is removed by hand with `git worktree remove --force`.
-#
-# A worktree removed here also gives up its jCodeMunch index, the one
-# .claude/hooks/provision-worktree.sh gave it at creation (T-181): without that, the
-# registry keeps naming a root that is no longer on disk, which is the state the owner's
-# machine was found in — seven create events and no removals, the oldest naming a path
-# gone for a fortnight. A jCodeMunch repository id is not derivable from its path, so it
-# is read from the registry `list-repos --json` prints. Everything about that stage is
-# best effort: this hook tidies and never blocks, so a machine without the tool, a path
-# the registry does not know and a refused delete are each one line on stderr and an
-# exit 0 like every other outcome.
-
+# This hook may tidy and never block, so every outcome below exits 0 and says why on stderr.
 INPUT="$(cat)"
 WT="$(printf '%s' "$INPUT" | jq -r '.worktree_path // empty' 2>/dev/null || true)"
 [ -n "$WT" ] || { echo "worktree-remove-hook: no worktree_path in input" >&2; exit 0; }
 [ -d "$WT" ] || { echo "worktree-remove-hook: $WT already gone" >&2; exit 0; }
-# Physically, and before the removal: the registry holds resolved roots, and the path
-# cannot be resolved once the directory it names has gone.
+# Physically, and before the removal: a path cannot be resolved once its directory has gone.
 WT_REAL="$(cd "$WT" && pwd -P)"
 
 keep() {
@@ -68,7 +44,7 @@ else
 fi
 [ "$AHEAD" -eq 0 ] || keep "it has $AHEAD commit(s) $AGAINST does not have (branch $BRANCH)"
 
-# The main checkout owns the worktree list; resolve it from the shared .git directory.
+# The main checkout owns the worktree list; resolve it from the shared `.git` directory.
 COMMON="$(git -C "$WT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
 ROOT="$(dirname "$COMMON")"
 

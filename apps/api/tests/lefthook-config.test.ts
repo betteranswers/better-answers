@@ -30,6 +30,8 @@ const lefthook = z.object({
 });
 type Lefthook = z.infer<typeof lefthook>;
 
+const LOCAL_GATES = "docs/operations/local-gates.md";
+
 const config = (): Lefthook => lefthook.parse(parse(read("lefthook.yml")));
 
 const preCommit = () => {
@@ -60,8 +62,34 @@ const declaredBinary = (packageName: string, binaryName: string = packageName): 
   return path.join(path.dirname(manifestPath), relative);
 };
 
+const manifestScripts = (workspace: string): Readonly<Record<string, string>> =>
+  z
+    .object({ scripts: z.record(z.string(), z.string()) })
+    .parse(JSON.parse(read(`${workspace}/package.json`))).scripts;
+
+const SCRIPT_CALL = /(?:pnpm run|check\.mjs)\s+([\w:.\- ]+)/g;
+
+// A delegating command names its binary in the script it runs, or in the steps that script
+// hands the `check` runner.
+const reachedFrom = (workspace: string, run: string): string => {
+  const scripts = manifestScripts(workspace);
+  const namedIn = (text: string): readonly string[] =>
+    [...text.matchAll(SCRIPT_CALL)].flatMap(([, list]) => (list ?? "").trim().split(/\s+/));
+  const bodies = (names: readonly string[]): readonly string[] =>
+    names.flatMap((name) => (scripts[name] === undefined ? [] : [scripts[name]]));
+
+  const first = bodies(namedIn(run));
+  if (first.length === 0) throw new Error(`\`${run}\` reaches no script ${workspace} declares`);
+  return [...first, ...bodies(first.flatMap(namedIn))].join("\n");
+};
+
 type Proof =
-  | { readonly kind: "npm"; readonly package: string; readonly binary?: string }
+  | {
+      readonly kind: "npm";
+      readonly package: string;
+      readonly binary?: string;
+      readonly via?: string;
+    }
   | { readonly kind: "uv" }
   | { readonly kind: "guarded"; readonly binary: string };
 
@@ -78,29 +106,31 @@ const HOOK: Readonly<Record<string, { readonly glob: string | undefined; readonl
 
     "api-typecheck": {
       glob: "*.{ts,tsx}",
-      proof: { kind: "npm", package: "typescript", binary: "tsc" },
+      proof: { kind: "npm", package: "typescript", binary: "tsc", via: "apps/api" },
     },
     "web-typecheck": {
       glob: "*.{ts,tsx}",
-      proof: { kind: "npm", package: "typescript", binary: "tsc" },
+      proof: { kind: "npm", package: "typescript", binary: "tsc", via: "apps/web" },
     },
     "core-typecheck": {
       glob: "*.{ts,tsx}",
-      proof: { kind: "npm", package: "typescript", binary: "tsc" },
+      proof: { kind: "npm", package: "typescript", binary: "tsc", via: "packages/core" },
     },
     "schema-typecheck": {
       glob: "*.{ts,tsx}",
-      proof: { kind: "npm", package: "typescript", binary: "tsc" },
+      proof: { kind: "npm", package: "typescript", binary: "tsc", via: "packages/schema" },
     },
     "devtools-typecheck": {
       glob: "*.{ts,tsx}",
-      proof: { kind: "npm", package: "typescript", binary: "tsc" },
+      proof: { kind: "npm", package: "typescript", binary: "tsc", via: "packages/devtools" },
     },
   };
 
-const npmCommands = (): readonly (readonly [string, string, string])[] =>
+const npmCommands = (): readonly (readonly [string, string, string, string | undefined])[] =>
   Object.entries(HOOK).flatMap(([name, { proof }]) =>
-    proof.kind === "npm" ? [[name, proof.package, proof.binary ?? proof.package] as const] : [],
+    proof.kind === "npm"
+      ? [[name, proof.package, proof.binary ?? proof.package, proof.via] as const]
+      : [],
   );
 
 const uvCommands = (): readonly string[] =>
@@ -169,8 +199,9 @@ describe("the pre-commit hook (T-070)", () => {
 
   it.each(npmCommands())(
     "runs `%s` from a binary this repository's own packages declare",
-    (command, packageName, binaryName) => {
-      expect(runOf(command)).toContain(binaryName);
+    (command, packageName, binaryName, via) => {
+      const naming = via === undefined ? runOf(command) : reachedFrom(via, runOf(command));
+      expect(naming).toContain(binaryName);
       expect(existsSync(declaredBinary(packageName, binaryName))).toBe(true);
     },
   );
@@ -203,17 +234,21 @@ describe("the pre-commit hook (T-070)", () => {
       }
     }
 
-    const header = read("lefthook.yml").split(/^[^#\s]/m)[0] ?? "";
-    expect(header).toContain("worst case");
-    expect(header).toMatch(/\d+(\.\d+)?s/);
+    const operations = read(LOCAL_GATES);
+    expect(operations).toContain("worst case");
+    expect(operations).toMatch(/\d+(\.\d+)?s/);
   });
 
-  it("documents both escape hatches and the typecheck's own workspace limit in its header", () => {
-    const header = read("lefthook.yml").split(/^[^#\s]/m)[0] ?? "";
-    expect(header).toContain("LEFTHOOK=0");
-    expect(header).toContain("LEFTHOOK_EXCLUDE");
+  it("documents both escape hatches and the typecheck's own workspace limit where it is read", () => {
+    const operations = read(LOCAL_GATES);
+    expect(operations).toContain("LEFTHOOK=0");
+    expect(operations).toContain("LEFTHOOK_EXCLUDE");
 
-    expect(header).toContain("root `check` owns the cross-workspace case");
+    expect(operations).toContain("root `check` owns the cross-workspace case");
+  });
+
+  it("sends a reader of the hook file to the document that holds the rest", () => {
+    expect(read("lefthook.yml")).toContain(LOCAL_GATES);
   });
 
   it("is installed by a root `prepare` script, so a fresh clone needs no remembered step", () => {

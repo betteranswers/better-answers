@@ -5,7 +5,7 @@ import path from "node:path";
 
 import esbuild from "esbuild";
 
-import { LANGUAGE_BY_EXTENSION, normalized } from "./config-comments.mjs";
+import { CUSTOM_MIGRATION, LANGUAGE_BY_EXTENSION, normalized } from "./config-comments.mjs";
 import { workerPython } from "./worker-python.mjs";
 
 const checkout = path.resolve(import.meta.dirname, "..");
@@ -49,8 +49,9 @@ const typeScriptDigest = (file, source) =>
       loader: loaderFor(file),
       jsx: "transform",
       legalComments: "none",
-      // The transform alone keeps a comment sitting on a property; only minified whitespace
-      // drops every one. Identifiers and syntax stay, or a renamed local reads as unchanged.
+
+      // Only minified whitespace drops a comment sitting on a property; identifiers and
+      // syntax stay, or a renamed local reads as unchanged.
       minifyWhitespace: true,
       minifyIdentifiers: false,
       minifySyntax: false,
@@ -61,8 +62,6 @@ const typeScriptDigest = (file, source) =>
 const PYYAML = "pyyaml==6.0.3";
 const NOTHING_ASKED = { digests: {}, errors: {}, data: {}, unread: {} };
 
-// One crossing for both readings: the Python tier's own normalisation, and the YAML and TOML
-// parse that answers for the syntax table.
 const pythonAnswers = (sources, data) => {
   if (Object.keys(sources).length + Object.keys(data).length === 0) return NOTHING_ASKED;
   const answer = spawnSync(
@@ -210,10 +209,8 @@ export const Screen = () => (
 const FIXTURE_PY = `#!/usr/bin/env python3
 """The module docstring."""
 
-
 def waited() -> None:
     """Only a docstring."""
-
 
 def answered(value: int) -> int:
     # the caller already checked the bound
@@ -286,7 +283,7 @@ ignore = ["E501"]  # the formatter owns the line length
 banner = "a # inside a string is the value"
 `;
 
-const FIXTURE_SQL = `-- Custom migration (hand-written SQL; ADR 0032).
+const FIXTURE_SQL = `${CUSTOM_MIGRATION}
 -- the substrate's first table, and the counter in front of /oauth2/*
 CREATE TABLE workspace (
   id uuid PRIMARY KEY,

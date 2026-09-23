@@ -12,6 +12,7 @@
     "./mutant-probe": "./src/mutant-probe.ts",
     "./mutation-summary": "./src/mutation-summary.ts",
     "./oxlint-config": "./src/oxlint-config.ts",
+    "./root-commands": "./src/root-commands.ts",
     "./throwaway-tree": "./src/throwaway-tree.ts"
   },
   "scripts": {

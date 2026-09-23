@@ -9,10 +9,9 @@ import {
   reportOf,
 } from "@better-answers/devtools/comment-density";
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
+
+import { rootScripts } from "@better-answers/devtools/root-commands";
 
 import type { Unit } from "@better-answers/devtools/comment-density";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
@@ -20,8 +19,8 @@ import type { Tree } from "@better-answers/devtools/throwaway-tree";
 const WORKSPACE = "packages/probe";
 const MIGRATIONS = `${WORKSPACE}/migrations`;
 
-const asWorkspace: Unit = { path: WORKSPACE, kind: "workspace" };
-const asDirectory: Unit = { path: MIGRATIONS, kind: "directory" };
+const asWorkspace: Unit = { name: WORKSPACE, kind: "workspace" };
+const asDirectory: Unit = { name: MIGRATIONS, kind: "directory" };
 
 const commentLine = "// one comment line that says nothing the code does not\n";
 const codeLine = (index: number): string =>
@@ -58,6 +57,13 @@ const DILUTED_OVER = diluting(sqlWithRatio(30, 40));
 const DILUTED_UNDER = diluting(sqlWithRatio(2, 40));
 
 const cloc = clocOver([WORKSPACE], { tree: UNDER, counted: 2 });
+
+const yamlComment = "# one comment line that says nothing the key does not\n";
+const yamlLine = (index: number): string => `keep${String(index)}: ${String(index)}\n`;
+
+const yamlWithRatio = (comments: number, code: number): string =>
+  yamlComment.repeat(comments) +
+  Array.from({ length: code }, (_, index) => yamlLine(index)).join("");
 
 describe("the line counter reads what the ceiling is measured on", () => {
   it("counts a Python docstring as a comment, which the ceiling leans on", () => {
@@ -247,18 +253,84 @@ describe("the ceiling's wrapper, asked for something it does not offer", () => {
   });
 });
 
-describe("the root manifest names the migrations as a unit of their own", () => {
-  it("measures them with --directory, so the schema's TypeScript cannot dilute their SQL", () => {
-    const root = z
-      .looseObject({ scripts: z.record(z.string(), z.string()).default({}) })
-      .parse(
-        JSON.parse(
-          readFileSync(path.resolve(import.meta.dirname, "../../../package.json"), "utf8"),
-        ),
-      );
+const CONFIG_FILES = ["one.yml", "two.mjs"] as const;
+const NAMED = "the-root-tool-configuration";
 
-    expect(root.scripts["comment-density"] ?? "").toContain(
-      "--directory packages/schema/migrations",
-    );
+const configTree = (comments: number): Tree => ({
+  [`${WORKSPACE}/package.json`]: "{}",
+  [CONFIG_FILES[0]]: yamlWithRatio(comments, 20),
+  [CONFIG_FILES[1]]: withRatio(comments, 20),
+});
+
+const asNamed: Unit = { name: NAMED, kind: "directory", holds: [...CONFIG_FILES] };
+
+const clocConfig = clocOver([...CONFIG_FILES], { tree: configTree(1), counted: 2 });
+
+describe("a set of files measured as one named unit", () => {
+  it("adds the files up under the name rather than each on its own", () => {
+    const measured = measure(clocConfig(configTree(1)), [asNamed]);
+
+    expect(measured).toHaveLength(1);
+    expect(measured[0]?.unit).toBe(NAMED);
+    expect(measured[0]?.code).toBe(40);
+    expect(overTheCeiling(measured)).toEqual([]);
+  });
+
+  it("fails under the one name when the set as a whole is over the ceiling", () => {
+    const over = overTheCeiling(measure(clocConfig(configTree(6)), [asNamed]));
+
+    expect(over.map((one) => one.unit)).toEqual([NAMED]);
+  });
+});
+
+describe("the ceiling's wrapper over a set named as one unit", () => {
+  const wrapper = runsOverThrowawayTree({
+    executable: WRAPPER_EXECUTABLE,
+    argv: ["packages", "--unit", `${NAMED}=${CONFIG_FILES.join(",")}`],
+    foundSomething: [1],
+    smoke: { tree: configTree(6), reports: (output) => output.includes(`${NAMED} source:`) },
+  });
+
+  it("names the set, not the files, when it is over the ceiling", () => {
+    const output = wrapper(configTree(6));
+
+    expect(output).toContain(`${NAMED} source:`);
+    expect(output).not.toContain(CONFIG_FILES[0]);
+  });
+
+  it("passes over a set under the ceiling", () => {
+    expect(wrapper(configTree(1))).toContain("under the ceiling");
+  });
+
+  it("refuses a named file the tree does not hold, rather than measuring what is left", () => {
+    expect(() =>
+      wrapper({ [`${WORKSPACE}/package.json`]: "{}", [CONFIG_FILES[0]]: "keep: 1\n" }),
+    ).toThrow(new RegExp(`${NAMED} names no ${CONFIG_FILES[1]}`));
+  });
+
+  it("refuses a --unit that names no set", () => {
+    expect(() =>
+      runsOverThrowawayTree({
+        executable: WRAPPER_EXECUTABLE,
+        argv: ["packages", "--unit", "nothing-after-the-name"],
+        foundSomething: [],
+        smoke: { tree: UNDER, reports: () => true },
+      })(UNDER),
+    ).toThrow(/--unit takes <name>=<path>/);
+  });
+});
+
+describe("the root manifest names each config root as a unit of its own", () => {
+  it.each([
+    "--directory packages/schema/migrations",
+    "--directory .claude/hooks",
+    "--directory scripts",
+    `--unit ${NAMED}=`,
+  ])("measures %s apart from the workspaces beside it", (named) => {
+    expect(rootScripts()["comment-density"] ?? "").toContain(named);
+  });
+
+  it("names the root scripts in the TypeScript comment gate's own command", () => {
+    expect((rootScripts()["comment-gate:ts"] ?? "").split(/\s+/)).toContain("scripts");
   });
 });
