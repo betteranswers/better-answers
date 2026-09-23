@@ -15,10 +15,11 @@ from .pins import VERSION_STRING
 from .pseudonyms import normalised, pseudonyms_for, written_as
 from .restores import Restore
 from .withholdings import (
-    UNDER_ITS_OWN_PLACEHOLDER,
     Policy,
     Withholding,
+    WrittenSpan,
     withholdings_over,
+    written_spans_of,
 )
 
 __all__ = ["Redaction", "Restore", "redact"]
@@ -34,6 +35,7 @@ class Redaction:
     text: str
     findings: tuple[Finding, ...]
     withholdings: tuple[Withholding, ...]
+    written_spans: tuple[WrittenSpan, ...]
     counts: Mapping[str, int]
     verdict: str | None
     version: str
@@ -61,10 +63,12 @@ def redact(
     letters = pseudonyms_for(_names_in(text, findings), policy.seed)
 
     withholdings = withholdings_over(findings, text, policy)
+    written_spans = written_spans_of(withholdings)
     return Redaction(
-        text=_written(text, withholdings, letters),
+        text=_written(text, written_spans, letters),
         findings=findings,
         withholdings=withholdings,
+        written_spans=written_spans,
         counts=_counted(findings),
         verdict=_verdict_of(findings),
         version=VERSION_STRING,
@@ -92,20 +96,20 @@ def _placeholder_of(
 
 
 def _written(
-    text: str, withholdings: Sequence[Withholding], letters: Mapping[str, str]
+    text: str, written_spans: Sequence[WrittenSpan], letters: Mapping[str, str]
 ) -> str:
 
+    # The spans arrive in offset order, so writing from the last keeps every earlier
+    # offset true of the text being rewritten.
     redacted = text
-    for withholding in sorted(
-        (one for one in withholdings if one.written == UNDER_ITS_OWN_PLACEHOLDER),
-        key=lambda it: it.finding.start,
-        reverse=True,
-    ):
-        finding = withholding.finding
+    for span in reversed(written_spans):
+        finding = span.withholding.finding
         redacted = (
-            redacted[: finding.start]
-            + _placeholder_of(withholding, text[finding.start : finding.end], letters)
-            + redacted[finding.end :]
+            redacted[: span.start]
+            + _placeholder_of(
+                span.withholding, text[finding.start : finding.end], letters
+            )
+            + redacted[span.end :]
         )
     return redacted
 

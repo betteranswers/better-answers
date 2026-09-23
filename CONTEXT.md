@@ -222,14 +222,17 @@ Where a unit lives is decided by **minting**.
   and the like for the rest, `[person A]` for a pseudonymised name. The latter two are **typed
   placeholders** — each names the class of data taken, one word per category — where the always
   set has the one neutral word for everything in it, so that a reader is never told what class of
-  data the document held. It is the word a *withholding* writes.
+  data the document held. It is the word written over a *written span*.
 - **withholding** — what one binding does with one *finding* on one run: *withheld* or *left in
   the text*, at a tier, for one **reason**, the first of these that holds — *overridden by the
   erasure* (a request names it and an Admin had kept it) · *erasure* (a request names it) ·
-  *restored* · *switched off* · *in force*. Beside the reason, how it was **written**: under its
-  own placeholder, under another finding's, or not at all — a withheld finding inside a longer
-  withheld span is written under that span's word and is no less withheld. A finding is never
-  rewritten by a withholding. _Avoid_: decision, detection.
+  *restored* · *switched off* · *in force*. It says nothing of where a placeholder lands; the
+  *written spans* do. A finding is never rewritten by a withholding. _Avoid_: decision, detection.
+- **written span** — the run of characters one placeholder is written over, naming the
+  *withholding* it writes for. Every character of a withheld finding lies under exactly one, so a
+  finding that loses part of its run to another keeps its own word over the rest. How a finding
+  was **written** is read off the spans: under its own placeholder where one names it, under
+  another finding's where others cover every character of it, not at all otherwise.
 - **emptying a binding** — deleting a binding's derived rows in the app's transaction and
   removing that binding's store in the run the same act enqueues. The two go together, whatever
   asked for them: the store is the engine's target-state tracking, so rows deleted beside a store

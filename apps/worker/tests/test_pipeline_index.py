@@ -28,7 +28,6 @@ from better_answers_worker.redaction.pins import DETECTOR_PIN, RULE_VERSION
 from better_answers_worker.redaction.withholdings import (
     AN_ERASURE,
     IN_FORCE,
-    UNDER_ITS_OWN_PLACEHOLDER,
     Withholding,
 )
 from factories import (
@@ -979,7 +978,6 @@ def test_the_insert_steps_over_a_known_span_and_over_no_other_collision(
                 withheld=True,
                 tier="always",
                 reason=IN_FORCE,
-                written=UNDER_ITS_OWN_PLACEHOLDER,
             ),
         ),
         counts=(("bank-details", 1),),
@@ -1021,7 +1019,6 @@ def test_a_rows_tier_is_the_one_the_withholding_names_and_not_the_findings(
                 withheld=True,
                 tier="always",
                 reason=AN_ERASURE,
-                written=UNDER_ITS_OWN_PLACEHOLDER,
             ),
         ),
         counts=(("person-name", 1),),

@@ -3,18 +3,16 @@ from collections.abc import Mapping, Sequence
 import pytest
 
 from better_answers_worker.redaction import Redaction, Restore, redact
-from better_answers_worker.redaction.engine import Span, spans_detected
+from better_answers_worker.redaction.engine import Finding, Span, spans_detected
 from better_answers_worker.redaction.pins import VERSION_STRING
 from better_answers_worker.redaction.withholdings import (
     AN_ERASURE,
     IN_FORCE,
-    NOT_WRITTEN_AT_ALL,
     OVERRIDDEN_BY_THE_ERASURE,
     RESTORED,
     SWITCHED_OFF,
-    UNDER_ANOTHER_FINDINGS_PLACEHOLDER,
-    UNDER_ITS_OWN_PLACEHOLDER,
     Withholding,
+    WrittenSpan,
     overridden_in,
 )
 from planted_page import (
@@ -80,6 +78,42 @@ DATE_IN_CONTEXT = "3 February 1978"
 FENCED_SORT_CODE = "00-00-99 ACCOUNT=87654321"
 
 
+UNDER_ITS_OWN_PLACEHOLDER = "its-own-placeholder"
+
+
+UNDER_ANOTHER_FINDINGS_PLACEHOLDER = "another-findings-placeholder"
+
+
+NOT_WRITTEN_AT_ALL = "not-at-all"
+
+
+A_PARTIAL_OVERLAP = "Write to 12 Acacia Avenue, Leeds LS1 4AB tel 0113 496 0000 today"
+
+
+AN_ADDRESS_THE_BANK_RULE_RAN_INTO = (
+    "Pay Imogen Sarkar, 12 Acacia Avenue, Leeds LS1 4AB 20-45-77 41234567 today"
+)
+
+
+def span_over(text: str, rule_id: str, run: str) -> Span:
+    start = text.index(run)
+    return Span(rule_id=rule_id, start=start, end=start + len(run), score=0.9)
+
+
+def redacted_over(
+    text: str, claims: Sequence[tuple[str, str]], rules_in_force: Mapping[str, bool]
+) -> Redaction:
+    spans = tuple(span_over(text, rule_id, run) for rule_id, run in claims)
+    return redact(text, spans, rules_in_force, NO_SUPPRESSIONS, SEED)
+
+
+def written_runs(found: Redaction, text: str) -> list[tuple[str, str]]:
+    return [
+        (text[span.start : span.end], span.withholding.finding.rule_id)
+        for span in found.written_spans
+    ]
+
+
 @pytest.fixture(scope="module")
 def page() -> str:
     return FIXTURE_PAGE.read_text(encoding="utf-8")
@@ -113,6 +147,15 @@ def under_another_seed(page: str, spans: tuple[Span, ...]) -> Redaction:
 @pytest.fixture(scope="module")
 def with_one_name_suppressed(page: str, spans: tuple[Span, ...]) -> Redaction:
     return redact(page, spans, AN_HR_SHAPED_BINDING, ONE_NAME_SUPPRESSED, SEED)
+
+
+@pytest.fixture(scope="module")
+def with_a_partial_overlap() -> Redaction:
+    claims = (
+        ("UK_HOME_ADDRESS", "12 Acacia Avenue, Leeds LS1 4AB"),
+        ("PHONE_NUMBER", "LS1 4AB tel 0113 496 0000"),
+    )
+    return redacted_over(A_PARTIAL_OVERLAP, claims, THE_SAFE_SET)
 
 
 def spans_under(found: Redaction, page: str, category: str) -> list[str]:
@@ -156,12 +199,17 @@ def reasons_over(found: Redaction, page: str, span: str) -> set[str]:
     return {withholding.reason for withholding in withholdings_over(found, page, span)}
 
 
-def under_their_own_placeholder(found: Redaction) -> list[tuple[int, int]]:
-    return [
-        (withholding.finding.start, withholding.finding.end)
-        for withholding in found.withholdings
-        if withholding.written == UNDER_ITS_OWN_PLACEHOLDER
-    ]
+def written_over(found: Redaction, offset: int) -> list[WrittenSpan]:
+    return [span for span in found.written_spans if span.start <= offset < span.end]
+
+
+def how_written(found: Redaction, withholding: Withholding) -> str:
+    if any(span.withholding == withholding for span in found.written_spans):
+        return UNDER_ITS_OWN_PLACEHOLDER
+    finding = withholding.finding
+    if all(written_over(found, offset) for offset in range(finding.start, finding.end)):
+        return UNDER_ANOTHER_FINDINGS_PLACEHOLDER
+    return NOT_WRITTEN_AT_ALL
 
 
 def test_every_span_is_cut_back_out_of_the_text_by_the_offsets_it_came_with(
@@ -461,11 +509,19 @@ def test_a_signatory_named_inside_a_home_address_is_withheld_with_its_block(
         assert end_of_the_address not in on_a_plain_binding.text
 
     (his_name,) = withholdings_over(on_a_plain_binding, page, A_FOURTH_OFFICER)
+    (the_address,) = withholdings_over(
+        on_a_plain_binding, page, AN_ADDRESS_AROUND_A_NAME
+    )
 
-    assert (his_name.withheld, his_name.written) == (
+    assert (his_name.withheld, how_written(on_a_plain_binding, his_name)) == (
         True,
         UNDER_ANOTHER_FINDINGS_PLACEHOLDER,
     )
+    assert [
+        (page[span.start : span.end], span.withholding)
+        for span in on_a_plain_binding.written_spans
+        if span.start < the_address.finding.end and the_address.finding.start < span.end
+    ] == [(AN_ADDRESS_AROUND_A_NAME, the_address)]
 
     assert A_FOURTH_OFFICER not in with_nothing_switchable_on.text
     for end_of_the_address in A_STREET_AND_ITS_POSTCODE:
@@ -475,10 +531,10 @@ def test_a_signatory_named_inside_a_home_address_is_withheld_with_its_block(
         with_nothing_switchable_on, page, A_FOURTH_OFFICER
     )
 
-    assert (under_no_address.withheld, under_no_address.written) == (
-        True,
-        UNDER_ITS_OWN_PLACEHOLDER,
-    )
+    assert (
+        under_no_address.withheld,
+        how_written(with_nothing_switchable_on, under_no_address),
+    ) == (True, UNDER_ITS_OWN_PLACEHOLDER)
 
 
 def test_a_suppressed_name_is_withheld_and_every_other_name_is_untouched(
@@ -526,6 +582,7 @@ def test_the_same_inputs_twice_give_identical_output(
     assert again.text == on_an_hr_shaped_binding.text
     assert again.findings == on_an_hr_shaped_binding.findings
     assert again.withholdings == on_an_hr_shaped_binding.withholdings
+    assert again.written_spans == on_an_hr_shaped_binding.written_spans
     assert again.counts == on_an_hr_shaped_binding.counts
     assert again.verdict == on_an_hr_shaped_binding.verdict
     assert again.version == on_an_hr_shaped_binding.version
@@ -685,12 +742,13 @@ def test_a_restore_moves_neither_the_counts_nor_the_verdict_the_findings_give(
     assert found.counts == on_a_plain_binding.counts
 
 
-def test_a_withheld_finding_lies_under_a_written_placeholder_and_a_kept_one_writes_none(
+def test_each_withheld_character_lies_under_one_written_span_and_a_kept_one_writes_none(
     on_a_plain_binding: Redaction,
     with_nothing_switchable_on: Redaction,
     on_an_hr_shaped_binding: Redaction,
     under_another_seed: Redaction,
     with_one_name_suppressed: Redaction,
+    with_a_partial_overlap: Redaction,
 ) -> None:
 
     for found in (
@@ -699,17 +757,186 @@ def test_a_withheld_finding_lies_under_a_written_placeholder_and_a_kept_one_writ
         on_an_hr_shaped_binding,
         under_another_seed,
         with_one_name_suppressed,
+        with_a_partial_overlap,
     ):
-        written = under_their_own_placeholder(found)
-
-        assert written
+        assert found.written_spans
+        for span in found.written_spans:
+            finding = span.withholding.finding
+            assert span.withholding in found.withholdings, span
+            assert span.withholding.withheld, span
+            assert finding.start <= span.start < span.end <= finding.end, span
         for withholding in found.withholdings:
             finding = withholding.finding
-            if not withholding.withheld:
-                assert withholding.written == NOT_WRITTEN_AT_ALL, finding
-                continue
-            assert any(
-                opened <= finding.start and finding.end <= shut
-                for opened, shut in written
-            ), (withholding.reason, finding)
-            assert withholding.written != NOT_WRITTEN_AT_ALL, finding
+            if withholding.withheld:
+                assert [
+                    offset
+                    for offset in range(finding.start, finding.end)
+                    if len(written_over(found, offset)) != 1
+                ] == [], (withholding.reason, finding)
+
+
+def test_a_loser_of_a_partial_overlap_gives_up_only_the_characters_the_winner_takes(
+    with_a_partial_overlap: Redaction,
+) -> None:
+
+    the_address, the_phone = with_a_partial_overlap.withholdings
+
+    assert [
+        (span.start, span.end, span.withholding)
+        for span in with_a_partial_overlap.written_spans
+    ] == [(9, 40, the_address), (40, 58, the_phone)]
+    assert [
+        (one.finding.category, one.tier, one.finding.rule_id)
+        for one in (the_address, the_phone)
+    ] == [
+        ("home-address", "default-on", "UK_HOME_ADDRESS"),
+        ("personal-contact", "default-on", "PHONE_NUMBER"),
+    ]
+    assert with_a_partial_overlap.text == (
+        "Write to [home address withheld][personal contact withheld] today"
+    )
+
+
+def test_a_trimmed_loser_is_still_the_finding_it_was_raised_as(
+    with_a_partial_overlap: Redaction,
+) -> None:
+
+    the_address = Finding(
+        category="home-address",
+        tier="default-on",
+        rule_id="UK_HOME_ADDRESS",
+        start=9,
+        end=40,
+        score=0.9,
+    )
+    the_phone = Finding(
+        category="personal-contact",
+        tier="default-on",
+        rule_id="PHONE_NUMBER",
+        start=33,
+        end=58,
+        score=0.9,
+    )
+
+    assert with_a_partial_overlap.findings == (the_address, the_phone)
+    assert with_a_partial_overlap.withholdings == (
+        Withholding(the_address, withheld=True, tier="default-on", reason=IN_FORCE),
+        Withholding(the_phone, withheld=True, tier="default-on", reason=IN_FORCE),
+    )
+    assert with_a_partial_overlap.counts == {"home-address": 1, "personal-contact": 1}
+    assert with_a_partial_overlap.verdict is None
+    assert overridden_in(with_a_partial_overlap.withholdings) == ()
+
+
+@pytest.mark.parametrize(
+    ("text", "claims", "written"),
+    [
+        pytest.param(
+            "From 12 Acacia Avenue, Leeds LS1 4AB tel 0113 496 0000"
+            " to 9 Kestrel Lane, Wetherby LS22 4TD",
+            (
+                ("UK_HOME_ADDRESS", "12 Acacia Avenue, Leeds LS1 4AB"),
+                ("PHONE_NUMBER", "LS1 4AB tel 0113 496 0000 to 9"),
+                ("UK_HOME_ADDRESS", "9 Kestrel Lane, Wetherby LS22 4TD"),
+            ),
+            [
+                ("12 Acacia Avenue, Leeds LS1 4AB", "UK_HOME_ADDRESS"),
+                (" tel 0113 496 0000 to ", "PHONE_NUMBER"),
+                ("9 Kestrel Lane, Wetherby LS22 4TD", "UK_HOME_ADDRESS"),
+            ],
+            id="beaten on both sides",
+        ),
+        pytest.param(
+            A_PARTIAL_OVERLAP,
+            (
+                ("UK_HOME_ADDRESS", "12 Acacia Avenue, Leeds LS1 4AB"),
+                ("PHONE_NUMBER", "LS1 4AB tel 0113 496 0000"),
+                ("UK_HOME_ADDRESS", "Leeds LS1 4AB tel"),
+            ),
+            [
+                ("12 Acacia Avenue, Leeds LS1 4AB", "UK_HOME_ADDRESS"),
+                (" tel 0113 496 0000", "PHONE_NUMBER"),
+            ],
+            id="covered by two winners between them",
+        ),
+        pytest.param(
+            "NHS number 943 476 5919 on file",
+            (("UK_NHS", "943 476 5919"), ("PHONE_NUMBER", "943 476 5919")),
+            [("943 476 5919", "UK_NHS")],
+            id="the same run claimed by two rules",
+        ),
+    ],
+)
+def test_a_loser_is_written_over_what_its_winners_leave_and_nowhere_if_they_leave_none(
+    text: str, claims: tuple[tuple[str, str], ...], written: list[tuple[str, str]]
+) -> None:
+
+    found = redacted_over(text, claims, THE_SAFE_SET)
+
+    assert written_runs(found, text) == written
+
+
+@pytest.mark.parametrize(
+    "inside",
+    [
+        pytest.param((("PERSON", "Imogen Sarkar"),), id="a finding inside it"),
+        pytest.param(
+            (("PERSON", "Imogen Sarkar"), ("PERSON", "Sarkar")),
+            id="a finding inside a finding inside it",
+        ),
+    ],
+)
+def test_a_finding_inside_a_losing_container_is_withheld_under_what_the_container_keeps(
+    inside: tuple[tuple[str, str], ...],
+) -> None:
+
+    text = AN_ADDRESS_THE_BANK_RULE_RAN_INTO
+    claims = (
+        ("UK_HOME_ADDRESS", "Imogen Sarkar, 12 Acacia Avenue, Leeds LS1 4AB"),
+        *inside,
+        ("UK_BANK_ACCOUNT", "4AB 20-45-77 41234567"),
+    )
+
+    found = redacted_over(text, claims, AN_HR_SHAPED_BINDING)
+
+    assert written_runs(found, text) == [
+        ("Imogen Sarkar, 12 Acacia Avenue, Leeds LS1 ", "UK_HOME_ADDRESS"),
+        ("4AB 20-45-77 41234567", "UK_BANK_ACCOUNT"),
+    ]
+    assert [
+        (one.withheld, how_written(found, one))
+        for one in found.withholdings
+        if one.finding.rule_id == "PERSON"
+    ] == [(True, UNDER_ANOTHER_FINDINGS_PLACEHOLDER)] * len(inside)
+    assert found.text == "Pay [home address withheld][withheld] today"
+
+
+def test_a_name_that_lost_part_of_its_run_is_written_with_the_whole_names_letter() -> (
+    None
+):
+
+    text = (
+        "Imogen Sarkar asked Rosalind Petheridge to write to"
+        " Imogen Sarkar, 9 Kestrel Lane, Wetherby LS22 4TD"
+    )
+    again = text.rindex("Imogen Sarkar")
+    spans = (
+        span_over(text, "PERSON", "Imogen Sarkar"),
+        span_over(text, "PERSON", "Rosalind Petheridge"),
+        Span(
+            rule_id="PERSON", start=again, end=again + len("Imogen Sarkar"), score=0.9
+        ),
+        span_over(text, "UK_HOME_ADDRESS", "Sarkar, 9 Kestrel Lane, Wetherby LS22 4TD"),
+    )
+
+    found = redact(text, spans, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED)
+
+    assert written_runs(found, text) == [
+        ("Imogen Sarkar", "PERSON"),
+        ("Rosalind Petheridge", "PERSON"),
+        ("Imogen ", "PERSON"),
+        ("Sarkar, 9 Kestrel Lane, Wetherby LS22 4TD", "UK_HOME_ADDRESS"),
+    ]
+    assert found.text == (
+        "[person U] asked [person E] to write to [person U][home address withheld]"
+    )
