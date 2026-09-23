@@ -1,0 +1,97 @@
+name: scan
+
+# Each package's newest `sha-`-tagged version: release tags skip `backup`, and `main`'s head may have no image.
+
+on:
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tiers:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    outputs:
+      tiers: ${{ steps.read.outputs.tiers }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/workflows/build.yml
+          sparse-checkout-cone-mode: false
+      - name: the tiers build.yml builds an image for
+        id: read
+        env:
+          TIERS: .jobs.image.strategy.matrix.include[].tier
+        run: |
+          set -euo pipefail
+          tiers="$(yq --output-format=json --indent=0 "[${TIERS}]" .github/workflows/build.yml)"
+          if ! jq --exit-status 'length > 0 and all(type == "string")' <<<"${tiers}" >/dev/null; then
+            echo "::error::build.yml's image job names no tier at ${TIERS} (read ${tiers}), so there is nothing to scan"
+            exit 1
+          fi
+          echo "tiers=${tiers}" >> "$GITHUB_OUTPUT"
+
+  trivy:
+    needs: tiers
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        tier: ${{ fromJSON(needs.tiers.outputs.tiers) }}
+    steps:
+      - name: the newest image build.yml pushed for this tier
+        id: image
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+          TIER: ${{ matrix.tier }}
+          # A provenance push lands after its image, tagged `sha256-`, so recency alone picks the signature.
+          NEWEST_BUILD: >-
+            [.[][] | select(any(.metadata.container.tags[]; test("^sha-[0-9a-f]+$")))]
+            | select(length > 0)
+            | max_by(.created_at)
+            | "\(.name) \([.metadata.container.tags[] | select(test("^sha-[0-9a-f]+$"))] | first)"
+        run: |
+          set -euo pipefail
+          if ! pages="$(gh api --paginate --slurp "orgs/${OWNER}/packages/container/${TIER}/versions?per_page=100")"; then
+            echo "::error::the packages API would not list ghcr.io/${OWNER}/${TIER}'s versions to this run's token"
+            exit 1
+          fi
+          read -r digest tag <<<"$(jq --raw-output "${NEWEST_BUILD}" <<<"${pages}")" || true
+          if ! [[ "${digest:-}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::ghcr.io/${OWNER}/${TIER} holds no sha- tagged version, so build.yml has pushed nothing here to scan"
+            exit 1
+          fi
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          echo "This leg scans \`ghcr.io/${OWNER}/${TIER}@${digest}\`, tagged \`${tag}\`." >> "$GITHUB_STEP_SUMMARY"
+      # Keyed by host in the Docker config, so the token is offered to ghcr.io alone, never to the mirror serving the scanner's database.
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}@${{ steps.image.outputs.digest }}
+          format: sarif
+          output: ${{ matrix.tier }}.sarif
+          exit-code: "0"
+          # Named, because the action's own default trails the scanner's security releases; Renovate moves this input.
+          version: v0.74.0
+          # A dated database entry each night would share the Actions cache's 10 GB with the image layers, and evict them.
+          cache: "false"
+          # The worker's layers are 1.47 GB compressed, and the five-minute default spans the pull as well as the scan.
+          timeout: 15m
+      - uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
+        with:
+          sarif_file: ${{ matrix.tier }}.sarif
+          category: image-${{ matrix.tier }}

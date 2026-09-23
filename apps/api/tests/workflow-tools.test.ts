@@ -34,6 +34,7 @@ const RUNS_NO_SUITE: readonly { readonly file: string; readonly because: string 
       "runs named image-probe files only, never a workspace's whole suite; the one whole-suite run it has is a call to check.yml, which carries the action itself",
   },
   { file: "release.yml", because: "promotes digests between environments and runs no suite" },
+  { file: "scan.yml", because: "scans the images build.yml pushed and runs no suite" },
 ];
 
 const linesOf = (file: string): readonly string[] =>
