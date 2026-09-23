@@ -104,9 +104,6 @@ NEVER_WALKED = frozenset(
 # `check` accepts.
 UNCOVERED = (Path("apps/worker/pyproject.toml"),)
 
-# Deleted from here by the change that strips it and names it in the root `check`.
-AWAITS_ITS_OWN_STRIP = (Path("packages/schema/migrations"),)
-
 DOLLAR = re.compile(r"\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$")
 
 
@@ -331,10 +328,7 @@ def _findings(path: Path, source: str) -> list[str]:
 
 
 def _this_gates(found: Path) -> bool:
-    return not any(
-        found == root or root in found.parents
-        for root in UNCOVERED + AWAITS_ITS_OWN_STRIP
-    )
+    return not any(found == root or root in found.parents for root in UNCOVERED)
 
 
 def _under(root: Path) -> Iterable[Path]:

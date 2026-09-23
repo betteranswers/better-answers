@@ -23,7 +23,7 @@
     "jscpd": "node scripts/jscpd.mjs",
     "comment-gate:ts": "oxlint --config packages/devtools/lint-rules/comment-gate.oxlintrc.json apps packages",
     "comment-gate:python": "python3 packages/devtools/python/comment_gate.py apps packages .github deploy",
-    "comment-density": "node scripts/comment-density.mjs apps packages --directory .github --directory deploy",
+    "comment-density": "node scripts/comment-density.mjs apps packages --directory .github --directory deploy --directory packages/schema/migrations",
     "insert-scan": "node scripts/insert-scan.mjs apps packages",
     "mutant-probe": "node scripts/mutant-probe.mjs",
     "strip-comments": "node scripts/strip-comments.mjs",

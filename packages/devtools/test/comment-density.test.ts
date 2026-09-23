@@ -9,7 +9,10 @@ import {
   reportOf,
 } from "@better-answers/devtools/comment-density";
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import type { Unit } from "@better-answers/devtools/comment-density";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
@@ -241,5 +244,21 @@ describe("the ceiling's wrapper, asked for something it does not offer", () => {
     [[], /name at least one root of workspaces/],
   ])("refuses %j", (argv, message) => {
     expect(refusing(argv)).toThrow(message);
+  });
+});
+
+describe("the root manifest names the migrations as a unit of their own", () => {
+  it("measures them with --directory, so the schema's TypeScript cannot dilute their SQL", () => {
+    const root = z
+      .looseObject({ scripts: z.record(z.string(), z.string()).default({}) })
+      .parse(
+        JSON.parse(
+          readFileSync(path.resolve(import.meta.dirname, "../../../package.json"), "utf8"),
+        ),
+      );
+
+    expect(root.scripts["comment-density"] ?? "").toContain(
+      "--directory packages/schema/migrations",
+    );
   });
 });
