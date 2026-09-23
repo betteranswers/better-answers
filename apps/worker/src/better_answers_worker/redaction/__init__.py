@@ -3,25 +3,19 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from .descriptors import A_PERSON_NAME, DESCRIPTORS
-from .engine import (
-    ALWAYS_TIER,
-    DESCRIPTOR_BY_CATEGORY,
-    Finding,
-    detect,
-    without_overlaps,
-)
+from .engine import ALWAYS_TIER, DESCRIPTOR_BY_CATEGORY, Finding, detect
 from .officers import raised_by_the_block_rule
 from .pins import VERSION_STRING
 from .pseudonyms import normalised, pseudonyms_for, written_as
-from .restores import Restore, restored_among
-from .suppressions import raised_by_a_suppression, suppressed_among
+from .restores import Restore
+from .withholdings import (
+    UNDER_ITS_OWN_PLACEHOLDER,
+    Policy,
+    Withholding,
+    withholdings_over,
+)
 
 __all__ = ["Redaction", "Restore", "redact"]
-
-
-SWITCHABLE_TIERS: Mapping[str, tuple[str, bool]] = MappingProxyType(
-    {"default-on": ("default_on", True), "default-off": ("default_off", False)}
-)
 
 
 ALWAYS_PLACEHOLDER = next(
@@ -33,10 +27,10 @@ ALWAYS_PLACEHOLDER = next(
 class Redaction:
     text: str
     findings: tuple[Finding, ...]
+    withholdings: tuple[Withholding, ...]
     counts: Mapping[str, int]
     verdict: str | None
     version: str
-    overridden: tuple[Finding, ...]
 
 
 def redact(
@@ -47,40 +41,26 @@ def redact(
     restores: Sequence[Restore] = (),
 ) -> Redaction:
 
-    findings = raised_by_a_suppression(
-        raised_by_the_block_rule(detect(text), text), text, suppressions
+    policy = Policy(
+        rules_in_force=rules_in_force,
+        suppressions=suppressions,
+        restores=restores,
+        seed=seed,
     )
 
-    letters = pseudonyms_for(_names_in(text, findings), seed)
+    findings = raised_by_the_block_rule(detect(text), text)
 
-    restored = restored_among(findings, restores)
-    erased = suppressed_among(findings, text, suppressions)
-    left_in = restored - erased
-    withheld = without_overlaps(
-        [
-            finding
-            for finding in findings
-            if _in_force(finding.tier, rules_in_force) and finding not in left_in
-        ]
-    )
+    letters = pseudonyms_for(_names_in(text, findings), policy.seed)
+
+    withholdings = withholdings_over(findings, text, policy)
     return Redaction(
-        text=_written(text, withheld, letters),
+        text=_written(text, withholdings, letters),
         findings=findings,
+        withholdings=withholdings,
         counts=_counted(findings),
         verdict=_verdict_of(findings),
         version=VERSION_STRING,
-        overridden=tuple(
-            finding for finding in findings if finding in restored and finding in erased
-        ),
     )
-
-
-def _in_force(tier: str, rules_in_force: Mapping[str, bool]) -> bool:
-    switch = SWITCHABLE_TIERS.get(tier)
-    if switch is None:
-        return True
-    key, unconfigured = switch
-    return rules_in_force.get(key, unconfigured)
 
 
 def _names_in(text: str, findings: Sequence[Finding]) -> tuple[str, ...]:
@@ -92,22 +72,31 @@ def _names_in(text: str, findings: Sequence[Finding]) -> tuple[str, ...]:
     )
 
 
-def _placeholder_of(finding: Finding, name: str, letters: Mapping[str, str]) -> str:
-    if finding.tier == ALWAYS_TIER:
+def _placeholder_of(
+    withholding: Withholding, name: str, letters: Mapping[str, str]
+) -> str:
+    if withholding.tier == ALWAYS_TIER:
         return ALWAYS_PLACEHOLDER
-    descriptor = DESCRIPTOR_BY_CATEGORY[finding.category]
+    descriptor = DESCRIPTOR_BY_CATEGORY[withholding.finding.category]
     if descriptor.category != A_PERSON_NAME:
         return descriptor.placeholder
     return written_as(letters[normalised(name)], descriptor.placeholder)
 
 
-def _written(text: str, withheld: Sequence[Finding], letters: Mapping[str, str]) -> str:
+def _written(
+    text: str, withholdings: Sequence[Withholding], letters: Mapping[str, str]
+) -> str:
 
     redacted = text
-    for finding in sorted(withheld, key=lambda it: it.start, reverse=True):
+    for withholding in sorted(
+        (one for one in withholdings if one.written == UNDER_ITS_OWN_PLACEHOLDER),
+        key=lambda it: it.finding.start,
+        reverse=True,
+    ):
+        finding = withholding.finding
         redacted = (
             redacted[: finding.start]
-            + _placeholder_of(finding, text[finding.start : finding.end], letters)
+            + _placeholder_of(withholding, text[finding.start : finding.end], letters)
             + redacted[finding.end :]
         )
     return redacted

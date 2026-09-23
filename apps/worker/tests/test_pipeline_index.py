@@ -23,6 +23,12 @@ from better_answers_worker.pipeline.catalogue import (
 )
 from better_answers_worker.redaction.engine import Finding
 from better_answers_worker.redaction.pins import DETECTOR_PIN, RULE_VERSION
+from better_answers_worker.redaction.withholdings import (
+    AN_ERASURE,
+    IN_FORCE,
+    UNDER_ITS_OWN_PLACEHOLDER,
+    Withholding,
+)
 from factories import (
     seed_chunk,
     seed_finding,
@@ -86,6 +92,29 @@ THE_VERSION = f"{RULE_VERSION}:{DETECTOR_PIN}"
 
 def sha256_of(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def an_invoice_read_as(
+    *,
+    text: str = "",
+    withholdings: tuple[Withholding, ...] = (),
+    counts: tuple[tuple[str, int], ...] = (),
+    verdict: str | None = None,
+) -> ReadDocument:
+    return ReadDocument(
+        source_document_id=AN_INVOICE_ID,
+        normalised_key=normalised_key_of(AN_INVOICE_ID),
+        redacted=RedactedDocument(
+            text=text,
+            findings=tuple(one.finding for one in withholdings),
+            withholdings=withholdings,
+            counts=counts,
+            verdict=verdict,
+            version=THE_VERSION,
+            content_hash=sha256_of(AN_INVOICE),
+        ),
+        chunks=(),
+    )
 
 
 class ABucket:
@@ -516,20 +545,7 @@ def test_the_fold_takes_the_narrower_word_whichever_side_it_arrives_on(
     workspace_id = a_binding_whose_document_stands_at(
         connection, AN_INVOICE_ID, standing
     )
-    read = ReadDocument(
-        source_document_id=AN_INVOICE_ID,
-        normalised_key=normalised_key_of(AN_INVOICE_ID),
-        redacted=RedactedDocument(
-            text=AN_INVOICE_REDACTED,
-            findings=(),
-            counts=(),
-            verdict=verdict,
-            version=THE_VERSION,
-            content_hash=sha256_of(AN_INVOICE),
-            overridden=(),
-        ),
-        chunks=(),
-    )
+    read = an_invoice_read_as(text=AN_INVOICE_REDACTED, verdict=verdict)
 
     with (
         queue.connected(bootstrap_for(dsn, tmp_path).database_url) as worker,
@@ -935,6 +951,16 @@ def test_a_name_an_erasure_has_since_raised_reads_always_after_the_next_run(
     ] == ["always"]
 
 
+A_BANK_SPAN = Finding(
+    category="bank-details",
+    tier="always",
+    rule_id="UK_BANK_ACCOUNT",
+    start=0,
+    end=7,
+    score=0.55,
+)
+
+
 def test_the_insert_steps_over_a_known_span_and_over_no_other_collision(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
@@ -943,28 +969,17 @@ def test_the_insert_steps_over_a_known_span_and_over_no_other_collision(
     bootstrap = bootstrap_for(dsn, tmp_path)
     index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
     taken = marked_rows_of(connection, workspace_id)[0]["id"]
-    another_span = ReadDocument(
-        source_document_id=AN_INVOICE_ID,
-        normalised_key=normalised_key_of(AN_INVOICE_ID),
-        redacted=RedactedDocument(
-            text="",
-            findings=(
-                Finding(
-                    category="bank-details",
-                    tier="always",
-                    rule_id="UK_BANK_ACCOUNT",
-                    start=0,
-                    end=7,
-                    score=0.55,
-                ),
+    another_span = an_invoice_read_as(
+        withholdings=(
+            Withholding(
+                finding=A_BANK_SPAN,
+                withheld=True,
+                tier="always",
+                reason=IN_FORCE,
+                written=UNDER_ITS_OWN_PLACEHOLDER,
             ),
-            counts=(("bank-details", 1),),
-            verdict=None,
-            version=THE_VERSION,
-            content_hash=sha256_of(AN_INVOICE),
-            overridden=(),
         ),
-        chunks=(),
+        counts=(("bank-details", 1),),
     )
 
     with (
@@ -979,6 +994,44 @@ def test_the_insert_steps_over_a_known_span_and_over_no_other_collision(
         )
 
     assert [row["id"] for row in marked_rows_of(connection, workspace_id)] == [taken]
+
+
+A_NAME_SPAN = Finding(
+    category="person-name",
+    tier="default-off",
+    rule_id="PERSON",
+    start=25,
+    end=36,
+    score=0.91,
+)
+
+
+def test_a_rows_tier_is_the_one_the_withholding_names_and_not_the_findings(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
+    raised = an_invoice_read_as(
+        withholdings=(
+            Withholding(
+                finding=A_NAME_SPAN,
+                withheld=True,
+                tier="always",
+                reason=AN_ERASURE,
+                written=UNDER_ITS_OWN_PLACEHOLDER,
+            ),
+        ),
+        counts=(("person-name", 1),),
+    )
+
+    with (
+        queue.connected(bootstrap_for(dsn, tmp_path).database_url) as worker,
+        queue.scoped(worker, workspace_id) as cursor,
+    ):
+        record_findings(cursor, run_for(workspace_id), [raised])
+
+    assert A_NAME_SPAN.tier == "default-off"
+    assert [row["tier"] for row in readings_of(connection, workspace_id)] == ["always"]
 
 
 # jscpd:ignore-start

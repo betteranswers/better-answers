@@ -1,18 +1,7 @@
 from collections.abc import Mapping, Sequence
 
-from .engine import Finding, raised_to_always
+from .engine import Finding
 from .pseudonyms import normalised
-
-
-def raised_by_a_suppression(
-    findings: Sequence[Finding],
-    text: str,
-    suppressions: Sequence[Mapping[str, Sequence[str]]],
-) -> tuple[Finding, ...]:
-    erased = suppressed_among(findings, text, suppressions)
-    if not erased:
-        return tuple(findings)
-    return raised_to_always(findings, lambda finding: finding in erased)
 
 
 def suppressed_among(

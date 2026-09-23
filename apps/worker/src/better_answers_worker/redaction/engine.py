@@ -315,35 +315,3 @@ def _finding_of(result: RecognizerResult) -> Finding | None:
         end=result.end,
         score=result.score,
     )
-
-
-def without_overlaps(raised: Sequence[Finding]) -> tuple[Finding, ...]:
-    competing = [finding for finding in raised if not _inside_another(finding, raised)]
-    taken: list[Finding] = []
-    for finding in sorted(competing, key=_precedence):
-        if any(
-            finding.start < other.end and other.start < finding.end for other in taken
-        ):
-            continue
-        taken.append(finding)
-    return tuple(sorted(taken, key=lambda it: (it.start, it.end, it.rule_id)))
-
-
-def _inside_another(finding: Finding, raised: Sequence[Finding]) -> bool:
-
-    return any(
-        other.start <= finding.start
-        and finding.end <= other.end
-        and other.end - other.start > finding.end - finding.start
-        for other in raised
-    )
-
-
-def _precedence(finding: Finding) -> tuple[int, int, float, int, str]:
-    return (
-        TIER_PRECEDENCE[finding.tier],
-        finding.start - finding.end,
-        -finding.score,
-        finding.start,
-        finding.rule_id,
-    )
