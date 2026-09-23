@@ -1459,21 +1459,31 @@ describe("the wipe of every binding the map found", () => {
     );
   });
 
-  it("takes over a run queued for another reason rather than queueing a second, so the worker empties the binding", async () => {
-    const { scenario, shared, apart, found } = await aMapOverTwoOfThreeBindings();
-    await seedingWith(db().pool, (seed) =>
-      seed.job({
-        workspaceId: scenario.workspaceId,
-        kind: "index",
-        subjectId: shared.id,
-        reason: "rule-change",
-      }),
-    );
+  it.each([
+    ["restored", "wiped"],
+    ["rule-change", "rule-change"],
+  ] as const)(
+    "queues no second run behind one queued as %s, and leaves it %s, a reason the worker empties the binding on",
+    async (queuedAs, left) => {
+      const { scenario, shared, apart, found } = await aMapOverTwoOfThreeBindings();
+      await seedingWith(db().pool, (seed) =>
+        seed.job({
+          workspaceId: scenario.workspaceId,
+          kind: "index",
+          subjectId: shared.id,
+          reason: queuedAs,
+        }),
+      );
 
-    await rederivingOver(scenario, found, LOCKED_AT);
+      await rederivingOver(scenario, found, LOCKED_AT);
 
-    expect(await queuedIn(scenario.workspaceId)).toEqual(wipesOf([shared, apart]));
-  });
+      expect(await queuedIn(scenario.workspaceId)).toEqual(
+        wipesOf([shared, apart]).map((run) =>
+          run.subject_id === shared.id ? { ...run, reason: left } : run,
+        ),
+      );
+    },
+  );
 });
 
 const completedForASubjectWithNoUserRow = async () => {
