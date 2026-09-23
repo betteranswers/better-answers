@@ -9,7 +9,7 @@ import type { TestProject } from "vitest/node";
 
 import { POSTGRES_IMAGE } from "../src/postgres-image.ts";
 import {
-  applyJournal,
+  migrateAsDeployed,
   type MigratedPostgres,
   migratedPostgresOver,
   POSTGRES_COMMAND,
@@ -84,7 +84,7 @@ const startWarmPostgres = async (project: TestProject): Promise<() => Promise<vo
       max: 1,
     });
     try {
-      await applyJournal(migrationPool);
+      await migrateAsDeployed(migrationPool);
     } finally {
       await migrationPool.end();
     }

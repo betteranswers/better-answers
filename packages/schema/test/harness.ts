@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
 
-import { migrationsFolder } from "../src/index.ts";
+import { MARK_THE_MATCH_LEAKPROOF, migrationsFolder } from "../src/index.ts";
 import { POSTGRES_IMAGE } from "../src/postgres-image.ts";
 
 export const POSTGRES_COMMAND = [
@@ -25,8 +25,9 @@ export type MigratedPostgres = {
   readonly stop: () => Promise<void>;
 };
 
-export const applyJournal = async (pool: pg.Pool): Promise<void> => {
+export const migrateAsDeployed = async (pool: pg.Pool): Promise<void> => {
   await migrate(drizzle(pool), { migrationsFolder });
+  await pool.query(MARK_THE_MATCH_LEAKPROOF);
 };
 
 export const migratedPostgresOver = (
@@ -60,7 +61,7 @@ export const startMigratedPostgres = async (): Promise<MigratedPostgres> => {
     await container.stop();
   });
   try {
-    await applyJournal(migrated.pool);
+    await migrateAsDeployed(migrated.pool);
   } catch (error) {
     await migrated.stop();
     throw error;

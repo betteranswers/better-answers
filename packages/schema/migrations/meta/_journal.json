@@ -344,6 +344,13 @@
       "when": 1790142704500,
       "tag": "0048_the-retired-run-reason",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1790184726022,
+      "tag": "0049_the-chunks-by-binding",
+      "breakpoints": true
     }
   ]
 }
